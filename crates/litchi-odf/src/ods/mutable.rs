@@ -5,10 +5,10 @@
 
 use crate::core::{OdfStructure, OwnedPackage, PackageWriter};
 use crate::ods::{
-    Cell, CellAnnotation, CellValue, Column, ContentValidation, DatabaseRange, NamedDefinition,
-    NamedDefinitionScope, NamedExpression, NamedRange, Row, Sheet, SheetPrintSettings,
-    SheetScenario, SheetStyle, SheetTableSource, Spreadsheet, SpreadsheetProtection,
-    TableStructure, TableVisibility,
+    Cell, CellAnnotation, CellRangeSource, CellValue, Column, ContentValidation, DatabaseRange,
+    NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange, Row, Sheet,
+    SheetPrintSettings, SheetScenario, SheetStyle, SheetTableSource, Spreadsheet,
+    SpreadsheetProtection, TableStructure, TableVisibility,
     cell::{merge_cell_range, unmerge_cell_range},
     data_validation::{validate_collection, write_content_validations},
     database_range::write_database_ranges,
@@ -538,6 +538,7 @@ impl MutableSpreadsheet {
                     text: String::new(),
                     formula: None,
                     annotation: None,
+                    range_source: None,
                     validation_name: None,
                     style_name: None,
                     matrix_span: None,
@@ -598,6 +599,7 @@ impl MutableSpreadsheet {
                 text: String::new(),
                 formula: None,
                 annotation: None,
+                range_source: None,
                 validation_name: None,
                 style_name: None,
                 matrix_span: None,
@@ -627,6 +629,45 @@ impl MutableSpreadsheet {
             .get_mut(row)
             .and_then(|row| row.cells.get_mut(col))
             .and_then(Cell::take_annotation))
+    }
+
+    /// Attach or replace inert external-range metadata on a cell.
+    pub fn set_cell_range_source(
+        &mut self,
+        sheet_index: usize,
+        row: usize,
+        col: usize,
+        source: CellRangeSource,
+    ) -> Result<()> {
+        let sheet = self.sheets.get(sheet_index).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(format!("Sheet index {sheet_index} out of bounds"))
+        })?;
+        let exists = sheet
+            .rows
+            .get(row)
+            .is_some_and(|row| row.cells.get(col).is_some());
+        if !exists {
+            self.set_cell(sheet_index, row, col, CellValue::Empty)?;
+        }
+        self.sheets[sheet_index].rows[row].cells[col].set_range_source(source);
+        Ok(())
+    }
+
+    /// Remove and return external-range metadata from a cell.
+    pub fn remove_cell_range_source(
+        &mut self,
+        sheet_index: usize,
+        row: usize,
+        col: usize,
+    ) -> Result<Option<CellRangeSource>> {
+        let sheet = self.sheets.get_mut(sheet_index).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(format!("Sheet index {sheet_index} out of bounds"))
+        })?;
+        Ok(sheet
+            .rows
+            .get_mut(row)
+            .and_then(|row| row.cells.get_mut(col))
+            .and_then(Cell::take_range_source))
     }
 
     /// Apply a named content validation to a cell.
@@ -665,6 +706,7 @@ impl MutableSpreadsheet {
                 text: String::new(),
                 formula: None,
                 annotation: None,
+                range_source: None,
                 validation_name: None,
                 style_name: None,
                 matrix_span: None,
@@ -724,6 +766,7 @@ impl MutableSpreadsheet {
                 text: String::new(),
                 formula: None,
                 annotation: None,
+                range_source: None,
                 validation_name: None,
                 style_name: None,
                 matrix_span: None,
@@ -765,6 +808,7 @@ impl MutableSpreadsheet {
                 text: String::new(),
                 formula: None,
                 annotation: None,
+                range_source: None,
                 validation_name: None,
                 style_name: None,
                 matrix_span: None,
@@ -825,6 +869,7 @@ impl MutableSpreadsheet {
                 text: String::new(),
                 formula: None,
                 annotation: None,
+                range_source: None,
                 validation_name: None,
                 style_name: None,
                 matrix_span: None,
@@ -1231,7 +1276,14 @@ impl MutableSpreadsheet {
         out.push_str(of_ns);
         let has_annotations = self.has_annotations();
         let has_validation_event_listeners = self.has_validation_event_listeners();
-        let has_table_sources = self.sheets.iter().any(|sheet| sheet.table_source.is_some());
+        let has_table_sources = self.sheets.iter().any(|sheet| {
+            sheet.table_source.is_some()
+                || sheet
+                    .rows
+                    .iter()
+                    .flat_map(|row| &row.cells)
+                    .any(|cell| cell.range_source.is_some())
+        });
         let has_protection_extensions = has_protection_extensions(
             &self.protection,
             self.sheets.iter().map(|sheet| &sheet.protection),
@@ -1806,5 +1858,36 @@ mod tests {
         );
         assert_eq!(sheets[0].table_source.as_ref(), Some(&source));
         assert_eq!(sheets[0].scenario.as_ref(), Some(&scenario));
+    }
+
+    #[test]
+    fn mutable_spreadsheet_edits_cell_range_sources() {
+        let mut mutable = MutableSpreadsheet::new();
+        mutable.add_sheet("Imports").unwrap();
+        mutable.set_cell(0, 0, 1, CellValue::Number(42.0)).unwrap();
+        let source = CellRangeSource::new("Data", "../data.ods", 2, 3).unwrap();
+        mutable
+            .set_cell_range_source(0, 0, 1, source.clone())
+            .unwrap();
+
+        let mut output = Spreadsheet::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            output.sheets().unwrap()[0].rows[0].cells[1].range_source(),
+            Some(&source)
+        );
+        assert_eq!(
+            output.sheets().unwrap()[0].rows[0].cells[1].value,
+            CellValue::Number(42.0)
+        );
+        assert_eq!(
+            mutable.remove_cell_range_source(0, 0, 1).unwrap(),
+            Some(source)
+        );
+        let mut output = Spreadsheet::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+        assert!(
+            output.sheets().unwrap()[0].rows[0].cells[1]
+                .range_source()
+                .is_none()
+        );
     }
 }

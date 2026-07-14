@@ -23,6 +23,7 @@
 //! - ✅ Cell annotations with metadata, rich text/lists, extensions, and drawing geometry
 //! - ✅ Database ranges, recursive filters, sort keys, and subtotal rules
 //! - ✅ Inert database query/table/SQL source metadata
+//! - ✅ What-if scenarios and inert external cell-range sources
 //!
 //! ## ✅ Formula Support (`formula.rs`) - PARTIAL
 //! - ✅ Formula string representation
@@ -44,13 +45,13 @@
 //! - ✅ Content-validation definitions, prompts, cell bindings, and inert event metadata
 //! - ✅ Document/sheet keys, direct cell protection flags, and LibreOffice permissions
 //! - ✅ Database ranges, filters, sorting, subtotals, and inert source metadata
+//! - ✅ Create, edit, remove, and round-trip scenarios and external range links
 //!
 //! ## 🚧 TODO - Advanced Features
 //! - ⚠️ Chart creation and parsing (embedded charts)
 //! - ⚠️ Conditional formatting
 //! - ⚠️ Pivot tables
 //! - ⚠️ Sparklines
-//! - ⚠️ Data tables and scenarios
 //! - ⚠️ External data connections
 //!
 //! # References
@@ -103,7 +104,7 @@ pub use protection::{
 pub use row::Row;
 pub use scenario::SheetScenario;
 pub use sheet::Sheet;
-pub use source::{SheetTableSource, TableSourceMode};
+pub use source::{CellRangeSource, SheetTableSource, TableSourceMode};
 pub use spreadsheet::Spreadsheet;
 pub use structure::{
     Column, SheetPrintSettings, SheetStyle, SheetStyleUsage, TableGroup, TableRange,

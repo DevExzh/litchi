@@ -4,10 +4,10 @@
 
 use crate::core::{OdfStructure, PackageWriter};
 use crate::ods::{
-    Cell, CellAnnotation, CellValue, Column, ContentValidation, DatabaseRange, NamedDefinition,
-    NamedDefinitionScope, NamedExpression, NamedRange, Row, Sheet, SheetPrintSettings,
-    SheetScenario, SheetStyle, SheetTableSource, SpreadsheetProtection, TableStructure,
-    TableVisibility,
+    Cell, CellAnnotation, CellRangeSource, CellValue, Column, ContentValidation, DatabaseRange,
+    NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange, Row, Sheet,
+    SheetPrintSettings, SheetScenario, SheetStyle, SheetTableSource, SpreadsheetProtection,
+    TableStructure, TableVisibility,
     cell::{merge_cell_range, unmerge_cell_range},
     data_validation::{validate_collection, write_content_validations},
     database_range::write_database_ranges,
@@ -344,6 +344,7 @@ impl SpreadsheetBuilder {
                 value: CellValue::Text(value.to_string()),
                 formula: None,
                 annotation: None,
+                range_source: None,
                 validation_name: None,
                 style_name: None,
                 matrix_span: None,
@@ -407,6 +408,7 @@ impl SpreadsheetBuilder {
                 value: CellValue::Number(value),
                 formula: None,
                 annotation: None,
+                range_source: None,
                 validation_name: None,
                 style_name: None,
                 matrix_span: None,
@@ -485,6 +487,7 @@ impl SpreadsheetBuilder {
                     value: value.clone(),
                     formula: None,
                     annotation: None,
+                    range_source: None,
                     validation_name: None,
                     style_name: None,
                     matrix_span: None,
@@ -559,6 +562,7 @@ impl SpreadsheetBuilder {
                     value: CellValue::Empty,
                     formula: None,
                     annotation: None,
+                    range_source: None,
                     validation_name: None,
                     style_name: None,
                     matrix_span: None,
@@ -583,6 +587,7 @@ impl SpreadsheetBuilder {
             };
 
             let annotation = row_data.cells[col].annotation.take();
+            let range_source = row_data.cells[col].range_source.take();
             let validation_name = row_data.cells[col].validation_name.take();
             let style_name = row_data.cells[col].style_name.take();
             let matrix_span = row_data.cells[col].matrix_span;
@@ -594,6 +599,7 @@ impl SpreadsheetBuilder {
                 value,
                 formula: None,
                 annotation,
+                range_source,
                 validation_name,
                 style_name,
                 matrix_span,
@@ -654,6 +660,7 @@ impl SpreadsheetBuilder {
                     value: CellValue::Empty,
                     formula: None,
                     annotation: None,
+                    range_source: None,
                     validation_name: None,
                     style_name: None,
                     matrix_span: None,
@@ -702,6 +709,7 @@ impl SpreadsheetBuilder {
                 value: CellValue::Empty,
                 formula: None,
                 annotation: None,
+                range_source: None,
                 validation_name: None,
                 style_name: None,
                 matrix_span: None,
@@ -728,6 +736,42 @@ impl SpreadsheetBuilder {
             .and_then(|sheet| sheet.rows.get_mut(row))
             .and_then(|row| row.cells.get_mut(col))
             .and_then(Cell::take_annotation))
+    }
+
+    /// Attach or replace inert external-range metadata on a cell in the current sheet.
+    pub fn set_cell_range_source(
+        &mut self,
+        row: usize,
+        col: usize,
+        source: CellRangeSource,
+    ) -> Result<&mut Self> {
+        if self.sheets.is_empty() {
+            self.add_sheet("Sheet1")?;
+        }
+        let exists = self
+            .sheets
+            .last()
+            .and_then(|sheet| sheet.rows.get(row))
+            .is_some_and(|row| row.cells.get(col).is_some());
+        if !exists {
+            self.set_cell(row, col, CellValue::Empty)?;
+        }
+        self.sheets
+            .last_mut()
+            .and_then(|sheet| sheet.rows.get_mut(row))
+            .and_then(|row| row.cells.get_mut(col))
+            .expect("set_cell materialized the requested cell")
+            .set_range_source(source);
+        Ok(self)
+    }
+
+    /// Remove and return external-range metadata from a cell in the current sheet.
+    pub fn remove_cell_range_source(&mut self, row: usize, col: usize) -> Option<CellRangeSource> {
+        self.sheets
+            .last_mut()
+            .and_then(|sheet| sheet.rows.get_mut(row))
+            .and_then(|row| row.cells.get_mut(col))
+            .and_then(Cell::take_range_source)
     }
 
     /// Apply a named content validation to a cell in the current sheet.
@@ -766,6 +810,7 @@ impl SpreadsheetBuilder {
                 value: CellValue::Empty,
                 formula: None,
                 annotation: None,
+                range_source: None,
                 validation_name: None,
                 style_name: None,
                 matrix_span: None,
@@ -818,6 +863,7 @@ impl SpreadsheetBuilder {
                 value: CellValue::Empty,
                 formula: None,
                 annotation: None,
+                range_source: None,
                 validation_name: None,
                 style_name: None,
                 matrix_span: None,
@@ -859,6 +905,7 @@ impl SpreadsheetBuilder {
                 value: CellValue::Empty,
                 formula: None,
                 annotation: None,
+                range_source: None,
                 validation_name: None,
                 style_name: None,
                 matrix_span: None,
@@ -912,6 +959,7 @@ impl SpreadsheetBuilder {
                 value: CellValue::Empty,
                 formula: None,
                 annotation: None,
+                range_source: None,
                 validation_name: None,
                 style_name: None,
                 matrix_span: None,
@@ -1411,7 +1459,14 @@ impl SpreadsheetBuilder {
         out.push_str(of_ns);
         let has_annotations = self.has_annotations();
         let has_validation_event_listeners = self.has_validation_event_listeners();
-        let has_table_sources = self.sheets.iter().any(|sheet| sheet.table_source.is_some());
+        let has_table_sources = self.sheets.iter().any(|sheet| {
+            sheet.table_source.is_some()
+                || sheet
+                    .rows
+                    .iter()
+                    .flat_map(|row| &row.cells)
+                    .any(|cell| cell.range_source.is_some())
+        });
         let has_protection_extensions = has_protection_extensions(
             &self.protection,
             self.sheets.iter().map(|sheet| &sheet.protection),
@@ -1882,6 +1937,7 @@ mod tests {
                 text: "100".to_string(),
                 formula: None,
                 annotation: None,
+                range_source: None,
                 validation_name: None,
                 style_name: None,
                 matrix_span: None,
@@ -1896,6 +1952,7 @@ mod tests {
                 text: "Test".to_string(),
                 formula: None,
                 annotation: None,
+                range_source: None,
                 validation_name: None,
                 style_name: None,
                 matrix_span: None,
@@ -2408,6 +2465,30 @@ mod tests {
             SpreadsheetBuilder::new()
                 .set_sheet_table_source(Some(source))
                 .is_err()
+        );
+    }
+
+    #[test]
+    fn builder_round_trips_inert_cell_range_sources() {
+        let mut source = CellRangeSource::new("Prices & Tax", "../prices&tax.ods", 5, 2).unwrap();
+        source.set_filter_options(Some("locale=en_US".to_string()));
+        source.set_refresh_delay(Some("PT10M".to_string())).unwrap();
+
+        let mut builder = SpreadsheetBuilder::new();
+        builder
+            .add_sheet("Imports")
+            .unwrap()
+            .set_cell(1, 2, CellValue::Text("cached".to_string()))
+            .unwrap()
+            .set_cell_range_source(1, 2, source.clone())
+            .unwrap();
+
+        let mut spreadsheet = Spreadsheet::from_bytes(builder.build().unwrap()).unwrap();
+        let sheets = spreadsheet.sheets().unwrap();
+        assert_eq!(sheets[0].rows[1].cells[2].range_source(), Some(&source));
+        assert_eq!(
+            sheets[0].rows[1].cells[2].value,
+            CellValue::Text("cached".to_string())
         );
     }
 }

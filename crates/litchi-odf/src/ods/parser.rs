@@ -1,10 +1,10 @@
 //! ODS-specific parsing utilities.
 
 use super::{
-    Cell, CellMatrixSpan, CellMerge, CellValue, Column, NamedDefinition, NamedDefinitionScope,
-    NamedExpression, NamedRange, NamedRangeUsage, Row, Sheet, SheetPrintSettings, SheetScenario,
-    SheetStyle, SheetTableSource, TableGroup, TableRange, TableSourceMode, TableStructure,
-    TableVisibility,
+    Cell, CellMatrixSpan, CellMerge, CellRangeSource, CellValue, Column, NamedDefinition,
+    NamedDefinitionScope, NamedExpression, NamedRange, NamedRangeUsage, Row, Sheet,
+    SheetPrintSettings, SheetScenario, SheetStyle, SheetTableSource, TableGroup, TableRange,
+    TableSourceMode, TableStructure, TableVisibility,
     annotation::{AnnotationBuilder, decode_reference},
     scenario::validate_scenario,
     source::validate_table_source,
@@ -277,6 +277,25 @@ impl OdsParser {
                         }
                         current_cell = Some(cell_builder);
                         text_content.clear();
+                    } else if let Some(cell) = current_cell.as_mut()
+                        && Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            TABLE_NAMESPACE_URI,
+                            "cell-range-source",
+                        )
+                    {
+                        let source = Self::parse_cell_range_source(
+                            e,
+                            reader.decoder(),
+                            &document_namespaces,
+                        )?;
+                        if cell.range_source.replace(source).is_some() {
+                            return Err(Error::InvalidFormat(
+                                "table cell contains multiple table:cell-range-source elements"
+                                    .to_string(),
+                            ));
+                        }
                     } else if current_cell.is_some()
                         && Self::element_name_is(
                             e.name().as_ref(),
@@ -315,6 +334,25 @@ impl OdsParser {
                             &document_namespaces,
                             &mut text_content,
                         )?;
+                    } else if let Some(cell) = current_cell.as_mut()
+                        && Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            TABLE_NAMESPACE_URI,
+                            "cell-range-source",
+                        )
+                    {
+                        let source = Self::parse_cell_range_source(
+                            e,
+                            reader.decoder(),
+                            &document_namespaces,
+                        )?;
+                        if cell.range_source.replace(source).is_some() {
+                            return Err(Error::InvalidFormat(
+                                "table cell contains multiple table:cell-range-source elements"
+                                    .to_string(),
+                            ));
+                        }
                     } else if current_sheet.is_some()
                         && current_row.is_none()
                         && Self::element_name_is(
@@ -1331,6 +1369,110 @@ impl OdsParser {
         Ok(source)
     }
 
+    fn parse_cell_range_source(
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+        namespaces: &BTreeMap<String, String>,
+    ) -> Result<CellRangeSource> {
+        let mut name = None;
+        let mut href = None;
+        let mut link_type = None;
+        let mut rows = None;
+        let mut columns = None;
+        let mut actuate_on_request = false;
+        let mut filter_name = None;
+        let mut filter_options = None;
+        let mut refresh_delay = None;
+
+        for attribute in element.attributes() {
+            let attribute = attribute
+                .map_err(|error| Error::InvalidFormat(format!("invalid XML attribute: {error}")))?;
+            let decode =
+                |qualified_name| Self::decode_attribute(&attribute, decoder, qualified_name);
+            let is_table = |local_name| {
+                Self::attribute_name_is(
+                    attribute.key.as_ref(),
+                    namespaces,
+                    TABLE_NAMESPACE_URI,
+                    local_name,
+                )
+            };
+            let is_xlink = |local_name| {
+                Self::attribute_name_is(
+                    attribute.key.as_ref(),
+                    namespaces,
+                    XLINK_NAMESPACE,
+                    local_name,
+                )
+            };
+            if is_table("name") {
+                name = Some(decode("table:name")?);
+            } else if is_table("last-row-spanned") {
+                rows = Some(Self::parse_positive_usize(
+                    &attribute,
+                    decoder,
+                    "last-row-spanned",
+                )?);
+            } else if is_table("last-column-spanned") {
+                columns = Some(Self::parse_positive_usize(
+                    &attribute,
+                    decoder,
+                    "last-column-spanned",
+                )?);
+            } else if is_table("filter-name") {
+                filter_name = Some(decode("table:filter-name")?);
+            } else if is_table("filter-options") {
+                filter_options = Some(decode("table:filter-options")?);
+            } else if is_table("refresh-delay") {
+                refresh_delay = Some(decode("table:refresh-delay")?);
+            } else if is_xlink("type") {
+                link_type = Some(decode("xlink:type")?);
+            } else if is_xlink("href") {
+                href = Some(decode("xlink:href")?);
+            } else if is_xlink("actuate") {
+                let value = decode("xlink:actuate")?;
+                if value != "onRequest" {
+                    return Err(Error::InvalidFormat(format!(
+                        "invalid cell range source xlink:actuate '{value}'"
+                    )));
+                }
+                actuate_on_request = true;
+            }
+        }
+
+        let link_type = link_type.ok_or_else(|| {
+            Error::InvalidFormat("table:cell-range-source requires xlink:type".to_string())
+        })?;
+        if link_type != "simple" {
+            return Err(Error::InvalidFormat(format!(
+                "invalid cell range source xlink:type '{link_type}'"
+            )));
+        }
+        let mut source = CellRangeSource::new(
+            name.ok_or_else(|| {
+                Error::InvalidFormat("table:cell-range-source requires table:name".to_string())
+            })?,
+            href.ok_or_else(|| {
+                Error::InvalidFormat("table:cell-range-source requires xlink:href".to_string())
+            })?,
+            rows.ok_or_else(|| {
+                Error::InvalidFormat(
+                    "table:cell-range-source requires table:last-row-spanned".to_string(),
+                )
+            })?,
+            columns.ok_or_else(|| {
+                Error::InvalidFormat(
+                    "table:cell-range-source requires table:last-column-spanned".to_string(),
+                )
+            })?,
+        )?;
+        source.set_actuate_on_request(actuate_on_request);
+        source.set_filter_name(filter_name);
+        source.set_filter_options(filter_options);
+        source.set_refresh_delay(refresh_delay)?;
+        Ok(source)
+    }
+
     fn parse_column(
         element: &BytesStart<'_>,
         decoder: Decoder,
@@ -1475,6 +1617,7 @@ impl OdsParser {
                 }
             },
             annotation: None,
+            range_source: None,
         })
     }
 
@@ -1896,6 +2039,7 @@ pub(crate) struct CellBuilder {
     repeated: usize,
     merge: CellMerge,
     annotation: Option<super::CellAnnotation>,
+    range_source: Option<CellRangeSource>,
 }
 
 impl CellBuilder {
@@ -1908,6 +2052,7 @@ impl CellBuilder {
             // Clone necessary: formula may be reused for repeated cells
             formula: self.formula.clone(),
             annotation: self.annotation.clone(),
+            range_source: self.range_source.clone(),
             validation_name: self.validation_name.clone(),
             style_name: self.style_name.clone(),
             matrix_span: self.matrix_span,
@@ -2239,6 +2384,65 @@ mod tests {
     }
 
     #[test]
+    fn parses_cell_range_sources_with_namespace_aliases_and_repetition() {
+        let xml = r#"<o:document-content
+            xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+            xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"
+            xmlns:x="http://www.w3.org/1999/xlink">
+          <o:body><o:spreadsheet><t:table t:name="Links"><t:table-row>
+            <t:table-cell t:number-columns-repeated="2">
+              <t:cell-range-source t:name="Named &amp; Range"
+                t:last-column-spanned="4" t:last-row-spanned="3"
+                t:filter-name="calc8" t:filter-options="A&amp;B"
+                t:refresh-delay="PT15M" x:type="simple"
+                x:href="../Data&amp;More.ods" x:actuate="onRequest"></t:cell-range-source>
+            </t:table-cell>
+          </t:table-row></t:table></o:spreadsheet></o:body>
+        </o:document-content>"#;
+
+        let sheets = OdsParser::parse_sheets(xml).unwrap();
+        let cells = &sheets[0].rows[0].cells;
+        assert_eq!(cells.len(), 2);
+        for cell in cells {
+            let source = cell.range_source().unwrap();
+            assert_eq!(source.name(), "Named & Range");
+            assert_eq!(source.href(), "../Data&More.ods");
+            assert_eq!((source.rows(), source.columns()), (3, 4));
+            assert!(source.actuate_on_request());
+            assert_eq!(source.filter_name(), Some("calc8"));
+            assert_eq!(source.filter_options(), Some("A&B"));
+            assert_eq!(source.refresh_delay(), Some("PT15M"));
+        }
+    }
+
+    #[test]
+    fn rejects_incomplete_or_duplicate_cell_range_sources() {
+        let missing_type = r#"<o:document-content
+            xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+            xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"
+            xmlns:x="http://www.w3.org/1999/xlink">
+          <o:body><o:spreadsheet><t:table t:name="Links"><t:table-row><t:table-cell>
+            <t:cell-range-source t:name="R" t:last-column-spanned="1"
+              t:last-row-spanned="1" x:href="source.ods"/>
+          </t:table-cell></t:table-row></t:table></o:spreadsheet></o:body>
+        </o:document-content>"#;
+        assert!(OdsParser::parse_sheets(missing_type).is_err());
+
+        let duplicate = r#"<o:document-content
+            xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+            xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"
+            xmlns:x="http://www.w3.org/1999/xlink">
+          <o:body><o:spreadsheet><t:table t:name="Links"><t:table-row><t:table-cell>
+            <t:cell-range-source t:name="R1" t:last-column-spanned="1"
+              t:last-row-spanned="1" x:type="simple" x:href="one.ods"/>
+            <t:cell-range-source t:name="R2" t:last-column-spanned="1"
+              t:last-row-spanned="1" x:type="simple" x:href="two.ods"/>
+          </t:table-cell></t:table-row></t:table></o:spreadsheet></o:body>
+        </o:document-content>"#;
+        assert!(OdsParser::parse_sheets(duplicate).is_err());
+    }
+
+    #[test]
     fn test_parse_empty_sheet() {
         let sheets = OdsParser::parse_sheets(TEST_EMPTY_SHEET_XML).unwrap();
         assert_eq!(sheets.len(), 1);
@@ -2545,6 +2749,7 @@ mod tests {
                 text: "A1".to_string(),
                 formula: None,
                 annotation: None,
+                range_source: None,
                 validation_name: None,
                 style_name: None,
                 matrix_span: None,
@@ -2577,6 +2782,7 @@ mod tests {
             text: "A".to_string(),
             formula: None,
             annotation: None,
+            range_source: None,
             validation_name: None,
             style_name: None,
             matrix_span: None,
@@ -2593,6 +2799,7 @@ mod tests {
             text: "42".to_string(),
             formula: None,
             annotation: None,
+            range_source: None,
             validation_name: None,
             style_name: None,
             matrix_span: None,
@@ -2619,6 +2826,7 @@ mod tests {
             currency: None,
             formula: None,
             annotation: None,
+            range_source: None,
             validation_name: None,
             style_name: None,
             matrix_span: None,
@@ -2640,6 +2848,7 @@ mod tests {
             currency: None,
             formula: None,
             annotation: None,
+            range_source: None,
             validation_name: None,
             style_name: None,
             matrix_span: None,
@@ -2661,6 +2870,7 @@ mod tests {
             currency: None,
             formula: None,
             annotation: None,
+            range_source: None,
             validation_name: None,
             style_name: None,
             matrix_span: None,
@@ -2684,6 +2894,7 @@ mod tests {
             currency: None,
             formula: None,
             annotation: None,
+            range_source: None,
             validation_name: None,
             style_name: None,
             matrix_span: None,
@@ -2708,6 +2919,7 @@ mod tests {
             currency: None,
             formula: None,
             annotation: None,
+            range_source: None,
             validation_name: None,
             style_name: None,
             matrix_span: None,
@@ -2729,6 +2941,7 @@ mod tests {
             currency: None,
             formula: None,
             annotation: None,
+            range_source: None,
             validation_name: None,
             style_name: None,
             matrix_span: None,
@@ -2752,6 +2965,7 @@ mod tests {
             currency: None,
             formula: None,
             annotation: None,
+            range_source: None,
             validation_name: None,
             style_name: None,
             matrix_span: None,
@@ -2775,6 +2989,7 @@ mod tests {
             currency: None, // No currency specified
             formula: None,
             annotation: None,
+            range_source: None,
             validation_name: None,
             style_name: None,
             matrix_span: None,

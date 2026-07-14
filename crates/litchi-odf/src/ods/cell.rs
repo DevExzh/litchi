@@ -1,6 +1,6 @@
 //! Cell data structures for ODS spreadsheets.
 
-use super::{CellAnnotation, Row};
+use super::{CellAnnotation, CellRangeSource, Row};
 use litchi_core::{Result, xml::escape_xml};
 use std::num::NonZeroUsize;
 
@@ -86,6 +86,8 @@ pub struct Cell {
     pub formula: Option<String>,
     /// The optional ODF annotation (comment/note) attached to the cell.
     pub annotation: Option<CellAnnotation>,
+    /// Optional inert metadata for an externally imported rectangular range.
+    pub range_source: Option<CellRangeSource>,
     /// Name of the document-level content validation applied to this cell.
     pub validation_name: Option<String>,
     /// Name of the ODF table-cell style applied directly to this cell.
@@ -112,6 +114,7 @@ impl Cell {
             text: text.into(),
             formula: None,
             annotation: None,
+            range_source: None,
             validation_name: None,
             style_name: None,
             merge: CellMerge::None,
@@ -182,6 +185,26 @@ impl Cell {
     /// Check whether this cell has an annotation.
     pub fn has_annotation(&self) -> bool {
         self.annotation.is_some()
+    }
+
+    /// Return inert external-range metadata without accessing its URI.
+    pub fn range_source(&self) -> Option<&CellRangeSource> {
+        self.range_source.as_ref()
+    }
+
+    /// Mutably access inert external-range metadata.
+    pub fn range_source_mut(&mut self) -> Option<&mut CellRangeSource> {
+        self.range_source.as_mut()
+    }
+
+    /// Attach or replace inert external-range metadata.
+    pub fn set_range_source(&mut self, source: CellRangeSource) {
+        self.range_source = Some(source);
+    }
+
+    /// Remove and return inert external-range metadata.
+    pub fn take_range_source(&mut self) -> Option<CellRangeSource> {
+        self.range_source.take()
     }
 
     /// Return the document-level content-validation name applied to this cell.
@@ -477,7 +500,8 @@ pub(crate) fn merge_cell_range(
                 && (!cell.is_empty()
                     || !cell.text.is_empty()
                     || cell.formula.is_some()
-                    || cell.annotation.is_some())
+                    || cell.annotation.is_some()
+                    || cell.range_source.is_some())
             {
                 return Err(litchi_core::Error::InvalidFormat(format!(
                     "merged range would cover populated cell ({row_index}, {column_index})"
@@ -502,6 +526,7 @@ pub(crate) fn merge_cell_range(
                 text: String::new(),
                 formula: None,
                 annotation: None,
+                range_source: None,
                 validation_name: None,
                 style_name: None,
                 matrix_span: None,
@@ -610,8 +635,20 @@ pub(crate) fn write_cell_xml(output: &mut String, cell: &Cell) {
         });
     }
 
-    if cell.merge == CellMerge::Covered {
+    if cell.merge == CellMerge::Covered && cell.range_source.is_none() {
         output.push_str("/>");
+        return;
+    }
+
+    if cell.merge == CellMerge::Covered {
+        output.push('>');
+        super::source::write_cell_range_source(
+            output,
+            cell.range_source
+                .as_ref()
+                .expect("covered cell source was checked"),
+        );
+        output.push_str("</table:covered-table-cell>");
         return;
     }
 
@@ -652,7 +689,7 @@ pub(crate) fn write_cell_xml(output: &mut String, cell: &Cell) {
         CellValue::Empty if cell.formula.is_some() => {
             output.push_str(" office:value-type=\"float\" office:value=\"0\"");
         },
-        CellValue::Empty if cell.annotation.is_none() => {
+        CellValue::Empty if cell.annotation.is_none() && cell.range_source.is_none() => {
             output.push_str("/>");
             return;
         },
@@ -660,6 +697,9 @@ pub(crate) fn write_cell_xml(output: &mut String, cell: &Cell) {
     }
 
     output.push('>');
+    if let Some(source) = &cell.range_source {
+        super::source::write_cell_range_source(output, source);
+    }
     if let Some(annotation) = &cell.annotation {
         annotation.write_xml(output);
     }
@@ -753,6 +793,7 @@ mod tests {
             text: String::new(),
             formula: None,
             annotation: None,
+            range_source: None,
             validation_name: None,
             style_name: None,
             matrix_span: None,
@@ -774,6 +815,7 @@ mod tests {
             text: "anchor".to_string(),
             formula: None,
             annotation: None,
+            range_source: None,
             validation_name: None,
             style_name: Some("Merged".to_string()),
             matrix_span: None,
@@ -803,12 +845,37 @@ mod tests {
     }
 
     #[test]
+    fn writes_range_sources_before_cell_content_and_inside_covered_cells() {
+        let source = CellRangeSource::new("Named", "source.ods", 2, 3).unwrap();
+        let mut cell = Cell::new(CellValue::Text("value".to_string()), "value", 0, 0);
+        cell.set_range_source(source.clone());
+
+        let mut xml = String::new();
+        write_cell_xml(&mut xml, &cell);
+        let source_position = xml.find("<table:cell-range-source").unwrap();
+        let text_position = xml.find("<text:p>").unwrap();
+        assert!(source_position < text_position);
+        assert!(!xml.contains("xmlns:"));
+
+        cell.value = CellValue::Empty;
+        cell.text.clear();
+        cell.set_covered(true);
+        xml.clear();
+        write_cell_xml(&mut xml, &cell);
+        assert!(xml.starts_with("<table:covered-table-cell>"));
+        assert!(xml.contains("<table:cell-range-source"));
+        assert!(xml.ends_with("</table:covered-table-cell>"));
+        assert_eq!(cell.take_range_source(), Some(source));
+    }
+
+    #[test]
     fn test_cell_text() {
         let cell = Cell {
             value: CellValue::Text("Hello".to_string()),
             text: "Hello".to_string(),
             formula: None,
             annotation: None,
+            range_source: None,
             validation_name: None,
             style_name: None,
             matrix_span: None,
@@ -828,6 +895,7 @@ mod tests {
             text: "42".to_string(),
             formula: None,
             annotation: None,
+            range_source: None,
             validation_name: None,
             style_name: None,
             matrix_span: None,
@@ -850,6 +918,7 @@ mod tests {
             text: "42".to_string(),
             formula: None,
             annotation: None,
+            range_source: None,
             validation_name: None,
             style_name: None,
             matrix_span: None,
@@ -866,6 +935,7 @@ mod tests {
             text: "$100".to_string(),
             formula: None,
             annotation: None,
+            range_source: None,
             validation_name: None,
             style_name: None,
             matrix_span: None,
@@ -882,6 +952,7 @@ mod tests {
             text: "50%".to_string(),
             formula: None,
             annotation: None,
+            range_source: None,
             validation_name: None,
             style_name: None,
             matrix_span: None,
@@ -898,6 +969,7 @@ mod tests {
             text: "Hello".to_string(),
             formula: None,
             annotation: None,
+            range_source: None,
             validation_name: None,
             style_name: None,
             matrix_span: None,
@@ -917,6 +989,7 @@ mod tests {
             text: "42".to_string(),
             formula: Some("=A1+B1".to_string()),
             annotation: None,
+            range_source: None,
             validation_name: None,
             style_name: None,
             matrix_span: None,
@@ -936,6 +1009,7 @@ mod tests {
             text: "Hello".to_string(),
             formula: None,
             annotation: None,
+            range_source: None,
             validation_name: None,
             style_name: None,
             matrix_span: None,
@@ -955,6 +1029,7 @@ mod tests {
             text: "42".to_string(),
             formula: Some("=A1".to_string()),
             annotation: None,
+            range_source: None,
             validation_name: None,
             style_name: None,
             matrix_span: None,
@@ -971,6 +1046,7 @@ mod tests {
             text: "Hello".to_string(),
             formula: None,
             annotation: None,
+            range_source: None,
             validation_name: None,
             style_name: None,
             matrix_span: None,
@@ -990,6 +1066,7 @@ mod tests {
             text: String::new(),
             formula: None,
             annotation: None,
+            range_source: None,
             validation_name: None,
             style_name: None,
             matrix_span: None,
@@ -1009,6 +1086,7 @@ mod tests {
             text: String::new(),
             formula: None,
             annotation: None,
+            range_source: None,
             validation_name: None,
             style_name: None,
             matrix_span: None,
@@ -1025,6 +1103,7 @@ mod tests {
             text: "Hello".to_string(),
             formula: None,
             annotation: None,
+            range_source: None,
             validation_name: None,
             style_name: None,
             matrix_span: None,

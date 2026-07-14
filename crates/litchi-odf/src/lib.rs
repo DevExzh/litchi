@@ -240,9 +240,9 @@ pub use odp::{
 };
 pub use ods::{
     AnnotationElement, AnnotationNode, Cell as SCell, CellAnnotation, CellMatrixSpan, CellMerge,
-    CellStyleProtection, CellValue, Column as SColumn, ContentValidation, DatabaseFilter,
-    DatabaseOrientation, DatabaseRange, DatabaseSort, DatabaseSortKey, DatabaseSource,
-    EmbeddedNumberBehavior, FilterCondition, FilterConditionSource, FilterDataType,
+    CellRangeSource, CellStyleProtection, CellValue, Column as SColumn, ContentValidation,
+    DatabaseFilter, DatabaseOrientation, DatabaseRange, DatabaseSort, DatabaseSortKey,
+    DatabaseSource, EmbeddedNumberBehavior, FilterCondition, FilterConditionSource, FilterDataType,
     FilterExpression, FormulaNamespace, MutableSpreadsheet, NamedDefinition, NamedDefinitionScope,
     NamedExpression, NamedRange, NamedRangeUsage, ProtectionKey, Row as SRow, Sheet,
     SheetPrintSettings, SheetProtection, SheetProtectionOptions, SheetScenario, SheetStyle,
