@@ -1,3 +1,4 @@
+use crate::common::xml::decode_xml_reference;
 use crate::docx::drawing::{DrawingObject, parse_drawing_objects};
 use crate::docx::hyperlink::Hyperlink;
 use crate::docx::image::{InlineImage, parse_inline_images};
@@ -7,7 +8,7 @@ use crate::error::{OoxmlError, Result};
 use litchi_core::VerticalPosition;
 use litchi_core::XmlSlice;
 use litchi_opc::rel::Relationships;
-use quick_xml::events::{BytesRef, BytesStart, Event};
+use quick_xml::events::{BytesStart, Event};
 use quick_xml::{Reader, XmlVersion};
 use smallvec::SmallVec;
 use std::borrow::Cow;
@@ -58,28 +59,6 @@ pub(crate) fn extract_word_text(xml_bytes: &[u8]) -> Result<String> {
     }
     result.shrink_to_fit();
     Ok(result)
-}
-
-pub(crate) fn decode_xml_reference(reference: &BytesRef<'_>) -> Result<String> {
-    if let Some(character) = reference
-        .resolve_char_ref()
-        .map_err(|error| OoxmlError::Xml(error.to_string()))?
-    {
-        return Ok(character.to_string());
-    }
-    let name = reference
-        .decode()
-        .map_err(|error| OoxmlError::Xml(error.to_string()))?;
-    match name.as_ref() {
-        "amp" => Ok("&".to_string()),
-        "lt" => Ok("<".to_string()),
-        "gt" => Ok(">".to_string()),
-        "quot" => Ok("\"".to_string()),
-        "apos" => Ok("'".to_string()),
-        _ => Err(OoxmlError::InvalidFormat(format!(
-            "unsupported XML entity reference '&{name};'"
-        ))),
-    }
 }
 
 /// A paragraph in a Word document.

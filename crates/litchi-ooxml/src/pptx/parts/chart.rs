@@ -2,11 +2,13 @@
 //!
 //! This module provides types for working with charts in PPTX files.
 
+use crate::common::xml::decode_xml_reference;
 use crate::error::{OoxmlError, Result};
 use litchi_core::xml::escape_xml;
 use litchi_opc::part::Part;
 use quick_xml::Reader;
-use quick_xml::events::Event;
+use quick_xml::XmlVersion;
+use quick_xml::events::{BytesStart, Event};
 
 /// Chart type enumeration.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -57,6 +59,49 @@ pub struct ChartPart<'a> {
 }
 
 impl<'a> ChartPart<'a> {
+    fn plot_type(name: &[u8]) -> Option<ChartType> {
+        match name {
+            b"barChart" | b"bar3DChart" => Some(ChartType::Bar),
+            b"lineChart" | b"line3DChart" => Some(ChartType::Line),
+            b"pieChart" | b"pie3DChart" | b"ofPieChart" => Some(ChartType::Pie),
+            b"areaChart" | b"area3DChart" => Some(ChartType::Area),
+            b"scatterChart" => Some(ChartType::Scatter),
+            b"bubbleChart" => Some(ChartType::Bubble),
+            b"doughnutChart" => Some(ChartType::Doughnut),
+            b"radarChart" => Some(ChartType::Radar),
+            b"surfaceChart" | b"surface3DChart" => Some(ChartType::Surface),
+            b"stockChart" => Some(ChartType::Stock),
+            _ => None,
+        }
+    }
+
+    fn inspect_plot_element(
+        element: &BytesStart<'_>,
+        chart_type: &mut ChartType,
+        in_primary_bar_chart: &mut bool,
+    ) {
+        let name = element.local_name();
+        if let Some(detected) = Self::plot_type(name.as_ref())
+            && *chart_type == ChartType::Unknown
+        {
+            *chart_type = detected;
+            *in_primary_bar_chart = matches!(name.as_ref(), b"barChart" | b"bar3DChart");
+        }
+
+        if name.as_ref() == b"barDir" && *in_primary_bar_chart {
+            for attribute in element.attributes().flatten() {
+                if attribute.key.local_name().as_ref() == b"val" {
+                    *chart_type = match attribute.value.as_ref() {
+                        b"col" => ChartType::Column,
+                        b"bar" => ChartType::Bar,
+                        _ => *chart_type,
+                    };
+                    break;
+                }
+            }
+        }
+    }
+
     /// Create a ChartPart from an OPC Part.
     pub fn from_part(part: &'a dyn Part) -> Result<Self> {
         Ok(Self { part })
@@ -79,7 +124,7 @@ impl<'a> ChartPart<'a> {
     /// ```
     pub fn chart_info(&self) -> Result<ChartInfo> {
         let mut reader = Reader::from_reader(self.xml_bytes());
-        reader.config_mut().trim_text(true);
+        reader.config_mut().trim_text(false);
 
         let mut chart_type = ChartType::Unknown;
         let mut title: Option<String> = None;
@@ -87,50 +132,56 @@ impl<'a> ChartPart<'a> {
 
         let mut in_title = false;
         let mut in_title_text = false;
+        let mut in_primary_bar_chart = false;
 
         loop {
             match reader.read_event() {
-                Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
+                Ok(Event::Start(ref e)) => {
                     let tag_name = e.local_name();
+                    Self::inspect_plot_element(e, &mut chart_type, &mut in_primary_bar_chart);
 
-                    // Detect chart type from plot area elements
-                    chart_type = match tag_name.as_ref() {
-                        b"barChart" => ChartType::Bar,
-                        b"bar3DChart" => ChartType::Bar,
-                        b"lineChart" => ChartType::Line,
-                        b"line3DChart" => ChartType::Line,
-                        b"pieChart" => ChartType::Pie,
-                        b"pie3DChart" => ChartType::Pie,
-                        b"areaChart" => ChartType::Area,
-                        b"area3DChart" => ChartType::Area,
-                        b"scatterChart" => ChartType::Scatter,
-                        b"bubbleChart" => ChartType::Bubble,
-                        b"doughnutChart" => ChartType::Doughnut,
-                        b"radarChart" => ChartType::Radar,
-                        b"surfaceChart" => ChartType::Surface,
-                        b"surface3DChart" => ChartType::Surface,
-                        b"stockChart" => ChartType::Stock,
-                        b"title" => {
-                            in_title = true;
-                            chart_type
-                        },
+                    match tag_name.as_ref() {
+                        b"title" => in_title = true,
                         b"legend" => {
                             has_legend = true;
-                            chart_type
                         },
                         b"t" if in_title => {
                             in_title_text = true;
-                            chart_type
                         },
-                        _ => chart_type,
-                    };
+                        _ => {},
+                    }
+                },
+                Ok(Event::Empty(ref e)) => {
+                    Self::inspect_plot_element(e, &mut chart_type, &mut in_primary_bar_chart);
+                    if e.local_name().as_ref() == b"legend" {
+                        has_legend = true;
+                    }
                 },
                 Ok(Event::Text(e)) if in_title_text => {
-                    let text = std::str::from_utf8(e.as_ref())
-                        .map_err(|e| OoxmlError::Xml(e.to_string()))?;
+                    let decoded = e
+                        .xml_content(XmlVersion::Implicit1_0)
+                        .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+                    let text = quick_xml::escape::unescape(&decoded)
+                        .map_err(|error| OoxmlError::Xml(error.to_string()))?;
                     match &mut title {
-                        Some(t) => t.push_str(text),
-                        None => title = Some(text.to_string()),
+                        Some(current) => current.push_str(&text),
+                        None => title = Some(text.into_owned()),
+                    }
+                },
+                Ok(Event::CData(e)) if in_title_text => {
+                    let text = e
+                        .xml_content(XmlVersion::Implicit1_0)
+                        .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+                    match &mut title {
+                        Some(current) => current.push_str(&text),
+                        None => title = Some(text.into_owned()),
+                    }
+                },
+                Ok(Event::GeneralRef(reference)) if in_title_text => {
+                    let text = decode_xml_reference(&reference)?;
+                    match &mut title {
+                        Some(current) => current.push_str(&text),
+                        None => title = Some(text),
                     }
                 },
                 Ok(Event::End(e)) => {
@@ -138,6 +189,7 @@ impl<'a> ChartPart<'a> {
                     match tag_name.as_ref() {
                         b"title" => in_title = false,
                         b"t" => in_title_text = false,
+                        b"barChart" | b"bar3DChart" => in_primary_bar_chart = false,
                         _ => {},
                     }
                 },
@@ -586,6 +638,43 @@ pub fn generate_chart_graphic_frame(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use litchi_opc::{packuri::PackURI, part::BlobPart};
+
+    fn parse_chart_info(xml: &str) -> ChartInfo {
+        let part = BlobPart::new(
+            PackURI::new("/ppt/charts/chart1.xml").unwrap(),
+            "application/vnd.openxmlformats-officedocument.drawingml.chart+xml".to_string(),
+            xml.as_bytes().to_vec(),
+        );
+        ChartPart::from_part(&part).unwrap().chart_info().unwrap()
+    }
+
+    #[test]
+    fn chart_info_distinguishes_column_and_decodes_title() {
+        let xml = r#"<c:chartSpace xmlns:c="urn:chart" xmlns:a="urn:drawing"><c:chart><c:title><c:tx><c:rich><a:p><a:r><a:t>Revenue &amp; Growth</a:t></a:r></a:p></c:rich></c:tx></c:title><c:plotArea><c:barChart><c:barDir c:val="col"/></c:barChart></c:plotArea><c:legend/></c:chart></c:chartSpace>"#;
+        let info = parse_chart_info(xml);
+
+        assert_eq!(info.chart_type, ChartType::Column);
+        assert_eq!(info.title.as_deref(), Some("Revenue & Growth"));
+        assert!(info.has_legend);
+    }
+
+    #[test]
+    fn chart_info_uses_first_plot_in_combination_chart() {
+        let xml = r#"<chartSpace><chart><plotArea><lineChart/><barChart><barDir val="col"/></barChart></plotArea></chart></chartSpace>"#;
+        let info = parse_chart_info(xml);
+
+        assert_eq!(info.chart_type, ChartType::Line);
+    }
+
+    #[test]
+    fn empty_title_does_not_capture_later_text() {
+        let xml = r#"<chartSpace><chart><title/><plotArea><barChart><barDir val="bar"/></barChart><t>not a title</t></plotArea></chart></chartSpace>"#;
+        let info = parse_chart_info(xml);
+
+        assert_eq!(info.chart_type, ChartType::Bar);
+        assert!(info.title.is_none());
+    }
 
     #[test]
     fn test_chart_series() {
