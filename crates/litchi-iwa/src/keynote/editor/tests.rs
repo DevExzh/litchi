@@ -7,6 +7,7 @@ use crate::shapes::{DrawablePoint, DrawableSize};
 
 const TEST_SLIDE_MESSAGE_TYPE: u32 = 5;
 const TEST_PLACEHOLDER_MESSAGE_TYPE: u32 = 7;
+const TEST_TITLE_PLACEHOLDER_FIELD: u32 = 5;
 const TEST_SLIDE_NUMBER_PLACEHOLDER_FIELD: u32 = 20;
 const TEST_SLIDE_OWNED_DRAWABLES_FIELD: u32 = 7;
 const TEST_SLIDE_DRAWABLES_Z_ORDER_FIELD: u32 = 42;
@@ -1917,7 +1918,7 @@ fn ordinary_text_box_duplicate_delete_is_independent_and_exact() {
             .iter()
             .map(|reference| reference.identifier)
             .collect::<Vec<_>>(),
-        [17, 23]
+        [5, 6, 17, 23]
     );
     let shape =
         tswp::ShapeInfoArchive::decode(archive.object(23).unwrap().messages[0].data.as_slice())
@@ -2197,11 +2198,7 @@ fn text_box_graph_crud_preserves_unknowns_and_rejects_external_owners() {
             Ok(())
         })
         .unwrap();
-    let mut editor = KeynoteEditor::from_package(package).unwrap();
-    let before = editor.to_bytes().unwrap();
-    assert!(editor.duplicate_slide_text_box(0, 17, "rejected").is_err());
-    assert!(editor.remove_slide_text_box(0, 17).is_err());
-    assert_eq!(editor.to_bytes().unwrap(), before);
+    assert!(KeynoteEditor::from_package(package).is_err());
 }
 
 #[test]
@@ -2380,6 +2377,175 @@ fn slide_number_visibility_rejects_inconsistent_native_state_transactionally() {
     let before = editor.to_bytes().unwrap();
     assert!(editor.set_slide_number_visible(0, true).is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
+fn slide_text_placeholder_visibility_matches_native_ownership_and_preserves_references() {
+    let mut package = test_package();
+    package
+        .update_archive("Index/Slide-4.iwa", |archive| {
+            let slide = archive.object_mut(4).unwrap();
+            let message = slide.messages[0].clone();
+            let data = transform_length_delimited_fields_at_path(
+                &message.data,
+                &[TEST_TITLE_PLACEHOLDER_FIELD],
+                |reference| {
+                    let mut reference = reference.to_vec();
+                    append_unknown_varint(&mut reference, 98, 980);
+                    Ok(reference)
+                },
+            )?;
+            slide.replace_message(
+                0,
+                RawMessage {
+                    type_: message.type_,
+                    data,
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    let mut editor = KeynoteEditor::from_package(package).unwrap();
+    let before = editor.slides().unwrap();
+    assert_eq!(before[0].is_title_visible, Some(true));
+    assert_eq!(before[0].is_body_visible, Some(true));
+    let document_before = editor
+        .package()
+        .archive("Index/Document.iwa")
+        .unwrap()
+        .to_bytes()
+        .unwrap();
+    let raw_title = {
+        let archive = editor.package().archive("Index/Slide-4.iwa").unwrap();
+        repeated_length_delimited_payloads(
+            &archive.object(4).unwrap().messages[0].data,
+            TEST_TITLE_PLACEHOLDER_FIELD,
+        )
+        .unwrap()[0]
+            .to_vec()
+    };
+
+    editor.set_slide_title_visible(0, false).unwrap();
+    let hidden = editor.slides().unwrap();
+    assert_eq!(hidden[0].is_title_visible, Some(false));
+    assert_eq!(hidden[0].is_body_visible, Some(true));
+    assert_eq!(hidden[0].title.as_deref(), Some("Old title"));
+    let hidden_bytes = editor.to_bytes().unwrap();
+    editor.set_slide_title_visible(0, false).unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), hidden_bytes);
+
+    editor.set_slide_title_visible(0, true).unwrap();
+    let graph = ObjectGraph::read(editor.package()).unwrap();
+    let slide: kn::SlideArchive = graph
+        .decode_type(4, TEST_SLIDE_MESSAGE_TYPE, "KN.SlideArchive")
+        .unwrap();
+    assert_eq!(
+        slide
+            .owned_drawables
+            .iter()
+            .map(|reference| reference.identifier)
+            .collect::<Vec<_>>(),
+        vec![6, 5]
+    );
+    assert_eq!(
+        slide
+            .drawables_z_order
+            .iter()
+            .map(|reference| reference.identifier)
+            .collect::<Vec<_>>(),
+        vec![6, 5]
+    );
+    let archive = editor.package().archive("Index/Slide-4.iwa").unwrap();
+    let data = &archive.object(4).unwrap().messages[0].data;
+    for field in [
+        TEST_SLIDE_OWNED_DRAWABLES_FIELD,
+        TEST_SLIDE_DRAWABLES_Z_ORDER_FIELD,
+    ] {
+        assert_eq!(
+            repeated_length_delimited_payloads(data, field)
+                .unwrap()
+                .last()
+                .copied(),
+            Some(raw_title.as_slice())
+        );
+    }
+    assert_eq!(
+        editor
+            .package()
+            .archive("Index/Document.iwa")
+            .unwrap()
+            .to_bytes()
+            .unwrap(),
+        document_before
+    );
+
+    editor
+        .set_slide_text_placeholder_visible(0, KeynoteSlideTextPlaceholder::Body, false)
+        .unwrap();
+    let updated = editor.slides().unwrap();
+    assert_eq!(updated[0].is_title_visible, Some(true));
+    assert_eq!(updated[0].is_body_visible, Some(false));
+    assert_eq!(updated[0].body.as_deref(), Some("Old body 🚀"));
+    let reparsed = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(reparsed.slides().unwrap(), updated);
+}
+
+#[test]
+fn slide_text_placeholder_visibility_rejects_missing_or_inconsistent_state() {
+    let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
+    let before = editor.to_bytes().unwrap();
+    assert!(editor.set_slide_title_visible(2, false).is_err());
+    assert_eq!(editor.to_bytes().unwrap(), before);
+
+    let mut missing = test_package();
+    missing
+        .update_archive("Index/Slide-4.iwa", |archive| {
+            let slide = archive.object_mut(4).unwrap();
+            let message = slide.messages[0].clone();
+            let mut decoded = kn::SlideArchive::decode(message.data.as_slice())?;
+            decoded.body_placeholder = None;
+            decoded
+                .owned_drawables
+                .retain(|reference| reference.identifier != 6);
+            decoded
+                .drawables_z_order
+                .retain(|reference| reference.identifier != 6);
+            slide.replace_message(
+                0,
+                RawMessage {
+                    type_: message.type_,
+                    data: decoded.encode_to_vec(),
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    let mut missing_editor = KeynoteEditor::from_package(missing).unwrap();
+    assert_eq!(missing_editor.slides().unwrap()[0].is_body_visible, None);
+    let missing_before = missing_editor.to_bytes().unwrap();
+    assert!(missing_editor.set_slide_body_visible(0, true).is_err());
+    assert_eq!(missing_editor.to_bytes().unwrap(), missing_before);
+
+    let mut inconsistent = test_package();
+    inconsistent
+        .update_archive("Index/Slide-4.iwa", |archive| {
+            let slide = archive.object_mut(4).unwrap();
+            let message = slide.messages[0].clone();
+            let mut decoded = kn::SlideArchive::decode(message.data.as_slice())?;
+            decoded
+                .drawables_z_order
+                .retain(|reference| reference.identifier != 5);
+            slide.replace_message(
+                0,
+                RawMessage {
+                    type_: message.type_,
+                    data: decoded.encode_to_vec(),
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    assert!(KeynoteEditor::from_package(inconsistent).is_err());
 }
 
 #[test]
@@ -3472,6 +3638,7 @@ fn test_package() -> IWorkPackage {
         title_placeholder: Some(reference(5)),
         body_placeholder: Some(reference(6)),
         owned_drawables: vec![reference(5), reference(6)],
+        drawables_z_order: vec![reference(5), reference(6)],
         note: Some(reference(15)),
         transition: test_transition(),
         ..Default::default()
@@ -3498,6 +3665,7 @@ fn test_package() -> IWorkPackage {
         title_placeholder: Some(reference(11)),
         body_placeholder: Some(reference(12)),
         owned_drawables: vec![reference(11), reference(12)],
+        drawables_z_order: vec![reference(11), reference(12)],
         transition: test_transition(),
         ..Default::default()
     };

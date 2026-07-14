@@ -65,6 +65,16 @@ pub struct KeynoteSlideInfo {
     pub name: Option<String>,
     pub is_skipped: bool,
     pub is_slide_number_visible: Option<bool>,
+    /// Whether the layout-provided title placeholder participates in this slide.
+    ///
+    /// `None` means the selected layout has no title placeholder. Hidden
+    /// placeholders retain their storage, so [`Self::title`] remains readable.
+    pub is_title_visible: Option<bool>,
+    /// Whether the layout-provided body placeholder participates in this slide.
+    ///
+    /// `None` means the selected layout has no body placeholder. Hidden
+    /// placeholders retain their storage, so [`Self::body`] remains readable.
+    pub is_body_visible: Option<bool>,
     pub transition: Option<KeynoteTransitionSettings>,
     pub title_storage_id: Option<u64>,
     pub title: Option<String>,
@@ -72,6 +82,13 @@ pub struct KeynoteSlideInfo {
     pub body: Option<String>,
     pub notes_storage_id: Option<u64>,
     pub notes: Option<String>,
+}
+
+/// Layout-provided text placeholder whose per-slide visibility can be changed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum KeynoteSlideTextPlaceholder {
+    Title,
+    Body,
 }
 
 /// Stable identity of a slide layout in the presentation theme.
@@ -944,6 +961,30 @@ impl KeynoteEditor {
             })?;
             let slide: kn::SlideArchive =
                 graph.decode(slide_reference.identifier, "KN.SlideArchive")?;
+            let is_title_visible = slide
+                .title_placeholder
+                .as_ref()
+                .map(|reference| {
+                    placeholder_visibility::validate_placeholder_ownership(
+                        index,
+                        &slide,
+                        reference.identifier,
+                        KeynoteSlideTextPlaceholder::Title,
+                    )
+                })
+                .transpose()?;
+            let is_body_visible = slide
+                .body_placeholder
+                .as_ref()
+                .map(|reference| {
+                    placeholder_visibility::validate_placeholder_ownership(
+                        index,
+                        &slide,
+                        reference.identifier,
+                        KeynoteSlideTextPlaceholder::Body,
+                    )
+                })
+                .transpose()?;
             let title_storage_id = slide
                 .title_placeholder
                 .map(|reference| graph.drawable_storage(reference.identifier))
@@ -988,6 +1029,8 @@ impl KeynoteEditor {
                 name: slide.name.filter(|name| !name.is_empty()),
                 is_skipped: node.is_skipped,
                 is_slide_number_visible: node.is_slide_number_visible,
+                is_title_visible,
+                is_body_visible,
                 transition,
                 title_storage_id,
                 title,
@@ -3133,6 +3176,8 @@ impl KeynoteEditor {
 }
 
 mod builds;
+mod placeholder_ownership;
+mod placeholder_visibility;
 mod slide_create;
 mod slide_graph;
 mod slide_number;
