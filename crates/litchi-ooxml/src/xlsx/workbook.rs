@@ -1864,6 +1864,11 @@ mod tests {
            xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
   <cols><col min="2" max="3" width="12.5" hidden="1" customWidth="1"/></cols>
   <sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData>
+  <autoFilter ref="A1:E10">
+    <sortState ref="A2:E10" caseSensitive="1" sortMethod="stroke">
+      <sortCondition ref="E2:E10" descending="true" sortBy="value"/>
+    </sortState>
+  </autoFilter>
   <mergeCells count="1"><mergeCell ref="B2:C3"/></mergeCells>
   <hyperlinks>
     <hyperlink ref="B2:C3" r:id="rId1" location="Section 1"
@@ -1982,6 +1987,14 @@ mod tests {
         assert!(worksheet.row_breaks()[0].pivot);
         assert_eq!(worksheet.col_breaks()[0].max, 1_048_575);
         assert!(!worksheet.col_breaks()[0].manual);
+        let filter = worksheet.get_auto_filter().unwrap();
+        assert_eq!(filter.range.as_deref(), Some("A1:E10"));
+        let sort = filter.sort_state.as_ref().unwrap();
+        assert_eq!(sort.ref_range, "A2:E10");
+        assert_eq!(sort.case_sensitive, Some(true));
+        assert_eq!(sort.sort_method, Some(crate::xlsx::SortMethod::Stroke));
+        assert_eq!(sort.conditions.len(), 1);
+        assert_eq!(sort.conditions[0].descending, Some(true));
     }
 
     #[test]

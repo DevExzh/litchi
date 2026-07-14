@@ -16,11 +16,14 @@ use crate::xlsx::namespace::{
     SPREADSHEETML_NAMESPACE, is_spreadsheetml_name, relationship_attribute_value,
 };
 use crate::xlsx::shared_strings::decode_spreadsheet_text;
+use crate::xlsx::sort::{SortBy, SortCondition, SortMethod, SortState};
 use crate::xlsx::worksheet::{
-    ColumnInfo, ConditionalFormatRule, DataValidationRule, PageBreak, PageSetup, RowInfo,
+    AutoFilter, ColumnInfo, ConditionalFormatRule, DataValidationRule, PageBreak, PageSetup,
+    RowInfo,
 };
 
 const MAX_EXCEL_COLUMN: u32 = 16_384;
+const MAX_SORT_CONDITIONS: usize = 64;
 
 #[derive(Default)]
 pub(crate) struct ParsedWorksheetData {
@@ -36,6 +39,7 @@ pub(crate) struct ParsedWorksheetData {
     pub(crate) page_setup: Option<PageSetup>,
     pub(crate) row_breaks: Vec<PageBreak>,
     pub(crate) col_breaks: Vec<PageBreak>,
+    pub(crate) auto_filter: Option<AutoFilter>,
     pub(crate) dimensions: Option<(u32, u32, u32, u32)>,
 }
 
@@ -57,6 +61,8 @@ enum Context {
     ConditionalFormatting,
     RowBreaks,
     ColBreaks,
+    AutoFilter,
+    SortState,
     MergeCells,
     SheetData,
     Row,
@@ -156,6 +162,7 @@ struct Parser {
     cell: Option<PendingCell>,
     run: Option<PendingRun>,
     validation: Option<PendingValidation>,
+    sort_state: Option<SortState>,
     previous_row: u32,
     rows: HashSet<u32>,
     merged_regions: HashSet<(u32, u32, u32, u32)>,
@@ -171,6 +178,7 @@ struct Parser {
     seen_page_setup: bool,
     seen_row_breaks: bool,
     seen_col_breaks: bool,
+    seen_auto_filter: bool,
     seen_merge_cells: bool,
     expected_merge_count: Option<usize>,
     min_row: u32,
@@ -187,6 +195,7 @@ impl Parser {
             cell: None,
             run: None,
             validation: None,
+            sort_state: None,
             previous_row: 0,
             rows: HashSet::new(),
             merged_regions: HashSet::new(),
@@ -202,6 +211,7 @@ impl Parser {
             seen_page_setup: false,
             seen_row_breaks: false,
             seen_col_breaks: false,
+            seen_auto_filter: false,
             seen_merge_cells: false,
             expected_merge_count: None,
             min_row: u32::MAX,
@@ -415,6 +425,24 @@ impl Parser {
             self.page_break(element, decoder)?;
             return Ok(Context::Other);
         }
+        if parent == Context::Worksheet
+            && is_spreadsheetml_name(namespace, element.name(), b"autoFilter")
+        {
+            self.start_auto_filter(element, decoder)?;
+            return Ok(Context::AutoFilter);
+        }
+        if parent == Context::AutoFilter
+            && is_spreadsheetml_name(namespace, element.name(), b"sortState")
+        {
+            self.start_sort_state(element, decoder)?;
+            return Ok(Context::SortState);
+        }
+        if parent == Context::SortState
+            && is_spreadsheetml_name(namespace, element.name(), b"sortCondition")
+        {
+            self.sort_condition(element, decoder)?;
+            return Ok(Context::Other);
+        }
         if parent == Context::SheetData && is_spreadsheetml_name(namespace, element.name(), b"row")
         {
             self.start_row(element, decoder)?;
@@ -542,6 +570,19 @@ impl Parser {
             && is_spreadsheetml_name(namespace, element.name(), b"brk")
         {
             self.page_break(element, decoder)?;
+        } else if parent == Context::Worksheet
+            && is_spreadsheetml_name(namespace, element.name(), b"autoFilter")
+        {
+            self.start_auto_filter(element, decoder)?;
+        } else if parent == Context::AutoFilter
+            && is_spreadsheetml_name(namespace, element.name(), b"sortState")
+        {
+            self.start_sort_state(element, decoder)?;
+            self.finish_sort_state()?;
+        } else if parent == Context::SortState
+            && is_spreadsheetml_name(namespace, element.name(), b"sortCondition")
+        {
+            self.sort_condition(element, decoder)?;
         } else if parent == Context::SheetData
             && is_spreadsheetml_name(namespace, element.name(), b"row")
         {
@@ -1083,6 +1124,129 @@ impl Parser {
         Ok(())
     }
 
+    fn start_auto_filter(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
+        if self.seen_auto_filter {
+            return Err(invalid("duplicate worksheet autoFilter element"));
+        }
+        self.seen_auto_filter = true;
+        let range = unqualified_attribute_value(element, b"ref", decoder)?;
+        if let Some(range) = range.as_deref() {
+            parse_range(range, "worksheet auto-filter reference")?;
+        }
+        self.data.auto_filter = Some(AutoFilter {
+            range,
+            sort_state: None,
+        });
+        Ok(())
+    }
+
+    fn start_sort_state(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
+        if self.sort_state.is_some()
+            || self
+                .data
+                .auto_filter
+                .as_ref()
+                .is_some_and(|filter| filter.sort_state.is_some())
+        {
+            return Err(invalid("duplicate worksheet auto-filter sortState"));
+        }
+        let ref_range =
+            required_string(element, b"ref", decoder, "worksheet sort-state reference")?;
+        parse_range(&ref_range, "worksheet sort-state reference")?;
+        let sort_method = unqualified_attribute_value(element, b"sortMethod", decoder)?
+            .map(|value| {
+                SortMethod::parse(&value)
+                    .ok_or_else(|| invalid(format!("invalid worksheet sort method '{value}'")))
+            })
+            .transpose()?;
+        self.sort_state = Some(SortState {
+            ref_range,
+            column_sort: optional_bool(
+                element,
+                b"columnSort",
+                decoder,
+                "worksheet sort-state columnSort",
+            )?,
+            case_sensitive: optional_bool(
+                element,
+                b"caseSensitive",
+                decoder,
+                "worksheet sort-state caseSensitive",
+            )?,
+            sort_method,
+            conditions: Vec::new(),
+        });
+        Ok(())
+    }
+
+    fn sort_condition(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
+        if self
+            .sort_state
+            .as_ref()
+            .is_none_or(|state| state.conditions.len() >= MAX_SORT_CONDITIONS)
+        {
+            return Err(invalid(format!(
+                "worksheet sort state exceeds {MAX_SORT_CONDITIONS} conditions"
+            )));
+        }
+        let ref_range = required_string(
+            element,
+            b"ref",
+            decoder,
+            "worksheet sort-condition reference",
+        )?;
+        parse_range(&ref_range, "worksheet sort-condition reference")?;
+        let sort_by = unqualified_attribute_value(element, b"sortBy", decoder)?
+            .map(|value| {
+                SortBy::parse(&value)
+                    .ok_or_else(|| invalid(format!("invalid worksheet sort criterion '{value}'")))
+            })
+            .transpose()?;
+        let condition = SortCondition {
+            ref_range,
+            descending: optional_bool(
+                element,
+                b"descending",
+                decoder,
+                "worksheet sort-condition descending",
+            )?,
+            sort_by,
+            custom_list: unqualified_attribute_value(element, b"customList", decoder)?,
+            dxf_id: optional_u32(
+                element,
+                b"dxfId",
+                decoder,
+                "worksheet sort-condition differential-format ID",
+            )?,
+            icon_set: unqualified_attribute_value(element, b"iconSet", decoder)?,
+            icon_id: optional_u32(
+                element,
+                b"iconId",
+                decoder,
+                "worksheet sort-condition icon ID",
+            )?,
+        };
+        self.sort_state
+            .as_mut()
+            .ok_or_else(|| invalid("sort condition outside a worksheet sort state"))?
+            .conditions
+            .push(condition);
+        Ok(())
+    }
+
+    fn finish_sort_state(&mut self) -> Result<()> {
+        let sort_state = self
+            .sort_state
+            .take()
+            .ok_or_else(|| invalid("missing worksheet auto-filter sortState"))?;
+        self.data
+            .auto_filter
+            .as_mut()
+            .ok_or_else(|| invalid("worksheet sortState outside an autoFilter"))?
+            .sort_state = Some(sort_state);
+        Ok(())
+    }
+
     fn start_merge_cells(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
         if self.seen_merge_cells {
             return Err(invalid("duplicate worksheet mergeCells element"));
@@ -1475,6 +1639,7 @@ impl Parser {
             Context::DataValidations => self.finish_data_validations(),
             Context::ConditionalFormatting => self.finish_conditional_formatting(),
             Context::RowBreaks | Context::ColBreaks => self.finish_breaks(),
+            Context::SortState => self.finish_sort_state(),
             _ => Ok(()),
         }
     }
@@ -2133,6 +2298,46 @@ mod tests {
     }
 
     #[test]
+    fn parses_auto_filter_sort_state() {
+        let xml = format!(
+            r#"<x:worksheet xmlns:x="{STRICT_S}" xmlns:f="urn:foreign">
+                <f:autoFilter ref="A1:XFD1048576"><x:sortState ref="A1:XFD1048576"/></f:autoFilter>
+                <x:autoFilter ref="A1:D10">
+                    <x:filterColumn colId="0"><x:customFilters/></x:filterColumn>
+                    <x:sortState ref="A2:D10" columnSort="false" caseSensitive="true"
+                            sortMethod="pinYin">
+                        <x:sortCondition ref="B2:B10" descending="1" sortBy="cellColor"
+                            customList="High,Low" dxfId="4"/>
+                        <x:sortCondition ref="C2:C10" sortBy="icon" iconSet="3Arrows"
+                            iconId="2"></x:sortCondition>
+                    </x:sortState>
+                </x:autoFilter>
+            </x:worksheet>"#
+        );
+        let data = parse_worksheet_data(&xml).unwrap();
+        let filter = data.auto_filter.unwrap();
+
+        assert_eq!(filter.range.as_deref(), Some("A1:D10"));
+        let state = filter.sort_state.unwrap();
+        assert_eq!(state.ref_range, "A2:D10");
+        assert_eq!(state.column_sort, Some(false));
+        assert_eq!(state.case_sensitive, Some(true));
+        assert_eq!(state.sort_method, Some(SortMethod::PinYin));
+        assert_eq!(state.conditions.len(), 2);
+        assert_eq!(state.conditions[0].ref_range, "B2:B10");
+        assert_eq!(state.conditions[0].descending, Some(true));
+        assert_eq!(state.conditions[0].sort_by, Some(SortBy::CellColor));
+        assert_eq!(state.conditions[0].custom_list.as_deref(), Some("High,Low"));
+        assert_eq!(state.conditions[0].dxf_id, Some(4));
+        assert_eq!(state.conditions[1].sort_by, Some(SortBy::Icon));
+        assert_eq!(state.conditions[1].icon_set.as_deref(), Some("3Arrows"));
+        assert_eq!(state.conditions[1].icon_id, Some(2));
+
+        let data = parse_worksheet_data(&wrap("<autoFilter/>")).unwrap();
+        assert_eq!(data.auto_filter.unwrap().range, None);
+    }
+
+    #[test]
     fn rejects_invalid_columns_and_merged_regions() {
         let invalid_documents = [
             "<cols><col min=\"0\" max=\"1\"/></cols>",
@@ -2152,6 +2357,12 @@ mod tests {
                 "accepted invalid worksheet fragment: {fragment}"
             );
         }
+
+        let conditions = "<sortCondition ref=\"A1:A2\"/>".repeat(MAX_SORT_CONDITIONS + 1);
+        let xml = wrap(&format!(
+            "<autoFilter><sortState ref=\"A1:A2\">{conditions}</sortState></autoFilter>"
+        ));
+        assert!(parse_worksheet_data(&xml).is_err());
     }
 
     #[test]
@@ -2218,6 +2429,29 @@ mod tests {
             "<colBreaks><brk id=\"1\" max=\"1048576\"/></colBreaks>",
             "<rowBreaks><brk id=\"1\" man=\"yes\"/></rowBreaks>",
             "<rowBreaks/><rowBreaks/>",
+        ];
+
+        for fragment in invalid_documents {
+            let xml = wrap(fragment);
+            assert!(
+                parse_worksheet_data(&xml).is_err(),
+                "accepted invalid worksheet fragment: {fragment}"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_invalid_auto_filter_sort_state() {
+        let invalid_documents = [
+            "<autoFilter ref=\"A0:B2\"/>",
+            "<autoFilter ref=\"A1:B2\"><sortState/></autoFilter>",
+            "<autoFilter ref=\"A1:B2\"><sortState ref=\"B2:A1\"/></autoFilter>",
+            "<autoFilter ref=\"A1:B2\"><sortState ref=\"A1:B2\" columnSort=\"yes\"/></autoFilter>",
+            "<autoFilter ref=\"A1:B2\"><sortState ref=\"A1:B2\" sortMethod=\"alphabetical\"/></autoFilter>",
+            "<autoFilter ref=\"A1:B2\"><sortState ref=\"A1:B2\"><sortCondition/></sortState></autoFilter>",
+            "<autoFilter ref=\"A1:B2\"><sortState ref=\"A1:B2\"><sortCondition ref=\"A1:A2\" sortBy=\"fill\"/></sortState></autoFilter>",
+            "<autoFilter ref=\"A1:B2\"><sortState ref=\"A1:B2\"/><sortState ref=\"A1:B2\"/></autoFilter>",
+            "<autoFilter ref=\"A1:B2\"/><autoFilter ref=\"A1:B2\"/>",
         ];
 
         for fragment in invalid_documents {

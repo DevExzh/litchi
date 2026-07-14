@@ -16,7 +16,7 @@ use super::RichTextRun;
 use super::cell::{Cell, CellIterator as XlsxCellIterator, RowIterator as XlsxRowIterator};
 use super::format::{CellBorder, CellFill, CellFont, CellFormat};
 use super::parsers::worksheet_parser;
-use super::sort::{SortBy, SortCondition, SortMethod, SortState};
+use super::sort::SortState;
 use super::sparkline::{SparklineGroup, parse_sparkline_groups_from_worksheet_xml};
 use super::views::{SheetView, SheetViewType};
 
@@ -165,8 +165,8 @@ pub struct PageSetup {
 /// Auto-filter information
 #[derive(Debug, Clone)]
 pub struct AutoFilter {
-    /// Range (e.g., "A1:D10")
-    pub range: String,
+    /// Optional range to which the auto-filter applies (e.g., "A1:D10").
+    pub range: Option<String>,
     /// Optional sort state associated with the auto-filter.
     pub sort_state: Option<SortState>,
 }
@@ -254,17 +254,6 @@ impl<'a> Worksheet<'a> {
         let hyperlinks = self.parse_sheet_data(content)?;
         self.resolve_hyperlinks(hyperlinks, relationships)?;
 
-        // Parse auto-filter
-        if let Some(af_start) = content.find("<autoFilter ") {
-            if let Some(af_end) = content[af_start..].find("</autoFilter>") {
-                let af_content = &content[af_start..af_start + af_end + 13];
-                self.parse_auto_filter(af_content)?;
-            } else if let Some(af_end) = content[af_start..].find("/>") {
-                let af_content = &content[af_start..af_start + af_end + 2];
-                self.parse_auto_filter(af_content)?;
-            }
-        }
-
         // Parse sheet views
         if let Some(views_start) = content.find("<sheetViews")
             && let Some(views_end) = content[views_start..].find("</sheetViews>")
@@ -299,6 +288,7 @@ impl<'a> Worksheet<'a> {
         self.page_setup = parsed.page_setup.unwrap_or_default();
         self.row_breaks = parsed.row_breaks;
         self.col_breaks = parsed.col_breaks;
+        self.auto_filter = parsed.auto_filter;
         self.dimensions = parsed.dimensions;
         Ok(parsed.hyperlinks)
     }
@@ -774,90 +764,6 @@ impl<'a> Worksheet<'a> {
             );
         }
         Ok(())
-    }
-
-    /// Parse auto-filter from XML.
-    fn parse_auto_filter(&mut self, content: &str) -> Result<()> {
-        let range = Self::extract_attribute(content, "ref");
-        let sort_state = if let Some(ss_start) = content.find("<sortState") {
-            if let Some(ss_end) = content[ss_start..].find("</sortState>") {
-                let ss_content = &content[ss_start..ss_start + ss_end + 12];
-                Self::parse_sort_state(ss_content, range.as_deref())
-            } else if let Some(ss_end) = content[ss_start..].find("/>") {
-                let ss_content = &content[ss_start..ss_start + ss_end + 2];
-                Self::parse_sort_state(ss_content, range.as_deref())
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        if let Some(range) = range {
-            self.auto_filter = Some(AutoFilter { range, sort_state });
-        }
-        Ok(())
-    }
-
-    /// Parse sort state from XML.
-    fn parse_sort_state(content: &str, fallback_ref: Option<&str>) -> Option<SortState> {
-        let tag_end = content.find('>').unwrap_or(content.len());
-        let tag = &content[..tag_end];
-        let ref_range =
-            Self::extract_attribute(tag, "ref").or_else(|| fallback_ref.map(|v| v.to_string()))?;
-        let column_sort = Self::extract_attribute(tag, "columnSort")
-            .map(|v| v == "1" || v.eq_ignore_ascii_case("true"));
-        let case_sensitive = Self::extract_attribute(tag, "caseSensitive")
-            .map(|v| v == "1" || v.eq_ignore_ascii_case("true"));
-        let sort_method = Self::extract_attribute(tag, "sortMethod")
-            .as_deref()
-            .and_then(SortMethod::parse);
-
-        let mut conditions = Vec::new();
-        let mut pos = 0;
-        while let Some(cond_start) = content[pos..].find("<sortCondition ") {
-            let cond_start_pos = pos + cond_start;
-            if let Some(cond_end) = content[cond_start_pos..].find("/>") {
-                let cond_tag = &content[cond_start_pos..cond_start_pos + cond_end + 2];
-                if let Some(condition) = Self::parse_sort_condition(cond_tag) {
-                    conditions.push(condition);
-                }
-                pos = cond_start_pos + cond_end + 2;
-            } else {
-                break;
-            }
-        }
-
-        Some(SortState {
-            ref_range,
-            column_sort,
-            case_sensitive,
-            sort_method,
-            conditions,
-        })
-    }
-
-    fn parse_sort_condition(tag: &str) -> Option<SortCondition> {
-        let ref_range = Self::extract_attribute(tag, "ref")?;
-        let descending = Self::extract_attribute(tag, "descending")
-            .map(|v| v == "1" || v.eq_ignore_ascii_case("true"));
-        let sort_by = Self::extract_attribute(tag, "sortBy")
-            .as_deref()
-            .and_then(SortBy::parse);
-        let custom_list = Self::extract_attribute(tag, "customList");
-        let dxf_id = Self::extract_attribute(tag, "dxfId").and_then(|v| v.parse::<u32>().ok());
-        let icon_set = Self::extract_attribute(tag, "iconSet");
-        let icon_id = Self::extract_attribute(tag, "iconId").and_then(|v| v.parse::<u32>().ok());
-
-        Some(SortCondition {
-            ref_range,
-            descending,
-            sort_by,
-            custom_list,
-            dxf_id,
-            icon_set,
-            icon_id,
-        })
     }
 
     /// Parse sheet views from XML.
@@ -1600,7 +1506,7 @@ impl<'a> Worksheet<'a> {
     /// let ws = wb.worksheet_by_index(0)?;
     ///
     /// if let Some(auto_filter) = ws.get_auto_filter() {
-    ///     println!("Auto-filter range: {}", auto_filter.range);
+    ///     println!("Auto-filter range: {:?}", auto_filter.range);
     /// }
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
