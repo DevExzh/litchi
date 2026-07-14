@@ -1363,9 +1363,11 @@ impl<'a> Document<'a> {
     // - Requires parsing w:fldSimple and w:fldChar elements with MERGEFIELD
     // - execute_mail_merge(), get_merge_fields()
     //
-    // TODO: Page/Section breaks (MS-DOCX Section 17.3.3.3)
-    // - Partially supported via Section API, advanced break types pending
-    // - insert_page_break(), insert_section_break()
+    // ✅ COMPLETED: Typed run breaks (MS-DOCX Section 17.3.3.1)
+    // - Run::breaks() preserves text-wrapping, page, and column breaks plus clear behavior
+    // - Rendered pagination hints remain distinguishable from authored breaks
+    // TODO: Section-break insertion and mutation
+    // - insert_section_break()
     //
     // TODO: Watermarks (MS-DOCX Section 17.10.2)
     // - Requires parsing VML shapes in headers with watermark styling

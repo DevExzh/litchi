@@ -600,6 +600,41 @@ pub struct Run {
     xml_data: RunXmlData,
 }
 
+/// The semantic type of an explicit WordprocessingML run break.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum RunBreakType {
+    /// A normal line break within the current text flow.
+    #[default]
+    TextWrapping,
+    /// A page break.
+    Page,
+    /// A column break.
+    Column,
+}
+
+/// How text wrapping resumes after a line break around floating objects.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum RunBreakClear {
+    /// Resume on the next line without clearing either side.
+    #[default]
+    None,
+    /// Resume when the left side is clear.
+    Left,
+    /// Resume when the right side is clear.
+    Right,
+    /// Resume when both sides are clear.
+    All,
+}
+
+/// A typed `<w:br>` element contained in a run.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct RunBreak {
+    /// Break type; omitted `w:type` defaults to text wrapping.
+    pub break_type: RunBreakType,
+    /// Wrapping-clear behavior; omitted `w:clear` defaults to none.
+    pub clear: RunBreakClear,
+}
+
 impl Run {
     /// Create a new Run from XML bytes (owned).
     pub fn new(xml_bytes: Vec<u8>) -> Self {
@@ -664,6 +699,87 @@ impl Run {
         }
 
         Ok(result)
+    }
+
+    /// Parse all explicit break elements in this run, preserving type and clear behavior.
+    pub fn breaks(&self) -> Result<SmallVec<[RunBreak; 2]>> {
+        let mut reader = Reader::from_reader(self.xml_bytes());
+        reader.config_mut().trim_text(true);
+        let mut breaks = SmallVec::new();
+        loop {
+            match reader.read_event() {
+                Ok(Event::Start(e)) | Ok(Event::Empty(e)) if e.local_name().as_ref() == b"br" => {
+                    let mut run_break = RunBreak::default();
+                    for attribute in e.attributes() {
+                        let attribute =
+                            attribute.map_err(|error| OoxmlError::Xml(error.to_string()))?;
+                        let value = attribute
+                            .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
+                            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+                        match attribute.key.local_name().as_ref() {
+                            b"type" => {
+                                run_break.break_type = match value.as_ref() {
+                                    "textWrapping" => RunBreakType::TextWrapping,
+                                    "page" => RunBreakType::Page,
+                                    "column" => RunBreakType::Column,
+                                    _ => {
+                                        return Err(OoxmlError::InvalidFormat(format!(
+                                            "invalid Word run break type '{value}'"
+                                        )));
+                                    },
+                                };
+                            },
+                            b"clear" => {
+                                run_break.clear = match value.as_ref() {
+                                    "none" => RunBreakClear::None,
+                                    "left" => RunBreakClear::Left,
+                                    "right" => RunBreakClear::Right,
+                                    "all" => RunBreakClear::All,
+                                    _ => {
+                                        return Err(OoxmlError::InvalidFormat(format!(
+                                            "invalid Word run break clear value '{value}'"
+                                        )));
+                                    },
+                                };
+                            },
+                            _ => {},
+                        }
+                    }
+                    breaks.push(run_break);
+                },
+                Ok(Event::Eof) => break,
+                Err(error) => return Err(OoxmlError::Xml(error.to_string())),
+                _ => {},
+            }
+        }
+        Ok(breaks)
+    }
+
+    /// Count layout-engine page-break hints in this run.
+    ///
+    /// `<w:lastRenderedPageBreak>` is not an authored break; it records where Word last
+    /// paginated content, so it is intentionally exposed separately from [`Self::breaks`].
+    pub fn last_rendered_page_break_count(&self) -> Result<usize> {
+        let mut reader = Reader::from_reader(self.xml_bytes());
+        reader.config_mut().trim_text(true);
+        let mut count = 0usize;
+        loop {
+            match reader.read_event() {
+                Ok(Event::Start(e)) | Ok(Event::Empty(e))
+                    if e.local_name().as_ref() == b"lastRenderedPageBreak" =>
+                {
+                    count = count.checked_add(1).ok_or_else(|| {
+                        OoxmlError::InvalidFormat(
+                            "too many rendered page break markers in one run".to_string(),
+                        )
+                    })?;
+                },
+                Ok(Event::Eof) => break,
+                Err(error) => return Err(OoxmlError::Xml(error.to_string())),
+                _ => {},
+            }
+        }
+        Ok(count)
     }
 
     /// Check if this run is bold.
@@ -1463,5 +1579,50 @@ mod tests {
 
         let run = Run::new(xml.to_vec());
         assert!(run.italic().unwrap().unwrap_or(false));
+    }
+
+    #[test]
+    fn parses_typed_run_breaks_and_rendered_hints() {
+        let xml = br#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+            <w:t>Before</w:t><w:br/><w:br w:type="page"/><w:br w:type="column" w:clear="all"/>
+            <w:br w:type="textWrapping" w:clear="left"></w:br>
+            <w:lastRenderedPageBreak/><w:lastRenderedPageBreak></w:lastRenderedPageBreak>
+        </w:r>"#;
+        let run = Run::new(xml.to_vec());
+        assert_eq!(
+            run.breaks().unwrap().as_slice(),
+            [
+                RunBreak::default(),
+                RunBreak {
+                    break_type: RunBreakType::Page,
+                    clear: RunBreakClear::None,
+                },
+                RunBreak {
+                    break_type: RunBreakType::Column,
+                    clear: RunBreakClear::All,
+                },
+                RunBreak {
+                    break_type: RunBreakType::TextWrapping,
+                    clear: RunBreakClear::Left,
+                },
+            ]
+        );
+        assert_eq!(run.last_rendered_page_break_count().unwrap(), 2);
+        assert_eq!(run.text().unwrap(), "Before\n\n\n\n");
+    }
+
+    #[test]
+    fn rejects_invalid_run_break_enums() {
+        let invalid_type = Run::new(
+            br#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:br w:type="section"/></w:r>"#
+                .to_vec(),
+        );
+        assert!(invalid_type.breaks().is_err());
+
+        let invalid_clear = Run::new(
+            br#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:br w:clear="center"/></w:r>"#
+                .to_vec(),
+        );
+        assert!(invalid_clear.breaks().is_err());
     }
 }

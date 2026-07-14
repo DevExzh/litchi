@@ -91,7 +91,7 @@ pub use hyperlink::Hyperlink;
 pub use image::InlineImage;
 pub use numbering::{AbstractNum, Num, Numbering};
 pub use package::Package;
-pub use paragraph::{Paragraph, Run, RunProperties};
+pub use paragraph::{Paragraph, Run, RunBreak, RunBreakClear, RunBreakType, RunProperties};
 pub use revision::{Revision, RevisionType};
 pub use section::{Emu, Margins, PageSize, Section, Sections};
 pub use settings::{DocumentSettings, ProtectionType};
