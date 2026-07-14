@@ -143,6 +143,7 @@ fn main() -> Result<()> {
                 width: Some("8cm".to_string()),
                 height: Some("2cm".to_string()),
                 style_name: None,
+                image_href: None,
             },
             Shape {
                 shape_type: ShapeType::TextBox,
@@ -153,6 +154,7 @@ fn main() -> Result<()> {
                 width: Some("8cm".to_string()),
                 height: Some("2cm".to_string()),
                 style_name: None,
+                image_href: None,
             },
             Shape {
                 shape_type: ShapeType::TextBox,
@@ -163,6 +165,7 @@ fn main() -> Result<()> {
                 width: Some("10cm".to_string()),
                 height: Some("2cm".to_string()),
                 style_name: None,
+                image_href: None,
             },
         ],
     };
@@ -279,6 +282,7 @@ fn main() -> Result<()> {
             width: Some("14cm".to_string()),
             height: Some("4cm".to_string()),
             style_name: None,
+            image_href: None,
         }],
     };
     builder.add_slide_element(slide16)?;

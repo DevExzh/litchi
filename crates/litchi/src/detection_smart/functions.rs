@@ -237,13 +237,54 @@ mod tests {
 
     #[test]
     #[cfg(feature = "ooxml")]
-    #[ignore] // TODO: This test needs a more complete OOXML structure to pass validation
     fn test_detect_docx_from_bytes() {
         // Create a minimal ZIP file that looks like a DOCX
         let zip_data = create_minimal_docx_zip();
         let format = detect_file_format_from_bytes(&zip_data);
         assert!(format.is_some());
         assert_eq!(format.unwrap(), FileFormat::Docx);
+    }
+
+    #[test]
+    #[cfg(feature = "ooxml")]
+    fn detects_xml_binary_and_macro_enabled_ooxml_families() {
+        let cases = [
+            (
+                "word/document.xml",
+                "application/vnd.ms-word.document.macroEnabled.main+xml",
+                FileFormat::Docx,
+            ),
+            (
+                "ppt/presentation.xml",
+                "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml",
+                FileFormat::Pptx,
+            ),
+            (
+                "ppt/presentation.xml",
+                "application/vnd.ms-powerpoint.presentation.macroEnabled.main+xml",
+                FileFormat::Pptx,
+            ),
+            (
+                "xl/workbook.xml",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml",
+                FileFormat::Xlsx,
+            ),
+            (
+                "xl/workbook.xml",
+                "application/vnd.ms-excel.sheet.macroEnabled.main+xml",
+                FileFormat::Xlsx,
+            ),
+            (
+                "xl/workbook.bin",
+                "application/vnd.ms-excel.sheet.binary.macroEnabled.main",
+                FileFormat::Xlsb,
+            ),
+        ];
+
+        for (part_name, content_type, expected) in cases {
+            let package = create_minimal_ooxml_zip(part_name, content_type);
+            assert_eq!(detect_file_format_from_bytes(&package), Some(expected));
+        }
     }
 
     #[test]
@@ -260,25 +301,34 @@ mod tests {
     // Helper function to create a minimal DOCX-like ZIP for testing
     #[cfg(feature = "ooxml")]
     fn create_minimal_docx_zip() -> Vec<u8> {
+        create_minimal_ooxml_zip(
+            "word/document.xml",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml",
+        )
+    }
+
+    #[cfg(feature = "ooxml")]
+    fn create_minimal_ooxml_zip(part_name: &str, content_type: &str) -> Vec<u8> {
         use soapberry_zip::office::StreamingArchiveWriter;
 
         let mut writer = StreamingArchiveWriter::new();
+        let content_types = format!(
+            r#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="bin" ContentType="application/octet-stream"/><Override PartName="/{part_name}" ContentType="{content_type}"/></Types>"#
+        );
 
         // Add [Content_Types].xml
         writer
-            .write_deflated(
-                "[Content_Types].xml",
-                b"<Types><Default Extension=\"xml\" ContentType=\"application/xml\"/></Types>",
-            )
+            .write_deflated("[Content_Types].xml", content_types.as_bytes())
             .unwrap();
 
-        // Add word/document.xml
+        let relationships = format!(
+            r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="{part_name}"/></Relationships>"#
+        );
         writer
-            .write_deflated(
-                "word/document.xml",
-                b"<document><body><p>Hello</p></body></document>",
-            )
+            .write_deflated("_rels/.rels", relationships.as_bytes())
             .unwrap();
+
+        writer.write_deflated(part_name, b"office data").unwrap();
 
         writer.finish_to_bytes().unwrap()
     }

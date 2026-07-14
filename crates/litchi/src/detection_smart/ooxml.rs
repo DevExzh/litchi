@@ -66,38 +66,59 @@ pub fn detect_zip_format_from_reader<R: Read + Seek>(_reader: &mut R) -> Option<
 /// This function requires the `ooxml` feature to be enabled.
 #[cfg(feature = "ooxml")]
 pub fn detect_ooxml_format_from_package(package: &crate::ooxml::OpcPackage) -> Option<FileFormat> {
-    // Check for Word document by looking for document part
-    if package.iter_parts().any(|part| {
-        part.content_type().contains("wordprocessingml")
-            || part.content_type().contains("document.main")
-    }) {
+    fn is_word_main(content_type: &str) -> bool {
+        content_type.contains("wordprocessingml.document.main")
+            || content_type.contains("wordprocessingml.template.main")
+            || content_type.contains("ms-word.document.macroEnabled.main")
+            || content_type.contains("ms-word.template.macroEnabledTemplate.main")
+    }
+
+    fn is_powerpoint_main(content_type: &str) -> bool {
+        content_type.contains("presentationml.presentation.main")
+            || content_type.contains("presentationml.slideshow.main")
+            || content_type.contains("presentationml.template.main")
+            || content_type.contains("ms-powerpoint.presentation.macroEnabled.main")
+            || content_type.contains("ms-powerpoint.slideshow.macroEnabled.main")
+            || content_type.contains("ms-powerpoint.template.macroEnabled.main")
+    }
+
+    fn is_excel_binary_main(content_type: &str) -> bool {
+        content_type.contains("ms-excel.sheet.binary.macroEnabled.main")
+    }
+
+    fn is_excel_xml_main(content_type: &str) -> bool {
+        content_type.contains("spreadsheetml.sheet.main")
+            || content_type.contains("spreadsheetml.template.main")
+            || content_type.contains("ms-excel.sheet.macroEnabled.main")
+            || content_type.contains("ms-excel.template.macroEnabled.main")
+    }
+
+    if package
+        .iter_parts()
+        .any(|part| is_word_main(part.content_type()))
+    {
         return Some(FileFormat::Docx);
     }
 
-    // Check for PowerPoint presentation by looking for presentation part
-    if package.iter_parts().any(|part| {
-        part.content_type().contains("presentationml")
-            || part.content_type().contains("presentation.main")
-    }) {
+    if package
+        .iter_parts()
+        .any(|part| is_powerpoint_main(part.content_type()))
+    {
         return Some(FileFormat::Pptx);
     }
 
-    // Check for Excel spreadsheet by looking for workbook part
-    if package.iter_parts().any(|part| {
-        part.content_type().contains("spreadsheetml")
-            || part.content_type().contains("worksheet")
-            || part.content_type().contains("workbook")
-    }) {
-        // Check if it's XLSB (binary) by looking for binary parts
-        let has_binary_parts = package.iter_parts().any(|part| {
-            part.content_type().contains("binary") || part.content_type().contains("xlsb")
-        });
+    if package
+        .iter_parts()
+        .any(|part| is_excel_binary_main(part.content_type()))
+    {
+        return Some(FileFormat::Xlsb);
+    }
 
-        if has_binary_parts {
-            return Some(FileFormat::Xlsb);
-        } else {
-            return Some(FileFormat::Xlsx);
-        }
+    if package
+        .iter_parts()
+        .any(|part| is_excel_xml_main(part.content_type()))
+    {
+        return Some(FileFormat::Xlsx);
     }
 
     None
