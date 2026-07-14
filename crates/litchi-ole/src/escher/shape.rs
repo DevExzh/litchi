@@ -22,6 +22,8 @@ pub enum EscherShapeType {
     Group,
     Table,
     Picture,
+    Object,
+    Media,
     AutoShape,
     Connector,
     Unknown,
@@ -44,6 +46,7 @@ pub struct EscherShape<'data> {
     container: EscherContainer<'data>,
     anchor: Option<ShapeAnchor>,
     placeholder: Option<EscherPlaceholder>,
+    external_object_id: Option<u32>,
 }
 
 /// Placeholder metadata embedded in an OfficeArt client-data record.
@@ -58,7 +61,8 @@ impl<'data> EscherShape<'data> {
     /// Parse an Escher shape from an SpContainer or SpgrContainer record.
     pub fn from_container(container: EscherContainer<'data>) -> Self {
         let placeholder = Self::extract_placeholder(&container);
-        let mut shape_type = Self::detect_shape_type(&container);
+        let frame_info = Self::extract_frame_info(&container);
+        let mut shape_type = Self::detect_shape_type(&container, frame_info.kind);
         if placeholder.is_some()
             && !matches!(shape_type, EscherShapeType::Group | EscherShapeType::Table)
         {
@@ -126,6 +130,7 @@ impl<'data> EscherShape<'data> {
             container,
             anchor,
             placeholder,
+            external_object_id: frame_info.external_object_id,
         }
     }
 
@@ -184,12 +189,21 @@ impl<'data> EscherShape<'data> {
         self.placeholder
     }
 
+    /// Return the external object reference used by an OLE or media frame.
+    #[inline]
+    pub fn external_object_id(&self) -> Option<u32> {
+        self.external_object_id
+    }
+
     /// Return owned copies of the child shapes.
     pub fn child_shapes(&self) -> Vec<EscherShape<'data>> {
         self.children.clone()
     }
 
-    fn detect_shape_type(container: &EscherContainer<'data>) -> EscherShapeType {
+    fn detect_shape_type(
+        container: &EscherContainer<'data>,
+        frame_kind: Option<EscherShapeType>,
+    ) -> EscherShapeType {
         if container.record().record_type == EscherRecordType::SpgrContainer {
             return if Self::is_table_group(container) {
                 EscherShapeType::Table
@@ -205,7 +219,7 @@ impl<'data> EscherShape<'data> {
                 // MSOSPT 75 is the frame used for pictures in binary Office files.
                 // The image normally lives in the Pictures stream and is referenced
                 // through the pib property rather than embedded in this container.
-                75 => EscherShapeType::Picture,
+                75 => frame_kind.unwrap_or(EscherShapeType::Picture),
                 202 => EscherShapeType::TextBox,
                 1 => EscherShapeType::Rectangle,
                 3 => EscherShapeType::Ellipse,
@@ -268,6 +282,53 @@ impl<'data> EscherShape<'data> {
         })
     }
 
+    fn extract_frame_info(container: &EscherContainer<'data>) -> EscherFrameInfo {
+        const EX_OBJ_REF_ATOM: u16 = 3009;
+        const INTERACTIVE_INFO: u16 = 4082;
+        const INTERACTIVE_INFO_ATOM: u16 = 4083;
+        const ACTION_OLE: u8 = 5;
+        const ACTION_MEDIA: u8 = 6;
+
+        let Some(client_data) = container.find_child(EscherRecordType::ClientData) else {
+            return EscherFrameInfo::default();
+        };
+        let client_data = EscherContainer::new(client_data);
+        let mut info = EscherFrameInfo::default();
+
+        for record in client_data.children().flatten() {
+            match record.record_type_raw {
+                EX_OBJ_REF_ATOM if record.data.len() >= 4 => {
+                    info.external_object_id = Some(u32::from_le_bytes([
+                        record.data[0],
+                        record.data[1],
+                        record.data[2],
+                        record.data[3],
+                    ]));
+                    info.kind.get_or_insert(EscherShapeType::Object);
+                },
+                INTERACTIVE_INFO if record.is_container() => {
+                    let interactive = EscherContainer::new(record);
+                    let action = interactive
+                        .children()
+                        .flatten()
+                        .find(|child| {
+                            child.record_type_raw == INTERACTIVE_INFO_ATOM && child.data.len() >= 9
+                        })
+                        .map(|atom| atom.data[8]);
+
+                    info.kind = match action {
+                        Some(ACTION_OLE) => Some(EscherShapeType::Object),
+                        Some(ACTION_MEDIA) => Some(EscherShapeType::Media),
+                        _ => info.kind,
+                    };
+                },
+                _ => {},
+            }
+        }
+
+        info
+    }
+
     fn extract_shape_id(container: &EscherContainer<'data>) -> Option<u32> {
         if let Some(sp) = container.find_child(EscherRecordType::Sp)
             && sp.data.len() >= 4
@@ -293,4 +354,10 @@ impl<'data> EscherShape<'data> {
 
         None
     }
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+struct EscherFrameInfo {
+    kind: Option<EscherShapeType>,
+    external_object_id: Option<u32>,
 }

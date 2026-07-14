@@ -14,6 +14,22 @@ use litchi_core::error::Result;
 #[cfg(feature = "imgconv")]
 use litchi_imgconv::Blip;
 
+/// Semantic kind of a PowerPoint picture frame.
+///
+/// Binary PowerPoint uses the same OfficeArt frame shape for ordinary images,
+/// embedded OLE objects, and media previews. The client-data records distinguish
+/// the three cases.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PictureFrameKind {
+    /// An ordinary embedded or linked image.
+    #[default]
+    Picture,
+    /// A preview for an embedded or linked OLE object.
+    OleObject,
+    /// A preview frame for audio or video media.
+    Media,
+}
+
 /// Picture shape containing an embedded image
 ///
 /// Represents an image embedded in a PowerPoint slide, with methods
@@ -47,6 +63,10 @@ pub struct PictureShape {
     pub blip_id: Option<u32>,
     /// Picture name/filename
     pub name: Option<String>,
+    /// Semantic kind of this picture frame.
+    frame_kind: PictureFrameKind,
+    /// Reference to an external OLE or media object.
+    external_object_id: Option<u32>,
     /// Escher container data (for extracting BLIP)
     #[cfg(feature = "imgconv")]
     escher_data: Option<Vec<u8>>,
@@ -65,6 +85,8 @@ impl PictureShape {
             properties,
             blip_id: None,
             name: None,
+            frame_kind: PictureFrameKind::Picture,
+            external_object_id: None,
             #[cfg(feature = "imgconv")]
             escher_data: None,
         }
@@ -72,10 +94,17 @@ impl PictureShape {
 
     /// Create from shape properties
     pub fn from_properties(properties: ShapeProperties) -> Self {
+        let frame_kind = match properties.shape_type {
+            ShapeType::Object => PictureFrameKind::OleObject,
+            ShapeType::Media => PictureFrameKind::Media,
+            _ => PictureFrameKind::Picture,
+        };
         Self {
             properties,
             blip_id: None,
             name: None,
+            frame_kind,
+            external_object_id: None,
             #[cfg(feature = "imgconv")]
             escher_data: None,
         }
@@ -89,6 +118,21 @@ impl PictureShape {
     /// Set picture name
     pub fn set_name<S: Into<String>>(&mut self, name: S) {
         self.name = Some(name.into());
+    }
+
+    /// Set the semantic frame kind and keep the common shape type in sync.
+    pub fn set_frame_kind(&mut self, frame_kind: PictureFrameKind) {
+        self.frame_kind = frame_kind;
+        self.properties.shape_type = match frame_kind {
+            PictureFrameKind::Picture => ShapeType::Picture,
+            PictureFrameKind::OleObject => ShapeType::Object,
+            PictureFrameKind::Media => ShapeType::Media,
+        };
+    }
+
+    /// Set the external OLE or media object reference.
+    pub fn set_external_object_id(&mut self, external_object_id: u32) {
+        self.external_object_id = Some(external_object_id);
     }
 
     /// Set picture bounds (position and size)
@@ -113,6 +157,16 @@ impl PictureShape {
     /// Get picture name
     pub fn name(&self) -> Option<&str> {
         self.name.as_deref()
+    }
+
+    /// Get the semantic frame kind.
+    pub const fn frame_kind(&self) -> PictureFrameKind {
+        self.frame_kind
+    }
+
+    /// Get the external OLE or media object reference.
+    pub const fn external_object_id(&self) -> Option<u32> {
+        self.external_object_id
     }
 
     /// Extract the embedded image from this picture shape
@@ -256,6 +310,20 @@ mod tests {
         let mut picture = PictureShape::new(1);
         picture.set_blip_id(42);
         assert_eq!(picture.blip_id(), Some(42));
+    }
+
+    #[test]
+    fn frame_kind_tracks_the_common_shape_type() {
+        let mut picture = PictureShape::new(1);
+        picture.set_frame_kind(PictureFrameKind::OleObject);
+        assert_eq!(picture.frame_kind(), PictureFrameKind::OleObject);
+        assert_eq!(picture.properties.shape_type, ShapeType::Object);
+
+        let media = PictureShape::from_properties(ShapeProperties {
+            shape_type: ShapeType::Media,
+            ..Default::default()
+        });
+        assert_eq!(media.frame_kind(), PictureFrameKind::Media);
     }
 
     #[test]

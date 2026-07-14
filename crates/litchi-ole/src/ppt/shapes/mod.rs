@@ -58,8 +58,8 @@ pub use shape_enum::ShapeEnum;
 
 // Re-export concrete shape types
 pub use autoshape::AutoShape;
-pub use picture::PictureShape;
 #[cfg(feature = "imgconv")]
 pub use picture::extract_blip_id_from_escher;
+pub use picture::{PictureFrameKind, PictureShape};
 pub use placeholder::{Placeholder, PlaceholderSize, PlaceholderType};
 pub use textbox::TextBox;

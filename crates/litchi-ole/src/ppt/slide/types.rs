@@ -186,9 +186,19 @@ impl<'doc> Slide<'doc> {
                 Some(ShapeEnum::TextBox(textbox))
             },
 
-            EscherShapeType::Picture => {
+            EscherShapeType::Picture | EscherShapeType::Object | EscherShapeType::Media => {
                 // Create PictureShape
                 let mut picture = crate::ppt::shapes::PictureShape::new(shape_id);
+
+                picture.set_frame_kind(match escher_shape.shape_type() {
+                    EscherShapeType::Object => PictureFrameKind::OleObject,
+                    EscherShapeType::Media => PictureFrameKind::Media,
+                    _ => PictureFrameKind::Picture,
+                });
+
+                if let Some(external_object_id) = escher_shape.external_object_id() {
+                    picture.set_external_object_id(external_object_id);
+                }
 
                 if let Some(a) = anchor {
                     picture.set_bounds(a.left, a.top, a.width(), a.height());
@@ -567,9 +577,14 @@ mod tests {
     use crate::ppt::records::PptRecord;
     use crate::ppt::slide::SlideData;
 
-    fn create_picture_escher_drawing(blip_id: u32) -> Vec<u8> {
+    fn create_frame_escher_drawing(
+        blip_id: u32,
+        interactive_action: Option<u8>,
+        external_object_id: Option<u32>,
+    ) -> Vec<u8> {
         use crate::escher::writer::{
-            PropertyBuilder, ShapeBuilder, record_type, write_client_anchor, write_container,
+            PropertyBuilder, ShapeBuilder, record_type, write_atom, write_client_anchor,
+            write_container,
         };
 
         let mut shape_children = Vec::new();
@@ -580,6 +595,34 @@ mod tests {
         properties.add_simple(0x4104, blip_id as i32);
         properties.write(&mut shape_children).unwrap();
         write_client_anchor(&mut shape_children, 10, 20, 210, 120).unwrap();
+
+        let mut client_data_children = Vec::new();
+        if let Some(external_object_id) = external_object_id {
+            write_atom(
+                &mut client_data_children,
+                0,
+                0,
+                3009,
+                &external_object_id.to_le_bytes(),
+            )
+            .unwrap();
+        }
+        if let Some(action) = interactive_action {
+            let mut interactive_atom = [0u8; 16];
+            interactive_atom[8] = action;
+            let mut interactive_children = Vec::new();
+            write_atom(&mut interactive_children, 0, 0, 4083, &interactive_atom).unwrap();
+            write_container(&mut client_data_children, 0, 4082, &interactive_children).unwrap();
+        }
+        if !client_data_children.is_empty() {
+            write_container(
+                &mut shape_children,
+                0,
+                record_type::CLIENT_DATA,
+                &client_data_children,
+            )
+            .unwrap();
+        }
 
         let mut shape_container = Vec::new();
         write_container(
@@ -593,6 +636,10 @@ mod tests {
         let mut drawing = Vec::new();
         write_container(&mut drawing, 0, record_type::DG_CONTAINER, &shape_container).unwrap();
         drawing
+    }
+
+    fn create_picture_escher_drawing(blip_id: u32) -> Vec<u8> {
+        create_frame_escher_drawing(blip_id, None, None)
     }
 
     fn create_placeholder_escher_drawing() -> Vec<u8> {
@@ -1066,6 +1113,72 @@ mod tests {
         assert_eq!(picture.properties.y, 20);
         assert_eq!(picture.properties.width, 200);
         assert_eq!(picture.properties.height, 100);
+    }
+
+    #[test]
+    fn ole_frame_is_distinguished_from_an_ordinary_picture() {
+        use crate::ppt::shapes::{PictureFrameKind, ShapeType};
+
+        let doc_data = vec![0u8; 32];
+        let ppdrawing = create_test_record(
+            PptRecordType::PPDrawing,
+            create_frame_escher_drawing(8, Some(5), Some(77)),
+            Vec::new(),
+        );
+        let record = create_test_record(PptRecordType::Slide, Vec::new(), vec![ppdrawing]);
+        let slide = Slide::from_slide_data(create_slide_data(record, 256, &doc_data), 1);
+
+        let shapes = slide.shapes().unwrap();
+        assert_eq!(shapes[0].shape_type(), ShapeType::Object);
+        let object = shapes[0].as_object_frame().expect("OLE frame");
+        assert_eq!(object.frame_kind(), PictureFrameKind::OleObject);
+        assert_eq!(object.external_object_id(), Some(77));
+        assert_eq!(object.blip_id(), Some(8));
+        assert_eq!(object.properties.x, 10);
+        assert_eq!(object.properties.width, 200);
+    }
+
+    #[test]
+    fn media_frame_preserves_preview_and_external_object_references() {
+        use crate::ppt::shapes::{PictureFrameKind, ShapeType};
+
+        let doc_data = vec![0u8; 32];
+        let ppdrawing = create_test_record(
+            PptRecordType::PPDrawing,
+            create_frame_escher_drawing(9, Some(6), Some(88)),
+            Vec::new(),
+        );
+        let record = create_test_record(PptRecordType::Slide, Vec::new(), vec![ppdrawing]);
+        let slide = Slide::from_slide_data(create_slide_data(record, 256, &doc_data), 1);
+
+        let shapes = slide.shapes().unwrap();
+        assert_eq!(shapes[0].shape_type(), ShapeType::Media);
+        let media = shapes[0].as_media_frame().expect("media frame");
+        assert_eq!(media.frame_kind(), PictureFrameKind::Media);
+        assert_eq!(media.external_object_id(), Some(88));
+        assert_eq!(media.blip_id(), Some(9));
+        assert_eq!(media.properties.y, 20);
+        assert_eq!(media.properties.height, 100);
+    }
+
+    #[test]
+    fn external_object_reference_alone_marks_an_ole_frame() {
+        use crate::ppt::shapes::{PictureFrameKind, ShapeType};
+
+        let doc_data = vec![0u8; 32];
+        let ppdrawing = create_test_record(
+            PptRecordType::PPDrawing,
+            create_frame_escher_drawing(10, None, Some(99)),
+            Vec::new(),
+        );
+        let record = create_test_record(PptRecordType::Slide, Vec::new(), vec![ppdrawing]);
+        let slide = Slide::from_slide_data(create_slide_data(record, 256, &doc_data), 1);
+
+        let shapes = slide.shapes().unwrap();
+        assert_eq!(shapes[0].shape_type(), ShapeType::Object);
+        let object = shapes[0].as_object_frame().expect("OLE frame");
+        assert_eq!(object.frame_kind(), PictureFrameKind::OleObject);
+        assert_eq!(object.external_object_id(), Some(99));
     }
 
     #[test]

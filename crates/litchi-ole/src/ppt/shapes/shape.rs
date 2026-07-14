@@ -25,6 +25,8 @@ pub enum ShapeType {
     Connector,
     /// Object shape (embedded objects)
     Object,
+    /// Media shape (audio or video preview frame)
+    Media,
     /// Table shape
     Table,
     /// Unknown shape type
@@ -43,6 +45,7 @@ impl From<u16> for ShapeType {
             7 => ShapeType::Connector,
             8 => ShapeType::Object,
             9 => ShapeType::Table,
+            10 => ShapeType::Media,
             other => ShapeType::Unknown(other),
         }
     }
@@ -120,6 +123,7 @@ impl fmt::Display for ShapeType {
             ShapeType::Line => write!(f, "Line"),
             ShapeType::Connector => write!(f, "Connector"),
             ShapeType::Object => write!(f, "Object"),
+            ShapeType::Media => write!(f, "Media"),
             ShapeType::Table => write!(f, "Table"),
             ShapeType::Unknown(id) => write!(f, "Unknown({})", id),
         }

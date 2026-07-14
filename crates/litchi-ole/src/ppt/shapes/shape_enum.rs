@@ -25,7 +25,7 @@ pub enum ShapeEnum<'a> {
     Placeholder(Placeholder<'a>),
     /// Auto shape (rectangle, ellipse, arrow, etc.)
     AutoShape(AutoShape<'a>),
-    /// Picture/image shape
+    /// Picture frame, including OLE-object and media previews
     Picture(PictureShape),
     /// Table shape
     Table(TableShape),
@@ -45,7 +45,7 @@ where
             ShapeEnum::TextBox(_) => ShapeType::TextBox,
             ShapeEnum::Placeholder(_) => ShapeType::Placeholder,
             ShapeEnum::AutoShape(_) => ShapeType::AutoShape,
-            ShapeEnum::Picture(_) => ShapeType::Picture,
+            ShapeEnum::Picture(picture) => picture.properties.shape_type,
             ShapeEnum::Table(_) => ShapeType::Table,
             ShapeEnum::Group(_) => ShapeType::Group,
             ShapeEnum::Line(_) => ShapeType::Line,
@@ -137,6 +137,20 @@ where
             ShapeEnum::Picture(pic) => Some(pic),
             _ => None,
         }
+    }
+
+    /// Get an embedded or linked OLE object frame.
+    #[inline]
+    pub fn as_object_frame(&self) -> Option<&PictureShape> {
+        self.as_picture()
+            .filter(|picture| picture.frame_kind() == super::picture::PictureFrameKind::OleObject)
+    }
+
+    /// Get an audio or video media frame.
+    #[inline]
+    pub fn as_media_frame(&self) -> Option<&PictureShape> {
+        self.as_picture()
+            .filter(|picture| picture.frame_kind() == super::picture::PictureFrameKind::Media)
     }
 
     /// Get shape as TableShape if it is one.
