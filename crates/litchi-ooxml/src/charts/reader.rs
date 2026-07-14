@@ -9,7 +9,7 @@ use crate::charts::axis::{
 };
 use crate::charts::chart::{
     Chart, ChartHeaderFooter, ChartPageMargins, ChartPageOrientation, ChartPageSetup,
-    ChartPrintSettings, PivotFormat, View3D, WallFloor,
+    ChartPrintSettings, PivotFormat, PivotSource, View3D, WallFloor,
 };
 use crate::charts::legend::{Legend, LegendEntry};
 use crate::charts::models::{
@@ -207,6 +207,46 @@ pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
 
     loop {
         match xml_reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"lang" => {
+                if chart.language.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart contains duplicate language declarations".into(),
+                    ));
+                }
+                chart.language = Some(required_string_attr(
+                    e,
+                    b"val",
+                    xml_reader.decoder(),
+                    "chart language",
+                )?);
+                consume_empty_chart_element(&mut xml_reader, b"lang", "chart language")?;
+            },
+            Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"lang" => {
+                if chart.language.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart contains duplicate language declarations".into(),
+                    ));
+                }
+                chart.language = Some(required_string_attr(
+                    e,
+                    b"val",
+                    xml_reader.decoder(),
+                    "chart language",
+                )?);
+            },
+            Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"pivotSource" => {
+                if chart.pivot_source.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart contains duplicate pivot sources".into(),
+                    ));
+                }
+                chart.pivot_source = Some(parse_pivot_source(&mut xml_reader)?);
+            },
+            Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"pivotSource" => {
+                return Err(OoxmlError::InvalidFormat(
+                    "chart pivot source requires a name and format ID".into(),
+                ));
+            },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"pivotFmts" => {
                 if chart.pivot_formats.is_some() {
                     return Err(OoxmlError::InvalidFormat(
@@ -316,6 +356,62 @@ pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
     }
 
     Ok(chart)
+}
+
+fn parse_pivot_source<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<PivotSource> {
+    let mut name = None;
+    let mut format_id = None;
+    let mut buf = Vec::new();
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"name" => {
+                if name.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart pivot source contains duplicate names".into(),
+                    ));
+                }
+                name = Some(parse_text_element(reader, b"name")?);
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"name" => {
+                if name.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart pivot source contains duplicate names".into(),
+                    ));
+                }
+                name = Some(String::new());
+            },
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"fmtId" => {
+                if format_id.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart pivot source contains duplicate format IDs".into(),
+                    ));
+                }
+                format_id = Some(required_u32_attr(element, "chart pivot-source format ID")?);
+                consume_empty_chart_element(reader, b"fmtId", "chart pivot-source format ID")?;
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"fmtId" => {
+                if format_id.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart pivot source contains duplicate format IDs".into(),
+                    ));
+                }
+                format_id = Some(required_u32_attr(element, "chart pivot-source format ID")?);
+            },
+            Ok(Event::End(ref element)) if element.local_name().as_ref() == b"pivotSource" => break,
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated chart pivot source".into(),
+                ));
+            },
+            Err(error) => return Err(error),
+            _ => {},
+        }
+        buf.clear();
+    }
+    Ok(PivotSource::new(
+        name.ok_or_else(|| missing_attribute("chart pivot-source name"))?,
+        format_id.ok_or_else(|| missing_attribute("chart pivot-source format ID"))?,
+    ))
 }
 
 fn parse_pivot_formats<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Vec<PivotFormat>> {
@@ -4128,6 +4224,21 @@ fn required_u32_attr(element: &BytesStart<'_>, description: &str) -> Result<u32>
         .ok_or_else(|| invalid_attribute(description, &value))
 }
 
+fn required_string_attr(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+    description: &str,
+) -> Result<String> {
+    element
+        .try_get_attribute(name)
+        .map_err(|error| OoxmlError::Xml(error.to_string()))?
+        .ok_or_else(|| missing_attribute(description))?
+        .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
+        .map(|value| value.into_owned())
+        .map_err(|error| OoxmlError::Xml(error.to_string()))
+}
+
 fn optional_u32_attr(
     element: &BytesStart<'_>,
     name: &[u8],
@@ -4298,6 +4409,38 @@ fn get_attr(e: &BytesStart, name: &[u8]) -> Option<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn round_trips_and_validates_chart_language_and_pivot_source() {
+        let xml =
+            br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
+            <c:lang val="zh-Hant"/><c:pivotSource><c:name>Pivot &amp; One</c:name>
+                <c:fmtId val="42"/></c:pivotSource>
+            <c:chart><c:plotArea/></c:chart></c:chartSpace>"#;
+        let chart = parse_chart(xml.as_slice()).unwrap();
+        assert_eq!(chart.language.as_deref(), Some("zh-Hant"));
+        let source = chart.pivot_source.as_ref().unwrap();
+        assert_eq!(source.name, "Pivot & One");
+        assert_eq!(source.format_id, 42);
+
+        let mut output = Vec::new();
+        crate::charts::writer::write_chart(&mut output, &chart).unwrap();
+        let reparsed = parse_chart(output.as_slice()).unwrap();
+        assert_eq!(reparsed.language.as_deref(), Some("zh-Hant"));
+        assert_eq!(reparsed.pivot_source.as_ref().unwrap().name, "Pivot & One");
+
+        for invalid in [
+            br#"<c:lang val="en-US"/><c:lang val="fr-FR"/>"#.as_slice(),
+            br#"<c:pivotSource><c:fmtId val="1"/></c:pivotSource>"#.as_slice(),
+            br#"<c:pivotSource><c:name>Pivot</c:name></c:pivotSource>"#.as_slice(),
+            br#"<c:pivotSource/>"#.as_slice(),
+        ] {
+            let mut document = br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">"#.to_vec();
+            document.extend_from_slice(invalid);
+            document.extend_from_slice(b"<c:chart><c:plotArea/></c:chart></c:chartSpace>");
+            assert!(parse_chart(document.as_slice()).is_err());
+        }
+    }
 
     #[test]
     fn round_trips_and_validates_chart_print_settings() {

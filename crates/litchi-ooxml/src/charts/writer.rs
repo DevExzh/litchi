@@ -5,7 +5,7 @@
 use crate::charts::axis::{Axis, AxisCommon, CategoryAxis, DateAxis, SeriesAxis, ValueAxis};
 use crate::charts::chart::{
     Chart, ChartHeaderFooter, ChartPageMargins, ChartPageSetup, ChartPrintSettings, PivotFormat,
-    View3D, WallFloor,
+    PivotSource, View3D, WallFloor,
 };
 use crate::charts::legend::Legend;
 use crate::charts::models::{Layout, NumericData, StringData, TitleText};
@@ -104,7 +104,9 @@ pub fn write_chart<W: Write>(writer: &mut W, chart: &Chart) -> std::io::Result<(
         r#"<c:date1904 val="{}"/>"#,
         if chart.date_1904 { "1" } else { "0" }
     )?;
-    write!(writer, r#"<c:lang val="en-US"/>"#)?;
+    if let Some(language) = chart.language.as_ref() {
+        write!(writer, r#"<c:lang val="{}"/>"#, escape_xml(language))?;
+    }
     write!(
         writer,
         r#"<c:roundedCorners val="{}"/>"#,
@@ -113,6 +115,10 @@ pub fn write_chart<W: Write>(writer: &mut W, chart: &Chart) -> std::io::Result<(
 
     if let Some(ref style) = chart.style {
         write!(writer, r#"<c:style val="{}"/>"#, style)?;
+    }
+
+    if let Some(source) = chart.pivot_source.as_ref() {
+        write_pivot_source(writer, source)?;
     }
 
     write!(writer, "<c:chart>")?;
@@ -211,6 +217,16 @@ fn write_title<W: Write>(
     )?;
     write!(writer, "</c:title>")?;
 
+    Ok(())
+}
+
+fn write_pivot_source<W: Write>(writer: &mut W, source: &PivotSource) -> std::io::Result<()> {
+    write!(
+        writer,
+        r#"<c:pivotSource><c:name>{}</c:name><c:fmtId val="{}"/></c:pivotSource>"#,
+        escape_xml(&source.name),
+        source.format_id
+    )?;
     Ok(())
 }
 

@@ -189,6 +189,26 @@ pub struct PivotFormat {
     pub data_label: Option<DataLabel>,
 }
 
+/// Pivot-table source metadata for a pivot chart.
+#[derive(Debug, Clone)]
+pub struct PivotSource {
+    /// Pivot-table name
+    pub name: String,
+    /// Pivot format identifier
+    pub format_id: u32,
+}
+
+impl PivotSource {
+    /// Create pivot-source metadata.
+    #[inline]
+    pub fn new(name: impl Into<String>, format_id: u32) -> Self {
+        Self {
+            name: name.into(),
+            format_id,
+        }
+    }
+}
+
 impl PivotFormat {
     /// Create a pivot-format entry for one data point.
     #[inline]
@@ -317,6 +337,10 @@ pub struct Chart {
     pub show_data_labels_over_max: bool,
     /// Chart style index
     pub style: Option<u32>,
+    /// Chart content language
+    pub language: Option<String>,
+    /// Optional pivot-table source metadata
+    pub pivot_source: Option<PivotSource>,
     /// Use 1904 date system
     pub date_1904: bool,
     /// Rounding corners
@@ -345,6 +369,8 @@ impl Chart {
             plot_visible_only: true,
             show_data_labels_over_max: false,
             style: None,
+            language: None,
+            pivot_source: None,
             date_1904: false,
             rounded_corners: false,
             print_settings: None,

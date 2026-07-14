@@ -81,7 +81,7 @@ pub mod writer;
 pub use axis::{Axis, AxisCommon, CategoryAxis, DateAxis, SeriesAxis, ValueAxis};
 pub use chart::{
     Chart, ChartHeaderFooter, ChartPageMargins, ChartPageOrientation, ChartPageSetup,
-    ChartPrintSettings, PivotFormat, View3D, WallFloor,
+    ChartPrintSettings, PivotFormat, PivotSource, View3D, WallFloor,
 };
 pub use legend::Legend;
 pub use models::{
