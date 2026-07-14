@@ -595,6 +595,21 @@ impl Default for StockTypeGroup {
     }
 }
 
+/// Formatting entry for one indexed surface-chart band.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BandFormat {
+    /// Zero-based band index
+    pub index: u32,
+}
+
+impl BandFormat {
+    /// Create a surface band-format entry.
+    #[inline]
+    pub fn new(index: u32) -> Self {
+        Self { index }
+    }
+}
+
 /// Surface chart type group.
 #[derive(Debug, Clone)]
 pub struct SurfaceTypeGroup {
@@ -602,6 +617,8 @@ pub struct SurfaceTypeGroup {
     pub common: TypeGroupCommon,
     /// Wireframe mode
     pub wireframe: bool,
+    /// Optional indexed band-format collection; `Some` preserves an empty wrapper
+    pub band_formats: Option<Vec<BandFormat>>,
 }
 
 impl SurfaceTypeGroup {
@@ -611,6 +628,7 @@ impl SurfaceTypeGroup {
         Self {
             common: TypeGroupCommon::new(),
             wireframe: false,
+            band_formats: None,
         }
     }
 }
@@ -629,6 +647,8 @@ pub struct Surface3DTypeGroup {
     pub common: TypeGroupCommon,
     /// Wireframe mode
     pub wireframe: bool,
+    /// Optional indexed band-format collection; `Some` preserves an empty wrapper
+    pub band_formats: Option<Vec<BandFormat>>,
 }
 
 impl Surface3DTypeGroup {
@@ -638,6 +658,7 @@ impl Surface3DTypeGroup {
         Self {
             common: TypeGroupCommon::new(),
             wireframe: false,
+            band_formats: None,
         }
     }
 }

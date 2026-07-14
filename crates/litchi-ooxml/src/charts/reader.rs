@@ -13,10 +13,10 @@ use crate::charts::models::{
     DataSourceRef, Layout, NumberFormat, NumericData, RichText, StringData, TitleText,
 };
 use crate::charts::plot_area::{
-    Area3DTypeGroup, AreaTypeGroup, Bar3DTypeGroup, BarShape, BarTypeGroup, BubbleTypeGroup,
-    ChartLines, DataTable, DoughnutTypeGroup, Line3DTypeGroup, LineTypeGroup, OfPieTypeGroup,
-    Pie3DTypeGroup, PieTypeGroup, PlotArea, RadarTypeGroup, ScatterTypeGroup, StockTypeGroup,
-    Surface3DTypeGroup, SurfaceTypeGroup, TypeGroup, TypeGroupCommon, UpDownBars,
+    Area3DTypeGroup, AreaTypeGroup, BandFormat, Bar3DTypeGroup, BarShape, BarTypeGroup,
+    BubbleTypeGroup, ChartLines, DataTable, DoughnutTypeGroup, Line3DTypeGroup, LineTypeGroup,
+    OfPieTypeGroup, Pie3DTypeGroup, PieTypeGroup, PlotArea, RadarTypeGroup, ScatterTypeGroup,
+    StockTypeGroup, Surface3DTypeGroup, SurfaceTypeGroup, TypeGroup, TypeGroupCommon, UpDownBars,
 };
 use crate::charts::series::{
     DataLabel, DataLabels, DataPoint, ErrorBar, ErrorBarDirection, ErrorBarType, ErrorBarValueType,
@@ -1242,33 +1242,152 @@ fn parse_stock_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Stock
 }
 
 fn parse_surface_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<SurfaceTypeGroup> {
-    let mut wireframe = false;
-    let common = parse_common_type_group(reader, b"surfaceChart", false, true, |element| {
-        if element.local_name().as_ref() == b"wireframe" {
-            wireframe = parse_bool_attr(element)?;
-        }
-        Ok(())
-    })?;
+    let (common, wireframe, band_formats) = parse_surface_type_group(reader, b"surfaceChart")?;
     let mut group = SurfaceTypeGroup::new();
     group.common = common;
     group.wireframe = wireframe;
+    group.band_formats = band_formats;
     Ok(group)
 }
 
 fn parse_surface_3d_chart<R: BufRead>(
     reader: &mut ChartXmlReader<R>,
 ) -> Result<Surface3DTypeGroup> {
-    let mut wireframe = false;
-    let common = parse_common_type_group(reader, b"surface3DChart", false, true, |element| {
-        if element.local_name().as_ref() == b"wireframe" {
-            wireframe = parse_bool_attr(element)?;
-        }
-        Ok(())
-    })?;
+    let (common, wireframe, band_formats) = parse_surface_type_group(reader, b"surface3DChart")?;
     let mut group = Surface3DTypeGroup::new();
     group.common = common;
     group.wireframe = wireframe;
+    group.band_formats = band_formats;
     Ok(group)
+}
+
+fn parse_surface_type_group<R: BufRead>(
+    reader: &mut ChartXmlReader<R>,
+    end_name: &[u8],
+) -> Result<(TypeGroupCommon, bool, Option<Vec<BandFormat>>)> {
+    let mut common = TypeGroupCommon::new();
+    let mut wireframe = false;
+    let mut band_formats = None;
+    let mut buf = Vec::new();
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"bandFmts" => {
+                if band_formats.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "surface chart contains duplicate band-format collections".into(),
+                    ));
+                }
+                band_formats = Some(parse_surface_band_formats(reader)?);
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"bandFmts" => {
+                if band_formats.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "surface chart contains duplicate band-format collections".into(),
+                    ));
+                }
+                band_formats = Some(Vec::new());
+            },
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"ser" => {
+                if let Some(series) = parse_series(reader)? {
+                    common.series.push(series);
+                }
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"ser" => {
+                return Err(OoxmlError::InvalidFormat(
+                    "surface chart contains an empty series".into(),
+                ));
+            },
+            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element)) => {
+                match element.local_name().as_ref() {
+                    b"wireframe" => wireframe = parse_bool_attr(element)?,
+                    b"axId" => common
+                        .axis_ids
+                        .push(required_u32_attr(element, "surface chart axis ID")?),
+                    _ => {},
+                }
+            },
+            Ok(Event::End(ref element)) if element.local_name().as_ref() == end_name => break,
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated surface chart".into(),
+                ));
+            },
+            Err(error) => return Err(error),
+            _ => {},
+        }
+        buf.clear();
+    }
+    Ok((common, wireframe, band_formats))
+}
+
+fn parse_surface_band_formats<R: BufRead>(
+    reader: &mut ChartXmlReader<R>,
+) -> Result<Vec<BandFormat>> {
+    let mut formats = Vec::new();
+    let mut buf = Vec::new();
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"bandFmt" => {
+                let format = parse_surface_band_format(reader)?;
+                if formats
+                    .iter()
+                    .any(|existing: &BandFormat| existing.index == format.index)
+                {
+                    return Err(OoxmlError::InvalidFormat(format!(
+                        "surface chart contains duplicate band index {}",
+                        format.index
+                    )));
+                }
+                formats.push(format);
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"bandFmt" => {
+                return Err(OoxmlError::InvalidFormat(
+                    "surface chart band format is missing its index".into(),
+                ));
+            },
+            Ok(Event::End(ref element)) if element.local_name().as_ref() == b"bandFmts" => break,
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated surface chart band formats".into(),
+                ));
+            },
+            Err(error) => return Err(error),
+            _ => {},
+        }
+        buf.clear();
+    }
+    Ok(formats)
+}
+
+fn parse_surface_band_format<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<BandFormat> {
+    let mut index = None;
+    let mut buf = Vec::new();
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element))
+                if element.local_name().as_ref() == b"idx" =>
+            {
+                if index.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "surface chart band format contains duplicate indexes".into(),
+                    ));
+                }
+                index = Some(required_u32_attr(element, "surface chart band index")?);
+            },
+            Ok(Event::End(ref element)) if element.local_name().as_ref() == b"bandFmt" => break,
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated surface chart band format".into(),
+                ));
+            },
+            Err(error) => return Err(error),
+            _ => {},
+        }
+        buf.clear();
+    }
+    Ok(BandFormat::new(index.ok_or_else(|| {
+        missing_attribute("surface chart band index")
+    })?))
 }
 
 fn parse_bar_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<BarTypeGroup>> {
@@ -4051,6 +4170,64 @@ mod tests {
             ..UpDownBars::default()
         });
         invalid.plot_area.type_groups.push(TypeGroup::Line(line));
+        assert!(crate::charts::writer::write_chart(&mut Vec::new(), &invalid).is_err());
+    }
+
+    #[test]
+    fn round_trips_and_validates_surface_band_formats() {
+        let xml =
+            br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
+            <c:chart><c:plotArea>
+                <c:surfaceChart><c:wireframe/><c:bandFmts>
+                    <c:bandFmt><c:idx val="2"/><c:spPr/></c:bandFmt>
+                    <c:bandFmt><c:idx val="7"/><c:spPr/></c:bandFmt>
+                </c:bandFmts></c:surfaceChart>
+                <c:surface3DChart><c:bandFmts/></c:surface3DChart>
+            </c:plotArea></c:chart>
+        </c:chartSpace>"#;
+        let chart = parse_chart(xml.as_slice()).unwrap();
+        let TypeGroup::Surface(surface) = &chart.plot_area.type_groups[0] else {
+            panic!("expected surface chart");
+        };
+        assert!(surface.wireframe);
+        assert_eq!(
+            surface
+                .band_formats
+                .as_ref()
+                .unwrap()
+                .iter()
+                .map(|format| format.index)
+                .collect::<Vec<_>>(),
+            [2, 7]
+        );
+        let TypeGroup::Surface3D(surface) = &chart.plot_area.type_groups[1] else {
+            panic!("expected 3D surface chart");
+        };
+        assert!(surface.band_formats.as_ref().unwrap().is_empty());
+
+        let mut output = Vec::new();
+        crate::charts::writer::write_chart(&mut output, &chart).unwrap();
+        let reparsed = parse_chart(output.as_slice()).unwrap();
+        let TypeGroup::Surface(surface) = &reparsed.plot_area.type_groups[0] else {
+            panic!("expected surface chart");
+        };
+        assert_eq!(surface.band_formats.as_ref().unwrap().len(), 2);
+
+        let duplicate =
+            br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
+            <c:chart><c:plotArea><c:surfaceChart><c:bandFmts>
+                <c:bandFmt><c:idx val="1"/></c:bandFmt>
+                <c:bandFmt><c:idx val="1"/></c:bandFmt>
+            </c:bandFmts></c:surfaceChart></c:plotArea></c:chart></c:chartSpace>"#;
+        assert!(parse_chart(duplicate.as_slice()).is_err());
+
+        let mut invalid = Chart::new();
+        let mut surface = SurfaceTypeGroup::new();
+        surface.band_formats = Some(vec![BandFormat::new(3), BandFormat::new(3)]);
+        invalid
+            .plot_area
+            .type_groups
+            .push(TypeGroup::Surface(surface));
         assert!(crate::charts::writer::write_chart(&mut Vec::new(), &invalid).is_err());
     }
 

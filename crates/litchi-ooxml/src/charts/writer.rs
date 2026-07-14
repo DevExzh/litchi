@@ -7,8 +7,8 @@ use crate::charts::chart::{Chart, View3D, WallFloor};
 use crate::charts::legend::Legend;
 use crate::charts::models::{Layout, NumericData, StringData, TitleText};
 use crate::charts::plot_area::{
-    Area3DTypeGroup, AreaTypeGroup, Bar3DTypeGroup, BarTypeGroup, BubbleTypeGroup, DataTable,
-    DoughnutTypeGroup, Line3DTypeGroup, LineTypeGroup, OfPieTypeGroup, Pie3DTypeGroup,
+    Area3DTypeGroup, AreaTypeGroup, BandFormat, Bar3DTypeGroup, BarTypeGroup, BubbleTypeGroup,
+    DataTable, DoughnutTypeGroup, Line3DTypeGroup, LineTypeGroup, OfPieTypeGroup, Pie3DTypeGroup,
     PieTypeGroup, PlotArea, RadarTypeGroup, ScatterTypeGroup, StockTypeGroup, Surface3DTypeGroup,
     SurfaceTypeGroup, TypeGroup, TypeGroupCommon, UpDownBars,
 };
@@ -878,6 +878,9 @@ fn write_surface_chart<W: Write>(writer: &mut W, group: &SurfaceTypeGroup) -> st
     for series in &group.common.series {
         write_series(writer, series, SeriesFeatures::SURFACE)?;
     }
+    if let Some(formats) = group.band_formats.as_deref() {
+        write_surface_band_formats(writer, formats)?;
+    }
 
     write_type_group_axis_ids(writer, &group.common, &[1, 2, 3], 3, 3, "surface chart")?;
     write!(writer, "</c:surfaceChart>")?;
@@ -898,6 +901,9 @@ fn write_surface_3d_chart<W: Write>(
 
     for series in &group.common.series {
         write_series(writer, series, SeriesFeatures::SURFACE)?;
+    }
+    if let Some(formats) = group.band_formats.as_deref() {
+        write_surface_band_formats(writer, formats)?;
     }
 
     write_type_group_axis_ids(writer, &group.common, &[1, 2, 3], 3, 3, "3D surface chart")?;
@@ -1609,6 +1615,29 @@ fn write_up_down_bars<W: Write>(writer: &mut W, bars: &UpDownBars) -> std::io::R
         write!(writer, "<c:downBars/>")?;
     }
     write!(writer, "</c:upDownBars>")?;
+    Ok(())
+}
+
+fn write_surface_band_formats<W: Write>(
+    writer: &mut W,
+    formats: &[BandFormat],
+) -> std::io::Result<()> {
+    let mut indexes = std::collections::HashSet::with_capacity(formats.len());
+    write!(writer, "<c:bandFmts>")?;
+    for format in formats {
+        if !indexes.insert(format.index) {
+            return Err(invalid_chart_input(format!(
+                "surface chart contains duplicate band index {}",
+                format.index
+            )));
+        }
+        write!(
+            writer,
+            r#"<c:bandFmt><c:idx val="{}"/><c:spPr/></c:bandFmt>"#,
+            format.index
+        )?;
+    }
+    write!(writer, "</c:bandFmts>")?;
     Ok(())
 }
 
