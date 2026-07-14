@@ -12,6 +12,14 @@ use quick_xml::name::{NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
 use std::fmt::Write as _;
 
+pub(crate) const STRICT_WEB_SETTINGS_RELATIONSHIP: &str =
+    "http://purl.oclc.org/ooxml/officeDocument/relationships/webSettings";
+
+pub(crate) fn is_web_settings_relationship(value: &str) -> bool {
+    value == litchi_opc::constants::relationship_type::WEB_SETTINGS
+        || value == STRICT_WEB_SETTINGS_RELATIONSHIP
+}
+
 /// Scalar settings from a Word `webSettings.xml` part.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct WebSettings {
