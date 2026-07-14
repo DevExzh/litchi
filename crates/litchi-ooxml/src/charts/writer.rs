@@ -3,7 +3,10 @@
 //! This module provides functionality to generate chart XML for OOXML packages.
 
 use crate::charts::axis::{Axis, AxisCommon, CategoryAxis, DateAxis, SeriesAxis, ValueAxis};
-use crate::charts::chart::{Chart, PivotFormat, View3D, WallFloor};
+use crate::charts::chart::{
+    Chart, ChartHeaderFooter, ChartPageMargins, ChartPageSetup, ChartPrintSettings, PivotFormat,
+    View3D, WallFloor,
+};
 use crate::charts::legend::Legend;
 use crate::charts::models::{Layout, NumericData, StringData, TitleText};
 use crate::charts::plot_area::{
@@ -178,14 +181,9 @@ pub fn write_chart<W: Write>(writer: &mut W, chart: &Chart) -> std::io::Result<(
 
     write!(writer, "</c:chart>")?;
 
-    write!(writer, "<c:printSettings>")?;
-    write!(writer, "<c:headerFooter/>")?;
-    write!(
-        writer,
-        r#"<c:pageMargins b="0.75" l="0.7" r="0.7" t="0.75" header="0.3" footer="0.3"/>"#
-    )?;
-    write!(writer, "<c:pageSetup/>")?;
-    write!(writer, "</c:printSettings>")?;
+    if let Some(settings) = chart.print_settings.as_ref() {
+        write_print_settings(writer, settings)?;
+    }
 
     write!(writer, "</c:chartSpace>")?;
 
@@ -236,6 +234,110 @@ fn write_pivot_formats<W: Write>(writer: &mut W, formats: &[PivotFormat]) -> std
         write!(writer, "</c:pivotFmt>")?;
     }
     write!(writer, "</c:pivotFmts>")?;
+    Ok(())
+}
+
+fn write_print_settings<W: Write>(
+    writer: &mut W,
+    settings: &ChartPrintSettings,
+) -> std::io::Result<()> {
+    write!(writer, "<c:printSettings>")?;
+    if let Some(header_footer) = settings.header_footer.as_ref() {
+        write_chart_header_footer(writer, header_footer)?;
+    }
+    if let Some(margins) = settings.page_margins.as_ref() {
+        write_chart_page_margins(writer, margins)?;
+    }
+    if let Some(setup) = settings.page_setup.as_ref() {
+        write_chart_page_setup(writer, setup)?;
+    }
+    write!(writer, "</c:printSettings>")?;
+    Ok(())
+}
+
+fn write_chart_header_footer<W: Write>(
+    writer: &mut W,
+    header_footer: &ChartHeaderFooter,
+) -> std::io::Result<()> {
+    write!(
+        writer,
+        r#"<c:headerFooter alignWithMargins="{}" differentOddEven="{}" differentFirst="{}">"#,
+        if header_footer.align_with_margins {
+            "1"
+        } else {
+            "0"
+        },
+        if header_footer.different_odd_even {
+            "1"
+        } else {
+            "0"
+        },
+        if header_footer.different_first {
+            "1"
+        } else {
+            "0"
+        }
+    )?;
+    for (name, value) in [
+        ("oddHeader", header_footer.odd_header.as_ref()),
+        ("oddFooter", header_footer.odd_footer.as_ref()),
+        ("evenHeader", header_footer.even_header.as_ref()),
+        ("evenFooter", header_footer.even_footer.as_ref()),
+        ("firstHeader", header_footer.first_header.as_ref()),
+        ("firstFooter", header_footer.first_footer.as_ref()),
+    ] {
+        if let Some(value) = value {
+            write!(writer, "<c:{name}>{}</c:{name}>", escape_xml(value))?;
+        }
+    }
+    write!(writer, "</c:headerFooter>")?;
+    Ok(())
+}
+
+fn write_chart_page_margins<W: Write>(
+    writer: &mut W,
+    margins: &ChartPageMargins,
+) -> std::io::Result<()> {
+    for (name, value) in [
+        ("left", margins.left),
+        ("right", margins.right),
+        ("top", margins.top),
+        ("bottom", margins.bottom),
+        ("header", margins.header),
+        ("footer", margins.footer),
+    ] {
+        if !value.is_finite() {
+            return Err(invalid_chart_input(format!(
+                "chart {name} page margin must be finite"
+            )));
+        }
+    }
+    write!(
+        writer,
+        r#"<c:pageMargins l="{}" r="{}" t="{}" b="{}" header="{}" footer="{}"/>"#,
+        margins.left, margins.right, margins.top, margins.bottom, margins.header, margins.footer
+    )?;
+    Ok(())
+}
+
+fn write_chart_page_setup<W: Write>(writer: &mut W, setup: &ChartPageSetup) -> std::io::Result<()> {
+    write!(
+        writer,
+        r#"<c:pageSetup paperSize="{}" firstPageNumber="{}" orientation="{}" blackAndWhite="{}" draft="{}" useFirstPageNumber="{}" horizontalDpi="{}" verticalDpi="{}" copies="{}"/>"#,
+        setup.paper_size,
+        setup.first_page_number,
+        setup.orientation.xml_value(),
+        if setup.black_and_white { "1" } else { "0" },
+        if setup.draft { "1" } else { "0" },
+        if setup.use_first_page_number {
+            "1"
+        } else {
+            "0"
+        },
+        setup.horizontal_dpi,
+        setup.vertical_dpi,
+        setup.copies
+    )?;
     Ok(())
 }
 

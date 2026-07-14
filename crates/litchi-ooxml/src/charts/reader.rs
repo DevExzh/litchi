@@ -7,7 +7,10 @@ use crate::charts::axis::{
     Axis, AxisCommon, AxisCrossBetween, AxisCrossMode, AxisLabelAlign, BuiltInUnit, CategoryAxis,
     DateAxis, DisplayUnits, SeriesAxis, TimeUnit, ValueAxis,
 };
-use crate::charts::chart::{Chart, PivotFormat, View3D, WallFloor};
+use crate::charts::chart::{
+    Chart, ChartHeaderFooter, ChartPageMargins, ChartPageOrientation, ChartPageSetup,
+    ChartPrintSettings, PivotFormat, View3D, WallFloor,
+};
 use crate::charts::legend::{Legend, LegendEntry};
 use crate::charts::models::{
     DataSourceRef, Layout, NumberFormat, NumericData, RichText, StringData, TitleText,
@@ -223,6 +226,22 @@ pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
             Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"plotArea" => {
                 chart.plot_area = PlotArea::new();
             },
+            Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"printSettings" => {
+                if chart.print_settings.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart contains duplicate print settings".into(),
+                    ));
+                }
+                chart.print_settings = Some(parse_print_settings(&mut xml_reader)?);
+            },
+            Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"printSettings" => {
+                if chart.print_settings.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart contains duplicate print settings".into(),
+                    ));
+                }
+                chart.print_settings = Some(ChartPrintSettings::new());
+            },
             Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
                 let tag_name = e.local_name();
                 match tag_name.as_ref() {
@@ -400,6 +419,263 @@ fn parse_pivot_format<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Pivo
     format.marker = marker;
     format.data_label = data_label;
     Ok(format)
+}
+
+fn parse_print_settings<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<ChartPrintSettings> {
+    let mut settings = ChartPrintSettings::new();
+    let mut buf = Vec::new();
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"headerFooter" => {
+                if settings.header_footer.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart print settings contain duplicate headers and footers".into(),
+                    ));
+                }
+                settings.header_footer = Some(parse_chart_header_footer(reader, element)?);
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"headerFooter" => {
+                if settings.header_footer.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart print settings contain duplicate headers and footers".into(),
+                    ));
+                }
+                settings.header_footer = Some(parse_chart_header_footer_attributes(element)?);
+            },
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"pageMargins" => {
+                if settings.page_margins.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart print settings contain duplicate page margins".into(),
+                    ));
+                }
+                settings.page_margins = Some(parse_chart_page_margins(element)?);
+                consume_empty_chart_element(reader, b"pageMargins", "chart page margins")?;
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"pageMargins" => {
+                if settings.page_margins.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart print settings contain duplicate page margins".into(),
+                    ));
+                }
+                settings.page_margins = Some(parse_chart_page_margins(element)?);
+            },
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"pageSetup" => {
+                if settings.page_setup.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart print settings contain duplicate page setup".into(),
+                    ));
+                }
+                settings.page_setup = Some(parse_chart_page_setup(element)?);
+                consume_empty_chart_element(reader, b"pageSetup", "chart page setup")?;
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"pageSetup" => {
+                if settings.page_setup.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart print settings contain duplicate page setup".into(),
+                    ));
+                }
+                settings.page_setup = Some(parse_chart_page_setup(element)?);
+            },
+            Ok(Event::End(ref element)) if element.local_name().as_ref() == b"printSettings" => {
+                break;
+            },
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated chart print settings".into(),
+                ));
+            },
+            Err(error) => return Err(error),
+            _ => {},
+        }
+        buf.clear();
+    }
+    Ok(settings)
+}
+
+fn parse_chart_header_footer_attributes(element: &BytesStart<'_>) -> Result<ChartHeaderFooter> {
+    let mut header_footer = ChartHeaderFooter::new();
+    header_footer.align_with_margins = optional_bool_attr(
+        element,
+        b"alignWithMargins",
+        true,
+        "header/footer alignment",
+    )?;
+    header_footer.different_odd_even = optional_bool_attr(
+        element,
+        b"differentOddEven",
+        false,
+        "odd/even header/footer selection",
+    )?;
+    header_footer.different_first = optional_bool_attr(
+        element,
+        b"differentFirst",
+        false,
+        "first-page header/footer selection",
+    )?;
+    Ok(header_footer)
+}
+
+fn parse_chart_header_footer<R: BufRead>(
+    reader: &mut ChartXmlReader<R>,
+    element: &BytesStart<'_>,
+) -> Result<ChartHeaderFooter> {
+    let mut header_footer = parse_chart_header_footer_attributes(element)?;
+    let mut buf = Vec::new();
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref child)) => {
+                let value = match child.local_name().as_ref() {
+                    b"oddHeader" => &mut header_footer.odd_header,
+                    b"oddFooter" => &mut header_footer.odd_footer,
+                    b"evenHeader" => &mut header_footer.even_header,
+                    b"evenFooter" => &mut header_footer.even_footer,
+                    b"firstHeader" => &mut header_footer.first_header,
+                    b"firstFooter" => &mut header_footer.first_footer,
+                    name if name == IGNORED_NAMESPACE_ELEMENT.as_bytes() => {
+                        buf.clear();
+                        continue;
+                    },
+                    _ => {
+                        return Err(OoxmlError::InvalidFormat(
+                            "chart header/footer contains an unexpected child".into(),
+                        ));
+                    },
+                };
+                if value.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart header/footer contains a duplicate string".into(),
+                    ));
+                }
+                *value = Some(parse_text_element(reader, child.local_name().as_ref())?);
+            },
+            Ok(Event::Empty(ref child)) => {
+                let value = match child.local_name().as_ref() {
+                    b"oddHeader" => &mut header_footer.odd_header,
+                    b"oddFooter" => &mut header_footer.odd_footer,
+                    b"evenHeader" => &mut header_footer.even_header,
+                    b"evenFooter" => &mut header_footer.even_footer,
+                    b"firstHeader" => &mut header_footer.first_header,
+                    b"firstFooter" => &mut header_footer.first_footer,
+                    name if name == IGNORED_NAMESPACE_ELEMENT.as_bytes() => {
+                        buf.clear();
+                        continue;
+                    },
+                    _ => {
+                        return Err(OoxmlError::InvalidFormat(
+                            "chart header/footer contains an unexpected child".into(),
+                        ));
+                    },
+                };
+                if value.replace(String::new()).is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart header/footer contains a duplicate string".into(),
+                    ));
+                }
+            },
+            Ok(Event::End(ref child)) if child.local_name().as_ref() == b"headerFooter" => break,
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated chart header/footer".into(),
+                ));
+            },
+            Err(error) => return Err(error),
+            _ => {},
+        }
+        buf.clear();
+    }
+    Ok(header_footer)
+}
+
+fn parse_chart_page_margins(element: &BytesStart<'_>) -> Result<ChartPageMargins> {
+    Ok(ChartPageMargins::new(
+        required_named_f64_attr(element, b"l", "chart left page margin")?,
+        required_named_f64_attr(element, b"r", "chart right page margin")?,
+        required_named_f64_attr(element, b"t", "chart top page margin")?,
+        required_named_f64_attr(element, b"b", "chart bottom page margin")?,
+        required_named_f64_attr(element, b"header", "chart header page margin")?,
+        required_named_f64_attr(element, b"footer", "chart footer page margin")?,
+    ))
+}
+
+fn parse_chart_page_setup(element: &BytesStart<'_>) -> Result<ChartPageSetup> {
+    let mut setup = ChartPageSetup::new();
+    setup.paper_size = optional_u32_attr(element, b"paperSize", 1, "chart printer paper size")?;
+    setup.first_page_number =
+        optional_u32_attr(element, b"firstPageNumber", 1, "chart first page number")?;
+    setup.orientation = match get_attr(element, b"orientation").as_deref() {
+        None | Some(b"default") => ChartPageOrientation::Default,
+        Some(b"portrait") => ChartPageOrientation::Portrait,
+        Some(b"landscape") => ChartPageOrientation::Landscape,
+        Some(value) => return Err(invalid_attribute("chart page orientation", value)),
+    };
+    setup.black_and_white = optional_bool_attr(
+        element,
+        b"blackAndWhite",
+        false,
+        "chart black-and-white printing",
+    )?;
+    setup.draft = optional_bool_attr(element, b"draft", false, "chart draft printing")?;
+    setup.use_first_page_number = optional_bool_attr(
+        element,
+        b"useFirstPageNumber",
+        false,
+        "chart first-page-number usage",
+    )?;
+    setup.horizontal_dpi = optional_i32_attr(
+        element,
+        b"horizontalDpi",
+        600,
+        "chart horizontal printer resolution",
+    )?;
+    setup.vertical_dpi = optional_i32_attr(
+        element,
+        b"verticalDpi",
+        600,
+        "chart vertical printer resolution",
+    )?;
+    setup.copies = optional_u32_attr(element, b"copies", 1, "chart print copies")?;
+    Ok(setup)
+}
+
+fn consume_empty_chart_element<R: BufRead>(
+    reader: &mut ChartXmlReader<R>,
+    end_name: &[u8],
+    description: &str,
+) -> Result<()> {
+    let mut buf = Vec::new();
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::End(ref element)) if element.local_name().as_ref() == end_name => {
+                return Ok(());
+            },
+            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element))
+                if element.local_name().as_ref() != IGNORED_NAMESPACE_ELEMENT.as_bytes() =>
+            {
+                return Err(OoxmlError::InvalidFormat(format!(
+                    "{description} contains child elements"
+                )));
+            },
+            Ok(Event::Text(ref text))
+                if !text
+                    .decode()
+                    .map_err(|error| OoxmlError::Xml(error.to_string()))?
+                    .trim()
+                    .is_empty() =>
+            {
+                return Err(OoxmlError::InvalidFormat(format!(
+                    "{description} contains text"
+                )));
+            },
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(format!(
+                    "unterminated {description}"
+                )));
+            },
+            Err(error) => return Err(error),
+            _ => {},
+        }
+        buf.clear();
+    }
 }
 
 struct ParsedTitle {
@@ -3852,6 +4128,61 @@ fn required_u32_attr(element: &BytesStart<'_>, description: &str) -> Result<u32>
         .ok_or_else(|| invalid_attribute(description, &value))
 }
 
+fn optional_u32_attr(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    default: u32,
+    description: &str,
+) -> Result<u32> {
+    let Some(value) = get_attr(element, name) else {
+        return Ok(default);
+    };
+    std::str::from_utf8(&value)
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .ok_or_else(|| invalid_attribute(description, &value))
+}
+
+fn optional_i32_attr(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    default: i32,
+    description: &str,
+) -> Result<i32> {
+    let Some(value) = get_attr(element, name) else {
+        return Ok(default);
+    };
+    std::str::from_utf8(&value)
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .ok_or_else(|| invalid_attribute(description, &value))
+}
+
+fn optional_bool_attr(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    default: bool,
+    description: &str,
+) -> Result<bool> {
+    match get_attr(element, name) {
+        Some(value) => parse_bool_value(&value, description),
+        None => Ok(default),
+    }
+}
+
+fn required_named_f64_attr(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    description: &str,
+) -> Result<f64> {
+    let value = get_attr(element, name).ok_or_else(|| missing_attribute(description))?;
+    std::str::from_utf8(&value)
+        .ok()
+        .and_then(|value| value.parse::<f64>().ok())
+        .filter(|value| value.is_finite())
+        .ok_or_else(|| invalid_attribute(description, &value))
+}
+
 fn required_positive_u32_attr(element: &BytesStart<'_>, description: &str) -> Result<u32> {
     let value = required_u32_attr(element, description)?;
     if value == 0 {
@@ -3967,6 +4298,87 @@ fn get_attr(e: &BytesStart, name: &[u8]) -> Option<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn round_trips_and_validates_chart_print_settings() {
+        let xml =
+            br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
+            <c:chart><c:plotArea/></c:chart><c:printSettings>
+                <c:headerFooter alignWithMargins="0" differentOddEven="1" differentFirst="true">
+                    <c:oddHeader>&amp;LRevenue</c:oddHeader><c:oddFooter>&amp;P / &amp;N</c:oddFooter>
+                    <c:evenHeader/><c:firstFooter><![CDATA[First & last]]></c:firstFooter>
+                </c:headerFooter>
+                <c:pageMargins l="0.2" r="0.3" t="0.4" b="0.5" header="0.1" footer="0.15"/>
+                <c:pageSetup paperSize="9" firstPageNumber="4" orientation="landscape"
+                    blackAndWhite="1" draft="true" useFirstPageNumber="1"
+                    horizontalDpi="300" verticalDpi="1200" copies="2"/>
+            </c:printSettings></c:chartSpace>"#;
+        let chart = parse_chart(xml.as_slice()).unwrap();
+        let settings = chart.print_settings.as_ref().unwrap();
+        let header_footer = settings.header_footer.as_ref().unwrap();
+        assert!(!header_footer.align_with_margins);
+        assert!(header_footer.different_odd_even);
+        assert!(header_footer.different_first);
+        assert_eq!(header_footer.odd_header.as_deref(), Some("&LRevenue"));
+        assert_eq!(header_footer.even_header.as_deref(), Some(""));
+        assert_eq!(header_footer.first_footer.as_deref(), Some("First & last"));
+        let margins = settings.page_margins.as_ref().unwrap();
+        assert_eq!(margins.left, 0.2);
+        assert_eq!(margins.footer, 0.15);
+        let setup = settings.page_setup.as_ref().unwrap();
+        assert_eq!(setup.paper_size, 9);
+        assert_eq!(setup.first_page_number, 4);
+        assert_eq!(setup.orientation, ChartPageOrientation::Landscape);
+        assert!(setup.black_and_white);
+        assert!(setup.draft);
+        assert!(setup.use_first_page_number);
+        assert_eq!(setup.horizontal_dpi, 300);
+        assert_eq!(setup.vertical_dpi, 1200);
+        assert_eq!(setup.copies, 2);
+
+        let mut output = Vec::new();
+        crate::charts::writer::write_chart(&mut output, &chart).unwrap();
+        let reparsed = parse_chart(output.as_slice()).unwrap();
+        assert_eq!(
+            reparsed
+                .print_settings
+                .as_ref()
+                .unwrap()
+                .header_footer
+                .as_ref()
+                .unwrap()
+                .odd_footer
+                .as_deref(),
+            Some("&P / &N")
+        );
+
+        let empty =
+            br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
+            <c:chart><c:plotArea/></c:chart><c:printSettings/></c:chartSpace>"#;
+        let empty = parse_chart(empty.as_slice()).unwrap();
+        let empty = empty.print_settings.unwrap();
+        assert!(empty.header_footer.is_none());
+        assert!(empty.page_margins.is_none());
+        assert!(empty.page_setup.is_none());
+
+        for invalid in [
+            br#"<c:pageMargins l="0.2" r="0.3" t="0.4" b="0.5" header="0.1"/>"#.as_slice(),
+            br#"<c:pageSetup orientation="diagonal"/>"#.as_slice(),
+            br#"<c:pageSetup/><c:pageSetup/>"#.as_slice(),
+            br#"<c:headerFooter><c:bogus/></c:headerFooter>"#.as_slice(),
+        ] {
+            let mut document = br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea/></c:chart><c:printSettings>"#.to_vec();
+            document.extend_from_slice(invalid);
+            document.extend_from_slice(b"</c:printSettings></c:chartSpace>");
+            assert!(parse_chart(document.as_slice()).is_err());
+        }
+
+        let mut invalid = Chart::new();
+        let mut settings = ChartPrintSettings::new();
+        settings.page_margins = Some(ChartPageMargins::new(f64::NAN, 0.3, 0.4, 0.5, 0.1, 0.15));
+        invalid.print_settings = Some(settings);
+        assert!(crate::charts::writer::write_chart(&mut Vec::new(), &invalid).is_err());
+    }
 
     #[test]
     fn round_trips_and_validates_pivot_chart_formats() {

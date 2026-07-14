@@ -9,6 +9,175 @@ use crate::charts::plot_area::PlotArea;
 use crate::charts::series::{DataLabel, Marker};
 use crate::charts::types::DisplayBlanks;
 
+/// Printed chart header and footer strings and selection flags.
+#[derive(Debug, Clone)]
+pub struct ChartHeaderFooter {
+    /// Odd-page header
+    pub odd_header: Option<String>,
+    /// Odd-page footer
+    pub odd_footer: Option<String>,
+    /// Even-page header
+    pub even_header: Option<String>,
+    /// Even-page footer
+    pub even_footer: Option<String>,
+    /// First-page header
+    pub first_header: Option<String>,
+    /// First-page footer
+    pub first_footer: Option<String>,
+    /// Align header and footer with page margins
+    pub align_with_margins: bool,
+    /// Use distinct odd- and even-page strings
+    pub different_odd_even: bool,
+    /// Use distinct first-page strings
+    pub different_first: bool,
+}
+
+impl ChartHeaderFooter {
+    /// Create an empty header/footer using schema defaults.
+    #[inline]
+    pub fn new() -> Self {
+        Self {
+            odd_header: None,
+            odd_footer: None,
+            even_header: None,
+            even_footer: None,
+            first_header: None,
+            first_footer: None,
+            align_with_margins: true,
+            different_odd_even: false,
+            different_first: false,
+        }
+    }
+}
+
+impl Default for ChartHeaderFooter {
+    #[inline]
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Page margins for printing a chart, in inches.
+#[derive(Debug, Clone, Copy)]
+pub struct ChartPageMargins {
+    /// Left margin
+    pub left: f64,
+    /// Right margin
+    pub right: f64,
+    /// Top margin
+    pub top: f64,
+    /// Bottom margin
+    pub bottom: f64,
+    /// Header margin
+    pub header: f64,
+    /// Footer margin
+    pub footer: f64,
+}
+
+impl ChartPageMargins {
+    /// Create a complete page-margin set.
+    #[inline]
+    pub fn new(left: f64, right: f64, top: f64, bottom: f64, header: f64, footer: f64) -> Self {
+        Self {
+            left,
+            right,
+            top,
+            bottom,
+            header,
+            footer,
+        }
+    }
+}
+
+/// Printed chart page orientation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ChartPageOrientation {
+    /// Use the printer default
+    #[default]
+    Default,
+    /// Portrait orientation
+    Portrait,
+    /// Landscape orientation
+    Landscape,
+}
+
+impl ChartPageOrientation {
+    pub(crate) const fn xml_value(self) -> &'static str {
+        match self {
+            Self::Default => "default",
+            Self::Portrait => "portrait",
+            Self::Landscape => "landscape",
+        }
+    }
+}
+
+/// Page setup used when printing a chart.
+#[derive(Debug, Clone, Copy)]
+pub struct ChartPageSetup {
+    /// Printer paper-size code
+    pub paper_size: u32,
+    /// First printed page number
+    pub first_page_number: u32,
+    /// Page orientation
+    pub orientation: ChartPageOrientation,
+    /// Print in black and white
+    pub black_and_white: bool,
+    /// Use draft quality
+    pub draft: bool,
+    /// Honor `first_page_number`
+    pub use_first_page_number: bool,
+    /// Horizontal printer resolution
+    pub horizontal_dpi: i32,
+    /// Vertical printer resolution
+    pub vertical_dpi: i32,
+    /// Number of copies
+    pub copies: u32,
+}
+
+impl ChartPageSetup {
+    /// Create page setup using schema defaults.
+    #[inline]
+    pub fn new() -> Self {
+        Self {
+            paper_size: 1,
+            first_page_number: 1,
+            orientation: ChartPageOrientation::Default,
+            black_and_white: false,
+            draft: false,
+            use_first_page_number: false,
+            horizontal_dpi: 600,
+            vertical_dpi: 600,
+            copies: 1,
+        }
+    }
+}
+
+impl Default for ChartPageSetup {
+    #[inline]
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Optional chart printing configuration.
+#[derive(Debug, Clone, Default)]
+pub struct ChartPrintSettings {
+    /// Header and footer settings
+    pub header_footer: Option<ChartHeaderFooter>,
+    /// Page margins
+    pub page_margins: Option<ChartPageMargins>,
+    /// Page setup
+    pub page_setup: Option<ChartPageSetup>,
+}
+
+impl ChartPrintSettings {
+    /// Create an explicitly empty print-settings container.
+    #[inline]
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
 /// Formatting override for one pivot-chart data point.
 #[derive(Debug, Clone)]
 pub struct PivotFormat {
@@ -152,6 +321,8 @@ pub struct Chart {
     pub date_1904: bool,
     /// Rounding corners
     pub rounded_corners: bool,
+    /// Optional chart printing configuration
+    pub print_settings: Option<ChartPrintSettings>,
 }
 
 impl Chart {
@@ -176,6 +347,7 @@ impl Chart {
             style: None,
             date_1904: false,
             rounded_corners: false,
+            print_settings: None,
         }
     }
 

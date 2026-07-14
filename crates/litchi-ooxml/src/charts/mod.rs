@@ -79,7 +79,10 @@ pub mod types;
 pub mod writer;
 
 pub use axis::{Axis, AxisCommon, CategoryAxis, DateAxis, SeriesAxis, ValueAxis};
-pub use chart::{Chart, PivotFormat, View3D, WallFloor};
+pub use chart::{
+    Chart, ChartHeaderFooter, ChartPageMargins, ChartPageOrientation, ChartPageSetup,
+    ChartPrintSettings, PivotFormat, View3D, WallFloor,
+};
 pub use legend::Legend;
 pub use models::{
     Layout, MultiLevelStringData, NumberFormat, NumericData, RichText, StringData, TitleText,
