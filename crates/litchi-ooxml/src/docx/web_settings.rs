@@ -314,6 +314,84 @@ impl Frameset {
     pub fn children(&self) -> &[FramesetChild] {
         &self.children
     }
+
+    /// Set the frameset size expression.
+    pub fn set_size(&mut self, value: impl Into<String>) -> &mut Self {
+        self.size = Some(value.into());
+        self
+    }
+
+    /// Remove the explicit frameset size expression.
+    pub fn clear_size(&mut self) -> &mut Self {
+        self.size = None;
+        self
+    }
+
+    /// Set splitter-bar properties.
+    pub fn set_split_bar(&mut self, value: FramesetSplitBar) -> &mut Self {
+        self.split_bar = Some(value);
+        self
+    }
+
+    /// Return mutable splitter-bar properties, if present.
+    pub fn split_bar_mut(&mut self) -> Option<&mut FramesetSplitBar> {
+        self.split_bar.as_mut()
+    }
+
+    /// Remove explicit splitter-bar properties.
+    pub fn clear_split_bar(&mut self) -> &mut Self {
+        self.split_bar = None;
+        self
+    }
+
+    /// Set the child layout.
+    pub fn set_layout(&mut self, value: FrameLayout) -> &mut Self {
+        self.layout = Some(value);
+        self
+    }
+
+    /// Restore the schema-defined row layout.
+    pub fn clear_layout(&mut self) -> &mut Self {
+        self.layout = None;
+        self
+    }
+
+    /// Append an empty frame and return it for configuration.
+    pub fn add_frame(&mut self) -> &mut Frame {
+        self.children.push(FramesetChild::Frame(Frame::default()));
+        match self.children.last_mut() {
+            Some(FramesetChild::Frame(frame)) => frame,
+            _ => unreachable!(),
+        }
+    }
+
+    /// Append a configured frame.
+    pub fn push_frame(&mut self, frame: Frame) -> &mut Self {
+        self.children.push(FramesetChild::Frame(frame));
+        self
+    }
+
+    /// Append an empty nested frameset and return it for configuration.
+    pub fn add_frameset(&mut self) -> &mut Frameset {
+        self.children
+            .push(FramesetChild::Frameset(Frameset::default()));
+        match self.children.last_mut() {
+            Some(FramesetChild::Frameset(frameset)) => frameset,
+            _ => unreachable!(),
+        }
+    }
+
+    /// Append a configured nested frameset.
+    pub fn push_frameset(&mut self, frameset: Frameset) -> &mut Self {
+        self.children.push(FramesetChild::Frameset(frameset));
+        self
+    }
+
+    /// Remove all nested frames and framesets.
+    pub fn clear_children(&mut self) -> &mut Self {
+        self.children.clear();
+        self
+    }
 }
 
 impl Frame {
@@ -348,6 +426,86 @@ impl Frame {
     pub fn linked_to_file(&self) -> Option<bool> {
         self.linked_to_file
     }
+
+    pub fn set_size(&mut self, value: impl Into<String>) -> &mut Self {
+        self.size = Some(value.into());
+        self
+    }
+
+    pub fn clear_size(&mut self) -> &mut Self {
+        self.size = None;
+        self
+    }
+
+    pub fn set_name(&mut self, value: impl Into<String>) -> &mut Self {
+        self.name = Some(value.into());
+        self
+    }
+
+    pub fn clear_name(&mut self) -> &mut Self {
+        self.name = None;
+        self
+    }
+
+    pub fn set_source_file_relationship_id(&mut self, value: impl Into<String>) -> &mut Self {
+        self.source_file_relationship_id = Some(value.into());
+        self
+    }
+
+    pub fn clear_source_file_relationship_id(&mut self) -> &mut Self {
+        self.source_file_relationship_id = None;
+        self
+    }
+
+    pub fn set_margin_width(&mut self, value: u64) -> &mut Self {
+        self.margin_width = Some(value);
+        self
+    }
+
+    pub fn clear_margin_width(&mut self) -> &mut Self {
+        self.margin_width = None;
+        self
+    }
+
+    pub fn set_margin_height(&mut self, value: u64) -> &mut Self {
+        self.margin_height = Some(value);
+        self
+    }
+
+    pub fn clear_margin_height(&mut self) -> &mut Self {
+        self.margin_height = None;
+        self
+    }
+
+    pub fn set_scrollbar(&mut self, value: FrameScrollbarVisibility) -> &mut Self {
+        self.scrollbar = Some(value);
+        self
+    }
+
+    pub fn clear_scrollbar(&mut self) -> &mut Self {
+        self.scrollbar = None;
+        self
+    }
+
+    pub fn set_no_resize_allowed(&mut self, value: bool) -> &mut Self {
+        self.no_resize_allowed = Some(value);
+        self
+    }
+
+    pub fn clear_no_resize_allowed(&mut self) -> &mut Self {
+        self.no_resize_allowed = None;
+        self
+    }
+
+    pub fn set_linked_to_file(&mut self, value: bool) -> &mut Self {
+        self.linked_to_file = Some(value);
+        self
+    }
+
+    pub fn clear_linked_to_file(&mut self) -> &mut Self {
+        self.linked_to_file = None;
+        self
+    }
 }
 
 impl FramesetSplitBar {
@@ -366,9 +524,63 @@ impl FramesetSplitBar {
     pub fn flat_borders(&self) -> Option<bool> {
         self.flat_borders
     }
+
+    pub fn set_width_twips(&mut self, value: u64) -> &mut Self {
+        self.width_twips = Some(value);
+        self
+    }
+
+    pub fn clear_width_twips(&mut self) -> &mut Self {
+        self.width_twips = None;
+        self
+    }
+
+    pub fn set_color(&mut self, value: FramesetColor) -> &mut Self {
+        self.color = Some(value);
+        self
+    }
+
+    pub fn color_mut(&mut self) -> Option<&mut FramesetColor> {
+        self.color.as_mut()
+    }
+
+    pub fn clear_color(&mut self) -> &mut Self {
+        self.color = None;
+        self
+    }
+
+    pub fn set_no_border(&mut self, value: bool) -> &mut Self {
+        self.no_border = Some(value);
+        self
+    }
+
+    pub fn clear_no_border(&mut self) -> &mut Self {
+        self.no_border = None;
+        self
+    }
+
+    pub fn set_flat_borders(&mut self, value: bool) -> &mut Self {
+        self.flat_borders = Some(value);
+        self
+    }
+
+    pub fn clear_flat_borders(&mut self) -> &mut Self {
+        self.flat_borders = None;
+        self
+    }
 }
 
 impl FramesetColor {
+    /// Create a validated automatic or six-digit RGB splitter color.
+    pub fn new(value: impl Into<String>) -> Result<Self> {
+        Ok(Self {
+            value: validate_word_color(value.into(), "frameset splitter color")?,
+            theme_color: None,
+            theme_tint: None,
+            theme_shade: None,
+        })
+    }
+
     pub fn value(&self) -> &str {
         &self.value
     }
@@ -383,6 +595,41 @@ impl FramesetColor {
 
     pub fn theme_shade(&self) -> Option<u8> {
         self.theme_shade
+    }
+
+    pub fn set_value(&mut self, value: impl Into<String>) -> Result<&mut Self> {
+        self.value = validate_word_color(value.into(), "frameset splitter color")?;
+        Ok(self)
+    }
+
+    pub fn set_theme_color(&mut self, value: ThemeColor) -> &mut Self {
+        self.theme_color = Some(value);
+        self
+    }
+
+    pub fn clear_theme_color(&mut self) -> &mut Self {
+        self.theme_color = None;
+        self
+    }
+
+    pub fn set_theme_tint(&mut self, value: u8) -> &mut Self {
+        self.theme_tint = Some(value);
+        self
+    }
+
+    pub fn clear_theme_tint(&mut self) -> &mut Self {
+        self.theme_tint = None;
+        self
+    }
+
+    pub fn set_theme_shade(&mut self, value: u8) -> &mut Self {
+        self.theme_shade = Some(value);
+        self
+    }
+
+    pub fn clear_theme_shade(&mut self) -> &mut Self {
+        self.theme_shade = None;
+        self
     }
 }
 
@@ -484,6 +731,23 @@ impl WebSettings {
     /// Return the root frameset definition, if present.
     pub fn frameset(&self) -> Option<&Frameset> {
         self.frameset.as_ref()
+    }
+
+    /// Set the root web frameset definition.
+    pub fn set_frameset(&mut self, value: Frameset) -> &mut Self {
+        self.frameset = Some(value);
+        self
+    }
+
+    /// Return the mutable root web frameset definition, if present.
+    pub fn frameset_mut(&mut self) -> Option<&mut Frameset> {
+        self.frameset.as_mut()
+    }
+
+    /// Remove the root web frameset definition.
+    pub fn clear_frameset(&mut self) -> &mut Self {
+        self.frameset = None;
+        self
     }
 
     /// Return the top-level HTML division definitions, preserving part absence.
@@ -1808,13 +2072,10 @@ fn parse_frameset_color(
     decoder: Decoder,
     resolver: &NamespaceResolver,
 ) -> Result<FramesetColor> {
-    let value = required_value(element, decoder, resolver, "frameset splitter color")?;
-    if value != "auto" && (value.len() != 6 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()))
-    {
-        return Err(OoxmlError::InvalidFormat(format!(
-            "invalid frameset splitter color '{value}'"
-        )));
-    }
+    let value = validate_word_color(
+        required_value(element, decoder, resolver, "frameset splitter color")?,
+        "frameset splitter color",
+    )?;
     let theme_color = word_attribute_value(element, b"themeColor", decoder, resolver)?
         .map(|value| {
             ThemeColor::from_xml(&value)
@@ -1829,6 +2090,16 @@ fn parse_frameset_color(
         theme_tint,
         theme_shade,
     })
+}
+
+fn validate_word_color(value: String, description: &str) -> Result<String> {
+    if value != "auto" && (value.len() != 6 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()))
+    {
+        return Err(OoxmlError::InvalidFormat(format!(
+            "invalid {description} '{value}'"
+        )));
+    }
+    Ok(value)
 }
 
 fn required_unsigned_long(
@@ -2386,6 +2657,84 @@ mod tests {
             WebSettings::extract_from_xml(settings.to_xml().unwrap().as_bytes()).unwrap(),
             WebSettings::default()
         );
+    }
+
+    #[test]
+    fn builds_and_edits_recursive_framesets_for_round_trip() {
+        let mut color = FramesetColor::new("A0b1C2").unwrap();
+        color
+            .set_theme_color(ThemeColor::Accent4)
+            .set_theme_tint(0x0a)
+            .set_theme_shade(0xff);
+
+        let mut split_bar = FramesetSplitBar::default();
+        split_bar
+            .set_width_twips(u64::MAX)
+            .set_color(color)
+            .set_no_border(true)
+            .set_flat_borders(false);
+
+        let mut frameset = Frameset::default();
+        frameset
+            .set_size("2* & 1*")
+            .set_split_bar(split_bar)
+            .set_layout(FrameLayout::Columns);
+        frameset
+            .add_frame()
+            .set_size("50%")
+            .set_name("main & detail")
+            .set_source_file_relationship_id("rId7")
+            .set_margin_width(42)
+            .set_margin_height(24)
+            .set_scrollbar(FrameScrollbarVisibility::Auto)
+            .set_no_resize_allowed(false)
+            .set_linked_to_file(true);
+        frameset
+            .add_frameset()
+            .set_size("1*")
+            .set_layout(FrameLayout::None)
+            .add_frame()
+            .set_name("nested");
+
+        let mut settings = WebSettings::default();
+        settings.set_frameset(frameset);
+        let serialized = settings.to_xml().unwrap();
+        let reparsed = WebSettings::extract_from_xml(serialized.as_bytes()).unwrap();
+        assert_eq!(reparsed, settings);
+        assert!(serialized.contains("main &amp; detail"));
+
+        let frameset = settings.frameset_mut().unwrap();
+        assert_eq!(frameset.children().len(), 2);
+        assert!(matches!(frameset.children()[0], FramesetChild::Frame(_)));
+        assert!(matches!(frameset.children()[1], FramesetChild::Frameset(_)));
+        frameset
+            .clear_size()
+            .clear_split_bar()
+            .clear_layout()
+            .clear_children();
+        assert_eq!(frameset, &Frameset::default());
+        settings.clear_frameset();
+        assert!(settings.frameset().is_none());
+    }
+
+    #[test]
+    fn validates_mutable_frameset_colors_without_losing_prior_value() {
+        assert!(FramesetColor::new("12345").is_err());
+        let mut color = FramesetColor::new("auto").unwrap();
+        assert!(color.set_value("GG0000").is_err());
+        assert_eq!(color.value(), "auto");
+        color.set_value("00ffAA").unwrap();
+        assert_eq!(color.value(), "00ffAA");
+        color
+            .set_theme_color(ThemeColor::Text1)
+            .set_theme_tint(1)
+            .set_theme_shade(2)
+            .clear_theme_color()
+            .clear_theme_tint()
+            .clear_theme_shade();
+        assert_eq!(color.theme_color(), None);
+        assert_eq!(color.theme_tint(), None);
+        assert_eq!(color.theme_shade(), None);
     }
 
     #[test]
