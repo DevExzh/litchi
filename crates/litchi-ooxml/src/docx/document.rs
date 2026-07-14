@@ -1012,6 +1012,27 @@ impl<'a> Document<'a> {
         Ok(self.fields()?.len())
     }
 
+    /// Get all mail-merge fields in document order.
+    ///
+    /// This recognizes `MERGEFIELD` instructions represented by either
+    /// `<w:fldSimple>` or complex `<w:fldChar>` field sequences.
+    pub fn merge_fields(&self) -> Result<Vec<Field>> {
+        Ok(self
+            .fields()?
+            .into_iter()
+            .filter(Field::is_merge_field)
+            .collect())
+    }
+
+    /// Get the data-source column names referenced by mail-merge fields.
+    pub fn merge_field_names(&self) -> Result<Vec<String>> {
+        Ok(self
+            .merge_fields()?
+            .into_iter()
+            .filter_map(|field| field.merge_field_name().map(str::to_owned))
+            .collect())
+    }
+
     /// Get the numbering definitions for the document.
     ///
     /// Returns a `Numbering` object providing access to abstract numbering
@@ -1359,9 +1380,9 @@ impl<'a> Document<'a> {
     // - Requires parsing w:sdt elements with w:docPartGallery="Table of Contents"
     // - insert_toc(), update_toc(), remove_toc()
     //
-    // TODO: Mail merge fields (MS-DOCX Section 17.16.5.35)
-    // - Field::extract_from_document parses both w:fldSimple and complex w:fldChar fields
-    // - execute_mail_merge(), get_merge_fields()
+    // ✅ Mail merge field discovery: merge_fields(), merge_field_names()
+    // TODO: Mail merge mutation (MS-DOCX Section 17.16.5.35)
+    // - execute_mail_merge()
     //
     // ✅ COMPLETED: Typed run breaks (MS-DOCX Section 17.3.3.1)
     // - Run::breaks() preserves text-wrapping, page, and column breaks plus clear behavior

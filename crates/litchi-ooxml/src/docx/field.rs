@@ -118,6 +118,40 @@ impl Field {
             .unwrap_or(&self.instruction)
     }
 
+    /// Check whether this is a mail-merge field.
+    pub fn is_merge_field(&self) -> bool {
+        self.field_type().eq_ignore_ascii_case("MERGEFIELD")
+    }
+
+    /// Return the data-source column name from a `MERGEFIELD` instruction.
+    ///
+    /// Both unquoted names (`MERGEFIELD FirstName`) and quoted names containing
+    /// spaces (`MERGEFIELD "Full Name"`) are supported. Field switches following
+    /// the name are excluded.
+    pub fn merge_field_name(&self) -> Option<&str> {
+        if !self.is_merge_field() {
+            return None;
+        }
+        let instruction = self.instruction.trim_start();
+        let field_type_end = instruction
+            .find(char::is_whitespace)
+            .unwrap_or(instruction.len());
+        let remainder = instruction[field_type_end..].trim_start();
+        if remainder.is_empty() || remainder.starts_with('\\') {
+            return None;
+        }
+        if let Some(quoted) = remainder.strip_prefix('"') {
+            let end = quoted.find('"')?;
+            let name = &quoted[..end];
+            return (!name.is_empty()).then_some(name);
+        }
+        let end = remainder
+            .find(char::is_whitespace)
+            .unwrap_or(remainder.len());
+        let name = &remainder[..end];
+        (!name.is_empty()).then_some(name)
+    }
+
     /// Extract all fields from document XML bytes.
     ///
     /// # Arguments
@@ -450,6 +484,27 @@ mod tests {
         );
         assert_eq!(field.field_type(), "REF");
         assert!(field.is_dirty());
+    }
+
+    #[test]
+    fn extracts_mail_merge_field_names_without_switches() {
+        let quoted = Field::new(
+            r#"  MERGEFIELD "Full Name" \* MERGEFORMAT "#.to_string(),
+            None,
+            false,
+        );
+        assert!(quoted.is_merge_field());
+        assert_eq!(quoted.merge_field_name(), Some("Full Name"));
+
+        let unquoted = Field::new("mergefield CustomerId \\b prefix".to_string(), None, false);
+        assert!(unquoted.is_merge_field());
+        assert_eq!(unquoted.merge_field_name(), Some("CustomerId"));
+
+        let missing = Field::new("MERGEFIELD \\* MERGEFORMAT".to_string(), None, false);
+        assert_eq!(missing.merge_field_name(), None);
+        let page = Field::new("PAGE".to_string(), None, false);
+        assert!(!page.is_merge_field());
+        assert_eq!(page.merge_field_name(), None);
     }
 
     #[test]
