@@ -15,6 +15,7 @@ use litchi_opc::PackURI;
 use super::RichTextRun;
 use super::cell::{Cell, CellIterator as XlsxCellIterator, RowIterator as XlsxRowIterator};
 use super::format::{CellBorder, CellFill, CellFont, CellFormat};
+use super::parsers::worksheet_parser;
 use super::sort::{SortBy, SortCondition, SortMethod, SortState};
 use super::sparkline::{SparklineGroup, parse_sparkline_groups_from_worksheet_xml};
 use super::views::{SheetView, SheetViewType};
@@ -223,13 +224,7 @@ impl<'a> Worksheet<'a> {
 
     /// Parse worksheet XML to extract cell data.
     fn parse_worksheet_xml(&mut self, content: &str) -> Result<()> {
-        // Parse sheetData section (cells)
-        if let Some(sheet_data_start) = content.find("<sheetData>")
-            && let Some(sheet_data_end) = content[sheet_data_start..].find("</sheetData>")
-        {
-            let sheet_data_content = &content[sheet_data_start..sheet_data_start + sheet_data_end];
-            self.parse_sheet_data(sheet_data_content)?;
-        }
+        self.parse_sheet_data(content)?;
 
         // Parse merged cells
         if let Some(merge_start) = content.find("<mergeCells")
@@ -323,63 +318,18 @@ impl<'a> Worksheet<'a> {
 
     /// Parse sheetData content.
     fn parse_sheet_data(&mut self, sheet_data: &str) -> Result<()> {
-        let mut pos = 0;
-        let mut min_row = u32::MAX;
-        let mut max_row = 0;
-        let mut min_col = u32::MAX;
-        let mut max_col = 0;
-
-        while let Some(row_start) = sheet_data[pos..].find("<row ") {
-            let row_start_pos = pos + row_start;
-            if let Some(row_end) = sheet_data[row_start_pos..].find("</row>") {
-                let row_content = &sheet_data[row_start_pos..row_start_pos + row_end + 6];
-
-                if let Some((row_num, row_info, cells)) = self.parse_row_xml(row_content)? {
-                    min_row = min_row.min(row_num);
-                    max_row = max_row.max(row_num);
-
-                    // Store row information if it has custom properties
-                    if let Some(info) = row_info {
-                        self.rows.insert(row_num, info);
-                    }
-
-                    for (col_num, value, style_idx, rich_runs) in cells {
-                        min_col = min_col.min(col_num);
-                        max_col = max_col.max(col_num);
-
-                        self.cells
-                            .entry(row_num)
-                            .or_default()
-                            .insert(col_num, value);
-
-                        if let Some(idx) = style_idx {
-                            self.cell_styles
-                                .entry(row_num)
-                                .or_default()
-                                .insert(col_num, idx);
-                        }
-
-                        if let Some(runs) = rich_runs {
-                            self.rich_text_cells.insert((row_num, col_num), runs);
-                        }
-                    }
-                }
-
-                pos = row_start_pos + row_end + 6;
-            } else {
-                break;
-            }
-        }
-
-        if min_row <= max_row && min_col <= max_col {
-            self.dimensions = Some((min_row, min_col, max_row, max_col));
-        }
-
+        let parsed = worksheet_parser::parse_worksheet_data(sheet_data)?;
+        self.cells = parsed.cells;
+        self.cell_styles = parsed.cell_styles;
+        self.rows = parsed.rows;
+        self.rich_text_cells = parsed.rich_text_cells;
+        self.dimensions = parsed.dimensions;
         Ok(())
     }
 
     /// Parse a single row XML.
     #[allow(clippy::type_complexity)]
+    #[allow(dead_code)]
     fn parse_row_xml(
         &self,
         row_content: &str,

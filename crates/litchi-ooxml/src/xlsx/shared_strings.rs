@@ -588,7 +588,7 @@ fn boolean_property(element: &BytesStart<'_>, decoder: Decoder, description: &st
     }
 }
 
-fn decode_spreadsheet_text(value: &str) -> Result<String> {
+pub(crate) fn decode_spreadsheet_text(value: &str) -> Result<String> {
     let bytes = value.as_bytes();
     let mut decoded = String::with_capacity(value.len());
     let mut copied_until = 0;
