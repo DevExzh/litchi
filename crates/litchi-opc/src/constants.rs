@@ -231,6 +231,11 @@ pub mod relationship_type {
     pub const PERSONS: &str = "http://schemas.microsoft.com/office/2017/10/relationships/person";
     pub const SHEET_METADATA: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/sheetMetadata";
+    pub const WORKSHEET: &str =
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet";
+    /// ISO/IEC 29500 Strict worksheet relationship type.
+    pub const STRICT_WORKSHEET: &str =
+        "http://purl.oclc.org/ooxml/officeDocument/relationships/worksheet";
 
     // Images and media
     pub const IMAGE: &str =

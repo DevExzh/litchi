@@ -401,6 +401,44 @@ impl Workbook {
         &self.package
     }
 
+    /// Resolve a worksheet through the relationship declared by workbook.xml.
+    pub(crate) fn worksheet_part_uri(&self, worksheet: &WorksheetInfo) -> SheetResult<PackURI> {
+        use litchi_opc::constants::relationship_type as rt;
+
+        let workbook_uri = PackURI::new("/xl/workbook.xml")?;
+        let workbook_part = self.package.get_part(&workbook_uri)?;
+        let relationship = workbook_part
+            .rels()
+            .get(&worksheet.relationship_id)
+            .ok_or_else(|| {
+                format!(
+                    "Worksheet '{}' references missing relationship '{}'",
+                    worksheet.name, worksheet.relationship_id
+                )
+            })?;
+
+        if relationship.reltype() != rt::WORKSHEET && relationship.reltype() != rt::STRICT_WORKSHEET
+        {
+            return Err(format!(
+                "Relationship '{}' for worksheet '{}' has invalid type '{}'",
+                worksheet.relationship_id,
+                worksheet.name,
+                relationship.reltype()
+            )
+            .into());
+        }
+
+        if relationship.is_external() {
+            return Err(format!(
+                "Relationship '{}' for worksheet '{}' has an external target",
+                worksheet.relationship_id, worksheet.name
+            )
+            .into());
+        }
+
+        Ok(relationship.target_partname()?)
+    }
+
     /// Get the shared strings table (for internal use by worksheet)
     pub(crate) fn shared_strings(&self) -> &SharedStrings {
         &self.shared_strings
@@ -540,15 +578,7 @@ impl Workbook {
             .get(sheet_index)
             .ok_or("Worksheet index out of bounds")?;
 
-        let workbook_uri = PackURI::new("/xl/workbook.xml")?;
-        let workbook_part = self.package().get_part(&workbook_uri)?;
-        let workbook_rels = workbook_part.rels();
-
-        let rel = workbook_rels
-            .get(ws_info.relationship_id.as_str())
-            .ok_or("Worksheet relationship not found")?;
-
-        let worksheet_uri = rel.target_partname()?;
+        let worksheet_uri = self.worksheet_part_uri(ws_info)?;
         crate::xlsx::read_threaded_comments(self.package(), &worksheet_uri)
     }
 
@@ -1814,4 +1844,103 @@ impl Workbook {
     // - All core writing operations are implemented
     // - Advanced features like pivot tables, images would require substantial XML generation code
     // - The library is production-ready for standard Excel CRUD operations
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Workbook;
+    use litchi_core::sheet::{CellValue, WorkbookTrait};
+    use litchi_opc::constants::{content_type as ct, relationship_type as rt};
+    use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
+
+    const WORKBOOK_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+          xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets><sheet name="Sales" sheetId="42" r:id="rId1"/></sheets>
+</workbook>"#;
+
+    const WORKSHEET_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData>
+</worksheet>"#;
+
+    fn package_with_worksheet_relationship(reltype: &str, external: bool) -> OpcPackage {
+        let mut package = OpcPackage::new();
+        let workbook_uri = PackURI::new("/xl/workbook.xml").unwrap();
+        let mut workbook_part = BlobPart::new(
+            workbook_uri,
+            ct::SML_SHEET_MAIN.to_string(),
+            WORKBOOK_XML.as_bytes().to_vec(),
+        );
+
+        let relationship_id = if external {
+            workbook_part.relate_to_ext("https://example.invalid/sheet.xml", reltype)
+        } else {
+            workbook_part.relate_to("custom/sales-data.xml", reltype)
+        };
+        assert_eq!(relationship_id, "rId1");
+        package.add_part(Box::new(workbook_part));
+
+        if !external {
+            package.add_part(Box::new(BlobPart::new(
+                PackURI::new("/xl/custom/sales-data.xml").unwrap(),
+                ct::SML_WORKSHEET.to_string(),
+                WORKSHEET_XML.as_bytes().to_vec(),
+            )));
+        }
+
+        package
+    }
+
+    #[test]
+    fn loads_worksheet_from_relationship_target() {
+        let workbook =
+            Workbook::new(package_with_worksheet_relationship(rt::WORKSHEET, false)).unwrap();
+        let worksheet = workbook.worksheet_by_index(0).unwrap();
+
+        assert_eq!(
+            worksheet.cell_value(1, 1).unwrap().as_ref(),
+            &CellValue::Int(7)
+        );
+    }
+
+    #[test]
+    fn accepts_strict_worksheet_relationship_type() {
+        let workbook = Workbook::new(package_with_worksheet_relationship(
+            rt::STRICT_WORKSHEET,
+            false,
+        ))
+        .unwrap();
+
+        assert_eq!(workbook.worksheet_by_index(0).unwrap().row_count(), 1);
+    }
+
+    #[test]
+    fn rejects_non_worksheet_relationship_type() {
+        let workbook =
+            Workbook::new(package_with_worksheet_relationship(rt::CHART, false)).unwrap();
+        let error = workbook
+            .worksheet_by_index(0)
+            .err()
+            .expect("non-worksheet relationship must fail")
+            .to_string();
+
+        assert!(error.contains("invalid type"), "unexpected error: {error}");
+    }
+
+    #[test]
+    fn rejects_external_worksheet_target() {
+        let workbook =
+            Workbook::new(package_with_worksheet_relationship(rt::WORKSHEET, true)).unwrap();
+        let error = workbook
+            .worksheet_by_index(0)
+            .err()
+            .expect("external worksheet relationship must fail")
+            .to_string();
+
+        assert!(
+            error.contains("external target"),
+            "unexpected error: {error}"
+        );
+    }
 }

@@ -10,7 +10,6 @@ use litchi_core::sheet::{
     Cell as CellTrait, CellIterator, CellValue, Result, RowIterator, Worksheet as WorksheetTrait,
 };
 use litchi_core::xml::unescape_xml;
-use litchi_opc::PackURI;
 
 use super::RichTextRun;
 use super::cell::{Cell, CellIterator as XlsxCellIterator, RowIterator as XlsxRowIterator};
@@ -209,10 +208,7 @@ impl<'a> Worksheet<'a> {
 
     /// Load worksheet data from the XML.
     pub fn load_data(&mut self) -> Result<()> {
-        // Get the worksheet part using the relationship ID
-        let worksheet_uri =
-            PackURI::new(format!("/xl/worksheets/sheet{}.xml", self.info.sheet_id))?;
-
+        let worksheet_uri = self.workbook.worksheet_part_uri(&self.info)?;
         let worksheet_part = self.workbook.package().get_part(&worksheet_uri)?;
         let content = std::str::from_utf8(worksheet_part.blob())?;
 
