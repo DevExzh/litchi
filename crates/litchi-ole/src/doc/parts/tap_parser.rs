@@ -90,12 +90,10 @@ impl<'arena> TapParser<'arena> {
         for sprm in sprms {
             if sprm.opcode == 0xD608 {
                 // Found sprmTDefTable
-                // For long SPRMs (0xD608), operand format is:
-                // - 2 bytes: size (already parsed, included in operand)
-                // - 1 byte: itcMac (cell count)
-                // - rest: cell boundaries and descriptors
-                if sprm.operand.len() >= 3 {
-                    let cell_count = sprm.operand[2] as usize; // Skip 2-byte size field
+                // The shared decoder removes the long-SPRM size field, so the
+                // first operand byte is itcMac.
+                if let Some(cell_count) = sprm.operand_byte() {
+                    let cell_count = cell_count as usize;
                     return Ok(TableProperties::with_cell_count(cell_count));
                 }
             }
@@ -108,9 +106,9 @@ impl<'arena> TapParser<'arena> {
 
     /// Check if a SPRM is a TAP (table) SPRM.
     ///
-    /// TAP SPRMs have type 5 (bits 0-2 of opcode).
+    /// TAP SPRMs have type 5 (bits 10-12 of opcode).
     fn is_tap_sprm(opcode: u16) -> bool {
-        (opcode & 0x07) == 5
+        ((opcode >> 10) & 0x07) == 5
     }
 
     /// Apply a single SPRM to table properties.
@@ -230,39 +228,38 @@ impl<'arena> TapParser<'arena> {
         &self,
         tap: &mut TableProperties,
         sprm: &Sprm,
-        grpprl: &[u8],
+        _grpprl: &[u8],
     ) -> Result<()> {
-        let offset = sprm.offset + 3; // Skip sprm (2) + size (1)
-        if offset >= grpprl.len() {
+        let data = sprm.operand_bytes();
+        if data.is_empty() {
             return Ok(());
         }
 
         // Read cell count
-        let itc_mac = binary_to_doc_result(read_byte(grpprl, offset))? as usize;
+        let itc_mac = binary_to_doc_result(read_byte(data, 0))? as usize;
         tap.cell_count = itc_mac;
 
         // Read cell boundaries (rgdxaCenter)
         let mut boundaries = Vec::with_capacity(itc_mac + 1);
         for i in 0..=itc_mac {
-            let boundary_offset = offset + 1 + (i * 2);
-            if boundary_offset + 1 < grpprl.len() {
-                boundaries.push(binary_to_doc_result(read_i16_le(grpprl, boundary_offset))?);
+            let boundary_offset = 1 + (i * 2);
+            if boundary_offset + 1 < data.len() {
+                boundaries.push(binary_to_doc_result(read_i16_le(data, boundary_offset))?);
             }
         }
         tap.cell_boundaries = boundaries;
 
         // Calculate where cell descriptors start
-        let end_of_sprm = offset + sprm.size.saturating_sub(3); // -3 for sprm header
-        let start_of_tcs = offset + 1 + ((itc_mac + 1) * 2);
-        let has_tcs = start_of_tcs < end_of_sprm;
+        let start_of_tcs = 1 + ((itc_mac + 1) * 2);
+        let has_tcs = start_of_tcs < data.len();
 
         // Read cell descriptors (TableCellDescriptor - TC)
         if has_tcs {
             let mut cell_props = Vec::with_capacity(itc_mac);
             for i in 0..itc_mac {
                 let tc_offset = start_of_tcs + (i * 20); // Each TC is 20 bytes
-                if tc_offset + 20 <= grpprl.len() {
-                    cell_props.push(self.parse_table_cell_descriptor(grpprl, tc_offset)?);
+                if tc_offset + 20 <= data.len() {
+                    cell_props.push(self.parse_table_cell_descriptor(data, tc_offset)?);
                 } else {
                     cell_props.push(CellProperties::default());
                 }

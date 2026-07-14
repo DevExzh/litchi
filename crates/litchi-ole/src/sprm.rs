@@ -153,22 +153,27 @@ fn parse_sprms_two_byte(grpprl: &[u8]) -> Vec<Sprm> {
             2 | 4 | 5 => 2, // 2 byte operand
             3 => 4,         // 4 byte operand
             6 => {
-                // Variable length - read size from first byte (or 2 bytes for long SPRMs)
-                if offset + 1 < grpprl.len() {
-                    // Check if this is a long SPRM (SPRM_LONG_PARAGRAPH or SPRM_LONG_TABLE)
-                    if opcode == 0xc615 || opcode == 0xd608 {
-                        // Long SPRM - operand size in next 2 bytes
-                        if offset + 3 <= grpprl.len() {
-                            read_u16_le(grpprl, offset).unwrap_or(0) as usize
-                        } else {
-                            break;
-                        }
-                    } else {
-                        // Regular variable SPRM - size in first byte
-                        grpprl[offset] as usize
+                // Variable operands have a length prefix that is not part of
+                // the operand exposed to property decoders.
+                if opcode == 0xc615 || opcode == 0xd608 {
+                    if offset + 2 > grpprl.len() {
+                        break;
                     }
+                    // For the two long encodings, cb includes one byte beyond
+                    // the actual operand (matching MS-DOC and POI's size rule).
+                    let encoded_size = read_u16_le(grpprl, offset).unwrap_or(0) as usize;
+                    if encoded_size == 0 {
+                        break;
+                    }
+                    offset += 2;
+                    encoded_size - 1
                 } else {
-                    break;
+                    if offset >= grpprl.len() {
+                        break;
+                    }
+                    let size = grpprl[offset] as usize;
+                    offset += 1;
+                    size
                 }
             },
             7 => 3, // 3 byte operand
@@ -265,6 +270,37 @@ mod tests {
         // Verify the opcodes were correctly parsed (little-endian)
         assert_eq!(sprms[0].opcode, 0x0835); // Bold
         assert_eq!(sprms[1].opcode, 0x4A43); // Font size (0x43, 0x4A bytes → 0x4A43 LE)
+    }
+
+    #[test]
+    fn variable_sprm_excludes_length_and_preserves_following_sprm() {
+        let grpprl = [
+            0x71, 0xCA, // sprmCShd
+            0x03, // three operand bytes
+            0xAA, 0xBB, 0xCC, // operand
+            0x35, 0x08, 0x01, // following sprmCFBold
+        ];
+        let sprms = parse_sprms(&grpprl);
+        assert_eq!(sprms.len(), 2);
+        assert_eq!(sprms[0].operand.as_slice(), &[0xAA, 0xBB, 0xCC]);
+        assert_eq!(sprms[0].size, 6);
+        assert_eq!(sprms[1].opcode, 0x0835);
+        assert_eq!(sprms[1].offset, 6);
+    }
+
+    #[test]
+    fn long_variable_sprm_decodes_adjusted_word_length() {
+        let grpprl = [
+            0x08, 0xD6, // sprmTDefTable
+            0x04, 0x00, // cb includes one extra byte
+            0x02, 0x10, 0x20, // three operand bytes
+            0x35, 0x08, 0x01, // following sprmCFBold
+        ];
+        let sprms = parse_sprms(&grpprl);
+        assert_eq!(sprms.len(), 2);
+        assert_eq!(sprms[0].operand.as_slice(), &[0x02, 0x10, 0x20]);
+        assert_eq!(sprms[0].size, 7);
+        assert_eq!(sprms[1].offset, 7);
     }
 
     #[test]
