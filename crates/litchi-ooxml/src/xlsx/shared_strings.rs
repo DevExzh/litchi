@@ -1,31 +1,506 @@
-//! Shared strings table for Excel files.
-//!
-//! Excel uses a shared strings table to efficiently store string values.
-//! This module provides parsing and access to the shared strings.
-//!
-//! Performance optimizations:
-//! - Uses memchr for fast character searching
-//! - Pre-allocates vectors with reasonable capacities
-//! - Uses FxHashMap for better performance (if available)
+//! Shared-string table support for Excel workbooks.
 
 use std::collections::HashMap;
 
-use super::RichTextRun;
-use litchi_core::sheet::Result;
+use litchi_core::sheet::Result as SheetResult;
+use quick_xml::encoding::Decoder;
+use quick_xml::events::{BytesStart, Event};
+use quick_xml::name::ResolveResult;
+use quick_xml::reader::NsReader;
 
-// Performance: Pre-allocate typical capacities to reduce reallocations
-const INITIAL_STRINGS_CAPACITY: usize = 10000;
+use super::RichTextRun;
+use super::namespace::is_spreadsheetml_name;
+use crate::common::xml::{decode_xml_reference, unqualified_attribute_value};
+use crate::error::{OoxmlError, Result};
+
+const MAX_PREALLOCATED_STRINGS: usize = 4096;
 
 /// Shared strings table for efficient string storage.
 #[derive(Debug, Default)]
 pub struct SharedStrings {
-    /// The actual strings
     strings: Vec<String>,
-    /// Reverse mapping from string to index for deduplication
-    #[allow(dead_code)] // Used for deduplication logic
-    string_to_index: HashMap<String, usize>,
-    /// Optional rich text runs per string index
     rich_text: HashMap<usize, Vec<RichTextRun>>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum StringContext {
+    SharedStringTable,
+    StringItem,
+    RichRun,
+    RunProperties,
+    Text(TextTarget),
+    Other,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum TextTarget {
+    Simple,
+    RichRun,
+}
+
+struct PendingString {
+    text: String,
+    runs: Vec<RichTextRun>,
+    saw_simple_text: bool,
+    saw_rich_run: bool,
+}
+
+impl PendingString {
+    fn new() -> Self {
+        Self {
+            text: String::new(),
+            runs: Vec::new(),
+            saw_simple_text: false,
+            saw_rich_run: false,
+        }
+    }
+}
+
+struct PendingRun {
+    value: RichTextRun,
+    saw_text: bool,
+    saw_properties: bool,
+    seen_properties: u8,
+}
+
+impl PendingRun {
+    fn new() -> Self {
+        Self {
+            value: RichTextRun {
+                text: String::new(),
+                font_name: None,
+                font_size: None,
+                bold: false,
+                italic: false,
+                underline: false,
+                color: None,
+            },
+            saw_text: false,
+            saw_properties: false,
+            seen_properties: 0,
+        }
+    }
+}
+
+struct SharedStringParser {
+    strings: Vec<String>,
+    rich_text: HashMap<usize, Vec<RichTextRun>>,
+    pending_string: Option<PendingString>,
+    pending_run: Option<PendingRun>,
+    expected_count: Option<u32>,
+    expected_unique_count: Option<u32>,
+}
+
+impl SharedStringParser {
+    fn new() -> Self {
+        Self {
+            strings: Vec::new(),
+            rich_text: HashMap::new(),
+            pending_string: None,
+            pending_run: None,
+            expected_count: None,
+            expected_unique_count: None,
+        }
+    }
+
+    fn parse(content: &str) -> Result<SharedStrings> {
+        let mut reader = NsReader::from_reader(content.as_bytes());
+        let mut parser = Self::new();
+        let mut stack = Vec::new();
+        let mut closed_root = false;
+
+        loop {
+            let decoder = reader.decoder();
+            let event = reader
+                .read_event()
+                .map_err(|error| OoxmlError::Xml(error.to_string()))?
+                .into_owned();
+            let resolver = reader.resolver().clone();
+            let (namespace, event) = resolver.resolve_event(event);
+            match event {
+                Event::Start(element) => {
+                    if stack.is_empty() {
+                        if closed_root || !is_spreadsheetml_name(&namespace, element.name(), b"sst")
+                        {
+                            return Err(invalid(
+                                "shared strings XML must have one SpreadsheetML sst root",
+                            ));
+                        }
+                        parser.parse_root_attributes(&element, decoder)?;
+                        stack.push(StringContext::SharedStringTable);
+                        continue;
+                    }
+                    let parent = current_context(&stack)?;
+                    stack.push(parser.start_element(parent, &namespace, &element, decoder)?);
+                },
+                Event::Empty(element) if stack.is_empty() => {
+                    if closed_root || !is_spreadsheetml_name(&namespace, element.name(), b"sst") {
+                        return Err(invalid(
+                            "shared strings XML must have one SpreadsheetML sst root",
+                        ));
+                    }
+                    parser.parse_root_attributes(&element, decoder)?;
+                    closed_root = true;
+                },
+                Event::Empty(element) => {
+                    let parent = current_context(&stack)?;
+                    parser.empty_element(parent, &namespace, &element, decoder)?;
+                },
+                Event::Text(text) => {
+                    if let Some(target) = current_text_target(&stack) {
+                        let value = text
+                            .decode()
+                            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+                        parser.push_text(target, &value)?;
+                    }
+                },
+                Event::CData(text) => {
+                    if let Some(target) = current_text_target(&stack) {
+                        let value = text
+                            .decode()
+                            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+                        parser.push_text(target, &value)?;
+                    }
+                },
+                Event::GeneralRef(reference) => {
+                    if let Some(target) = current_text_target(&stack) {
+                        parser.push_text(target, &decode_xml_reference(&reference)?)?;
+                    }
+                },
+                Event::End(element) => {
+                    let context = stack.pop().ok_or_else(|| {
+                        invalid("shared strings XML has a closing element outside its root")
+                    })?;
+                    parser.finish_context(context)?;
+                    if context == StringContext::SharedStringTable {
+                        if !is_spreadsheetml_name(&namespace, element.name(), b"sst") {
+                            return Err(invalid(
+                                "shared strings XML has an invalid root closing element",
+                            ));
+                        }
+                        closed_root = true;
+                    }
+                },
+                Event::Eof if !closed_root || !stack.is_empty() => {
+                    return Err(invalid(
+                        "shared strings XML has a missing or unterminated SpreadsheetML sst root",
+                    ));
+                },
+                Event::Eof => break,
+                _ => {},
+            }
+        }
+
+        parser.validate_counts()?;
+        Ok(SharedStrings {
+            strings: parser.strings,
+            rich_text: parser.rich_text,
+        })
+    }
+
+    fn parse_root_attributes(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
+        self.expected_count = optional_u32(element, b"count", decoder, "shared-string count")?;
+        self.expected_unique_count = optional_u32(
+            element,
+            b"uniqueCount",
+            decoder,
+            "shared-string unique count",
+        )?;
+        if let Some(expected) = self.expected_unique_count {
+            let capacity = usize::try_from(expected)
+                .unwrap_or(usize::MAX)
+                .min(MAX_PREALLOCATED_STRINGS);
+            self.strings.reserve(capacity);
+            self.rich_text.reserve(capacity / 4);
+        }
+        Ok(())
+    }
+
+    fn start_element(
+        &mut self,
+        parent: StringContext,
+        namespace: &ResolveResult<'_>,
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+    ) -> Result<StringContext> {
+        if parent == StringContext::SharedStringTable
+            && is_spreadsheetml_name(namespace, element.name(), b"si")
+        {
+            self.start_string()?;
+            return Ok(StringContext::StringItem);
+        }
+        if parent == StringContext::StringItem
+            && is_spreadsheetml_name(namespace, element.name(), b"t")
+        {
+            self.start_text(TextTarget::Simple)?;
+            return Ok(StringContext::Text(TextTarget::Simple));
+        }
+        if parent == StringContext::StringItem
+            && is_spreadsheetml_name(namespace, element.name(), b"r")
+        {
+            self.start_run()?;
+            return Ok(StringContext::RichRun);
+        }
+        if parent == StringContext::RichRun
+            && is_spreadsheetml_name(namespace, element.name(), b"rPr")
+        {
+            self.start_run_properties()?;
+            return Ok(StringContext::RunProperties);
+        }
+        if parent == StringContext::RichRun
+            && is_spreadsheetml_name(namespace, element.name(), b"t")
+        {
+            self.start_text(TextTarget::RichRun)?;
+            return Ok(StringContext::Text(TextTarget::RichRun));
+        }
+        if parent == StringContext::RunProperties {
+            self.parse_run_property(namespace, element, decoder)?;
+        }
+        Ok(StringContext::Other)
+    }
+
+    fn empty_element(
+        &mut self,
+        parent: StringContext,
+        namespace: &ResolveResult<'_>,
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+    ) -> Result<()> {
+        if parent == StringContext::SharedStringTable
+            && is_spreadsheetml_name(namespace, element.name(), b"si")
+        {
+            self.start_string()?;
+            self.finish_string()?;
+        } else if parent == StringContext::StringItem
+            && is_spreadsheetml_name(namespace, element.name(), b"t")
+        {
+            self.start_text(TextTarget::Simple)?;
+        } else if parent == StringContext::StringItem
+            && is_spreadsheetml_name(namespace, element.name(), b"r")
+        {
+            return Err(invalid("shared-string rich-text run is missing its text"));
+        } else if parent == StringContext::RichRun
+            && is_spreadsheetml_name(namespace, element.name(), b"rPr")
+        {
+            self.start_run_properties()?;
+        } else if parent == StringContext::RichRun
+            && is_spreadsheetml_name(namespace, element.name(), b"t")
+        {
+            self.start_text(TextTarget::RichRun)?;
+        } else if parent == StringContext::RunProperties {
+            self.parse_run_property(namespace, element, decoder)?;
+        }
+        Ok(())
+    }
+
+    fn start_string(&mut self) -> Result<()> {
+        if self.pending_string.is_some() {
+            return Err(invalid("nested shared-string item"));
+        }
+        self.pending_string = Some(PendingString::new());
+        Ok(())
+    }
+
+    fn start_run(&mut self) -> Result<()> {
+        let string = self
+            .pending_string
+            .as_mut()
+            .ok_or_else(|| invalid("rich-text run outside a shared-string item"))?;
+        if string.saw_simple_text {
+            return Err(invalid(
+                "shared-string item mixes simple text and rich-text runs",
+            ));
+        }
+        string.saw_rich_run = true;
+        if self.pending_run.is_some() {
+            return Err(invalid("nested shared-string rich-text run"));
+        }
+        self.pending_run = Some(PendingRun::new());
+        Ok(())
+    }
+
+    fn start_run_properties(&mut self) -> Result<()> {
+        let run = self
+            .pending_run
+            .as_mut()
+            .ok_or_else(|| invalid("run properties outside a shared-string rich-text run"))?;
+        if run.saw_properties {
+            return Err(invalid("duplicate shared-string run properties"));
+        }
+        run.saw_properties = true;
+        Ok(())
+    }
+
+    fn start_text(&mut self, target: TextTarget) -> Result<()> {
+        match target {
+            TextTarget::Simple => {
+                let string = self
+                    .pending_string
+                    .as_mut()
+                    .ok_or_else(|| invalid("text outside a shared-string item"))?;
+                if string.saw_rich_run {
+                    return Err(invalid(
+                        "shared-string item mixes simple text and rich-text runs",
+                    ));
+                }
+                if string.saw_simple_text {
+                    return Err(invalid("duplicate text in shared-string item"));
+                }
+                string.saw_simple_text = true;
+            },
+            TextTarget::RichRun => {
+                let run = self
+                    .pending_run
+                    .as_mut()
+                    .ok_or_else(|| invalid("text outside a shared-string rich-text run"))?;
+                if run.saw_text {
+                    return Err(invalid("duplicate text in shared-string rich-text run"));
+                }
+                run.saw_text = true;
+            },
+        }
+        Ok(())
+    }
+
+    fn push_text(&mut self, target: TextTarget, value: &str) -> Result<()> {
+        match target {
+            TextTarget::Simple => self
+                .pending_string
+                .as_mut()
+                .ok_or_else(|| invalid("text outside a shared-string item"))?
+                .text
+                .push_str(value),
+            TextTarget::RichRun => self
+                .pending_run
+                .as_mut()
+                .ok_or_else(|| invalid("text outside a shared-string rich-text run"))?
+                .value
+                .text
+                .push_str(value),
+        }
+        Ok(())
+    }
+
+    fn parse_run_property(
+        &mut self,
+        namespace: &ResolveResult<'_>,
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+    ) -> Result<()> {
+        let run = self
+            .pending_run
+            .as_mut()
+            .ok_or_else(|| invalid("run property outside a shared-string rich-text run"))?;
+        if is_spreadsheetml_name(namespace, element.name(), b"rFont") {
+            mark_property(&mut run.seen_properties, 1, "font name")?;
+            let value = required_string(element, b"val", decoder, "rich-text font name")?;
+            run.value.font_name = Some(value);
+        } else if is_spreadsheetml_name(namespace, element.name(), b"sz") {
+            mark_property(&mut run.seen_properties, 2, "font size")?;
+            let value = required_string(element, b"val", decoder, "rich-text font size")?;
+            let size = value
+                .parse::<f64>()
+                .map_err(|_| invalid(format!("invalid rich-text font size '{value}'")))?;
+            if !size.is_finite() || size <= 0.0 {
+                return Err(invalid(format!("invalid rich-text font size '{value}'")));
+            }
+            run.value.font_size = Some(size);
+        } else if is_spreadsheetml_name(namespace, element.name(), b"b") {
+            mark_property(&mut run.seen_properties, 4, "bold property")?;
+            run.value.bold = boolean_property(element, decoder, "rich-text bold")?;
+        } else if is_spreadsheetml_name(namespace, element.name(), b"i") {
+            mark_property(&mut run.seen_properties, 8, "italic property")?;
+            run.value.italic = boolean_property(element, decoder, "rich-text italic")?;
+        } else if is_spreadsheetml_name(namespace, element.name(), b"u") {
+            mark_property(&mut run.seen_properties, 16, "underline property")?;
+            let value = unqualified_attribute_value(element, b"val", decoder)?
+                .unwrap_or_else(|| "single".to_string());
+            run.value.underline = match value.as_str() {
+                "none" => false,
+                "single" | "double" | "singleAccounting" | "doubleAccounting" => true,
+                _ => {
+                    return Err(invalid(format!(
+                        "invalid rich-text underline value '{value}'"
+                    )));
+                },
+            };
+        } else if is_spreadsheetml_name(namespace, element.name(), b"color") {
+            mark_property(&mut run.seen_properties, 32, "color property")?;
+            if let Some(rgb) = unqualified_attribute_value(element, b"rgb", decoder)? {
+                if !matches!(rgb.len(), 6 | 8) || !rgb.bytes().all(|byte| byte.is_ascii_hexdigit())
+                {
+                    return Err(invalid(format!("invalid rich-text RGB color '{rgb}'")));
+                }
+                run.value.color = Some(rgb);
+            }
+        }
+        Ok(())
+    }
+
+    fn finish_context(&mut self, context: StringContext) -> Result<()> {
+        match context {
+            StringContext::RichRun => self.finish_run(),
+            StringContext::StringItem => self.finish_string(),
+            _ => Ok(()),
+        }
+    }
+
+    fn finish_run(&mut self) -> Result<()> {
+        let mut run = self
+            .pending_run
+            .take()
+            .ok_or_else(|| invalid("missing shared-string rich-text run"))?;
+        if !run.saw_text {
+            return Err(invalid("shared-string rich-text run is missing its text"));
+        }
+        run.value.text = decode_spreadsheet_text(&run.value.text)?;
+        let string = self
+            .pending_string
+            .as_mut()
+            .ok_or_else(|| invalid("rich-text run outside a shared-string item"))?;
+        string.text.push_str(&run.value.text);
+        string.runs.push(run.value);
+        Ok(())
+    }
+
+    fn finish_string(&mut self) -> Result<()> {
+        if self.pending_run.is_some() {
+            return Err(invalid("unterminated shared-string rich-text run"));
+        }
+        let mut string = self
+            .pending_string
+            .take()
+            .ok_or_else(|| invalid("missing shared-string item"))?;
+        if !string.saw_rich_run {
+            string.text = decode_spreadsheet_text(&string.text)?;
+        }
+        let index = self.strings.len();
+        self.strings.push(string.text);
+        if !string.runs.is_empty() {
+            self.rich_text.insert(index, string.runs);
+        }
+        Ok(())
+    }
+
+    fn validate_counts(&self) -> Result<()> {
+        let actual = u32::try_from(self.strings.len())
+            .map_err(|_| invalid("shared-string count exceeds u32"))?;
+        if let Some(expected) = self.expected_unique_count
+            && expected != actual
+        {
+            return Err(invalid(format!(
+                "shared-string uniqueCount declares {expected}, parsed {actual}"
+            )));
+        }
+        if let Some(expected) = self.expected_count
+            && expected < actual
+        {
+            return Err(invalid(format!(
+                "shared-string count declares {expected}, below {actual} unique strings"
+            )));
+        }
+        Ok(())
+    }
 }
 
 impl SharedStrings {
@@ -34,49 +509,15 @@ impl SharedStrings {
         Self::default()
     }
 
-    /// Parse shared strings from xl/sharedStrings.xml content - optimized version.
-    pub fn parse(content: &str) -> Result<Self> {
-        let mut strings = Vec::with_capacity(INITIAL_STRINGS_CAPACITY);
-        let string_to_index = HashMap::with_capacity(INITIAL_STRINGS_CAPACITY);
-        let mut rich_text: HashMap<usize, Vec<RichTextRun>> =
-            HashMap::with_capacity(INITIAL_STRINGS_CAPACITY / 4);
-
-        let bytes = content.as_bytes();
-        let mut pos = 0;
-
-        while let Some(si_start) = memchr::memmem::find(&bytes[pos..], b"<si>") {
-            let si_start_pos = pos + si_start;
-            if let Some(si_end) = memchr::memmem::find(&bytes[si_start_pos..], b"</si>") {
-                let si_content = &content[si_start_pos..si_start_pos + si_end + 5];
-
-                if let Some(text) = Self::extract_text_from_si(si_content) {
-                    let index = strings.len();
-                    // Performance: Always push to maintain order, deduplication handled by Excel
-                    strings.push(text);
-
-                    if let Some(runs) = Self::extract_rich_text_runs_from_si(si_content)
-                        && !runs.is_empty()
-                    {
-                        rich_text.insert(index, runs);
-                    }
-                }
-
-                pos = si_start_pos + si_end + 5;
-            } else {
-                break;
-            }
-        }
-
-        Ok(SharedStrings {
-            strings,
-            string_to_index,
-            rich_text,
-        })
+    /// Parse shared strings from `xl/sharedStrings.xml`.
+    pub fn parse(content: &str) -> SheetResult<Self> {
+        SharedStringParser::parse(content)
+            .map_err(|error| Box::new(error) as Box<dyn std::error::Error + Send + Sync>)
     }
 
     /// Get a string by its index.
     pub fn get(&self, index: usize) -> Option<&str> {
-        self.strings.get(index).map(|s| s.as_str())
+        self.strings.get(index).map(String::as_str)
     }
 
     /// Get the number of strings in the table.
@@ -96,194 +537,203 @@ impl SharedStrings {
 
     /// Get rich text runs for a specific shared string index, if present.
     pub fn rich_text_runs(&self, index: usize) -> Option<&[RichTextRun]> {
-        self.rich_text.get(&index).map(|v| v.as_slice())
+        self.rich_text.get(&index).map(Vec::as_slice)
     }
+}
 
-    /// Extract text content from <si> element - optimized version.
-    fn extract_text_from_si(si_content: &str) -> Option<String> {
-        let bytes = si_content.as_bytes();
-        let mut result = String::new();
-        let mut search_start = 0;
+fn current_context(stack: &[StringContext]) -> Result<StringContext> {
+    stack
+        .last()
+        .copied()
+        .ok_or_else(|| invalid("shared strings XML is missing its root context"))
+}
 
-        // An <si> may contain multiple <r><t>...</t></r> runs for rich text. Concatenate
-        // the text from all <t> elements in document order.
-        while let Some(rel_pos) = memchr::memmem::find(&bytes[search_start..], b"<t") {
-            let t_pos = search_start + rel_pos;
-
-            // Find the closing '>' of the <t ...> start tag.
-            let after_t = &bytes[t_pos..];
-            let gt_rel = match memchr::memchr(b'>', after_t) {
-                Some(p) => p,
-                None => break,
-            };
-            let text_start = t_pos + gt_rel + 1;
-
-            // Find the corresponding </t> end tag.
-            let after_text = &bytes[text_start..];
-            if let Some(end_rel) = memchr::memmem::find(after_text, b"</t>") {
-                let text_end = text_start + end_rel;
-                result.push_str(&si_content[text_start..text_end]);
-                // Advance search past this </t>
-                search_start = text_end + 4; // len("</t>")
-            } else {
-                break;
-            }
-        }
-
-        if result.is_empty() {
-            None
-        } else {
-            Some(result)
-        }
+fn current_text_target(stack: &[StringContext]) -> Option<TextTarget> {
+    match stack.last() {
+        Some(StringContext::Text(target)) => Some(*target),
+        _ => None,
     }
+}
 
-    /// Extract rich text runs (if any) from an <si> element.
-    fn extract_rich_text_runs_from_si(si_content: &str) -> Option<Vec<RichTextRun>> {
-        let bytes = si_content.as_bytes();
-        let mut runs: Vec<RichTextRun> = Vec::new();
-        let mut pos = 0usize;
-        let slice = &bytes;
+fn required_string(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+    description: &str,
+) -> Result<String> {
+    unqualified_attribute_value(element, name, decoder)?
+        .ok_or_else(|| invalid(format!("missing {description} attribute")))
+}
 
-        while let Some(rel) = memchr::memmem::find(&slice[pos..], b"<r") {
-            let r_pos = pos + rel;
-            let next = slice.get(r_pos + 2).copied();
-            if !matches!(next, Some(b'>') | Some(b' ')) {
-                pos = r_pos + 2;
-                continue;
-            }
-
-            let after_r = &slice[r_pos..];
-            let gt_rel = match memchr::memchr(b'>', after_r) {
-                Some(p) => p,
-                None => break,
-            };
-            let inner_start = r_pos + gt_rel + 1;
-            let after_inner = &slice[inner_start..];
-            let end_rel = match memchr::memmem::find(after_inner, b"</r>") {
-                Some(p) => p,
-                None => break,
-            };
-            let inner_end = inner_start + end_rel;
-            let run_inner = &si_content[inner_start..inner_end];
-
-            if let Some(run) = Self::parse_rich_text_run(run_inner) {
-                runs.push(run);
-            }
-
-            pos = inner_end + 4; // len("</r>")
-        }
-
-        if runs.is_empty() {
-            // Fallback: treat entire shared string as a single run if we have text
-            // but no explicit <r> elements.
-            if let Some(text) = Self::extract_text_from_si(si_content)
-                && !text.is_empty()
-            {
-                runs.push(RichTextRun {
-                    text,
-                    font_name: None,
-                    font_size: None,
-                    bold: false,
-                    italic: false,
-                    underline: false,
-                    color: None,
-                });
-            }
-        }
-
-        if runs.is_empty() { None } else { Some(runs) }
-    }
-
-    fn parse_rich_text_run(content: &str) -> Option<RichTextRun> {
-        let bytes = content.as_bytes();
-        let mut text = String::new();
-        let mut search_start = 0;
-
-        while let Some(rel_pos) = memchr::memmem::find(&bytes[search_start..], b"<t") {
-            let t_pos = search_start + rel_pos;
-            let after_t = &bytes[t_pos..];
-            let gt_rel = match memchr::memchr(b'>', after_t) {
-                Some(p) => p,
-                None => break,
-            };
-            let text_start = t_pos + gt_rel + 1;
-
-            let after_text = &bytes[text_start..];
-            if let Some(end_rel) = memchr::memmem::find(after_text, b"</t>") {
-                let text_end = text_start + end_rel;
-                text.push_str(&content[text_start..text_end]);
-                search_start = text_end + 4;
-            } else {
-                break;
-            }
-        }
-
-        if text.is_empty() {
-            return None;
-        }
-
-        let mut font_name: Option<String> = None;
-        let mut font_size: Option<f64> = None;
-        let mut bold = false;
-        let mut italic = false;
-        let mut underline = false;
-        let mut color: Option<String> = None;
-
-        if let Some(rpr_start) = content.find("<rPr") {
-            let rpr_bytes = &bytes[rpr_start..];
-            if let Some(rpr_end_rel) = memchr::memmem::find(rpr_bytes, b"</rPr>") {
-                let rpr_end = rpr_start + rpr_end_rel + "</rPr>".len();
-                let rpr_content = &content[rpr_start..rpr_end];
-
-                if let Some(pos) = rpr_content.find("<rFont")
-                    && let Some(val_pos) = rpr_content[pos..].find("val=\"")
-                {
-                    let start = pos + val_pos + 5;
-                    if let Some(end_rel) = rpr_content[start..].find('"') {
-                        font_name = Some(rpr_content[start..start + end_rel].to_string());
-                    }
-                }
-
-                if let Some(pos) = rpr_content.find("<sz")
-                    && let Some(val_pos) = rpr_content[pos..].find("val=\"")
-                {
-                    let start = pos + val_pos + 5;
-                    if let Some(end_rel) = rpr_content[start..].find('"')
-                        && let Ok(sz) = rpr_content[start..start + end_rel].parse::<f64>()
-                    {
-                        font_size = Some(sz);
-                    }
-                }
-
-                if rpr_content.contains("<b/") || rpr_content.contains("<b ") {
-                    bold = true;
-                }
-                if rpr_content.contains("<i/") || rpr_content.contains("<i ") {
-                    italic = true;
-                }
-                if rpr_content.contains("<u/") || rpr_content.contains("<u ") {
-                    underline = true;
-                }
-
-                if let Some(pos) = rpr_content.find("<color")
-                    && let Some(rgb_pos) = rpr_content[pos..].find("rgb=\"")
-                {
-                    let start = pos + rgb_pos + 5;
-                    if let Some(end_rel) = rpr_content[start..].find('"') {
-                        color = Some(rpr_content[start..start + end_rel].to_string());
-                    }
-                }
-            }
-        }
-
-        Some(RichTextRun {
-            text,
-            font_name,
-            font_size,
-            bold,
-            italic,
-            underline,
-            color,
+fn optional_u32(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+    description: &str,
+) -> Result<Option<u32>> {
+    unqualified_attribute_value(element, name, decoder)?
+        .map(|value| {
+            value
+                .parse::<u32>()
+                .map_err(|_| invalid(format!("invalid {description} value '{value}'")))
         })
+        .transpose()
+}
+
+fn boolean_property(element: &BytesStart<'_>, decoder: Decoder, description: &str) -> Result<bool> {
+    match unqualified_attribute_value(element, b"val", decoder)?.as_deref() {
+        None | Some("1" | "true") => Ok(true),
+        Some("0" | "false") => Ok(false),
+        Some(value) => Err(invalid(format!("invalid {description} value '{value}'"))),
+    }
+}
+
+fn decode_spreadsheet_text(value: &str) -> Result<String> {
+    let bytes = value.as_bytes();
+    let mut decoded = String::with_capacity(value.len());
+    let mut copied_until = 0;
+    let mut index = 0;
+
+    while index + 7 <= bytes.len() {
+        let Some((unit, end)) = spreadsheet_escape_at(bytes, index) else {
+            index += 1;
+            continue;
+        };
+        decoded.push_str(&value[copied_until..index]);
+        if (0xD800..=0xDBFF).contains(&unit) {
+            let Some((low, pair_end)) = spreadsheet_escape_at(bytes, end) else {
+                return Err(invalid(format!(
+                    "unpaired high surrogate in SpreadsheetML escape at byte {index}"
+                )));
+            };
+            if !(0xDC00..=0xDFFF).contains(&low) {
+                return Err(invalid(format!(
+                    "unpaired high surrogate in SpreadsheetML escape at byte {index}"
+                )));
+            }
+            let scalar = 0x1_0000 + ((u32::from(unit) - 0xD800) << 10) + (u32::from(low) - 0xDC00);
+            decoded.push(char::from_u32(scalar).ok_or_else(|| {
+                invalid(format!(
+                    "invalid surrogate pair in SpreadsheetML escape at byte {index}"
+                ))
+            })?);
+            index = pair_end;
+            copied_until = pair_end;
+        } else if (0xDC00..=0xDFFF).contains(&unit) {
+            return Err(invalid(format!(
+                "unpaired low surrogate in SpreadsheetML escape at byte {index}"
+            )));
+        } else {
+            decoded.push(char::from_u32(u32::from(unit)).ok_or_else(|| {
+                invalid(format!(
+                    "invalid code unit in SpreadsheetML escape at byte {index}"
+                ))
+            })?);
+            index = end;
+            copied_until = end;
+        }
+    }
+    decoded.push_str(&value[copied_until..]);
+    Ok(decoded)
+}
+
+fn spreadsheet_escape_at(bytes: &[u8], index: usize) -> Option<(u16, usize)> {
+    let escape = bytes.get(index..index.checked_add(7)?)?;
+    if escape[0] != b'_' || escape[1] != b'x' || escape[6] != b'_' {
+        return None;
+    }
+    let mut value = 0u16;
+    for byte in &escape[2..6] {
+        value = value.checked_mul(16)?;
+        value = value.checked_add(u16::from(hex_value(*byte)?))?;
+    }
+    Some((value, index + 7))
+}
+
+fn hex_value(byte: u8) -> Option<u8> {
+    match byte {
+        b'0'..=b'9' => Some(byte - b'0'),
+        b'a'..=b'f' => Some(byte - b'a' + 10),
+        b'A'..=b'F' => Some(byte - b'A' + 10),
+        _ => None,
+    }
+}
+
+fn mark_property(seen: &mut u8, bit: u8, description: &str) -> Result<()> {
+    if *seen & bit != 0 {
+        return Err(invalid(format!("duplicate shared-string {description}")));
+    }
+    *seen |= bit;
+    Ok(())
+}
+
+fn invalid(message: impl Into<String>) -> OoxmlError {
+    OoxmlError::InvalidFormat(message.into())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const S: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+    const STRICT_S: &str = "http://purl.oclc.org/ooxml/spreadsheetml/main";
+
+    #[test]
+    fn preserves_indexes_and_decodes_plain_and_rich_text() {
+        let xml = format!(
+            r#"<x:sst xmlns:x="{S}" count="5" uniqueCount="4">
+                <x:si><x:t>A &amp; B_x000A__xD83D__xDE00__x005F_x0041_</x:t></x:si>
+                <x:si><x:t/></x:si>
+                <x:si><x:r><x:rPr><x:rFont val="A &amp; B"/><x:sz val="11.5"/>
+                    <x:b val="0"/><x:i/><x:u val="double"/><x:color rgb="FF112233"/></x:rPr>
+                    <x:t>Rich &lt;</x:t></x:r><x:r><x:t><![CDATA[text>]]></x:t></x:r>
+                    <x:rPh sb="0" eb="1"><x:t>phonetic</x:t></x:rPh></x:si>
+                <x:si/>
+            </x:sst>"#
+        );
+        let strings = SharedStrings::parse(&xml).unwrap();
+        assert_eq!(
+            strings.strings(),
+            &["A & B\n😀_x0041_", "", "Rich <text>", ""]
+        );
+        assert!(strings.rich_text_runs(0).is_none());
+        let runs = strings.rich_text_runs(2).unwrap();
+        assert_eq!(runs.len(), 2);
+        assert_eq!(runs[0].text, "Rich <");
+        assert_eq!(runs[0].font_name.as_deref(), Some("A & B"));
+        assert_eq!(runs[0].font_size, Some(11.5));
+        assert!(!runs[0].bold);
+        assert!(runs[0].italic);
+        assert!(runs[0].underline);
+        assert_eq!(runs[0].color.as_deref(), Some("FF112233"));
+        assert_eq!(runs[1].text, "text>");
+    }
+
+    #[test]
+    fn accepts_strict_namespaces_and_ignores_foreign_lookalikes() {
+        let xml = format!(
+            r#"<sst xmlns="{STRICT_S}" xmlns:f="urn:foreign" uniqueCount="2">
+                <f:si><si><t>Nested</t></si></f:si>
+                <si><f:t>Ignored</f:t><t>Strict</t></si><si><r><f:t>Ignored</f:t><t>Run</t></r></si>
+            </sst>"#
+        );
+        let strings = SharedStrings::parse(&xml).unwrap();
+        assert_eq!(strings.strings(), &["Strict", "Run"]);
+        assert_eq!(strings.rich_text_runs(1).unwrap()[0].text, "Run");
+    }
+
+    #[test]
+    fn rejects_bad_counts_structure_and_run_properties() {
+        for xml in [
+            format!(r#"<sst xmlns="{S}" uniqueCount="2"><si><t>one</t></si></sst>"#),
+            format!(r#"<sst xmlns="{S}" count="0"><si><t>one</t></si></sst>"#),
+            format!(r#"<sst xmlns="{S}"><si><t>one</t><r><t>two</t></r></si></sst>"#),
+            format!(r#"<sst xmlns="{S}"><si><r><rPr><sz val="NaN"/></rPr><t>x</t></r></si></sst>"#),
+            format!(r#"<sst xmlns="{S}"><si><r><rPr><b/><b/></rPr><t>x</t></r></si></sst>"#),
+            format!(r#"<sst xmlns="{S}"><si><t>bad_xD800_</t></si></sst>"#),
+            format!(r#"<sst xmlns="{S}"><si><r><rPr/><t>x</t>"#),
+        ] {
+            assert!(SharedStrings::parse(&xml).is_err(), "accepted {xml}");
+        }
     }
 }
