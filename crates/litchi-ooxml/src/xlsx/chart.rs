@@ -912,10 +912,43 @@ pub(crate) fn chart_fragment_relationship_ids(chart: &ChartModel) -> Result<Hash
                 .as_ref()
                 .and_then(|surface| surface.extension_list.as_ref())
                 .map(crate::charts::ChartExtensionList::as_xml),
+            chart
+                .legend
+                .as_ref()
+                .and_then(|legend| legend.shape_properties.as_ref())
+                .map(crate::charts::ChartShapeProperties::as_xml),
+            chart
+                .legend
+                .as_ref()
+                .and_then(|legend| legend.text_properties.as_ref())
+                .map(crate::charts::ChartTextProperties::as_xml),
+            chart
+                .legend
+                .as_ref()
+                .and_then(|legend| legend.extension_list.as_ref())
+                .map(crate::charts::ChartExtensionList::as_xml),
         ]
         .into_iter()
         .flatten(),
     );
+    if let Some(legend) = chart.legend.as_ref() {
+        for entry in &legend.entries {
+            fragments.extend(
+                [
+                    entry
+                        .text_properties
+                        .as_ref()
+                        .map(crate::charts::ChartTextProperties::as_xml),
+                    entry
+                        .extension_list
+                        .as_ref()
+                        .map(crate::charts::ChartExtensionList::as_xml),
+                ]
+                .into_iter()
+                .flatten(),
+            );
+        }
+    }
     for group in &chart.plot_area.type_groups {
         match group {
             crate::charts::TypeGroup::Area(group) => {

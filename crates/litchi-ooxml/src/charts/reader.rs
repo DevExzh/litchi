@@ -5131,6 +5131,9 @@ fn parse_legend<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Legend> {
     let mut overlay = false;
     let mut layout = None;
     let mut entries = Vec::new();
+    let mut shape_properties = None;
+    let mut text_properties = None;
+    let mut extension_list = None;
     let mut buf = Vec::new();
 
     loop {
@@ -5171,6 +5174,66 @@ fn parse_legend<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Legend> {
                     },
                 });
             },
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"spPr" => {
+                if shape_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart legend contains duplicate shape properties".into(),
+                    ));
+                }
+                shape_properties = Some(ChartShapeProperties::from_xml(
+                    reader.capture_fragment(element, "chart legend shape properties")?,
+                )?);
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"spPr" => {
+                if shape_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart legend contains duplicate shape properties".into(),
+                    ));
+                }
+                shape_properties = Some(ChartShapeProperties::from_xml(
+                    reader.capture_empty_fragment(element)?,
+                )?);
+            },
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"txPr" => {
+                if text_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart legend contains duplicate text properties".into(),
+                    ));
+                }
+                text_properties = Some(ChartTextProperties::from_xml(
+                    reader.capture_fragment(element, "chart legend text properties")?,
+                )?);
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"txPr" => {
+                if text_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart legend contains duplicate text properties".into(),
+                    ));
+                }
+                text_properties = Some(ChartTextProperties::from_xml(
+                    reader.capture_empty_fragment(element)?,
+                )?);
+            },
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"extLst" => {
+                if extension_list.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart legend contains duplicate extension lists".into(),
+                    ));
+                }
+                extension_list = Some(ChartExtensionList::from_xml(
+                    reader.capture_fragment(element, "chart legend extension list")?,
+                )?);
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"extLst" => {
+                if extension_list.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart legend contains duplicate extension lists".into(),
+                    ));
+                }
+                extension_list = Some(ChartExtensionList::from_xml(
+                    reader.capture_empty_fragment(element)?,
+                )?);
+            },
             Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
                 let tag_name = e.local_name();
                 match tag_name.as_ref() {
@@ -5207,6 +5270,9 @@ fn parse_legend<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Legend> {
     let mut legend = Legend::new(position).with_overlay(overlay);
     legend.layout = layout;
     legend.entries = entries;
+    legend.shape_properties = shape_properties;
+    legend.text_properties = text_properties;
+    legend.extension_list = extension_list;
     Ok(legend)
 }
 
@@ -5214,10 +5280,52 @@ fn parse_legend_entry<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Lege
     let mut index = None;
     let mut deleted = false;
     let mut saw_delete = false;
+    let mut text_properties = None;
+    let mut extension_list = None;
     let mut buf = Vec::new();
 
     loop {
         match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"txPr" => {
+                if saw_delete || text_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart legend entry contains multiple choice values".into(),
+                    ));
+                }
+                text_properties = Some(ChartTextProperties::from_xml(
+                    reader.capture_fragment(element, "chart legend-entry text properties")?,
+                )?);
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"txPr" => {
+                if saw_delete || text_properties.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart legend entry contains multiple choice values".into(),
+                    ));
+                }
+                text_properties = Some(ChartTextProperties::from_xml(
+                    reader.capture_empty_fragment(element)?,
+                )?);
+            },
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"extLst" => {
+                if extension_list.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart legend entry contains duplicate extension lists".into(),
+                    ));
+                }
+                extension_list = Some(ChartExtensionList::from_xml(
+                    reader.capture_fragment(element, "chart legend-entry extension list")?,
+                )?);
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"extLst" => {
+                if extension_list.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart legend entry contains duplicate extension lists".into(),
+                    ));
+                }
+                extension_list = Some(ChartExtensionList::from_xml(
+                    reader.capture_empty_fragment(element)?,
+                )?);
+            },
             Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element)) => {
                 match element.local_name().as_ref() {
                     b"idx" => {
@@ -5229,9 +5337,9 @@ fn parse_legend_entry<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Lege
                         index = Some(required_u32_attr(element, "chart legend entry index")?);
                     },
                     b"delete" => {
-                        if saw_delete {
+                        if saw_delete || text_properties.is_some() {
                             return Err(OoxmlError::InvalidFormat(
-                                "chart legend entry contains duplicate delete flags".into(),
+                                "chart legend entry contains multiple choice values".into(),
                             ));
                         }
                         deleted = parse_bool_attr(element)?;
@@ -5253,8 +5361,15 @@ fn parse_legend_entry<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Lege
     }
 
     let index = index.ok_or_else(|| missing_attribute("chart legend entry index"))?;
+    if !saw_delete && text_properties.is_none() {
+        return Err(OoxmlError::InvalidFormat(
+            "chart legend entry is missing its delete or text-properties choice".into(),
+        ));
+    }
     let mut entry = LegendEntry::new(index);
     entry.deleted = deleted;
+    entry.text_properties = text_properties;
+    entry.extension_list = extension_list;
     Ok(entry)
 }
 
@@ -6911,6 +7026,89 @@ mod tests {
         };
         chart.legend = Some(legend);
         assert!(crate::charts::writer::write_chart(&mut Vec::new(), &chart).is_err());
+    }
+
+    #[test]
+    fn round_trips_legend_and_entry_formatting_fragments() {
+        let xml = br#"<c:chartSpace
+                xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"
+                xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+                xmlns:x="urn:example:legend">
+            <c:chart><c:plotArea/><c:legend><c:legendPos val="b"/>
+                <c:legendEntry><c:idx val="2"/><c:txPr><a:bodyPr/><a:lstStyle/><a:p/></c:txPr>
+                    <c:extLst><c:ext uri="entry"><x:entryPayload/></c:ext></c:extLst>
+                </c:legendEntry>
+                <c:legendEntry><c:idx val="3"/><c:delete val="1"/></c:legendEntry>
+                <c:overlay val="1"/>
+                <c:spPr><a:solidFill><a:srgbClr val="123456"/></a:solidFill></c:spPr>
+                <c:txPr><a:bodyPr rot="1200000"/><a:lstStyle/><a:p/></c:txPr>
+                <c:extLst><c:ext uri="legend"><x:legendPayload/></c:ext></c:extLst>
+            </c:legend></c:chart>
+        </c:chartSpace>"#;
+        let chart = parse_chart(xml.as_slice()).unwrap();
+        let legend = chart.legend.as_ref().unwrap();
+        assert_eq!(legend.position, LegendPosition::Bottom);
+        assert!(legend.overlay);
+        assert_eq!(legend.entries.len(), 2);
+        assert!(legend.entries[0].text_properties.is_some());
+        assert!(legend.entries[0].extension_list.is_some());
+        assert!(legend.entries[1].deleted);
+        assert!(
+            std::str::from_utf8(legend.shape_properties.as_ref().unwrap().as_xml())
+                .unwrap()
+                .contains("123456")
+        );
+        assert!(
+            std::str::from_utf8(legend.text_properties.as_ref().unwrap().as_xml())
+                .unwrap()
+                .contains("1200000")
+        );
+        assert!(
+            std::str::from_utf8(legend.extension_list.as_ref().unwrap().as_xml())
+                .unwrap()
+                .contains("legendPayload")
+        );
+
+        let mut output = Vec::new();
+        crate::charts::writer::write_chart(&mut output, &chart).unwrap();
+        let reparsed = parse_chart(output.as_slice()).unwrap();
+        let reparsed = reparsed.legend.as_ref().unwrap();
+        assert_eq!(reparsed.shape_properties, legend.shape_properties);
+        assert_eq!(reparsed.text_properties, legend.text_properties);
+        assert_eq!(reparsed.extension_list, legend.extension_list);
+        assert_eq!(
+            reparsed.entries[0].text_properties,
+            legend.entries[0].text_properties
+        );
+        assert_eq!(
+            reparsed.entries[0].extension_list,
+            legend.entries[0].extension_list
+        );
+
+        for invalid_entry in [
+            br#"<c:legendEntry><c:idx val="1"/></c:legendEntry>"#.as_slice(),
+            br#"<c:legendEntry><c:idx val="1"/><c:delete/><c:txPr/></c:legendEntry>"#.as_slice(),
+        ] {
+            let mut document = br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea/><c:legend>"#.to_vec();
+            document.extend_from_slice(invalid_entry);
+            document.extend_from_slice(b"</c:legend></c:chart></c:chartSpace>");
+            assert!(parse_chart(document.as_slice()).is_err());
+        }
+
+        let mut invalid = Chart::new();
+        let mut legend = Legend::default();
+        let mut entry = LegendEntry::new(1);
+        entry.deleted = true;
+        entry.text_properties = Some(
+            ChartTextProperties::from_xml(
+                br#"<c:txPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"/>"#
+                    .to_vec(),
+            )
+            .unwrap(),
+        );
+        legend.entries.push(entry);
+        invalid.legend = Some(legend);
+        assert!(crate::charts::writer::write_chart(&mut Vec::new(), &invalid).is_err());
     }
 
     #[test]

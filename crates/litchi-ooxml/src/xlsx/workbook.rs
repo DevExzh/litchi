@@ -2659,6 +2659,24 @@ mod tests {
             .plot_area
             .type_groups
             .push(TypeGroup::Line(line));
+        let mut legend = crate::charts::Legend {
+            shape_properties: Some(
+                ChartShapeProperties::from_xml(
+                    br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:blipFill><a:blip r:embed="rId411"/></a:blipFill></c:spPr>"#.to_vec(),
+                )
+                .unwrap(),
+            ),
+            ..crate::charts::Legend::default()
+        };
+        let mut legend_entry = crate::charts::legend::LegendEntry::new(0);
+        legend_entry.extension_list = Some(
+            ChartExtensionList::from_xml(
+                br#"<c:extLst xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:x="urn:example"><c:ext uri="entry"><x:reference r:id="rId412"/></c:ext></c:extLst>"#.to_vec(),
+            )
+            .unwrap(),
+        );
+        legend.entries.push(legend_entry);
+        chart.chart.legend = Some(legend);
         let fragment_ids = crate::xlsx::chart::chart_fragment_relationship_ids(&chart.chart)
             .expect("relationship-bearing fragments should be valid XML");
         assert_eq!(
@@ -2672,6 +2690,8 @@ mod tests {
                 "rId408".to_string(),
                 "rId409".to_string(),
                 "rId410".to_string(),
+                "rId411".to_string(),
+                "rId412".to_string(),
             ]
             .into()
         );
@@ -2682,6 +2702,7 @@ mod tests {
         assert!(
             [
                 "rId403", "rId404", "rId405", "rId406", "rId407", "rId408", "rId409", "rId410",
+                "rId411", "rId412",
             ]
             .iter()
             .any(|relationship_id| error.contains(relationship_id))

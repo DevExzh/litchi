@@ -3,6 +3,7 @@
 //! This module contains structures for representing chart legends
 //! and their positioning.
 
+use crate::charts::chart::{ChartExtensionList, ChartShapeProperties, ChartTextProperties};
 use crate::charts::models::Layout;
 use crate::charts::types::LegendPosition;
 
@@ -17,6 +18,12 @@ pub struct Legend {
     pub layout: Option<Layout>,
     /// Individual legend entries
     pub entries: Vec<LegendEntry>,
+    /// DrawingML shape properties for the legend container
+    pub shape_properties: Option<ChartShapeProperties>,
+    /// DrawingML text properties for the legend container
+    pub text_properties: Option<ChartTextProperties>,
+    /// Legend extension list
+    pub extension_list: Option<ChartExtensionList>,
 }
 
 impl Legend {
@@ -28,6 +35,9 @@ impl Legend {
             overlay: false,
             layout: None,
             entries: Vec::new(),
+            shape_properties: None,
+            text_properties: None,
+            extension_list: None,
         }
     }
 
@@ -66,6 +76,10 @@ pub struct LegendEntry {
     pub index: u32,
     /// Whether entry is deleted
     pub deleted: bool,
+    /// DrawingML text properties used instead of the delete choice
+    pub text_properties: Option<ChartTextProperties>,
+    /// Legend-entry extension list
+    pub extension_list: Option<ChartExtensionList>,
 }
 
 impl LegendEntry {
@@ -75,6 +89,8 @@ impl LegendEntry {
         Self {
             index,
             deleted: false,
+            text_properties: None,
+            extension_list: None,
         }
     }
 }

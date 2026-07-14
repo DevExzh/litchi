@@ -2405,11 +2405,23 @@ fn write_legend<W: Write>(writer: &mut W, legend: &Legend) -> std::io::Result<()
         }
         write!(writer, "<c:legendEntry>")?;
         write!(writer, r#"<c:idx val="{}"/>"#, entry.index)?;
-        write!(
-            writer,
-            r#"<c:delete val="{}"/>"#,
-            if entry.deleted { "1" } else { "0" }
-        )?;
+        if let Some(text_properties) = entry.text_properties.as_ref() {
+            if entry.deleted {
+                return Err(invalid_chart_input(
+                    "chart legend entry cannot be deleted and have text properties",
+                ));
+            }
+            writer.write_all(text_properties.as_xml())?;
+        } else {
+            write!(
+                writer,
+                r#"<c:delete val="{}"/>"#,
+                if entry.deleted { "1" } else { "0" }
+            )?;
+        }
+        if let Some(extension_list) = entry.extension_list.as_ref() {
+            writer.write_all(extension_list.as_xml())?;
+        }
         write!(writer, "</c:legendEntry>")?;
     }
     if let Some(layout) = legend.layout.as_ref() {
@@ -2420,6 +2432,15 @@ fn write_legend<W: Write>(writer: &mut W, legend: &Legend) -> std::io::Result<()
         r#"<c:overlay val="{}"/>"#,
         if legend.overlay { "1" } else { "0" }
     )?;
+    if let Some(shape_properties) = legend.shape_properties.as_ref() {
+        writer.write_all(shape_properties.as_xml())?;
+    }
+    if let Some(text_properties) = legend.text_properties.as_ref() {
+        writer.write_all(text_properties.as_xml())?;
+    }
+    if let Some(extension_list) = legend.extension_list.as_ref() {
+        writer.write_all(extension_list.as_xml())?;
+    }
     write!(writer, "</c:legend>")?;
     Ok(())
 }
