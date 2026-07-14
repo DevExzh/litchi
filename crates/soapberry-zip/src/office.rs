@@ -561,6 +561,22 @@ impl<'data> LazyArchiveReader<'data> {
             .collect()
     }
 
+    /// Read multiple files in parallel while preserving individual errors.
+    ///
+    /// This is intended for parsers that must distinguish a missing or corrupt
+    /// required part from a successfully read package.
+    pub fn read_many_parallel_results<'a>(
+        &self,
+        names: &'a [&'a str],
+    ) -> Vec<(&'a str, Result<Vec<u8>, Error>)> {
+        use rayon::prelude::*;
+
+        names
+            .par_iter()
+            .map(|name| (*name, self.inner.read(name)))
+            .collect()
+    }
+
     /// Read multiple files in parallel with caching.
     ///
     /// This efficiently decompresses multiple files in parallel while still

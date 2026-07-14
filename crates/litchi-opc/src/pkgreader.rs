@@ -372,7 +372,10 @@ impl PackageReader {
 
         match archive.read(rels_path) {
             Ok(rels_xml) => Self::parse_rels_xml(&rels_xml, source_uri.base_uri()),
-            Err(_) => Ok(SmallVec::new()), // No relationships file
+            Err(error) if matches!(error.kind(), soapberry_zip::ErrorKind::FileNotFound(_)) => {
+                Ok(SmallVec::new())
+            },
+            Err(error) => Err(error.into()),
         }
     }
 
@@ -403,11 +406,10 @@ impl PackageReader {
             if srel.is_external() {
                 continue;
             }
-            if let Ok(partname) = srel.target_partname() {
-                let partname_str = partname.to_string();
-                if visited.insert(partname_str) {
-                    work_queue.push((partname, srel.reltype.clone()));
-                }
+            let partname = srel.target_partname()?;
+            let partname_str = partname.to_string();
+            if visited.insert(partname_str) {
+                work_queue.push((partname, srel.reltype.clone()));
             }
         }
 
@@ -421,11 +423,10 @@ impl PackageReader {
                 if child_srel.is_external() {
                     continue;
                 }
-                if let Ok(child_partname) = child_srel.target_partname() {
-                    let child_partname_str = child_partname.to_string();
-                    if visited.insert(child_partname_str) {
-                        work_queue.push((child_partname, child_srel.reltype.clone()));
-                    }
+                let child_partname = child_srel.target_partname()?;
+                let child_partname_str = child_partname.to_string();
+                if visited.insert(child_partname_str) {
+                    work_queue.push((child_partname, child_srel.reltype.clone()));
                 }
             }
 
@@ -440,7 +441,10 @@ impl PackageReader {
             .collect();
 
         // Decompress all part contents in parallel
-        let mut decompressed = archive.read_many_parallel(&member_names);
+        let mut decompressed = HashMap::with_capacity(member_names.len());
+        for (member_name, result) in archive.read_many_parallel_results(&member_names) {
+            decompressed.insert(member_name.to_string(), result?);
+        }
 
         // Phase 3: Build SerializedPart structures (take ownership, no cloning)
         let mut sparts = Vec::with_capacity(discovered.len());
@@ -489,6 +493,21 @@ impl PackageReader {
 mod tests {
     use super::*;
 
+    fn package_bytes(root_relationships: &[u8], document: &[u8]) -> Vec<u8> {
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        writer
+            .write_stored(
+                "[Content_Types].xml",
+                br#"<Types><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>"#,
+            )
+            .unwrap();
+        writer
+            .write_stored("_rels/.rels", root_relationships)
+            .unwrap();
+        writer.write_stored("word/document.xml", document).unwrap();
+        writer.finish_to_bytes().unwrap()
+    }
+
     #[test]
     fn test_content_type_map() {
         let xml = br#"<?xml version="1.0"?>
@@ -508,5 +527,55 @@ mod tests {
             ct_map.get(&uri).unwrap(),
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"
         );
+    }
+
+    #[test]
+    fn missing_relationship_parts_are_optional_but_malformed_xml_is_not() {
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        writer.write_stored("placeholder", b"x").unwrap();
+        let bytes = writer.finish_to_bytes().unwrap();
+        let archive = soapberry_zip::office::LazyArchiveReader::new(&bytes).unwrap();
+        let package_uri = PackURI::new(PACKAGE_URI).unwrap();
+        assert!(
+            PackageReader::load_rels_lazy(&archive, &package_uri)
+                .unwrap()
+                .is_empty()
+        );
+
+        let bytes = package_bytes(b"<Relationships><Relationship", b"document");
+        let archive = soapberry_zip::office::LazyArchiveReader::new(&bytes).unwrap();
+        let error = PackageReader::load_rels_lazy(&archive, &package_uri).unwrap_err();
+        assert!(matches!(error, OpcError::XmlError(_)));
+    }
+
+    #[test]
+    fn corrupt_required_parts_report_zip_errors() {
+        const DOCUMENT: &[u8] = b"unique required document payload";
+        let relationships = br#"<Relationships><Relationship Id="rId1" Type="officeDocument" Target="word/document.xml"/></Relationships>"#;
+        let mut bytes = package_bytes(relationships, DOCUMENT);
+        let position = bytes
+            .windows(DOCUMENT.len())
+            .position(|window| window == DOCUMENT)
+            .unwrap();
+        bytes[position] ^= 0xff;
+
+        let physical = PhysPkgReader::new(&bytes).unwrap();
+        let error = match PackageReader::from_phys_reader(&physical) {
+            Ok(_) => panic!("corrupt required part unexpectedly loaded"),
+            Err(error) => error,
+        };
+        assert!(matches!(error, OpcError::ZipError(_)));
+    }
+
+    #[test]
+    fn invalid_internal_relationship_targets_are_rejected() {
+        let relationships = br#"<Relationships><Relationship Id="rId1" Type="officeDocument" Target="../escape.xml"/></Relationships>"#;
+        let bytes = package_bytes(relationships, b"document");
+        let physical = PhysPkgReader::new(&bytes).unwrap();
+        let error = match PackageReader::from_phys_reader(&physical) {
+            Ok(_) => panic!("invalid relationship target unexpectedly loaded"),
+            Err(error) => error,
+        };
+        assert!(matches!(error, OpcError::InvalidPackUri(_)));
     }
 }

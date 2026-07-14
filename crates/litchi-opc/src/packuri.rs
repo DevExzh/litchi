@@ -21,12 +21,49 @@ impl PackURI {
     ///
     /// # Returns
     /// * `Ok(PackURI)` if the URI is valid
-    /// * `Err` if the URI doesn't start with a forward slash
+    /// * `Err` if the URI is not a canonical, fragment-free package path
     pub fn new<S: Into<String>>(uri: S) -> Result<Self, String> {
         let uri = uri.into();
         if !uri.starts_with('/') {
             return Err(format!("PackURI must begin with slash, got '{}'", uri));
         }
+        if uri == "/" {
+            return Ok(PackURI { uri });
+        }
+        if uri.ends_with('/') {
+            return Err(format!("PackURI must not end with slash, got '{uri}'"));
+        }
+        if uri.contains("//") {
+            return Err(format!(
+                "PackURI must not contain empty segments, got '{uri}'"
+            ));
+        }
+        if uri.contains('\\') {
+            return Err(format!("PackURI must use forward slashes, got '{uri}'"));
+        }
+        if uri.contains(['?', '#']) {
+            return Err(format!(
+                "PackURI must not contain a query or fragment, got '{uri}'"
+            ));
+        }
+        if uri
+            .chars()
+            .any(|character| character.is_control() || character == ' ')
+        {
+            return Err(format!(
+                "PackURI spaces and control characters must be percent-encoded, got '{uri}'"
+            ));
+        }
+        if uri
+            .split('/')
+            .skip(1)
+            .any(|part| matches!(part, "." | ".."))
+        {
+            return Err(format!(
+                "PackURI must not contain dot segments, got '{uri}'"
+            ));
+        }
+        Self::validate_percent_encoding(&uri)?;
         Ok(PackURI { uri })
     }
 
@@ -39,9 +76,35 @@ impl PackURI {
     /// * `base_uri` - The base URI to resolve from
     /// * `relative_ref` - The relative reference to resolve
     pub fn from_rel_ref(base_uri: &str, relative_ref: &str) -> Result<Self, String> {
+        if relative_ref.is_empty() {
+            return Err("Relationship target must not be empty".to_string());
+        }
+        if relative_ref.contains('\\') {
+            return Err(format!(
+                "Relationship target must use forward slashes, got '{relative_ref}'"
+            ));
+        }
+        if relative_ref.contains(['?', '#']) {
+            return Err(format!(
+                "Internal relationship target must not contain a query or fragment, got '{relative_ref}'"
+            ));
+        }
+        if relative_ref
+            .split('/')
+            .next()
+            .is_some_and(|first| first.contains(':'))
+        {
+            return Err(format!(
+                "Internal relationship target must not be an absolute URI, got '{relative_ref}'"
+            ));
+        }
         // Join the paths using POSIX-style path manipulation
-        let joined = Self::join_paths(base_uri, relative_ref);
-        let normalized = Self::normalize_path(&joined);
+        let joined = if relative_ref.starts_with('/') {
+            relative_ref.to_string()
+        } else {
+            Self::join_paths(base_uri, relative_ref)
+        };
+        let normalized = Self::normalize_path(&joined)?;
         Self::new(normalized)
     }
 
@@ -205,7 +268,7 @@ impl PackURI {
     }
 
     /// Helper function to normalize a path (resolve ".." and ".")
-    fn normalize_path(path: &str) -> String {
+    fn normalize_path(path: &str) -> Result<String, String> {
         let mut parts = Vec::new();
 
         for part in path.split('/') {
@@ -221,6 +284,10 @@ impl PackURI {
                     // Go up one directory
                     if parts.len() > 1 {
                         parts.pop();
+                    } else {
+                        return Err(format!(
+                            "Relationship target escapes the package root: '{path}'"
+                        ));
                     }
                 },
                 _ => {
@@ -231,10 +298,46 @@ impl PackURI {
 
         // Handle root case
         if parts.is_empty() || (parts.len() == 1 && parts[0].is_empty()) {
-            return "/".to_string();
+            return Ok("/".to_string());
         }
 
-        parts.join("/")
+        Ok(parts.join("/"))
+    }
+
+    fn validate_percent_encoding(uri: &str) -> Result<(), String> {
+        let bytes = uri.as_bytes();
+        let mut index = 0usize;
+        while index < bytes.len() {
+            if bytes[index] != b'%' {
+                index += 1;
+                continue;
+            }
+            let encoded = bytes.get(index + 1..index + 3).ok_or_else(|| {
+                format!("PackURI contains incomplete percent encoding, got '{uri}'")
+            })?;
+            if !encoded.iter().all(u8::is_ascii_hexdigit) {
+                return Err(format!(
+                    "PackURI contains invalid percent encoding, got '{uri}'"
+                ));
+            }
+            let decoded = (hex_value(encoded[0]) << 4) | hex_value(encoded[1]);
+            if matches!(decoded, b'/' | b'\\') {
+                return Err(format!(
+                    "PackURI must not percent-encode path separators, got '{uri}'"
+                ));
+            }
+            index += 3;
+        }
+        Ok(())
+    }
+}
+
+fn hex_value(byte: u8) -> u8 {
+    match byte {
+        b'0'..=b'9' => byte - b'0',
+        b'a'..=b'f' => byte - b'a' + 10,
+        b'A'..=b'F' => byte - b'A' + 10,
+        _ => 0,
     }
 }
 
@@ -264,6 +367,46 @@ mod tests {
     fn test_packuri_new() {
         assert!(PackURI::new("/word/document.xml").is_ok());
         assert!(PackURI::new("word/document.xml").is_err());
+    }
+
+    #[test]
+    fn rejects_ambiguous_or_noncanonical_part_names() {
+        for invalid in [
+            "/word/",
+            "/word//document.xml",
+            "/word/./document.xml",
+            "/word/../document.xml",
+            "/word\\document.xml",
+            "/word/document.xml?query",
+            "/word/document.xml#fragment",
+            "/word/my document.xml",
+            "/word/%document.xml",
+            "/word/%2Fdocument.xml",
+            "/word/%5cdocument.xml",
+        ] {
+            assert!(PackURI::new(invalid).is_err(), "accepted {invalid}");
+        }
+        assert!(PackURI::new("/word/my%20document.xml").is_ok());
+        assert!(PackURI::new("/").is_ok());
+    }
+
+    #[test]
+    fn resolves_internal_targets_without_allowing_root_escape() {
+        assert_eq!(
+            PackURI::from_rel_ref("/word", "styles/styles.xml")
+                .unwrap()
+                .as_str(),
+            "/word/styles/styles.xml"
+        );
+        assert_eq!(
+            PackURI::from_rel_ref("/word/charts", "../embeddings/data.bin")
+                .unwrap()
+                .as_str(),
+            "/word/embeddings/data.bin"
+        );
+        assert!(PackURI::from_rel_ref("/", "../escape.xml").is_err());
+        assert!(PackURI::from_rel_ref("/word", "https://example.com/a.xml").is_err());
+        assert!(PackURI::from_rel_ref("/word", "document.xml#bookmark").is_err());
     }
 
     #[test]
