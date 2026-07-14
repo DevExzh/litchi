@@ -2207,6 +2207,9 @@ fn write_axis_common<W: Write>(
     if let Some(min) = min {
         write!(writer, r#"<c:min val="{}"/>"#, min)?;
     }
+    if let Some(extension_list) = common.scaling_extension_list.as_ref() {
+        writer.write_all(extension_list.as_xml())?;
+    }
     write!(writer, "</c:scaling>")?;
 
     write!(
@@ -2325,6 +2328,7 @@ fn write_category_axis<W: Write>(writer: &mut W, axis: &CategoryAxis) -> std::io
         r#"<c:noMultiLvlLbl val="{}"/>"#,
         if axis.no_multi_level { "1" } else { "0" }
     )?;
+    write_axis_extension(writer, &axis.common)?;
     write!(writer, "</c:catAx>")?;
     Ok(())
 }
@@ -2379,6 +2383,7 @@ fn write_value_axis<W: Write>(writer: &mut W, axis: &ValueAxis) -> std::io::Resu
         write!(writer, "</c:dispUnits>")?;
     }
 
+    write_axis_extension(writer, &axis.common)?;
     write!(writer, "</c:valAx>")?;
     Ok(())
 }
@@ -2406,6 +2411,7 @@ fn write_date_axis<W: Write>(writer: &mut W, axis: &DateAxis) -> std::io::Result
     if let Some(unit) = axis.minor_time_unit {
         write!(writer, r#"<c:minorTimeUnit val="{}"/>"#, unit.xml_value())?;
     }
+    write_axis_extension(writer, &axis.common)?;
     write!(writer, "</c:dateAx>")?;
     Ok(())
 }
@@ -2419,7 +2425,15 @@ fn write_series_axis<W: Write>(writer: &mut W, axis: &SeriesAxis) -> std::io::Re
     if let Some(skip) = axis.tick_mark_skip {
         write!(writer, r#"<c:tickMarkSkip val="{}"/>"#, skip)?;
     }
+    write_axis_extension(writer, &axis.common)?;
     write!(writer, "</c:serAx>")?;
+    Ok(())
+}
+
+fn write_axis_extension<W: Write>(writer: &mut W, common: &AxisCommon) -> std::io::Result<()> {
+    if let Some(extension_list) = common.extension_list.as_ref() {
+        writer.write_all(extension_list.as_xml())?;
+    }
     Ok(())
 }
 

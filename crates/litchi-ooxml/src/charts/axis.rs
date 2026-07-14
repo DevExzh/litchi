@@ -197,6 +197,10 @@ pub struct AxisCommon {
     pub shape_properties: Option<ChartShapeProperties>,
     /// DrawingML text properties for axis labels
     pub text_properties: Option<ChartTextProperties>,
+    /// Extension list inside the axis scaling container
+    pub scaling_extension_list: Option<ChartExtensionList>,
+    /// Extension list at the end of the concrete axis
+    pub extension_list: Option<ChartExtensionList>,
     /// Manual layout for the axis title
     pub layout: Option<Layout>,
     /// DrawingML shape properties for the axis title
@@ -231,6 +235,8 @@ impl AxisCommon {
             minor_gridlines: None,
             shape_properties: None,
             text_properties: None,
+            scaling_extension_list: None,
+            extension_list: None,
             layout: None,
             title_shape_properties: None,
             title_text_properties: None,

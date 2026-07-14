@@ -4671,6 +4671,8 @@ struct ParsedAxisCommon {
     minor_gridlines: Option<ChartLines>,
     shape_properties: Option<ChartShapeProperties>,
     text_properties: Option<ChartTextProperties>,
+    scaling_extension_list: Option<ChartExtensionList>,
+    extension_list: Option<ChartExtensionList>,
 }
 
 impl ParsedAxisCommon {
@@ -4699,6 +4701,8 @@ impl ParsedAxisCommon {
             minor_gridlines: None,
             shape_properties: None,
             text_properties: None,
+            scaling_extension_list: None,
+            extension_list: None,
         }
     }
 
@@ -4733,6 +4737,8 @@ impl ParsedAxisCommon {
         common.minor_gridlines = self.minor_gridlines;
         common.shape_properties = self.shape_properties;
         common.text_properties = self.text_properties;
+        common.scaling_extension_list = self.scaling_extension_list;
+        common.extension_list = self.extension_list;
         Ok(common)
     }
 }
@@ -4855,6 +4861,40 @@ fn parse_axis_common_fragment<R: BufRead>(
     Ok(())
 }
 
+fn parse_axis_extension<R: BufRead>(
+    reader: &mut ChartXmlReader<R>,
+    common: &mut ParsedAxisCommon,
+    element: &BytesStart<'_>,
+    empty: bool,
+    scaling: bool,
+) -> Result<()> {
+    let target = if scaling {
+        &mut common.scaling_extension_list
+    } else {
+        &mut common.extension_list
+    };
+    if target.is_some() {
+        return Err(OoxmlError::InvalidFormat(format!(
+            "chart axis contains duplicate {} extension lists",
+            if scaling { "scaling" } else { "axis" }
+        )));
+    }
+    let xml = if empty {
+        reader.capture_empty_fragment(element)?
+    } else {
+        reader.capture_fragment(
+            element,
+            if scaling {
+                "chart axis scaling extension list"
+            } else {
+                "chart axis extension list"
+            },
+        )?
+    };
+    *target = Some(ChartExtensionList::from_xml(xml)?);
+    Ok(())
+}
+
 fn parse_category_axis<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<CategoryAxis>> {
     let mut common = ParsedAxisCommon::new();
     let mut auto = true;
@@ -4863,10 +4903,20 @@ fn parse_category_axis<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Opt
     let mut tick_label_skip = None;
     let mut tick_mark_skip = None;
     let mut no_multi_level = false;
+    let mut in_scaling = false;
     let mut buf = Vec::new();
 
     loop {
         match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"scaling" => {
+                in_scaling = true;
+            },
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"extLst" => {
+                parse_axis_extension(reader, &mut common, element, false, in_scaling)?;
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"extLst" => {
+                parse_axis_extension(reader, &mut common, element, true, in_scaling)?;
+            },
             Ok(Event::Start(ref element)) if is_axis_common_fragment(element) => {
                 parse_axis_common_fragment(reader, &mut common, element, false)?;
             },
@@ -4905,6 +4955,9 @@ fn parse_category_axis<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Opt
                 }
             },
             Ok(Event::End(ref element)) if element.local_name().as_ref() == b"catAx" => break,
+            Ok(Event::End(ref element)) if element.local_name().as_ref() == b"scaling" => {
+                in_scaling = false;
+            },
             Ok(Event::Eof) => return Err(unterminated_axis("category")),
             Err(error) => return Err(error),
             _ => {},
@@ -4933,10 +4986,20 @@ fn parse_value_axis<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option
     let mut log_base = None;
     let mut display_units = None;
     let mut cross_between = AxisCrossBetween::Between;
+    let mut in_scaling = false;
     let mut buf = Vec::new();
 
     loop {
         match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"scaling" => {
+                in_scaling = true;
+            },
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"extLst" => {
+                parse_axis_extension(reader, &mut common, element, false, in_scaling)?;
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"extLst" => {
+                parse_axis_extension(reader, &mut common, element, true, in_scaling)?;
+            },
             Ok(Event::Start(ref element)) if is_axis_common_fragment(element) => {
                 parse_axis_common_fragment(reader, &mut common, element, false)?;
             },
@@ -4991,6 +5054,9 @@ fn parse_value_axis<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option
                 }
             },
             Ok(Event::End(ref element)) if element.local_name().as_ref() == b"valAx" => break,
+            Ok(Event::End(ref element)) if element.local_name().as_ref() == b"scaling" => {
+                in_scaling = false;
+            },
             Ok(Event::Eof) => return Err(unterminated_axis("value")),
             Err(error) => return Err(error),
             _ => {},
@@ -5194,10 +5260,20 @@ fn parse_date_axis<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<
     let mut minor_time_unit = None;
     let mut base_time_unit = None;
     let mut auto = true;
+    let mut in_scaling = false;
     let mut buf = Vec::new();
 
     loop {
         match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"scaling" => {
+                in_scaling = true;
+            },
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"extLst" => {
+                parse_axis_extension(reader, &mut common, element, false, in_scaling)?;
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"extLst" => {
+                parse_axis_extension(reader, &mut common, element, true, in_scaling)?;
+            },
             Ok(Event::Start(ref element)) if is_axis_common_fragment(element) => {
                 parse_axis_common_fragment(reader, &mut common, element, false)?;
             },
@@ -5233,6 +5309,9 @@ fn parse_date_axis<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<
                 }
             },
             Ok(Event::End(ref element)) if element.local_name().as_ref() == b"dateAx" => break,
+            Ok(Event::End(ref element)) if element.local_name().as_ref() == b"scaling" => {
+                in_scaling = false;
+            },
             Ok(Event::Eof) => return Err(unterminated_axis("date")),
             Err(error) => return Err(error),
             _ => {},
@@ -5263,10 +5342,20 @@ fn parse_series_axis<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Optio
     let mut common = ParsedAxisCommon::new();
     let mut tick_label_skip = None;
     let mut tick_mark_skip = None;
+    let mut in_scaling = false;
     let mut buf = Vec::new();
 
     loop {
         match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"scaling" => {
+                in_scaling = true;
+            },
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"extLst" => {
+                parse_axis_extension(reader, &mut common, element, false, in_scaling)?;
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"extLst" => {
+                parse_axis_extension(reader, &mut common, element, true, in_scaling)?;
+            },
             Ok(Event::Start(ref element)) if is_axis_common_fragment(element) => {
                 parse_axis_common_fragment(reader, &mut common, element, false)?;
             },
@@ -5296,6 +5385,9 @@ fn parse_series_axis<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Optio
                 }
             },
             Ok(Event::End(ref element)) if element.local_name().as_ref() == b"serAx" => break,
+            Ok(Event::End(ref element)) if element.local_name().as_ref() == b"scaling" => {
+                in_scaling = false;
+            },
             Ok(Event::Eof) => return Err(unterminated_axis("series")),
             Err(error) => return Err(error),
             _ => {},
@@ -7310,14 +7402,17 @@ mod tests {
                 <c:spPr><a:solidFill><a:srgbClr val="112233"/></a:solidFill></c:spPr>
                 <c:txPr><a:bodyPr rot="600000"/><a:lstStyle/><a:p/></c:txPr>
                 <c:extLst><c:ext uri="chart-title"><x:chartPayload/></c:ext></c:extLst>
-            </c:title><c:plotArea><c:catAx><c:axId val="1"/><c:scaling/>
+            </c:title><c:plotArea><c:catAx><c:axId val="1"/><c:scaling>
+                <c:extLst><c:ext uri="scaling"><x:scalingPayload/></c:ext></c:extLst>
+            </c:scaling>
                 <c:axPos val="b"/><c:majorGridlines><c:spPr><a:solidFill><a:srgbClr val="445566"/></a:solidFill></c:spPr></c:majorGridlines>
                 <c:minorGridlines/><c:title><c:tx><c:rich><a:p><a:r><a:t>Quarter</a:t></a:r></a:p></c:rich></c:tx>
                     <c:spPr><a:noFill/></c:spPr><c:txPr><a:bodyPr vert="vert"/><a:lstStyle/><a:p/></c:txPr>
                     <c:extLst><c:ext uri="axis-title"><x:axisPayload/></c:ext></c:extLst>
                 </c:title><c:spPr><a:ln w="12700"/></c:spPr>
                 <c:txPr><a:bodyPr rot="-600000"/><a:lstStyle/><a:p/></c:txPr>
-                <c:crossAx val="2"/></c:catAx></c:plotArea></c:chart>
+                <c:crossAx val="2"/><c:extLst><c:ext uri="axis"><x:axisBodyPayload/></c:ext></c:extLst>
+                </c:catAx></c:plotArea></c:chart>
         </c:chartSpace>"#;
         let chart = parse_chart(xml.as_slice()).unwrap();
         assert!(
@@ -7363,6 +7458,16 @@ mod tests {
                 .unwrap()
                 .contains("-600000")
         );
+        assert!(
+            std::str::from_utf8(common.scaling_extension_list.as_ref().unwrap().as_xml())
+                .unwrap()
+                .contains("scalingPayload")
+        );
+        assert!(
+            std::str::from_utf8(common.extension_list.as_ref().unwrap().as_xml())
+                .unwrap()
+                .contains("axisBodyPayload")
+        );
         assert!(common.title_shape_properties.is_some());
         assert!(
             std::str::from_utf8(common.title_text_properties.as_ref().unwrap().as_xml())
@@ -7401,6 +7506,11 @@ mod tests {
         assert_eq!(reparsed_common.minor_gridlines, common.minor_gridlines);
         assert_eq!(reparsed_common.shape_properties, common.shape_properties);
         assert_eq!(reparsed_common.text_properties, common.text_properties);
+        assert_eq!(
+            reparsed_common.scaling_extension_list,
+            common.scaling_extension_list
+        );
+        assert_eq!(reparsed_common.extension_list, common.extension_list);
 
         let duplicate = br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:title><c:spPr/><c:spPr/></c:title><c:plotArea/></c:chart></c:chartSpace>"#;
         assert!(parse_chart(duplicate.as_slice()).is_err());

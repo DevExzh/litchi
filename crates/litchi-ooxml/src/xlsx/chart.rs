@@ -1001,6 +1001,14 @@ pub(crate) fn chart_fragment_relationship_ids(chart: &ChartModel) -> Result<Hash
                     .text_properties
                     .as_ref()
                     .map(crate::charts::ChartTextProperties::as_xml),
+                common
+                    .scaling_extension_list
+                    .as_ref()
+                    .map(crate::charts::ChartExtensionList::as_xml),
+                common
+                    .extension_list
+                    .as_ref()
+                    .map(crate::charts::ChartExtensionList::as_xml),
             ]
             .into_iter()
             .flatten(),
