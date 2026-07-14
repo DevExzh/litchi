@@ -546,6 +546,138 @@ impl WebSettings {
         self.save_smart_tags_as_xml
     }
 
+    /// Set the requested output encoding.
+    pub fn set_encoding(&mut self, value: impl Into<String>) -> &mut Self {
+        self.encoding = Some(value.into());
+        self
+    }
+
+    /// Remove the requested output encoding.
+    pub fn clear_encoding(&mut self) -> &mut Self {
+        self.encoding = None;
+        self
+    }
+
+    /// Set whether output should be optimized for browsers.
+    pub fn set_optimize_for_browser(&mut self, value: bool) -> &mut Self {
+        self.optimize_for_browser = Some(value);
+        self
+    }
+
+    /// Restore schema-defined behavior for browser optimization.
+    pub fn clear_optimize_for_browser(&mut self) -> &mut Self {
+        self.optimize_for_browser = None;
+        self
+    }
+
+    /// Set whether web output should rely on VML.
+    pub fn set_rely_on_vml(&mut self, value: bool) -> &mut Self {
+        self.rely_on_vml = Some(value);
+        self
+    }
+
+    /// Restore schema-defined behavior for VML use.
+    pub fn clear_rely_on_vml(&mut self) -> &mut Self {
+        self.rely_on_vml = None;
+        self
+    }
+
+    /// Set whether PNG images are allowed.
+    pub fn set_allow_png(&mut self, value: bool) -> &mut Self {
+        self.allow_png = Some(value);
+        self
+    }
+
+    /// Restore schema-defined behavior for PNG images.
+    pub fn clear_allow_png(&mut self) -> &mut Self {
+        self.allow_png = None;
+        self
+    }
+
+    /// Set whether web output should avoid CSS.
+    pub fn set_do_not_rely_on_css(&mut self, value: bool) -> &mut Self {
+        self.do_not_rely_on_css = Some(value);
+        self
+    }
+
+    /// Restore schema-defined behavior for CSS output.
+    pub fn clear_do_not_rely_on_css(&mut self) -> &mut Self {
+        self.do_not_rely_on_css = None;
+        self
+    }
+
+    /// Set whether web output should avoid a single-file representation.
+    pub fn set_do_not_save_as_single_file(&mut self, value: bool) -> &mut Self {
+        self.do_not_save_as_single_file = Some(value);
+        self
+    }
+
+    /// Restore schema-defined behavior for single-file output.
+    pub fn clear_do_not_save_as_single_file(&mut self) -> &mut Self {
+        self.do_not_save_as_single_file = None;
+        self
+    }
+
+    /// Set whether supporting files should avoid a dedicated folder.
+    pub fn set_do_not_organize_in_folder(&mut self, value: bool) -> &mut Self {
+        self.do_not_organize_in_folder = Some(value);
+        self
+    }
+
+    /// Restore schema-defined behavior for supporting-file folders.
+    pub fn clear_do_not_organize_in_folder(&mut self) -> &mut Self {
+        self.do_not_organize_in_folder = None;
+        self
+    }
+
+    /// Set whether web output should avoid long file names.
+    pub fn set_do_not_use_long_file_names(&mut self, value: bool) -> &mut Self {
+        self.do_not_use_long_file_names = Some(value);
+        self
+    }
+
+    /// Restore schema-defined behavior for long file names.
+    pub fn clear_do_not_use_long_file_names(&mut self) -> &mut Self {
+        self.do_not_use_long_file_names = None;
+        self
+    }
+
+    /// Set the arbitrary-precision XML integer for web-output pixel density.
+    pub fn set_pixels_per_inch(&mut self, value: impl Into<String>) -> Result<&mut Self> {
+        self.pixels_per_inch = Some(normalize_xml_integer(value.into(), "pixels-per-inch")?);
+        Ok(self)
+    }
+
+    /// Remove the explicit web-output pixel density.
+    pub fn clear_pixels_per_inch(&mut self) -> &mut Self {
+        self.pixels_per_inch = None;
+        self
+    }
+
+    /// Set the target display size for generated web pages.
+    pub fn set_target_screen_size(&mut self, value: TargetScreenSize) -> &mut Self {
+        self.target_screen_size = Some(value);
+        self
+    }
+
+    /// Remove the explicit target display size.
+    pub fn clear_target_screen_size(&mut self) -> &mut Self {
+        self.target_screen_size = None;
+        self
+    }
+
+    /// Set whether smart tags should be retained in generated XML.
+    pub fn set_save_smart_tags_as_xml(&mut self, value: bool) -> &mut Self {
+        self.save_smart_tags_as_xml = Some(value);
+        self
+    }
+
+    /// Restore schema-defined smart-tag serialization behavior.
+    pub fn clear_save_smart_tags_as_xml(&mut self) -> &mut Self {
+        self.save_smart_tags_as_xml = None;
+        self
+    }
+
     /// Serialize these web-output settings as canonical transitional WordprocessingML.
     ///
     /// The typed model is validated while parsing. Serialization additionally
@@ -2200,6 +2332,60 @@ mod tests {
         assert!(serialized.contains("main &amp; detail"));
         assert!(serialized.contains("w:themeTint=\"0A\""));
         assert!(serialized.contains("w:themeShade=\"FF\""));
+    }
+
+    #[test]
+    fn edits_and_clears_every_scalar_web_setting() {
+        let mut settings = WebSettings::default();
+        settings
+            .set_encoding("utf&8")
+            .set_optimize_for_browser(true)
+            .set_rely_on_vml(false)
+            .set_allow_png(true)
+            .set_do_not_rely_on_css(false)
+            .set_do_not_save_as_single_file(true)
+            .set_do_not_organize_in_folder(false)
+            .set_do_not_use_long_file_names(true);
+        settings
+            .set_pixels_per_inch(" +123456789012345678901234567890 ")
+            .unwrap()
+            .set_target_screen_size(TargetScreenSize::Pixels1800x1440)
+            .set_save_smart_tags_as_xml(false);
+
+        let serialized = settings.to_xml().unwrap();
+        let reparsed = WebSettings::extract_from_xml(serialized.as_bytes()).unwrap();
+        assert_eq!(reparsed, settings);
+        assert_eq!(reparsed.encoding(), Some("utf&8"));
+        assert_eq!(
+            reparsed.pixels_per_inch(),
+            Some("+123456789012345678901234567890")
+        );
+        assert_eq!(
+            reparsed.target_screen_size(),
+            Some(TargetScreenSize::Pixels1800x1440)
+        );
+
+        let previous_pixels = settings.pixels_per_inch().unwrap().to_owned();
+        assert!(settings.set_pixels_per_inch("96.0").is_err());
+        assert_eq!(settings.pixels_per_inch(), Some(previous_pixels.as_str()));
+
+        settings
+            .clear_encoding()
+            .clear_optimize_for_browser()
+            .clear_rely_on_vml()
+            .clear_allow_png()
+            .clear_do_not_rely_on_css()
+            .clear_do_not_save_as_single_file()
+            .clear_do_not_organize_in_folder()
+            .clear_do_not_use_long_file_names()
+            .clear_pixels_per_inch()
+            .clear_target_screen_size()
+            .clear_save_smart_tags_as_xml();
+        assert_eq!(settings, WebSettings::default());
+        assert_eq!(
+            WebSettings::extract_from_xml(settings.to_xml().unwrap().as_bytes()).unwrap(),
+            WebSettings::default()
+        );
     }
 
     #[test]
