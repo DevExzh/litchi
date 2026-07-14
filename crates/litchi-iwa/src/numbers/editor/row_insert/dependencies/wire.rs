@@ -1,0 +1,262 @@
+//! Wire-preserving formula dependency row rewrites.
+
+use super::*;
+
+pub(super) fn rewrite_shifted_formula_owner_wire(
+    original: &[u8],
+    previous: &tsce::FormulaOwnerDependenciesArchive,
+    current: &tsce::FormulaOwnerDependenciesArchive,
+) -> Result<Vec<u8>> {
+    let mut immutable = current.clone();
+    immutable.cell_dependencies = previous.cell_dependencies.clone();
+    immutable.spanning_column_dependencies = previous.spanning_column_dependencies.clone();
+    immutable.spanning_row_dependencies = previous.spanning_row_dependencies.clone();
+    if immutable != *previous {
+        return Err(Error::InvalidFormat(
+            "Numbers formula owner changed outside row dependencies".to_owned(),
+        ));
+    }
+    let mut data = match (&previous.cell_dependencies, &current.cell_dependencies) {
+        (Some(previous), Some(current)) => {
+            transform_length_delimited_field(original, 4, |dependencies| {
+                rewrite_shifted_dependency_records(
+                    dependencies,
+                    1,
+                    &previous.cell_record,
+                    &current.cell_record,
+                )
+            })?
+        },
+        (None, None) => original.to_vec(),
+        _ => {
+            return Err(Error::InvalidFormat(
+                "Numbers inline dependency representation changed".to_owned(),
+            ));
+        },
+    };
+    data = rewrite_optional_spanning_dependencies(
+        &data,
+        7,
+        previous.spanning_column_dependencies.as_ref(),
+        current.spanning_column_dependencies.as_ref(),
+    )?;
+    data = rewrite_optional_spanning_dependencies(
+        &data,
+        8,
+        previous.spanning_row_dependencies.as_ref(),
+        current.spanning_row_dependencies.as_ref(),
+    )?;
+    if tsce::FormulaOwnerDependenciesArchive::decode(data.as_slice())? != *current {
+        return Err(Error::InvalidFormat(
+            "Numbers formula owner row shift failed wire validation".to_owned(),
+        ));
+    }
+    Ok(data)
+}
+
+fn rewrite_optional_spanning_dependencies(
+    data: &[u8],
+    field_number: u32,
+    previous: Option<&tsce::SpanningDependenciesExpandedArchive>,
+    current: Option<&tsce::SpanningDependenciesExpandedArchive>,
+) -> Result<Vec<u8>> {
+    match (previous, current) {
+        (Some(previous), Some(current)) => {
+            transform_length_delimited_field(data, field_number, |spanning| {
+                rewrite_spanning_dependencies(spanning, previous, current)
+            })
+        },
+        (None, None) => Ok(data.to_vec()),
+        _ => Err(Error::InvalidFormat(
+            "Numbers spanning dependency representation changed".to_owned(),
+        )),
+    }
+}
+
+fn rewrite_spanning_dependencies(
+    original: &[u8],
+    previous: &tsce::SpanningDependenciesExpandedArchive,
+    current: &tsce::SpanningDependenciesExpandedArchive,
+) -> Result<Vec<u8>> {
+    let mut immutable = current.clone();
+    immutable.total_range_for_table = previous.total_range_for_table;
+    immutable.body_range_for_table = previous.body_range_for_table;
+    if immutable != *previous {
+        return Err(Error::InvalidFormat(
+            "Numbers spanning dependencies changed outside table ranges".to_owned(),
+        ));
+    }
+    let mut data = rewrite_optional_range_coordinate(
+        original,
+        2,
+        previous.total_range_for_table.as_ref(),
+        current.total_range_for_table.as_ref(),
+    )?;
+    data = rewrite_optional_range_coordinate(
+        &data,
+        3,
+        previous.body_range_for_table.as_ref(),
+        current.body_range_for_table.as_ref(),
+    )?;
+    if tsce::SpanningDependenciesExpandedArchive::decode(data.as_slice())? != *current {
+        return Err(Error::InvalidFormat(
+            "Numbers spanning dependency row shift failed wire validation".to_owned(),
+        ));
+    }
+    Ok(data)
+}
+
+fn rewrite_optional_range_coordinate(
+    data: &[u8],
+    field_number: u32,
+    previous: Option<&tsce::RangeCoordinateArchive>,
+    current: Option<&tsce::RangeCoordinateArchive>,
+) -> Result<Vec<u8>> {
+    match (previous, current) {
+        (Some(previous), Some(current)) => {
+            let mut immutable = *current;
+            immutable.bottom_right_row = previous.bottom_right_row;
+            if immutable != *previous {
+                return Err(Error::InvalidFormat(
+                    "Numbers dependency range changed outside its final row".to_owned(),
+                ));
+            }
+            transform_length_delimited_field(data, field_number, |range| {
+                let patched =
+                    patch_varint_field(range, 4, true, Some(u64::from(current.bottom_right_row)))?;
+                if tsce::RangeCoordinateArchive::decode(patched.as_slice())? != *current {
+                    return Err(Error::InvalidFormat(
+                        "Numbers dependency range row shift failed wire validation".to_owned(),
+                    ));
+                }
+                Ok(patched)
+            })
+        },
+        (None, None) => Ok(data.to_vec()),
+        _ => Err(Error::InvalidFormat(
+            "Numbers dependency range representation changed".to_owned(),
+        )),
+    }
+}
+
+pub(super) fn rewrite_shifted_dependency_tile_wire(
+    original: &[u8],
+    previous: &tsce::CellRecordTileArchive,
+    current: &tsce::CellRecordTileArchive,
+) -> Result<Vec<u8>> {
+    let mut immutable = current.clone();
+    immutable.cell_records = previous.cell_records.clone();
+    if immutable != *previous {
+        return Err(Error::InvalidFormat(
+            "Numbers dependency tile identity changed during row insertion".to_owned(),
+        ));
+    }
+    let data = rewrite_shifted_dependency_records(
+        original,
+        4,
+        &previous.cell_records,
+        &current.cell_records,
+    )?;
+    if tsce::CellRecordTileArchive::decode(data.as_slice())? != *current {
+        return Err(Error::InvalidFormat(
+            "Numbers dependency tile row shift failed wire validation".to_owned(),
+        ));
+    }
+    Ok(data)
+}
+
+fn rewrite_shifted_dependency_records(
+    data: &[u8],
+    field_number: u32,
+    previous: &[tsce::CellRecordExpandedArchive],
+    current: &[tsce::CellRecordExpandedArchive],
+) -> Result<Vec<u8>> {
+    if previous.len() != current.len() {
+        return Err(Error::InvalidFormat(
+            "Numbers dependency record count changed during row insertion".to_owned(),
+        ));
+    }
+    let raw = repeated_length_delimited_payloads(data, field_number)?;
+    if raw.len() != previous.len() {
+        return Err(Error::InvalidFormat(
+            "Numbers dependency wire count is inconsistent".to_owned(),
+        ));
+    }
+    let replacements = previous
+        .iter()
+        .zip(current)
+        .zip(raw)
+        .map(|((previous, current), raw)| {
+            if tsce::CellRecordExpandedArchive::decode(raw)? != *previous {
+                return Err(Error::InvalidFormat(
+                    "Numbers dependency record changed during row insertion".to_owned(),
+                ));
+            }
+            let mut immutable = current.clone();
+            immutable.row = previous.row;
+            immutable.expanded_edges = previous.expanded_edges.clone();
+            if immutable != *previous {
+                return Err(Error::InvalidFormat(
+                    "Numbers dependency record changed outside row coordinates".to_owned(),
+                ));
+            }
+            let mut record = patch_varint_field(raw, 2, true, Some(u64::from(current.row)))?;
+            match (&previous.expanded_edges, &current.expanded_edges) {
+                (Some(previous), Some(current)) => {
+                    record = transform_length_delimited_field(&record, 6, |edges| {
+                        rewrite_shifted_edges(edges, previous, current)
+                    })?;
+                },
+                (None, None) => {},
+                _ => {
+                    return Err(Error::InvalidFormat(
+                        "Numbers dependency edge representation changed".to_owned(),
+                    ));
+                },
+            }
+            Ok(record)
+        })
+        .collect::<Result<Vec<_>>>()?;
+    rewrite_repeated_length_delimited_fields(data, field_number, &replacements)
+}
+
+fn rewrite_shifted_edges(
+    original: &[u8],
+    previous: &tsce::ExpandedEdgesArchive,
+    current: &tsce::ExpandedEdgesArchive,
+) -> Result<Vec<u8>> {
+    let mut immutable = current.clone();
+    immutable.edge_without_owner_rows = previous.edge_without_owner_rows.clone();
+    immutable.edge_with_owner_rows = previous.edge_with_owner_rows.clone();
+    if immutable != *previous {
+        return Err(Error::InvalidFormat(
+            "Numbers formula edges changed outside row coordinates".to_owned(),
+        ));
+    }
+    let mut data = rewrite_repeated_varint_fields(
+        original,
+        1,
+        &current
+            .edge_without_owner_rows
+            .iter()
+            .copied()
+            .map(u64::from)
+            .collect::<Vec<_>>(),
+    )?;
+    data = rewrite_repeated_varint_fields(
+        &data,
+        3,
+        &current
+            .edge_with_owner_rows
+            .iter()
+            .copied()
+            .map(u64::from)
+            .collect::<Vec<_>>(),
+    )?;
+    if tsce::ExpandedEdgesArchive::decode(data.as_slice())? != *current {
+        return Err(Error::InvalidFormat(
+            "Numbers formula edge row shift failed wire validation".to_owned(),
+        ));
+    }
+    Ok(data)
+}

@@ -1787,6 +1787,7 @@ impl NumbersEditor {
 
 mod formula_clone;
 mod model;
+mod row_insert;
 mod sheet_duplicate;
 mod storage;
 mod table_duplicate;

@@ -167,6 +167,32 @@ fn print_archive(archive: litchi_iwa::archive::Archive, object_id: Option<u64>) 
             {
                 println!("  calculation_engine={engine:#?}");
             }
+            if message.type_ == 4_008
+                && let Ok(owner) =
+                    litchi_iwa::protobuf::tsce::FormulaOwnerDependenciesArchive::decode(
+                        message.data.as_slice(),
+                    )
+            {
+                println!("  formula_owner_dependencies={owner:#?}");
+            }
+            if matches!(message.type_, 6_000 | 6_001)
+                && let Ok(model) =
+                    litchi_iwa::protobuf::tst::TableModelArchive::decode(message.data.as_slice())
+            {
+                println!("  table_model={model:#?}");
+            }
+            if message.type_ == 6_220
+                && let Ok(filter) =
+                    litchi_iwa::protobuf::tst::FilterSetArchive::decode(message.data.as_slice())
+            {
+                println!("  filter_set={filter:#?}");
+            }
+            if message.type_ == 6_373
+                && let Ok(group) =
+                    litchi_iwa::protobuf::tst::GroupByArchive::decode(message.data.as_slice())
+            {
+                println!("  group_by={group:#?}");
+            }
             if message.type_ == 10_000
                 && let Ok(document) = DocumentArchive::decode(message.data.as_slice())
             {
