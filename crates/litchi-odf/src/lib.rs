@@ -252,8 +252,8 @@ pub use odp::{Shape, Slide};
 
 // Re-export document element types for unified API (for ODT tables)
 pub use elements::table::{Table, TableCell as Cell, TableRow as Row};
-pub use elements::text::Paragraph;
-pub use elements::text::Span as Run; // Span is equivalent to Run in ODF
+pub use elements::text::Span as Run;
+pub use elements::text::{Heading, List, ListItem, Paragraph}; // Span is equivalent to Run in ODF
 
 // Re-export parser types for document element iteration
 pub use elements::parser::{DocumentOrderElement, DocumentParser};

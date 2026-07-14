@@ -4,8 +4,9 @@
 //! for in-place modification of content, styles, and metadata.
 
 use crate::core::{OdfStructure, PackageWriter};
+use crate::elements::parser::DocumentOrderElement;
 use crate::elements::table::Table;
-use crate::elements::text::Paragraph;
+use crate::elements::text::{Heading, List, Paragraph};
 use crate::odt::Document;
 use litchi_core::{Metadata, Result, xml::escape_xml};
 use std::path::Path;
@@ -15,8 +16,12 @@ use std::path::Path;
 enum DocumentElement {
     /// A paragraph element
     Paragraph(Paragraph),
+    /// A heading element
+    Heading(Heading),
     /// A table element
     Table(Table),
+    /// A text list element
+    List(List),
 }
 
 /// A mutable ODT document that supports in-place modifications.
@@ -77,8 +82,7 @@ impl MutableDocument {
     /// # }
     /// ```
     pub fn from_document(doc: Document) -> Result<Self> {
-        let paragraphs = doc.paragraphs()?;
-        let tables = doc.tables()?;
+        let source_elements = doc.elements()?;
         let metadata = doc.metadata()?;
 
         // Get MIME type from package
@@ -90,16 +94,15 @@ impl MutableDocument {
             .ok()
             .and_then(|bytes| String::from_utf8(bytes).ok());
 
-        // Create elements vector with proper ordering
-        // For now, add paragraphs first, then tables (preserving original behavior)
-        // Future: Use Document::elements() to preserve exact order
-        let mut elements = Vec::new();
-        for para in paragraphs {
-            elements.push(DocumentElement::Paragraph(para));
-        }
-        for table in tables {
-            elements.push(DocumentElement::Table(table));
-        }
+        let elements = source_elements
+            .into_iter()
+            .map(|element| match element {
+                DocumentOrderElement::Paragraph(paragraph) => DocumentElement::Paragraph(paragraph),
+                DocumentOrderElement::Heading(heading) => DocumentElement::Heading(heading),
+                DocumentOrderElement::Table(table) => DocumentElement::Table(table),
+                DocumentOrderElement::List(list) => DocumentElement::List(list),
+            })
+            .collect();
 
         Ok(Self {
             elements,
@@ -153,6 +156,28 @@ impl MutableDocument {
                 } else {
                     None
                 }
+            })
+            .collect()
+    }
+
+    /// Get all headings in the document.
+    pub fn headings(&self) -> Vec<&Heading> {
+        self.elements
+            .iter()
+            .filter_map(|element| match element {
+                DocumentElement::Heading(heading) => Some(heading),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Get all lists in the document.
+    pub fn lists(&self) -> Vec<&List> {
+        self.elements
+            .iter()
+            .filter_map(|element| match element {
+                DocumentElement::List(list) => Some(list),
+                _ => None,
             })
             .collect()
     }
@@ -217,6 +242,26 @@ impl MutableDocument {
         let mut para = Paragraph::new();
         para.set_text(text);
         self.elements.push(DocumentElement::Paragraph(para));
+        Ok(())
+    }
+
+    /// Add a heading to the end of the document.
+    pub fn add_heading(&mut self, text: &str, level: u8) -> Result<()> {
+        if !(1..=6).contains(&level) {
+            return Err(litchi_core::Error::InvalidFormat(
+                "Heading level must be between 1 and 6".to_string(),
+            ));
+        }
+
+        let mut heading = Heading::new(level);
+        heading.set_text(text);
+        self.elements.push(DocumentElement::Heading(heading));
+        Ok(())
+    }
+
+    /// Add an existing list element to the end of the document.
+    pub fn add_list(&mut self, list: List) -> Result<()> {
+        self.elements.push(DocumentElement::List(list));
         Ok(())
     }
 
@@ -466,7 +511,9 @@ impl MutableDocument {
             .iter()
             .map(|e| match e {
                 DocumentElement::Paragraph(p) => p.text().map(|t| t.len()).unwrap_or(0),
+                DocumentElement::Heading(h) => h.text().map(|t| t.len()).unwrap_or(0),
                 DocumentElement::Table(_) => 256,
+                DocumentElement::List(_) => 256,
             })
             .sum::<usize>();
         let mut body = String::with_capacity(estimated);
@@ -478,8 +525,16 @@ impl MutableDocument {
                     let elem: crate::elements::element::Element = para.clone().into();
                     body.push_str(&elem.to_xml_string());
                 },
+                DocumentElement::Heading(heading) => {
+                    let elem: crate::elements::element::Element = heading.clone().into();
+                    body.push_str(&elem.to_xml_string());
+                },
                 DocumentElement::Table(table) => {
                     let elem: crate::elements::element::Element = table.clone().into();
+                    body.push_str(&elem.to_xml_string());
+                },
+                DocumentElement::List(list) => {
+                    let elem: crate::elements::element::Element = list.clone().into();
                     body.push_str(&elem.to_xml_string());
                 },
             }
@@ -624,5 +679,117 @@ impl MutableDocument {
 impl Default for MutableDocument {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::elements::parser::DocumentOrderElement;
+    use crate::elements::table::{TableCell, TableRow};
+    use crate::elements::text::{ListItem, Paragraph};
+    use crate::odt::DocumentBuilder;
+
+    fn source_document() -> Document {
+        let mut builder = DocumentBuilder::new();
+        builder.add_paragraph("Before table").unwrap();
+
+        let mut table = Table::new();
+        table.set_name("Data");
+        let mut row = TableRow::new();
+        let mut cell = TableCell::new();
+        cell.set_text("Cell content");
+        row.add_cell(cell);
+        table.add_row(row);
+        builder.add_table(table).unwrap();
+
+        builder.add_heading("After table", 2).unwrap();
+        builder
+            .add_bulleted_list(vec!["First item", "Second item"])
+            .unwrap();
+        builder.add_paragraph("Document end").unwrap();
+
+        Document::from_bytes(builder.build().unwrap()).unwrap()
+    }
+
+    fn element_kinds(document: &Document) -> Vec<&'static str> {
+        document
+            .elements()
+            .unwrap()
+            .iter()
+            .map(|element| match element {
+                DocumentOrderElement::Paragraph(_) => "paragraph",
+                DocumentOrderElement::Heading(_) => "heading",
+                DocumentOrderElement::Table(_) => "table",
+                DocumentOrderElement::List(_) => "list",
+            })
+            .collect()
+    }
+
+    #[test]
+    fn conversion_preserves_top_level_order_without_nested_paragraph_duplicates() {
+        let mutable = MutableDocument::from_document(source_document()).unwrap();
+
+        assert_eq!(mutable.paragraphs().len(), 2);
+        assert_eq!(mutable.tables().len(), 1);
+        assert_eq!(mutable.headings().len(), 1);
+        assert_eq!(mutable.lists().len(), 1);
+        assert_eq!(mutable.headings()[0].text().unwrap(), "After table");
+        assert_eq!(mutable.headings()[0].level(), Some(2));
+        assert_eq!(mutable.lists()[0].items().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn read_modify_write_keeps_paragraph_table_heading_and_list_order() {
+        let mutable = MutableDocument::from_document(source_document()).unwrap();
+        let round_trip = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+
+        assert_eq!(
+            element_kinds(&round_trip),
+            ["paragraph", "table", "heading", "list", "paragraph"]
+        );
+
+        let elements = round_trip.elements().unwrap();
+        let DocumentOrderElement::Table(table) = &elements[1] else {
+            panic!("second element should remain a table");
+        };
+        assert_eq!(table.name(), Some("Data"));
+        assert_eq!(
+            table
+                .row(0)
+                .unwrap()
+                .unwrap()
+                .cell(0)
+                .unwrap()
+                .unwrap()
+                .text()
+                .unwrap(),
+            "Cell content"
+        );
+
+        let DocumentOrderElement::List(list) = &elements[3] else {
+            panic!("fourth element should remain a list");
+        };
+        let items = list.items().unwrap();
+        assert_eq!(items[0].text().unwrap(), "First item");
+        assert_eq!(items[1].text().unwrap(), "Second item");
+    }
+
+    #[test]
+    fn mutable_document_can_add_headings_and_lists() {
+        let mut document = MutableDocument::new();
+        assert!(document.add_heading("Invalid", 0).is_err());
+        document.add_heading("Title", 1).unwrap();
+
+        let mut list = List::new();
+        let mut item = ListItem::new();
+        let mut paragraph = Paragraph::new();
+        paragraph.set_text("Item");
+        item.add_paragraph(paragraph);
+        list.add_item(item);
+        document.add_list(list).unwrap();
+
+        let round_trip = Document::from_bytes(document.to_bytes().unwrap()).unwrap();
+        assert_eq!(element_kinds(&round_trip), ["heading", "list"]);
     }
 }
