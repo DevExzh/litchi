@@ -75,7 +75,7 @@ mod style_protection;
 
 pub use annotation::{AnnotationElement, AnnotationNode, CellAnnotation};
 pub use builder::SpreadsheetBuilder;
-pub use cell::{Cell, CellValue};
+pub use cell::{Cell, CellMerge, CellValue};
 pub use data_validation::{
     ContentValidation, ValidationDisplayList, ValidationErrorMacro, ValidationErrorMessage,
     ValidationEventListener, ValidationMessage, ValidationMessageType,

@@ -1,7 +1,8 @@
 //! Cell data structures for ODS spreadsheets.
 
-use super::CellAnnotation;
+use super::{CellAnnotation, Row};
 use litchi_core::{Result, xml::escape_xml};
+use std::num::NonZeroUsize;
 
 /// Cell data types supported by ODF spreadsheets.
 ///
@@ -27,6 +28,21 @@ pub enum CellValue {
     Time(String),
 }
 
+/// Merge role of an ODF table cell.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum CellMerge {
+    /// The cell is not part of a merged range.
+    #[default]
+    None,
+    /// The cell anchors a merged range with the given row and column spans.
+    Span {
+        rows: NonZeroUsize,
+        columns: NonZeroUsize,
+    },
+    /// The cell is covered by another cell's span.
+    Covered,
+}
+
 /// A cell in an ODS spreadsheet.
 ///
 /// Cells contain typed values, optional formulas, and positioning information.
@@ -44,6 +60,8 @@ pub struct Cell {
     pub validation_name: Option<String>,
     /// Name of the ODF table-cell style applied directly to this cell.
     pub style_name: Option<String>,
+    /// The cell's role in an ODF merged range.
+    pub merge: CellMerge,
     /// Legacy ODF `table:protect` state, preserved independently when present.
     pub protect: Option<bool>,
     /// ODF `table:protected` state, preserved independently when present.
@@ -144,6 +162,44 @@ impl Cell {
     /// Remove the directly applied table-cell style reference.
     pub fn clear_style_name(&mut self) {
         self.style_name = None;
+    }
+
+    /// Return this cell's merge role.
+    pub fn merge(&self) -> CellMerge {
+        self.merge
+    }
+
+    /// Return the `(row_span, column_span)` for a merge anchor.
+    pub fn span(&self) -> Option<(usize, usize)> {
+        match self.merge {
+            CellMerge::Span { rows, columns } => Some((rows.get(), columns.get())),
+            CellMerge::None | CellMerge::Covered => None,
+        }
+    }
+
+    /// Set this cell as a merge anchor.
+    pub fn set_span(&mut self, rows: usize, columns: usize) -> Result<()> {
+        let rows = NonZeroUsize::new(rows).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat("cell row span must be positive".to_string())
+        })?;
+        let columns = NonZeroUsize::new(columns).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat("cell column span must be positive".to_string())
+        })?;
+        self.merge = if rows.get() == 1 && columns.get() == 1 {
+            CellMerge::None
+        } else {
+            CellMerge::Span { rows, columns }
+        };
+        Ok(())
+    }
+
+    /// Mark this cell as covered by a merge anchor.
+    pub fn set_covered(&mut self, covered: bool) {
+        self.merge = if covered {
+            CellMerge::Covered
+        } else {
+            CellMerge::None
+        };
     }
 
     /// Return the legacy `table:protect` state.
@@ -309,9 +365,145 @@ impl Cell {
     }
 }
 
+pub(crate) fn merge_cell_range(
+    rows: &mut Vec<Row>,
+    start_row: usize,
+    start_col: usize,
+    row_span: usize,
+    column_span: usize,
+) -> Result<()> {
+    let end_row = start_row.checked_add(row_span).ok_or_else(|| {
+        litchi_core::Error::InvalidFormat("merged row range overflows address space".to_string())
+    })?;
+    let end_col = start_col.checked_add(column_span).ok_or_else(|| {
+        litchi_core::Error::InvalidFormat("merged column range overflows address space".to_string())
+    })?;
+    if row_span == 0 || column_span == 0 {
+        return Err(litchi_core::Error::InvalidFormat(
+            "merged cell ranges must have positive spans".to_string(),
+        ));
+    }
+
+    if row_span == 1 && column_span == 1 {
+        return Err(litchi_core::Error::InvalidFormat(
+            "a merged range must cover more than one cell".to_string(),
+        ));
+    }
+    let materialized_cells = row_span.checked_mul(end_col).ok_or_else(|| {
+        litchi_core::Error::InvalidFormat("merged range allocation overflows".to_string())
+    })?;
+    if materialized_cells > 1_048_576 || end_row > 1_048_576 {
+        return Err(litchi_core::Error::InvalidFormat(
+            "merged range exceeds the expansion safety limit".to_string(),
+        ));
+    }
+
+    // Validate the existing portion before growing the vectors so errors do
+    // not leave a partially expanded sheet behind.
+    for (row_index, row) in rows.iter().enumerate().take(end_row).skip(start_row) {
+        for (column_index, cell) in row.cells.iter().enumerate().take(end_col).skip(start_col) {
+            if cell.merge != CellMerge::None {
+                return Err(litchi_core::Error::InvalidFormat(format!(
+                    "merged range overlaps cell ({row_index}, {column_index})"
+                )));
+            }
+            if (row_index != start_row || column_index != start_col)
+                && (!cell.is_empty()
+                    || !cell.text.is_empty()
+                    || cell.formula.is_some()
+                    || cell.annotation.is_some())
+            {
+                return Err(litchi_core::Error::InvalidFormat(format!(
+                    "merged range would cover populated cell ({row_index}, {column_index})"
+                )));
+            }
+        }
+    }
+
+    while rows.len() < end_row {
+        rows.push(Row {
+            cells: Vec::new(),
+            index: rows.len(),
+        });
+    }
+    for (row_index, row) in rows.iter_mut().enumerate().take(end_row).skip(start_row) {
+        while row.cells.len() < end_col {
+            row.cells.push(Cell {
+                value: CellValue::Empty,
+                text: String::new(),
+                formula: None,
+                annotation: None,
+                validation_name: None,
+                style_name: None,
+                merge: CellMerge::None,
+                protect: None,
+                protected: None,
+                row: row_index,
+                col: row.cells.len(),
+            });
+        }
+    }
+
+    rows[start_row].cells[start_col].set_span(row_span, column_span)?;
+    for (row_index, row) in rows.iter_mut().enumerate().take(end_row).skip(start_row) {
+        for (column_index, cell) in row
+            .cells
+            .iter_mut()
+            .enumerate()
+            .take(end_col)
+            .skip(start_col)
+        {
+            if row_index != start_row || column_index != start_col {
+                cell.set_covered(true);
+            }
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn unmerge_cell_range(rows: &mut [Row], start_row: usize, start_col: usize) -> bool {
+    let Some((row_span, column_span)) = rows
+        .get(start_row)
+        .and_then(|row| row.cells.get(start_col))
+        .and_then(Cell::span)
+    else {
+        return false;
+    };
+    let end_row = start_row.saturating_add(row_span).min(rows.len());
+    for (row_index, row) in rows.iter_mut().enumerate().take(end_row).skip(start_row) {
+        let end_col = start_col.saturating_add(column_span).min(row.cells.len());
+        for (column_index, cell) in row
+            .cells
+            .iter_mut()
+            .enumerate()
+            .take(end_col)
+            .skip(start_col)
+        {
+            if (row_index == start_row && column_index == start_col)
+                || cell.merge == CellMerge::Covered
+            {
+                cell.merge = CellMerge::None;
+            }
+        }
+    }
+    true
+}
+
 pub(crate) fn write_cell_xml(output: &mut String, cell: &Cell) {
-    output.push_str("<table:table-cell");
-    if let Some(formula) = &cell.formula {
+    output.push_str(match cell.merge {
+        CellMerge::Covered => "<table:covered-table-cell",
+        CellMerge::None | CellMerge::Span { .. } => "<table:table-cell",
+    });
+    if let CellMerge::Span { rows, columns } = cell.merge {
+        output.push_str(" table:number-rows-spanned=\"");
+        output.push_str(&rows.get().to_string());
+        output.push_str("\" table:number-columns-spanned=\"");
+        output.push_str(&columns.get().to_string());
+        output.push('"');
+    }
+    if let Some(formula) = &cell.formula
+        && cell.merge != CellMerge::Covered
+    {
         output.push_str(" table:formula=\"");
         output.push_str(&escape_xml(formula));
         output.push('"');
@@ -339,6 +531,11 @@ pub(crate) fn write_cell_xml(output: &mut String, cell: &Cell) {
         } else {
             " table:protected=\"false\""
         });
+    }
+
+    if cell.merge == CellMerge::Covered {
+        output.push_str("/>");
+        return;
     }
 
     match &cell.value {
@@ -468,6 +665,7 @@ mod tests {
             annotation: None,
             validation_name: None,
             style_name: None,
+            merge: Default::default(),
             protect: None,
             protected: None,
             row: 0,
@@ -479,6 +677,38 @@ mod tests {
     }
 
     #[test]
+    fn writes_merge_anchors_and_covered_cells() {
+        let mut cell = Cell {
+            value: CellValue::Text("anchor".to_string()),
+            text: "anchor".to_string(),
+            formula: None,
+            annotation: None,
+            validation_name: None,
+            style_name: Some("Merged".to_string()),
+            merge: CellMerge::None,
+            protect: None,
+            protected: None,
+            row: 0,
+            col: 0,
+        };
+        assert!(cell.set_span(0, 2).is_err());
+        cell.set_span(2, 3).unwrap();
+        let mut xml = String::new();
+        write_cell_xml(&mut xml, &cell);
+        assert!(xml.starts_with(
+            r#"<table:table-cell table:number-rows-spanned="2" table:number-columns-spanned="3""#
+        ));
+
+        cell.set_covered(true);
+        xml.clear();
+        write_cell_xml(&mut xml, &cell);
+        assert_eq!(
+            xml,
+            r#"<table:covered-table-cell table:style-name="Merged"/>"#
+        );
+    }
+
+    #[test]
     fn test_cell_text() {
         let cell = Cell {
             value: CellValue::Text("Hello".to_string()),
@@ -487,6 +717,7 @@ mod tests {
             annotation: None,
             validation_name: None,
             style_name: None,
+            merge: Default::default(),
             protect: None,
             protected: None,
             row: 0,
@@ -504,6 +735,7 @@ mod tests {
             annotation: None,
             validation_name: None,
             style_name: None,
+            merge: Default::default(),
             protect: None,
             protected: None,
             row: 0,
@@ -524,6 +756,7 @@ mod tests {
             annotation: None,
             validation_name: None,
             style_name: None,
+            merge: Default::default(),
             protect: None,
             protected: None,
             row: 0,
@@ -538,6 +771,7 @@ mod tests {
             annotation: None,
             validation_name: None,
             style_name: None,
+            merge: Default::default(),
             protect: None,
             protected: None,
             row: 0,
@@ -552,6 +786,7 @@ mod tests {
             annotation: None,
             validation_name: None,
             style_name: None,
+            merge: Default::default(),
             protect: None,
             protected: None,
             row: 0,
@@ -566,6 +801,7 @@ mod tests {
             annotation: None,
             validation_name: None,
             style_name: None,
+            merge: Default::default(),
             protect: None,
             protected: None,
             row: 0,
@@ -583,6 +819,7 @@ mod tests {
             annotation: None,
             validation_name: None,
             style_name: None,
+            merge: Default::default(),
             protect: None,
             protected: None,
             row: 0,
@@ -600,6 +837,7 @@ mod tests {
             annotation: None,
             validation_name: None,
             style_name: None,
+            merge: Default::default(),
             protect: None,
             protected: None,
             row: 0,
@@ -617,6 +855,7 @@ mod tests {
             annotation: None,
             validation_name: None,
             style_name: None,
+            merge: Default::default(),
             protect: None,
             protected: None,
             row: 0,
@@ -631,6 +870,7 @@ mod tests {
             annotation: None,
             validation_name: None,
             style_name: None,
+            merge: Default::default(),
             protect: None,
             protected: None,
             row: 0,
@@ -648,6 +888,7 @@ mod tests {
             annotation: None,
             validation_name: None,
             style_name: None,
+            merge: Default::default(),
             protect: None,
             protected: None,
             row: 5,
@@ -665,6 +906,7 @@ mod tests {
             annotation: None,
             validation_name: None,
             style_name: None,
+            merge: Default::default(),
             protect: None,
             protected: None,
             row: 0,
@@ -679,6 +921,7 @@ mod tests {
             annotation: None,
             validation_name: None,
             style_name: None,
+            merge: Default::default(),
             protect: None,
             protected: None,
             row: 0,

@@ -1,7 +1,7 @@
 //! ODS-specific parsing utilities.
 
 use super::{
-    Cell, CellValue, NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange,
+    Cell, CellMerge, CellValue, NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange,
     NamedRangeUsage, Row, Sheet,
     annotation::{AnnotationBuilder, decode_reference},
 };
@@ -14,9 +14,13 @@ use quick_xml::events::Event;
 use quick_xml::name::{Namespace, NamespaceResolver, PrefixDeclaration, ResolveResult};
 use quick_xml::reader::NsReader;
 use std::collections::BTreeMap;
+use std::num::NonZeroUsize;
 
 const TABLE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:table:1.0";
 const OFFICE_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
+const MAX_EXPANDED_ROWS_PER_SHEET: usize = 1_048_576;
+const MAX_EXPANDED_CELLS_PER_ROW: usize = 1_048_576;
+const MAX_EXPANDED_CELLS_PER_SHEET: usize = 4_194_304;
 
 /// Parser for ODS-specific structures.
 ///
@@ -69,11 +73,18 @@ impl OdsParser {
                                 current_sheet = Some(SheetBuilder::new(name));
                             },
                             b"table:table-row" if current_sheet.is_some() => {
-                                current_row = Some(RowBuilder::new());
+                                current_row = Some(RowBuilder::with_repeated(
+                                    Self::parse_repeated(e, b"table:number-rows-repeated")?,
+                                ));
                             },
-                            b"table:table-cell" if current_row.is_some() => {
-                                let cell_builder =
+                            b"table:table-cell" | b"table:covered-table-cell"
+                                if current_row.is_some() =>
+                            {
+                                let mut cell_builder =
                                     Self::parse_cell_attributes(e, reader.decoder())?;
+                                if e.name().as_ref() == b"table:covered-table-cell" {
+                                    cell_builder.merge = CellMerge::Covered;
+                                }
                                 current_cell = Some(cell_builder);
                                 text_content.clear();
                             },
@@ -104,12 +115,22 @@ impl OdsParser {
                         }
                     } else if text_element_depth > 0 {
                         Self::push_text_empty_element(e, reader.decoder(), &mut text_content)?;
-                    } else if e.name().as_ref() == b"table:table-cell" && current_row.is_some() {
-                        let cell_builder = Self::parse_cell_attributes(e, reader.decoder())?;
+                    } else if matches!(
+                        e.name().as_ref(),
+                        b"table:table-cell" | b"table:covered-table-cell"
+                    ) && current_row.is_some()
+                    {
+                        let mut cell_builder = Self::parse_cell_attributes(e, reader.decoder())?;
+                        if e.name().as_ref() == b"table:covered-table-cell" {
+                            cell_builder.merge = CellMerge::Covered;
+                        }
                         if let Some(row) = current_row.as_mut() {
-                            for _ in 0..cell_builder.repeated {
-                                row.add_cell(cell_builder.build(""));
-                            }
+                            row.add_repeated_cells(&cell_builder, "")?;
+                        }
+                    } else if e.name().as_ref() == b"table:table-row" && current_sheet.is_some() {
+                        let repeated = Self::parse_repeated(e, b"table:number-rows-repeated")?;
+                        if let Some(sheet) = current_sheet.as_mut() {
+                            sheet.add_repeated_row(RowBuilder::new().build(), repeated)?;
                         }
                     }
                 },
@@ -178,27 +199,19 @@ impl OdsParser {
                     }
 
                     match e.name().as_ref() {
-                        b"table:table-cell" => {
+                        b"table:table-cell" | b"table:covered-table-cell" => {
                             if let Some(cell_builder) = current_cell.take() {
-                                let repeated = cell_builder.repeated;
                                 if let Some(ref mut row_builder) = current_row {
-                                    // Handle repeated cells - build cell once for first occurrence
-                                    if repeated > 0 {
-                                        let cell = cell_builder.build(&text_content);
-                                        row_builder.add_cell(cell);
-                                        // Clone only for additional repetitions
-                                        for _ in 1..repeated {
-                                            row_builder.add_cell(cell_builder.build(&text_content));
-                                        }
-                                    }
+                                    row_builder.add_repeated_cells(&cell_builder, &text_content)?;
                                 }
                             }
                         },
                         b"table:table-row" => {
                             if let Some(row_builder) = current_row.take() {
+                                let repeated = row_builder.repeated;
                                 let row = row_builder.build();
                                 if let Some(ref mut sheet_builder) = current_sheet {
-                                    sheet_builder.add_row(row);
+                                    sheet_builder.add_repeated_row(row, repeated)?;
                                 }
                             }
                         },
@@ -555,6 +568,42 @@ impl OdsParser {
         Ok("Sheet1".to_string()) // Default name
     }
 
+    fn parse_repeated(e: &BytesStart<'_>, attribute_name: &[u8]) -> Result<usize> {
+        for attribute in e.attributes() {
+            let attribute = attribute
+                .map_err(|error| Error::InvalidFormat(format!("invalid XML attribute: {error}")))?;
+            if attribute.key.as_ref() == attribute_name {
+                return Self::parse_positive_usize(&attribute, attribute_name);
+            }
+        }
+        Ok(1)
+    }
+
+    fn parse_positive_usize(
+        attribute: &quick_xml::events::attributes::Attribute<'_>,
+        attribute_name: &[u8],
+    ) -> Result<usize> {
+        let value = std::str::from_utf8(attribute.value.as_ref()).map_err(|_| {
+            Error::InvalidFormat(format!(
+                "{} is not valid UTF-8",
+                String::from_utf8_lossy(attribute_name)
+            ))
+        })?;
+        let parsed = value.parse::<usize>().map_err(|_| {
+            Error::InvalidFormat(format!(
+                "invalid {} value '{value}'",
+                String::from_utf8_lossy(attribute_name)
+            ))
+        })?;
+        if parsed == 0 {
+            return Err(Error::InvalidFormat(format!(
+                "{} must be positive",
+                String::from_utf8_lossy(attribute_name)
+            )));
+        }
+        Ok(parsed)
+    }
+
     /// Parse cell attributes and create a CellBuilder
     fn parse_cell_attributes(
         e: &quick_xml::events::BytesStart,
@@ -569,6 +618,8 @@ impl OdsParser {
         let mut protect = None;
         let mut protected = None;
         let mut repeated = 1;
+        let mut row_span = 1;
+        let mut column_span = 1;
 
         for attr_result in e.attributes() {
             let attr =
@@ -625,12 +676,14 @@ impl OdsParser {
                     protected = Some(Self::parse_bool_attribute(&attr, decoder)?);
                 },
                 b"table:number-columns-repeated" => {
-                    if let Ok(rep) = String::from_utf8(attr.value.to_vec())
-                        .map_err(|_| Error::InvalidFormat("Invalid UTF-8".to_string()))?
-                        .parse::<usize>()
-                    {
-                        repeated = rep;
-                    }
+                    repeated = Self::parse_positive_usize(&attr, b"table:number-columns-repeated")?;
+                },
+                b"table:number-rows-spanned" => {
+                    row_span = Self::parse_positive_usize(&attr, b"table:number-rows-spanned")?;
+                },
+                b"table:number-columns-spanned" => {
+                    column_span =
+                        Self::parse_positive_usize(&attr, b"table:number-columns-spanned")?;
                 },
                 _ => {},
             }
@@ -646,6 +699,15 @@ impl OdsParser {
             protect,
             protected,
             repeated,
+            merge: if row_span == 1 && column_span == 1 {
+                CellMerge::None
+            } else {
+                CellMerge::Span {
+                    rows: NonZeroUsize::new(row_span).expect("positive row span was checked"),
+                    columns: NonZeroUsize::new(column_span)
+                        .expect("positive column span was checked"),
+                }
+            },
             annotation: None,
         })
     }
@@ -671,6 +733,7 @@ impl OdsParser {
 pub(crate) struct SheetBuilder {
     name: String,
     rows: Vec<Row>,
+    cell_count: usize,
 }
 
 impl SheetBuilder {
@@ -678,6 +741,7 @@ impl SheetBuilder {
         Self {
             name,
             rows: Vec::new(),
+            cell_count: 0,
         }
     }
 
@@ -689,6 +753,33 @@ impl SheetBuilder {
             cell.row = row_index;
         }
         self.rows.push(row);
+    }
+
+    fn add_repeated_row(&mut self, row: Row, repeated: usize) -> Result<()> {
+        let expanded_rows = self.rows.len().checked_add(repeated).ok_or_else(|| {
+            Error::InvalidFormat("table row repetition overflows address space".to_string())
+        })?;
+        if expanded_rows > MAX_EXPANDED_ROWS_PER_SHEET {
+            return Err(Error::InvalidFormat(format!(
+                "expanded sheet exceeds the {MAX_EXPANDED_ROWS_PER_SHEET} row safety limit"
+            )));
+        }
+        let added_cells = row.cells.len().checked_mul(repeated).ok_or_else(|| {
+            Error::InvalidFormat("table row repetition overflows cell count".to_string())
+        })?;
+        let expanded_cells = self.cell_count.checked_add(added_cells).ok_or_else(|| {
+            Error::InvalidFormat("expanded sheet cell count overflows address space".to_string())
+        })?;
+        if expanded_cells > MAX_EXPANDED_CELLS_PER_SHEET {
+            return Err(Error::InvalidFormat(format!(
+                "expanded sheet exceeds the {MAX_EXPANDED_CELLS_PER_SHEET} cell safety limit"
+            )));
+        }
+        self.cell_count = expanded_cells;
+        for _ in 0..repeated {
+            self.add_row(row.clone());
+        }
+        Ok(())
     }
 
     pub fn build(self) -> Sheet {
@@ -703,16 +794,43 @@ impl SheetBuilder {
 /// Builder for constructing Row during parsing
 pub(crate) struct RowBuilder {
     cells: Vec<Cell>,
+    repeated: usize,
 }
 
 impl RowBuilder {
     pub fn new() -> Self {
-        Self { cells: Vec::new() }
+        Self::with_repeated(1)
+    }
+
+    fn with_repeated(repeated: usize) -> Self {
+        Self {
+            cells: Vec::new(),
+            repeated,
+        }
     }
 
     pub fn add_cell(&mut self, mut cell: Cell) {
         cell.col = self.cells.len();
         self.cells.push(cell);
+    }
+
+    fn add_repeated_cells(&mut self, builder: &CellBuilder, text: &str) -> Result<()> {
+        let expanded = self
+            .cells
+            .len()
+            .checked_add(builder.repeated)
+            .ok_or_else(|| {
+                Error::InvalidFormat("table cell repetition overflows address space".to_string())
+            })?;
+        if expanded > MAX_EXPANDED_CELLS_PER_ROW {
+            return Err(Error::InvalidFormat(format!(
+                "expanded row exceeds the {MAX_EXPANDED_CELLS_PER_ROW} cell safety limit"
+            )));
+        }
+        for _ in 0..builder.repeated {
+            self.add_cell(builder.build(text));
+        }
+        Ok(())
     }
 
     pub fn build(mut self) -> Row {
@@ -740,6 +858,7 @@ pub(crate) struct CellBuilder {
     protect: Option<bool>,
     protected: Option<bool>,
     repeated: usize,
+    merge: CellMerge,
     annotation: Option<super::CellAnnotation>,
 }
 
@@ -755,6 +874,7 @@ impl CellBuilder {
             annotation: self.annotation.clone(),
             validation_name: self.validation_name.clone(),
             style_name: self.style_name.clone(),
+            merge: self.merge,
             protect: self.protect,
             protected: self.protected,
             row: 0, // Will be set by parent
@@ -1157,6 +1277,39 @@ mod tests {
     }
 
     #[test]
+    fn parses_repeated_rows_and_merged_cell_coordinates() {
+        let xml = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><office:body><office:spreadsheet><table:table table:name="Merged"><table:table-row table:number-rows-repeated="2"><table:table-cell office:value-type="string"><text:p>A</text:p></table:table-cell></table:table-row><table:table-row><table:table-cell table:number-rows-spanned="2" table:number-columns-spanned="2" office:value-type="string"><text:p>anchor</text:p></table:table-cell><table:covered-table-cell/><table:table-cell office:value-type="string"><text:p>C</text:p></table:table-cell></table:table-row><table:table-row><table:covered-table-cell table:number-columns-repeated="2"/></table:table-row></table:table></office:spreadsheet></office:body></office:document-content>"#;
+        let sheets = OdsParser::parse_sheets(xml).unwrap();
+        let rows = &sheets[0].rows;
+        assert_eq!(rows.len(), 4);
+        assert_eq!(rows[0].cells[0].text, "A");
+        assert_eq!(rows[1].cells[0].coordinates(), (1, 0));
+        assert_eq!(rows[2].cells[0].span(), Some((2, 2)));
+        assert_eq!(rows[2].cells[1].merge(), CellMerge::Covered);
+        assert_eq!(rows[2].cells[2].text, "C");
+        assert_eq!(rows[2].cells[2].coordinates(), (2, 2));
+        assert_eq!(rows[3].cells.len(), 2);
+        assert!(
+            rows[3]
+                .cells
+                .iter()
+                .all(|cell| cell.merge() == CellMerge::Covered)
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_or_dangerous_repetition_counts() {
+        let zero = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:spreadsheet><table:table><table:table-row table:number-rows-repeated="0"/></table:table></office:spreadsheet></office:body></office:document-content>"#;
+        assert!(OdsParser::parse_sheets(zero).is_err());
+
+        let excessive = format!(
+            r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:spreadsheet><table:table><table:table-row table:number-rows-repeated="{}"/></table:table></office:spreadsheet></office:body></office:document-content>"#,
+            MAX_EXPANDED_ROWS_PER_SHEET + 1
+        );
+        assert!(OdsParser::parse_sheets(&excessive).is_err());
+    }
+
+    #[test]
     fn test_sheet_builder() {
         let mut builder = SheetBuilder::new("TestSheet".to_string());
 
@@ -1174,6 +1327,7 @@ mod tests {
                 annotation: None,
                 validation_name: None,
                 style_name: None,
+                merge: Default::default(),
                 protect: None,
                 protected: None,
                 row: 0,
@@ -1201,6 +1355,7 @@ mod tests {
             annotation: None,
             validation_name: None,
             style_name: None,
+            merge: Default::default(),
             protect: None,
             protected: None,
             row: 0,
@@ -1215,6 +1370,7 @@ mod tests {
             annotation: None,
             validation_name: None,
             style_name: None,
+            merge: Default::default(),
             protect: None,
             protected: None,
             row: 0,
@@ -1239,6 +1395,7 @@ mod tests {
             annotation: None,
             validation_name: None,
             style_name: None,
+            merge: Default::default(),
             protect: None,
             protected: None,
             repeated: 1,
@@ -1258,6 +1415,7 @@ mod tests {
             annotation: None,
             validation_name: None,
             style_name: None,
+            merge: Default::default(),
             protect: None,
             protected: None,
             repeated: 1,
@@ -1277,6 +1435,7 @@ mod tests {
             annotation: None,
             validation_name: None,
             style_name: None,
+            merge: Default::default(),
             protect: None,
             protected: None,
             repeated: 1,
@@ -1298,6 +1457,7 @@ mod tests {
             annotation: None,
             validation_name: None,
             style_name: None,
+            merge: Default::default(),
             protect: None,
             protected: None,
             repeated: 1,
@@ -1320,6 +1480,7 @@ mod tests {
             annotation: None,
             validation_name: None,
             style_name: None,
+            merge: Default::default(),
             protect: None,
             protected: None,
             repeated: 1,
@@ -1339,6 +1500,7 @@ mod tests {
             annotation: None,
             validation_name: None,
             style_name: None,
+            merge: Default::default(),
             protect: None,
             protected: None,
             repeated: 1,
@@ -1360,6 +1522,7 @@ mod tests {
             annotation: None,
             validation_name: None,
             style_name: None,
+            merge: Default::default(),
             protect: None,
             protected: None,
             repeated: 1,
@@ -1381,6 +1544,7 @@ mod tests {
             annotation: None,
             validation_name: None,
             style_name: None,
+            merge: Default::default(),
             protect: None,
             protected: None,
             repeated: 1,

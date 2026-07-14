@@ -7,6 +7,7 @@ use crate::core::{OdfStructure, PackageWriter};
 use crate::ods::{
     Cell, CellAnnotation, CellValue, ContentValidation, NamedDefinition, NamedDefinitionScope,
     NamedExpression, NamedRange, Row, Sheet, Spreadsheet, SpreadsheetProtection,
+    cell::{merge_cell_range, unmerge_cell_range},
     data_validation::{validate_collection, write_content_validations},
     named_expression::{ensure_unique, write_named_definitions},
     protection::{
@@ -457,6 +458,7 @@ impl MutableSpreadsheet {
                     annotation: None,
                     validation_name: None,
                     style_name: None,
+                    merge: Default::default(),
                     protect: None,
                     protected: None,
                     row,
@@ -512,6 +514,7 @@ impl MutableSpreadsheet {
                 annotation: None,
                 validation_name: None,
                 style_name: None,
+                merge: Default::default(),
                 protect: None,
                 protected: None,
                 row,
@@ -574,6 +577,7 @@ impl MutableSpreadsheet {
                 annotation: None,
                 validation_name: None,
                 style_name: None,
+                merge: Default::default(),
                 protect: None,
                 protected: None,
                 row,
@@ -628,6 +632,7 @@ impl MutableSpreadsheet {
                 annotation: None,
                 validation_name: None,
                 style_name: None,
+                merge: Default::default(),
                 protect: None,
                 protected: None,
                 row,
@@ -664,6 +669,7 @@ impl MutableSpreadsheet {
                 annotation: None,
                 validation_name: None,
                 style_name: None,
+                merge: Default::default(),
                 protect: None,
                 protected: None,
                 row,
@@ -689,6 +695,34 @@ impl MutableSpreadsheet {
             .get_mut(row)
             .and_then(|row| row.cells.get_mut(col))
             .and_then(|cell| cell.style_name.take()))
+    }
+
+    /// Merge a rectangular cell range in a sheet.
+    pub fn merge_cells(
+        &mut self,
+        sheet_index: usize,
+        start_row: usize,
+        start_col: usize,
+        row_span: usize,
+        column_span: usize,
+    ) -> Result<()> {
+        let sheet = self.sheets.get_mut(sheet_index).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(format!("Sheet index {sheet_index} out of bounds"))
+        })?;
+        merge_cell_range(&mut sheet.rows, start_row, start_col, row_span, column_span)
+    }
+
+    /// Remove a merge anchored at a cell.
+    pub fn unmerge_cells(
+        &mut self,
+        sheet_index: usize,
+        start_row: usize,
+        start_col: usize,
+    ) -> Result<bool> {
+        let sheet = self.sheets.get_mut(sheet_index).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(format!("Sheet index {sheet_index} out of bounds"))
+        })?;
+        Ok(unmerge_cell_range(&mut sheet.rows, start_row, start_col))
     }
 
     /// Clear a cell value.
@@ -927,6 +961,16 @@ mod tests {
         writer.finish_to_bytes().unwrap()
     }
 
+    fn package_with_repeated_merged_cells() -> Vec<u8> {
+        let content = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" office:version="1.3"><office:body><office:spreadsheet><table:table table:name="Merged"><table:table-row table:number-rows-repeated="2"><table:table-cell office:value-type="string"><text:p>A</text:p></table:table-cell></table:table-row><table:table-row><table:table-cell table:number-rows-spanned="2" table:number-columns-spanned="2" office:value-type="string"><text:p>anchor</text:p></table:table-cell><table:covered-table-cell/><table:table-cell office:value-type="string"><text:p>C</text:p></table:table-cell></table:table-row><table:table-row><table:covered-table-cell table:number-columns-repeated="2"/></table:table-row></table:table></office:spreadsheet></office:body></office:document-content>"#;
+        let mut writer = PackageWriter::new();
+        writer
+            .set_mimetype("application/vnd.oasis.opendocument.spreadsheet")
+            .unwrap();
+        writer.add_file("content.xml", content.as_bytes()).unwrap();
+        writer.finish_to_bytes().unwrap()
+    }
+
     #[test]
     fn mutable_spreadsheet_preserves_and_edits_named_definitions() {
         let mut builder = SpreadsheetBuilder::new();
@@ -1109,6 +1153,56 @@ mod tests {
         assert_eq!(
             output.cell_style_protection(cell).unwrap(),
             Some(CellStyleProtection::Protected)
+        );
+    }
+
+    #[test]
+    fn mutable_spreadsheet_preserves_repeated_rows_and_merged_cells() {
+        let spreadsheet = Spreadsheet::from_bytes(package_with_repeated_merged_cells()).unwrap();
+        let mutable = MutableSpreadsheet::from_spreadsheet(spreadsheet).unwrap();
+        let bytes = mutable.to_bytes().unwrap();
+        let package = crate::core::OwnedPackage::from_bytes(bytes.clone()).unwrap();
+        let content = String::from_utf8(package.get_file("content.xml").unwrap()).unwrap();
+        assert!(content.contains(r#"table:number-rows-spanned="2""#));
+        assert!(content.contains("<table:covered-table-cell"));
+
+        let mut output = Spreadsheet::from_bytes(bytes).unwrap();
+        let sheets = output.sheets().unwrap();
+        let rows = &sheets[0].rows;
+        assert_eq!(rows.len(), 4);
+        assert_eq!(rows[1].cells[0].coordinates(), (1, 0));
+        assert_eq!(rows[2].cells[0].span(), Some((2, 2)));
+        assert_eq!(rows[2].cells[1].merge(), crate::ods::CellMerge::Covered);
+        assert_eq!(rows[2].cells[2].coordinates(), (2, 2));
+        assert_eq!(rows[3].cells.len(), 2);
+    }
+
+    #[test]
+    fn mutable_spreadsheet_creates_and_removes_merged_ranges() {
+        let mut mutable = MutableSpreadsheet::new();
+        mutable.add_sheet("Merged").unwrap();
+        mutable
+            .set_cell(0, 1, 1, CellValue::Text("anchor".to_string()))
+            .unwrap();
+        mutable.merge_cells(0, 1, 1, 2, 2).unwrap();
+
+        let mut output = Spreadsheet::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+        let sheets = output.sheets().unwrap();
+        assert_eq!(sheets[0].rows[1].cells[1].span(), Some((2, 2)));
+        assert_eq!(
+            sheets[0].rows[2].cells[2].merge(),
+            crate::ods::CellMerge::Covered
+        );
+
+        assert!(mutable.unmerge_cells(0, 1, 1).unwrap());
+        assert!(!mutable.unmerge_cells(0, 1, 1).unwrap());
+        let mut output = Spreadsheet::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+        assert!(
+            output.sheets().unwrap()[0]
+                .rows
+                .iter()
+                .flat_map(|row| &row.cells)
+                .all(|cell| cell.merge() == crate::ods::CellMerge::None)
         );
     }
 }

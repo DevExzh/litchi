@@ -6,6 +6,7 @@ use crate::core::{OdfStructure, PackageWriter};
 use crate::ods::{
     Cell, CellAnnotation, CellValue, ContentValidation, NamedDefinition, NamedDefinitionScope,
     NamedExpression, NamedRange, Row, Sheet, SpreadsheetProtection,
+    cell::{merge_cell_range, unmerge_cell_range},
     data_validation::{validate_collection, write_content_validations},
     named_expression::{ensure_unique, write_named_definitions},
     protection::{
@@ -301,6 +302,7 @@ impl SpreadsheetBuilder {
                 annotation: None,
                 validation_name: None,
                 style_name: None,
+                merge: Default::default(),
                 protect: None,
                 protected: None,
                 row: row_index,
@@ -359,6 +361,7 @@ impl SpreadsheetBuilder {
                 annotation: None,
                 validation_name: None,
                 style_name: None,
+                merge: Default::default(),
                 protect: None,
                 protected: None,
                 row: row_index,
@@ -432,6 +435,7 @@ impl SpreadsheetBuilder {
                     annotation: None,
                     validation_name: None,
                     style_name: None,
+                    merge: Default::default(),
                     protect: None,
                     protected: None,
                     row: row_index,
@@ -498,6 +502,7 @@ impl SpreadsheetBuilder {
                     annotation: None,
                     validation_name: None,
                     style_name: None,
+                    merge: Default::default(),
                     protect: None,
                     protected: None,
                     row,
@@ -520,6 +525,7 @@ impl SpreadsheetBuilder {
             let annotation = row_data.cells[col].annotation.take();
             let validation_name = row_data.cells[col].validation_name.take();
             let style_name = row_data.cells[col].style_name.take();
+            let merge = row_data.cells[col].merge;
             let protect = row_data.cells[col].protect;
             let protected = row_data.cells[col].protected;
             row_data.cells[col] = Cell {
@@ -529,6 +535,7 @@ impl SpreadsheetBuilder {
                 annotation,
                 validation_name,
                 style_name,
+                merge,
                 protect,
                 protected,
                 row,
@@ -584,6 +591,7 @@ impl SpreadsheetBuilder {
                     annotation: None,
                     validation_name: None,
                     style_name: None,
+                    merge: Default::default(),
                     protect: None,
                     protected: None,
                     row,
@@ -627,6 +635,7 @@ impl SpreadsheetBuilder {
                 annotation: None,
                 validation_name: None,
                 style_name: None,
+                merge: Default::default(),
                 protect: None,
                 protected: None,
                 row,
@@ -686,6 +695,7 @@ impl SpreadsheetBuilder {
                 annotation: None,
                 validation_name: None,
                 style_name: None,
+                merge: Default::default(),
                 protect: None,
                 protected: None,
                 row,
@@ -733,6 +743,7 @@ impl SpreadsheetBuilder {
                 annotation: None,
                 validation_name: None,
                 style_name: None,
+                merge: Default::default(),
                 protect: None,
                 protected: None,
                 row,
@@ -769,6 +780,7 @@ impl SpreadsheetBuilder {
                 annotation: None,
                 validation_name: None,
                 style_name: None,
+                merge: Default::default(),
                 protect: None,
                 protected: None,
                 row,
@@ -787,6 +799,29 @@ impl SpreadsheetBuilder {
             .and_then(|sheet| sheet.rows.get_mut(row))
             .and_then(|row| row.cells.get_mut(col))
             .and_then(|cell| cell.style_name.take()))
+    }
+
+    /// Merge a rectangular range in the current sheet.
+    pub fn merge_cells(
+        &mut self,
+        start_row: usize,
+        start_col: usize,
+        row_span: usize,
+        column_span: usize,
+    ) -> Result<&mut Self> {
+        if self.sheets.is_empty() {
+            self.add_sheet("Sheet1")?;
+        }
+        let sheet = self.sheets.last_mut().expect("default sheet was added");
+        merge_cell_range(&mut sheet.rows, start_row, start_col, row_span, column_span)?;
+        Ok(self)
+    }
+
+    /// Remove a merge anchored at a cell in the current sheet.
+    pub fn unmerge_cells(&mut self, start_row: usize, start_col: usize) -> bool {
+        self.sheets
+            .last_mut()
+            .is_some_and(|sheet| unmerge_cell_range(&mut sheet.rows, start_row, start_col))
     }
 
     /// Select a specific sheet by index for subsequent operations
@@ -1481,6 +1516,7 @@ mod tests {
                 annotation: None,
                 validation_name: None,
                 style_name: None,
+                merge: Default::default(),
                 protect: None,
                 protected: None,
                 row: 0,
@@ -1493,6 +1529,7 @@ mod tests {
                 annotation: None,
                 validation_name: None,
                 style_name: None,
+                merge: Default::default(),
                 protect: None,
                 protected: None,
                 row: 0,
@@ -1733,5 +1770,27 @@ mod tests {
         let xml = builder.generate_content_xml();
         // Empty cell with formula should have value type
         assert!(xml.contains("office:value-type="));
+    }
+
+    #[test]
+    fn builder_creates_and_removes_merged_ranges_safely() {
+        let mut builder = SpreadsheetBuilder::new();
+        builder.add_sheet("Merged").unwrap();
+        builder
+            .set_cell(0, 0, CellValue::Text("anchor".to_string()))
+            .unwrap();
+        builder.merge_cells(0, 0, 2, 3).unwrap();
+        assert_eq!(builder.sheets[0].rows[0].cells[0].span(), Some((2, 3)));
+        assert_eq!(
+            builder.sheets[0].rows[1].cells[2].merge(),
+            crate::ods::CellMerge::Covered
+        );
+        assert!(builder.unmerge_cells(0, 0));
+        assert!(!builder.unmerge_cells(0, 0));
+
+        builder
+            .set_cell(0, 1, CellValue::Text("occupied".to_string()))
+            .unwrap();
+        assert!(builder.merge_cells(0, 0, 1, 2).is_err());
     }
 }
