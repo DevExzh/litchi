@@ -9,10 +9,26 @@ use litchi_core::VerticalPosition;
 use litchi_core::XmlSlice;
 use litchi_opc::rel::Relationships;
 use quick_xml::events::{BytesStart, Event};
+use quick_xml::name::{Namespace, ResolveResult};
+use quick_xml::reader::NsReader;
 use quick_xml::{Reader, XmlVersion};
 use smallvec::SmallVec;
 use std::borrow::Cow;
 use std::sync::Arc;
+
+const WORDPROCESSINGML_NAMESPACE: &[u8] =
+    b"http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+const STRICT_WORDPROCESSINGML_NAMESPACE: &[u8] =
+    b"http://purl.oclc.org/ooxml/wordprocessingml/main";
+
+fn is_wordprocessing_namespace(namespace: &ResolveResult<'_>) -> bool {
+    matches!(
+        namespace,
+        ResolveResult::Bound(Namespace(value))
+            if *value == WORDPROCESSINGML_NAMESPACE
+                || *value == STRICT_WORDPROCESSINGML_NAMESPACE
+    )
+}
 
 pub(crate) fn extract_word_text(xml_bytes: &[u8]) -> Result<String> {
     let mut reader = Reader::from_reader(xml_bytes);
@@ -168,91 +184,124 @@ impl Paragraph {
     ///
     /// # Performance
     ///
-    /// Uses zero-copy parsing with NO Vec::push calls.
-    /// Reuses existing Arc if paragraph is already shared.
+    /// Uses namespace-aware streaming boundary detection and shared XML slices.
     pub fn runs(&self) -> Result<SmallVec<[Run; 8]>> {
+        enum RunEvent {
+            Start,
+            NestedStart,
+            Empty,
+            End,
+            Eof,
+            Other,
+        }
+
         let xml_bytes = self.xml_bytes();
-        let len = xml_bytes.len();
-
-        // PASS 1: Count runs
-        let count = count_runs(xml_bytes);
-        if count == 0 {
-            return Ok(SmallVec::new());
-        }
-
-        // Reuse Arc if available (cheap), or create one (allocates once)
         let (source_arc, base_offset) = self.xml_data.get_or_create_arc();
+        let mut reader = NsReader::from_reader(xml_bytes);
+        let mut runs = SmallVec::new();
+        let mut run_start = None;
+        let mut run_depth = 0usize;
 
-        // Pre-allocate SmallVec with exact capacity
-        let mut runs: SmallVec<[Run; 8]> = SmallVec::with_capacity(count);
-
-        // OPTIMIZATION: Pre-increment Arc refcount to avoid per-run atomic operations.
-        let arc_ptr = Arc::into_raw(source_arc);
-        // SAFETY: arc_ptr came from Arc::into_raw, so it's valid.
-        unsafe {
-            for _ in 0..(count - 1) {
-                Arc::increment_strong_count(arc_ptr);
-            }
-        }
-
-        // PASS 2: Fill directly using unsafe to avoid push
-        let mut write_idx = 0usize;
-        let mut i = 0usize;
-        let runs_ptr = runs.as_mut_ptr();
-
-        while i < len && write_idx < count {
-            let Some(tag_start) = memchr::memchr(b'<', &xml_bytes[i..]) else {
-                break;
+        loop {
+            let event_start = usize::try_from(reader.buffer_position()).map_err(|_| {
+                OoxmlError::InvalidFormat("Word paragraph offset does not fit usize".to_string())
+            })?;
+            let event = {
+                let (namespace, event) = reader
+                    .read_resolved_event()
+                    .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+                let is_run = |element: &BytesStart<'_>| {
+                    is_wordprocessing_namespace(&namespace) && element.local_name().as_ref() == b"r"
+                };
+                match event {
+                    Event::Start(_) if run_start.is_some() => RunEvent::NestedStart,
+                    Event::Start(element) if is_run(&element) => RunEvent::Start,
+                    Event::Empty(element) if run_start.is_none() && is_run(&element) => {
+                        RunEvent::Empty
+                    },
+                    Event::End(_) if run_start.is_some() => RunEvent::End,
+                    Event::Eof => RunEvent::Eof,
+                    _ => RunEvent::Other,
+                }
             };
-            let tag_start = i + tag_start;
+            let event_end = usize::try_from(reader.buffer_position()).map_err(|_| {
+                OoxmlError::InvalidFormat("Word paragraph offset does not fit usize".to_string())
+            })?;
 
-            if tag_start + 5 < len && &xml_bytes[tag_start..tag_start + 4] == b"<w:r" {
-                let next_char = xml_bytes[tag_start + 4];
-                if (next_char == b'>' || next_char == b' ' || next_char == b'/')
-                    && let Some(end) = find_run_end(&xml_bytes[tag_start..])
-                {
-                    let end_pos = tag_start + end;
-                    let run_len = (end_pos - tag_start) as u32;
-
-                    // SAFETY: arc_ptr is valid; each from_raw consumes one refcount we pre-incremented
-                    let arc_clone = unsafe { Arc::from_raw(arc_ptr) };
-
-                    // Write directly to pre-allocated slot (no push)
-                    // Add base_offset to get absolute position in source Arc
-                    unsafe {
-                        std::ptr::write(
-                            runs_ptr.add(write_idx),
-                            Run::from_slice(XmlSlice::new(
-                                arc_clone,
-                                base_offset + tag_start as u32,
-                                run_len,
-                            )),
-                        );
+            match event {
+                RunEvent::Start => {
+                    run_start = Some(event_start);
+                    run_depth = 1;
+                },
+                RunEvent::NestedStart => {
+                    run_depth = run_depth.checked_add(1).ok_or_else(|| {
+                        OoxmlError::InvalidFormat("Word run nesting is too deep".to_string())
+                    })?;
+                },
+                RunEvent::Empty => {
+                    Self::push_run_slice(
+                        &mut runs,
+                        &source_arc,
+                        base_offset,
+                        event_start,
+                        event_end,
+                    )?;
+                },
+                RunEvent::End => {
+                    run_depth = run_depth.checked_sub(1).ok_or_else(|| {
+                        OoxmlError::InvalidFormat("invalid Word run nesting".to_string())
+                    })?;
+                    if run_depth == 0 {
+                        let Some(start) = run_start.take() else {
+                            return Err(OoxmlError::InvalidFormat(
+                                "missing Word run start offset".to_string(),
+                            ));
+                        };
+                        Self::push_run_slice(
+                            &mut runs,
+                            &source_arc,
+                            base_offset,
+                            start,
+                            event_end,
+                        )?;
                     }
-                    write_idx += 1;
-                    i = end_pos;
-                    continue;
-                }
+                },
+                RunEvent::Eof if run_start.is_some() => {
+                    return Err(OoxmlError::InvalidFormat(
+                        "unterminated Word run".to_string(),
+                    ));
+                },
+                RunEvent::Eof => break,
+                _ => {},
             }
-
-            i = tag_start + 1;
-        }
-
-        // Handle refcount mismatch: decrement unused pre-incremented refcounts
-        if write_idx < count {
-            unsafe {
-                for _ in 0..(count - write_idx) {
-                    Arc::decrement_strong_count(arc_ptr);
-                }
-            }
-        }
-
-        // Set final length
-        unsafe {
-            runs.set_len(write_idx);
         }
 
         Ok(runs)
+    }
+
+    fn push_run_slice(
+        runs: &mut SmallVec<[Run; 8]>,
+        source: &Arc<Vec<u8>>,
+        base_offset: u32,
+        start: usize,
+        end: usize,
+    ) -> Result<()> {
+        let start = u32::try_from(start)
+            .map_err(|_| OoxmlError::InvalidFormat("Word run offset exceeds u32".to_string()))?;
+        let length =
+            u32::try_from(end.checked_sub(start as usize).ok_or_else(|| {
+                OoxmlError::InvalidFormat("invalid Word run byte range".to_string())
+            })?)
+            .map_err(|_| OoxmlError::InvalidFormat("Word run length exceeds u32".to_string()))?;
+        let absolute_start = base_offset.checked_add(start).ok_or_else(|| {
+            OoxmlError::InvalidFormat("Word run absolute offset exceeds u32".to_string())
+        })?;
+        runs.push(Run::from_slice(XmlSlice::new(
+            Arc::clone(source),
+            absolute_start,
+            length,
+        )));
+        Ok(())
     }
 
     /// Extract all OMML formulas from this paragraph.
@@ -1406,76 +1455,6 @@ impl Run {
     }
 }
 
-/// Count runs in a paragraph XML (for pre-allocation).
-#[inline]
-fn count_runs(xml_bytes: &[u8]) -> usize {
-    let mut count = 0usize;
-    let mut i = 0usize;
-    let len = xml_bytes.len();
-
-    while i < len {
-        let Some(tag_start) = memchr::memchr(b'<', &xml_bytes[i..]) else {
-            break;
-        };
-        let tag_start = i + tag_start;
-
-        if tag_start + 5 < len && &xml_bytes[tag_start..tag_start + 4] == b"<w:r" {
-            let c = xml_bytes[tag_start + 4];
-            if (c == b'>' || c == b' ' || c == b'/')
-                && let Some(end) = find_run_end(&xml_bytes[tag_start..])
-            {
-                count += 1;
-                i = tag_start + end;
-                continue;
-            }
-        }
-        i = tag_start + 1;
-    }
-    count
-}
-
-/// Find the end of a `<w:r>` element.
-/// Returns byte offset AFTER the closing `</w:r>`.
-#[inline]
-fn find_run_end(xml: &[u8]) -> Option<usize> {
-    let first_gt = memchr::memchr(b'>', xml)?;
-    if first_gt > 0 && xml[first_gt - 1] == b'/' {
-        return Some(first_gt + 1); // Self-closing
-    }
-
-    let mut depth = 1i32;
-    let mut pos = first_gt + 1;
-
-    while pos < xml.len() && depth > 0 {
-        let Some(next_lt) = memchr::memchr(b'<', &xml[pos..]) else {
-            break;
-        };
-        pos += next_lt;
-
-        // Check for </w:r>
-        if pos + 6 <= xml.len() && &xml[pos..pos + 5] == b"</w:r" {
-            if xml[pos + 5] == b'>' {
-                depth -= 1;
-                if depth == 0 {
-                    return Some(pos + 6);
-                }
-            }
-        }
-        // Check for nested <w:r> (shouldn't happen but handle it)
-        else if pos + 5 <= xml.len() && &xml[pos..pos + 4] == b"<w:r" {
-            let c = xml[pos + 4];
-            if c == b'>' || c == b' ' {
-                let gt = memchr::memchr(b'>', &xml[pos..])?;
-                if gt > 0 && xml[pos + gt - 1] != b'/' {
-                    depth += 1;
-                }
-            }
-        }
-        pos += 1;
-    }
-    None
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1505,6 +1484,37 @@ mod tests {
         let runs = paragraph.runs().unwrap();
         assert_eq!(runs[0].text().unwrap(), "  A & B < C 😀  ");
         assert_eq!(runs[1].text().unwrap(), "\t\n\n‑\u{00ad}tail");
+    }
+
+    #[test]
+    fn runs_resolve_namespace_aliases_and_ignore_lookalikes() {
+        let xml = br#"<wp:p xmlns:wp="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:false="urn:not-wordprocessingml">
+            <false:r><false:t>ignored</false:t></false:r>
+            <wp:r><wp:t>kept</wp:t></wp:r>
+            <wp:r/>
+        </wp:p>"#;
+
+        let runs = Paragraph::new(xml.to_vec()).runs().unwrap();
+        assert_eq!(runs.len(), 2);
+        assert_eq!(runs[0].text().unwrap(), "kept");
+        assert_eq!(runs[1].text().unwrap(), "");
+    }
+
+    #[test]
+    fn runs_accept_the_strict_wordprocessingml_namespace() {
+        let xml = br#"<s:p xmlns:s="http://purl.oclc.org/ooxml/wordprocessingml/main">
+            <s:r><s:t>strict</s:t></s:r>
+        </s:p>"#;
+
+        let runs = Paragraph::new(xml.to_vec()).runs().unwrap();
+        assert_eq!(runs.len(), 1);
+        assert_eq!(runs[0].text().unwrap(), "strict");
+    }
+
+    #[test]
+    fn runs_reject_unterminated_run_xml() {
+        let xml = br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r><w:t>truncated</w:t>"#;
+        assert!(Paragraph::new(xml.to_vec()).runs().is_err());
     }
 
     #[test]
