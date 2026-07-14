@@ -77,6 +77,7 @@ pub mod table;
 pub mod template;
 pub mod theme;
 pub mod variables;
+pub mod web_settings;
 pub mod writer;
 
 pub use bookmark::Bookmark;
@@ -103,6 +104,7 @@ pub use styles::{Style, Styles};
 pub use table::{Cell, Row, Table, VMergeState};
 pub use theme::Theme;
 pub use variables::DocumentVariables;
+pub use web_settings::{TargetScreenSize, WebSettings};
 // Re-export shared formatting types
 pub use format::{ImageFormat, LineSpacing, ParagraphAlignment, TableBorderStyle, UnderlineStyle};
 // Re-export writer types

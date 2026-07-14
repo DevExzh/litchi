@@ -22,6 +22,7 @@ use crate::docx::styles::Styles;
 use crate::docx::table::Table;
 use crate::docx::theme::Theme;
 use crate::docx::variables::DocumentVariables;
+use crate::docx::web_settings::WebSettings;
 use crate::error::{OoxmlError, Result};
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::relationship_type;
@@ -1127,6 +1128,22 @@ impl<'a> Document<'a> {
                 // No settings in document
                 Ok(None)
             },
+        }
+    }
+
+    /// Get the document's web-output settings, if a web-settings part exists.
+    pub fn web_settings(&self) -> Result<Option<WebSettings>> {
+        let main_part = self.opc.main_document_part()?;
+        match main_part
+            .rels()
+            .part_with_reltype(relationship_type::WEB_SETTINGS)
+        {
+            Ok(relationship) => {
+                let target = relationship.target_partname()?;
+                let part = self.opc.get_part(&target)?;
+                Ok(Some(WebSettings::extract_from_part(part)?))
+            },
+            Err(_) => Ok(None),
         }
     }
 
