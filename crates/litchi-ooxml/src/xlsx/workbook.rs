@@ -1952,6 +1952,7 @@ fn validate_threaded_comment_people<'a>(
 #[cfg(test)]
 mod tests {
     use super::{Workbook, validate_threaded_comment_people};
+    use crate::charts::plot_area::TypeGroup;
     use litchi_core::sheet::{CellValue, WorkbookTrait, Worksheet as _};
     use litchi_opc::constants::{content_type as ct, relationship_type as rt};
     use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
@@ -2047,6 +2048,32 @@ mod tests {
         assert_eq!(worksheet.charts().len(), 1);
         assert_eq!(worksheet.charts()[0].anchor.from_col, 3);
         assert_eq!(worksheet.charts()[0].anchor.to_row, 14);
+        let TypeGroup::Bar(group) = &worksheet.charts()[0].chart.plot_area.type_groups[0] else {
+            panic!("expected reopened bar chart");
+        };
+        let series = &group.common.series[0];
+        assert_eq!(
+            series
+                .categories
+                .as_ref()
+                .unwrap()
+                .source_ref
+                .as_ref()
+                .unwrap()
+                .formula,
+            "Sheet1!$A$2:$A$4"
+        );
+        assert_eq!(
+            series
+                .values
+                .as_ref()
+                .unwrap()
+                .source_ref
+                .as_ref()
+                .unwrap()
+                .formula,
+            "Sheet1!$B$2:$B$4"
+        );
     }
 
     #[test]
