@@ -106,8 +106,32 @@ pub struct DataValidationRule {
     pub range: String,
     /// Validation type (e.g., "list", "whole", "decimal")
     pub validation_type: String,
-    /// Allowed values or formula
+    /// Comparison operator, when applicable.
+    pub operator: Option<String>,
+    /// First validation formula.
     pub formula: Option<String>,
+    /// Second validation formula, when applicable.
+    pub formula2: Option<String>,
+    /// Whether blank cells are allowed.
+    pub allow_blank: bool,
+    /// Whether the in-cell dropdown arrow is hidden.
+    pub show_drop_down: bool,
+    /// Whether the input message is shown.
+    pub show_input_message: bool,
+    /// Whether the error message is shown.
+    pub show_error_message: bool,
+    /// Error alert style.
+    pub error_style: Option<String>,
+    /// IME mode.
+    pub ime_mode: Option<String>,
+    /// Error alert title.
+    pub error_title: Option<String>,
+    /// Error alert text.
+    pub error: Option<String>,
+    /// Input prompt title.
+    pub prompt_title: Option<String>,
+    /// Input prompt text.
+    pub prompt: Option<String>,
 }
 
 /// Conditional formatting rule
@@ -228,22 +252,6 @@ impl<'a> Worksheet<'a> {
         let hyperlinks = self.parse_sheet_data(content)?;
         self.resolve_hyperlinks(hyperlinks, relationships)?;
 
-        // Parse data validations
-        if let Some(dv_start) = content.find("<dataValidations")
-            && let Some(dv_end) = content[dv_start..].find("</dataValidations>")
-        {
-            let dv_content = &content[dv_start..dv_start + dv_end + 18];
-            self.parse_data_validations(dv_content)?;
-        }
-
-        // Parse conditional formatting
-        if let Some(cf_start) = content.find("<conditionalFormatting")
-            && let Some(cf_end) = content[cf_start..].find("</conditionalFormatting>")
-        {
-            let cf_content = &content[cf_start..cf_start + cf_end + 24];
-            self.parse_conditional_formatting(cf_content)?;
-        }
-
         // Parse page setup
         if let Some(ps_start) = content.find("<pageSetup ")
             && let Some(ps_end) = content[ps_start..].find("/>")
@@ -306,6 +314,8 @@ impl<'a> Worksheet<'a> {
         self.rich_text_cells = parsed.rich_text_cells;
         self.merged_regions = parsed.merged_regions;
         self.columns = parsed.columns;
+        self.data_validations = parsed.data_validations;
+        self.conditional_formats = parsed.conditional_formats;
         self.dimensions = parsed.dimensions;
         Ok(parsed.hyperlinks)
     }
@@ -780,74 +790,6 @@ impl<'a> Worksheet<'a> {
                 },
             );
         }
-        Ok(())
-    }
-
-    /// Parse data validations from XML.
-    fn parse_data_validations(&mut self, content: &str) -> Result<()> {
-        let mut pos = 0;
-        while let Some(dv_start) = content[pos..].find("<dataValidation ") {
-            let dv_start_pos = pos + dv_start;
-            if let Some(dv_end) = content[dv_start_pos..].find("</dataValidation>") {
-                let dv_tag = &content[dv_start_pos..dv_start_pos + dv_end + 17];
-
-                let range = Self::extract_attribute(dv_tag, "sqref");
-                let validation_type = Self::extract_attribute(dv_tag, "type");
-                let formula = if let Some(formula_start) = dv_tag.find("<formula1>")
-                    && let Some(formula_end) = dv_tag[formula_start..].find("</formula1>")
-                {
-                    Some(dv_tag[formula_start + 10..formula_start + formula_end].to_string())
-                } else {
-                    None
-                };
-
-                if let Some(range_val) = range {
-                    self.data_validations.push(DataValidationRule {
-                        range: range_val,
-                        validation_type: validation_type.unwrap_or_else(|| String::from("list")),
-                        formula,
-                    });
-                }
-
-                pos = dv_start_pos + dv_end + 17;
-            } else {
-                break;
-            }
-        }
-        Ok(())
-    }
-
-    /// Parse conditional formatting from XML.
-    fn parse_conditional_formatting(&mut self, content: &str) -> Result<()> {
-        // Extract sqref attribute for the range
-        let range = Self::extract_attribute(content, "sqref");
-
-        if let Some(range_val) = range {
-            let mut pos = 0;
-            while let Some(rule_start) = content[pos..].find("<cfRule ") {
-                let rule_start_pos = pos + rule_start;
-                if let Some(rule_end) = content[rule_start_pos..].find("/>") {
-                    let rule_tag = &content[rule_start_pos..rule_start_pos + rule_end + 2];
-
-                    let rule_type = Self::extract_attribute(rule_tag, "type");
-                    let priority = Self::extract_attribute(rule_tag, "priority")
-                        .and_then(|s| s.parse::<u32>().ok());
-
-                    if let (Some(type_val), Some(priority_val)) = (rule_type, priority) {
-                        self.conditional_formats.push(ConditionalFormatRule {
-                            range: range_val.clone(),
-                            rule_type: type_val,
-                            priority: priority_val,
-                        });
-                    }
-
-                    pos = rule_start_pos + rule_end + 2;
-                } else {
-                    break;
-                }
-            }
-        }
-
         Ok(())
     }
 

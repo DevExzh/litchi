@@ -1870,6 +1870,15 @@ mod tests {
                display="Example &amp; Co" tooltip="Open example"/>
     <hyperlink ref="D4" location="&apos;Other Sheet&apos;!A1"/>
   </hyperlinks>
+  <dataValidations count="1">
+    <dataValidation sqref="E1:E2" type="whole" operator="between" allowBlank="1"
+                    showErrorMessage="true" errorTitle="Out of range">
+      <formula1>1</formula1><formula2>10</formula2>
+    </dataValidation>
+  </dataValidations>
+  <conditionalFormatting sqref="E1:E2">
+    <cfRule type="expression" priority="1"><formula>E1&gt;0</formula></cfRule>
+  </conditionalFormatting>
 </worksheet>"#;
 
     fn package_with_worksheet_relationship(reltype: &str, external: bool) -> OpcPackage {
@@ -1945,6 +1954,19 @@ mod tests {
         assert_eq!(
             worksheet.get_hyperlink(4, 4).unwrap().target,
             "'Other Sheet'!A1"
+        );
+        let validation = &worksheet.get_data_validations()[0];
+        assert_eq!(validation.range, "E1:E2");
+        assert_eq!(validation.operator.as_deref(), Some("between"));
+        assert_eq!(validation.formula.as_deref(), Some("1"));
+        assert_eq!(validation.formula2.as_deref(), Some("10"));
+        assert!(validation.allow_blank);
+        assert!(validation.show_error_message);
+        assert_eq!(validation.error_title.as_deref(), Some("Out of range"));
+        assert_eq!(worksheet.get_conditional_formatting().len(), 1);
+        assert_eq!(
+            worksheet.get_conditional_formatting()[0].rule_type,
+            "expression"
         );
     }
 
