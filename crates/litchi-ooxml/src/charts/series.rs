@@ -252,6 +252,14 @@ pub struct Trendline {
     pub display_equation: bool,
     /// Display R-squared value on chart
     pub display_r_squared: bool,
+    /// Whether a trendline label is present
+    pub show_label: bool,
+    /// Explicit trendline-label text or formula reference
+    pub label: Option<TitleText>,
+    /// Manual layout for the trendline label
+    pub label_layout: Option<Layout>,
+    /// Number format for the trendline label
+    pub label_number_format: Option<NumberFormat>,
 }
 
 /// Trendline type.
@@ -285,6 +293,10 @@ impl Trendline {
             intercept: None,
             display_equation: false,
             display_r_squared: false,
+            show_label: false,
+            label: None,
+            label_layout: None,
+            label_number_format: None,
         }
     }
 }

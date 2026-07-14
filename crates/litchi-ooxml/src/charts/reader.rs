@@ -1707,6 +1707,27 @@ fn parse_trendline<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Trendli
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"trendlineName" => {
                 trendline.name = Some(parse_text_element(reader, b"trendlineName")?);
             },
+            Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"trendlineLbl" => {
+                if trendline.show_label {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart trendline contains duplicate labels".into(),
+                    ));
+                }
+                trendline.show_label = true;
+                (
+                    trendline.label,
+                    trendline.label_layout,
+                    trendline.label_number_format,
+                ) = parse_trendline_label(reader)?;
+            },
+            Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"trendlineLbl" => {
+                if trendline.show_label {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart trendline contains duplicate labels".into(),
+                    ));
+                }
+                trendline.show_label = true;
+            },
             Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => match e.local_name().as_ref() {
                 b"trendlineType" => {
                     let value = get_attr(e, b"val")
@@ -1775,6 +1796,73 @@ fn parse_trendline<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Trendli
         ));
     }
     Ok(trendline)
+}
+
+fn parse_trendline_label<R: BufRead>(
+    reader: &mut ChartXmlReader<R>,
+) -> Result<(Option<TitleText>, Option<Layout>, Option<NumberFormat>)> {
+    let mut text = None;
+    let mut saw_text = false;
+    let mut layout = None;
+    let mut number_format = None;
+    let mut buf = Vec::new();
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"layout" => {
+                if layout.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart trendline label contains duplicate layouts".into(),
+                    ));
+                }
+                layout = Some(parse_layout(reader)?);
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"layout" => {
+                layout = Some(match layout {
+                    None => Layout::new(),
+                    Some(_) => {
+                        return Err(OoxmlError::InvalidFormat(
+                            "chart trendline label contains duplicate layouts".into(),
+                        ));
+                    },
+                });
+            },
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"tx" => {
+                if saw_text {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart trendline label contains duplicate text".into(),
+                    ));
+                }
+                saw_text = true;
+                text = parse_label_text(reader)?;
+            },
+            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element))
+                if element.local_name().as_ref() == b"numFmt" =>
+            {
+                if number_format.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart trendline label contains duplicate number formats".into(),
+                    ));
+                }
+                number_format = Some(parse_number_format(
+                    element,
+                    reader.decoder(),
+                    "chart trendline-label",
+                )?);
+            },
+            Ok(Event::End(ref element)) if element.local_name().as_ref() == b"trendlineLbl" => {
+                break;
+            },
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated chart trendline label".into(),
+                ));
+            },
+            Err(error) => return Err(error),
+            _ => {},
+        }
+        buf.clear();
+    }
+    Ok((text, layout, number_format))
 }
 
 fn parse_error_bar<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<ErrorBar> {
@@ -3319,6 +3407,10 @@ mod tests {
         trendline.intercept = Some(-1.0);
         trendline.display_equation = true;
         trendline.display_r_squared = true;
+        trendline.show_label = true;
+        trendline.label = Some(TitleText::from_ref("Sheet1!$F$2"));
+        trendline.label_layout = Some(Layout::new().with_size(0.3, 0.2));
+        trendline.label_number_format = Some(NumberFormat::new("0.000").with_source_linked(false));
         scatter_series.trendlines.push(trendline);
         scatter_series.error_bars.push(ErrorBar {
             direction: ErrorBarDirection::Y,
@@ -3480,6 +3572,22 @@ mod tests {
         assert_eq!(series.trendlines[0].intercept, Some(-1.0));
         assert!(series.trendlines[0].display_equation);
         assert!(series.trendlines[0].display_r_squared);
+        assert!(series.trendlines[0].show_label);
+        let Some(TitleText::Reference(label)) = series.trendlines[0].label.as_ref() else {
+            panic!("expected trendline-label formula");
+        };
+        assert_eq!(label.formula, "Sheet1!$F$2");
+        assert_eq!(
+            series.trendlines[0].label_layout.as_ref().unwrap().width,
+            Some(0.3)
+        );
+        assert_eq!(
+            series.trendlines[0].label_layout.as_ref().unwrap().height,
+            Some(0.2)
+        );
+        let number_format = series.trendlines[0].label_number_format.as_ref().unwrap();
+        assert_eq!(number_format.format_code, "0.000");
+        assert!(!number_format.source_linked);
         assert_eq!(series.error_bars.len(), 2);
         assert_eq!(series.error_bars[0].direction, ErrorBarDirection::Y);
         assert_eq!(series.error_bars[0].value, Some(1.5));

@@ -1085,6 +1085,32 @@ fn write_trendline<W: Write>(writer: &mut W, trendline: &Trendline) -> std::io::
         },
         if trendline.display_equation { "1" } else { "0" }
     )?;
+    if trendline.show_label
+        || trendline.label.is_some()
+        || trendline.label_layout.is_some()
+        || trendline.label_number_format.is_some()
+    {
+        write!(writer, "<c:trendlineLbl>")?;
+        if let Some(layout) = trendline.label_layout.as_ref() {
+            write_layout(writer, Some(layout))?;
+        }
+        if let Some(label) = trendline.label.as_ref() {
+            write_title_text(writer, label)?;
+        }
+        if let Some(number_format) = trendline.label_number_format.as_ref() {
+            write!(
+                writer,
+                r#"<c:numFmt formatCode="{}" sourceLinked="{}"/>"#,
+                escape_xml(&number_format.format_code),
+                if number_format.source_linked {
+                    "1"
+                } else {
+                    "0"
+                }
+            )?;
+        }
+        write!(writer, "</c:trendlineLbl>")?;
+    }
     write!(writer, "</c:trendline>")?;
     Ok(())
 }
