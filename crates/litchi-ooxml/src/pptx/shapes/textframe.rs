@@ -1,7 +1,146 @@
 /// Text frame for accessing text content in shapes.
+use crate::common::xml::decode_xml_reference;
 use crate::error::{OoxmlError, Result};
-use quick_xml::Reader;
 use quick_xml::events::Event;
+use quick_xml::name::{Namespace, QName, ResolveResult};
+use quick_xml::reader::NsReader;
+use quick_xml::{Reader, XmlVersion};
+
+const DRAWINGML_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/drawingml/2006/main";
+const STRICT_DRAWINGML_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/drawingml/main";
+
+fn is_drawingml_name(
+    namespace: &ResolveResult<'_>,
+    name: QName<'_>,
+    local_name: &[u8],
+    fragment_prefix: &Option<Option<Vec<u8>>>,
+) -> bool {
+    if name.local_name().as_ref() != local_name {
+        return false;
+    }
+    match namespace {
+        ResolveResult::Bound(Namespace(value)) => {
+            *value == DRAWINGML_NAMESPACE || *value == STRICT_DRAWINGML_NAMESPACE
+        },
+        ResolveResult::Unknown(prefix) => {
+            prefix.as_slice() == b"a"
+                || fragment_prefix
+                    .as_ref()
+                    .and_then(|prefix| prefix.as_deref())
+                    == Some(prefix.as_slice())
+        },
+        ResolveResult::Unbound => fragment_prefix == &Some(None),
+    }
+}
+
+pub(crate) fn extract_drawingml_text(
+    xml_bytes: &[u8],
+    paragraph_separator: Option<char>,
+) -> Result<String> {
+    let mut reader = NsReader::from_reader(xml_bytes);
+    let mut result = String::with_capacity(xml_bytes.len() / 8);
+    let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
+    let mut depth = 0usize;
+    let mut text_depth = None;
+    let mut seen_paragraph = false;
+
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event()
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+        if fragment_prefix.is_none()
+            && let Event::Start(element) = &event
+            && !matches!(namespace, ResolveResult::Bound(_))
+        {
+            fragment_prefix = Some(
+                element
+                    .name()
+                    .prefix()
+                    .map(|prefix| prefix.into_inner().to_vec()),
+            );
+        }
+
+        match event {
+            Event::Start(element) => {
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("DrawingML nesting is too deep".to_string())
+                })?;
+                if is_drawingml_name(&namespace, element.name(), b"p", &fragment_prefix) {
+                    if seen_paragraph
+                        && !result.is_empty()
+                        && let Some(separator) = paragraph_separator
+                        && !result.ends_with(separator)
+                    {
+                        result.push(separator);
+                    }
+                    seen_paragraph = true;
+                } else if text_depth.is_none()
+                    && is_drawingml_name(&namespace, element.name(), b"t", &fragment_prefix)
+                {
+                    text_depth = Some(depth);
+                } else if is_drawingml_name(&namespace, element.name(), b"br", &fragment_prefix) {
+                    result.push('\n');
+                } else if is_drawingml_name(&namespace, element.name(), b"tab", &fragment_prefix) {
+                    result.push('\t');
+                }
+            },
+            Event::Empty(element) => {
+                if is_drawingml_name(&namespace, element.name(), b"p", &fragment_prefix) {
+                    if seen_paragraph
+                        && !result.is_empty()
+                        && let Some(separator) = paragraph_separator
+                        && !result.ends_with(separator)
+                    {
+                        result.push(separator);
+                    }
+                    seen_paragraph = true;
+                } else if is_drawingml_name(&namespace, element.name(), b"br", &fragment_prefix) {
+                    result.push('\n');
+                } else if is_drawingml_name(&namespace, element.name(), b"tab", &fragment_prefix) {
+                    result.push('\t');
+                }
+            },
+            Event::Text(text) if text_depth.is_some() => {
+                let decoded = text
+                    .xml_content(XmlVersion::Explicit1_0)
+                    .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+                result.push_str(
+                    &quick_xml::escape::unescape(&decoded)
+                        .map_err(|error| OoxmlError::Xml(error.to_string()))?,
+                );
+            },
+            Event::CData(text) if text_depth.is_some() => {
+                result.push_str(
+                    &text
+                        .xml_content(XmlVersion::Explicit1_0)
+                        .map_err(|error| OoxmlError::Xml(error.to_string()))?,
+                );
+            },
+            Event::GeneralRef(reference) if text_depth.is_some() => {
+                result.push_str(&decode_xml_reference(&reference)?);
+            },
+            Event::End(element) => {
+                if text_depth == Some(depth)
+                    && is_drawingml_name(&namespace, element.name(), b"t", &fragment_prefix)
+                {
+                    text_depth = None;
+                }
+                depth = depth.checked_sub(1).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("invalid DrawingML nesting".to_string())
+                })?;
+            },
+            Event::Eof if depth != 0 || text_depth.is_some() => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated DrawingML XML".to_string(),
+                ));
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    result.shrink_to_fit();
+    Ok(result)
+}
 
 /// A text frame containing text content.
 ///
@@ -41,39 +180,7 @@ impl TextFrame {
     ///
     /// Returns all text content concatenated together.
     pub fn text(&self) -> Result<String> {
-        let mut reader = Reader::from_reader(&self.xml_bytes[..]);
-        reader.config_mut().trim_text(true);
-
-        let mut text = String::new();
-        let mut in_text_element = false;
-
-        loop {
-            match reader.read_event() {
-                Ok(Event::Start(e))
-                    // Check if this is an a:t element (DrawingML text)
-                    if e.local_name().as_ref() == b"t" => {
-                        in_text_element = true;
-                    },
-                Ok(Event::Text(e)) if in_text_element => {
-                    // Extract text content
-                    let t = std::str::from_utf8(e.as_ref())
-                        .map_err(|e| OoxmlError::Xml(e.to_string()))?;
-                    if !text.is_empty() && !text.ends_with('\n') {
-                        text.push('\n');
-                    }
-                    text.push_str(t);
-                },
-                Ok(Event::End(e))
-                    if e.local_name().as_ref() == b"t" => {
-                        in_text_element = false;
-                    },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {},
-            }
-        }
-
-        Ok(text)
+        extract_drawingml_text(&self.xml_bytes, Some('\n'))
     }
 
     /// Get paragraphs in this text frame.
@@ -183,31 +290,45 @@ impl Paragraph {
 
     /// Extract all text from this paragraph.
     pub fn text(&self) -> Result<String> {
-        let mut reader = Reader::from_reader(&self.xml_bytes[..]);
-        reader.config_mut().trim_text(true);
+        extract_drawingml_text(&self.xml_bytes, None)
+    }
+}
 
-        let mut text = String::new();
-        let mut in_text_element = false;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-        loop {
-            match reader.read_event() {
-                Ok(Event::Start(e)) if e.local_name().as_ref() == b"t" => {
-                    in_text_element = true;
-                },
-                Ok(Event::Text(e)) if in_text_element => {
-                    let t = std::str::from_utf8(e.as_ref())
-                        .map_err(|e| OoxmlError::Xml(e.to_string()))?;
-                    text.push_str(t);
-                },
-                Ok(Event::End(e)) if e.local_name().as_ref() == b"t" => {
-                    in_text_element = false;
-                },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {},
-            }
-        }
+    #[test]
+    fn drawingml_text_preserves_runs_whitespace_and_paragraphs() {
+        let xml = br#"<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:d="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:false="urn:not-drawingml">
+            <d:txBody>
+                <d:p><d:r><d:t xml:space="preserve"> A &amp; </d:t></d:r><d:r><false:t>ignored</false:t><d:t><![CDATA[B < C]]></d:t><d:tab/><d:br/></d:r></d:p>
+                <d:p><d:r><d:t>Second</d:t></d:r></d:p>
+            </d:txBody>
+        </p:sp>"#;
+        let frame = TextFrame::from_xml(xml).unwrap();
+        assert_eq!(frame.text().unwrap(), " A & B < C\t\nSecond");
+    }
 
-        Ok(text)
+    #[test]
+    fn drawingml_paragraph_text_accepts_inherited_conventional_prefix() {
+        let paragraph = Paragraph::new(
+            br#"<a:p><a:r><a:t>one</a:t></a:r><a:r><a:t>two</a:t></a:r></a:p>"#.to_vec(),
+        );
+        assert_eq!(paragraph.text().unwrap(), "onetwo");
+    }
+
+    #[test]
+    fn drawingml_text_rejects_foreign_lookalikes_and_truncation() {
+        let foreign = Paragraph::new(
+            br#"<x:p xmlns:x="urn:not-drawingml"><x:r><x:t>ignored</x:t></x:r></x:p>"#.to_vec(),
+        );
+        assert_eq!(foreign.text().unwrap(), "");
+
+        let truncated = Paragraph::new(
+            br#"<a:p xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:r><a:t>bad</a:t>"#
+                .to_vec(),
+        );
+        assert!(truncated.text().is_err());
     }
 }

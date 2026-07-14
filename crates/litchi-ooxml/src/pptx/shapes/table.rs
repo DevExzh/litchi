@@ -1,5 +1,6 @@
 /// Table shape implementation for PowerPoint presentations.
 use crate::error::{OoxmlError, Result};
+use crate::pptx::shapes::textframe::extract_drawingml_text;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 
@@ -338,34 +339,22 @@ impl TableCell {
 
     /// Extract all text from this cell.
     pub fn text(&self) -> Result<String> {
-        let mut reader = Reader::from_reader(&self.xml_bytes[..]);
-        reader.config_mut().trim_text(true);
+        Ok(extract_drawingml_text(&self.xml_bytes, Some(' '))?
+            .trim()
+            .to_string())
+    }
+}
 
-        let mut text = String::new();
-        let mut in_text_element = false;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-        loop {
-            match reader.read_event() {
-                Ok(Event::Start(e)) if e.local_name().as_ref() == b"t" => {
-                    in_text_element = true;
-                },
-                Ok(Event::Text(e)) if in_text_element => {
-                    let t = std::str::from_utf8(e.as_ref())
-                        .map_err(|e| OoxmlError::Xml(e.to_string()))?;
-                    if !text.is_empty() && !text.ends_with(' ') {
-                        text.push(' ');
-                    }
-                    text.push_str(t);
-                },
-                Ok(Event::End(e)) if e.local_name().as_ref() == b"t" => {
-                    in_text_element = false;
-                },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {},
-            }
-        }
-
-        Ok(text.trim().to_string())
+    #[test]
+    fn table_cell_text_decodes_runs_and_separates_paragraphs() {
+        let cell = TableCell::new(
+            br#"<d:tc xmlns:d="http://schemas.openxmlformats.org/drawingml/2006/main"><d:txBody><d:p><d:r><d:t>A &amp; </d:t></d:r><d:r><d:t><![CDATA[B < C]]></d:t></d:r></d:p><d:p><d:r><d:t>D</d:t></d:r></d:p></d:txBody></d:tc>"#
+                .to_vec(),
+        );
+        assert_eq!(cell.text().unwrap(), "A & B < C D");
     }
 }
