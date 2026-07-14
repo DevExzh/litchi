@@ -146,6 +146,21 @@ impl Default for TypeGroupCommon {
     }
 }
 
+/// A schema-defined chart line whose DrawingML styling is optional.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ChartLines;
+
+/// Up/down bars shown between corresponding points in line or stock charts.
+#[derive(Debug, Clone, Default)]
+pub struct UpDownBars {
+    /// Gap between bars (0-500 percent)
+    pub gap_width: Option<u32>,
+    /// Optional formatting container for rising-value bars
+    pub up_bars: Option<ChartLines>,
+    /// Optional formatting container for falling-value bars
+    pub down_bars: Option<ChartLines>,
+}
+
 /// Area chart type group.
 #[derive(Debug, Clone)]
 pub struct AreaTypeGroup {
@@ -153,6 +168,8 @@ pub struct AreaTypeGroup {
     pub common: TypeGroupCommon,
     /// Grouping type
     pub grouping: BarGrouping,
+    /// Drop lines connecting points to the category axis
+    pub drop_lines: Option<ChartLines>,
 }
 
 impl AreaTypeGroup {
@@ -162,6 +179,7 @@ impl AreaTypeGroup {
         Self {
             common: TypeGroupCommon::new(),
             grouping,
+            drop_lines: None,
         }
     }
 }
@@ -175,6 +193,8 @@ pub struct Area3DTypeGroup {
     pub grouping: BarGrouping,
     /// Gap depth (0-500%)
     pub gap_depth: Option<u32>,
+    /// Drop lines connecting points to the category axis
+    pub drop_lines: Option<ChartLines>,
 }
 
 impl Area3DTypeGroup {
@@ -185,6 +205,7 @@ impl Area3DTypeGroup {
             common: TypeGroupCommon::new(),
             grouping,
             gap_depth: None,
+            drop_lines: None,
         }
     }
 }
@@ -202,6 +223,8 @@ pub struct BarTypeGroup {
     pub gap_width: Option<u32>,
     /// Overlap (-100% to 100%)
     pub overlap: Option<i32>,
+    /// Connector-line formatting entries
+    pub series_lines: Vec<ChartLines>,
 }
 
 impl BarTypeGroup {
@@ -214,6 +237,7 @@ impl BarTypeGroup {
             grouping,
             gap_width: None,
             overlap: None,
+            series_lines: Vec::new(),
         }
     }
 }
@@ -359,6 +383,12 @@ pub struct LineTypeGroup {
     pub marker: bool,
     /// Smooth the chart-group lines
     pub smooth: bool,
+    /// Drop lines connecting points to the category axis
+    pub drop_lines: Option<ChartLines>,
+    /// Lines connecting the highest and lowest values
+    pub high_low_lines: Option<ChartLines>,
+    /// Up/down bars between corresponding series points
+    pub up_down_bars: Option<UpDownBars>,
 }
 
 impl LineTypeGroup {
@@ -370,6 +400,9 @@ impl LineTypeGroup {
             grouping,
             marker: true,
             smooth: false,
+            drop_lines: None,
+            high_low_lines: None,
+            up_down_bars: None,
         }
     }
 }
@@ -383,6 +416,8 @@ pub struct Line3DTypeGroup {
     pub grouping: BarGrouping,
     /// Gap depth (0-500%)
     pub gap_depth: Option<u32>,
+    /// Drop lines connecting points to the category axis
+    pub drop_lines: Option<ChartLines>,
 }
 
 impl Line3DTypeGroup {
@@ -393,6 +428,7 @@ impl Line3DTypeGroup {
             common: TypeGroupCommon::new(),
             grouping,
             gap_depth: None,
+            drop_lines: None,
         }
     }
 }
@@ -441,6 +477,8 @@ pub struct OfPieTypeGroup {
     pub custom_split_points: Option<Vec<u32>>,
     /// Secondary plot size (5-200 percent)
     pub second_pie_size: Option<u32>,
+    /// Connector-line formatting entries between the primary and secondary plots
+    pub series_lines: Vec<ChartLines>,
 }
 
 impl OfPieTypeGroup {
@@ -455,6 +493,7 @@ impl OfPieTypeGroup {
             split_position: None,
             custom_split_points: None,
             second_pie_size: None,
+            series_lines: Vec::new(),
         }
     }
 }
@@ -528,6 +567,12 @@ impl ScatterTypeGroup {
 pub struct StockTypeGroup {
     /// Common properties
     pub common: TypeGroupCommon,
+    /// Drop lines connecting points to the category axis
+    pub drop_lines: Option<ChartLines>,
+    /// Lines connecting the highest and lowest values
+    pub high_low_lines: Option<ChartLines>,
+    /// Up/down bars between corresponding series points
+    pub up_down_bars: Option<UpDownBars>,
 }
 
 impl StockTypeGroup {
@@ -536,6 +581,9 @@ impl StockTypeGroup {
     pub fn new() -> Self {
         Self {
             common: TypeGroupCommon::new(),
+            drop_lines: None,
+            high_low_lines: None,
+            up_down_bars: None,
         }
     }
 }

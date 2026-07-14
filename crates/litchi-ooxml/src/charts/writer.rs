@@ -10,7 +10,7 @@ use crate::charts::plot_area::{
     Area3DTypeGroup, AreaTypeGroup, Bar3DTypeGroup, BarTypeGroup, BubbleTypeGroup, DataTable,
     DoughnutTypeGroup, Line3DTypeGroup, LineTypeGroup, OfPieTypeGroup, Pie3DTypeGroup,
     PieTypeGroup, PlotArea, RadarTypeGroup, ScatterTypeGroup, StockTypeGroup, Surface3DTypeGroup,
-    SurfaceTypeGroup, TypeGroup, TypeGroupCommon,
+    SurfaceTypeGroup, TypeGroup, TypeGroupCommon, UpDownBars,
 };
 use crate::charts::series::{
     DataLabels, DataPoint, ErrorBar, ErrorBarDirection, ErrorBarType, ErrorBarValueType, Series,
@@ -391,6 +391,9 @@ fn write_area_chart<W: Write>(writer: &mut W, group: &AreaTypeGroup) -> std::io:
     }
 
     write_group_data_labels(writer, &group.common)?;
+    if group.drop_lines.is_some() {
+        write!(writer, "<c:dropLines/>")?;
+    }
     write_type_group_axis_ids(writer, &group.common, &[1, 2], 2, 2, "area chart")?;
     write!(writer, "</c:areaChart>")?;
 
@@ -416,6 +419,9 @@ fn write_area_3d_chart<W: Write>(writer: &mut W, group: &Area3DTypeGroup) -> std
     }
 
     write_group_data_labels(writer, &group.common)?;
+    if group.drop_lines.is_some() {
+        write!(writer, "<c:dropLines/>")?;
+    }
     if let Some(gap_depth) = group.gap_depth {
         write!(writer, r#"<c:gapDepth val="{gap_depth}"/>"#)?;
     }
@@ -466,6 +472,9 @@ fn write_bar_chart<W: Write>(writer: &mut W, group: &BarTypeGroup) -> std::io::R
 
     if let Some(overlap) = group.overlap {
         write!(writer, r#"<c:overlap val="{}"/>"#, overlap)?;
+    }
+    for _ in &group.series_lines {
+        write!(writer, "<c:serLines/>")?;
     }
 
     write_type_group_axis_ids(writer, &group.common, &[1, 2], 2, 2, "bar chart")?;
@@ -624,6 +633,15 @@ fn write_line_chart<W: Write>(writer: &mut W, group: &LineTypeGroup) -> std::io:
     }
 
     write_group_data_labels(writer, &group.common)?;
+    if group.drop_lines.is_some() {
+        write!(writer, "<c:dropLines/>")?;
+    }
+    if group.high_low_lines.is_some() {
+        write!(writer, "<c:hiLowLines/>")?;
+    }
+    if let Some(up_down_bars) = group.up_down_bars.as_ref() {
+        write_up_down_bars(writer, up_down_bars)?;
+    }
     write!(
         writer,
         r#"<c:marker val="{}"/>"#,
@@ -659,6 +677,9 @@ fn write_line_3d_chart<W: Write>(writer: &mut W, group: &Line3DTypeGroup) -> std
     }
 
     write_group_data_labels(writer, &group.common)?;
+    if group.drop_lines.is_some() {
+        write!(writer, "<c:dropLines/>")?;
+    }
     if let Some(gap_depth) = group.gap_depth {
         write!(writer, r#"<c:gapDepth val="{gap_depth}"/>"#)?;
     }
@@ -750,6 +771,9 @@ fn write_of_pie_chart<W: Write>(writer: &mut W, group: &OfPieTypeGroup) -> std::
     if let Some(second_pie_size) = group.second_pie_size {
         write!(writer, r#"<c:secondPieSize val="{second_pie_size}"/>"#)?;
     }
+    for _ in &group.series_lines {
+        write!(writer, "<c:serLines/>")?;
+    }
     write!(writer, "</c:ofPieChart>")?;
     Ok(())
 }
@@ -828,6 +852,15 @@ fn write_stock_chart<W: Write>(writer: &mut W, group: &StockTypeGroup) -> std::i
     }
 
     write_group_data_labels(writer, &group.common)?;
+    if group.drop_lines.is_some() {
+        write!(writer, "<c:dropLines/>")?;
+    }
+    if group.high_low_lines.is_some() {
+        write!(writer, "<c:hiLowLines/>")?;
+    }
+    if let Some(up_down_bars) = group.up_down_bars.as_ref() {
+        write_up_down_bars(writer, up_down_bars)?;
+    }
     write_type_group_axis_ids(writer, &group.common, &[1, 2], 2, 2, "stock chart")?;
     write!(writer, "</c:stockChart>")?;
 
@@ -1561,6 +1594,22 @@ fn write_group_data_labels<W: Write>(
     } else {
         write_data_labels_default(writer)
     }
+}
+
+fn write_up_down_bars<W: Write>(writer: &mut W, bars: &UpDownBars) -> std::io::Result<()> {
+    validate_optional_u32_range(bars.gap_width, 0, 500, "chart up/down-bar gap width")?;
+    write!(writer, "<c:upDownBars>")?;
+    if let Some(gap_width) = bars.gap_width {
+        write!(writer, r#"<c:gapWidth val="{gap_width}"/>"#)?;
+    }
+    if bars.up_bars.is_some() {
+        write!(writer, "<c:upBars/>")?;
+    }
+    if bars.down_bars.is_some() {
+        write!(writer, "<c:downBars/>")?;
+    }
+    write!(writer, "</c:upDownBars>")?;
+    Ok(())
 }
 
 fn write_type_group_axis_ids<W: Write>(

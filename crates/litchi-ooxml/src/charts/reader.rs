@@ -14,9 +14,9 @@ use crate::charts::models::{
 };
 use crate::charts::plot_area::{
     Area3DTypeGroup, AreaTypeGroup, Bar3DTypeGroup, BarShape, BarTypeGroup, BubbleTypeGroup,
-    DataTable, DoughnutTypeGroup, Line3DTypeGroup, LineTypeGroup, OfPieTypeGroup, Pie3DTypeGroup,
-    PieTypeGroup, PlotArea, RadarTypeGroup, ScatterTypeGroup, StockTypeGroup, Surface3DTypeGroup,
-    SurfaceTypeGroup, TypeGroup, TypeGroupCommon,
+    ChartLines, DataTable, DoughnutTypeGroup, Line3DTypeGroup, LineTypeGroup, OfPieTypeGroup,
+    Pie3DTypeGroup, PieTypeGroup, PlotArea, RadarTypeGroup, ScatterTypeGroup, StockTypeGroup,
+    Surface3DTypeGroup, SurfaceTypeGroup, TypeGroup, TypeGroupCommon, UpDownBars,
 };
 use crate::charts::series::{
     DataLabel, DataLabels, DataPoint, ErrorBar, ErrorBarDirection, ErrorBarType, ErrorBarValueType,
@@ -798,12 +798,32 @@ fn begin_group_data_labels(seen: &mut bool) -> Result<()> {
     Ok(())
 }
 
+fn set_chart_lines(target: &mut Option<ChartLines>, description: &str) -> Result<()> {
+    if target.replace(ChartLines).is_some() {
+        return Err(OoxmlError::InvalidFormat(format!(
+            "{description} are duplicated"
+        )));
+    }
+    Ok(())
+}
+
+fn set_empty_up_down_bars(target: &mut Option<UpDownBars>, description: &str) -> Result<()> {
+    if target.replace(UpDownBars::default()).is_some() {
+        return Err(OoxmlError::InvalidFormat(format!(
+            "{description} contains duplicate up/down bars"
+        )));
+    }
+    Ok(())
+}
+
 fn parse_area_3d_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Area3DTypeGroup> {
     let mut grouping = BarGrouping::Standard;
     let mut gap_depth = None;
+    let mut drop_lines = None;
     let common = parse_common_type_group(reader, b"area3DChart", true, true, |element| {
         match element.local_name().as_ref() {
             b"grouping" => grouping = parse_grouping(element)?,
+            b"dropLines" => set_chart_lines(&mut drop_lines, "3D area chart drop lines")?,
             b"gapDepth" => {
                 gap_depth = Some(match get_attr(element, b"val") {
                     Some(_) => bounded_percentage_u32_attr(element, "area 3D gap depth", 0, 500)?,
@@ -817,6 +837,7 @@ fn parse_area_3d_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Are
     let mut group = Area3DTypeGroup::new(grouping);
     group.common = common;
     group.gap_depth = gap_depth;
+    group.drop_lines = drop_lines;
     Ok(group)
 }
 
@@ -898,9 +919,11 @@ fn parse_doughnut_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Do
 fn parse_line_3d_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Line3DTypeGroup> {
     let mut grouping = BarGrouping::Standard;
     let mut gap_depth = None;
+    let mut drop_lines = None;
     let common = parse_common_type_group(reader, b"line3DChart", true, true, |element| {
         match element.local_name().as_ref() {
             b"grouping" => grouping = parse_grouping(element)?,
+            b"dropLines" => set_chart_lines(&mut drop_lines, "3D line chart drop lines")?,
             b"gapDepth" => {
                 gap_depth = Some(match get_attr(element, b"val") {
                     Some(_) => bounded_percentage_u32_attr(element, "line 3D gap depth", 0, 500)?,
@@ -914,6 +937,7 @@ fn parse_line_3d_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Lin
     let mut group = Line3DTypeGroup::new(grouping);
     group.common = common;
     group.gap_depth = gap_depth;
+    group.drop_lines = drop_lines;
     Ok(group)
 }
 
@@ -1042,6 +1066,7 @@ fn parse_of_pie_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<OfPi
                             None => 75,
                         });
                     },
+                    b"serLines" => group.series_lines.push(ChartLines),
                     _ => {},
                 }
             },
@@ -1089,6 +1114,50 @@ fn parse_custom_pie_split<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<
     Ok(points)
 }
 
+fn parse_up_down_bars<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<UpDownBars> {
+    let mut bars = UpDownBars::default();
+    let mut saw_gap_width = false;
+    let mut buf = Vec::new();
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element)) => {
+                match element.local_name().as_ref() {
+                    b"gapWidth" => {
+                        if saw_gap_width {
+                            return Err(OoxmlError::InvalidFormat(
+                                "chart up/down bars contain duplicate gap widths".into(),
+                            ));
+                        }
+                        saw_gap_width = true;
+                        bars.gap_width = Some(match get_attr(element, b"val") {
+                            Some(_) => bounded_percentage_u32_attr(
+                                element,
+                                "chart up/down-bar gap width",
+                                0,
+                                500,
+                            )?,
+                            None => 150,
+                        });
+                    },
+                    b"upBars" => set_chart_lines(&mut bars.up_bars, "chart up bars")?,
+                    b"downBars" => set_chart_lines(&mut bars.down_bars, "chart down bars")?,
+                    _ => {},
+                }
+            },
+            Ok(Event::End(ref element)) if element.local_name().as_ref() == b"upDownBars" => break,
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated chart up/down bars".into(),
+                ));
+            },
+            Err(error) => return Err(error),
+            _ => {},
+        }
+        buf.clear();
+    }
+    Ok(bars)
+}
+
 fn parse_radar_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<RadarTypeGroup> {
     let mut style = RadarStyle::Standard;
     let common = parse_common_type_group(reader, b"radarChart", true, true, |element| {
@@ -1110,8 +1179,65 @@ fn parse_radar_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Radar
 }
 
 fn parse_stock_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<StockTypeGroup> {
+    let mut common = TypeGroupCommon::new();
+    let mut saw_data_labels = false;
+    let mut drop_lines = None;
+    let mut high_low_lines = None;
+    let mut up_down_bars = None;
+    let mut buf = Vec::new();
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"upDownBars" => {
+                if up_down_bars.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "stock chart contains duplicate up/down bars".into(),
+                    ));
+                }
+                up_down_bars = Some(parse_up_down_bars(reader)?);
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"upDownBars" => {
+                set_empty_up_down_bars(&mut up_down_bars, "stock chart")?;
+            },
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"dLbls" => {
+                begin_group_data_labels(&mut saw_data_labels)?;
+                common.data_labels = Some(parse_data_labels(reader)?);
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"dLbls" => {
+                begin_group_data_labels(&mut saw_data_labels)?;
+                common.data_labels = Some(DataLabels::default());
+            },
+            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element)) => {
+                match element.local_name().as_ref() {
+                    b"ser" => {
+                        if let Some(series) = parse_series(reader)? {
+                            common.series.push(series);
+                        }
+                    },
+                    b"axId" => common
+                        .axis_ids
+                        .push(required_u32_attr(element, "stock chart axis ID")?),
+                    b"dropLines" => set_chart_lines(&mut drop_lines, "stock chart drop lines")?,
+                    b"hiLowLines" => {
+                        set_chart_lines(&mut high_low_lines, "stock chart high/low lines")?
+                    },
+                    _ => {},
+                }
+            },
+            Ok(Event::End(ref element)) if element.local_name().as_ref() == b"stockChart" => break,
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat("unterminated stock chart".into()));
+            },
+            Err(error) => return Err(error),
+            _ => {},
+        }
+        buf.clear();
+    }
+
     let mut group = StockTypeGroup::new();
-    group.common = parse_common_type_group(reader, b"stockChart", true, true, |_| Ok(()))?;
+    group.common = common;
+    group.drop_lines = drop_lines;
+    group.high_low_lines = high_low_lines;
+    group.up_down_bars = up_down_bars;
     Ok(group)
 }
 
@@ -1152,6 +1278,7 @@ fn parse_bar_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<
     let mut saw_data_labels = false;
     let mut gap_width = None;
     let mut overlap = None;
+    let mut series_lines = Vec::new();
     let mut buf = Vec::new();
 
     loop {
@@ -1204,6 +1331,7 @@ fn parse_bar_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<
                             None => 0,
                         });
                     },
+                    b"serLines" => series_lines.push(ChartLines),
                     _ => {},
                 }
             },
@@ -1223,6 +1351,7 @@ fn parse_bar_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<
     group.common = common;
     group.gap_width = gap_width;
     group.overlap = overlap;
+    group.series_lines = series_lines;
     Ok(Some(group))
 }
 
@@ -1329,10 +1458,24 @@ fn parse_line_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option
     let mut saw_data_labels = false;
     let mut marker = true;
     let mut smooth = false;
+    let mut drop_lines = None;
+    let mut high_low_lines = None;
+    let mut up_down_bars = None;
     let mut buf = Vec::new();
 
     loop {
         match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"upDownBars" => {
+                if up_down_bars.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "line chart contains duplicate up/down bars".into(),
+                    ));
+                }
+                up_down_bars = Some(parse_up_down_bars(reader)?);
+            },
+            Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"upDownBars" => {
+                set_empty_up_down_bars(&mut up_down_bars, "line chart")?;
+            },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"dLbls" => {
                 begin_group_data_labels(&mut saw_data_labels)?;
                 common.data_labels = Some(parse_data_labels(reader)?);
@@ -1353,6 +1496,10 @@ fn parse_line_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option
                     b"axId" => common
                         .axis_ids
                         .push(required_u32_attr(e, "line chart axis ID")?),
+                    b"dropLines" => set_chart_lines(&mut drop_lines, "line chart drop lines")?,
+                    b"hiLowLines" => {
+                        set_chart_lines(&mut high_low_lines, "line chart high/low lines")?
+                    },
                     b"ser" => {
                         if let Some(series) = parse_series(reader)? {
                             common.series.push(series);
@@ -1379,6 +1526,9 @@ fn parse_line_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option
     group.common = common;
     group.marker = marker;
     group.smooth = smooth;
+    group.drop_lines = drop_lines;
+    group.high_low_lines = high_low_lines;
+    group.up_down_bars = up_down_bars;
     Ok(Some(group))
 }
 
@@ -1440,6 +1590,7 @@ fn parse_area_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option
     let mut grouping = BarGrouping::Standard;
     let mut common = TypeGroupCommon::new();
     let mut saw_data_labels = false;
+    let mut drop_lines = None;
     let mut buf = Vec::new();
 
     loop {
@@ -1464,6 +1615,7 @@ fn parse_area_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option
                     b"axId" => common
                         .axis_ids
                         .push(required_u32_attr(e, "area chart axis ID")?),
+                    b"dropLines" => set_chart_lines(&mut drop_lines, "area chart drop lines")?,
                     b"ser" => {
                         if let Some(series) = parse_series(reader)? {
                             common.series.push(series);
@@ -1486,6 +1638,7 @@ fn parse_area_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option
 
     let mut group = AreaTypeGroup::new(grouping);
     group.common = common;
+    group.drop_lines = drop_lines;
     Ok(Some(group))
 }
 
@@ -3818,6 +3971,87 @@ mod tests {
             chart.plot_area.type_groups.push(TypeGroup::Line(line));
             assert!(crate::charts::writer::write_chart(&mut Vec::new(), &chart).is_err());
         }
+    }
+
+    #[test]
+    fn round_trips_chart_lines_and_up_down_bars() {
+        let xml =
+            br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
+            <c:chart><c:plotArea>
+                <c:areaChart><c:dropLines/></c:areaChart>
+                <c:area3DChart><c:dropLines/></c:area3DChart>
+                <c:barChart><c:serLines/><c:serLines/></c:barChart>
+                <c:lineChart><c:dropLines/><c:hiLowLines/><c:upDownBars>
+                    <c:gapWidth val="225%"/><c:upBars/><c:downBars/>
+                </c:upDownBars></c:lineChart>
+                <c:line3DChart><c:dropLines/></c:line3DChart>
+                <c:ofPieChart><c:ofPieType val="bar"/><c:serLines/></c:ofPieChart>
+                <c:stockChart><c:dropLines/><c:hiLowLines/><c:upDownBars/></c:stockChart>
+            </c:plotArea></c:chart>
+        </c:chartSpace>"#;
+        let chart = parse_chart(xml.as_slice()).unwrap();
+        let TypeGroup::Area(area) = &chart.plot_area.type_groups[0] else {
+            panic!("expected area chart");
+        };
+        assert!(area.drop_lines.is_some());
+        let TypeGroup::Area3D(area) = &chart.plot_area.type_groups[1] else {
+            panic!("expected 3D area chart");
+        };
+        assert!(area.drop_lines.is_some());
+        let TypeGroup::Bar(bar) = &chart.plot_area.type_groups[2] else {
+            panic!("expected bar chart");
+        };
+        assert_eq!(bar.series_lines.len(), 2);
+        let TypeGroup::Line(line) = &chart.plot_area.type_groups[3] else {
+            panic!("expected line chart");
+        };
+        assert!(line.drop_lines.is_some());
+        assert!(line.high_low_lines.is_some());
+        let bars = line.up_down_bars.as_ref().unwrap();
+        assert_eq!(bars.gap_width, Some(225));
+        assert!(bars.up_bars.is_some());
+        assert!(bars.down_bars.is_some());
+        let TypeGroup::Line3D(line) = &chart.plot_area.type_groups[4] else {
+            panic!("expected 3D line chart");
+        };
+        assert!(line.drop_lines.is_some());
+        let TypeGroup::OfPie(of_pie) = &chart.plot_area.type_groups[5] else {
+            panic!("expected of-pie chart");
+        };
+        assert_eq!(of_pie.series_lines.len(), 1);
+        let TypeGroup::Stock(stock) = &chart.plot_area.type_groups[6] else {
+            panic!("expected stock chart");
+        };
+        assert!(stock.drop_lines.is_some());
+        assert!(stock.high_low_lines.is_some());
+        assert!(stock.up_down_bars.is_some());
+
+        let mut output = Vec::new();
+        crate::charts::writer::write_chart(&mut output, &chart).unwrap();
+        let reparsed = parse_chart(output.as_slice()).unwrap();
+        let TypeGroup::Line(line) = &reparsed.plot_area.type_groups[3] else {
+            panic!("expected line chart");
+        };
+        assert_eq!(line.up_down_bars.as_ref().unwrap().gap_width, Some(225));
+        let TypeGroup::Bar(bar) = &reparsed.plot_area.type_groups[2] else {
+            panic!("expected bar chart");
+        };
+        assert_eq!(bar.series_lines.len(), 2);
+
+        let duplicate =
+            br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
+            <c:chart><c:plotArea><c:lineChart><c:dropLines/><c:dropLines/>
+            </c:lineChart></c:plotArea></c:chart></c:chartSpace>"#;
+        assert!(parse_chart(duplicate.as_slice()).is_err());
+
+        let mut invalid = Chart::new();
+        let mut line = LineTypeGroup::new(BarGrouping::Standard);
+        line.up_down_bars = Some(UpDownBars {
+            gap_width: Some(501),
+            ..UpDownBars::default()
+        });
+        invalid.plot_area.type_groups.push(TypeGroup::Line(line));
+        assert!(crate::charts::writer::write_chart(&mut Vec::new(), &invalid).is_err());
     }
 
     #[test]
