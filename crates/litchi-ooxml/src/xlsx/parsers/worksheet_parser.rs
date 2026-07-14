@@ -13,6 +13,8 @@ use std::collections::HashMap;
 
 use litchi_core::sheet::{CellValue, Result};
 
+use crate::xlsx::cell::Cell;
+
 // Performance: Pre-allocate typical capacities to reduce reallocations
 const INITIAL_ROW_CAPACITY: usize = 1000;
 const INITIAL_COL_CAPACITY: usize = 100;
@@ -175,34 +177,5 @@ pub fn parse_cell_xml(cell_content: &str) -> Result<Option<(u32, CellValue)>> {
 
 /// Convert Excel reference (e.g., "A1") to coordinates - optimized version.
 pub fn reference_to_coords(reference: &str) -> Result<(u32, u32)> {
-    let bytes = reference.as_bytes();
-    let mut col_str_end = 0;
-
-    // Find where column letters end and row numbers begin
-    for (i, &byte) in bytes.iter().enumerate() {
-        if byte.is_ascii_digit() {
-            col_str_end = i;
-            break;
-        }
-    }
-
-    if col_str_end == 0 {
-        return Err(format!("Invalid reference: {}", reference).into());
-    }
-
-    // Convert column letters to number (A=1, B=2, ..., Z=26, AA=27, etc.)
-    let mut col_num = 0u32;
-    for &byte in &bytes[..col_str_end] {
-        if !byte.is_ascii_alphabetic() {
-            return Err(format!("Invalid column in reference: {}", reference).into());
-        }
-        col_num = col_num * 26 + (byte.to_ascii_uppercase() - b'A' + 1) as u32;
-    }
-
-    // Parse row number using fast integer parsing
-    let row_part = &bytes[col_str_end..];
-    let row_num = atoi_simd::parse::<_, false, false>(row_part)
-        .map_err(|_| format!("Invalid row number in reference: {}", reference))?;
-
-    Ok((col_num, row_num))
+    Cell::reference_to_coords(reference)
 }

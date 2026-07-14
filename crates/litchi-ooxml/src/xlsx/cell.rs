@@ -6,6 +6,9 @@
 use litchi_core::sheet::{Cell as CellTrait, CellValue, Result};
 use std::borrow::Cow;
 
+const MAX_EXCEL_COLUMN: u32 = 16_384;
+const MAX_EXCEL_ROW: u32 = 1_048_576;
+
 /// Concrete implementation of the Cell trait for Excel files.
 #[derive(Debug, Clone)]
 pub struct Cell {
@@ -38,34 +41,43 @@ impl Cell {
         letters
     }
 
-    /// Convert Excel reference (e.g., "A1") to row and column numbers.
+    /// Convert an Excel A1 reference to one-based column and row numbers.
     pub fn reference_to_coords(reference: &str) -> Result<(u32, u32)> {
-        let mut chars = reference.chars();
-        let mut col_str = String::new();
-        let mut row_str = String::new();
-
-        // Extract column part (letters)
-        for ch in &mut chars {
-            if ch.is_ascii_alphabetic() {
-                col_str.push(ch);
-            } else {
-                row_str.push(ch);
-                break;
-            }
+        let bytes = reference.as_bytes();
+        let column_end = bytes
+            .iter()
+            .position(u8::is_ascii_digit)
+            .ok_or_else(|| format!("Invalid cell reference: {reference}"))?;
+        if column_end == 0 || column_end == bytes.len() {
+            return Err(format!("Invalid cell reference: {reference}").into());
         }
 
-        // Add remaining characters to row string
-        row_str.extend(chars);
-
-        // Convert column letters to number (A=1, B=2, ..., Z=26, AA=27, etc.)
         let mut col_num = 0u32;
-        for ch in col_str.chars() {
-            col_num = col_num * 26 + (ch.to_ascii_uppercase() as u32 - 'A' as u32 + 1);
+        for byte in &bytes[..column_end] {
+            if !byte.is_ascii_alphabetic() {
+                return Err(format!("Invalid column in cell reference: {reference}").into());
+            }
+            let digit = u32::from(byte.to_ascii_uppercase() - b'A' + 1);
+            col_num = col_num
+                .checked_mul(26)
+                .and_then(|value| value.checked_add(digit))
+                .ok_or_else(|| format!("Column overflows in cell reference: {reference}"))?;
+        }
+        if col_num > MAX_EXCEL_COLUMN {
+            return Err(
+                format!("Column exceeds Excel limits in cell reference: {reference}").into(),
+            );
         }
 
-        let row_num = row_str
-            .parse::<u32>()
-            .map_err(|_| format!("Invalid row number in reference: {}", reference))?;
+        let row_bytes = &bytes[column_end..];
+        if !row_bytes.iter().all(u8::is_ascii_digit) {
+            return Err(format!("Invalid row in cell reference: {reference}").into());
+        }
+        let row_num = atoi_simd::parse::<_, false, false>(row_bytes)
+            .map_err(|_| format!("Invalid row number in cell reference: {reference}"))?;
+        if row_num == 0 || row_num > MAX_EXCEL_ROW {
+            return Err(format!("Row exceeds Excel limits in cell reference: {reference}").into());
+        }
 
         Ok((col_num, row_num))
     }
@@ -144,5 +156,41 @@ impl<'a> litchi_core::sheet::RowIterator<'a> for RowIterator {
         let row = std::mem::take(&mut self.rows[self.index]);
         self.index += 1;
         Some(Ok(Cow::Owned(row)))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Cell;
+
+    #[test]
+    fn parses_valid_a1_references_at_grid_boundaries() {
+        assert_eq!(Cell::reference_to_coords("A1").unwrap(), (1, 1));
+        assert_eq!(Cell::reference_to_coords("aa42").unwrap(), (27, 42));
+        assert_eq!(
+            Cell::reference_to_coords("XFD1048576").unwrap(),
+            (16_384, 1_048_576)
+        );
+    }
+
+    #[test]
+    fn rejects_malformed_overflowing_and_out_of_grid_references() {
+        for reference in [
+            "",
+            "A",
+            "1",
+            "A0",
+            "A-1",
+            "$A$1",
+            "A1x",
+            "XFE1",
+            "A1048577",
+            "ZZZZZZZZZZZZZZZZZZZZ1",
+        ] {
+            assert!(
+                Cell::reference_to_coords(reference).is_err(),
+                "accepted {reference}"
+            );
+        }
     }
 }
