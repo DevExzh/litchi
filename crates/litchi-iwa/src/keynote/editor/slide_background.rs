@@ -43,6 +43,18 @@ impl KeynoteEditor {
         Ok(resolve_slide_background(self, slide_index)?.background)
     }
 
+    /// Read the background stored directly on the slide's variation style.
+    ///
+    /// `None` means the slide inherits its effective background from its
+    /// layout style. This is distinct from [`KeynoteSlideBackground::None`],
+    /// which is an explicit native “No Fill” override.
+    pub fn slide_background_override(
+        &self,
+        slide_index: usize,
+    ) -> Result<Option<KeynoteSlideBackground>> {
+        direct_slide_background_override(self, slide_index)
+    }
+
     /// Set a slide background through a native, cullable slide-style variation.
     pub fn set_slide_background(
         &mut self,
@@ -61,6 +73,63 @@ impl KeynoteEditor {
             &resolved.fill_payload,
         )
     }
+
+    /// Delete a direct slide-background override and restore layout inheritance.
+    ///
+    /// Returns `true` when an override was removed and `false` when the slide
+    /// already inherited its background.
+    pub fn reset_slide_background(&mut self, slide_index: usize) -> Result<bool> {
+        if direct_slide_background_override(self, slide_index)?.is_none() {
+            return Ok(false);
+        }
+        super::slide_background_reset::reset_slide_background(self, slide_index)?;
+        Ok(true)
+    }
+}
+
+fn direct_slide_background_override(
+    editor: &KeynoteEditor,
+    slide_index: usize,
+) -> Result<Option<KeynoteSlideBackground>> {
+    let slides = editor.slides()?;
+    let slide = slides.get(slide_index).ok_or_else(|| {
+        Error::ParseError(format!(
+            "Keynote slide index {slide_index} is out of range for {} slides",
+            slides.len()
+        ))
+    })?;
+    let graph = ObjectGraph::read(editor.package())?;
+    let native: kn::SlideArchive =
+        graph.decode_type(slide.slide_id, SLIDE_MESSAGE_TYPE, "KN.SlideArchive")?;
+    let style_id = native.style.identifier;
+    let style: kn::SlideStyleArchive =
+        graph.decode_type(style_id, SLIDE_STYLE_MESSAGE_TYPE, "KN.SlideStyleArchive")?;
+    if style.super_.is_variation != Some(true) {
+        return Ok(None);
+    }
+    let raw =
+        graph.message_data_type(style_id, SLIDE_STYLE_MESSAGE_TYPE, "KN.SlideStyleArchive")?;
+    let properties_payload = optional_length_delimited_payload(raw, 11)?;
+    if properties_payload.is_some() != style.slide_properties.is_some() {
+        return Err(Error::InvalidFormat(format!(
+            "Keynote slide style {style_id} has inconsistent slide-properties wire data"
+        )));
+    }
+    let Some(properties_payload) = properties_payload else {
+        return Ok(None);
+    };
+    let fill_payload = optional_length_delimited_payload(properties_payload, 1)?;
+    if fill_payload.is_some()
+        != style
+            .slide_properties
+            .as_ref()
+            .is_some_and(|properties| properties.fill.is_some())
+    {
+        return Err(Error::InvalidFormat(format!(
+            "Keynote slide style {style_id} has inconsistent fill wire data"
+        )));
+    }
+    fill_payload.map(background_from_fill).transpose()
 }
 
 pub(super) fn resolve_slide_background(

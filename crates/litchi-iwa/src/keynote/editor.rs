@@ -26,12 +26,12 @@ use crate::shapes::{
 };
 use crate::text::{IWorkTextEditor, TextStorageInfo};
 use crate::wire::{
-    append_repeated_length_delimited_field, patch_fixed32_field, patch_fixed64_field,
-    patch_length_delimited_field, patch_nested_fixed32_field, patch_nested_fixed64_field,
-    patch_nested_length_delimited_field, patch_nested_varint_field, patch_varint_field,
-    remove_repeated_length_delimited_field_where, repeated_length_delimited_payloads,
-    rewrite_repeated_length_delimited_fields, transform_length_delimited_field,
-    transform_length_delimited_fields_at_path,
+    append_repeated_length_delimited_field, parse_wire_fields, patch_fixed32_field,
+    patch_fixed64_field, patch_length_delimited_field, patch_nested_fixed32_field,
+    patch_nested_fixed64_field, patch_nested_length_delimited_field, patch_nested_varint_field,
+    patch_varint_field, remove_repeated_length_delimited_field_where,
+    repeated_length_delimited_payloads, rewrite_repeated_length_delimited_fields,
+    transform_length_delimited_field, transform_length_delimited_fields_at_path,
 };
 use crate::{EmbeddedMediaAsset, Error, IWorkMediaEditor, IWorkPackage, Result};
 
@@ -3180,10 +3180,14 @@ mod builds;
 mod placeholder_ownership;
 mod placeholder_visibility;
 mod slide_background;
+mod slide_background_reset;
 mod slide_background_wire;
 mod slide_create;
 mod slide_graph;
 mod slide_number;
+mod slide_style_graph;
+mod slide_style_metadata;
+mod slide_style_registry;
 
 use builds::*;
 pub use slide_background::{KeynoteRgbColorSpace, KeynoteRgbaColor, KeynoteSlideBackground};
