@@ -136,6 +136,29 @@ impl<'doc> Slide<'doc> {
         let anchor = escher_shape.anchor();
 
         match escher_shape.shape_type() {
+            EscherShapeType::Placeholder => {
+                let placeholder_info = escher_shape.placeholder()?;
+                let mut properties = shape::ShapeProperties {
+                    id: shape_id,
+                    shape_type: shape::ShapeType::Placeholder,
+                    ..Default::default()
+                };
+                if let Some(a) = anchor {
+                    properties.x = a.left;
+                    properties.y = a.top;
+                    properties.width = a.width();
+                    properties.height = a.height();
+                }
+
+                Some(ShapeEnum::Placeholder(Placeholder::from_parsed(
+                    properties,
+                    PlaceholderType::from_native_slide(placeholder_info.placeholder_type),
+                    placeholder_info.size,
+                    u16::try_from(placeholder_info.position).ok(),
+                    escher_shape.text(),
+                )))
+            },
+
             EscherShapeType::TextBox => {
                 // Create TextBox with proper properties
                 let mut properties = shape::ShapeProperties {
@@ -572,6 +595,61 @@ mod tests {
         drawing
     }
 
+    fn create_placeholder_escher_drawing() -> Vec<u8> {
+        use crate::escher::writer::{
+            ShapeBuilder, record_type, write_atom, write_client_anchor, write_container,
+        };
+
+        let mut shape_children = Vec::new();
+        ShapeBuilder::new(202, 43)
+            .write(&mut shape_children)
+            .unwrap();
+        write_client_anchor(&mut shape_children, 15, 25, 315, 125).unwrap();
+
+        let utf16: Vec<u8> = "Slide title"
+            .encode_utf16()
+            .flat_map(u16::to_le_bytes)
+            .collect();
+        let mut embedded_text = Vec::new();
+        write_atom(&mut embedded_text, 0, 0, 4000, &utf16).unwrap();
+        write_atom(
+            &mut shape_children,
+            0,
+            0,
+            record_type::CLIENT_TEXTBOX,
+            &embedded_text,
+        )
+        .unwrap();
+
+        let mut placeholder_data = Vec::new();
+        placeholder_data.extend_from_slice(&3u32.to_le_bytes());
+        placeholder_data.push(13); // native slide title placeholder
+        placeholder_data.push(2); // quarter size
+        placeholder_data.extend_from_slice(&0u16.to_le_bytes());
+        let mut client_data_children = Vec::new();
+        write_atom(&mut client_data_children, 0, 0, 3011, &placeholder_data).unwrap();
+        write_container(
+            &mut shape_children,
+            0,
+            record_type::CLIENT_DATA,
+            &client_data_children,
+        )
+        .unwrap();
+
+        let mut shape_container = Vec::new();
+        write_container(
+            &mut shape_container,
+            0,
+            record_type::SP_CONTAINER,
+            &shape_children,
+        )
+        .unwrap();
+
+        let mut drawing = Vec::new();
+        write_container(&mut drawing, 0, record_type::DG_CONTAINER, &shape_container).unwrap();
+        drawing
+    }
+
     fn create_table_escher_drawing() -> Vec<u8> {
         use crate::escher::writer::{
             ShapeBuilder, record_type, write_atom, write_child_anchor, write_container, write_spgr,
@@ -988,6 +1066,31 @@ mod tests {
         assert_eq!(picture.properties.y, 20);
         assert_eq!(picture.properties.width, 200);
         assert_eq!(picture.properties.height, 100);
+    }
+
+    #[test]
+    fn placeholder_client_data_is_exposed_with_text_and_geometry() {
+        use crate::ppt::shapes::{PlaceholderSize, PlaceholderType, Shape};
+
+        let doc_data = vec![0u8; 32];
+        let ppdrawing = create_test_record(
+            PptRecordType::PPDrawing,
+            create_placeholder_escher_drawing(),
+            Vec::new(),
+        );
+        let record = create_test_record(PptRecordType::Slide, Vec::new(), vec![ppdrawing]);
+        let slide = Slide::from_slide_data(create_slide_data(record, 256, &doc_data), 1);
+
+        let shapes = slide.shapes().unwrap();
+        assert_eq!(shapes.len(), 1);
+        let placeholder = shapes[0].as_placeholder().expect("title placeholder");
+        assert_eq!(placeholder.id(), 43);
+        assert_eq!(placeholder.placeholder_type(), PlaceholderType::Title);
+        assert_eq!(placeholder.placeholder_size(), PlaceholderSize::Quarter);
+        assert_eq!(placeholder.index(), Some(3));
+        assert_eq!(placeholder.bounds(), (15, 25, 300, 100));
+        assert_eq!(shapes[0].text().unwrap(), "Slide title");
+        assert!(placeholder.has_text());
     }
 
     #[test]

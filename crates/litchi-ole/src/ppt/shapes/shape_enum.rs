@@ -96,7 +96,7 @@ where
 
     /// Get shape as TextBox if it is one.
     #[inline]
-    pub fn as_textbox(&self) -> Option<&TextBox<'_>> {
+    pub fn as_textbox(&self) -> Option<&TextBox<'a>> {
         match self {
             ShapeEnum::TextBox(tb) => Some(tb),
             _ => None,
@@ -105,7 +105,7 @@ where
 
     /// Get shape as Placeholder if it is one.
     #[inline]
-    pub fn as_placeholder(&self) -> Option<&Placeholder<'_>> {
+    pub fn as_placeholder(&self) -> Option<&Placeholder<'a>> {
         match self {
             ShapeEnum::Placeholder(ph) => Some(ph),
             _ => None,
@@ -114,7 +114,7 @@ where
 
     /// Get shape as AutoShape if it is one.
     #[inline]
-    pub fn as_autoshape(&self) -> Option<&AutoShape<'_>> {
+    pub fn as_autoshape(&self) -> Option<&AutoShape<'a>> {
         match self {
             ShapeEnum::AutoShape(as_) => Some(as_),
             _ => None,
@@ -150,7 +150,7 @@ where
 
     /// Get shape as GroupShape if it is one.
     #[inline]
-    pub fn as_group(&self) -> Option<&GroupShape<'_>> {
+    pub fn as_group(&self) -> Option<&GroupShape<'a>> {
         match self {
             ShapeEnum::Group(group) => Some(group),
             _ => None,

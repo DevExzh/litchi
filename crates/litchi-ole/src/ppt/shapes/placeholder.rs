@@ -102,6 +102,34 @@ impl From<u16> for PlaceholderType {
     }
 }
 
+impl PlaceholderType {
+    pub(crate) fn from_native_slide(value: u8) -> Self {
+        match value {
+            0 => Self::None,
+            7 => Self::DateAndTime,
+            8 => Self::SlideNumber,
+            9 => Self::Footer,
+            10 => Self::Header,
+            11 => Self::SlideImage,
+            13 => Self::Title,
+            14 => Self::Body,
+            15 => Self::CenterTitle,
+            16 => Self::SubTitle,
+            17 => Self::VerticalTextTitle,
+            18 => Self::VerticalTextBody,
+            19 => Self::Content,
+            20 => Self::Chart,
+            21 => Self::Table,
+            22 => Self::ClipArt,
+            23 => Self::Diagram,
+            24 => Self::MediaClip,
+            25 => Self::VerticalObject,
+            26 => Self::Picture,
+            other => Self::Custom(other.into()),
+        }
+    }
+}
+
 impl std::fmt::Display for PlaceholderType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -160,6 +188,24 @@ impl<'a> Placeholder<'a> {
             placeholder_type: PlaceholderType::Body, // Default
             size: None,
             index: None,
+            raw_placeholder_data: None,
+        }
+    }
+
+    pub(crate) fn from_parsed(
+        properties: ShapeProperties,
+        placeholder_type: PlaceholderType,
+        size: u8,
+        index: Option<u16>,
+        text: Option<String>,
+    ) -> Self {
+        let mut container = ShapeContainer::new(properties, Vec::new());
+        container.text_content = text;
+        Self {
+            container,
+            placeholder_type,
+            size: Some(size),
+            index,
             raw_placeholder_data: None,
         }
     }
@@ -327,7 +373,10 @@ impl<'a> Placeholder<'a> {
 
     /// Check if this is a content/body placeholder.
     pub fn is_content(&self) -> bool {
-        matches!(self.placeholder_type, PlaceholderType::Body)
+        matches!(
+            self.placeholder_type,
+            PlaceholderType::Body | PlaceholderType::Content
+        )
     }
 
     /// Check if this is a media placeholder (picture, chart, etc.).
@@ -349,19 +398,18 @@ impl<'a> Placeholder<'a> {
     /// Get the placeholder size (quarter, half, full).
     pub fn placeholder_size(&self) -> PlaceholderSize {
         match self.size {
-            Some(1) => PlaceholderSize::Quarter,
-            Some(2) => PlaceholderSize::Half,
-            Some(3) => PlaceholderSize::Full,
-            _ => PlaceholderSize::Full, // Default to full size
+            Some(2) => PlaceholderSize::Quarter,
+            Some(1) => PlaceholderSize::Half,
+            _ => PlaceholderSize::Full,
         }
     }
 
     /// Set the placeholder size.
     pub fn set_placeholder_size(&mut self, size: PlaceholderSize) {
         self.size = match size {
-            PlaceholderSize::Quarter => Some(1),
-            PlaceholderSize::Half => Some(2),
-            PlaceholderSize::Full => Some(3),
+            PlaceholderSize::Quarter => Some(2),
+            PlaceholderSize::Half => Some(1),
+            PlaceholderSize::Full => Some(0),
         };
     }
 }
@@ -379,12 +427,14 @@ where
     }
 
     fn text(&self) -> super::super::package::Result<String> {
-        // Placeholders typically don't have their own text - they hold content
-        Ok(String::new())
+        Ok(self.container.text_content.clone().unwrap_or_default())
     }
 
     fn has_text(&self) -> bool {
-        false // Placeholders don't have inherent text content
+        self.container
+            .text_content
+            .as_ref()
+            .is_some_and(|text| !text.is_empty())
     }
 
     fn clone_box(&self) -> Box<dyn Shape> {
@@ -464,5 +514,28 @@ mod tests {
         assert_eq!(PlaceholderType::from(11), PlaceholderType::SlideImage);
         assert_eq!(PlaceholderType::from(26), PlaceholderType::Picture);
         assert_eq!(PlaceholderType::from(999), PlaceholderType::Custom(999));
+    }
+
+    #[test]
+    fn placeholder_size_uses_native_ppt_values() {
+        let mut placeholder = Placeholder::new(ShapeProperties::default(), vec![]);
+
+        for (raw, expected) in [
+            (0, PlaceholderSize::Full),
+            (1, PlaceholderSize::Half),
+            (2, PlaceholderSize::Quarter),
+        ] {
+            placeholder.set_size(raw);
+            assert_eq!(placeholder.placeholder_size(), expected);
+        }
+
+        for (size, expected_raw) in [
+            (PlaceholderSize::Full, 0),
+            (PlaceholderSize::Half, 1),
+            (PlaceholderSize::Quarter, 2),
+        ] {
+            placeholder.set_placeholder_size(size);
+            assert_eq!(placeholder.size(), Some(expected_raw));
+        }
     }
 }

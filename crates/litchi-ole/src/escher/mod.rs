@@ -38,7 +38,7 @@ pub use properties::{
     EscherArrayProperty, EscherProperties, EscherPropertyId, EscherPropertyValue, ShapeAnchor,
 };
 pub use record::EscherRecord;
-pub use shape::{EscherShape, EscherShapeType};
+pub use shape::{EscherPlaceholder, EscherShape, EscherShapeType};
 pub use shape_factory::EscherShapeFactory;
 pub use text::extract_text_from_escher;
 pub use types::EscherRecordType;

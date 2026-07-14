@@ -16,6 +16,7 @@ pub enum EscherShapeType {
     Rectangle,
     Ellipse,
     TextBox,
+    Placeholder,
     Line,
     Polygon,
     Group,
@@ -42,12 +43,27 @@ pub struct EscherShape<'data> {
     pub children: Vec<EscherShape<'data>>,
     container: EscherContainer<'data>,
     anchor: Option<ShapeAnchor>,
+    placeholder: Option<EscherPlaceholder>,
+}
+
+/// Placeholder metadata embedded in an OfficeArt client-data record.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EscherPlaceholder {
+    pub position: i32,
+    pub placeholder_type: u8,
+    pub size: u8,
 }
 
 impl<'data> EscherShape<'data> {
     /// Parse an Escher shape from an SpContainer or SpgrContainer record.
     pub fn from_container(container: EscherContainer<'data>) -> Self {
-        let shape_type = Self::detect_shape_type(&container);
+        let placeholder = Self::extract_placeholder(&container);
+        let mut shape_type = Self::detect_shape_type(&container);
+        if placeholder.is_some()
+            && !matches!(shape_type, EscherShapeType::Group | EscherShapeType::Table)
+        {
+            shape_type = EscherShapeType::Placeholder;
+        }
         // A group is represented by an SpgrContainer whose first SpContainer
         // carries the group's ID, properties, and anchor. Keep the outer
         // container for child traversal, but read metadata from that header.
@@ -109,6 +125,7 @@ impl<'data> EscherShape<'data> {
             children,
             container,
             anchor,
+            placeholder,
         }
     }
 
@@ -135,7 +152,10 @@ impl<'data> EscherShape<'data> {
     pub fn can_contain_text(&self) -> bool {
         matches!(
             self.shape_type,
-            EscherShapeType::TextBox | EscherShapeType::Rectangle | EscherShapeType::AutoShape
+            EscherShapeType::TextBox
+                | EscherShapeType::Placeholder
+                | EscherShapeType::Rectangle
+                | EscherShapeType::AutoShape
         )
     }
 
@@ -156,6 +176,12 @@ impl<'data> EscherShape<'data> {
     #[inline]
     pub fn children(&self) -> &[EscherShape<'data>] {
         &self.children
+    }
+
+    /// Return placeholder metadata when this is a placeholder shape.
+    #[inline]
+    pub fn placeholder(&self) -> Option<EscherPlaceholder> {
+        self.placeholder
     }
 
     /// Return owned copies of the child shapes.
@@ -220,6 +246,26 @@ impl<'data> EscherShape<'data> {
         properties
             .get_int(super::properties::EscherPropertyId::GroupTableProperties)
             .is_some_and(|value| value & 1 != 0)
+    }
+
+    fn extract_placeholder(container: &EscherContainer<'data>) -> Option<EscherPlaceholder> {
+        let client_data = container.find_child(EscherRecordType::ClientData)?;
+        let client_data = EscherContainer::new(client_data);
+        let placeholder = client_data
+            .children()
+            .flatten()
+            .find(|record| record.record_type_raw == 3011 && record.data.len() >= 8)?;
+
+        Some(EscherPlaceholder {
+            position: i32::from_le_bytes([
+                placeholder.data[0],
+                placeholder.data[1],
+                placeholder.data[2],
+                placeholder.data[3],
+            ]),
+            placeholder_type: placeholder.data[4],
+            size: placeholder.data[5],
+        })
     }
 
     fn extract_shape_id(container: &EscherContainer<'data>) -> Option<u32> {
