@@ -17,7 +17,9 @@ use std::collections::BTreeMap;
 use std::num::NonZeroUsize;
 
 const TABLE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:table:1.0";
+const TABLE_NAMESPACE_URI: &str = "urn:oasis:names:tc:opendocument:xmlns:table:1.0";
 const OFFICE_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
+const TEXT_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
 const MAX_EXPANDED_ROWS_PER_SHEET: usize = 1_048_576;
 const MAX_EXPANDED_CELLS_PER_ROW: usize = 1_048_576;
 const MAX_EXPANDED_CELLS_PER_SHEET: usize = 4_194_304;
@@ -66,39 +68,72 @@ impl OdsParser {
                         )?);
                     } else if text_element_depth > 0 {
                         text_element_depth += 1;
-                    } else {
-                        match e.name().as_ref() {
-                            b"table:table" => {
-                                let name = Self::extract_table_name(e)?;
-                                current_sheet = Some(SheetBuilder::new(name));
-                            },
-                            b"table:table-row" if current_sheet.is_some() => {
-                                current_row = Some(RowBuilder::with_repeated(
-                                    Self::parse_repeated(e, b"table:number-rows-repeated")?,
-                                ));
-                            },
-                            b"table:table-cell" | b"table:covered-table-cell"
-                                if current_row.is_some() =>
-                            {
-                                let mut cell_builder =
-                                    Self::parse_cell_attributes(e, reader.decoder())?;
-                                if e.name().as_ref() == b"table:covered-table-cell" {
-                                    cell_builder.merge = CellMerge::Covered;
-                                }
-                                current_cell = Some(cell_builder);
-                                text_content.clear();
-                            },
-                            b"text:p" if current_cell.is_some() => {
-                                if !text_content.is_empty() {
-                                    text_content.push('\n');
-                                }
-                                text_element_depth = 1;
-                            },
-                            _ => {},
+                    } else if Self::element_name_is(
+                        e.name().as_ref(),
+                        &document_namespaces,
+                        TABLE_NAMESPACE_URI,
+                        "table",
+                    ) {
+                        let name =
+                            Self::extract_table_name(e, reader.decoder(), &document_namespaces)?;
+                        current_sheet = Some(SheetBuilder::new(name));
+                    } else if current_sheet.is_some()
+                        && Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            TABLE_NAMESPACE_URI,
+                            "table-row",
+                        )
+                    {
+                        current_row = Some(RowBuilder::with_repeated(Self::parse_repeated(
+                            e,
+                            reader.decoder(),
+                            &document_namespaces,
+                            "number-rows-repeated",
+                        )?));
+                    } else if current_row.is_some()
+                        && (Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            TABLE_NAMESPACE_URI,
+                            "table-cell",
+                        ) || Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            TABLE_NAMESPACE_URI,
+                            "covered-table-cell",
+                        ))
+                    {
+                        let covered = Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            TABLE_NAMESPACE_URI,
+                            "covered-table-cell",
+                        );
+                        let mut cell_builder =
+                            Self::parse_cell_attributes(e, reader.decoder(), &document_namespaces)?;
+                        if covered {
+                            cell_builder.merge = CellMerge::Covered;
                         }
+                        current_cell = Some(cell_builder);
+                        text_content.clear();
+                    } else if current_cell.is_some()
+                        && Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            TEXT_NAMESPACE,
+                            "p",
+                        )
+                    {
+                        if !text_content.is_empty() {
+                            text_content.push('\n');
+                        }
+                        text_element_depth = 1;
                     }
                 },
                 Ok(Event::Empty(ref e)) => {
+                    let empty_scope =
+                        Self::push_namespace_scope(e, reader.decoder(), &mut document_namespaces)?;
                     if let Some(builder) = annotation_builder.as_mut() {
                         builder.empty(e, reader.decoder())?;
                     } else if current_cell.is_some()
@@ -114,25 +149,58 @@ impl OdsParser {
                             cell.annotation = Some(annotation);
                         }
                     } else if text_element_depth > 0 {
-                        Self::push_text_empty_element(e, reader.decoder(), &mut text_content)?;
-                    } else if matches!(
-                        e.name().as_ref(),
-                        b"table:table-cell" | b"table:covered-table-cell"
-                    ) && current_row.is_some()
+                        Self::push_text_empty_element(
+                            e,
+                            reader.decoder(),
+                            &document_namespaces,
+                            &mut text_content,
+                        )?;
+                    } else if current_row.is_some()
+                        && (Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            TABLE_NAMESPACE_URI,
+                            "table-cell",
+                        ) || Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            TABLE_NAMESPACE_URI,
+                            "covered-table-cell",
+                        ))
                     {
-                        let mut cell_builder = Self::parse_cell_attributes(e, reader.decoder())?;
-                        if e.name().as_ref() == b"table:covered-table-cell" {
+                        let covered = Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            TABLE_NAMESPACE_URI,
+                            "covered-table-cell",
+                        );
+                        let mut cell_builder =
+                            Self::parse_cell_attributes(e, reader.decoder(), &document_namespaces)?;
+                        if covered {
                             cell_builder.merge = CellMerge::Covered;
                         }
                         if let Some(row) = current_row.as_mut() {
                             row.add_repeated_cells(&cell_builder, "")?;
                         }
-                    } else if e.name().as_ref() == b"table:table-row" && current_sheet.is_some() {
-                        let repeated = Self::parse_repeated(e, b"table:number-rows-repeated")?;
+                    } else if current_sheet.is_some()
+                        && Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            TABLE_NAMESPACE_URI,
+                            "table-row",
+                        )
+                    {
+                        let repeated = Self::parse_repeated(
+                            e,
+                            reader.decoder(),
+                            &document_namespaces,
+                            "number-rows-repeated",
+                        )?;
                         if let Some(sheet) = current_sheet.as_mut() {
                             sheet.add_repeated_row(RowBuilder::new().build(), repeated)?;
                         }
                     }
+                    Self::pop_namespace_scope(&mut document_namespaces, Some(empty_scope));
                 },
                 Ok(Event::Text(ref t)) if annotation_builder.is_some() => {
                     if let Some(builder) = annotation_builder.as_mut() {
@@ -198,30 +266,43 @@ impl OdsParser {
                         continue;
                     }
 
-                    match e.name().as_ref() {
-                        b"table:table-cell" | b"table:covered-table-cell" => {
-                            if let Some(cell_builder) = current_cell.take() {
-                                if let Some(ref mut row_builder) = current_row {
-                                    row_builder.add_repeated_cells(&cell_builder, &text_content)?;
-                                }
+                    if Self::element_name_is(
+                        e.name().as_ref(),
+                        &document_namespaces,
+                        TABLE_NAMESPACE_URI,
+                        "table-cell",
+                    ) || Self::element_name_is(
+                        e.name().as_ref(),
+                        &document_namespaces,
+                        TABLE_NAMESPACE_URI,
+                        "covered-table-cell",
+                    ) {
+                        if let Some(cell_builder) = current_cell.take()
+                            && let Some(ref mut row_builder) = current_row
+                        {
+                            row_builder.add_repeated_cells(&cell_builder, &text_content)?;
+                        }
+                    } else if Self::element_name_is(
+                        e.name().as_ref(),
+                        &document_namespaces,
+                        TABLE_NAMESPACE_URI,
+                        "table-row",
+                    ) {
+                        if let Some(row_builder) = current_row.take() {
+                            let repeated = row_builder.repeated;
+                            let row = row_builder.build();
+                            if let Some(ref mut sheet_builder) = current_sheet {
+                                sheet_builder.add_repeated_row(row, repeated)?;
                             }
-                        },
-                        b"table:table-row" => {
-                            if let Some(row_builder) = current_row.take() {
-                                let repeated = row_builder.repeated;
-                                let row = row_builder.build();
-                                if let Some(ref mut sheet_builder) = current_sheet {
-                                    sheet_builder.add_repeated_row(row, repeated)?;
-                                }
-                            }
-                        },
-                        b"table:table" => {
-                            if let Some(sheet_builder) = current_sheet.take() {
-                                let sheet = sheet_builder.build();
-                                sheets.push(sheet);
-                            }
-                        },
-                        _ => {},
+                        }
+                    } else if Self::element_name_is(
+                        e.name().as_ref(),
+                        &document_namespaces,
+                        TABLE_NAMESPACE_URI,
+                        "table",
+                    ) && let Some(sheet_builder) = current_sheet.take()
+                    {
+                        sheets.push(sheet_builder.build());
                     }
                     Self::pop_namespace_scope(&mut document_namespaces, namespace_scopes.pop());
                 },
@@ -241,17 +322,49 @@ impl OdsParser {
         element: &BytesStart<'_>,
         namespaces: &BTreeMap<String, String>,
     ) -> bool {
-        let qualified_name = element.name();
-        let Ok(name) = std::str::from_utf8(qualified_name.as_ref()) else {
+        Self::element_name_is(
+            element.name().as_ref(),
+            namespaces,
+            OFFICE_NAMESPACE,
+            "annotation",
+        )
+    }
+
+    fn element_name_is(
+        qualified_name: &[u8],
+        namespaces: &BTreeMap<String, String>,
+        namespace: &str,
+        local_name: &str,
+    ) -> bool {
+        let Ok(name) = std::str::from_utf8(qualified_name) else {
+            return false;
+        };
+        let (prefix, local) = match name.split_once(':') {
+            Some(parts) => parts,
+            None => ("", name),
+        };
+        local == local_name
+            && namespaces
+                .get(prefix)
+                .is_some_and(|candidate| candidate == namespace)
+    }
+
+    fn attribute_name_is(
+        qualified_name: &[u8],
+        namespaces: &BTreeMap<String, String>,
+        namespace: &str,
+        local_name: &str,
+    ) -> bool {
+        let Ok(name) = std::str::from_utf8(qualified_name) else {
             return false;
         };
         let Some((prefix, local)) = name.split_once(':') else {
             return false;
         };
-        local == "annotation"
+        local == local_name
             && namespaces
                 .get(prefix)
-                .is_some_and(|namespace| namespace == OFFICE_NAMESPACE)
+                .is_some_and(|candidate| candidate == namespace)
     }
 
     fn push_namespace_scope(
@@ -267,7 +380,11 @@ impl OdsParser {
             let name = std::str::from_utf8(attribute.key.as_ref()).map_err(|_| {
                 Error::InvalidFormat("invalid UTF-8 in XML namespace declaration".to_string())
             })?;
-            let Some(prefix) = name.strip_prefix("xmlns:") else {
+            let prefix = if name == "xmlns" {
+                ""
+            } else if let Some(prefix) = name.strip_prefix("xmlns:") {
+                prefix
+            } else {
                 continue;
             };
             let value = attribute
@@ -300,36 +417,43 @@ impl OdsParser {
     fn push_text_empty_element(
         element: &BytesStart<'_>,
         decoder: Decoder,
+        namespaces: &BTreeMap<String, String>,
         text: &mut String,
     ) -> Result<()> {
-        match element.name().as_ref() {
-            b"text:line-break" => text.push('\n'),
-            b"text:tab" => text.push('\t'),
-            b"text:s" => {
-                let mut count = 1usize;
-                for attribute in element.attributes() {
-                    let attribute = attribute.map_err(|error| {
-                        Error::InvalidFormat(format!("invalid text:s attribute: {error}"))
-                    })?;
-                    if attribute.key.as_ref() == b"text:c" {
-                        let value = attribute
-                            .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
-                            .map_err(|error| {
-                                Error::InvalidFormat(format!("invalid text:s count: {error}"))
-                            })?;
-                        count = value.parse::<usize>().map_err(|_| {
-                            Error::InvalidFormat(format!("invalid text:s count '{value}'"))
+        if Self::element_name_is(
+            element.name().as_ref(),
+            namespaces,
+            TEXT_NAMESPACE,
+            "line-break",
+        ) {
+            text.push('\n');
+        } else if Self::element_name_is(element.name().as_ref(), namespaces, TEXT_NAMESPACE, "tab")
+        {
+            text.push('\t');
+        } else if Self::element_name_is(element.name().as_ref(), namespaces, TEXT_NAMESPACE, "s") {
+            let mut count = 1usize;
+            for attribute in element.attributes() {
+                let attribute = attribute.map_err(|error| {
+                    Error::InvalidFormat(format!("invalid text:s attribute: {error}"))
+                })?;
+                if Self::attribute_name_is(attribute.key.as_ref(), namespaces, TEXT_NAMESPACE, "c")
+                {
+                    let value = attribute
+                        .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+                        .map_err(|error| {
+                            Error::InvalidFormat(format!("invalid text:s count: {error}"))
                         })?;
-                    }
+                    count = value.parse::<usize>().map_err(|_| {
+                        Error::InvalidFormat(format!("invalid text:s count '{value}'"))
+                    })?;
                 }
-                if count > 1_000_000 {
-                    return Err(Error::InvalidFormat(
-                        "text:s count exceeds the supported safety limit".to_string(),
-                    ));
-                }
-                text.extend(std::iter::repeat_n(' ', count));
-            },
-            _ => {},
+            }
+            if count > 1_000_000 {
+                return Err(Error::InvalidFormat(
+                    "text:s count exceeds the supported safety limit".to_string(),
+                ));
+            }
+            text.extend(std::iter::repeat_n(' ', count));
         }
         Ok(())
     }
@@ -556,24 +680,40 @@ impl OdsParser {
     }
 
     /// Extract table name from table:table element
-    fn extract_table_name(e: &quick_xml::events::BytesStart) -> Result<String> {
+    fn extract_table_name(
+        e: &BytesStart<'_>,
+        decoder: Decoder,
+        namespaces: &BTreeMap<String, String>,
+    ) -> Result<String> {
         for attr_result in e.attributes() {
-            let attr =
-                attr_result.map_err(|_| Error::InvalidFormat("Invalid attribute".to_string()))?;
-            if attr.key.as_ref() == b"table:name" {
-                return String::from_utf8(attr.value.to_vec())
-                    .map_err(|_| Error::InvalidFormat("Invalid UTF-8 in table name".to_string()));
+            let attr = attr_result
+                .map_err(|error| Error::InvalidFormat(format!("invalid XML attribute: {error}")))?;
+            if Self::attribute_name_is(attr.key.as_ref(), namespaces, TABLE_NAMESPACE_URI, "name") {
+                return attr
+                    .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
+                    .map(|value| value.into_owned())
+                    .map_err(|error| Error::InvalidFormat(format!("invalid table name: {error}")));
             }
         }
         Ok("Sheet1".to_string()) // Default name
     }
 
-    fn parse_repeated(e: &BytesStart<'_>, attribute_name: &[u8]) -> Result<usize> {
+    fn parse_repeated(
+        e: &BytesStart<'_>,
+        decoder: Decoder,
+        namespaces: &BTreeMap<String, String>,
+        local_name: &str,
+    ) -> Result<usize> {
         for attribute in e.attributes() {
             let attribute = attribute
                 .map_err(|error| Error::InvalidFormat(format!("invalid XML attribute: {error}")))?;
-            if attribute.key.as_ref() == attribute_name {
-                return Self::parse_positive_usize(&attribute, attribute_name);
+            if Self::attribute_name_is(
+                attribute.key.as_ref(),
+                namespaces,
+                TABLE_NAMESPACE_URI,
+                local_name,
+            ) {
+                return Self::parse_positive_usize(&attribute, decoder, local_name);
             }
         }
         Ok(1)
@@ -581,24 +721,20 @@ impl OdsParser {
 
     fn parse_positive_usize(
         attribute: &quick_xml::events::attributes::Attribute<'_>,
-        attribute_name: &[u8],
+        decoder: Decoder,
+        attribute_name: &str,
     ) -> Result<usize> {
-        let value = std::str::from_utf8(attribute.value.as_ref()).map_err(|_| {
-            Error::InvalidFormat(format!(
-                "{} is not valid UTF-8",
-                String::from_utf8_lossy(attribute_name)
-            ))
-        })?;
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
+            .map_err(|error| {
+                Error::InvalidFormat(format!("invalid table:{attribute_name}: {error}"))
+            })?;
         let parsed = value.parse::<usize>().map_err(|_| {
-            Error::InvalidFormat(format!(
-                "invalid {} value '{value}'",
-                String::from_utf8_lossy(attribute_name)
-            ))
+            Error::InvalidFormat(format!("invalid table:{attribute_name} value '{value}'"))
         })?;
         if parsed == 0 {
             return Err(Error::InvalidFormat(format!(
-                "{} must be positive",
-                String::from_utf8_lossy(attribute_name)
+                "table:{attribute_name} must be positive"
             )));
         }
         Ok(parsed)
@@ -608,6 +744,7 @@ impl OdsParser {
     fn parse_cell_attributes(
         e: &quick_xml::events::BytesStart,
         decoder: Decoder,
+        namespaces: &BTreeMap<String, String>,
     ) -> Result<CellBuilder> {
         let mut value_type = None;
         let mut value_str = None;
@@ -622,70 +759,45 @@ impl OdsParser {
         let mut column_span = 1;
 
         for attr_result in e.attributes() {
-            let attr =
-                attr_result.map_err(|_| Error::InvalidFormat("Invalid attribute".to_string()))?;
-            match attr.key.as_ref() {
-                b"office:value-type" => {
-                    value_type = Some(
-                        String::from_utf8(attr.value.to_vec())
-                            .map_err(|_| Error::InvalidFormat("Invalid UTF-8".to_string()))?,
-                    );
-                },
-                b"office:value" => {
-                    value_str = Some(
-                        String::from_utf8(attr.value.to_vec())
-                            .map_err(|_| Error::InvalidFormat("Invalid UTF-8".to_string()))?,
-                    );
-                },
-                b"office:currency" => {
-                    currency = Some(
-                        String::from_utf8(attr.value.to_vec())
-                            .map_err(|_| Error::InvalidFormat("Invalid UTF-8".to_string()))?,
-                    );
-                },
-                b"table:formula" => {
-                    formula = Some(
-                        String::from_utf8(attr.value.to_vec())
-                            .map_err(|_| Error::InvalidFormat("Invalid UTF-8".to_string()))?,
-                    );
-                },
-                b"table:content-validation-name" => {
-                    validation_name = Some(
-                        attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
-                            .map_err(|error| {
-                                Error::InvalidFormat(format!(
-                                    "invalid content-validation name: {error}"
-                                ))
-                            })?
-                            .into_owned(),
-                    );
-                },
-                b"table:style-name" => {
-                    style_name = Some(
-                        attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
-                            .map_err(|error| {
-                                Error::InvalidFormat(format!("invalid cell style name: {error}"))
-                            })?
-                            .into_owned(),
-                    );
-                },
-                b"table:protect" => {
-                    protect = Some(Self::parse_bool_attribute(&attr, decoder)?);
-                },
-                b"table:protected" => {
-                    protected = Some(Self::parse_bool_attribute(&attr, decoder)?);
-                },
-                b"table:number-columns-repeated" => {
-                    repeated = Self::parse_positive_usize(&attr, b"table:number-columns-repeated")?;
-                },
-                b"table:number-rows-spanned" => {
-                    row_span = Self::parse_positive_usize(&attr, b"table:number-rows-spanned")?;
-                },
-                b"table:number-columns-spanned" => {
-                    column_span =
-                        Self::parse_positive_usize(&attr, b"table:number-columns-spanned")?;
-                },
-                _ => {},
+            let attr = attr_result
+                .map_err(|error| Error::InvalidFormat(format!("invalid XML attribute: {error}")))?;
+            let is_office = |local_name| {
+                Self::attribute_name_is(attr.key.as_ref(), namespaces, OFFICE_NAMESPACE, local_name)
+            };
+            let is_table = |local_name| {
+                Self::attribute_name_is(
+                    attr.key.as_ref(),
+                    namespaces,
+                    TABLE_NAMESPACE_URI,
+                    local_name,
+                )
+            };
+            if is_office("value-type") {
+                value_type = Some(Self::decode_attribute(&attr, decoder, "office:value-type")?);
+            } else if is_office("value") {
+                value_str = Some(Self::decode_attribute(&attr, decoder, "office:value")?);
+            } else if is_office("currency") {
+                currency = Some(Self::decode_attribute(&attr, decoder, "office:currency")?);
+            } else if is_table("formula") {
+                formula = Some(Self::decode_attribute(&attr, decoder, "table:formula")?);
+            } else if is_table("content-validation-name") {
+                validation_name = Some(Self::decode_attribute(
+                    &attr,
+                    decoder,
+                    "table:content-validation-name",
+                )?);
+            } else if is_table("style-name") {
+                style_name = Some(Self::decode_attribute(&attr, decoder, "table:style-name")?);
+            } else if is_table("protect") {
+                protect = Some(Self::parse_bool_attribute(&attr, decoder)?);
+            } else if is_table("protected") {
+                protected = Some(Self::parse_bool_attribute(&attr, decoder)?);
+            } else if is_table("number-columns-repeated") {
+                repeated = Self::parse_positive_usize(&attr, decoder, "number-columns-repeated")?;
+            } else if is_table("number-rows-spanned") {
+                row_span = Self::parse_positive_usize(&attr, decoder, "number-rows-spanned")?;
+            } else if is_table("number-columns-spanned") {
+                column_span = Self::parse_positive_usize(&attr, decoder, "number-columns-spanned")?;
             }
         }
 
@@ -726,6 +838,17 @@ impl OdsParser {
                 "invalid Boolean attribute value '{value}'"
             ))),
         }
+    }
+
+    fn decode_attribute(
+        attribute: &quick_xml::events::attributes::Attribute<'_>,
+        decoder: Decoder,
+        name: &str,
+    ) -> Result<String> {
+        attribute
+            .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
+            .map(|value| value.into_owned())
+            .map_err(|error| Error::InvalidFormat(format!("invalid {name}: {error}")))
     }
 }
 
@@ -1295,6 +1418,21 @@ mod tests {
                 .iter()
                 .all(|cell| cell.merge() == CellMerge::Covered)
         );
+    }
+
+    #[test]
+    fn parses_sheet_content_with_arbitrary_namespace_prefixes() {
+        let xml = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:x="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><o:body><o:spreadsheet><t:table t:name="A&amp;B"><t:table-row t:number-rows-repeated="2"><t:table-cell o:value-type="string" t:style-name="Style&amp;One" t:protected="1"><x:p>one<x:s x:c="2"/>two<x:tab/>three<x:line-break/>four</x:p></t:table-cell><t:covered-table-cell/></t:table-row></t:table></o:spreadsheet></o:body></o:document-content>"#;
+        let sheets = OdsParser::parse_sheets(xml).unwrap();
+        assert_eq!(sheets[0].name, "A&B");
+        assert_eq!(sheets[0].rows.len(), 2);
+        for (row_index, row) in sheets[0].rows.iter().enumerate() {
+            assert_eq!(row.cells[0].coordinates(), (row_index, 0));
+            assert_eq!(row.cells[0].style_name(), Some("Style&One"));
+            assert_eq!(row.cells[0].protected(), Some(true));
+            assert_eq!(row.cells[0].text, "one  two\tthree\nfour");
+            assert_eq!(row.cells[1].merge(), CellMerge::Covered);
+        }
     }
 
     #[test]
