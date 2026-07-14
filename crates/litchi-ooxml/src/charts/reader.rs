@@ -3,10 +3,15 @@
 //! This module provides functionality to parse chart XML files
 //! from OOXML packages.
 
-use crate::charts::axis::{Axis, CategoryAxis, DateAxis, SeriesAxis, ValueAxis};
+use crate::charts::axis::{
+    Axis, AxisCommon, AxisCrossBetween, AxisCrossMode, AxisLabelAlign, BuiltInUnit, CategoryAxis,
+    DateAxis, DisplayUnits, SeriesAxis, TimeUnit, ValueAxis,
+};
 use crate::charts::chart::{Chart, View3D, WallFloor};
 use crate::charts::legend::Legend;
-use crate::charts::models::{DataSourceRef, NumericData, RichText, StringData, TitleText};
+use crate::charts::models::{
+    DataSourceRef, NumberFormat, NumericData, RichText, StringData, TitleText,
+};
 use crate::charts::plot_area::{
     Area3DTypeGroup, AreaTypeGroup, Bar3DTypeGroup, BarShape, BarTypeGroup, BubbleTypeGroup,
     DoughnutTypeGroup, Line3DTypeGroup, LineTypeGroup, Pie3DTypeGroup, PieTypeGroup, PlotArea,
@@ -15,13 +20,14 @@ use crate::charts::plot_area::{
 };
 use crate::charts::series::Series;
 use crate::charts::types::{
-    AxisPosition, BarDirection, BarGrouping, DisplayBlanks, LegendPosition, RadarStyle,
-    ScatterStyle,
+    AxisOrientation, AxisPosition, BarDirection, BarGrouping, DisplayBlanks, LegendPosition,
+    RadarStyle, ScatterStyle, TickLabelPosition, TickMark,
 };
 use crate::common::xml::decode_xml_reference;
 use crate::error::{OoxmlError, Result};
-use quick_xml::Reader;
+use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
+use quick_xml::{Reader, XmlVersion};
 use std::io::BufRead;
 
 /// Parse a chart XML document.
@@ -103,11 +109,20 @@ pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
 
 fn parse_title<R: BufRead>(reader: &mut Reader<R>) -> Result<TitleText> {
     let mut text = String::new();
+    let mut formula = None;
     let mut buf = Vec::new();
     let mut in_text = false;
 
     loop {
         match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"f" => {
+                if formula.is_some() {
+                    return Err(OoxmlError::InvalidFormat(
+                        "chart title contains duplicate formula references".to_string(),
+                    ));
+                }
+                formula = Some(parse_text_element(reader, b"f")?);
+            },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"t" => {
                 in_text = true;
             },
@@ -135,7 +150,16 @@ fn parse_title<R: BufRead>(reader: &mut Reader<R>) -> Result<TitleText> {
         buf.clear();
     }
 
-    Ok(TitleText::Literal(RichText::new(text)))
+    if let Some(formula) = formula {
+        if !text.is_empty() {
+            return Err(OoxmlError::InvalidFormat(
+                "chart title mixes a formula reference with literal text".to_string(),
+            ));
+        }
+        Ok(TitleText::Reference(DataSourceRef::new(formula)))
+    } else {
+        Ok(TitleText::Literal(RichText::new(text)))
+    }
 }
 
 fn parse_view_3d<R: BufRead>(reader: &mut Reader<R>) -> Result<View3D> {
@@ -1112,156 +1136,372 @@ fn parse_point_value<R: BufRead>(reader: &mut Reader<R>) -> Result<Option<f64>> 
     }
 }
 
+struct ParsedAxisCommon {
+    axis_id: Option<u32>,
+    cross_axis_id: Option<u32>,
+    position: Option<AxisPosition>,
+    title: Option<TitleText>,
+    number_format: Option<NumberFormat>,
+    orientation: AxisOrientation,
+    major_tick_mark: TickMark,
+    minor_tick_mark: TickMark,
+    tick_label_position: TickLabelPosition,
+    deleted: bool,
+    cross_mode: AxisCrossMode,
+    crosses_at: Option<f64>,
+    show_major_gridlines: bool,
+    show_minor_gridlines: bool,
+}
+
+impl ParsedAxisCommon {
+    fn new() -> Self {
+        Self {
+            axis_id: None,
+            cross_axis_id: None,
+            position: None,
+            title: None,
+            number_format: None,
+            orientation: AxisOrientation::MinMax,
+            major_tick_mark: TickMark::Out,
+            minor_tick_mark: TickMark::None,
+            tick_label_position: TickLabelPosition::NextTo,
+            deleted: false,
+            cross_mode: AxisCrossMode::AutoZero,
+            crosses_at: None,
+            show_major_gridlines: false,
+            show_minor_gridlines: false,
+        }
+    }
+
+    fn finish(self) -> Result<AxisCommon> {
+        let axis_id = self
+            .axis_id
+            .ok_or_else(|| missing_attribute("chart axis ID"))?;
+        let position = self
+            .position
+            .ok_or_else(|| missing_attribute("chart axis position"))?;
+        let cross_axis_id = self
+            .cross_axis_id
+            .ok_or_else(|| missing_attribute("chart crossing-axis ID"))?;
+        let mut common = AxisCommon::new(axis_id, position, cross_axis_id);
+        common.title = self.title;
+        common.number_format = self.number_format;
+        common.orientation = self.orientation;
+        common.major_tick_mark = self.major_tick_mark;
+        common.minor_tick_mark = self.minor_tick_mark;
+        common.tick_label_position = self.tick_label_position;
+        common.deleted = self.deleted;
+        common.cross_mode = self.cross_mode;
+        common.crosses_at = self.crosses_at;
+        common.show_major_gridlines = self.show_major_gridlines;
+        common.show_minor_gridlines = self.show_minor_gridlines;
+        Ok(common)
+    }
+}
+
+fn parse_axis_common_element(
+    common: &mut ParsedAxisCommon,
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+) -> Result<bool> {
+    match element.local_name().as_ref() {
+        b"axId" => common.axis_id = Some(required_u32_attr(element, "chart axis ID")?),
+        b"orientation" => common.orientation = parse_axis_orientation(element)?,
+        b"delete" => common.deleted = parse_bool_attr(element)?,
+        b"axPos" => common.position = Some(parse_axis_position(element)?),
+        b"majorGridlines" => common.show_major_gridlines = true,
+        b"minorGridlines" => common.show_minor_gridlines = true,
+        b"numFmt" => common.number_format = Some(parse_axis_number_format(element, decoder)?),
+        b"majorTickMark" => common.major_tick_mark = parse_tick_mark(element)?,
+        b"minorTickMark" => common.minor_tick_mark = parse_tick_mark(element)?,
+        b"tickLblPos" => common.tick_label_position = parse_tick_label_position(element)?,
+        b"crossAx" => {
+            common.cross_axis_id = Some(required_u32_attr(element, "chart crossing-axis ID")?);
+        },
+        b"crosses" => common.cross_mode = parse_axis_cross_mode(element)?,
+        b"crossesAt" => {
+            common.crosses_at = Some(required_f64_attr(element, "chart axis crossing value")?);
+        },
+        _ => return Ok(false),
+    }
+    Ok(true)
+}
+
 fn parse_category_axis<R: BufRead>(reader: &mut Reader<R>) -> Result<Option<CategoryAxis>> {
-    let mut axis_id = 0;
-    let mut cross_axis_id = 0;
-    let mut position = AxisPosition::Bottom;
+    let mut common = ParsedAxisCommon::new();
+    let mut auto = true;
+    let mut label_align = None;
+    let mut label_offset = None;
+    let mut tick_label_skip = None;
+    let mut tick_mark_skip = None;
+    let mut no_multi_level = false;
     let mut buf = Vec::new();
 
     loop {
         match reader.read_event_into(&mut buf) {
-            Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
-                let tag_name = e.local_name();
-                match tag_name.as_ref() {
-                    b"axId" => {
-                        axis_id = parse_u32_attr(e, b"val").unwrap_or(0);
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"title" => {
+                common.title = Some(parse_title(reader)?);
+            },
+            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element))
+                if !parse_axis_common_element(&mut common, element, reader.decoder())? =>
+            {
+                match element.local_name().as_ref() {
+                    b"auto" => auto = parse_bool_attr(element)?,
+                    b"lblAlgn" => label_align = Some(parse_axis_label_align(element)?),
+                    b"lblOffset" => {
+                        label_offset = Some(bounded_u32_attr(
+                            element,
+                            "chart axis label offset",
+                            0,
+                            1000,
+                        )?);
                     },
-                    b"crossAx" => {
-                        cross_axis_id = parse_u32_attr(e, b"val").unwrap_or(0);
+                    b"tickLblSkip" => {
+                        tick_label_skip = Some(required_positive_u32_attr(
+                            element,
+                            "chart tick-label skip",
+                        )?);
                     },
-                    b"axPos" => {
-                        position = parse_axis_position(e)?;
+                    b"tickMarkSkip" => {
+                        tick_mark_skip =
+                            Some(required_positive_u32_attr(element, "chart tick-mark skip")?);
                     },
+                    b"noMultiLvlLbl" => no_multi_level = parse_bool_attr(element)?,
                     _ => {},
                 }
             },
-            Ok(Event::End(ref e)) if e.local_name().as_ref() == b"catAx" => break,
-            Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
-                    "unterminated chart element".to_string(),
-                ));
-            },
-            Err(e) => return Err(OoxmlError::Xml(e.to_string())),
+            Ok(Event::End(ref element)) if element.local_name().as_ref() == b"catAx" => break,
+            Ok(Event::Eof) => return Err(unterminated_axis("category")),
+            Err(error) => return Err(OoxmlError::Xml(error.to_string())),
             _ => {},
         }
         buf.clear();
     }
 
-    Ok(Some(CategoryAxis::new(axis_id, position, cross_axis_id)))
+    let common = common.finish()?;
+    let mut axis = CategoryAxis::new(common.axis_id, common.position, common.cross_axis_id);
+    axis.common = common;
+    axis.auto = auto;
+    axis.label_align = label_align;
+    axis.label_offset = label_offset;
+    axis.tick_label_skip = tick_label_skip;
+    axis.tick_mark_skip = tick_mark_skip;
+    axis.no_multi_level = no_multi_level;
+    Ok(Some(axis))
 }
 
 fn parse_value_axis<R: BufRead>(reader: &mut Reader<R>) -> Result<Option<ValueAxis>> {
-    let mut axis_id = 0;
-    let mut cross_axis_id = 0;
-    let mut position = AxisPosition::Left;
+    let mut common = ParsedAxisCommon::new();
+    let mut min = None;
+    let mut max = None;
+    let mut major_unit = None;
+    let mut minor_unit = None;
+    let mut log_base = None;
+    let mut built_in_unit = None;
+    let mut custom_unit = None;
+    let mut cross_between = AxisCrossBetween::Between;
     let mut buf = Vec::new();
 
     loop {
         match reader.read_event_into(&mut buf) {
-            Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
-                let tag_name = e.local_name();
-                match tag_name.as_ref() {
-                    b"axId" => {
-                        axis_id = parse_u32_attr(e, b"val").unwrap_or(0);
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"title" => {
+                common.title = Some(parse_title(reader)?);
+            },
+            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element))
+                if !parse_axis_common_element(&mut common, element, reader.decoder())? =>
+            {
+                match element.local_name().as_ref() {
+                    b"min" => min = Some(required_f64_attr(element, "chart axis minimum")?),
+                    b"max" => max = Some(required_f64_attr(element, "chart axis maximum")?),
+                    b"majorUnit" => {
+                        major_unit = Some(required_positive_f64_attr(
+                            element,
+                            "chart axis major unit",
+                        )?);
                     },
-                    b"crossAx" => {
-                        cross_axis_id = parse_u32_attr(e, b"val").unwrap_or(0);
+                    b"minorUnit" => {
+                        minor_unit = Some(required_positive_f64_attr(
+                            element,
+                            "chart axis minor unit",
+                        )?);
                     },
-                    b"axPos" => {
-                        position = parse_axis_position(e)?;
+                    b"logBase" => {
+                        let value = required_f64_attr(element, "chart logarithmic base")?;
+                        if !(2.0..=1000.0).contains(&value) {
+                            return Err(OoxmlError::InvalidFormat(
+                                "chart logarithmic base must be between 2 and 1000".into(),
+                            ));
+                        }
+                        log_base = Some(value);
                     },
+                    b"builtInUnit" => built_in_unit = Some(parse_built_in_unit(element)?),
+                    b"custUnit" => {
+                        custom_unit = Some(required_positive_f64_attr(
+                            element,
+                            "chart custom display unit",
+                        )?);
+                    },
+                    b"crossBetween" => cross_between = parse_axis_cross_between(element)?,
                     _ => {},
                 }
             },
-            Ok(Event::End(ref e)) if e.local_name().as_ref() == b"valAx" => break,
-            Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
-                    "unterminated chart element".to_string(),
-                ));
-            },
-            Err(e) => return Err(OoxmlError::Xml(e.to_string())),
+            Ok(Event::End(ref element)) if element.local_name().as_ref() == b"valAx" => break,
+            Ok(Event::Eof) => return Err(unterminated_axis("value")),
+            Err(error) => return Err(OoxmlError::Xml(error.to_string())),
             _ => {},
         }
         buf.clear();
     }
 
-    Ok(Some(ValueAxis::new(axis_id, position, cross_axis_id)))
+    if min.zip(max).is_some_and(|(min, max)| min > max) {
+        return Err(OoxmlError::InvalidFormat(
+            "chart axis minimum exceeds maximum".into(),
+        ));
+    }
+    if built_in_unit.is_some() && custom_unit.is_some() {
+        return Err(OoxmlError::InvalidFormat(
+            "chart axis cannot have both built-in and custom display units".into(),
+        ));
+    }
+    let common = common.finish()?;
+    let mut axis = ValueAxis::new(common.axis_id, common.position, common.cross_axis_id);
+    axis.common = common;
+    axis.min = min;
+    axis.max = max;
+    axis.major_unit = major_unit;
+    axis.minor_unit = minor_unit;
+    axis.log_base = log_base;
+    axis.cross_between = cross_between;
+    axis.display_units = if built_in_unit.is_some() || custom_unit.is_some() {
+        Some(DisplayUnits {
+            built_in_unit,
+            custom_unit,
+            label: None,
+            layout: None,
+        })
+    } else {
+        None
+    };
+    Ok(Some(axis))
 }
 
 fn parse_date_axis<R: BufRead>(reader: &mut Reader<R>) -> Result<Option<DateAxis>> {
-    let mut axis_id = 0;
-    let mut cross_axis_id = 0;
-    let mut position = AxisPosition::Bottom;
+    let mut common = ParsedAxisCommon::new();
+    let mut min = None;
+    let mut max = None;
+    let mut major_unit = None;
+    let mut minor_unit = None;
+    let mut major_time_unit = None;
+    let mut minor_time_unit = None;
+    let mut base_time_unit = None;
+    let mut auto = true;
     let mut buf = Vec::new();
 
     loop {
         match reader.read_event_into(&mut buf) {
-            Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
-                let tag_name = e.local_name();
-                match tag_name.as_ref() {
-                    b"axId" => {
-                        axis_id = parse_u32_attr(e, b"val").unwrap_or(0);
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"title" => {
+                common.title = Some(parse_title(reader)?);
+            },
+            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element))
+                if !parse_axis_common_element(&mut common, element, reader.decoder())? =>
+            {
+                match element.local_name().as_ref() {
+                    b"min" => min = Some(required_f64_attr(element, "chart date minimum")?),
+                    b"max" => max = Some(required_f64_attr(element, "chart date maximum")?),
+                    b"majorUnit" => {
+                        major_unit = Some(required_positive_f64_attr(
+                            element,
+                            "chart date-axis major unit",
+                        )?);
                     },
-                    b"crossAx" => {
-                        cross_axis_id = parse_u32_attr(e, b"val").unwrap_or(0);
+                    b"minorUnit" => {
+                        minor_unit = Some(required_positive_f64_attr(
+                            element,
+                            "chart date-axis minor unit",
+                        )?);
                     },
-                    b"axPos" => {
-                        position = parse_axis_position(e)?;
-                    },
+                    b"majorTimeUnit" => major_time_unit = Some(parse_time_unit(element)?),
+                    b"minorTimeUnit" => minor_time_unit = Some(parse_time_unit(element)?),
+                    b"baseTimeUnit" => base_time_unit = Some(parse_time_unit(element)?),
+                    b"auto" => auto = parse_bool_attr(element)?,
                     _ => {},
                 }
             },
-            Ok(Event::End(ref e)) if e.local_name().as_ref() == b"dateAx" => break,
-            Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
-                    "unterminated chart element".to_string(),
-                ));
-            },
-            Err(e) => return Err(OoxmlError::Xml(e.to_string())),
+            Ok(Event::End(ref element)) if element.local_name().as_ref() == b"dateAx" => break,
+            Ok(Event::Eof) => return Err(unterminated_axis("date")),
+            Err(error) => return Err(OoxmlError::Xml(error.to_string())),
             _ => {},
         }
         buf.clear();
     }
 
-    Ok(Some(DateAxis::new(axis_id, position, cross_axis_id)))
+    if min.zip(max).is_some_and(|(min, max)| min > max) {
+        return Err(OoxmlError::InvalidFormat(
+            "chart date-axis minimum exceeds maximum".into(),
+        ));
+    }
+    let common = common.finish()?;
+    let mut axis = DateAxis::new(common.axis_id, common.position, common.cross_axis_id);
+    axis.common = common;
+    axis.min = min;
+    axis.max = max;
+    axis.major_unit = major_unit;
+    axis.minor_unit = minor_unit;
+    axis.major_time_unit = major_time_unit;
+    axis.minor_time_unit = minor_time_unit;
+    axis.base_time_unit = base_time_unit;
+    axis.auto = auto;
+    Ok(Some(axis))
 }
 
 fn parse_series_axis<R: BufRead>(reader: &mut Reader<R>) -> Result<Option<SeriesAxis>> {
-    let mut axis_id = 0;
-    let mut cross_axis_id = 0;
-    let mut position = AxisPosition::Bottom;
+    let mut common = ParsedAxisCommon::new();
+    let mut tick_label_skip = None;
+    let mut tick_mark_skip = None;
     let mut buf = Vec::new();
 
     loop {
         match reader.read_event_into(&mut buf) {
-            Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
-                let tag_name = e.local_name();
-                match tag_name.as_ref() {
-                    b"axId" => {
-                        axis_id = parse_u32_attr(e, b"val").unwrap_or(0);
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"title" => {
+                common.title = Some(parse_title(reader)?);
+            },
+            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element))
+                if !parse_axis_common_element(&mut common, element, reader.decoder())? =>
+            {
+                match element.local_name().as_ref() {
+                    b"tickLblSkip" => {
+                        tick_label_skip = Some(required_positive_u32_attr(
+                            element,
+                            "chart series-axis tick-label skip",
+                        )?);
                     },
-                    b"crossAx" => {
-                        cross_axis_id = parse_u32_attr(e, b"val").unwrap_or(0);
-                    },
-                    b"axPos" => {
-                        position = parse_axis_position(e)?;
+                    b"tickMarkSkip" => {
+                        tick_mark_skip = Some(required_positive_u32_attr(
+                            element,
+                            "chart series-axis tick-mark skip",
+                        )?);
                     },
                     _ => {},
                 }
             },
-            Ok(Event::End(ref e)) if e.local_name().as_ref() == b"serAx" => break,
-            Ok(Event::Eof) => {
-                return Err(OoxmlError::InvalidFormat(
-                    "unterminated chart element".to_string(),
-                ));
-            },
-            Err(e) => return Err(OoxmlError::Xml(e.to_string())),
+            Ok(Event::End(ref element)) if element.local_name().as_ref() == b"serAx" => break,
+            Ok(Event::Eof) => return Err(unterminated_axis("series")),
+            Err(error) => return Err(OoxmlError::Xml(error.to_string())),
             _ => {},
         }
         buf.clear();
     }
 
-    Ok(Some(SeriesAxis::new(axis_id, position, cross_axis_id)))
+    let common = common.finish()?;
+    let mut axis = SeriesAxis::new(common.axis_id, common.position, common.cross_axis_id);
+    axis.common = common;
+    axis.tick_label_skip = tick_label_skip;
+    axis.tick_mark_skip = tick_mark_skip;
+    Ok(Some(axis))
+}
+
+fn unterminated_axis(kind: &str) -> OoxmlError {
+    OoxmlError::InvalidFormat(format!("unterminated chart {kind} axis"))
 }
 
 fn parse_legend<R: BufRead>(reader: &mut Reader<R>) -> Result<Legend> {
@@ -1337,6 +1577,114 @@ fn parse_axis_position(e: &BytesStart) -> Result<AxisPosition> {
     }
 }
 
+fn parse_axis_orientation(element: &BytesStart<'_>) -> Result<AxisOrientation> {
+    let value =
+        get_attr(element, b"val").ok_or_else(|| missing_attribute("chart axis orientation"))?;
+    match value.as_slice() {
+        b"minMax" => Ok(AxisOrientation::MinMax),
+        b"maxMin" => Ok(AxisOrientation::MaxMin),
+        _ => Err(invalid_attribute("chart axis orientation", &value)),
+    }
+}
+
+fn parse_tick_mark(element: &BytesStart<'_>) -> Result<TickMark> {
+    let value =
+        get_attr(element, b"val").ok_or_else(|| missing_attribute("chart tick-mark style"))?;
+    match value.as_slice() {
+        b"cross" => Ok(TickMark::Cross),
+        b"in" => Ok(TickMark::In),
+        b"none" => Ok(TickMark::None),
+        b"out" => Ok(TickMark::Out),
+        _ => Err(invalid_attribute("chart tick-mark style", &value)),
+    }
+}
+
+fn parse_tick_label_position(element: &BytesStart<'_>) -> Result<TickLabelPosition> {
+    let value =
+        get_attr(element, b"val").ok_or_else(|| missing_attribute("chart tick-label position"))?;
+    match value.as_slice() {
+        b"high" => Ok(TickLabelPosition::High),
+        b"low" => Ok(TickLabelPosition::Low),
+        b"nextTo" => Ok(TickLabelPosition::NextTo),
+        b"none" => Ok(TickLabelPosition::None),
+        _ => Err(invalid_attribute("chart tick-label position", &value)),
+    }
+}
+
+fn parse_axis_cross_mode(element: &BytesStart<'_>) -> Result<AxisCrossMode> {
+    let value =
+        get_attr(element, b"val").ok_or_else(|| missing_attribute("chart axis crossing mode"))?;
+    match value.as_slice() {
+        b"autoZero" => Ok(AxisCrossMode::AutoZero),
+        b"max" => Ok(AxisCrossMode::Max),
+        b"min" => Ok(AxisCrossMode::Min),
+        _ => Err(invalid_attribute("chart axis crossing mode", &value)),
+    }
+}
+
+fn parse_axis_cross_between(element: &BytesStart<'_>) -> Result<AxisCrossBetween> {
+    let value = get_attr(element, b"val")
+        .ok_or_else(|| missing_attribute("chart axis crossing position"))?;
+    match value.as_slice() {
+        b"between" => Ok(AxisCrossBetween::Between),
+        b"midCat" => Ok(AxisCrossBetween::MidCategory),
+        _ => Err(invalid_attribute("chart axis crossing position", &value)),
+    }
+}
+
+fn parse_axis_label_align(element: &BytesStart<'_>) -> Result<AxisLabelAlign> {
+    let value =
+        get_attr(element, b"val").ok_or_else(|| missing_attribute("chart axis label alignment"))?;
+    match value.as_slice() {
+        b"ctr" => Ok(AxisLabelAlign::Center),
+        b"l" => Ok(AxisLabelAlign::Left),
+        b"r" => Ok(AxisLabelAlign::Right),
+        _ => Err(invalid_attribute("chart axis label alignment", &value)),
+    }
+}
+
+fn parse_time_unit(element: &BytesStart<'_>) -> Result<TimeUnit> {
+    let value = get_attr(element, b"val").ok_or_else(|| missing_attribute("chart time unit"))?;
+    match value.as_slice() {
+        b"days" => Ok(TimeUnit::Days),
+        b"months" => Ok(TimeUnit::Months),
+        b"years" => Ok(TimeUnit::Years),
+        _ => Err(invalid_attribute("chart time unit", &value)),
+    }
+}
+
+fn parse_built_in_unit(element: &BytesStart<'_>) -> Result<BuiltInUnit> {
+    let value = get_attr(element, b"val")
+        .ok_or_else(|| missing_attribute("chart built-in display unit"))?;
+    match value.as_slice() {
+        b"hundreds" => Ok(BuiltInUnit::Hundreds),
+        b"thousands" => Ok(BuiltInUnit::Thousands),
+        b"tenThousands" => Ok(BuiltInUnit::TenThousands),
+        b"hundredThousands" => Ok(BuiltInUnit::HundredThousands),
+        b"millions" => Ok(BuiltInUnit::Millions),
+        b"tenMillions" => Ok(BuiltInUnit::TenMillions),
+        b"hundredMillions" => Ok(BuiltInUnit::HundredMillions),
+        b"billions" => Ok(BuiltInUnit::Billions),
+        b"trillions" => Ok(BuiltInUnit::Trillions),
+        _ => Err(invalid_attribute("chart built-in display unit", &value)),
+    }
+}
+
+fn parse_axis_number_format(element: &BytesStart<'_>, decoder: Decoder) -> Result<NumberFormat> {
+    let format_code = element
+        .try_get_attribute(b"formatCode")
+        .map_err(|error| OoxmlError::Xml(error.to_string()))?
+        .ok_or_else(|| missing_attribute("chart axis number format code"))?
+        .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
+        .map_err(|error| OoxmlError::Xml(error.to_string()))?
+        .into_owned();
+    let source_linked = match get_attr(element, b"sourceLinked") {
+        Some(value) => parse_bool_value(&value, "chart axis source-linked flag")?,
+        None => true,
+    };
+    Ok(NumberFormat::new(format_code).with_source_linked(source_linked))
+}
+
 #[inline]
 fn parse_display_blanks(e: &BytesStart) -> crate::error::Result<DisplayBlanks> {
     if let Some(val) = get_attr(e, b"val") {
@@ -1354,13 +1702,17 @@ fn parse_display_blanks(e: &BytesStart) -> crate::error::Result<DisplayBlanks> {
 #[inline]
 fn parse_bool_attr(e: &BytesStart) -> crate::error::Result<bool> {
     if let Some(val) = get_attr(e, b"val") {
-        match val.as_slice() {
-            b"1" | b"true" => Ok(true),
-            b"0" | b"false" => Ok(false),
-            _ => Err(invalid_attribute("chart boolean", &val)),
-        }
+        parse_bool_value(&val, "chart boolean")
     } else {
         Ok(true)
+    }
+}
+
+fn parse_bool_value(value: &[u8], description: &str) -> Result<bool> {
+    match value {
+        b"1" | b"true" => Ok(true),
+        b"0" | b"false" => Ok(false),
+        _ => Err(invalid_attribute(description, value)),
     }
 }
 
@@ -1390,6 +1742,36 @@ fn required_i32_attr(element: &BytesStart<'_>, description: &str) -> Result<i32>
         .ok()
         .and_then(|value| value.parse().ok())
         .ok_or_else(|| invalid_attribute(description, &value))
+}
+
+fn required_positive_u32_attr(element: &BytesStart<'_>, description: &str) -> Result<u32> {
+    let value = required_u32_attr(element, description)?;
+    if value == 0 {
+        return Err(OoxmlError::InvalidFormat(format!(
+            "{description} must be positive"
+        )));
+    }
+    Ok(value)
+}
+
+fn required_f64_attr(element: &BytesStart<'_>, description: &str) -> Result<f64> {
+    let value = get_attr(element, b"val").ok_or_else(|| missing_attribute(description))?;
+    let parsed = std::str::from_utf8(&value)
+        .ok()
+        .and_then(|value| value.parse::<f64>().ok())
+        .filter(|value| value.is_finite())
+        .ok_or_else(|| invalid_attribute(description, &value))?;
+    Ok(parsed)
+}
+
+fn required_positive_f64_attr(element: &BytesStart<'_>, description: &str) -> Result<f64> {
+    let value = required_f64_attr(element, description)?;
+    if value <= 0.0 {
+        return Err(OoxmlError::InvalidFormat(format!(
+            "{description} must be positive"
+        )));
+    }
+    Ok(value)
 }
 
 fn bounded_u32_attr(
@@ -1501,6 +1883,14 @@ mod tests {
         let mut bubble = BubbleTypeGroup::new();
         bubble.bubble_scale = Some(125);
         bubble.show_negative_bubbles = false;
+        bubble.bubble_3d = true;
+        bubble.size_represents = "w".to_string();
+        let mut bubble_series = Series::new(0);
+        bubble_series.x_values = Some(NumericData::from_values(vec![1.0]));
+        bubble_series.y_values = Some(NumericData::from_values(vec![2.0]));
+        bubble_series.bubble_sizes = Some(NumericData::from_values(vec![3.0]));
+        bubble_series.bubble_3d = true;
+        bubble.common.series.push(bubble_series);
 
         let mut chart = Chart::new();
         chart.plot_area.type_groups = vec![
@@ -1579,5 +1969,141 @@ mod tests {
         };
         assert_eq!(group.bubble_scale, Some(125));
         assert!(!group.show_negative_bubbles);
+        assert!(group.bubble_3d);
+        assert_eq!(group.size_represents, "w");
+        assert_eq!(
+            group.common.series[0].x_values.as_ref().unwrap().values,
+            [1.0]
+        );
+        assert_eq!(
+            group.common.series[0].y_values.as_ref().unwrap().values,
+            [2.0]
+        );
+        assert_eq!(
+            group.common.series[0].bubble_sizes.as_ref().unwrap().values,
+            [3.0]
+        );
+        assert!(group.common.series[0].bubble_3d);
+    }
+
+    #[test]
+    fn writer_round_trips_modeled_axis_properties_in_one_scaling_block() {
+        let mut category = CategoryAxis::new(10, AxisPosition::Bottom, 20);
+        category.common.orientation = AxisOrientation::MaxMin;
+        category.common.title = Some(TitleText::from_string("Quarter"));
+        category.common.number_format =
+            Some(NumberFormat::new("mmm-yy \"fiscal\"").with_source_linked(false));
+        category.common.major_tick_mark = TickMark::Cross;
+        category.common.minor_tick_mark = TickMark::In;
+        category.common.tick_label_position = TickLabelPosition::Low;
+        category.common.deleted = true;
+        category.common.cross_mode = AxisCrossMode::Max;
+        category.common.show_major_gridlines = true;
+        category.auto = false;
+        category.label_align = Some(AxisLabelAlign::Right);
+        category.label_offset = Some(250);
+        category.tick_label_skip = Some(2);
+        category.tick_mark_skip = Some(3);
+        category.no_multi_level = true;
+
+        let mut value = ValueAxis::new(20, AxisPosition::Left, 10);
+        value.common.crosses_at = Some(0.5);
+        value.common.show_minor_gridlines = true;
+        value.min = Some(-5.0);
+        value.max = Some(100.0);
+        value.major_unit = Some(10.0);
+        value.minor_unit = Some(2.0);
+        value.log_base = Some(10.0);
+        value.cross_between = AxisCrossBetween::MidCategory;
+        value.display_units = Some(DisplayUnits::built_in(BuiltInUnit::Millions));
+
+        let mut date = DateAxis::new(30, AxisPosition::Top, 40);
+        date.min = Some(45_000.0);
+        date.max = Some(46_000.0);
+        date.major_unit = Some(2.0);
+        date.minor_unit = Some(1.0);
+        date.major_time_unit = Some(TimeUnit::Months);
+        date.minor_time_unit = Some(TimeUnit::Days);
+        date.base_time_unit = Some(TimeUnit::Years);
+        date.auto = false;
+
+        let mut series = SeriesAxis::new(40, AxisPosition::Right, 30);
+        series.tick_label_skip = Some(4);
+        series.tick_mark_skip = Some(5);
+
+        let mut chart = Chart::new();
+        chart.title = Some(TitleText::from_ref("Sheet1!$C$1"));
+        chart.plot_area.axes = vec![
+            Axis::Category(category),
+            Axis::Value(value),
+            Axis::Date(date),
+            Axis::Series(series),
+        ];
+
+        let mut xml = Vec::new();
+        crate::charts::writer::write_chart(&mut xml, &chart).unwrap();
+        let xml_text = std::str::from_utf8(&xml).unwrap();
+        assert_eq!(xml_text.matches("<c:scaling>").count(), 4);
+        let parsed = parse_chart(xml.as_slice()).unwrap();
+        let Some(TitleText::Reference(title)) = parsed.title.as_ref() else {
+            panic!("expected chart title reference");
+        };
+        assert_eq!(title.formula, "Sheet1!$C$1");
+        assert_eq!(parsed.plot_area.axes.len(), 4);
+
+        let Axis::Category(category) = &parsed.plot_area.axes[0] else {
+            unreachable!();
+        };
+        assert_eq!(category.common.orientation, AxisOrientation::MaxMin);
+        assert!(category.common.deleted);
+        assert_eq!(category.common.major_tick_mark, TickMark::Cross);
+        assert_eq!(category.common.minor_tick_mark, TickMark::In);
+        assert_eq!(category.common.tick_label_position, TickLabelPosition::Low);
+        assert_eq!(category.common.cross_mode, AxisCrossMode::Max);
+        assert!(category.common.show_major_gridlines);
+        let Some(TitleText::Literal(title)) = category.common.title.as_ref() else {
+            panic!("expected literal category-axis title");
+        };
+        assert_eq!(title.text, "Quarter");
+        assert_eq!(category.label_align, Some(AxisLabelAlign::Right));
+        assert_eq!(category.label_offset, Some(250));
+        assert_eq!(category.tick_label_skip, Some(2));
+        assert_eq!(category.tick_mark_skip, Some(3));
+        assert!(category.no_multi_level);
+        let number_format = category.common.number_format.as_ref().unwrap();
+        assert_eq!(number_format.format_code, "mmm-yy \"fiscal\"");
+        assert!(!number_format.source_linked);
+
+        let Axis::Value(value) = &parsed.plot_area.axes[1] else {
+            unreachable!();
+        };
+        assert_eq!(value.min, Some(-5.0));
+        assert_eq!(value.max, Some(100.0));
+        assert_eq!(value.log_base, Some(10.0));
+        assert_eq!(value.major_unit, Some(10.0));
+        assert_eq!(value.minor_unit, Some(2.0));
+        assert_eq!(value.common.crosses_at, Some(0.5));
+        assert!(value.common.show_minor_gridlines);
+        assert_eq!(value.cross_between, AxisCrossBetween::MidCategory);
+        assert_eq!(
+            value.display_units.as_ref().unwrap().built_in_unit,
+            Some(BuiltInUnit::Millions)
+        );
+
+        let Axis::Date(date) = &parsed.plot_area.axes[2] else {
+            unreachable!();
+        };
+        assert_eq!(date.min, Some(45_000.0));
+        assert_eq!(date.max, Some(46_000.0));
+        assert_eq!(date.major_time_unit, Some(TimeUnit::Months));
+        assert_eq!(date.minor_time_unit, Some(TimeUnit::Days));
+        assert_eq!(date.base_time_unit, Some(TimeUnit::Years));
+        assert!(!date.auto);
+
+        let Axis::Series(series) = &parsed.plot_area.axes[3] else {
+            unreachable!();
+        };
+        assert_eq!(series.tick_label_skip, Some(4));
+        assert_eq!(series.tick_mark_skip, Some(5));
     }
 }

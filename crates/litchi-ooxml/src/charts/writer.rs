@@ -369,6 +369,12 @@ fn write_bubble_chart<W: Write>(writer: &mut W, group: &BubbleTypeGroup) -> std:
 
     write_data_labels_default(writer)?;
 
+    write!(
+        writer,
+        r#"<c:bubble3D val="{}"/>"#,
+        if group.bubble_3d { "1" } else { "0" }
+    )?;
+
     // bubbleScale defaults to 100 if not specified
     let scale = group.bubble_scale.unwrap_or(100);
     write!(writer, r#"<c:bubbleScale val="{}"/>"#, scale)?;
@@ -381,6 +387,11 @@ fn write_bubble_chart<W: Write>(writer: &mut W, group: &BubbleTypeGroup) -> std:
         } else {
             "0"
         }
+    )?;
+    write!(
+        writer,
+        r#"<c:sizeRepresents val="{}"/>"#,
+        escape_xml(&group.size_represents)
     )?;
 
     write!(writer, r#"<c:axId val="1"/><c:axId val="2"/>"#)?;
@@ -711,7 +722,10 @@ fn write_bubble_series<W: Write>(writer: &mut W, series: &Series) -> std::io::Re
         write!(writer, "</c:tx>")?;
     }
 
-    // Bubble charts do NOT have xVal - only yVal and bubbleSize
+    if let Some(ref x_values) = series.x_values {
+        write_numeric_data_ref(writer, "c:xVal", x_values)?;
+    }
+
     if let Some(ref y_values) = series.y_values {
         write_numeric_data_ref(writer, "c:yVal", y_values)?;
     }
@@ -720,8 +734,11 @@ fn write_bubble_series<W: Write>(writer: &mut W, series: &Series) -> std::io::Re
         write_numeric_data_ref(writer, "c:bubbleSize", bubble_sizes)?;
     }
 
-    // Per OOXML spec, bubble3D appears in each series
-    write!(writer, r#"<c:bubble3D val="0"/>"#)?;
+    write!(
+        writer,
+        r#"<c:bubble3D val="{}"/>"#,
+        if series.bubble_3d { "1" } else { "0" }
+    )?;
 
     write!(writer, "</c:ser>")?;
 
@@ -839,15 +856,30 @@ fn write_axis<W: Write>(writer: &mut W, axis: &Axis) -> std::io::Result<()> {
     }
 }
 
-fn write_axis_common<W: Write>(writer: &mut W, common: &AxisCommon) -> std::io::Result<()> {
+fn write_axis_common<W: Write>(
+    writer: &mut W,
+    common: &AxisCommon,
+    min: Option<f64>,
+    max: Option<f64>,
+    log_base: Option<f64>,
+) -> std::io::Result<()> {
     write!(writer, r#"<c:axId val="{}"/>"#, common.axis_id)?;
 
     write!(writer, "<c:scaling>")?;
+    if let Some(log_base) = log_base {
+        write!(writer, r#"<c:logBase val="{}"/>"#, log_base)?;
+    }
     write!(
         writer,
         r#"<c:orientation val="{}"/>"#,
         common.orientation.xml_value()
     )?;
+    if let Some(max) = max {
+        write!(writer, r#"<c:max val="{}"/>"#, max)?;
+    }
+    if let Some(min) = min {
+        write!(writer, r#"<c:min val="{}"/>"#, min)?;
+    }
     write!(writer, "</c:scaling>")?;
 
     write!(
@@ -872,6 +904,19 @@ fn write_axis_common<W: Write>(writer: &mut W, common: &AxisCommon) -> std::io::
 
     if let Some(ref title) = common.title {
         write_title(writer, title)?;
+    }
+
+    if let Some(number_format) = &common.number_format {
+        write!(
+            writer,
+            r#"<c:numFmt formatCode="{}" sourceLinked="{}"/>"#,
+            escape_xml(&number_format.format_code),
+            if number_format.source_linked {
+                "1"
+            } else {
+                "0"
+            }
+        )?;
     }
 
     write!(
@@ -907,7 +952,7 @@ fn write_axis_common<W: Write>(writer: &mut W, common: &AxisCommon) -> std::io::
 
 fn write_category_axis<W: Write>(writer: &mut W, axis: &CategoryAxis) -> std::io::Result<()> {
     write!(writer, "<c:catAx>")?;
-    write_axis_common(writer, &axis.common)?;
+    write_axis_common(writer, &axis.common, None, None, None)?;
     write!(
         writer,
         r#"<c:auto val="{}"/>"#,
@@ -923,6 +968,12 @@ fn write_category_axis<W: Write>(writer: &mut W, axis: &CategoryAxis) -> std::io
         r#"<c:lblOffset val="{}"/>"#,
         axis.label_offset.unwrap_or(100)
     )?;
+    if let Some(skip) = axis.tick_label_skip {
+        write!(writer, r#"<c:tickLblSkip val="{}"/>"#, skip)?;
+    }
+    if let Some(skip) = axis.tick_mark_skip {
+        write!(writer, r#"<c:tickMarkSkip val="{}"/>"#, skip)?;
+    }
     write!(
         writer,
         r#"<c:noMultiLvlLbl val="{}"/>"#,
@@ -934,7 +985,7 @@ fn write_category_axis<W: Write>(writer: &mut W, axis: &CategoryAxis) -> std::io
 
 fn write_value_axis<W: Write>(writer: &mut W, axis: &ValueAxis) -> std::io::Result<()> {
     write!(writer, "<c:valAx>")?;
-    write_axis_common(writer, &axis.common)?;
+    write_axis_common(writer, &axis.common, axis.min, axis.max, axis.log_base)?;
 
     write!(
         writer,
@@ -942,17 +993,21 @@ fn write_value_axis<W: Write>(writer: &mut W, axis: &ValueAxis) -> std::io::Resu
         axis.cross_between.xml_value()
     )?;
 
-    if let Some(min) = axis.min {
-        write!(writer, r#"<c:scaling><c:min val="{}"/></c:scaling>"#, min)?;
-    }
-    if let Some(max) = axis.max {
-        write!(writer, r#"<c:scaling><c:max val="{}"/></c:scaling>"#, max)?;
-    }
     if let Some(major_unit) = axis.major_unit {
         write!(writer, r#"<c:majorUnit val="{}"/>"#, major_unit)?;
     }
     if let Some(minor_unit) = axis.minor_unit {
         write!(writer, r#"<c:minorUnit val="{}"/>"#, minor_unit)?;
+    }
+    if let Some(display_units) = &axis.display_units {
+        write!(writer, "<c:dispUnits>")?;
+        if let Some(unit) = display_units.built_in_unit {
+            write!(writer, r#"<c:builtInUnit val="{}"/>"#, unit.xml_value())?;
+        }
+        if let Some(unit) = display_units.custom_unit {
+            write!(writer, r#"<c:custUnit val="{}"/>"#, unit)?;
+        }
+        write!(writer, "</c:dispUnits>")?;
     }
 
     write!(writer, "</c:valAx>")?;
@@ -961,19 +1016,40 @@ fn write_value_axis<W: Write>(writer: &mut W, axis: &ValueAxis) -> std::io::Resu
 
 fn write_date_axis<W: Write>(writer: &mut W, axis: &DateAxis) -> std::io::Result<()> {
     write!(writer, "<c:dateAx>")?;
-    write_axis_common(writer, &axis.common)?;
+    write_axis_common(writer, &axis.common, axis.min, axis.max, None)?;
     write!(
         writer,
         r#"<c:auto val="{}"/>"#,
         if axis.auto { "1" } else { "0" }
     )?;
+    if let Some(unit) = axis.base_time_unit {
+        write!(writer, r#"<c:baseTimeUnit val="{}"/>"#, unit.xml_value())?;
+    }
+    if let Some(unit) = axis.major_unit {
+        write!(writer, r#"<c:majorUnit val="{}"/>"#, unit)?;
+    }
+    if let Some(unit) = axis.major_time_unit {
+        write!(writer, r#"<c:majorTimeUnit val="{}"/>"#, unit.xml_value())?;
+    }
+    if let Some(unit) = axis.minor_unit {
+        write!(writer, r#"<c:minorUnit val="{}"/>"#, unit)?;
+    }
+    if let Some(unit) = axis.minor_time_unit {
+        write!(writer, r#"<c:minorTimeUnit val="{}"/>"#, unit.xml_value())?;
+    }
     write!(writer, "</c:dateAx>")?;
     Ok(())
 }
 
 fn write_series_axis<W: Write>(writer: &mut W, axis: &SeriesAxis) -> std::io::Result<()> {
     write!(writer, "<c:serAx>")?;
-    write_axis_common(writer, &axis.common)?;
+    write_axis_common(writer, &axis.common, None, None, None)?;
+    if let Some(skip) = axis.tick_label_skip {
+        write!(writer, r#"<c:tickLblSkip val="{}"/>"#, skip)?;
+    }
+    if let Some(skip) = axis.tick_mark_skip {
+        write!(writer, r#"<c:tickMarkSkip val="{}"/>"#, skip)?;
+    }
     write!(writer, "</c:serAx>")?;
     Ok(())
 }
