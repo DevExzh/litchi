@@ -463,6 +463,7 @@ impl MutableSpreadsheet {
                     annotation: None,
                     validation_name: None,
                     style_name: None,
+                    matrix_span: None,
                     merge: Default::default(),
                     protect: None,
                     protected: None,
@@ -519,6 +520,7 @@ impl MutableSpreadsheet {
                 annotation: None,
                 validation_name: None,
                 style_name: None,
+                matrix_span: None,
                 merge: Default::default(),
                 protect: None,
                 protected: None,
@@ -582,6 +584,7 @@ impl MutableSpreadsheet {
                 annotation: None,
                 validation_name: None,
                 style_name: None,
+                matrix_span: None,
                 merge: Default::default(),
                 protect: None,
                 protected: None,
@@ -637,6 +640,7 @@ impl MutableSpreadsheet {
                 annotation: None,
                 validation_name: None,
                 style_name: None,
+                matrix_span: None,
                 merge: Default::default(),
                 protect: None,
                 protected: None,
@@ -674,6 +678,7 @@ impl MutableSpreadsheet {
                 annotation: None,
                 validation_name: None,
                 style_name: None,
+                matrix_span: None,
                 merge: Default::default(),
                 protect: None,
                 protected: None,
@@ -700,6 +705,63 @@ impl MutableSpreadsheet {
             .get_mut(row)
             .and_then(|row| row.cells.get_mut(col))
             .and_then(|cell| cell.style_name.take()))
+    }
+
+    /// Set matrix formula result dimensions on a cell.
+    pub fn set_cell_matrix_span(
+        &mut self,
+        sheet_index: usize,
+        row: usize,
+        col: usize,
+        row_span: usize,
+        column_span: usize,
+    ) -> Result<()> {
+        let sheet = self.sheets.get_mut(sheet_index).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(format!("Sheet index {sheet_index} out of bounds"))
+        })?;
+        let matrix_span = crate::ods::CellMatrixSpan::new(row_span, column_span)?;
+        while sheet.rows.len() <= row {
+            sheet.rows.push(Row {
+                cells: Vec::new(),
+                index: sheet.rows.len(),
+            });
+        }
+        let row_data = &mut sheet.rows[row];
+        while row_data.cells.len() <= col {
+            row_data.cells.push(Cell {
+                value: CellValue::Empty,
+                text: String::new(),
+                formula: None,
+                annotation: None,
+                validation_name: None,
+                style_name: None,
+                matrix_span: None,
+                merge: Default::default(),
+                protect: None,
+                protected: None,
+                row,
+                col: row_data.cells.len(),
+            });
+        }
+        row_data.cells[col].matrix_span = Some(matrix_span);
+        Ok(())
+    }
+
+    /// Remove matrix formula result dimensions from a cell.
+    pub fn clear_cell_matrix_span(
+        &mut self,
+        sheet_index: usize,
+        row: usize,
+        col: usize,
+    ) -> Result<bool> {
+        let sheet = self.sheets.get_mut(sheet_index).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(format!("Sheet index {sheet_index} out of bounds"))
+        })?;
+        Ok(sheet
+            .rows
+            .get_mut(row)
+            .and_then(|row| row.cells.get_mut(col))
+            .is_some_and(|cell| cell.matrix_span.take().is_some()))
     }
 
     /// Merge a rectangular cell range in a sheet.
@@ -1222,5 +1284,24 @@ mod tests {
                 .flat_map(|row| &row.cells)
                 .all(|cell| cell.merge() == crate::ods::CellMerge::None)
         );
+    }
+
+    #[test]
+    fn mutable_spreadsheet_round_trips_matrix_formula_spans() {
+        let mut mutable = MutableSpreadsheet::new();
+        mutable.add_sheet("Matrix").unwrap();
+        mutable.set_cell(0, 0, 0, CellValue::Number(1.0)).unwrap();
+        mutable.sheets_mut()[0].rows[0].cells[0].formula = Some("of:=SEQUENCE(4;3)".to_string());
+        assert!(mutable.set_cell_matrix_span(0, 0, 0, 0, 3).is_err());
+        mutable.set_cell_matrix_span(0, 0, 0, 4, 3).unwrap();
+
+        let mut output = Spreadsheet::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+        let cell = &output.sheets().unwrap()[0].rows[0].cells[0];
+        assert_eq!(
+            cell.matrix_span().map(|span| (span.rows(), span.columns())),
+            Some((4, 3))
+        );
+        assert!(mutable.clear_cell_matrix_span(0, 0, 0).unwrap());
+        assert!(!mutable.clear_cell_matrix_span(0, 0, 0).unwrap());
     }
 }

@@ -302,6 +302,7 @@ impl SpreadsheetBuilder {
                 annotation: None,
                 validation_name: None,
                 style_name: None,
+                matrix_span: None,
                 merge: Default::default(),
                 protect: None,
                 protected: None,
@@ -361,6 +362,7 @@ impl SpreadsheetBuilder {
                 annotation: None,
                 validation_name: None,
                 style_name: None,
+                matrix_span: None,
                 merge: Default::default(),
                 protect: None,
                 protected: None,
@@ -435,6 +437,7 @@ impl SpreadsheetBuilder {
                     annotation: None,
                     validation_name: None,
                     style_name: None,
+                    matrix_span: None,
                     merge: Default::default(),
                     protect: None,
                     protected: None,
@@ -502,6 +505,7 @@ impl SpreadsheetBuilder {
                     annotation: None,
                     validation_name: None,
                     style_name: None,
+                    matrix_span: None,
                     merge: Default::default(),
                     protect: None,
                     protected: None,
@@ -525,6 +529,7 @@ impl SpreadsheetBuilder {
             let annotation = row_data.cells[col].annotation.take();
             let validation_name = row_data.cells[col].validation_name.take();
             let style_name = row_data.cells[col].style_name.take();
+            let matrix_span = row_data.cells[col].matrix_span;
             let merge = row_data.cells[col].merge;
             let protect = row_data.cells[col].protect;
             let protected = row_data.cells[col].protected;
@@ -535,6 +540,7 @@ impl SpreadsheetBuilder {
                 annotation,
                 validation_name,
                 style_name,
+                matrix_span,
                 merge,
                 protect,
                 protected,
@@ -591,6 +597,7 @@ impl SpreadsheetBuilder {
                     annotation: None,
                     validation_name: None,
                     style_name: None,
+                    matrix_span: None,
                     merge: Default::default(),
                     protect: None,
                     protected: None,
@@ -635,6 +642,7 @@ impl SpreadsheetBuilder {
                 annotation: None,
                 validation_name: None,
                 style_name: None,
+                matrix_span: None,
                 merge: Default::default(),
                 protect: None,
                 protected: None,
@@ -695,6 +703,7 @@ impl SpreadsheetBuilder {
                 annotation: None,
                 validation_name: None,
                 style_name: None,
+                matrix_span: None,
                 merge: Default::default(),
                 protect: None,
                 protected: None,
@@ -743,6 +752,7 @@ impl SpreadsheetBuilder {
                 annotation: None,
                 validation_name: None,
                 style_name: None,
+                matrix_span: None,
                 merge: Default::default(),
                 protect: None,
                 protected: None,
@@ -780,6 +790,7 @@ impl SpreadsheetBuilder {
                 annotation: None,
                 validation_name: None,
                 style_name: None,
+                matrix_span: None,
                 merge: Default::default(),
                 protect: None,
                 protected: None,
@@ -799,6 +810,55 @@ impl SpreadsheetBuilder {
             .and_then(|sheet| sheet.rows.get_mut(row))
             .and_then(|row| row.cells.get_mut(col))
             .and_then(|cell| cell.style_name.take()))
+    }
+
+    /// Set matrix formula result dimensions on a cell in the current sheet.
+    pub fn set_cell_matrix_span(
+        &mut self,
+        row: usize,
+        col: usize,
+        row_span: usize,
+        column_span: usize,
+    ) -> Result<&mut Self> {
+        let matrix_span = crate::ods::CellMatrixSpan::new(row_span, column_span)?;
+        if self.sheets.is_empty() {
+            self.add_sheet("Sheet1")?;
+        }
+        let sheet = self.sheets.last_mut().expect("default sheet was added");
+        while sheet.rows.len() <= row {
+            sheet.rows.push(Row {
+                cells: Vec::new(),
+                index: sheet.rows.len(),
+            });
+        }
+        let row_data = &mut sheet.rows[row];
+        while row_data.cells.len() <= col {
+            row_data.cells.push(Cell {
+                text: String::new(),
+                value: CellValue::Empty,
+                formula: None,
+                annotation: None,
+                validation_name: None,
+                style_name: None,
+                matrix_span: None,
+                merge: Default::default(),
+                protect: None,
+                protected: None,
+                row,
+                col: row_data.cells.len(),
+            });
+        }
+        row_data.cells[col].matrix_span = Some(matrix_span);
+        Ok(self)
+    }
+
+    /// Remove matrix formula result dimensions from a cell.
+    pub fn clear_cell_matrix_span(&mut self, row: usize, col: usize) -> bool {
+        self.sheets
+            .last_mut()
+            .and_then(|sheet| sheet.rows.get_mut(row))
+            .and_then(|row| row.cells.get_mut(col))
+            .is_some_and(|cell| cell.matrix_span.take().is_some())
     }
 
     /// Merge a rectangular range in the current sheet.
@@ -1516,6 +1576,7 @@ mod tests {
                 annotation: None,
                 validation_name: None,
                 style_name: None,
+                matrix_span: None,
                 merge: Default::default(),
                 protect: None,
                 protected: None,
@@ -1529,6 +1590,7 @@ mod tests {
                 annotation: None,
                 validation_name: None,
                 style_name: None,
+                matrix_span: None,
                 merge: Default::default(),
                 protect: None,
                 protected: None,
@@ -1792,5 +1854,18 @@ mod tests {
             .set_cell(0, 1, CellValue::Text("occupied".to_string()))
             .unwrap();
         assert!(builder.merge_cells(0, 0, 1, 2).is_err());
+    }
+
+    #[test]
+    fn builder_sets_and_clears_matrix_formula_spans() {
+        let mut builder = SpreadsheetBuilder::new();
+        assert!(builder.set_cell_matrix_span(0, 0, 0, 2).is_err());
+        builder.set_cell_formula(0, 0, "of:=SEQUENCE(3;2)").unwrap();
+        builder.set_cell_matrix_span(0, 0, 3, 2).unwrap();
+        let xml = builder.generate_content_xml();
+        assert!(xml.contains(r#"table:number-matrix-rows-spanned="3""#));
+        assert!(xml.contains(r#"table:number-matrix-columns-spanned="2""#));
+        assert!(builder.clear_cell_matrix_span(0, 0));
+        assert!(!builder.clear_cell_matrix_span(0, 0));
     }
 }

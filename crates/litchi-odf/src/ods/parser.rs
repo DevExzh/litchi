@@ -1,8 +1,8 @@
 //! ODS-specific parsing utilities.
 
 use super::{
-    Cell, CellMerge, CellValue, NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange,
-    NamedRangeUsage, Row, Sheet,
+    Cell, CellMatrixSpan, CellMerge, CellValue, NamedDefinition, NamedDefinitionScope,
+    NamedExpression, NamedRange, NamedRangeUsage, Row, Sheet,
     annotation::{AnnotationBuilder, decode_reference},
 };
 use litchi_core::{Error, Result};
@@ -757,6 +757,8 @@ impl OdsParser {
         let mut repeated = 1;
         let mut row_span = 1;
         let mut column_span = 1;
+        let mut matrix_row_span = None;
+        let mut matrix_column_span = None;
 
         for attr_result in e.attributes() {
             let attr = attr_result
@@ -798,6 +800,18 @@ impl OdsParser {
                 row_span = Self::parse_positive_usize(&attr, decoder, "number-rows-spanned")?;
             } else if is_table("number-columns-spanned") {
                 column_span = Self::parse_positive_usize(&attr, decoder, "number-columns-spanned")?;
+            } else if is_table("number-matrix-rows-spanned") {
+                matrix_row_span = Some(Self::parse_positive_usize(
+                    &attr,
+                    decoder,
+                    "number-matrix-rows-spanned",
+                )?);
+            } else if is_table("number-matrix-columns-spanned") {
+                matrix_column_span = Some(Self::parse_positive_usize(
+                    &attr,
+                    decoder,
+                    "number-matrix-columns-spanned",
+                )?);
             }
         }
 
@@ -808,6 +822,14 @@ impl OdsParser {
             formula,
             validation_name,
             style_name,
+            matrix_span: if matrix_row_span.is_some() || matrix_column_span.is_some() {
+                Some(CellMatrixSpan::new(
+                    matrix_row_span.unwrap_or(1),
+                    matrix_column_span.unwrap_or(1),
+                )?)
+            } else {
+                None
+            },
             protect,
             protected,
             repeated,
@@ -978,6 +1000,7 @@ pub(crate) struct CellBuilder {
     formula: Option<String>,
     validation_name: Option<String>,
     style_name: Option<String>,
+    matrix_span: Option<CellMatrixSpan>,
     protect: Option<bool>,
     protected: Option<bool>,
     repeated: usize,
@@ -997,6 +1020,7 @@ impl CellBuilder {
             annotation: self.annotation.clone(),
             validation_name: self.validation_name.clone(),
             style_name: self.style_name.clone(),
+            matrix_span: self.matrix_span,
             merge: self.merge,
             protect: self.protect,
             protected: self.protected,
@@ -1401,7 +1425,7 @@ mod tests {
 
     #[test]
     fn parses_repeated_rows_and_merged_cell_coordinates() {
-        let xml = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><office:body><office:spreadsheet><table:table table:name="Merged"><table:table-row table:number-rows-repeated="2"><table:table-cell office:value-type="string"><text:p>A</text:p></table:table-cell></table:table-row><table:table-row><table:table-cell table:number-rows-spanned="2" table:number-columns-spanned="2" office:value-type="string"><text:p>anchor</text:p></table:table-cell><table:covered-table-cell/><table:table-cell office:value-type="string"><text:p>C</text:p></table:table-cell></table:table-row><table:table-row><table:covered-table-cell table:number-columns-repeated="2"/></table:table-row></table:table></office:spreadsheet></office:body></office:document-content>"#;
+        let xml = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><office:body><office:spreadsheet><table:table table:name="Merged"><table:table-row table:number-rows-repeated="2"><table:table-cell office:value-type="string"><text:p>A</text:p></table:table-cell></table:table-row><table:table-row><table:table-cell table:number-rows-spanned="2" table:number-columns-spanned="2" office:value-type="string"><text:p>anchor</text:p></table:table-cell><table:covered-table-cell/><table:table-cell table:number-matrix-rows-spanned="3" table:number-matrix-columns-spanned="2" office:value-type="string"><text:p>C</text:p></table:table-cell></table:table-row><table:table-row><table:covered-table-cell table:number-columns-repeated="2"/></table:table-row></table:table></office:spreadsheet></office:body></office:document-content>"#;
         let sheets = OdsParser::parse_sheets(xml).unwrap();
         let rows = &sheets[0].rows;
         assert_eq!(rows.len(), 4);
@@ -1410,6 +1434,12 @@ mod tests {
         assert_eq!(rows[2].cells[0].span(), Some((2, 2)));
         assert_eq!(rows[2].cells[1].merge(), CellMerge::Covered);
         assert_eq!(rows[2].cells[2].text, "C");
+        assert_eq!(
+            rows[2].cells[2]
+                .matrix_span()
+                .map(|span| (span.rows(), span.columns())),
+            Some((3, 2))
+        );
         assert_eq!(rows[2].cells[2].coordinates(), (2, 2));
         assert_eq!(rows[3].cells.len(), 2);
         assert!(
@@ -1465,6 +1495,7 @@ mod tests {
                 annotation: None,
                 validation_name: None,
                 style_name: None,
+                matrix_span: None,
                 merge: Default::default(),
                 protect: None,
                 protected: None,
@@ -1493,6 +1524,7 @@ mod tests {
             annotation: None,
             validation_name: None,
             style_name: None,
+            matrix_span: None,
             merge: Default::default(),
             protect: None,
             protected: None,
@@ -1508,6 +1540,7 @@ mod tests {
             annotation: None,
             validation_name: None,
             style_name: None,
+            matrix_span: None,
             merge: Default::default(),
             protect: None,
             protected: None,
@@ -1533,6 +1566,7 @@ mod tests {
             annotation: None,
             validation_name: None,
             style_name: None,
+            matrix_span: None,
             merge: Default::default(),
             protect: None,
             protected: None,
@@ -1553,6 +1587,7 @@ mod tests {
             annotation: None,
             validation_name: None,
             style_name: None,
+            matrix_span: None,
             merge: Default::default(),
             protect: None,
             protected: None,
@@ -1573,6 +1608,7 @@ mod tests {
             annotation: None,
             validation_name: None,
             style_name: None,
+            matrix_span: None,
             merge: Default::default(),
             protect: None,
             protected: None,
@@ -1595,6 +1631,7 @@ mod tests {
             annotation: None,
             validation_name: None,
             style_name: None,
+            matrix_span: None,
             merge: Default::default(),
             protect: None,
             protected: None,
@@ -1618,6 +1655,7 @@ mod tests {
             annotation: None,
             validation_name: None,
             style_name: None,
+            matrix_span: None,
             merge: Default::default(),
             protect: None,
             protected: None,
@@ -1638,6 +1676,7 @@ mod tests {
             annotation: None,
             validation_name: None,
             style_name: None,
+            matrix_span: None,
             merge: Default::default(),
             protect: None,
             protected: None,
@@ -1660,6 +1699,7 @@ mod tests {
             annotation: None,
             validation_name: None,
             style_name: None,
+            matrix_span: None,
             merge: Default::default(),
             protect: None,
             protected: None,
@@ -1682,6 +1722,7 @@ mod tests {
             annotation: None,
             validation_name: None,
             style_name: None,
+            matrix_span: None,
             merge: Default::default(),
             protect: None,
             protected: None,

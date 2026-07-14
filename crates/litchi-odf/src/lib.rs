@@ -234,7 +234,7 @@ pub use litchi_core::unit::{Length, LengthUnit};
 // Re-export main types for convenience
 pub use odp::{MutablePresentation, Presentation, PresentationBuilder};
 pub use ods::{
-    AnnotationElement, AnnotationNode, Cell as SCell, CellAnnotation, CellMerge,
+    AnnotationElement, AnnotationNode, Cell as SCell, CellAnnotation, CellMatrixSpan, CellMerge,
     CellStyleProtection, CellValue, ContentValidation, FormulaNamespace, MutableSpreadsheet,
     NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange, NamedRangeUsage,
     ProtectionKey, Row as SRow, Sheet, SheetProtection, SheetProtectionOptions, Spreadsheet,
