@@ -72,7 +72,7 @@ pub use paragraph::{Paragraph, Run};
 pub use parts::numbering::{ListLevel, ListTables, NumberFormat};
 pub use shapes::DocShape;
 pub use table::{Cell, Row, Table};
-pub use writer::{CharacterFormatting, DocWriteError, DocWriter, ParagraphFormatting};
+pub use writer::{CharacterFormatting, DocWriteError, DocWriter, LineSpacing, ParagraphFormatting};
 
 /// Crate-native ordered document element returned by [`Document::elements`].
 ///

@@ -52,7 +52,7 @@ pub mod hyperlinks;
 pub mod numbering;
 
 // Re-export public types
-pub use core::{CharacterFormatting, DocWriteError, DocWriter, ParagraphFormatting};
+pub use core::{CharacterFormatting, DocWriteError, DocWriter, LineSpacing, ParagraphFormatting};
 pub use fib::FibBuilder;
 pub use fkp::{ChpxFkpBuilder, PapxFkpBuilder};
 pub use footnotes::{EndnotesWriter, FootnoteEntry, FootnotesWriter};

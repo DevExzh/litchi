@@ -152,12 +152,93 @@ pub struct CharacterFormatting {
 }
 
 /// Line spacing descriptor for paragraphs, equivalent to POI's LineSpacingDescriptor (LSPD).
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct LineSpacing {
     /// Line height. If `is_multiple` is false, value is in twips. If true, value is in 240ths of a line.
     pub dya_line: i16,
     /// Whether `dya_line` is a multiple of single line (value is 240ths of a line) instead of twips.
     pub is_multiple: bool,
+}
+
+impl LineSpacing {
+    /// Single-line spacing (240/240 of a line).
+    pub const fn single() -> Self {
+        Self {
+            dya_line: 240,
+            is_multiple: true,
+        }
+    }
+
+    /// One-and-a-half-line spacing (360/240 of a line).
+    pub const fn one_and_half() -> Self {
+        Self {
+            dya_line: 360,
+            is_multiple: true,
+        }
+    }
+
+    /// Double-line spacing (480/240 of a line).
+    pub const fn double() -> Self {
+        Self {
+            dya_line: 480,
+            is_multiple: true,
+        }
+    }
+
+    /// Create proportional line spacing expressed in 240ths of one line.
+    pub fn multiple_240ths(value: u16) -> Result<Self, DocWriteError> {
+        let dya_line = i16::try_from(value).map_err(|_| {
+            DocWriteError::InvalidData(format!(
+                "line-spacing multiple {value} exceeds the signed LSPD range"
+            ))
+        })?;
+        if dya_line == 0 {
+            return Err(DocWriteError::InvalidData(
+                "line-spacing multiple must be greater than zero".into(),
+            ));
+        }
+        Ok(Self {
+            dya_line,
+            is_multiple: true,
+        })
+    }
+
+    /// Create minimum line spacing in twips.
+    pub fn at_least_twips(value: u16) -> Result<Self, DocWriteError> {
+        let dya_line = i16::try_from(value).map_err(|_| {
+            DocWriteError::InvalidData(format!(
+                "minimum line spacing {value} twips exceeds the signed LSPD range"
+            ))
+        })?;
+        if dya_line == 0 {
+            return Err(DocWriteError::InvalidData(
+                "minimum line spacing must be greater than zero".into(),
+            ));
+        }
+        Ok(Self {
+            dya_line,
+            is_multiple: false,
+        })
+    }
+
+    /// Create exact line spacing in twips.
+    pub fn exact_twips(value: u16) -> Result<Self, DocWriteError> {
+        if value == 0 || value > 32_768 {
+            return Err(DocWriteError::InvalidData(format!(
+                "exact line spacing {value} twips is outside the LSPD range 1..=32768"
+            )));
+        }
+        Ok(Self {
+            dya_line: -(i32::from(value)) as i16,
+            is_multiple: false,
+        })
+    }
+}
+
+impl Default for LineSpacing {
+    fn default() -> Self {
+        Self::single()
+    }
 }
 
 /// Paragraph formatting properties
@@ -2032,8 +2113,6 @@ fn build_papx_grpprl(fmt: &ParagraphFormatting) -> Vec<u8> {
         grp.extend_from_slice(&bytes);
     }
 
-    // Line spacing is more complex (structure) -> TODO implement later to ensure spec compliance
-
     grp
 }
 
@@ -2289,8 +2368,48 @@ mod tests {
     #[test]
     fn test_line_spacing_default() {
         let ls = LineSpacing::default();
-        assert_eq!(ls.dya_line, 0);
-        assert!(!ls.is_multiple);
+        assert_eq!(ls, LineSpacing::single());
+        assert_eq!(ls.dya_line, 240);
+        assert!(ls.is_multiple);
+    }
+
+    #[test]
+    fn test_line_spacing_constructors_and_sprm_encoding() {
+        let cases = [
+            (LineSpacing::single(), [0xf0, 0x00, 0x01, 0x00]),
+            (LineSpacing::one_and_half(), [0x68, 0x01, 0x01, 0x00]),
+            (LineSpacing::double(), [0xe0, 0x01, 0x01, 0x00]),
+            (
+                LineSpacing::multiple_240ths(300).unwrap(),
+                [0x2c, 0x01, 0x01, 0x00],
+            ),
+            (
+                LineSpacing::at_least_twips(240).unwrap(),
+                [0xf0, 0x00, 0x00, 0x00],
+            ),
+            (
+                LineSpacing::exact_twips(240).unwrap(),
+                [0x10, 0xff, 0x00, 0x00],
+            ),
+        ];
+
+        for (line_spacing, operand) in cases {
+            let formatting = ParagraphFormatting {
+                line_spacing: Some(line_spacing),
+                ..ParagraphFormatting::default()
+            };
+            let mut expected = SPRM_P_DYA_LINE.to_le_bytes().to_vec();
+            expected.extend_from_slice(&operand);
+            assert_eq!(build_papx_grpprl(&formatting), expected);
+        }
+
+        assert_eq!(LineSpacing::exact_twips(32_768).unwrap().dya_line, i16::MIN);
+        assert!(LineSpacing::multiple_240ths(0).is_err());
+        assert!(LineSpacing::multiple_240ths(32_768).is_err());
+        assert!(LineSpacing::at_least_twips(0).is_err());
+        assert!(LineSpacing::at_least_twips(32_768).is_err());
+        assert!(LineSpacing::exact_twips(0).is_err());
+        assert!(LineSpacing::exact_twips(32_769).is_err());
     }
 
     #[test]
