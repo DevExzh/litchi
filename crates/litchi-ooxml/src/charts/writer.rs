@@ -8,9 +8,9 @@ use crate::charts::legend::Legend;
 use crate::charts::models::{Layout, NumericData, StringData, TitleText};
 use crate::charts::plot_area::{
     Area3DTypeGroup, AreaTypeGroup, Bar3DTypeGroup, BarTypeGroup, BubbleTypeGroup,
-    DoughnutTypeGroup, Line3DTypeGroup, LineTypeGroup, Pie3DTypeGroup, PieTypeGroup, PlotArea,
-    RadarTypeGroup, ScatterTypeGroup, StockTypeGroup, Surface3DTypeGroup, SurfaceTypeGroup,
-    TypeGroup,
+    DoughnutTypeGroup, Line3DTypeGroup, LineTypeGroup, OfPieTypeGroup, Pie3DTypeGroup,
+    PieTypeGroup, PlotArea, RadarTypeGroup, ScatterTypeGroup, StockTypeGroup, Surface3DTypeGroup,
+    SurfaceTypeGroup, TypeGroup,
 };
 use crate::charts::series::{
     DataLabels, DataPoint, ErrorBar, ErrorBarDirection, ErrorBarType, ErrorBarValueType, Series,
@@ -343,6 +343,7 @@ fn write_type_group<W: Write>(writer: &mut W, type_group: &TypeGroup) -> std::io
         TypeGroup::Doughnut(group) => write_doughnut_chart(writer, group),
         TypeGroup::Line(group) => write_line_chart(writer, group),
         TypeGroup::Line3D(group) => write_line_3d_chart(writer, group),
+        TypeGroup::OfPie(group) => write_of_pie_chart(writer, group),
         TypeGroup::Pie(group) => write_pie_chart(writer, group),
         TypeGroup::Pie3D(group) => write_pie_3d_chart(writer, group),
         TypeGroup::Radar(group) => write_radar_chart(writer, group),
@@ -628,6 +629,64 @@ fn write_pie_chart<W: Write>(writer: &mut W, group: &PieTypeGroup) -> std::io::R
     )?;
     write!(writer, "</c:pieChart>")?;
 
+    Ok(())
+}
+
+fn write_of_pie_chart<W: Write>(writer: &mut W, group: &OfPieTypeGroup) -> std::io::Result<()> {
+    if group.gap_width.is_some_and(|value| value > 500) {
+        return Err(invalid_chart_input(
+            "of-pie chart gap width must be between 0 and 500",
+        ));
+    }
+    if group
+        .second_pie_size
+        .is_some_and(|value| !(5..=200).contains(&value))
+    {
+        return Err(invalid_chart_input(
+            "of-pie chart secondary size must be between 5 and 200",
+        ));
+    }
+    if group.split_position.is_some_and(|value| !value.is_finite()) {
+        return Err(invalid_chart_input(
+            "of-pie chart split position must be finite",
+        ));
+    }
+
+    write!(writer, "<c:ofPieChart>")?;
+    write!(
+        writer,
+        r#"<c:ofPieType val="{}"/>"#,
+        group.of_pie_type.xml_value()
+    )?;
+    write!(
+        writer,
+        r#"<c:varyColors val="{}"/>"#,
+        if group.common.vary_colors { "1" } else { "0" }
+    )?;
+    for series in &group.common.series {
+        write_series(writer, series, SeriesFeatures::PIE)?;
+    }
+    write_data_labels_default(writer)?;
+    if let Some(gap_width) = group.gap_width {
+        write!(writer, r#"<c:gapWidth val="{gap_width}"/>"#)?;
+    }
+    if let Some(split_type) = group.split_type {
+        write!(writer, r#"<c:splitType val="{}"/>"#, split_type.xml_value())?;
+    }
+    if let Some(split_position) = group.split_position {
+        write!(writer, r#"<c:splitPos val="{split_position}"/>"#)?;
+    }
+    if let Some(points) = group.custom_split_points.as_ref() {
+        write!(writer, "<c:custSplit>")?;
+        for point in points {
+            write!(writer, r#"<c:secondPiePt val="{point}"/>"#)?;
+        }
+        write!(writer, "</c:custSplit>")?;
+    }
+    if let Some(second_pie_size) = group.second_pie_size {
+        write!(writer, r#"<c:secondPieSize val="{second_pie_size}"/>"#)?;
+    }
+    write!(writer, "</c:ofPieChart>")?;
     Ok(())
 }
 

@@ -86,9 +86,9 @@ pub use models::{
 };
 pub use plot_area::{
     Area3DTypeGroup, AreaTypeGroup, Bar3DTypeGroup, BarTypeGroup, BubbleTypeGroup,
-    DoughnutTypeGroup, Line3DTypeGroup, LineTypeGroup, Pie3DTypeGroup, PieTypeGroup, PlotArea,
-    RadarTypeGroup, ScatterTypeGroup, StockTypeGroup, Surface3DTypeGroup, SurfaceTypeGroup,
-    TypeGroup,
+    DoughnutTypeGroup, Line3DTypeGroup, LineTypeGroup, OfPieTypeGroup, Pie3DTypeGroup,
+    PieTypeGroup, PlotArea, RadarTypeGroup, ScatterTypeGroup, StockTypeGroup, Surface3DTypeGroup,
+    SurfaceTypeGroup, TypeGroup,
 };
 pub use series::{DataLabels, DataPoint, Series};
-pub use types::ChartType;
+pub use types::{ChartType, OfPieSplitType, OfPieType};

@@ -14,9 +14,9 @@ use crate::charts::models::{
 };
 use crate::charts::plot_area::{
     Area3DTypeGroup, AreaTypeGroup, Bar3DTypeGroup, BarShape, BarTypeGroup, BubbleTypeGroup,
-    DoughnutTypeGroup, Line3DTypeGroup, LineTypeGroup, Pie3DTypeGroup, PieTypeGroup, PlotArea,
-    RadarTypeGroup, ScatterTypeGroup, StockTypeGroup, Surface3DTypeGroup, SurfaceTypeGroup,
-    TypeGroup, TypeGroupCommon,
+    DoughnutTypeGroup, Line3DTypeGroup, LineTypeGroup, OfPieTypeGroup, Pie3DTypeGroup,
+    PieTypeGroup, PlotArea, RadarTypeGroup, ScatterTypeGroup, StockTypeGroup, Surface3DTypeGroup,
+    SurfaceTypeGroup, TypeGroup, TypeGroupCommon,
 };
 use crate::charts::series::{
     DataLabel, DataLabels, DataPoint, ErrorBar, ErrorBarDirection, ErrorBarType, ErrorBarValueType,
@@ -24,8 +24,8 @@ use crate::charts::series::{
 };
 use crate::charts::types::{
     AxisOrientation, AxisPosition, BarDirection, BarGrouping, DataLabelPosition, DisplayBlanks,
-    LayoutMode, LayoutTarget, LegendPosition, MarkerStyle, RadarStyle, ScatterStyle,
-    TickLabelPosition, TickMark,
+    LayoutMode, LayoutTarget, LegendPosition, MarkerStyle, OfPieSplitType, OfPieType, RadarStyle,
+    ScatterStyle, TickLabelPosition, TickMark,
 };
 use crate::common::xml::{decode_xml_reference, is_drawingml_chart_name, is_drawingml_name};
 use crate::error::{OoxmlError, Result};
@@ -516,6 +516,11 @@ fn parse_plot_area<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<PlotAre
                             .type_groups
                             .push(TypeGroup::Line3D(parse_line_3d_chart(reader)?));
                     },
+                    b"ofPieChart" => {
+                        plot_area
+                            .type_groups
+                            .push(TypeGroup::OfPie(parse_of_pie_chart(reader)?));
+                    },
                     b"pie3DChart" => {
                         plot_area
                             .type_groups
@@ -779,6 +784,163 @@ fn parse_pie_3d_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Pie3
     let mut group = Pie3DTypeGroup::new();
     group.common = parse_common_type_group(reader, b"pie3DChart", |_| Ok(()))?;
     Ok(group)
+}
+
+fn parse_of_pie_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<OfPieTypeGroup> {
+    let mut group = OfPieTypeGroup::new(OfPieType::Pie);
+    let mut saw_of_pie_type = false;
+    let mut saw_gap_width = false;
+    let mut saw_split_type = false;
+    let mut saw_split_position = false;
+    let mut saw_custom_split = false;
+    let mut saw_second_pie_size = false;
+    let mut buf = Vec::new();
+
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"custSplit" => {
+                if saw_custom_split {
+                    return Err(OoxmlError::InvalidFormat(
+                        "of-pie chart contains duplicate custom splits".into(),
+                    ));
+                }
+                saw_custom_split = true;
+                group.custom_split_points = Some(parse_custom_pie_split(reader)?);
+            },
+            Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"custSplit" => {
+                if saw_custom_split {
+                    return Err(OoxmlError::InvalidFormat(
+                        "of-pie chart contains duplicate custom splits".into(),
+                    ));
+                }
+                saw_custom_split = true;
+                group.custom_split_points = Some(Vec::new());
+            },
+            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element)) => {
+                match element.local_name().as_ref() {
+                    b"ofPieType" => {
+                        if saw_of_pie_type {
+                            return Err(OoxmlError::InvalidFormat(
+                                "of-pie chart contains duplicate plot types".into(),
+                            ));
+                        }
+                        saw_of_pie_type = true;
+                        group.of_pie_type = match get_attr(element, b"val").as_deref() {
+                            None | Some(b"pie") => OfPieType::Pie,
+                            Some(b"bar") => OfPieType::Bar,
+                            Some(value) => return Err(invalid_attribute("of-pie type", value)),
+                        };
+                    },
+                    b"varyColors" => group.common.vary_colors = parse_bool_attr(element)?,
+                    b"ser" => {
+                        if let Some(series) = parse_series(reader)? {
+                            group.common.series.push(series);
+                        }
+                    },
+                    b"gapWidth" => {
+                        if saw_gap_width {
+                            return Err(OoxmlError::InvalidFormat(
+                                "of-pie chart contains duplicate gap widths".into(),
+                            ));
+                        }
+                        saw_gap_width = true;
+                        group.gap_width = Some(match get_attr(element, b"val") {
+                            Some(_) => {
+                                bounded_percentage_u32_attr(element, "of-pie gap width", 0, 500)?
+                            },
+                            None => 150,
+                        });
+                    },
+                    b"splitType" => {
+                        if saw_split_type {
+                            return Err(OoxmlError::InvalidFormat(
+                                "of-pie chart contains duplicate split types".into(),
+                            ));
+                        }
+                        saw_split_type = true;
+                        group.split_type = Some(match get_attr(element, b"val").as_deref() {
+                            None | Some(b"auto") => OfPieSplitType::Automatic,
+                            Some(b"cust") => OfPieSplitType::Custom,
+                            Some(b"percent") => OfPieSplitType::Percent,
+                            Some(b"pos") => OfPieSplitType::Position,
+                            Some(b"val") => OfPieSplitType::Value,
+                            Some(value) => {
+                                return Err(invalid_attribute("of-pie split type", value));
+                            },
+                        });
+                    },
+                    b"splitPos" => {
+                        if saw_split_position {
+                            return Err(OoxmlError::InvalidFormat(
+                                "of-pie chart contains duplicate split positions".into(),
+                            ));
+                        }
+                        saw_split_position = true;
+                        group.split_position =
+                            Some(required_f64_attr(element, "of-pie split position")?);
+                    },
+                    b"secondPieSize" => {
+                        if saw_second_pie_size {
+                            return Err(OoxmlError::InvalidFormat(
+                                "of-pie chart contains duplicate secondary sizes".into(),
+                            ));
+                        }
+                        saw_second_pie_size = true;
+                        group.second_pie_size = Some(match get_attr(element, b"val") {
+                            Some(_) => bounded_percentage_u32_attr(
+                                element,
+                                "of-pie secondary size",
+                                5,
+                                200,
+                            )?,
+                            None => 75,
+                        });
+                    },
+                    _ => {},
+                }
+            },
+            Ok(Event::End(ref element)) if element.local_name().as_ref() == b"ofPieChart" => break,
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated of-pie chart".into(),
+                ));
+            },
+            Err(error) => return Err(error),
+            _ => {},
+        }
+        buf.clear();
+    }
+
+    if !saw_of_pie_type {
+        return Err(OoxmlError::InvalidFormat(
+            "of-pie chart is missing its plot type".into(),
+        ));
+    }
+    Ok(group)
+}
+
+fn parse_custom_pie_split<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Vec<u32>> {
+    let mut points = Vec::new();
+    let mut buf = Vec::new();
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element))
+                if element.local_name().as_ref() == b"secondPiePt" =>
+            {
+                points.push(required_u32_attr(element, "of-pie secondary point")?);
+            },
+            Ok(Event::End(ref element)) if element.local_name().as_ref() == b"custSplit" => break,
+            Ok(Event::Eof) => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated of-pie custom split".into(),
+                ));
+            },
+            Err(error) => return Err(error),
+            _ => {},
+        }
+        buf.clear();
+    }
+    Ok(points)
 }
 
 fn parse_radar_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<RadarTypeGroup> {
@@ -3144,6 +3306,26 @@ fn bounded_u32_attr(
     Ok(value)
 }
 
+fn bounded_percentage_u32_attr(
+    element: &BytesStart<'_>,
+    description: &str,
+    minimum: u32,
+    maximum: u32,
+) -> Result<u32> {
+    let value = get_attr(element, b"val").ok_or_else(|| missing_attribute(description))?;
+    let text = std::str::from_utf8(&value).map_err(|_| invalid_attribute(description, &value))?;
+    let digits = text.strip_suffix('%').unwrap_or(text);
+    let parsed = digits
+        .parse::<u32>()
+        .map_err(|_| invalid_attribute(description, &value))?;
+    if !(minimum..=maximum).contains(&parsed) {
+        return Err(OoxmlError::InvalidFormat(format!(
+            "{description} must be between {minimum} and {maximum}"
+        )));
+    }
+    Ok(parsed)
+}
+
 fn missing_attribute(description: &str) -> OoxmlError {
     OoxmlError::InvalidFormat(format!("{description} is missing its value"))
 }
@@ -3317,6 +3499,74 @@ mod tests {
     }
 
     #[test]
+    fn parses_of_pie_schema_defaults_and_empty_custom_split() {
+        let xml =
+            br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
+            <c:chart><c:plotArea><c:ofPieChart><c:ofPieType/>
+                <c:gapWidth/><c:splitType/><c:custSplit/><c:secondPieSize/>
+            </c:ofPieChart></c:plotArea></c:chart>
+        </c:chartSpace>"#;
+
+        let chart = parse_chart(xml.as_slice()).unwrap();
+        let [TypeGroup::OfPie(group)] = chart.plot_area.type_groups.as_slice() else {
+            panic!("expected an of-pie chart");
+        };
+        assert_eq!(group.of_pie_type, OfPieType::Pie);
+        assert_eq!(group.gap_width, Some(150));
+        assert_eq!(group.split_type, Some(OfPieSplitType::Automatic));
+        assert_eq!(group.custom_split_points.as_deref(), Some([].as_slice()));
+        assert_eq!(group.second_pie_size, Some(75));
+
+        let percent_xml =
+            br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
+            <c:chart><c:plotArea><c:ofPieChart><c:ofPieType val="bar"/>
+                <c:gapWidth val="225%"/><c:secondPieSize val="80%"/>
+            </c:ofPieChart></c:plotArea></c:chart>
+        </c:chartSpace>"#;
+        let chart = parse_chart(percent_xml.as_slice()).unwrap();
+        let [TypeGroup::OfPie(group)] = chart.plot_area.type_groups.as_slice() else {
+            panic!("expected an of-pie chart");
+        };
+        assert_eq!(group.gap_width, Some(225));
+        assert_eq!(group.second_pie_size, Some(80));
+    }
+
+    #[test]
+    fn rejects_invalid_of_pie_input_and_output() {
+        for xml in [
+            br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea><c:ofPieChart/></c:plotArea></c:chart></c:chartSpace>"#.as_slice(),
+            br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea><c:ofPieChart><c:ofPieType val="ring"/></c:ofPieChart></c:plotArea></c:chart></c:chartSpace>"#.as_slice(),
+            br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea><c:ofPieChart><c:ofPieType/><c:gapWidth val="501"/></c:ofPieChart></c:plotArea></c:chart></c:chartSpace>"#.as_slice(),
+            br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea><c:ofPieChart><c:ofPieType/><c:secondPieSize val="4"/></c:ofPieChart></c:plotArea></c:chart></c:chartSpace>"#.as_slice(),
+            br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea><c:ofPieChart><c:ofPieType/><c:splitPos val="NaN"/></c:ofPieChart></c:plotArea></c:chart></c:chartSpace>"#.as_slice(),
+        ] {
+            assert!(parse_chart(xml).is_err());
+        }
+
+        for invalid_group in [
+            OfPieTypeGroup {
+                gap_width: Some(501),
+                ..OfPieTypeGroup::new(OfPieType::Pie)
+            },
+            OfPieTypeGroup {
+                split_position: Some(f64::INFINITY),
+                ..OfPieTypeGroup::new(OfPieType::Pie)
+            },
+            OfPieTypeGroup {
+                second_pie_size: Some(4),
+                ..OfPieTypeGroup::new(OfPieType::Pie)
+            },
+        ] {
+            let mut chart = Chart::new();
+            chart
+                .plot_area
+                .type_groups
+                .push(TypeGroup::OfPie(invalid_group));
+            assert!(crate::charts::writer::write_chart(&mut Vec::new(), &chart).is_err());
+        }
+    }
+
+    #[test]
     fn writer_rejects_invalid_display_units_and_duplicate_legend_entries() {
         let mut chart = Chart::new();
         let mut axis = ValueAxis::new(1, AxisPosition::Left, 2);
@@ -3431,6 +3681,13 @@ mod tests {
             no_end_cap: false,
         });
         scatter.common.series.push(scatter_series);
+        let mut of_pie = OfPieTypeGroup::new(OfPieType::Bar);
+        of_pie.common.vary_colors = true;
+        of_pie.gap_width = Some(225);
+        of_pie.split_type = Some(OfPieSplitType::Custom);
+        of_pie.split_position = Some(3.5);
+        of_pie.custom_split_points = Some(vec![1, 4]);
+        of_pie.second_pie_size = Some(80);
 
         let mut chart = Chart::new();
         chart.plot_area.type_groups = vec![
@@ -3445,6 +3702,7 @@ mod tests {
             TypeGroup::Doughnut(doughnut),
             TypeGroup::Line(LineTypeGroup::new(BarGrouping::Standard)),
             TypeGroup::Line3D(Line3DTypeGroup::new(BarGrouping::PercentStacked)),
+            TypeGroup::OfPie(of_pie),
             TypeGroup::Pie(PieTypeGroup::new()),
             TypeGroup::Pie3D(Pie3DTypeGroup::new()),
             TypeGroup::Radar(RadarTypeGroup::new(RadarStyle::Filled)),
@@ -3458,7 +3716,7 @@ mod tests {
         crate::charts::writer::write_chart(&mut xml, &chart).unwrap();
         let parsed = parse_chart(xml.as_slice()).unwrap();
 
-        assert_eq!(parsed.plot_area.type_groups.len(), 15);
+        assert_eq!(parsed.plot_area.type_groups.len(), 16);
         assert!(matches!(
             parsed.plot_area.type_groups[0],
             TypeGroup::Area(_)
@@ -3479,24 +3737,25 @@ mod tests {
             parsed.plot_area.type_groups[7],
             TypeGroup::Line3D(_)
         ));
+        assert!(matches!(parsed.plot_area.type_groups[9], TypeGroup::Pie(_)));
         assert!(matches!(
-            parsed.plot_area.type_groups[9],
+            parsed.plot_area.type_groups[10],
             TypeGroup::Pie3D(_)
         ));
         assert!(matches!(
-            parsed.plot_area.type_groups[10],
+            parsed.plot_area.type_groups[11],
             TypeGroup::Radar(_)
         ));
         assert!(matches!(
-            parsed.plot_area.type_groups[12],
+            parsed.plot_area.type_groups[13],
             TypeGroup::Stock(_)
         ));
         assert!(matches!(
-            parsed.plot_area.type_groups[13],
+            parsed.plot_area.type_groups[14],
             TypeGroup::Surface(_)
         ));
         assert!(matches!(
-            parsed.plot_area.type_groups[14],
+            parsed.plot_area.type_groups[15],
             TypeGroup::Surface3D(_)
         ));
         let TypeGroup::Doughnut(group) = &parsed.plot_area.type_groups[5] else {
@@ -3524,7 +3783,17 @@ mod tests {
             [3.0]
         );
         assert!(group.common.series[0].bubble_3d);
-        let TypeGroup::Scatter(group) = &parsed.plot_area.type_groups[11] else {
+        let TypeGroup::OfPie(group) = &parsed.plot_area.type_groups[8] else {
+            unreachable!();
+        };
+        assert_eq!(group.of_pie_type, OfPieType::Bar);
+        assert!(group.common.vary_colors);
+        assert_eq!(group.gap_width, Some(225));
+        assert_eq!(group.split_type, Some(OfPieSplitType::Custom));
+        assert_eq!(group.split_position, Some(3.5));
+        assert_eq!(group.custom_split_points.as_deref(), Some(&[1, 4][..]));
+        assert_eq!(group.second_pie_size, Some(80));
+        let TypeGroup::Scatter(group) = &parsed.plot_area.type_groups[12] else {
             unreachable!();
         };
         let series = &group.common.series[0];

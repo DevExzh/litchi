@@ -24,6 +24,8 @@ pub enum ChartType {
     Line,
     /// Line chart (3D)
     Line3D,
+    /// Pie-of-pie or bar-of-pie chart
+    OfPie,
     /// Pie chart
     Pie,
     /// Pie chart (3D)
@@ -55,6 +57,7 @@ impl ChartType {
             Self::Doughnut => "doughnutChart",
             Self::Line => "lineChart",
             Self::Line3D => "line3DChart",
+            Self::OfPie => "ofPieChart",
             Self::Pie => "pieChart",
             Self::Pie3D => "pie3DChart",
             Self::Radar => "radarChart",
@@ -79,6 +82,55 @@ impl ChartType {
     #[inline]
     pub const fn supports_categories(&self) -> bool {
         !matches!(self, Self::Scatter | Self::Bubble)
+    }
+}
+
+/// Secondary plot used by an of-pie chart.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OfPieType {
+    /// Render the secondary plot as a pie.
+    Pie,
+    /// Render the secondary plot as a bar.
+    Bar,
+}
+
+impl OfPieType {
+    /// Returns the XML value for this secondary plot type.
+    #[inline]
+    pub const fn xml_value(self) -> &'static str {
+        match self {
+            Self::Pie => "pie",
+            Self::Bar => "bar",
+        }
+    }
+}
+
+/// Rule used to move points into an of-pie chart's secondary plot.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OfPieSplitType {
+    /// Let the chart application choose the split.
+    Automatic,
+    /// Use the explicit custom point-index list.
+    Custom,
+    /// Split by percentage.
+    Percent,
+    /// Split by point position.
+    Position,
+    /// Split by value.
+    Value,
+}
+
+impl OfPieSplitType {
+    /// Returns the XML value for this split rule.
+    #[inline]
+    pub const fn xml_value(self) -> &'static str {
+        match self {
+            Self::Automatic => "auto",
+            Self::Custom => "cust",
+            Self::Percent => "percent",
+            Self::Position => "pos",
+            Self::Value => "val",
+        }
     }
 }
 

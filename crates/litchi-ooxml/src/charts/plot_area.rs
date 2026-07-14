@@ -6,7 +6,9 @@
 use crate::charts::axis::Axis;
 use crate::charts::models::Layout;
 use crate::charts::series::Series;
-use crate::charts::types::{BarDirection, BarGrouping, RadarStyle, ScatterStyle};
+use crate::charts::types::{
+    BarDirection, BarGrouping, OfPieSplitType, OfPieType, RadarStyle, ScatterStyle,
+};
 
 /// Plot area containing chart data and axes.
 #[derive(Debug, Clone)]
@@ -71,6 +73,8 @@ pub enum TypeGroup {
     Line(LineTypeGroup),
     /// Line 3D chart
     Line3D(Line3DTypeGroup),
+    /// Pie-of-pie or bar-of-pie chart
+    OfPie(OfPieTypeGroup),
     /// Pie chart
     Pie(PieTypeGroup),
     /// Pie 3D chart
@@ -386,6 +390,41 @@ impl Default for PieTypeGroup {
     #[inline]
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// Pie-of-pie or bar-of-pie chart type group.
+#[derive(Debug, Clone)]
+pub struct OfPieTypeGroup {
+    /// Common properties
+    pub common: TypeGroupCommon,
+    /// Secondary plot type
+    pub of_pie_type: OfPieType,
+    /// Gap between the primary and secondary plots (0-500 percent)
+    pub gap_width: Option<u32>,
+    /// Rule used to select points for the secondary plot
+    pub split_type: Option<OfPieSplitType>,
+    /// Position, percentage, or value used by the selected split rule
+    pub split_position: Option<f64>,
+    /// Explicit point indexes in the secondary plot; `Some` preserves an empty custom split
+    pub custom_split_points: Option<Vec<u32>>,
+    /// Secondary plot size (5-200 percent)
+    pub second_pie_size: Option<u32>,
+}
+
+impl OfPieTypeGroup {
+    /// Create a new of-pie type group.
+    #[inline]
+    pub fn new(of_pie_type: OfPieType) -> Self {
+        Self {
+            common: TypeGroupCommon::new(),
+            of_pie_type,
+            gap_width: None,
+            split_type: None,
+            split_position: None,
+            custom_split_points: None,
+            second_pie_size: None,
+        }
     }
 }
 
