@@ -2196,6 +2196,142 @@ fn duplicates_populated_table_with_independent_storage() {
 }
 
 #[test]
+fn duplicates_formula_table_with_independent_dependency_owner() {
+    let mut editor = NumbersEditor::from_package(test_package_with_calculation_engine()).unwrap();
+    let expression = FormulaExpression::function(
+        "SUM",
+        [
+            FormulaExpression::Number(1.0),
+            FormulaExpression::Number(2.0),
+        ],
+    );
+    editor.set_formula(10, 1, 1, expression).unwrap();
+
+    let created = editor.duplicate_table(10).unwrap();
+    let owner = find_table_owner(editor.package(), created.object_id).unwrap();
+    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(document.sheets().unwrap()[0].tables.len(), 2);
+    assert_eq!(
+        document.sheets().unwrap()[0].tables[0].get_cell(1, 1),
+        Some(&CellValue::Formula("=SUM(1,2)".to_owned()))
+    );
+    assert_eq!(
+        document.sheets().unwrap()[0].tables[1].get_cell(1, 1),
+        Some(&CellValue::Formula("=SUM(1,2)".to_owned()))
+    );
+
+    let calculation = editor
+        .package()
+        .archive("Index/CalculationEngine.iwa")
+        .unwrap();
+    let owners = calculation
+        .objects
+        .iter()
+        .flat_map(|object| &object.messages)
+        .filter(|message| message.type_ == 4008)
+        .filter_map(|message| {
+            tsce::FormulaOwnerDependenciesArchive::decode(message.data.as_slice()).ok()
+        })
+        .collect::<Vec<_>>();
+    let original_owner = owners
+        .iter()
+        .find(|candidate| {
+            candidate
+                .formula_owner
+                .as_ref()
+                .is_some_and(|owner| owner.identifier == 3)
+        })
+        .unwrap();
+    let cloned_owner = owners
+        .iter()
+        .find(|candidate| {
+            candidate
+                .formula_owner
+                .as_ref()
+                .is_some_and(|candidate| candidate.identifier == owner.table_info_id)
+        })
+        .unwrap();
+    assert_ne!(
+        original_owner.internal_formula_owner_id,
+        cloned_owner.internal_formula_owner_id
+    );
+    assert_ne!(
+        original_owner.formula_owner_uid,
+        cloned_owner.formula_owner_uid
+    );
+    let engine = calculation
+        .objects
+        .iter()
+        .flat_map(|object| &object.messages)
+        .find_map(|message| {
+            (message.type_ == 4000)
+                .then(|| tsce::CalculationEngineArchive::decode(message.data.as_slice()).ok())
+                .flatten()
+        })
+        .unwrap();
+    assert_eq!(engine.dependency_tracker.number_of_formulas, Some(2));
+    assert!(
+        engine
+            .dependency_tracker
+            .owner_id_map
+            .unwrap()
+            .map_entry
+            .iter()
+            .any(|entry| entry.internal_owner_id == cloned_owner.internal_formula_owner_id)
+    );
+
+    editor
+        .set_formula(
+            created.object_id,
+            1,
+            1,
+            FormulaExpression::function("SUM", [FormulaExpression::Number(9.0)]),
+        )
+        .unwrap();
+    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        document.sheets().unwrap()[0].tables[0].get_cell(1, 1),
+        Some(&CellValue::Formula("=SUM(1,2)".to_owned()))
+    );
+    assert_eq!(
+        document.sheets().unwrap()[0].tables[1].get_cell(1, 1),
+        Some(&CellValue::Formula("=SUM(9)".to_owned()))
+    );
+}
+
+#[test]
+fn formula_table_duplicate_rejects_unsupported_dependencies_transactionally() {
+    let mut package = test_package_with_calculation_engine();
+    package
+        .update_archive("Index/CalculationEngine.iwa", |archive| {
+            let object = archive.object_mut(101).unwrap();
+            let message = object.messages[0].clone();
+            let mut owner = tsce::FormulaOwnerDependenciesArchive::decode(message.data.as_slice())?;
+            owner.uuid_references = Some(tsce::UuidReferencesArchive {
+                table_refs: vec![tsce::uuid_references_archive::TableRef {
+                    owner_uuid: owner.formula_owner_uid,
+                    coord_set: None,
+                }],
+                table_uuid_refs: Vec::new(),
+            });
+            object.replace_message(
+                0,
+                RawMessage {
+                    type_: message.type_,
+                    data: owner.encode_to_vec(),
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    let mut editor = NumbersEditor::from_package(package).unwrap();
+    let before = editor.to_bytes().unwrap();
+
+    assert!(editor.duplicate_table(10).is_err());
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
 fn rename_and_resize_preserve_unknown_wire_and_restore_exact_component() {
     let mut package = test_package();
     package
@@ -2406,6 +2542,118 @@ fn reorders_and_removes_sheets_transactionally() {
     assert_eq!(editor.sheets().unwrap()[0].object_id, 2);
     let before = editor.to_bytes().unwrap();
     assert!(editor.remove_sheet(2).is_err());
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
+fn moves_populated_table_between_sheets_losslessly() {
+    let mut package = two_sheet_package();
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            let source_sheet = archive.object_mut(2).unwrap();
+            let source_message = source_sheet.messages[0].clone();
+            let data = crate::wire::transform_length_delimited_fields_at_path(
+                &source_message.data,
+                &[2],
+                |reference| {
+                    let mut reference = reference.to_vec();
+                    append_unknown_varint(&mut reference, 98, 980);
+                    Ok(reference)
+                },
+            )?;
+            source_sheet.replace_message(
+                0,
+                RawMessage {
+                    type_: source_message.type_,
+                    data,
+                },
+            )?;
+            source_sheet.archive_info.message_infos[0].object_references = vec![3];
+
+            let target_sheet = archive.object_mut(50).unwrap();
+            target_sheet.archive_info.message_infos[0]
+                .object_references
+                .clear();
+
+            let table_info = archive.object_mut(3).unwrap();
+            let mut info = tst::TableInfoArchive::decode(table_info.messages[0].data.as_slice())?;
+            info.super_.parent = Some(Reference {
+                identifier: 2,
+                ..Default::default()
+            });
+            let mut data = info.encode_to_vec();
+            data = crate::wire::transform_length_delimited_fields_at_path(
+                &data,
+                &[1, 2],
+                |reference| {
+                    let mut reference = reference.to_vec();
+                    append_unknown_varint(&mut reference, 97, 970);
+                    Ok(reference)
+                },
+            )?;
+            append_unknown_varint(&mut data, 99, 990);
+            table_info.replace_message(0, RawMessage { type_: 6003, data })?;
+            table_info.archive_info.message_infos[0].object_references = vec![2, 10];
+            Ok(())
+        })
+        .unwrap();
+    let baseline = package.to_bytes().unwrap();
+    let mut editor = NumbersEditor::from_package(package).unwrap();
+
+    let moved = editor.move_table(10, 50).unwrap();
+    assert_eq!(moved.name, "Table 1");
+    assert_eq!(find_table_owner(editor.package(), 10).unwrap().sheet_id, 50);
+    let archive = editor.package().archive("Index/Document.iwa").unwrap();
+    let (_, source) = decode_sheet(archive.object(2).unwrap()).unwrap();
+    let (_, target) = decode_sheet(archive.object(50).unwrap()).unwrap();
+    assert!(source.drawable_infos.is_empty());
+    assert_eq!(
+        target
+            .drawable_infos
+            .iter()
+            .map(|reference| reference.identifier)
+            .collect::<Vec<_>>(),
+        [3]
+    );
+    let target_reference = crate::wire::repeated_length_delimited_payloads(
+        &archive.object(50).unwrap().messages[0].data,
+        2,
+    )
+    .unwrap()[0];
+    assert!(
+        target_reference
+            .windows(2)
+            .any(|window| window == [0x90, 0x06])
+    );
+    let table_data = &archive.object(3).unwrap().messages[0].data;
+    let table_info = tst::TableInfoArchive::decode(table_data.as_slice()).unwrap();
+    assert_eq!(table_info.super_.parent.unwrap().identifier, 50);
+    let mut table_unknown = Vec::new();
+    append_unknown_varint(&mut table_unknown, 99, 990);
+    assert!(table_data.ends_with(&table_unknown));
+    assert!(table_data.windows(2).any(|window| window == [0x88, 0x06]));
+
+    editor
+        .set_cell(10, 0, 0, CellValue::Text("Moved cell".to_owned()))
+        .unwrap();
+    assert_eq!(
+        NumbersDocument::from_bytes(&editor.to_bytes().unwrap())
+            .unwrap()
+            .sheets()
+            .unwrap()[1]
+            .tables[0]
+            .get_cell(0, 0),
+        Some(&CellValue::Text("Moved cell".to_owned()))
+    );
+
+    let mut editor = NumbersEditor::from_bytes(&baseline).unwrap();
+    editor.move_table(10, 50).unwrap();
+    editor.move_table(10, 2).unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+    let before = editor.to_bytes().unwrap();
+    assert!(editor.move_table(999, 50).is_err());
+    assert!(editor.move_table(10, 999).is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
 }
 
@@ -3252,7 +3500,7 @@ fn test_package() -> IWorkPackage {
     };
 
     let model = TableModelArchive {
-        table_id: "table-id".to_string(),
+        table_id: "00000000-0000-0002-0000-000000000001".to_string(),
         table_name: "Table 1".to_string(),
         number_of_rows: 4,
         number_of_columns: 4,
@@ -3399,7 +3647,10 @@ fn test_package() -> IWorkPackage {
 fn test_package_with_calculation_engine() -> IWorkPackage {
     let mut package = test_package();
     let owner = tsce::FormulaOwnerDependenciesArchive {
-        formula_owner_uid: crate::protobuf::tsp::Uuid { lower: 1, upper: 2 },
+        formula_owner_uid: crate::protobuf::tsp::Uuid {
+            lower: 0x0200_0000_0000_0000,
+            upper: 0x0100_0000_0000_0000,
+        },
         internal_formula_owner_id: 0,
         owner_kind: Some(1),
         cell_dependencies: Some(tsce::CellDependenciesExpandedArchive::default()),

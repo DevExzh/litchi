@@ -679,6 +679,44 @@ fn section_append_remove_is_wire_preserving_and_transactional() {
     editor.remove_section(inserted.object_id).unwrap();
     assert_eq!(editor.to_bytes().unwrap(), before_middle);
 
+    assert_eq!(editor.section_text(section_id).unwrap(), "Body");
+    assert_eq!(editor.section_text(created.object_id).unwrap(), "");
+    editor
+        .set_section_text(created.object_id, "Appended 🚀")
+        .unwrap();
+    assert_eq!(editor.body_text().unwrap(), "Body\u{4}Appended 🚀");
+    let before_surrogate = editor.to_bytes().unwrap();
+    assert!(
+        editor
+            .replace_section_text(created.object_id, 10..10, "x")
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), before_surrogate);
+    editor
+        .replace_section_text(created.object_id, 9..11, "東京")
+        .unwrap();
+    assert_eq!(
+        editor.section_text(created.object_id).unwrap(),
+        "Appended 東京"
+    );
+    editor.clear_section_text(section_id).unwrap();
+    assert_eq!(editor.body_text().unwrap(), "\u{4}Appended 東京");
+    assert_eq!(editor.sections()[1].character_index, 1);
+    editor.set_section_text(section_id, "First").unwrap();
+    assert_eq!(editor.body_text().unwrap(), "First\u{4}Appended 東京");
+    assert_eq!(editor.sections()[1].character_index, 6);
+
+    let before_rejected_body = editor.to_bytes().unwrap();
+    assert!(editor.replace_body_text(0..6, "crossed").is_err());
+    assert!(editor.replace_body_text(0..0, "bad\u{4}break").is_err());
+    assert!(editor.set_body_text("flattened").is_err());
+    assert!(editor.section_text(999).is_err());
+    assert_eq!(editor.to_bytes().unwrap(), before_rejected_body);
+
+    editor.set_section_text(section_id, "Body").unwrap();
+    editor.clear_section_text(created.object_id).unwrap();
+    assert_eq!(editor.body_text().unwrap(), "Body\u{4}");
+
     let before_rejected = editor.to_bytes().unwrap();
     assert!(editor.insert_section(section_id, 0, "Invalid").is_err());
     assert!(editor.insert_section(section_id, 99, "Invalid").is_err());

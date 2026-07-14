@@ -36,9 +36,13 @@ fn print_record(record: &tsce::CellRecordExpandedArchive, indent: &str) {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let path = env::args()
-        .nth(1)
+    let arguments = env::args().skip(1).collect::<Vec<_>>();
+    let path = arguments
+        .first()
         .ok_or("usage: inspect_numbers_dependencies <file.numbers>")?;
+    let debug = arguments
+        .get(1)
+        .is_some_and(|argument| argument == "--debug");
     let package = IWorkPackage::open(path)?;
     let archive = package.archive("Index/CalculationEngine.iwa")?;
     for object in archive.objects {
@@ -88,6 +92,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         for record in &dependencies.cell_record {
                             print_record(record, "  inline ");
                         }
+                    }
+                    if debug {
+                        println!("  {owner:#?}");
                     }
                 },
                 4009 => {

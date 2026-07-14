@@ -188,7 +188,10 @@ fn print_archive(archive: litchi_iwa::archive::Archive, object_id: Option<u64>) 
                         component
                             .object_uuid_map_entries
                             .iter()
-                            .map(|entry| entry.identifier)
+                            .map(|entry| (
+                                entry.identifier,
+                                format!("{:016x}{:016x}", entry.uuid.upper, entry.uuid.lower),
+                            ))
                             .collect::<Vec<_>>(),
                         component
                             .external_references

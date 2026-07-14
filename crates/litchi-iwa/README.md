@@ -123,8 +123,11 @@ let pivot_categories = numbers.pivot_categories()?;
 assert!(pivot_categories.iter().all(|category| category.label.is_some()));
 numbers.resize_table(table.object_id, 30, 10)?;
 numbers.rename_table(table.object_id, "Inventory")?;
+let original_sheet_id = numbers.sheets()?[0].object_id;
 let new_sheet = numbers.add_empty_sheet("Archive")?;
 let new_table = numbers.add_empty_table(new_sheet.object_id, "Log", 100, 6)?;
+numbers.move_table(table.object_id, new_sheet.object_id)?;
+numbers.move_table(table.object_id, original_sheet_id)?;
 numbers.move_sheet(new_sheet.index, 0)?;
 numbers.remove_table(new_table.object_id)?;
 numbers.remove_sheet(new_sheet.object_id)?;
@@ -168,14 +171,14 @@ if let Some(sheet) = numbers.sheets()?.first()
 numbers.save("updated.numbers")?;
 
 let mut pages = PagesEditor::open("input.pages")?;
-pages.set_body_text("Updated body")?;
+let section_id = pages.sections()[0].object_id;
+pages.set_section_text(section_id, "Updated body")?;
 let first_header = pages
     .header_footers()?
     .into_iter()
     .find(|region| matches!(region.kind, litchi_iwa::pages::PagesHeaderFooterKind::Header))
     .expect("document header");
 pages.set_header_footer_text(first_header.storage.object_id, "Quarterly report")?;
-let section_id = pages.sections()[0].object_id;
 pages.set_section_name(section_id, Some("Executive summary"))?;
 let mut section_settings = pages.section_settings(section_id)?;
 section_settings.inherit_previous_header_footer = Some(false);
@@ -385,6 +388,17 @@ Workbook sheet ordering and standard or form-sheet table ownership lists reuse
 the original raw `TSP.Reference` payloads, preserving extensions inside each
 reference; newly appended references are removed byte-exactly on rollback or
 create/delete cycles.
+Populated tables can also move between sheets without changing their object
+identity, cell stores, formulas, comments, styles, or geometry. The operation
+transfers the original raw drawable reference, rewrites the optional table
+parent, and updates both sheets' IWA reference metadata atomically. See
+`move_numbers_table`.
+
+Populated tables can be duplicated with independent storage and CalculationEngine
+owner families. Formula hosts, table UUID references, dependency tiles, package
+UUID registries, and cross-component references are remapped transactionally;
+unsupported advanced dependency state is rejected without modifying the editor.
+See `duplicate_numbers_table`.
 
 Ordinary sheet-owned text boxes expose UTF-16 text replacement, geometry,
 hyperlink, lock, aspect-ratio, and accessibility-property updates. Their
@@ -447,7 +461,12 @@ Pages sections can be appended by cloning a reachable section's layout and
 template references at the current UTF-16 body end, then removed without
 deleting body text. Both operations patch only the repeated section-boundary
 record and retain unknown protobuf fields. Body insertion keeps the mandatory
-initial section boundary at index zero.
+initial section boundary at index zero. Section-scoped text supports read,
+UTF-16 range replacement, whole-value update, and clear operations without
+exposing the native U+0004 separators. Boundary positions and header/footer
+locations are refreshed after every edit. Global whole-body replacement is
+restricted to single-section documents so it cannot silently orphan section
+graphs; use `edit_pages_section_text` for native multi-section files.
 
 Pages page dimensions, margins, scale, orientation, and vertical-layout flags
 are also patched directly in the protobuf wire stream. Unknown Apple fields

@@ -45,6 +45,10 @@ use crate::wire::{
     transform_length_delimited_fields_at_path,
 };
 use crate::{EmbeddedMediaAsset, Error, IWorkMediaEditor, IWorkPackage, Result};
+use formula_clone::{
+    clone_table_formula_graph, formula_graph_owner_uuids, remap_cloned_formula_owner_storage,
+    remap_cloned_formula_storage,
+};
 
 const MAX_TABLE_UIDS: usize = 1_100_000;
 const HEADER_BUCKET_ROWS: usize = 65_536;
@@ -1347,13 +1351,7 @@ impl NumbersEditor {
             .ok_or_else(|| Error::InvalidFormat("Numbers table model is missing".to_owned()))?;
         let model_message_index = find_table_model_message(template_model_object)?;
 
-        let mut next_identifier = locations
-            .keys()
-            .copied()
-            .max()
-            .unwrap_or(0)
-            .checked_add(1)
-            .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))?;
+        let mut next_identifier = next_object_identifier(&self.package)?;
         let new_info_id = take_identifier(&mut next_identifier)?;
         let new_model_id = take_identifier(&mut next_identifier)?;
         let owned_kinds = table_owned_objects(&template.model)?;
@@ -1505,11 +1503,10 @@ impl NumbersEditor {
 
     /// Duplicate a populated table on its owning sheet.
     ///
-    /// Cell tiles, headers, data lists, UID maps, and stroke state are cloned
-    /// independently while workbook styles and referenced rich-text/comment
-    /// payloads retain their native copy-on-write sharing. Tables containing
-    /// formulas are rejected until their calculation-engine graph can also be
-    /// cloned safely.
+    /// Cell tiles, headers, data lists, UID maps, stroke state, formulas, and
+    /// CalculationEngine dependency owners are cloned independently. Workbook
+    /// styles and referenced rich-text/comment payloads retain their native
+    /// copy-on-write sharing.
     #[allow(deprecated)]
     pub fn duplicate_table(&mut self, table_id: u64) -> Result<NumbersTableInfo> {
         let descriptors = table_models(&self.package)?;
@@ -1517,7 +1514,6 @@ impl NumbersEditor {
             .iter()
             .find(|descriptor| descriptor.object_id == table_id)
             .ok_or_else(|| Error::ParseError(format!("Numbers table {table_id} not found")))?;
-        reject_formula_table_duplication(&self.package, &source.model)?;
         let owner = find_table_owner(&self.package, table_id)?;
         let locations = object_locations(&self.package)?;
         let info_archive_name = locations.get(&owner.table_info_id).ok_or_else(|| {
@@ -1584,15 +1580,18 @@ impl NumbersEditor {
             &name,
         )?;
         let mut objects = Vec::with_capacity(graph.len() + 2);
-        objects.push(clone_numbers_object_metadata(
-            model_object,
-            new_model_id,
-            vec![RawMessage {
-                type_: model_object.messages[model_message_index].type_,
-                data: model_data,
-            }],
-            &remap,
-        )?);
+        objects.push((
+            model_archive_name.clone(),
+            clone_numbers_object_metadata(
+                model_object,
+                new_model_id,
+                vec![RawMessage {
+                    type_: model_object.messages[model_message_index].type_,
+                    data: model_data,
+                }],
+                &remap,
+            )?,
+        ));
 
         let info_data = duplicate_table_info_wire(
             info_object.messages[info_message_index].data.as_slice(),
@@ -1600,15 +1599,18 @@ impl NumbersEditor {
             &remap,
             TABLE_DUPLICATE_OFFSET,
         )?;
-        objects.push(clone_numbers_object_metadata(
-            info_object,
-            new_info_id,
-            vec![RawMessage {
-                type_: info_object.messages[info_message_index].type_,
-                data: info_data,
-            }],
-            &remap,
-        )?);
+        objects.push((
+            info_archive_name.clone(),
+            clone_numbers_object_metadata(
+                info_object,
+                new_info_id,
+                vec![RawMessage {
+                    type_: info_object.messages[info_message_index].type_,
+                    data: info_data,
+                }],
+                &remap,
+            )?,
+        ));
 
         for &source_id in graph.keys() {
             let archive_name = locations.get(&source_id).ok_or_else(|| {
@@ -1622,12 +1624,39 @@ impl NumbersEditor {
                     "Numbers table storage object {source_id} is missing"
                 ))
             })?;
-            objects.push(clone_table_storage_object(source_object, &remap)?);
+            let mut cloned = clone_table_storage_object(source_object, &remap)?;
+            remap_cloned_formula_storage(&mut cloned, &source.model.table_id, &table_uuid)?;
+            objects.push((archive_name.clone(), cloned));
         }
 
         let mut staged = self.package.clone();
-        let component = format!("Index/Tables/Table-{new_info_id}.iwa");
-        staged.replace_archive(&component, &Archive { objects })?;
+        for (archive_name, object) in objects {
+            staged.update_archive(&archive_name, |archive| archive.insert_object(object))?;
+        }
+        register_cloned_numbers_objects(&mut staged, &self.package, &locations, &remap)?;
+        if let Some((source_owner_uuid, new_owner_uuid)) = formula_graph_owner_uuids(
+            &staged,
+            owner.table_info_id,
+            &source.model.table_id,
+            &table_uuid,
+        )? {
+            for &source_id in graph.keys() {
+                let archive_name = locations.get(&source_id).ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Numbers table storage object {source_id} is missing"
+                    ))
+                })?;
+                let cloned_id = remap[&source_id];
+                staged.update_archive(archive_name, |archive| {
+                    let object = archive.object_mut(cloned_id).ok_or_else(|| {
+                        Error::InvalidFormat(format!(
+                            "Numbers cloned table storage object {cloned_id} is missing"
+                        ))
+                    })?;
+                    remap_cloned_formula_owner_storage(object, &source_owner_uuid, &new_owner_uuid)
+                })?;
+            }
+        }
         let sheet_archive_name = locations.get(&owner.sheet_id).ok_or_else(|| {
             Error::InvalidFormat(format!("Numbers sheet {} is missing", owner.sheet_id))
         })?;
@@ -1657,6 +1686,29 @@ impl NumbersEditor {
             }
             Ok(())
         })?;
+        register_numbers_component_reference(
+            &mut staged,
+            sheet_archive_name,
+            info_archive_name,
+            new_info_id,
+        )?;
+        let table_last_identifier = next_identifier.checked_sub(1).ok_or_else(|| {
+            Error::InvalidFormat("Numbers table clone allocated no identifiers".to_owned())
+        })?;
+        set_package_last_object_identifier(&mut staged, table_last_identifier)?;
+        clone_table_formula_graph(
+            &mut staged,
+            owner.table_info_id,
+            new_info_id,
+            &source.model.table_id,
+            &table_uuid,
+        )?;
+        register_numbers_component_reference(
+            &mut staged,
+            "Index/CalculationEngine.iwa",
+            info_archive_name,
+            new_info_id,
+        )?;
 
         let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
         let created = verified
@@ -1831,9 +1883,11 @@ impl NumbersEditor {
     }
 }
 
+mod formula_clone;
 mod model;
 mod storage;
 mod table_duplicate;
+mod table_move;
 
 use model::*;
 use storage::*;

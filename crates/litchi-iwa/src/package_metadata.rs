@@ -24,12 +24,56 @@ pub(crate) fn next_object_identifier(package: &IWorkPackage) -> Result<u64> {
             maximum = maximum.max(identifier);
         }
     }
-    if let Some(identifier) = package_last_object_identifier(package)? {
-        maximum = maximum.max(identifier);
+    if package.contains_entry(PACKAGE_METADATA_ENTRY) {
+        let archive = package.archive(PACKAGE_METADATA_ENTRY)?;
+        let (object_index, message_index) = package_metadata_location(&archive)?;
+        let metadata = crate::protobuf::tsp::PackageMetadata::decode(
+            archive.objects[object_index].messages[message_index]
+                .data
+                .as_slice(),
+        )?;
+        maximum = maximum.max(package_metadata_object_identifier_maximum(&metadata));
     }
     maximum
         .checked_add(1)
         .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))
+}
+
+fn package_metadata_object_identifier_maximum(
+    metadata: &crate::protobuf::tsp::PackageMetadata,
+) -> u64 {
+    let mut maximum = metadata.last_object_identifier;
+    if let Some(reference) = &metadata.data_metadata_map {
+        maximum = maximum.max(reference.identifier);
+    }
+    for component in metadata
+        .components
+        .iter()
+        .chain(&metadata.versioned_components)
+    {
+        maximum = maximum.max(component.identifier);
+        for entry in &component.object_uuid_map_entries {
+            maximum = maximum.max(entry.identifier);
+        }
+        for reference in component
+            .external_references
+            .iter()
+            .chain(&component.versioned_external_references)
+        {
+            if let Some(identifier) = reference.object_identifier {
+                maximum = maximum.max(identifier);
+            }
+        }
+        for reference in &component.data_references {
+            for object in &reference.object_reference_list {
+                maximum = maximum.max(object.object_identifier);
+            }
+        }
+        for &identifier in &component.ambiguous_object_identifiers {
+            maximum = maximum.max(identifier);
+        }
+    }
+    maximum
 }
 
 pub(crate) fn package_last_object_identifier(package: &IWorkPackage) -> Result<Option<u64>> {
@@ -391,15 +435,20 @@ pub(crate) fn add_component_object_uuids(
             .flat_map(|component| &component.object_uuid_map_entries)
             .map(|entry| (entry.uuid.lower, entry.uuid.upper))
             .collect::<HashSet<_>>();
-        if metadata
+        let conflicting = metadata
             .components
             .iter()
             .flat_map(|component| &component.object_uuid_map_entries)
-            .any(|entry| requested.contains(&entry.identifier))
-        {
-            return Err(Error::InvalidFormat(
-                "UUID allocation would duplicate an existing object mapping".to_owned(),
-            ));
+            .filter_map(|entry| {
+                requested
+                    .contains(&entry.identifier)
+                    .then_some(entry.identifier)
+            })
+            .collect::<Vec<_>>();
+        if !conflicting.is_empty() {
+            return Err(Error::InvalidFormat(format!(
+                "UUID allocation would duplicate existing object mappings {conflicting:?}"
+            )));
         }
         let entries = identifiers
             .iter()
@@ -591,4 +640,56 @@ fn package_metadata_location(archive: &Archive) -> Result<(usize, usize)> {
             "PackageMetadata payload is missing from Index/Metadata.iwa".to_owned(),
         )
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::archive::ArchiveObject;
+    use crate::protobuf::tsp::{
+        ComponentExternalReference, ComponentInfo, ObjectUuidMapEntry, PackageMetadata, Uuid,
+    };
+
+    #[test]
+    fn allocator_observes_identifiers_retained_only_by_metadata_registries() {
+        let metadata = PackageMetadata {
+            last_object_identifier: 10,
+            components: vec![ComponentInfo {
+                identifier: 1,
+                preferred_locator: "Document".to_owned(),
+                object_uuid_map_entries: vec![ObjectUuidMapEntry {
+                    identifier: 40,
+                    uuid: Uuid { lower: 1, upper: 2 },
+                }],
+                external_references: vec![ComponentExternalReference {
+                    component_identifier: 2,
+                    object_identifier: Some(50),
+                    is_weak: None,
+                }],
+                ambiguous_object_identifiers: vec![60],
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let mut package = IWorkPackage::new();
+        package
+            .replace_archive(
+                PACKAGE_METADATA_ENTRY,
+                &Archive {
+                    objects: vec![
+                        ArchiveObject::new(
+                            10,
+                            vec![RawMessage {
+                                type_: PACKAGE_METADATA_MESSAGE_TYPE,
+                                data: metadata.encode_to_vec(),
+                            }],
+                        )
+                        .unwrap(),
+                    ],
+                },
+            )
+            .unwrap();
+
+        assert_eq!(next_object_identifier(&package).unwrap(), 61);
+    }
 }

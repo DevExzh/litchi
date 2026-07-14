@@ -2,30 +2,6 @@
 
 use super::*;
 
-pub(super) fn reject_formula_table_duplication(
-    package: &IWorkPackage,
-    model: &TableModelArchive,
-) -> Result<()> {
-    let formula_table = model.base_data_store.formula_table.identifier;
-    if formula_table == 0 {
-        return Ok(());
-    }
-    let locations = object_locations(package)?;
-    let formulas = resolve_table_data_list(
-        package,
-        &locations,
-        formula_table,
-        tst::table_data_list::ListType::Formula,
-    )?;
-    if formulas.entries.is_empty() {
-        Ok(())
-    } else {
-        Err(Error::ParseError(
-            "Cannot duplicate a Numbers table containing formulas".to_owned(),
-        ))
-    }
-}
-
 pub(super) fn table_owned_graph(
     package: &IWorkPackage,
     locations: &HashMap<u64, String>,
@@ -302,6 +278,85 @@ pub(super) fn clone_table_storage_object(
         });
     }
     clone_numbers_object_metadata(source, new_identifier, messages, remap)
+}
+
+pub(super) fn register_cloned_numbers_objects(
+    staged: &mut IWorkPackage,
+    source: &IWorkPackage,
+    locations: &HashMap<u64, String>,
+    remap: &HashMap<u64, u64>,
+) -> Result<()> {
+    let mut clone_entries = HashMap::with_capacity(remap.len());
+    let mut uuid_additions = HashMap::<u64, Vec<u64>>::new();
+    for (&source_id, &new_id) in remap {
+        let entry = locations.get(&source_id).ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Numbers cloned object {source_id} has no source component"
+            ))
+        })?;
+        clone_entries.insert(new_id, entry.clone());
+        let Some(component) = component_identifier_for_entry(source, entry)? else {
+            continue;
+        };
+        if component_uuid_identifiers(source, component)?
+            .is_some_and(|identifiers| identifiers.contains(&source_id))
+        {
+            uuid_additions.entry(component).or_default().push(new_id);
+        }
+    }
+    for (component, identifiers) in uuid_additions {
+        add_component_object_uuids(staged, component, &identifiers)?;
+    }
+
+    let mut references = HashSet::new();
+    for (&new_id, source_entry) in &clone_entries {
+        let Some(source_component) = component_identifier_for_entry(staged, source_entry)? else {
+            continue;
+        };
+        let archive = staged.archive(source_entry)?;
+        let object = archive.object(new_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("Numbers cloned object {new_id} is missing"))
+        })?;
+        for target_id in object
+            .archive_info
+            .message_infos
+            .iter()
+            .flat_map(|info| &info.object_references)
+        {
+            let Some(target_entry) = clone_entries.get(target_id) else {
+                continue;
+            };
+            let Some(target_component) = component_identifier_for_entry(staged, target_entry)?
+            else {
+                continue;
+            };
+            if source_component != target_component {
+                references.insert((source_component, target_component, *target_id));
+            }
+        }
+    }
+    for (source_component, target_component, object_id) in references {
+        add_component_external_reference(staged, source_component, target_component, object_id)?;
+    }
+    Ok(())
+}
+
+pub(super) fn register_numbers_component_reference(
+    package: &mut IWorkPackage,
+    source_entry: &str,
+    target_entry: &str,
+    object_id: u64,
+) -> Result<()> {
+    let Some(source_component) = component_identifier_for_entry(package, source_entry)? else {
+        return Ok(());
+    };
+    let Some(target_component) = component_identifier_for_entry(package, target_entry)? else {
+        return Ok(());
+    };
+    if source_component != target_component {
+        add_component_external_reference(package, source_component, target_component, object_id)?;
+    }
+    Ok(())
 }
 
 fn remap_table_data_list_segments(
