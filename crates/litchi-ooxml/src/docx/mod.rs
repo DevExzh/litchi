@@ -70,6 +70,7 @@ pub mod parts;
 pub mod revision;
 pub mod section;
 pub mod settings;
+pub mod smart_tag;
 pub mod statistics;
 pub mod styles;
 pub mod table;
@@ -96,6 +97,7 @@ pub use paragraph::{Paragraph, Run, RunBreak, RunBreakClear, RunBreakType, RunPr
 pub use revision::{Revision, RevisionType};
 pub use section::{Emu, Margins, PageSize, Section, Sections};
 pub use settings::{DocumentSettings, ProtectionType};
+pub use smart_tag::{SmartTag, SmartTagAttribute};
 pub use statistics::DocumentStatistics;
 pub use styles::{Style, Styles};
 pub use table::{Cell, Row, Table, VMergeState};

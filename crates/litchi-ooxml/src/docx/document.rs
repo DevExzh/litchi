@@ -13,6 +13,7 @@ use crate::docx::paragraph::Paragraph;
 use crate::docx::parts::DocumentPart;
 use crate::docx::section::{Section, Sections};
 use crate::docx::settings::DocumentSettings;
+use crate::docx::smart_tag::SmartTag;
 use crate::docx::statistics::{
     DocumentStatistics, count_characters, count_characters_no_spaces, count_words,
     estimate_line_count, estimate_page_count,
@@ -182,6 +183,20 @@ impl<'a> Document<'a> {
     pub fn tables(&self) -> Result<Vec<Table>> {
         // Convert SmallVec to Vec for API compatibility
         Ok(self.part.tables()?.into_iter().collect())
+    }
+
+    /// Return all run-level smart tags in document order.
+    pub fn smart_tags(&self) -> Result<Vec<SmartTag>> {
+        let mut tags = Vec::new();
+        for paragraph in self.part.paragraphs()? {
+            tags.extend(paragraph.smart_tags()?);
+        }
+        Ok(tags)
+    }
+
+    /// Return the number of run-level smart tags in the document.
+    pub fn smart_tag_count(&self) -> Result<usize> {
+        Ok(self.smart_tags()?.len())
     }
 
     /// Get all document elements (paragraphs and tables) in document order.

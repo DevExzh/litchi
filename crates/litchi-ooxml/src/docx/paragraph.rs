@@ -6,6 +6,7 @@ use crate::docx::hyperlink::Hyperlink;
 use crate::docx::image::{InlineImage, parse_inline_images};
 use crate::docx::namespace::{is_wordprocessing_namespace, scan_word_element_ranges};
 use crate::docx::revision::{Revision, parse_revisions};
+use crate::docx::smart_tag::SmartTag;
 use crate::error::{OoxmlError, Result};
 /// Paragraph and Run structures for Word documents.
 use litchi_core::VerticalPosition;
@@ -377,6 +378,138 @@ impl Paragraph {
         }
 
         Ok(runs)
+    }
+
+    /// Return all run-level smart tags in document order, including nested tags.
+    pub fn smart_tags(&self) -> Result<Vec<SmartTag>> {
+        enum SmartTagEvent {
+            Start(bool),
+            Empty(bool),
+            End(bool),
+            Eof,
+            Other,
+        }
+
+        let xml_bytes = self.xml_bytes();
+        let (source_arc, base_offset) = self.xml_data.get_or_create_arc();
+        let mut reader = NsReader::from_reader(xml_bytes);
+        let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
+        let mut depth = 0usize;
+        let mut open_tags = Vec::new();
+        let mut ranges = Vec::new();
+
+        loop {
+            let event_start = usize::try_from(reader.buffer_position()).map_err(|_| {
+                OoxmlError::InvalidFormat("Word smart-tag offset does not fit usize".into())
+            })?;
+            let event = {
+                let (namespace, event) = reader
+                    .read_resolved_event()
+                    .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+
+                if fragment_prefix.is_none()
+                    && let Event::Start(element) = &event
+                    && element.local_name().as_ref() == b"p"
+                    && !matches!(namespace, ResolveResult::Bound(_))
+                {
+                    fragment_prefix = Some(
+                        element
+                            .name()
+                            .prefix()
+                            .map(|prefix| prefix.into_inner().to_vec()),
+                    );
+                }
+
+                match event {
+                    Event::Start(element) => SmartTagEvent::Start(is_fragment_word_name(
+                        &namespace,
+                        element.name(),
+                        b"smartTag",
+                        &fragment_prefix,
+                    )),
+                    Event::Empty(element) => SmartTagEvent::Empty(is_fragment_word_name(
+                        &namespace,
+                        element.name(),
+                        b"smartTag",
+                        &fragment_prefix,
+                    )),
+                    Event::End(element) => SmartTagEvent::End(is_fragment_word_name(
+                        &namespace,
+                        element.name(),
+                        b"smartTag",
+                        &fragment_prefix,
+                    )),
+                    Event::Eof => SmartTagEvent::Eof,
+                    _ => SmartTagEvent::Other,
+                }
+            };
+            let event_end = usize::try_from(reader.buffer_position()).map_err(|_| {
+                OoxmlError::InvalidFormat("Word smart-tag offset does not fit usize".into())
+            })?;
+
+            match event {
+                SmartTagEvent::Start(is_smart_tag) => {
+                    depth = depth.checked_add(1).ok_or_else(|| {
+                        OoxmlError::InvalidFormat("Word XML nesting is too deep".into())
+                    })?;
+                    if is_smart_tag {
+                        open_tags.push((event_start, depth));
+                    }
+                },
+                SmartTagEvent::Empty(true) => {
+                    ranges.push((event_start, event_end));
+                },
+                SmartTagEvent::End(is_smart_tag) => {
+                    if is_smart_tag {
+                        let Some((start, tag_depth)) = open_tags.pop() else {
+                            return Err(OoxmlError::InvalidFormat(
+                                "Word smart tag has no opening element".into(),
+                            ));
+                        };
+                        if tag_depth != depth {
+                            return Err(OoxmlError::InvalidFormat(
+                                "invalid nested Word smart tag".into(),
+                            ));
+                        }
+                        ranges.push((start, event_end));
+                    }
+                    depth = depth.checked_sub(1).ok_or_else(|| {
+                        OoxmlError::InvalidFormat("invalid Word XML nesting".into())
+                    })?;
+                },
+                SmartTagEvent::Eof if !open_tags.is_empty() || depth != 0 => {
+                    return Err(OoxmlError::InvalidFormat(
+                        "unterminated Word smart-tag XML".into(),
+                    ));
+                },
+                SmartTagEvent::Eof => break,
+                _ => {},
+            }
+        }
+
+        ranges.sort_unstable_by_key(|&(start, _)| start);
+        ranges
+            .into_iter()
+            .map(|(start, end)| {
+                let start = u32::try_from(start).map_err(|_| {
+                    OoxmlError::InvalidFormat("Word smart-tag offset exceeds u32".into())
+                })?;
+                let length = u32::try_from(end.checked_sub(start as usize).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("invalid Word smart-tag byte range".into())
+                })?)
+                .map_err(|_| {
+                    OoxmlError::InvalidFormat("Word smart-tag length exceeds u32".into())
+                })?;
+                let absolute_start = base_offset.checked_add(start).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("Word smart-tag absolute offset exceeds u32".into())
+                })?;
+                SmartTag::parse(XmlSlice::new(
+                    Arc::clone(&source_arc),
+                    absolute_start,
+                    length,
+                ))
+            })
+            .collect()
     }
 
     fn push_run_slice(
@@ -1271,6 +1404,60 @@ mod tests {
         let runs = paragraph.runs().unwrap();
         assert_eq!(runs.len(), 1);
         assert_eq!(runs[0].text().unwrap(), "inherited");
+    }
+
+    #[test]
+    fn reads_nested_smart_tags_and_their_typed_metadata() {
+        let xml = br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            xmlns:false="urn:not-wordprocessingml">
+            <w:smartTag w:uri="urn:contacts" w:element="person">
+                <w:smartTagPr>
+                    <w:attr w:uri="urn:meta" w:name="kind" w:val="friend &amp; peer"/>
+                </w:smartTagPr>
+                <w:r><w:t>A &amp; </w:t></w:r>
+                <w:smartTag w:element="givenName">
+                    <w:smartTagPr><w:attr w:name="language" w:val="en"/></w:smartTagPr>
+                    <w:r><w:t>Bob</w:t></w:r>
+                </w:smartTag>
+            </w:smartTag>
+            <false:smartTag false:element="ignored"><w:r><w:t>not a tag</w:t></w:r></false:smartTag>
+            <w:smartTag w:element="empty"/>
+        </w:p>"#;
+
+        let paragraph = Paragraph::new(xml.to_vec());
+        let tags = paragraph.smart_tags().unwrap();
+        assert_eq!(tags.len(), 3);
+
+        assert_eq!(tags[0].uri.as_deref(), Some("urn:contacts"));
+        assert_eq!(tags[0].element, "person");
+        assert_eq!(tags[0].attributes.len(), 1);
+        assert_eq!(tags[0].attributes[0].uri.as_deref(), Some("urn:meta"));
+        assert_eq!(tags[0].attributes[0].name, "kind");
+        assert_eq!(tags[0].attributes[0].value, "friend & peer");
+        assert_eq!(tags[0].text().unwrap(), "A & Bob");
+
+        assert_eq!(tags[1].element, "givenName");
+        assert_eq!(tags[1].attributes[0].name, "language");
+        assert_eq!(tags[1].text().unwrap(), "Bob");
+        assert_eq!(tags[2].element, "empty");
+        assert_eq!(tags[2].text().unwrap(), "");
+
+        assert_eq!(paragraph.runs().unwrap().len(), 3);
+    }
+
+    #[test]
+    fn smart_tags_require_schema_mandated_attributes() {
+        let missing_element = Paragraph::new(
+            br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:smartTag><w:r><w:t>invalid</w:t></w:r></w:smartTag></w:p>"#
+                .to_vec(),
+        );
+        assert!(missing_element.smart_tags().is_err());
+
+        let missing_property_value = Paragraph::new(
+            br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:smartTag w:element="person"><w:smartTagPr><w:attr w:name="kind"/></w:smartTagPr></w:smartTag></w:p>"#
+                .to_vec(),
+        );
+        assert!(missing_property_value.smart_tags().is_err());
     }
 
     #[test]
