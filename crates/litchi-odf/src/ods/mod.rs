@@ -24,6 +24,7 @@
 //! - ✅ Database ranges, recursive filters, sort keys, and subtotal rules
 //! - ✅ Inert database query/table/SQL source metadata
 //! - ✅ What-if scenarios and inert external cell-range sources
+//! - ✅ Inert formula-auditing highlights and operations (`table:detective`)
 //!
 //! ## ✅ Formula Support (`formula.rs`) - PARTIAL
 //! - ✅ Formula string representation
@@ -46,6 +47,7 @@
 //! - ✅ Document/sheet keys, direct cell protection flags, and LibreOffice permissions
 //! - ✅ Database ranges, filters, sorting, subtotals, and inert source metadata
 //! - ✅ Create, edit, remove, and round-trip scenarios and external range links
+//! - ✅ Create, edit, remove, and round-trip cell formula-auditing metadata
 //!
 //! ## 🚧 TODO - Advanced Features
 //! - ⚠️ Chart creation and parsing (embedded charts)
@@ -65,6 +67,7 @@ mod builder;
 mod cell;
 mod data_validation;
 mod database_range;
+mod detective;
 /// OpenFormula parsing and support
 pub mod formula;
 mod mutable;
@@ -92,6 +95,10 @@ pub use database_range::{
     DatabaseFilter, DatabaseOrientation, DatabaseRange, DatabaseSort, DatabaseSortKey,
     DatabaseSource, EmbeddedNumberBehavior, FilterCondition, FilterConditionSource, FilterDataType,
     FilterExpression, SortOrder, SubtotalField, SubtotalRule, SubtotalRules, SubtotalSortGroups,
+};
+pub use detective::{
+    CellDetective, DetectiveDirection, DetectiveHighlightedRange, DetectiveOperation,
+    DetectiveOperationKind,
 };
 pub use mutable::MutableSpreadsheet;
 pub use named_expression::{

@@ -4,8 +4,8 @@
 
 use crate::core::{OdfStructure, PackageWriter};
 use crate::ods::{
-    Cell, CellAnnotation, CellRangeSource, CellValue, Column, ContentValidation, DatabaseRange,
-    NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange, Row, Sheet,
+    Cell, CellAnnotation, CellDetective, CellRangeSource, CellValue, Column, ContentValidation,
+    DatabaseRange, NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange, Row, Sheet,
     SheetPrintSettings, SheetScenario, SheetStyle, SheetTableSource, SpreadsheetProtection,
     TableStructure, TableVisibility,
     cell::{merge_cell_range, unmerge_cell_range},
@@ -345,6 +345,7 @@ impl SpreadsheetBuilder {
                 formula: None,
                 annotation: None,
                 range_source: None,
+                detective: None,
                 validation_name: None,
                 style_name: None,
                 matrix_span: None,
@@ -409,6 +410,7 @@ impl SpreadsheetBuilder {
                 formula: None,
                 annotation: None,
                 range_source: None,
+                detective: None,
                 validation_name: None,
                 style_name: None,
                 matrix_span: None,
@@ -488,6 +490,7 @@ impl SpreadsheetBuilder {
                     formula: None,
                     annotation: None,
                     range_source: None,
+                    detective: None,
                     validation_name: None,
                     style_name: None,
                     matrix_span: None,
@@ -563,6 +566,7 @@ impl SpreadsheetBuilder {
                     formula: None,
                     annotation: None,
                     range_source: None,
+                    detective: None,
                     validation_name: None,
                     style_name: None,
                     matrix_span: None,
@@ -588,6 +592,7 @@ impl SpreadsheetBuilder {
 
             let annotation = row_data.cells[col].annotation.take();
             let range_source = row_data.cells[col].range_source.take();
+            let detective = row_data.cells[col].detective.take();
             let validation_name = row_data.cells[col].validation_name.take();
             let style_name = row_data.cells[col].style_name.take();
             let matrix_span = row_data.cells[col].matrix_span;
@@ -600,6 +605,7 @@ impl SpreadsheetBuilder {
                 formula: None,
                 annotation,
                 range_source,
+                detective,
                 validation_name,
                 style_name,
                 matrix_span,
@@ -661,6 +667,7 @@ impl SpreadsheetBuilder {
                     formula: None,
                     annotation: None,
                     range_source: None,
+                    detective: None,
                     validation_name: None,
                     style_name: None,
                     matrix_span: None,
@@ -710,6 +717,7 @@ impl SpreadsheetBuilder {
                 formula: None,
                 annotation: None,
                 range_source: None,
+                detective: None,
                 validation_name: None,
                 style_name: None,
                 matrix_span: None,
@@ -774,6 +782,42 @@ impl SpreadsheetBuilder {
             .and_then(Cell::take_range_source)
     }
 
+    /// Attach or replace formula-auditing metadata on a cell in the current sheet.
+    pub fn set_cell_detective(
+        &mut self,
+        row: usize,
+        col: usize,
+        detective: CellDetective,
+    ) -> Result<&mut Self> {
+        if self.sheets.is_empty() {
+            self.add_sheet("Sheet1")?;
+        }
+        let exists = self
+            .sheets
+            .last()
+            .and_then(|sheet| sheet.rows.get(row))
+            .is_some_and(|row| row.cells.get(col).is_some());
+        if !exists {
+            self.set_cell(row, col, CellValue::Empty)?;
+        }
+        self.sheets
+            .last_mut()
+            .and_then(|sheet| sheet.rows.get_mut(row))
+            .and_then(|row| row.cells.get_mut(col))
+            .expect("set_cell materialized the requested cell")
+            .set_detective(detective);
+        Ok(self)
+    }
+
+    /// Remove and return formula-auditing metadata from a cell in the current sheet.
+    pub fn remove_cell_detective(&mut self, row: usize, col: usize) -> Option<CellDetective> {
+        self.sheets
+            .last_mut()
+            .and_then(|sheet| sheet.rows.get_mut(row))
+            .and_then(|row| row.cells.get_mut(col))
+            .and_then(Cell::take_detective)
+    }
+
     /// Apply a named content validation to a cell in the current sheet.
     pub fn set_cell_validation(
         &mut self,
@@ -811,6 +855,7 @@ impl SpreadsheetBuilder {
                 formula: None,
                 annotation: None,
                 range_source: None,
+                detective: None,
                 validation_name: None,
                 style_name: None,
                 matrix_span: None,
@@ -864,6 +909,7 @@ impl SpreadsheetBuilder {
                 formula: None,
                 annotation: None,
                 range_source: None,
+                detective: None,
                 validation_name: None,
                 style_name: None,
                 matrix_span: None,
@@ -906,6 +952,7 @@ impl SpreadsheetBuilder {
                 formula: None,
                 annotation: None,
                 range_source: None,
+                detective: None,
                 validation_name: None,
                 style_name: None,
                 matrix_span: None,
@@ -960,6 +1007,7 @@ impl SpreadsheetBuilder {
                 formula: None,
                 annotation: None,
                 range_source: None,
+                detective: None,
                 validation_name: None,
                 style_name: None,
                 matrix_span: None,
@@ -1584,7 +1632,10 @@ impl SpreadsheetBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Spreadsheet, TableGroup, TableRange};
+    use crate::{
+        DetectiveDirection, DetectiveHighlightedRange, DetectiveOperation, DetectiveOperationKind,
+        Spreadsheet, TableGroup, TableRange,
+    };
     use tempfile::tempdir;
 
     #[test]
@@ -1938,6 +1989,7 @@ mod tests {
                 formula: None,
                 annotation: None,
                 range_source: None,
+                detective: None,
                 validation_name: None,
                 style_name: None,
                 matrix_span: None,
@@ -1953,6 +2005,7 @@ mod tests {
                 formula: None,
                 annotation: None,
                 range_source: None,
+                detective: None,
                 validation_name: None,
                 style_name: None,
                 matrix_span: None,
@@ -2490,5 +2543,34 @@ mod tests {
             sheets[0].rows[1].cells[2].value,
             CellValue::Text("cached".to_string())
         );
+    }
+
+    #[test]
+    fn builder_round_trips_cell_detective_metadata() {
+        let mut detective = CellDetective::new();
+        detective
+            .add_highlighted_range(
+                DetectiveHighlightedRange::valid(
+                    Some(".A1:.A4".to_string()),
+                    DetectiveDirection::FromSameTable,
+                    Some(false),
+                )
+                .unwrap(),
+            )
+            .add_operation(DetectiveOperation::new(
+                DetectiveOperationKind::TraceDependents,
+                2,
+            ));
+        let mut builder = SpreadsheetBuilder::new();
+        builder
+            .set_cell(0, 0, CellValue::Number(11.0))
+            .unwrap()
+            .set_cell_detective(0, 0, detective.clone())
+            .unwrap();
+
+        let mut spreadsheet = Spreadsheet::from_bytes(builder.build().unwrap()).unwrap();
+        let cell = &spreadsheet.sheets().unwrap()[0].rows[0].cells[0];
+        assert_eq!(cell.value, CellValue::Number(11.0));
+        assert_eq!(cell.detective(), Some(&detective));
     }
 }

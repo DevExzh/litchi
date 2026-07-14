@@ -199,7 +199,7 @@ pub(crate) fn validate_cell_range_addresses(ranges: &[String]) -> Result<()> {
         let parsed = split_cell_range_addresses(range)?;
         if range != range.trim() || parsed.len() != 1 || parsed[0].as_str() != range.as_str() {
             return Err(Error::InvalidFormat(format!(
-                "invalid individual table print range '{range}'"
+                "invalid individual table cell range '{range}'"
             )));
         }
     }

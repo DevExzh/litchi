@@ -1,9 +1,10 @@
 //! ODS-specific parsing utilities.
 
 use super::{
-    Cell, CellMatrixSpan, CellMerge, CellRangeSource, CellValue, Column, NamedDefinition,
-    NamedDefinitionScope, NamedExpression, NamedRange, NamedRangeUsage, Row, Sheet,
-    SheetPrintSettings, SheetScenario, SheetStyle, SheetTableSource, TableGroup, TableRange,
+    Cell, CellDetective, CellMatrixSpan, CellMerge, CellRangeSource, CellValue, Column,
+    DetectiveDirection, DetectiveHighlightedRange, DetectiveOperation, DetectiveOperationKind,
+    NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange, NamedRangeUsage, Row,
+    Sheet, SheetPrintSettings, SheetScenario, SheetStyle, SheetTableSource, TableGroup, TableRange,
     TableSourceMode, TableStructure, TableVisibility,
     annotation::{AnnotationBuilder, decode_reference},
     scenario::validate_scenario,
@@ -68,6 +69,8 @@ impl OdsParser {
         let mut text_content = String::new();
         let mut annotation_builder: Option<AnnotationBuilder> = None;
         let mut annotation_depth = 0usize;
+        let mut detective_builder: Option<CellDetective> = None;
+        let mut detective_child_open = false;
         let mut sheet_text_field = None;
         let mut sheet_text = String::new();
         let mut document_namespaces = BTreeMap::new();
@@ -80,7 +83,20 @@ impl OdsParser {
                         Self::push_namespace_scope(e, reader.decoder(), &mut document_namespaces)?;
                     namespace_scopes.push(namespace_scope);
 
-                    if let Some(builder) = annotation_builder.as_mut() {
+                    if let Some(builder) = detective_builder.as_mut() {
+                        if detective_child_open {
+                            return Err(Error::InvalidFormat(
+                                "table:detective child elements must be empty".to_string(),
+                            ));
+                        }
+                        Self::parse_detective_child(
+                            builder,
+                            e,
+                            reader.decoder(),
+                            &document_namespaces,
+                        )?;
+                        detective_child_open = true;
+                    } else if let Some(builder) = annotation_builder.as_mut() {
                         builder.start(e, reader.decoder())?;
                         annotation_depth += 1;
                     } else if current_cell.is_some()
@@ -296,6 +312,20 @@ impl OdsParser {
                                     .to_string(),
                             ));
                         }
+                    } else if let Some(cell) = current_cell.as_mut()
+                        && Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            TABLE_NAMESPACE_URI,
+                            "detective",
+                        )
+                    {
+                        if cell.detective.is_some() {
+                            return Err(Error::InvalidFormat(
+                                "table cell contains multiple table:detective elements".to_string(),
+                            ));
+                        }
+                        detective_builder = Some(CellDetective::new());
                     } else if current_cell.is_some()
                         && Self::element_name_is(
                             e.name().as_ref(),
@@ -313,7 +343,19 @@ impl OdsParser {
                 Ok(Event::Empty(ref e)) => {
                     let empty_scope =
                         Self::push_namespace_scope(e, reader.decoder(), &mut document_namespaces)?;
-                    if let Some(builder) = annotation_builder.as_mut() {
+                    if let Some(builder) = detective_builder.as_mut() {
+                        if detective_child_open {
+                            return Err(Error::InvalidFormat(
+                                "table:detective child elements must be empty".to_string(),
+                            ));
+                        }
+                        Self::parse_detective_child(
+                            builder,
+                            e,
+                            reader.decoder(),
+                            &document_namespaces,
+                        )?;
+                    } else if let Some(builder) = annotation_builder.as_mut() {
                         builder.empty(e, reader.decoder())?;
                     } else if current_cell.is_some()
                         && Self::is_office_annotation(e, &document_namespaces)
@@ -351,6 +393,19 @@ impl OdsParser {
                             return Err(Error::InvalidFormat(
                                 "table cell contains multiple table:cell-range-source elements"
                                     .to_string(),
+                            ));
+                        }
+                    } else if let Some(cell) = current_cell.as_mut()
+                        && Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            TABLE_NAMESPACE_URI,
+                            "detective",
+                        )
+                    {
+                        if cell.detective.replace(CellDetective::new()).is_some() {
+                            return Err(Error::InvalidFormat(
+                                "table cell contains multiple table:detective elements".to_string(),
                             ));
                         }
                     } else if current_sheet.is_some()
@@ -483,6 +538,31 @@ impl OdsParser {
                     }
                     Self::pop_namespace_scope(&mut document_namespaces, Some(empty_scope));
                 },
+                Ok(Event::Text(ref t)) if detective_builder.is_some() => {
+                    let decoded = t.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
+                        Error::InvalidFormat(format!("invalid detective text: {error}"))
+                    })?;
+                    if !decoded.trim().is_empty() {
+                        return Err(Error::InvalidFormat(
+                            "table:detective cannot contain text".to_string(),
+                        ));
+                    }
+                },
+                Ok(Event::CData(ref t)) if detective_builder.is_some() => {
+                    let decoded = t.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
+                        Error::InvalidFormat(format!("invalid detective CDATA: {error}"))
+                    })?;
+                    if !decoded.trim().is_empty() {
+                        return Err(Error::InvalidFormat(
+                            "table:detective cannot contain CDATA".to_string(),
+                        ));
+                    }
+                },
+                Ok(Event::GeneralRef(_)) if detective_builder.is_some() => {
+                    return Err(Error::InvalidFormat(
+                        "table:detective cannot contain entity references".to_string(),
+                    ));
+                },
                 Ok(Event::Text(ref t)) if annotation_builder.is_some() => {
                     if let Some(builder) = annotation_builder.as_mut() {
                         builder.text(t)?;
@@ -537,6 +617,35 @@ impl OdsParser {
                     text_content.push_str(&decode_reference(reference)?);
                 },
                 Ok(Event::End(ref e)) => {
+                    if detective_builder.is_some() {
+                        if detective_child_open {
+                            detective_child_open = false;
+                        } else if Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            TABLE_NAMESPACE_URI,
+                            "detective",
+                        ) {
+                            let detective = detective_builder
+                                .take()
+                                .expect("detective builder was checked");
+                            let cell = current_cell.as_mut().ok_or_else(|| {
+                                Error::InvalidFormat(
+                                    "table:detective must be contained in a table cell".to_string(),
+                                )
+                            })?;
+                            if cell.detective.replace(detective).is_some() {
+                                return Err(Error::InvalidFormat(
+                                    "table cell contains multiple table:detective elements"
+                                        .to_string(),
+                                ));
+                            }
+                        }
+                        Self::pop_namespace_scope(&mut document_namespaces, namespace_scopes.pop());
+                        buf.clear();
+                        continue;
+                    }
+
                     if annotation_builder.is_some() {
                         if annotation_depth == 0 {
                             let annotation = annotation_builder
@@ -1473,6 +1582,147 @@ impl OdsParser {
         Ok(source)
     }
 
+    fn parse_detective_child(
+        detective: &mut CellDetective,
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+        namespaces: &BTreeMap<String, String>,
+    ) -> Result<()> {
+        if Self::element_name_is(
+            element.name().as_ref(),
+            namespaces,
+            TABLE_NAMESPACE_URI,
+            "highlighted-range",
+        ) {
+            if !detective.operations().is_empty() {
+                return Err(Error::InvalidFormat(
+                    "table:highlighted-range must precede table:operation".to_string(),
+                ));
+            }
+            detective
+                .add_highlighted_range(Self::parse_detective_range(element, decoder, namespaces)?);
+        } else if Self::element_name_is(
+            element.name().as_ref(),
+            namespaces,
+            TABLE_NAMESPACE_URI,
+            "operation",
+        ) {
+            detective.add_operation(Self::parse_detective_operation(
+                element, decoder, namespaces,
+            )?);
+        } else {
+            return Err(Error::InvalidFormat(
+                "table:detective contains an unsupported child element".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn parse_detective_range(
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+        namespaces: &BTreeMap<String, String>,
+    ) -> Result<DetectiveHighlightedRange> {
+        let mut address = None;
+        let mut direction = None;
+        let mut contains_error = None;
+        let mut marked_invalid = None;
+        for attribute in element.attributes() {
+            let attribute = attribute
+                .map_err(|error| Error::InvalidFormat(format!("invalid XML attribute: {error}")))?;
+            let is_table = |local_name| {
+                Self::attribute_name_is(
+                    attribute.key.as_ref(),
+                    namespaces,
+                    TABLE_NAMESPACE_URI,
+                    local_name,
+                )
+            };
+            if is_table("cell-range-address") {
+                address = Some(Self::decode_attribute(
+                    &attribute,
+                    decoder,
+                    "table:cell-range-address",
+                )?);
+            } else if is_table("direction") {
+                direction = Some(DetectiveDirection::parse(&Self::decode_attribute(
+                    &attribute,
+                    decoder,
+                    "table:direction",
+                )?)?);
+            } else if is_table("contains-error") {
+                contains_error = Some(Self::parse_bool_attribute(&attribute, decoder)?);
+            } else if is_table("marked-invalid") {
+                marked_invalid = Some(Self::parse_bool_attribute(&attribute, decoder)?);
+            }
+        }
+
+        if let Some(marked_invalid) = marked_invalid {
+            if address.is_some() || direction.is_some() || contains_error.is_some() {
+                return Err(Error::InvalidFormat(
+                    "invalid detective ranges cannot contain directional range attributes"
+                        .to_string(),
+                ));
+            }
+            Ok(DetectiveHighlightedRange::invalid(marked_invalid))
+        } else {
+            DetectiveHighlightedRange::valid(
+                address,
+                direction.ok_or_else(|| {
+                    Error::InvalidFormat(
+                        "table:highlighted-range requires table:direction".to_string(),
+                    )
+                })?,
+                contains_error,
+            )
+        }
+    }
+
+    fn parse_detective_operation(
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+        namespaces: &BTreeMap<String, String>,
+    ) -> Result<DetectiveOperation> {
+        let mut kind = None;
+        let mut index = None;
+        for attribute in element.attributes() {
+            let attribute = attribute
+                .map_err(|error| Error::InvalidFormat(format!("invalid XML attribute: {error}")))?;
+            if Self::attribute_name_is(
+                attribute.key.as_ref(),
+                namespaces,
+                TABLE_NAMESPACE_URI,
+                "name",
+            ) {
+                kind = Some(DetectiveOperationKind::parse(&Self::decode_attribute(
+                    &attribute,
+                    decoder,
+                    "table:name",
+                )?)?);
+            } else if Self::attribute_name_is(
+                attribute.key.as_ref(),
+                namespaces,
+                TABLE_NAMESPACE_URI,
+                "index",
+            ) {
+                let value = Self::decode_attribute(&attribute, decoder, "table:index")?;
+                index = Some(value.parse::<usize>().map_err(|_| {
+                    Error::InvalidFormat(format!(
+                        "invalid non-negative detective operation index '{value}'"
+                    ))
+                })?);
+            }
+        }
+        Ok(DetectiveOperation::new(
+            kind.ok_or_else(|| {
+                Error::InvalidFormat("table:operation requires table:name".to_string())
+            })?,
+            index.ok_or_else(|| {
+                Error::InvalidFormat("table:operation requires table:index".to_string())
+            })?,
+        ))
+    }
+
     fn parse_column(
         element: &BytesStart<'_>,
         decoder: Decoder,
@@ -1618,6 +1868,7 @@ impl OdsParser {
             },
             annotation: None,
             range_source: None,
+            detective: None,
         })
     }
 
@@ -2040,6 +2291,7 @@ pub(crate) struct CellBuilder {
     merge: CellMerge,
     annotation: Option<super::CellAnnotation>,
     range_source: Option<CellRangeSource>,
+    detective: Option<CellDetective>,
 }
 
 impl CellBuilder {
@@ -2053,6 +2305,7 @@ impl CellBuilder {
             formula: self.formula.clone(),
             annotation: self.annotation.clone(),
             range_source: self.range_source.clone(),
+            detective: self.detective.clone(),
             validation_name: self.validation_name.clone(),
             style_name: self.style_name.clone(),
             matrix_span: self.matrix_span,
@@ -2443,6 +2696,90 @@ mod tests {
     }
 
     #[test]
+    fn parses_typed_detective_ranges_and_operations() {
+        let xml = r#"<o:document-content
+            xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+            xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0">
+          <o:body><o:spreadsheet><t:table t:name="Audit"><t:table-row>
+            <t:table-cell t:number-columns-repeated="2"><t:detective>
+              <t:highlighted-range t:cell-range-address=".A1:.B2"
+                t:direction="from-same-table" t:contains-error="true"/>
+              <t:highlighted-range t:marked-invalid="false"></t:highlighted-range>
+              <t:operation t:name="trace-precedents" t:index="0"/>
+              <t:operation t:name="trace-errors" t:index="7"></t:operation>
+            </t:detective></t:table-cell>
+          </t:table-row></t:table></o:spreadsheet></o:body>
+        </o:document-content>"#;
+
+        let sheets = OdsParser::parse_sheets(xml).unwrap();
+        let cells = &sheets[0].rows[0].cells;
+        assert_eq!(cells.len(), 2);
+        for cell in cells {
+            let detective = cell.detective().unwrap();
+            assert_eq!(detective.highlighted_ranges().len(), 2);
+            assert_eq!(detective.operations().len(), 2);
+            let range = &detective.highlighted_ranges()[0];
+            assert_eq!(range.cell_range_address(), Some(".A1:.B2"));
+            assert_eq!(range.direction(), Some(DetectiveDirection::FromSameTable));
+            assert_eq!(range.contains_error(), Some(true));
+            assert_eq!(range.marked_invalid(), None);
+            assert_eq!(
+                detective.highlighted_ranges()[1].marked_invalid(),
+                Some(false)
+            );
+            assert_eq!(
+                detective.operations()[1],
+                DetectiveOperation::new(DetectiveOperationKind::TraceErrors, 7)
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_schema_invalid_detective_metadata() {
+        let operation_before_range = r#"<o:document-content
+            xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+            xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0">
+          <o:body><o:spreadsheet><t:table t:name="Audit"><t:table-row><t:table-cell>
+            <t:detective><t:operation t:name="trace-errors" t:index="0"/>
+              <t:highlighted-range t:direction="from-same-table"/></t:detective>
+          </t:table-cell></t:table-row></t:table></o:spreadsheet></o:body>
+        </o:document-content>"#;
+        assert!(OdsParser::parse_sheets(operation_before_range).is_err());
+
+        let mixed_range = r#"<o:document-content
+            xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+            xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0">
+          <o:body><o:spreadsheet><t:table t:name="Audit"><t:table-row><t:table-cell>
+            <t:detective><t:highlighted-range t:marked-invalid="true"
+              t:direction="from-same-table"/></t:detective>
+          </t:table-cell></t:table-row></t:table></o:spreadsheet></o:body>
+        </o:document-content>"#;
+        assert!(OdsParser::parse_sheets(mixed_range).is_err());
+
+        let negative_index = operation_before_range
+            .replace(
+                r#"t:name="trace-errors" t:index="0""#,
+                r#"t:name="trace-errors" t:index="-1""#,
+            )
+            .replace(
+                r#"<t:highlighted-range t:direction="from-same-table"/>"#,
+                "",
+            );
+        assert!(OdsParser::parse_sheets(&negative_index).is_err());
+
+        let nested_child = operation_before_range
+            .replace(
+                r#"<t:operation t:name="trace-errors" t:index="0"/>"#,
+                "",
+            )
+            .replace(
+                r#"<t:highlighted-range t:direction="from-same-table"/>"#,
+                r#"<t:highlighted-range t:direction="from-same-table"><t:operation t:name="trace-errors" t:index="1"/></t:highlighted-range>"#,
+            );
+        assert!(OdsParser::parse_sheets(&nested_child).is_err());
+    }
+
+    #[test]
     fn test_parse_empty_sheet() {
         let sheets = OdsParser::parse_sheets(TEST_EMPTY_SHEET_XML).unwrap();
         assert_eq!(sheets.len(), 1);
@@ -2750,6 +3087,7 @@ mod tests {
                 formula: None,
                 annotation: None,
                 range_source: None,
+                detective: None,
                 validation_name: None,
                 style_name: None,
                 matrix_span: None,
@@ -2783,6 +3121,7 @@ mod tests {
             formula: None,
             annotation: None,
             range_source: None,
+            detective: None,
             validation_name: None,
             style_name: None,
             matrix_span: None,
@@ -2800,6 +3139,7 @@ mod tests {
             formula: None,
             annotation: None,
             range_source: None,
+            detective: None,
             validation_name: None,
             style_name: None,
             matrix_span: None,
@@ -2827,6 +3167,7 @@ mod tests {
             formula: None,
             annotation: None,
             range_source: None,
+            detective: None,
             validation_name: None,
             style_name: None,
             matrix_span: None,
@@ -2849,6 +3190,7 @@ mod tests {
             formula: None,
             annotation: None,
             range_source: None,
+            detective: None,
             validation_name: None,
             style_name: None,
             matrix_span: None,
@@ -2871,6 +3213,7 @@ mod tests {
             formula: None,
             annotation: None,
             range_source: None,
+            detective: None,
             validation_name: None,
             style_name: None,
             matrix_span: None,
@@ -2895,6 +3238,7 @@ mod tests {
             formula: None,
             annotation: None,
             range_source: None,
+            detective: None,
             validation_name: None,
             style_name: None,
             matrix_span: None,
@@ -2920,6 +3264,7 @@ mod tests {
             formula: None,
             annotation: None,
             range_source: None,
+            detective: None,
             validation_name: None,
             style_name: None,
             matrix_span: None,
@@ -2942,6 +3287,7 @@ mod tests {
             formula: None,
             annotation: None,
             range_source: None,
+            detective: None,
             validation_name: None,
             style_name: None,
             matrix_span: None,
@@ -2966,6 +3312,7 @@ mod tests {
             formula: None,
             annotation: None,
             range_source: None,
+            detective: None,
             validation_name: None,
             style_name: None,
             matrix_span: None,
@@ -2990,6 +3337,7 @@ mod tests {
             formula: None,
             annotation: None,
             range_source: None,
+            detective: None,
             validation_name: None,
             style_name: None,
             matrix_span: None,

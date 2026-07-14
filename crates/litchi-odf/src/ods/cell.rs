@@ -1,6 +1,6 @@
 //! Cell data structures for ODS spreadsheets.
 
-use super::{CellAnnotation, CellRangeSource, Row};
+use super::{CellAnnotation, CellDetective, CellRangeSource, Row};
 use litchi_core::{Result, xml::escape_xml};
 use std::num::NonZeroUsize;
 
@@ -88,6 +88,8 @@ pub struct Cell {
     pub annotation: Option<CellAnnotation>,
     /// Optional inert metadata for an externally imported rectangular range.
     pub range_source: Option<CellRangeSource>,
+    /// Optional inert formula-auditing highlights and operations.
+    pub detective: Option<CellDetective>,
     /// Name of the document-level content validation applied to this cell.
     pub validation_name: Option<String>,
     /// Name of the ODF table-cell style applied directly to this cell.
@@ -115,6 +117,7 @@ impl Cell {
             formula: None,
             annotation: None,
             range_source: None,
+            detective: None,
             validation_name: None,
             style_name: None,
             merge: CellMerge::None,
@@ -205,6 +208,26 @@ impl Cell {
     /// Remove and return inert external-range metadata.
     pub fn take_range_source(&mut self) -> Option<CellRangeSource> {
         self.range_source.take()
+    }
+
+    /// Return formula-auditing metadata attached to this cell.
+    pub fn detective(&self) -> Option<&CellDetective> {
+        self.detective.as_ref()
+    }
+
+    /// Mutably access formula-auditing metadata attached to this cell.
+    pub fn detective_mut(&mut self) -> Option<&mut CellDetective> {
+        self.detective.as_mut()
+    }
+
+    /// Attach or replace formula-auditing metadata.
+    pub fn set_detective(&mut self, detective: CellDetective) {
+        self.detective = Some(detective);
+    }
+
+    /// Remove and return formula-auditing metadata.
+    pub fn take_detective(&mut self) -> Option<CellDetective> {
+        self.detective.take()
     }
 
     /// Return the document-level content-validation name applied to this cell.
@@ -501,7 +524,8 @@ pub(crate) fn merge_cell_range(
                     || !cell.text.is_empty()
                     || cell.formula.is_some()
                     || cell.annotation.is_some()
-                    || cell.range_source.is_some())
+                    || cell.range_source.is_some()
+                    || cell.detective.is_some())
             {
                 return Err(litchi_core::Error::InvalidFormat(format!(
                     "merged range would cover populated cell ({row_index}, {column_index})"
@@ -527,6 +551,7 @@ pub(crate) fn merge_cell_range(
                 formula: None,
                 annotation: None,
                 range_source: None,
+                detective: None,
                 validation_name: None,
                 style_name: None,
                 matrix_span: None,
@@ -635,19 +660,26 @@ pub(crate) fn write_cell_xml(output: &mut String, cell: &Cell) {
         });
     }
 
-    if cell.merge == CellMerge::Covered && cell.range_source.is_none() {
+    if cell.merge == CellMerge::Covered
+        && cell.range_source.is_none()
+        && cell.annotation.is_none()
+        && cell.detective.is_none()
+    {
         output.push_str("/>");
         return;
     }
 
     if cell.merge == CellMerge::Covered {
         output.push('>');
-        super::source::write_cell_range_source(
-            output,
-            cell.range_source
-                .as_ref()
-                .expect("covered cell source was checked"),
-        );
+        if let Some(source) = &cell.range_source {
+            super::source::write_cell_range_source(output, source);
+        }
+        if let Some(annotation) = &cell.annotation {
+            annotation.write_xml(output);
+        }
+        if let Some(detective) = &cell.detective {
+            super::detective::write_detective(output, detective);
+        }
         output.push_str("</table:covered-table-cell>");
         return;
     }
@@ -689,7 +721,11 @@ pub(crate) fn write_cell_xml(output: &mut String, cell: &Cell) {
         CellValue::Empty if cell.formula.is_some() => {
             output.push_str(" office:value-type=\"float\" office:value=\"0\"");
         },
-        CellValue::Empty if cell.annotation.is_none() && cell.range_source.is_none() => {
+        CellValue::Empty
+            if cell.annotation.is_none()
+                && cell.range_source.is_none()
+                && cell.detective.is_none() =>
+        {
             output.push_str("/>");
             return;
         },
@@ -702,6 +738,9 @@ pub(crate) fn write_cell_xml(output: &mut String, cell: &Cell) {
     }
     if let Some(annotation) = &cell.annotation {
         annotation.write_xml(output);
+    }
+    if let Some(detective) = &cell.detective {
+        super::detective::write_detective(output, detective);
     }
     if matches!(cell.value, CellValue::Empty) {
         if cell.formula.is_some() {
@@ -794,6 +833,7 @@ mod tests {
             formula: None,
             annotation: None,
             range_source: None,
+            detective: None,
             validation_name: None,
             style_name: None,
             matrix_span: None,
@@ -816,6 +856,7 @@ mod tests {
             formula: None,
             annotation: None,
             range_source: None,
+            detective: None,
             validation_name: None,
             style_name: Some("Merged".to_string()),
             matrix_span: None,
@@ -876,6 +917,7 @@ mod tests {
             formula: None,
             annotation: None,
             range_source: None,
+            detective: None,
             validation_name: None,
             style_name: None,
             matrix_span: None,
@@ -896,6 +938,7 @@ mod tests {
             formula: None,
             annotation: None,
             range_source: None,
+            detective: None,
             validation_name: None,
             style_name: None,
             matrix_span: None,
@@ -919,6 +962,7 @@ mod tests {
             formula: None,
             annotation: None,
             range_source: None,
+            detective: None,
             validation_name: None,
             style_name: None,
             matrix_span: None,
@@ -936,6 +980,7 @@ mod tests {
             formula: None,
             annotation: None,
             range_source: None,
+            detective: None,
             validation_name: None,
             style_name: None,
             matrix_span: None,
@@ -953,6 +998,7 @@ mod tests {
             formula: None,
             annotation: None,
             range_source: None,
+            detective: None,
             validation_name: None,
             style_name: None,
             matrix_span: None,
@@ -970,6 +1016,7 @@ mod tests {
             formula: None,
             annotation: None,
             range_source: None,
+            detective: None,
             validation_name: None,
             style_name: None,
             matrix_span: None,
@@ -990,6 +1037,7 @@ mod tests {
             formula: Some("=A1+B1".to_string()),
             annotation: None,
             range_source: None,
+            detective: None,
             validation_name: None,
             style_name: None,
             matrix_span: None,
@@ -1010,6 +1058,7 @@ mod tests {
             formula: None,
             annotation: None,
             range_source: None,
+            detective: None,
             validation_name: None,
             style_name: None,
             matrix_span: None,
@@ -1030,6 +1079,7 @@ mod tests {
             formula: Some("=A1".to_string()),
             annotation: None,
             range_source: None,
+            detective: None,
             validation_name: None,
             style_name: None,
             matrix_span: None,
@@ -1047,6 +1097,7 @@ mod tests {
             formula: None,
             annotation: None,
             range_source: None,
+            detective: None,
             validation_name: None,
             style_name: None,
             matrix_span: None,
@@ -1067,6 +1118,7 @@ mod tests {
             formula: None,
             annotation: None,
             range_source: None,
+            detective: None,
             validation_name: None,
             style_name: None,
             matrix_span: None,
@@ -1087,6 +1139,7 @@ mod tests {
             formula: None,
             annotation: None,
             range_source: None,
+            detective: None,
             validation_name: None,
             style_name: None,
             matrix_span: None,
@@ -1104,6 +1157,7 @@ mod tests {
             formula: None,
             annotation: None,
             range_source: None,
+            detective: None,
             validation_name: None,
             style_name: None,
             matrix_span: None,

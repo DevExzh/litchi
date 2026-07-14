@@ -5,8 +5,8 @@
 
 use crate::core::{OdfStructure, OwnedPackage, PackageWriter};
 use crate::ods::{
-    Cell, CellAnnotation, CellRangeSource, CellValue, Column, ContentValidation, DatabaseRange,
-    NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange, Row, Sheet,
+    Cell, CellAnnotation, CellDetective, CellRangeSource, CellValue, Column, ContentValidation,
+    DatabaseRange, NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange, Row, Sheet,
     SheetPrintSettings, SheetScenario, SheetStyle, SheetTableSource, Spreadsheet,
     SpreadsheetProtection, TableStructure, TableVisibility,
     cell::{merge_cell_range, unmerge_cell_range},
@@ -539,6 +539,7 @@ impl MutableSpreadsheet {
                     formula: None,
                     annotation: None,
                     range_source: None,
+                    detective: None,
                     validation_name: None,
                     style_name: None,
                     matrix_span: None,
@@ -600,6 +601,7 @@ impl MutableSpreadsheet {
                 formula: None,
                 annotation: None,
                 range_source: None,
+                detective: None,
                 validation_name: None,
                 style_name: None,
                 matrix_span: None,
@@ -670,6 +672,45 @@ impl MutableSpreadsheet {
             .and_then(Cell::take_range_source))
     }
 
+    /// Attach or replace formula-auditing metadata on a cell.
+    pub fn set_cell_detective(
+        &mut self,
+        sheet_index: usize,
+        row: usize,
+        col: usize,
+        detective: CellDetective,
+    ) -> Result<()> {
+        let sheet = self.sheets.get(sheet_index).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(format!("Sheet index {sheet_index} out of bounds"))
+        })?;
+        let exists = sheet
+            .rows
+            .get(row)
+            .is_some_and(|row| row.cells.get(col).is_some());
+        if !exists {
+            self.set_cell(sheet_index, row, col, CellValue::Empty)?;
+        }
+        self.sheets[sheet_index].rows[row].cells[col].set_detective(detective);
+        Ok(())
+    }
+
+    /// Remove and return formula-auditing metadata from a cell.
+    pub fn remove_cell_detective(
+        &mut self,
+        sheet_index: usize,
+        row: usize,
+        col: usize,
+    ) -> Result<Option<CellDetective>> {
+        let sheet = self.sheets.get_mut(sheet_index).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(format!("Sheet index {sheet_index} out of bounds"))
+        })?;
+        Ok(sheet
+            .rows
+            .get_mut(row)
+            .and_then(|row| row.cells.get_mut(col))
+            .and_then(Cell::take_detective))
+    }
+
     /// Apply a named content validation to a cell.
     pub fn set_cell_validation(
         &mut self,
@@ -707,6 +748,7 @@ impl MutableSpreadsheet {
                 formula: None,
                 annotation: None,
                 range_source: None,
+                detective: None,
                 validation_name: None,
                 style_name: None,
                 matrix_span: None,
@@ -767,6 +809,7 @@ impl MutableSpreadsheet {
                 formula: None,
                 annotation: None,
                 range_source: None,
+                detective: None,
                 validation_name: None,
                 style_name: None,
                 matrix_span: None,
@@ -809,6 +852,7 @@ impl MutableSpreadsheet {
                 formula: None,
                 annotation: None,
                 range_source: None,
+                detective: None,
                 validation_name: None,
                 style_name: None,
                 matrix_span: None,
@@ -870,6 +914,7 @@ impl MutableSpreadsheet {
                 formula: None,
                 annotation: None,
                 range_source: None,
+                detective: None,
                 validation_name: None,
                 style_name: None,
                 matrix_span: None,
@@ -1397,8 +1442,9 @@ impl Default for MutableSpreadsheet {
 mod tests {
     use super::*;
     use crate::ods::{
-        CellStyleProtection, NamedRangeUsage, SpreadsheetBuilder, ValidationDisplayList,
-        ValidationErrorMacro, ValidationEventListener, ValidationScriptEventListener,
+        CellStyleProtection, DetectiveOperation, DetectiveOperationKind, NamedRangeUsage,
+        SpreadsheetBuilder, ValidationDisplayList, ValidationErrorMacro, ValidationEventListener,
+        ValidationScriptEventListener,
     };
 
     fn package_with_cell_styles() -> Vec<u8> {
@@ -1888,6 +1934,30 @@ mod tests {
             output.sheets().unwrap()[0].rows[0].cells[1]
                 .range_source()
                 .is_none()
+        );
+    }
+
+    #[test]
+    fn mutable_spreadsheet_edits_cell_detective_metadata() {
+        let mut detective = CellDetective::new();
+        detective.add_operation(DetectiveOperation::new(
+            DetectiveOperationKind::RemovePrecedents,
+            4,
+        ));
+        let mut mutable = MutableSpreadsheet::new();
+        mutable.add_sheet("Audit").unwrap();
+        mutable
+            .set_cell_detective(0, 2, 3, detective.clone())
+            .unwrap();
+
+        let mut output = Spreadsheet::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            output.sheets().unwrap()[0].rows[2].cells[3].detective(),
+            Some(&detective)
+        );
+        assert_eq!(
+            mutable.remove_cell_detective(0, 2, 3).unwrap(),
+            Some(detective)
         );
     }
 }
