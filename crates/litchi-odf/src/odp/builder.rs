@@ -343,25 +343,57 @@ impl PresentationBuilder {
 
     /// Generate XML for a shape
     pub(super) fn generate_shape_xml(shape: &crate::odp::Shape, idx: usize) -> Result<String> {
+        use crate::odp::DrawingShapeKind;
         use litchi_core::ShapeType;
 
-        // Determine default position and size if not provided
-        let x = shape.x.as_deref().unwrap_or("2cm");
-        let y = shape.y.as_deref().unwrap_or("8cm");
-        let width = shape.width.as_deref().unwrap_or("10cm");
-        let height = shape.height.as_deref().unwrap_or("5cm");
+        let generated = shape.drawing_kind.is_none();
+        let x = shape.x.as_deref().or(generated.then_some("2cm"));
+        let y = shape.y.as_deref().or(generated.then_some("8cm"));
+        let width = shape.width.as_deref().or(generated.then_some("10cm"));
+        let height = shape.height.as_deref().or(generated.then_some("5cm"));
         let default_name = format!("Shape{}", idx + 1);
         let name = shape.name.as_deref().unwrap_or(&default_name);
-        let style_name = shape.style_name.as_deref().unwrap_or("gr3");
-        let escaped_name = escape_xml(name);
-        let escaped_style_name = escape_xml(style_name);
-        let escaped_x = escape_xml(x);
-        let escaped_y = escape_xml(y);
-        let escaped_width = escape_xml(width);
-        let escaped_height = escape_xml(height);
-        let mut shape_attributes = format!(
-            r#" draw:layer="{}""#,
-            escape_xml(shape.layer.as_deref().unwrap_or("layout"))
+        let mut position_attributes = String::new();
+        push_optional_attribute(&mut position_attributes, "svg:x", x);
+        push_optional_attribute(&mut position_attributes, "svg:y", y);
+        push_optional_attribute(&mut position_attributes, "svg:width", width);
+        push_optional_attribute(&mut position_attributes, "svg:height", height);
+        let mut line_attributes = String::new();
+        push_optional_attribute(
+            &mut line_attributes,
+            "svg:x1",
+            shape.x.as_deref().or(generated.then_some("2cm")),
+        );
+        push_optional_attribute(
+            &mut line_attributes,
+            "svg:y1",
+            shape.y.as_deref().or(generated.then_some("8cm")),
+        );
+        push_optional_attribute(
+            &mut line_attributes,
+            "svg:x2",
+            shape.width.as_deref().or(generated.then_some("12cm")),
+        );
+        push_optional_attribute(
+            &mut line_attributes,
+            "svg:y2",
+            shape.height.as_deref().or(generated.then_some("8cm")),
+        );
+        let mut shape_attributes = String::new();
+        push_optional_attribute(
+            &mut shape_attributes,
+            "draw:name",
+            shape.name.as_deref().or(generated.then_some(name)),
+        );
+        push_optional_attribute(
+            &mut shape_attributes,
+            "draw:style-name",
+            shape.style_name.as_deref().or(generated.then_some("gr3")),
+        );
+        push_optional_attribute(
+            &mut shape_attributes,
+            "draw:layer",
+            shape.layer.as_deref().or(generated.then_some("layout")),
         );
         if let Some(z_index) = &shape.z_index {
             validate_z_index(z_index)?;
@@ -389,6 +421,40 @@ impl PresentationBuilder {
                 if user_transformed { "true" } else { "false" }
             ));
         }
+        let mut drawing_attribute_names = BTreeSet::new();
+        for attribute in &shape.drawing_attributes {
+            let modeled = match attribute.namespace {
+                crate::odp::DrawingAttributeNamespace::Drawing => matches!(
+                    attribute.local_name.as_str(),
+                    "name" | "style-name" | "layer" | "z-index" | "transform"
+                ),
+                crate::odp::DrawingAttributeNamespace::Svg => matches!(
+                    attribute.local_name.as_str(),
+                    "x" | "y" | "width" | "height" | "x1" | "y1" | "x2" | "y2"
+                ),
+            };
+            if modeled {
+                return Err(litchi_core::Error::InvalidFormat(format!(
+                    "ODP shape attribute '{}:{}' must use its dedicated shape field",
+                    attribute.namespace.prefix(),
+                    attribute.local_name
+                )));
+            }
+            let qualified_name =
+                format!("{}:{}", attribute.namespace.prefix(), attribute.local_name);
+            if !drawing_attribute_names.insert(qualified_name.clone()) {
+                return Err(litchi_core::Error::InvalidFormat(format!(
+                    "duplicate ODP shape attribute '{qualified_name}'"
+                )));
+            }
+            shape_attributes.push(' ');
+            shape_attributes.push_str(attribute.namespace.prefix());
+            shape_attributes.push(':');
+            shape_attributes.push_str(&attribute.local_name);
+            shape_attributes.push_str("=\"");
+            shape_attributes.push_str(&escape_xml(&attribute.value));
+            shape_attributes.push('"');
+        }
 
         if shape.media.is_some() && shape.shape_type != ShapeType::GraphicFrame {
             return Err(litchi_core::Error::InvalidFormat(format!(
@@ -397,67 +463,78 @@ impl PresentationBuilder {
             )));
         }
 
-        let element_name = match shape.shape_type {
+        let element_kind = match shape.shape_type {
             ShapeType::TextBox
             | ShapeType::Placeholder
             | ShapeType::Picture
-            | ShapeType::GraphicFrame => "draw:frame",
-            ShapeType::AutoShape => "draw:rect",
-            ShapeType::Line => "draw:line",
-            ShapeType::Connector => "draw:connector",
-            _ => "",
+            | ShapeType::GraphicFrame => DrawingShapeKind::Frame,
+            ShapeType::AutoShape => shape.drawing_kind.unwrap_or(DrawingShapeKind::Rectangle),
+            ShapeType::Line => shape.drawing_kind.unwrap_or(DrawingShapeKind::Line),
+            ShapeType::Connector => shape.drawing_kind.unwrap_or(DrawingShapeKind::Connector),
+            ShapeType::Group => DrawingShapeKind::Group,
+            _ => shape.drawing_kind.unwrap_or(DrawingShapeKind::Frame),
         };
+        let compatible_kind = match shape.shape_type {
+            ShapeType::TextBox
+            | ShapeType::Placeholder
+            | ShapeType::Picture
+            | ShapeType::GraphicFrame => element_kind == DrawingShapeKind::Frame,
+            ShapeType::AutoShape => !matches!(
+                element_kind,
+                DrawingShapeKind::Frame
+                    | DrawingShapeKind::Line
+                    | DrawingShapeKind::Measure
+                    | DrawingShapeKind::Connector
+                    | DrawingShapeKind::Group
+            ),
+            ShapeType::Line => matches!(
+                element_kind,
+                DrawingShapeKind::Line | DrawingShapeKind::Measure
+            ),
+            ShapeType::Connector => element_kind == DrawingShapeKind::Connector,
+            ShapeType::Group => element_kind == DrawingShapeKind::Group,
+            _ => true,
+        };
+        if !compatible_kind {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "ODP drawing element '{}' is incompatible with {} shape '{}'",
+                element_kind.element_name(),
+                shape.shape_type,
+                name
+            )));
+        }
+        let element_name = element_kind.element_name();
         let mut xml = match shape.shape_type {
             ShapeType::TextBox | ShapeType::Placeholder => {
                 if shape.has_text() {
                     format!(
-                        r#"<draw:frame draw:name="{}" draw:style-name="{}"{} svg:x="{}" svg:y="{}" svg:width="{}" svg:height="{}"><draw:text-box>{}</draw:text-box></draw:frame>"#,
-                        escaped_name,
-                        escaped_style_name,
+                        r#"<draw:frame{}{}><draw:text-box>{}</draw:text-box></draw:frame>"#,
                         shape_attributes,
-                        escaped_x,
-                        escaped_y,
-                        escaped_width,
-                        escaped_height,
+                        position_attributes,
                         generate_text_paragraphs(&shape.text, Some("P2"))
                     )
                 } else {
                     // Empty frame
                     format!(
-                        r#"<draw:frame draw:name="{}" draw:style-name="{}"{} svg:x="{}" svg:y="{}" svg:width="{}" svg:height="{}"/>"#,
-                        escaped_name,
-                        escaped_style_name,
-                        shape_attributes,
-                        escaped_x,
-                        escaped_y,
-                        escaped_width,
-                        escaped_height
+                        r#"<draw:frame{}{}/>"#,
+                        shape_attributes, position_attributes
                     )
                 }
             },
             ShapeType::AutoShape => {
                 if shape.has_text() {
                     format!(
-                        r#"<draw:rect draw:name="{}" draw:style-name="{}"{} svg:x="{}" svg:y="{}" svg:width="{}" svg:height="{}">{}</draw:rect>"#,
-                        escaped_name,
-                        escaped_style_name,
+                        r#"<{}{}{}>{}</{}>"#,
+                        element_name,
                         shape_attributes,
-                        escaped_x,
-                        escaped_y,
-                        escaped_width,
-                        escaped_height,
-                        generate_text_paragraphs(&shape.text, Some("P2"))
+                        position_attributes,
+                        generate_text_paragraphs(&shape.text, Some("P2")),
+                        element_name
                     )
                 } else {
                     format!(
-                        r#"<draw:rect draw:name="{}" draw:style-name="{}"{} svg:x="{}" svg:y="{}" svg:width="{}" svg:height="{}"/>"#,
-                        escaped_name,
-                        escaped_style_name,
-                        shape_attributes,
-                        escaped_x,
-                        escaped_y,
-                        escaped_width,
-                        escaped_height
+                        r#"<{}{}{}/>"#,
+                        element_name, shape_attributes, position_attributes
                     )
                 }
             },
@@ -472,36 +549,14 @@ impl PresentationBuilder {
                     },
                 );
                 format!(
-                    r#"<draw:frame draw:name="{}" draw:style-name="{}"{} svg:x="{}" svg:y="{}" svg:width="{}" svg:height="{}">{}</draw:frame>"#,
-                    escaped_name,
-                    escaped_style_name,
-                    shape_attributes,
-                    escaped_x,
-                    escaped_y,
-                    escaped_width,
-                    escaped_height,
-                    image
+                    r#"<draw:frame{}{}>{}</draw:frame>"#,
+                    shape_attributes, position_attributes, image
                 )
             },
             ShapeType::Line | ShapeType::Connector => {
-                // Line shape - use x,y as start and width,height as end offsets
-                let x2 = shape.width.as_deref().unwrap_or("12cm");
-                let y2 = shape.height.as_deref().unwrap_or("8cm");
-                let element_name = if shape.shape_type == ShapeType::Connector {
-                    "draw:connector"
-                } else {
-                    "draw:line"
-                };
                 format!(
-                    r#"<{} draw:name="{}" draw:style-name="{}"{} svg:x1="{}" svg:y1="{}" svg:x2="{}" svg:y2="{}"/>"#,
-                    element_name,
-                    escaped_name,
-                    escaped_style_name,
-                    shape_attributes,
-                    escaped_x,
-                    escaped_y,
-                    escape_xml(x2),
-                    escape_xml(y2)
+                    r#"<{}{}{}/>"#,
+                    element_name, shape_attributes, line_attributes
                 )
             },
             ShapeType::GraphicFrame if shape.media.is_some() => {
@@ -512,15 +567,8 @@ impl PresentationBuilder {
                     .expect("media checked by match guard")
                     .write_xml(&mut plugin)?;
                 format!(
-                    r#"<draw:frame draw:name="{}" draw:style-name="{}"{} svg:x="{}" svg:y="{}" svg:width="{}" svg:height="{}">{}</draw:frame>"#,
-                    escaped_name,
-                    escaped_style_name,
-                    shape_attributes,
-                    escaped_x,
-                    escaped_y,
-                    escaped_width,
-                    escaped_height,
-                    plugin
+                    r#"<draw:frame{}{}>{}</draw:frame>"#,
+                    shape_attributes, position_attributes, plugin
                 )
             },
             ShapeType::Group | ShapeType::Table | ShapeType::GraphicFrame | ShapeType::Unknown => {
@@ -803,6 +851,59 @@ mod tests {
         connector.shape_type = ShapeType::Connector;
         let connector_xml = PresentationBuilder::generate_shape_xml(&connector, 1).unwrap();
         assert!(connector_xml.starts_with("<draw:connector"));
+    }
+
+    #[test]
+    fn writes_explicit_drawing_kinds_and_escaped_geometry_attributes() {
+        let mut shape = Shape::new();
+        shape.name = Some("Ellipse".to_string());
+        shape.drawing_kind = Some(crate::odp::DrawingShapeKind::Ellipse);
+        shape.drawing_attributes.push(
+            crate::odp::DrawingAttribute::new(
+                crate::odp::DrawingAttributeNamespace::Drawing,
+                "kind",
+                "section & arc",
+            )
+            .unwrap(),
+        );
+        shape.drawing_attributes.push(
+            crate::odp::DrawingAttribute::new(
+                crate::odp::DrawingAttributeNamespace::Svg,
+                "rx",
+                "2cm",
+            )
+            .unwrap(),
+        );
+        let xml = PresentationBuilder::generate_shape_xml(&shape, 0).unwrap();
+        assert!(xml.starts_with("<draw:ellipse"));
+        assert!(xml.contains(r#"draw:kind="section &amp; arc""#));
+        assert!(xml.contains(r#"svg:rx="2cm""#));
+        assert!(!xml.contains("svg:x="));
+
+        shape.shape_type = ShapeType::Line;
+        assert!(PresentationBuilder::generate_shape_xml(&shape, 0).is_err());
+
+        shape.shape_type = ShapeType::AutoShape;
+        shape.drawing_attributes.push(
+            crate::odp::DrawingAttribute::new(
+                crate::odp::DrawingAttributeNamespace::Svg,
+                "rx",
+                "3cm",
+            )
+            .unwrap(),
+        );
+        assert!(PresentationBuilder::generate_shape_xml(&shape, 0).is_err());
+
+        let mut reserved = Shape::new();
+        reserved.drawing_attributes.push(
+            crate::odp::DrawingAttribute::new(
+                crate::odp::DrawingAttributeNamespace::Drawing,
+                "name",
+                "duplicate",
+            )
+            .unwrap(),
+        );
+        assert!(PresentationBuilder::generate_shape_xml(&reserved, 0).is_err());
     }
 
     #[test]

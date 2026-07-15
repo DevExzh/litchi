@@ -74,7 +74,7 @@ pub use legacy_animation::{LegacyAnimationKind, LegacyAnimationNode};
 pub use media::{MediaActuate, MediaParameter, MediaReference, MediaShow};
 pub use mutable::MutablePresentation;
 pub use presentation::Presentation;
-pub use slide::{Shape, Slide};
+pub use slide::{DrawingAttribute, DrawingAttributeNamespace, DrawingShapeKind, Shape, Slide};
 pub use transition::{
     SlideTransition, TransitionDirection, TransitionSound, TransitionSoundShow, TransitionSpeed,
     TransitionStyle, TransitionType,

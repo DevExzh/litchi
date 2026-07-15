@@ -257,12 +257,12 @@ pub use litchi_core::unit::{Length, LengthUnit};
 // Re-export main types for convenience
 pub use odp::{
     AnimationAttribute, AnimationAttributeNamespace, AnimationKind, AnimationNode,
-    DrawingHyperlink, HyperlinkShow, LegacyAnimationKind, LegacyAnimationNode, MediaActuate,
-    MediaParameter, MediaReference, MediaShow, MutablePresentation, Presentation,
-    PresentationAction, PresentationBuilder, PresentationEffect, PresentationEffectDirection,
-    PresentationEventListener, ScriptEventListener, ShapeEventListener, SlideTransition,
-    TransitionDirection, TransitionSound, TransitionSoundShow, TransitionSpeed, TransitionStyle,
-    TransitionType,
+    DrawingAttribute, DrawingAttributeNamespace, DrawingHyperlink, DrawingShapeKind, HyperlinkShow,
+    LegacyAnimationKind, LegacyAnimationNode, MediaActuate, MediaParameter, MediaReference,
+    MediaShow, MutablePresentation, Presentation, PresentationAction, PresentationBuilder,
+    PresentationEffect, PresentationEffectDirection, PresentationEventListener,
+    ScriptEventListener, ShapeEventListener, SlideTransition, TransitionDirection, TransitionSound,
+    TransitionSoundShow, TransitionSpeed, TransitionStyle, TransitionType,
 };
 pub use ods::{
     AnnotationElement, AnnotationNode, CalculationIteration, CalculationNullDate,

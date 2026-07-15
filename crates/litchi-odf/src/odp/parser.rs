@@ -4,11 +4,12 @@ use super::animation::ANIMATION_NAMESPACE;
 use super::legacy_animation::validate_legacy_animation_root;
 use super::{
     AnimationAttribute, AnimationAttributeNamespace, AnimationKind, AnimationNode,
-    DrawingHyperlink, HyperlinkShow, LegacyAnimationKind, LegacyAnimationNode, MediaActuate,
-    MediaParameter, MediaReference, MediaShow, PresentationAction, PresentationEffect,
-    PresentationEffectDirection, PresentationEventListener, ScriptEventListener, Shape,
-    ShapeEventListener, Slide, SlideTransition, TransitionDirection, TransitionSound,
-    TransitionSoundShow, TransitionSpeed, TransitionStyle, TransitionType,
+    DrawingAttribute, DrawingAttributeNamespace, DrawingHyperlink, DrawingShapeKind, HyperlinkShow,
+    LegacyAnimationKind, LegacyAnimationNode, MediaActuate, MediaParameter, MediaReference,
+    MediaShow, PresentationAction, PresentationEffect, PresentationEffectDirection,
+    PresentationEventListener, ScriptEventListener, Shape, ShapeEventListener, Slide,
+    SlideTransition, TransitionDirection, TransitionSound, TransitionSoundShow, TransitionSpeed,
+    TransitionStyle, TransitionType,
 };
 use litchi_core::{Error, Result, ShapeType};
 use quick_xml::XmlVersion;
@@ -53,7 +54,12 @@ enum ShapeElement {
     Path,
     Polygon,
     Polyline,
+    RegularPolygon,
+    PageThumbnail,
+    Measure,
+    Caption,
     Connector,
+    Control,
     Group,
 }
 
@@ -92,6 +98,8 @@ pub(crate) struct OdpParser;
 #[allow(dead_code)]
 struct ShapeBuilder {
     shape_type: ShapeType,
+    drawing_kind: Option<DrawingShapeKind>,
+    drawing_attributes: Vec<DrawingAttribute>,
     text: String,
     name: Option<String>,
     x: Option<String>,
@@ -160,6 +168,8 @@ impl ShapeBuilder {
     fn new() -> Self {
         Self {
             shape_type: ShapeType::AutoShape,
+            drawing_kind: None,
+            drawing_attributes: Vec::new(),
             text: String::new(),
             name: None,
             x: None,
@@ -187,6 +197,8 @@ impl ShapeBuilder {
     fn build(self) -> Shape {
         Shape {
             shape_type: self.shape_type,
+            drawing_kind: self.drawing_kind,
+            drawing_attributes: self.drawing_attributes,
             text: self.text,
             name: self.name,
             x: self.x,
@@ -238,7 +250,12 @@ impl OdpParser {
                 b"path" => OdpElement::Shape(ShapeElement::Path),
                 b"polygon" => OdpElement::Shape(ShapeElement::Polygon),
                 b"polyline" => OdpElement::Shape(ShapeElement::Polyline),
+                b"regular-polygon" => OdpElement::Shape(ShapeElement::RegularPolygon),
+                b"page-thumbnail" => OdpElement::Shape(ShapeElement::PageThumbnail),
+                b"measure" => OdpElement::Shape(ShapeElement::Measure),
+                b"caption" => OdpElement::Shape(ShapeElement::Caption),
                 b"connector" => OdpElement::Shape(ShapeElement::Connector),
+                b"control" => OdpElement::Shape(ShapeElement::Control),
                 b"g" => OdpElement::Shape(ShapeElement::Group),
                 b"image" => OdpElement::Image,
                 b"object" | b"object-ole" => OdpElement::Object,
@@ -590,19 +607,40 @@ impl OdpParser {
         let mut builder = ShapeBuilder::new();
         let presentation_class = Self::get_attr(reader, element, PRESENTATION_NAMESPACE, b"class")?;
         builder.is_frame = matches!(shape_element, ShapeElement::Frame);
+        builder.drawing_kind = Some(match shape_element {
+            ShapeElement::Frame => DrawingShapeKind::Frame,
+            ShapeElement::Rect => DrawingShapeKind::Rectangle,
+            ShapeElement::Ellipse => DrawingShapeKind::Ellipse,
+            ShapeElement::Line => DrawingShapeKind::Line,
+            ShapeElement::CustomShape => DrawingShapeKind::CustomShape,
+            ShapeElement::Circle => DrawingShapeKind::Circle,
+            ShapeElement::Path => DrawingShapeKind::Path,
+            ShapeElement::Polygon => DrawingShapeKind::Polygon,
+            ShapeElement::Polyline => DrawingShapeKind::Polyline,
+            ShapeElement::RegularPolygon => DrawingShapeKind::RegularPolygon,
+            ShapeElement::PageThumbnail => DrawingShapeKind::PageThumbnail,
+            ShapeElement::Measure => DrawingShapeKind::Measure,
+            ShapeElement::Caption => DrawingShapeKind::Caption,
+            ShapeElement::Connector => DrawingShapeKind::Connector,
+            ShapeElement::Control => DrawingShapeKind::Control,
+            ShapeElement::Group => DrawingShapeKind::Group,
+        });
         builder.is_title = presentation_class.as_deref() == Some("title");
         builder.shape_type = match shape_element {
             ShapeElement::Frame => match presentation_class.as_deref() {
                 Some(_) => ShapeType::Placeholder,
                 _ => ShapeType::TextBox,
             },
-            ShapeElement::Line => ShapeType::Line,
+            ShapeElement::Line | ShapeElement::Measure => ShapeType::Line,
             ShapeElement::Connector => ShapeType::Connector,
             ShapeElement::Group => ShapeType::Group,
             _ => ShapeType::AutoShape,
         };
         builder.name = Self::get_attr(reader, element, DRAW_NAMESPACE, b"name")?;
-        if matches!(shape_element, ShapeElement::Line | ShapeElement::Connector) {
+        if matches!(
+            shape_element,
+            ShapeElement::Line | ShapeElement::Connector | ShapeElement::Measure
+        ) {
             builder.x = Self::get_attr(reader, element, SVG_NAMESPACE, b"x1")?;
             builder.y = Self::get_attr(reader, element, SVG_NAMESPACE, b"y1")?;
             builder.width = Self::get_attr(reader, element, SVG_NAMESPACE, b"x2")?;
@@ -631,7 +669,56 @@ impl OdpParser {
             Self::get_attr(reader, element, PRESENTATION_NAMESPACE, b"user-transformed")?,
             "presentation:user-transformed",
         )?;
+        builder.drawing_attributes = Self::drawing_attributes(reader, element)?;
         Ok(builder)
+    }
+
+    fn drawing_attributes(
+        reader: &NsReader<&[u8]>,
+        element: &BytesStart<'_>,
+    ) -> Result<Vec<DrawingAttribute>> {
+        let mut attributes = Vec::new();
+        for attribute in element.attributes() {
+            let attribute = attribute.map_err(|error| {
+                Error::InvalidFormat(format!("invalid ODP shape attribute: {error}"))
+            })?;
+            let (namespace, local_name) = reader.resolver().resolve_attribute(attribute.key);
+            let namespace = if Self::is_namespace(&namespace, DRAW_NAMESPACE) {
+                DrawingAttributeNamespace::Drawing
+            } else if Self::is_namespace(&namespace, SVG_NAMESPACE) {
+                DrawingAttributeNamespace::Svg
+            } else {
+                continue;
+            };
+            let local_name = local_name.as_ref();
+            let modeled = match namespace {
+                DrawingAttributeNamespace::Drawing => matches!(
+                    local_name,
+                    b"name" | b"style-name" | b"layer" | b"z-index" | b"transform"
+                ),
+                DrawingAttributeNamespace::Svg => matches!(
+                    local_name,
+                    b"x" | b"y" | b"width" | b"height" | b"x1" | b"y1" | b"x2" | b"y2"
+                ),
+            };
+            if modeled {
+                continue;
+            }
+            let value = attribute
+                .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                .map_err(|error| {
+                    Error::InvalidFormat(format!("invalid ODP shape attribute value: {error}"))
+                })?
+                .into_owned();
+            attributes.push(DrawingAttribute::new(
+                namespace,
+                String::from_utf8(local_name.to_vec()).map_err(|_| {
+                    Error::InvalidFormat("non-UTF-8 ODP shape attribute name".to_string())
+                })?,
+                value,
+            )?);
+        }
+        Ok(attributes)
     }
 
     fn media_reference(
@@ -2091,6 +2178,65 @@ mod tests {
         </office:presentation>
     </office:body>
 </office:document-content>"#;
+
+    #[test]
+    fn preserves_drawing_element_kinds_and_unmodeled_geometry_attributes() {
+        let xml = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+            xmlns:d="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"
+            xmlns:s="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0">
+            <o:body><o:presentation><d:page>
+              <d:rect d:name="rect" d:corner-radius="2mm"/>
+              <d:ellipse d:name="ellipse" d:kind="section" d:start-angle="30" s:rx="2cm" s:ry="1cm"/>
+              <d:circle d:name="circle" s:cx="3cm" s:cy="4cm" s:r="2cm"/>
+              <d:path d:name="path" s:viewBox="0 0 100 100" s:d="M 0 0 L 100 100"/>
+              <d:polygon d:name="polygon" s:viewBox="0 0 10 10" d:points="0,0 10,0 5,10"/>
+              <d:polyline d:name="polyline" d:points="0,0 5,5 10,0"/>
+              <d:regular-polygon d:name="regular" d:corners="7" d:concave="true" d:sharpness="25%"/>
+              <d:page-thumbnail d:name="thumb" d:page-number="2"/>
+              <d:measure d:name="measure" s:x1="1cm" s:y1="2cm" s:x2="3cm" s:y2="4cm"/>
+              <d:caption d:name="caption" d:caption-point-x="1cm" d:caption-point-y="2cm"/>
+              <d:connector d:name="connector" d:type="curve" d:start-shape="a" d:end-shape="b" s:x1="0cm" s:y1="0cm" s:x2="1cm" s:y2="1cm"/>
+              <d:control d:name="control" d:control="control1"/>
+              <d:custom-shape d:name="custom" d:engine="vendor" d:data="opaque"/>
+            </d:page></o:presentation></o:body>
+        </o:document-content>"#;
+        let slides = OdpParser::parse_slides(xml).unwrap();
+        let shapes = &slides[0].shapes;
+        let expected = [
+            DrawingShapeKind::Rectangle,
+            DrawingShapeKind::Ellipse,
+            DrawingShapeKind::Circle,
+            DrawingShapeKind::Path,
+            DrawingShapeKind::Polygon,
+            DrawingShapeKind::Polyline,
+            DrawingShapeKind::RegularPolygon,
+            DrawingShapeKind::PageThumbnail,
+            DrawingShapeKind::Measure,
+            DrawingShapeKind::Caption,
+            DrawingShapeKind::Connector,
+            DrawingShapeKind::Control,
+            DrawingShapeKind::CustomShape,
+        ];
+        assert_eq!(shapes.len(), expected.len());
+        for (index, (shape, expected_kind)) in shapes.iter().zip(expected).enumerate() {
+            assert_eq!(shape.drawing_kind(), Some(expected_kind));
+            let regenerated =
+                crate::odp::PresentationBuilder::generate_shape_xml(shape, index).unwrap();
+            assert!(regenerated.starts_with(&format!("<{}", expected_kind.element_name())));
+            assert!(!regenerated.contains("draw:layer="));
+        }
+        let ellipse = crate::odp::PresentationBuilder::generate_shape_xml(&shapes[1], 1).unwrap();
+        assert!(ellipse.contains(r#"draw:kind="section""#));
+        assert!(ellipse.contains(r#"draw:start-angle="30""#));
+        assert!(ellipse.contains(r#"svg:rx="2cm""#));
+        let path = crate::odp::PresentationBuilder::generate_shape_xml(&shapes[3], 3).unwrap();
+        assert!(path.contains(r#"svg:viewBox="0 0 100 100""#));
+        assert!(path.contains(r#"svg:d="M 0 0 L 100 100""#));
+        let connector =
+            crate::odp::PresentationBuilder::generate_shape_xml(&shapes[10], 10).unwrap();
+        assert!(connector.contains(r#"draw:type="curve""#));
+        assert!(connector.contains(r#"draw:start-shape="a""#));
+    }
 
     const TEST_EMPTY_PRESENTATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 <office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"

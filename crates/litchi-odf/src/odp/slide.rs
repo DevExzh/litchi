@@ -142,10 +142,148 @@ impl Slide {
 /// A shape (element) on a slide.
 ///
 /// Shapes represent visual elements like text boxes, images, and drawings.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DrawingShapeKind {
+    /// `draw:frame`.
+    Frame,
+    /// `draw:rect`.
+    Rectangle,
+    /// `draw:line`.
+    Line,
+    /// `draw:polyline`.
+    Polyline,
+    /// `draw:polygon`.
+    Polygon,
+    /// `draw:regular-polygon`.
+    RegularPolygon,
+    /// `draw:path`.
+    Path,
+    /// `draw:circle`.
+    Circle,
+    /// `draw:ellipse`.
+    Ellipse,
+    /// `draw:g`.
+    Group,
+    /// `draw:page-thumbnail`.
+    PageThumbnail,
+    /// `draw:measure`.
+    Measure,
+    /// `draw:caption`.
+    Caption,
+    /// `draw:connector`.
+    Connector,
+    /// `draw:control`.
+    Control,
+    /// `draw:custom-shape`.
+    CustomShape,
+}
+
+impl DrawingShapeKind {
+    pub(crate) fn element_name(self) -> &'static str {
+        match self {
+            Self::Frame => "draw:frame",
+            Self::Rectangle => "draw:rect",
+            Self::Line => "draw:line",
+            Self::Polyline => "draw:polyline",
+            Self::Polygon => "draw:polygon",
+            Self::RegularPolygon => "draw:regular-polygon",
+            Self::Path => "draw:path",
+            Self::Circle => "draw:circle",
+            Self::Ellipse => "draw:ellipse",
+            Self::Group => "draw:g",
+            Self::PageThumbnail => "draw:page-thumbnail",
+            Self::Measure => "draw:measure",
+            Self::Caption => "draw:caption",
+            Self::Connector => "draw:connector",
+            Self::Control => "draw:control",
+            Self::CustomShape => "draw:custom-shape",
+        }
+    }
+}
+
+/// Namespace of an unmodeled drawing-shape attribute.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DrawingAttributeNamespace {
+    /// OpenDocument drawing namespace (`draw:*`).
+    Drawing,
+    /// ODF SVG-compatible namespace (`svg:*`).
+    Svg,
+}
+
+impl DrawingAttributeNamespace {
+    pub(crate) fn prefix(self) -> &'static str {
+        match self {
+            Self::Drawing => "draw",
+            Self::Svg => "svg",
+        }
+    }
+}
+
+/// An exact drawing or SVG attribute not represented by a dedicated shape field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DrawingAttribute {
+    pub(crate) namespace: DrawingAttributeNamespace,
+    pub(crate) local_name: String,
+    pub(crate) value: String,
+}
+
+impl DrawingAttribute {
+    /// Create a drawing attribute after validating its XML local name.
+    pub fn new(
+        namespace: DrawingAttributeNamespace,
+        local_name: impl Into<String>,
+        value: impl Into<String>,
+    ) -> Result<Self> {
+        let local_name = local_name.into();
+        if !is_xml_local_name(&local_name) {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "invalid drawing attribute local name '{local_name}'"
+            )));
+        }
+        Ok(Self {
+            namespace,
+            local_name,
+            value: value.into(),
+        })
+    }
+
+    /// Return the attribute namespace.
+    pub fn namespace(&self) -> DrawingAttributeNamespace {
+        self.namespace
+    }
+
+    /// Return the attribute local name.
+    pub fn local_name(&self) -> &str {
+        &self.local_name
+    }
+
+    /// Return the decoded attribute value.
+    pub fn value(&self) -> &str {
+        &self.value
+    }
+}
+
+fn is_xml_local_name(value: &str) -> bool {
+    let mut characters = value.chars();
+    characters
+        .next()
+        .is_some_and(|character| character == '_' || character.is_ascii_alphabetic())
+        && characters.all(|character| {
+            character == '_'
+                || character == '-'
+                || character == '.'
+                || character.is_ascii_alphanumeric()
+        })
+}
+
 #[derive(Debug, Clone)]
 pub struct Shape {
     /// Shape type (text box, image, frame, etc.)
     pub shape_type: litchi_core::ShapeType,
+    /// Exact ODF drawing element kind for parsed shapes.
+    pub drawing_kind: Option<DrawingShapeKind>,
+    /// Exact unmodeled `draw:*` and `svg:*` attributes.
+    pub drawing_attributes: Vec<DrawingAttribute>,
     /// Text content if the shape contains text
     pub text: String,
     /// Shape name/ID
@@ -190,6 +328,8 @@ impl Shape {
     pub fn new() -> Self {
         Self {
             shape_type: litchi_core::ShapeType::AutoShape,
+            drawing_kind: None,
+            drawing_attributes: Vec::new(),
             text: String::new(),
             name: None,
             x: None,
@@ -218,6 +358,16 @@ impl Shape {
     /// Get the shape type.
     pub fn shape_type(&self) -> litchi_core::ShapeType {
         self.shape_type
+    }
+
+    /// Get the exact ODF drawing element kind, when parsed or explicitly set.
+    pub fn drawing_kind(&self) -> Option<DrawingShapeKind> {
+        self.drawing_kind
+    }
+
+    /// Return unmodeled drawing and SVG attributes in source order.
+    pub fn drawing_attributes(&self) -> &[DrawingAttribute] {
+        &self.drawing_attributes
     }
 
     /// Check if this is a text shape.
