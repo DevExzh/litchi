@@ -197,12 +197,18 @@
 //! - ✅ Linked external documents remain inert and are never refreshed automatically
 //! - ✅ Metadata and lossless exact original-byte saving
 //!
-//! ## 🚧 Additional ODF Formats (PACKAGE SUPPORT)
+//! ## ✅ OTH - Writer/Web Templates (READ-ONLY COMPATIBILITY MODEL)
 //!
-//! All standard families and templates can be validated, inspected, extracted,
-//! and saved losslessly through [`OpenDocumentPackage`]. Specialized semantic
-//! object models remain in progress for:
-//! - OTH - OpenDocument Web (.oth)
+//! - ✅ Open LibreOffice/odfpy/odfdo `.oth` templates from paths, readers, or bytes
+//! - ✅ Namespace-aware `office:text` package validation
+//! - ✅ Reuse the complete text-document semantic reader
+//! - ✅ Metadata and lossless exact original-byte saving
+//! - ℹ️ `text-web` is a legacy producer MIME type, not an ODF 1.3/1.4 conformance MIME
+//!
+//! ## 🚧 Additional ODF Formats
+//!
+//! Package recognition and a specialized semantic model remain in progress for:
+//! - ODB - OpenDocument Database Front End (.odb)
 //!
 //! Standard flat XML documents (`.fodt`, `.fods`, `.fodp`, `.fodg`, `.fodc`,
 //! and `.fodi`) are validated and saved losslessly through [`FlatOpenDocument`].
@@ -292,6 +298,8 @@ mod odp;
 mod ods;
 /// ODF text document (.odt) support
 mod odt;
+/// LibreOffice-compatible OpenDocument web template (.oth) support.
+mod oth;
 
 // Re-export common utilities for convenience
 // These are used across all Office formats, not ODF-specific
@@ -309,6 +317,7 @@ pub use odg::{
 };
 pub use odi::{ImageAttribute, ImageContent, ImageDocument, ImageElement, ImageElementKind};
 pub use odm::{MasterDocument, MasterSubdocument};
+pub use oth::WebDocument;
 
 // Re-export main types for convenience
 pub use odp::{

@@ -29,7 +29,7 @@ pub enum OpenDocumentFamily {
     Image,
     /// Text master document or template.
     Master,
-    /// Web-oriented text document.
+    /// Legacy producer-specific web-oriented text template.
     Web,
 }
 
@@ -427,7 +427,7 @@ fn classify_mimetype(mimetype: &str) -> Option<(OpenDocumentFamily, bool)> {
         constants::ODF_IMAGE_TEMPLATE => (OpenDocumentFamily::Image, true),
         constants::ODF_MASTER => (OpenDocumentFamily::Master, false),
         constants::ODF_MASTER_TEMPLATE => (OpenDocumentFamily::Master, true),
-        constants::ODF_WEB => (OpenDocumentFamily::Web, false),
+        constants::ODF_WEB => (OpenDocumentFamily::Web, true),
         _ => return None,
     })
 }
@@ -507,7 +507,7 @@ mod tests {
                 OpenDocumentFamily::Master,
                 true,
             ),
-            (constants::ODF_WEB, OpenDocumentFamily::Web, false),
+            (constants::ODF_WEB, OpenDocumentFamily::Web, true),
         ] {
             let bytes = package(mimetype);
             let document = OpenDocumentPackage::from_bytes(bytes.clone()).unwrap();
