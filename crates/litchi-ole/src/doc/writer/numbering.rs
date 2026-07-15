@@ -71,7 +71,8 @@ impl ListLevel {
                 }
                 i += 2;
             } else {
-                xst_chars.push(src[i] as u16);
+                let mut encoded = [0u16; 2];
+                xst_chars.extend_from_slice(src[i].encode_utf16(&mut encoded));
                 i += 1;
             }
         }
@@ -195,8 +196,15 @@ impl ListStructure {
     /// and are NOT counted in `lcbPlfLst`.
     pub fn levels_to_bytes(&self) -> Vec<u8> {
         let mut buf = Vec::new();
-        for level in &self.levels {
-            buf.extend_from_slice(&level.to_bytes());
+        let level_count = if self.levels.len() <= 1 { 1 } else { 9 };
+        for level_index in 0..level_count {
+            if let Some(level) = self.levels.get(level_index) {
+                buf.extend_from_slice(&level.to_bytes());
+            } else {
+                let mut level = ListLevel::new(1, NumberFormat::Decimal);
+                level.number_text = format!("%{}.", level_index + 1);
+                buf.extend_from_slice(&level.to_bytes());
+            }
         }
         buf
     }
@@ -308,6 +316,11 @@ impl NumberingWriter {
         // Each override
         for lfo in &self.list_overrides {
             buf.extend_from_slice(&lfo.to_bytes());
+        }
+
+        // Parallel LFOData array. With clfolvl=0 each entry contains only its main-story CP.
+        for _ in &self.list_overrides {
+            buf.extend_from_slice(&0u32.to_le_bytes());
         }
 
         buf
@@ -567,8 +580,8 @@ mod tests {
 
         let bytes = writer.build_plflfo();
 
-        // 4 bytes count + 2 * 16 bytes LFO
-        assert_eq!(bytes.len(), 36);
+        // 4 bytes count + 2 * 16 bytes LFO + 2 * 4 bytes LFOData
+        assert_eq!(bytes.len(), 44);
         assert_eq!(
             u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]),
             2

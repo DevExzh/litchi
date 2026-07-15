@@ -2562,6 +2562,47 @@ mod tests {
     }
 
     #[test]
+    fn list_tables_round_trip_through_fib_indices() {
+        let mut writer = DocWriter::new();
+        let mut list = crate::doc::writer::numbering::ListStructure::new(42);
+        let mut level = crate::doc::writer::numbering::ListLevel::new(
+            3,
+            crate::doc::writer::numbering::NumberFormat::Decimal,
+        );
+        level.number_text = "%1.😀".to_string();
+        list.add_level(level);
+        writer.add_list(list);
+        writer.add_list_override(crate::doc::writer::numbering::ListFormatOverride::new(
+            42, 1,
+        ));
+        writer
+            .add_paragraph_runs(
+                vec![("List item".to_string(), CharacterFormatting::default())],
+                ParagraphFormatting {
+                    ilvl: Some(0),
+                    ilfo: Some(1),
+                    ..ParagraphFormatting::default()
+                },
+            )
+            .unwrap();
+
+        let mut cursor = Cursor::new(Vec::new());
+        writer.write_to(&mut cursor).unwrap();
+        let mut package =
+            crate::doc::Package::from_reader(Cursor::new(cursor.into_inner())).unwrap();
+        let document = package.document().unwrap();
+        let tables = document.list_tables().unwrap();
+        assert_eq!(tables.structures().len(), 1);
+        assert_eq!(tables.overrides().len(), 1);
+        assert_eq!(tables.structures()[0].levels[0].number_text, "%1.😀");
+
+        let paragraphs = document.paragraphs().unwrap();
+        let info = document.paragraph_list_info(&paragraphs[0]).unwrap();
+        assert_eq!(info.start_at, 3);
+        assert_eq!(info.number_text, "%1.😀");
+    }
+
+    #[test]
     fn test_add_table_invalid_dimensions() {
         let mut writer = DocWriter::new();
         assert!(writer.add_table(0, 3).is_err());

@@ -95,56 +95,86 @@ pub struct ListLevel {
 }
 
 impl ListLevel {
-    /// Parse a list level from LVLF structure (28 bytes minimum)
+    /// Parse a complete LVL structure.
     pub fn from_bytes(data: &[u8], level: u8) -> Result<Self> {
+        Self::parse_with_size(data, level).map(|(level, _)| level)
+    }
+
+    fn parse_with_size(data: &[u8], level: u8) -> Result<(Self, usize)> {
         if data.len() < 28 {
             return Err(DocError::InvalidFormat("LVLF too short".to_string()));
+        }
+        if level > 8 {
+            return Err(DocError::InvalidFormat(
+                "list level index exceeds 8".to_string(),
+            ));
         }
 
         let start_at = binary::read_u32_le(data, 0)
             .map_err(|e| DocError::InvalidFormat(format!("Failed to read start_at: {}", e)))?;
         let number_format = NumberFormat::from_u8(data[4]);
-        let alignment = ListAlignment::from_u8(data[5]);
-        let follow_char = data[7];
-
-        // Read indentation values (signed 32-bit)
-        let indent_left = binary::read_i32_le(data, 12)
+        let alignment = ListAlignment::from_u8(data[5] & 0x03);
+        let follow_char = data[15];
+        let indent_left = binary::read_i32_le(data, 16)
             .map_err(|e| DocError::InvalidFormat(format!("Failed to read indent_left: {}", e)))?;
-        let indent_hanging = binary::read_i32_le(data, 16).map_err(|e| {
-            DocError::InvalidFormat(format!("Failed to read indent_hanging: {}", e))
-        })?;
+        let cb_chpx = data[24] as usize;
+        let cb_papx = data[25] as usize;
+        let text_offset = 28usize
+            .checked_add(cb_papx)
+            .and_then(|offset| offset.checked_add(cb_chpx))
+            .ok_or_else(|| DocError::InvalidFormat("LVL size overflows".to_string()))?;
+        let cch_end = text_offset
+            .checked_add(2)
+            .ok_or_else(|| DocError::InvalidFormat("LVL XST offset overflows".to_string()))?;
+        if cch_end > data.len() {
+            return Err(DocError::InvalidFormat(
+                "LVL is missing its XST length".to_string(),
+            ));
+        }
+        let text_len = binary::read_u16_le(data, text_offset)
+            .map_err(|e| DocError::InvalidFormat(format!("Failed to read XST length: {e}")))?
+            as usize;
+        let text_bytes_len = text_len
+            .checked_mul(2)
+            .ok_or_else(|| DocError::InvalidFormat("LVL XST size overflows".to_string()))?;
+        let total_size = cch_end
+            .checked_add(text_bytes_len)
+            .ok_or_else(|| DocError::InvalidFormat("LVL size overflows".to_string()))?;
+        if total_size > data.len() {
+            return Err(DocError::InvalidFormat(
+                "LVL XST extends beyond the table stream".to_string(),
+            ));
+        }
 
-        // Number text follows the fixed structure
-        let number_text = if data.len() > 28 {
-            // Read cbGrpprlChpx and cbGrpprlPapx to skip SPRM data
-            let cb_chpx = data.get(25).copied().unwrap_or(0) as usize;
-            let cb_papx = data.get(26).copied().unwrap_or(0) as usize;
-
-            // Number text length is at offset 27
-            let text_len = data.get(27).copied().unwrap_or(0) as usize;
-            let text_offset = 28 + cb_chpx + cb_papx;
-
-            if text_offset + text_len * 2 <= data.len() {
-                // Number text is UTF-16LE
-                let text_bytes = &data[text_offset..text_offset + text_len * 2];
-                <String as Utf16LeExt>::from_utf16le_lossy(text_bytes)
-            } else {
-                String::new()
+        let text_bytes = &data[cch_end..total_size];
+        let mut text_units = Vec::with_capacity(text_len);
+        for chunk in text_bytes.chunks_exact(2) {
+            text_units.push(u16::from_le_bytes([chunk[0], chunk[1]]));
+        }
+        let mut number_text = String::new();
+        for decoded in std::char::decode_utf16(text_units) {
+            match decoded.unwrap_or(char::REPLACEMENT_CHARACTER) {
+                placeholder @ '\0'..='\u{8}' => {
+                    number_text.push('%');
+                    number_text.push(char::from(b'1' + placeholder as u8));
+                },
+                ch => number_text.push(ch),
             }
-        } else {
-            String::new()
-        };
+        }
 
-        Ok(Self {
-            start_at,
-            number_format,
-            alignment,
-            level,
-            follow_char,
-            indent_left,
-            indent_hanging,
-            number_text,
-        })
+        Ok((
+            Self {
+                start_at,
+                number_format,
+                alignment,
+                level,
+                follow_char,
+                indent_left,
+                indent_hanging: 0,
+                number_text,
+            },
+            total_size,
+        ))
     }
 
     /// Check if this is a bullet list
@@ -187,35 +217,11 @@ impl ListStructure {
         let flags = data[26];
         let is_simple = (flags & 0x01) != 0;
 
-        // Parse levels (LVL structures follow LST)
-        let mut levels = Vec::new();
-        let mut offset = 28;
-
-        for level in 0..9 {
-            if offset + 28 <= data.len() {
-                if let Ok(lvl) = ListLevel::from_bytes(&data[offset..], level) {
-                    levels.push(lvl);
-
-                    // Calculate actual LVLF size to advance offset
-                    // This is approximate - in reality we need to parse cbGrpprlChpx, cbGrpprlPapx
-                    let cb_chpx = data.get(offset + 25).copied().unwrap_or(0) as usize;
-                    let cb_papx = data.get(offset + 26).copied().unwrap_or(0) as usize;
-                    let text_len = data.get(offset + 27).copied().unwrap_or(0) as usize;
-
-                    offset += 28 + cb_chpx + cb_papx + text_len * 2;
-                } else {
-                    break;
-                }
-            } else {
-                break;
-            }
-        }
-
         Ok(Self {
             list_id,
             template_id,
             is_simple,
-            levels,
+            levels: Vec::new(),
         })
     }
 
@@ -237,17 +243,24 @@ pub struct ListFormatOverride {
 }
 
 impl ListFormatOverride {
-    /// Parse an LFO structure (12 bytes)
+    /// Parse an LFO structure (16 bytes).
     pub fn from_bytes(data: &[u8]) -> Result<Self> {
-        if data.len() < 12 {
+        Self::from_bytes_with_id(data, 1)
+    }
+
+    fn from_bytes_with_id(data: &[u8], lfo_id: u32) -> Result<Self> {
+        if data.len() < 16 {
             return Err(DocError::InvalidFormat("LFO too short".to_string()));
         }
 
         let list_id = binary::read_u32_le(data, 0)
             .map_err(|e| DocError::InvalidFormat(format!("Failed to read list_id: {}", e)))?;
-        let override_count = data[8];
-        let lfo_id = binary::read_u32_le(data, 8)
-            .map_err(|e| DocError::InvalidFormat(format!("Failed to read lfo_id: {}", e)))?; // Actually at offset 8-11
+        let override_count = data[12];
+        if override_count > 9 {
+            return Err(DocError::InvalidFormat(
+                "LFO override count exceeds 9".to_string(),
+            ));
+        }
 
         Ok(Self {
             list_id,
@@ -276,19 +289,39 @@ impl ListTables {
         let mut list_structures = Vec::new();
         let mut list_overrides = Vec::new();
 
-        // Parse PlfLst (List Table) - FIB index 27
-        if let Some((offset, length)) = fib.get_table_pointer(27)
+        // Parse PlfLst (List Table) - FibRgFcLcb97 index 73.
+        if let Some((offset, length)) = fib.get_table_pointer(73)
             && length > 0
             && (offset as usize) < table_stream.len()
         {
-            let plf_data = &table_stream[offset as usize..];
-            let plf_len = length.min((table_stream.len() - offset as usize) as u32) as usize;
+            let offset = offset as usize;
+            let header_end = offset.checked_add(length as usize).ok_or_else(|| {
+                DocError::InvalidFormat("PlfLst table range overflows".to_string())
+            })?;
+            if header_end > table_stream.len() {
+                return Err(DocError::InvalidFormat(
+                    "PlfLst header extends beyond the table stream".to_string(),
+                ));
+            }
+            let level_end = fib
+                .get_table_pointer(74)
+                .map(|(lfo_offset, _)| lfo_offset as usize)
+                .filter(|&lfo_offset| lfo_offset >= header_end)
+                .unwrap_or(table_stream.len());
+            if level_end > table_stream.len() {
+                return Err(DocError::InvalidFormat(
+                    "PlfLst level range extends beyond the table stream".to_string(),
+                ));
+            }
 
-            list_structures = Self::parse_plflst(&plf_data[..plf_len])?;
+            list_structures = Self::parse_plflst(
+                &table_stream[offset..header_end],
+                &table_stream[header_end..level_end],
+            )?;
         }
 
-        // Parse PlfLfo (List Format Override Table) - FIB index 28
-        if let Some((offset, length)) = fib.get_table_pointer(28)
+        // Parse PlfLfo (List Format Override Table) - FibRgFcLcb97 index 74.
+        if let Some((offset, length)) = fib.get_table_pointer(74)
             && length > 0
             && (offset as usize) < table_stream.len()
         {
@@ -305,35 +338,49 @@ impl ListTables {
     }
 
     /// Parse PlfLst (List Table)
-    fn parse_plflst(data: &[u8]) -> Result<Vec<ListStructure>> {
-        if data.len() < 2 {
-            return Ok(Vec::new());
+    fn parse_plflst(header_data: &[u8], level_data: &[u8]) -> Result<Vec<ListStructure>> {
+        if header_data.len() < 2 {
+            return Err(DocError::InvalidFormat("PlfLst is too short".to_string()));
         }
 
-        let count = binary::read_u16_le(data, 0)
+        let count = binary::read_u16_le(header_data, 0)
             .map_err(|e| DocError::InvalidFormat(format!("Failed to read count: {}", e)))?
             as usize;
+        let expected_header_len = 2usize
+            .checked_add(count.checked_mul(28).ok_or_else(|| {
+                DocError::InvalidFormat("PlfLst structure count overflows".to_string())
+            })?)
+            .ok_or_else(|| DocError::InvalidFormat("PlfLst size overflows".to_string()))?;
+        if header_data.len() != expected_header_len {
+            return Err(DocError::InvalidFormat(format!(
+                "PlfLst header length is {}, expected {expected_header_len}",
+                header_data.len()
+            )));
+        }
+
         let mut structures = Vec::with_capacity(count);
-        let mut offset = 2;
+        for index in 0..count {
+            let offset = 2 + index * 28;
+            structures.push(ListStructure::from_bytes(
+                &header_data[offset..offset + 28],
+            )?);
+        }
 
-        for _ in 0..count {
-            if offset >= data.len() {
-                break;
-            }
-
-            // Each LST is variable length, parse and advance
-            if let Ok(lst) = ListStructure::from_bytes(&data[offset..]) {
-                // Calculate size (this is approximate)
-                let mut lst_size = 28;
-                for _level in &lst.levels {
-                    lst_size += 28; // Base LVLF
-                    // Add SPRM and text sizes (simplified)
-                }
-
-                structures.push(lst);
-                offset += lst_size.min(data.len() - offset);
-            } else {
-                break;
+        let mut level_offset = 0usize;
+        for structure in &mut structures {
+            let level_count = if structure.is_simple { 1 } else { 9 };
+            structure.levels.reserve(level_count);
+            for level in 0..level_count {
+                let (parsed, size) = ListLevel::parse_with_size(
+                    level_data.get(level_offset..).ok_or_else(|| {
+                        DocError::InvalidFormat("PlfLst LVL offset is invalid".to_string())
+                    })?,
+                    level as u8,
+                )?;
+                level_offset = level_offset.checked_add(size).ok_or_else(|| {
+                    DocError::InvalidFormat("PlfLst LVL size overflows".to_string())
+                })?;
+                structure.levels.push(parsed);
             }
         }
 
@@ -350,19 +397,62 @@ impl ListTables {
             .map_err(|e| DocError::InvalidFormat(format!("Failed to read count: {}", e)))?
             as usize;
         let mut overrides = Vec::with_capacity(count);
+        let lfo_bytes = count
+            .checked_mul(16)
+            .ok_or_else(|| DocError::InvalidFormat("PlfLfo count overflows".to_string()))?;
+        let lfo_data_start = 4usize
+            .checked_add(lfo_bytes)
+            .ok_or_else(|| DocError::InvalidFormat("PlfLfo size overflows".to_string()))?;
+        if lfo_data_start > data.len() {
+            return Err(DocError::InvalidFormat(
+                "PlfLfo LFO array is truncated".to_string(),
+            ));
+        }
         let mut offset = 4;
 
-        for _ in 0..count {
-            if offset + 12 > data.len() {
-                break;
-            }
+        for index in 0..count {
+            overrides.push(ListFormatOverride::from_bytes_with_id(
+                &data[offset..offset + 16],
+                u32::try_from(index + 1)
+                    .map_err(|_| DocError::InvalidFormat("PlfLfo index exceeds u32".to_string()))?,
+            )?);
+            offset += 16;
+        }
 
-            if let Ok(lfo) = ListFormatOverride::from_bytes(&data[offset..]) {
-                overrides.push(lfo);
-                offset += 12;
-            } else {
-                break;
+        let mut data_offset = lfo_data_start;
+        for lfo in &overrides {
+            data_offset = data_offset.checked_add(4).ok_or_else(|| {
+                DocError::InvalidFormat("PlfLfo LFOData size overflows".to_string())
+            })?;
+            if data_offset > data.len() {
+                return Err(DocError::InvalidFormat(
+                    "PlfLfo LFOData array is truncated".to_string(),
+                ));
             }
+            for _ in 0..lfo.override_count {
+                let base_end = data_offset
+                    .checked_add(8)
+                    .ok_or_else(|| DocError::InvalidFormat("LFOLVL size overflows".to_string()))?;
+                if base_end > data.len() {
+                    return Err(DocError::InvalidFormat("LFOLVL is truncated".to_string()));
+                }
+                let flags = binary::read_u32_le(data, data_offset + 4).map_err(|e| {
+                    DocError::InvalidFormat(format!("Failed to read LFOLVL flags: {e}"))
+                })?;
+                data_offset = base_end;
+                if flags & 0x20 != 0 {
+                    let (_, size) = ListLevel::parse_with_size(&data[data_offset..], 0)?;
+                    data_offset = data_offset.checked_add(size).ok_or_else(|| {
+                        DocError::InvalidFormat("LFOLVL formatting size overflows".to_string())
+                    })?;
+                }
+            }
+        }
+        if data_offset != data.len() {
+            return Err(DocError::InvalidFormat(format!(
+                "PlfLfo has {} trailing bytes",
+                data.len() - data_offset
+            )));
         }
 
         Ok(overrides)
@@ -394,22 +484,6 @@ impl ListTables {
     pub fn get_list_for_lfo(&self, lfo_id: u32) -> Option<&ListStructure> {
         self.find_override(lfo_id)
             .and_then(|lfo| self.find_structure(lfo.list_id))
-    }
-}
-
-/// Helper trait for UTF-16LE string conversion
-trait Utf16LeExt {
-    fn from_utf16le_lossy(bytes: &[u8]) -> String;
-}
-
-impl Utf16LeExt for String {
-    fn from_utf16le_lossy(bytes: &[u8]) -> String {
-        let mut u16_vec = Vec::with_capacity(bytes.len() / 2);
-        for chunk in bytes.chunks_exact(2) {
-            let val = u16::from_le_bytes([chunk[0], chunk[1]]);
-            u16_vec.push(val);
-        }
-        String::from_utf16_lossy(&u16_vec)
     }
 }
 
@@ -861,41 +935,6 @@ mod tests {
     }
 
     #[test]
-    fn test_utf16le_ext_empty() {
-        let result = <String as Utf16LeExt>::from_utf16le_lossy(b"");
-        assert_eq!(result, "");
-    }
-
-    #[test]
-    fn test_utf16le_ext_single_char() {
-        // 'A' in UTF-16LE
-        let result = <String as Utf16LeExt>::from_utf16le_lossy(b"A\0");
-        assert_eq!(result, "A");
-    }
-
-    #[test]
-    fn test_utf16le_ext_multiple_chars() {
-        // "ABC" in UTF-16LE
-        let bytes = ['A' as u16, 'B' as u16, 'C' as u16]
-            .iter()
-            .flat_map(|c| c.to_le_bytes())
-            .collect::<Vec<_>>();
-        let result = <String as Utf16LeExt>::from_utf16le_lossy(&bytes);
-        assert_eq!(result, "ABC");
-    }
-
-    #[test]
-    fn test_utf16le_ext_unicode() {
-        // Unicode test in UTF-16LE
-        let bytes: Vec<u8> = "Test"
-            .encode_utf16()
-            .flat_map(|c| c.to_le_bytes())
-            .collect();
-        let result = <String as Utf16LeExt>::from_utf16le_lossy(&bytes);
-        assert_eq!(result, "Test");
-    }
-
-    #[test]
     fn test_list_level_from_bytes_too_short() {
         let data = vec![0u8; 10];
         let result = ListLevel::from_bytes(&data, 0);
@@ -904,22 +943,19 @@ mod tests {
 
     #[test]
     fn test_list_level_from_bytes_minimal() {
-        // Create a minimal valid LVLF structure (28 bytes minimum)
-        let mut data = vec![0u8; 28];
+        // A minimal LVL is a 28-byte LVLF plus an empty two-byte XST.
+        let mut data = vec![0u8; 30];
         // start_at at offset 0
         data[0] = 1; // start_at = 1
         // number_format at offset 4
         data[4] = 0; // Arabic
         // alignment at offset 5
         data[5] = 0; // Left
-        // follow_char at offset 7
-        data[7] = 0;
-        // indent_left at offset 12
-        data[12] = 0xD0; // 720 in little-endian
-        data[13] = 0x02;
-        // indent_hanging at offset 16
-        data[16] = 0x68; // 360 in little-endian
-        data[17] = 0x01;
+        // follow_char at offset 15
+        data[15] = 0;
+        // dxaIndentSav at offset 16
+        data[16] = 0xD0; // 720 in little-endian
+        data[17] = 0x02;
 
         let result = ListLevel::from_bytes(&data, 0);
         assert!(result.is_ok());
@@ -930,14 +966,16 @@ mod tests {
         assert_eq!(level.alignment, ListAlignment::Left);
         assert_eq!(level.level, 0);
         assert_eq!(level.indent_left, 720);
-        assert_eq!(level.indent_hanging, 360);
+        assert_eq!(level.indent_hanging, 0);
         assert_eq!(level.number_text, "");
     }
 
     #[test]
     fn test_list_level_from_bytes_bullet() {
-        let mut data = vec![0u8; 28];
+        let mut data = vec![0u8; 32];
         data[4] = 23; // Bullet format
+        data[28..30].copy_from_slice(&1u16.to_le_bytes());
+        data[30..32].copy_from_slice(&0x2022u16.to_le_bytes());
 
         let level = ListLevel::from_bytes(&data, 0).unwrap();
         assert!(level.is_bullet());
@@ -946,27 +984,15 @@ mod tests {
 
     #[test]
     fn test_list_level_from_bytes_with_text() {
-        let mut data = vec![0u8; 40];
+        let mut data = vec![0u8; 34];
         // Fixed part
         data[0] = 1; // start_at
         data[4] = 0; // Arabic
         data[5] = 0; // Left
-        data[7] = 0; // follow_char
-        // cbGrpprlChpx at offset 25
-        data[25] = 0;
-        // cbGrpprlPapx at offset 26
-        data[26] = 0;
-        // text length at offset 27
-        data[27] = 3; // 3 characters
-
-        // Add UTF-16LE text at offset 28: "%1."
-        let text = "%1.";
-        let text_offset = 28;
-        for (i, c) in text.encode_utf16().enumerate() {
-            let bytes = c.to_le_bytes();
-            data[text_offset + i * 2] = bytes[0];
-            data[text_offset + i * 2 + 1] = bytes[1];
-        }
+        data[15] = 0; // follow_char
+        data[28..30].copy_from_slice(&2u16.to_le_bytes());
+        data[30..32].copy_from_slice(&0u16.to_le_bytes()); // level 0 placeholder
+        data[32..34].copy_from_slice(&('.' as u16).to_le_bytes());
 
         let level = ListLevel::from_bytes(&data, 0).unwrap();
         assert_eq!(level.number_text, "%1.");
@@ -1012,15 +1038,14 @@ mod tests {
 
     #[test]
     fn test_list_format_override_from_bytes_valid() {
-        let mut data = vec![0u8; 12];
+        let mut data = vec![0u8; 16];
         // list_id at offset 0
         data[0] = 0x39;
         data[1] = 0x00;
         data[2] = 0x00;
         data[3] = 0x00;
-        // override_count at offset 8
-        data[8] = 2;
-        // lfo_id at offset 8-11 (overlaps with override_count in this structure)
+        // override_count at offset 12
+        data[12] = 2;
 
         let result = ListFormatOverride::from_bytes(&data);
         assert!(result.is_ok());
@@ -1048,14 +1073,67 @@ mod tests {
 
     #[test]
     fn test_list_level_negative_indent() {
-        let mut data = vec![0u8; 28];
-        // indent_left at offset 12 (signed 32-bit)
-        data[12] = 0xF0; // -16 in little-endian two's complement
-        data[13] = 0xFF;
-        data[14] = 0xFF;
-        data[15] = 0xFF;
+        let mut data = vec![0u8; 30];
+        // dxaIndentSav at offset 16 (signed 32-bit)
+        data[16] = 0xF0; // -16 in little-endian two's complement
+        data[17] = 0xFF;
+        data[18] = 0xFF;
+        data[19] = 0xFF;
 
         let level = ListLevel::from_bytes(&data, 0).unwrap();
         assert_eq!(level.indent_left, -16);
+    }
+
+    #[test]
+    fn parses_split_plflst_header_and_level_array() {
+        let mut writer = crate::doc::writer::numbering::NumberingWriter::new();
+        let mut list = crate::doc::writer::numbering::ListStructure::new(42);
+        let mut first = crate::doc::writer::numbering::ListLevel::new(
+            3,
+            crate::doc::writer::numbering::NumberFormat::Decimal,
+        );
+        first.number_text = "%1.😀".to_string();
+        list.add_level(first);
+        list.add_level(crate::doc::writer::numbering::ListLevel::new(
+            1,
+            crate::doc::writer::numbering::NumberFormat::LowerLetter,
+        ));
+        writer.add_list(list);
+        let (header, levels) = writer.build_plflst();
+
+        let parsed = ListTables::parse_plflst(&header, &levels).unwrap();
+        assert_eq!(parsed.len(), 1);
+        assert_eq!(parsed[0].list_id, 42);
+        assert!(!parsed[0].is_simple);
+        assert_eq!(parsed[0].levels.len(), 9);
+        assert_eq!(parsed[0].levels[0].start_at, 3);
+        assert_eq!(parsed[0].levels[0].number_text, "%1.😀");
+        assert_eq!(parsed[0].levels[1].number_format, NumberFormat::LowerLetter);
+    }
+
+    #[test]
+    fn parses_parallel_lfo_and_lfo_data_arrays() {
+        let mut writer = crate::doc::writer::numbering::NumberingWriter::new();
+        writer.add_override(crate::doc::writer::numbering::ListFormatOverride::new(
+            100, 1,
+        ));
+        writer.add_override(crate::doc::writer::numbering::ListFormatOverride::new(
+            200, 2,
+        ));
+
+        let parsed = ListTables::parse_plflfo(&writer.build_plflfo()).unwrap();
+        assert_eq!(parsed.len(), 2);
+        assert_eq!((parsed[0].list_id, parsed[0].lfo_id), (100, 1));
+        assert_eq!((parsed[1].list_id, parsed[1].lfo_id), (200, 2));
+    }
+
+    #[test]
+    fn rejects_truncated_list_tables() {
+        assert!(ListTables::parse_plflst(&[1, 0], &[]).is_err());
+        assert!(ListTables::parse_plflst(&[0, 0, 0], &[]).is_err());
+
+        let mut truncated_lfo = vec![0u8; 20];
+        truncated_lfo[..4].copy_from_slice(&1u32.to_le_bytes());
+        assert!(ListTables::parse_plflfo(&truncated_lfo).is_err());
     }
 }
