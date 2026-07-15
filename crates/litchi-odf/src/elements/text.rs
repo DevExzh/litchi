@@ -628,6 +628,7 @@ pub(crate) fn parse_text_blocks(xml_content: &str) -> Result<Vec<TextBlock>> {
     let mut active: Option<ActiveTextBlock> = None;
     let mut document_depth = 0usize;
     let mut tracked_changes_depth = 0usize;
+    let mut note_body_depth = 0usize;
     let mut total_text_bytes = 0usize;
 
     loop {
@@ -652,13 +653,18 @@ pub(crate) fn parse_text_blocks(xml_content: &str) -> Result<Vec<TextBlock>> {
                 } else if is_text_element(text_namespace, element, b"tracked-changes") {
                     tracked_changes_depth = 1;
                 } else if let Some(current) = active.as_mut() {
-                    if is_text_block(text_namespace, element) {
+                    current.depth += 1;
+                    if note_body_depth > 0 {
+                        note_body_depth += 1;
+                    } else if is_text_element(text_namespace, element, b"note-body") {
+                        note_body_depth = 1;
+                    } else if is_text_block(text_namespace, element) {
                         return Err(Error::InvalidFormat(
                             "nested ODF paragraphs or headings are not allowed".to_string(),
                         ));
+                    } else {
+                        append_text_control(&reader, text_namespace, element, &mut current.text)?;
                     }
-                    current.depth += 1;
-                    append_text_control(&reader, text_namespace, element, &mut current.text)?;
                 } else if is_text_block(text_namespace, element) {
                     active = Some(ActiveTextBlock {
                         element: make_text_block_element(&reader, element)?,
@@ -669,12 +675,16 @@ pub(crate) fn parse_text_blocks(xml_content: &str) -> Result<Vec<TextBlock>> {
             },
             Event::Empty(ref element) if tracked_changes_depth == 0 => {
                 if let Some(current) = active.as_mut() {
-                    if is_text_block(text_namespace, element) {
-                        return Err(Error::InvalidFormat(
-                            "nested ODF paragraphs or headings are not allowed".to_string(),
-                        ));
+                    if note_body_depth == 0
+                        && !is_text_element(text_namespace, element, b"note-body")
+                    {
+                        if is_text_block(text_namespace, element) {
+                            return Err(Error::InvalidFormat(
+                                "nested ODF paragraphs or headings are not allowed".to_string(),
+                            ));
+                        }
+                        append_text_control(&reader, text_namespace, element, &mut current.text)?;
                     }
-                    append_text_control(&reader, text_namespace, element, &mut current.text)?;
                 } else if is_text_block(text_namespace, element) {
                     push_text_block(
                         make_text_block_element(&reader, element)?,
@@ -684,7 +694,9 @@ pub(crate) fn parse_text_blocks(xml_content: &str) -> Result<Vec<TextBlock>> {
                     )?;
                 }
             },
-            Event::Text(ref value) if tracked_changes_depth == 0 && active.is_some() => {
+            Event::Text(ref value)
+                if tracked_changes_depth == 0 && note_body_depth == 0 && active.is_some() =>
+            {
                 let decoded = value
                     .xml_content(XmlVersion::Explicit1_0)
                     .map_err(|error| {
@@ -695,7 +707,9 @@ pub(crate) fn parse_text_blocks(xml_content: &str) -> Result<Vec<TextBlock>> {
                     &decoded,
                 )?;
             },
-            Event::CData(ref value) if tracked_changes_depth == 0 && active.is_some() => {
+            Event::CData(ref value)
+                if tracked_changes_depth == 0 && note_body_depth == 0 && active.is_some() =>
+            {
                 let decoded = value
                     .xml_content(XmlVersion::Explicit1_0)
                     .map_err(|error| {
@@ -706,7 +720,9 @@ pub(crate) fn parse_text_blocks(xml_content: &str) -> Result<Vec<TextBlock>> {
                     &decoded,
                 )?;
             },
-            Event::GeneralRef(ref reference) if tracked_changes_depth == 0 && active.is_some() => {
+            Event::GeneralRef(ref reference)
+                if tracked_changes_depth == 0 && note_body_depth == 0 && active.is_some() =>
+            {
                 let decoded = decode_reference(reference)?;
                 append_checked(
                     &mut active.as_mut().expect("checked active block").text,
@@ -720,6 +736,7 @@ pub(crate) fn parse_text_blocks(xml_content: &str) -> Result<Vec<TextBlock>> {
                 if tracked_changes_depth > 0 {
                     tracked_changes_depth -= 1;
                 } else if let Some(current) = active.as_mut() {
+                    note_body_depth = note_body_depth.saturating_sub(1);
                     current.depth = current.depth.checked_sub(1).ok_or_else(|| {
                         Error::InvalidFormat("ODF text block stack underflow".to_string())
                     })?;
@@ -740,7 +757,8 @@ pub(crate) fn parse_text_blocks(xml_content: &str) -> Result<Vec<TextBlock>> {
         buffer.clear();
     }
 
-    if active.is_some() || tracked_changes_depth != 0 || document_depth != 0 {
+    if active.is_some() || tracked_changes_depth != 0 || note_body_depth != 0 || document_depth != 0
+    {
         return Err(Error::InvalidFormat(
             "incomplete ODF text XML structure".to_string(),
         ));
@@ -1241,5 +1259,14 @@ mod tests {
             std::str::from_utf8(TEXT_NAMESPACE).unwrap()
         );
         assert_eq!(TextElements::extract_text(&zero).unwrap(), "AB");
+    }
+
+    #[test]
+    fn keeps_note_citations_but_excludes_note_bodies_from_outer_paragraphs() {
+        let xml = r#"<o:text xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><t:p>Before<t:note t:note-class="footnote" t:id="n1"><t:note-citation>1</t:note-citation><t:note-body><t:p>Hidden body</t:p><t:list><t:list-item><t:p>Hidden item</t:p></t:list-item></t:list></t:note-body></t:note>After</t:p></o:text>"#;
+        assert_eq!(TextElements::extract_text(xml).unwrap(), "Before1After");
+        let paragraphs = TextElements::parse_paragraphs(xml).unwrap();
+        assert_eq!(paragraphs.len(), 1);
+        assert_eq!(paragraphs[0].text().unwrap(), "Before1After");
     }
 }

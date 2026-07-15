@@ -547,6 +547,27 @@ impl Document {
         super::reference_mark::parse_reference_marks(self.content.xml_content())
     }
 
+    /// Get all semantic footnotes and endnotes in document order.
+    pub fn notes(&self) -> Result<Vec<super::Note>> {
+        super::note::parse_notes(self.content.xml_content())
+    }
+
+    pub fn footnotes(&self) -> Result<Vec<super::Note>> {
+        Ok(self
+            .notes()?
+            .into_iter()
+            .filter(|note| note.class() == super::NoteClass::Footnote)
+            .collect())
+    }
+
+    pub fn endnotes(&self) -> Result<Vec<super::Note>> {
+        Ok(self
+            .notes()?
+            .into_iter()
+            .filter(|note| note.class() == super::NoteClass::Endnote)
+            .collect())
+    }
+
     /// Get all bookmarks in the document.
     ///
     /// # Examples

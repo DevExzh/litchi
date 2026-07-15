@@ -58,6 +58,7 @@ mod header_footer;
 mod index;
 mod index_mark;
 mod mutable;
+mod note;
 mod page_layout;
 mod parser;
 mod reference_mark;
@@ -68,6 +69,7 @@ pub use header_footer::{HeaderFooter, HeaderFooterKind, MasterPage};
 pub use index::{TextIndex, TextIndexAttribute, TextIndexContent, TextIndexElement, TextIndexKind};
 pub use index_mark::{TextIndexMark, TextIndexMarkKind};
 pub use mutable::MutableDocument;
+pub use note::{Note, NoteClass};
 pub use page_layout::{PageLayout, PageLayoutAttribute, PageLayoutProperties, PageUsage};
 pub use reference_mark::ReferenceMark;
 

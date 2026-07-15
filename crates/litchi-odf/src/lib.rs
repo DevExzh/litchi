@@ -54,6 +54,7 @@
 //! - ✅ Metadata extraction
 //! - ✅ Hyperlink extraction
 //! - ✅ Footnote and endnote support
+//! - ✅ Exact note citations, fixed labels, nested bodies, and note classes
 //! - ✅ Bookmark and reference tracking
 //! - ✅ Comment and change tracking parsing
 //! - ✅ Section parsing
@@ -367,10 +368,10 @@ pub use ods::{
     ValidationPresentationSound, ValidationScriptEventListener,
 };
 pub use odt::{
-    Document, DocumentBuilder, HeaderFooter, HeaderFooterKind, MasterPage, MutableDocument,
-    PageLayout, PageLayoutAttribute, PageLayoutProperties, PageUsage, ReferenceMark, TextIndex,
-    TextIndexAttribute, TextIndexContent, TextIndexElement, TextIndexKind, TextIndexMark,
-    TextIndexMarkKind,
+    Document, DocumentBuilder, HeaderFooter, HeaderFooterKind, MasterPage, MutableDocument, Note,
+    NoteClass, PageLayout, PageLayoutAttribute, PageLayoutProperties, PageUsage, ReferenceMark,
+    TextIndex, TextIndexAttribute, TextIndexContent, TextIndexElement, TextIndexKind,
+    TextIndexMark, TextIndexMarkKind,
 };
 
 // Re-export shapes for presentations
