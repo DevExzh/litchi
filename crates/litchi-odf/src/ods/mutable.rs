@@ -6,7 +6,7 @@
 use crate::core::{OdfStructure, OwnedPackage, PackageWriter};
 use crate::ods::{
     CalculationSettings, Cell, CellAnnotation, CellDetective, CellRangeSource, CellValue, Column,
-    Consolidation, ContentValidation, DatabaseRange, LabelRange, NamedDefinition,
+    Consolidation, ContentValidation, DatabaseRange, DdeLink, LabelRange, NamedDefinition,
     NamedDefinitionScope, NamedExpression, NamedRange, Row, Sheet, SheetPrintSettings,
     SheetScenario, SheetStyle, SheetTableSource, Spreadsheet, SpreadsheetProtection,
     TableStructure, TableVisibility,
@@ -15,6 +15,7 @@ use crate::ods::{
     consolidation::write_consolidation,
     data_validation::{validate_collection, write_content_validations},
     database_range::write_database_ranges,
+    dde::write_dde_links,
     label_range::write_label_ranges,
     named_expression::{ensure_unique, write_named_definitions},
     protection::{
@@ -70,6 +71,7 @@ pub struct MutableSpreadsheet {
     calculation_settings: Option<CalculationSettings>,
     label_ranges: Vec<LabelRange>,
     consolidation: Option<Consolidation>,
+    dde_links: Vec<DdeLink>,
     protection: SpreadsheetProtection,
     /// Original package retained for copying auxiliary package parts.
     source_package: Option<OwnedPackage>,
@@ -90,6 +92,7 @@ impl MutableSpreadsheet {
                 .named_definitions
                 .iter()
                 .any(|definition| matches!(definition, NamedDefinition::Expression(_)))
+            || self.dde_links.iter().any(DdeLink::has_formulas)
     }
 
     fn has_annotations(&self) -> bool {
@@ -98,6 +101,7 @@ impl MutableSpreadsheet {
             .flat_map(|sheet| sheet.rows.iter())
             .flat_map(|row| row.cells.iter())
             .any(Cell::has_annotation)
+            || self.dde_links.iter().any(DdeLink::has_annotations)
     }
 
     fn push_table_columns(out: &mut String, max_cols: usize) {
@@ -156,6 +160,7 @@ impl MutableSpreadsheet {
         let calculation_settings = spreadsheet.calculation_settings().cloned();
         let label_ranges = spreadsheet.label_ranges().to_vec();
         let consolidation = spreadsheet.consolidation().cloned();
+        let dde_links = spreadsheet.dde_links().to_vec();
         let protection = spreadsheet.protection().clone();
         let mimetype = "application/vnd.oasis.opendocument.spreadsheet".to_string();
         let source_package = Some(spreadsheet.into_package());
@@ -173,6 +178,7 @@ impl MutableSpreadsheet {
             calculation_settings,
             label_ranges,
             consolidation,
+            dde_links,
             protection,
             source_package,
         })
@@ -193,6 +199,7 @@ impl MutableSpreadsheet {
             calculation_settings: None,
             label_ranges: Vec::new(),
             consolidation: None,
+            dde_links: Vec::new(),
             protection: SpreadsheetProtection::default(),
             source_package: None,
         }
@@ -279,6 +286,28 @@ impl MutableSpreadsheet {
         }
         self.consolidation = consolidation;
         Ok(())
+    }
+
+    /// Return inert DDE declarations and their cached tables.
+    pub fn dde_links(&self) -> &[DdeLink] {
+        &self.dde_links
+    }
+
+    /// Mutably access inert DDE declarations and cached tables.
+    pub fn dde_links_mut(&mut self) -> &mut Vec<DdeLink> {
+        &mut self.dde_links
+    }
+
+    /// Add a validated inert DDE declaration and cached table.
+    pub fn add_dde_link(&mut self, link: DdeLink) -> Result<()> {
+        link.validate()?;
+        self.dde_links.push(link);
+        Ok(())
+    }
+
+    /// Remove a DDE declaration by index.
+    pub fn remove_dde_link(&mut self, index: usize) -> Option<DdeLink> {
+        (index < self.dde_links.len()).then(|| self.dde_links.remove(index))
     }
 
     /// Return database ranges and their filter/sort metadata.
@@ -1383,6 +1412,7 @@ impl MutableSpreadsheet {
 
         write_database_ranges(&mut body, &self.database_ranges)?;
         write_consolidation(&mut body, self.consolidation.as_ref())?;
+        write_dde_links(&mut body, &self.dde_links)?;
 
         let of_ns = if self.has_formulas() {
             " xmlns:of=\"urn:oasis:names:tc:opendocument:xmlns:of:1.2\""
@@ -1404,10 +1434,14 @@ impl MutableSpreadsheet {
                     .iter()
                     .flat_map(|row| &row.cells)
                     .any(|cell| cell.range_source.is_some())
-        });
+        }) || self.dde_links.iter().any(DdeLink::has_table_sources);
         let has_protection_extensions = has_protection_extensions(
             &self.protection,
-            self.sheets.iter().map(|sheet| &sheet.protection),
+            self.sheets.iter().map(|sheet| &sheet.protection).chain(
+                self.dde_links
+                    .iter()
+                    .map(|link| &link.cached_table.protection),
+            ),
         );
         if has_annotations {
             out.push_str(r#" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:loext="urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0""#);
@@ -1490,6 +1524,7 @@ impl MutableSpreadsheet {
         if let Some(consolidation) = &self.consolidation {
             consolidation.validate()?;
         }
+        self.dde_links.iter().try_for_each(DdeLink::validate)?;
         let mut writer = PackageWriter::new();
 
         writer.set_mimetype(&self.mimetype)?;

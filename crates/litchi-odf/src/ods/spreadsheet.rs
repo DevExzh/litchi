@@ -1,13 +1,14 @@
 //! Main Spreadsheet structure and implementation.
 
 use super::{
-    CalculationSettings, Consolidation, ContentValidation, DatabaseRange, LabelRange,
+    CalculationSettings, Consolidation, ContentValidation, DatabaseRange, DdeLink, LabelRange,
     NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange, Sheet, SheetProtection,
     SpreadsheetProtection,
     calculation::parse_calculation_settings,
     consolidation::parse_consolidation,
     data_validation::parse_content_validations,
     database_range::parse_database_ranges,
+    dde::parse_dde_links,
     label_range::parse_label_ranges,
     parser::OdsParser,
     protection::parse_protection,
@@ -57,6 +58,7 @@ pub struct Spreadsheet {
     calculation_settings: Option<CalculationSettings>,
     label_ranges: Vec<LabelRange>,
     consolidation: Option<Consolidation>,
+    dde_links: Vec<DdeLink>,
     protection: SpreadsheetProtection,
     sheet_protections: Vec<SheetProtection>,
     cell_styles: CellStyleRegistry,
@@ -143,6 +145,7 @@ impl Spreadsheet {
         let calculation_settings = parse_calculation_settings(content.xml_content())?;
         let label_ranges = parse_label_ranges(content.xml_content())?;
         let consolidation = parse_consolidation(content.xml_content())?;
+        let dde_links = parse_dde_links(content.xml_content())?;
         let (protection, sheet_protections) = parse_protection(content.xml_content())?;
 
         let styles = if package.has_file("styles.xml") {
@@ -174,6 +177,7 @@ impl Spreadsheet {
             calculation_settings,
             label_ranges,
             consolidation,
+            dde_links,
             protection,
             sheet_protections,
             cell_styles,
@@ -193,6 +197,11 @@ impl Spreadsheet {
     /// Return the inert spreadsheet consolidation declaration.
     pub fn consolidation(&self) -> Option<&Consolidation> {
         self.consolidation.as_ref()
+    }
+
+    /// Return inert DDE declarations and their document-stored cached tables.
+    pub fn dde_links(&self) -> &[DdeLink] {
+        &self.dde_links
     }
 
     /// Create an ODS spreadsheet from raw bytes (ZIP archive data).

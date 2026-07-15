@@ -28,6 +28,7 @@
 //! - ✅ Formula calculation, null-date, and iteration settings
 //! - ✅ Row and column label ranges
 //! - ✅ Inert spreadsheet consolidation declarations
+//! - ✅ Inert DDE source declarations and document-stored cached tables
 //!
 //! ## ✅ Formula Support (`formula.rs`) - PARTIAL
 //! - ✅ Formula string representation
@@ -54,6 +55,7 @@
 //! - ✅ Create, edit, clear, and round-trip calculation settings
 //! - ✅ Create, edit, remove, and round-trip row/column label ranges
 //! - ✅ Create, edit, clear, and round-trip consolidation declarations
+//! - ✅ Create, edit, remove, and round-trip inert DDE caches
 //!
 //! ## 🚧 TODO - Advanced Features
 //! - ⚠️ Chart creation and parsing (embedded charts)
@@ -75,6 +77,7 @@ mod cell;
 mod consolidation;
 mod data_validation;
 mod database_range;
+mod dde;
 mod detective;
 /// OpenFormula parsing and support
 pub mod formula;
@@ -109,6 +112,7 @@ pub use database_range::{
     DatabaseSource, EmbeddedNumberBehavior, FilterCondition, FilterConditionSource, FilterDataType,
     FilterExpression, SortOrder, SubtotalField, SubtotalRule, SubtotalRules, SubtotalSortGroups,
 };
+pub use dde::{DdeConversionMode, DdeLink, DdeSource};
 pub use detective::{
     CellDetective, DetectiveDirection, DetectiveHighlightedRange, DetectiveOperation,
     DetectiveOperationKind,
