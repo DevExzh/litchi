@@ -17,8 +17,10 @@ pub enum TapBuildError {
     RowOutOfBounds(usize),
     /// DOC table rows can contain at most 63 cells.
     InvalidCellCount(usize),
-    /// Cumulative cell boundaries exceed signed 16-bit twip coordinates.
+    /// Cumulative cell boundaries exceed the DOC XAS coordinate range.
     CellWidthsOverflow,
+    /// DOC row heights use the YAS range of -31680 through 31680 twips.
+    InvalidRowHeight(i16),
     /// A merge continuation cannot occur in the first cell.
     MergeWithoutPrecedingCell,
     /// Brc80 spacing is a five-bit value.
@@ -40,8 +42,11 @@ impl std::fmt::Display for TapBuildError {
             Self::CellWidthsOverflow => {
                 write!(
                     f,
-                    "DOC cell widths exceed the signed 16-bit coordinate range"
+                    "DOC cell widths exceed the 31680-twip XAS coordinate range"
                 )
+            },
+            Self::InvalidRowHeight(height) => {
+                write!(f, "DOC row height {height} is outside the YAS range")
             },
             Self::MergeWithoutPrecedingCell => {
                 write!(f, "the first DOC table cell cannot be a merge continuation")
@@ -177,6 +182,9 @@ pub(crate) fn generate_row_sprms(row: &TableRow) -> Result<Vec<u8>, TapBuildErro
     if row.cells.first().is_some_and(|cell| cell.merged) {
         return Err(TapBuildError::MergeWithoutPrecedingCell);
     }
+    if !(-31_680..=31_680).contains(&row.height) {
+        return Err(TapBuildError::InvalidRowHeight(row.height));
+    }
     let effective_widths = if row.cells.iter().all(|cell| cell.width == 0) {
         const DEFAULT_TABLE_WIDTH: u32 = 8640;
         (0..cell_count)
@@ -197,7 +205,10 @@ pub(crate) fn generate_row_sprms(row: &TableRow) -> Result<Vec<u8>, TapBuildErro
         boundary = boundary
             .checked_add(u32::from(*width))
             .ok_or(TapBuildError::CellWidthsOverflow)?;
-        boundaries.push(i16::try_from(boundary).map_err(|_| TapBuildError::CellWidthsOverflow)?);
+        if boundary > 31_680 {
+            return Err(TapBuildError::CellWidthsOverflow);
+        }
+        boundaries.push(boundary as i16);
     }
 
     let mut builder = SprmBuilder::new();
@@ -207,7 +218,10 @@ pub(crate) fn generate_row_sprms(row: &TableRow) -> Result<Vec<u8>, TapBuildErro
             .iter()
             .any(|cell| cell.merged || cell.vertical_merge != VerticalMergeStatus::None)
     {
+        // Emit the legacy form first for older readers, followed by the
+        // authoritative modern form as required for equivalent SPRMs.
         builder.add_bool(0x3403, true);
+        builder.add_bool(0x3466, true);
     }
     if row.is_header {
         builder.add_bool(0x3404, true);
@@ -733,6 +747,13 @@ mod tests {
         });
 
         let sprms = builder.try_generate_row_sprms(0).unwrap();
+        let opcodes = crate::sprm::parse_sprms(&sprms)
+            .into_iter()
+            .map(|sprm| sprm.opcode)
+            .collect::<Vec<_>>();
+        let legacy_cant_split = opcodes.iter().position(|opcode| *opcode == 0x3403).unwrap();
+        let modern_cant_split = opcodes.iter().position(|opcode| *opcode == 0x3466).unwrap();
+        assert!(legacy_cant_split < modern_cant_split);
         let tap = crate::doc::parts::tap::TableProperties::from_sprm(&sprms).unwrap();
         assert_eq!(tap.cell_boundaries, [0, 1000, 2000]);
         assert_eq!(tap.row_height, Some(-200));
@@ -917,6 +938,20 @@ mod tests {
         assert_eq!(
             builder.try_generate_row_sprms(0),
             Err(TapBuildError::CellWidthsOverflow)
+        );
+
+        let mut builder = TapBuilder::new();
+        builder.add_row(TableRow {
+            cells: vec![TableCell {
+                width: 1000,
+                ..TableCell::default()
+            }],
+            height: i16::MIN,
+            ..TableRow::default()
+        });
+        assert_eq!(
+            builder.try_generate_row_sprms(0),
+            Err(TapBuildError::InvalidRowHeight(i16::MIN))
         );
 
         let mut builder = TapBuilder::new();

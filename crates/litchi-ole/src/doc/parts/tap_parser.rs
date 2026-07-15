@@ -129,6 +129,16 @@ impl<'arena> TapParser<'arena> {
         ((opcode >> 10) & 0x07) == 5
     }
 
+    fn parse_bool8(sprm: &Sprm, name: &str) -> Result<bool> {
+        let operand = sprm.operand_bytes();
+        if operand.len() != 1 || !matches!(operand[0], 0 | 1) {
+            return Err(DocError::Corrupted(format!(
+                "{name} must contain one Boolean8 value"
+            )));
+        }
+        Ok(operand[0] != 0)
+    }
+
     /// Apply a single SPRM to table properties.
     ///
     /// Based on Apache POI's unCompressTAPOperation method.
@@ -142,48 +152,102 @@ impl<'arena> TapParser<'arena> {
         let operation = get_sprm_operation(sprm.opcode);
 
         match operation {
-            // sprmTJc (0x5400) - Table justification
+            // sprmTJc90 (0x5400) - Physical table justification
             0x00 => {
-                if let Some(jc) = sprm.operand_byte() {
-                    tap.justification = match jc {
-                        0 => TableJustification::Left,
-                        1 => TableJustification::Center,
-                        2 => TableJustification::Right,
-                        _ => TableJustification::Left,
-                    };
+                let operand = sprm.operand_bytes();
+                if operand.len() != 2 {
+                    return Err(DocError::Corrupted(
+                        "sprmTJc90 operand must contain 2 bytes".to_string(),
+                    ));
                 }
+                tap.justification = match binary_to_doc_result(read_u16_le(operand, 0))? {
+                    0 => TableJustification::Left,
+                    1 => TableJustification::Center,
+                    2 => TableJustification::Right,
+                    _ => {
+                        return Err(DocError::Corrupted(
+                            "sprmTJc90 contains an invalid justification".to_string(),
+                        ));
+                    },
+                };
             },
             // sprmTDxaLeft (0x9601) - Table indent from left
             0x01 => {
-                if let Some(offset) = sprm.operand_word() {
-                    let adjust = offset as i16
-                        - (tap.cell_boundaries.first().copied().unwrap_or(0) + tap.gap_half);
-                    for boundary in &mut tap.cell_boundaries {
-                        *boundary += adjust;
-                    }
+                let operand = sprm.operand_bytes();
+                if operand.len() != 2 {
+                    return Err(DocError::Corrupted(
+                        "sprmTDxaLeft operand must contain 2 bytes".to_string(),
+                    ));
                 }
+                let indent = binary_to_doc_result(read_i16_le(operand, 0))?;
+                if !(-31_680..=31_680).contains(&indent) {
+                    return Err(DocError::Corrupted(
+                        "sprmTDxaLeft is outside the XAS range".to_string(),
+                    ));
+                }
+                let current_origin = i32::from(tap.cell_boundaries.first().copied().unwrap_or(0))
+                    + i32::from(tap.gap_half);
+                let adjust = i32::from(indent) - current_origin;
+                let boundaries = tap
+                    .cell_boundaries
+                    .iter()
+                    .map(|boundary| i32::from(*boundary) + adjust)
+                    .map(|boundary| {
+                        i16::try_from(boundary).map_err(|_| {
+                            DocError::Corrupted(
+                                "sprmTDxaLeft overflows table coordinates".to_string(),
+                            )
+                        })
+                    })
+                    .collect::<Result<Vec<_>>>()?;
+                if boundaries
+                    .iter()
+                    .any(|boundary| !(-31_680..=31_680).contains(boundary))
+                {
+                    return Err(DocError::Corrupted(
+                        "sprmTDxaLeft produces a coordinate outside the XAS range".to_string(),
+                    ));
+                }
+                tap.cell_boundaries = boundaries;
+                tap.indent_left = indent;
             },
             // sprmTDxaGapHalf (0x9602) - Half the width of spacing between cells
             0x02 => {
-                if let Some(gap) = sprm.operand_word() {
-                    if !tap.cell_boundaries.is_empty() {
-                        let adjust = tap.gap_half - gap as i16;
-                        tap.cell_boundaries[0] += adjust;
-                    }
-                    tap.gap_half = gap as i16;
+                let operand = sprm.operand_bytes();
+                if operand.len() != 2 {
+                    return Err(DocError::Corrupted(
+                        "sprmTDxaGapHalf operand must contain 2 bytes".to_string(),
+                    ));
                 }
+                let gap = binary_to_doc_result(read_i16_le(operand, 0))?;
+                if !(0..=31_680).contains(&gap) {
+                    return Err(DocError::Corrupted(
+                        "sprmTDxaGapHalf is outside its allowed XAS range".to_string(),
+                    ));
+                }
+                if let Some(first) = tap.cell_boundaries.first().copied() {
+                    let adjusted = i32::from(first) + i32::from(tap.gap_half) - i32::from(gap);
+                    if !(-31_680..=31_680).contains(&adjusted)
+                        || tap
+                            .cell_boundaries
+                            .get(1)
+                            .is_some_and(|second| adjusted > i32::from(*second))
+                    {
+                        return Err(DocError::Corrupted(
+                            "sprmTDxaGapHalf produces an invalid first cell boundary".to_string(),
+                        ));
+                    }
+                    tap.cell_boundaries[0] = adjusted as i16;
+                }
+                tap.gap_half = gap;
             },
             // sprmTFCantSplit (0x3403) - Row can't be split across pages
             0x03 => {
-                if let Some(flag) = sprm.operand_byte() {
-                    tap.allow_row_break = flag == 0;
-                }
+                tap.allow_row_break = !Self::parse_bool8(sprm, "sprmTFCantSplit90")?;
             },
             // sprmTTableHeader (0x3404) - Row is header row
             0x04 => {
-                if let Some(flag) = sprm.operand_byte() {
-                    tap.is_header_row = flag != 0;
-                }
+                tap.is_header_row = Self::parse_bool8(sprm, "sprmTTableHeader")?;
             },
             // sprmTTableBorders (0xD605) - Table borders
             0x05 => {
@@ -193,9 +257,19 @@ impl<'arena> TapParser<'arena> {
             0x06 => {},
             // sprmTDyaRowHeight (0x9407) - Row height
             0x07 => {
-                if let Some(height) = sprm.operand_word() {
-                    tap.row_height = Some(height as i16);
+                let operand = sprm.operand_bytes();
+                if operand.len() != 2 {
+                    return Err(DocError::Corrupted(
+                        "sprmTDyaRowHeight operand must contain 2 bytes".to_string(),
+                    ));
                 }
+                let height = binary_to_doc_result(read_i16_le(operand, 0))?;
+                if !(-31_680..=31_680).contains(&height) {
+                    return Err(DocError::Corrupted(
+                        "sprmTDyaRowHeight is outside the YAS range".to_string(),
+                    ));
+                }
+                tap.row_height = (height != 0).then_some(height);
             },
             // sprmTDefTable (0xD608) - Table definition
             0x08 => {
@@ -255,6 +329,10 @@ impl<'arena> TapParser<'arena> {
             0x36 => self.parse_cell_range_bool(tap, sprm, CellBoolProperty::FitText)?,
             0x39 => self.parse_cell_range_bool(tap, sprm, CellBoolProperty::NoWrap)?,
             0x42 => self.parse_cell_range_bool(tap, sprm, CellBoolProperty::HideMark)?,
+            // Modern row can't-split property supersedes sprmTFCantSplit90.
+            0x66 => {
+                tap.allow_row_break = !Self::parse_bool8(sprm, "sprmTFCantSplit")?;
+            },
             // sprmTPropRMark (0xD667) - Row property revision mark
             0x67 => {
                 let operand = sprm.operand_bytes();
@@ -1761,6 +1839,66 @@ mod tests {
         assert!(parse_with(0x5624, &[1, 1]).is_ok());
         let tap = parse_with(0x5624, &[1, 2]).unwrap();
         assert_eq!(tap.cell_properties[1].merge_status, CellMergeStatus::First);
+    }
+
+    #[test]
+    fn applies_core_row_geometry_and_pagination_strictly() {
+        let arena = Bump::new();
+        let parser = TapParser::new(&arena);
+        let mut grpprl = table_definition_grpprl(&[2, 0, 0, 100, 0, 200, 0]);
+        append_fixed_sprm(&mut grpprl, 0x5400, &[2, 0]);
+        append_fixed_sprm(&mut grpprl, 0x9602, &[20, 0]);
+        append_fixed_sprm(&mut grpprl, 0x9601, &[200, 0]);
+        append_fixed_sprm(&mut grpprl, 0x3403, &[0]);
+        append_fixed_sprm(&mut grpprl, 0x3404, &[1]);
+        append_fixed_sprm(&mut grpprl, 0x9407, &(-240i16).to_le_bytes());
+        append_fixed_sprm(&mut grpprl, 0x3466, &[1]);
+
+        let tap = parser.parse_tap(&grpprl).unwrap();
+        assert_eq!(tap.justification, TableJustification::Right);
+        assert_eq!(tap.indent_left, 200);
+        assert_eq!(tap.gap_half, 20);
+        assert_eq!(tap.cell_boundaries, [180, 300, 400]);
+        assert_eq!(tap.row_height, Some(-240));
+        assert!(tap.is_header_row);
+        assert!(!tap.allow_row_break);
+
+        append_fixed_sprm(&mut grpprl, 0x9407, &[0, 0]);
+        append_fixed_sprm(&mut grpprl, 0x3466, &[0]);
+        let tap = parser.parse_tap(&grpprl).unwrap();
+        assert_eq!(tap.row_height, None);
+        assert!(tap.allow_row_break);
+    }
+
+    #[test]
+    fn rejects_malformed_core_row_geometry_and_pagination() {
+        let arena = Bump::new();
+        let parser = TapParser::new(&arena);
+        let parse_with = |opcode, operand: &[u8]| {
+            let mut grpprl = table_definition_grpprl(&[1, 0, 0, 100, 0]);
+            append_fixed_sprm(&mut grpprl, opcode, operand);
+            parser.parse_tap(&grpprl)
+        };
+
+        assert!(parse_with(0x5400, &[3, 0]).is_err());
+        assert!(parse_with(0x9601, &(-31_681i16).to_le_bytes()).is_err());
+        assert!(parse_with(0x9602, &(-1i16).to_le_bytes()).is_err());
+        assert!(parse_with(0x9602, &31_681i16.to_le_bytes()).is_err());
+        assert!(parse_with(0x3403, &[2]).is_err());
+        assert!(parse_with(0x3404, &[2]).is_err());
+        assert!(parse_with(0x3466, &[2]).is_err());
+        assert!(parse_with(0x9407, &(-31_681i16).to_le_bytes()).is_err());
+        assert!(parse_with(0x9407, &31_681i16.to_le_bytes()).is_err());
+
+        let mut shifted = table_definition_grpprl(&[1, 0x30, 0x75, 0x94, 0x75]);
+        append_fixed_sprm(&mut shifted, 0x9601, &31_680i16.to_le_bytes());
+        assert!(parser.parse_tap(&shifted).is_err());
+
+        let mut reordered = table_definition_grpprl(&[1, 0, 0, 100, 0]);
+        append_fixed_sprm(&mut reordered, 0x9602, &[200, 0]);
+        reordered.extend_from_slice(&table_definition_grpprl(&[1, 0, 0, 100, 0]));
+        append_fixed_sprm(&mut reordered, 0x9602, &[0, 0]);
+        assert!(parser.parse_tap(&reordered).is_err());
     }
 
     #[test]
