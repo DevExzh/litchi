@@ -99,6 +99,12 @@ pub struct FibBuilder {
     /// Comment-owner XST array offset and size
     fc_grp_xst_atn_owners: u32,
     lcb_grp_xst_atn_owners: u32,
+    fc_sttbf_bkmk: u32,
+    lcb_sttbf_bkmk: u32,
+    fc_plcf_bkf: u32,
+    lcb_plcf_bkf: u32,
+    fc_plcf_bkl: u32,
+    lcb_plcf_bkl: u32,
     /// Annotation bookmark name table (`SttbfAtnBkmk`)
     fc_sttbf_atn_bkmk: u32,
     lcb_sttbf_atn_bkmk: u32,
@@ -176,6 +182,12 @@ impl FibBuilder {
             lcb_plcfand_txt: 0,
             fc_grp_xst_atn_owners: 0,
             lcb_grp_xst_atn_owners: 0,
+            fc_sttbf_bkmk: 0,
+            lcb_sttbf_bkmk: 0,
+            fc_plcf_bkf: 0,
+            lcb_plcf_bkf: 0,
+            fc_plcf_bkl: 0,
+            lcb_plcf_bkl: 0,
             fc_sttbf_atn_bkmk: 0,
             lcb_sttbf_atn_bkmk: 0,
             fc_plcf_atn_bkf: 0,
@@ -316,6 +328,21 @@ impl FibBuilder {
     pub fn set_grp_xst_atn_owners(&mut self, offset: u32, size: u32) {
         self.fc_grp_xst_atn_owners = offset;
         self.lcb_grp_xst_atn_owners = size;
+    }
+
+    pub fn set_sttbf_bkmk(&mut self, offset: u32, size: u32) {
+        self.fc_sttbf_bkmk = offset;
+        self.lcb_sttbf_bkmk = size;
+    }
+
+    pub fn set_plcf_bkf(&mut self, offset: u32, size: u32) {
+        self.fc_plcf_bkf = offset;
+        self.lcb_plcf_bkf = size;
+    }
+
+    pub fn set_plcf_bkl(&mut self, offset: u32, size: u32) {
+        self.fc_plcf_bkl = offset;
+        self.lcb_plcf_bkl = size;
     }
 
     /// Set the annotation-bookmark name table (`SttbfAtnBkmk`).
@@ -576,6 +603,9 @@ impl FibBuilder {
         const PLCFHDD: usize = 11; // Headers/Footers PLCF
         const STTBFFFN: usize = 15; // Font table
         const PLCFFLDMOM: usize = 16; // Main document field table
+        const STTBFBKMK: usize = 21;
+        const PLCFBKF: usize = 22;
+        const PLCFBKL: usize = 23;
         const GRPXSTATNOWNERS: usize = 36; // Comment-owner XST array
         const STTBFATNBKMK: usize = 37; // Annotation bookmark names
         const PLCFATNBKF: usize = 42; // Annotation bookmark starts
@@ -592,6 +622,9 @@ impl FibBuilder {
         set_field(buf, PLCFFNDTXT, self.fc_plcffnd_txt, self.lcb_plcffnd_txt);
         set_field(buf, PLCFANDREF, self.fc_plcfand_ref, self.lcb_plcfand_ref);
         set_field(buf, PLCFANDTXT, self.fc_plcfand_txt, self.lcb_plcfand_txt);
+        set_field(buf, STTBFBKMK, self.fc_sttbf_bkmk, self.lcb_sttbf_bkmk);
+        set_field(buf, PLCFBKF, self.fc_plcf_bkf, self.lcb_plcf_bkf);
+        set_field(buf, PLCFBKL, self.fc_plcf_bkl, self.lcb_plcf_bkl);
         set_field(buf, PLCFENDREF, self.fc_plcfend_ref, self.lcb_plcfend_ref);
         set_field(buf, PLCFENDTXT, self.fc_plcfend_txt, self.lcb_plcfend_txt);
         set_field(buf, PLCFSED, self.fc_plcfsed, self.lcb_plcfsed);

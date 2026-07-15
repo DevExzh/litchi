@@ -71,6 +71,7 @@
 //! - Apache POI (HWPF)
 //! - Other OLE2-based Word readers
 
+use super::bookmarks::BookmarkEntry;
 use super::comments::CommentEntry;
 use super::fib::FibBuilder;
 use super::font_table::FontTableBuilder;
@@ -164,6 +165,12 @@ struct CommentStoryData {
     bookmark_ends: Vec<u8>,
     extended_metadata: Vec<u8>,
     char_count: u32,
+}
+
+struct BookmarkTableData {
+    names: Vec<u8>,
+    starts: Vec<u8>,
+    ends: Vec<u8>,
 }
 
 #[derive(Clone, Copy)]
@@ -410,6 +417,8 @@ pub struct DocWriter {
     endnotes: Vec<FootnoteEntry>,
     /// Comments
     comments: Vec<CommentEntry>,
+    /// Standard bookmarks
+    bookmarks: Vec<BookmarkEntry>,
     /// Numbering writer for list tables
     numbering: NumberingWriter,
 }
@@ -430,6 +439,7 @@ impl DocWriter {
             footnotes: Vec::new(),
             endnotes: Vec::new(),
             comments: Vec::new(),
+            bookmarks: Vec::new(),
             numbering: NumberingWriter::new(),
         }
     }
@@ -615,6 +625,11 @@ impl DocWriter {
     /// Add a point or ranged comment to the document.
     pub fn add_comment(&mut self, entry: CommentEntry) {
         self.comments.push(entry);
+    }
+
+    /// Add a standard bookmark to the document.
+    pub fn add_bookmark(&mut self, entry: BookmarkEntry) {
+        self.bookmarks.push(entry);
     }
 
     /// Add a list structure definition.
@@ -1123,6 +1138,105 @@ impl DocWriter {
         table_stream.extend_from_slice(&comment.extended_metadata);
     }
 
+    fn build_bookmark_tables(
+        entries: &[BookmarkEntry],
+        document_end: u32,
+    ) -> Result<Option<BookmarkTableData>, DocWriteError> {
+        if entries.is_empty() {
+            return Ok(None);
+        }
+        if entries.len() > 0x3FFB {
+            return Err(DocWriteError::InvalidData(
+                "DOC standard bookmark table exceeds 0x3FFB entries".to_string(),
+            ));
+        }
+        let mut unique = std::collections::HashSet::with_capacity(entries.len());
+        let mut records = Vec::with_capacity(entries.len());
+        for (index, entry) in entries.iter().enumerate() {
+            let units = entry.name.encode_utf16().collect::<Vec<_>>();
+            if units.is_empty() || units.len() >= 40 || !unique.insert(entry.name.clone()) {
+                return Err(DocWriteError::InvalidData(
+                    "DOC bookmark names must be unique and contain 1 through 39 UTF-16 code units"
+                        .to_string(),
+                ));
+            }
+            if entry.start > entry.end || entry.end > document_end {
+                return Err(DocWriteError::InvalidData(
+                    "DOC bookmark range must be ordered and inside the document parts".to_string(),
+                ));
+            }
+            let mut bkc = u16::from(entry.is_native) << 14;
+            if let Some((first, limit)) = entry.column_range {
+                if first >= limit || first > 0x7F || limit > 0x3F {
+                    return Err(DocWriteError::InvalidData(
+                        "DOC bookmark column range exceeds BKC limits".to_string(),
+                    ));
+                }
+                bkc |= 0x8000 | u16::from(first) | (u16::from(limit) << 8);
+            }
+            records.push((index, entry, units, bkc));
+        }
+
+        let sentinel = document_end.checked_add(1).ok_or_else(|| {
+            DocWriteError::InvalidData("DOC bookmark sentinel CP overflows".to_string())
+        })?;
+        let mut start_order = records.iter().collect::<Vec<_>>();
+        start_order.sort_by_key(|record| (record.1.start, record.0));
+        let mut end_order = records.iter().collect::<Vec<_>>();
+        end_order.sort_by_key(|record| (record.1.end, record.0));
+        let end_indexes = end_order
+            .iter()
+            .enumerate()
+            .map(|(end_index, record)| (record.0, end_index as u16))
+            .collect::<HashMap<_, _>>();
+
+        let mut names = Vec::new();
+        names.extend_from_slice(&0xFFFFu16.to_le_bytes());
+        names.extend_from_slice(&(entries.len() as u16).to_le_bytes());
+        names.extend_from_slice(&0u16.to_le_bytes());
+        for record in &start_order {
+            names.extend_from_slice(&(record.2.len() as u16).to_le_bytes());
+            names.extend(record.2.iter().copied().flat_map(u16::to_le_bytes));
+        }
+
+        let mut starts = Vec::with_capacity((entries.len() + 1) * 4 + entries.len() * 4);
+        for record in &start_order {
+            starts.extend_from_slice(&record.1.start.to_le_bytes());
+        }
+        starts.extend_from_slice(&sentinel.to_le_bytes());
+        for record in &start_order {
+            starts.extend_from_slice(&end_indexes[&record.0].to_le_bytes());
+            starts.extend_from_slice(&record.3.to_le_bytes());
+        }
+
+        let mut ends = Vec::with_capacity((entries.len() + 1) * 4);
+        for record in &end_order {
+            ends.extend_from_slice(&record.1.end.to_le_bytes());
+        }
+        ends.extend_from_slice(&sentinel.to_le_bytes());
+        Ok(Some(BookmarkTableData {
+            names,
+            starts,
+            ends,
+        }))
+    }
+
+    fn append_bookmark_tables(
+        fib: &mut FibBuilder,
+        table_stream: &mut Vec<u8>,
+        bookmarks: &BookmarkTableData,
+    ) {
+        let mut offset = table_stream.len() as u32;
+        fib.set_sttbf_bkmk(offset, bookmarks.names.len() as u32);
+        table_stream.extend_from_slice(&bookmarks.names);
+        offset = table_stream.len() as u32;
+        fib.set_plcf_bkf(offset, bookmarks.starts.len() as u32);
+        table_stream.extend_from_slice(&bookmarks.starts);
+        offset = table_stream.len() as u32;
+        fib.set_plcf_bkl(offset, bookmarks.ends.len() as u32);
+        table_stream.extend_from_slice(&bookmarks.ends);
+    }
+
     /// Build header/footer story text and PlcfHdd
     ///
     /// Appends header/footer text to `text_stream`, extends CHPX/PAPX entries and pieces.
@@ -1595,6 +1709,7 @@ impl DocWriter {
             &mut current_cp,
             &mut font_builder,
         )?;
+        let bookmark_tables = Self::build_bookmark_tables(&self.bookmarks, current_cp)?;
 
         // Mandatory trailing paragraph mark when ANY subdocument exists.
         // Per MS-DOC spec: "The total number of character positions is
@@ -1710,6 +1825,10 @@ impl DocWriter {
 
         if let Some(comment) = &comment_story {
             Self::append_comment_tables(&mut fib, &mut table_stream, comment);
+            table_offset = table_stream.len() as u32;
+        }
+        if let Some(bookmarks) = &bookmark_tables {
+            Self::append_bookmark_tables(&mut fib, &mut table_stream, bookmarks);
             table_offset = table_stream.len() as u32;
         }
 
@@ -2118,6 +2237,7 @@ impl DocWriter {
             &mut current_cp,
             &mut font_builder,
         )?;
+        let bookmark_tables = Self::build_bookmark_tables(&self.bookmarks, current_cp)?;
 
         // Mandatory trailing paragraph mark when ANY subdocument exists (same as save()).
         let has_subdocs = footnote_plcfs.is_some()
@@ -2226,6 +2346,10 @@ impl DocWriter {
 
         if let Some(comment) = &comment_story {
             Self::append_comment_tables(&mut fib, &mut table_stream, comment);
+            table_offset = table_stream.len() as u32;
+        }
+        if let Some(bookmarks) = &bookmark_tables {
+            Self::append_bookmark_tables(&mut fib, &mut table_stream, bookmarks);
             table_offset = table_stream.len() as u32;
         }
 
@@ -3198,6 +3322,74 @@ mod tests {
             ),
         );
         assert!(error.contains("pre-order"));
+    }
+
+    #[test]
+    fn standard_bookmarks_round_trip_through_both_output_paths() {
+        let mut writer = DocWriter::new();
+        writer.add_paragraph("Main text").unwrap();
+        writer.add_bookmark(BookmarkEntry::new("Outer", 2, 5));
+        writer.add_bookmark(
+            BookmarkEntry::new("_Cell", 0, 8)
+                .with_native_export(false)
+                .with_column_range(1, 3),
+        );
+
+        let mut cursor = Cursor::new(Vec::new());
+        writer.write_to(&mut cursor).unwrap();
+        let mut package =
+            crate::doc::Package::from_reader(Cursor::new(cursor.into_inner())).unwrap();
+        let bookmarks = package.document().unwrap().bookmarks().unwrap();
+        assert_eq!(bookmarks.len(), 2);
+        assert_eq!(bookmarks[0].name, "_Cell");
+        assert_eq!((bookmarks[0].start, bookmarks[0].end), (0, 8));
+        assert_eq!(bookmarks[0].column_range, Some((1, 3)));
+        assert!(!bookmarks[0].is_native);
+        assert_eq!(bookmarks[1].name, "Outer");
+        assert_eq!((bookmarks[1].start, bookmarks[1].end), (2, 5));
+
+        let path = std::env::temp_dir().join(format!(
+            "litchi-doc-bookmarks-{}-{}.doc",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        writer.save(&path).unwrap();
+        let mut package = crate::doc::Package::open(&path).unwrap();
+        assert_eq!(package.document().unwrap().bookmarks().unwrap(), bookmarks);
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn rejects_invalid_standard_bookmarks() {
+        let write_error = |entries: Vec<BookmarkEntry>| {
+            let mut writer = DocWriter::new();
+            writer.add_paragraph("Main").unwrap();
+            for entry in entries {
+                writer.add_bookmark(entry);
+            }
+            writer
+                .write_to(&mut Cursor::new(Vec::new()))
+                .unwrap_err()
+                .to_string()
+        };
+        assert!(write_error(vec![BookmarkEntry::new("", 0, 1)]).contains("names"));
+        assert!(
+            write_error(vec![
+                BookmarkEntry::new("Same", 0, 1),
+                BookmarkEntry::new("Same", 1, 2),
+            ])
+            .contains("unique")
+        );
+        assert!(write_error(vec![BookmarkEntry::new("Range", 4, 2)]).contains("range"));
+        assert!(
+            write_error(vec![
+                BookmarkEntry::new("Column", 0, 1).with_column_range(3, 2)
+            ])
+            .contains("column")
+        );
     }
 
     #[test]

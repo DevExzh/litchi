@@ -7,6 +7,7 @@
 mod core;
 
 /// Comments writer input types
+pub mod bookmarks;
 pub mod comments;
 
 /// FIB (File Information Block) generation
@@ -55,6 +56,7 @@ pub mod hyperlinks;
 pub mod numbering;
 
 // Re-export public types
+pub use bookmarks::BookmarkEntry;
 pub use comments::CommentEntry;
 pub use core::{CharacterFormatting, DocWriteError, DocWriter, LineSpacing, ParagraphFormatting};
 pub use fib::FibBuilder;
