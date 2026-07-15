@@ -528,6 +528,15 @@ impl Document {
         super::parser::OdtParser::parse_sections(self.content.xml_content())
     }
 
+    /// Get all generated text indexes, including their inert source definitions and cached bodies.
+    ///
+    /// This covers tables of contents and illustration, table, object, user, alphabetical,
+    /// and bibliography indexes. Stored source declarations are never evaluated, and external
+    /// alphabetical auto-mark files are never fetched.
+    pub fn text_indexes(&self) -> Result<Vec<super::TextIndex>> {
+        super::index::parse_text_indexes(self.content.xml_content())
+    }
+
     /// Get all bookmarks in the document.
     ///
     /// # Examples

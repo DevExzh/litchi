@@ -21,6 +21,7 @@
 //! - ✅ `comments()` - Parse document comments
 //! - ✅ `track_changes()` - Parse tracked changes
 //! - ✅ `sections()` - Parse document sections
+//! - ✅ `text_indexes()` - Parse all generated index sources and cached bodies
 //! - ✅ Style parsing and resolution with registry
 //!
 //! ## ✅ Writing (`builder.rs`, `mutable.rs`) - COMPLETE
@@ -52,6 +53,7 @@
 mod builder;
 mod document;
 mod header_footer;
+mod index;
 mod mutable;
 mod page_layout;
 mod parser;
@@ -59,6 +61,7 @@ mod parser;
 pub use builder::DocumentBuilder;
 pub use document::Document;
 pub use header_footer::{HeaderFooter, HeaderFooterKind, MasterPage};
+pub use index::{TextIndex, TextIndexAttribute, TextIndexContent, TextIndexElement, TextIndexKind};
 pub use mutable::MutableDocument;
 pub use page_layout::{PageLayout, PageLayoutAttribute, PageLayoutProperties, PageUsage};
 

@@ -57,6 +57,7 @@
 //! - ✅ Bookmark and reference tracking
 //! - ✅ Comment and change tracking parsing
 //! - ✅ Section parsing
+//! - ✅ Generated indexes, source templates, and cached index bodies
 //!
 //! ### Writing (`odt/builder.rs`, `odt/mutable.rs`)
 //! - ✅ DocumentBuilder for creating new ODT files
@@ -365,7 +366,8 @@ pub use ods::{
 };
 pub use odt::{
     Document, DocumentBuilder, HeaderFooter, HeaderFooterKind, MasterPage, MutableDocument,
-    PageLayout, PageLayoutAttribute, PageLayoutProperties, PageUsage,
+    PageLayout, PageLayoutAttribute, PageLayoutProperties, PageUsage, TextIndex,
+    TextIndexAttribute, TextIndexContent, TextIndexElement, TextIndexKind,
 };
 
 // Re-export shapes for presentations
