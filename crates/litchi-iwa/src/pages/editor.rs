@@ -81,6 +81,21 @@ pub struct PagesEditor {
 }
 
 impl PagesEditor {
+    /// Start configuring a new Pages package built from typed IWA objects.
+    pub fn builder() -> crate::pages::PagesDocumentBuilder {
+        crate::pages::PagesDocumentBuilder::new()
+    }
+
+    /// Create a blank, independent Pages document without a bundled template.
+    pub fn create() -> Result<Self> {
+        Self::builder().build()
+    }
+
+    /// Create an independent Pages document with initial body text.
+    pub fn create_with_text(body_text: impl Into<String>) -> Result<Self> {
+        Self::builder().body_text(body_text).build()
+    }
+
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         Self::from_package(IWorkPackage::open(path)?)
     }

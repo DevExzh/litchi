@@ -29,10 +29,12 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
+mod creation;
 pub mod document;
 pub mod editor;
 pub mod section;
 
+pub use creation::PagesDocumentBuilder;
 pub use document::PagesDocument;
 pub use editor::{
     PagesDocumentOptions, PagesDrawableTextInfo, PagesEditor, PagesFootnoteFormat,

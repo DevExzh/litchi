@@ -28,7 +28,8 @@ pub struct IWorkDocumentIdentity {
 }
 
 impl IWorkDocumentIdentity {
-    fn generate() -> Self {
+    /// Generate three fresh, mutually distinct RFC 4122 version 4 UUIDs.
+    pub fn generate() -> Self {
         let document_uuid = generate_uuid_string();
         let version_uuid = generate_distinct_uuid(&[&document_uuid]);
         let private_uuid = generate_distinct_uuid(&[&document_uuid, &version_uuid]);

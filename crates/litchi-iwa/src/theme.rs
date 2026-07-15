@@ -58,6 +58,20 @@ pub struct IWorkThemeArchive {
 }
 
 impl IWorkThemeArchive {
+    /// Construct a new theme from strongly typed base and extension archives.
+    ///
+    /// Unlike [`Self::decode`], a newly constructed theme has no opaque fields
+    /// inherited from another package, making it suitable for documents built
+    /// entirely from scratch.
+    pub fn new(base: tss::ThemeArchive, extensions: IWorkThemeExtensions) -> Self {
+        Self {
+            base,
+            extensions,
+            opaque_base_fields: Vec::new(),
+            opaque_wrapper_fields: Vec::new(),
+        }
+    }
+
     /// Decode an application theme without losing proto2 extension fields.
     pub fn decode(data: &[u8]) -> Result<Self> {
         let wrapper_fields = parse_wire_fields(data)?;

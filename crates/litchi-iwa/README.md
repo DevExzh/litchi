@@ -29,6 +29,7 @@ println!("{}", structured.summary());
 ## Features
 
 - Parse Pages, Numbers, and Keynote bundles from a path or in-memory bytes
+- Build independent Pages packages from typed IWA objects with no bundled template
 - Snappy decompression and protobuf decoding of `.iwa` streams
 - Text extraction across all iWork applications
 - Structured-data extraction: tables (with CSV export), slides, sections
@@ -65,6 +66,21 @@ println!("{}", structured.summary());
   copy-on-write threads, annotation authors, dates, and UUIDs
 
 ## Semantic editing
+
+### Create Pages documents from scratch
+
+```rust
+use litchi_iwa::pages::PagesEditor;
+
+let mut pages = PagesEditor::builder()
+    .body_text("Created entirely by litchi-iwa")
+    .language("en")
+    .locale("en_US")
+    .build()?;
+pages.set_body_text("Created and then updated through the same typed API")?;
+pages.save("created.pages")?;
+# Ok::<(), litchi_iwa::Error>(())
+```
 
 ### Edit existing documents
 
