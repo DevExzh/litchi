@@ -197,9 +197,8 @@ impl Document {
         // Reconstruct both property bin tables from one shared piece-table parse.
         let piece_table = Self::parse_piece_table(&fib, &table_stream);
         let chp_bin_table = piece_table.as_ref().and_then(|piece_table| {
-            Self::table_slice(&fib, &table_stream, 12).and_then(|data| {
-                ChpBinTable::parse(data, &word_document, piece_table, stylesheet.as_ref())
-            })
+            Self::table_slice(&fib, &table_stream, 12)
+                .and_then(|data| ChpBinTable::parse(data, &word_document, piece_table))
         });
         let pap_bin_table = piece_table.as_ref().and_then(|piece_table| {
             Self::table_slice(&fib, &table_stream, 13).and_then(|data| {

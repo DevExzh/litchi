@@ -12,7 +12,6 @@ use super::chp::CharacterProperties;
 /// - [MS-DOC] 2.8.5 PlcfBteChpx
 use super::fkp::ChpxFkp;
 use super::piece_table::PieceTable;
-use super::styles::StyleSheet;
 use litchi_core::binary::read_u32_le;
 
 /// A character run with properties.
@@ -55,7 +54,6 @@ impl ChpBinTable {
         plcf_bte_chpx_data: &[u8],
         word_document: &[u8],
         piece_table: &PieceTable,
-        stylesheet: Option<&StyleSheet>,
     ) -> Option<Self> {
         // PlcfBteChpx structure:
         // - Array of FC positions (4 bytes each, n+1 entries)
@@ -125,7 +123,7 @@ impl ChpBinTable {
                             .map(|piece| piece.property_modifier())
                             .unwrap_or_default();
                         let (properties, direct_grpprl) =
-                            Self::parse_chpx(&entry.grpprl, piece_modifier, stylesheet);
+                            Self::parse_chpx(&entry.grpprl, piece_modifier);
                         all_runs.push(CharacterRun {
                             start_cp,
                             end_cp,
@@ -175,27 +173,16 @@ impl ChpBinTable {
     /// Delegates to CharacterProperties::from_sprm for consistent behavior
     /// with the full SPRM parser (handles is_spec, is_obj, is_data flags correctly).
     #[inline]
-    fn parse_chpx(
-        grpprl: &[u8],
-        piece_modifier: &[u8],
-        stylesheet: Option<&StyleSheet>,
-    ) -> (CharacterProperties, Vec<u8>) {
+    fn parse_chpx(grpprl: &[u8], piece_modifier: &[u8]) -> (CharacterProperties, Vec<u8>) {
         if grpprl.is_empty() && piece_modifier.is_empty() {
             return (CharacterProperties::default(), Vec::new());
         }
 
         let direct = [grpprl, piece_modifier].concat();
-        let direct_properties = CharacterProperties::from_sprm(&direct).unwrap_or_default();
-        let style_sprms = stylesheet
-            .zip(direct_properties.style_index)
-            .and_then(|(styles, index)| styles.resolve_character_style_sprms(index).ok())
-            .map(|(_, properties)| properties)
-            .unwrap_or_default();
-        let resolved_grpprl = [style_sprms.as_slice(), direct.as_slice()].concat();
 
         // Use the complete SPRM parser from CharacterProperties
         // This ensures all flags (is_spec, is_obj, is_data, etc.) are set correctly
-        let properties = CharacterProperties::from_sprm(&resolved_grpprl).unwrap_or_default();
+        let properties = CharacterProperties::from_sprm(&direct).unwrap_or_default();
         (properties, direct)
     }
 
