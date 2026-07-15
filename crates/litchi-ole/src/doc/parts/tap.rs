@@ -249,6 +249,33 @@ pub struct TableStyleDefaults {
     pub no_wrap: Option<bool>,
     pub horizontal_band_size: Option<u8>,
     pub vertical_band_size: Option<u8>,
+    pub border_top: Option<TableStyleBorder>,
+    pub border_bottom: Option<TableStyleBorder>,
+    pub border_left: Option<TableStyleBorder>,
+    pub border_right: Option<TableStyleBorder>,
+    pub border_inside_horizontal: Option<TableStyleBorder>,
+    pub border_inside_vertical: Option<TableStyleBorder>,
+    pub border_diagonal_down: Option<TableStyleBorder>,
+    pub border_diagonal_up: Option<TableStyleBorder>,
+    pub shading: Option<TableStyleShading>,
+}
+
+/// An explicitly specified border value in a DOC table style.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TableStyleBorder {
+    /// Explicitly clear the border.
+    NoBorder,
+    /// Apply this border style.
+    Border(BorderStyle),
+}
+
+/// An explicitly specified shading value in a DOC table style.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TableStyleShading {
+    /// `ShdAuto`: explicitly apply no shading.
+    NoShading,
+    /// Apply this shading descriptor.
+    Shading(CellShading),
 }
 
 /// Legacy Word table-cell shading.

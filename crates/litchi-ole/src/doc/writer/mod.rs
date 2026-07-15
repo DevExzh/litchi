@@ -62,8 +62,8 @@ pub mod numbering;
 pub use crate::doc::parts::tap::{
     CellBorderTypes, CellShading, CellSpacing, CellSpacingSource, ShadingPattern,
     TableHorizontalAnchor, TableHorizontalPosition, TableJustification, TableLook, TableLookFlags,
-    TablePositioning, TableStyleDefaults, TableVerticalAnchor, TableVerticalPosition, TableWidth,
-    WidthType,
+    TablePositioning, TableStyleBorder, TableStyleDefaults, TableStyleShading, TableVerticalAnchor,
+    TableVerticalPosition, TableWidth, WidthType,
 };
 pub use bookmarks::BookmarkEntry;
 pub use comments::CommentEntry;

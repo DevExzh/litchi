@@ -653,6 +653,8 @@ impl<'arena> TapParser<'arena> {
             0x7D => {
                 tap.style_defaults.no_wrap = Some(Self::parse_bool8(sprm, "sprmTCellNoWrapStyle")?);
             },
+            0x7F..=0x86 => self.parse_style_border(tap, sprm, operation)?,
+            0x87 => self.parse_style_shading(tap, sprm)?,
             0x88 => {
                 tap.style_defaults.horizontal_band_size =
                     Some(Self::parse_band_size(sprm, "sprmTCHorzBands")?);
@@ -1572,6 +1574,68 @@ impl<'arena> TapParser<'arena> {
         Ok(())
     }
 
+    fn parse_style_border(
+        &self,
+        tap: &mut TableProperties,
+        sprm: &Sprm,
+        operation: u16,
+    ) -> Result<()> {
+        use super::tap::TableStyleBorder;
+
+        let operand = sprm.operand_bytes();
+        if operand.len() != 8 || operand[4..] == [0xFF; 4] {
+            return Err(DocError::Corrupted(
+                "DOC table-style border must contain a non-nil 8-byte Brc".to_string(),
+            ));
+        }
+        let border = match Self::parse_full_border(operand)? {
+            Some(border) => TableStyleBorder::Border(border),
+            None => TableStyleBorder::NoBorder,
+        };
+        let target = match operation {
+            0x7F => &mut tap.style_defaults.border_top,
+            0x80 => &mut tap.style_defaults.border_bottom,
+            0x81 => &mut tap.style_defaults.border_left,
+            0x82 => &mut tap.style_defaults.border_right,
+            0x83 => &mut tap.style_defaults.border_inside_horizontal,
+            0x84 => &mut tap.style_defaults.border_inside_vertical,
+            0x85 => &mut tap.style_defaults.border_diagonal_down,
+            0x86 => &mut tap.style_defaults.border_diagonal_up,
+            _ => unreachable!(),
+        };
+        *target = Some(border);
+        Ok(())
+    }
+
+    fn parse_style_shading(&self, tap: &mut TableProperties, sprm: &Sprm) -> Result<()> {
+        use super::tap::TableStyleShading;
+
+        let operand = sprm.operand_bytes();
+        if operand.len() != 10 {
+            return Err(DocError::Corrupted(
+                "DOC table-style shading must contain a 10-byte Shd".to_string(),
+            ));
+        }
+        let is_nil = operand[..8].iter().all(|byte| *byte == 0xFF) && operand[8..] == [0, 0];
+        if is_nil {
+            return Ok(());
+        }
+        let is_auto = operand[..4] == [0, 0, 0, 0xFF]
+            && operand[4..8] == [0, 0, 0, 0xFF]
+            && operand[8..] == [0, 0];
+        if is_auto {
+            tap.style_defaults.shading = Some(TableStyleShading::NoShading);
+            return Ok(());
+        }
+        let mut cell = CellProperties::default();
+        Self::apply_full_shading(&mut cell, operand, false)?;
+        let shading = cell.shading.ok_or_else(|| {
+            DocError::Corrupted("DOC table-style shading did not contain a Shd value".to_string())
+        })?;
+        tap.style_defaults.shading = Some(TableStyleShading::Shading(shading));
+        Ok(())
+    }
+
     fn parse_cell_spacing(&self, tap: &mut TableProperties, sprm: &Sprm) -> Result<()> {
         let operand = sprm.operand_bytes();
         if operand.len() != 6 || operand[0] != 0 || operand[1] != 1 || operand[2] != 0x0F {
@@ -1834,6 +1898,7 @@ impl<'arena> TapParser<'arena> {
 #[cfg(test)]
 mod tests {
     use super::super::tap::TableStyleDefaults;
+    use super::super::tap::{TableStyleBorder, TableStyleShading};
     use super::*;
 
     fn table_definition_grpprl(operand: &[u8]) -> Vec<u8> {
@@ -2578,6 +2643,7 @@ mod tests {
                 no_wrap: Some(false),
                 horizontal_band_size: Some(2),
                 vertical_band_size: Some(3),
+                ..TableStyleDefaults::default()
             }
         );
     }
@@ -2605,6 +2671,99 @@ mod tests {
         assert!(parse_fixed(0x347D, &[2]).is_err());
         assert!(parse_fixed(0x3488, &[0]).is_err());
         assert!(parse_fixed(0x3489, &[4]).is_err());
+    }
+
+    #[test]
+    fn parses_visual_table_style_defaults() {
+        let arena = Bump::new();
+        let parser = TapParser::new(&arena);
+        let mut grpprl = Vec::new();
+        append_variable_sprm(&mut grpprl, 0xD47F, &[0; 8]);
+        for (opcode, border_type) in [
+            (0xD680, 1),
+            (0xD681, 3),
+            (0xD682, 6),
+            (0xD683, 7),
+            (0xD684, 8),
+            (0xD685, 0x1A),
+            (0xD686, 0x1B),
+        ] {
+            append_variable_sprm(
+                &mut grpprl,
+                opcode,
+                &full_border([1, 2, 3, 0], 8, border_type, 0),
+            );
+        }
+        let shading = CellShading {
+            foreground_color: Some((4, 5, 6)),
+            background_color: Some((7, 8, 9)),
+            pattern: ShadingPattern::DarkCross,
+        };
+        append_variable_sprm(
+            &mut grpprl,
+            0xD687,
+            &full_shading([4, 5, 6, 0], [7, 8, 9, 0], shading.pattern as u16),
+        );
+        // ShdNil is ignored inside a table style and does not clear the prior value.
+        append_variable_sprm(&mut grpprl, 0xD687, &full_shading([0xFF; 4], [0xFF; 4], 0));
+
+        let tap = parser.parse_tap(&grpprl).unwrap();
+        assert_eq!(
+            tap.style_defaults.border_top,
+            Some(TableStyleBorder::NoBorder)
+        );
+        assert!(matches!(
+            tap.style_defaults.border_bottom,
+            Some(TableStyleBorder::Border(BorderStyle {
+                border_type: BorderType::Single,
+                ..
+            }))
+        ));
+        assert!(matches!(
+            tap.style_defaults.border_diagonal_down,
+            Some(TableStyleBorder::Border(BorderStyle {
+                border_type: BorderType::Outset,
+                ..
+            }))
+        ));
+        assert!(matches!(
+            tap.style_defaults.border_diagonal_up,
+            Some(TableStyleBorder::Border(BorderStyle {
+                border_type: BorderType::Inset,
+                ..
+            }))
+        ));
+        assert_eq!(
+            tap.style_defaults.shading,
+            Some(TableStyleShading::Shading(shading))
+        );
+
+        let mut auto = Vec::new();
+        append_variable_sprm(
+            &mut auto,
+            0xD687,
+            &full_shading([0, 0, 0, 0xFF], [0, 0, 0, 0xFF], 0),
+        );
+        assert_eq!(
+            parser.parse_tap(&auto).unwrap().style_defaults.shading,
+            Some(TableStyleShading::NoShading)
+        );
+    }
+
+    #[test]
+    fn rejects_malformed_visual_table_style_defaults() {
+        let arena = Bump::new();
+        let parser = TapParser::new(&arena);
+        let parse_with = |opcode, operand: &[u8]| {
+            let mut grpprl = Vec::new();
+            append_variable_sprm(&mut grpprl, opcode, operand);
+            parser.parse_tap(&grpprl)
+        };
+        assert!(parse_with(0xD47F, &[0; 7]).is_err());
+        assert!(parse_with(0xD47F, &[0, 0, 0, 0, 0xFF, 0xFF, 0xFF, 0xFF]).is_err());
+        assert!(parse_with(0xD47F, &full_border([0; 4], 8, 2, 0)).is_err());
+        assert!(parse_with(0xD687, &[0; 9]).is_err());
+        assert!(parse_with(0xD687, &full_shading([0; 4], [0; 4], 99)).is_err());
     }
 
     #[test]

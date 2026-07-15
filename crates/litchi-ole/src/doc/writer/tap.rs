@@ -8,8 +8,9 @@ use super::sprm::SprmBuilder;
 use crate::doc::parts::tap::{
     BorderStyle, BorderType, CellBorderTypes, CellBorders, CellShading, CellSpacing,
     CellSpacingSource, TableHorizontalAnchor, TableHorizontalPosition, TableJustification,
-    TableLook, TablePositioning, TableStyleDefaults, TableVerticalAnchor, TableVerticalPosition,
-    TableWidth, TextDirection, VerticalAlignment, VerticalMergeStatus, WidthType,
+    TableLook, TablePositioning, TableStyleBorder, TableStyleDefaults, TableStyleShading,
+    TableVerticalAnchor, TableVerticalPosition, TableWidth, TextDirection, VerticalAlignment,
+    VerticalMergeStatus, WidthType,
 };
 
 /// Error returned when table row properties cannot be represented in DOC TAP.
@@ -448,6 +449,40 @@ pub fn generate_table_style_sprms(defaults: &TableStyleDefaults) -> Result<Vec<u
     if let Some(no_wrap) = defaults.no_wrap {
         sprms.extend_from_slice(&0x347Du16.to_le_bytes());
         sprms.push(u8::from(no_wrap));
+    }
+    for (opcode, border) in [
+        (0xD47Fu16, defaults.border_top),
+        (0xD680, defaults.border_bottom),
+        (0xD681, defaults.border_left),
+        (0xD682, defaults.border_right),
+        (0xD683, defaults.border_inside_horizontal),
+        (0xD684, defaults.border_inside_vertical),
+        (0xD685, defaults.border_diagonal_down),
+        (0xD686, defaults.border_diagonal_up),
+    ] {
+        let Some(border) = border else {
+            continue;
+        };
+        sprms.extend_from_slice(&opcode.to_le_bytes());
+        sprms.push(8);
+        append_full_border(
+            &mut sprms,
+            match border {
+                TableStyleBorder::NoBorder => None,
+                TableStyleBorder::Border(border) => Some(border),
+            },
+            false,
+        )?;
+    }
+    if let Some(shading) = defaults.shading {
+        sprms.extend_from_slice(&0xD687u16.to_le_bytes());
+        sprms.push(10);
+        match shading {
+            TableStyleShading::NoShading => append_shading(&mut sprms, None, true),
+            TableStyleShading::Shading(shading) => {
+                append_shading(&mut sprms, Some(shading), false);
+            },
+        }
     }
     if let Some(size) = defaults.horizontal_band_size {
         sprms.extend_from_slice(&0x3488u16.to_le_bytes());
@@ -1394,6 +1429,7 @@ mod tests {
             no_wrap: Some(false),
             horizontal_band_size: Some(2),
             vertical_band_size: Some(3),
+            ..TableStyleDefaults::default()
         };
         let sprms = generate_table_style_sprms(&defaults).unwrap();
         let parsed_sprms = crate::sprm::parse_sprms(&sprms);
@@ -1431,6 +1467,59 @@ mod tests {
                 ..TableStyleDefaults::default()
             }),
             Err(TapBuildError::InvalidStyleBandSize("vertical", 4))
+        );
+    }
+
+    #[test]
+    fn round_trips_visual_table_style_defaults() {
+        let border = BorderStyle {
+            width: 8,
+            color: Some((1, 2, 3)),
+            border_type: BorderType::Outset,
+            spacing: 2,
+            shadow: true,
+            frame: false,
+        };
+        let shading = CellShading {
+            foreground_color: Some((4, 5, 6)),
+            background_color: Some((7, 8, 9)),
+            pattern: ShadingPattern::DarkCross,
+        };
+        let defaults = TableStyleDefaults {
+            border_top: Some(TableStyleBorder::NoBorder),
+            border_inside_vertical: Some(TableStyleBorder::Border(border)),
+            shading: Some(TableStyleShading::Shading(shading)),
+            ..TableStyleDefaults::default()
+        };
+        let sprms = generate_table_style_sprms(&defaults).unwrap();
+        let tap = crate::doc::parts::tap::TableProperties::from_sprm(&sprms).unwrap();
+        assert_eq!(tap.style_defaults, defaults);
+
+        let clear = TableStyleDefaults {
+            shading: Some(TableStyleShading::NoShading),
+            ..TableStyleDefaults::default()
+        };
+        let sprms = generate_table_style_sprms(&clear).unwrap();
+        let tap = crate::doc::parts::tap::TableProperties::from_sprm(&sprms).unwrap();
+        assert_eq!(tap.style_defaults, clear);
+    }
+
+    #[test]
+    fn rejects_invalid_visual_table_style_defaults() {
+        let defaults = TableStyleDefaults {
+            border_top: Some(TableStyleBorder::Border(BorderStyle {
+                width: 8,
+                color: None,
+                border_type: BorderType::Single,
+                spacing: 32,
+                shadow: false,
+                frame: false,
+            })),
+            ..TableStyleDefaults::default()
+        };
+        assert_eq!(
+            generate_table_style_sprms(&defaults),
+            Err(TapBuildError::InvalidBorderSpacing(32))
         );
     }
 
