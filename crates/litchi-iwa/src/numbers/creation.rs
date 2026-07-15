@@ -2,7 +2,7 @@
 
 use crate::archive::{Archive, ArchiveObject, RawMessage};
 use crate::identity::IWorkDocumentIdentity;
-use crate::protobuf::{tn, tsa, tsce, tsch, tsd, tsk, tsp, tss, tst, tswp};
+use crate::protobuf::{tn, tsa, tsce, tsd, tsk, tsp, tss, tst, tswp};
 use crate::{IWorkPackage, IWorkThemeArchive, IWorkThemeExtensions, Result};
 use plist::Value;
 use prost::Message;
@@ -26,7 +26,9 @@ const MAX_TABLE_UIDS: usize = 1_100_000;
 
 const DOCUMENT: u64 = 1;
 const METADATA: u64 = 2;
-const STYLESHEET: u64 = 3;
+// Numbers reserves identifier 3 for its lazily-created TSCKDocumentSupport root.
+// Keeping generated objects above that slot allows an opened document to save.
+const STYLESHEET: u64 = 40;
 const THEME: u64 = 4;
 const SIDEBAR_ROOT: u64 = 5;
 const SIDEBAR_SHEET: u64 = 6;
@@ -44,7 +46,6 @@ const SHEET_STYLE: u64 = 17;
 const TABLE_STYLE: u64 = 18;
 const CELL_STYLE: u64 = 19;
 const TABLE_PRESET: u64 = 20;
-const CHART_PRESET: u64 = 21;
 const TILE: u64 = 22;
 const ROW_HEADERS: u64 = 23;
 const COLUMN_HEADERS: u64 = 24;
@@ -62,6 +63,10 @@ const ANNOTATION_AUTHOR_STORAGE: u64 = 35;
 const VIEW_STATE: u64 = 36;
 const UI_STATE: u64 = 37;
 const DOCUMENT_METADATA: u64 = 38;
+const FORMULA_OWNER: u64 = 39;
+
+const TABLE_FORMULA_OWNER_INTERNAL_ID: u32 = 6;
+const TABLE_FORMULA_OWNER_KIND: u32 = 1;
 
 #[derive(Debug, Clone, Copy)]
 #[repr(u32)]
@@ -80,7 +85,7 @@ enum NumbersMessageType {
     ShapeStyle = 2_025,
     MediaStyle = 3_016,
     CalculationEngine = 4_000,
-    ChartPreset = 5_020,
+    FormulaOwnerDependencies = 4_008,
     TableInfo = 6_000,
     TableModel = 6_001,
     Tile = 6_002,
@@ -91,6 +96,7 @@ enum NumbersMessageType {
     TablePreset = 6_008,
     TableAuxiliary = 6_200,
     TableStyleNetwork = 6_247,
+    StrokeSidecar = 6_305,
     DropCapStyle = 10_024,
     PackageMetadata = 11_006,
     DocumentMetadata = 11_011,
@@ -127,7 +133,6 @@ const DOCUMENT_OBJECTS: &[u64] = &[
     TABLE_INFO,
     TABLE_MODEL,
     TABLE_PRESET,
-    CHART_PRESET,
     TILE,
     ROW_HEADERS,
     COLUMN_HEADERS,
@@ -211,11 +216,15 @@ impl NumbersDocumentBuilder {
     pub fn build_package(self) -> Result<IWorkPackage> {
         self.validate()?;
         let identity = IWorkDocumentIdentity::generate();
+        let table_uuid = fresh_tsp_uuid();
         let mut package = IWorkPackage::new();
-        package.replace_archive(DOCUMENT_ARCHIVE_ENTRY, &document_archive(&self)?)?;
+        package.replace_archive(
+            DOCUMENT_ARCHIVE_ENTRY,
+            &document_archive(&self, &table_uuid)?,
+        )?;
         package.replace_archive(
             CALCULATION_ARCHIVE_ENTRY,
-            &calculation_archive(&self.locale)?,
+            &calculation_archive(&self.locale, &table_uuid)?,
         )?;
         package.replace_archive(STYLESHEET_ARCHIVE_ENTRY, &stylesheet_archive()?)?;
         package.replace_archive(VIEW_STATE_ARCHIVE_ENTRY, &view_state_archive()?)?;
@@ -277,7 +286,7 @@ impl NumbersEditor {
     }
 }
 
-fn document_archive(builder: &NumbersDocumentBuilder) -> Result<Archive> {
+fn document_archive(builder: &NumbersDocumentBuilder, table_uuid: &tsp::Uuid) -> Result<Archive> {
     let document = tn::DocumentArchive {
         sheets: vec![reference(SHEET)],
         super_: tsa::DocumentArchive {
@@ -342,9 +351,7 @@ fn document_archive(builder: &NumbersDocumentBuilder) -> Result<Archive> {
                 dropcap_style_presets: repeated_reference(6, DROP_CAP_STYLE),
                 ..Default::default()
             }),
-            chart: Some(tsch::ChartPresetsArchive {
-                chart_presets: repeated_reference(6, CHART_PRESET),
-            }),
+            chart: None,
             table: Some(tst::ThemePresetsArchive {
                 table_style_presets: repeated_reference(6, TABLE_PRESET),
                 ..Default::default()
@@ -384,7 +391,7 @@ fn document_archive(builder: &NumbersDocumentBuilder) -> Result<Archive> {
         ..Default::default()
     };
     let model = tst::TableModelArchive {
-        table_id: fresh_uuid(),
+        table_id: format_tsp_uuid(table_uuid),
         table_style: reference(TABLE_STYLE),
         body_text_style: reference(PARAGRAPH_STYLE),
         header_row_text_style: reference(PARAGRAPH_STYLE),
@@ -471,7 +478,6 @@ fn document_archive(builder: &NumbersDocumentBuilder) -> Result<Archive> {
                 MEDIA_STYLE,
                 DROP_CAP_STYLE,
                 TABLE_PRESET,
-                CHART_PRESET,
             ],
         )?,
         object(
@@ -571,12 +577,6 @@ fn document_archive(builder: &NumbersDocumentBuilder) -> Result<Archive> {
             &[TABLE_STYLE_NETWORK],
         )?,
         object(
-            CHART_PRESET,
-            NumbersMessageType::ChartPreset,
-            tsch::ChartStylePreset::default(),
-            &[],
-        )?,
-        object(
             TILE,
             NumbersMessageType::Tile,
             tst::Tile {
@@ -635,7 +635,7 @@ fn document_archive(builder: &NumbersDocumentBuilder) -> Result<Archive> {
         )?,
         object(
             STROKE_SIDECAR,
-            NumbersMessageType::TableAuxiliary,
+            NumbersMessageType::StrokeSidecar,
             tst::StrokeSidecarArchive {
                 row_count: Some(rows),
                 column_count: Some(columns),
@@ -741,21 +741,65 @@ fn document_metadata_archive() -> Result<Archive> {
     })
 }
 
-fn calculation_archive(locale: &str) -> Result<Archive> {
+fn calculation_archive(locale: &str, table_uuid: &tsp::Uuid) -> Result<Archive> {
+    let formula_owner_uuid = formula_owner_uuid_for_table(table_uuid);
+    let formula_owner = tsce::FormulaOwnerDependenciesArchive {
+        formula_owner_uid: formula_owner_uuid,
+        internal_formula_owner_id: TABLE_FORMULA_OWNER_INTERNAL_ID,
+        owner_kind: Some(TABLE_FORMULA_OWNER_KIND),
+        cell_dependencies: Some(tsce::CellDependenciesExpandedArchive::default()),
+        range_dependencies: Some(tsce::RangeDependenciesArchive::default()),
+        volatile_dependencies: Some(tsce::VolatileDependenciesExpandedArchive {
+            volatile_time_cells: Some(tsce::CellCoordSetArchive::default()),
+            volatile_random_cells: Some(tsce::CellCoordSetArchive::default()),
+            volatile_locale_cells: Some(tsce::CellCoordSetArchive::default()),
+            volatile_sheet_table_name_cells: Some(tsce::CellCoordSetArchive::default()),
+            volatile_remote_data_cells: Some(tsce::CellCoordSetArchive::default()),
+            volatile_geometry_cell_refs: Some(tsce::InternalCellRefSetArchive::default()),
+        }),
+        spanning_column_dependencies: Some(tsce::SpanningDependenciesExpandedArchive::default()),
+        spanning_row_dependencies: Some(tsce::SpanningDependenciesExpandedArchive::default()),
+        whole_owner_dependencies: Some(tsce::WholeOwnerDependenciesExpandedArchive {
+            dependent_cells: Some(tsce::InternalCellRefSetArchive::default()),
+        }),
+        cell_errors: Some(tsce::CellErrorsArchive::default()),
+        formula_owner: Some(reference(TABLE_INFO)),
+        tiled_cell_dependencies: Some(tsce::CellDependenciesTiledArchive::default()),
+        uuid_references: Some(tsce::UuidReferencesArchive::default()),
+        tiled_range_dependencies: Some(tsce::RangeDependenciesTiledArchive::default()),
+        spill_range_sizes: Some(tsce::CellSpillSizesArchive::default()),
+        ..Default::default()
+    };
     Ok(Archive {
-        objects: vec![object(
-            CALCULATION_ENGINE,
-            NumbersMessageType::CalculationEngine,
-            tsce::CalculationEngineArchive {
-                dependency_tracker: tsce::DependencyTrackerArchive {
-                    number_of_formulas: Some(0),
+        objects: vec![
+            object(
+                CALCULATION_ENGINE,
+                NumbersMessageType::CalculationEngine,
+                tsce::CalculationEngineArchive {
+                    dependency_tracker: tsce::DependencyTrackerArchive {
+                        owner_id_map: Some(tsce::OwnerIdMapArchive {
+                            map_entry: vec![tsce::owner_id_map_archive::OwnerIdMapArchiveEntry {
+                                internal_owner_id: TABLE_FORMULA_OWNER_INTERNAL_ID,
+                                owner_id: uuid_as_cfuuid(&formula_owner_uuid),
+                            }],
+                            ..Default::default()
+                        }),
+                        number_of_formulas: Some(0),
+                        formula_owner_dependencies: vec![reference(FORMULA_OWNER)],
+                        ..Default::default()
+                    },
+                    saved_locale_identifier: Some(locale.to_owned()),
                     ..Default::default()
                 },
-                saved_locale_identifier: Some(locale.to_owned()),
-                ..Default::default()
-            },
-            &[],
-        )?],
+                &[FORMULA_OWNER],
+            )?,
+            object(
+                FORMULA_OWNER,
+                NumbersMessageType::FormulaOwnerDependencies,
+                formula_owner,
+                &[],
+            )?,
+        ],
     })
 }
 
@@ -917,7 +961,15 @@ fn metadata_archive(identity: &IWorkDocumentIdentity) -> Result<Archive> {
             is_weak: None,
         });
     let mut calculation = component(CALCULATION_ENGINE, "CalculationEngine", &[3, 2, 10]);
-    calculation.object_uuid_map_entries = vec![object_uuid(CALCULATION_ENGINE)];
+    calculation.object_uuid_map_entries = [CALCULATION_ENGINE, FORMULA_OWNER]
+        .into_iter()
+        .map(object_uuid)
+        .collect();
+    calculation.external_references = vec![tsp::ComponentExternalReference {
+        component_identifier: DOCUMENT,
+        object_identifier: Some(TABLE_INFO),
+        is_weak: None,
+    }];
     let view_state = component(VIEW_STATE, "ViewState", &[2, 0, 0]);
     let annotation = component(
         ANNOTATION_AUTHOR_STORAGE,
@@ -938,7 +990,7 @@ fn metadata_archive(identity: &IWorkDocumentIdentity) -> Result<Archive> {
         },
     ]);
     let metadata = tsp::PackageMetadata {
-        last_object_identifier: DOCUMENT_METADATA,
+        last_object_identifier: STYLESHEET,
         revision: Some(tsp::DocumentRevision {
             sequence_32: Some(0),
             identifier: Some(identity.version_uuid().to_owned()),
@@ -1104,9 +1156,32 @@ fn object_uuid(identifier: u64) -> tsp::ObjectUuidMapEntry {
     }
 }
 
-fn fresh_uuid() -> String {
-    let braced = litchi_core::id::generate_guid_braced();
-    braced.trim_matches(['{', '}']).to_owned()
+fn format_tsp_uuid(uuid: &tsp::Uuid) -> String {
+    format!(
+        "{:08X}-{:04X}-{:04X}-{:04X}-{:012X}",
+        uuid.upper >> 32,
+        (uuid.upper >> 16) & 0xffff,
+        uuid.upper & 0xffff,
+        uuid.lower >> 48,
+        uuid.lower & 0xffff_ffff_ffff,
+    )
+}
+
+fn formula_owner_uuid_for_table(table: &tsp::Uuid) -> tsp::Uuid {
+    tsp::Uuid {
+        lower: table.upper.swap_bytes(),
+        upper: table.lower.swap_bytes(),
+    }
+}
+
+fn uuid_as_cfuuid(uuid: &tsp::Uuid) -> tsp::CfuuidArchive {
+    tsp::CfuuidArchive {
+        uuid_bytes: None,
+        uuid_w0: Some(uuid.lower as u32),
+        uuid_w1: Some((uuid.lower >> 32) as u32),
+        uuid_w2: Some(uuid.upper as u32),
+        uuid_w3: Some((uuid.upper >> 32) as u32),
+    }
 }
 
 fn object(
@@ -1187,7 +1262,9 @@ fn solid_fill() -> tsd::FillArchive {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::numbers::{CellValue, NumbersDocument};
+    use crate::numbers::{
+        CellValue, FormulaBinaryOperator, FormulaCellReference, FormulaExpression, NumbersDocument,
+    };
 
     #[test]
     fn creates_and_reopens_independent_spreadsheet() {
@@ -1211,6 +1288,7 @@ mod tests {
 
     #[test]
     fn generated_package_contains_only_synthetic_required_entries() {
+        const DOCUMENT_SUPPORT_RESERVED_IDENTIFIER: u64 = 3;
         const EXPECTED_ENTRIES: [&str; 10] = [
             DOCUMENT_ARCHIVE_ENTRY,
             CALCULATION_ARCHIVE_ENTRY,
@@ -1230,6 +1308,14 @@ mod tests {
         assert_eq!(first.len(), EXPECTED_ENTRIES.len());
         assert!(first.entry_names().all(|name| !name.starts_with("Data/")));
         assert!(first.entry_names().all(|name| !name.starts_with("preview")));
+        assert!(
+            first
+                .archive(STYLESHEET_ARCHIVE_ENTRY)
+                .unwrap()
+                .object(DOCUMENT_SUPPORT_RESERVED_IDENTIFIER)
+                .is_none(),
+            "object identifier 3 must remain available for Numbers document support"
+        );
         assert_ne!(
             first.entry("Metadata/DocumentIdentifier"),
             second.entry("Metadata/DocumentIdentifier")
@@ -1261,6 +1347,40 @@ mod tests {
         );
         assert_eq!(table.get_cell(2, 2), Some(&CellValue::Number(42.5)));
         assert!(table.get_cell(3, 3).is_none_or(CellValue::is_empty));
+    }
+
+    #[test]
+    fn generated_table_supports_formula_crud() {
+        let mut editor = NumbersEditor::create().unwrap();
+        let table_id = editor.tables().unwrap()[0].object_id;
+        editor
+            .set_cell(table_id, 0, 0, CellValue::Number(40.0))
+            .unwrap();
+        editor
+            .set_cell(table_id, 0, 1, CellValue::Number(2.0))
+            .unwrap();
+        let baseline = editor.to_bytes().unwrap();
+
+        editor
+            .set_formula(
+                table_id,
+                0,
+                2,
+                FormulaExpression::binary(
+                    FormulaBinaryOperator::Divide,
+                    FormulaExpression::cell(FormulaCellReference::relative(0, 0)),
+                    FormulaExpression::cell(FormulaCellReference::relative(0, 1)),
+                ),
+            )
+            .unwrap();
+        let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            document.sheets().unwrap()[0].tables[0].get_cell(0, 2),
+            Some(&CellValue::Formula("=(A1/B1)".to_owned()))
+        );
+
+        editor.clear_cell(table_id, 0, 2).unwrap();
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
     }
 
     #[test]
