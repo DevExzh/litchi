@@ -231,6 +231,27 @@ pub struct CellProperties {
     pub padding_left: Option<i16>,
     pub padding_bottom: Option<i16>,
     pub padding_right: Option<i16>,
+    /// Direct-format provenance used when table-style defaults are resolved.
+    #[doc(hidden)]
+    pub direct_style: CellDirectStyle,
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct CellDirectStyle {
+    pub vertical_alignment: bool,
+    pub no_wrap: bool,
+    pub shading: bool,
+    pub border_top: bool,
+    pub border_left: bool,
+    pub border_bottom: bool,
+    pub border_right: bool,
+    pub border_diagonal_down: bool,
+    pub border_diagonal_up: bool,
+    pub padding_top: bool,
+    pub padding_left: bool,
+    pub padding_bottom: bool,
+    pub padding_right: bool,
 }
 
 /// Per-side border type overrides from `sprmTCellBrcType`.
@@ -334,6 +355,91 @@ impl TableStyleCondition {
             Self::BottomLeftCell => 0x0800,
         }
     }
+}
+
+pub(crate) fn matching_table_style_conditions(
+    rows: &[&TableProperties],
+    row_position: usize,
+    cell_index: usize,
+) -> Vec<TableStyleCondition> {
+    let Some(row) = rows.get(row_position).copied() else {
+        return Vec::new();
+    };
+    let Some(table_look) = row.table_look else {
+        return Vec::new();
+    };
+    let cell_count = row.cell_count;
+    if cell_count == 0 || cell_index >= cell_count {
+        return Vec::new();
+    }
+    let flags = table_look.flags;
+    let last_row = row_position + 1 == rows.len();
+    let header_row = row_position == 0 || row.is_header_row;
+    let matches_header = flags.contains(TableLookFlags::HEADER_ROW) && header_row;
+    let matches_footer = flags.contains(TableLookFlags::LAST_ROW) && last_row && !matches_header;
+
+    let logical_index = if row.right_to_left {
+        cell_count - 1 - cell_index
+    } else {
+        cell_index
+    };
+    let matches_left = flags.contains(TableLookFlags::HEADER_COLUMN) && logical_index == 0;
+    let matches_right = flags.contains(TableLookFlags::LAST_COLUMN)
+        && logical_index + 1 == cell_count
+        && !matches_left;
+
+    let mut conditions = Vec::with_capacity(5);
+    if !matches_header && !matches_footer && !flags.contains(TableLookFlags::NO_ROW_BANDING) {
+        if let Some(size) = row.style_defaults.horizontal_band_size {
+            let preceding = rows[..row_position]
+                .iter()
+                .enumerate()
+                .filter(|(index, row)| {
+                    !flags.contains(TableLookFlags::HEADER_ROW)
+                        || !(*index == 0 || row.is_header_row)
+                })
+                .count();
+            conditions.push(if (preceding / usize::from(size)) % 2 == 0 {
+                TableStyleCondition::OddRowBand
+            } else {
+                TableStyleCondition::EvenRowBand
+            });
+        }
+    }
+    if !matches_left && !matches_right && !flags.contains(TableLookFlags::NO_COLUMN_BANDING) {
+        if let Some(size) = row.style_defaults.vertical_band_size {
+            let preceding = if flags.contains(TableLookFlags::HEADER_COLUMN) && logical_index > 0 {
+                logical_index - 1
+            } else {
+                logical_index
+            };
+            conditions.push(if (preceding / usize::from(size)) % 2 == 0 {
+                TableStyleCondition::OddColumnBand
+            } else {
+                TableStyleCondition::EvenColumnBand
+            });
+        }
+    }
+    if matches_left {
+        conditions.push(TableStyleCondition::FirstColumn);
+    } else if matches_right {
+        conditions.push(TableStyleCondition::LastColumn);
+    }
+    if matches_header {
+        conditions.push(TableStyleCondition::HeaderRow);
+    } else if matches_footer {
+        conditions.push(TableStyleCondition::FooterRow);
+    }
+    if matches_header && matches_left {
+        conditions.push(TableStyleCondition::TopLeftCell);
+    } else if matches_header && matches_right {
+        conditions.push(TableStyleCondition::TopRightCell);
+    } else if matches_footer && matches_left {
+        conditions.push(TableStyleCondition::BottomLeftCell);
+    } else if matches_footer && matches_right {
+        conditions.push(TableStyleCondition::BottomRightCell);
+    }
+    conditions
 }
 
 /// Conditional table formatting carried by `sprmTCnf`.
@@ -751,5 +857,47 @@ mod tests {
         assert_eq!(tap.cell_boundaries.len(), 3);
         assert_eq!(tap.get_cell_width(0), Some(100));
         assert_eq!(tap.get_cell_width(1), Some(100));
+    }
+
+    #[test]
+    fn matches_bands_and_logical_columns_for_rtl_tables() {
+        let row = || TableProperties {
+            cell_count: 5,
+            right_to_left: true,
+            table_look: Some(TableLook {
+                autoformat_index: -1,
+                flags: TableLookFlags::HEADER_ROW | TableLookFlags::HEADER_COLUMN,
+            }),
+            style_defaults: TableStyleDefaults {
+                horizontal_band_size: Some(2),
+                vertical_band_size: Some(2),
+                ..TableStyleDefaults::default()
+            },
+            ..TableProperties::default()
+        };
+        let rows = [row(), row(), row(), row()];
+        let rows = rows.iter().collect::<Vec<_>>();
+
+        assert_eq!(
+            matching_table_style_conditions(&rows, 1, 3),
+            [
+                TableStyleCondition::OddRowBand,
+                TableStyleCondition::OddColumnBand,
+            ]
+        );
+        assert_eq!(
+            matching_table_style_conditions(&rows, 3, 1),
+            [
+                TableStyleCondition::EvenRowBand,
+                TableStyleCondition::EvenColumnBand,
+            ]
+        );
+        assert_eq!(
+            matching_table_style_conditions(&rows, 1, 4),
+            [
+                TableStyleCondition::OddRowBand,
+                TableStyleCondition::FirstColumn,
+            ]
+        );
     }
 }

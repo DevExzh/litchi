@@ -955,9 +955,11 @@ impl<'arena> TapParser<'arena> {
                 )));
             },
         };
+        props.direct_style.vertical_alignment = true;
 
         props.fit_text = flags & 0x1000 != 0;
         props.no_wrap = flags & 0x2000 != 0;
+        props.direct_style.no_wrap = true;
         props.hide_mark = flags & 0x4000 != 0;
 
         // Read preferred width (bytes 2-3)
@@ -994,6 +996,10 @@ impl<'arena> TapParser<'arena> {
         props.borders.left = Self::parse_border_code(data, offset + 8)?;
         props.borders.bottom = Self::parse_border_code(data, offset + 12)?;
         props.borders.right = Self::parse_border_code(data, offset + 16)?;
+        props.direct_style.border_top = data[offset + 4..offset + 8] != [0xFF; 4];
+        props.direct_style.border_left = data[offset + 8..offset + 12] != [0xFF; 4];
+        props.direct_style.border_bottom = data[offset + 12..offset + 16] != [0xFF; 4];
+        props.direct_style.border_right = data[offset + 16..offset + 20] != [0xFF; 4];
 
         Ok(props)
     }
@@ -1163,13 +1169,17 @@ impl<'arena> TapParser<'arena> {
             ));
         }
         for (cell, colorref) in tap.cell_properties.iter_mut().zip(operand.chunks_exact(4)) {
-            let border = match operation {
-                0x1A => &mut cell.borders.top,
-                0x1B => &mut cell.borders.left,
-                0x1C => &mut cell.borders.bottom,
-                0x1D => &mut cell.borders.right,
+            let (border, direct) = match operation {
+                0x1A => (&mut cell.borders.top, &mut cell.direct_style.border_top),
+                0x1B => (&mut cell.borders.left, &mut cell.direct_style.border_left),
+                0x1C => (
+                    &mut cell.borders.bottom,
+                    &mut cell.direct_style.border_bottom,
+                ),
+                0x1D => (&mut cell.borders.right, &mut cell.direct_style.border_right),
                 _ => unreachable!(),
             };
+            *direct = true;
             if colorref == [0xFF; 4] {
                 *border = None;
             } else {
@@ -1218,21 +1228,27 @@ impl<'arena> TapParser<'arena> {
         for cell in &mut tap.cell_properties[first..limit] {
             if sides & 0x01 != 0 {
                 cell.borders.top = border;
+                cell.direct_style.border_top = true;
             }
             if sides & 0x02 != 0 {
                 cell.borders.left = border;
+                cell.direct_style.border_left = true;
             }
             if sides & 0x04 != 0 {
                 cell.borders.bottom = border;
+                cell.direct_style.border_bottom = true;
             }
             if sides & 0x08 != 0 {
                 cell.borders.right = border;
+                cell.direct_style.border_right = true;
             }
             if sides & 0x10 != 0 {
                 cell.borders.diagonal_down = border;
+                cell.direct_style.border_diagonal_down = true;
             }
             if sides & 0x20 != 0 {
                 cell.borders.diagonal_up = border;
+                cell.direct_style.border_diagonal_up = true;
             }
         }
         Ok(())
@@ -1322,6 +1338,7 @@ impl<'arena> TapParser<'arena> {
         };
         for cell in &mut tap.cell_properties[range] {
             cell.vertical_alignment = alignment;
+            cell.direct_style.vertical_alignment = true;
         }
         Ok(())
     }
@@ -1378,7 +1395,10 @@ impl<'arena> TapParser<'arena> {
         for cell in &mut tap.cell_properties[range] {
             match property {
                 CellBoolProperty::FitText => cell.fit_text = value,
-                CellBoolProperty::NoWrap => cell.no_wrap = value,
+                CellBoolProperty::NoWrap => {
+                    cell.no_wrap = value;
+                    cell.direct_style.no_wrap = true;
+                },
                 CellBoolProperty::HideMark => cell.hide_mark = value,
             }
         }
@@ -1606,15 +1626,19 @@ impl<'arena> TapParser<'arena> {
             // Apply padding based on grfbrc flags
             if (grf_brc & 0x01) != 0 {
                 cell.padding_top = padding;
+                cell.direct_style.padding_top = true;
             }
             if (grf_brc & 0x02) != 0 {
                 cell.padding_left = padding;
+                cell.direct_style.padding_left = true;
             }
             if (grf_brc & 0x04) != 0 {
                 cell.padding_bottom = padding;
+                cell.direct_style.padding_bottom = true;
             }
             if (grf_brc & 0x08) != 0 {
                 cell.padding_right = padding;
+                cell.direct_style.padding_right = true;
             }
         }
 
@@ -1853,6 +1877,7 @@ impl<'arena> TapParser<'arena> {
                 tap.cell_properties[i].shading = None;
                 tap.cell_properties[i].shading_inherits_from_style = false;
                 tap.cell_properties[i].background_color = None;
+                tap.cell_properties[i].direct_style.shading = true;
                 continue;
             }
             let ico_fore = (shd & 0x1F) as u8;
@@ -1874,6 +1899,7 @@ impl<'arena> TapParser<'arena> {
             tap.cell_properties[i].background_color = shading.background_color;
             tap.cell_properties[i].shading = Some(shading);
             tap.cell_properties[i].shading_inherits_from_style = false;
+            tap.cell_properties[i].direct_style.shading = true;
         }
 
         Ok(())
@@ -1956,6 +1982,7 @@ impl<'arena> TapParser<'arena> {
             cell.shading = None;
             cell.background_color = None;
             cell.shading_inherits_from_style = raw;
+            cell.direct_style.shading = !raw;
             return Ok(());
         }
         let is_auto =
@@ -1964,6 +1991,7 @@ impl<'arena> TapParser<'arena> {
             cell.shading = None;
             cell.background_color = None;
             cell.shading_inherits_from_style = false;
+            cell.direct_style.shading = true;
             return Ok(());
         }
         let foreground_color = Self::parse_colorref(&bytes[..4])?;
@@ -1982,6 +2010,7 @@ impl<'arena> TapParser<'arena> {
         });
         cell.background_color = background_color;
         cell.shading_inherits_from_style = false;
+        cell.direct_style.shading = true;
         Ok(())
     }
 
@@ -2126,6 +2155,12 @@ mod tests {
         assert!(cell.fit_text);
         assert!(cell.no_wrap);
         assert!(cell.hide_mark);
+        assert!(cell.direct_style.vertical_alignment);
+        assert!(cell.direct_style.no_wrap);
+        assert!(cell.direct_style.border_top);
+        assert!(cell.direct_style.border_left);
+        assert!(cell.direct_style.border_bottom);
+        assert!(cell.direct_style.border_right);
         let width = cell.preferred_width.unwrap();
         assert_eq!(width.value, 1440);
         assert_eq!(width.width_type, WidthType::Twips);
@@ -2246,7 +2281,9 @@ mod tests {
 
         let tap = parser.parse_tap(&grpprl).unwrap();
         assert!(tap.cell_properties[0].shading_inherits_from_style);
+        assert!(!tap.cell_properties[0].direct_style.shading);
         assert_eq!(tap.cell_properties[1].background_color, Some((255, 0, 0)));
+        assert!(tap.cell_properties[1].direct_style.shading);
         assert_eq!(
             tap.cell_properties[1].shading.unwrap().pattern,
             ShadingPattern::DarkCross
@@ -2405,6 +2442,8 @@ mod tests {
         assert_eq!(width.value, 2500);
         assert!(tap.cell_properties.iter().all(|cell| cell.fit_text));
         assert!(tap.cell_properties[1].no_wrap);
+        assert!(tap.cell_properties[1].direct_style.no_wrap);
+        assert!(tap.cell_properties[2].direct_style.vertical_alignment);
         assert!(tap.cell_properties[2].hide_mark);
     }
 

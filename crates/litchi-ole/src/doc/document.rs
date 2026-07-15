@@ -1350,6 +1350,7 @@ impl Document {
             }
         }
 
+        super::table::apply_table_cell_styles(&mut rows);
         Ok(rows)
     }
 

@@ -8,7 +8,7 @@ use super::chp_bin_table::ChpBinTable;
 use super::pap::ParagraphProperties;
 use super::pap_bin_table::PapBinTable;
 use super::styles::StyleSheet;
-use super::tap::{TableLookFlags, TableStyleCondition};
+use super::tap::{TableStyleCondition, matching_table_style_conditions};
 use crate::sprm::parse_sprms;
 use crate::sprm_operations::{SPRM_C_ISTD, get_sprm_type};
 use std::sync::Arc;
@@ -311,18 +311,6 @@ impl<'a> ParagraphExtractor<'a> {
         let row_end_index = row_ends[row_position];
         let row_properties = runs[row_end_index].properties.table_properties.as_ref()?;
         let style_index = row_properties.table_style_index?;
-        let Some(table_look) = row_properties.table_look else {
-            return Some(TableTextContext {
-                style_index,
-                conditions: Vec::new(),
-            });
-        };
-        let flags = table_look.flags;
-        let last_row = row_position + 1 == row_ends.len();
-        let header_row = row_position == 0 || row_properties.is_header_row;
-        let matches_header = flags.contains(TableLookFlags::HEADER_ROW) && header_row;
-        let matches_footer =
-            flags.contains(TableLookFlags::LAST_ROW) && last_row && !matches_header;
 
         let row_start_cp = row_position
             .checked_sub(1)
@@ -340,90 +328,11 @@ impl<'a> ParagraphExtractor<'a> {
                 cell_index += 1;
             }
         }
-        let cell_count = row_properties.cell_count;
-        if cell_count == 0 || cell_index >= cell_count {
-            return Some(TableTextContext {
-                style_index,
-                conditions: Vec::new(),
-            });
-        }
-        let left_index = if row_properties.right_to_left {
-            cell_count - 1
-        } else {
-            0
-        };
-        let right_index = if row_properties.right_to_left {
-            0
-        } else {
-            cell_count - 1
-        };
-        let matches_left =
-            flags.contains(TableLookFlags::HEADER_COLUMN) && cell_index == left_index;
-        let matches_right = flags.contains(TableLookFlags::LAST_COLUMN)
-            && cell_index == right_index
-            && !matches_left;
-
-        let mut conditions = Vec::with_capacity(5);
-        if !matches_header && !matches_footer && !flags.contains(TableLookFlags::NO_ROW_BANDING) {
-            if let Some(size) = row_properties.style_defaults.horizontal_band_size {
-                let preceding = row_ends[..row_position]
-                    .iter()
-                    .filter(|&&index| {
-                        !flags.contains(TableLookFlags::HEADER_ROW)
-                            || !(index == row_ends[0]
-                                || runs[index]
-                                    .properties
-                                    .table_properties
-                                    .as_ref()
-                                    .is_some_and(|properties| properties.is_header_row))
-                    })
-                    .count();
-                conditions.push(if (preceding / usize::from(size)) % 2 == 0 {
-                    TableStyleCondition::OddRowBand
-                } else {
-                    TableStyleCondition::EvenRowBand
-                });
-            }
-        }
-        if !matches_left && !matches_right && !flags.contains(TableLookFlags::NO_COLUMN_BANDING) {
-            if let Some(size) = row_properties.style_defaults.vertical_band_size {
-                let logical_index = if row_properties.right_to_left {
-                    cell_count - 1 - cell_index
-                } else {
-                    cell_index
-                };
-                let preceding =
-                    if flags.contains(TableLookFlags::HEADER_COLUMN) && logical_index > 0 {
-                        logical_index - 1
-                    } else {
-                        logical_index
-                    };
-                conditions.push(if (preceding / usize::from(size)) % 2 == 0 {
-                    TableStyleCondition::OddColumnBand
-                } else {
-                    TableStyleCondition::EvenColumnBand
-                });
-            }
-        }
-        if matches_left {
-            conditions.push(TableStyleCondition::FirstColumn);
-        } else if matches_right {
-            conditions.push(TableStyleCondition::LastColumn);
-        }
-        if matches_header {
-            conditions.push(TableStyleCondition::HeaderRow);
-        } else if matches_footer {
-            conditions.push(TableStyleCondition::FooterRow);
-        }
-        if matches_header && matches_left {
-            conditions.push(TableStyleCondition::TopLeftCell);
-        } else if matches_header && matches_right {
-            conditions.push(TableStyleCondition::TopRightCell);
-        } else if matches_footer && matches_left {
-            conditions.push(TableStyleCondition::BottomLeftCell);
-        } else if matches_footer && matches_right {
-            conditions.push(TableStyleCondition::BottomRightCell);
-        }
+        let table_rows = row_ends
+            .iter()
+            .map(|&index| runs[index].properties.table_properties.as_ref())
+            .collect::<Option<Vec<_>>>()?;
+        let conditions = matching_table_style_conditions(&table_rows, row_position, cell_index);
 
         Some(TableTextContext {
             style_index,
@@ -659,7 +568,7 @@ fn preserve_character_style_state(
 #[cfg(test)]
 mod tests {
     use super::super::pap_bin_table::ParagraphRun;
-    use super::super::tap::{TableLook, TableProperties, TableStyleDefaults};
+    use super::super::tap::{TableLook, TableLookFlags, TableProperties, TableStyleDefaults};
     use super::*;
     use crate::sprm_operations::{SPRM_C_F_BOLD, SPRM_C_F_ITALIC};
 
