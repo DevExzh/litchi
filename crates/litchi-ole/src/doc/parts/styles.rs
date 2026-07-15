@@ -234,6 +234,71 @@ impl StyleSheet {
         Ok((effective_index, properties))
     }
 
+    /// Resolve the paragraph and character property differences contributed by
+    /// a paragraph style, in parent-first application order.
+    ///
+    /// An invalid, empty, or non-paragraph style produces document defaults and
+    /// therefore returns `None` with empty property arrays.
+    pub fn resolve_paragraph_style_sprms(
+        &self,
+        requested_index: u16,
+    ) -> Result<(Option<u16>, Vec<u8>, Vec<u8>)> {
+        let Some(style) = self
+            .get(requested_index)
+            .filter(|style| style.kind == StyleKind::Paragraph)
+        else {
+            return Ok((None, Vec::new(), Vec::new()));
+        };
+        let chain = self.style_chain(style);
+        let mut paragraph = Vec::new();
+        let mut character = Vec::new();
+        for style in chain {
+            if let Some(properties) = style.paragraph_properties() {
+                let properties = strip_paragraph_style_index(properties, style.index)?;
+                validate_style_sprms(properties, 1, "UpxPapx")?;
+                paragraph.extend_from_slice(properties);
+            }
+            if let Some(properties) = style.character_properties() {
+                validate_style_sprms(properties, 2, "UpxChpx")?;
+                character.extend_from_slice(properties);
+            }
+        }
+        Ok((Some(requested_index), paragraph, character))
+    }
+
+    /// Resolve character property differences for a character style in
+    /// parent-first application order.
+    pub fn resolve_character_style_sprms(
+        &self,
+        requested_index: u16,
+    ) -> Result<(Option<u16>, Vec<u8>)> {
+        let Some(style) = self
+            .get(requested_index)
+            .filter(|style| style.kind == StyleKind::Character)
+        else {
+            return Ok((None, Vec::new()));
+        };
+        let mut character = Vec::new();
+        for style in self.style_chain(style) {
+            if let Some(properties) = style.character_properties() {
+                validate_style_sprms(properties, 2, "UpxChpx")?;
+                character.extend_from_slice(properties);
+            }
+        }
+        Ok((Some(requested_index), character))
+    }
+
+    fn style_chain<'a>(&'a self, style: &'a StyleDefinition) -> Vec<&'a StyleDefinition> {
+        let mut chain = Vec::new();
+        let mut current = Some(style);
+        while let Some(style) = current {
+            chain.push(style);
+            current = style.base_style.and_then(|index| self.get(index));
+        }
+        chain.reverse();
+        chain
+    }
+
     fn effective_table_style_index(&self, requested_index: u16) -> u16 {
         if self
             .get(requested_index)
@@ -492,6 +557,31 @@ fn parse_style(std: &[u8], index: u16, cb_std: u16, stdf_size: u16) -> Result<St
         raw_std: std.to_vec(),
         outer_padding: None,
     })
+}
+
+fn strip_paragraph_style_index(properties: &[u8], style_index: u16) -> Result<&[u8]> {
+    if properties.len() >= 2 {
+        let prefix = read_u16(properties, 0, "UpxPapx.istd")?;
+        if prefix == style_index {
+            return Ok(&properties[2..]);
+        }
+    }
+    Ok(properties)
+}
+
+fn validate_style_sprms(properties: &[u8], expected_type: u8, structure: &str) -> Result<()> {
+    let sprms = crate::sprm::parse_sprms(properties);
+    let consumed = sprms.last().map_or(0, |sprm| sprm.offset + sprm.size);
+    if consumed != properties.len()
+        || sprms
+            .iter()
+            .any(|sprm| crate::sprm_operations::get_sprm_type(sprm.opcode) != expected_type)
+    {
+        return Err(corrupted(&format!(
+            "{structure} contains malformed or wrong-type SPRMs"
+        )));
+    }
+    Ok(())
 }
 
 fn validate_styles(styles: &[Option<StyleDefinition>]) -> Result<()> {
@@ -908,5 +998,76 @@ mod tests {
         assert!(overridden.auto_fit);
         assert!(overridden.right_to_left);
         assert_eq!(overridden.revision_save_id, Some(0x1234_5678));
+    }
+
+    #[test]
+    fn resolves_paragraph_and_character_style_property_arrays() {
+        let mut slots = vec![None; 19];
+        slots[0] = Some(std_record(0, 1, NIL_STYLE, 0, "Normal", &[&[], &[]]));
+        slots[10] = Some(std_record(65, 2, NIL_STYLE, 10, "Font", &[&[]]));
+        slots[15] = Some(std_record(
+            0x0FFE,
+            1,
+            0,
+            0,
+            "Base Paragraph",
+            &[&[15, 0, 0x03, 0x24, 2], &[0x35, 0x08, 1]],
+        ));
+        slots[16] = Some(std_record(
+            0x0FFE,
+            1,
+            15,
+            0,
+            "Derived Paragraph",
+            &[&[0x03, 0x24, 1], &[0x36, 0x08, 1]],
+        ));
+        slots[17] = Some(std_record(
+            0x0FFE,
+            2,
+            10,
+            17,
+            "Base Character",
+            &[&[0x35, 0x08, 1]],
+        ));
+        slots[18] = Some(std_record(
+            0x0FFE,
+            2,
+            17,
+            18,
+            "Derived Character",
+            &[&[0x36, 0x08, 1]],
+        ));
+        let stylesheet = parse(&stylesheet(slots)).unwrap();
+
+        let (effective, paragraph, character) =
+            stylesheet.resolve_paragraph_style_sprms(16).unwrap();
+        assert_eq!(effective, Some(16));
+        assert_eq!(paragraph, [0x03, 0x24, 2, 0x03, 0x24, 1]);
+        assert_eq!(character, [0x35, 0x08, 1, 0x36, 0x08, 1]);
+        let styled = super::super::pap::ParagraphProperties::from_sprm(&paragraph).unwrap();
+        assert_eq!(
+            styled.justification,
+            super::super::pap::Justification::Center
+        );
+        let mut direct = paragraph.clone();
+        direct.extend_from_slice(&[0x03, 0x24, 0]);
+        let overridden = super::super::pap::ParagraphProperties::from_sprm(&direct).unwrap();
+        assert_eq!(
+            overridden.justification,
+            super::super::pap::Justification::Left
+        );
+
+        let (effective, character) = stylesheet.resolve_character_style_sprms(18).unwrap();
+        assert_eq!(effective, Some(18));
+        assert_eq!(character, [0x35, 0x08, 1, 0x36, 0x08, 1]);
+
+        assert_eq!(
+            stylesheet.resolve_paragraph_style_sprms(18).unwrap(),
+            (None, Vec::new(), Vec::new())
+        );
+        assert_eq!(
+            stylesheet.resolve_character_style_sprms(16).unwrap(),
+            (None, Vec::new())
+        );
     }
 }
