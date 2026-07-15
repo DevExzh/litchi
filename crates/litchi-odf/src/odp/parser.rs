@@ -2,9 +2,9 @@
 
 use super::animation::ANIMATION_NAMESPACE;
 use super::{
-    AnimationAttribute, AnimationAttributeNamespace, AnimationKind, AnimationNode, Shape, Slide,
-    SlideTransition, TransitionDirection, TransitionSound, TransitionSoundShow, TransitionSpeed,
-    TransitionStyle, TransitionType,
+    AnimationAttribute, AnimationAttributeNamespace, AnimationKind, AnimationNode, MediaActuate,
+    MediaParameter, MediaReference, MediaShow, Shape, Slide, SlideTransition, TransitionDirection,
+    TransitionSound, TransitionSoundShow, TransitionSpeed, TransitionStyle, TransitionType,
 };
 use litchi_core::{Error, Result, ShapeType};
 use quick_xml::XmlVersion;
@@ -59,6 +59,8 @@ enum OdpElement {
     Image,
     Table,
     Object,
+    Plugin,
+    PluginParameter,
     TextParagraph,
     TextSpace,
     TextTab,
@@ -86,6 +88,8 @@ struct ShapeBuilder {
     height: Option<String>,
     style_name: Option<String>,
     image_href: Option<String>,
+    media: Option<MediaReference>,
+    is_frame: bool,
     is_title: bool,
     has_paragraph: bool,
 }
@@ -143,6 +147,8 @@ impl ShapeBuilder {
             height: None,
             style_name: None,
             image_href: None,
+            media: None,
+            is_frame: false,
             is_title: false,
             has_paragraph: false,
         }
@@ -159,6 +165,7 @@ impl ShapeBuilder {
             height: self.height,
             style_name: self.style_name,
             image_href: self.image_href,
+            media: self.media,
         }
     }
 
@@ -196,7 +203,9 @@ impl OdpParser {
                 b"connector" => OdpElement::Shape(ShapeElement::Connector),
                 b"g" => OdpElement::Shape(ShapeElement::Group),
                 b"image" => OdpElement::Image,
-                b"object" | b"object-ole" | b"plugin" => OdpElement::Object,
+                b"object" | b"object-ole" => OdpElement::Object,
+                b"plugin" => OdpElement::Plugin,
+                b"param" => OdpElement::PluginParameter,
                 _ => OdpElement::Other,
             }
         } else if Self::is_namespace(namespace, PRESENTATION_NAMESPACE) && local_name == b"notes" {
@@ -409,6 +418,7 @@ impl OdpParser {
     ) -> Result<ShapeBuilder> {
         let mut builder = ShapeBuilder::new();
         let presentation_class = Self::get_attr(reader, element, PRESENTATION_NAMESPACE, b"class")?;
+        builder.is_frame = matches!(shape_element, ShapeElement::Frame);
         builder.is_title = presentation_class.as_deref() == Some("title");
         builder.shape_type = match shape_element {
             ShapeElement::Frame => match presentation_class.as_deref() {
@@ -436,6 +446,52 @@ impl OdpParser {
             Self::get_attr(reader, element, PRESENTATION_NAMESPACE, b"style-name")?,
         );
         Ok(builder)
+    }
+
+    fn media_reference(
+        reader: &NsReader<&[u8]>,
+        element: &BytesStart<'_>,
+    ) -> Result<MediaReference> {
+        let href = Self::get_attr(reader, element, XLINK_NAMESPACE, b"href")?.ok_or_else(|| {
+            Error::InvalidFormat("draw:plugin is missing required xlink:href".to_string())
+        })?;
+        let link_type =
+            Self::get_attr(reader, element, XLINK_NAMESPACE, b"type")?.ok_or_else(|| {
+                Error::InvalidFormat("draw:plugin is missing required xlink:type".to_string())
+            })?;
+        if link_type != "simple" {
+            return Err(Error::InvalidFormat(format!(
+                "draw:plugin xlink:type must be 'simple', found '{link_type}'"
+            )));
+        }
+        let mut media = MediaReference::new(href)?;
+        if let Some(mime_type) = Self::get_attr(reader, element, DRAW_NAMESPACE, b"mime-type")? {
+            media.set_mime_type(mime_type)?;
+        }
+        if let Some(show) = Self::get_attr(reader, element, XLINK_NAMESPACE, b"show")? {
+            media.set_show(Some(MediaShow::parse(&show)?));
+        }
+        if let Some(actuate) = Self::get_attr(reader, element, XLINK_NAMESPACE, b"actuate")? {
+            media.set_actuate(Some(MediaActuate::parse(&actuate)?));
+        }
+        if let Some(xml_id) = Self::get_attr(reader, element, XML_NAMESPACE, b"id")? {
+            media.set_xml_id(xml_id)?;
+        }
+        Ok(media)
+    }
+
+    fn media_parameter(
+        reader: &NsReader<&[u8]>,
+        element: &BytesStart<'_>,
+    ) -> Result<MediaParameter> {
+        let name = Self::get_attr(reader, element, DRAW_NAMESPACE, b"name")?.ok_or_else(|| {
+            Error::InvalidFormat("draw:param is missing required draw:name".to_string())
+        })?;
+        let value =
+            Self::get_attr(reader, element, DRAW_NAMESPACE, b"value")?.ok_or_else(|| {
+                Error::InvalidFormat("draw:param is missing required draw:value".to_string())
+            })?;
+        MediaParameter::new(name, value)
     }
 
     fn append_segment(target: &mut String, has_segment: &mut bool, text: &str) {
@@ -827,6 +883,8 @@ impl OdpParser {
         let mut current_shape: Option<ShapeBuilder> = None;
         let mut shape_depth = 0;
         let mut current_paragraph: Option<ParagraphText> = None;
+        let mut in_media_plugin = false;
+        let mut in_media_parameter = false;
 
         loop {
             let (namespace, event) = reader
@@ -835,6 +893,16 @@ impl OdpParser {
             match event {
                 Event::Start(ref element) => {
                     let element_type = Self::classify(&namespace, element.local_name().as_ref());
+                    if in_media_parameter {
+                        return Err(Error::InvalidFormat(
+                            "draw:param cannot contain child elements".to_string(),
+                        ));
+                    }
+                    if in_media_plugin && !matches!(element_type, OdpElement::PluginParameter) {
+                        return Err(Error::InvalidFormat(
+                            "draw:plugin can only contain draw:param elements".to_string(),
+                        ));
+                    }
                     match element_type {
                         OdpElement::Page => {
                             if in_slide {
@@ -864,6 +932,50 @@ impl OdpParser {
                             in_slide = true;
                         },
                         OdpElement::Notes if in_slide => in_notes = true,
+                        OdpElement::Plugin if current_shape.is_some() => {
+                            let builder = current_shape.as_mut().expect("shape checked above");
+                            if !builder.is_frame {
+                                return Err(Error::InvalidFormat(
+                                    "draw:plugin must be contained directly by draw:frame"
+                                        .to_string(),
+                                ));
+                            }
+                            if builder.media.is_some() {
+                                return Err(Error::InvalidFormat(
+                                    "ODP frame contains multiple draw:plugin elements".to_string(),
+                                ));
+                            }
+                            builder.shape_type = ShapeType::GraphicFrame;
+                            builder.media = Some(Self::media_reference(&reader, element)?);
+                            in_media_plugin = true;
+                        },
+                        OdpElement::Plugin if in_slide => {
+                            return Err(Error::InvalidFormat(
+                                "draw:plugin must be contained by a drawing shape".to_string(),
+                            ));
+                        },
+                        OdpElement::PluginParameter
+                            if in_media_plugin
+                                && !in_media_parameter
+                                && current_shape.is_some() =>
+                        {
+                            current_shape
+                                .as_mut()
+                                .and_then(|builder| builder.media.as_mut())
+                                .expect("media plugin state checked above")
+                                .add_parameter(Self::media_parameter(&reader, element)?)?;
+                            in_media_parameter = true;
+                        },
+                        _ if in_media_parameter => {
+                            return Err(Error::InvalidFormat(
+                                "draw:param cannot contain child elements".to_string(),
+                            ));
+                        },
+                        _ if in_media_plugin => {
+                            return Err(Error::InvalidFormat(
+                                "draw:plugin can only contain draw:param elements".to_string(),
+                            ));
+                        },
                         OdpElement::TextParagraph if in_slide => {
                             if current_paragraph.is_some() {
                                 return Err(Error::InvalidFormat(
@@ -944,6 +1056,14 @@ impl OdpParser {
                         .expect("paragraph checked above")
                         .push_text(&text);
                 },
+                Event::Text(ref text) if in_media_plugin => {
+                    let text = Self::decode_text(text)?;
+                    if !text.trim().is_empty() {
+                        return Err(Error::InvalidFormat(
+                            "draw:plugin cannot contain text".to_string(),
+                        ));
+                    }
+                },
                 Event::CData(ref text) if current_paragraph.is_some() => {
                     let decoded = text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
                         Error::InvalidFormat(format!("invalid presentation CDATA: {error}"))
@@ -953,6 +1073,16 @@ impl OdpParser {
                         .expect("paragraph checked above")
                         .push_text(&decoded);
                 },
+                Event::CData(ref text) if in_media_plugin => {
+                    let decoded = text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
+                        Error::InvalidFormat(format!("invalid media plugin CDATA: {error}"))
+                    })?;
+                    if !decoded.trim().is_empty() {
+                        return Err(Error::InvalidFormat(
+                            "draw:plugin cannot contain text".to_string(),
+                        ));
+                    }
+                },
                 Event::GeneralRef(ref reference) if current_paragraph.is_some() => {
                     let text = Self::decode_reference(reference)?;
                     current_paragraph
@@ -960,8 +1090,23 @@ impl OdpParser {
                         .expect("paragraph checked above")
                         .push_text(&text);
                 },
+                Event::GeneralRef(_) if in_media_plugin => {
+                    return Err(Error::InvalidFormat(
+                        "draw:plugin cannot contain character references".to_string(),
+                    ));
+                },
                 Event::Empty(ref element) => {
                     let element_type = Self::classify(&namespace, element.local_name().as_ref());
+                    if in_media_parameter {
+                        return Err(Error::InvalidFormat(
+                            "draw:param cannot contain child elements".to_string(),
+                        ));
+                    }
+                    if in_media_plugin && !matches!(element_type, OdpElement::PluginParameter) {
+                        return Err(Error::InvalidFormat(
+                            "draw:plugin can only contain draw:param elements".to_string(),
+                        ));
+                    }
                     match element_type {
                         OdpElement::Page if !in_slide => {
                             let style_name =
@@ -981,6 +1126,49 @@ impl OdpParser {
                                 shapes: Vec::new(),
                             });
                             slide_index += 1;
+                        },
+                        OdpElement::Plugin => {
+                            if let Some(builder) = current_shape.as_mut() {
+                                if !builder.is_frame {
+                                    return Err(Error::InvalidFormat(
+                                        "draw:plugin must be contained directly by draw:frame"
+                                            .to_string(),
+                                    ));
+                                }
+                                if builder.media.is_some() {
+                                    return Err(Error::InvalidFormat(
+                                        "ODP frame contains multiple draw:plugin elements"
+                                            .to_string(),
+                                    ));
+                                }
+                                builder.shape_type = ShapeType::GraphicFrame;
+                                builder.media = Some(Self::media_reference(&reader, element)?);
+                            } else if in_slide {
+                                return Err(Error::InvalidFormat(
+                                    "draw:plugin must be contained by a drawing shape".to_string(),
+                                ));
+                            }
+                        },
+                        OdpElement::PluginParameter
+                            if in_media_plugin
+                                && !in_media_parameter
+                                && current_shape.is_some() =>
+                        {
+                            current_shape
+                                .as_mut()
+                                .and_then(|builder| builder.media.as_mut())
+                                .expect("media plugin state checked above")
+                                .add_parameter(Self::media_parameter(&reader, element)?)?;
+                        },
+                        _ if in_media_parameter => {
+                            return Err(Error::InvalidFormat(
+                                "draw:param cannot contain child elements".to_string(),
+                            ));
+                        },
+                        _ if in_media_plugin => {
+                            return Err(Error::InvalidFormat(
+                                "draw:plugin can only contain draw:param elements".to_string(),
+                            ));
                         },
                         OdpElement::TextParagraph if in_slide => {
                             Self::push_parsed_paragraph(
@@ -1089,6 +1277,16 @@ impl OdpParser {
                     }
                     if matches!(element_type, OdpElement::Notes) {
                         in_notes = false;
+                        buf.clear();
+                        continue;
+                    }
+                    if matches!(element_type, OdpElement::Plugin) {
+                        in_media_plugin = false;
+                        buf.clear();
+                        continue;
+                    }
+                    if matches!(element_type, OdpElement::PluginParameter) && in_media_parameter {
+                        in_media_parameter = false;
                         buf.clear();
                         continue;
                     }
@@ -1319,6 +1517,7 @@ mod tests {
             height: Some("5cm".to_string()),
             style_name: Some("Style1".to_string()),
             image_href: None,
+            media: None,
         };
         let debug_str = format!("{:?}", shape);
         assert!(debug_str.contains("Shape"));
@@ -1337,6 +1536,7 @@ mod tests {
             height: Some("3cm".to_string()),
             style_name: None,
             image_href: None,
+            media: None,
         };
         let cloned = shape.clone();
         assert_eq!(shape.shape_type, cloned.shape_type);
@@ -1370,6 +1570,7 @@ mod tests {
                 height: None,
                 style_name: None,
                 image_href: None,
+                media: None,
             };
             let _ = format!("{:?}", shape);
         }
@@ -1589,5 +1790,44 @@ mod tests {
 
         let error = OdpParser::parse_slides(&xml).unwrap_err();
         assert!(error.to_string().contains("128 levels"));
+    }
+
+    #[test]
+    fn parses_inert_media_plugins_and_parameters() {
+        let xml = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:x="http://www.w3.org/1999/xlink" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0"><o:body><o:presentation><d:page><d:frame d:name="Movie" s:x="1cm" s:y="2cm"><d:plugin x:href="Media/a&amp;b.mp4" x:type="simple" d:mime-type="video/mp4" x:show="embed" x:actuate="onRequest" xml:id="movie1"><d:param d:name="autoplay" d:value="false"/><d:param d:name="caption" d:value="A &amp; B"> </d:param></d:plugin></d:frame></d:page></o:presentation></o:body></o:document-content>"#;
+
+        let slides = OdpParser::parse_slides(xml).unwrap();
+        let shape = &slides[0].shapes[0];
+        assert_eq!(shape.shape_type, ShapeType::GraphicFrame);
+        let media = shape.media().unwrap();
+        assert_eq!(media.href(), "Media/a&b.mp4");
+        assert_eq!(media.mime_type(), Some("video/mp4"));
+        assert_eq!(media.show(), Some(MediaShow::Embed));
+        assert_eq!(media.actuate(), Some(MediaActuate::OnRequest));
+        assert_eq!(media.xml_id(), Some("movie1"));
+        assert_eq!(media.parameters().len(), 2);
+        assert_eq!(media.parameters()[0].name(), "autoplay");
+        assert_eq!(media.parameters()[1].value(), "A & B");
+    }
+
+    #[test]
+    fn rejects_schema_invalid_media_plugins() {
+        let invalid_plugins = [
+            r#"<d:frame><d:plugin x:type="simple"/></d:frame>"#,
+            r#"<d:frame><d:plugin x:href="a.mp4"/></d:frame>"#,
+            r#"<d:frame><d:plugin x:href="a.mp4" x:type="extended"/></d:frame>"#,
+            r#"<d:frame><d:plugin x:href="a.mp4" x:type="simple" x:show="invalid"/></d:frame>"#,
+            r#"<d:plugin x:href="a.mp4" x:type="simple"/>"#,
+            r#"<d:rect><d:plugin x:href="a.mp4" x:type="simple"/></d:rect>"#,
+            r#"<d:frame><d:plugin x:href="a.mp4" x:type="simple">text</d:plugin></d:frame>"#,
+            r#"<d:frame><d:plugin x:href="a.mp4" x:type="simple"><d:param d:name="x"/></d:plugin></d:frame>"#,
+            r#"<d:frame><d:plugin x:href="a.mp4" x:type="simple"><d:param d:name="x" d:value="y"><d:param d:name="nested" d:value="z"/></d:param></d:plugin></d:frame>"#,
+        ];
+        for plugin in invalid_plugins {
+            let xml = format!(
+                r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:x="http://www.w3.org/1999/xlink"><o:body><o:presentation><d:page>{plugin}</d:page></o:presentation></o:body></o:document-content>"#
+            );
+            assert!(OdpParser::parse_slides(&xml).is_err(), "accepted {plugin}");
+        }
     }
 }

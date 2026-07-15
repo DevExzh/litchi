@@ -170,6 +170,21 @@ impl Presentation {
         Ok(slides.into_iter().nth(index))
     }
 
+    /// Read a package-contained media payload without fetching external URLs.
+    ///
+    /// Returns `None` for external links, fragment links, unsafe paths, and
+    /// package-relative references whose payload is absent.
+    pub fn media_data(&self, media: &super::MediaReference) -> Result<Option<Vec<u8>>> {
+        let Some(path) = media.package_path() else {
+            return Ok(None);
+        };
+        let package = self.package.package()?;
+        if !package.has_file(path) {
+            return Ok(None);
+        }
+        package.get_file(path).map(Some)
+    }
+
     /// Extract all text content from the presentation.
     ///
     /// Returns text from all slides, separated by double newlines.

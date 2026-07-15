@@ -3,8 +3,10 @@
 //! This module provides a builder pattern for creating new ODP presentations from scratch.
 
 use crate::core::{OdfStructure, PackageWriter};
+use crate::odp::MediaReference;
 use crate::odp::Slide;
 use crate::odp::animation::validate_animation_roots;
+use crate::odp::media::{EmbeddedMedia, embed_media};
 use litchi_core::{Metadata, Result, xml::escape_xml};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -30,6 +32,7 @@ use std::path::Path;
 pub struct PresentationBuilder {
     slides: Vec<Slide>,
     metadata: Metadata,
+    media_files: BTreeMap<String, EmbeddedMedia>,
 }
 
 fn encode_text_content(text: &str) -> String {
@@ -211,6 +214,7 @@ impl PresentationBuilder {
         Self {
             slides: Vec::new(),
             metadata: Metadata::default(),
+            media_files: BTreeMap::new(),
         }
     }
 
@@ -221,6 +225,19 @@ impl PresentationBuilder {
     /// * `metadata` - Document metadata (title, author, etc.)
     pub fn set_metadata(&mut self, metadata: Metadata) {
         self.metadata = metadata;
+    }
+
+    /// Add a package-contained audio or video payload.
+    ///
+    /// The returned inert reference can be attached to a shape with
+    /// [`crate::Shape::with_media`]. External resources are never fetched.
+    pub fn embed_media(
+        &mut self,
+        path: impl Into<String>,
+        bytes: impl Into<Vec<u8>>,
+        media_type: impl Into<String>,
+    ) -> Result<MediaReference> {
+        embed_media(&mut self.media_files, path, bytes, media_type)
     }
 
     /// Add a slide with title and text content
@@ -337,6 +354,13 @@ impl PresentationBuilder {
         let escaped_width = escape_xml(width);
         let escaped_height = escape_xml(height);
 
+        if shape.media.is_some() && shape.shape_type != ShapeType::GraphicFrame {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "ODP media shape '{}' must use the graphic-frame shape type",
+                name
+            )));
+        }
+
         let xml = match shape.shape_type {
             ShapeType::TextBox | ShapeType::Placeholder => {
                 let presentation_class = if shape.shape_type == ShapeType::Placeholder {
@@ -433,6 +457,24 @@ impl PresentationBuilder {
                     escaped_y,
                     escape_xml(x2),
                     escape_xml(y2)
+                )
+            },
+            ShapeType::GraphicFrame if shape.media.is_some() => {
+                let mut plugin = String::new();
+                shape
+                    .media
+                    .as_ref()
+                    .expect("media checked by match guard")
+                    .write_xml(&mut plugin)?;
+                format!(
+                    r#"<draw:frame draw:name="{}" draw:style-name="{}" draw:layer="layout" svg:x="{}" svg:y="{}" svg:width="{}" svg:height="{}">{}</draw:frame>"#,
+                    escaped_name,
+                    escaped_style_name,
+                    escaped_x,
+                    escaped_y,
+                    escaped_width,
+                    escaped_height,
+                    plugin
                 )
             },
             ShapeType::Group | ShapeType::Table | ShapeType::GraphicFrame | ShapeType::Unknown => {
@@ -625,6 +667,10 @@ impl PresentationBuilder {
         let meta_xml = self.generate_meta_xml();
         writer.add_file("meta.xml", meta_xml.as_bytes())?;
 
+        for (path, media) in &self.media_files {
+            writer.add_file_with_media_type(path, &media.bytes, &media.media_type)?;
+        }
+
         // Finish and return bytes
         writer.finish_to_bytes()
     }
@@ -657,9 +703,10 @@ impl PresentationBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::OwnedPackage;
     use crate::odp::{
-        Presentation, Shape, TransitionDirection, TransitionSound, TransitionSoundShow,
-        TransitionSpeed, TransitionStyle, TransitionType,
+        MediaParameter, Presentation, Shape, TransitionDirection, TransitionSound,
+        TransitionSoundShow, TransitionSpeed, TransitionStyle, TransitionType,
     };
     use litchi_core::ShapeType;
 
@@ -741,5 +788,84 @@ mod tests {
         assert!(sound.actuate_on_request);
         assert_eq!(sound.show, Some(TransitionSoundShow::Replace));
         assert_eq!(sound.xml_id.as_deref(), Some("transitionSound1"));
+    }
+
+    #[test]
+    fn embeds_and_round_trips_inert_presentation_media() {
+        const VIDEO: &[u8] = b"test-video-payload";
+        let mut builder = PresentationBuilder::new();
+        let mut media = builder
+            .embed_media("Media/demo.mp4", VIDEO, "video/mp4")
+            .unwrap();
+        media
+            .add_parameter(MediaParameter::new("autoplay", "false").unwrap())
+            .unwrap();
+        media.set_xml_id("demoVideo").unwrap();
+        let shape = Shape::new().with_media(media.clone());
+        builder
+            .add_slide_element(Slide {
+                title: None,
+                text: String::new(),
+                index: 0,
+                notes: None,
+                transition: None,
+                animations: Vec::new(),
+                shapes: vec![shape],
+            })
+            .unwrap();
+
+        let bytes = builder.build().unwrap();
+        let package = OwnedPackage::from_bytes(bytes.clone()).unwrap();
+        assert_eq!(package.get_file("Media/demo.mp4").unwrap(), VIDEO);
+        assert_eq!(
+            package
+                .package()
+                .unwrap()
+                .manifest()
+                .get_media_type("Media/demo.mp4"),
+            Some("video/mp4")
+        );
+        let content = String::from_utf8(package.get_file("content.xml").unwrap()).unwrap();
+        assert!(content.contains(r#"draw:mime-type="video/mp4""#));
+        assert!(content.contains(r#"xlink:href="Media/demo.mp4""#));
+        assert!(content.contains(r#"draw:name="autoplay" draw:value="false""#));
+
+        let presentation = Presentation::from_bytes(bytes).unwrap();
+        let parsed = presentation.slides().unwrap();
+        assert_eq!(parsed[0].shapes[0].media(), Some(&media));
+        assert_eq!(
+            presentation
+                .media_data(parsed[0].shapes[0].media().unwrap())
+                .unwrap(),
+            Some(VIDEO.to_vec())
+        );
+    }
+
+    #[test]
+    fn rejects_unsafe_or_duplicate_embedded_media_paths() {
+        let mut builder = PresentationBuilder::new();
+        assert!(
+            builder
+                .embed_media("../escape.mp4", [], "video/mp4")
+                .is_err()
+        );
+        assert!(
+            builder
+                .embed_media("content.xml", [], "application/xml")
+                .is_err()
+        );
+        builder
+            .embed_media("Media/audio.ogg", [], "audio/ogg")
+            .unwrap();
+        assert!(
+            builder
+                .embed_media("Media/audio.ogg", [], "audio/ogg")
+                .is_err()
+        );
+        assert!(
+            builder
+                .embed_media("Media/bad.bin", [], "not a mime type")
+                .is_err()
+        );
     }
 }

@@ -5,7 +5,8 @@
 
 use crate::core::{OdfStructure, OwnedPackage, PackageWriter};
 use crate::odp::animation::validate_animation_roots;
-use crate::odp::{Presentation, Shape, Slide};
+use crate::odp::media::{EmbeddedMedia, embed_media, validate_package_media_path};
+use crate::odp::{MediaReference, Presentation, Shape, Slide};
 use litchi_core::{Metadata, Result, xml::escape_xml};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -45,6 +46,8 @@ pub struct MutablePresentation {
     styles_xml: Option<String>,
     /// Original package retained for copying auxiliary package parts.
     source_package: Option<OwnedPackage>,
+    /// Newly embedded package media, keyed by package path.
+    media_files: BTreeMap<String, EmbeddedMedia>,
 }
 
 impl MutablePresentation {
@@ -81,6 +84,7 @@ impl MutablePresentation {
             mimetype,
             styles_xml,
             source_package,
+            media_files: BTreeMap::new(),
         })
     }
 
@@ -100,6 +104,7 @@ impl MutablePresentation {
             mimetype: "application/vnd.oasis.opendocument.presentation".to_string(),
             styles_xml: None,
             source_package: None,
+            media_files: BTreeMap::new(),
         }
     }
 
@@ -121,6 +126,28 @@ impl MutablePresentation {
     /// Get a mutable reference to the presentation metadata.
     pub fn metadata_mut(&mut self) -> &mut Metadata {
         &mut self.metadata
+    }
+
+    /// Add a package-contained audio or video payload.
+    ///
+    /// Existing source-package paths cannot be replaced implicitly. The
+    /// returned inert reference can be attached with [`Shape::with_media`].
+    pub fn embed_media(
+        &mut self,
+        path: impl Into<String>,
+        bytes: impl Into<Vec<u8>>,
+        media_type: impl Into<String>,
+    ) -> Result<MediaReference> {
+        let path = path.into();
+        validate_package_media_path(&path)?;
+        if let Some(package) = &self.source_package
+            && package.has_file(&path)?
+        {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "cannot replace existing ODP package media path '{path}' implicitly"
+            )));
+        }
+        embed_media(&mut self.media_files, path, bytes, media_type)
     }
 
     /// Add a new slide to the end of the presentation.
@@ -603,6 +630,10 @@ impl MutablePresentation {
         let meta_xml = self.generate_meta_xml();
         writer.add_file("meta.xml", meta_xml.as_bytes())?;
 
+        for (path, media) in &self.media_files {
+            writer.add_file_with_media_type(path, &media.bytes, &media.media_type)?;
+        }
+
         if let Some(package) = &self.source_package {
             writer.copy_auxiliary_files_from(package)?;
         }
@@ -793,6 +824,65 @@ mod tests {
                 "bad namespace variant"
             )
             .is_err()
+        );
+    }
+
+    #[test]
+    fn mutable_presentation_preserves_and_adds_embedded_media() {
+        const ORIGINAL: &[u8] = b"original-video";
+        const ADDED: &[u8] = b"added-audio";
+        let mut builder = PresentationBuilder::new();
+        let original = builder
+            .embed_media("Media/original.mp4", ORIGINAL, "video/mp4")
+            .unwrap();
+        builder
+            .add_slide_element(Slide {
+                title: None,
+                text: String::new(),
+                index: 0,
+                notes: None,
+                transition: None,
+                animations: Vec::new(),
+                shapes: vec![Shape::new().with_media(original)],
+            })
+            .unwrap();
+        let presentation = Presentation::from_bytes(builder.build().unwrap()).unwrap();
+        let mut mutable = MutablePresentation::from_presentation(presentation).unwrap();
+        assert!(
+            mutable
+                .embed_media("Media/original.mp4", b"replacement", "video/mp4")
+                .is_err()
+        );
+        let added = mutable
+            .embed_media("Media/added.ogg", ADDED, "audio/ogg")
+            .unwrap();
+        mutable
+            .add_shape(0, Shape::new().with_media(added))
+            .unwrap();
+
+        let bytes = mutable.to_bytes().unwrap();
+        let package = OwnedPackage::from_bytes(bytes.clone()).unwrap();
+        assert_eq!(package.get_file("Media/original.mp4").unwrap(), ORIGINAL);
+        assert_eq!(package.get_file("Media/added.ogg").unwrap(), ADDED);
+        assert_eq!(
+            package
+                .package()
+                .unwrap()
+                .manifest()
+                .get_media_type("Media/added.ogg"),
+            Some("audio/ogg")
+        );
+
+        let reparsed = Presentation::from_bytes(bytes).unwrap();
+        let slides = reparsed.slides().unwrap();
+        assert_eq!(slides[0].shapes.len(), 2);
+        assert_eq!(
+            slides[0].shapes[0].media().unwrap().href(),
+            "Media/original.mp4"
+        );
+        assert_eq!(
+            slides[0].shapes[1].media().unwrap().href(),
+            "Media/added.ogg"
         );
     }
 }

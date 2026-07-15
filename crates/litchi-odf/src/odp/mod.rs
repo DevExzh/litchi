@@ -21,6 +21,7 @@
 //! - ✅ Speaker notes
 //! - ✅ Slide transition and automatic-timing style resolution
 //! - ✅ Inert ODF/SMIL animation and timing trees
+//! - ✅ Inert audio/video plugin references and parameters
 //!
 //! ## ✅ Writing (`builder.rs`, `mutable.rs`) - COMPLETE
 //! - ✅ `PresentationBuilder::new()` - Create new presentations
@@ -32,9 +33,9 @@
 //! - ✅ `MutablePresentation` - Modify existing presentations
 //! - ✅ Slide transitions, timings, and transition sounds
 //! - ✅ Animation tree creation and namespace-preserving round trips
+//! - ✅ Package-contained audio/video embedding and mutable preservation
 //!
 //! ## 🚧 TODO - Advanced Features
-//! - ⚠️ Multimedia embedding (audio, video)
 //! - ⚠️ Custom slide layouts
 //! - ⚠️ Advanced shape properties (gradients, shadows, 3D effects)
 //! - ⚠️ Slide master editing
@@ -50,6 +51,7 @@
 
 mod animation;
 mod builder;
+mod media;
 mod mutable;
 mod parser;
 mod presentation;
@@ -60,6 +62,7 @@ pub use animation::{
     AnimationAttribute, AnimationAttributeNamespace, AnimationKind, AnimationNode,
 };
 pub use builder::PresentationBuilder;
+pub use media::{MediaActuate, MediaParameter, MediaReference, MediaShow};
 pub use mutable::MutablePresentation;
 pub use presentation::Presentation;
 pub use slide::{Shape, Slide};

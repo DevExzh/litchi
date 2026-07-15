@@ -1,6 +1,6 @@
 //! Slide and shape structures for ODP presentations.
 
-use super::{AnimationNode, SlideTransition};
+use super::{AnimationNode, MediaReference, SlideTransition};
 use litchi_core::Result;
 
 /// A slide in an ODP presentation.
@@ -146,6 +146,8 @@ pub struct Shape {
     pub style_name: Option<String>,
     /// Image source referenced by `draw:image`, when this is a picture shape.
     pub image_href: Option<String>,
+    /// Inert audio/video plugin referenced by this frame.
+    pub media: Option<MediaReference>,
 }
 
 impl Shape {
@@ -161,6 +163,7 @@ impl Shape {
             height: None,
             style_name: None,
             image_href: None,
+            media: None,
         }
     }
 
@@ -199,10 +202,24 @@ impl Shape {
         self.image_href.as_deref()
     }
 
+    /// Return the inert audio/video plugin referenced by this shape.
+    pub fn media(&self) -> Option<&MediaReference> {
+        self.media.as_ref()
+    }
+
+    /// Attach an inert audio/video plugin and mark this shape as a graphic frame.
+    pub fn with_media(mut self, media: MediaReference) -> Self {
+        self.shape_type = litchi_core::ShapeType::GraphicFrame;
+        self.image_href = None;
+        self.media = Some(media);
+        self
+    }
+
     /// Set the image source and mark this shape as a picture.
     pub fn with_image_href(mut self, href: impl Into<String>) -> Self {
         self.shape_type = litchi_core::ShapeType::Picture;
         self.image_href = Some(href.into());
+        self.media = None;
         self
     }
 }
@@ -303,6 +320,7 @@ mod tests {
             height: Some("3cm".to_string()),
             style_name: None,
             image_href: None,
+            media: None,
         }];
         let slide = Slide {
             title: None,
@@ -407,6 +425,7 @@ mod tests {
             height: None,
             style_name: None,
             image_href: None,
+            media: None,
         };
         assert_eq!(shape.text().unwrap(), "Hello");
     }
@@ -423,6 +442,7 @@ mod tests {
             height: None,
             style_name: None,
             image_href: None,
+            media: None,
         };
         assert_eq!(shape.shape_type(), litchi_core::ShapeType::Picture);
     }
@@ -451,6 +471,7 @@ mod tests {
             height: None,
             style_name: None,
             image_href: None,
+            media: None,
         };
         assert_eq!(shape.name(), Some("MyShape"));
     }
@@ -467,6 +488,7 @@ mod tests {
             height: None,
             style_name: None,
             image_href: None,
+            media: None,
         };
         assert_eq!(shape.name(), None);
     }
@@ -483,6 +505,7 @@ mod tests {
             height: None,
             style_name: None,
             image_href: None,
+            media: None,
         };
         let (x, y) = shape.position();
         assert_eq!(x, Some("10cm"));
@@ -501,6 +524,7 @@ mod tests {
             height: Some("15cm".to_string()),
             style_name: None,
             image_href: None,
+            media: None,
         };
         let (w, h) = shape.dimensions();
         assert_eq!(w, Some("20cm"));
@@ -519,6 +543,7 @@ mod tests {
             height: Some("5cm".to_string()),
             style_name: Some("Style1".to_string()),
             image_href: None,
+            media: None,
         };
         let cloned = shape.clone();
         assert_eq!(shape.shape_type, cloned.shape_type);
