@@ -152,7 +152,7 @@ impl KeynoteTransitionTextDelivery {
 #[derive(Debug, Clone, PartialEq)]
 pub struct KeynoteTransitionSettings {
     pub animation_type: Option<String>,
-    pub effect: Option<String>,
+    pub effect: Option<KeynoteTransitionEffect>,
     pub duration: Option<f64>,
     pub direction: Option<KeynoteTransitionDirection>,
     pub delay: Option<f64>,
@@ -198,7 +198,10 @@ impl KeynoteTransitionSettings {
         let animation = attributes.animation_attributes.as_ref()?;
         Some(Self {
             animation_type: animation.animation_type.clone(),
-            effect: animation.effect.clone(),
+            effect: animation
+                .effect
+                .as_deref()
+                .map(KeynoteTransitionEffect::from_identifier),
             duration: animation.duration,
             direction: animation
                 .direction
@@ -240,7 +243,11 @@ impl KeynoteTransitionSettings {
 }
 
 impl KeynoteEditor {
-    /// Replace a slide's modern transition fields transactionally.
+    /// Create or replace a slide's modern transition fields transactionally.
+    ///
+    /// Current Keynote slides encode “no effect” as a modern transition whose
+    /// typed effect is [`KeynoteTransitionEffect::None`], so replacing that
+    /// value creates a visible transition without fabricating a new archive.
     ///
     /// Legacy-only transitions are rejected so the editor never guesses which
     /// representation should take precedence.
@@ -375,10 +382,25 @@ fn validate_transition_settings(settings: &KeynoteTransitionSettings) -> Result<
         ));
     }
     if settings
+        .effect
+        .as_ref()
+        .is_some_and(|effect| !effect.is_canonical())
+    {
+        return Err(Error::ParseError(
+            "Keynote transition effect must use its named variant for known native identifiers"
+                .to_owned(),
+        ));
+    }
+    if settings
         .animation_type
         .as_deref()
         .into_iter()
-        .chain(settings.effect.as_deref())
+        .chain(
+            settings
+                .effect
+                .as_ref()
+                .map(KeynoteTransitionEffect::as_identifier),
+        )
         .chain(
             settings
                 .animation_parameters

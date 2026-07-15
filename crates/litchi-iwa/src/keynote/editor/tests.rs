@@ -3490,10 +3490,44 @@ fn slide_text_placeholder_visibility_rejects_missing_or_inconsistent_state() {
 }
 
 #[test]
+fn transition_lifecycle_is_typed_transactional_and_wire_exact() {
+    let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
+    let baseline = editor.to_bytes().unwrap();
+    let original = editor.slide_transition(0).unwrap().unwrap();
+    assert_eq!(original.effect, Some(KeynoteTransitionEffect::None));
+    assert!(!original.has_effect());
+
+    let mut dissolve = original.clone();
+    dissolve.effect = Some(KeynoteTransitionEffect::Dissolve);
+    dissolve.duration = Some(1.5);
+    dissolve.direction = Some(KeynoteTransitionDirection::from_raw(2));
+    dissolve.animation_parameters.detail = Some(0.75);
+    dissolve.custom_parameters.bounce = Some(true);
+    editor.set_slide_transition(0, dissolve.clone()).unwrap();
+    assert_eq!(editor.slide_transition(0).unwrap(), Some(dissolve));
+    assert!(editor.slide_transition(0).unwrap().unwrap().has_effect());
+
+    assert!(editor.clear_slide_transition(0).unwrap());
+    assert_eq!(editor.slide_transition(0).unwrap(), Some(original));
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+    assert!(!editor.clear_slide_transition(0).unwrap());
+    assert!(editor.slide_transition(99).is_err());
+    assert!(editor.clear_slide_transition(99).is_err());
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+    let mut invalid = editor.slide_transition(0).unwrap().unwrap();
+    invalid.effect = Some(KeynoteTransitionEffect::Unknown("none".to_owned()));
+    assert!(editor.set_slide_transition(0, invalid).is_err());
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+}
+
+#[test]
 fn transition_custom_parameter_crud_is_lossless_and_transactional() {
     let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
     let mut settings = editor.slides().unwrap()[0].transition.clone().unwrap();
-    settings.effect = Some("com.example.future-transition".to_owned());
+    settings.effect = Some(KeynoteTransitionEffect::Unknown(
+        "com.example.future-transition".to_owned(),
+    ));
     settings.direction = Some(KeynoteTransitionDirection::from_raw(42));
     settings.custom_parameters = KeynoteTransitionCustomParameters {
         twist: Some(-0.375),
@@ -3898,7 +3932,7 @@ fn scalar_updates_preserve_unknown_wire_and_restore_exact_components() {
     editor.set_slide_skipped(0, false).unwrap();
     let mut changed_transition = original_transition.clone();
     changed_transition.animation_type = Some("Transition".to_owned());
-    changed_transition.effect = Some("dissolve".to_owned());
+    changed_transition.effect = Some(KeynoteTransitionEffect::Unknown("dissolve".to_owned()));
     changed_transition.duration = Some(2.5);
     changed_transition.direction = Some(KeynoteTransitionDirection::from_raw(2));
     changed_transition.delay = Some(1.0);

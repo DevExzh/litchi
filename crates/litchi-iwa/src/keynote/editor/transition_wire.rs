@@ -92,7 +92,11 @@ pub(super) fn patch_transition_settings_wire(
         &data,
         &animation_path(EFFECT_FIELD),
         animation.effect.is_some(),
-        settings.effect.as_deref().map(str::as_bytes),
+        settings
+            .effect
+            .as_ref()
+            .map(KeynoteTransitionEffect::as_identifier)
+            .map(str::as_bytes),
     )?;
     for (field_number, current, replacement) in [
         (DURATION_FIELD, animation.duration, settings.duration),

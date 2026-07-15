@@ -55,8 +55,9 @@ println!("{}", structured.summary());
   emphasis actions, typed Keyboard / Shimmer / Skid / Swoosh / Trace build-in/build-out
   effects with native direction models, wire-preserving
   move/reorder operations, validated raw CRUD for unmapped native build parameters,
-  typed transition acceleration and text delivery, lossless effect-specific
-  transition parameters, component UUIDs,
+  typed transition effects, acceleration and text delivery, semantic transition
+  deletion through Keynote's native `none` state, lossless effect-specific
+  parameters, component UUIDs,
   and slide-node cache maintenance
 - Typed direct-drawable comment CRUD with Pages document-reachability,
   Numbers sheet-ownership, and Keynote slide-ownership guards
@@ -283,12 +284,14 @@ let layout = keynote.default_slide_layout()?;
 let fresh = keynote.add_slide(layout)?;
 keynote.set_slide_title(fresh.index, "New from theme")?;
 let mut transition = keynote.slides()?[0].transition.clone().expect("transition");
+transition.effect = Some(litchi_iwa::keynote::KeynoteTransitionEffect::Dissolve);
 transition.duration = Some(1.5);
 transition.custom_parameters.acceleration =
     Some(litchi_iwa::keynote::KeynoteTransitionAcceleration::EaseInOut);
 transition.custom_parameters.text_delivery =
     Some(litchi_iwa::keynote::KeynoteTransitionTextDelivery::ByWord);
 keynote.set_slide_transition(0, transition)?;
+keynote.clear_slide_transition(0)?;
 let mut show = keynote.show_settings()?;
 show.loop_presentation = Some(true);
 show.mode = Some(litchi_iwa::keynote::KeynoteShowMode::SelfPlaying);
@@ -566,8 +569,11 @@ boxes but can disable its Lock control for that placement mode. See
 `edit_pages_text_box_properties`.
 
 Keynote show dimensions and playback flags, slide skip state and navigator
-name, and modern transition strings/timing fields use the same bounded wire
-mutations. Native twist, mosaic, bounce, Magic Move fading, timing curve, text
+name, and modern transition identifiers/timing fields use the same bounded wire
+mutations. Transition effects are typed, including native None, Dissolve, and
+Magic Move variants plus lossless future identifiers. Clearing an effect emits
+Keynote's real `none` representation while retaining start timing and the native
+random seed. Native twist, mosaic, bounce, Magic Move fading, timing curve, text
 delivery, motion blur, and travel-distance transition parameters are available
 through a lossless CRUD model, with typed acceleration and text delivery.
 Modern animation color, arbitrary native
