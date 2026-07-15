@@ -808,6 +808,23 @@ impl<'a> Parser<'a> {
             ControlWord::KeepNext => state.paragraph.keep_next = true,
             ControlWord::PageBreakBefore => state.paragraph.page_break_before = true,
             ControlWord::WidowControl => state.paragraph.widow_control = true,
+            ControlWord::ListOverrideIndex(value) => {
+                state.paragraph.list_override = Some(*value);
+            },
+            ControlWord::ListLevelIndex(value) => {
+                let level = u8::try_from(*value).map_err(|_| {
+                    RtfError::MalformedDocument(
+                        "RTF paragraph list level is outside the supported range".to_string(),
+                    )
+                })?;
+                if level > 8 {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF paragraph list level exceeds the nine-level specification limit"
+                            .to_string(),
+                    ));
+                }
+                state.paragraph.list_level = Some(level);
+            },
 
             // Unicode
             ControlWord::UnicodeSkip(n) => state.unicode_skip = *n,
@@ -1624,6 +1641,14 @@ impl<'a> Parser<'a> {
             ControlWord::KeepNext => state.paragraph.keep_next = true,
             ControlWord::PageBreakBefore => state.paragraph.page_break_before = true,
             ControlWord::WidowControl => state.paragraph.widow_control = true,
+            ControlWord::ListOverrideIndex(value) => {
+                state.paragraph.list_override = Some(*value);
+            },
+            ControlWord::ListLevelIndex(value) => {
+                if let Ok(level @ 0..=8) = u8::try_from(*value) {
+                    state.paragraph.list_level = Some(level);
+                }
+            },
             _ => {},
         }
     }

@@ -228,6 +228,10 @@ pub struct Paragraph {
     pub page_break_before: bool,
     /// Widow/orphan control
     pub widow_control: bool,
+    /// List override index (`\lsN`) applied to this paragraph
+    pub list_override: Option<i32>,
+    /// Zero-based list level (`\ilvlN`) applied to this paragraph
+    pub list_level: Option<u8>,
 }
 
 /// Underline style

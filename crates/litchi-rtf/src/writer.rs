@@ -1042,6 +1042,19 @@ impl<W: Write> RtfWriter<W> {
             self.write_control_word("widctlpar", None)?;
         }
 
+        if let Some(list_override) = para.list_override {
+            self.write_control_word("ls", Some(list_override))?;
+        }
+        if let Some(list_level) = para.list_level {
+            if list_level > 8 {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF paragraph list levels must be between zero and eight",
+                ));
+            }
+            self.write_control_word("ilvl", Some(i32::from(list_level)))?;
+        }
+
         Ok(())
     }
 
@@ -1692,7 +1705,7 @@ mod tests {
     #[test]
     fn document_writer_round_trips_list_tables() {
         let document = RtfDocument::parse(
-            r#"{\rtf1\ansi{\*\listtable{\list\listtemplateid42\listhybrid{\listlevel\levelnfc0\leveljc2\levelfollow1\levelstartat3\levelspace120\levelindent360{\leveltext\'02\'00.;}{\levelnumbers\'01;}\f2}{\listlevel\levelnfc77\leveljc0\levelfollow2\levelstartat1{\leveltext\'01\u8226?;}{\levelnumbers;}}{\listname Outline;}\listid77}}{\*\listoverridetable{\listoverride\listid77\listoverridecount1{\lfolevel\listoverridestartat\levelstartat9}\ls4}}Body}"#,
+            r#"{\rtf1\ansi{\*\listtable{\list\listtemplateid42\listhybrid{\listlevel\levelnfc0\leveljc2\levelfollow1\levelstartat3\levelspace120\levelindent360{\leveltext\'02\'00.;}{\levelnumbers\'01;}\f2}{\listlevel\levelnfc77\leveljc0\levelfollow2\levelstartat1{\leveltext\'01\u8226?;}{\levelnumbers;}}{\listname Outline;}\listid77}}{\*\listoverridetable{\listoverride\listid77\listoverridecount1{\lfolevel\listoverridestartat\levelstartat9}\ls4}}\pard\ls4\ilvl1 Body}"#,
         )
         .unwrap();
         let mut output = Vec::new();
@@ -1702,6 +1715,9 @@ mod tests {
 
         let reparsed = RtfDocument::from_bytes(&output).unwrap();
         assert_eq!(reparsed.text(), "Body");
+        let paragraph = reparsed.blocks().last().unwrap().paragraph;
+        assert_eq!(paragraph.list_override, Some(4));
+        assert_eq!(paragraph.list_level, Some(1));
         let list = reparsed.list_table().get(77).unwrap();
         assert_eq!(list.template_id, 42);
         assert!(list.hybrid);

@@ -932,6 +932,15 @@ mod tests {
     }
 
     #[test]
+    fn preserves_paragraph_list_instance_and_level() {
+        let doc = RtfDocument::parse(r#"{\rtf1\pard\ls4\ilvl2 Listed text}"#).unwrap();
+        assert_eq!(doc.text(), "Listed text");
+        let paragraph = doc.blocks().last().unwrap().paragraph;
+        assert_eq!(paragraph.list_override, Some(4));
+        assert_eq!(paragraph.list_level, Some(2));
+    }
+
+    #[test]
     fn parses_nested_bookmarks_with_range_metadata() {
         let rtf = r#"{\rtf1\ansi Before {\*\bkmkstart\bkmkcolf1\bkmkcoll3\bkmkpub Outer}alpha {\*\bkmkstart Inner}\u20320?{\*\bkmkend Inner} omega{\*\bkmkend Outer} After}"#;
         let doc = RtfDocument::parse(rtf).unwrap();
