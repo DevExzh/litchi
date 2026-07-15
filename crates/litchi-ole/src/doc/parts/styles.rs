@@ -1145,5 +1145,20 @@ mod tests {
             overridden.justification,
             super::super::pap::Justification::Center
         );
+
+        let permuted = super::super::pap::ParagraphProperties::cascade_styles(
+            Some(16),
+            &[
+                0x01, 0xC6, 7, // sprmPIstdPermute and SPPOperand length
+                0, 16, 0, 16, 0, 15, 0, // style 16 maps to style 15
+            ],
+            &stylesheet,
+        )
+        .unwrap();
+        assert_eq!(permuted.style_index, Some(15));
+        assert_eq!(
+            permuted.justification,
+            super::super::pap::Justification::Right
+        );
     }
 }

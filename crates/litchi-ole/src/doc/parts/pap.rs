@@ -647,10 +647,16 @@ impl ParagraphProperties {
             if get_sprm_type(sprm.opcode) != 1 {
                 continue;
             }
-            if sprm.opcode == 0x4600 {
-                let requested = sprm.operand_word().ok_or_else(|| {
+            let requested_style = if sprm.opcode == SPRM_P_ISTD {
+                Some(sprm.operand_word().ok_or_else(|| {
                     DocError::Corrupted("sprmPIstd is missing its style index".to_string())
-                })?;
+                })?)
+            } else if sprm.opcode == SPRM_P_ISTD_PERMUTE {
+                Self::permuted_style(sprm, current.style_index)?
+            } else {
+                None
+            };
+            if let Some(requested) = requested_style {
                 let mut styled = Self::paragraph_style_baseline(Some(requested), stylesheet)?;
                 styled.style_index = Some(requested);
                 Self::preserve_style_state(&current, &mut styled);
@@ -908,7 +914,12 @@ impl ParagraphProperties {
             },
             // Operation 0x01: sprmPIstdPermute - Style permutation
             0x01 => {
-                // Used only for piece table grpprl's, not for PAPX
+                if let Some(style) = Self::permuted_style(sprm, pap.style_index)? {
+                    pap.style_index = Some(style);
+                    if (1..=9).contains(&style) {
+                        pap.outline_level = Some((style - 1) as u8);
+                    }
+                }
             },
             // Operation 0x02: sprmPIncLvl - Increment outline level
             0x02 => {
@@ -1423,6 +1434,46 @@ impl ParagraphProperties {
         crate::doc::revision::decode_dttm(timestamp)?;
         pap.formatting_revision_timestamp = Some(timestamp);
         Ok(())
+    }
+
+    fn permuted_style(sprm: &Sprm, current: Option<u16>) -> Result<Option<u16>> {
+        let operand = sprm.operand_bytes();
+        if operand.len() < 7 {
+            return Err(DocError::Corrupted(
+                "sprmPIstdPermute SPPOperand is too short".to_string(),
+            ));
+        }
+        if operand[0] != 0 {
+            return Err(DocError::Corrupted(
+                "sprmPIstdPermute fLong must be zero".to_string(),
+            ));
+        }
+        let first = read_u16_le(operand, 1).map_err(|error| {
+            DocError::Corrupted(format!("invalid sprmPIstdPermute first style: {error}"))
+        })?;
+        let last = read_u16_le(operand, 3).map_err(|error| {
+            DocError::Corrupted(format!("invalid sprmPIstdPermute last style: {error}"))
+        })?;
+        if last < first {
+            return Err(DocError::Corrupted(
+                "sprmPIstdPermute last style precedes its first style".to_string(),
+            ));
+        }
+        let count = usize::from(last - first) + 1;
+        let expected = 5 + count * 2;
+        if operand.len() != expected {
+            return Err(DocError::Corrupted(format!(
+                "sprmPIstdPermute has {} bytes; expected {expected}",
+                operand.len()
+            )));
+        }
+        let Some(current) = current.filter(|style| (first..=last).contains(style)) else {
+            return Ok(None);
+        };
+        let offset = 5 + usize::from(current - first) * 2;
+        read_u16_le(operand, offset).map(Some).map_err(|error| {
+            DocError::Corrupted(format!("invalid sprmPIstdPermute mapped style: {error}"))
+        })
     }
 
     fn strict_bool8(sprm: &Sprm, name: &str) -> Result<bool> {
@@ -2623,6 +2674,32 @@ mod tests {
         let properties = ParagraphProperties::from_sprm(&logical_supersedes_physical).unwrap();
         assert_eq!(properties.justification, Justification::Distributed);
         assert_eq!(properties.physical_justification, None);
+    }
+
+    #[test]
+    fn applies_style_permutations_and_rejects_malformed_spp_operands() {
+        let permutation = [
+            0, 2, 0, 4, 0, // fLong, first, last
+            20, 0, 21, 0, 22, 0, // mappings for styles 2 through 4
+        ];
+        let mut grpprl = SPRM_P_ISTD.to_le_bytes().to_vec();
+        grpprl.extend_from_slice(&3u16.to_le_bytes());
+        grpprl.extend_from_slice(&SPRM_P_ISTD_PERMUTE.to_le_bytes());
+        grpprl.push(permutation.len() as u8);
+        grpprl.extend_from_slice(&permutation);
+        let properties = ParagraphProperties::from_sprm(&grpprl).unwrap();
+        assert_eq!(properties.style_index, Some(21));
+
+        for operand in [
+            vec![1, 2, 0, 4, 0, 20, 0, 21, 0, 22, 0],
+            vec![0, 4, 0, 2, 0, 20, 0],
+            vec![0, 2, 0, 4, 0, 20, 0, 21, 0],
+        ] {
+            let mut invalid = SPRM_P_ISTD_PERMUTE.to_le_bytes().to_vec();
+            invalid.push(operand.len() as u8);
+            invalid.extend_from_slice(&operand);
+            assert!(ParagraphProperties::from_sprm(&invalid).is_err());
+        }
     }
 
     #[test]
