@@ -2613,6 +2613,7 @@ fn insert_unique<T>(
     Ok(())
 }
 
+mod body_shapes;
 mod document_options;
 mod footnote_settings;
 mod images;
@@ -2623,6 +2624,7 @@ mod section_settings;
 mod text_box_create;
 mod types;
 
+pub use body_shapes::{PagesBodyShapeInfo, PagesBodyShapeKind, RemovedPagesBodyShape};
 pub use images::{PagesImageInfo, RemovedPagesImage};
 
 #[cfg(test)]

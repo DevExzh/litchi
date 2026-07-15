@@ -44,16 +44,16 @@ enum VerticalAnchorBasis {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct TextBoxObjectIds {
-    drawable: u64,
-    caption: u64,
-    title: u64,
-    storage: u64,
-    attachment: u64,
+pub(super) struct BodyTextShapeObjectIds {
+    pub(super) drawable: u64,
+    pub(super) caption: u64,
+    pub(super) title: u64,
+    pub(super) storage: u64,
+    pub(super) attachment: u64,
 }
 
-impl TextBoxObjectIds {
-    fn allocate(first: u64) -> Result<Self> {
+impl BodyTextShapeObjectIds {
+    pub(super) fn allocate(first: u64) -> Result<Self> {
         let identifier = |offset: u64| {
             first
                 .checked_add(offset)
@@ -68,12 +68,34 @@ impl TextBoxObjectIds {
         })
     }
 
-    fn last(self) -> u64 {
+    pub(super) const fn last(self) -> u64 {
         self.attachment
     }
 
-    fn uuid_objects(self) -> [u64; 4] {
+    pub(super) const fn all(self) -> [u64; 5] {
+        [
+            self.drawable,
+            self.caption,
+            self.title,
+            self.storage,
+            self.attachment,
+        ]
+    }
+
+    pub(super) const fn uuid_objects(self) -> [u64; 4] {
         [self.drawable, self.caption, self.title, self.storage]
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum BodyTextShapeRole {
+    TextBox,
+    Shape,
+}
+
+impl BodyTextShapeRole {
+    const fn is_text_box(self) -> bool {
+        matches!(self, Self::TextBox)
     }
 }
 
@@ -99,7 +121,7 @@ impl PagesEditor {
             "TSWP.StorageArchive",
         )?;
         let style_id = text_box_style_id(self.package(), &root)?;
-        let storage = text_box_storage(text, &body);
+        let storage = body_text_storage(text, &body);
         let first_identifier = next_object_identifier(self.package())?;
         let (creates_z_order, z_order_id) = if let Some(z_order) = &root.drawables_zorder {
             (false, z_order.identifier)
@@ -109,20 +131,21 @@ impl PagesEditor {
         let graph_first_identifier = first_identifier
             .checked_add(u64::from(creates_z_order))
             .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))?;
-        let ids = TextBoxObjectIds::allocate(graph_first_identifier)?;
+        let ids = BodyTextShapeObjectIds::allocate(graph_first_identifier)?;
         let archive_name = find_object_archive(self.package(), self.body_storage_id)?;
 
         let mut staged = self.package().clone();
         if creates_z_order {
             create_drawable_z_order(&mut staged, &archive_name, z_order_id)?;
         }
-        let objects = text_box_objects(
+        let objects = body_text_shape_objects(
             ids,
             self.body_storage_id,
             style_id,
             geometry,
             storage,
             root.left_margin.unwrap_or_default(),
+            BodyTextShapeRole::TextBox,
         )?;
         staged.update_archive(&archive_name, |archive| {
             for object in objects {
@@ -224,7 +247,7 @@ fn text_box_style_id(package: &IWorkPackage, root: &DocumentArchive) -> Result<u
         .ok_or_else(|| Error::InvalidFormat("Pages theme has no text-box style preset".to_owned()))
 }
 
-fn text_box_storage(text: &str, body: &StorageArchive) -> StorageArchive {
+pub(super) fn body_text_storage(text: &str, body: &StorageArchive) -> StorageArchive {
     let paragraph_style = first_object_attribute(&body.table_para_style);
     let list_style = first_object_attribute(&body.table_list_style);
     let language = body.table_language.as_ref().and_then(|table| {
@@ -287,19 +310,20 @@ fn zero_para_data() -> crate::protobuf::tswp::ParaDataAttributeTable {
 }
 
 #[allow(deprecated)]
-fn text_box_objects(
-    ids: TextBoxObjectIds,
+pub(super) fn body_text_shape_objects(
+    ids: BodyTextShapeObjectIds,
     body_storage_id: u64,
     style_id: u64,
     geometry: DrawableGeometry,
     storage: StorageArchive,
     left_margin: f32,
+    role: BodyTextShapeRole,
 ) -> Result<[ArchiveObject; 5]> {
     let position = geometry.position.ok_or_else(|| {
-        Error::InvalidFormat("validated text-box geometry has no position".to_owned())
+        Error::InvalidFormat("validated body text-shape geometry has no position".to_owned())
     })?;
     let size = geometry.size.ok_or_else(|| {
-        Error::InvalidFormat("validated text-box geometry has no size".to_owned())
+        Error::InvalidFormat("validated body text-shape geometry has no size".to_owned())
     })?;
     let storage_references = storage_references(&storage);
     let shape = crate::protobuf::tswp::ShapeInfoArchive {
@@ -341,7 +365,7 @@ fn text_box_objects(
         },
         deprecated_storage: Some(reference(ids.storage)),
         owned_storage: Some(reference(ids.storage)),
-        is_text_box: Some(true),
+        is_text_box: Some(role.is_text_box()),
         ..Default::default()
     };
     let attachment = DrawableAttachmentArchive {

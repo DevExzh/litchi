@@ -101,6 +101,27 @@ pages.save("created-with-text-box.pages")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
 
+Ordinary text-bearing rectangles have independent shape CRUD. Their path,
+storage, stand-ins, body attachment, z-order, style relationship, and UUIDs
+are likewise built directly from typed values:
+
+```rust
+use litchi_iwa::pages::PagesEditor;
+use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+
+let body = "Quarterly report";
+let mut pages = PagesEditor::create_with_text(body)?;
+let rectangle = pages.add_body_rectangle(
+    body.encode_utf16().count(),
+    "A fully editable shape",
+    DrawablePoint { x: 180.0, y: 240.0 },
+    DrawableSize { width: 300.0, height: 150.0 },
+)?;
+pages.set_body_shape_text(rectangle.drawable_object_id, "Updated")?;
+pages.save("created-with-shape.pages")?;
+# Ok::<(), litchi_iwa::Error>(())
+```
+
 Images use the same source-free path. The image object, body attachment,
 stand-ins, z-order, style link, UUIDs, component data reference, and `Data/*`
 asset are constructed directly; no blank Pages package is embedded:

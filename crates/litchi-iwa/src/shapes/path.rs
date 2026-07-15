@@ -3,6 +3,8 @@
 use crate::protobuf::{tsd, tsp, tswp};
 use crate::{Error, Result};
 
+const NORMALIZED_RECTANGLE_EXTENT: f32 = 100.0;
+
 /// Structural path family used by an ordinary iWork shape.
 ///
 /// Rectangle paths are distinguished from arbitrary Bézier paths so
@@ -59,19 +61,28 @@ pub(crate) fn shape_path_kind(shape: &tswp::ShapeInfoArchive) -> Result<ShapePat
 }
 
 fn is_rectangle_path(bezier: &tsd::BezierPathSourceArchive) -> bool {
-    use tsp::path::ElementType;
-
     let Some(size) = bezier.natural_size.as_ref() else {
         return false;
     };
     let Some(path) = bezier.path.as_ref() else {
         return false;
     };
+    rectangle_elements_match(path, size.width, size.height)
+        || rectangle_elements_match(
+            path,
+            NORMALIZED_RECTANGLE_EXTENT,
+            NORMALIZED_RECTANGLE_EXTENT,
+        )
+}
+
+fn rectangle_elements_match(path: &tsp::Path, width: f32, height: f32) -> bool {
+    use tsp::path::ElementType;
+
     let expected = [
         (ElementType::MoveTo, Some((0.0, 0.0))),
-        (ElementType::LineTo, Some((size.width, 0.0))),
-        (ElementType::LineTo, Some((size.width, size.height))),
-        (ElementType::LineTo, Some((0.0, size.height))),
+        (ElementType::LineTo, Some((width, 0.0))),
+        (ElementType::LineTo, Some((width, height))),
+        (ElementType::LineTo, Some((0.0, height))),
         (ElementType::CloseSubpath, None),
         (ElementType::MoveTo, Some((0.0, 0.0))),
     ];
@@ -97,6 +108,13 @@ fn is_rectangle_path(bezier: &tsd::BezierPathSourceArchive) -> bool {
 mod tests {
     use super::*;
 
+    fn path_element(r#type: tsp::path::ElementType, points: Vec<tsp::Point>) -> tsp::path::Element {
+        tsp::path::Element {
+            r#type: r#type as i32,
+            points,
+        }
+    }
+
     #[test]
     fn rejects_missing_and_ambiguous_path_families() {
         let mut shape = tswp::ShapeInfoArchive::default();
@@ -107,5 +125,35 @@ mod tests {
         path.bezier_path_source = Some(tsd::BezierPathSourceArchive::default());
         path.scalar_path_source = Some(tsd::ScalarPathSourceArchive::default());
         assert!(shape_path_kind(&shape).is_err());
+    }
+
+    #[test]
+    fn classifies_pages_normalized_rectangle_independently_of_natural_size() {
+        use tsp::path::ElementType;
+
+        let point = |x, y| tsp::Point { x, y };
+        let mut shape = tswp::ShapeInfoArchive::default();
+        shape.super_.pathsource = Some(tsd::PathSourceArchive {
+            bezier_path_source: Some(tsd::BezierPathSourceArchive {
+                natural_size: Some(tsp::Size {
+                    width: 300.0,
+                    height: 150.0,
+                }),
+                path: Some(tsp::Path {
+                    elements: vec![
+                        path_element(ElementType::MoveTo, vec![point(0.0, 0.0)]),
+                        path_element(ElementType::LineTo, vec![point(100.0, 0.0)]),
+                        path_element(ElementType::LineTo, vec![point(100.0, 100.0)]),
+                        path_element(ElementType::LineTo, vec![point(0.0, 100.0)]),
+                        path_element(ElementType::CloseSubpath, Vec::new()),
+                        path_element(ElementType::MoveTo, vec![point(0.0, 0.0)]),
+                    ],
+                }),
+                ..Default::default()
+            }),
+            ..Default::default()
+        });
+
+        assert_eq!(shape_path_kind(&shape).unwrap(), ShapePathKind::Rectangle);
     }
 }

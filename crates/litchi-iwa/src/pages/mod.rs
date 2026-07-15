@@ -37,11 +37,12 @@ pub mod section;
 pub use creation::PagesDocumentBuilder;
 pub use document::PagesDocument;
 pub use editor::{
-    PagesDocumentOptions, PagesDrawableTextInfo, PagesEditor, PagesFootnoteFormat,
-    PagesFootnoteGap, PagesFootnoteKind, PagesFootnoteNumbering, PagesFootnoteSettings,
-    PagesHeaderFooterInfo, PagesHeaderFooterKind, PagesImageInfo, PagesPageLayout, PagesPageNumber,
-    PagesPageOrientation, PagesRgbColorSpace, PagesRgbaColor, PagesSectionBackground,
-    PagesSectionInfo, PagesSectionPageNumbering, PagesSectionSettings, PagesSectionStart,
-    PagesTemplateKind, RemovedPagesImage, RemovedPagesTextBox,
+    PagesBodyShapeInfo, PagesBodyShapeKind, PagesDocumentOptions, PagesDrawableTextInfo,
+    PagesEditor, PagesFootnoteFormat, PagesFootnoteGap, PagesFootnoteKind, PagesFootnoteNumbering,
+    PagesFootnoteSettings, PagesHeaderFooterInfo, PagesHeaderFooterKind, PagesImageInfo,
+    PagesPageLayout, PagesPageNumber, PagesPageOrientation, PagesRgbColorSpace, PagesRgbaColor,
+    PagesSectionBackground, PagesSectionInfo, PagesSectionPageNumbering, PagesSectionSettings,
+    PagesSectionStart, PagesTemplateKind, RemovedPagesBodyShape, RemovedPagesImage,
+    RemovedPagesTextBox,
 };
 pub use section::{PagesSection, PagesSectionType};
