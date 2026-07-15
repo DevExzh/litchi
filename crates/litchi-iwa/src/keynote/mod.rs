@@ -30,11 +30,13 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
+pub mod creation;
 pub mod document;
 pub mod editor;
 pub mod show;
 pub mod slide;
 
+pub use creation::KeynoteDocumentBuilder;
 pub use document::KeynoteDocument;
 pub use editor::{
     KeynoteBuildAcceleration, KeynoteBuildChunkInfo, KeynoteBuildCustomParameters,

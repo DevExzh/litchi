@@ -3,6 +3,7 @@
 use std::env;
 
 use litchi_iwa::IWorkPackage;
+use litchi_iwa::IWorkThemeArchive;
 use litchi_iwa::protobuf::kn;
 use litchi_iwa::protobuf::tn;
 use litchi_iwa::protobuf::tp::{
@@ -16,7 +17,10 @@ use litchi_iwa::protobuf::tsp::PackageMetadata;
 use litchi_iwa::protobuf::tss::StylesheetArchive;
 use litchi_iwa::protobuf::tst::TableDataList;
 use litchi_iwa::protobuf::tst::{TableInfoArchive, TableModelArchive};
-use litchi_iwa::protobuf::tswp::{ShapeInfoArchive, StorageArchive};
+use litchi_iwa::protobuf::tswp::{
+    CharacterStyleArchive, ListStyleArchive, ParagraphStyleArchive, ShapeInfoArchive,
+    ShapeStyleArchive, StorageArchive,
+};
 use prost::Message;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -92,6 +96,44 @@ fn print_archive(archive: litchi_iwa::archive::Archive, object_id: Option<u64>) 
             {
                 println!("  keynote_theme={theme:#?}");
             }
+            if message.type_ == 10
+                && let Ok(theme) = IWorkThemeArchive::decode(message.data.as_slice())
+            {
+                println!(
+                    "  keynote_theme_presets=drawing={:?} text={:?} chart={:?} table={:?} application={:?}",
+                    theme.extensions.drawing.as_ref().map(|presets| (
+                        presets.gradient_fill_presets.len(),
+                        presets.image_fill_presets.len(),
+                        presets.shadow_presets.len(),
+                        presets.line_style_presets.len(),
+                        presets.shape_style_presets.len(),
+                        presets.textbox_style_presets.len(),
+                        presets.image_style_presets.len(),
+                        presets.movie_style_presets.len(),
+                        presets.drawing_line_style_presets.len(),
+                    )),
+                    theme.extensions.text.as_ref().map(|presets| (
+                        presets.list_style_presets.len(),
+                        presets.character_style_presets.len(),
+                        presets.paragraph_style_presets.len(),
+                        presets.dropcap_style_presets.len(),
+                    )),
+                    theme
+                        .extensions
+                        .chart
+                        .as_ref()
+                        .map(|presets| presets.chart_presets.len()),
+                    theme
+                        .extensions
+                        .table
+                        .as_ref()
+                        .map(|presets| presets.table_style_presets.len()),
+                    theme.extensions.application.as_ref().map(|presets| (
+                        presets.caption_style_presets.len(),
+                        presets.svg_import_style_presets.len(),
+                    )),
+                );
+            }
             if message.type_ == 2_043
                 && let Ok(attachment) =
                     kn::SlideNumberAttachmentArchive::decode(message.data.as_slice())
@@ -138,6 +180,11 @@ fn print_archive(archive: litchi_iwa::archive::Archive, object_id: Option<u64>) 
             {
                 println!("  numbers_sheet={sheet:#?}");
             }
+            if message.type_ == 2
+                && let Ok(show) = kn::ShowArchive::decode(message.data.as_slice())
+            {
+                println!("  keynote_show={show:#?}");
+            }
             if message.type_ == 601
                 && let Ok(state) = litchi_iwa::protobuf::tsa::FunctionBrowserStateArchive::decode(
                     message.data.as_slice(),
@@ -160,10 +207,36 @@ fn print_archive(archive: litchi_iwa::archive::Archive, object_id: Option<u64>) 
             {
                 println!("  keynote_slide={slide:#?}");
             }
+            if message.type_ == 7
+                && let Ok(placeholder) = kn::PlaceholderArchive::decode(message.data.as_slice())
+            {
+                println!("  keynote_placeholder={placeholder:#?}");
+            }
             if message.type_ == 9
                 && let Ok(style) = kn::SlideStyleArchive::decode(message.data.as_slice())
             {
                 println!("  keynote_slide_style={style:#?}");
+            }
+            if message.type_ == 15
+                && let Ok(note) = kn::NoteArchive::decode(message.data.as_slice())
+            {
+                println!("  keynote_note={note:#?}");
+            }
+            if message.type_ == 21
+                && let Ok(soundtrack) = kn::Soundtrack::decode(message.data.as_slice())
+            {
+                println!("  keynote_soundtrack={soundtrack:#?}");
+            }
+            if message.type_ == 184
+                && let Ok(source) = kn::LiveVideoSource::decode(message.data.as_slice())
+            {
+                println!("  keynote_live_video_source={source:#?}");
+            }
+            if message.type_ == 185
+                && let Ok(collection) =
+                    kn::LiveVideoSourceCollection::decode(message.data.as_slice())
+            {
+                println!("  keynote_live_video_collection={collection:#?}");
             }
             if message.type_ == 401
                 && let Ok(stylesheet) = StylesheetArchive::decode(message.data.as_slice())
@@ -174,6 +247,26 @@ fn print_archive(archive: litchi_iwa::archive::Archive, object_id: Option<u64>) 
                 && let Ok(shape) = ShapeInfoArchive::decode(message.data.as_slice())
             {
                 println!("  text_shape={shape:#?}");
+            }
+            if message.type_ == 2_021
+                && let Ok(style) = CharacterStyleArchive::decode(message.data.as_slice())
+            {
+                println!("  character_style={style:#?}");
+            }
+            if message.type_ == 2_022
+                && let Ok(style) = ParagraphStyleArchive::decode(message.data.as_slice())
+            {
+                println!("  paragraph_style={style:#?}");
+            }
+            if message.type_ == 2_023
+                && let Ok(style) = ListStyleArchive::decode(message.data.as_slice())
+            {
+                println!("  list_style={style:#?}");
+            }
+            if message.type_ == 2_025
+                && let Ok(style) = ShapeStyleArchive::decode(message.data.as_slice())
+            {
+                println!("  shape_style={style:#?}");
             }
             if matches!(message.type_, 2_001 | 2_022)
                 && let Ok(storage) = StorageArchive::decode(message.data.as_slice())
