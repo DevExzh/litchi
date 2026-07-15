@@ -63,6 +63,12 @@ enum ShapeElement {
     Connector,
     Control,
     Group,
+    ThreeDimensionalScene,
+    ThreeDimensionalLight,
+    ThreeDimensionalCube,
+    ThreeDimensionalSphere,
+    ThreeDimensionalExtrude,
+    ThreeDimensionalRotate,
 }
 
 #[derive(Clone, Copy)]
@@ -278,6 +284,16 @@ impl OdpParser {
                 b"handle" => OdpElement::EnhancedHandle,
                 _ => OdpElement::Other,
             }
+        } else if Self::is_namespace(namespace, DR3D_NAMESPACE) {
+            match local_name {
+                b"scene" => OdpElement::Shape(ShapeElement::ThreeDimensionalScene),
+                b"light" => OdpElement::Shape(ShapeElement::ThreeDimensionalLight),
+                b"cube" => OdpElement::Shape(ShapeElement::ThreeDimensionalCube),
+                b"sphere" => OdpElement::Shape(ShapeElement::ThreeDimensionalSphere),
+                b"extrude" => OdpElement::Shape(ShapeElement::ThreeDimensionalExtrude),
+                b"rotate" => OdpElement::Shape(ShapeElement::ThreeDimensionalRotate),
+                _ => OdpElement::Other,
+            }
         } else if Self::is_namespace(namespace, OFFICE_NAMESPACE)
             && local_name == b"event-listeners"
         {
@@ -310,6 +326,126 @@ impl OdpParser {
         } else {
             OdpElement::Other
         }
+    }
+
+    fn drawing_kind(shape_element: ShapeElement) -> DrawingShapeKind {
+        match shape_element {
+            ShapeElement::Frame => DrawingShapeKind::Frame,
+            ShapeElement::Rect => DrawingShapeKind::Rectangle,
+            ShapeElement::Ellipse => DrawingShapeKind::Ellipse,
+            ShapeElement::Line => DrawingShapeKind::Line,
+            ShapeElement::CustomShape => DrawingShapeKind::CustomShape,
+            ShapeElement::Circle => DrawingShapeKind::Circle,
+            ShapeElement::Path => DrawingShapeKind::Path,
+            ShapeElement::Polygon => DrawingShapeKind::Polygon,
+            ShapeElement::Polyline => DrawingShapeKind::Polyline,
+            ShapeElement::RegularPolygon => DrawingShapeKind::RegularPolygon,
+            ShapeElement::PageThumbnail => DrawingShapeKind::PageThumbnail,
+            ShapeElement::Measure => DrawingShapeKind::Measure,
+            ShapeElement::Caption => DrawingShapeKind::Caption,
+            ShapeElement::Connector => DrawingShapeKind::Connector,
+            ShapeElement::Control => DrawingShapeKind::Control,
+            ShapeElement::Group => DrawingShapeKind::Group,
+            ShapeElement::ThreeDimensionalScene => DrawingShapeKind::ThreeDimensionalScene,
+            ShapeElement::ThreeDimensionalLight => DrawingShapeKind::ThreeDimensionalLight,
+            ShapeElement::ThreeDimensionalCube => DrawingShapeKind::ThreeDimensionalCube,
+            ShapeElement::ThreeDimensionalSphere => DrawingShapeKind::ThreeDimensionalSphere,
+            ShapeElement::ThreeDimensionalExtrude => DrawingShapeKind::ThreeDimensionalExtrude,
+            ShapeElement::ThreeDimensionalRotate => DrawingShapeKind::ThreeDimensionalRotate,
+        }
+    }
+
+    fn validate_shape_parent(parent: &ShapeBuilder, child: DrawingShapeKind) -> Result<()> {
+        match parent.drawing_kind {
+            Some(DrawingShapeKind::Group) => {
+                if child.is_three_dimensional() && child != DrawingShapeKind::ThreeDimensionalScene
+                {
+                    return Err(Error::InvalidFormat(
+                        "3D drawing objects require a dr3d:scene parent".to_string(),
+                    ));
+                }
+            },
+            Some(DrawingShapeKind::ThreeDimensionalScene) => {
+                if !child.is_three_dimensional() {
+                    return Err(Error::InvalidFormat(
+                        "dr3d:scene can only contain 3D lights and objects".to_string(),
+                    ));
+                }
+                if child == DrawingShapeKind::ThreeDimensionalLight
+                    && parent.children.iter().any(|existing| {
+                        existing.drawing_kind() != Some(DrawingShapeKind::ThreeDimensionalLight)
+                    })
+                {
+                    return Err(Error::InvalidFormat(
+                        "dr3d:light elements must precede 3D objects".to_string(),
+                    ));
+                }
+            },
+            _ => {
+                return Err(Error::InvalidFormat(
+                    "nested drawing shapes require a draw:g or dr3d:scene parent".to_string(),
+                ));
+            },
+        }
+        Ok(())
+    }
+
+    fn validate_three_dimensional_child_element(
+        parent: Option<&ShapeBuilder>,
+        child: OdpElement,
+    ) -> Result<()> {
+        let Some(parent_kind) = parent.and_then(|builder| builder.drawing_kind) else {
+            return Ok(());
+        };
+        if !parent_kind.is_three_dimensional() {
+            return Ok(());
+        }
+        if parent_kind != DrawingShapeKind::ThreeDimensionalScene {
+            return Err(Error::InvalidFormat(
+                "3D light and object elements cannot contain child elements".to_string(),
+            ));
+        }
+        match child {
+            OdpElement::Shape(shape) if Self::drawing_kind(shape).is_three_dimensional() => Ok(()),
+            // `svg:title`, `svg:desc`, `draw:glue-point`, and foreign
+            // extension elements are intentionally handled as opaque content.
+            OdpElement::Other => Ok(()),
+            _ => Err(Error::InvalidFormat(
+                "dr3d:scene can only contain 3D content".to_string(),
+            )),
+        }
+    }
+
+    fn validate_required_three_dimensional_attributes(
+        kind: DrawingShapeKind,
+        attributes: &[DrawingAttribute],
+    ) -> Result<()> {
+        let has = |namespace, local_name| {
+            attributes.iter().any(|attribute| {
+                attribute.namespace() == namespace && attribute.local_name() == local_name
+            })
+        };
+        if kind == DrawingShapeKind::ThreeDimensionalLight
+            && !has(DrawingAttributeNamespace::Dr3d, "direction")
+        {
+            return Err(Error::InvalidFormat(
+                "dr3d:light requires dr3d:direction".to_string(),
+            ));
+        }
+        if matches!(
+            kind,
+            DrawingShapeKind::ThreeDimensionalExtrude | DrawingShapeKind::ThreeDimensionalRotate
+        ) {
+            for local_name in ["viewBox", "d"] {
+                if !has(DrawingAttributeNamespace::Svg, local_name) {
+                    return Err(Error::InvalidFormat(format!(
+                        "{} requires svg:{local_name}",
+                        kind.element_name()
+                    )));
+                }
+            }
+        }
+        Ok(())
     }
 
     fn animation_attributes(
@@ -621,24 +757,7 @@ impl OdpParser {
         let mut builder = ShapeBuilder::new();
         let presentation_class = Self::get_attr(reader, element, PRESENTATION_NAMESPACE, b"class")?;
         builder.is_frame = matches!(shape_element, ShapeElement::Frame);
-        builder.drawing_kind = Some(match shape_element {
-            ShapeElement::Frame => DrawingShapeKind::Frame,
-            ShapeElement::Rect => DrawingShapeKind::Rectangle,
-            ShapeElement::Ellipse => DrawingShapeKind::Ellipse,
-            ShapeElement::Line => DrawingShapeKind::Line,
-            ShapeElement::CustomShape => DrawingShapeKind::CustomShape,
-            ShapeElement::Circle => DrawingShapeKind::Circle,
-            ShapeElement::Path => DrawingShapeKind::Path,
-            ShapeElement::Polygon => DrawingShapeKind::Polygon,
-            ShapeElement::Polyline => DrawingShapeKind::Polyline,
-            ShapeElement::RegularPolygon => DrawingShapeKind::RegularPolygon,
-            ShapeElement::PageThumbnail => DrawingShapeKind::PageThumbnail,
-            ShapeElement::Measure => DrawingShapeKind::Measure,
-            ShapeElement::Caption => DrawingShapeKind::Caption,
-            ShapeElement::Connector => DrawingShapeKind::Connector,
-            ShapeElement::Control => DrawingShapeKind::Control,
-            ShapeElement::Group => DrawingShapeKind::Group,
-        });
+        builder.drawing_kind = Some(Self::drawing_kind(shape_element));
         builder.is_title = presentation_class.as_deref() == Some("title");
         builder.shape_type = match shape_element {
             ShapeElement::Frame => match presentation_class.as_deref() {
@@ -647,7 +766,7 @@ impl OdpParser {
             },
             ShapeElement::Line | ShapeElement::Measure => ShapeType::Line,
             ShapeElement::Connector => ShapeType::Connector,
-            ShapeElement::Group => ShapeType::Group,
+            ShapeElement::Group | ShapeElement::ThreeDimensionalScene => ShapeType::Group,
             _ => ShapeType::AutoShape,
         };
         builder.name = Self::get_attr(reader, element, DRAW_NAMESPACE, b"name")?;
@@ -684,6 +803,10 @@ impl OdpParser {
             "presentation:user-transformed",
         )?;
         builder.drawing_attributes = Self::drawing_attributes(reader, element)?;
+        Self::validate_required_three_dimensional_attributes(
+            builder.drawing_kind.expect("shape kind initialized"),
+            &builder.drawing_attributes,
+        )?;
         Ok(builder)
     }
 
@@ -1675,6 +1798,10 @@ impl OdpParser {
             match event {
                 Event::Start(ref element) => {
                     let element_type = Self::classify(&namespace, element.local_name().as_ref());
+                    Self::validate_three_dimensional_child_element(
+                        shape_stack.last(),
+                        element_type,
+                    )?;
                     if in_media_parameter {
                         return Err(Error::InvalidFormat(
                             "draw:param cannot contain child elements".to_string(),
@@ -1819,6 +1946,15 @@ impl OdpParser {
                         },
                         OdpElement::EventListeners if !shape_stack.is_empty() => {
                             let builder = shape_stack.last_mut().expect("shape checked above");
+                            if builder
+                                .drawing_kind
+                                .is_some_and(|kind| kind.is_three_dimensional())
+                            {
+                                return Err(Error::InvalidFormat(
+                                    "3D shapes cannot contain presentation event listeners"
+                                        .to_string(),
+                                ));
+                            }
                             if builder.event_listeners_seen {
                                 return Err(Error::InvalidFormat(
                                     "ODP shape contains multiple office:event-listeners elements"
@@ -1893,6 +2029,7 @@ impl OdpParser {
                             )?);
                         },
                         OdpElement::Shape(shape_element) => {
+                            let drawing_kind = Self::drawing_kind(shape_element);
                             shape_node_count =
                                 shape_node_count.checked_add(1).ok_or_else(|| {
                                     Error::InvalidFormat("ODP shape count overflow".to_string())
@@ -1915,6 +2052,14 @@ impl OdpParser {
                                 ));
                             }
                             if in_slide && shape_stack.is_empty() {
+                                if drawing_kind.is_three_dimensional()
+                                    && drawing_kind != DrawingShapeKind::ThreeDimensionalScene
+                                {
+                                    return Err(Error::InvalidFormat(
+                                        "3D drawing objects require a dr3d:scene parent"
+                                            .to_string(),
+                                    ));
+                                }
                                 if current_hyperlink.is_some() && !hyperlink_applies {
                                     return Err(Error::InvalidFormat(
                                         "misplaced draw:a presentation hyperlink".to_string(),
@@ -1928,10 +2073,13 @@ impl OdpParser {
                                 }
                                 shape_stack.push(builder);
                             } else if let Some(parent) = shape_stack.last() {
-                                if parent.shape_type != ShapeType::Group {
+                                Self::validate_shape_parent(parent, drawing_kind)?;
+                                if hyperlink_applies
+                                    && parent.drawing_kind
+                                        == Some(DrawingShapeKind::ThreeDimensionalScene)
+                                {
                                     return Err(Error::InvalidFormat(
-                                        "nested ODP drawing shapes require a draw:g parent"
-                                            .to_string(),
+                                        "3D scene children cannot be wrapped in draw:a".to_string(),
                                     ));
                                 }
                                 let mut builder =
@@ -1979,6 +2127,21 @@ impl OdpParser {
                         ));
                     }
                 },
+                Event::Text(ref text)
+                    if shape_stack.last().is_some_and(|builder| {
+                        builder.drawing_kind.is_some_and(|kind| {
+                            kind.is_three_dimensional()
+                                && kind != DrawingShapeKind::ThreeDimensionalScene
+                        })
+                    }) =>
+                {
+                    let text = Self::decode_text(text)?;
+                    if !text.trim().is_empty() {
+                        return Err(Error::InvalidFormat(
+                            "3D drawing elements cannot contain text".to_string(),
+                        ));
+                    }
+                },
                 Event::CData(ref text) if current_paragraph.is_some() => {
                     let decoded = text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
                         Error::InvalidFormat(format!("invalid presentation CDATA: {error}"))
@@ -2010,8 +2173,36 @@ impl OdpParser {
                         "draw:plugin cannot contain character references".to_string(),
                     ));
                 },
+                Event::GeneralRef(_)
+                    if shape_stack.last().is_some_and(|builder| {
+                        builder.drawing_kind.is_some_and(|kind| {
+                            kind.is_three_dimensional()
+                                && kind != DrawingShapeKind::ThreeDimensionalScene
+                        })
+                    }) =>
+                {
+                    return Err(Error::InvalidFormat(
+                        "3D drawing elements cannot contain character references".to_string(),
+                    ));
+                },
+                Event::CData(ref data)
+                    if shape_stack.last().is_some_and(|builder| {
+                        builder.drawing_kind.is_some_and(|kind| {
+                            kind.is_three_dimensional()
+                                && kind != DrawingShapeKind::ThreeDimensionalScene
+                        })
+                    }) && !data.iter().all(u8::is_ascii_whitespace) =>
+                {
+                    return Err(Error::InvalidFormat(
+                        "3D drawing elements cannot contain CDATA text".to_string(),
+                    ));
+                },
                 Event::Empty(ref element) => {
                     let element_type = Self::classify(&namespace, element.local_name().as_ref());
+                    Self::validate_three_dimensional_child_element(
+                        shape_stack.last(),
+                        element_type,
+                    )?;
                     if in_media_parameter {
                         return Err(Error::InvalidFormat(
                             "draw:param cannot contain child elements".to_string(),
@@ -2099,6 +2290,15 @@ impl OdpParser {
                         },
                         OdpElement::EventListeners if !shape_stack.is_empty() => {
                             let builder = shape_stack.last_mut().expect("shape checked above");
+                            if builder
+                                .drawing_kind
+                                .is_some_and(|kind| kind.is_three_dimensional())
+                            {
+                                return Err(Error::InvalidFormat(
+                                    "3D shapes cannot contain presentation event listeners"
+                                        .to_string(),
+                                ));
+                            }
                             if builder.event_listeners_seen {
                                 return Err(Error::InvalidFormat(
                                     "ODP shape contains multiple office:event-listeners elements"
@@ -2239,6 +2439,7 @@ impl OdpParser {
                             }
                         },
                         OdpElement::Shape(shape_element) if in_slide => {
+                            let drawing_kind = Self::drawing_kind(shape_element);
                             shape_node_count =
                                 shape_node_count.checked_add(1).ok_or_else(|| {
                                     Error::InvalidFormat("ODP shape count overflow".to_string())
@@ -2261,14 +2462,25 @@ impl OdpParser {
                                 hyperlink_shape_seen = true;
                             }
                             if let Some(parent) = shape_stack.last_mut() {
-                                if parent.shape_type != ShapeType::Group {
+                                Self::validate_shape_parent(parent, drawing_kind)?;
+                                if hyperlink_applies
+                                    && parent.drawing_kind
+                                        == Some(DrawingShapeKind::ThreeDimensionalScene)
+                                {
                                     return Err(Error::InvalidFormat(
-                                        "nested ODP drawing shapes require a draw:g parent"
-                                            .to_string(),
+                                        "3D scene children cannot be wrapped in draw:a".to_string(),
                                     ));
                                 }
                                 parent.children.push(builder.build());
                             } else {
+                                if drawing_kind.is_three_dimensional()
+                                    && drawing_kind != DrawingShapeKind::ThreeDimensionalScene
+                                {
+                                    return Err(Error::InvalidFormat(
+                                        "3D drawing objects require a dr3d:scene parent"
+                                            .to_string(),
+                                    ));
+                                }
                                 Self::finish_shape(
                                     builder,
                                     &mut current_slide_title,
@@ -2534,6 +2746,88 @@ mod tests {
         assert!(regenerated.contains(r#"dr3d:projection="perspective""#));
         assert!(regenerated.contains(r#"draw:formula="$0 * 2 &amp; 21600""#));
         assert!(regenerated.contains(r#"draw:handle-position="$0 10800""#));
+    }
+
+    #[test]
+    fn preserves_recursive_inert_three_dimensional_scenes() {
+        let xml = r##"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+            xmlns:d="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"
+            xmlns:s="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0"
+            xmlns:r="urn:oasis:names:tc:opendocument:xmlns:dr3d:1.0">
+            <o:body><o:presentation><d:page>
+              <r:scene s:x="1cm" s:y="2cm" s:width="8cm" s:height="6cm"
+                r:vrp="(0 0 10)" r:projection="perspective" r:ambient-color="#112233">
+                <r:light r:direction="(0 0 -1)" r:diffuse-color="#ffffff" r:enabled="true"/>
+                <r:cube r:min-edge="(-1 -1 -1)" r:max-edge="(1 1 1)" r:transform="rotatex(0.5)"/>
+                <r:scene r:shade-mode="phong">
+                  <r:sphere r:center="(0 0 0)" r:size="(2 2 2)"/>
+                  <r:extrude s:viewBox="0 0 10 10" s:d="M 0 0 L 10 10"/>
+                  <r:rotate s:viewBox="0 0 20 20" s:d="M 1 1 L 19 19"/>
+                </r:scene>
+              </r:scene>
+            </d:page></o:presentation></o:body>
+        </o:document-content>"##;
+        let slides = OdpParser::parse_slides(xml).unwrap();
+        let scene = &slides[0].shapes[0];
+        assert_eq!(
+            scene.drawing_kind(),
+            Some(DrawingShapeKind::ThreeDimensionalScene)
+        );
+        assert_eq!(scene.x.as_deref(), Some("1cm"));
+        assert_eq!(scene.children.len(), 3);
+        assert_eq!(
+            scene.children[0].drawing_kind(),
+            Some(DrawingShapeKind::ThreeDimensionalLight)
+        );
+        assert_eq!(
+            scene.children[1].drawing_kind(),
+            Some(DrawingShapeKind::ThreeDimensionalCube)
+        );
+        let nested = &scene.children[2];
+        assert_eq!(
+            nested.drawing_kind(),
+            Some(DrawingShapeKind::ThreeDimensionalScene)
+        );
+        assert_eq!(nested.children.len(), 3);
+        assert_eq!(
+            nested.children[0].drawing_kind(),
+            Some(DrawingShapeKind::ThreeDimensionalSphere)
+        );
+        assert_eq!(
+            nested.children[1].drawing_kind(),
+            Some(DrawingShapeKind::ThreeDimensionalExtrude)
+        );
+        assert_eq!(
+            nested.children[2].drawing_kind(),
+            Some(DrawingShapeKind::ThreeDimensionalRotate)
+        );
+        let regenerated = crate::odp::PresentationBuilder::generate_shape_xml(scene, 0).unwrap();
+        assert!(regenerated.starts_with("<dr3d:scene"));
+        assert!(regenerated.contains(r#"dr3d:projection="perspective""#));
+        assert!(regenerated.contains(r#"dr3d:direction="(0 0 -1)""#));
+        assert!(regenerated.contains(r#"<dr3d:cube"#));
+        assert!(regenerated.contains(r#"<dr3d:sphere"#));
+        assert!(regenerated.contains(r#"svg:d="M 0 0 L 10 10""#));
+    }
+
+    #[test]
+    fn rejects_invalid_three_dimensional_shape_hierarchies() {
+        for body in [
+            r#"<r:cube/>"#,
+            r#"<d:g><r:sphere/></d:g>"#,
+            r#"<r:scene><d:rect/></r:scene>"#,
+            r#"<r:scene><r:cube/><r:light r:direction="(0 0 -1)"/></r:scene>"#,
+            r#"<r:scene><r:cube>not empty</r:cube></r:scene>"#,
+            r#"<r:scene><r:cube><d:glue-point/></r:cube></r:scene>"#,
+            r#"<r:scene><r:light/></r:scene>"#,
+            r#"<r:scene><r:extrude s:d="M 0 0"/></r:scene>"#,
+            r#"<r:scene><r:rotate s:viewBox="0 0 10 10"/></r:scene>"#,
+        ] {
+            let xml = format!(
+                r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:r="urn:oasis:names:tc:opendocument:xmlns:dr3d:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0"><o:body><o:presentation><d:page>{body}</d:page></o:presentation></o:body></o:document-content>"#
+            );
+            assert!(OdpParser::parse_slides(&xml).is_err(), "accepted {body}");
+        }
     }
 
     #[test]

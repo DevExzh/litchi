@@ -178,6 +178,18 @@ pub enum DrawingShapeKind {
     Control,
     /// `draw:custom-shape`.
     CustomShape,
+    /// `dr3d:scene`.
+    ThreeDimensionalScene,
+    /// `dr3d:light`.
+    ThreeDimensionalLight,
+    /// `dr3d:cube`.
+    ThreeDimensionalCube,
+    /// `dr3d:sphere`.
+    ThreeDimensionalSphere,
+    /// `dr3d:extrude`.
+    ThreeDimensionalExtrude,
+    /// `dr3d:rotate`.
+    ThreeDimensionalRotate,
 }
 
 impl DrawingShapeKind {
@@ -199,7 +211,25 @@ impl DrawingShapeKind {
             Self::Connector => "draw:connector",
             Self::Control => "draw:control",
             Self::CustomShape => "draw:custom-shape",
+            Self::ThreeDimensionalScene => "dr3d:scene",
+            Self::ThreeDimensionalLight => "dr3d:light",
+            Self::ThreeDimensionalCube => "dr3d:cube",
+            Self::ThreeDimensionalSphere => "dr3d:sphere",
+            Self::ThreeDimensionalExtrude => "dr3d:extrude",
+            Self::ThreeDimensionalRotate => "dr3d:rotate",
         }
+    }
+
+    pub(crate) fn is_three_dimensional(self) -> bool {
+        matches!(
+            self,
+            Self::ThreeDimensionalScene
+                | Self::ThreeDimensionalLight
+                | Self::ThreeDimensionalCube
+                | Self::ThreeDimensionalSphere
+                | Self::ThreeDimensionalExtrude
+                | Self::ThreeDimensionalRotate
+        )
     }
 }
 

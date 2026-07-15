@@ -530,7 +530,8 @@ mod tests {
  xmlns:d="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"
  xmlns:s="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0"
  xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
- xmlns:p="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0">
+ xmlns:p="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0"
+ xmlns:r="urn:oasis:names:tc:opendocument:xmlns:dr3d:1.0">
  <o:body><o:drawing>
   <d:page d:name="First &amp; Best" d:id="legacy1" xml:id="page1"
    d:style-name="dp1" d:master-page-name="Default" d:nav-order="shape1 shape2"
@@ -539,6 +540,7 @@ mod tests {
    <d:frame d:name="Label" s:x="1cm" s:y="2cm"><d:text-box><t:p>Hello</t:p></d:text-box></d:frame>
    <d:g d:name="Group"><d:path d:name="Curve" s:d="M 0 0 L 1 1"/></d:g>
    <d:custom-shape><d:enhanced-geometry d:type="diamond"><d:equation d:name="f0" d:formula="$0/2"/><d:handle d:handle-position="$0 $1"/></d:enhanced-geometry></d:custom-shape>
+   <r:scene r:projection="parallel"><r:light r:direction="(0 0 -1)"/><r:sphere r:center="(0 0 0)"/></r:scene>
   </d:page>
   <d:page/>
  </o:drawing></o:body>
@@ -568,7 +570,7 @@ mod tests {
         assert_eq!(document.text(), "Hello");
 
         let shapes = document.pages()[0].shapes();
-        assert_eq!(shapes.len(), 3);
+        assert_eq!(shapes.len(), 4);
         assert_eq!(shapes[0].drawing_kind(), Some(DrawingShapeKind::Frame));
         assert_eq!(shapes[0].text, "Hello");
         assert_eq!(shapes[1].drawing_kind(), Some(DrawingShapeKind::Group));
@@ -582,6 +584,11 @@ mod tests {
             geometry.children()[0].kind(),
             EnhancedGeometryChildKind::Equation
         );
+        assert_eq!(
+            shapes[3].drawing_kind(),
+            Some(DrawingShapeKind::ThreeDimensionalScene)
+        );
+        assert_eq!(shapes[3].children().len(), 2);
         assert_eq!(
             document.metadata().unwrap().title.as_deref(),
             Some("Drawing title")

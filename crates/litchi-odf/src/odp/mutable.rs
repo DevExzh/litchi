@@ -533,7 +533,7 @@ impl MutablePresentation {
 
         let transition_styles = super::builder::generate_transition_styles(&self.slides);
         Ok(format!(
-            r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:anim="urn:oasis:names:tc:opendocument:xmlns:animation:1.0" xmlns:smil="urn:oasis:names:tc:opendocument:xmlns:smil-compatible:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:script="urn:oasis:names:tc:opendocument:xmlns:script:1.0"{} office:version="1.3"><office:scripts/><office:font-face-decls/><office:automatic-styles>{}</office:automatic-styles><office:body><office:presentation>{}</office:presentation></office:body></office:document-content>"#,
+            r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:anim="urn:oasis:names:tc:opendocument:xmlns:animation:1.0" xmlns:smil="urn:oasis:names:tc:opendocument:xmlns:smil-compatible:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:dr3d="urn:oasis:names:tc:opendocument:xmlns:dr3d:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:script="urn:oasis:names:tc:opendocument:xmlns:script:1.0"{} office:version="1.3"><office:scripts/><office:font-face-decls/><office:automatic-styles>{}</office:automatic-styles><office:body><office:presentation>{}</office:presentation></office:body></office:document-content>"#,
             extension_declarations, transition_styles, body
         ))
     }
@@ -817,6 +817,46 @@ mod tests {
         let slides = reparsed.slides().unwrap();
         let geometry = slides[0].shapes[0].enhanced_geometry().unwrap();
         assert_eq!(geometry.children().len(), 2);
+    }
+
+    #[test]
+    fn mutable_presentation_preserves_recursive_inert_three_dimensional_scenes() {
+        let content = br##"<o:document-content
+            xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+            xmlns:d="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"
+            xmlns:s="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0"
+            xmlns:r="urn:oasis:names:tc:opendocument:xmlns:dr3d:1.0">
+          <o:body><o:presentation><d:page>
+            <r:scene s:x="1cm" s:width="8cm" r:projection="perspective" r:ambient-color="#102030">
+              <r:light r:direction="(0 0 -1)" r:enabled="true"/>
+              <r:cube r:min-edge="(-1 -1 -1)" r:max-edge="(1 1 1)"/>
+              <r:scene r:shade-mode="gouraud"><r:sphere r:size="(2 2 2)"/></r:scene>
+            </r:scene>
+          </d:page></o:presentation></o:body>
+        </o:document-content>"##;
+        let mut writer = PackageWriter::new();
+        writer
+            .set_mimetype("application/vnd.oasis.opendocument.presentation")
+            .unwrap();
+        writer.add_file("content.xml", content).unwrap();
+        let presentation = Presentation::from_bytes(writer.finish_to_bytes().unwrap()).unwrap();
+        let mutable = MutablePresentation::from_presentation(presentation).unwrap();
+        let bytes = mutable.to_bytes().unwrap();
+        let package = OwnedPackage::from_bytes(bytes.clone()).unwrap();
+        let regenerated = String::from_utf8(package.get_file("content.xml").unwrap()).unwrap();
+        assert!(regenerated.contains("<dr3d:scene"));
+        assert!(regenerated.contains(r##"dr3d:ambient-color="#102030""##));
+        assert!(regenerated.contains(r#"dr3d:min-edge="(-1 -1 -1)""#));
+        assert!(regenerated.contains(r#"dr3d:shade-mode="gouraud""#));
+
+        let reparsed = Presentation::from_bytes(bytes).unwrap();
+        let scene = &reparsed.slides().unwrap()[0].shapes[0];
+        assert_eq!(
+            scene.drawing_kind(),
+            Some(crate::odp::DrawingShapeKind::ThreeDimensionalScene)
+        );
+        assert_eq!(scene.children().len(), 3);
+        assert_eq!(scene.children()[2].children().len(), 1);
     }
 
     #[test]

@@ -129,6 +129,98 @@ fn push_drawing_attributes(
     Ok(())
 }
 
+fn validate_drawing_shape_parent(
+    kind: crate::odp::DrawingShapeKind,
+    parent: Option<crate::odp::DrawingShapeKind>,
+) -> Result<()> {
+    use crate::odp::DrawingShapeKind;
+
+    match parent {
+        None if kind.is_three_dimensional() && kind != DrawingShapeKind::ThreeDimensionalScene => {
+            Err(litchi_core::Error::InvalidFormat(
+                "3D drawing objects require a dr3d:scene parent".to_string(),
+            ))
+        },
+        None => Ok(()),
+        Some(DrawingShapeKind::Group) => {
+            if kind.is_three_dimensional() && kind != DrawingShapeKind::ThreeDimensionalScene {
+                Err(litchi_core::Error::InvalidFormat(
+                    "3D drawing objects require a dr3d:scene parent".to_string(),
+                ))
+            } else {
+                Ok(())
+            }
+        },
+        Some(DrawingShapeKind::ThreeDimensionalScene) if kind.is_three_dimensional() => Ok(()),
+        Some(DrawingShapeKind::ThreeDimensionalScene) => Err(litchi_core::Error::InvalidFormat(
+            "dr3d:scene can only contain 3D lights and objects".to_string(),
+        )),
+        Some(_) => Err(litchi_core::Error::InvalidFormat(
+            "nested drawing shapes require a draw:g or dr3d:scene parent".to_string(),
+        )),
+    }
+}
+
+fn validate_three_dimensional_child_order(children: &[crate::odp::Shape]) -> Result<()> {
+    use crate::odp::DrawingShapeKind;
+
+    let mut object_seen = false;
+    for child in children {
+        let kind = child.drawing_kind().ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(
+                "dr3d:scene child is missing its exact 3D element kind".to_string(),
+            )
+        })?;
+        if kind == DrawingShapeKind::ThreeDimensionalLight {
+            if object_seen {
+                return Err(litchi_core::Error::InvalidFormat(
+                    "dr3d:light elements must precede 3D objects".to_string(),
+                ));
+            }
+        } else {
+            object_seen = true;
+        }
+    }
+    Ok(())
+}
+
+fn validate_required_three_dimensional_attributes(
+    kind: crate::odp::DrawingShapeKind,
+    attributes: &[crate::odp::DrawingAttribute],
+) -> Result<()> {
+    use crate::odp::{DrawingAttributeNamespace, DrawingShapeKind};
+
+    let has = |namespace, local_name| {
+        attributes.iter().any(|attribute| {
+            attribute.namespace() == namespace && attribute.local_name() == local_name
+        })
+    };
+    if kind == DrawingShapeKind::ThreeDimensionalLight
+        && !has(DrawingAttributeNamespace::Dr3d, "direction")
+    {
+        return Err(litchi_core::Error::InvalidFormat(
+            "dr3d:light requires dr3d:direction".to_string(),
+        ));
+    }
+    if matches!(
+        kind,
+        DrawingShapeKind::ThreeDimensionalExtrude | DrawingShapeKind::ThreeDimensionalRotate
+    ) {
+        for (namespace, local_name) in [
+            (DrawingAttributeNamespace::Svg, "viewBox"),
+            (DrawingAttributeNamespace::Svg, "d"),
+        ] {
+            if !has(namespace, local_name) {
+                return Err(litchi_core::Error::InvalidFormat(format!(
+                    "{} requires svg:{local_name}",
+                    kind.element_name()
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
 pub(super) fn slide_style_name(slide: &Slide, index: usize) -> String {
     if slide
         .transition
@@ -405,13 +497,14 @@ impl PresentationBuilder {
     /// Generate XML for a shape
     pub(super) fn generate_shape_xml(shape: &crate::odp::Shape, idx: usize) -> Result<String> {
         let mut node_count = 0usize;
-        Self::generate_shape_xml_at_depth(shape, idx, 0, &mut node_count)
+        Self::generate_shape_xml_at_depth(shape, idx, 0, None, &mut node_count)
     }
 
     fn generate_shape_xml_at_depth(
         shape: &crate::odp::Shape,
         idx: usize,
         depth: usize,
+        parent_kind: Option<crate::odp::DrawingShapeKind>,
         node_count: &mut usize,
     ) -> Result<String> {
         use crate::odp::DrawingShapeKind;
@@ -563,7 +656,7 @@ impl PresentationBuilder {
             ShapeType::AutoShape => shape.drawing_kind.unwrap_or(DrawingShapeKind::Rectangle),
             ShapeType::Line => shape.drawing_kind.unwrap_or(DrawingShapeKind::Line),
             ShapeType::Connector => shape.drawing_kind.unwrap_or(DrawingShapeKind::Connector),
-            ShapeType::Group => DrawingShapeKind::Group,
+            ShapeType::Group => shape.drawing_kind.unwrap_or(DrawingShapeKind::Group),
             _ => shape.drawing_kind.unwrap_or(DrawingShapeKind::Frame),
         };
         let compatible_kind = match shape.shape_type {
@@ -578,13 +671,17 @@ impl PresentationBuilder {
                     | DrawingShapeKind::Measure
                     | DrawingShapeKind::Connector
                     | DrawingShapeKind::Group
+                    | DrawingShapeKind::ThreeDimensionalScene
             ),
             ShapeType::Line => matches!(
                 element_kind,
                 DrawingShapeKind::Line | DrawingShapeKind::Measure
             ),
             ShapeType::Connector => element_kind == DrawingShapeKind::Connector,
-            ShapeType::Group => element_kind == DrawingShapeKind::Group,
+            ShapeType::Group => matches!(
+                element_kind,
+                DrawingShapeKind::Group | DrawingShapeKind::ThreeDimensionalScene
+            ),
             _ => true,
         };
         if !compatible_kind {
@@ -592,6 +689,21 @@ impl PresentationBuilder {
                 "ODP drawing element '{}' is incompatible with {} shape '{}'",
                 element_kind.element_name(),
                 shape.shape_type,
+                name
+            )));
+        }
+        validate_drawing_shape_parent(element_kind, parent_kind)?;
+        validate_required_three_dimensional_attributes(element_kind, &shape.drawing_attributes)?;
+        if element_kind.is_three_dimensional() && !shape.event_listeners.is_empty() {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "3D shape '{}' cannot contain presentation event listeners",
+                name
+            )));
+        }
+        if parent_kind == Some(DrawingShapeKind::ThreeDimensionalScene) && shape.hyperlink.is_some()
+        {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "3D scene child '{}' cannot be wrapped in draw:a",
                 name
             )));
         }
@@ -620,28 +732,50 @@ impl PresentationBuilder {
                 }
             },
             ShapeType::AutoShape => {
-                let geometry = shape
-                    .enhanced_geometry
-                    .as_ref()
-                    .map(Self::generate_enhanced_geometry_xml)
-                    .transpose()?
-                    .unwrap_or_default();
-                if shape.has_text() || !geometry.is_empty() {
-                    let mut contents = if shape.has_text() {
-                        generate_text_paragraphs(&shape.text, Some("P2"))
-                    } else {
-                        String::new()
-                    };
-                    contents.push_str(&geometry);
-                    format!(
-                        r#"<{}{}{}>{}</{}>"#,
-                        element_name, shape_attributes, position_attributes, contents, element_name
-                    )
-                } else {
+                if element_kind.is_three_dimensional() {
+                    if shape.has_text()
+                        || shape.image_href.is_some()
+                        || shape.media.is_some()
+                        || shape.enhanced_geometry.is_some()
+                        || !shape.event_listeners.is_empty()
+                    {
+                        return Err(litchi_core::Error::InvalidFormat(format!(
+                            "3D object '{}' contains unsupported 2D shape payload",
+                            name
+                        )));
+                    }
                     format!(
                         r#"<{}{}{}/>"#,
                         element_name, shape_attributes, position_attributes
                     )
+                } else {
+                    let geometry = shape
+                        .enhanced_geometry
+                        .as_ref()
+                        .map(Self::generate_enhanced_geometry_xml)
+                        .transpose()?
+                        .unwrap_or_default();
+                    if shape.has_text() || !geometry.is_empty() {
+                        let mut contents = if shape.has_text() {
+                            generate_text_paragraphs(&shape.text, Some("P2"))
+                        } else {
+                            String::new()
+                        };
+                        contents.push_str(&geometry);
+                        format!(
+                            r#"<{}{}{}>{}</{}>"#,
+                            element_name,
+                            shape_attributes,
+                            position_attributes,
+                            contents,
+                            element_name
+                        )
+                    } else {
+                        format!(
+                            r#"<{}{}{}/>"#,
+                            element_name, shape_attributes, position_attributes
+                        )
+                    }
                 }
             },
             ShapeType::Picture => {
@@ -688,19 +822,31 @@ impl PresentationBuilder {
                         name
                     )));
                 }
-                if shape.children.is_empty() {
-                    format!(r#"<draw:g{shape_attributes}/>"#)
+                let container_position = if element_kind == DrawingShapeKind::ThreeDimensionalScene
+                {
+                    position_attributes.as_str()
                 } else {
+                    ""
+                };
+                if shape.children.is_empty() {
+                    format!(r#"<{element_name}{shape_attributes}{container_position}/>"#)
+                } else {
+                    if element_kind == DrawingShapeKind::ThreeDimensionalScene {
+                        validate_three_dimensional_child_order(&shape.children)?;
+                    }
                     let mut children = String::new();
                     for (child_index, child) in shape.children.iter().enumerate() {
                         children.push_str(&Self::generate_shape_xml_at_depth(
                             child,
                             child_index,
                             depth + 1,
+                            Some(element_kind),
                             node_count,
                         )?);
                     }
-                    format!(r#"<draw:g{shape_attributes}>{children}</draw:g>"#)
+                    format!(
+                        r#"<{element_name}{shape_attributes}{container_position}>{children}</{element_name}>"#
+                    )
                 }
             },
             ShapeType::Table | ShapeType::GraphicFrame | ShapeType::Unknown => {
@@ -1036,6 +1182,48 @@ mod tests {
             .unwrap(),
         );
         assert!(PresentationBuilder::generate_shape_xml(&reserved, 0).is_err());
+    }
+
+    #[test]
+    fn validates_three_dimensional_scene_hierarchy_and_light_order() {
+        use crate::odp::DrawingShapeKind;
+
+        let mut light = Shape::new();
+        light.drawing_kind = Some(DrawingShapeKind::ThreeDimensionalLight);
+        light.drawing_attributes.push(
+            crate::odp::DrawingAttribute::new(
+                crate::odp::DrawingAttributeNamespace::Dr3d,
+                "direction",
+                "(0 0 -1)",
+            )
+            .unwrap(),
+        );
+        let mut cube = Shape::new();
+        cube.drawing_kind = Some(DrawingShapeKind::ThreeDimensionalCube);
+
+        let mut scene = Shape::new();
+        scene.shape_type = ShapeType::Group;
+        scene.drawing_kind = Some(DrawingShapeKind::ThreeDimensionalScene);
+        scene.children = vec![light.clone(), cube.clone()];
+        let xml = PresentationBuilder::generate_shape_xml(&scene, 0).unwrap();
+        assert!(xml.starts_with("<dr3d:scene"));
+        assert!(xml.contains("<dr3d:light"));
+        assert!(xml.contains("<dr3d:cube"));
+
+        let mut missing_direction = Shape::new();
+        missing_direction.drawing_kind = Some(DrawingShapeKind::ThreeDimensionalLight);
+        scene.children = vec![missing_direction];
+        assert!(PresentationBuilder::generate_shape_xml(&scene, 0).is_err());
+
+        scene.children = vec![cube.clone(), light];
+        assert!(PresentationBuilder::generate_shape_xml(&scene, 0).is_err());
+        assert!(PresentationBuilder::generate_shape_xml(&cube, 0).is_err());
+
+        let mut group = Shape::new();
+        group.shape_type = ShapeType::Group;
+        group.drawing_kind = Some(DrawingShapeKind::Group);
+        group.children.push(cube);
+        assert!(PresentationBuilder::generate_shape_xml(&group, 0).is_err());
     }
 
     #[test]
