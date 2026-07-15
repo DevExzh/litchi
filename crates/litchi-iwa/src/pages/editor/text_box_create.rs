@@ -466,7 +466,7 @@ fn pages_object(
     Ok(object)
 }
 
-fn create_drawable_z_order(
+pub(super) fn create_drawable_z_order(
     package: &mut IWorkPackage,
     archive_name: &str,
     z_order_id: u64,

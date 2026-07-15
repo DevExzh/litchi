@@ -39,9 +39,9 @@ pub use document::PagesDocument;
 pub use editor::{
     PagesDocumentOptions, PagesDrawableTextInfo, PagesEditor, PagesFootnoteFormat,
     PagesFootnoteGap, PagesFootnoteKind, PagesFootnoteNumbering, PagesFootnoteSettings,
-    PagesHeaderFooterInfo, PagesHeaderFooterKind, PagesPageLayout, PagesPageNumber,
+    PagesHeaderFooterInfo, PagesHeaderFooterKind, PagesImageInfo, PagesPageLayout, PagesPageNumber,
     PagesPageOrientation, PagesRgbColorSpace, PagesRgbaColor, PagesSectionBackground,
     PagesSectionInfo, PagesSectionPageNumbering, PagesSectionSettings, PagesSectionStart,
-    PagesTemplateKind, RemovedPagesTextBox,
+    PagesTemplateKind, RemovedPagesImage, RemovedPagesTextBox,
 };
 pub use section::{PagesSection, PagesSectionType};

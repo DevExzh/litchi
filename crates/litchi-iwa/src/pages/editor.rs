@@ -2615,12 +2615,15 @@ fn insert_unique<T>(
 
 mod document_options;
 mod footnote_settings;
+mod images;
 mod page_layout;
 mod section_background;
 mod section_content;
 mod section_settings;
 mod text_box_create;
 mod types;
+
+pub use images::{PagesImageInfo, RemovedPagesImage};
 
 #[cfg(test)]
 mod tests;

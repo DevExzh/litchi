@@ -101,6 +101,29 @@ pages.save("created-with-text-box.pages")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
 
+Images use the same source-free path. The image object, body attachment,
+stand-ins, z-order, style link, UUIDs, component data reference, and `Data/*`
+asset are constructed directly; no blank Pages package is embedded:
+
+```rust
+use std::fs;
+use litchi_iwa::pages::PagesEditor;
+use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+
+let body = "Quarterly report";
+let image = fs::read("chart.png")?;
+let mut pages = PagesEditor::create_with_text(body)?;
+pages.add_body_image(
+    body.encode_utf16().count(),
+    "chart.png",
+    &image,
+    DrawablePoint { x: 96.0, y: 144.0 },
+    DrawableSize { width: 300.0, height: 225.0 },
+)?;
+pages.save("created-with-image.pages")?;
+# Ok::<(), litchi_iwa::Error>(())
+```
+
 ### Create Numbers spreadsheets from scratch
 
 Scratch-created spreadsheets can add ordinary text boxes directly to a sheet.
