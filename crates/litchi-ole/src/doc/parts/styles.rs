@@ -1061,6 +1061,19 @@ mod tests {
         assert_eq!(effective, Some(18));
         assert_eq!(character, [0x35, 0x08, 1, 0x36, 0x08, 1]);
 
+        let direct_grpprl = [0x30, 0x4A, 18, 0, 0x35, 0x08, 0];
+        let direct = super::super::chp::CharacterProperties::from_sprm(&direct_grpprl).unwrap();
+        let cascaded = super::super::paragraph_extractor::cascade_character_properties(
+            Some(&stylesheet),
+            &[0x35, 0x08, 1, 0x36, 0x08, 0],
+            &direct,
+            &direct_grpprl,
+        )
+        .unwrap();
+        assert_eq!(cascaded.style_index, Some(18));
+        assert_eq!(cascaded.is_bold, Some(false));
+        assert_eq!(cascaded.is_italic, Some(true));
+
         assert_eq!(
             stylesheet.resolve_paragraph_style_sprms(18).unwrap(),
             (None, Vec::new(), Vec::new())

@@ -7,6 +7,7 @@ use super::chp::CharacterProperties;
 use super::chp_bin_table::ChpBinTable;
 use super::pap::ParagraphProperties;
 use super::pap_bin_table::PapBinTable;
+use super::styles::StyleSheet;
 use std::sync::Arc;
 
 /// Type alias for extracted paragraph data: (text, properties, runs).
@@ -31,6 +32,8 @@ pub struct ParagraphExtractor<'a> {
     text_ranges: Vec<usize>, // UTF-16 CP boundary -> UTF-8 byte offset
     /// Character position range to extract (for subdocuments)
     cp_range: Option<(u32, u32)>,
+    /// Stylesheet used to apply paragraph-style character properties.
+    stylesheet: Option<&'a StyleSheet>,
 }
 
 impl<'a> ParagraphExtractor<'a> {
@@ -55,6 +58,7 @@ impl<'a> ParagraphExtractor<'a> {
             text,
             text_ranges,
             cp_range: None,
+            stylesheet: None,
         })
     }
 
@@ -76,6 +80,19 @@ impl<'a> ParagraphExtractor<'a> {
     ) -> Result<Self> {
         let mut extractor = Self::new(text, pap_bin_table, chp_bin_table)?;
         extractor.cp_range = Some(cp_range);
+        Ok(extractor)
+    }
+
+    /// Create a range extractor that applies paragraph and character styles.
+    pub(crate) fn new_with_range_and_stylesheet(
+        text: Arc<String>,
+        pap_bin_table: Option<&'a PapBinTable>,
+        chp_bin_table: Option<&'a ChpBinTable>,
+        cp_range: (u32, u32),
+        stylesheet: Option<&'a StyleSheet>,
+    ) -> Result<Self> {
+        let mut extractor = Self::new_with_range(text, pap_bin_table, chp_bin_table, cp_range)?;
+        extractor.stylesheet = stylesheet;
         Ok(extractor)
     }
 
@@ -164,14 +181,14 @@ impl<'a> ParagraphExtractor<'a> {
             } else {
                 para_end
             };
-            let runs = self.extract_runs(para_start, para_text_end)?;
+            let runs = self.extract_runs(para_start, para_text_end, para_props.style_index)?;
 
             paragraphs.push((para_text, para_props, runs));
         }
 
         // Fallback if no paragraphs were found
         if paragraphs.is_empty() && !self.text.is_empty() {
-            let runs = self.extract_runs(doc_start_cp, doc_end_cp)?;
+            let runs = self.extract_runs(doc_start_cp, doc_end_cp, None)?;
             paragraphs.push((
                 self.text.as_ref().clone(),
                 ParagraphProperties::default(),
@@ -215,8 +232,16 @@ impl<'a> ParagraphExtractor<'a> {
         &self,
         para_start: u32,
         para_end: u32,
+        paragraph_style_index: Option<u16>,
     ) -> Result<Vec<(String, CharacterProperties)>> {
         let mut runs = Vec::new();
+        let paragraph_style_chpx = self
+            .stylesheet
+            .zip(paragraph_style_index)
+            .map(|(styles, index)| styles.resolve_paragraph_style_sprms(index))
+            .transpose()?
+            .map(|(_, _, character)| character)
+            .unwrap_or_default();
 
         if let Some(chp_bin_table) = self.chp_bin_table {
             // Get runs that overlap with this paragraph
@@ -239,7 +264,13 @@ impl<'a> ParagraphExtractor<'a> {
                     continue;
                 }
 
-                runs.push((run_text, run.properties.clone()));
+                let properties = cascade_character_properties(
+                    self.stylesheet,
+                    &paragraph_style_chpx,
+                    &run.properties,
+                    &run.direct_grpprl,
+                )?;
+                runs.push((run_text, properties));
             }
         }
 
@@ -247,7 +278,8 @@ impl<'a> ParagraphExtractor<'a> {
         if runs.is_empty() {
             let para_text = self.extract_text_range(para_start, para_end);
             if !para_text.is_empty() {
-                runs.push((para_text, CharacterProperties::default()));
+                let properties = CharacterProperties::from_sprm(&paragraph_style_chpx)?;
+                runs.push((para_text, properties));
             }
         } else {
             // Filter out empty runs before consolidation to prevent style markers without text
@@ -312,6 +344,30 @@ impl<'a> ParagraphExtractor<'a> {
 
         consolidated
     }
+}
+
+pub(crate) fn cascade_character_properties(
+    stylesheet: Option<&StyleSheet>,
+    paragraph_style_chpx: &[u8],
+    direct_properties: &CharacterProperties,
+    direct_grpprl: &[u8],
+) -> Result<CharacterProperties> {
+    let character_style_chpx = stylesheet
+        .zip(direct_properties.style_index)
+        .map(|(styles, index)| styles.resolve_character_style_sprms(index))
+        .transpose()?
+        .map(|(_, character)| character)
+        .unwrap_or_default();
+    if paragraph_style_chpx.is_empty() && character_style_chpx.is_empty() {
+        return Ok(direct_properties.clone());
+    }
+    let combined = [
+        paragraph_style_chpx,
+        character_style_chpx.as_slice(),
+        direct_grpprl,
+    ]
+    .concat();
+    CharacterProperties::from_sprm(&combined)
 }
 
 #[cfg(test)]

@@ -197,8 +197,9 @@ impl Document {
         // Reconstruct both property bin tables from one shared piece-table parse.
         let piece_table = Self::parse_piece_table(&fib, &table_stream);
         let chp_bin_table = piece_table.as_ref().and_then(|piece_table| {
-            Self::table_slice(&fib, &table_stream, 12)
-                .and_then(|data| ChpBinTable::parse(data, &word_document, piece_table))
+            Self::table_slice(&fib, &table_stream, 12).and_then(|data| {
+                ChpBinTable::parse(data, &word_document, piece_table, stylesheet.as_ref())
+            })
         });
         let pap_bin_table = piece_table.as_ref().and_then(|piece_table| {
             Self::table_slice(&fib, &table_stream, 13).and_then(|data| {
@@ -868,11 +869,12 @@ impl Document {
 
         let text = Arc::new(self.text()?);
 
-        let para_extractor = ParagraphExtractor::new_with_range(
+        let para_extractor = ParagraphExtractor::new_with_range_and_stylesheet(
             Arc::clone(&text),
             self.pap_bin_table.as_ref(),
             self.chp_bin_table.as_ref(),
             (start_cp, end_cp),
+            self.stylesheet.as_ref(),
         )?;
 
         let extracted = para_extractor.extract_paragraphs()?;
@@ -991,11 +993,12 @@ impl Document {
 
             // Create extractor for this CP range - text is shared via Arc::clone (cheap pointer copy)
             // Pass ChpBinTable reference to avoid re-parsing
-            let para_extractor = ParagraphExtractor::new_with_range(
+            let para_extractor = ParagraphExtractor::new_with_range_and_stylesheet(
                 Arc::clone(&text),
                 self.pap_bin_table.as_ref(),
                 self.chp_bin_table.as_ref(),
                 (start_cp, end_cp),
+                self.stylesheet.as_ref(),
             )?;
 
             let extracted_paras = para_extractor.extract_paragraphs()?;

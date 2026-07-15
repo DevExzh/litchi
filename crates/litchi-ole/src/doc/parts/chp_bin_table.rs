@@ -12,6 +12,7 @@ use super::chp::CharacterProperties;
 /// - [MS-DOC] 2.8.5 PlcfBteChpx
 use super::fkp::ChpxFkp;
 use super::piece_table::PieceTable;
+use super::styles::StyleSheet;
 use litchi_core::binary::read_u32_le;
 
 /// A character run with properties.
@@ -25,6 +26,8 @@ pub struct CharacterRun {
     pub end_cp: u32,
     /// Character properties
     pub properties: CharacterProperties,
+    /// Direct CHPX followed by piece modifiers, retained for style cascading.
+    pub(crate) direct_grpprl: Vec<u8>,
 }
 
 /// CHPBinTable - manages character property bin table.
@@ -52,6 +55,7 @@ impl ChpBinTable {
         plcf_bte_chpx_data: &[u8],
         word_document: &[u8],
         piece_table: &PieceTable,
+        stylesheet: Option<&StyleSheet>,
     ) -> Option<Self> {
         // PlcfBteChpx structure:
         // - Array of FC positions (4 bytes each, n+1 entries)
@@ -120,11 +124,13 @@ impl ChpBinTable {
                             .piece_for_cp(start_cp)
                             .map(|piece| piece.property_modifier())
                             .unwrap_or_default();
-                        let properties = Self::parse_chpx(&entry.grpprl, piece_modifier);
+                        let (properties, direct_grpprl) =
+                            Self::parse_chpx(&entry.grpprl, piece_modifier, stylesheet);
                         all_runs.push(CharacterRun {
                             start_cp,
                             end_cp,
                             properties,
+                            direct_grpprl,
                         });
                     }
                 }
@@ -169,22 +175,28 @@ impl ChpBinTable {
     /// Delegates to CharacterProperties::from_sprm for consistent behavior
     /// with the full SPRM parser (handles is_spec, is_obj, is_data flags correctly).
     #[inline]
-    fn parse_chpx(grpprl: &[u8], piece_modifier: &[u8]) -> CharacterProperties {
+    fn parse_chpx(
+        grpprl: &[u8],
+        piece_modifier: &[u8],
+        stylesheet: Option<&StyleSheet>,
+    ) -> (CharacterProperties, Vec<u8>) {
         if grpprl.is_empty() && piece_modifier.is_empty() {
-            return CharacterProperties::default();
+            return (CharacterProperties::default(), Vec::new());
         }
 
-        let combined;
-        let grpprl = if piece_modifier.is_empty() {
-            grpprl
-        } else {
-            combined = [grpprl, piece_modifier].concat();
-            &combined
-        };
+        let direct = [grpprl, piece_modifier].concat();
+        let direct_properties = CharacterProperties::from_sprm(&direct).unwrap_or_default();
+        let style_sprms = stylesheet
+            .zip(direct_properties.style_index)
+            .and_then(|(styles, index)| styles.resolve_character_style_sprms(index).ok())
+            .map(|(_, properties)| properties)
+            .unwrap_or_default();
+        let resolved_grpprl = [style_sprms.as_slice(), direct.as_slice()].concat();
 
         // Use the complete SPRM parser from CharacterProperties
         // This ensures all flags (is_spec, is_obj, is_data, etc.) are set correctly
-        CharacterProperties::from_sprm(grpprl).unwrap_or_default()
+        let properties = CharacterProperties::from_sprm(&resolved_grpprl).unwrap_or_default();
+        (properties, direct)
     }
 
     /// Get all character runs.
