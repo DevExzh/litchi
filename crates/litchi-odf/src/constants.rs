@@ -79,6 +79,9 @@ pub const ODF_MASTER_TEMPLATE: &str = "application/vnd.oasis.opendocument.text-m
 /// MIME type for OpenDocument Web (.oth)
 pub const ODF_WEB: &str = "application/vnd.oasis.opendocument.text-web";
 
+/// MIME type for OpenDocument Database Front End (.odb)
+pub const ODF_DATABASE: &str = "application/vnd.oasis.opendocument.base";
+
 // ============================================================================
 // FILE EXTENSIONS TO MIME TYPE MAPPING
 // ============================================================================
@@ -104,6 +107,7 @@ pub static ODF_EXTENSIONS: Map<&'static str, &'static str> = phf_map! {
     "odm" => ODF_MASTER,
     "otm" => ODF_MASTER_TEMPLATE,
     "oth" => ODF_WEB,
+    "odb" => ODF_DATABASE,
     "fodt" => ODF_TEXT,
     "fods" => ODF_SPREADSHEET,
     "fodp" => ODF_PRESENTATION,
@@ -132,6 +136,7 @@ pub static ODF_MIMETYPES: Map<&'static str, &'static str> = phf_map! {
     "application/vnd.oasis.opendocument.text-master" => "odm",
     "application/vnd.oasis.opendocument.text-master-template" => "otm",
     "application/vnd.oasis.opendocument.text-web" => "oth",
+    "application/vnd.oasis.opendocument.base" => "odb",
 };
 
 /// MIME type to conventional flat OpenDocument extension mapping.
@@ -306,6 +311,7 @@ mod tests {
         assert_eq!(get_mime_type_from_extension("odp"), Some(ODF_PRESENTATION));
         assert_eq!(get_mime_type_from_extension("unknown"), None);
         assert_eq!(get_mime_type_from_extension("fodg"), Some(ODF_DRAWING));
+        assert_eq!(get_mime_type_from_extension("odb"), Some(ODF_DATABASE));
         assert_eq!(
             get_mime_type_from_extension("otm"),
             Some(ODF_MASTER_TEMPLATE)
@@ -325,6 +331,7 @@ mod tests {
             get_extension_from_mime_type(ODF_MASTER_TEMPLATE),
             Some("otm")
         );
+        assert_eq!(get_extension_from_mime_type(ODF_DATABASE), Some("odb"));
     }
 
     #[test]
@@ -337,6 +344,7 @@ mod tests {
         assert!(is_odf_extension("fodp"));
         assert!(is_odf_extension("fodg"));
         assert!(is_odf_extension("otm"));
+        assert!(is_odf_extension("odb"));
         assert!(!is_odf_extension("txt"));
         assert!(!is_odf_extension("docx"));
     }

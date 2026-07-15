@@ -44,4 +44,6 @@ pub enum FileFormat {
     Odm,
     /// OpenDocument Web Document (.oth)
     Oth,
+    /// OpenDocument Database Front End (.odb)
+    Odb,
 }

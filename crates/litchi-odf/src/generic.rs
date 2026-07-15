@@ -31,6 +31,8 @@ pub enum OpenDocumentFamily {
     Master,
     /// Legacy producer-specific web-oriented text template.
     Web,
+    /// Database front-end document.
+    Database,
 }
 
 /// Validated, format-neutral OpenDocument package.
@@ -79,7 +81,12 @@ impl FlatOpenDocument {
         let (family, template) = classify_mimetype(&mimetype).ok_or_else(|| {
             Error::InvalidFormat(format!("unsupported OpenDocument mimetype '{mimetype}'"))
         })?;
-        if template || matches!(family, OpenDocumentFamily::Master | OpenDocumentFamily::Web) {
+        if template
+            || matches!(
+                family,
+                OpenDocumentFamily::Master | OpenDocumentFamily::Web | OpenDocumentFamily::Database
+            )
+        {
             return Err(Error::InvalidFormat(format!(
                 "mimetype '{mimetype}' has no standard flat OpenDocument form"
             )));
@@ -114,7 +121,7 @@ impl FlatOpenDocument {
             OpenDocumentFamily::Chart => "fodc",
             OpenDocumentFamily::Formula => "fodf",
             OpenDocumentFamily::Image => "fodi",
-            OpenDocumentFamily::Master | OpenDocumentFamily::Web => {
+            OpenDocumentFamily::Master | OpenDocumentFamily::Web | OpenDocumentFamily::Database => {
                 unreachable!("master and web flat documents are rejected")
             },
         }
@@ -175,7 +182,9 @@ fn validate_flat_document(xml: &str, family: OpenDocumentFamily) -> Result<()> {
         OpenDocumentFamily::Chart => b"chart".as_slice(),
         OpenDocumentFamily::Formula => b"formula".as_slice(),
         OpenDocumentFamily::Image => b"image".as_slice(),
-        OpenDocumentFamily::Master | OpenDocumentFamily::Web => unreachable!(),
+        OpenDocumentFamily::Master | OpenDocumentFamily::Web | OpenDocumentFamily::Database => {
+            unreachable!()
+        },
     };
     loop {
         let (namespace, event) = reader
@@ -428,6 +437,7 @@ fn classify_mimetype(mimetype: &str) -> Option<(OpenDocumentFamily, bool)> {
         constants::ODF_MASTER => (OpenDocumentFamily::Master, false),
         constants::ODF_MASTER_TEMPLATE => (OpenDocumentFamily::Master, true),
         constants::ODF_WEB => (OpenDocumentFamily::Web, true),
+        constants::ODF_DATABASE => (OpenDocumentFamily::Database, false),
         _ => return None,
     })
 }
@@ -508,6 +518,7 @@ mod tests {
                 true,
             ),
             (constants::ODF_WEB, OpenDocumentFamily::Web, true),
+            (constants::ODF_DATABASE, OpenDocumentFamily::Database, false),
         ] {
             let bytes = package(mimetype);
             let document = OpenDocumentPackage::from_bytes(bytes.clone()).unwrap();

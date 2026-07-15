@@ -205,10 +205,14 @@
 //! - ✅ Metadata and lossless exact original-byte saving
 //! - ℹ️ `text-web` is a legacy producer MIME type, not an ODF 1.3/1.4 conformance MIME
 //!
-//! ## 🚧 Additional ODF Formats
+//! ## ✅ ODB - Database Front Ends (READ-ONLY SEMANTIC MODEL)
 //!
-//! Package recognition and a specialized semantic model remain in progress for:
-//! - ODB - OpenDocument Database Front End (.odb)
+//! - ✅ Open database front ends from paths, readers, or bytes
+//! - ✅ Namespace-aware complete database configuration subtree and expanded attributes
+//! - ✅ Connections, driver settings, forms, reports, queries, tables, schemas, keys, and indices
+//! - ✅ Opaque access to package-contained embedded database engine resources
+//! - ✅ Metadata and lossless exact original-byte saving
+//! - ✅ Connections, SQL commands, embedded engines, and macros always remain inert
 //!
 //! Standard flat XML documents (`.fodt`, `.fods`, `.fodp`, `.fodg`, `.fodc`,
 //! and `.fodi`) are validated and saved losslessly through [`FlatOpenDocument`].
@@ -284,6 +288,8 @@ pub mod elements;
 mod formula;
 /// Format-neutral package access for every OpenDocument family.
 mod generic;
+/// OpenDocument database front-end (.odb) support.
+mod odb;
 /// OpenDocument standalone chart (.odc/.otc) support.
 mod odc;
 /// OpenDocument drawing (.odg/.otg) support.
@@ -311,6 +317,9 @@ pub use formula::{FormulaDocument, MathAttribute, MathContent, MathElement, Math
 pub use generic::{FlatOpenDocument, OpenDocumentFamily, OpenDocumentPackage};
 pub use litchi_core::RGBColor as Color;
 pub use litchi_core::unit::{Length, LengthUnit};
+pub use odb::{
+    DatabaseAttribute, DatabaseContent, DatabaseDocument, DatabaseElement, DatabaseElementKind,
+};
 pub use odc::{ChartAttribute, ChartDocument, ChartElement, ChartElementKind};
 pub use odg::{
     DrawingDocument, DrawingLayer, DrawingLayerDisplay, DrawingPage, DrawingPageProperties,

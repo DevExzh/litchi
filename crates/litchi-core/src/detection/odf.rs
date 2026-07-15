@@ -36,6 +36,7 @@ const ODI_TEMPLATE_MIME: &str = "application/vnd.oasis.opendocument.image-templa
 const ODM_MIME: &str = "application/vnd.oasis.opendocument.text-master";
 const ODM_TEMPLATE_MIME: &str = "application/vnd.oasis.opendocument.text-master-template";
 const OTH_MIME: &str = "application/vnd.oasis.opendocument.text-web";
+const ODB_MIME: &str = "application/vnd.oasis.opendocument.base";
 const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 
 /// Detect ODF format from mimetype content.
@@ -77,6 +78,7 @@ pub fn detect_odf_format_from_mimetype(mimetype: &[u8]) -> Option<FileFormat> {
         ODI_MIME | ODI_TEMPLATE_MIME => Some(FileFormat::Odi),
         ODM_MIME | ODM_TEMPLATE_MIME => Some(FileFormat::Odm),
         OTH_MIME => Some(FileFormat::Oth),
+        ODB_MIME => Some(FileFormat::Odb),
         _ => None,
     }
 }
@@ -278,6 +280,7 @@ mod tests {
             (ODM_MIME, FileFormat::Odm),
             (ODM_TEMPLATE_MIME, FileFormat::Odm),
             (OTH_MIME, FileFormat::Oth),
+            (ODB_MIME, FileFormat::Odb),
         ] {
             assert_eq!(
                 detect_odf_format_from_mimetype(mimetype.as_bytes()),

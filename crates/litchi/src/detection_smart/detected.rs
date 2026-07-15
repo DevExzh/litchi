@@ -70,6 +70,8 @@ pub enum DetectedFormat {
     Odm(Vec<u8>),
     #[cfg(feature = "odf")]
     Oth(Vec<u8>),
+    #[cfg(feature = "odf")]
+    Odb(Vec<u8>),
     /// Flat OpenDocument XML with its detected family.
     #[cfg(feature = "odf")]
     FlatOdf(litchi_core::detection::FileFormat, Vec<u8>),
@@ -212,6 +214,7 @@ pub fn detect_format_smart(bytes: Vec<u8>) -> Option<DetectedFormat> {
                                 FileFormat::Odi => Some(DetectedFormat::Odi(bytes)),
                                 FileFormat::Odm => Some(DetectedFormat::Odm(bytes)),
                                 FileFormat::Oth => Some(DetectedFormat::Oth(bytes)),
+                                FileFormat::Odb => Some(DetectedFormat::Odb(bytes)),
                                 _ => None,
                             };
                         }
@@ -264,6 +267,7 @@ mod tests {
                 "application/vnd.oasis.opendocument.text-web",
                 FileFormat::Oth,
             ),
+            ("application/vnd.oasis.opendocument.base", FileFormat::Odb),
         ] {
             let bytes = package_with_mimetype(mimetype);
             let detected = detect_format_smart(bytes.clone()).unwrap();
@@ -274,6 +278,7 @@ mod tests {
                 DetectedFormat::Odi(retained) => (FileFormat::Odi, retained),
                 DetectedFormat::Odm(retained) => (FileFormat::Odm, retained),
                 DetectedFormat::Oth(retained) => (FileFormat::Oth, retained),
+                DetectedFormat::Odb(retained) => (FileFormat::Odb, retained),
                 _ => panic!("wrong smart-detection result for {mimetype}"),
             };
             assert_eq!(format, expected);
