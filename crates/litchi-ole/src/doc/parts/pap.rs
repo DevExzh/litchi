@@ -176,6 +176,8 @@ pub struct ParagraphProperties {
     pub table_properties_preserved_for_revision: bool,
     /// Whether paragraph properties before a tracked change are preserved.
     pub properties_preserved_for_revision: bool,
+    /// Paragraph state immediately before the active `sprmPWall` boundary.
+    pub preserved_properties_for_revision: Option<Box<ParagraphProperties>>,
     /// Nonzero `PGPInfo.ipgpSelf` associated with this paragraph.
     pub paragraph_group_id: Option<u32>,
     /// Revision save ID associated with paragraph formatting.
@@ -836,6 +838,8 @@ impl ParagraphProperties {
         styled.table_properties = previous.table_properties.clone();
         styled.paragraph_group_id = previous.paragraph_group_id;
         styled.properties_preserved_for_revision = previous.properties_preserved_for_revision;
+        styled.preserved_properties_for_revision =
+            previous.preserved_properties_for_revision.clone();
         styled.revision_save_id = previous.revision_save_id;
         styled.has_formatting_revision = previous.has_formatting_revision;
         styled.formatting_revision_author_index = previous.formatting_revision_author_index;
@@ -994,7 +998,16 @@ impl ParagraphProperties {
                 return Ok(());
             },
             SPRM_P_WALL => {
-                pap.properties_preserved_for_revision = Self::strict_bool8(sprm, "sprmPWall")?;
+                let enabled = Self::strict_bool8(sprm, "sprmPWall")?;
+                pap.preserved_properties_for_revision = if enabled {
+                    let mut previous = pap.clone();
+                    previous.properties_preserved_for_revision = false;
+                    previous.preserved_properties_for_revision = None;
+                    Some(Box::new(previous))
+                } else {
+                    None
+                };
+                pap.properties_preserved_for_revision = enabled;
                 return Ok(());
             },
             SPRM_P_IPGP => {
@@ -2718,6 +2731,7 @@ mod tests {
 
         let properties = ParagraphProperties::from_sprm(&grpprl).unwrap();
         assert!(properties.properties_preserved_for_revision);
+        assert!(properties.preserved_properties_for_revision.is_some());
         assert_eq!(properties.paragraph_group_id, Some(9));
         assert_eq!(properties.revision_save_id, Some(0x1122_3344));
         assert!(properties.no_allow_overlap);
@@ -2743,6 +2757,33 @@ mod tests {
 
         let invalid_tight_wrap = [SPRM_P_TTWO.to_le_bytes().as_slice(), &[5]].concat();
         assert!(ParagraphProperties::from_sprm(&invalid_tight_wrap).is_err());
+    }
+
+    #[test]
+    fn preserves_and_resets_ordered_paragraph_revision_state() {
+        let mut grpprl = Vec::new();
+        grpprl.extend_from_slice(&SPRM_P_DXA_LEFT.to_le_bytes());
+        grpprl.extend_from_slice(&100i16.to_le_bytes());
+        grpprl.extend_from_slice(&SPRM_P_WALL.to_le_bytes());
+        grpprl.push(1);
+        grpprl.extend_from_slice(&SPRM_P_DXA_RIGHT.to_le_bytes());
+        grpprl.extend_from_slice(&200i16.to_le_bytes());
+
+        let properties = ParagraphProperties::from_sprm(&grpprl).unwrap();
+        assert!(properties.properties_preserved_for_revision);
+        assert_eq!(properties.indent_left, Some(100));
+        assert_eq!(properties.indent_right, Some(200));
+        let previous = properties.preserved_properties_for_revision.unwrap();
+        assert_eq!(previous.indent_left, Some(100));
+        assert_eq!(previous.indent_right, None);
+        assert!(!previous.properties_preserved_for_revision);
+        assert!(previous.preserved_properties_for_revision.is_none());
+
+        grpprl.extend_from_slice(&SPRM_P_WALL.to_le_bytes());
+        grpprl.push(0);
+        let properties = ParagraphProperties::from_sprm(&grpprl).unwrap();
+        assert!(!properties.properties_preserved_for_revision);
+        assert!(properties.preserved_properties_for_revision.is_none());
     }
 
     #[test]

@@ -443,6 +443,8 @@ pub struct ParagraphFormatting {
     pub legacy_autonumbering: Option<LegacyAutoNumbering>,
     /// Revision save ID associated with this paragraph's formatting
     pub revision_save_id: Option<u32>,
+    /// Formatting state retained before a tracked paragraph-property change
+    pub preserved_properties_for_revision: Option<Box<ParagraphFormatting>>,
     /// Mark the paragraph formatting as a tracked change.
     pub formatting_revision: Option<FormattingRevision>,
     /// Whether a numbered list was applied after the previous revision.
@@ -1374,11 +1376,15 @@ impl DocWriter {
                 .flat_map(|cell| cell.paragraphs.iter())
         });
         for paragraph in self.paragraphs.iter().chain(table_paragraphs) {
-            if let Some(revision) = &paragraph.formatting.formatting_revision {
-                index_author(&revision.author)?;
-            }
-            if let Some(revision) = &paragraph.formatting.numbering_revision {
-                index_author(&revision.author)?;
+            let mut formatting = Some(&paragraph.formatting);
+            while let Some(current) = formatting {
+                if let Some(revision) = &current.formatting_revision {
+                    index_author(&revision.author)?;
+                }
+                if let Some(revision) = &current.numbering_revision {
+                    index_author(&revision.author)?;
+                }
+                formatting = current.preserved_properties_for_revision.as_deref();
             }
             for run in &paragraph.runs {
                 if let Some(revision) = &run.formatting.insertion_revision {
@@ -3854,6 +3860,15 @@ fn build_revision_papx_grpprl(
     fmt: &ParagraphFormatting,
     revisions: Option<&RevisionWriterData>,
 ) -> Result<Vec<u8>, DocWriteError> {
+    if fmt
+        .preserved_properties_for_revision
+        .as_ref()
+        .is_some_and(|previous| previous.preserved_properties_for_revision.is_some())
+    {
+        return Err(DocWriteError::InvalidData(
+            "DOC paragraph property revisions cannot contain nested preserved states".to_string(),
+        ));
+    }
     if let Some(alignment) = fmt.alignment
         && alignment > 9
     {
@@ -4099,7 +4114,15 @@ fn build_revision_papx_grpprl(
         }
     }
 
-    let mut grp = build_papx_grpprl(fmt);
+    let mut grp = if let Some(previous) = &fmt.preserved_properties_for_revision {
+        let mut grp = build_revision_papx_grpprl(previous, revisions)?;
+        grp.extend_from_slice(&SPRM_P_WALL.to_le_bytes());
+        grp.push(1);
+        grp.extend_from_slice(&build_papx_grpprl(fmt));
+        grp
+    } else {
+        build_papx_grpprl(fmt)
+    };
     if let Some(revision) = &fmt.formatting_revision {
         let revisions = revisions.ok_or_else(|| {
             DocWriteError::InvalidData("DOC paragraph revision author was not indexed".to_string())
@@ -4767,6 +4790,45 @@ mod tests {
     }
 
     #[test]
+    fn preserves_ordered_paragraph_property_revision_state() {
+        let formatting = ParagraphFormatting {
+            right_indent: Some(200),
+            preserved_properties_for_revision: Some(Box::new(ParagraphFormatting {
+                left_indent: Some(100),
+                ..ParagraphFormatting::default()
+            })),
+            ..ParagraphFormatting::default()
+        };
+        let grpprl = build_revision_papx_grpprl(&formatting, None).unwrap();
+        let properties = crate::doc::parts::pap::ParagraphProperties::from_sprm(&grpprl).unwrap();
+        assert_eq!(properties.indent_left, Some(100));
+        assert_eq!(properties.indent_right, Some(200));
+        let previous = properties.preserved_properties_for_revision.unwrap();
+        assert_eq!(previous.indent_left, Some(100));
+        assert_eq!(previous.indent_right, None);
+
+        let mut writer = DocWriter::new();
+        writer
+            .add_formatted_paragraph("Tracked formatting", formatting)
+            .unwrap();
+        let mut cursor = Cursor::new(Vec::new());
+        writer.write_to(&mut cursor).unwrap();
+        let mut package =
+            crate::doc::Package::from_reader(Cursor::new(cursor.into_inner())).unwrap();
+        let document = package.document().unwrap();
+        let paragraphs = document.paragraphs().unwrap();
+        let properties = paragraphs[0].properties();
+        assert_eq!(properties.indent_left, Some(100));
+        assert_eq!(properties.indent_right, Some(200));
+        let previous = properties
+            .preserved_properties_for_revision
+            .as_ref()
+            .unwrap();
+        assert_eq!(previous.indent_left, Some(100));
+        assert_eq!(previous.indent_right, None);
+    }
+
+    #[test]
     fn test_line_spacing_constructors_and_sprm_encoding() {
         let cases = [
             (LineSpacing::single(), [0xf0, 0x00, 0x01, 0x00]),
@@ -5156,6 +5218,22 @@ mod tests {
             },
             ParagraphFormatting {
                 ilfo: Some(0x07FF),
+                ..ParagraphFormatting::default()
+            },
+            ParagraphFormatting {
+                preserved_properties_for_revision: Some(Box::new(ParagraphFormatting {
+                    left_indent: Some(31_681),
+                    ..ParagraphFormatting::default()
+                })),
+                ..ParagraphFormatting::default()
+            },
+            ParagraphFormatting {
+                preserved_properties_for_revision: Some(Box::new(ParagraphFormatting {
+                    preserved_properties_for_revision: Some(Box::new(
+                        ParagraphFormatting::default(),
+                    )),
+                    ..ParagraphFormatting::default()
+                })),
                 ..ParagraphFormatting::default()
             },
             ParagraphFormatting {
