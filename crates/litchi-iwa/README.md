@@ -196,6 +196,26 @@ keynote.save("created-with-text-box.key")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
 
+Ordinary text-bearing rectangles have independent shape CRUD. Their Bézier
+path, storage, stand-ins, style relationship, ownership, z-order, and UUIDs are
+also constructed directly from typed values:
+
+```rust
+use litchi_iwa::keynote::KeynoteDocumentBuilder;
+use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+
+let mut keynote = KeynoteDocumentBuilder::new().build()?;
+let rectangle = keynote.add_slide_rectangle(
+    0,
+    "A fully editable shape",
+    DrawablePoint { x: 720.0, y: 660.0 },
+    DrawableSize { width: 480.0, height: 240.0 },
+)?;
+keynote.set_slide_shape_text(0, rectangle.drawable_object_id, "Updated")?;
+keynote.save("created-with-shape.key")?;
+# Ok::<(), litchi_iwa::Error>(())
+```
+
 Images can be embedded into the same source-free presentation. The image,
 stand-ins, ownership, style link, UUIDs, component data reference, and `Data/*`
 asset are all created directly; no blank Keynote package is embedded:

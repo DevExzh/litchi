@@ -30,22 +30,22 @@ enum TextWrapFit {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct TextBoxObjectIds {
-    drawable: u64,
-    caption: u64,
-    title: u64,
-    storage: u64,
+pub(super) struct TextBoxObjectIds {
+    pub(super) drawable: u64,
+    pub(super) caption: u64,
+    pub(super) title: u64,
+    pub(super) storage: u64,
 }
 
-struct TextBoxContext {
-    slide_id: u64,
-    theme_id: u64,
-    stylesheet_id: u64,
-    slide: kn::SlideArchive,
+pub(super) struct TextBoxContext {
+    pub(super) slide_id: u64,
+    pub(super) theme_id: u64,
+    pub(super) stylesheet_id: u64,
+    pub(super) slide: kn::SlideArchive,
 }
 
-struct TextBoxThemeStyles {
-    shape: u64,
+pub(super) struct TextBoxThemeStyles {
+    pub(super) shape: u64,
     stylesheet: tsp::Reference,
     paragraph: Option<tsp::Reference>,
     list: Option<tsp::Reference>,
@@ -53,7 +53,7 @@ struct TextBoxThemeStyles {
 }
 
 impl TextBoxObjectIds {
-    fn allocate(first: u64) -> Result<Self> {
+    pub(super) fn allocate(first: u64) -> Result<Self> {
         let identifier = |offset: u64| {
             first
                 .checked_add(offset)
@@ -67,11 +67,11 @@ impl TextBoxObjectIds {
         })
     }
 
-    const fn last(self) -> u64 {
+    pub(super) const fn last(self) -> u64 {
         self.storage
     }
 
-    const fn all(self) -> [u64; 4] {
+    pub(super) const fn all(self) -> [u64; 4] {
         [self.drawable, self.caption, self.title, self.storage]
     }
 }
@@ -98,7 +98,8 @@ impl KeynoteEditor {
         let storage = text_box_storage(text, base_storage.as_ref(), &styles);
         let ids = TextBoxObjectIds::allocate(next_object_identifier(self.package())?)?;
         let archive_name = graph.archive_name(context.slide_id)?.to_owned();
-        let objects = text_box_objects(ids, context.slide_id, styles.shape, geometry, storage)?;
+        let objects =
+            text_box_objects(ids, context.slide_id, styles.shape, geometry, storage, true)?;
 
         let mut staged = self.package().clone();
         staged.update_archive(&archive_name, |archive| {
@@ -141,7 +142,7 @@ impl KeynoteEditor {
     }
 }
 
-fn text_box_context(graph: &ObjectGraph, slide_index: usize) -> Result<TextBoxContext> {
+pub(super) fn text_box_context(graph: &ObjectGraph, slide_index: usize) -> Result<TextBoxContext> {
     let document: kn::DocumentArchive = graph.decode(1, "KN.DocumentArchive")?;
     let show: kn::ShowArchive = graph.decode(document.show.identifier, "KN.ShowArchive")?;
     let node_reference = show.slide_tree.slides.get(slide_index).ok_or_else(|| {
@@ -194,7 +195,7 @@ fn validate_text_box_geometry(
     .validate()
 }
 
-fn text_box_theme_styles(
+pub(super) fn text_box_theme_styles(
     graph: &ObjectGraph,
     theme_id: u64,
     stylesheet_id: u64,
@@ -222,7 +223,7 @@ fn text_box_theme_styles(
     })
 }
 
-fn slide_text_storage_template(
+pub(super) fn slide_text_storage_template(
     graph: &ObjectGraph,
     slide: &kn::SlideArchive,
 ) -> Result<Option<tswp::StorageArchive>> {
@@ -240,7 +241,7 @@ fn slide_text_storage_template(
     Ok(None)
 }
 
-fn text_box_storage(
+pub(super) fn text_box_storage(
     text: &str,
     base: Option<&tswp::StorageArchive>,
     styles: &TextBoxThemeStyles,
@@ -311,12 +312,13 @@ fn zero_para_data() -> tswp::ParaDataAttributeTable {
 }
 
 #[allow(deprecated)]
-fn text_box_objects(
+pub(super) fn text_box_objects(
     ids: TextBoxObjectIds,
     slide_id: u64,
     style_id: u64,
     geometry: DrawableGeometry,
     storage: tswp::StorageArchive,
+    is_text_box: bool,
 ) -> Result<[ArchiveObject; 4]> {
     let position = geometry.position.ok_or_else(|| {
         Error::InvalidFormat("validated Keynote text-box geometry has no position".to_owned())
@@ -364,7 +366,7 @@ fn text_box_objects(
         },
         deprecated_storage: Some(reference(ids.storage)),
         owned_storage: Some(reference(ids.storage)),
-        is_text_box: Some(true),
+        is_text_box: Some(is_text_box),
         ..Default::default()
     };
     Ok([
@@ -373,7 +375,7 @@ fn text_box_objects(
             SHAPE_INFO_MESSAGE_TYPE,
             shape,
             &STANDARD_MESSAGE_VERSION,
-            &[slide_id, ids.caption, ids.title, style_id, ids.storage],
+            &[ids.caption, ids.title, style_id, ids.storage],
         )?,
         keynote_object(
             ids.caption,

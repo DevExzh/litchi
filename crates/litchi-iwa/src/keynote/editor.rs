@@ -120,6 +120,8 @@ pub enum KeynoteSlideTextRole {
     Title,
     Body,
     TextBox,
+    /// Writable text owned by an ordinary non-text-box shape.
+    Shape,
 }
 
 /// A writable text storage owned by a drawable on one Keynote slide.
@@ -922,8 +924,8 @@ impl KeynoteEditor {
 
     /// List every writable text storage owned by a drawable on one slide.
     ///
-    /// This includes title and body placeholders plus ordinary text boxes in
-    /// slide ownership order. Speaker notes are exposed separately on
+    /// This includes title and body placeholders, ordinary text boxes, and
+    /// text-bearing shapes in slide ownership order. Speaker notes are exposed separately on
     /// [`KeynoteSlideInfo`] because they are owned by `KN.NoteArchive` rather
     /// than a drawable.
     pub fn slide_text_storages(&self, slide_index: usize) -> Result<Vec<KeynoteSlideTextInfo>> {
@@ -978,7 +980,20 @@ impl KeynoteEditor {
                 } else if body == Some(drawable_id) {
                     KeynoteSlideTextRole::Body
                 } else {
-                    KeynoteSlideTextRole::TextBox
+                    let shape: tswp::ShapeInfoArchive = graph.decode_type(
+                        drawable_id,
+                        SHAPE_INFO_MESSAGE_TYPE,
+                        "TSWP.ShapeInfoArchive",
+                    )?;
+                    match shape.is_text_box {
+                        Some(true) => KeynoteSlideTextRole::TextBox,
+                        Some(false) => KeynoteSlideTextRole::Shape,
+                        None => {
+                            return Err(Error::InvalidFormat(format!(
+                                "Keynote shape {drawable_id} has no text-box classification"
+                            )));
+                        },
+                    }
                 };
                 result.push(KeynoteSlideTextInfo {
                     slide_index,
@@ -991,7 +1006,7 @@ impl KeynoteEditor {
         Ok(result)
     }
 
-    /// Replace a UTF-16 range in a slide-owned text box or placeholder.
+    /// Replace a UTF-16 range in a slide-owned text box, shape, or placeholder.
     pub fn replace_slide_text_storage(
         &mut self,
         slide_index: usize,
@@ -1007,7 +1022,7 @@ impl KeynoteEditor {
         Ok(())
     }
 
-    /// Replace all text in a slide-owned text box or placeholder.
+    /// Replace all text in a slide-owned text box, shape, or placeholder.
     pub fn set_slide_text_storage(
         &mut self,
         slide_index: usize,
@@ -1022,7 +1037,7 @@ impl KeynoteEditor {
         Ok(())
     }
 
-    /// Clear a slide-owned text box or placeholder without deleting its shape.
+    /// Clear slide-owned drawable text without deleting its shape or placeholder.
     pub fn clear_slide_text_storage(
         &mut self,
         slide_index: usize,
@@ -2931,6 +2946,7 @@ mod slide_layout_update;
 mod slide_movies;
 mod slide_number;
 mod slide_preview;
+mod slide_shapes;
 mod slide_style_graph;
 mod slide_style_metadata;
 mod slide_style_registry;
@@ -2953,6 +2969,7 @@ pub use slide_background_gradient::{
 use slide_graph::*;
 pub use slide_images::{KeynoteSlideImageInfo, KeynoteSlideImageKind, RemovedKeynoteSlideImage};
 pub use slide_movies::{KeynoteSlideMovieInfo, KeynoteSlideMovieKind, RemovedKeynoteSlideMovie};
+pub use slide_shapes::{KeynoteSlideShapeInfo, KeynoteSlideShapeKind, RemovedKeynoteSlideShape};
 pub use soundtrack::{KeynoteSoundtrackMode, KeynoteSoundtrackSettings};
 pub use soundtrack_items::KeynoteSoundtrackItemInfo;
 pub use transition::{
