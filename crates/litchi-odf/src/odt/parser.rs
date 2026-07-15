@@ -5,8 +5,8 @@
 //! that works across all ODF formats, see `crate::elements::parser::DocumentParser`.
 
 use crate::elements::xml::{
-    DC_NAMESPACE, META_NAMESPACE, OFFICE_NAMESPACE, TEXT_NAMESPACE, XML_NAMESPACE, append_checked,
-    append_text_control, decode_reference, is_bound, namespaced_attribute,
+    DC_NAMESPACE, META_NAMESPACE, OFFICE_NAMESPACE, TEXT_NAMESPACE, XLINK_NAMESPACE, XML_NAMESPACE,
+    append_checked, append_text_control, decode_reference, is_bound, namespaced_attribute,
 };
 use litchi_core::{Error, Result};
 use quick_xml::XmlVersion;
@@ -79,8 +79,55 @@ pub struct Section {
     pub style: Option<String>,
     /// Whether the section is protected
     pub protected: bool,
+    /// Optional XML identifier.
+    pub xml_id: Option<String>,
+    /// Stored protection-key material; never used to unlock content automatically.
+    pub protection_key: Option<String>,
+    /// Digest algorithm URI for the protection key.
+    pub protection_key_digest_algorithm: Option<String>,
+    /// Visibility behavior.
+    pub display: SectionDisplay,
+    /// Inert condition expression for conditionally displayed sections.
+    pub condition: Option<String>,
+    /// Optional linked-section source; never fetched.
+    pub source: Option<SectionSource>,
+    /// Optional DDE source; never activated.
+    pub dde_source: Option<SectionDdeSource>,
     /// Text content within the section
     pub content: String,
+}
+
+/// Section visibility behavior.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SectionDisplay {
+    /// Display normally.
+    Visible,
+    /// Do not display.
+    Hidden,
+    /// Display according to the stored inert condition.
+    Condition,
+}
+
+/// An inert linked-section source declaration.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SectionSource {
+    /// External or package-local URI. It is never fetched automatically.
+    pub href: Option<String>,
+    /// Named section within the source document.
+    pub section_name: Option<String>,
+    /// Producer-specific import filter name.
+    pub filter_name: Option<String>,
+}
+
+/// An inert Dynamic Data Exchange source declaration.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SectionDdeSource {
+    /// DDE source name.
+    pub name: Option<String>,
+    /// Stored conversion mode.
+    pub conversion_mode: Option<String>,
+    /// Whether the producer requested automatic updates; no update is performed.
+    pub automatic_update: Option<bool>,
 }
 
 impl OdtParser {
@@ -1212,6 +1259,7 @@ struct ActiveSection {
     paragraph_depth: Option<usize>,
     seen_paragraph: bool,
     order: usize,
+    source_depth: Option<usize>,
 }
 
 fn parse_sections(content: &str) -> Result<Vec<Section>> {
@@ -1227,11 +1275,17 @@ fn parse_sections(content: &str) -> Result<Vec<Section>> {
             .read_resolved_event_into(&mut buffer)
             .map_err(|error| Error::InvalidFormat(format!("invalid section XML: {error}")))?;
         let text_element = is_bound(&namespace, TEXT_NAMESPACE);
+        let office_element = is_bound(&namespace, OFFICE_NAMESPACE);
         match event {
             Event::Start(ref element) => {
                 document_depth = checked_semantic_depth(document_depth, "section")?;
                 for section in &mut active {
-                    section.depth += 1;
+                    if section.source_depth.is_some() {
+                        return Err(Error::InvalidFormat(
+                            "section source declarations must be empty".to_string(),
+                        ));
+                    }
+                    section.depth = checked_semantic_depth(section.depth, "section")?;
                     if text_element
                         && matches!(element.local_name().as_ref(), b"p" | b"h")
                         && section.paragraph_depth.is_none()
@@ -1258,8 +1312,22 @@ fn parse_sections(content: &str) -> Result<Vec<Section>> {
                         paragraph_depth: None,
                         seen_paragraph: false,
                         order: next_order,
+                        source_depth: None,
                     });
                     next_order += 1;
+                } else if let Some(section) = active.last_mut()
+                    && section.depth == 2
+                    && ((text_element && element.local_name().as_ref() == b"section-source")
+                        || (office_element && element.local_name().as_ref() == b"dde-source"))
+                {
+                    apply_section_source(
+                        &reader,
+                        element,
+                        text_element,
+                        office_element,
+                        &mut section.section,
+                    )?;
+                    section.source_depth = Some(section.depth);
                 }
             },
             Event::Empty(ref element) => {
@@ -1271,6 +1339,18 @@ fn parse_sections(content: &str) -> Result<Vec<Section>> {
                     }
                     sections.push((next_order, section_from_start(&reader, element)?));
                     next_order += 1;
+                } else if let Some(section) = active.last_mut()
+                    && section.depth == 1
+                    && ((text_element && element.local_name().as_ref() == b"section-source")
+                        || (office_element && element.local_name().as_ref() == b"dde-source"))
+                {
+                    apply_section_source(
+                        &reader,
+                        element,
+                        text_element,
+                        office_element,
+                        &mut section.section,
+                    )?;
                 } else {
                     for section in &mut active {
                         if text_element && matches!(element.local_name().as_ref(), b"p" | b"h") {
@@ -1285,6 +1365,11 @@ fn parse_sections(content: &str) -> Result<Vec<Section>> {
                 }
             },
             Event::Text(ref value) if !active.is_empty() => {
+                if active.iter().any(|section| section.source_depth.is_some()) {
+                    return Err(Error::InvalidFormat(
+                        "section source declarations must be empty".to_string(),
+                    ));
+                }
                 let value = value
                     .xml_content(XmlVersion::Explicit1_0)
                     .map_err(|error| {
@@ -1297,6 +1382,11 @@ fn parse_sections(content: &str) -> Result<Vec<Section>> {
                 }
             },
             Event::CData(ref value) if !active.is_empty() => {
+                if active.iter().any(|section| section.source_depth.is_some()) {
+                    return Err(Error::InvalidFormat(
+                        "section source declarations must be empty".to_string(),
+                    ));
+                }
                 let value = value
                     .xml_content(XmlVersion::Explicit1_0)
                     .map_err(|error| {
@@ -1309,8 +1399,16 @@ fn parse_sections(content: &str) -> Result<Vec<Section>> {
                 }
             },
             Event::GeneralRef(ref reference) if !active.is_empty() => {
+                if active.iter().any(|section| section.source_depth.is_some()) {
+                    return Err(Error::InvalidFormat(
+                        "section source declarations must be empty".to_string(),
+                    ));
+                }
                 let value = decode_reference(reference, "section")?;
                 for section in &mut active {
+                    if section.source_depth == Some(section.depth) {
+                        section.source_depth = None;
+                    }
                     if section.paragraph_depth.is_some() {
                         append_checked(&mut section.section.content, &value)?;
                     }
@@ -1355,12 +1453,149 @@ fn section_from_start(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Res
         .map(|value| parse_boolean(&value, "text:protected"))
         .transpose()?
         .unwrap_or(false);
+    let xml_id = namespaced_attribute(reader, element, XML_NAMESPACE, b"id", "section")?;
+    let protection_key = namespaced_attribute(
+        reader,
+        element,
+        TEXT_NAMESPACE,
+        b"protection-key",
+        "section",
+    )?;
+    let protection_key_digest_algorithm = namespaced_attribute(
+        reader,
+        element,
+        TEXT_NAMESPACE,
+        b"protection-key-digest-algorithm",
+        "section",
+    )?;
+    let display_value =
+        namespaced_attribute(reader, element, TEXT_NAMESPACE, b"display", "section")?;
+    let condition = namespaced_attribute(reader, element, TEXT_NAMESPACE, b"condition", "section")?;
+    let display = match display_value.as_deref() {
+        None | Some("true") => SectionDisplay::Visible,
+        Some("none") => SectionDisplay::Hidden,
+        Some("condition") if condition.is_some() => SectionDisplay::Condition,
+        Some("condition") => {
+            return Err(Error::InvalidFormat(
+                "text:display='condition' requires text:condition".to_string(),
+            ));
+        },
+        Some(value) => {
+            return Err(Error::InvalidFormat(format!(
+                "unsupported text:display value '{value}'"
+            )));
+        },
+    };
+    if condition.is_some() && display != SectionDisplay::Condition {
+        return Err(Error::InvalidFormat(
+            "text:condition requires text:display='condition'".to_string(),
+        ));
+    }
     Ok(Section {
         name,
         style,
         protected,
+        xml_id,
+        protection_key,
+        protection_key_digest_algorithm,
+        display,
+        condition,
+        source: None,
+        dde_source: None,
         content: String::new(),
     })
+}
+
+fn apply_section_source(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    text_element: bool,
+    office_element: bool,
+    section: &mut Section,
+) -> Result<()> {
+    if section.source.is_some() || section.dde_source.is_some() {
+        return Err(Error::InvalidFormat(
+            "section may have only one source declaration".to_string(),
+        ));
+    }
+    if text_element && element.local_name().as_ref() == b"section-source" {
+        let href =
+            namespaced_attribute(reader, element, XLINK_NAMESPACE, b"href", "section source")?;
+        let link_type =
+            namespaced_attribute(reader, element, XLINK_NAMESPACE, b"type", "section source")?;
+        if link_type.as_deref().is_some_and(|value| value != "simple") {
+            return Err(Error::InvalidFormat(
+                "section source xlink:type must be 'simple'".to_string(),
+            ));
+        }
+        let show =
+            namespaced_attribute(reader, element, XLINK_NAMESPACE, b"show", "section source")?;
+        if show.as_deref().is_some_and(|value| value != "embed") {
+            return Err(Error::InvalidFormat(
+                "section source xlink:show must be 'embed'".to_string(),
+            ));
+        }
+        if href.is_some() != link_type.is_some() || href.is_none() && show.is_some() {
+            return Err(Error::InvalidFormat(
+                "section source xlink:href and xlink:type must appear together".to_string(),
+            ));
+        }
+        section.source = Some(SectionSource {
+            href,
+            section_name: namespaced_attribute(
+                reader,
+                element,
+                TEXT_NAMESPACE,
+                b"section-name",
+                "section source",
+            )?,
+            filter_name: namespaced_attribute(
+                reader,
+                element,
+                TEXT_NAMESPACE,
+                b"filter-name",
+                "section source",
+            )?,
+        });
+    } else if office_element && element.local_name().as_ref() == b"dde-source" {
+        let conversion_mode = namespaced_attribute(
+            reader,
+            element,
+            OFFICE_NAMESPACE,
+            b"conversion-mode",
+            "section DDE source",
+        )?;
+        if conversion_mode.as_deref().is_some_and(|value| {
+            !matches!(
+                value,
+                "into-default-style-data-style" | "into-english-number" | "keep-text"
+            )
+        }) {
+            return Err(Error::InvalidFormat(
+                "unsupported office:conversion-mode on section DDE source".to_string(),
+            ));
+        }
+        section.dde_source = Some(SectionDdeSource {
+            name: namespaced_attribute(
+                reader,
+                element,
+                OFFICE_NAMESPACE,
+                b"name",
+                "section DDE source",
+            )?,
+            conversion_mode,
+            automatic_update: namespaced_attribute(
+                reader,
+                element,
+                OFFICE_NAMESPACE,
+                b"automatic-update",
+                "section DDE source",
+            )?
+            .map(|value| parse_boolean(&value, "office:automatic-update"))
+            .transpose()?,
+        });
+    }
+    Ok(())
 }
 
 fn parse_boolean(value: &str, context: &str) -> Result<bool> {
@@ -1653,17 +1888,36 @@ mod tests {
 
     #[test]
     fn parses_nested_sections_in_document_order_with_visible_text() {
-        let xml = r#"<x:document-content xmlns:x="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><x:body><x:text><t:section t:name="Outer &amp; Main" t:style-name="S1" t:protected="1"><t:p>One &amp;<t:s t:c="2"/></t:p><t:section t:name="Inner"><t:p>Inner <![CDATA[X]]></t:p></t:section><t:p>Last</t:p></t:section><t:section t:name="Empty"/></x:text></x:body></x:document-content>"#;
+        let xml = r#"<x:document-content xmlns:x="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:l="http://www.w3.org/1999/xlink"><x:body><x:text><t:section t:name="Outer &amp; Main" t:style-name="S1" t:protected="1" xml:id="outer" t:protection-key="YWJj" t:protection-key-digest-algorithm="urn:sha256" t:display="condition" t:condition="ooow:visible()"><t:section-source l:type="simple" l:href="https://example.invalid/doc.odt" l:show="embed" t:section-name="Remote" t:filter-name="writer8"/><t:p>One &amp;<t:s t:c="2"/></t:p><t:section t:name="Inner"><t:p>Inner <![CDATA[X]]></t:p></t:section><t:p>Last</t:p></t:section><t:section t:name="Empty"><x:dde-source x:name="Feed" x:conversion-mode="keep-text" x:automatic-update="false"/></t:section></x:text></x:body></x:document-content>"#;
         let sections = OdtParser::parse_sections(xml).unwrap();
         assert_eq!(sections.len(), 3);
         assert_eq!(sections[0].name, "Outer & Main");
         assert_eq!(sections[0].style.as_deref(), Some("S1"));
         assert!(sections[0].protected);
+        assert_eq!(sections[0].xml_id.as_deref(), Some("outer"));
+        assert_eq!(sections[0].protection_key.as_deref(), Some("YWJj"));
+        assert_eq!(
+            sections[0].protection_key_digest_algorithm.as_deref(),
+            Some("urn:sha256")
+        );
+        assert_eq!(sections[0].display, SectionDisplay::Condition);
+        assert_eq!(sections[0].condition.as_deref(), Some("ooow:visible()"));
+        let source = sections[0].source.as_ref().unwrap();
+        assert_eq!(
+            source.href.as_deref(),
+            Some("https://example.invalid/doc.odt")
+        );
+        assert_eq!(source.section_name.as_deref(), Some("Remote"));
+        assert_eq!(source.filter_name.as_deref(), Some("writer8"));
         assert_eq!(sections[0].content, "One &  \nInner X\nLast");
         assert_eq!(sections[1].name, "Inner");
         assert_eq!(sections[1].content, "Inner X");
         assert_eq!(sections[2].name, "Empty");
         assert!(sections[2].content.is_empty());
+        let dde = sections[2].dde_source.as_ref().unwrap();
+        assert_eq!(dde.name.as_deref(), Some("Feed"));
+        assert_eq!(dde.conversion_mode.as_deref(), Some("keep-text"));
+        assert_eq!(dde.automatic_update, Some(false));
     }
 
     #[test]
@@ -1681,6 +1935,24 @@ mod tests {
             r#"<t:section xmlns:t="{namespace}" xmlns:u="{namespace}" t:name="A" u:name="B"/>"#
         );
         assert!(OdtParser::parse_sections(&duplicate).is_err());
+        let missing_condition =
+            format!(r#"<t:section xmlns:t="{namespace}" t:name="A" t:display="condition"/>"#);
+        assert!(OdtParser::parse_sections(&missing_condition).is_err());
+        let stray_condition =
+            format!(r#"<t:section xmlns:t="{namespace}" t:name="A" t:condition="x"/>"#);
+        assert!(OdtParser::parse_sections(&stray_condition).is_err());
+        let duplicate_source = format!(
+            r#"<t:section xmlns:t="{namespace}" xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" t:name="A"><t:section-source/><o:dde-source/></t:section>"#
+        );
+        assert!(OdtParser::parse_sections(&duplicate_source).is_err());
+        let nonempty_source = format!(
+            r#"<t:section xmlns:t="{namespace}" t:name="A"><t:section-source>bad</t:section-source></t:section>"#
+        );
+        assert!(OdtParser::parse_sections(&nonempty_source).is_err());
+        let incomplete_link = format!(
+            r#"<t:section xmlns:t="{namespace}" xmlns:l="http://www.w3.org/1999/xlink" t:name="A"><t:section-source l:href="x"/></t:section>"#
+        );
+        assert!(OdtParser::parse_sections(&incomplete_link).is_err());
     }
 
     #[test]
@@ -1739,6 +2011,13 @@ mod tests {
             name: "Sec1".to_string(),
             style: Some("Style1".to_string()),
             protected: true,
+            xml_id: None,
+            protection_key: None,
+            protection_key_digest_algorithm: None,
+            display: SectionDisplay::Visible,
+            condition: None,
+            source: None,
+            dde_source: None,
             content: "Content".to_string(),
         };
         let debug_str = format!("{:?}", section);
@@ -1781,6 +2060,13 @@ mod tests {
             name: "Sec1".to_string(),
             style: None,
             protected: false,
+            xml_id: None,
+            protection_key: None,
+            protection_key_digest_algorithm: None,
+            display: SectionDisplay::Visible,
+            condition: None,
+            source: None,
+            dde_source: None,
             content: "Text".to_string(),
         };
         let cloned = section.clone();

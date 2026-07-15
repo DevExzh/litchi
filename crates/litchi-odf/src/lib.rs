@@ -58,6 +58,7 @@
 //! - ✅ Bookmark and reference tracking
 //! - ✅ Comment and change tracking parsing
 //! - ✅ Section parsing
+//! - ✅ Section protection, conditional visibility, linked sources, and inert DDE
 //! - ✅ Generated indexes, source templates, and cached index bodies
 //! - ✅ Point/range index source marks and inert bibliography records
 //! - ✅ Point/range cross-reference targets with exact positions and text
@@ -370,8 +371,8 @@ pub use ods::{
 pub use odt::{
     Document, DocumentBuilder, HeaderFooter, HeaderFooterKind, MasterPage, MutableDocument, Note,
     NoteClass, PageLayout, PageLayoutAttribute, PageLayoutProperties, PageUsage, ReferenceMark,
-    TextIndex, TextIndexAttribute, TextIndexContent, TextIndexElement, TextIndexKind,
-    TextIndexMark, TextIndexMarkKind,
+    SectionDdeSource, SectionDisplay, SectionSource, TextIndex, TextIndexAttribute,
+    TextIndexContent, TextIndexElement, TextIndexKind, TextIndexMark, TextIndexMarkKind,
 };
 
 // Re-export shapes for presentations

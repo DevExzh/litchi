@@ -21,6 +21,7 @@
 //! - ✅ `comments()` - Parse document comments
 //! - ✅ `track_changes()` - Parse tracked changes
 //! - ✅ `sections()` - Parse document sections
+//! - ✅ Section protection keys, visibility conditions, linked sources, and inert DDE
 //! - ✅ `text_indexes()` - Parse all generated index sources and cached bodies
 //! - ✅ `text_index_marks()` - Parse TOC, user, alphabetical, and bibliography marks
 //! - ✅ `reference_marks()` - Parse point/range cross-reference targets
@@ -75,4 +76,6 @@ pub use reference_mark::ReferenceMark;
 
 // Re-export ODT-specific types for external use
 #[allow(unused_imports)] // Library public API
-pub use parser::{ChangeType, Comment, Section, TrackChange};
+pub use parser::{
+    ChangeType, Comment, Section, SectionDdeSource, SectionDisplay, SectionSource, TrackChange,
+};
