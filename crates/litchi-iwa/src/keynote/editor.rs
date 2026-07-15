@@ -143,93 +143,6 @@ struct KeynoteTextBoxGraph {
     uuid_object_ids: Vec<u64>,
 }
 
-/// Modern transition fields embedded in a Keynote slide.
-#[derive(Debug, Clone, PartialEq)]
-pub struct KeynoteTransitionSettings {
-    pub animation_type: Option<String>,
-    pub effect: Option<String>,
-    pub duration: Option<f64>,
-    pub direction: Option<u32>,
-    pub delay: Option<f64>,
-    pub is_automatic: Option<bool>,
-    /// Modern animation-level parameters, including byte-exact native color
-    /// and timing-curve protobuf payloads.
-    pub animation_parameters: KeynoteTransitionAnimationParameters,
-    /// Native effect-specific parameters whose effect semantics are not yet
-    /// promoted to typed transition variants.
-    pub custom_parameters: KeynoteTransitionCustomParameters,
-}
-
-/// Lossless parameters stored inside a transition's modern animation archive.
-///
-/// Color and timing curves are kept as encoded native protobuf payloads. This
-/// permits arbitrary current and future path-source variants to round-trip
-/// without exposing private generated protobuf types in the public API.
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct KeynoteTransitionAnimationParameters {
-    pub color_payload: Option<Vec<u8>>,
-    pub timing_curve_payloads: [Option<Vec<u8>>; 3],
-    pub random_number_seed: Option<u32>,
-    pub detail: Option<f64>,
-    pub timing_curve_theme_names: [Option<String>; 3],
-    pub writing_direction_is_rtl: Option<bool>,
-}
-
-/// Lossless native parameters shared by Keynote transition effects.
-///
-/// These values intentionally retain their protobuf-level representation so
-/// callers can round-trip effects that do not yet have a typed semantic API.
-#[derive(Debug, Clone, Copy, Default, PartialEq)]
-pub struct KeynoteTransitionCustomParameters {
-    pub twist: Option<f32>,
-    pub mosaic_size: Option<u32>,
-    pub mosaic_type: Option<u32>,
-    pub bounce: Option<bool>,
-    pub magic_move_fade_unmatched_objects: Option<bool>,
-    pub timing_curve: Option<i32>,
-    pub text_delivery_type: Option<i32>,
-    pub motion_blur: Option<bool>,
-    pub travel_distance: Option<f32>,
-}
-
-impl KeynoteTransitionSettings {
-    fn from_native(attributes: &kn::TransitionAttributesArchive) -> Option<Self> {
-        let animation = attributes.animation_attributes.as_ref()?;
-        Some(Self {
-            animation_type: animation.animation_type.clone(),
-            effect: animation.effect.clone(),
-            duration: animation.duration,
-            direction: animation.direction,
-            delay: animation.delay,
-            is_automatic: animation.is_automatic,
-            animation_parameters: KeynoteTransitionAnimationParameters {
-                color_payload: None,
-                timing_curve_payloads: [None, None, None],
-                random_number_seed: animation.random_number_seed,
-                detail: animation.custom_detail,
-                timing_curve_theme_names: [
-                    animation.custom_effect_timing_curve_theme_name_1.clone(),
-                    animation.custom_effect_timing_curve_theme_name_2.clone(),
-                    animation.custom_effect_timing_curve_theme_name_3.clone(),
-                ],
-                writing_direction_is_rtl: animation.writing_direction_is_rtl,
-            },
-            custom_parameters: KeynoteTransitionCustomParameters {
-                twist: attributes.custom_twist,
-                mosaic_size: attributes.custom_mosaic_size,
-                mosaic_type: attributes.custom_mosaic_type,
-                bounce: attributes.custom_bounce,
-                magic_move_fade_unmatched_objects: attributes
-                    .custom_magic_move_fade_unmatched_objects,
-                timing_curve: attributes.custom_timing_curve,
-                text_delivery_type: attributes.custom_text_delivery_type,
-                motion_blur: attributes.custom_motion_blur,
-                travel_distance: attributes.custom_travel_distance,
-            },
-        })
-    }
-}
-
 fn optional_length_delimited_payload(data: &[u8], field_number: u32) -> Result<Option<&[u8]>> {
     let payloads = repeated_length_delimited_payloads(data, field_number)?;
     if payloads.len() > 1 {
@@ -250,30 +163,6 @@ fn required_length_delimited_payload<'a>(
             "{context} is missing protobuf field {field_number}"
         ))
     })
-}
-
-fn transition_settings_from_wire(
-    original: &[u8],
-    attributes: &kn::TransitionAttributesArchive,
-) -> Result<Option<KeynoteTransitionSettings>> {
-    let Some(mut settings) = KeynoteTransitionSettings::from_native(attributes) else {
-        return Ok(None);
-    };
-    let transition = required_length_delimited_payload(original, 4, "Keynote slide transition")?;
-    let attributes_wire =
-        required_length_delimited_payload(transition, 2, "Keynote transition attributes")?;
-    let animation = required_length_delimited_payload(
-        attributes_wire,
-        8,
-        "Keynote modern transition attributes",
-    )?;
-    settings.animation_parameters.color_payload =
-        optional_length_delimited_payload(animation, 7)?.map(Vec::from);
-    for (index, field_number) in [8, 9, 10].into_iter().enumerate() {
-        settings.animation_parameters.timing_curve_payloads[index] =
-            optional_length_delimited_payload(animation, field_number)?.map(Vec::from);
-    }
-    Ok(Some(settings))
 }
 
 /// Native start relationship for one Keynote build event.
@@ -2135,87 +2024,6 @@ impl KeynoteEditor {
         Ok(removed)
     }
 
-    /// Replace the standard transition fields for a slide with a modern
-    /// `AnimationAttributesArchive`. Legacy-only transitions are rejected so
-    /// that the editor never guesses which representation should take precedence.
-    pub fn set_slide_transition(
-        &mut self,
-        slide_index: usize,
-        settings: KeynoteTransitionSettings,
-    ) -> Result<()> {
-        validate_transition_settings(&settings)?;
-        let slides = self.slides()?;
-        let slide = slides.get(slide_index).ok_or_else(|| {
-            Error::ParseError(format!(
-                "Keynote slide index {slide_index} is out of range for {} slides",
-                slides.len()
-            ))
-        })?;
-        if slide.transition.is_none() {
-            return Err(Error::InvalidFormat(format!(
-                "Keynote slide {slide_index} has no modern transition attributes"
-            )));
-        }
-        let slide_id = slide.slide_id;
-        let graph = ObjectGraph::read(self.text.package())?;
-        let archive_name = graph.archive_name(slide_id)?.to_owned();
-        let mut staged = self.text.package().clone();
-        staged.update_archive(&archive_name, |archive| {
-            let object = archive.object_mut(slide_id).ok_or_else(|| {
-                Error::InvalidFormat(format!("Keynote slide object {slide_id} is missing"))
-            })?;
-            let message_index = object
-                .messages
-                .iter()
-                .position(|message| {
-                    message.type_ == 5 && kn::SlideArchive::decode(message.data.as_slice()).is_ok()
-                })
-                .ok_or_else(|| {
-                    Error::InvalidFormat(format!(
-                        "Keynote slide object {slide_id} has no SlideArchive payload"
-                    ))
-                })?;
-            let message_type = object.messages[message_index].type_;
-            let original = object.messages[message_index].data.as_slice();
-            let slide = kn::SlideArchive::decode(original)?;
-            let attributes = &slide.transition.attributes;
-            if attributes.animation_attributes.is_none() {
-                return Err(Error::InvalidFormat(format!(
-                    "Keynote slide {slide_index} has no modern transition attributes"
-                )));
-            }
-            let data = patch_transition_settings_wire(original, attributes, &settings)?;
-            let verified = kn::SlideArchive::decode(data.as_slice())?;
-            let verified = transition_settings_from_wire(&data, &verified.transition.attributes)?;
-            if verified.as_ref() != Some(&settings) {
-                return Err(Error::InvalidFormat(
-                    "Keynote transition wire patch failed validation".to_owned(),
-                ));
-            }
-            object.replace_message(
-                message_index,
-                RawMessage {
-                    type_: message_type,
-                    data,
-                },
-            )?;
-            Ok(())
-        })?;
-        let verified = Self::from_bytes(&staged.to_bytes()?)?;
-        if verified
-            .slides()?
-            .get(slide_index)
-            .and_then(|slide| slide.transition.as_ref())
-            != Some(&settings)
-        {
-            return Err(Error::InvalidFormat(
-                "Keynote transition update failed round-trip validation".to_owned(),
-            ));
-        }
-        self.text = IWorkTextEditor::from_package(staged);
-        Ok(())
-    }
-
     pub fn set_slide_title(&mut self, slide_index: usize, replacement: &str) -> Result<()> {
         let storage_id = self.slide_storage(slide_index, true)?;
         self.text.set_text(storage_id, replacement)
@@ -3101,6 +2909,8 @@ mod slide_number;
 mod slide_style_graph;
 mod slide_style_metadata;
 mod slide_style_registry;
+mod transition;
+mod transition_wire;
 
 use builds::*;
 pub use show_settings::{KeynoteShowMode, KeynoteShowSettings};
@@ -3110,5 +2920,11 @@ pub use slide_background_gradient::{
     KeynoteGradient, KeynoteGradientAngle, KeynoteGradientKind, KeynoteGradientStop,
 };
 use slide_graph::*;
+pub use transition::{
+    KeynoteTransitionAcceleration, KeynoteTransitionAnimationParameters,
+    KeynoteTransitionCustomParameters, KeynoteTransitionDirection, KeynoteTransitionMosaicType,
+    KeynoteTransitionSettings, KeynoteTransitionTextDelivery,
+};
+use transition_wire::{transition_settings_from_wire, validate_transition_wire};
 #[cfg(test)]
 mod tests;

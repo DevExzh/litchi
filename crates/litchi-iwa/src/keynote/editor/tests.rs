@@ -3227,15 +3227,15 @@ fn transition_custom_parameter_crud_is_lossless_and_transactional() {
     let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
     let mut settings = editor.slides().unwrap()[0].transition.clone().unwrap();
     settings.effect = Some("com.example.future-transition".to_owned());
-    settings.direction = Some(42);
+    settings.direction = Some(KeynoteTransitionDirection::from_raw(42));
     settings.custom_parameters = KeynoteTransitionCustomParameters {
         twist: Some(-0.375),
         mosaic_size: Some(0),
-        mosaic_type: Some(7),
+        mosaic_type: Some(KeynoteTransitionMosaicType::from_raw(7)),
         bounce: Some(false),
         magic_move_fade_unmatched_objects: Some(true),
-        timing_curve: Some(5),
-        text_delivery_type: Some(3),
+        acceleration: Some(KeynoteTransitionAcceleration::Custom),
+        text_delivery: Some(KeynoteTransitionTextDelivery::ByCharacter),
         motion_blur: Some(false),
         travel_distance: Some(275.5),
     };
@@ -3263,12 +3263,27 @@ fn transition_custom_parameter_crud_is_lossless_and_transactional() {
     editor.set_slide_transition(0, settings.clone()).unwrap();
     assert_eq!(editor.to_bytes().unwrap(), before_noop);
 
+    settings.custom_parameters.acceleration = Some(KeynoteTransitionAcceleration::Unknown(19));
+    settings.custom_parameters.text_delivery = Some(KeynoteTransitionTextDelivery::Unknown(-1));
+    editor.set_slide_transition(0, settings.clone()).unwrap();
+    let reparsed = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reparsed.slides().unwrap()[0].transition.as_ref(),
+        Some(&settings)
+    );
+
     let before_invalid = editor.to_bytes().unwrap();
     let mut invalid = settings.clone();
     invalid.custom_parameters.twist = Some(f32::NAN);
     assert!(editor.set_slide_transition(0, invalid).is_err());
     let mut invalid = settings.clone();
     invalid.custom_parameters.travel_distance = Some(f32::INFINITY);
+    assert!(editor.set_slide_transition(0, invalid).is_err());
+    let mut invalid = settings.clone();
+    invalid.custom_parameters.acceleration = Some(KeynoteTransitionAcceleration::Unknown(5));
+    assert!(editor.set_slide_transition(0, invalid).is_err());
+    let mut invalid = settings.clone();
+    invalid.custom_parameters.text_delivery = Some(KeynoteTransitionTextDelivery::Unknown(3));
     assert!(editor.set_slide_transition(0, invalid).is_err());
     assert_eq!(editor.to_bytes().unwrap(), before_invalid);
 
@@ -3296,11 +3311,11 @@ fn transition_custom_parameters_reject_malformed_wire_transactionally() {
         settings.custom_parameters = KeynoteTransitionCustomParameters {
             twist: Some(0.25),
             mosaic_size: Some(16),
-            mosaic_type: Some(2),
+            mosaic_type: Some(KeynoteTransitionMosaicType::from_raw(2)),
             bounce: Some(true),
             magic_move_fade_unmatched_objects: Some(false),
-            timing_curve: Some(4),
-            text_delivery_type: Some(2),
+            acceleration: Some(KeynoteTransitionAcceleration::EaseInOut),
+            text_delivery: Some(KeynoteTransitionTextDelivery::ByWord),
             motion_blur: Some(true),
             travel_distance: Some(80.0),
         };
@@ -3618,7 +3633,7 @@ fn scalar_updates_preserve_unknown_wire_and_restore_exact_components() {
     changed_transition.animation_type = Some("Transition".to_owned());
     changed_transition.effect = Some("dissolve".to_owned());
     changed_transition.duration = Some(2.5);
-    changed_transition.direction = Some(2);
+    changed_transition.direction = Some(KeynoteTransitionDirection::from_raw(2));
     changed_transition.delay = Some(1.0);
     changed_transition.is_automatic = Some(true);
     editor.set_slide_transition(0, changed_transition).unwrap();

@@ -48,8 +48,9 @@ pub use editor::{
     KeynoteShowMode, KeynoteShowSettings, KeynoteSlideBackground, KeynoteSlideInfo,
     KeynoteSlideLayoutId, KeynoteSlideLayoutInfo, KeynoteSlideTextInfo,
     KeynoteSlideTextPlaceholder, KeynoteSlideTextRole, KeynoteSwooshDirection,
-    KeynoteTransitionAnimationParameters, KeynoteTransitionCustomParameters,
-    KeynoteTransitionSettings, RemovedKeynoteTextBox,
+    KeynoteTransitionAcceleration, KeynoteTransitionAnimationParameters,
+    KeynoteTransitionCustomParameters, KeynoteTransitionDirection, KeynoteTransitionMosaicType,
+    KeynoteTransitionSettings, KeynoteTransitionTextDelivery, RemovedKeynoteTextBox,
 };
 pub use show::KeynoteShow;
 pub use slide::{BuildAnimation, KeynoteSlide, SlideTransition};

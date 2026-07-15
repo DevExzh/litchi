@@ -3,7 +3,9 @@ use std::env;
 
 use litchi_iwa::IWorkPackage;
 use litchi_iwa::archive::ArchiveObject;
-use litchi_iwa::keynote::KeynoteShowMode;
+use litchi_iwa::keynote::{
+    KeynoteShowMode, KeynoteTransitionAcceleration, KeynoteTransitionTextDelivery,
+};
 use litchi_iwa::protobuf::kn::{
     BuildArchive, BuildChunkArchive, DocumentArchive, PlaceholderArchive, ShowArchive,
     SlideArchive, SlideNodeArchive,
@@ -101,8 +103,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 );
                 let transition = &slide.transition.attributes;
                 println!(
-                    "  transition modern={:?} legacy=({:?},{:?},{:?},{:?},{:?})",
+                    "  transition modern={:?} custom=(timing={:?},delivery={:?},mosaic={:?}) legacy=({:?},{:?},{:?},{:?},{:?})",
                     transition.animation_attributes,
+                    transition
+                        .custom_timing_curve
+                        .map(KeynoteTransitionAcceleration::from_raw),
+                    transition
+                        .custom_text_delivery_type
+                        .map(KeynoteTransitionTextDelivery::from_raw),
+                    transition.custom_mosaic_type,
                     transition.database_animation_type,
                     transition.database_effect,
                     transition.database_duration,

@@ -50,7 +50,8 @@ println!("{}", structured.summary());
   emphasis actions, typed Keyboard / Shimmer / Skid / Swoosh / Trace build-in/build-out
   effects with native direction models, wire-preserving
   move/reorder operations, validated raw CRUD for unmapped native build parameters,
-  validated raw CRUD for effect-specific transition parameters, component UUIDs,
+  typed transition acceleration and text delivery, lossless effect-specific
+  transition parameters, component UUIDs,
   and slide-node cache maintenance
 - Typed direct-drawable comment CRUD with Pages document-reachability,
   Numbers sheet-ownership, and Keynote slide-ownership guards
@@ -259,6 +260,10 @@ let fresh = keynote.add_slide(layout)?;
 keynote.set_slide_title(fresh.index, "New from theme")?;
 let mut transition = keynote.slides()?[0].transition.clone().expect("transition");
 transition.duration = Some(1.5);
+transition.custom_parameters.acceleration =
+    Some(litchi_iwa::keynote::KeynoteTransitionAcceleration::EaseInOut);
+transition.custom_parameters.text_delivery =
+    Some(litchi_iwa::keynote::KeynoteTransitionTextDelivery::ByWord);
 keynote.set_slide_transition(0, transition)?;
 let mut show = keynote.show_settings()?;
 show.loop_presentation = Some(true);
@@ -532,7 +537,8 @@ Keynote show dimensions and playback flags, slide skip state and navigator
 name, and modern transition strings/timing fields use the same bounded wire
 mutations. Native twist, mosaic, bounce, Magic Move fading, timing curve, text
 delivery, motion blur, and travel-distance transition parameters are available
-through a lossless raw CRUD model. Modern animation color, arbitrary native
+through a lossless CRUD model, with typed acceleration and text delivery.
+Modern animation color, arbitrary native
 timing-curve payloads, random seeds, effect detail, curve theme names, and
 right-to-left writing direction are writable as well. Unknown nested transition
 extensions remain byte-exact at the slide, transition, transition-attributes,
