@@ -73,15 +73,21 @@ pub(crate) fn parse_protection(xml: &str) -> Result<(SpreadsheetProtection, Vec<
     let mut buffer = Vec::new();
     let mut spreadsheet = SpreadsheetProtection::default();
     let mut spreadsheet_seen = false;
-    let mut inside_spreadsheet = false;
     let mut sheets = Vec::new();
     let mut current_sheet: Option<SheetProtection> = None;
-    let mut nested_table_depth = 0usize;
+    let mut element_depth = 0usize;
+    let mut spreadsheet_depth = None;
+    let mut current_sheet_depth = None;
 
     loop {
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(|error| Error::InvalidFormat(format!("XML parsing error: {error}")))?;
+        let is_start = matches!(&event, Event::Start(_));
+        let is_end = matches!(&event, Event::End(_));
+        if is_start {
+            element_depth += 1;
+        }
         match event {
             Event::Start(element)
                 if is_namespace(&namespace, OFFICE_NAMESPACE)
@@ -94,7 +100,7 @@ pub(crate) fn parse_protection(xml: &str) -> Result<(SpreadsheetProtection, Vec<
                 }
                 spreadsheet = parse_spreadsheet_attributes(&reader, &element)?;
                 spreadsheet_seen = true;
-                inside_spreadsheet = true;
+                spreadsheet_depth = Some(element_depth);
             },
             Event::Empty(element)
                 if is_namespace(&namespace, OFFICE_NAMESPACE)
@@ -111,25 +117,28 @@ pub(crate) fn parse_protection(xml: &str) -> Result<(SpreadsheetProtection, Vec<
             Event::Start(element)
                 if is_namespace(&namespace, TABLE_NAMESPACE)
                     && element.local_name().as_ref() == b"table"
-                    && inside_spreadsheet =>
+                    && spreadsheet_depth.is_some_and(|depth| element_depth == depth + 1) =>
             {
-                if current_sheet.is_some() {
-                    nested_table_depth += 1;
-                } else {
-                    current_sheet = Some(parse_sheet_attributes(&reader, &element)?);
-                }
+                current_sheet = Some(parse_sheet_attributes(&reader, &element)?);
+                current_sheet_depth = Some(element_depth);
             },
             Event::Empty(element)
                 if is_namespace(&namespace, TABLE_NAMESPACE)
                     && element.local_name().as_ref() == b"table"
-                    && inside_spreadsheet
+                    && spreadsheet_depth == Some(element_depth)
                     && current_sheet.is_none() =>
             {
                 sheets.push(parse_sheet_attributes(&reader, &element)?);
             },
             Event::Start(element) | Event::Empty(element)
                 if current_sheet.is_some()
-                    && nested_table_depth == 0
+                    && current_sheet_depth.is_some_and(|depth| {
+                        if is_start {
+                            element_depth == depth + 1
+                        } else {
+                            element_depth == depth
+                        }
+                    })
                     && element.local_name().as_ref() == b"table-protection"
                     && is_protection_extension_namespace(&namespace) =>
             {
@@ -145,26 +154,26 @@ pub(crate) fn parse_protection(xml: &str) -> Result<(SpreadsheetProtection, Vec<
             Event::End(element)
                 if is_namespace(&namespace, TABLE_NAMESPACE)
                     && element.local_name().as_ref() == b"table"
-                    && current_sheet.is_some() =>
+                    && current_sheet_depth == Some(element_depth) =>
             {
-                if nested_table_depth > 0 {
-                    nested_table_depth -= 1;
-                } else {
-                    sheets.push(current_sheet.take().expect("checked sheet"));
-                }
+                sheets.push(current_sheet.take().expect("checked sheet"));
+                current_sheet_depth = None;
             },
             Event::End(element)
                 if is_namespace(&namespace, OFFICE_NAMESPACE)
                     && element.local_name().as_ref() == b"spreadsheet" =>
             {
-                inside_spreadsheet = false;
+                spreadsheet_depth = None;
             },
             Event::Eof => break,
             _ => {},
         }
+        if is_end {
+            element_depth = element_depth.saturating_sub(1);
+        }
         buffer.clear();
     }
-    if current_sheet.is_some() || nested_table_depth != 0 || inside_spreadsheet {
+    if current_sheet.is_some() || current_sheet_depth.is_some() || spreadsheet_depth.is_some() {
         return Err(Error::InvalidFormat(
             "unterminated protected sheet".to_string(),
         ));
@@ -405,5 +414,22 @@ mod tests {
         assert!(parse_protection(invalid).is_err());
         let nested = r#"<o:spreadsheet xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><t:table><t:table/></t:table></o:spreadsheet>"#;
         assert_eq!(parse_protection(nested).unwrap().1.len(), 1);
+    }
+
+    #[test]
+    fn ignores_dde_cache_table_protection() {
+        let xml = r#"<o:spreadsheet
+          xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+          xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0">
+          <t:dde-links><t:dde-link>
+            <o:dde-source o:dde-application="app" o:dde-topic="topic" o:dde-item="item"/>
+            <t:table t:name="Cache" t:protected="true"/>
+          </t:dde-link></t:dde-links>
+          <t:table t:name="Visible" t:protected="false"/>
+        </o:spreadsheet>"#;
+
+        let (_, sheets) = parse_protection(xml).unwrap();
+        assert_eq!(sheets.len(), 1);
+        assert_eq!(sheets[0].protected, Some(false));
     }
 }

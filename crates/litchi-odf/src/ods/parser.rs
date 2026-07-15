@@ -75,6 +75,9 @@ impl OdsParser {
         let mut sheet_text = String::new();
         let mut document_namespaces = BTreeMap::new();
         let mut namespace_scopes = Vec::new();
+        let mut element_depth = 0usize;
+        let mut spreadsheet_depth = None;
+        let mut current_sheet_depth = None;
 
         loop {
             match reader.read_event_into(&mut buf) {
@@ -82,6 +85,15 @@ impl OdsParser {
                     let namespace_scope =
                         Self::push_namespace_scope(e, reader.decoder(), &mut document_namespaces)?;
                     namespace_scopes.push(namespace_scope);
+                    element_depth += 1;
+                    if Self::element_name_is(
+                        e.name().as_ref(),
+                        &document_namespaces,
+                        OFFICE_NAMESPACE,
+                        "spreadsheet",
+                    ) {
+                        spreadsheet_depth = Some(element_depth);
+                    }
 
                     if let Some(builder) = detective_builder.as_mut() {
                         if detective_child_open {
@@ -114,7 +126,8 @@ impl OdsParser {
                         &document_namespaces,
                         TABLE_NAMESPACE_URI,
                         "table",
-                    ) {
+                    ) && spreadsheet_depth.is_some_and(|depth| element_depth == depth + 1)
+                    {
                         let name =
                             Self::extract_table_name(e, reader.decoder(), &document_namespaces)?;
                         let (style, print_settings) = Self::parse_sheet_formatting(
@@ -124,6 +137,7 @@ impl OdsParser {
                         )?;
                         current_sheet =
                             Some(SheetBuilder::with_formatting(name, style, print_settings));
+                        current_sheet_depth = Some(element_depth);
                     } else if current_sheet.is_some()
                         && current_row.is_none()
                         && Self::element_name_is(
@@ -343,7 +357,25 @@ impl OdsParser {
                 Ok(Event::Empty(ref e)) => {
                     let empty_scope =
                         Self::push_namespace_scope(e, reader.decoder(), &mut document_namespaces)?;
-                    if let Some(builder) = detective_builder.as_mut() {
+                    if spreadsheet_depth == Some(element_depth)
+                        && Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            TABLE_NAMESPACE_URI,
+                            "table",
+                        )
+                    {
+                        let name =
+                            Self::extract_table_name(e, reader.decoder(), &document_namespaces)?;
+                        let (style, print_settings) = Self::parse_sheet_formatting(
+                            e,
+                            reader.decoder(),
+                            &document_namespaces,
+                        )?;
+                        sheets.push(
+                            SheetBuilder::with_formatting(name, style, print_settings).build()?,
+                        );
+                    } else if let Some(builder) = detective_builder.as_mut() {
                         if detective_child_open {
                             return Err(Error::InvalidFormat(
                                 "table:detective child elements must be empty".to_string(),
@@ -617,6 +649,21 @@ impl OdsParser {
                     text_content.push_str(&decode_reference(reference)?);
                 },
                 Ok(Event::End(ref e)) => {
+                    let closes_current_sheet = current_sheet_depth == Some(element_depth)
+                        && Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            TABLE_NAMESPACE_URI,
+                            "table",
+                        );
+                    let closes_spreadsheet = spreadsheet_depth == Some(element_depth)
+                        && Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            OFFICE_NAMESPACE,
+                            "spreadsheet",
+                        );
+                    element_depth = element_depth.saturating_sub(1);
                     if detective_builder.is_some() {
                         if detective_child_open {
                             detective_child_open = false;
@@ -755,14 +802,13 @@ impl OdsParser {
                         if let Some(sheet) = current_sheet.as_mut() {
                             sheet.row_structure.end_header(sheet.rows.len())?;
                         }
-                    } else if Self::element_name_is(
-                        e.name().as_ref(),
-                        &document_namespaces,
-                        TABLE_NAMESPACE_URI,
-                        "table",
-                    ) && let Some(sheet_builder) = current_sheet.take()
+                    } else if closes_current_sheet && let Some(sheet_builder) = current_sheet.take()
                     {
                         sheets.push(sheet_builder.build()?);
+                        current_sheet_depth = None;
+                    }
+                    if closes_spreadsheet {
+                        spreadsheet_depth = None;
                     }
                     Self::pop_namespace_scope(&mut document_namespaces, namespace_scopes.pop());
                 },
@@ -2844,9 +2890,10 @@ mod tests {
     fn test_extract_table_name_default() {
         // XML without table:name attribute
         let xml = r#"<?xml version="1.0"?>
-<office:document-content xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0">
-    <table:table>
-    </table:table>
+<office:document-content
+    xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+    xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0">
+    <office:body><office:spreadsheet><table:table/></office:spreadsheet></office:body>
 </office:document-content>"#;
 
         let sheets = OdsParser::parse_sheets(xml).unwrap();
@@ -3441,5 +3488,26 @@ mod tests {
               table:cell-range-address="$Sheet1.$A$1" table:range-usable-as="chart"/>
             </table:named-expressions></office:spreadsheet>"#;
         assert!(OdsParser::parse_named_definitions(invalid_usage).is_err());
+    }
+
+    #[test]
+    fn sheet_parser_ignores_dde_cache_tables() {
+        let xml = r#"<o:document-content
+            xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+            xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0">
+          <o:body><o:spreadsheet>
+            <t:dde-links><t:dde-link>
+              <o:dde-source o:dde-application="soffice" o:dde-topic="topic" o:dde-item="item"/>
+              <t:table t:name="Cached"><t:table-row><t:table-cell o:value-type="string"><text:p xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">cached</text:p></t:table-cell></t:table-row></t:table>
+            </t:dde-link></t:dde-links>
+            <t:table t:name="Visible"><t:table-row><t:table-cell o:value-type="string"/></t:table-row></t:table>
+            <t:table t:name="Empty"/>
+          </o:spreadsheet></o:body>
+        </o:document-content>"#;
+
+        let sheets = OdsParser::parse_sheets(xml).unwrap();
+        assert_eq!(sheets.len(), 2);
+        assert_eq!(sheets[0].name, "Visible");
+        assert_eq!(sheets[1].name, "Empty");
     }
 }
