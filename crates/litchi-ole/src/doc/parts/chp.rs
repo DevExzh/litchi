@@ -525,7 +525,7 @@ impl CharacterProperties {
     ///
     /// * `chp` - The character properties to modify
     /// * `sprm` - The SPRM operation to apply
-    fn apply_sprm(chp: &mut CharacterProperties, sprm: &Sprm) -> Result<()> {
+    pub(crate) fn apply_sprm(chp: &mut CharacterProperties, sprm: &Sprm) -> Result<()> {
         // Extract operation code (bits 0-8 of opcode)
         let operation = get_sprm_operation(sprm.opcode);
 

@@ -1074,6 +1074,31 @@ mod tests {
         assert_eq!(cascaded.is_bold, Some(false));
         assert_eq!(cascaded.is_italic, Some(true));
 
+        let ordered_grpprl = [
+            0x35, 0x08, 0, // direct bold before the style: reset by sprmCIstd
+            0x0C, 0x2A, 7, // highlight: explicitly preserved by sprmCIstd
+            0x55, 0x08, 1, // fSpec: explicitly preserved by sprmCIstd
+            0x30, 0x4A, 18, 0, // derived character style
+            0x36, 0x08, 0, // direct italic after the style: authoritative
+        ];
+        let ordered_direct =
+            super::super::chp::CharacterProperties::from_sprm(&ordered_grpprl).unwrap();
+        let ordered = super::super::paragraph_extractor::cascade_character_properties(
+            Some(&stylesheet),
+            &[0x35, 0x08, 1],
+            &ordered_direct,
+            &ordered_grpprl,
+        )
+        .unwrap();
+        assert_eq!(ordered.style_index, Some(18));
+        assert_eq!(ordered.is_bold, Some(true));
+        assert_eq!(ordered.is_italic, Some(false));
+        assert!(ordered.is_spec);
+        assert_eq!(
+            ordered.highlight,
+            Some(super::super::chp::HighlightColor::Yellow)
+        );
+
         assert_eq!(
             stylesheet.resolve_paragraph_style_sprms(18).unwrap(),
             (None, Vec::new(), Vec::new())

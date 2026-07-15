@@ -8,6 +8,8 @@ use super::chp_bin_table::ChpBinTable;
 use super::pap::ParagraphProperties;
 use super::pap_bin_table::PapBinTable;
 use super::styles::StyleSheet;
+use crate::sprm::parse_sprms;
+use crate::sprm_operations::{SPRM_C_ISTD, get_sprm_type};
 use std::sync::Arc;
 
 /// Type alias for extracted paragraph data: (text, properties, runs).
@@ -352,22 +354,76 @@ pub(crate) fn cascade_character_properties(
     direct_properties: &CharacterProperties,
     direct_grpprl: &[u8],
 ) -> Result<CharacterProperties> {
-    let character_style_chpx = stylesheet
-        .zip(direct_properties.style_index)
-        .map(|(styles, index)| styles.resolve_character_style_sprms(index))
-        .transpose()?
-        .map(|(_, character)| character)
-        .unwrap_or_default();
-    if paragraph_style_chpx.is_empty() && character_style_chpx.is_empty() {
+    if stylesheet.is_none() && paragraph_style_chpx.is_empty() {
         return Ok(direct_properties.clone());
     }
-    let combined = [
-        paragraph_style_chpx,
-        character_style_chpx.as_slice(),
-        direct_grpprl,
-    ]
-    .concat();
-    CharacterProperties::from_sprm(&combined)
+    let paragraph_baseline = CharacterProperties::from_sprm(paragraph_style_chpx)?;
+    let mut current = paragraph_baseline.clone();
+    let sprms = parse_sprms(direct_grpprl);
+    let consumed = sprms.last().map_or(0, |sprm| sprm.offset + sprm.size);
+    if consumed != direct_grpprl.len() {
+        return Err(super::super::package::DocError::Corrupted(
+            "CHPX grpprl does not contain a whole number of SPRMs".to_string(),
+        ));
+    }
+    for sprm in &sprms {
+        if get_sprm_type(sprm.opcode) != 2 {
+            continue;
+        }
+        if sprm.opcode == SPRM_C_ISTD {
+            let requested = sprm.operand_word().ok_or_else(|| {
+                super::super::package::DocError::Corrupted(
+                    "sprmCIstd is missing its style index".to_string(),
+                )
+            })?;
+            let style_chpx = stylesheet
+                .map(|styles| styles.resolve_character_style_sprms(requested))
+                .transpose()?
+                .map(|(_, character)| character)
+                .unwrap_or_default();
+            let mut styled = paragraph_baseline.clone();
+            for style_sprm in parse_sprms(&style_chpx) {
+                CharacterProperties::apply_sprm(&mut styled, &style_sprm)?;
+            }
+            styled.style_index = Some(requested);
+            preserve_character_style_state(&current, &mut styled);
+            current = styled;
+        } else {
+            CharacterProperties::apply_sprm(&mut current, sprm)?;
+        }
+    }
+    Ok(current)
+}
+
+fn preserve_character_style_state(
+    previous: &CharacterProperties,
+    styled: &mut CharacterProperties,
+) {
+    styled.is_revision_deleted = previous.is_revision_deleted;
+    styled.deletion_author_index = previous.deletion_author_index;
+    styled.deletion_timestamp = previous.deletion_timestamp;
+    styled.deletion_revision_id = previous.deletion_revision_id;
+    styled.deletion_revision_save_id = previous.deletion_revision_save_id;
+    styled.is_bidi = previous.is_bidi;
+    styled.is_complex_scripts = previous.is_complex_scripts;
+    styled.is_revision_inserted = previous.is_revision_inserted;
+    styled.revision_author_index = previous.revision_author_index;
+    styled.revision_timestamp = previous.revision_timestamp;
+    styled.revision_id = previous.revision_id;
+    styled.is_spec = previous.is_spec;
+    styled.is_data = previous.is_data;
+    styled.is_ole2 = previous.is_ole2;
+    styled.is_obj = previous.is_obj;
+    styled.pic_offset = previous.pic_offset;
+    styled.obj_offset = previous.obj_offset;
+    styled.has_formatting_revision = previous.has_formatting_revision;
+    styled.formatting_revision_author_index = previous.formatting_revision_author_index;
+    styled.formatting_revision_timestamp = previous.formatting_revision_timestamp;
+    styled.script_hint = previous.script_hint;
+    styled.highlight = previous.highlight;
+    styled.insertion_revision_save_id = previous.insertion_revision_save_id;
+    styled.formatting_revision_save_id = previous.formatting_revision_save_id;
+    styled.display_field_revision = previous.display_field_revision.clone();
 }
 
 #[cfg(test)]
