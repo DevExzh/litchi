@@ -5,7 +5,7 @@
 //! that works across all ODF formats, see `crate::elements::parser::DocumentParser`.
 
 use crate::elements::xml::{
-    DC_NAMESPACE, META_NAMESPACE, OFFICE_NAMESPACE, TEXT_NAMESPACE, append_checked,
+    DC_NAMESPACE, META_NAMESPACE, OFFICE_NAMESPACE, TEXT_NAMESPACE, XML_NAMESPACE, append_checked,
     append_text_control, decode_reference, is_bound, namespaced_attribute,
 };
 use litchi_core::{Error, Result};
@@ -98,119 +98,8 @@ impl OdtParser {
     ///
     /// Vector of `TrackChange` objects with metadata
     pub fn parse_track_changes(content: &str) -> Result<Vec<TrackChange>> {
-        use quick_xml::Reader;
-        use quick_xml::events::Event;
-
-        let mut reader = Reader::from_str(content);
-        let mut buf = Vec::new();
-        let mut changes = Vec::new();
-        let mut in_tracked_changes = false;
-        let mut in_change_element = false;
-        let mut current_change: Option<TrackChange> = None;
-        let mut depth: usize = 0;
-
-        loop {
-            match reader.read_event_into(&mut buf) {
-                Ok(Event::Start(ref e)) => {
-                    let tag_name = String::from_utf8_lossy(e.name().as_ref()).to_string();
-
-                    match tag_name.as_str() {
-                        "text:tracked-changes" => {
-                            in_tracked_changes = true;
-                        },
-                        "text:changed-region" if in_tracked_changes => {
-                            // Extract change ID
-                            let mut id = String::new();
-                            for attr in e.attributes().flatten() {
-                                let key = String::from_utf8_lossy(attr.key.as_ref());
-                                if key.ends_with(":id") {
-                                    id = String::from_utf8_lossy(&attr.value).to_string();
-                                }
-                            }
-
-                            current_change = Some(TrackChange {
-                                id,
-                                author: None,
-                                date: None,
-                                change_type: ChangeType::Insertion,
-                                content: String::new(),
-                            });
-                            depth += 1;
-                        },
-                        "text:insertion" | "text:deletion" | "text:format-change"
-                            if in_tracked_changes && current_change.is_some() =>
-                        {
-                            if let Some(ref mut change) = current_change {
-                                change.change_type = match tag_name.as_str() {
-                                    "text:insertion" => ChangeType::Insertion,
-                                    "text:deletion" => ChangeType::Deletion,
-                                    "text:format-change" => ChangeType::FormatChange,
-                                    _ => ChangeType::Insertion,
-                                };
-                            }
-                            in_change_element = true;
-                            depth += 1;
-                        },
-                        "office:change-info" if in_change_element => {
-                            depth += 1;
-                        },
-                        "dc:creator" if in_change_element => {
-                            depth += 1;
-                        },
-                        "dc:date" if in_change_element => {
-                            depth += 1;
-                        },
-                        _ if in_tracked_changes => {
-                            depth += 1;
-                        },
-                        _ => {},
-                    }
-                },
-                Ok(Event::Text(ref t)) if in_change_element => {
-                    let text = String::from_utf8_lossy(t).to_string();
-
-                    // Determine what we're reading based on parent context
-                    if let Some(ref mut change) = current_change {
-                        // This is a simplification; in reality we'd track the parent element
-                        if change.author.is_none() {
-                            change.author = Some(text.clone());
-                        } else if change.date.is_none() {
-                            change.date = Some(text);
-                        }
-                    }
-                },
-                Ok(Event::End(ref e)) => {
-                    let tag_name = String::from_utf8_lossy(e.name().as_ref()).to_string();
-
-                    match tag_name.as_str() {
-                        "text:tracked-changes" => {
-                            in_tracked_changes = false;
-                        },
-                        "text:changed-region" if in_tracked_changes => {
-                            if let Some(change) = current_change.take() {
-                                changes.push(change);
-                            }
-                            depth = depth.saturating_sub(1);
-                        },
-                        "text:insertion" | "text:deletion" | "text:format-change"
-                            if in_tracked_changes =>
-                        {
-                            in_change_element = false;
-                            depth = depth.saturating_sub(1);
-                        },
-                        _ if in_tracked_changes && depth > 0 => {
-                            depth = depth.saturating_sub(1);
-                        },
-                        _ => {},
-                    }
-                },
-                Ok(Event::Eof) => break,
-                Err(_) => break,
-                _ => {},
-            }
-            buf.clear();
-        }
-
+        let mut changes = parse_change_declarations(content)?;
+        correlate_change_ranges(content, &mut changes)?;
         Ok(changes)
     }
 
@@ -245,6 +134,669 @@ impl OdtParser {
     pub fn parse_sections(content: &str) -> Result<Vec<Section>> {
         parse_sections(content)
     }
+}
+
+struct ActiveTrackedChange {
+    id: String,
+    author: Option<String>,
+    date: Option<String>,
+    change_type: Option<ChangeType>,
+    content: String,
+    depth: usize,
+    kind_depth: Option<usize>,
+    change_info_depth: Option<usize>,
+    change_info_seen: bool,
+    creator_depth: Option<usize>,
+    date_depth: Option<usize>,
+    paragraph_depth: Option<usize>,
+    seen_paragraph: bool,
+}
+
+fn parse_change_declarations(content: &str) -> Result<Vec<TrackChange>> {
+    let mut reader = NsReader::from_str(content);
+    let mut buffer = Vec::new();
+    let mut document_depth = 0usize;
+    let mut tracked_depth = 0usize;
+    let mut tracked_changes_seen = false;
+    let mut active: Option<ActiveTrackedChange> = None;
+    let mut changes = Vec::new();
+    let mut ids = HashMap::new();
+
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| {
+                Error::InvalidFormat(format!("invalid tracked-change XML: {error}"))
+            })?;
+        let text_element = is_bound(&namespace, TEXT_NAMESPACE);
+        let office_element = is_bound(&namespace, OFFICE_NAMESPACE);
+        let dc_element = is_bound(&namespace, DC_NAMESPACE);
+        match event {
+            Event::Start(ref element) => {
+                document_depth = checked_semantic_depth(document_depth, "tracked change")?;
+                if tracked_depth == 0 {
+                    if text_element && element.local_name().as_ref() == b"tracked-changes" {
+                        if tracked_changes_seen {
+                            return Err(Error::InvalidFormat(
+                                "multiple text:tracked-changes elements are not allowed"
+                                    .to_string(),
+                            ));
+                        }
+                        tracked_changes_seen = true;
+                        tracked_depth = 1;
+                    }
+                } else {
+                    tracked_depth = checked_semantic_depth(tracked_depth, "tracked change")?;
+                    if let Some(change) = active.as_mut() {
+                        change.depth = checked_semantic_depth(change.depth, "changed region")?;
+                        process_change_declaration_start(
+                            &reader,
+                            element,
+                            text_element,
+                            office_element,
+                            dc_element,
+                            change,
+                        )?;
+                    } else if text_element && element.local_name().as_ref() == b"changed-region" {
+                        if tracked_depth != 2 {
+                            return Err(Error::InvalidFormat(
+                                "text:changed-region must be a direct child of text:tracked-changes"
+                                    .to_string(),
+                            ));
+                        }
+                        if changes.len() >= MAX_SEMANTIC_ITEMS {
+                            return Err(Error::InvalidFormat(format!(
+                                "document exceeds {MAX_SEMANTIC_ITEMS} tracked changes"
+                            )));
+                        }
+                        let id = change_region_id(&reader, element)?;
+                        if ids.insert(id.clone(), changes.len()).is_some() {
+                            return Err(Error::InvalidFormat(format!(
+                                "duplicate tracked-change ID '{id}'"
+                            )));
+                        }
+                        active = Some(ActiveTrackedChange {
+                            id,
+                            author: None,
+                            date: None,
+                            change_type: None,
+                            content: String::new(),
+                            depth: 1,
+                            kind_depth: None,
+                            change_info_depth: None,
+                            change_info_seen: false,
+                            creator_depth: None,
+                            date_depth: None,
+                            paragraph_depth: None,
+                            seen_paragraph: false,
+                        });
+                    }
+                }
+            },
+            Event::Empty(ref element) if tracked_depth > 0 => {
+                if text_element && element.local_name().as_ref() == b"changed-region" {
+                    return Err(Error::InvalidFormat(
+                        "text:changed-region requires a change declaration".to_string(),
+                    ));
+                }
+                if let Some(change) = active.as_mut() {
+                    process_change_declaration_empty(
+                        &reader,
+                        element,
+                        text_element,
+                        office_element,
+                        dc_element,
+                        change,
+                    )?;
+                }
+            },
+            Event::Empty(ref element)
+                if text_element && element.local_name().as_ref() == b"tracked-changes" =>
+            {
+                if tracked_changes_seen {
+                    return Err(Error::InvalidFormat(
+                        "multiple text:tracked-changes elements are not allowed".to_string(),
+                    ));
+                }
+                tracked_changes_seen = true;
+            },
+            Event::Text(ref value) if active.is_some() => {
+                let value = value
+                    .xml_content(XmlVersion::Explicit1_0)
+                    .map_err(|error| {
+                        Error::InvalidFormat(format!("invalid tracked-change text: {error}"))
+                    })?;
+                append_change_declaration_text(active.as_mut().expect("checked change"), &value)?;
+            },
+            Event::CData(ref value) if active.is_some() => {
+                let value = value
+                    .xml_content(XmlVersion::Explicit1_0)
+                    .map_err(|error| {
+                        Error::InvalidFormat(format!("invalid tracked-change CDATA: {error}"))
+                    })?;
+                append_change_declaration_text(active.as_mut().expect("checked change"), &value)?;
+            },
+            Event::GeneralRef(ref reference) if active.is_some() => {
+                let value = decode_reference(reference, "tracked change")?;
+                append_change_declaration_text(active.as_mut().expect("checked change"), &value)?;
+            },
+            Event::End(_) => {
+                document_depth = document_depth.checked_sub(1).ok_or_else(|| {
+                    Error::InvalidFormat("tracked-change XML stack underflow".to_string())
+                })?;
+                if tracked_depth > 0 {
+                    if let Some(change) = active.as_mut() {
+                        if change.creator_depth == Some(change.depth) {
+                            change.creator_depth = None;
+                        }
+                        if change.date_depth == Some(change.depth) {
+                            change.date_depth = None;
+                        }
+                        if change.paragraph_depth == Some(change.depth) {
+                            change.paragraph_depth = None;
+                        }
+                        if change.change_info_depth == Some(change.depth) {
+                            change.change_info_depth = None;
+                        }
+                        if change.kind_depth == Some(change.depth) {
+                            change.kind_depth = None;
+                        }
+                        change.depth = change.depth.checked_sub(1).ok_or_else(|| {
+                            Error::InvalidFormat("changed-region stack underflow".to_string())
+                        })?;
+                        if change.depth == 0 {
+                            let change = active.take().expect("checked change");
+                            let change_type = change.change_type.ok_or_else(|| {
+                                Error::InvalidFormat(format!(
+                                    "changed region '{}' has no change declaration",
+                                    change.id
+                                ))
+                            })?;
+                            if !change.change_info_seen {
+                                return Err(Error::InvalidFormat(format!(
+                                    "changed region '{}' has no office:change-info",
+                                    change.id
+                                )));
+                            }
+                            changes.push(TrackChange {
+                                id: change.id,
+                                author: change.author,
+                                date: change.date,
+                                change_type,
+                                content: change.content,
+                            });
+                        }
+                    }
+                    tracked_depth = tracked_depth.checked_sub(1).ok_or_else(|| {
+                        Error::InvalidFormat("tracked-changes stack underflow".to_string())
+                    })?;
+                }
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+        buffer.clear();
+    }
+    if document_depth != 0 || tracked_depth != 0 || active.is_some() {
+        return Err(Error::InvalidFormat(
+            "incomplete tracked-change XML structure".to_string(),
+        ));
+    }
+    Ok(changes)
+}
+
+fn change_region_id(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<String> {
+    let text_id = namespaced_attribute(reader, element, TEXT_NAMESPACE, b"id", "changed-region")?;
+    let xml_id = namespaced_attribute(reader, element, XML_NAMESPACE, b"id", "changed-region")?;
+    let id = text_id.or(xml_id).ok_or_else(|| {
+        Error::InvalidFormat("text:changed-region requires text:id or xml:id".to_string())
+    })?;
+    if id.is_empty() {
+        return Err(Error::InvalidFormat(
+            "tracked-change ID must not be empty".to_string(),
+        ));
+    }
+    Ok(id)
+}
+
+fn process_change_declaration_start(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    text_element: bool,
+    office_element: bool,
+    dc_element: bool,
+    change: &mut ActiveTrackedChange,
+) -> Result<()> {
+    if text_element {
+        let change_type = match element.local_name().as_ref() {
+            b"insertion" => Some(ChangeType::Insertion),
+            b"deletion" => Some(ChangeType::Deletion),
+            b"format-change" => Some(ChangeType::FormatChange),
+            _ => None,
+        };
+        if let Some(change_type) = change_type {
+            if change.change_type.is_some() {
+                return Err(Error::InvalidFormat(format!(
+                    "changed region '{}' has multiple change declarations",
+                    change.id
+                )));
+            }
+            if change.depth != 2 {
+                return Err(Error::InvalidFormat(
+                    "change declaration must be a direct child of text:changed-region".to_string(),
+                ));
+            }
+            change.change_type = Some(change_type);
+            change.kind_depth = Some(change.depth);
+            return Ok(());
+        }
+    }
+    if office_element && element.local_name().as_ref() == b"change-info" {
+        if change.kind_depth != change.depth.checked_sub(1) || change.change_info_seen {
+            return Err(Error::InvalidFormat(format!(
+                "invalid office:change-info in changed region '{}'",
+                change.id
+            )));
+        }
+        change.change_info_seen = true;
+        change.change_info_depth = Some(change.depth);
+    } else if dc_element
+        && element.local_name().as_ref() == b"creator"
+        && change.change_info_depth.is_some()
+    {
+        if change.change_info_depth != change.depth.checked_sub(1) || change.author.is_some() {
+            return Err(Error::InvalidFormat(format!(
+                "invalid dc:creator in changed region '{}'",
+                change.id
+            )));
+        }
+        change.author = Some(String::new());
+        change.creator_depth = Some(change.depth);
+    } else if dc_element
+        && element.local_name().as_ref() == b"date"
+        && change.change_info_depth.is_some()
+    {
+        if change.change_info_depth != change.depth.checked_sub(1) || change.date.is_some() {
+            return Err(Error::InvalidFormat(format!(
+                "invalid dc:date in changed region '{}'",
+                change.id
+            )));
+        }
+        change.date = Some(String::new());
+        change.date_depth = Some(change.depth);
+    } else if text_element
+        && matches!(element.local_name().as_ref(), b"p" | b"h")
+        && change.change_type == Some(ChangeType::Deletion)
+        && change.change_info_depth.is_none()
+        && change.paragraph_depth.is_none()
+    {
+        if change.seen_paragraph {
+            append_checked(&mut change.content, "\n")?;
+        }
+        change.seen_paragraph = true;
+        change.paragraph_depth = Some(change.depth);
+    }
+    if text_element && change.paragraph_depth.is_some() {
+        append_text_control(reader, element, &mut change.content)?;
+    }
+    Ok(())
+}
+
+fn process_change_declaration_empty(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    text_element: bool,
+    office_element: bool,
+    dc_element: bool,
+    change: &mut ActiveTrackedChange,
+) -> Result<()> {
+    if text_element
+        && matches!(
+            element.local_name().as_ref(),
+            b"insertion" | b"deletion" | b"format-change"
+        )
+    {
+        return Err(Error::InvalidFormat(
+            "change declaration requires office:change-info".to_string(),
+        ));
+    }
+    if office_element && element.local_name().as_ref() == b"change-info" {
+        if change.kind_depth != change.depth.checked_sub(1) || change.change_info_seen {
+            return Err(Error::InvalidFormat(format!(
+                "invalid office:change-info in changed region '{}'",
+                change.id
+            )));
+        }
+        change.change_info_seen = true;
+    } else if dc_element
+        && element.local_name().as_ref() == b"creator"
+        && change.change_info_depth.is_some()
+    {
+        if change.change_info_depth != change.depth.checked_sub(1) || change.author.is_some() {
+            return Err(Error::InvalidFormat(format!(
+                "invalid dc:creator in changed region '{}'",
+                change.id
+            )));
+        }
+        change.author = Some(String::new());
+    } else if dc_element
+        && element.local_name().as_ref() == b"date"
+        && change.change_info_depth.is_some()
+    {
+        if change.change_info_depth != change.depth.checked_sub(1) || change.date.is_some() {
+            return Err(Error::InvalidFormat(format!(
+                "invalid dc:date in changed region '{}'",
+                change.id
+            )));
+        }
+        change.date = Some(String::new());
+    } else if text_element
+        && matches!(element.local_name().as_ref(), b"p" | b"h")
+        && change.change_type == Some(ChangeType::Deletion)
+        && change.change_info_depth.is_none()
+    {
+        if change.seen_paragraph {
+            append_checked(&mut change.content, "\n")?;
+        }
+        change.seen_paragraph = true;
+    } else if text_element && change.paragraph_depth.is_some() {
+        append_text_control(reader, element, &mut change.content)?;
+    }
+    Ok(())
+}
+
+fn append_change_declaration_text(change: &mut ActiveTrackedChange, value: &str) -> Result<()> {
+    if change.creator_depth.is_some() {
+        append_checked(change.author.as_mut().expect("creator initialized"), value)
+    } else if change.date_depth.is_some() {
+        append_checked(change.date.as_mut().expect("date initialized"), value)
+    } else if change.paragraph_depth.is_some() {
+        append_checked(&mut change.content, value)
+    } else {
+        Ok(())
+    }
+}
+
+struct PendingChangeRange {
+    text: String,
+    seen_paragraph: bool,
+}
+
+#[derive(Default)]
+struct ChangeRangeState {
+    pending: HashMap<String, PendingChangeRange>,
+    completed: HashMap<String, Vec<String>>,
+    completed_count: usize,
+}
+
+fn correlate_change_ranges(content: &str, changes: &mut [TrackChange]) -> Result<()> {
+    let change_types: HashMap<String, ChangeType> = changes
+        .iter()
+        .map(|change| (change.id.clone(), change.change_type))
+        .collect();
+    let mut reader = NsReader::from_str(content);
+    let mut buffer = Vec::new();
+    let mut document_depth = 0usize;
+    let mut tracked_depth = 0usize;
+    let mut paragraph_depth: Option<usize> = None;
+    let mut annotation_depth = 0usize;
+    let mut ranges = ChangeRangeState::default();
+
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| Error::InvalidFormat(format!("invalid change-range XML: {error}")))?;
+        let text_element = is_bound(&namespace, TEXT_NAMESPACE);
+        let office_element = is_bound(&namespace, OFFICE_NAMESPACE);
+        match event {
+            Event::Start(ref element) => {
+                document_depth = checked_semantic_depth(document_depth, "change range")?;
+                if tracked_depth > 0 {
+                    tracked_depth = checked_semantic_depth(tracked_depth, "change range")?;
+                } else if text_element && element.local_name().as_ref() == b"tracked-changes" {
+                    tracked_depth = 1;
+                } else if annotation_depth > 0 {
+                    annotation_depth = checked_semantic_depth(annotation_depth, "annotation")?;
+                    if let Some(depth) = paragraph_depth.as_mut() {
+                        *depth = checked_semantic_depth(*depth, "change-range paragraph")?;
+                    }
+                } else {
+                    enter_change_paragraph(
+                        text_element,
+                        element,
+                        &mut paragraph_depth,
+                        &mut ranges.pending,
+                    )?;
+                    if office_element && element.local_name().as_ref() == b"annotation" {
+                        annotation_depth = 1;
+                    } else {
+                        process_change_marker(
+                            &reader,
+                            element,
+                            text_element,
+                            paragraph_depth.is_some(),
+                            &change_types,
+                            &mut ranges,
+                        )?;
+                        if text_element && paragraph_depth.is_some() {
+                            for range in ranges.pending.values_mut() {
+                                append_text_control(&reader, element, &mut range.text)?;
+                            }
+                        }
+                    }
+                }
+            },
+            Event::Empty(ref element) if tracked_depth == 0 => {
+                if annotation_depth > 0
+                    || office_element && element.local_name().as_ref() == b"annotation"
+                {
+                    // Annotation definitions are metadata rather than visible range text.
+                } else if text_element && matches!(element.local_name().as_ref(), b"p" | b"h") {
+                    for range in ranges.pending.values_mut() {
+                        if range.seen_paragraph {
+                            append_checked(&mut range.text, "\n")?;
+                        }
+                        range.seen_paragraph = true;
+                    }
+                } else {
+                    process_change_marker(
+                        &reader,
+                        element,
+                        text_element,
+                        paragraph_depth.is_some(),
+                        &change_types,
+                        &mut ranges,
+                    )?;
+                    if text_element && paragraph_depth.is_some() {
+                        for range in ranges.pending.values_mut() {
+                            append_text_control(&reader, element, &mut range.text)?;
+                        }
+                    }
+                }
+            },
+            Event::Text(ref value)
+                if tracked_depth == 0 && annotation_depth == 0 && paragraph_depth.is_some() =>
+            {
+                let value = value
+                    .xml_content(XmlVersion::Explicit1_0)
+                    .map_err(|error| {
+                        Error::InvalidFormat(format!("invalid change-range text: {error}"))
+                    })?;
+                for range in ranges.pending.values_mut() {
+                    append_checked(&mut range.text, &value)?;
+                }
+            },
+            Event::CData(ref value)
+                if tracked_depth == 0 && annotation_depth == 0 && paragraph_depth.is_some() =>
+            {
+                let value = value
+                    .xml_content(XmlVersion::Explicit1_0)
+                    .map_err(|error| {
+                        Error::InvalidFormat(format!("invalid change-range CDATA: {error}"))
+                    })?;
+                for range in ranges.pending.values_mut() {
+                    append_checked(&mut range.text, &value)?;
+                }
+            },
+            Event::GeneralRef(ref reference)
+                if tracked_depth == 0 && annotation_depth == 0 && paragraph_depth.is_some() =>
+            {
+                let value = decode_reference(reference, "change range")?;
+                for range in ranges.pending.values_mut() {
+                    append_checked(&mut range.text, &value)?;
+                }
+            },
+            Event::End(_) => {
+                document_depth = document_depth.checked_sub(1).ok_or_else(|| {
+                    Error::InvalidFormat("change-range XML stack underflow".to_string())
+                })?;
+                if tracked_depth > 0 {
+                    tracked_depth = tracked_depth.checked_sub(1).ok_or_else(|| {
+                        Error::InvalidFormat("tracked-change range stack underflow".to_string())
+                    })?;
+                } else {
+                    annotation_depth = annotation_depth.saturating_sub(1);
+                    if let Some(depth) = paragraph_depth.as_mut() {
+                        *depth = depth.checked_sub(1).ok_or_else(|| {
+                            Error::InvalidFormat(
+                                "change-range paragraph stack underflow".to_string(),
+                            )
+                        })?;
+                        if *depth == 0 {
+                            paragraph_depth = None;
+                        }
+                    }
+                }
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+        buffer.clear();
+    }
+    if document_depth != 0
+        || tracked_depth != 0
+        || paragraph_depth.is_some()
+        || annotation_depth != 0
+    {
+        return Err(Error::InvalidFormat(
+            "incomplete change-range XML structure".to_string(),
+        ));
+    }
+    if let Some(id) = ranges.pending.keys().next() {
+        return Err(Error::InvalidFormat(format!(
+            "unclosed text:change-start for '{id}'"
+        )));
+    }
+    for change in changes {
+        if change.change_type != ChangeType::Deletion
+            && let Some(completed) = ranges.completed.remove(&change.id)
+        {
+            change.content.clear();
+            for (index, range) in completed.iter().enumerate() {
+                if index > 0 {
+                    append_checked(&mut change.content, "\n")?;
+                }
+                append_checked(&mut change.content, range)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn enter_change_paragraph(
+    text_element: bool,
+    element: &BytesStart<'_>,
+    paragraph_depth: &mut Option<usize>,
+    pending: &mut HashMap<String, PendingChangeRange>,
+) -> Result<()> {
+    if let Some(depth) = paragraph_depth.as_mut() {
+        *depth = checked_semantic_depth(*depth, "change-range paragraph")?;
+    } else if text_element && matches!(element.local_name().as_ref(), b"p" | b"h") {
+        *paragraph_depth = Some(1);
+        for range in pending.values_mut() {
+            if range.seen_paragraph {
+                append_checked(&mut range.text, "\n")?;
+            }
+            range.seen_paragraph = true;
+        }
+    }
+    Ok(())
+}
+
+fn process_change_marker(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    text_element: bool,
+    in_paragraph: bool,
+    change_types: &HashMap<String, ChangeType>,
+    ranges: &mut ChangeRangeState,
+) -> Result<()> {
+    if !text_element {
+        return Ok(());
+    }
+    let marker = element.local_name();
+    if !matches!(marker.as_ref(), b"change" | b"change-start" | b"change-end") {
+        return Ok(());
+    }
+    let id = namespaced_attribute(
+        reader,
+        element,
+        TEXT_NAMESPACE,
+        b"change-id",
+        "change marker",
+    )?
+    .ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "text:{} requires text:change-id",
+            String::from_utf8_lossy(marker.as_ref())
+        ))
+    })?;
+    if !change_types.contains_key(&id) {
+        return Err(Error::InvalidFormat(format!(
+            "change marker references unknown ID '{id}'"
+        )));
+    }
+    match marker.as_ref() {
+        b"change-start" => {
+            if ranges.pending.len() >= MAX_SEMANTIC_ITEMS {
+                return Err(Error::InvalidFormat(format!(
+                    "document exceeds {MAX_SEMANTIC_ITEMS} open change ranges"
+                )));
+            }
+            if ranges
+                .pending
+                .insert(
+                    id.clone(),
+                    PendingChangeRange {
+                        text: String::new(),
+                        seen_paragraph: in_paragraph,
+                    },
+                )
+                .is_some()
+            {
+                return Err(Error::InvalidFormat(format!(
+                    "duplicate open change range '{id}'"
+                )));
+            }
+        },
+        b"change-end" => {
+            let range = ranges.pending.remove(&id).ok_or_else(|| {
+                Error::InvalidFormat(format!("text:change-end has no open range for '{id}'"))
+            })?;
+            ranges.completed_count = ranges.completed_count.checked_add(1).ok_or_else(|| {
+                Error::InvalidFormat("completed change-range count overflow".to_string())
+            })?;
+            if ranges.completed_count > MAX_SEMANTIC_ITEMS {
+                return Err(Error::InvalidFormat(format!(
+                    "document exceeds {MAX_SEMANTIC_ITEMS} completed change ranges"
+                )));
+            }
+            ranges.completed.entry(id).or_default().push(range.text);
+        },
+        b"change" => {},
+        _ => unreachable!(),
+    }
+    Ok(())
 }
 
 struct ActiveComment {
@@ -922,19 +1474,23 @@ mod tests {
         let changes = OdtParser::parse_track_changes(TEST_TRACK_CHANGES_XML).unwrap();
         assert_eq!(changes.len(), 3);
 
-        // Check first change (insertion)
         assert_eq!(changes[0].id, "change1");
         assert_eq!(changes[0].change_type, ChangeType::Insertion);
-        // Parser extracts text elements - author/date extraction depends on XML structure
-        assert!(changes[0].author.is_some());
+        assert_eq!(changes[0].author.as_deref(), Some("John Doe"));
+        assert_eq!(changes[0].date.as_deref(), Some("2024-03-15T10:30:00"));
+        assert!(changes[0].content.is_empty());
 
-        // Check second change (deletion)
         assert_eq!(changes[1].id, "change2");
         assert_eq!(changes[1].change_type, ChangeType::Deletion);
+        assert_eq!(changes[1].author.as_deref(), Some("Jane Smith"));
+        assert_eq!(changes[1].date.as_deref(), Some("2024-03-15T11:00:00"));
+        assert!(changes[1].content.is_empty());
 
-        // Check third change (format)
         assert_eq!(changes[2].id, "change3");
         assert_eq!(changes[2].change_type, ChangeType::FormatChange);
+        assert_eq!(changes[2].author.as_deref(), Some("Bob Wilson"));
+        assert_eq!(changes[2].date.as_deref(), Some("2024-03-15T12:00:00"));
+        assert!(changes[2].content.is_empty());
     }
 
     #[test]
@@ -947,6 +1503,88 @@ mod tests {
     fn test_parse_track_changes_no_tracked_changes() {
         let changes = OdtParser::parse_track_changes(TEST_EMPTY_CONTENT).unwrap();
         assert!(changes.is_empty());
+    }
+
+    #[test]
+    fn parses_tracked_change_metadata_deletions_and_referenced_ranges() {
+        let xml = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:d="http://purl.org/dc/elements/1.1/"><o:body><o:text><t:tracked-changes><t:changed-region t:id="i1"><t:insertion><o:change-info><d:creator>A &amp; B</d:creator><d:date>2026-07-16T10:00:00</d:date><t:p>review note</t:p></o:change-info></t:insertion></t:changed-region><t:changed-region xml:id="d1"><t:deletion><o:change-info><d:creator>Deleter</d:creator><d:date>2026-07-16</d:date><t:p>not deleted text</t:p></o:change-info><t:p>Gone &amp;<t:s t:c="2"/><t:span><![CDATA[X]]></t:span></t:p><t:p>Second<t:tab/></t:p></t:deletion></t:changed-region><t:changed-region t:id="f1"><t:format-change><o:change-info><d:creator>Stylist</d:creator><d:date>2026-07-15</d:date></o:change-info></t:format-change></t:changed-region></t:tracked-changes><t:p>pre<t:change-start t:change-id="i1"/>In&amp;<o:annotation o:name="note"><t:p>hidden comment</t:p></o:annotation><t:span>sert</t:span><t:s t:c="2"/><![CDATA[!]]><t:change-end t:change-id="i1"/>post<t:change t:change-id="d1"/></t:p><t:p><t:change-start t:change-id="i1"/>Again<t:change-end t:change-id="i1"/> and <t:change-start t:change-id="f1"/>Bold<t:change-end t:change-id="f1"/></t:p></o:text></o:body></o:document-content>"#;
+        let changes = OdtParser::parse_track_changes(xml).unwrap();
+        assert_eq!(changes.len(), 3);
+        assert_eq!(changes[0].id, "i1");
+        assert_eq!(changes[0].author.as_deref(), Some("A & B"));
+        assert_eq!(changes[0].date.as_deref(), Some("2026-07-16T10:00:00"));
+        assert_eq!(changes[0].content, "In&sert  !\nAgain");
+        assert_eq!(changes[1].id, "d1");
+        assert_eq!(changes[1].change_type, ChangeType::Deletion);
+        assert_eq!(changes[1].content, "Gone &  X\nSecond\t");
+        assert_eq!(changes[2].id, "f1");
+        assert_eq!(changes[2].change_type, ChangeType::FormatChange);
+        assert_eq!(changes[2].content, "Bold");
+    }
+
+    #[test]
+    fn tracked_changes_reject_ambiguous_declarations_and_ranges() {
+        let prelude = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:u="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:d="http://purl.org/dc/elements/1.1/"><o:body><o:text>"#;
+        let info = r#"<o:change-info><d:creator>A</d:creator><d:date>D</d:date></o:change-info>"#;
+        let suffix = "</o:text></o:body></o:document-content>";
+
+        let missing_id = format!(
+            "{prelude}<t:tracked-changes><t:changed-region><t:insertion>{info}</t:insertion></t:changed-region></t:tracked-changes>{suffix}"
+        );
+        assert!(OdtParser::parse_track_changes(&missing_id).is_err());
+
+        let duplicate_id = format!(
+            "{prelude}<t:tracked-changes><t:changed-region t:id=\"x\"><t:insertion>{info}</t:insertion></t:changed-region><t:changed-region t:id=\"x\"><t:deletion>{info}</t:deletion></t:changed-region></t:tracked-changes>{suffix}"
+        );
+        assert!(OdtParser::parse_track_changes(&duplicate_id).is_err());
+
+        let multiple_kinds = format!(
+            "{prelude}<t:tracked-changes><t:changed-region t:id=\"x\"><t:insertion>{info}</t:insertion><t:deletion>{info}</t:deletion></t:changed-region></t:tracked-changes>{suffix}"
+        );
+        assert!(OdtParser::parse_track_changes(&multiple_kinds).is_err());
+
+        let missing_kind = format!(
+            "{prelude}<t:tracked-changes><t:changed-region t:id=\"x\"/></t:tracked-changes>{suffix}"
+        );
+        assert!(OdtParser::parse_track_changes(&missing_kind).is_err());
+
+        let unknown_marker = format!(
+            "{prelude}<t:tracked-changes><t:changed-region t:id=\"x\"><t:insertion>{info}</t:insertion></t:changed-region></t:tracked-changes><t:p><t:change t:change-id=\"unknown\"/></t:p>{suffix}"
+        );
+        assert!(OdtParser::parse_track_changes(&unknown_marker).is_err());
+
+        let unmatched_end = format!(
+            "{prelude}<t:tracked-changes><t:changed-region t:id=\"x\"><t:insertion>{info}</t:insertion></t:changed-region></t:tracked-changes><t:p><t:change-end t:change-id=\"x\"/></t:p>{suffix}"
+        );
+        assert!(OdtParser::parse_track_changes(&unmatched_end).is_err());
+
+        let unmatched_start = format!(
+            "{prelude}<t:tracked-changes><t:changed-region t:id=\"x\"><t:insertion>{info}</t:insertion></t:changed-region></t:tracked-changes><t:p><t:change-start t:change-id=\"x\"/>open</t:p>{suffix}"
+        );
+        assert!(OdtParser::parse_track_changes(&unmatched_start).is_err());
+
+        let duplicate_attribute = format!(
+            "{prelude}<t:tracked-changes><t:changed-region t:id=\"x\"><t:insertion>{info}</t:insertion></t:changed-region></t:tracked-changes><t:p><t:change t:change-id=\"x\" u:change-id=\"x\"/></t:p>{suffix}"
+        );
+        assert!(OdtParser::parse_track_changes(&duplicate_attribute).is_err());
+        assert!(OdtParser::parse_track_changes("<t:tracked-changes>").is_err());
+    }
+
+    #[test]
+    fn tracked_changes_enforce_nesting_bound() {
+        let mut xml = String::from(
+            r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:d="http://purl.org/dc/elements/1.1/"><o:body><o:text><t:tracked-changes><t:changed-region t:id="d"><t:deletion><o:change-info><d:creator>A</d:creator><d:date>D</d:date></o:change-info><t:p>"#,
+        );
+        for _ in 0..MAX_SEMANTIC_DEPTH {
+            xml.push_str("<t:span>");
+        }
+        for _ in 0..MAX_SEMANTIC_DEPTH {
+            xml.push_str("</t:span>");
+        }
+        xml.push_str(
+            "</t:p></t:deletion></t:changed-region></t:tracked-changes></o:text></o:body></o:document-content>",
+        );
+        assert!(OdtParser::parse_track_changes(&xml).is_err());
     }
 
     #[test]
