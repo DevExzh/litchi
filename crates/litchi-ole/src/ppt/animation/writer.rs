@@ -6,19 +6,21 @@ use super::types::{
     AfterEffect, AnimationEffect, AnimationInfo, BuildAtom, BuildKind, BuildList, BuildListEntry,
     ChartBuild, DiagramBuild, EffectDirection, ExtendedTimeNode, LegacyAnimationAtom,
     LegacyAnimationBuild, LegacyAnimationEffect, LegacyTextBuildSubEffect, ParagraphBuild,
-    ParagraphBuildLevel, TimeAnimateColor, TimeAnimateColorBy, TimeBehavior, TimeBehaviorAdditive,
-    TimeBehaviorAtom, TimeBehaviorProperty, TimeBehaviorPropertyList, TimeColorBehavior,
-    TimeColorBehaviorAtom, TimeColorDirection, TimeColorModel, TimeCommandBehavior,
-    TimeCommandBehaviorAtom, TimeCommandBehaviorType, TimeCondition, TimeConditionAtom,
-    TimeConditionType, TimeEffectBehavior, TimeEffectBehaviorAtom, TimeEffectNodeType,
-    TimeEffectTransition, TimeEffectType, TimeIterateData, TimeIterateDirection,
-    TimeIterateIntervalType, TimeIterateType, TimeMasterRelation, TimeModifier, TimeMotionBehavior,
-    TimeMotionBehaviorAtom, TimeMotionOrigin, TimeNodeAtom, TimeNodeProperty, TimeNodePropertyList,
-    TimePropertyListContext, TimeRotationBehavior, TimeRotationBehaviorAtom, TimeRotationDirection,
-    TimeScaleBehavior, TimeScaleBehaviorAtom, TimeSequenceData, TimeSequenceNextAction,
-    TimeSequencePreviousAction, TimeTriggerEvent, TimeTriggerObject, TimeVisualElement,
+    ParagraphBuildLevel, TimeAnimateColor, TimeAnimateColorBy, TimeAnimateValueType, TimeBehavior,
+    TimeBehaviorAdditive, TimeBehaviorAtom, TimeBehaviorProperty, TimeBehaviorPropertyList,
+    TimeColorBehavior, TimeColorBehaviorAtom, TimeColorDirection, TimeColorModel,
+    TimeCommandBehavior, TimeCommandBehaviorAtom, TimeCommandBehaviorType, TimeCondition,
+    TimeConditionAtom, TimeConditionType, TimeEffectBehavior, TimeEffectBehaviorAtom,
+    TimeEffectNodeType, TimeEffectTransition, TimeEffectType, TimeIterateData,
+    TimeIterateDirection, TimeIterateIntervalType, TimeIterateType, TimeMasterRelation,
+    TimeModifier, TimeMotionBehavior, TimeMotionBehaviorAtom, TimeMotionOrigin, TimeNodeAtom,
+    TimeNodeProperty, TimeNodePropertyList, TimePropertyListContext, TimeRotationBehavior,
+    TimeRotationBehaviorAtom, TimeRotationDirection, TimeScaleBehavior, TimeScaleBehaviorAtom,
+    TimeSequenceData, TimeSequenceNextAction, TimeSequencePreviousAction, TimeSetBehavior,
+    TimeSetBehaviorAtom, TimeTriggerEvent, TimeTriggerObject, TimeVisualElement,
     TimeVisualElementKind, is_valid_animation_attribute_name, is_valid_motion_path,
     is_valid_runtime_context, is_valid_time_filter, is_valid_time_points_types,
+    is_valid_time_set_value, time_set_attribute_value_type,
 };
 use crate::consts::PptRecordType;
 use crate::ppt::package::{PptError, Result};
@@ -1067,6 +1069,71 @@ pub fn write_time_scale_behavior_atom(atom: &TimeScaleBehaviorAtom) -> Result<Ve
     let mut result = create_record_header(PptRecordType::TimeScaleBehavior, 0, 0, 32);
     result.extend(data);
     Ok(result)
+}
+
+/// Serialize an exact set-property behavior container.
+pub fn write_time_set_behavior(set: &TimeSetBehavior) -> Result<Vec<u8>> {
+    validate_set_behavior(set)?;
+    let mut children = write_time_set_behavior_atom(&set.atom);
+    if let Some(value) = &set.to {
+        append_time_variant(&mut children, 1, encode_time_variant_string(value))?;
+    }
+    children.extend(write_time_behavior(&set.behavior)?);
+    wrap_record(PptRecordType::TimeSetBehaviorContainer, 0x0F, 0, children)
+}
+
+/// Serialize an exact `TimeSetBehaviorAtom`.
+pub fn write_time_set_behavior_atom(atom: &TimeSetBehaviorAtom) -> Vec<u8> {
+    let flags = u32::from(atom.to_used) | (u32::from(atom.value_type.is_some()) << 1);
+    let value_type = atom.value_type.map_or(1u32, |value| match value {
+        TimeAnimateValueType::String => 0,
+        TimeAnimateValueType::Number => 1,
+        TimeAnimateValueType::Color => 2,
+    });
+    let mut result = create_record_header(PptRecordType::TimeSetBehavior, 0, 0, 8);
+    result.extend(flags.to_le_bytes());
+    result.extend(value_type.to_le_bytes());
+    result
+}
+
+fn validate_set_behavior(set: &TimeSetBehavior) -> Result<()> {
+    if set.atom.to_used && set.to.is_none() {
+        return Err(PptError::InvalidFormat(
+            "set to-use flag requires a value".to_string(),
+        ));
+    }
+    if !set.behavior.atom.attribute_names_used {
+        return Err(PptError::InvalidFormat(
+            "set behavior requires an explicit attribute name".to_string(),
+        ));
+    }
+    let attribute = match set.behavior.attribute_names.as_deref() {
+        Some([attribute]) => attribute.as_str(),
+        _ => {
+            return Err(PptError::InvalidFormat(
+                "set behavior requires exactly one attribute name".to_string(),
+            ));
+        },
+    };
+    let expected_type = time_set_attribute_value_type(attribute).ok_or_else(|| {
+        PptError::InvalidFormat(format!("unsupported set behavior attribute {attribute}"))
+    })?;
+    let actual_type = set.atom.value_type.unwrap_or(TimeAnimateValueType::Number);
+    if actual_type != expected_type {
+        return Err(PptError::InvalidFormat(
+            "set behavior value type does not match its attribute".to_string(),
+        ));
+    }
+    if set
+        .to
+        .as_deref()
+        .is_some_and(|value| !is_valid_time_set_value(attribute, value))
+    {
+        return Err(PptError::InvalidFormat(
+            "set behavior value is invalid for its attribute".to_string(),
+        ));
+    }
+    validate_basic_behavior_properties(&set.behavior)
 }
 
 fn validate_rotation_behavior(behavior: &TimeBehavior) -> Result<()> {

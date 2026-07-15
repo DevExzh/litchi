@@ -9,20 +9,21 @@ use super::types::{
     ExtendedTimeNode, LegacyAnimationAtom, LegacyAnimationBuild, LegacyAnimationEffect,
     LegacyTextBuildSubEffect, ParagraphBuild, ParagraphBuildAtom, ParagraphBuildLevel,
     ParagraphBuildType, SlideAnimationExtension, TimeAnimateColor, TimeAnimateColorBy,
-    TimeBehavior, TimeBehaviorAdditive, TimeBehaviorAtom, TimeBehaviorProperty,
-    TimeBehaviorPropertyList, TimeColorBehavior, TimeColorBehaviorAtom, TimeColorDirection,
-    TimeColorModel, TimeCommandBehavior, TimeCommandBehaviorAtom, TimeCommandBehaviorType,
-    TimeCondition, TimeConditionAtom, TimeConditionType, TimeEffectBehavior,
-    TimeEffectBehaviorAtom, TimeEffectFilter, TimeEffectNodeType, TimeEffectTransition,
-    TimeEffectType, TimeIterateData, TimeIterateDirection, TimeIterateIntervalType,
-    TimeIterateType, TimeMasterRelation, TimeModifier, TimeMotionBehavior, TimeMotionBehaviorAtom,
-    TimeMotionOrigin, TimeNodeAtom, TimeNodeFill, TimeNodeKind, TimeNodeProperty,
-    TimeNodePropertyList, TimeNodeRestart, TimePropertyListContext, TimeRotationBehavior,
-    TimeRotationBehaviorAtom, TimeRotationDirection, TimeScaleBehavior, TimeScaleBehaviorAtom,
-    TimeSequenceData, TimeSequenceNextAction, TimeSequencePreviousAction, TimeTriggerEvent,
-    TimeTriggerObject, TimeVisualElement, TimeVisualElementKind, is_valid_animation_attribute_name,
-    is_valid_motion_path, is_valid_runtime_context, is_valid_time_filter,
-    is_valid_time_points_types,
+    TimeAnimateValueType, TimeBehavior, TimeBehaviorAdditive, TimeBehaviorAtom,
+    TimeBehaviorProperty, TimeBehaviorPropertyList, TimeColorBehavior, TimeColorBehaviorAtom,
+    TimeColorDirection, TimeColorModel, TimeCommandBehavior, TimeCommandBehaviorAtom,
+    TimeCommandBehaviorType, TimeCondition, TimeConditionAtom, TimeConditionType,
+    TimeEffectBehavior, TimeEffectBehaviorAtom, TimeEffectFilter, TimeEffectNodeType,
+    TimeEffectTransition, TimeEffectType, TimeIterateData, TimeIterateDirection,
+    TimeIterateIntervalType, TimeIterateType, TimeMasterRelation, TimeModifier, TimeMotionBehavior,
+    TimeMotionBehaviorAtom, TimeMotionOrigin, TimeNodeAtom, TimeNodeFill, TimeNodeKind,
+    TimeNodeProperty, TimeNodePropertyList, TimeNodeRestart, TimePropertyListContext,
+    TimeRotationBehavior, TimeRotationBehaviorAtom, TimeRotationDirection, TimeScaleBehavior,
+    TimeScaleBehaviorAtom, TimeSequenceData, TimeSequenceNextAction, TimeSequencePreviousAction,
+    TimeSetBehavior, TimeSetBehaviorAtom, TimeTriggerEvent, TimeTriggerObject, TimeVisualElement,
+    TimeVisualElementKind, is_valid_animation_attribute_name, is_valid_motion_path,
+    is_valid_runtime_context, is_valid_time_filter, is_valid_time_points_types,
+    is_valid_time_set_value, time_set_attribute_value_type,
 };
 use crate::consts::PptRecordType;
 use crate::ppt::package::{PptError, Result};
@@ -1470,6 +1471,121 @@ pub fn parse_time_scale_behavior_atom(record: &PptRecord) -> Result<TimeScaleBeh
     })
 }
 
+/// Parse an exact set-property behavior container.
+pub fn parse_time_set_behavior(record: &PptRecord) -> Result<TimeSetBehavior> {
+    require_container(
+        record,
+        PptRecordType::TimeSetBehaviorContainer,
+        0,
+        "TimeSetBehaviorContainer",
+    )?;
+    let atom = record
+        .children
+        .first()
+        .ok_or_else(|| PptError::InvalidFormat("set behavior has no atom".to_string()))
+        .and_then(parse_time_set_behavior_atom)?;
+    let mut index = 1;
+    let to =
+        if record.children.get(index).is_some_and(|child| {
+            child.record_type == PptRecordType::TimeVariant && child.instance == 1
+        }) {
+            let value = parse_time_variant_string(&record.children[index])?;
+            index += 1;
+            Some(value)
+        } else {
+            None
+        };
+    let behavior = record
+        .children
+        .get(index)
+        .ok_or_else(|| PptError::InvalidFormat("set behavior has no target".to_string()))
+        .and_then(parse_time_behavior)?;
+    index += 1;
+    if index != record.children.len() {
+        return Err(PptError::InvalidFormat(
+            "set behavior has invalid child order or extra children".to_string(),
+        ));
+    }
+    let set = TimeSetBehavior { atom, to, behavior };
+    validate_set_behavior(&set)?;
+    Ok(set)
+}
+
+/// Parse an exact 8-byte `TimeSetBehaviorAtom` payload.
+pub fn parse_time_set_behavior_atom(record: &PptRecord) -> Result<TimeSetBehaviorAtom> {
+    require_atom(
+        record,
+        PptRecordType::TimeSetBehavior,
+        0,
+        8,
+        "TimeSetBehaviorAtom",
+    )?;
+    let flags = read_u32(&record.data, 0);
+    let value = read_u32(&record.data, 4);
+    let value_type = if flags & 0x02 != 0 {
+        Some(match value {
+            0 => TimeAnimateValueType::String,
+            1 => TimeAnimateValueType::Number,
+            2 => TimeAnimateValueType::Color,
+            value => {
+                return Err(PptError::InvalidFormat(format!(
+                    "invalid set behavior value type {value}"
+                )));
+            },
+        })
+    } else if value == 1 {
+        None
+    } else {
+        return Err(PptError::InvalidFormat(
+            "set behavior value type must be numeric when unused".to_string(),
+        ));
+    };
+    Ok(TimeSetBehaviorAtom {
+        to_used: flags & 0x01 != 0,
+        value_type,
+    })
+}
+
+fn validate_set_behavior(set: &TimeSetBehavior) -> Result<()> {
+    if set.atom.to_used && set.to.is_none() {
+        return Err(PptError::InvalidFormat(
+            "set to-use flag requires a value".to_string(),
+        ));
+    }
+    if !set.behavior.atom.attribute_names_used {
+        return Err(PptError::InvalidFormat(
+            "set behavior requires an explicit attribute name".to_string(),
+        ));
+    }
+    let attribute = match set.behavior.attribute_names.as_deref() {
+        Some([attribute]) => attribute.as_str(),
+        _ => {
+            return Err(PptError::InvalidFormat(
+                "set behavior requires exactly one attribute name".to_string(),
+            ));
+        },
+    };
+    let expected_type = time_set_attribute_value_type(attribute).ok_or_else(|| {
+        PptError::InvalidFormat(format!("unsupported set behavior attribute {attribute}"))
+    })?;
+    let actual_type = set.atom.value_type.unwrap_or(TimeAnimateValueType::Number);
+    if actual_type != expected_type {
+        return Err(PptError::InvalidFormat(
+            "set behavior value type does not match its attribute".to_string(),
+        ));
+    }
+    if set
+        .to
+        .as_deref()
+        .is_some_and(|value| !is_valid_time_set_value(attribute, value))
+    {
+        return Err(PptError::InvalidFormat(
+            "set behavior value is invalid for its attribute".to_string(),
+        ));
+    }
+    validate_basic_behavior_properties(&set.behavior)
+}
+
 fn validate_basic_behavior_properties(behavior: &TimeBehavior) -> Result<()> {
     if behavior.properties.as_ref().is_some_and(|list| {
         list.properties.iter().any(|property| {
@@ -2134,7 +2250,8 @@ mod tests {
         write_time_modifier, write_time_motion_behavior, write_time_motion_behavior_atom,
         write_time_node_atom, write_time_node_property_list, write_time_rotation_behavior,
         write_time_rotation_behavior_atom, write_time_scale_behavior,
-        write_time_scale_behavior_atom, write_time_sequence_data, write_time_visual_element,
+        write_time_scale_behavior_atom, write_time_sequence_data, write_time_set_behavior,
+        write_time_set_behavior_atom, write_time_visual_element,
     };
 
     fn sample_legacy_atom() -> LegacyAnimationAtom {
@@ -3244,6 +3361,242 @@ mod tests {
         bytes[36] = 0;
         let (record, _) = PptRecord::parse(&bytes, 0).unwrap();
         assert!(parse_time_scale_behavior_atom(&record).is_err());
+    }
+
+    #[test]
+    fn round_trips_set_behaviors_for_all_value_categories() {
+        assert_eq!(PptRecordType::TimeSetBehaviorContainer.as_u16(), 0xF131);
+        assert_eq!(PptRecordType::TimeSetBehavior.as_u16(), 0xF13A);
+        let common = |attribute: &str| TimeBehavior {
+            atom: TimeBehaviorAtom {
+                additive: Some(TimeBehaviorAdditive::Override),
+                attribute_names_used: true,
+            },
+            attribute_names: Some(vec![attribute.to_string()]),
+            properties: Some(TimeBehaviorPropertyList {
+                properties: vec![TimeBehaviorProperty::RuntimeContext("ppt".to_string())],
+            }),
+            target: TimeVisualElement::Shape {
+                kind: TimeVisualElementKind::Shape,
+                shape_id_ref: 23,
+                data1: 0,
+                data2: 0,
+            },
+        };
+        let cases = [
+            ("style.visibility", TimeAnimateValueType::Number, "hidden"),
+            ("style.fontWeight", TimeAnimateValueType::Number, "bold"),
+            ("fill.type", TimeAnimateValueType::Number, "gradientRadial"),
+            (
+                "stroke.dashstyle",
+                TimeAnimateValueType::Number,
+                "longDashDotDot",
+            ),
+            (
+                "stroke.startArrow",
+                TimeAnimateValueType::Number,
+                "doublechevron",
+            ),
+            (
+                "extrusion.render",
+                TimeAnimateValueType::Number,
+                "boundingcube",
+            ),
+            (
+                "ppt_x",
+                TimeAnimateValueType::Number,
+                "(max($,#ppt_y)+1.5e2)",
+            ),
+            ("shadow.matrix.ytoy", TimeAnimateValueType::Number, "-.5"),
+            (
+                "extrusion.rotationcenter.z",
+                TimeAnimateValueType::Number,
+                "1-e2",
+            ),
+            ("ppt_c", TimeAnimateValueType::Color, "#00aF7C"),
+            ("extrusion.color", TimeAnimateValueType::Color, "#AABBCC"),
+        ];
+        for (attribute, value_type, value) in cases {
+            let expected = TimeSetBehavior {
+                atom: TimeSetBehaviorAtom {
+                    to_used: true,
+                    value_type: (value_type != TimeAnimateValueType::Number).then_some(value_type),
+                },
+                to: Some(value.to_string()),
+                behavior: common(attribute),
+            };
+            let bytes = write_time_set_behavior(&expected).unwrap();
+            let (record, consumed) = PptRecord::parse(&bytes, 0).unwrap();
+            assert_eq!(consumed, bytes.len());
+            assert_eq!(parse_time_set_behavior(&record).unwrap(), expected);
+        }
+
+        for value_type in [
+            None,
+            Some(TimeAnimateValueType::String),
+            Some(TimeAnimateValueType::Number),
+            Some(TimeAnimateValueType::Color),
+        ] {
+            let expected = TimeSetBehaviorAtom {
+                to_used: false,
+                value_type,
+            };
+            let bytes = write_time_set_behavior_atom(&expected);
+            let (record, _) = PptRecord::parse(&bytes, 0).unwrap();
+            assert_eq!(parse_time_set_behavior_atom(&record).unwrap(), expected);
+        }
+    }
+
+    #[test]
+    fn validates_set_presets_numbers_formulas_and_colors() {
+        let presets = [
+            ("style.visibility", "visible"),
+            ("style.fontStyle", "italic"),
+            ("style.textEffectEmboss", "emboss"),
+            ("style.textShadow", "auto"),
+            ("style.textTransform", "super"),
+            ("style.textDecorationUnderline", "true"),
+            ("style.textEffectOutline", "false"),
+            ("style.textDecorationLineThrough", "true"),
+            ("imageData.grayscale", "false"),
+            ("fill.on", "t"),
+            ("fill.method", "sigma"),
+            ("stroke.on", "f"),
+            ("stroke.linestyle", "thickBetweenThin"),
+            ("stroke.filltype", "frame"),
+            ("stroke.endArrow", "chevron"),
+            ("stroke.startArrowWidth", "narrow"),
+            ("stroke.startArrowLength", "long"),
+            ("stroke.endArrowWidth", "wide"),
+            ("stroke.endArrowLength", "short"),
+            ("shadow.on", "true"),
+            ("shadow.type", "perspective"),
+            ("skew.on", "false"),
+            ("extrusion.on", "true"),
+            ("extrusion.type", "parallel"),
+            ("extrusion.plane", "yz"),
+            ("extrusion.lockrotationcenter", "false"),
+            ("extrusion.autorotationcenter", "true"),
+            ("extrusion.colormode", "false"),
+        ];
+        for (attribute, value) in presets {
+            assert_eq!(
+                time_set_attribute_value_type(attribute),
+                Some(TimeAnimateValueType::Number)
+            );
+            assert!(is_valid_time_set_value(attribute, value));
+        }
+        for value in ["0", "-1", "1.", ".5", "-.5", "1e2", "1-e2", "(sqrt(4))"] {
+            assert!(is_valid_time_set_value("ppt_x", value), "{value}");
+        }
+        for attribute in [
+            "ppt_c",
+            "fillcolor",
+            "style.color",
+            "imageData.chromakey",
+            "fill.color",
+            "fill.color2",
+            "stroke.color",
+            "stroke.color2",
+            "shadow.color",
+            "shadow.color2",
+            "extrusion.color",
+        ] {
+            assert_eq!(
+                time_set_attribute_value_type(attribute),
+                Some(TimeAnimateValueType::Color)
+            );
+            assert!(is_valid_time_set_value(attribute, "#123abc"));
+        }
+    }
+
+    #[test]
+    fn rejects_malformed_set_behaviors() {
+        let common = |attribute_names: Option<Vec<String>>, used| TimeBehavior {
+            atom: TimeBehaviorAtom {
+                additive: None,
+                attribute_names_used: used,
+            },
+            attribute_names,
+            properties: None,
+            target: TimeVisualElement::Page,
+        };
+        let valid = TimeSetBehavior {
+            atom: TimeSetBehaviorAtom {
+                to_used: true,
+                value_type: None,
+            },
+            to: Some("visible".to_string()),
+            behavior: common(Some(vec!["style.visibility".to_string()]), true),
+        };
+        for invalid in [
+            TimeSetBehavior {
+                to: None,
+                ..valid.clone()
+            },
+            TimeSetBehavior {
+                to: Some("opaque".to_string()),
+                ..valid.clone()
+            },
+            TimeSetBehavior {
+                atom: TimeSetBehaviorAtom {
+                    to_used: true,
+                    value_type: Some(TimeAnimateValueType::Color),
+                },
+                ..valid.clone()
+            },
+            TimeSetBehavior {
+                atom: TimeSetBehaviorAtom {
+                    to_used: true,
+                    value_type: Some(TimeAnimateValueType::String),
+                },
+                ..valid.clone()
+            },
+            TimeSetBehavior {
+                behavior: common(None, false),
+                ..valid.clone()
+            },
+            TimeSetBehavior {
+                behavior: common(Some(vec!["image".to_string()]), true),
+                ..valid.clone()
+            },
+            TimeSetBehavior {
+                behavior: common(Some(vec!["ppt_x".to_string(), "ppt_y".to_string()]), true),
+                ..valid.clone()
+            },
+        ] {
+            assert!(write_time_set_behavior(&invalid).is_err());
+        }
+        for value in ["", "-", ".", "1-", "1e-2", "(unknown+1)"] {
+            let invalid = TimeSetBehavior {
+                atom: TimeSetBehaviorAtom {
+                    to_used: true,
+                    value_type: None,
+                },
+                to: Some(value.to_string()),
+                behavior: common(Some(vec!["ppt_x".to_string()]), true),
+            };
+            assert!(write_time_set_behavior(&invalid).is_err(), "{value}");
+        }
+        for value in ["123456", "#12345", "#12345g", "#1234567"] {
+            let invalid = TimeSetBehavior {
+                atom: TimeSetBehaviorAtom {
+                    to_used: true,
+                    value_type: Some(TimeAnimateValueType::Color),
+                },
+                to: Some(value.to_string()),
+                behavior: common(Some(vec!["fill.color".to_string()]), true),
+            };
+            assert!(write_time_set_behavior(&invalid).is_err(), "{value}");
+        }
+
+        let mut atom = write_time_set_behavior_atom(&TimeSetBehaviorAtom {
+            to_used: false,
+            value_type: None,
+        });
+        atom[12..16].copy_from_slice(&2u32.to_le_bytes());
+        let (record, _) = PptRecord::parse(&atom, 0).unwrap();
+        assert!(parse_time_set_behavior_atom(&record).is_err());
     }
 
     #[test]

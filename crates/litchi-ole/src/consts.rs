@@ -151,6 +151,8 @@ pub enum PptRecordType {
     TimeRotationBehaviorContainer = 0xF12F,
     /// Scale behavior container
     TimeScaleBehaviorContainer = 0xF130,
+    /// Set-property behavior container
+    TimeSetBehaviorContainer = 0xF131,
     /// Command behavior container
     TimeCommandBehaviorContainer = 0xF132,
     /// Shared animation behavior atom
@@ -165,6 +167,8 @@ pub enum PptRecordType {
     TimeRotationBehavior = 0xF138,
     /// Scale behavior atom
     TimeScaleBehavior = 0xF139,
+    /// Set-property behavior atom
+    TimeSetBehavior = 0xF13A,
     /// Command behavior atom
     TimeCommandBehavior = 0xF13B,
     /// Animation target container
@@ -264,6 +268,7 @@ impl From<u16> for PptRecordType {
             0xF12E => PptRecordType::TimeMotionBehaviorContainer,
             0xF12F => PptRecordType::TimeRotationBehaviorContainer,
             0xF130 => PptRecordType::TimeScaleBehaviorContainer,
+            0xF131 => PptRecordType::TimeSetBehaviorContainer,
             0xF132 => PptRecordType::TimeCommandBehaviorContainer,
             0xF133 => PptRecordType::TimeBehavior,
             0xF135 => PptRecordType::TimeColorBehavior,
@@ -271,6 +276,7 @@ impl From<u16> for PptRecordType {
             0xF137 => PptRecordType::TimeMotionBehavior,
             0xF138 => PptRecordType::TimeRotationBehavior,
             0xF139 => PptRecordType::TimeScaleBehavior,
+            0xF13A => PptRecordType::TimeSetBehavior,
             0xF13B => PptRecordType::TimeCommandBehavior,
             0xF13C => PptRecordType::TimeClientVisualElement,
             0xF13D => PptRecordType::TimePropertyList,

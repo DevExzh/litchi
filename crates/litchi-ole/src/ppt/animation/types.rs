@@ -1222,6 +1222,31 @@ pub enum TimeMotionOrigin {
     ObjectCenter,
 }
 
+/// A PowerPoint 2002 behavior that assigns one property value.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TimeSetBehavior {
+    pub atom: TimeSetBehaviorAtom,
+    /// Optional value retained even when its use flag is clear.
+    pub to: Option<String>,
+    pub behavior: TimeBehavior,
+}
+
+/// Property-use flags and value type from a `TimeSetBehaviorAtom`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TimeSetBehaviorAtom {
+    pub to_used: bool,
+    /// Explicit value type, or `None` for the default numeric type.
+    pub value_type: Option<TimeAnimateValueType>,
+}
+
+/// Data type of a generic animated property value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TimeAnimateValueType {
+    String,
+    Number,
+    Color,
+}
+
 /// Animation target stored in a `ClientVisualElementContainer`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TimeVisualElement {
@@ -1742,6 +1767,272 @@ pub(crate) fn is_valid_animation_attribute_name(value: &str) -> bool {
                 | "shadow.color2"
                 | "extrusion.color"
         )
+}
+
+pub(crate) fn time_set_attribute_value_type(attribute: &str) -> Option<TimeAnimateValueType> {
+    if is_time_set_preset_attribute(attribute) || is_time_set_numeric_attribute(attribute) {
+        Some(TimeAnimateValueType::Number)
+    } else if matches!(
+        attribute,
+        "ppt_c"
+            | "fillcolor"
+            | "style.color"
+            | "imageData.chromakey"
+            | "fill.color"
+            | "fill.color2"
+            | "stroke.color"
+            | "stroke.color2"
+            | "shadow.color"
+            | "shadow.color2"
+            | "extrusion.color"
+    ) {
+        Some(TimeAnimateValueType::Color)
+    } else {
+        None
+    }
+}
+
+pub(crate) fn is_valid_time_set_value(attribute: &str, value: &str) -> bool {
+    if is_time_set_numeric_attribute(attribute) {
+        return is_valid_formula_or_number(value);
+    }
+    if time_set_attribute_value_type(attribute) == Some(TimeAnimateValueType::Color) {
+        return value.len() == 7
+            && value.starts_with('#')
+            && value[1..].bytes().all(|byte| byte.is_ascii_hexdigit());
+    }
+    match attribute {
+        "style.visibility" => matches!(value, "hidden" | "visible"),
+        "style.fontWeight" => matches!(value, "none" | "normal" | "bold"),
+        "style.fontStyle" => matches!(value, "none" | "normal" | "italic"),
+        "style.textEffectEmboss" => matches!(value, "none" | "normal" | "emboss"),
+        "style.textShadow" => matches!(value, "none" | "normal" | "auto"),
+        "style.textTransform" => matches!(value, "none" | "normal" | "sub" | "super"),
+        "style.textDecorationUnderline"
+        | "style.textEffectOutline"
+        | "style.textDecorationLineThrough"
+        | "imageData.grayscale"
+        | "extrusion.lockrotationcenter"
+        | "extrusion.autorotationcenter"
+        | "extrusion.colormode" => matches!(value, "false" | "true"),
+        "fill.on" | "stroke.on" | "shadow.on" | "skew.on" | "extrusion.on" => {
+            matches!(value, "false" | "f" | "t" | "true")
+        },
+        "fill.type" => matches!(
+            value,
+            "solid"
+                | "pattern"
+                | "tile"
+                | "frame"
+                | "gradientUnscaled"
+                | "gradient"
+                | "gradientCenter"
+                | "gradientRadial"
+                | "gradientTile"
+                | "background"
+        ),
+        "fill.method" => matches!(value, "none" | "linear" | "sigma" | "any"),
+        "stroke.linestyle" => matches!(
+            value,
+            "single" | "thinThin" | "thinThick" | "thickThin" | "thickBetweenThin"
+        ),
+        "stroke.dashstyle" => matches!(
+            value,
+            "solid" | "dot" | "dash" | "dashDot" | "longDash" | "longDashDot" | "longDashDotDot"
+        ),
+        "stroke.filltype" => matches!(value, "solid" | "tile" | "pattern" | "frame"),
+        "stroke.startArrow" | "stroke.endArrow" => matches!(
+            value,
+            "none"
+                | "block"
+                | "classic"
+                | "diamond"
+                | "oval"
+                | "open"
+                | "chevron"
+                | "doublechevron"
+        ),
+        "stroke.startArrowWidth" | "stroke.endArrowWidth" => {
+            matches!(value, "narrow" | "medium" | "wide")
+        },
+        "stroke.startArrowLength" | "stroke.endArrowLength" => {
+            matches!(value, "short" | "medium" | "long")
+        },
+        "shadow.type" => matches!(value, "single" | "double" | "emboss" | "perspective"),
+        "extrusion.type" => matches!(value, "parallel" | "perspective"),
+        "extrusion.render" => matches!(value, "solid" | "wireframe" | "boundingcube"),
+        "extrusion.plane" => matches!(value, "xy" | "zx" | "yz"),
+        _ => false,
+    }
+}
+
+fn is_time_set_preset_attribute(attribute: &str) -> bool {
+    matches!(
+        attribute,
+        "style.visibility"
+            | "style.fontWeight"
+            | "style.fontStyle"
+            | "style.textEffectEmboss"
+            | "style.textShadow"
+            | "style.textTransform"
+            | "style.textDecorationUnderline"
+            | "style.textEffectOutline"
+            | "style.textDecorationLineThrough"
+            | "imageData.grayscale"
+            | "fill.on"
+            | "fill.type"
+            | "fill.method"
+            | "stroke.on"
+            | "stroke.linestyle"
+            | "stroke.dashstyle"
+            | "stroke.filltype"
+            | "stroke.startArrow"
+            | "stroke.endArrow"
+            | "stroke.startArrowWidth"
+            | "stroke.startArrowLength"
+            | "stroke.endArrowWidth"
+            | "stroke.endArrowLength"
+            | "shadow.on"
+            | "shadow.type"
+            | "skew.on"
+            | "extrusion.on"
+            | "extrusion.type"
+            | "extrusion.render"
+            | "extrusion.plane"
+            | "extrusion.lockrotationcenter"
+            | "extrusion.autorotationcenter"
+            | "extrusion.colormode"
+    )
+}
+
+fn is_time_set_numeric_attribute(attribute: &str) -> bool {
+    matches!(
+        attribute,
+        "ppt_x"
+            | "ppt_y"
+            | "ppt_w"
+            | "ppt_h"
+            | "ppt_r"
+            | "xshear"
+            | "yshear"
+            | "ScaleX"
+            | "ScaleY"
+            | "r"
+            | "style.opacity"
+            | "style.rotation"
+            | "style.fontSize"
+            | "style.sRotation"
+            | "imageData.cropTop"
+            | "imageData.cropBottom"
+            | "imageData.cropLeft"
+            | "imageData.cropRight"
+            | "imageData.gain"
+            | "imageData.blacklevel"
+            | "imageData.gamma"
+            | "fill.opacity"
+            | "fill.opacity2"
+            | "fill.angle"
+            | "fill.focus"
+            | "fill.focusposition.x"
+            | "fill.focusposition.y"
+            | "fill.focussize.x"
+            | "fill.focussize.y"
+            | "stroke.weight"
+            | "stroke.opacity"
+            | "stroke.imagesize.x"
+            | "stroke.imagesize.y"
+            | "shadow.opacity"
+            | "shadow.offset.x"
+            | "shadow.offset.y"
+            | "shadow.offset2.x"
+            | "shadow.offset2.y"
+            | "shadow.origin.x"
+            | "shadow.origin.y"
+            | "shadow.matrix.xtox"
+            | "shadow.matrix.ytox"
+            | "shadow.matrix.ytoy"
+            | "shadow.matrix.perspectiveX"
+            | "shadow.matrix.perspectiveY"
+            | "skew.offset.x"
+            | "skew.offset.y"
+            | "skew.origin.x"
+            | "skew.origin.y"
+            | "skew.matrix.xtox"
+            | "skew.matrix.ytox"
+            | "skew.matrix.ytoy"
+            | "skew.matrix.perspectiveX"
+            | "skew.matrix.perspectiveY"
+            | "extrusion.viewpointorigin.x"
+            | "extrusion.viewpointorigin.y"
+            | "extrusion.viewpoint.x"
+            | "extrusion.viewpoint.y"
+            | "extrusion.viewpoint.z"
+            | "extrusion.skewangle"
+            | "extrusion.skewamt"
+            | "extrusion.backdepth"
+            | "extrusion.foredepth"
+            | "extrusion.orientation.x"
+            | "extrusion.orientation.y"
+            | "extrusion.orientation.z"
+            | "extrusion.orientationangle"
+            | "extrusion.rotationangle.x"
+            | "extrusion.rotationangle.y"
+            | "extrusion.rotationcenter.x"
+            | "extrusion.rotationcenter.y"
+            | "extrusion.rotationcenter.z"
+    )
+}
+
+fn is_valid_formula_or_number(value: &str) -> bool {
+    if let Some(formula) = value
+        .strip_prefix('(')
+        .and_then(|value| value.strip_suffix(')'))
+    {
+        return is_valid_time_formula_bytes(formula.as_bytes());
+    }
+    let bytes = value.as_bytes();
+    let mut position = usize::from(bytes.first() == Some(&b'-'));
+    if bytes.get(position) == Some(&b'.') {
+        position += 1;
+        let start = position;
+        while bytes.get(position).is_some_and(u8::is_ascii_digit) {
+            position += 1;
+        }
+        if position == start {
+            return false;
+        }
+    } else {
+        let start = position;
+        while bytes.get(position).is_some_and(u8::is_ascii_digit) {
+            position += 1;
+        }
+        if position == start {
+            return false;
+        }
+        if bytes.get(position) == Some(&b'.') {
+            position += 1;
+            while bytes.get(position).is_some_and(u8::is_ascii_digit) {
+                position += 1;
+            }
+        }
+    }
+    if position < bytes.len() {
+        if bytes.get(position) == Some(&b'-') {
+            position += 1;
+        }
+        if !matches!(bytes.get(position), Some(b'e' | b'E')) {
+            return false;
+        }
+        position += 1;
+        let start = position;
+        while bytes.get(position).is_some_and(u8::is_ascii_digit) {
+            position += 1;
+        }
+        if position == start {
+            return false;
+        }
+    }
+    position == bytes.len()
 }
 
 impl TimeNodeFill {
