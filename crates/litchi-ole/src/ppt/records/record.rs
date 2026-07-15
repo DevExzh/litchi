@@ -128,6 +128,10 @@ impl PptRecord {
                 | PptRecordType::Environment
                 | PptRecordType::InteractiveInfo
                 | PptRecordType::AnimationInfo
+                | PptRecordType::ProgTags
+                | PptRecordType::ProgStringTag
+                | PptRecordType::ProgBinaryTag
+                | PptRecordType::Comment2000
                 | PptRecordType::BuildList
                 | PptRecordType::ChartBuild
                 | PptRecordType::DiagramBuild
@@ -289,6 +293,15 @@ impl PptRecord {
 
     /// Extract text content from this record and its children.
     pub fn extract_text(&self) -> Result<String> {
+        if matches!(
+            self.record_type,
+            PptRecordType::ProgTags
+                | PptRecordType::ProgStringTag
+                | PptRecordType::ProgBinaryTag
+                | PptRecordType::Comment2000
+        ) {
+            return Ok(String::new());
+        }
         let mut text_parts = Vec::new();
 
         // Extract text from text-related records

@@ -1,10 +1,10 @@
 /// High-performance Slide implementation with lazy shape loading and zero-copy design.
-use super::super::package::Result;
+use super::super::package::{PptError, Result};
 use super::super::records::PptRecord;
 use super::super::shapes::ShapeEnum;
 use super::factory::SlideData;
 use crate::consts::PptRecordType;
-use crate::ppt::animation::ShapeAnimation;
+use crate::ppt::animation::{ShapeAnimation, SlideAnimationExtension};
 use once_cell::unsync::OnceCell;
 
 /// A slide in a PowerPoint presentation with lazy-loaded shapes.
@@ -30,6 +30,8 @@ pub struct Slide<'doc> {
     text_cache: OnceCell<String>,
     /// Lazily parsed, inert shape animation metadata.
     animations: OnceCell<Vec<ShapeAnimation>>,
+    /// Lazily parsed PowerPoint 2002 slide animation extension.
+    animation_extension: OnceCell<Option<SlideAnimationExtension>>,
 }
 
 impl<'doc> Slide<'doc> {
@@ -44,6 +46,7 @@ impl<'doc> Slide<'doc> {
             shapes: OnceCell::new(),
             text_cache: OnceCell::new(),
             animations: OnceCell::new(),
+            animation_extension: OnceCell::new(),
         }
     }
 
@@ -111,6 +114,48 @@ impl<'doc> Slide<'doc> {
             Self::collect_animations(child, animations)?;
         }
         Ok(())
+    }
+
+    /// Return inert PowerPoint 2002 timing and build metadata from `___PPT10`.
+    pub fn animation_extension(&self) -> Result<Option<&SlideAnimationExtension>> {
+        self.animation_extension
+            .get_or_try_init(|| self.parse_animation_extension())
+            .map(Option::as_ref)
+    }
+
+    fn parse_animation_extension(&self) -> Result<Option<SlideAnimationExtension>> {
+        for prog_tags in self.record.find_children(PptRecordType::ProgTags) {
+            for prog_binary_tag in prog_tags.find_children(PptRecordType::ProgBinaryTag) {
+                let Some(tag_name) = prog_binary_tag.find_child(PptRecordType::CString) else {
+                    continue;
+                };
+                if !Self::is_ppt10_tag_name(tag_name) {
+                    continue;
+                }
+                let data = prog_binary_tag
+                    .find_child(PptRecordType::BinaryTagData)
+                    .ok_or_else(|| {
+                        PptError::Corrupted(
+                            "___PPT10 programmable tag is missing BinaryTagData".to_string(),
+                        )
+                    })?;
+                return crate::ppt::animation::parse_slide_animation_extension(&data.data)
+                    .map(Some);
+            }
+        }
+        Ok(None)
+    }
+
+    fn is_ppt10_tag_name(record: &PptRecord) -> bool {
+        const PPT10: [u16; 8] = [0x5F, 0x5F, 0x5F, 0x50, 0x50, 0x54, 0x31, 0x30];
+        record.version == 0
+            && record.instance == 0
+            && record.data.len() == 16
+            && record
+                .data
+                .chunks_exact(2)
+                .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
+                .eq(PPT10)
     }
 
     /// Extract all text from this slide (lazy-loaded).
@@ -435,13 +480,19 @@ impl<'doc> Slide<'doc> {
         // Navigate: Slide -> ProgTags -> ProgBinaryTag -> BinaryTagData
         // Comment2000 records are children of BinaryTagData
         for child in &self.record.children {
-            if child.record_type_raw == 5000 {
+            if child.record_type == PptRecordType::ProgTags {
                 // PROG_TAGS
                 for prog_bin in &child.children {
-                    if prog_bin.record_type_raw == 5002 {
+                    if prog_bin.record_type == PptRecordType::ProgBinaryTag {
+                        if !prog_bin
+                            .find_child(PptRecordType::CString)
+                            .is_some_and(Self::is_ppt10_tag_name)
+                        {
+                            continue;
+                        }
                         // PROG_BINARY_TAG
                         for bin_tag in &prog_bin.children {
-                            if bin_tag.record_type_raw == 5003 {
+                            if bin_tag.record_type == PptRecordType::BinaryTagData {
                                 // BINARY_TAG_DATA
                                 // Parse Comment2000 containers from the data
                                 Self::parse_comments_from_data(&bin_tag.data, &mut comments);
@@ -458,7 +509,7 @@ impl<'doc> Slide<'doc> {
     /// Parse Comment2000 containers from raw BinaryTagData bytes.
     fn parse_comments_from_data(data: &[u8], comments: &mut Vec<ParsedComment>) {
         let mut offset = 0;
-        while offset + 8 <= data.len() {
+        while data.len().saturating_sub(offset) >= 8 {
             let ver_inst = u16::from_le_bytes([data[offset], data[offset + 1]]);
             let version = ver_inst & 0x000F;
             let rtype = u16::from_le_bytes([data[offset + 2], data[offset + 3]]);
@@ -468,14 +519,24 @@ impl<'doc> Slide<'doc> {
                 data[offset + 6],
                 data[offset + 7],
             ]) as usize;
+            let Some(record_end) = offset
+                .checked_add(8)
+                .and_then(|start| start.checked_add(rlen))
+            else {
+                break;
+            };
+            if record_end > data.len() {
+                break;
+            }
 
             if rtype == 12000 && version == 0x0F {
                 // Comment2000 container — parse its children
-                let container_end = (offset + 8 + rlen).min(data.len());
+                let container_end = record_end;
                 let mut comment = ParsedComment::default();
+                let mut has_atom = false;
                 let mut child_off = offset + 8;
 
-                while child_off + 8 <= container_end {
+                while container_end.saturating_sub(child_off) >= 8 {
                     let c_ver_inst = u16::from_le_bytes([data[child_off], data[child_off + 1]]);
                     let c_instance = (c_ver_inst >> 4) & 0x0FFF;
                     let c_type = u16::from_le_bytes([data[child_off + 2], data[child_off + 3]]);
@@ -487,7 +548,12 @@ impl<'doc> Slide<'doc> {
                     ]) as usize;
 
                     let c_data_start = child_off + 8;
-                    let c_data_end = (c_data_start + c_len).min(container_end);
+                    let Some(c_data_end) = c_data_start.checked_add(c_len) else {
+                        break;
+                    };
+                    if c_data_end > container_end {
+                        break;
+                    }
 
                     if c_type == 4026 {
                         // CString (UTF-16LE)
@@ -498,7 +564,7 @@ impl<'doc> Slide<'doc> {
                             2 => comment.initials = text,
                             _ => {},
                         }
-                    } else if c_type == 12001 && c_len >= 28 {
+                    } else if c_type == 12001 && c_len == 28 {
                         // Comment2000Atom (28 bytes)
                         let d = &data[c_data_start..c_data_end];
                         comment.index = i32::from_le_bytes([d[0], d[1], d[2], d[3]]);
@@ -512,20 +578,17 @@ impl<'doc> Slide<'doc> {
                         comment.millisecond = i16::from_le_bytes([d[18], d[19]]);
                         comment.x = i32::from_le_bytes([d[20], d[21], d[22], d[23]]);
                         comment.y = i32::from_le_bytes([d[24], d[25], d[26], d[27]]);
+                        has_atom = true;
                     }
 
                     child_off = c_data_end;
                 }
 
-                comments.push(comment);
-                offset = container_end;
-            } else if version == 0x0F {
-                // Other container — skip into children
-                offset += 8;
-            } else {
-                // Atom — skip over data
-                offset += 8 + rlen;
+                if has_atom {
+                    comments.push(comment);
+                }
             }
+            offset = record_end;
         }
     }
 
@@ -1484,6 +1547,100 @@ mod tests {
             crate::ppt::animation::LegacyAnimationEffect::Fade
         );
         assert_eq!(atom.order_id, 2);
+    }
+
+    #[test]
+    fn exposes_powerpoint_2002_animation_extension_from_programmable_tags() {
+        use crate::escher::writer::{write_atom, write_container};
+        use crate::ppt::animation::{
+            BuildList, ExtendedTimeNode, TimeNodeAtom, TimeNodeKind, write_build_list,
+            write_extended_time_node,
+        };
+        use crate::ppt::writer::comments::{SlideComment, build_slide_comments};
+
+        let timing = ExtendedTimeNode {
+            atom: TimeNodeAtom {
+                node_type: Some(TimeNodeKind::Sequential),
+                duration_ms: Some(2_000),
+                ..TimeNodeAtom::default()
+            },
+            children: Vec::new(),
+        };
+        let comment = SlideComment::new("Ada Lovelace", "Animate this", 12, 34);
+        let mut extension_data = build_slide_comments(&[comment]).unwrap();
+        extension_data.extend(write_extended_time_node(&timing).unwrap());
+        extension_data.extend(write_build_list(&BuildList::new()).unwrap());
+
+        let tag_name: Vec<u8> = "___PPT10"
+            .encode_utf16()
+            .flat_map(u16::to_le_bytes)
+            .collect();
+        let mut prog_binary_children = Vec::new();
+        write_atom(&mut prog_binary_children, 0, 0, 4026, &tag_name).unwrap();
+        write_atom(
+            &mut prog_binary_children,
+            0,
+            0,
+            PptRecordType::BinaryTagData.as_u16(),
+            &extension_data,
+        )
+        .unwrap();
+        let mut prog_tags_children = Vec::new();
+        write_container(
+            &mut prog_tags_children,
+            0,
+            PptRecordType::ProgBinaryTag.as_u16(),
+            &prog_binary_children,
+        )
+        .unwrap();
+        let mut slide_children = Vec::new();
+        write_container(
+            &mut slide_children,
+            0,
+            PptRecordType::ProgTags.as_u16(),
+            &prog_tags_children,
+        )
+        .unwrap();
+        let mut bytes = Vec::new();
+        write_container(
+            &mut bytes,
+            0,
+            PptRecordType::Slide.as_u16(),
+            &slide_children,
+        )
+        .unwrap();
+
+        let (record, consumed) = PptRecord::parse(&bytes, 0).unwrap();
+        assert_eq!(consumed, bytes.len());
+        let doc_data = Vec::new();
+        let slide = Slide::from_slide_data(create_slide_data(record, 256, &doc_data), 1);
+        let extension = slide.animation_extension().unwrap().unwrap();
+        assert_eq!(extension.time_node, Some(timing));
+        assert_eq!(extension.build_list, Some(BuildList::new()));
+        let comments = slide.comments();
+        assert_eq!(comments.len(), 1);
+        assert_eq!(comments[0].author, "Ada Lovelace");
+        assert_eq!(comments[0].text, "Animate this");
+        assert_eq!(slide.text().unwrap(), "");
+    }
+
+    #[test]
+    fn truncated_comment_atoms_are_ignored_without_panicking() {
+        let mut child = Vec::new();
+        child.extend(0u16.to_le_bytes());
+        child.extend(PptRecordType::Comment2000Atom.as_u16().to_le_bytes());
+        child.extend(28u32.to_le_bytes());
+        child.push(0);
+
+        let mut data = Vec::new();
+        data.extend(0x000Fu16.to_le_bytes());
+        data.extend(PptRecordType::Comment2000.as_u16().to_le_bytes());
+        data.extend(u32::try_from(child.len()).unwrap().to_le_bytes());
+        data.extend(child);
+
+        let mut comments = Vec::new();
+        Slide::<'static>::parse_comments_from_data(&data, &mut comments);
+        assert!(comments.is_empty());
     }
 
     #[test]

@@ -344,6 +344,15 @@ pub struct BuildList {
     pub builds: Vec<BuildListEntry>,
 }
 
+/// PowerPoint 2002 animation metadata stored in a slide's `___PPT10` tag.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct SlideAnimationExtension {
+    /// Optional root animation timing tree.
+    pub time_node: Option<ExtendedTimeNode>,
+    /// Optional shape build list.
+    pub build_list: Option<BuildList>,
+}
+
 impl BuildList {
     pub fn new() -> Self {
         Self::default()

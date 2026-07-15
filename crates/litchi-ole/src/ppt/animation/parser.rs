@@ -8,7 +8,8 @@ use super::types::{
     ChartBuildAtom, ChartBuildType, DiagramBuild, DiagramBuildAtom, DiagramBuildType,
     ExtendedTimeNode, LegacyAnimationAtom, LegacyAnimationBuild, LegacyAnimationEffect,
     LegacyTextBuildSubEffect, ParagraphBuild, ParagraphBuildAtom, ParagraphBuildLevel,
-    ParagraphBuildType, TimeNodeAtom, TimeNodeFill, TimeNodeKind, TimeNodeRestart,
+    ParagraphBuildType, SlideAnimationExtension, TimeNodeAtom, TimeNodeFill, TimeNodeKind,
+    TimeNodeRestart,
 };
 use crate::consts::PptRecordType;
 use crate::ppt::package::{PptError, Result};
@@ -220,6 +221,49 @@ pub fn parse_time_node_atom(record: &PptRecord) -> Result<TimeNodeAtom> {
         node_type,
         duration_ms,
     })
+}
+
+/// Discover PowerPoint 2002 timing and build records in `BinaryTagData`.
+pub fn parse_slide_animation_extension(data: &[u8]) -> Result<SlideAnimationExtension> {
+    let mut extension = SlideAnimationExtension::default();
+    let mut offset = 0usize;
+    while offset < data.len() {
+        if data.len() - offset < 8 {
+            return Err(PptError::Corrupted(
+                "slide binary tag ends with a partial record header".to_string(),
+            ));
+        }
+        let (record, consumed) = PptRecord::parse(data, offset)?;
+        if record.data_length as usize != record.data.len() || consumed < 8 {
+            return Err(PptError::Corrupted(format!(
+                "slide binary tag contains a truncated {:?} record",
+                record.record_type
+            )));
+        }
+        match record.record_type {
+            PptRecordType::ExtTimeNode => {
+                if extension.time_node.is_some() {
+                    return Err(PptError::InvalidFormat(
+                        "___PPT10 contains multiple root ExtTimeNode records".to_string(),
+                    ));
+                }
+                extension.time_node = Some(parse_extended_time_node(&record)?);
+            },
+            PptRecordType::BuildList => {
+                if extension.build_list.is_some() {
+                    return Err(PptError::InvalidFormat(
+                        "___PPT10 contains multiple BuildList records".to_string(),
+                    ));
+                }
+                extension.build_list = Some(parse_build_list(&record)?);
+            },
+            _ => {},
+        }
+        offset = offset
+            .checked_add(consumed)
+            .ok_or_else(|| PptError::Corrupted("slide binary tag offset overflow".to_string()))?;
+    }
+    Ok(extension)
 }
 
 /// Parse build list from BuildList container record.
@@ -752,6 +796,37 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn parses_slide_animation_extensions_and_rejects_duplicates_or_truncation() {
+        let node = ExtendedTimeNode {
+            atom: TimeNodeAtom {
+                node_type: Some(TimeNodeKind::Sequential),
+                ..TimeNodeAtom::default()
+            },
+            children: Vec::new(),
+        };
+        let build_list = BuildList::new();
+        let mut data = Vec::new();
+        data.extend(0u16.to_le_bytes());
+        data.extend(0x7777u16.to_le_bytes());
+        data.extend(0u32.to_le_bytes());
+        data.extend(write_extended_time_node(&node).unwrap());
+        let build_bytes = write_build_list(&build_list).unwrap();
+        data.extend(&build_bytes);
+
+        let parsed = parse_slide_animation_extension(&data).unwrap();
+        assert_eq!(parsed.time_node, Some(node));
+        assert_eq!(parsed.build_list, Some(build_list));
+
+        let mut duplicate = data.clone();
+        duplicate.extend(build_bytes);
+        assert!(parse_slide_animation_extension(&duplicate).is_err());
+
+        let mut truncated = data;
+        truncated.pop();
+        assert!(parse_slide_animation_extension(&truncated).is_err());
     }
 
     #[test]

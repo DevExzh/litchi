@@ -91,6 +91,14 @@ pub enum PptRecordType {
     CurrentUserAtom = 4086,
     /// Date time MC atom record
     DateTimeMCAtom = 4087,
+    /// Programmable tags container
+    ProgTags = 0x1388,
+    /// Programmable string tag container
+    ProgStringTag = 0x1389,
+    /// Programmable binary tag container
+    ProgBinaryTag = 0x138A,
+    /// Programmable binary tag data atom
+    BinaryTagData = 0x138B,
     /// Animation info record
     AnimationInfo = 4116,
     /// Animation info atom record
@@ -184,6 +192,10 @@ impl From<u16> for PptRecordType {
             4085 => PptRecordType::UserEditAtom,
             4086 => PptRecordType::CurrentUserAtom,
             4087 => PptRecordType::DateTimeMCAtom,
+            0x1388 => PptRecordType::ProgTags,
+            0x1389 => PptRecordType::ProgStringTag,
+            0x138A => PptRecordType::ProgBinaryTag,
+            0x138B => PptRecordType::BinaryTagData,
             4116 => PptRecordType::AnimationInfo,
             4081 => PptRecordType::AnimationInfoAtom,
             0x2B02 => PptRecordType::BuildList,
