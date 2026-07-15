@@ -2,8 +2,6 @@
 
 use crate::doc::CommentDateTime;
 use crate::doc::parts::styles::{StyleFlags, StyleKind, StylePost2000, StyleSheet};
-use crate::sprm::parse_sprms;
-use crate::sprm_operations::{SPRM_C_CNF, SPRM_P_CNF, get_sprm_type};
 use std::collections::HashMap;
 
 const MIN_STYLE_COUNT: usize = 15;
@@ -196,33 +194,6 @@ fn current_property_count(kind: StyleKind) -> usize {
     }
 }
 
-fn validate_grpprl(
-    bytes: &[u8],
-    expected_type: u8,
-    forbidden_conditional: Option<u16>,
-    description: &str,
-) -> Result<(), StyleWriteError> {
-    let sprms = parse_sprms(bytes);
-    let consumed = sprms.last().map_or(0, |sprm| sprm.offset + sprm.size);
-    if consumed != bytes.len() {
-        return Err(invalid(format!("{description} contains a truncated SPRM")));
-    }
-    if sprms
-        .iter()
-        .any(|sprm| get_sprm_type(sprm.opcode) != expected_type)
-    {
-        return Err(invalid(format!(
-            "{description} contains an SPRM for the wrong property group"
-        )));
-    }
-    if forbidden_conditional.is_some_and(|opcode| sprms.iter().any(|sprm| sprm.opcode == opcode)) {
-        return Err(invalid(format!(
-            "{description} contains conditional formatting outside a table style"
-        )));
-    }
-    Ok(())
-}
-
 fn validate_style(style: &DocStyleDefinition, index: u16) -> Result<(), StyleWriteError> {
     if style.invariant_id > USER_STYLE_ID {
         return Err(invalid(
@@ -269,48 +240,61 @@ fn validate_style(style: &DocStyleDefinition, index: u16) -> Result<(), StyleWri
     }
     match style.kind {
         StyleKind::Paragraph => {
-            validate_grpprl(
+            crate::doc::parts::styles::validate_paragraph_style_sprms(
                 &style.property_sets[0],
-                1,
-                Some(SPRM_P_CNF),
-                "paragraph-style UpxPapx",
-            )?;
-            validate_grpprl(
+                index,
+                false,
+            )
+            .map_err(|error| invalid(error.to_string()))?;
+            crate::doc::parts::styles::validate_character_style_sprms(
                 &style.property_sets[1],
-                2,
-                Some(SPRM_C_CNF),
-                "paragraph-style UpxChpx",
-            )?;
+                false,
+            )
+            .map_err(|error| invalid(error.to_string()))?;
         },
-        StyleKind::Character => validate_grpprl(
-            &style.property_sets[0],
-            2,
-            Some(SPRM_C_CNF),
-            "character-style UpxChpx",
-        )?,
+        StyleKind::Character => {
+            crate::doc::parts::styles::validate_character_style_sprms(
+                &style.property_sets[0],
+                false,
+            )
+            .map_err(|error| invalid(error.to_string()))?;
+        },
         StyleKind::Table => {
-            validate_grpprl(&style.property_sets[0], 5, None, "table-style UpxTapx")?;
-            validate_grpprl(&style.property_sets[1], 1, None, "table-style UpxPapx")?;
-            validate_grpprl(&style.property_sets[2], 2, None, "table-style UpxChpx")?;
+            crate::doc::parts::styles::validate_table_style_sprms(
+                &style.property_sets[0],
+                index,
+                false,
+            )
+            .map_err(|error| invalid(error.to_string()))?;
+            crate::doc::parts::styles::validate_paragraph_style_sprms(
+                &style.property_sets[1],
+                index,
+                true,
+            )
+            .map_err(|error| invalid(error.to_string()))?;
+            crate::doc::parts::styles::validate_character_style_sprms(
+                &style.property_sets[2],
+                true,
+            )
+            .map_err(|error| invalid(error.to_string()))?;
         },
-        StyleKind::Numbering => validate_grpprl(
-            &style.property_sets[0],
-            1,
-            Some(SPRM_P_CNF),
-            "numbering-style UpxPapx",
-        )?,
+        StyleKind::Numbering => {
+            crate::doc::parts::styles::validate_numbering_style_sprms(
+                &style.property_sets[0],
+                index,
+            )
+            .map_err(|error| invalid(error.to_string()))?;
+        },
     }
     if let Some(revision) = &style.revision {
         if revision.author.is_empty() {
             return Err(invalid("DOC style revision author must not be empty"));
         }
         match (style.kind, &revision.paragraph_properties) {
-            (StyleKind::Paragraph, Some(paragraph)) => validate_grpprl(
-                paragraph,
-                1,
-                Some(SPRM_P_CNF),
-                "revision-marked paragraph-style UpxPapxRM",
-            )?,
+            (StyleKind::Paragraph, Some(paragraph)) => {
+                crate::doc::parts::styles::validate_paragraph_style_sprms(paragraph, index, false)
+                    .map_err(|error| invalid(error.to_string()))?;
+            },
             (StyleKind::Character, None) => {},
             (StyleKind::Paragraph, None) => {
                 return Err(invalid(
@@ -324,12 +308,11 @@ fn validate_style(style: &DocStyleDefinition, index: u16) -> Result<(), StyleWri
             },
             (StyleKind::Table | StyleKind::Numbering, _) => unreachable!(),
         }
-        validate_grpprl(
+        crate::doc::parts::styles::validate_character_style_sprms(
             &revision.character_properties,
-            2,
-            Some(SPRM_C_CNF),
-            "revision-marked style UpxChpxRM",
-        )?;
+            false,
+        )
+        .map_err(|error| invalid(error.to_string()))?;
     }
     debug_assert_eq!(
         expected,
@@ -533,7 +516,7 @@ mod tests {
         TableConditionalFormatting, TableStyleCondition, TableStyleDefaults,
     };
     use crate::doc::writer::tap::generate_table_style_sprms_with_conditionals;
-    use crate::sprm_operations::{SPRM_C_F_BOLD, SPRM_P_F_KEEP};
+    use crate::sprm_operations::{SPRM_C_CNF, SPRM_C_F_BOLD, SPRM_P_CNF, SPRM_P_F_KEEP};
 
     fn conditional(opcode: u16, condition: u16, nested: &[u8]) -> Vec<u8> {
         let mut bytes = opcode.to_le_bytes().to_vec();
