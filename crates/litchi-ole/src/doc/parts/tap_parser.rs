@@ -52,6 +52,13 @@ enum CellBoolProperty {
     HideMark,
 }
 
+#[derive(Debug, Clone, Copy)]
+enum WidthUsage {
+    Table,
+    TablePart,
+    Indent,
+}
+
 impl<'arena> TapParser<'arena> {
     /// Create a new TAP parser with an arena allocator.
     ///
@@ -92,6 +99,8 @@ impl<'arena> TapParser<'arena> {
                 self.apply_sprm_to_tap(&mut tap, &sprm, grpprl)?;
             }
         }
+
+        Self::validate_preferred_indent(&tap)?;
 
         Ok(tap)
     }
@@ -137,6 +146,77 @@ impl<'arena> TapParser<'arena> {
             )));
         }
         Ok(operand[0] != 0)
+    }
+
+    fn parse_fts_width(sprm: &Sprm, usage: WidthUsage) -> Result<Option<TableWidth>> {
+        let operand = sprm.operand_bytes();
+        if operand.len() != 3 {
+            return Err(DocError::Corrupted(
+                "DOC preferred-width operand must contain 3 bytes".to_string(),
+            ));
+        }
+        let raw_value = binary_to_doc_result(read_u16_le(operand, 1))?;
+        let signed_value = i16::from_le_bytes([operand[1], operand[2]]);
+        let invalid = || {
+            DocError::Corrupted(
+                "DOC preferred-width operand has invalid units or value".to_string(),
+            )
+        };
+        Ok(match (usage, operand[0]) {
+            (WidthUsage::Table | WidthUsage::Indent, 0) if raw_value == 0 => None,
+            (WidthUsage::TablePart, 0) => None,
+            (_, 1) if raw_value == 0 => Some(TableWidth {
+                value: 0,
+                width_type: WidthType::Auto,
+            }),
+            (WidthUsage::Table, 2) if raw_value <= 30_000 => Some(TableWidth {
+                value: raw_value as i16,
+                width_type: WidthType::Percentage,
+            }),
+            (WidthUsage::TablePart, 2) if raw_value <= 5_000 => Some(TableWidth {
+                value: raw_value as i16,
+                width_type: WidthType::Percentage,
+            }),
+            (WidthUsage::Table | WidthUsage::TablePart, 3) if raw_value <= 31_680 => {
+                Some(TableWidth {
+                    value: raw_value as i16,
+                    width_type: WidthType::Twips,
+                })
+            },
+            (WidthUsage::Indent, 3) if (-31_560..=31_680).contains(&signed_value) => {
+                Some(TableWidth {
+                    value: signed_value,
+                    width_type: WidthType::Twips,
+                })
+            },
+            _ => return Err(invalid()),
+        })
+    }
+
+    fn validate_preferred_indent(tap: &TableProperties) -> Result<()> {
+        let Some(TableWidth {
+            value: indent,
+            width_type: WidthType::Twips,
+        }) = tap.preferred_indent
+        else {
+            return Ok(());
+        };
+        let table_width = match tap.preferred_width {
+            Some(TableWidth {
+                value,
+                width_type: WidthType::Twips,
+            }) => i32::from(value),
+            _ => {
+                i32::from(tap.cell_boundaries.last().copied().unwrap_or(0))
+                    - i32::from(tap.cell_boundaries.first().copied().unwrap_or(0))
+            },
+        };
+        if i32::from(indent) + table_width > 31_680 {
+            return Err(DocError::Corrupted(
+                "DOC preferred table indent places the right edge beyond 31680 twips".to_string(),
+            ));
+        }
+        Ok(())
     }
 
     /// Apply a single SPRM to table properties.
@@ -298,7 +378,12 @@ impl<'arena> TapParser<'arena> {
             0x12 => self.parse_full_cell_shading(tap, sprm, 0, false)?,
             // Full-color row border defaults.
             0x13 => self.parse_full_table_borders(tap, sprm)?,
+            0x14 => tap.preferred_width = Self::parse_fts_width(sprm, WidthUsage::Table)?,
+            0x15 => tap.auto_fit = Self::parse_bool8(sprm, "sprmTFAutofit")?,
             0x16 => self.parse_full_cell_shading(tap, sprm, 22, false)?,
+            0x17 => tap.width_before = Self::parse_fts_width(sprm, WidthUsage::TablePart)?,
+            0x18 => tap.width_after = Self::parse_fts_width(sprm, WidthUsage::TablePart)?,
+            0x19 => tap.keep_with_next = Self::parse_bool8(sprm, "sprmTFKeepFollow")?,
             // Per-cell colors for top, left, bottom, and right borders.
             0x1A..=0x1D => self.parse_cell_border_colors(tap, sprm, operation)?,
             // Legacy range border override.
@@ -321,6 +406,7 @@ impl<'arena> TapParser<'arena> {
             0x2F => self.parse_cell_border_range(tap, sprm, true)?,
             // Full-color shading applied to every cell in the table row.
             0x60 => self.parse_full_table_shading(tap, sprm)?,
+            0x61 => tap.preferred_indent = Self::parse_fts_width(sprm, WidthUsage::Indent)?,
             // sprmTCellPadding / sprmTCellPaddingDefault
             0x32 | 0x34 => {
                 self.parse_cell_padding(tap, sprm, grpprl)?;
@@ -1899,6 +1985,109 @@ mod tests {
         reordered.extend_from_slice(&table_definition_grpprl(&[1, 0, 0, 100, 0]));
         append_fixed_sprm(&mut reordered, 0x9602, &[0, 0]);
         assert!(parser.parse_tap(&reordered).is_err());
+    }
+
+    #[test]
+    fn parses_table_sizing_and_fit_properties() {
+        let arena = Bump::new();
+        let parser = TapParser::new(&arena);
+        let mut grpprl = table_definition_grpprl(&[2, 0, 0, 232, 3, 208, 7]);
+        append_fixed_sprm(&mut grpprl, 0xF614, &[2, 0x30, 0x75]);
+        append_fixed_sprm(&mut grpprl, 0x3615, &[1]);
+        append_fixed_sprm(&mut grpprl, 0xF617, &[2, 0x88, 0x13]);
+        append_fixed_sprm(&mut grpprl, 0xF618, &[3, 200, 0]);
+        append_fixed_sprm(&mut grpprl, 0x3619, &[1]);
+        append_fixed_sprm(&mut grpprl, 0xF661, &[3, 0x9C, 0xFF]);
+
+        let tap = parser.parse_tap(&grpprl).unwrap();
+        assert_eq!(
+            tap.preferred_width,
+            Some(TableWidth {
+                value: 30_000,
+                width_type: WidthType::Percentage,
+            })
+        );
+        assert!(tap.auto_fit);
+        assert_eq!(
+            tap.width_before,
+            Some(TableWidth {
+                value: 5_000,
+                width_type: WidthType::Percentage,
+            })
+        );
+        assert_eq!(
+            tap.width_after,
+            Some(TableWidth {
+                value: 200,
+                width_type: WidthType::Twips,
+            })
+        );
+        assert_eq!(
+            tap.preferred_indent,
+            Some(TableWidth {
+                value: -100,
+                width_type: WidthType::Twips,
+            })
+        );
+        assert!(tap.keep_with_next);
+
+        append_fixed_sprm(&mut grpprl, 0xF614, &[0, 0, 0]);
+        append_fixed_sprm(&mut grpprl, 0x3615, &[0]);
+        append_fixed_sprm(&mut grpprl, 0xF617, &[0, 0xFF, 0xFF]);
+        append_fixed_sprm(&mut grpprl, 0x3619, &[0]);
+        append_fixed_sprm(&mut grpprl, 0xF661, &[1, 0, 0]);
+        let tap = parser.parse_tap(&grpprl).unwrap();
+        assert!(tap.preferred_width.is_none());
+        assert!(!tap.auto_fit);
+        assert!(tap.width_before.is_none());
+        assert!(!tap.keep_with_next);
+        assert_eq!(
+            tap.preferred_indent,
+            Some(TableWidth {
+                value: 0,
+                width_type: WidthType::Auto,
+            })
+        );
+    }
+
+    #[test]
+    fn rejects_malformed_table_sizing_and_fit_properties() {
+        let arena = Bump::new();
+        let parser = TapParser::new(&arena);
+        let parse_with = |opcode, operand: &[u8]| {
+            let mut grpprl = table_definition_grpprl(&[1, 0, 0, 232, 3]);
+            append_fixed_sprm(&mut grpprl, opcode, operand);
+            parser.parse_tap(&grpprl)
+        };
+
+        for operand in [
+            [0, 1, 0],
+            [1, 1, 0],
+            [2, 0x31, 0x75],
+            [3, 0xC1, 0x7B],
+            [0x13, 0, 0],
+        ] {
+            assert!(parse_with(0xF614, &operand).is_err());
+        }
+        for operand in [[1, 1, 0], [2, 0x89, 0x13], [3, 0xC1, 0x7B], [0x13, 0, 0]] {
+            assert!(parse_with(0xF617, &operand).is_err());
+        }
+        for operand in [
+            [0, 1, 0],
+            [1, 1, 0],
+            [2, 0, 0],
+            [3, 0xB7, 0x84],
+            [0x13, 0, 0],
+        ] {
+            assert!(parse_with(0xF661, &operand).is_err());
+        }
+        assert!(parse_with(0x3615, &[2]).is_err());
+        assert!(parse_with(0x3619, &[2]).is_err());
+
+        let mut beyond_right_edge = table_definition_grpprl(&[1, 0, 0, 232, 3]);
+        append_fixed_sprm(&mut beyond_right_edge, 0xF661, &[3, 0xF8, 0x77]);
+        append_fixed_sprm(&mut beyond_right_edge, 0xF614, &[3, 0xE8, 0x03]);
+        assert!(parser.parse_tap(&beyond_right_edge).is_err());
     }
 
     #[test]

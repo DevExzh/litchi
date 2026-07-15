@@ -77,6 +77,12 @@ impl SprmBuilder {
         self.sprms.extend_from_slice(&value.to_le_bytes());
     }
 
+    /// Add a three-byte SPRM operand.
+    pub fn add_three_byte(&mut self, code: u16, value: [u8; 3]) {
+        self.sprms.extend_from_slice(&code.to_le_bytes());
+        self.sprms.extend_from_slice(&value);
+    }
+
     /// Add a signed word SPRM
     pub fn add_signed_word(&mut self, code: u16, value: i16) {
         self.sprms.extend_from_slice(&code.to_le_bytes());

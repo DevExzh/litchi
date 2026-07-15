@@ -1788,10 +1788,7 @@ impl DocWriter {
                 cells: Vec::new(),
                 formatting: super::tap::TableRow {
                     cells: Vec::with_capacity(cols),
-                    height: 0,
-                    is_header: false,
-                    allow_break: true,
-                    borders: super::tap::TableBorders::default(),
+                    ..super::tap::TableRow::default()
                 },
             };
             for _ in 0..cols {
@@ -3785,6 +3782,7 @@ mod tests {
                         }),
                         ..crate::doc::writer::TableBorders::default()
                     },
+                    ..crate::doc::writer::TableRow::default()
                 },
             )
             .unwrap();
@@ -3808,9 +3806,8 @@ mod tests {
                         },
                     ],
                     height: -480,
-                    is_header: false,
                     allow_break: false,
-                    borders: crate::doc::writer::TableBorders::default(),
+                    ..crate::doc::writer::TableRow::default()
                 },
             )
             .unwrap();
@@ -4875,10 +4872,7 @@ mod tests {
                 merged: false,
                 ..crate::doc::writer::TableCell::default()
             }],
-            height: 0,
-            is_header: false,
-            allow_break: true,
-            borders: crate::doc::writer::TableBorders::default(),
+            ..crate::doc::writer::TableRow::default()
         };
         assert!(writer.set_table_row_formatting(table, 0, one_cell).is_err());
 
@@ -4895,10 +4889,7 @@ mod tests {
                     ..crate::doc::writer::TableCell::default()
                 },
             ],
-            height: 0,
-            is_header: false,
-            allow_break: true,
-            borders: crate::doc::writer::TableBorders::default(),
+            ..crate::doc::writer::TableRow::default()
         };
         assert!(
             writer
@@ -4919,10 +4910,8 @@ mod tests {
                     ..crate::doc::writer::TableCell::default()
                 },
             ],
-            height: 0,
             is_header: true,
-            allow_break: true,
-            borders: crate::doc::writer::TableBorders::default(),
+            ..crate::doc::writer::TableRow::default()
         };
         writer
             .set_table_row_formatting(table, 1, late_header)
@@ -4941,10 +4930,7 @@ mod tests {
                         vertical_merge: crate::doc::parts::tap::VerticalMergeStatus::Merged,
                         ..crate::doc::writer::TableCell::default()
                     }],
-                    height: 0,
-                    is_header: false,
-                    allow_break: true,
-                    borders: crate::doc::writer::TableBorders::default(),
+                    ..crate::doc::writer::TableRow::default()
                 },
             )
             .unwrap();

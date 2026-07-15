@@ -27,6 +27,16 @@ pub struct TableProperties {
     pub indent_left: i16,
     /// Preferred table width
     pub preferred_width: Option<TableWidth>,
+    /// Automatically resize columns to fit table contents
+    pub auto_fit: bool,
+    /// Preferred leading space before the first cell
+    pub width_before: Option<TableWidth>,
+    /// Preferred trailing space after the last cell
+    pub width_after: Option<TableWidth>,
+    /// Preferred leading indentation of the table
+    pub preferred_indent: Option<TableWidth>,
+    /// Avoid a page break between this row and the following row
+    pub keep_with_next: bool,
     /// Row height in twips (positive = at least, negative = exact)
     pub row_height: Option<i16>,
     /// Row is header row
@@ -278,7 +288,7 @@ pub enum TextDirection {
 }
 
 /// Table or cell width specification.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TableWidth {
     /// Width value
     pub value: i16,
@@ -368,6 +378,11 @@ impl Default for TableProperties {
             gap_half: 0,
             indent_left: 0,
             preferred_width: None,
+            auto_fit: false,
+            width_before: None,
+            width_after: None,
+            preferred_indent: None,
+            keep_with_next: false,
             row_height: None,
             is_header_row: false,
             allow_row_break: true,

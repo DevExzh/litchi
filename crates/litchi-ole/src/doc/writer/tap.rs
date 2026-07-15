@@ -6,8 +6,8 @@
 
 use super::sprm::SprmBuilder;
 use crate::doc::parts::tap::{
-    BorderStyle, BorderType, CellBorders, CellShading, TextDirection, VerticalAlignment,
-    VerticalMergeStatus,
+    BorderStyle, BorderType, CellBorders, CellShading, TableWidth, TextDirection,
+    VerticalAlignment, VerticalMergeStatus, WidthType,
 };
 
 /// Error returned when table row properties cannot be represented in DOC TAP.
@@ -27,6 +27,8 @@ pub enum TapBuildError {
     InvalidBorderSpacing(u8),
     /// DOC cell padding cannot exceed 22 inches.
     InvalidCellPadding(u16),
+    /// A preferred-width property uses unsupported units or a value outside its context's range.
+    InvalidPreferredWidth(&'static str, TableWidth),
 }
 
 impl std::fmt::Display for TapBuildError {
@@ -56,6 +58,9 @@ impl std::fmt::Display for TapBuildError {
             },
             Self::InvalidCellPadding(padding) => {
                 write!(f, "DOC cell padding {padding} exceeds 31680 twips")
+            },
+            Self::InvalidPreferredWidth(property, width) => {
+                write!(f, "DOC {property} has an invalid preferred width {width:?}")
             },
         }
     }
@@ -116,6 +121,18 @@ pub struct TableRow {
     pub is_header: bool,
     /// Whether the row may split across page breaks
     pub allow_break: bool,
+    /// Preferred total table width
+    pub preferred_width: Option<TableWidth>,
+    /// Automatically resize columns to fit table contents
+    pub auto_fit: bool,
+    /// Preferred leading width before the first cell
+    pub width_before: Option<TableWidth>,
+    /// Preferred trailing width after the last cell
+    pub width_after: Option<TableWidth>,
+    /// Preferred leading indentation of the table
+    pub preferred_indent: Option<TableWidth>,
+    /// Avoid a page break between this row and the next row
+    pub keep_with_next: bool,
     /// Default outer and inside borders for this row
     pub borders: TableBorders,
 }
@@ -127,9 +144,64 @@ impl Default for TableRow {
             height: 0,
             is_header: false,
             allow_break: true,
+            preferred_width: None,
+            auto_fit: false,
+            width_before: None,
+            width_after: None,
+            preferred_indent: None,
+            keep_with_next: false,
             borders: TableBorders::default(),
         }
     }
+}
+
+#[derive(Debug, Clone, Copy)]
+enum PreferredWidthUsage {
+    Table,
+    TablePart,
+    Indent,
+}
+
+fn encode_preferred_width(
+    property: &'static str,
+    width: Option<TableWidth>,
+    usage: PreferredWidthUsage,
+) -> Result<Option<[u8; 3]>, TapBuildError> {
+    let Some(width) = width else {
+        return Ok(None);
+    };
+    let units = match width.width_type {
+        WidthType::Auto if width.value == 0 => 1,
+        WidthType::Percentage
+            if matches!(usage, PreferredWidthUsage::Table)
+                && (0..=30_000).contains(&width.value) =>
+        {
+            2
+        },
+        WidthType::Percentage
+            if matches!(usage, PreferredWidthUsage::TablePart)
+                && (0..=5_000).contains(&width.value) =>
+        {
+            2
+        },
+        WidthType::Twips
+            if matches!(
+                usage,
+                PreferredWidthUsage::Table | PreferredWidthUsage::TablePart
+            ) && (0..=31_680).contains(&width.value) =>
+        {
+            3
+        },
+        WidthType::Twips
+            if matches!(usage, PreferredWidthUsage::Indent)
+                && (-31_560..=31_680).contains(&width.value) =>
+        {
+            3
+        },
+        _ => return Err(TapBuildError::InvalidPreferredWidth(property, width)),
+    };
+    let value = width.value.to_le_bytes();
+    Ok(Some([units, value[0], value[1]]))
 }
 
 /// TAP (Table Properties) builder
@@ -211,6 +283,49 @@ pub(crate) fn generate_row_sprms(row: &TableRow) -> Result<Vec<u8>, TapBuildErro
         boundaries.push(boundary as i16);
     }
 
+    let preferred_width = encode_preferred_width(
+        "table width",
+        row.preferred_width,
+        PreferredWidthUsage::Table,
+    )?;
+    let width_before = encode_preferred_width(
+        "leading table-part width",
+        row.width_before,
+        PreferredWidthUsage::TablePart,
+    )?;
+    let width_after = encode_preferred_width(
+        "trailing table-part width",
+        row.width_after,
+        PreferredWidthUsage::TablePart,
+    )?;
+    let preferred_indent = encode_preferred_width(
+        "table indent",
+        row.preferred_indent,
+        PreferredWidthUsage::Indent,
+    )?;
+    if let Some(TableWidth {
+        value: indent,
+        width_type: WidthType::Twips,
+    }) = row.preferred_indent
+    {
+        let layout_width = match row.preferred_width {
+            Some(TableWidth {
+                value,
+                width_type: WidthType::Twips,
+            }) => i32::from(value),
+            _ => boundary as i32,
+        };
+        if i32::from(indent) + layout_width > 31_680 {
+            return Err(TapBuildError::InvalidPreferredWidth(
+                "table indent",
+                TableWidth {
+                    value: indent,
+                    width_type: WidthType::Twips,
+                },
+            ));
+        }
+    }
+
     let mut builder = SprmBuilder::new();
     if !row.allow_break
         || row
@@ -228,6 +343,24 @@ pub(crate) fn generate_row_sprms(row: &TableRow) -> Result<Vec<u8>, TapBuildErro
     }
     if row.height != 0 {
         builder.add_signed_word(0x9407, row.height);
+    }
+    if let Some(width) = preferred_width {
+        builder.add_three_byte(0xF614, width);
+    }
+    if row.auto_fit {
+        builder.add_bool(0x3615, true);
+    }
+    if let Some(width) = width_before {
+        builder.add_three_byte(0xF617, width);
+    }
+    if let Some(width) = width_after {
+        builder.add_three_byte(0xF618, width);
+    }
+    if row.keep_with_next {
+        builder.add_bool(0x3619, true);
+    }
+    if let Some(width) = preferred_indent {
+        builder.add_three_byte(0xF661, width);
     }
     let mut sprms = builder.build();
 
@@ -666,10 +799,7 @@ pub fn create_simple_table(rows: usize, cols: usize, cell_width: u16) -> TapBuil
         ];
         builder.add_row(TableRow {
             cells,
-            height: 0, // Auto height
-            is_header: false,
-            allow_break: true,
-            borders: TableBorders::default(),
+            ..TableRow::default()
         });
     }
 
@@ -744,6 +874,7 @@ mod tests {
                 }),
                 ..TableBorders::default()
             },
+            ..TableRow::default()
         });
 
         let sprms = builder.try_generate_row_sprms(0).unwrap();
@@ -868,14 +999,58 @@ mod tests {
                 ],
                 height: 200 + (i as i16 * 50),
                 is_header: i == 0,
-                allow_break: true,
-                borders: TableBorders::default(),
+                ..TableRow::default()
             });
         }
 
         assert_eq!(builder.row_count(), 5);
         let sprms = builder.generate_row_sprms(0);
         assert!(!sprms.is_empty());
+    }
+
+    #[test]
+    fn round_trips_table_sizing_and_fit_properties() {
+        let mut builder = TapBuilder::new();
+        builder.add_row(TableRow {
+            cells: vec![
+                TableCell {
+                    width: 1000,
+                    ..TableCell::default()
+                },
+                TableCell {
+                    width: 1000,
+                    ..TableCell::default()
+                },
+            ],
+            preferred_width: Some(TableWidth {
+                value: 7_500,
+                width_type: WidthType::Percentage,
+            }),
+            auto_fit: true,
+            width_before: Some(TableWidth {
+                value: 250,
+                width_type: WidthType::Percentage,
+            }),
+            width_after: Some(TableWidth {
+                value: 400,
+                width_type: WidthType::Twips,
+            }),
+            preferred_indent: Some(TableWidth {
+                value: -120,
+                width_type: WidthType::Twips,
+            }),
+            keep_with_next: true,
+            ..TableRow::default()
+        });
+
+        let sprms = builder.try_generate_row_sprms(0).unwrap();
+        let tap = crate::doc::parts::tap::TableProperties::from_sprm(&sprms).unwrap();
+        assert_eq!(tap.preferred_width, builder.rows()[0].preferred_width);
+        assert!(tap.auto_fit);
+        assert_eq!(tap.width_before, builder.rows()[0].width_before);
+        assert_eq!(tap.width_after, builder.rows()[0].width_after);
+        assert_eq!(tap.preferred_indent, builder.rows()[0].preferred_indent);
+        assert!(tap.keep_with_next);
     }
 
     #[test]
@@ -913,10 +1088,7 @@ mod tests {
                 merged: true,
                 ..TableCell::default()
             }],
-            height: 0,
-            is_header: false,
-            allow_break: true,
-            borders: TableBorders::default(),
+            ..TableRow::default()
         });
         assert_eq!(
             builder.try_generate_row_sprms(0),
@@ -930,10 +1102,7 @@ mod tests {
                 merged: false,
                 ..TableCell::default()
             }],
-            height: 0,
-            is_header: false,
-            allow_break: true,
-            borders: TableBorders::default(),
+            ..TableRow::default()
         });
         assert_eq!(
             builder.try_generate_row_sprms(0),
@@ -952,6 +1121,52 @@ mod tests {
         assert_eq!(
             builder.try_generate_row_sprms(0),
             Err(TapBuildError::InvalidRowHeight(i16::MIN))
+        );
+
+        let invalid_width = TableWidth {
+            value: 30_001,
+            width_type: WidthType::Percentage,
+        };
+        let mut builder = TapBuilder::new();
+        builder.add_row(TableRow {
+            cells: vec![TableCell {
+                width: 1000,
+                ..TableCell::default()
+            }],
+            preferred_width: Some(invalid_width),
+            ..TableRow::default()
+        });
+        assert_eq!(
+            builder.try_generate_row_sprms(0),
+            Err(TapBuildError::InvalidPreferredWidth(
+                "table width",
+                invalid_width
+            ))
+        );
+
+        let invalid_indent = TableWidth {
+            value: 31_000,
+            width_type: WidthType::Twips,
+        };
+        let mut builder = TapBuilder::new();
+        builder.add_row(TableRow {
+            cells: vec![TableCell {
+                width: 1000,
+                ..TableCell::default()
+            }],
+            preferred_width: Some(TableWidth {
+                value: 1_000,
+                width_type: WidthType::Twips,
+            }),
+            preferred_indent: Some(invalid_indent),
+            ..TableRow::default()
+        });
+        assert_eq!(
+            builder.try_generate_row_sprms(0),
+            Err(TapBuildError::InvalidPreferredWidth(
+                "table indent",
+                invalid_indent
+            ))
         );
 
         let mut builder = TapBuilder::new();
