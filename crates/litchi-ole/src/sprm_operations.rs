@@ -625,206 +625,206 @@ pub const SPRM_P_TTWO: u16 = 0x2471;
 // TAP (Table Properties) SPRM opcodes
 // Based on Apache POI's TableProperties and TableSprmUncompressor
 
-/// sprmTJc - Table justification (operation 0x00)
-pub const SPRM_T_JC: u16 = 0x5400;
+/// sprmTJc - Logical table justification (operation 0x8A)
+pub const SPRM_T_JC: u16 = 0x548A;
 
 /// sprmTIstd - Table style (operation 0x01)
-pub const SPRM_T_ISTD: u16 = 0x5401; // Note: Size code should be 3 (4-byte)
+pub const SPRM_T_ISTD: u16 = 0x563A;
 
 /// sprmTDxaLeft - Table left position (operation 0x02)
-pub const SPRM_T_DXA_LEFT: u16 = 0x9602;
+pub const SPRM_T_DXA_LEFT: u16 = 0x9601;
 
 /// sprmTDxaGapHalf - Half gap between cells (operation 0x03)
-pub const SPRM_T_DXA_GAP_HALF: u16 = 0x9603;
+pub const SPRM_T_DXA_GAP_HALF: u16 = 0x9602;
 
 /// sprmTFCantSplit - Table row cannot split (operation 0x04)
-pub const SPRM_T_F_CANT_SPLIT: u16 = 0x3404;
+pub const SPRM_T_F_CANT_SPLIT: u16 = 0x3666;
 
 /// sprmTTableHeader - Table header row (operation 0x05)
-pub const SPRM_T_TABLE_HEADER: u16 = 0x3405;
+pub const SPRM_T_TABLE_HEADER: u16 = 0x3404;
 
 /// sprmTTableBorders - Table borders (Word 6.0) (operation 0x06)
-pub const SPRM_T_TABLE_BORDERS: u16 = 0xD606;
+pub const SPRM_T_TABLE_BORDERS: u16 = 0xD613;
 
 /// sprmTDefTable10 - Table definition (Word 6.0) (operation 0x07)
 pub const SPRM_T_DEF_TABLE10: u16 = 0xD607;
 
 /// sprmTDyaRowHeight - Row height (operation 0x08)
-pub const SPRM_T_DYA_ROW_HEIGHT: u16 = 0x9608;
+pub const SPRM_T_DYA_ROW_HEIGHT: u16 = 0x9407;
 
 /// sprmTDefTable - Table definition (operation 0x09) (LONG SPRM)
 pub const SPRM_T_DEF_TABLE: u16 = 0xD608;
 
 /// sprmTDefTableShd - Table shading (operation 0x0A)
-pub const SPRM_T_DEF_TABLE_SHD: u16 = 0xD60A;
+pub const SPRM_T_DEF_TABLE_SHD: u16 = 0xD612;
 
 /// sprmTTlp - Table layout (operation 0x0B)
-pub const SPRM_T_TLP: u16 = 0x740B;
+pub const SPRM_T_TLP: u16 = 0x740A;
 
 /// sprmTFBiDi - Bi-directional table (operation 0x0C)
-pub const SPRM_T_F_BI_DI: u16 = 0x560C;
+pub const SPRM_T_F_BI_DI: u16 = 0x560B;
 
 /// sprmTHTMLProps - HTML properties (operation 0x0D)
 pub const SPRM_T_HTML_PROPS: u16 = 0x740D;
 
 /// sprmTSetBrc - Set cell borders (operation 0x0E)
-pub const SPRM_T_SET_BRC: u16 = 0xD60E;
+pub const SPRM_T_SET_BRC: u16 = 0xD62F;
 
 /// sprmTInsert - Insert cells (operation 0x0F)
-pub const SPRM_T_INSERT: u16 = 0x760F;
+pub const SPRM_T_INSERT: u16 = 0x7621;
 
 /// sprmTDelete - Delete cells (operation 0x10)
-pub const SPRM_T_DELETE: u16 = 0x5610;
+pub const SPRM_T_DELETE: u16 = 0x5622;
 
 /// sprmTDxaCol - Column width (operation 0x11)
-pub const SPRM_T_DXA_COL: u16 = 0x7611;
+pub const SPRM_T_DXA_COL: u16 = 0x7623;
 
 /// sprmTMerge - Merge cells (operation 0x12)
-pub const SPRM_T_MERGE: u16 = 0x5612;
+pub const SPRM_T_MERGE: u16 = 0x5624;
 
 /// sprmTSplit - Split cells (operation 0x13)
-pub const SPRM_T_SPLIT: u16 = 0x5613;
+pub const SPRM_T_SPLIT: u16 = 0x5625;
 
 /// sprmTSetBrc10 - Set borders (Word 6.0) (operation 0x14)
 pub const SPRM_T_SET_BRC10: u16 = 0xD614;
 
 /// sprmTSetShd - Set shading (operation 0x15) (LONG SPRM in some cases)
-pub const SPRM_T_SET_SHD: u16 = 0xD615;
+pub const SPRM_T_SET_SHD: u16 = 0xD62D;
 
 /// sprmTSetShdOdd - Set shading odd (operation 0x16)
-pub const SPRM_T_SET_SHD_ODD: u16 = 0xD616;
+pub const SPRM_T_SET_SHD_ODD: u16 = 0xD62E;
 
 /// sprmTTextFlow - Text flow direction (operation 0x17)
-pub const SPRM_T_TEXT_FLOW: u16 = 0x7617;
+pub const SPRM_T_TEXT_FLOW: u16 = 0x7629;
 
 /// sprmTDiagLine - Diagonal line (operation 0x18) - Not used
 pub const SPRM_T_DIAG_LINE: u16 = 0xD618;
 
 /// sprmTVertMerge - Vertical merge (operation 0x19)
-pub const SPRM_T_VERT_MERGE: u16 = 0xD619;
+pub const SPRM_T_VERT_MERGE: u16 = 0xD62B;
 
 /// sprmTVertAlign - Vertical alignment (operation 0x1A)
-pub const SPRM_T_VERT_ALIGN: u16 = 0xD61A;
+pub const SPRM_T_VERT_ALIGN: u16 = 0xD62C;
 
 /// sprmTCellPadding - Cell padding (operation 0x1B)
-pub const SPRM_T_CELL_PADDING: u16 = 0xD61B;
+pub const SPRM_T_CELL_PADDING: u16 = 0xD632;
 
 /// sprmTCellSpacingDefault - Default cell spacing (operation 0x1C)
-pub const SPRM_T_CELL_SPACING_DEFAULT: u16 = 0xD61C;
+pub const SPRM_T_CELL_SPACING_DEFAULT: u16 = 0xD633;
 
 /// sprmTCellPaddingDefault - Default cell padding (operation 0x1D)
-pub const SPRM_T_CELL_PADDING_DEFAULT: u16 = 0xD61D;
+pub const SPRM_T_CELL_PADDING_DEFAULT: u16 = 0xD634;
 
 /// sprmTCellWidth - Cell width (operation 0x1E)
-pub const SPRM_T_CELL_WIDTH: u16 = 0xD61E;
+pub const SPRM_T_CELL_WIDTH: u16 = 0xD635;
 
 /// sprmTFitText - Fit text (operation 0x1F)
-pub const SPRM_T_FIT_TEXT: u16 = 0xF61F;
+pub const SPRM_T_FIT_TEXT: u16 = 0xF636;
 
 /// sprmTFCellNoWrap - Cell no wrap (operation 0x20)
-pub const SPRM_T_F_CELL_NO_WRAP: u16 = 0xD620;
+pub const SPRM_T_F_CELL_NO_WRAP: u16 = 0xD639;
 
 /// sprmTIstdPermute - Table style permutation (operation 0x21)
 pub const SPRM_T_ISTD_PERMUTE: u16 = 0xD621;
 
 /// sprmTCellPaddingStyle - Cell padding style (operation 0x22)
-pub const SPRM_T_CELL_PADDING_STYLE: u16 = 0xD622;
+pub const SPRM_T_CELL_PADDING_STYLE: u16 = 0xD63E;
 
 /// sprmTCellFHideMark - Hide end of cell mark (operation 0x23)
-pub const SPRM_T_CELL_F_HIDE_MARK: u16 = 0xD623;
+pub const SPRM_T_CELL_F_HIDE_MARK: u16 = 0xD642;
 
 /// sprmTSetShdTable - Set table shading (operation 0x24)
-pub const SPRM_T_SET_SHD_TABLE: u16 = 0xD624;
+pub const SPRM_T_SET_SHD_TABLE: u16 = 0xD660;
 
 /// sprmTWidthBefore - Width before table (operation 0x25)
-pub const SPRM_T_WIDTH_BEFORE: u16 = 0xF625;
+pub const SPRM_T_WIDTH_BEFORE: u16 = 0xF617;
 
 /// sprmTWidthAfter - Width after table (operation 0x26)
-pub const SPRM_T_WIDTH_AFTER: u16 = 0xF626;
+pub const SPRM_T_WIDTH_AFTER: u16 = 0xF618;
 
 /// sprmTFBiDi90 - Bi-directional v90 (operation 0x27)
-pub const SPRM_T_F_BI_DI90: u16 = 0x3427;
+pub const SPRM_T_F_BI_DI90: u16 = 0x5664;
 
 /// sprmTFNoAllowOverlap - No allow overlap (operation 0x28)
-pub const SPRM_T_F_NO_ALLOW_OVERLAP: u16 = 0x3428;
+pub const SPRM_T_F_NO_ALLOW_OVERLAP: u16 = 0x3465;
 
 /// sprmTFCantOverlap - Cannot overlap (operation 0x29)
 pub const SPRM_T_F_CANT_OVERLAP: u16 = 0x3429;
 
 /// sprmTIpgp - Page number (operation 0x2A)
-pub const SPRM_T_IPGP: u16 = 0x742A;
+pub const SPRM_T_IPGP: u16 = 0x7469;
 
 /// sprmTCnf - Conditional formatting (operation 0x2B)
-pub const SPRM_T_CNF: u16 = 0xD62B;
+pub const SPRM_T_CNF: u16 = 0xD66A;
 
 /// sprmTDefTableShd80 - Table shading v80 (operation 0x2C)
-pub const SPRM_T_DEF_TABLE_SHD80: u16 = 0xD62C;
+pub const SPRM_T_DEF_TABLE_SHD80: u16 = 0xD609;
 
 /// sprmTDefTableShd2nd - Table shading 2nd (operation 0x2D)
-pub const SPRM_T_DEF_TABLE_SHD2ND: u16 = 0xD62D;
+pub const SPRM_T_DEF_TABLE_SHD2ND: u16 = 0xD616;
 
 /// sprmTDefTableShd3rd - Table shading 3rd (operation 0x2E)
-pub const SPRM_T_DEF_TABLE_SHD3RD: u16 = 0xD62E;
+pub const SPRM_T_DEF_TABLE_SHD3RD: u16 = 0xD60C;
 
 /// sprmTCellBrcType - Cell border type (operation 0x2F)
-pub const SPRM_T_CELL_BRC_TYPE: u16 = 0xD62F;
+pub const SPRM_T_CELL_BRC_TYPE: u16 = 0xD662;
 
 /// sprmTFAutofit - Autofit table (operation 0x30)
-pub const SPRM_T_F_AUTOFIT: u16 = 0x3430;
+pub const SPRM_T_F_AUTOFIT: u16 = 0x3615;
 
 /// sprmTDefTableShd - Table shading (operation 0x31)
-pub const SPRM_T_DEF_TABLE_SHD_RAW: u16 = 0xD631;
+pub const SPRM_T_DEF_TABLE_SHD_RAW: u16 = 0xD670;
 
 /// sprmTDefTableShd2ndRaw - Table shading 2nd raw (operation 0x32)
-pub const SPRM_T_DEF_TABLE_SHD2ND_RAW: u16 = 0xD632;
+pub const SPRM_T_DEF_TABLE_SHD2ND_RAW: u16 = 0xD671;
 
 /// sprmTDefTableShd3rdRaw - Table shading 3rd raw (operation 0x33)
-pub const SPRM_T_DEF_TABLE_SHD3RD_RAW: u16 = 0xD633;
+pub const SPRM_T_DEF_TABLE_SHD3RD_RAW: u16 = 0xD672;
 
 /// sprmTRsid - Revision save ID (operation 0x34)
-pub const SPRM_T_RSID: u16 = 0x7434;
+pub const SPRM_T_RSID: u16 = 0x7479;
 
 /// sprmTCellVertAlignStyle - Cell vertical alignment style (operation 0x35)
-pub const SPRM_T_CELL_VERT_ALIGN_STYLE: u16 = 0xD635;
+pub const SPRM_T_CELL_VERT_ALIGN_STYLE: u16 = 0x347C;
 
 /// sprmTCellNoWrapStyle - Cell no wrap style (operation 0x36)
-pub const SPRM_T_CELL_NO_WRAP_STYLE: u16 = 0xD636;
+pub const SPRM_T_CELL_NO_WRAP_STYLE: u16 = 0x347D;
 
 /// sprmTCellBrcTopStyle - Cell top border style (operation 0x37)
-pub const SPRM_T_CELL_BRC_TOP_STYLE: u16 = 0xD637;
+pub const SPRM_T_CELL_BRC_TOP_STYLE: u16 = 0xD47F;
 
 /// sprmTCellBrcBottomStyle - Cell bottom border style (operation 0x38)
-pub const SPRM_T_CELL_BRC_BOTTOM_STYLE: u16 = 0xD638;
+pub const SPRM_T_CELL_BRC_BOTTOM_STYLE: u16 = 0xD680;
 
 /// sprmTCellBrcLeftStyle - Cell left border style (operation 0x39)
-pub const SPRM_T_CELL_BRC_LEFT_STYLE: u16 = 0xD639;
+pub const SPRM_T_CELL_BRC_LEFT_STYLE: u16 = 0xD681;
 
 /// sprmTCellBrcRightStyle - Cell right border style (operation 0x3A)
-pub const SPRM_T_CELL_BRC_RIGHT_STYLE: u16 = 0xD63A;
+pub const SPRM_T_CELL_BRC_RIGHT_STYLE: u16 = 0xD682;
 
 /// sprmTCellBrcInsideHStyle - Cell inside horizontal border style (operation 0x3B)
-pub const SPRM_T_CELL_BRC_INSIDE_H_STYLE: u16 = 0xD63B;
+pub const SPRM_T_CELL_BRC_INSIDE_H_STYLE: u16 = 0xD683;
 
 /// sprmTCellBrcInsideVStyle - Cell inside vertical border style (operation 0x3C)
-pub const SPRM_T_CELL_BRC_INSIDE_V_STYLE: u16 = 0xD63C;
+pub const SPRM_T_CELL_BRC_INSIDE_V_STYLE: u16 = 0xD684;
 
 /// sprmTCellBrcTL2BRStyle - Cell top-left to bottom-right border style (operation 0x3D)
-pub const SPRM_T_CELL_BRC_TL2BR_STYLE: u16 = 0xD63D;
+pub const SPRM_T_CELL_BRC_TL2BR_STYLE: u16 = 0xD685;
 
 /// sprmTCellBrcTR2BLStyle - Cell top-right to bottom-left border style (operation 0x3E)
-pub const SPRM_T_CELL_BRC_TR2BL_STYLE: u16 = 0xD63E;
+pub const SPRM_T_CELL_BRC_TR2BL_STYLE: u16 = 0xD686;
 
 /// sprmTCellShdStyle - Cell shading style (operation 0x3F)
-pub const SPRM_T_CELL_SHD_STYLE: u16 = 0xD63F;
+pub const SPRM_T_CELL_SHD_STYLE: u16 = 0xD687;
 
 /// sprmTCHorzBands - Horizontal banded columns (operation 0x40)
-pub const SPRM_T_C_HORZ_BANDS: u16 = 0x3440;
+pub const SPRM_T_C_HORZ_BANDS: u16 = 0x3488;
 
 /// sprmTCVertBands - Vertical banded rows (operation 0x41)
-pub const SPRM_T_C_VERT_BANDS: u16 = 0x3441;
+pub const SPRM_T_C_VERT_BANDS: u16 = 0x3489;
 
 /// sprmTJc90 - Table justification v90 (operation 0x42)
-pub const SPRM_T_JC90: u16 = 0x5442;
+pub const SPRM_T_JC90: u16 = 0x5400;
 
 // SEP (Section Properties) SPRM opcodes (partial list for completeness)
 // Based on Apache POI's SectionProperties and LibreOffice sprmids.hxx
@@ -905,6 +905,20 @@ mod tests {
         // Bits: 0101 0100 0000 0000
         // Type (bits 10-12) = 101 = 5 (TAP)
         assert_eq!(get_sprm_type(SPRM_T_JC), 5);
+    }
+
+    #[test]
+    fn table_sprm_constants_use_canonical_word_2000_opcodes() {
+        assert_eq!(SPRM_T_DXA_LEFT, 0x9601);
+        assert_eq!(SPRM_T_DEF_TABLE, 0xD608);
+        assert_eq!(SPRM_T_TABLE_BORDERS, 0xD613);
+        assert_eq!(SPRM_T_WIDTH_BEFORE, 0xF617);
+        assert_eq!(SPRM_T_ISTD, 0x563A);
+        assert_eq!(SPRM_T_CNF, 0xD66A);
+        assert_eq!(SPRM_T_CELL_PADDING_STYLE, 0xD63E);
+        assert_eq!(SPRM_T_CELL_BRC_TOP_STYLE, 0xD47F);
+        assert_eq!(SPRM_T_CELL_SHD_STYLE, 0xD687);
+        assert_eq!(SPRM_T_JC, 0x548A);
     }
 
     #[test]

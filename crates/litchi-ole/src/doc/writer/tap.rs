@@ -12,6 +12,13 @@ use crate::doc::parts::tap::{
     TableStyleShading, TableVerticalAnchor, TableVerticalPosition, TableWidth, TextDirection,
     VerticalAlignment, VerticalMergeStatus, WidthType,
 };
+use crate::sprm_operations::{
+    SPRM_T_C_HORZ_BANDS, SPRM_T_C_VERT_BANDS, SPRM_T_CELL_BRC_BOTTOM_STYLE,
+    SPRM_T_CELL_BRC_INSIDE_H_STYLE, SPRM_T_CELL_BRC_INSIDE_V_STYLE, SPRM_T_CELL_BRC_LEFT_STYLE,
+    SPRM_T_CELL_BRC_RIGHT_STYLE, SPRM_T_CELL_BRC_TL2BR_STYLE, SPRM_T_CELL_BRC_TOP_STYLE,
+    SPRM_T_CELL_BRC_TR2BL_STYLE, SPRM_T_CELL_NO_WRAP_STYLE, SPRM_T_CELL_PADDING_STYLE,
+    SPRM_T_CELL_SHD_STYLE, SPRM_T_CELL_VERT_ALIGN_STYLE, SPRM_T_CNF, SPRM_T_ISTD, SPRM_T_JC,
+};
 
 /// Error returned when table row properties cannot be represented in DOC TAP.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -455,7 +462,7 @@ pub fn generate_table_style_sprms_with_conditionals(
         if nested.len() > 253 {
             return Err(TapBuildError::ConditionalPropertiesTooLong(nested.len()));
         }
-        sprms.extend_from_slice(&0xD66Au16.to_le_bytes());
+        sprms.extend_from_slice(&SPRM_T_CNF.to_le_bytes());
         sprms.push((nested.len() + 2) as u8);
         sprms.extend_from_slice(&conditional.condition.code().to_le_bytes());
         sprms.extend_from_slice(&nested);
@@ -518,7 +525,7 @@ fn generate_table_style_properties(
 
     let mut sprms = Vec::with_capacity(padding_groups.len() * 9 + 12);
     for (width, sides) in padding_groups {
-        sprms.extend_from_slice(&0xD63Eu16.to_le_bytes());
+        sprms.extend_from_slice(&SPRM_T_CELL_PADDING_STYLE.to_le_bytes());
         sprms.push(6);
         sprms.extend_from_slice(&[0, 1, sides, 3]);
         sprms.extend_from_slice(&width.to_le_bytes());
@@ -529,22 +536,28 @@ fn generate_table_style_properties(
             VerticalAlignment::Center => 1,
             VerticalAlignment::Bottom => 2,
         };
-        sprms.extend_from_slice(&0x347Cu16.to_le_bytes());
+        sprms.extend_from_slice(&SPRM_T_CELL_VERT_ALIGN_STYLE.to_le_bytes());
         sprms.push(value);
     }
     if let Some(no_wrap) = defaults.no_wrap {
-        sprms.extend_from_slice(&0x347Du16.to_le_bytes());
+        sprms.extend_from_slice(&SPRM_T_CELL_NO_WRAP_STYLE.to_le_bytes());
         sprms.push(u8::from(no_wrap));
     }
     for (opcode, border) in [
-        (0xD47Fu16, defaults.border_top),
-        (0xD680, defaults.border_bottom),
-        (0xD681, defaults.border_left),
-        (0xD682, defaults.border_right),
-        (0xD683, defaults.border_inside_horizontal),
-        (0xD684, defaults.border_inside_vertical),
-        (0xD685, defaults.border_diagonal_down),
-        (0xD686, defaults.border_diagonal_up),
+        (SPRM_T_CELL_BRC_TOP_STYLE, defaults.border_top),
+        (SPRM_T_CELL_BRC_BOTTOM_STYLE, defaults.border_bottom),
+        (SPRM_T_CELL_BRC_LEFT_STYLE, defaults.border_left),
+        (SPRM_T_CELL_BRC_RIGHT_STYLE, defaults.border_right),
+        (
+            SPRM_T_CELL_BRC_INSIDE_H_STYLE,
+            defaults.border_inside_horizontal,
+        ),
+        (
+            SPRM_T_CELL_BRC_INSIDE_V_STYLE,
+            defaults.border_inside_vertical,
+        ),
+        (SPRM_T_CELL_BRC_TL2BR_STYLE, defaults.border_diagonal_down),
+        (SPRM_T_CELL_BRC_TR2BL_STYLE, defaults.border_diagonal_up),
     ] {
         let Some(border) = border else {
             continue;
@@ -561,7 +574,7 @@ fn generate_table_style_properties(
         )?;
     }
     if let Some(shading) = defaults.shading {
-        sprms.extend_from_slice(&0xD687u16.to_le_bytes());
+        sprms.extend_from_slice(&SPRM_T_CELL_SHD_STYLE.to_le_bytes());
         sprms.push(10);
         match shading {
             TableStyleShading::NoShading => append_shading(&mut sprms, None, true),
@@ -571,11 +584,11 @@ fn generate_table_style_properties(
         }
     }
     if let Some(size) = defaults.horizontal_band_size {
-        sprms.extend_from_slice(&0x3488u16.to_le_bytes());
+        sprms.extend_from_slice(&SPRM_T_C_HORZ_BANDS.to_le_bytes());
         sprms.push(size);
     }
     if let Some(size) = defaults.vertical_band_size {
-        sprms.extend_from_slice(&0x3489u16.to_le_bytes());
+        sprms.extend_from_slice(&SPRM_T_C_VERT_BANDS.to_le_bytes());
         sprms.push(size);
     }
     Ok(sprms)
@@ -750,14 +763,14 @@ fn generate_current_row_sprms(row: &TableRow) -> Result<Vec<u8>, TapBuildError> 
     let mut builder = SprmBuilder::new();
     // Apply the style first so later SPRMs remain direct row formatting.
     if let Some(style_index) = row.table_style_index {
-        builder.add_word(0x563A, style_index);
+        builder.add_word(SPRM_T_ISTD, style_index);
     }
     if row.justification != TableJustification::Left || row.right_to_left {
         builder.add_word(
             0x5400,
             justification_code(physical_justification(row.justification, row.right_to_left)),
         );
-        builder.add_word(0x548A, justification_code(row.justification));
+        builder.add_word(SPRM_T_JC, justification_code(row.justification));
     }
     if let Some(positioning) = row.positioning {
         builder.add_byte(0x360D, encode_positioning(positioning));
