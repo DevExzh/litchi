@@ -1887,6 +1887,7 @@ mod model;
 mod row_insert;
 mod sheet_duplicate;
 mod sheet_images;
+mod sheet_shapes;
 mod storage;
 mod table_delete;
 mod table_dimension;
@@ -1900,6 +1901,7 @@ mod text_box_duplicate;
 
 use model::*;
 pub use sheet_images::{NumbersSheetImageInfo, RemovedNumbersSheetImage};
+pub use sheet_shapes::{NumbersSheetShapeInfo, NumbersSheetShapeKind, RemovedNumbersSheetShape};
 use storage::*;
 pub use table_dimension::{NumbersTableDimension, NumbersTableDimensionSize, NumbersTablePoints};
 use table_duplicate::*;

@@ -47,9 +47,10 @@ pub use creation::NumbersDocumentBuilder;
 pub use document::NumbersDocument;
 pub use editor::{
     NumbersCellCommentInfo, NumbersCellCommentReplyInfo, NumbersEditor, NumbersPivotCategoryInfo,
-    NumbersSheetImageInfo, NumbersSheetInfo, NumbersTableDimension, NumbersTableDimensionSize,
-    NumbersTableHeaderCount, NumbersTableHeaderSettings, NumbersTableInfo, NumbersTablePoints,
-    NumbersTableTitleSettings, NumbersTextBoxInfo, RemovedNumbersSheetImage, RemovedNumbersTextBox,
+    NumbersSheetImageInfo, NumbersSheetInfo, NumbersSheetShapeInfo, NumbersSheetShapeKind,
+    NumbersTableDimension, NumbersTableDimensionSize, NumbersTableHeaderCount,
+    NumbersTableHeaderSettings, NumbersTableInfo, NumbersTablePoints, NumbersTableTitleSettings,
+    NumbersTextBoxInfo, RemovedNumbersSheetImage, RemovedNumbersSheetShape, RemovedNumbersTextBox,
 };
 pub use formula::{
     FormulaAxisReference, FormulaBinaryOperator, FormulaCellReference, FormulaExpression,

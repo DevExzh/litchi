@@ -31,15 +31,15 @@ enum TextWrapFit {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct TextBoxObjectIds {
-    drawable: u64,
-    caption: u64,
-    title: u64,
-    storage: u64,
+pub(super) struct TextBoxObjectIds {
+    pub(super) drawable: u64,
+    pub(super) caption: u64,
+    pub(super) title: u64,
+    pub(super) storage: u64,
 }
 
 impl TextBoxObjectIds {
-    fn allocate(first: u64) -> Result<Self> {
+    pub(super) fn allocate(first: u64) -> Result<Self> {
         let identifier = |offset: u64| {
             first
                 .checked_add(offset)
@@ -53,17 +53,17 @@ impl TextBoxObjectIds {
         })
     }
 
-    const fn all(self) -> [u64; 4] {
+    pub(super) const fn all(self) -> [u64; 4] {
         [self.drawable, self.caption, self.title, self.storage]
     }
 
-    const fn last(self) -> u64 {
+    pub(super) const fn last(self) -> u64 {
         self.storage
     }
 }
 
-struct TextBoxThemeStyles {
-    shape: u64,
+pub(super) struct TextBoxThemeStyles {
+    pub(super) shape: u64,
     stylesheet: tsp::Reference,
     paragraph: Option<tsp::Reference>,
     list: Option<tsp::Reference>,
@@ -93,7 +93,7 @@ impl NumbersEditor {
         )?;
         let storage = text_box_storage(text, &styles);
         let ids = TextBoxObjectIds::allocate(next_object_identifier(&self.package)?)?;
-        let objects = text_box_objects(ids, sheet_id, styles.shape, geometry, storage)?;
+        let objects = text_box_objects(ids, sheet_id, styles.shape, geometry, storage, true)?;
 
         let mut staged = self.package.clone();
         staged.update_archive(&archive_name, |archive| {
@@ -160,7 +160,7 @@ fn validate_text_box_geometry(
     .validate()
 }
 
-fn text_box_theme_styles(
+pub(super) fn text_box_theme_styles(
     package: &IWorkPackage,
     theme_id: u64,
     stylesheet_id: u64,
@@ -229,7 +229,7 @@ fn text_box_theme_styles(
     Ok(styles)
 }
 
-fn text_box_storage(text: &str, styles: &TextBoxThemeStyles) -> tswp::StorageArchive {
+pub(super) fn text_box_storage(text: &str, styles: &TextBoxThemeStyles) -> tswp::StorageArchive {
     tswp::StorageArchive {
         style_sheet: Some(styles.stylesheet),
         text: vec![text.to_owned()],
@@ -264,12 +264,13 @@ fn zero_para_data() -> tswp::ParaDataAttributeTable {
 }
 
 #[allow(deprecated)]
-fn text_box_objects(
+pub(super) fn text_box_objects(
     ids: TextBoxObjectIds,
     sheet_id: u64,
     style_id: u64,
     geometry: DrawableGeometry,
     storage: tswp::StorageArchive,
+    is_text_box: bool,
 ) -> Result<[ArchiveObject; 4]> {
     let position = geometry.position.ok_or_else(|| {
         Error::InvalidFormat("validated Numbers text-box geometry has no position".to_owned())
@@ -317,7 +318,7 @@ fn text_box_objects(
         },
         deprecated_storage: Some(reference(ids.storage)),
         owned_storage: Some(reference(ids.storage)),
-        is_text_box: Some(true),
+        is_text_box: Some(is_text_box),
         ..Default::default()
     };
     Ok([
@@ -326,7 +327,7 @@ fn text_box_objects(
             SHAPE_INFO_MESSAGE_TYPE,
             shape,
             &STANDARD_MESSAGE_VERSION,
-            &[sheet_id, ids.caption, ids.title, style_id, ids.storage],
+            &[ids.caption, ids.title, style_id, ids.storage],
         )?,
         numbers_object(
             ids.caption,

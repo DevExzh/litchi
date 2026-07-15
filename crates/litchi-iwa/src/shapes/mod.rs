@@ -8,6 +8,7 @@
 //! from these elements.
 
 mod geometry;
+mod path;
 mod properties;
 pub mod text_extractor;
 
@@ -15,6 +16,8 @@ pub use geometry::{DrawableGeometry, DrawablePoint, DrawableSize};
 pub(crate) use geometry::{
     geometry_from_drawable, patch_drawable_geometry, set_shape_geometry, shape_geometry,
 };
+pub use path::ShapePathKind;
+pub(crate) use path::shape_path_kind;
 pub use properties::DrawableProperties;
 pub(crate) use properties::{set_shape_properties, shape_properties};
 pub use text_extractor::ShapeTextExtractor;

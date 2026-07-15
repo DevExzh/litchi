@@ -4,7 +4,10 @@ use std::collections::HashSet;
 use std::ops::Range;
 
 use super::*;
-use crate::shapes::{DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize};
+use crate::shapes::{
+    DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, ShapePathKind,
+    shape_path_kind,
+};
 use crate::text::TextStorageInfo;
 
 use super::text_box_create::{
@@ -19,19 +22,7 @@ const DEFAULT_DRAWABLE_FLAGS: u32 = 3;
 const DEFAULT_ROTATION_DEGREES: f32 = 0.0;
 
 /// Structural path family used by an ordinary Keynote shape.
-///
-/// A rectangle is distinguished from arbitrary Bézier geometry so callers can
-/// round-trip the source-built preset without relying on an untyped path name.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum KeynoteSlideShapeKind {
-    Rectangle,
-    BezierPath,
-    PointPath,
-    ScalarPath,
-    Callout,
-    ConnectionLine,
-    EditableBezierPath,
-}
+pub type KeynoteSlideShapeKind = ShapePathKind;
 
 /// One ordinary, non-text-box shape owned directly by a Keynote slide.
 #[derive(Debug, Clone, PartialEq)]
@@ -490,7 +481,7 @@ fn shape_info(
     Ok(KeynoteSlideShapeInfo {
         slide_index,
         drawable_object_id,
-        kind: shape_kind(shape)?,
+        kind: shape_path_kind(shape)?,
         storage: editor.text.storage(storage_id)?,
         geometry: shape_geometry(
             editor.package(),
@@ -592,81 +583,6 @@ fn validate_shape_private_objects(
         )));
     }
     Ok(())
-}
-
-fn shape_kind(shape: &tswp::ShapeInfoArchive) -> Result<KeynoteSlideShapeKind> {
-    let path = shape.super_.pathsource.as_ref().ok_or_else(|| {
-        Error::InvalidFormat("ordinary Keynote shape has no path source".to_owned())
-    })?;
-    let families = [
-        path.point_path_source.is_some(),
-        path.scalar_path_source.is_some(),
-        path.bezier_path_source.is_some(),
-        path.callout_path_source.is_some(),
-        path.connection_line_path_source.is_some(),
-        path.editable_bezier_path_source.is_some(),
-    ]
-    .into_iter()
-    .filter(|present| *present)
-    .count();
-    if families != 1 {
-        return Err(Error::InvalidFormat(format!(
-            "ordinary Keynote shape must have exactly one path family, found {families}"
-        )));
-    }
-    if let Some(bezier) = &path.bezier_path_source {
-        return Ok(if is_rectangle_path(bezier) {
-            KeynoteSlideShapeKind::Rectangle
-        } else {
-            KeynoteSlideShapeKind::BezierPath
-        });
-    }
-    if path.point_path_source.is_some() {
-        Ok(KeynoteSlideShapeKind::PointPath)
-    } else if path.scalar_path_source.is_some() {
-        Ok(KeynoteSlideShapeKind::ScalarPath)
-    } else if path.callout_path_source.is_some() {
-        Ok(KeynoteSlideShapeKind::Callout)
-    } else if path.connection_line_path_source.is_some() {
-        Ok(KeynoteSlideShapeKind::ConnectionLine)
-    } else {
-        Ok(KeynoteSlideShapeKind::EditableBezierPath)
-    }
-}
-
-fn is_rectangle_path(bezier: &tsd::BezierPathSourceArchive) -> bool {
-    use tsp::path::ElementType;
-
-    let Some(size) = bezier.natural_size.as_ref() else {
-        return false;
-    };
-    let Some(path) = bezier.path.as_ref() else {
-        return false;
-    };
-    let expected = [
-        (ElementType::MoveTo, Some((0.0, 0.0))),
-        (ElementType::LineTo, Some((size.width, 0.0))),
-        (ElementType::LineTo, Some((size.width, size.height))),
-        (ElementType::LineTo, Some((0.0, size.height))),
-        (ElementType::CloseSubpath, None),
-        (ElementType::MoveTo, Some((0.0, 0.0))),
-    ];
-    path.elements.len() == expected.len()
-        && path
-            .elements
-            .iter()
-            .zip(expected)
-            .all(|(element, expected)| {
-                ElementType::try_from(element.r#type).ok() == Some(expected.0)
-                    && match expected.1 {
-                        Some((x, y)) => {
-                            element.points.len() == 1
-                                && element.points[0].x == x
-                                && element.points[0].y == y
-                        },
-                        None => element.points.is_empty(),
-                    }
-            })
 }
 
 #[cfg(test)]

@@ -149,6 +149,27 @@ numbers.save("created-with-text-box.numbers")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
 
+Ordinary text-bearing rectangles have independent shape CRUD. Their Bézier
+path, storage, stand-ins, style relationship, ownership, and UUIDs are also
+constructed directly from typed values:
+
+```rust
+use litchi_iwa::numbers::NumbersDocumentBuilder;
+use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+
+let mut numbers = NumbersDocumentBuilder::new().build()?;
+let sheet_id = numbers.sheets()?[0].object_id;
+let rectangle = numbers.add_sheet_rectangle(
+    sheet_id,
+    "A fully editable shape",
+    DrawablePoint { x: 420.0, y: 300.0 },
+    DrawableSize { width: 300.0, height: 150.0 },
+)?;
+numbers.set_sheet_shape_text(sheet_id, rectangle.drawable_object_id, "Updated")?;
+numbers.save("created-with-shape.numbers")?;
+# Ok::<(), litchi_iwa::Error>(())
+```
+
 Images are also constructed directly as sheet-owned drawables. The private
 image graph, stylesheet link, UUIDs, component data reference, and `Data/*`
 asset are generated from typed values; no blank Numbers package is embedded:
