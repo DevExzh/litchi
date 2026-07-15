@@ -6,16 +6,17 @@ use super::types::{
     AfterEffect, AnimationEffect, AnimationInfo, BuildAtom, BuildKind, BuildList, BuildListEntry,
     ChartBuild, DiagramBuild, EffectDirection, ExtendedTimeNode, LegacyAnimationAtom,
     LegacyAnimationBuild, LegacyAnimationEffect, LegacyTextBuildSubEffect, ParagraphBuild,
-    ParagraphBuildLevel, TimeBehavior, TimeBehaviorAdditive, TimeBehaviorAtom,
-    TimeBehaviorProperty, TimeBehaviorPropertyList, TimeColorDirection, TimeColorModel,
-    TimeCommandBehavior, TimeCommandBehaviorAtom, TimeCommandBehaviorType, TimeCondition,
-    TimeConditionAtom, TimeConditionType, TimeEffectNodeType, TimeEffectType, TimeIterateData,
-    TimeIterateDirection, TimeIterateIntervalType, TimeIterateType, TimeMasterRelation,
-    TimeModifier, TimeNodeAtom, TimeNodeProperty, TimeNodePropertyList, TimePropertyListContext,
-    TimeRotationBehavior, TimeRotationBehaviorAtom, TimeRotationDirection, TimeScaleBehavior,
-    TimeScaleBehaviorAtom, TimeSequenceData, TimeSequenceNextAction, TimeSequencePreviousAction,
-    TimeTriggerEvent, TimeTriggerObject, TimeVisualElement, TimeVisualElementKind,
-    is_valid_runtime_context, is_valid_time_filter, is_valid_time_points_types,
+    ParagraphBuildLevel, TimeAnimateColor, TimeAnimateColorBy, TimeBehavior, TimeBehaviorAdditive,
+    TimeBehaviorAtom, TimeBehaviorProperty, TimeBehaviorPropertyList, TimeColorBehavior,
+    TimeColorBehaviorAtom, TimeColorDirection, TimeColorModel, TimeCommandBehavior,
+    TimeCommandBehaviorAtom, TimeCommandBehaviorType, TimeCondition, TimeConditionAtom,
+    TimeConditionType, TimeEffectNodeType, TimeEffectType, TimeIterateData, TimeIterateDirection,
+    TimeIterateIntervalType, TimeIterateType, TimeMasterRelation, TimeModifier, TimeNodeAtom,
+    TimeNodeProperty, TimeNodePropertyList, TimePropertyListContext, TimeRotationBehavior,
+    TimeRotationBehaviorAtom, TimeRotationDirection, TimeScaleBehavior, TimeScaleBehaviorAtom,
+    TimeSequenceData, TimeSequenceNextAction, TimeSequencePreviousAction, TimeTriggerEvent,
+    TimeTriggerObject, TimeVisualElement, TimeVisualElementKind, is_valid_runtime_context,
+    is_valid_time_filter, is_valid_time_points_types,
 };
 use crate::consts::PptRecordType;
 use crate::ppt::package::{PptError, Result};
@@ -427,6 +428,158 @@ pub fn write_time_behavior_atom(atom: &TimeBehaviorAtom) -> Vec<u8> {
     let mut result = create_record_header(PptRecordType::TimeBehavior, 0, 0, 16);
     result.extend(data);
     result
+}
+
+/// Serialize an exact color behavior container.
+pub fn write_time_color_behavior(behavior: &TimeColorBehavior) -> Result<Vec<u8>> {
+    validate_color_behavior(&behavior.atom, &behavior.behavior)?;
+    let mut children = write_time_color_behavior_atom(&behavior.atom)?;
+    children.extend(write_time_behavior(&behavior.behavior)?);
+    wrap_record(PptRecordType::TimeColorBehaviorContainer, 0x0F, 0, children)
+}
+
+/// Serialize an exact `TimeColorBehaviorAtom`.
+pub fn write_time_color_behavior_atom(atom: &TimeColorBehaviorAtom) -> Result<Vec<u8>> {
+    if atom.from.is_some() && atom.by.is_none() && atom.to.is_none() {
+        return Err(PptError::InvalidFormat(
+            "color from value requires a by or to value".to_string(),
+        ));
+    }
+    let flags = u32::from(atom.by.is_some())
+        | (u32::from(atom.from.is_some()) << 1)
+        | (u32::from(atom.to.is_some()) << 2)
+        | (u32::from(atom.color_space_used) << 3)
+        | (u32::from(atom.direction_used) << 4);
+    let mut data = Vec::with_capacity(52);
+    data.extend(flags.to_le_bytes());
+    data.extend(match &atom.by {
+        Some(color) => encode_animate_color_by(color)?,
+        None => [0; 16],
+    });
+    data.extend(match &atom.from {
+        Some(color) => encode_animate_color(color)?,
+        None => [0; 16],
+    });
+    data.extend(match &atom.to {
+        Some(color) => encode_animate_color(color)?,
+        None => [0; 16],
+    });
+    let mut result = create_record_header(PptRecordType::TimeColorBehavior, 0, 0, 52);
+    result.extend(data);
+    Ok(result)
+}
+
+fn encode_animate_color_by(color: &TimeAnimateColorBy) -> Result<[u8; 16]> {
+    let (model, values) = match color {
+        TimeAnimateColorBy::Rgb { red, green, blue } => (0u32, [*red, *green, *blue]),
+        TimeAnimateColorBy::Hsl {
+            hue,
+            saturation,
+            luminance,
+        } => (1, [*hue, *saturation, *luminance]),
+        TimeAnimateColorBy::Scheme(index) => return encode_scheme_color(*index),
+    };
+    if values.iter().any(|value| !(-255..=255).contains(value)) {
+        return Err(PptError::InvalidFormat(
+            "color offset component is out of range".to_string(),
+        ));
+    }
+    let mut data = [0; 16];
+    data[0..4].copy_from_slice(&model.to_le_bytes());
+    for (index, value) in values.into_iter().enumerate() {
+        data[4 + index * 4..8 + index * 4].copy_from_slice(&value.to_le_bytes());
+    }
+    Ok(data)
+}
+
+fn encode_animate_color(color: &TimeAnimateColor) -> Result<[u8; 16]> {
+    match color {
+        TimeAnimateColor::Scheme(index) => encode_scheme_color(*index),
+        TimeAnimateColor::Rgb { red, green, blue } => {
+            if *red > 255 || *green > 255 || *blue > 255 {
+                return Err(PptError::InvalidFormat(
+                    "RGB color component is out of range".to_string(),
+                ));
+            }
+            let mut data = [0; 16];
+            for (index, value) in [*red, *green, *blue].into_iter().enumerate() {
+                data[4 + index * 4..8 + index * 4].copy_from_slice(&value.to_le_bytes());
+            }
+            Ok(data)
+        },
+    }
+}
+
+fn encode_scheme_color(index: u32) -> Result<[u8; 16]> {
+    if index > 7 {
+        return Err(PptError::InvalidFormat(
+            "scheme color index is out of range".to_string(),
+        ));
+    }
+    let mut data = [0; 16];
+    data[0..4].copy_from_slice(&2u32.to_le_bytes());
+    data[4..8].copy_from_slice(&index.to_le_bytes());
+    Ok(data)
+}
+
+fn validate_color_behavior(atom: &TimeColorBehaviorAtom, behavior: &TimeBehavior) -> Result<()> {
+    const NAMES: &[&str] = &[
+        "ppt_c",
+        "style.color",
+        "imageData.chromakey",
+        "fill.color",
+        "fill.color2",
+        "stroke.color",
+        "stroke.color2",
+        "shadow.color",
+        "shadow.color2",
+        "extrusion.color",
+        "fillcolor",
+    ];
+    if !behavior.atom.attribute_names_used
+        || !matches!(behavior.attribute_names.as_deref(), Some([name]) if NAMES.contains(&name.as_str()))
+    {
+        return Err(PptError::InvalidFormat(
+            "color behavior requires exactly one supported color attribute".to_string(),
+        ));
+    }
+    let properties = behavior
+        .properties
+        .as_ref()
+        .map_or(&[][..], |list| list.properties.as_slice());
+    if properties.iter().any(|property| {
+        matches!(
+            property,
+            TimeBehaviorProperty::MotionPathEditRelative(_)
+                | TimeBehaviorProperty::PathEditRotationAngle(_)
+                | TimeBehaviorProperty::PathEditRotationX(_)
+                | TimeBehaviorProperty::PathEditRotationY(_)
+                | TimeBehaviorProperty::PointsTypes(_)
+        )
+    }) {
+        return Err(PptError::InvalidFormat(
+            "color behavior contains a motion-only property".to_string(),
+        ));
+    }
+    if atom.color_space_used
+        && !properties
+            .iter()
+            .any(|property| matches!(property, TimeBehaviorProperty::ColorModel(_)))
+    {
+        return Err(PptError::InvalidFormat(
+            "color-space-used flag requires a color model property".to_string(),
+        ));
+    }
+    if atom.direction_used
+        && !properties
+            .iter()
+            .any(|property| matches!(property, TimeBehaviorProperty::ColorDirection(_)))
+    {
+        return Err(PptError::InvalidFormat(
+            "direction-used flag requires a color direction property".to_string(),
+        ));
+    }
+    Ok(())
 }
 
 /// Serialize a typed `TimePropertyList4TimeBehavior` record.

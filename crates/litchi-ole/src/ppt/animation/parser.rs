@@ -8,8 +8,9 @@ use super::types::{
     ChartBuildAtom, ChartBuildType, DiagramBuild, DiagramBuildAtom, DiagramBuildType,
     ExtendedTimeNode, LegacyAnimationAtom, LegacyAnimationBuild, LegacyAnimationEffect,
     LegacyTextBuildSubEffect, ParagraphBuild, ParagraphBuildAtom, ParagraphBuildLevel,
-    ParagraphBuildType, SlideAnimationExtension, TimeBehavior, TimeBehaviorAdditive,
-    TimeBehaviorAtom, TimeBehaviorProperty, TimeBehaviorPropertyList, TimeColorDirection,
+    ParagraphBuildType, SlideAnimationExtension, TimeAnimateColor, TimeAnimateColorBy,
+    TimeBehavior, TimeBehaviorAdditive, TimeBehaviorAtom, TimeBehaviorProperty,
+    TimeBehaviorPropertyList, TimeColorBehavior, TimeColorBehaviorAtom, TimeColorDirection,
     TimeColorModel, TimeCommandBehavior, TimeCommandBehaviorAtom, TimeCommandBehaviorType,
     TimeCondition, TimeConditionAtom, TimeConditionType, TimeEffectNodeType, TimeEffectType,
     TimeIterateData, TimeIterateDirection, TimeIterateIntervalType, TimeIterateType,
@@ -568,6 +569,179 @@ pub fn parse_time_behavior_atom(record: &PptRecord) -> Result<TimeBehaviorAtom> 
         additive,
         attribute_names_used: flags & 0x04 != 0,
     })
+}
+
+/// Parse an exact color behavior container.
+pub fn parse_time_color_behavior(record: &PptRecord) -> Result<TimeColorBehavior> {
+    require_container(
+        record,
+        PptRecordType::TimeColorBehaviorContainer,
+        0,
+        "TimeColorBehaviorContainer",
+    )?;
+    if record.children.len() != 2 {
+        return Err(PptError::InvalidFormat(
+            "TimeColorBehaviorContainer requires an atom and common behavior".to_string(),
+        ));
+    }
+    let atom = parse_time_color_behavior_atom(&record.children[0])?;
+    let behavior = parse_time_behavior(&record.children[1])?;
+    validate_color_behavior(&atom, &behavior)?;
+    Ok(TimeColorBehavior { atom, behavior })
+}
+
+/// Parse an exact 52-byte `TimeColorBehaviorAtom` payload.
+pub fn parse_time_color_behavior_atom(record: &PptRecord) -> Result<TimeColorBehaviorAtom> {
+    require_atom(
+        record,
+        PptRecordType::TimeColorBehavior,
+        0,
+        52,
+        "TimeColorBehaviorAtom",
+    )?;
+    let flags = read_u32(&record.data, 0);
+    let by = (flags & 0x01 != 0)
+        .then(|| parse_animate_color_by(&record.data[4..20]))
+        .transpose()?;
+    let from = (flags & 0x02 != 0)
+        .then(|| parse_animate_color(&record.data[20..36]))
+        .transpose()?;
+    let to = (flags & 0x04 != 0)
+        .then(|| parse_animate_color(&record.data[36..52]))
+        .transpose()?;
+    if from.is_some() && by.is_none() && to.is_none() {
+        return Err(PptError::InvalidFormat(
+            "color from value requires a by or to value".to_string(),
+        ));
+    }
+    Ok(TimeColorBehaviorAtom {
+        by,
+        from,
+        to,
+        color_space_used: flags & 0x08 != 0,
+        direction_used: flags & 0x10 != 0,
+    })
+}
+
+fn parse_animate_color_by(data: &[u8]) -> Result<TimeAnimateColorBy> {
+    match read_u32(data, 0) {
+        0 | 1 => {
+            let values = (read_i32(data, 4), read_i32(data, 8), read_i32(data, 12));
+            if [values.0, values.1, values.2]
+                .iter()
+                .any(|value| !(-255..=255).contains(value))
+            {
+                return Err(PptError::InvalidFormat(
+                    "color offset component is out of range".to_string(),
+                ));
+            }
+            if read_u32(data, 0) == 0 {
+                Ok(TimeAnimateColorBy::Rgb {
+                    red: values.0,
+                    green: values.1,
+                    blue: values.2,
+                })
+            } else {
+                Ok(TimeAnimateColorBy::Hsl {
+                    hue: values.0,
+                    saturation: values.1,
+                    luminance: values.2,
+                })
+            }
+        },
+        2 => parse_scheme_color(data).map(TimeAnimateColorBy::Scheme),
+        model => Err(PptError::InvalidFormat(format!(
+            "invalid color-by model {model}"
+        ))),
+    }
+}
+
+fn parse_animate_color(data: &[u8]) -> Result<TimeAnimateColor> {
+    match read_u32(data, 0) {
+        0 => {
+            let (red, green, blue) = (read_u32(data, 4), read_u32(data, 8), read_u32(data, 12));
+            if red > 255 || green > 255 || blue > 255 {
+                return Err(PptError::InvalidFormat(
+                    "RGB color component is out of range".to_string(),
+                ));
+            }
+            Ok(TimeAnimateColor::Rgb { red, green, blue })
+        },
+        2 => parse_scheme_color(data).map(TimeAnimateColor::Scheme),
+        model => Err(PptError::InvalidFormat(format!(
+            "invalid absolute color model {model}"
+        ))),
+    }
+}
+
+fn parse_scheme_color(data: &[u8]) -> Result<u32> {
+    let index = read_u32(data, 4);
+    if index > 7 {
+        return Err(PptError::InvalidFormat(
+            "scheme color index is out of range".to_string(),
+        ));
+    }
+    Ok(index)
+}
+
+fn validate_color_behavior(atom: &TimeColorBehaviorAtom, behavior: &TimeBehavior) -> Result<()> {
+    const NAMES: &[&str] = &[
+        "ppt_c",
+        "style.color",
+        "imageData.chromakey",
+        "fill.color",
+        "fill.color2",
+        "stroke.color",
+        "stroke.color2",
+        "shadow.color",
+        "shadow.color2",
+        "extrusion.color",
+        "fillcolor",
+    ];
+    if !behavior.atom.attribute_names_used
+        || !matches!(behavior.attribute_names.as_deref(), Some([name]) if NAMES.contains(&name.as_str()))
+    {
+        return Err(PptError::InvalidFormat(
+            "color behavior requires exactly one supported color attribute".to_string(),
+        ));
+    }
+    let properties = behavior
+        .properties
+        .as_ref()
+        .map_or(&[][..], |list| list.properties.as_slice());
+    if properties.iter().any(|property| {
+        matches!(
+            property,
+            TimeBehaviorProperty::MotionPathEditRelative(_)
+                | TimeBehaviorProperty::PathEditRotationAngle(_)
+                | TimeBehaviorProperty::PathEditRotationX(_)
+                | TimeBehaviorProperty::PathEditRotationY(_)
+                | TimeBehaviorProperty::PointsTypes(_)
+        )
+    }) {
+        return Err(PptError::InvalidFormat(
+            "color behavior contains a motion-only property".to_string(),
+        ));
+    }
+    if atom.color_space_used
+        && !properties
+            .iter()
+            .any(|property| matches!(property, TimeBehaviorProperty::ColorModel(_)))
+    {
+        return Err(PptError::InvalidFormat(
+            "color-space-used flag requires a color model property".to_string(),
+        ));
+    }
+    if atom.direction_used
+        && !properties
+            .iter()
+            .any(|property| matches!(property, TimeBehaviorProperty::ColorDirection(_)))
+    {
+        return Err(PptError::InvalidFormat(
+            "direction-used flag requires a color direction property".to_string(),
+        ));
+    }
+    Ok(())
 }
 
 /// Parse a `TimePropertyList4TimeBehavior` record.
@@ -1634,7 +1808,8 @@ mod tests {
         BuildInfo, ChartBuildType, DiagramBuildType, LegacyAnimationAtom, LegacyAnimationBuild,
         LegacyAnimationEffect, LegacyTextBuildSubEffect, ParagraphBuildType, write_animation_info,
         write_animation_info_atom, write_build_list, write_extended_time_node, write_time_behavior,
-        write_time_behavior_atom, write_time_behavior_property_list, write_time_command_behavior,
+        write_time_behavior_atom, write_time_behavior_property_list, write_time_color_behavior,
+        write_time_color_behavior_atom, write_time_command_behavior,
         write_time_command_behavior_atom, write_time_condition, write_time_condition_atom,
         write_time_iterate_data, write_time_modifier, write_time_node_atom,
         write_time_node_property_list, write_time_rotation_behavior,
@@ -2120,6 +2295,180 @@ mod tests {
         let (mut record, _) = PptRecord::parse(&bytes, 0).unwrap();
         record.children[0].data[12..16].copy_from_slice(&0u32.to_le_bytes());
         assert!(parse_time_visual_element(&record).is_err());
+    }
+
+    #[test]
+    fn round_trips_color_behaviors_and_color_models() {
+        assert_eq!(PptRecordType::TimeColorBehaviorContainer.as_u16(), 0xF12C);
+        assert_eq!(PptRecordType::TimeColorBehavior.as_u16(), 0xF135);
+
+        for by in [
+            TimeAnimateColorBy::Rgb {
+                red: -255,
+                green: 0,
+                blue: 255,
+            },
+            TimeAnimateColorBy::Hsl {
+                hue: 120,
+                saturation: -40,
+                luminance: 15,
+            },
+            TimeAnimateColorBy::Scheme(7),
+        ] {
+            let expected = TimeColorBehaviorAtom {
+                by: Some(by),
+                from: Some(TimeAnimateColor::Rgb {
+                    red: 1,
+                    green: 2,
+                    blue: 255,
+                }),
+                to: Some(TimeAnimateColor::Scheme(3)),
+                color_space_used: true,
+                direction_used: true,
+            };
+            let bytes = write_time_color_behavior_atom(&expected).unwrap();
+            let (record, consumed) = PptRecord::parse(&bytes, 0).unwrap();
+            assert_eq!(consumed, bytes.len());
+            assert_eq!(parse_time_color_behavior_atom(&record).unwrap(), expected);
+        }
+
+        let expected = TimeColorBehavior {
+            atom: TimeColorBehaviorAtom {
+                by: Some(TimeAnimateColorBy::Hsl {
+                    hue: 45,
+                    saturation: 20,
+                    luminance: -10,
+                }),
+                from: None,
+                to: Some(TimeAnimateColor::Rgb {
+                    red: 0x11,
+                    green: 0x22,
+                    blue: 0x33,
+                }),
+                color_space_used: true,
+                direction_used: true,
+            },
+            behavior: TimeBehavior {
+                atom: TimeBehaviorAtom {
+                    additive: Some(TimeBehaviorAdditive::Override),
+                    attribute_names_used: true,
+                },
+                attribute_names: Some(vec!["fill.color".to_string()]),
+                properties: Some(TimeBehaviorPropertyList {
+                    properties: vec![
+                        TimeBehaviorProperty::RuntimeContext("ppt".to_string()),
+                        TimeBehaviorProperty::ColorModel(TimeColorModel::Hsl),
+                        TimeBehaviorProperty::ColorDirection(TimeColorDirection::CounterClockwise),
+                    ],
+                }),
+                target: TimeVisualElement::Shape {
+                    kind: TimeVisualElementKind::Shape,
+                    shape_id_ref: 17,
+                    data1: 0,
+                    data2: 0,
+                },
+            },
+        };
+        let bytes = write_time_color_behavior(&expected).unwrap();
+        let (record, consumed) = PptRecord::parse(&bytes, 0).unwrap();
+        assert_eq!(consumed, bytes.len());
+        assert_eq!(parse_time_color_behavior(&record).unwrap(), expected);
+    }
+
+    #[test]
+    fn rejects_malformed_color_behaviors() {
+        for atom in [
+            TimeColorBehaviorAtom {
+                by: Some(TimeAnimateColorBy::Rgb {
+                    red: 256,
+                    green: 0,
+                    blue: 0,
+                }),
+                from: None,
+                to: None,
+                color_space_used: false,
+                direction_used: false,
+            },
+            TimeColorBehaviorAtom {
+                by: None,
+                from: Some(TimeAnimateColor::Rgb {
+                    red: 0,
+                    green: 0,
+                    blue: 0,
+                }),
+                to: None,
+                color_space_used: false,
+                direction_used: false,
+            },
+            TimeColorBehaviorAtom {
+                by: Some(TimeAnimateColorBy::Scheme(8)),
+                from: None,
+                to: None,
+                color_space_used: false,
+                direction_used: false,
+            },
+            TimeColorBehaviorAtom {
+                by: None,
+                from: None,
+                to: Some(TimeAnimateColor::Rgb {
+                    red: 256,
+                    green: 0,
+                    blue: 0,
+                }),
+                color_space_used: false,
+                direction_used: false,
+            },
+        ] {
+            assert!(write_time_color_behavior_atom(&atom).is_err());
+        }
+
+        let valid_atom = TimeColorBehaviorAtom {
+            by: Some(TimeAnimateColorBy::Rgb {
+                red: 1,
+                green: 2,
+                blue: 3,
+            }),
+            from: None,
+            to: None,
+            color_space_used: false,
+            direction_used: false,
+        };
+        let mut bytes = write_time_color_behavior_atom(&valid_atom).unwrap();
+        bytes[12..16].copy_from_slice(&3u32.to_le_bytes());
+        let (record, _) = PptRecord::parse(&bytes, 0).unwrap();
+        assert!(parse_time_color_behavior_atom(&record).is_err());
+
+        let common = |name: &str, properties: Vec<TimeBehaviorProperty>| TimeBehavior {
+            atom: TimeBehaviorAtom {
+                additive: None,
+                attribute_names_used: true,
+            },
+            attribute_names: Some(vec![name.to_string()]),
+            properties: Some(TimeBehaviorPropertyList { properties }),
+            target: TimeVisualElement::Page,
+        };
+        for invalid in [
+            TimeColorBehavior {
+                atom: TimeColorBehaviorAtom {
+                    color_space_used: true,
+                    ..valid_atom.clone()
+                },
+                behavior: common("fill.color", vec![]),
+            },
+            TimeColorBehavior {
+                atom: valid_atom.clone(),
+                behavior: common("style.opacity", vec![]),
+            },
+            TimeColorBehavior {
+                atom: valid_atom,
+                behavior: common(
+                    "fill.color",
+                    vec![TimeBehaviorProperty::MotionPathEditRelative(true)],
+                ),
+            },
+        ] {
+            assert!(write_time_color_behavior(&invalid).is_err());
+        }
     }
 
     #[test]

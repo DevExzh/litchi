@@ -1001,6 +1001,46 @@ pub enum TimeColorDirection {
     CounterClockwise,
 }
 
+/// A PowerPoint 2002 color behavior and its common target information.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TimeColorBehavior {
+    pub atom: TimeColorBehaviorAtom,
+    pub behavior: TimeBehavior,
+}
+
+/// Values and property-use flags from a `TimeColorBehaviorAtom`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TimeColorBehaviorAtom {
+    pub by: Option<TimeAnimateColorBy>,
+    pub from: Option<TimeAnimateColor>,
+    pub to: Option<TimeAnimateColor>,
+    pub color_space_used: bool,
+    pub direction_used: bool,
+}
+
+/// Offset color used by a color animation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TimeAnimateColorBy {
+    Rgb {
+        red: i32,
+        green: i32,
+        blue: i32,
+    },
+    Hsl {
+        hue: i32,
+        saturation: i32,
+        luminance: i32,
+    },
+    Scheme(u32),
+}
+
+/// Absolute color used by a color animation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TimeAnimateColor {
+    Rgb { red: u32, green: u32, blue: u32 },
+    Scheme(u32),
+}
+
 /// Animation target stored in a `ClientVisualElementContainer`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TimeVisualElement {

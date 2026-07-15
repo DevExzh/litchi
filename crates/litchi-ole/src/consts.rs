@@ -141,6 +141,8 @@ pub enum PptRecordType {
     TimeModifier = 0xF129,
     /// Shared animation behavior container
     TimeBehaviorContainer = 0xF12A,
+    /// Color behavior container
+    TimeColorBehaviorContainer = 0xF12C,
     /// Rotation behavior container
     TimeRotationBehaviorContainer = 0xF12F,
     /// Scale behavior container
@@ -149,6 +151,8 @@ pub enum PptRecordType {
     TimeCommandBehaviorContainer = 0xF132,
     /// Shared animation behavior atom
     TimeBehavior = 0xF133,
+    /// Color behavior atom
+    TimeColorBehavior = 0xF135,
     /// Rotation behavior atom
     TimeRotationBehavior = 0xF138,
     /// Scale behavior atom
@@ -247,10 +251,12 @@ impl From<u16> for PptRecordType {
             0xF128 => PptRecordType::TimeCondition,
             0xF129 => PptRecordType::TimeModifier,
             0xF12A => PptRecordType::TimeBehaviorContainer,
+            0xF12C => PptRecordType::TimeColorBehaviorContainer,
             0xF12F => PptRecordType::TimeRotationBehaviorContainer,
             0xF130 => PptRecordType::TimeScaleBehaviorContainer,
             0xF132 => PptRecordType::TimeCommandBehaviorContainer,
             0xF133 => PptRecordType::TimeBehavior,
+            0xF135 => PptRecordType::TimeColorBehavior,
             0xF138 => PptRecordType::TimeRotationBehavior,
             0xF139 => PptRecordType::TimeScaleBehavior,
             0xF13B => PptRecordType::TimeCommandBehavior,

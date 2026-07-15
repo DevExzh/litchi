@@ -139,6 +139,7 @@ impl PptRecord {
                 | PptRecordType::ExtTimeNode
                 | PptRecordType::TimeConditionContainer
                 | PptRecordType::TimeBehaviorContainer
+                | PptRecordType::TimeColorBehaviorContainer
                 | PptRecordType::TimeRotationBehaviorContainer
                 | PptRecordType::TimeScaleBehaviorContainer
                 | PptRecordType::TimeCommandBehaviorContainer
