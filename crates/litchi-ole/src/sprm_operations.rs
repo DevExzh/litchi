@@ -442,23 +442,23 @@ pub const SPRM_P_DXA_FROM_TEXT10: u16 = 0x4622;
 /// sprmPWr - Text wrapping (operation 0x23)
 pub const SPRM_P_WR: u16 = 0x2423;
 
-/// sprmPBrcTop - Top border (operation 0x24)
-pub const SPRM_P_BRC_TOP: u16 = 0x6424;
+/// sprmPBrcTop80 - Top Brc80 border (operation 0x24)
+pub const SPRM_P_BRC_TOP80: u16 = 0x6424;
 
-/// sprmPBrcLeft - Left border (operation 0x25)
-pub const SPRM_P_BRC_LEFT: u16 = 0x6425;
+/// sprmPBrcLeft80 - Left Brc80 border (operation 0x25)
+pub const SPRM_P_BRC_LEFT80: u16 = 0x6425;
 
-/// sprmPBrcBottom - Bottom border (operation 0x26)
-pub const SPRM_P_BRC_BOTTOM: u16 = 0x6426;
+/// sprmPBrcBottom80 - Bottom Brc80 border (operation 0x26)
+pub const SPRM_P_BRC_BOTTOM80: u16 = 0x6426;
 
-/// sprmPBrcRight - Right border (operation 0x27)
-pub const SPRM_P_BRC_RIGHT: u16 = 0x6427;
+/// sprmPBrcRight80 - Right Brc80 border (operation 0x27)
+pub const SPRM_P_BRC_RIGHT80: u16 = 0x6427;
 
-/// sprmPBrcBetween - Between border (operation 0x28)
-pub const SPRM_P_BRC_BETWEEN: u16 = 0x6428;
+/// sprmPBrcBetween80 - Between Brc80 border (operation 0x28)
+pub const SPRM_P_BRC_BETWEEN80: u16 = 0x6428;
 
-/// sprmPBrcBar - Bar border (operation 0x29)
-pub const SPRM_P_BRC_BAR: u16 = 0x6429;
+/// sprmPBrcBar80 - Bar Brc80 border (operation 0x29)
+pub const SPRM_P_BRC_BAR80: u16 = 0x6629;
 
 /// sprmPFNoAutoHyph - No auto hyphenation (operation 0x2A)
 pub const SPRM_P_F_NO_AUTO_HYPH: u16 = 0x242A;
@@ -559,23 +559,23 @@ pub const SPRM_P_F_INNER_TTP: u16 = 0x244C;
 /// sprmPShd - Shading (Word 2002+) (operation 0x4D)
 pub const SPRM_P_SHD: u16 = 0xC64D;
 
-/// sprmPBrcTop80 - Top border v80 (operation 0x4E)
-pub const SPRM_P_BRC_TOP80: u16 = 0x664E;
+/// sprmPBrcTop - Current top Brc border (operation 0x4E)
+pub const SPRM_P_BRC_TOP: u16 = 0xC64E;
 
-/// sprmPBrcLeft80 - Left border v80 (operation 0x4F)
-pub const SPRM_P_BRC_LEFT80: u16 = 0x664F;
+/// sprmPBrcLeft - Current left Brc border (operation 0x4F)
+pub const SPRM_P_BRC_LEFT: u16 = 0xC64F;
 
-/// sprmPBrcBottom80 - Bottom border v80 (operation 0x50)
-pub const SPRM_P_BRC_BOTTOM80: u16 = 0x6650;
+/// sprmPBrcBottom - Current bottom Brc border (operation 0x50)
+pub const SPRM_P_BRC_BOTTOM: u16 = 0xC650;
 
-/// sprmPBrcRight80 - Right border v80 (operation 0x51)
-pub const SPRM_P_BRC_RIGHT80: u16 = 0x6651;
+/// sprmPBrcRight - Current right Brc border (operation 0x51)
+pub const SPRM_P_BRC_RIGHT: u16 = 0xC651;
 
-/// sprmPBrcBetween80 - Between border v80 (operation 0x52)
-pub const SPRM_P_BRC_BETWEEN80: u16 = 0x6652;
+/// sprmPBrcBetween - Current between Brc border (operation 0x52)
+pub const SPRM_P_BRC_BETWEEN: u16 = 0xC652;
 
-/// sprmPBrcBar80 - Bar border v80 (operation 0x53)
-pub const SPRM_P_BRC_BAR80: u16 = 0x6653;
+/// sprmPBrcBar - Current bar Brc border (operation 0x53)
+pub const SPRM_P_BRC_BAR: u16 = 0xC653;
 
 /// sprmPFNoAllowOverlap - No allow overlap (operation 0x62)
 pub const SPRM_P_F_NO_ALLOW_OVERLAP: u16 = 0x2462;
@@ -943,6 +943,18 @@ mod tests {
 
     #[test]
     fn current_high_paragraph_sprms_match_ms_doc() {
+        assert_eq!(SPRM_P_BRC_TOP80, 0x6424);
+        assert_eq!(SPRM_P_BRC_LEFT80, 0x6425);
+        assert_eq!(SPRM_P_BRC_BOTTOM80, 0x6426);
+        assert_eq!(SPRM_P_BRC_RIGHT80, 0x6427);
+        assert_eq!(SPRM_P_BRC_BETWEEN80, 0x6428);
+        assert_eq!(SPRM_P_BRC_BAR80, 0x6629);
+        assert_eq!(SPRM_P_BRC_TOP, 0xC64E);
+        assert_eq!(SPRM_P_BRC_LEFT, 0xC64F);
+        assert_eq!(SPRM_P_BRC_BOTTOM, 0xC650);
+        assert_eq!(SPRM_P_BRC_RIGHT, 0xC651);
+        assert_eq!(SPRM_P_BRC_BETWEEN, 0xC652);
+        assert_eq!(SPRM_P_BRC_BAR, 0xC653);
         assert_eq!(SPRM_P_DXC_RIGHT, 0x4455);
         assert_eq!(SPRM_P_DXC_LEFT, 0x4456);
         assert_eq!(SPRM_P_DXC_LEFT1, 0x4457);

@@ -80,7 +80,10 @@ use super::numbering::{ListFormatOverride, ListStructure, NumberingWriter};
 use super::piece_table::{Piece, PieceTableBuilder};
 use super::revisions::{DisplayFieldRevision, FormattingRevision, NumberingRevision, TextRevision};
 use crate::doc::CommentDateTime;
-use crate::doc::parts::pap::TextBoxTightWrap;
+use crate::doc::parts::pap::{
+    Border as ParagraphBorder, BorderStyle as ParagraphBorderStyle, Borders as ParagraphBorders,
+    TextBoxTightWrap,
+};
 use crate::sprm_operations::*;
 use litchi_cfb::writer::OleWriter;
 use std::collections::HashMap;
@@ -372,6 +375,8 @@ pub struct ParagraphFormatting {
     pub mirror_indents: Option<bool>,
     /// Lines in a text box whose edges permit tight wrapping
     pub text_box_tight_wrap: Option<TextBoxTightWrap>,
+    /// Paragraph borders
+    pub borders: ParagraphBorders,
     /// Line spacing descriptor
     pub line_spacing: Option<LineSpacing>,
     /// List level index (0-based, used with `ilfo` to associate paragraph with a list)
@@ -3461,6 +3466,18 @@ fn build_papx_grpprl(fmt: &ParagraphFormatting) -> Vec<u8> {
     if let Some(tight_wrap) = fmt.text_box_tight_wrap {
         push_byte(&mut grp, SPRM_P_TTWO, tight_wrap as u8);
     }
+    for (opcode, border) in [
+        (SPRM_P_BRC_TOP, fmt.borders.top),
+        (SPRM_P_BRC_LEFT, fmt.borders.left),
+        (SPRM_P_BRC_BOTTOM, fmt.borders.bottom),
+        (SPRM_P_BRC_RIGHT, fmt.borders.right),
+        (SPRM_P_BRC_BETWEEN, fmt.borders.between),
+        (SPRM_P_BRC_BAR, fmt.borders.bar),
+    ] {
+        if let Some(border) = border {
+            append_paragraph_border(&mut grp, opcode, border);
+        }
+    }
     if let Some(applied) = fmt.numbering_revision_list_applied {
         push_bool(&mut grp, SPRM_P_F_NUM_RM_INS, applied);
     }
@@ -3486,6 +3503,46 @@ fn build_papx_grpprl(fmt: &ParagraphFormatting) -> Vec<u8> {
     grp
 }
 
+fn append_paragraph_border(output: &mut Vec<u8>, opcode: u16, border: ParagraphBorder) {
+    output.extend_from_slice(&opcode.to_le_bytes());
+    output.push(8);
+    match border.color {
+        Some((red, green, blue)) => output.extend_from_slice(&[red, green, blue, 0]),
+        None => output.extend_from_slice(&[0, 0, 0, 0xFF]),
+    }
+    output.push(border.width);
+    output.push(match border.style {
+        ParagraphBorderStyle::None => 0,
+        ParagraphBorderStyle::Single => 1,
+        ParagraphBorderStyle::Double => 3,
+        ParagraphBorderStyle::Thick => 5,
+        ParagraphBorderStyle::Dotted => 6,
+        ParagraphBorderStyle::Dashed => 7,
+        ParagraphBorderStyle::DotDash => 8,
+        ParagraphBorderStyle::DotDotDash => 9,
+        ParagraphBorderStyle::Triple => 10,
+        ParagraphBorderStyle::ThinThickSmallGap => 11,
+        ParagraphBorderStyle::ThickThinSmallGap => 12,
+        ParagraphBorderStyle::ThinThickThinSmallGap => 13,
+        ParagraphBorderStyle::ThinThickMediumGap => 14,
+        ParagraphBorderStyle::ThickThinMediumGap => 15,
+        ParagraphBorderStyle::ThinThickThinMediumGap => 16,
+        ParagraphBorderStyle::ThinThickLargeGap => 17,
+        ParagraphBorderStyle::ThickThinLargeGap => 18,
+        ParagraphBorderStyle::ThinThickThinLargeGap => 19,
+        ParagraphBorderStyle::Wave => 20,
+        ParagraphBorderStyle::DoubleWave => 21,
+        ParagraphBorderStyle::DashSmallGap => 22,
+        ParagraphBorderStyle::DashDotStroked => 23,
+        ParagraphBorderStyle::ThreeDEmboss => 24,
+        ParagraphBorderStyle::ThreeDEngrave => 25,
+        ParagraphBorderStyle::Outset => 26,
+        ParagraphBorderStyle::Inset => 27,
+    });
+    output.push(border.spacing | (u8::from(border.shadow) << 5) | (u8::from(border.frame) << 6));
+    output.push(0);
+}
+
 fn build_revision_papx_grpprl(
     fmt: &ParagraphFormatting,
     revisions: Option<&RevisionWriterData>,
@@ -3506,6 +3563,24 @@ fn build_revision_papx_grpprl(
         {
             return Err(DocWriteError::InvalidData(format!(
                 "DOC paragraph {name} value {value} is outside -20..=31680"
+            )));
+        }
+    }
+    for border in [
+        fmt.borders.top,
+        fmt.borders.left,
+        fmt.borders.bottom,
+        fmt.borders.right,
+        fmt.borders.between,
+        fmt.borders.bar,
+    ]
+    .into_iter()
+    .flatten()
+    {
+        if border.spacing > 31 {
+            return Err(DocWriteError::InvalidData(format!(
+                "DOC paragraph border spacing {} exceeds 31 points",
+                border.spacing
             )));
         }
     }
@@ -4193,6 +4268,25 @@ mod tests {
                     contextual_spacing: Some(true),
                     mirror_indents: Some(true),
                     text_box_tight_wrap: Some(TextBoxTightWrap::FirstAndLastLine),
+                    borders: ParagraphBorders {
+                        top: Some(ParagraphBorder {
+                            style: ParagraphBorderStyle::Inset,
+                            width: 12,
+                            color: Some((0x11, 0x22, 0x33)),
+                            spacing: 7,
+                            shadow: true,
+                            frame: true,
+                        }),
+                        left: Some(ParagraphBorder {
+                            style: ParagraphBorderStyle::DoubleWave,
+                            width: 8,
+                            color: None,
+                            spacing: 4,
+                            shadow: false,
+                            frame: false,
+                        }),
+                        ..ParagraphBorders::default()
+                    },
                     line_spacing: Some(LineSpacing::exact_twips(360).unwrap()),
                     ..ParagraphFormatting::default()
                 },
@@ -4249,6 +4343,28 @@ mod tests {
             paragraphs[0].properties().text_box_tight_wrap,
             Some(TextBoxTightWrap::FirstAndLastLine)
         );
+        assert_eq!(
+            paragraphs[0].properties().borders,
+            ParagraphBorders {
+                top: Some(ParagraphBorder {
+                    style: ParagraphBorderStyle::Inset,
+                    width: 12,
+                    color: Some((0x11, 0x22, 0x33)),
+                    spacing: 7,
+                    shadow: true,
+                    frame: true,
+                }),
+                left: Some(ParagraphBorder {
+                    style: ParagraphBorderStyle::DoubleWave,
+                    width: 8,
+                    color: None,
+                    spacing: 4,
+                    shadow: false,
+                    frame: false,
+                }),
+                ..ParagraphBorders::default()
+            }
+        );
         assert_eq!(paragraphs[0].properties().line_spacing, Some(-360));
         assert_eq!(
             paragraphs[0].properties().line_spacing_type,
@@ -4279,6 +4395,20 @@ mod tests {
             },
             ParagraphFormatting {
                 space_after_lines: Some(31_681),
+                ..ParagraphFormatting::default()
+            },
+            ParagraphFormatting {
+                borders: ParagraphBorders {
+                    top: Some(ParagraphBorder {
+                        style: ParagraphBorderStyle::Single,
+                        width: 8,
+                        color: None,
+                        spacing: 32,
+                        shadow: false,
+                        frame: false,
+                    }),
+                    ..ParagraphBorders::default()
+                },
                 ..ParagraphFormatting::default()
             },
         ] {

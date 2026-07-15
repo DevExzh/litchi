@@ -322,7 +322,7 @@ pub enum TabLeader {
 }
 
 /// Paragraph borders.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Borders {
     /// Top border
     pub top: Option<Border>,
@@ -339,14 +339,20 @@ pub struct Borders {
 }
 
 /// Border definition.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Border {
     /// Border style
     pub style: BorderStyle,
     /// Border width in eighths of a point
     pub width: u8,
-    /// Border color (RGB)
-    pub color: (u8, u8, u8),
+    /// Border color (RGB), or `None` for automatic color
+    pub color: Option<(u8, u8, u8)>,
+    /// Distance from text to the border in points
+    pub spacing: u8,
+    /// Whether the border has a shadow effect
+    pub shadow: bool,
+    /// Whether the border has a frame effect
+    pub frame: bool,
 }
 
 /// Border styles.
@@ -364,6 +370,20 @@ pub enum BorderStyle {
     ThinThickSmallGap,
     ThickThinSmallGap,
     ThinThickThinSmallGap,
+    ThinThickMediumGap,
+    ThickThinMediumGap,
+    ThinThickThinMediumGap,
+    ThinThickLargeGap,
+    ThickThinLargeGap,
+    ThinThickThinLargeGap,
+    Wave,
+    DoubleWave,
+    DashSmallGap,
+    DashDotStroked,
+    ThreeDEmboss,
+    ThreeDEngrave,
+    Outset,
+    Inset,
 }
 
 /// Paragraph shading.
@@ -654,6 +674,30 @@ impl ParagraphProperties {
                 })?;
                 return Ok(());
             },
+            SPRM_P_BRC_TOP => {
+                pap.borders.top = Self::parse_current_border(sprm)?;
+                return Ok(());
+            },
+            SPRM_P_BRC_LEFT => {
+                pap.borders.left = Self::parse_current_border(sprm)?;
+                return Ok(());
+            },
+            SPRM_P_BRC_BOTTOM => {
+                pap.borders.bottom = Self::parse_current_border(sprm)?;
+                return Ok(());
+            },
+            SPRM_P_BRC_RIGHT => {
+                pap.borders.right = Self::parse_current_border(sprm)?;
+                return Ok(());
+            },
+            SPRM_P_BRC_BETWEEN => {
+                pap.borders.between = Self::parse_current_border(sprm)?;
+                return Ok(());
+            },
+            SPRM_P_BRC_BAR => {
+                pap.borders.bar = Self::parse_current_border(sprm)?;
+                return Ok(());
+            },
             SPRM_P_F_NO_ALLOW_OVERLAP => {
                 pap.no_allow_overlap = Self::strict_bool8(sprm, "sprmPFNoAllowOverlap")?;
                 return Ok(());
@@ -917,37 +961,13 @@ impl ParagraphProperties {
                     pap.text_wrap = Some(val);
                 }
             },
-            // Operation 0x24: sprmPBrcTop - Top border
-            0x24
-                // Parse BorderCode structure (4 bytes)
-                if sprm.operand.len() >= 4 => {
-                    pap.borders.top = Self::parse_border(&sprm.operand);
-                },
-            // Operation 0x25: sprmPBrcLeft - Left border
-            0x25
-                if sprm.operand.len() >= 4 => {
-                    pap.borders.left = Self::parse_border(&sprm.operand);
-                },
-            // Operation 0x26: sprmPBrcBottom - Bottom border
-            0x26
-                if sprm.operand.len() >= 4 => {
-                    pap.borders.bottom = Self::parse_border(&sprm.operand);
-                },
-            // Operation 0x27: sprmPBrcRight - Right border
-            0x27
-                if sprm.operand.len() >= 4 => {
-                    pap.borders.right = Self::parse_border(&sprm.operand);
-                },
-            // Operation 0x28: sprmPBrcBetween - Between border
-            0x28
-                if sprm.operand.len() >= 4 => {
-                    pap.borders.between = Self::parse_border(&sprm.operand);
-                },
-            // Operation 0x29: sprmPBrcBar - Bar border
-            0x29
-                if sprm.operand.len() >= 4 => {
-                    pap.borders.bar = Self::parse_border(&sprm.operand);
-                },
+            // Operations 0x24-0x29: Word 97 Brc80 borders
+            0x24 => pap.borders.top = Self::parse_border80(sprm)?,
+            0x25 => pap.borders.left = Self::parse_border80(sprm)?,
+            0x26 => pap.borders.bottom = Self::parse_border80(sprm)?,
+            0x27 => pap.borders.right = Self::parse_border80(sprm)?,
+            0x28 => pap.borders.between = Self::parse_border80(sprm)?,
+            0x29 => pap.borders.bar = Self::parse_border80(sprm)?,
             // Operation 0x2A: sprmPFNoAutoHyph - No auto hyphenation
             0x2A => {
                 if let Some(val) = sprm.operand_byte() {
@@ -1115,10 +1135,6 @@ impl ParagraphProperties {
                 if sprm.operand.len() >= 10 => {
                     pap.shading = Self::parse_shading_descriptor(&sprm.operand);
                 },
-            // Operations 0x4E-0x53: Borders v80
-            0x4E..=0x53 => {
-                // BrcXXX80 - Word 97-2000 borders
-            },
             // Operation 0x67: sprmPRsid - Revision save ID
             0x67 => {
                 // Revision save ID - not commonly used
@@ -1339,50 +1355,100 @@ impl ParagraphProperties {
         pap.tab_stops = tabs;
     }
 
-    /// Parse a border from BorderCode structure (4 bytes).
-    fn parse_border(data: &[u8]) -> Option<Border> {
-        if data.len() < 4 {
-            return None;
+    /// Parse a Word 97 `Brc80` paragraph border.
+    fn parse_border80(sprm: &Sprm) -> Result<Option<Border>> {
+        let data = sprm.operand_bytes();
+        if data.len() != 4 {
+            return Err(DocError::Corrupted(
+                "DOC paragraph Brc80 must contain exactly 4 bytes".to_string(),
+            ));
         }
-
-        // BorderCode structure (simplified)
-        let dpt_line_width = data[0];
-        let brc_type = data[1];
-        let ico = data[2];
-
-        if brc_type == 0 || brc_type == 255 {
-            return None; // No border
-        }
-
-        let style = match brc_type {
-            1 => BorderStyle::Single,
-            2 => BorderStyle::Thick,
-            3 => BorderStyle::Double,
-            5 => BorderStyle::Dotted,
-            6 => BorderStyle::Dashed,
-            7 => BorderStyle::DotDash,
-            8 => BorderStyle::DotDotDash,
-            9 => BorderStyle::Triple,
-            _ => BorderStyle::Single,
+        let Some(style) = Self::parse_border_style(data[1], false)? else {
+            return Ok(None);
         };
-
-        let color = match ico {
-            1 => (0, 0, 0),       // Black
-            2 => (0, 0, 255),     // Blue
-            3 => (0, 255, 255),   // Cyan
-            4 => (0, 255, 0),     // Green
-            5 => (255, 0, 255),   // Magenta
-            6 => (255, 0, 0),     // Red
-            7 => (255, 255, 0),   // Yellow
-            8 => (255, 255, 255), // White
-            _ => (0, 0, 0),       // Auto/Black
+        let color = match data[2] {
+            0 => None,
+            index @ 1..=16 => Some(Self::get_ico_color(index)),
+            invalid => {
+                return Err(DocError::Corrupted(format!(
+                    "DOC paragraph Brc80 has invalid color index {invalid}"
+                )));
+            },
         };
-
-        Some(Border {
+        Ok(Some(Border {
             style,
-            width: dpt_line_width,
+            width: data[0],
             color,
-        })
+            spacing: data[3] & 0x1F,
+            shadow: data[3] & 0x20 != 0,
+            frame: data[3] & 0x40 != 0,
+        }))
+    }
+
+    /// Parse a current 8-byte `Brc` wrapped by a `BrcOperand`.
+    fn parse_current_border(sprm: &Sprm) -> Result<Option<Border>> {
+        let data = sprm.operand_bytes();
+        if data.len() != 8 {
+            return Err(DocError::Corrupted(
+                "DOC paragraph BrcOperand must contain exactly 8 bytes".to_string(),
+            ));
+        }
+        let Some(style) = Self::parse_border_style(data[5], true)? else {
+            return Ok(None);
+        };
+        let color = match data[3] {
+            0 => Some((data[0], data[1], data[2])),
+            0xFF => None,
+            invalid => {
+                return Err(DocError::Corrupted(format!(
+                    "DOC paragraph Brc has invalid automatic-color flag {invalid:#04x}"
+                )));
+            },
+        };
+        Ok(Some(Border {
+            style,
+            width: data[4],
+            color,
+            spacing: data[6] & 0x1F,
+            shadow: data[6] & 0x20 != 0,
+            frame: data[6] & 0x40 != 0,
+        }))
+    }
+
+    fn parse_border_style(code: u8, current: bool) -> Result<Option<BorderStyle>> {
+        Ok(Some(match code {
+            0 => return Ok(None),
+            1 => BorderStyle::Single,
+            3 => BorderStyle::Double,
+            5 => BorderStyle::Thick,
+            6 => BorderStyle::Dotted,
+            7 => BorderStyle::Dashed,
+            8 => BorderStyle::DotDash,
+            9 => BorderStyle::DotDotDash,
+            10 => BorderStyle::Triple,
+            11 => BorderStyle::ThinThickSmallGap,
+            12 => BorderStyle::ThickThinSmallGap,
+            13 => BorderStyle::ThinThickThinSmallGap,
+            14 => BorderStyle::ThinThickMediumGap,
+            15 => BorderStyle::ThickThinMediumGap,
+            16 => BorderStyle::ThinThickThinMediumGap,
+            17 => BorderStyle::ThinThickLargeGap,
+            18 => BorderStyle::ThickThinLargeGap,
+            19 => BorderStyle::ThinThickThinLargeGap,
+            20 => BorderStyle::Wave,
+            21 => BorderStyle::DoubleWave,
+            22 => BorderStyle::DashSmallGap,
+            23 => BorderStyle::DashDotStroked,
+            24 => BorderStyle::ThreeDEmboss,
+            25 => BorderStyle::ThreeDEngrave,
+            26 if current => BorderStyle::Outset,
+            27 if current => BorderStyle::Inset,
+            invalid => {
+                return Err(DocError::Corrupted(format!(
+                    "DOC paragraph border has invalid type {invalid:#04x}"
+                )));
+            },
+        }))
     }
 
     /// Parse shading from Shd80 (2 bytes).
@@ -1501,13 +1567,25 @@ impl ParagraphProperties {
             || self.indent_left.is_some()
             || self.indent_right.is_some()
             || self.indent_first_line.is_some()
+            || self.indent_left_chars.is_some()
+            || self.indent_right_chars.is_some()
+            || self.indent_first_line_chars.is_some()
             || self.space_before.is_some()
             || self.space_after.is_some()
+            || self.space_before_lines.is_some()
+            || self.space_after_lines.is_some()
+            || self.space_before_auto
+            || self.space_after_auto
             || self.line_spacing.is_some()
             || self.keep_on_page
             || self.keep_with_next
             || self.page_break_before
             || self.widow_control
+            || self.no_allow_overlap
+            || self.contextual_spacing
+            || self.mirror_indents
+            || self.text_box_tight_wrap.is_some()
+            || self.borders != Borders::default()
             || !self.tab_stops.is_empty()
     }
 
@@ -1780,5 +1858,54 @@ mod tests {
 
         let invalid_legacy_jc = [SPRM_P_JC.to_le_bytes().as_slice(), &[5]].concat();
         assert!(ParagraphProperties::from_sprm(&invalid_legacy_jc).is_err());
+    }
+
+    #[test]
+    fn parses_current_and_word97_paragraph_borders_strictly() {
+        let mut grpprl = SPRM_P_BRC_TOP.to_le_bytes().to_vec();
+        grpprl.push(8);
+        grpprl.extend_from_slice(&[0x11, 0x22, 0x33, 0, 12, 27, 0x67, 0]);
+        grpprl.extend_from_slice(&SPRM_P_BRC_LEFT80.to_le_bytes());
+        grpprl.extend_from_slice(&[8, 3, 2, 0x24]);
+
+        let properties = ParagraphProperties::from_sprm(&grpprl).unwrap();
+        assert_eq!(
+            properties.borders.top,
+            Some(Border {
+                style: BorderStyle::Inset,
+                width: 12,
+                color: Some((0x11, 0x22, 0x33)),
+                spacing: 7,
+                shadow: true,
+                frame: true,
+            })
+        );
+        assert_eq!(
+            properties.borders.left,
+            Some(Border {
+                style: BorderStyle::Double,
+                width: 8,
+                color: Some((0, 0, 255)),
+                spacing: 4,
+                shadow: true,
+                frame: false,
+            })
+        );
+
+        for operand in [
+            vec![0, 0, 0, 1, 8, 1, 0, 0],
+            vec![0, 0, 0, 0, 8, 2, 0, 0],
+            vec![0; 7],
+        ] {
+            let mut invalid = SPRM_P_BRC_TOP.to_le_bytes().to_vec();
+            invalid.push(operand.len() as u8);
+            invalid.extend_from_slice(&operand);
+            assert!(ParagraphProperties::from_sprm(&invalid).is_err());
+        }
+
+        for operand in [[8, 1, 17, 0], [8, 26, 1, 0]] {
+            let invalid = [SPRM_P_BRC_TOP80.to_le_bytes().as_slice(), &operand].concat();
+            assert!(ParagraphProperties::from_sprm(&invalid).is_err());
+        }
     }
 }
