@@ -16,7 +16,7 @@ pub mod types;
 pub mod writer;
 
 pub use motion_path::{MotionPath, MotionPathBuilder, MotionPathType, PathCommand, PathEditMode};
-pub use parser::{parse_animation_info, parse_build_list};
+pub use parser::{parse_animation_info, parse_animation_info_atom, parse_build_list};
 pub use sound::{AnimationSound, BuiltinSound, SoundType};
 pub use triggers::{
     AnimationCondition, BeginCondition, EndCondition, InteractiveTrigger, IterationType,
@@ -24,7 +24,8 @@ pub use triggers::{
 };
 pub use types::{
     AfterEffect, AnimationEffect, AnimationInfo, AnimationTrigger, BuildInfo, BuildLevel,
-    BuildType, EffectDirection, EffectSpeed, FillMode, RestartMode, TimeNodeContainer,
-    TimeNodeType,
+    BuildType, EffectDirection, EffectSpeed, FillMode, LegacyAnimationAtom, LegacyAnimationBuild,
+    LegacyAnimationEffect, LegacyTextBuildSubEffect, RestartMode, ShapeAnimation,
+    TimeNodeContainer, TimeNodeType,
 };
-pub use writer::{write_animation_info, write_build_list};
+pub use writer::{write_animation_info, write_animation_info_atom, write_build_list};

@@ -4,9 +4,11 @@
 
 use super::types::{
     AfterEffect, AnimationEffect, AnimationInfo, AnimationTrigger, BuildInfo, BuildLevel,
-    BuildType, EffectDirection, EffectSpeed, TimeNodeContainer,
+    BuildType, EffectDirection, EffectSpeed, LegacyAnimationAtom, LegacyAnimationBuild,
+    LegacyAnimationEffect, LegacyTextBuildSubEffect,
 };
 use crate::consts::PptRecordType;
+use crate::ppt::package::{PptError, Result};
 
 /// Write InteractiveInfo container with InteractiveInfoAtom for animations.
 /// Per POI MovieShape, this is required alongside AnimationInfo in ClientData.
@@ -53,15 +55,25 @@ pub fn write_interactive_info_with_sound(sound_ref: u32) -> Vec<u8> {
 
 /// Write AnimationInfo container record.
 /// Returns (AnimationInfo bytes, sound_ref for InteractiveInfo)
-pub fn write_animation_info(info: &AnimationInfo) -> (Vec<u8>, u32) {
+pub fn write_animation_info(info: &AnimationInfo) -> Result<(Vec<u8>, u32)> {
+    if !info.time_nodes.is_empty() {
+        return Err(PptError::InvalidFormat(
+            "extended time nodes belong to the slide animation extension, not AnimationInfo"
+                .to_string(),
+        ));
+    }
     let mut data = Vec::new();
 
     let mut children: Vec<u8> = Vec::new();
 
     // AnimationInfoAtom MUST be the first child (per POI)
     // Extract first build item to determine animation type and sound
-    let (fly_method, fly_direction, sound_ref, has_sound) =
-        if let Some(ref build_list) = info.build_list {
+    let atom = if let Some(atom) = &info.legacy_atom {
+        atom.clone()
+    } else {
+        let (fly_method, fly_direction, sound_ref, has_sound) = if let Some(ref build_list) =
+            info.build_list
+        {
             if let Some(first_build) = build_list.builds.first() {
                 let (method, dir) = map_effect_to_ppt97(first_build.effect, first_build.direction);
                 let (snd_ref, has_snd) = if let Some(ref sound) = first_build.sound {
@@ -76,12 +88,26 @@ pub fn write_animation_info(info: &AnimationInfo) -> (Vec<u8>, u32) {
         } else {
             (0x00, 0, 0, false)
         };
-    children.extend(write_animation_info_atom_with_params(
-        fly_method,
-        fly_direction,
-        sound_ref,
-        has_sound,
-    ));
+        LegacyAnimationAtom {
+            has_sound,
+            sound_id_ref: sound_ref,
+            build_type: if info.has_animations() {
+                LegacyAnimationBuild::OneBuild
+            } else {
+                LegacyAnimationBuild::NoBuild
+            },
+            effect: LegacyAnimationEffect::parse(fly_method).unwrap_or_default(),
+            effect_direction: fly_direction,
+            text_build_sub_effect: match info.iteration {
+                super::triggers::IterationType::ByWord => LegacyTextBuildSubEffect::ByWord,
+                super::triggers::IterationType::ByLetter => LegacyTextBuildSubEffect::ByCharacter,
+                _ => LegacyTextBuildSubEffect::AllAtOnce,
+            },
+            ..LegacyAnimationAtom::default()
+        }
+    };
+    let sound_ref = atom.sound_id_ref;
+    children.extend(write_animation_info_atom(&atom)?);
 
     // NOTE: BuildList is omitted for ClientData embedding per POI AnimationInfo constructor
     // POI AnimationInfo contains ONLY AnimationInfoAtom when embedded in shape ClientData
@@ -90,11 +116,12 @@ pub fn write_animation_info(info: &AnimationInfo) -> (Vec<u8>, u32) {
     //     children.extend(write_build_list(build_list));
     // }
 
-    for time_node in &info.time_nodes {
-        children.extend(write_time_node(time_node));
-    }
-
     for raw_record in &info.raw_records {
+        if raw_record.record_type == PptRecordType::AnimationInfoAtom {
+            return Err(PptError::InvalidFormat(
+                "raw AnimationInfo children cannot contain another AnimationInfoAtom".to_string(),
+            ));
+        }
         children.extend(serialize_raw_record(raw_record));
     }
 
@@ -102,89 +129,68 @@ pub fn write_animation_info(info: &AnimationInfo) -> (Vec<u8>, u32) {
     data.extend(header);
     data.extend(children);
 
-    (data, sound_ref)
+    Ok((data, sound_ref))
 }
 
-/// Write AnimationInfoAtom record (28 bytes of data) with specific fly method, direction, and sound.
-/// This atom contains animation metadata and is required as the first child of AnimationInfo.
-/// Structure per LibreOffice ppt97animations.cxx:
-fn write_animation_info_atom_with_params(
-    fly_method: u8,
-    fly_direction: u8,
-    sound_ref: u32,
-    has_sound: bool,
-) -> Vec<u8> {
-    let mut data: Vec<u8> = Vec::new();
-
-    // AnimationInfoAtom structure (28 bytes total):
-    // Per LibreOffice Ppt97AnimationInfoAtom::ReadStream:
-
-    // 1. dimColor (4 bytes) - RGB color for dim effect
-    let dim_color = 0x00000000u32;
-    data.extend(&dim_color.to_le_bytes());
-
-    // 2. nFlags (4 bytes) - animation flags per LibreOffice ppt97animations.hxx:
-    // 0x0001 = Reverse (plays in reverse direction)
-    // 0x0004 = Automatic (starts automatically, not on click - "after previous")
-    // 0x0010 = Sound (has associated sound)
-    // 0x0040 = StopSound (stop previous sounds)
-    // 0x0400 = Critical flag for on-click animations (part of mouseclick pattern)
-    // LibreOffice shows 0x0410 = 1040 decimal = "mouseclick" (0x0400 + 0x0010 Sound)
-    let mut flags = 0x0400u32; // On-click trigger flag (NOT 0x0100!) playing)
-    if has_sound {
-        flags |= 0x0010; // Add Sound flag
+/// Serialize an exact PowerPoint 97 `AnimationInfoAtom`.
+pub fn write_animation_info_atom(atom: &LegacyAnimationAtom) -> Result<Vec<u8>> {
+    if atom.automatic && atom.delay_time_ms < 0 {
+        return Err(PptError::InvalidFormat(
+            "automatic AnimationInfoAtom cannot have a negative delay".to_string(),
+        ));
     }
-    data.extend(&flags.to_le_bytes());
+    if atom.order_id < -2 {
+        return Err(PptError::InvalidFormat(format!(
+            "AnimationInfoAtom orderID {} is less than -2",
+            atom.order_id
+        )));
+    }
+    if !atom.effect.accepts_direction(atom.effect_direction) {
+        return Err(PptError::InvalidFormat(format!(
+            "AnimationInfoAtom direction {:#04X} is invalid for {:?}",
+            atom.effect_direction, atom.effect
+        )));
+    }
 
-    // 3. nSoundRef (4 bytes) - sound reference (built-in sound ID or external sound index)
-    data.extend(&sound_ref.to_le_bytes());
+    let mut data = Vec::with_capacity(28);
+    data.extend(atom.dim_color.to_le_bytes());
+    let flags = [
+        atom.reverse,
+        atom.automatic,
+        atom.has_sound,
+        atom.stop_sound,
+        atom.play,
+        atom.synchronous,
+        atom.hide_while_not_playing,
+        atom.animate_background,
+    ]
+    .into_iter()
+    .enumerate()
+    .fold(0u16, |flags, (index, value)| {
+        flags | (u16::from(value) << (index * 2))
+    });
+    data.extend(flags.to_le_bytes());
+    data.extend(0u16.to_le_bytes());
+    data.extend(atom.sound_id_ref.to_le_bytes());
+    data.extend(atom.delay_time_ms.to_le_bytes());
+    data.extend(atom.order_id.to_le_bytes());
+    data.extend(atom.slide_count.to_le_bytes());
+    data.push(atom.build_type.as_u8());
+    data.push(atom.effect.as_u8());
+    data.push(atom.effect_direction);
+    data.push(match atom.after_effect {
+        AfterEffect::None => 0,
+        AfterEffect::DimToColor => 1,
+        AfterEffect::HideOnNextClick => 2,
+        AfterEffect::Hide => 3,
+    });
+    data.push(atom.text_build_sub_effect.as_u8());
+    data.push(atom.ole_verb);
+    data.extend([0, 0]);
 
-    // 4. nDelayTime (4 bytes, signed) - delay in milliseconds
-    let delay_time = 0i32;
-    data.extend(&delay_time.to_le_bytes());
-
-    // 5. nOrderID (2 bytes) - animation order per LibreOffice Ppt97AnimationInfoAtom offset 16
-    let order_id = 0u16;
-    data.extend(&order_id.to_le_bytes());
-
-    // 6. nSlideCount (2 bytes) - number of slides per LibreOffice Ppt97AnimationInfoAtom offset 18
-    let slide_count = 1u16;
-    data.extend(&slide_count.to_le_bytes());
-
-    // 7. nBuildType (1 byte) - CRITICAL: 0=no effect, 1=build all at once, >1=by level
-    let build_type = 1u8; // 1 = has effect (build all at once)
-    data.push(build_type);
-
-    // 8. nFlyMethod (1 byte) - animation effect type
-    data.push(fly_method);
-
-    // 9. nFlyDirection (1 byte) - direction of animation
-    data.push(fly_direction);
-
-    // 10. nAfterEffect (1 byte) - 0=none, 1=change color, 2=dim on next, 3=dim after
-    let after_effect = 0u8;
-    data.push(after_effect);
-
-    // 11. nSubEffect (1 byte) - text animation type (0=paragraph, 2=letter, other=word)
-    let sub_effect = 0u8;
-    data.push(sub_effect);
-
-    // 12. nOLEVerb (1 byte)
-    let ole_verb = 0u8;
-    data.push(ole_verb);
-
-    // 13-14. nUnknown1, nUnknown2 (2 bytes)
-    data.push(0u8);
-    data.push(0u8);
-
-    // Create record header with version=0x01 (atom), instance=0
-    let header = create_record_header(PptRecordType::AnimationInfoAtom, 0x01, 0, data.len() as u32);
-
-    let mut result = Vec::new();
-    result.extend(header);
+    let mut result = create_record_header(PptRecordType::AnimationInfoAtom, 0x01, 0, 28);
     result.extend(data);
-
-    result
+    Ok(result)
 }
 
 /// Map animation effect to PPT97 fly method and direction.
@@ -196,7 +202,7 @@ fn map_effect_to_ppt97(effect: AnimationEffect, direction: EffectDirection) -> (
     match effect {
         // Entrance effects
         Appear => (0x00, 0),
-        FadeIn => (0x0b, 0),
+        FadeIn => (0x06, 0),
         FlyIn => match direction {
             FromLeft => (0x0c, 0x00),
             FromTop => (0x0c, 0x01),
@@ -215,7 +221,7 @@ fn map_effect_to_ppt97(effect: AnimationEffect, direction: EffectDirection) -> (
             FromTop => (0x0a, 0x03),
             _ => (0x0a, 0x00),
         },
-        Split => (0x06, 0),
+        Split => (0x0d, 0),
         Dissolve => (0x05, 0),
         Box => match direction {
             Out => (0x0b, 0x00),
@@ -282,7 +288,11 @@ fn map_effect_to_ppt97(effect: AnimationEffect, direction: EffectDirection) -> (
         Descend => (0x0c, 0x01),          // fly from top
         RiseUp => (0x0c, 0x03),           // fly from bottom
         Random => (0x01, 0),              // random
-        Wheel | Plus | Diamond | Wedge | Strips => (0x00, 0),
+        Wheel => (0x1a, 1),
+        Plus => (0x12, 0),
+        Diamond => (0x11, 0),
+        Wedge => (0x13, 0),
+        Strips => (0x09, 4),
 
         // Emphasis effects (map to appear as PPT97 doesn't have these)
         Pulse | Spin | Teeter | Wave | Lighten | Darken => (0x00, 0),
@@ -349,46 +359,6 @@ fn write_build_atom(build: &BuildLevel) -> Vec<u8> {
     let header = create_record_header(PptRecordType::BuildAtom, 0x01, 0, atom_data.len() as u32);
     data.extend(header);
     data.extend(atom_data);
-
-    data
-}
-
-/// Write TimeNode container record.
-fn write_time_node(node: &TimeNodeContainer) -> Vec<u8> {
-    let mut data = Vec::new();
-
-    let mut children: Vec<u8> = Vec::new();
-
-    children.extend(write_time_properties(node));
-
-    for child in &node.children {
-        children.extend(write_time_node(child));
-    }
-
-    let header = create_record_header(PptRecordType::TimeNode, 0x0F, 0, children.len() as u32);
-    data.extend(header);
-    data.extend(children);
-
-    data
-}
-
-/// Write TimePropertyList record.
-fn write_time_properties(node: &TimeNodeContainer) -> Vec<u8> {
-    let mut data = Vec::new();
-
-    let mut prop_data: Vec<u8> = Vec::new();
-    let duration = node.duration.unwrap_or(1000);
-    prop_data.extend(&duration.to_le_bytes());
-    prop_data.extend(&node.delay.to_le_bytes());
-
-    let header = create_record_header(
-        PptRecordType::TimePropertyList,
-        0x00,
-        0,
-        prop_data.len() as u32,
-    );
-    data.extend(header);
-    data.extend(prop_data);
 
     data
 }
@@ -524,8 +494,8 @@ fn encode_after_effect(after_effect: AfterEffect) -> u8 {
     match after_effect {
         AfterEffect::None => 0,
         AfterEffect::DimToColor => 1,
-        AfterEffect::Hide => 2,
-        AfterEffect::HideOnNextClick => 3,
+        AfterEffect::HideOnNextClick => 2,
+        AfterEffect::Hide => 3,
     }
 }
 
@@ -547,12 +517,21 @@ fn create_record_header(
     instance: u16,
     data_length: u32,
 ) -> Vec<u8> {
+    create_record_header_raw(record_type.as_u16(), version, instance, data_length)
+}
+
+fn create_record_header_raw(
+    record_type: u16,
+    version: u16,
+    instance: u16,
+    data_length: u32,
+) -> Vec<u8> {
     let mut header = Vec::with_capacity(8);
 
     let version_instance = version | (instance << 4);
     header.extend(&version_instance.to_le_bytes());
 
-    header.extend(&record_type.as_u16().to_le_bytes());
+    header.extend(&record_type.to_le_bytes());
 
     header.extend(&data_length.to_le_bytes());
 
@@ -563,8 +542,8 @@ fn create_record_header(
 fn serialize_raw_record(record: &crate::ppt::records::PptRecord) -> Vec<u8> {
     let mut data = Vec::new();
 
-    let header = create_record_header(
-        record.record_type,
+    let header = create_record_header_raw(
+        record.record_type_raw,
         record.version,
         record.instance,
         record.data.len() as u32,
@@ -617,5 +596,21 @@ mod tests {
         let data = write_build_list(&build_info);
 
         assert_eq!(data.len(), 8);
+    }
+
+    #[test]
+    fn rejects_invalid_legacy_animation_atom_combinations() {
+        let mut atom = LegacyAnimationAtom {
+            effect: LegacyAnimationEffect::Wheel,
+            effect_direction: 7,
+            ..LegacyAnimationAtom::default()
+        };
+        assert!(write_animation_info_atom(&atom).is_err());
+
+        atom.effect = LegacyAnimationEffect::Cut;
+        atom.effect_direction = 0;
+        atom.automatic = true;
+        atom.delay_time_ms = -1;
+        assert!(write_animation_info_atom(&atom).is_err());
     }
 }

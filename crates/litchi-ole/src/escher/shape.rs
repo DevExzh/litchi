@@ -195,6 +195,42 @@ impl<'data> EscherShape<'data> {
         self.external_object_id
     }
 
+    /// Parse inert PowerPoint animation metadata from this shape's client data.
+    pub fn animation_info(
+        &self,
+    ) -> crate::ppt::package::Result<Option<crate::ppt::animation::AnimationInfo>> {
+        let group_header = if self.is_group {
+            self.container
+                .find_child(EscherRecordType::SpContainer)
+                .map(EscherContainer::new)
+        } else {
+            None
+        };
+        let metadata = group_header.as_ref().unwrap_or(&self.container);
+        let Some(client_data) = metadata.find_child(EscherRecordType::ClientData) else {
+            return Ok(None);
+        };
+        let mut offset = 0usize;
+        while offset + 8 <= client_data.data.len() {
+            let (record, consumed) =
+                crate::ppt::records::PptRecord::parse(client_data.data, offset)?;
+            if record.record_type == crate::consts::PptRecordType::AnimationInfo {
+                return crate::ppt::animation::parse_animation_info(&record).map(Some);
+            }
+            if consumed == 0 {
+                return Err(crate::ppt::package::PptError::Corrupted(
+                    "zero-length PPT record in OfficeArt client data".to_string(),
+                ));
+            }
+            offset = offset.checked_add(consumed).ok_or_else(|| {
+                crate::ppt::package::PptError::Corrupted(
+                    "OfficeArt client-data offset overflow".to_string(),
+                )
+            })?;
+        }
+        Ok(None)
+    }
+
     /// Return owned copies of the child shapes.
     pub fn child_shapes(&self) -> Vec<EscherShape<'data>> {
         self.children.clone()
@@ -264,22 +300,23 @@ impl<'data> EscherShape<'data> {
 
     fn extract_placeholder(container: &EscherContainer<'data>) -> Option<EscherPlaceholder> {
         let client_data = container.find_child(EscherRecordType::ClientData)?;
-        let client_data = EscherContainer::new(client_data);
-        let placeholder = client_data
-            .children()
-            .flatten()
-            .find(|record| record.record_type_raw == 3011 && record.data.len() >= 8)?;
-
-        Some(EscherPlaceholder {
-            position: i32::from_le_bytes([
-                placeholder.data[0],
-                placeholder.data[1],
-                placeholder.data[2],
-                placeholder.data[3],
-            ]),
-            placeholder_type: placeholder.data[4],
-            size: placeholder.data[5],
-        })
+        let mut offset = 0usize;
+        while offset + 8 <= client_data.data.len() {
+            let (record, consumed) =
+                crate::ppt::records::PptRecord::parse(client_data.data, offset).ok()?;
+            if record.record_type_raw == 3011 && record.data.len() >= 8 {
+                return Some(EscherPlaceholder {
+                    position: i32::from_le_bytes(record.data[0..4].try_into().ok()?),
+                    placeholder_type: record.data[4],
+                    size: record.data[5],
+                });
+            }
+            if consumed == 0 {
+                return None;
+            }
+            offset = offset.checked_add(consumed)?;
+        }
+        None
     }
 
     fn extract_frame_info(container: &EscherContainer<'data>) -> EscherFrameInfo {
@@ -292,10 +329,14 @@ impl<'data> EscherShape<'data> {
         let Some(client_data) = container.find_child(EscherRecordType::ClientData) else {
             return EscherFrameInfo::default();
         };
-        let client_data = EscherContainer::new(client_data);
         let mut info = EscherFrameInfo::default();
-
-        for record in client_data.children().flatten() {
+        let mut offset = 0usize;
+        while offset + 8 <= client_data.data.len() {
+            let Ok((record, consumed)) =
+                crate::ppt::records::PptRecord::parse(client_data.data, offset)
+            else {
+                break;
+            };
             match record.record_type_raw {
                 EX_OBJ_REF_ATOM if record.data.len() >= 4 => {
                     info.external_object_id = Some(u32::from_le_bytes([
@@ -306,11 +347,10 @@ impl<'data> EscherShape<'data> {
                     ]));
                     info.kind.get_or_insert(EscherShapeType::Object);
                 },
-                INTERACTIVE_INFO if record.is_container() => {
-                    let interactive = EscherContainer::new(record);
-                    let action = interactive
-                        .children()
-                        .flatten()
+                INTERACTIVE_INFO => {
+                    let action = record
+                        .children
+                        .iter()
                         .find(|child| {
                             child.record_type_raw == INTERACTIVE_INFO_ATOM && child.data.len() >= 9
                         })
@@ -324,6 +364,13 @@ impl<'data> EscherShape<'data> {
                 },
                 _ => {},
             }
+            if consumed == 0 {
+                break;
+            }
+            let Some(next) = offset.checked_add(consumed) else {
+                break;
+            };
+            offset = next;
         }
 
         info

@@ -1017,7 +1017,9 @@ fn build_client_data_with_animation(
     use crate::ppt::animation::writer::write_animation_info;
 
     // Write AnimationInfo container (contains AnimationInfoAtom with soundRef)
-    let (animation_bytes, _sound_ref) = write_animation_info(animation_info);
+    let (animation_bytes, _sound_ref) = write_animation_info(animation_info).map_err(|error| {
+        std::io::Error::new(std::io::ErrorKind::InvalidInput, error.to_string())
+    })?;
 
     // ClientData Escher record (0xF011) wrapping AnimationInfo only
     let mut client_data =

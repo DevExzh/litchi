@@ -4,6 +4,7 @@ use super::super::records::PptRecord;
 use super::super::shapes::ShapeEnum;
 use super::factory::SlideData;
 use crate::consts::PptRecordType;
+use crate::ppt::animation::ShapeAnimation;
 use once_cell::unsync::OnceCell;
 
 /// A slide in a PowerPoint presentation with lazy-loaded shapes.
@@ -27,6 +28,8 @@ pub struct Slide<'doc> {
     shapes: OnceCell<Vec<ShapeEnum<'static>>>,
     /// Cached text content
     text_cache: OnceCell<String>,
+    /// Lazily parsed, inert shape animation metadata.
+    animations: OnceCell<Vec<ShapeAnimation>>,
 }
 
 impl<'doc> Slide<'doc> {
@@ -40,6 +43,7 @@ impl<'doc> Slide<'doc> {
             record: data.record,
             shapes: OnceCell::new(),
             text_cache: OnceCell::new(),
+            animations: OnceCell::new(),
         }
     }
 
@@ -71,6 +75,42 @@ impl<'doc> Slide<'doc> {
     /// Get the number of shapes (triggers parsing if not yet loaded).
     pub fn shape_count(&self) -> Result<usize> {
         Ok(self.shapes()?.len())
+    }
+
+    /// Return inert PowerPoint 97 animation metadata keyed by shape ID.
+    pub fn animations(&self) -> Result<&[ShapeAnimation]> {
+        self.animations
+            .get_or_try_init(|| self.parse_animations())
+            .map(Vec::as_slice)
+    }
+
+    fn parse_animations(&self) -> Result<Vec<ShapeAnimation>> {
+        let Some(ppdrawing) = self.record.find_child(PptRecordType::PPDrawing) else {
+            return Ok(Vec::new());
+        };
+        let shapes =
+            super::super::escher::EscherShapeFactory::extract_shapes_from_drawing(&ppdrawing.data)?;
+        let mut animations = Vec::new();
+        for shape in &shapes {
+            Self::collect_animations(shape, &mut animations)?;
+        }
+        Ok(animations)
+    }
+
+    fn collect_animations(
+        shape: &super::super::escher::EscherShape<'_>,
+        animations: &mut Vec<ShapeAnimation>,
+    ) -> Result<()> {
+        if let Some(animation) = shape.animation_info()? {
+            animations.push(ShapeAnimation {
+                shape_id: shape.shape_id().unwrap_or(0),
+                animation,
+            });
+        }
+        for child in shape.children() {
+            Self::collect_animations(child, animations)?;
+        }
+        Ok(())
     }
 
     /// Extract all text from this slide (lazy-loaded).
@@ -640,6 +680,50 @@ mod tests {
 
     fn create_picture_escher_drawing(blip_id: u32) -> Vec<u8> {
         create_frame_escher_drawing(blip_id, None, None)
+    }
+
+    fn create_animated_escher_drawing() -> Vec<u8> {
+        use crate::escher::writer::{
+            ShapeBuilder, record_type, write_atom, write_client_anchor, write_container,
+        };
+        use crate::ppt::animation::{
+            AnimationInfo, LegacyAnimationAtom, LegacyAnimationBuild, LegacyAnimationEffect,
+            write_animation_info,
+        };
+
+        let atom = LegacyAnimationAtom {
+            build_type: LegacyAnimationBuild::OneBuild,
+            effect: LegacyAnimationEffect::Fade,
+            order_id: 2,
+            ..LegacyAnimationAtom::default()
+        };
+        let mut info = AnimationInfo::new();
+        info.legacy_atom = Some(atom);
+        let (animation, _) = write_animation_info(&info).unwrap();
+
+        let mut shape_children = Vec::new();
+        ShapeBuilder::new(1, 88).write(&mut shape_children).unwrap();
+        write_client_anchor(&mut shape_children, 10, 20, 210, 120).unwrap();
+        write_atom(
+            &mut shape_children,
+            0,
+            0,
+            record_type::CLIENT_DATA,
+            &animation,
+        )
+        .unwrap();
+
+        let mut shape_container = Vec::new();
+        write_container(
+            &mut shape_container,
+            0,
+            record_type::SP_CONTAINER,
+            &shape_children,
+        )
+        .unwrap();
+        let mut drawing = Vec::new();
+        write_container(&mut drawing, 0, record_type::DG_CONTAINER, &shape_container).unwrap();
+        drawing
     }
 
     fn create_placeholder_escher_drawing() -> Vec<u8> {
@@ -1378,6 +1462,28 @@ mod tests {
         assert_eq!(slide.slide_number(), 1);
         assert_eq!(slide.persist_id(), 256);
         assert!(!slide.has_drawing());
+    }
+
+    #[test]
+    fn exposes_inert_shape_animations_from_the_slide() {
+        let doc_data = vec![0u8; 1024];
+        let ppdrawing = create_test_record(
+            PptRecordType::PPDrawing,
+            create_animated_escher_drawing(),
+            Vec::new(),
+        );
+        let slide_record = create_test_record(PptRecordType::Slide, Vec::new(), vec![ppdrawing]);
+        let slide = Slide::from_slide_data(create_slide_data(slide_record, 256, &doc_data), 1);
+
+        let animations = slide.animations().unwrap();
+        assert_eq!(animations.len(), 1);
+        assert_eq!(animations[0].shape_id, 88);
+        let atom = animations[0].animation.legacy_atom.as_ref().unwrap();
+        assert_eq!(
+            atom.effect,
+            crate::ppt::animation::LegacyAnimationEffect::Fade
+        );
+        assert_eq!(atom.order_id, 2);
     }
 
     #[test]

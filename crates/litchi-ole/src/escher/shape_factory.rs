@@ -195,8 +195,8 @@ impl EscherShapeFactory {
 mod tests {
     use super::*;
     use crate::escher::writer::{
-        ShapeBuilder, record_type, write_child_anchor, write_client_anchor, write_container,
-        write_spgr,
+        ShapeBuilder, record_type, write_atom, write_child_anchor, write_client_anchor,
+        write_container, write_spgr,
     };
 
     fn shape_container(shape_type: u16, shape_id: u32, child_anchor: bool) -> Vec<u8> {
@@ -298,6 +298,36 @@ mod tests {
             group.children[0].shape_type(),
             super::super::shape::EscherShapeType::Ellipse
         );
+    }
+
+    #[test]
+    fn exposes_inert_animation_info_from_shape_client_data() {
+        use crate::ppt::animation::{
+            AnimationInfo, LegacyAnimationAtom, LegacyAnimationBuild, LegacyAnimationEffect,
+            write_animation_info,
+        };
+
+        let atom = LegacyAnimationAtom {
+            build_type: LegacyAnimationBuild::OneBuild,
+            effect: LegacyAnimationEffect::Wipe,
+            effect_direction: 2,
+            order_id: 4,
+            ..LegacyAnimationAtom::default()
+        };
+        let mut info = AnimationInfo::new();
+        info.legacy_atom = Some(atom.clone());
+        let (animation, _) = write_animation_info(&info).unwrap();
+
+        let mut children = Vec::new();
+        ShapeBuilder::new(1, 77).write(&mut children).unwrap();
+        write_atom(&mut children, 0, 0, record_type::CLIENT_DATA, &animation).unwrap();
+        let mut bytes = Vec::new();
+        write_container(&mut bytes, 0, record_type::SP_CONTAINER, &children).unwrap();
+        let (record, _) = super::super::record::EscherRecord::parse(&bytes, 0).unwrap();
+        let shape = super::super::shape::EscherShape::from_container(EscherContainer::new(record));
+        let parsed = shape.animation_info().unwrap().unwrap();
+        assert_eq!(shape.shape_id(), Some(77));
+        assert_eq!(parsed.legacy_atom, Some(atom));
     }
 
     #[test]
