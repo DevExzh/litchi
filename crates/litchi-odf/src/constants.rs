@@ -130,6 +130,10 @@ pub static ODF_MIMETYPES: Map<&'static str, &'static str> = phf_map! {
 };
 
 /// MIME type to conventional flat OpenDocument extension mapping.
+///
+/// `fodf` is the extended flat-formula convention used by odfdo. ODF 1.3
+/// defines the formula family only for packages whose `content.xml` root is
+/// MathML; it does not define an `office:formula` body element.
 pub static ODF_FLAT_MIMETYPES: Map<&'static str, &'static str> = phf_map! {
     "application/vnd.oasis.opendocument.text" => "fodt",
     "application/vnd.oasis.opendocument.spreadsheet" => "fods",

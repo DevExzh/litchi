@@ -49,7 +49,9 @@ pub struct OpenDocumentPackage {
 ///
 /// Flat documents combine content, styles, settings, and metadata under one
 /// `office:document` root and are conventionally stored as `.fodt`, `.fods`,
-/// `.fodp`, `.fodg`, `.fodc`, `.fodi`, or `.fodf`.
+/// `.fodp`, `.fodg`, `.fodc`, or `.fodi`. The `.fodf` extension is also
+/// accepted for compatibility with odfdo's non-standard `office:formula`
+/// convention; conforming packaged `.odf` formulas use a direct MathML root.
 pub struct FlatOpenDocument {
     xml: String,
     family: OpenDocumentFamily,
@@ -532,7 +534,7 @@ mod tests {
     }
 
     #[test]
-    fn opens_every_standard_flat_document_losslessly() {
+    fn opens_standard_and_odfdo_compatible_flat_documents_losslessly() {
         for (mimetype, body, family, extension) in [
             (
                 constants::ODF_TEXT,

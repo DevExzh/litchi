@@ -171,18 +171,28 @@
 //! - ✅ Embedded cached tables and vendor extension elements
 //! - ✅ Metadata and lossless exact original-byte saving
 //!
+//! ## ✅ ODF - Formula Documents (READ-ONLY SEMANTIC MODEL)
+//!
+//! - ✅ Open formulas and formula templates from paths, readers, or bytes
+//! - ✅ Namespace-aware direct MathML root and complete mixed-content subtree
+//! - ✅ Expanded attributes, common presentation element kinds, and vendor elements
+//! - ✅ MathML annotations and inert StarMath source extraction
+//! - ✅ Metadata and lossless exact original-byte saving
+//! - ✅ Formula markup remains inert and is never evaluated
+//!
 //! ## 🚧 Additional ODF Formats (PACKAGE SUPPORT)
 //!
 //! All standard families and templates can be validated, inspected, extracted,
 //! and saved losslessly through [`OpenDocumentPackage`]. Specialized semantic
 //! object models remain in progress for:
-//! - ODF - OpenDocument Formula (.odf/.otf)
 //! - ODI - OpenDocument Image (.odi/.oti)
 //! - ODM - OpenDocument Master (.odm)
 //! - OTH - OpenDocument Web (.oth)
 //!
-//! Flat XML documents (`.fodt`, `.fods`, `.fodp`, `.fodg`, `.fodc`, `.fodi`,
-//! and `.fodf`) are validated and saved losslessly through [`FlatOpenDocument`].
+//! Standard flat XML documents (`.fodt`, `.fods`, `.fodp`, `.fodg`, `.fodc`,
+//! and `.fodi`) are validated and saved losslessly through [`FlatOpenDocument`].
+//! The odfdo-compatible extended `.fodf` convention is accepted as well;
+//! conforming packaged `.odf` formulas use a direct MathML `math:math` root.
 //!
 //! ## 🚧 Advanced Features (PLANNED)
 //!
@@ -249,6 +259,8 @@ mod core;
 pub mod datatype;
 /// ODF XML element classes
 pub mod elements;
+/// OpenDocument formula (.odf/.otf) support.
+mod formula;
 /// Format-neutral package access for every OpenDocument family.
 mod generic;
 /// OpenDocument standalone chart (.odc/.otc) support.
@@ -268,6 +280,7 @@ pub use core::{
     AutoReloadMetadata, DocumentStatistics, HyperlinkBehaviourMetadata, OdfMetadata,
     TemplateMetadata, UserDefinedMetadata, UserDefinedValueType,
 };
+pub use formula::{FormulaDocument, MathAttribute, MathContent, MathElement, MathElementKind};
 pub use generic::{FlatOpenDocument, OpenDocumentFamily, OpenDocumentPackage};
 pub use litchi_core::RGBColor as Color;
 pub use litchi_core::unit::{Length, LengthUnit};
