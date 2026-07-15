@@ -483,6 +483,17 @@ pub struct KeynoteBuildSettings {
 }
 
 impl KeynoteBuildSettings {
+    /// Native playback trigger attached to a newly inserted movie.
+    pub(crate) fn movie_start() -> Self {
+        Self {
+            effect: "apple:movie-start".to_owned(),
+            duration: 0.5,
+            text_delivery: None,
+            delivery_option: None,
+            ..Self::appear_in()
+        }
+    }
+
     /// Native-compatible object-level Appear build-in settings.
     pub fn appear_in() -> Self {
         Self {
@@ -2968,7 +2979,10 @@ pub use slide_background_gradient::{
 };
 use slide_graph::*;
 pub use slide_images::{KeynoteSlideImageInfo, KeynoteSlideImageKind, RemovedKeynoteSlideImage};
-pub use slide_movies::{KeynoteSlideMovieInfo, KeynoteSlideMovieKind, RemovedKeynoteSlideMovie};
+pub use slide_movies::{
+    KeynoteSlideMovieInfo, KeynoteSlideMovieKind, KeynoteSlideMovieOptions,
+    RemovedKeynoteSlideMovie,
+};
 pub use slide_shapes::{KeynoteSlideShapeInfo, KeynoteSlideShapeKind, RemovedKeynoteSlideShape};
 pub use soundtrack::{KeynoteSoundtrackMode, KeynoteSoundtrackSettings};
 pub use soundtrack_items::KeynoteSoundtrackItemInfo;

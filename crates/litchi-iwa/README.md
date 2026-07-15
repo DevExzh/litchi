@@ -280,6 +280,35 @@ keynote.save("created-with-image.key")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
 
+File-backed movies use the same source-built path. The video, poster, media
+style, stand-ins, component registrations, and Keynote's automatic playback
+build and timing chunk are generated from typed values:
+
+```rust
+use std::fs;
+use std::time::Duration;
+use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteSlideMovieOptions};
+use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+
+let movie = fs::read("demo.mov")?;
+let poster = fs::read("demo-poster.png")?;
+let mut keynote = KeynoteDocumentBuilder::new().build()?;
+keynote.add_slide_movie(
+    0,
+    "demo.mov",
+    &movie,
+    "demo-poster.png",
+    &poster,
+    KeynoteSlideMovieOptions::new(
+        DrawablePoint { x: 640.0, y: 360.0 },
+        DrawableSize { width: 640.0, height: 360.0 },
+        Duration::from_secs(8),
+    ),
+)?;
+keynote.save("created-with-movie.key")?;
+# Ok::<(), litchi_iwa::Error>(())
+```
+
 ### Edit existing documents
 
 ```rust
