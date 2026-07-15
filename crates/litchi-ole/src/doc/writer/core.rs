@@ -3577,6 +3577,13 @@ fn build_revision_papx_grpprl(
             "DOC paragraph alignment {alignment} is outside 0..=9"
         )));
     }
+    if let Some(outline_level) = fmt.outline_level
+        && outline_level > 9
+    {
+        return Err(DocWriteError::InvalidData(format!(
+            "DOC paragraph outline level {outline_level} is outside 0..=9"
+        )));
+    }
     for (name, value) in [
         ("space_before_lines", fmt.space_before_lines),
         ("space_after_lines", fmt.space_after_lines),
@@ -4430,6 +4437,10 @@ mod tests {
         for formatting in [
             ParagraphFormatting {
                 alignment: Some(10),
+                ..ParagraphFormatting::default()
+            },
+            ParagraphFormatting {
+                outline_level: Some(10),
                 ..ParagraphFormatting::default()
             },
             ParagraphFormatting {

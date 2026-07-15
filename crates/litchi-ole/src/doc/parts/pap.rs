@@ -1044,15 +1044,19 @@ impl ParagraphProperties {
             0x3F | 0x65 | 0x6F => Self::apply_property_revision(pap, sprm)?,
             // Operation 0x40: sprmPOutLvl - Outline level
             0x40 => {
-                if let Some(lvl) = sprm.operand_byte() {
-                    pap.outline_level = Some(lvl);
+                let level = sprm.operand_byte().ok_or_else(|| {
+                    DocError::Corrupted("sprmPOutLvl is missing its outline level".to_string())
+                })?;
+                if level > 9 {
+                    return Err(DocError::Corrupted(format!(
+                        "sprmPOutLvl has invalid outline level {level}"
+                    )));
                 }
+                pap.outline_level = Some(level);
             },
             // Operation 0x41: sprmPFBiDi - Bi-directional paragraph
             0x41 => {
-                if let Some(val) = sprm.operand_byte() {
-                    pap.bi_directional = val != 0;
-                }
+                pap.bi_directional = Self::strict_bool8(sprm, "sprmPFBiDi")?;
             },
             // Operation 0x43: sprmPFNumRMIns - Numbering revision insert
             0x43 => {
@@ -1949,5 +1953,32 @@ mod tests {
             invalid.extend_from_slice(&operand);
             assert!(ParagraphProperties::from_sprm(&invalid).is_err());
         }
+    }
+
+    #[test]
+    fn parses_outline_and_bidi_controls_strictly() {
+        let grpprl = [
+            SPRM_P_OUT_LVL.to_le_bytes().as_slice(),
+            &[9],
+            SPRM_P_F_BI_DI.to_le_bytes().as_slice(),
+            &[1],
+        ]
+        .concat();
+        let properties = ParagraphProperties::from_sprm(&grpprl).unwrap();
+        assert_eq!(properties.outline_level, Some(9));
+        assert!(properties.bi_directional);
+
+        assert!(
+            ParagraphProperties::from_sprm(
+                &[SPRM_P_OUT_LVL.to_le_bytes().as_slice(), &[10]].concat()
+            )
+            .is_err()
+        );
+        assert!(
+            ParagraphProperties::from_sprm(
+                &[SPRM_P_F_BI_DI.to_le_bytes().as_slice(), &[2]].concat()
+            )
+            .is_err()
+        );
     }
 }
