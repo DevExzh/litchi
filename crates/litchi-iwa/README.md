@@ -149,6 +149,29 @@ numbers.save("created-with-text-box.numbers")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
 
+Images are also constructed directly as sheet-owned drawables. The private
+image graph, stylesheet link, UUIDs, component data reference, and `Data/*`
+asset are generated from typed values; no blank Numbers package is embedded:
+
+```rust
+use std::fs;
+use litchi_iwa::numbers::NumbersDocumentBuilder;
+use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+
+let image = fs::read("chart.png")?;
+let mut numbers = NumbersDocumentBuilder::new().build()?;
+let sheet_id = numbers.sheets()?[0].object_id;
+numbers.add_sheet_image(
+    sheet_id,
+    "chart.png",
+    &image,
+    DrawablePoint { x: 420.0, y: 180.0 },
+    DrawableSize { width: 320.0, height: 240.0 },
+)?;
+numbers.save("created-with-image.numbers")?;
+# Ok::<(), litchi_iwa::Error>(())
+```
+
 ### Create Keynote presentations from scratch
 
 Scratch-created presentations can add ordinary text boxes directly to any

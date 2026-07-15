@@ -47,9 +47,9 @@ pub use creation::NumbersDocumentBuilder;
 pub use document::NumbersDocument;
 pub use editor::{
     NumbersCellCommentInfo, NumbersCellCommentReplyInfo, NumbersEditor, NumbersPivotCategoryInfo,
-    NumbersSheetInfo, NumbersTableDimension, NumbersTableDimensionSize, NumbersTableHeaderCount,
-    NumbersTableHeaderSettings, NumbersTableInfo, NumbersTablePoints, NumbersTableTitleSettings,
-    NumbersTextBoxInfo, RemovedNumbersTextBox,
+    NumbersSheetImageInfo, NumbersSheetInfo, NumbersTableDimension, NumbersTableDimensionSize,
+    NumbersTableHeaderCount, NumbersTableHeaderSettings, NumbersTableInfo, NumbersTablePoints,
+    NumbersTableTitleSettings, NumbersTextBoxInfo, RemovedNumbersSheetImage, RemovedNumbersTextBox,
 };
 pub use formula::{
     FormulaAxisReference, FormulaBinaryOperator, FormulaCellReference, FormulaExpression,

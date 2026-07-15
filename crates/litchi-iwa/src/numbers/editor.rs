@@ -1886,6 +1886,7 @@ mod formula_dependency_shift;
 mod model;
 mod row_insert;
 mod sheet_duplicate;
+mod sheet_images;
 mod storage;
 mod table_delete;
 mod table_dimension;
@@ -1898,6 +1899,7 @@ mod text_box_create;
 mod text_box_duplicate;
 
 use model::*;
+pub use sheet_images::{NumbersSheetImageInfo, RemovedNumbersSheetImage};
 use storage::*;
 pub use table_dimension::{NumbersTableDimension, NumbersTableDimensionSize, NumbersTablePoints};
 use table_duplicate::*;
