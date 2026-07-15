@@ -692,6 +692,9 @@ impl Document {
                 reference.descriptor.bookmark_tag,
                 text,
             );
+            comment.range_start = reference.range_start_cp;
+            comment.range_end = reference.range_end_cp;
+            comment.extended_metadata = reference.extended_metadata;
             comment.paragraphs = paragraphs;
             result.push(comment);
         }

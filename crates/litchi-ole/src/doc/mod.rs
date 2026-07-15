@@ -64,7 +64,7 @@ pub mod table;
 /// DOC file writing
 pub mod writer;
 
-pub use comment::Comment;
+pub use comment::{Comment, CommentDateTime, CommentExtendedMetadata};
 pub use document::Document;
 pub use footnote::{Endnote, Footnote};
 pub use header_footer::HeaderFooter;
