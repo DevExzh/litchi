@@ -23,10 +23,11 @@ use super::types::{
     TimeRotationDirection, TimeScaleBehavior, TimeScaleBehaviorAtom, TimeSequenceData,
     TimeSequenceNextAction, TimeSequencePreviousAction, TimeSetBehavior, TimeSetBehaviorAtom,
     TimeSubEffect, TimeSubEffectBehavior, TimeTriggerEvent, TimeTriggerObject, TimeVariantValue,
-    TimeVisualElement, TimeVisualElementKind, is_valid_animation_attribute_name,
-    is_valid_motion_path, is_valid_runtime_context, is_valid_time_animate_value,
-    is_valid_time_filter, is_valid_time_formula, is_valid_time_points_types,
-    is_valid_time_set_value, time_animation_attribute_value_type, time_set_attribute_value_type,
+    TimeVisualElement, TimeVisualElementKind, has_valid_time_effect_properties,
+    is_valid_animation_attribute_name, is_valid_motion_path, is_valid_runtime_context,
+    is_valid_time_animate_value, is_valid_time_filter, is_valid_time_formula,
+    is_valid_time_points_types, is_valid_time_set_value, time_animation_attribute_value_type,
+    time_set_attribute_value_type,
 };
 use crate::consts::PptRecordType;
 use crate::ppt::package::{PptError, Result};
@@ -690,6 +691,11 @@ pub fn parse_time_node_property_list(
     {
         return Err(PptError::InvalidFormat(
             "event filter requires an interactive sequence".to_string(),
+        ));
+    }
+    if !has_valid_time_effect_properties(&properties) {
+        return Err(PptError::InvalidFormat(
+            "invalid effect ID, type, or direction combination".to_string(),
         ));
     }
     Ok(TimeNodePropertyList { properties })
@@ -3337,8 +3343,8 @@ mod tests {
         let root = TimeNodePropertyList {
             properties: vec![
                 TimeNodeProperty::DisplayHidden(true),
-                TimeNodeProperty::EffectId(42),
-                TimeNodeProperty::EffectDirection(-7),
+                TimeNodeProperty::EffectId(2),
+                TimeNodeProperty::EffectDirection(2),
                 TimeNodeProperty::EffectType(TimeEffectType::Entrance),
                 TimeNodeProperty::AfterEffect(true),
                 TimeNodeProperty::SlideCount(3),
@@ -3380,6 +3386,92 @@ mod tests {
             parse_time_node_property_list(&record, TimePropertyListContext::SubEffect).unwrap(),
             subeffect
         );
+    }
+
+    #[test]
+    fn validates_effect_ids_and_category_specific_directions() {
+        let list = |effect_type: TimeEffectType, effect_id: i32, direction: Option<i32>| {
+            TimeNodePropertyList {
+                properties: [
+                    Some(TimeNodeProperty::EffectType(effect_type)),
+                    Some(TimeNodeProperty::EffectId(effect_id)),
+                    direction.map(TimeNodeProperty::EffectDirection),
+                ]
+                .into_iter()
+                .flatten()
+                .collect(),
+            }
+        };
+        for (effect_type, effect_id, direction) in [
+            (TimeEffectType::Entrance, 0x3A, None),
+            (TimeEffectType::Exit, 2, Some(12)),
+            (TimeEffectType::Entrance, 3, Some(5)),
+            (TimeEffectType::Entrance, 4, Some(0x20)),
+            (TimeEffectType::Entrance, 0x0C, Some(8)),
+            (TimeEffectType::Entrance, 0x10, Some(0x2A)),
+            (TimeEffectType::Entrance, 0x11, Some(10)),
+            (TimeEffectType::Entrance, 0x12, Some(9)),
+            (TimeEffectType::Entrance, 0x15, Some(8)),
+            (TimeEffectType::Entrance, 0x17, Some(0x210)),
+            (TimeEffectType::Emphasis, 0x24, None),
+            (TimeEffectType::Emphasis, 1, Some(10)),
+            (TimeEffectType::Emphasis, 3, Some(6)),
+            (TimeEffectType::Emphasis, 4, Some(2)),
+            (TimeEffectType::Emphasis, 5, Some(7)),
+            (TimeEffectType::MotionPath, 0x40, Some(i32::MIN)),
+            (TimeEffectType::MediaCommand, 3, Some(i32::MAX)),
+        ] {
+            let expected = list(effect_type, effect_id, direction);
+            let bytes = write_time_node_property_list(&expected, TimePropertyListContext::TimeNode)
+                .unwrap();
+            let (record, _) = PptRecord::parse(&bytes, 0).unwrap();
+            assert_eq!(
+                parse_time_node_property_list(&record, TimePropertyListContext::TimeNode).unwrap(),
+                expected
+            );
+        }
+
+        let invalid = [
+            list(TimeEffectType::Entrance, -1, None),
+            list(TimeEffectType::Entrance, 0x3B, None),
+            list(TimeEffectType::Emphasis, 0x25, None),
+            list(TimeEffectType::MotionPath, 0x41, None),
+            list(TimeEffectType::MediaCommand, 4, None),
+            list(TimeEffectType::ActionVerb, 0, None),
+            list(TimeEffectType::Entrance, 2, Some(5)),
+            list(TimeEffectType::Entrance, 3, Some(1)),
+            list(TimeEffectType::Entrance, 0x10, Some(0x20)),
+            list(TimeEffectType::Entrance, 0x17, Some(0x211)),
+            list(TimeEffectType::Emphasis, 1, Some(3)),
+            list(TimeEffectType::Emphasis, 3, Some(2)),
+            list(TimeEffectType::Emphasis, 5, Some(8)),
+            TimeNodePropertyList {
+                properties: vec![TimeNodeProperty::EffectId(1)],
+            },
+            TimeNodePropertyList {
+                properties: vec![
+                    TimeNodeProperty::EffectType(TimeEffectType::Entrance),
+                    TimeNodeProperty::EffectDirection(1),
+                ],
+            },
+        ];
+        for invalid in invalid {
+            assert!(
+                write_time_node_property_list(&invalid, TimePropertyListContext::TimeNode).is_err()
+            );
+        }
+
+        let valid = list(TimeEffectType::Entrance, 2, Some(2));
+        let bytes =
+            write_time_node_property_list(&valid, TimePropertyListContext::TimeNode).unwrap();
+        let (mut record, _) = PptRecord::parse(&bytes, 0).unwrap();
+        let direction = record
+            .children
+            .iter_mut()
+            .find(|child| child.instance == 0x0A)
+            .unwrap();
+        direction.data[1..5].copy_from_slice(&5i32.to_le_bytes());
+        assert!(parse_time_node_property_list(&record, TimePropertyListContext::TimeNode).is_err());
     }
 
     #[test]

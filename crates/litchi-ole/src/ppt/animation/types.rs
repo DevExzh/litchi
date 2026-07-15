@@ -802,6 +802,68 @@ pub enum TimeEffectType {
     MediaCommand,
 }
 
+pub(crate) fn has_valid_time_effect_properties(properties: &[TimeNodeProperty]) -> bool {
+    let mut effect_id = None;
+    let mut direction = None;
+    let mut effect_type = None;
+    for property in properties {
+        match property {
+            TimeNodeProperty::EffectId(value) => effect_id = Some(*value),
+            TimeNodeProperty::EffectDirection(value) => direction = Some(*value),
+            TimeNodeProperty::EffectType(value) => effect_type = Some(*value),
+            _ => {},
+        }
+    }
+    let Some(effect_id) = effect_id else {
+        return direction.is_none();
+    };
+    let Some(effect_type) = effect_type else {
+        return false;
+    };
+    let valid_id = match effect_type {
+        TimeEffectType::Entrance | TimeEffectType::Exit => (0..=0x3A).contains(&effect_id),
+        TimeEffectType::Emphasis => (0..=0x24).contains(&effect_id),
+        TimeEffectType::MotionPath => (0..=0x40).contains(&effect_id),
+        TimeEffectType::MediaCommand => (0..=3).contains(&effect_id),
+        TimeEffectType::ActionVerb => false,
+    };
+    valid_id
+        && direction.is_none_or(|direction| {
+            is_valid_time_effect_direction(effect_type, effect_id, direction)
+        })
+}
+
+fn is_valid_time_effect_direction(
+    effect_type: TimeEffectType,
+    effect_id: i32,
+    direction: i32,
+) -> bool {
+    match effect_type {
+        TimeEffectType::Entrance | TimeEffectType::Exit => match effect_id {
+            0x02 | 0x07 => matches!(direction, 1 | 2 | 3 | 4 | 6 | 8 | 9 | 12),
+            0x03 | 0x05 | 0x0E | 0x13 => matches!(direction, 5 | 10),
+            0x04 | 0x06 | 0x08 | 0x0D => matches!(direction, 0x10 | 0x20),
+            0x0C | 0x16 => matches!(direction, 1 | 2 | 4 | 8),
+            0x10 => matches!(direction, 0x15 | 0x1A | 0x25 | 0x2A),
+            0x11 => matches!(direction, 1 | 2 | 4 | 8 | 10),
+            0x12 => matches!(direction, 3 | 6 | 9 | 12),
+            0x15 => matches!(direction, 1 | 2 | 3 | 4 | 8),
+            0x17 => matches!(direction, 0x10 | 0x20 | 0x24 | 0x110 | 0x120 | 0x210),
+            _ => true,
+        },
+        TimeEffectType::Emphasis => match effect_id {
+            0x01 | 0x07 => matches!(direction, 1 | 2 | 6 | 10),
+            // MS-PPT lists 0x01 for both instant and gradual for font color.
+            0x03 => matches!(direction, 1 | 6 | 10),
+            0x04 => matches!(direction, 1 | 2),
+            0x05 => (0..=7).contains(&direction),
+            _ => true,
+        },
+        TimeEffectType::MotionPath | TimeEffectType::MediaCommand => true,
+        TimeEffectType::ActionVerb => false,
+    }
+}
+
 /// Role of a time node in the timing structure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TimeEffectNodeType {

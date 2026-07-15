@@ -20,10 +20,11 @@ use super::types::{
     TimeScaleBehavior, TimeScaleBehaviorAtom, TimeSequenceData, TimeSequenceNextAction,
     TimeSequencePreviousAction, TimeSetBehavior, TimeSetBehaviorAtom, TimeSubEffect,
     TimeSubEffectBehavior, TimeTriggerEvent, TimeTriggerObject, TimeVariantValue,
-    TimeVisualElement, TimeVisualElementKind, is_valid_animation_attribute_name,
-    is_valid_motion_path, is_valid_runtime_context, is_valid_time_animate_value,
-    is_valid_time_filter, is_valid_time_formula, is_valid_time_points_types,
-    is_valid_time_set_value, time_animation_attribute_value_type, time_set_attribute_value_type,
+    TimeVisualElement, TimeVisualElementKind, has_valid_time_effect_properties,
+    is_valid_animation_attribute_name, is_valid_motion_path, is_valid_runtime_context,
+    is_valid_time_animate_value, is_valid_time_filter, is_valid_time_formula,
+    is_valid_time_points_types, is_valid_time_set_value, time_animation_attribute_value_type,
+    time_set_attribute_value_type,
 };
 use crate::consts::PptRecordType;
 use crate::ppt::package::{PptError, Result};
@@ -408,6 +409,11 @@ pub fn write_time_node_property_list(
     list: &TimeNodePropertyList,
     context: TimePropertyListContext,
 ) -> Result<Vec<u8>> {
+    if !has_valid_time_effect_properties(&list.properties) {
+        return Err(PptError::InvalidFormat(
+            "invalid effect ID, type, or direction combination".to_string(),
+        ));
+    }
     let mut seen = std::collections::HashSet::with_capacity(list.properties.len());
     let has_interactive_sequence = list.properties.iter().any(|property| {
         matches!(
