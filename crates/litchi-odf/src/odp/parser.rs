@@ -99,6 +99,12 @@ struct ShapeBuilder {
     width: Option<String>,
     height: Option<String>,
     style_name: Option<String>,
+    layer: Option<String>,
+    z_index: Option<String>,
+    transform: Option<String>,
+    presentation_class: Option<String>,
+    presentation_placeholder: Option<bool>,
+    presentation_user_transformed: Option<bool>,
     image_href: Option<String>,
     media: Option<MediaReference>,
     hyperlink: Option<DrawingHyperlink>,
@@ -161,6 +167,12 @@ impl ShapeBuilder {
             width: None,
             height: None,
             style_name: None,
+            layer: None,
+            z_index: None,
+            transform: None,
+            presentation_class: None,
+            presentation_placeholder: None,
+            presentation_user_transformed: None,
             image_href: None,
             media: None,
             hyperlink: None,
@@ -182,6 +194,12 @@ impl ShapeBuilder {
             width: self.width,
             height: self.height,
             style_name: self.style_name,
+            layer: self.layer,
+            z_index: self.z_index,
+            transform: self.transform,
+            presentation_class: self.presentation_class,
+            presentation_placeholder: self.presentation_placeholder,
+            presentation_user_transformed: self.presentation_user_transformed,
             image_href: self.image_href,
             media: self.media,
             hyperlink: self.hyperlink,
@@ -598,6 +616,21 @@ impl OdpParser {
         builder.style_name = Self::get_attr(reader, element, DRAW_NAMESPACE, b"style-name")?.or(
             Self::get_attr(reader, element, PRESENTATION_NAMESPACE, b"style-name")?,
         );
+        builder.layer = Self::get_attr(reader, element, DRAW_NAMESPACE, b"layer")?;
+        builder.z_index = Self::get_attr(reader, element, DRAW_NAMESPACE, b"z-index")?;
+        if let Some(z_index) = &builder.z_index {
+            super::slide::validate_z_index(z_index)?;
+        }
+        builder.transform = Self::get_attr(reader, element, DRAW_NAMESPACE, b"transform")?;
+        builder.presentation_class = presentation_class;
+        builder.presentation_placeholder = Self::parse_optional_bool(
+            Self::get_attr(reader, element, PRESENTATION_NAMESPACE, b"placeholder")?,
+            "presentation:placeholder",
+        )?;
+        builder.presentation_user_transformed = Self::parse_optional_bool(
+            Self::get_attr(reader, element, PRESENTATION_NAMESPACE, b"user-transformed")?,
+            "presentation:user-transformed",
+        )?;
         Ok(builder)
     }
 
@@ -2179,10 +2212,7 @@ mod tests {
             width: Some("10cm".to_string()),
             height: Some("5cm".to_string()),
             style_name: Some("Style1".to_string()),
-            image_href: None,
-            media: None,
-            hyperlink: None,
-            event_listeners: Vec::new(),
+            ..Shape::new()
         };
         let debug_str = format!("{:?}", shape);
         assert!(debug_str.contains("Shape"));
@@ -2200,10 +2230,7 @@ mod tests {
             width: Some("5cm".to_string()),
             height: Some("3cm".to_string()),
             style_name: None,
-            image_href: None,
-            media: None,
-            hyperlink: None,
-            event_listeners: Vec::new(),
+            ..Shape::new()
         };
         let cloned = shape.clone();
         assert_eq!(shape.shape_type, cloned.shape_type);
@@ -2236,10 +2263,7 @@ mod tests {
                 width: None,
                 height: None,
                 style_name: None,
-                image_href: None,
-                media: None,
-                hyperlink: None,
-                event_listeners: Vec::new(),
+                ..Shape::new()
             };
             let _ = format!("{:?}", shape);
         }
@@ -2307,6 +2331,39 @@ mod tests {
         let shape = &slides[0].shapes[0];
         assert_eq!(shape.shape_type, ShapeType::Picture);
         assert_eq!(shape.image_href(), Some("Pictures/a&b.png"));
+    }
+
+    #[test]
+    fn preserves_shape_stacking_transform_and_presentation_role() {
+        let xml = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0"><office:body><office:presentation><draw:page><draw:frame draw:name="Chart" draw:layer="controls" draw:z-index="184467440737095516160" draw:transform="rotate (0.5) translate (1cm 2cm)" presentation:class="chart" presentation:placeholder="true" presentation:user-transformed="false"/></draw:page></office:presentation></office:body></office:document-content>"#;
+
+        let slides = OdpParser::parse_slides(xml).unwrap();
+        let shape = &slides[0].shapes[0];
+        assert_eq!(shape.shape_type, ShapeType::Placeholder);
+        assert_eq!(shape.layer(), Some("controls"));
+        assert_eq!(shape.z_index(), Some("184467440737095516160"));
+        assert_eq!(shape.transform(), Some("rotate (0.5) translate (1cm 2cm)"));
+        assert_eq!(shape.presentation_class(), Some("chart"));
+        assert_eq!(shape.presentation_placeholder, Some(true));
+        assert_eq!(shape.presentation_user_transformed, Some(false));
+    }
+
+    #[test]
+    fn rejects_invalid_shape_stacking_and_boolean_values() {
+        for attribute in [
+            r#"draw:z-index="-1""#,
+            r#"draw:z-index="1.5""#,
+            r#"presentation:placeholder="yes""#,
+            r#"presentation:user-transformed="no""#,
+        ] {
+            let xml = format!(
+                r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0"><office:body><office:presentation><draw:page><draw:frame {attribute}/></draw:page></office:presentation></office:body></office:document-content>"#
+            );
+            assert!(
+                OdpParser::parse_slides(&xml).is_err(),
+                "accepted {attribute}"
+            );
+        }
     }
 
     #[test]

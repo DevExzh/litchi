@@ -9,6 +9,7 @@ use crate::odp::action::write_event_listeners;
 use crate::odp::animation::validate_animation_roots;
 use crate::odp::legacy_animation::validate_legacy_animation_root;
 use crate::odp::media::{EmbeddedMedia, embed_media};
+use crate::odp::slide::validate_z_index;
 use litchi_core::{Metadata, Result, xml::escape_xml};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -358,6 +359,36 @@ impl PresentationBuilder {
         let escaped_y = escape_xml(y);
         let escaped_width = escape_xml(width);
         let escaped_height = escape_xml(height);
+        let mut shape_attributes = format!(
+            r#" draw:layer="{}""#,
+            escape_xml(shape.layer.as_deref().unwrap_or("layout"))
+        );
+        if let Some(z_index) = &shape.z_index {
+            validate_z_index(z_index)?;
+            shape_attributes.push_str(&format!(r#" draw:z-index="{}""#, escape_xml(z_index)));
+        }
+        if let Some(transform) = &shape.transform {
+            shape_attributes.push_str(&format!(r#" draw:transform="{}""#, escape_xml(transform)));
+        }
+        let presentation_class = shape
+            .presentation_class
+            .as_deref()
+            .or_else(|| (shape.shape_type == ShapeType::Placeholder).then_some("object"));
+        if let Some(class) = presentation_class {
+            shape_attributes.push_str(&format!(r#" presentation:class="{}""#, escape_xml(class)));
+        }
+        if let Some(placeholder) = shape.presentation_placeholder {
+            shape_attributes.push_str(&format!(
+                r#" presentation:placeholder="{}""#,
+                if placeholder { "true" } else { "false" }
+            ));
+        }
+        if let Some(user_transformed) = shape.presentation_user_transformed {
+            shape_attributes.push_str(&format!(
+                r#" presentation:user-transformed="{}""#,
+                if user_transformed { "true" } else { "false" }
+            ));
+        }
 
         if shape.media.is_some() && shape.shape_type != ShapeType::GraphicFrame {
             return Err(litchi_core::Error::InvalidFormat(format!(
@@ -378,17 +409,12 @@ impl PresentationBuilder {
         };
         let mut xml = match shape.shape_type {
             ShapeType::TextBox | ShapeType::Placeholder => {
-                let presentation_class = if shape.shape_type == ShapeType::Placeholder {
-                    r#" presentation:class="object""#
-                } else {
-                    ""
-                };
                 if shape.has_text() {
                     format!(
-                        r#"<draw:frame draw:name="{}" draw:style-name="{}" draw:layer="layout"{} svg:x="{}" svg:y="{}" svg:width="{}" svg:height="{}"><draw:text-box>{}</draw:text-box></draw:frame>"#,
+                        r#"<draw:frame draw:name="{}" draw:style-name="{}"{} svg:x="{}" svg:y="{}" svg:width="{}" svg:height="{}"><draw:text-box>{}</draw:text-box></draw:frame>"#,
                         escaped_name,
                         escaped_style_name,
-                        presentation_class,
+                        shape_attributes,
                         escaped_x,
                         escaped_y,
                         escaped_width,
@@ -398,10 +424,10 @@ impl PresentationBuilder {
                 } else {
                     // Empty frame
                     format!(
-                        r#"<draw:frame draw:name="{}" draw:style-name="{}" draw:layer="layout"{} svg:x="{}" svg:y="{}" svg:width="{}" svg:height="{}"/>"#,
+                        r#"<draw:frame draw:name="{}" draw:style-name="{}"{} svg:x="{}" svg:y="{}" svg:width="{}" svg:height="{}"/>"#,
                         escaped_name,
                         escaped_style_name,
-                        presentation_class,
+                        shape_attributes,
                         escaped_x,
                         escaped_y,
                         escaped_width,
@@ -412,9 +438,10 @@ impl PresentationBuilder {
             ShapeType::AutoShape => {
                 if shape.has_text() {
                     format!(
-                        r#"<draw:rect draw:name="{}" draw:style-name="{}" draw:layer="layout" svg:x="{}" svg:y="{}" svg:width="{}" svg:height="{}">{}</draw:rect>"#,
+                        r#"<draw:rect draw:name="{}" draw:style-name="{}"{} svg:x="{}" svg:y="{}" svg:width="{}" svg:height="{}">{}</draw:rect>"#,
                         escaped_name,
                         escaped_style_name,
+                        shape_attributes,
                         escaped_x,
                         escaped_y,
                         escaped_width,
@@ -423,9 +450,10 @@ impl PresentationBuilder {
                     )
                 } else {
                     format!(
-                        r#"<draw:rect draw:name="{}" draw:style-name="{}" draw:layer="layout" svg:x="{}" svg:y="{}" svg:width="{}" svg:height="{}"/>"#,
+                        r#"<draw:rect draw:name="{}" draw:style-name="{}"{} svg:x="{}" svg:y="{}" svg:width="{}" svg:height="{}"/>"#,
                         escaped_name,
                         escaped_style_name,
+                        shape_attributes,
                         escaped_x,
                         escaped_y,
                         escaped_width,
@@ -444,9 +472,10 @@ impl PresentationBuilder {
                     },
                 );
                 format!(
-                    r#"<draw:frame draw:name="{}" draw:style-name="{}" draw:layer="layout" svg:x="{}" svg:y="{}" svg:width="{}" svg:height="{}">{}</draw:frame>"#,
+                    r#"<draw:frame draw:name="{}" draw:style-name="{}"{} svg:x="{}" svg:y="{}" svg:width="{}" svg:height="{}">{}</draw:frame>"#,
                     escaped_name,
                     escaped_style_name,
+                    shape_attributes,
                     escaped_x,
                     escaped_y,
                     escaped_width,
@@ -464,10 +493,11 @@ impl PresentationBuilder {
                     "draw:line"
                 };
                 format!(
-                    r#"<{} draw:name="{}" draw:style-name="{}" draw:layer="layout" svg:x1="{}" svg:y1="{}" svg:x2="{}" svg:y2="{}"/>"#,
+                    r#"<{} draw:name="{}" draw:style-name="{}"{} svg:x1="{}" svg:y1="{}" svg:x2="{}" svg:y2="{}"/>"#,
                     element_name,
                     escaped_name,
                     escaped_style_name,
+                    shape_attributes,
                     escaped_x,
                     escaped_y,
                     escape_xml(x2),
@@ -482,9 +512,10 @@ impl PresentationBuilder {
                     .expect("media checked by match guard")
                     .write_xml(&mut plugin)?;
                 format!(
-                    r#"<draw:frame draw:name="{}" draw:style-name="{}" draw:layer="layout" svg:x="{}" svg:y="{}" svg:width="{}" svg:height="{}">{}</draw:frame>"#,
+                    r#"<draw:frame draw:name="{}" draw:style-name="{}"{} svg:x="{}" svg:y="{}" svg:width="{}" svg:height="{}">{}</draw:frame>"#,
                     escaped_name,
                     escaped_style_name,
+                    shape_attributes,
                     escaped_x,
                     escaped_y,
                     escaped_width,
@@ -772,6 +803,36 @@ mod tests {
         connector.shape_type = ShapeType::Connector;
         let connector_xml = PresentationBuilder::generate_shape_xml(&connector, 1).unwrap();
         assert!(connector_xml.starts_with("<draw:connector"));
+    }
+
+    #[test]
+    fn writes_exact_shape_stacking_transform_and_presentation_role() {
+        let mut shape = Shape::new();
+        shape.layer = Some("foreground & controls".to_string());
+        shape
+            .set_z_index(Some("184467440737095516160".to_string()))
+            .unwrap();
+        shape.transform = Some("rotate (0.5)".to_string());
+        shape.presentation_class = Some("chart & graph".to_string());
+        shape.presentation_placeholder = Some(true);
+        shape.presentation_user_transformed = Some(false);
+
+        let xml = PresentationBuilder::generate_shape_xml(&shape, 0).unwrap();
+        assert!(xml.contains(r#"draw:layer="foreground &amp; controls""#));
+        assert!(xml.contains(r#"draw:z-index="184467440737095516160""#));
+        assert!(xml.contains(r#"draw:transform="rotate (0.5)""#));
+        assert!(xml.contains(r#"presentation:class="chart &amp; graph""#));
+        assert!(xml.contains(r#"presentation:placeholder="true""#));
+        assert!(xml.contains(r#"presentation:user-transformed="false""#));
+    }
+
+    #[test]
+    fn rejects_invalid_programmatic_shape_stacking_index() {
+        let mut shape = Shape::new();
+        assert!(shape.set_z_index(Some("-12".to_string())).is_err());
+
+        shape.z_index = Some("not-an-integer".to_string());
+        assert!(PresentationBuilder::generate_shape_xml(&shape, 0).is_err());
     }
 
     #[test]

@@ -160,6 +160,21 @@ pub struct Shape {
     pub height: Option<String>,
     /// Style name reference
     pub style_name: Option<String>,
+    /// Drawing layer containing this shape.
+    pub layer: Option<String>,
+    /// Exact `draw:z-index` lexical value.
+    ///
+    /// ODF uses the unbounded XML Schema `nonNegativeInteger` type here, so a
+    /// string avoids truncating valid values that exceed Rust integer widths.
+    pub z_index: Option<String>,
+    /// Optional ODF drawing transformation list.
+    pub transform: Option<String>,
+    /// Exact presentation role, such as `object`, `subtitle`, or `chart`.
+    pub presentation_class: Option<String>,
+    /// Whether this shape is a presentation placeholder.
+    pub presentation_placeholder: Option<bool>,
+    /// Whether a presentation placeholder was transformed by the user.
+    pub presentation_user_transformed: Option<bool>,
     /// Image source referenced by `draw:image`, when this is a picture shape.
     pub image_href: Option<String>,
     /// Inert audio/video plugin referenced by this frame.
@@ -182,6 +197,12 @@ impl Shape {
             width: None,
             height: None,
             style_name: None,
+            layer: None,
+            z_index: None,
+            transform: None,
+            presentation_class: None,
+            presentation_placeholder: None,
+            presentation_user_transformed: None,
             image_href: None,
             media: None,
             hyperlink: None,
@@ -217,6 +238,35 @@ impl Shape {
     /// Get the shape dimensions as (width, height).
     pub fn dimensions(&self) -> (Option<&str>, Option<&str>) {
         (self.width.as_deref(), self.height.as_deref())
+    }
+
+    /// Get the drawing layer containing this shape.
+    pub fn layer(&self) -> Option<&str> {
+        self.layer.as_deref()
+    }
+
+    /// Get the exact non-negative stacking index.
+    pub fn z_index(&self) -> Option<&str> {
+        self.z_index.as_deref()
+    }
+
+    /// Set or remove the exact non-negative stacking index.
+    pub fn set_z_index(&mut self, z_index: Option<String>) -> Result<()> {
+        if let Some(value) = &z_index {
+            validate_z_index(value)?;
+        }
+        self.z_index = z_index;
+        Ok(())
+    }
+
+    /// Get the ODF drawing transformation list.
+    pub fn transform(&self) -> Option<&str> {
+        self.transform.as_deref()
+    }
+
+    /// Get the exact presentation role for this shape.
+    pub fn presentation_class(&self) -> Option<&str> {
+        self.presentation_class.as_deref()
     }
 
     /// Get the image source referenced by this shape.
@@ -282,6 +332,20 @@ impl Default for Shape {
     fn default() -> Self {
         Self::new()
     }
+}
+
+pub(crate) fn validate_z_index(value: &str) -> Result<()> {
+    let digits = value
+        .strip_prefix('+')
+        .or_else(|| value.strip_prefix('-'))
+        .unwrap_or(value);
+    let negative_nonzero = value.starts_with('-') && digits.bytes().any(|byte| byte != b'0');
+    if digits.is_empty() || !digits.bytes().all(|byte| byte.is_ascii_digit()) || negative_nonzero {
+        return Err(litchi_core::Error::InvalidFormat(format!(
+            "invalid draw:z-index value '{value}'"
+        )));
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -378,10 +442,7 @@ mod tests {
             width: Some("5cm".to_string()),
             height: Some("3cm".to_string()),
             style_name: None,
-            image_href: None,
-            media: None,
-            hyperlink: None,
-            event_listeners: Vec::new(),
+            ..Shape::new()
         }];
         let slide = Slide {
             title: None,
@@ -490,10 +551,7 @@ mod tests {
             width: None,
             height: None,
             style_name: None,
-            image_href: None,
-            media: None,
-            hyperlink: None,
-            event_listeners: Vec::new(),
+            ..Shape::new()
         };
         assert_eq!(shape.text().unwrap(), "Hello");
     }
@@ -509,10 +567,7 @@ mod tests {
             width: None,
             height: None,
             style_name: None,
-            image_href: None,
-            media: None,
-            hyperlink: None,
-            event_listeners: Vec::new(),
+            ..Shape::new()
         };
         assert_eq!(shape.shape_type(), litchi_core::ShapeType::Picture);
     }
@@ -540,10 +595,7 @@ mod tests {
             width: None,
             height: None,
             style_name: None,
-            image_href: None,
-            media: None,
-            hyperlink: None,
-            event_listeners: Vec::new(),
+            ..Shape::new()
         };
         assert_eq!(shape.name(), Some("MyShape"));
     }
@@ -559,10 +611,7 @@ mod tests {
             width: None,
             height: None,
             style_name: None,
-            image_href: None,
-            media: None,
-            hyperlink: None,
-            event_listeners: Vec::new(),
+            ..Shape::new()
         };
         assert_eq!(shape.name(), None);
     }
@@ -578,10 +627,7 @@ mod tests {
             width: None,
             height: None,
             style_name: None,
-            image_href: None,
-            media: None,
-            hyperlink: None,
-            event_listeners: Vec::new(),
+            ..Shape::new()
         };
         let (x, y) = shape.position();
         assert_eq!(x, Some("10cm"));
@@ -599,10 +645,7 @@ mod tests {
             width: Some("20cm".to_string()),
             height: Some("15cm".to_string()),
             style_name: None,
-            image_href: None,
-            media: None,
-            hyperlink: None,
-            event_listeners: Vec::new(),
+            ..Shape::new()
         };
         let (w, h) = shape.dimensions();
         assert_eq!(w, Some("20cm"));
@@ -620,10 +663,7 @@ mod tests {
             width: Some("10cm".to_string()),
             height: Some("5cm".to_string()),
             style_name: Some("Style1".to_string()),
-            image_href: None,
-            media: None,
-            hyperlink: None,
-            event_listeners: Vec::new(),
+            ..Shape::new()
         };
         let cloned = shape.clone();
         assert_eq!(shape.shape_type, cloned.shape_type);
