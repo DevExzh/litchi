@@ -405,15 +405,7 @@ impl DatabaseRange {
             ));
         }
         if let Some(filter) = &self.filter {
-            validate_filter_expression(&filter.expression, 0, None)?;
-            if filter.condition_source == Some(FilterConditionSource::CellRange)
-                && filter.condition_source_range_address.is_none()
-            {
-                return Err(Error::InvalidFormat(
-                    "cell-range filter source requires table:condition-source-range-address"
-                        .to_string(),
-                ));
-            }
+            validate_filter(filter)?;
         }
         if self.sort.as_ref().is_some_and(|sort| sort.keys.is_empty()) {
             return Err(Error::InvalidFormat(
@@ -422,6 +414,18 @@ impl DatabaseRange {
         }
         Ok(())
     }
+}
+
+pub(crate) fn validate_filter(filter: &DatabaseFilter) -> Result<()> {
+    validate_filter_expression(&filter.expression, 0, None)?;
+    if filter.condition_source == Some(FilterConditionSource::CellRange)
+        && filter.condition_source_range_address.is_none()
+    {
+        return Err(Error::InvalidFormat(
+            "cell-range filter source requires table:condition-source-range-address".to_string(),
+        ));
+    }
+    Ok(())
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -588,7 +592,10 @@ fn database_range_from_start(
     })
 }
 
-fn parse_source_sql(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<DatabaseSource> {
+pub(crate) fn parse_source_sql(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+) -> Result<DatabaseSource> {
     let parse_statement = optional_bool(reader, element, b"parse-sql-statement")?
         .or(optional_bool(reader, element, b"parse-sql-statements")?);
     Ok(DatabaseSource::Sql {
@@ -598,7 +605,7 @@ fn parse_source_sql(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Resul
     })
 }
 
-fn parse_source_table(
+pub(crate) fn parse_source_table(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
 ) -> Result<DatabaseSource> {
@@ -610,7 +617,7 @@ fn parse_source_table(
     })
 }
 
-fn parse_source_query(
+pub(crate) fn parse_source_query(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
 ) -> Result<DatabaseSource> {
@@ -620,7 +627,10 @@ fn parse_source_query(
     })
 }
 
-fn parse_filter(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<DatabaseFilter> {
+pub(crate) fn parse_filter(
+    reader: &mut NsReader<&[u8]>,
+    start: &BytesStart<'_>,
+) -> Result<DatabaseFilter> {
     let target_range_address = optional_attr(reader, start, b"target-range-address")?;
     let condition_source = optional_attr(reader, start, b"condition-source")?
         .map(|value| FilterConditionSource::parse(&value))
@@ -979,7 +989,7 @@ fn write_database_range(output: &mut String, range: &DatabaseRange) {
     output.push_str("</table:database-range>");
 }
 
-fn write_database_source(output: &mut String, source: &DatabaseSource) {
+pub(crate) fn write_database_source(output: &mut String, source: &DatabaseSource) {
     match source {
         DatabaseSource::Sql {
             database_name,
@@ -1011,7 +1021,7 @@ fn write_database_source(output: &mut String, source: &DatabaseSource) {
     output.push_str("/>");
 }
 
-fn write_filter(output: &mut String, filter: &DatabaseFilter) {
+pub(crate) fn write_filter(output: &mut String, filter: &DatabaseFilter) {
     output.push_str("<table:filter");
     attr(
         output,

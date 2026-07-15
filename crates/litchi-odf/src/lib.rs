@@ -96,6 +96,7 @@
 //! - ✅ Inert database query/table/SQL source metadata
 //! - ✅ Spreadsheet calculation settings, label ranges, and inert consolidations
 //! - ✅ Inert DDE source declarations and document-stored cached tables
+//! - ✅ Data-pilot (pivot-table) sources, fields, levels, references, and groups
 //!
 //! ### Writing (`ods/builder.rs`, `ods/mutable.rs`)
 //! - ✅ SpreadsheetBuilder for creating new ODS files
@@ -112,12 +113,12 @@
 //! - ✅ Database ranges, filters, sorting, subtotals, and inert source metadata
 //! - ✅ Calculation settings, row/column label ranges, and inert consolidations
 //! - ✅ Create, edit, remove, and round-trip inert DDE caches
+//! - ✅ Create, edit, remove, and round-trip data-pilot tables
 //! - ✅ Save to file or bytes
 //!
 //! ### TODO - Advanced Features
 //! - ⚠️ Chart creation and parsing
 //! - ⚠️ Conditional formatting
-//! - ⚠️ Pivot tables
 //!
 //! ## ✅ ODP - Presentations (COMPLETE for reading/writing)
 //!
@@ -246,20 +247,25 @@ pub use ods::{
     AnnotationElement, AnnotationNode, CalculationIteration, CalculationNullDate,
     CalculationSettings, Cell as SCell, CellAnnotation, CellDetective, CellMatrixSpan, CellMerge,
     CellRangeSource, CellStyleProtection, CellValue, Column as SColumn, Consolidation,
-    ConsolidationUseLabels, ContentValidation, DatabaseFilter, DatabaseOrientation, DatabaseRange,
-    DatabaseSort, DatabaseSortKey, DatabaseSource, DdeConversionMode, DdeLink, DdeSource,
-    DetectiveDirection, DetectiveHighlightedRange, DetectiveOperation, DetectiveOperationKind,
-    EmbeddedNumberBehavior, FilterCondition, FilterConditionSource, FilterDataType,
-    FilterExpression, FormulaNamespace, IterationStatus, LabelRange, LabelRangeOrientation,
-    MutableSpreadsheet, NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange,
-    NamedRangeUsage, ProtectionKey, Row as SRow, Sheet, SheetPrintSettings, SheetProtection,
-    SheetProtectionOptions, SheetScenario, SheetStyle, SheetStyleUsage, SheetTableSource,
-    SortOrder, Spreadsheet, SpreadsheetBuilder, SpreadsheetProtection, SubtotalField, SubtotalRule,
-    SubtotalRules, SubtotalSortGroups, TableGroup, TableRange, TableSourceMode, TableStructure,
-    TableVisibility, ValidationDisplayList, ValidationErrorMacro, ValidationErrorMessage,
-    ValidationEventListener, ValidationMessage, ValidationMessageType,
-    ValidationPresentationEventListener, ValidationPresentationSound,
-    ValidationScriptEventListener,
+    ConsolidationUseLabels, ContentValidation, DataPilotDisplayInfo, DataPilotDisplayMemberMode,
+    DataPilotField, DataPilotFieldReference, DataPilotGrandTotal, DataPilotGroup,
+    DataPilotGroupBoundary, DataPilotGroupBy, DataPilotGroups, DataPilotLayoutInfo,
+    DataPilotLayoutMode, DataPilotLevel, DataPilotMember, DataPilotOrientation,
+    DataPilotReferenceMemberType, DataPilotReferenceType, DataPilotSortInfo, DataPilotSortMode,
+    DataPilotSortOrder, DataPilotSource, DataPilotTable, DatabaseFilter, DatabaseOrientation,
+    DatabaseRange, DatabaseSort, DatabaseSortKey, DatabaseSource, DdeConversionMode, DdeLink,
+    DdeSource, DetectiveDirection, DetectiveHighlightedRange, DetectiveOperation,
+    DetectiveOperationKind, EmbeddedNumberBehavior, FilterCondition, FilterConditionSource,
+    FilterDataType, FilterExpression, FormulaNamespace, IterationStatus, LabelRange,
+    LabelRangeOrientation, MutableSpreadsheet, NamedDefinition, NamedDefinitionScope,
+    NamedExpression, NamedRange, NamedRangeUsage, ProtectionKey, Row as SRow, Sheet,
+    SheetPrintSettings, SheetProtection, SheetProtectionOptions, SheetScenario, SheetStyle,
+    SheetStyleUsage, SheetTableSource, SortOrder, Spreadsheet, SpreadsheetBuilder,
+    SpreadsheetProtection, SubtotalField, SubtotalRule, SubtotalRules, SubtotalSortGroups,
+    TableGroup, TableRange, TableSourceMode, TableStructure, TableVisibility,
+    ValidationDisplayList, ValidationErrorMacro, ValidationErrorMessage, ValidationEventListener,
+    ValidationMessage, ValidationMessageType, ValidationPresentationEventListener,
+    ValidationPresentationSound, ValidationScriptEventListener,
 };
 pub use odt::{Document, DocumentBuilder, MutableDocument};
 

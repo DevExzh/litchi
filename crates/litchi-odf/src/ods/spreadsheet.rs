@@ -1,11 +1,12 @@
 //! Main Spreadsheet structure and implementation.
 
 use super::{
-    CalculationSettings, Consolidation, ContentValidation, DatabaseRange, DdeLink, LabelRange,
-    NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange, Sheet, SheetProtection,
-    SpreadsheetProtection,
+    CalculationSettings, Consolidation, ContentValidation, DataPilotTable, DatabaseRange, DdeLink,
+    LabelRange, NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange, Sheet,
+    SheetProtection, SpreadsheetProtection,
     calculation::parse_calculation_settings,
     consolidation::parse_consolidation,
+    data_pilot::parse_data_pilot_tables,
     data_validation::parse_content_validations,
     database_range::parse_database_ranges,
     dde::parse_dde_links,
@@ -55,6 +56,7 @@ pub struct Spreadsheet {
     named_definitions: Vec<NamedDefinition>,
     content_validations: Vec<ContentValidation>,
     database_ranges: Vec<DatabaseRange>,
+    data_pilot_tables: Vec<DataPilotTable>,
     calculation_settings: Option<CalculationSettings>,
     label_ranges: Vec<LabelRange>,
     consolidation: Option<Consolidation>,
@@ -142,6 +144,7 @@ impl Spreadsheet {
         let named_definitions = OdsParser::parse_named_definitions(content.xml_content())?;
         let content_validations = parse_content_validations(content.xml_content())?;
         let database_ranges = parse_database_ranges(content.xml_content())?;
+        let data_pilot_tables = parse_data_pilot_tables(content.xml_content())?;
         let calculation_settings = parse_calculation_settings(content.xml_content())?;
         let label_ranges = parse_label_ranges(content.xml_content())?;
         let consolidation = parse_consolidation(content.xml_content())?;
@@ -174,6 +177,7 @@ impl Spreadsheet {
             named_definitions,
             content_validations,
             database_ranges,
+            data_pilot_tables,
             calculation_settings,
             label_ranges,
             consolidation,
@@ -268,6 +272,11 @@ impl Spreadsheet {
     /// External database sources are inert metadata and are never executed.
     pub fn database_ranges(&self) -> &[DatabaseRange] {
         &self.database_ranges
+    }
+
+    /// Return data-pilot (pivot-table) declarations.
+    pub fn data_pilot_tables(&self) -> &[DataPilotTable] {
+        &self.data_pilot_tables
     }
 
     /// Find a content-validation definition by name.

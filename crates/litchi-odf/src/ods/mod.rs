@@ -29,6 +29,7 @@
 //! - ✅ Row and column label ranges
 //! - ✅ Inert spreadsheet consolidation declarations
 //! - ✅ Inert DDE source declarations and document-stored cached tables
+//! - ✅ Data-pilot (pivot-table) sources, fields, levels, references, and groups
 //!
 //! ## ✅ Formula Support (`formula.rs`) - PARTIAL
 //! - ✅ Formula string representation
@@ -56,11 +57,11 @@
 //! - ✅ Create, edit, remove, and round-trip row/column label ranges
 //! - ✅ Create, edit, clear, and round-trip consolidation declarations
 //! - ✅ Create, edit, remove, and round-trip inert DDE caches
+//! - ✅ Create, edit, remove, and round-trip data-pilot tables
 //!
 //! ## 🚧 TODO - Advanced Features
 //! - ⚠️ Chart creation and parsing (embedded charts)
 //! - ⚠️ Conditional formatting
-//! - ⚠️ Pivot tables
 //! - ⚠️ Sparklines
 //! - ⚠️ External data connections
 //!
@@ -75,6 +76,7 @@ mod builder;
 mod calculation;
 mod cell;
 mod consolidation;
+mod data_pilot;
 mod data_validation;
 mod database_range;
 mod dde;
@@ -101,6 +103,13 @@ pub use calculation::{
 };
 pub use cell::{Cell, CellMatrixSpan, CellMerge, CellValue};
 pub use consolidation::{Consolidation, ConsolidationUseLabels};
+pub use data_pilot::{
+    DataPilotDisplayInfo, DataPilotDisplayMemberMode, DataPilotField, DataPilotFieldReference,
+    DataPilotGrandTotal, DataPilotGroup, DataPilotGroupBoundary, DataPilotGroupBy, DataPilotGroups,
+    DataPilotLayoutInfo, DataPilotLayoutMode, DataPilotLevel, DataPilotMember,
+    DataPilotOrientation, DataPilotReferenceMemberType, DataPilotReferenceType, DataPilotSortInfo,
+    DataPilotSortMode, DataPilotSortOrder, DataPilotSource, DataPilotTable,
+};
 pub use data_validation::{
     ContentValidation, ValidationDisplayList, ValidationErrorMacro, ValidationErrorMessage,
     ValidationEventListener, ValidationMessage, ValidationMessageType,

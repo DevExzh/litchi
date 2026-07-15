@@ -6,13 +6,14 @@
 use crate::core::{OdfStructure, OwnedPackage, PackageWriter};
 use crate::ods::{
     CalculationSettings, Cell, CellAnnotation, CellDetective, CellRangeSource, CellValue, Column,
-    Consolidation, ContentValidation, DatabaseRange, DdeLink, LabelRange, NamedDefinition,
-    NamedDefinitionScope, NamedExpression, NamedRange, Row, Sheet, SheetPrintSettings,
-    SheetScenario, SheetStyle, SheetTableSource, Spreadsheet, SpreadsheetProtection,
-    TableStructure, TableVisibility,
+    Consolidation, ContentValidation, DataPilotTable, DatabaseRange, DdeLink, LabelRange,
+    NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange, Row, Sheet,
+    SheetPrintSettings, SheetScenario, SheetStyle, SheetTableSource, Spreadsheet,
+    SpreadsheetProtection, TableStructure, TableVisibility,
     calculation::write_calculation_settings,
     cell::{merge_cell_range, unmerge_cell_range},
     consolidation::write_consolidation,
+    data_pilot::write_data_pilot_tables,
     data_validation::{validate_collection, write_content_validations},
     database_range::write_database_ranges,
     dde::write_dde_links,
@@ -68,6 +69,7 @@ pub struct MutableSpreadsheet {
     named_definitions: Vec<NamedDefinition>,
     content_validations: Vec<ContentValidation>,
     database_ranges: Vec<DatabaseRange>,
+    data_pilot_tables: Vec<DataPilotTable>,
     calculation_settings: Option<CalculationSettings>,
     label_ranges: Vec<LabelRange>,
     consolidation: Option<Consolidation>,
@@ -157,6 +159,7 @@ impl MutableSpreadsheet {
         let named_definitions = spreadsheet.named_definitions().to_vec();
         let content_validations = spreadsheet.content_validations().to_vec();
         let database_ranges = spreadsheet.database_ranges().to_vec();
+        let data_pilot_tables = spreadsheet.data_pilot_tables().to_vec();
         let calculation_settings = spreadsheet.calculation_settings().cloned();
         let label_ranges = spreadsheet.label_ranges().to_vec();
         let consolidation = spreadsheet.consolidation().cloned();
@@ -175,6 +178,7 @@ impl MutableSpreadsheet {
             named_definitions,
             content_validations,
             database_ranges,
+            data_pilot_tables,
             calculation_settings,
             label_ranges,
             consolidation,
@@ -196,6 +200,7 @@ impl MutableSpreadsheet {
             named_definitions: Vec::new(),
             content_validations: Vec::new(),
             database_ranges: Vec::new(),
+            data_pilot_tables: Vec::new(),
             calculation_settings: None,
             label_ranges: Vec::new(),
             consolidation: None,
@@ -330,6 +335,28 @@ impl MutableSpreadsheet {
     /// Remove a database range by index.
     pub fn remove_database_range(&mut self, index: usize) -> Option<DatabaseRange> {
         (index < self.database_ranges.len()).then(|| self.database_ranges.remove(index))
+    }
+
+    /// Return data-pilot (pivot-table) declarations.
+    pub fn data_pilot_tables(&self) -> &[DataPilotTable] {
+        &self.data_pilot_tables
+    }
+
+    /// Mutably access data-pilot declarations.
+    pub fn data_pilot_tables_mut(&mut self) -> &mut Vec<DataPilotTable> {
+        &mut self.data_pilot_tables
+    }
+
+    /// Add a validated data-pilot table.
+    pub fn add_data_pilot_table(&mut self, table: DataPilotTable) -> Result<()> {
+        table.validate()?;
+        self.data_pilot_tables.push(table);
+        Ok(())
+    }
+
+    /// Remove a data-pilot table by index.
+    pub fn remove_data_pilot_table(&mut self, index: usize) -> Option<DataPilotTable> {
+        (index < self.data_pilot_tables.len()).then(|| self.data_pilot_tables.remove(index))
     }
 
     /// Return document-structure protection metadata.
@@ -1411,6 +1438,7 @@ impl MutableSpreadsheet {
         );
 
         write_database_ranges(&mut body, &self.database_ranges)?;
+        write_data_pilot_tables(&mut body, &self.data_pilot_tables)?;
         write_consolidation(&mut body, self.consolidation.as_ref())?;
         write_dde_links(&mut body, &self.dde_links)?;
 
@@ -1520,6 +1548,9 @@ impl MutableSpreadsheet {
         self.validate_annotations()?;
         self.validate_content_validations()?;
         self.validate_database_ranges()?;
+        self.data_pilot_tables
+            .iter()
+            .try_for_each(DataPilotTable::validate)?;
         self.validate_label_ranges()?;
         if let Some(consolidation) = &self.consolidation {
             consolidation.validate()?;

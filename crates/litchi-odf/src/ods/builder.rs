@@ -5,13 +5,14 @@
 use crate::core::{OdfStructure, PackageWriter};
 use crate::ods::{
     CalculationSettings, Cell, CellAnnotation, CellDetective, CellRangeSource, CellValue, Column,
-    Consolidation, ContentValidation, DatabaseRange, DdeLink, LabelRange, NamedDefinition,
-    NamedDefinitionScope, NamedExpression, NamedRange, Row, Sheet, SheetPrintSettings,
-    SheetScenario, SheetStyle, SheetTableSource, SpreadsheetProtection, TableStructure,
-    TableVisibility,
+    Consolidation, ContentValidation, DataPilotTable, DatabaseRange, DdeLink, LabelRange,
+    NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange, Row, Sheet,
+    SheetPrintSettings, SheetScenario, SheetStyle, SheetTableSource, SpreadsheetProtection,
+    TableStructure, TableVisibility,
     calculation::write_calculation_settings,
     cell::{merge_cell_range, unmerge_cell_range},
     consolidation::write_consolidation,
+    data_pilot::write_data_pilot_tables,
     data_validation::{validate_collection, write_content_validations},
     database_range::write_database_ranges,
     dde::write_dde_links,
@@ -57,6 +58,7 @@ pub struct SpreadsheetBuilder {
     named_definitions: Vec<NamedDefinition>,
     content_validations: Vec<ContentValidation>,
     database_ranges: Vec<DatabaseRange>,
+    data_pilot_tables: Vec<DataPilotTable>,
     calculation_settings: Option<CalculationSettings>,
     label_ranges: Vec<LabelRange>,
     consolidation: Option<Consolidation>,
@@ -87,6 +89,7 @@ impl SpreadsheetBuilder {
             named_definitions: Vec::new(),
             content_validations: Vec::new(),
             database_ranges: Vec::new(),
+            data_pilot_tables: Vec::new(),
             calculation_settings: None,
             label_ranges: Vec::new(),
             consolidation: None,
@@ -204,6 +207,23 @@ impl SpreadsheetBuilder {
         self.database_ranges
             .iter()
             .try_for_each(DatabaseRange::validate)
+    }
+
+    /// Return data-pilot (pivot-table) declarations.
+    pub fn data_pilot_tables(&self) -> &[DataPilotTable] {
+        &self.data_pilot_tables
+    }
+
+    /// Add a validated data-pilot table.
+    pub fn add_data_pilot_table(&mut self, table: DataPilotTable) -> Result<&mut Self> {
+        table.validate()?;
+        self.data_pilot_tables.push(table);
+        Ok(self)
+    }
+
+    /// Remove a data-pilot table by index.
+    pub fn remove_data_pilot_table(&mut self, index: usize) -> Option<DataPilotTable> {
+        (index < self.data_pilot_tables.len()).then(|| self.data_pilot_tables.remove(index))
     }
 
     /// Return document-structure protection metadata.
@@ -1572,6 +1592,7 @@ impl SpreadsheetBuilder {
         );
 
         write_database_ranges(&mut body, &self.database_ranges)?;
+        write_data_pilot_tables(&mut body, &self.data_pilot_tables)?;
         write_consolidation(&mut body, self.consolidation.as_ref())?;
         write_dde_links(&mut body, &self.dde_links)?;
 
@@ -1675,6 +1696,9 @@ impl SpreadsheetBuilder {
         self.validate_annotations()?;
         self.validate_content_validations()?;
         self.validate_database_ranges()?;
+        self.data_pilot_tables
+            .iter()
+            .try_for_each(DataPilotTable::validate)?;
         self.validate_label_ranges()?;
         if let Some(consolidation) = &self.consolidation {
             consolidation.validate()?;
