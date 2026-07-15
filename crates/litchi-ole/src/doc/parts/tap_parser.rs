@@ -26,7 +26,7 @@ fn binary_to_doc_result<T>(result: BinaryResult<T>) -> Result<T> {
 }
 use super::tap::{
     BorderStyle, BorderType, CellMergeStatus, CellProperties, TableJustification, TableProperties,
-    TableWidth, TextDirection, VerticalAlignment, WidthType,
+    TableWidth, TextDirection, VerticalAlignment, VerticalMergeStatus, WidthType,
 };
 use crate::sprm::{Sprm, parse_sprms};
 use crate::sprm_operations::get_sprm_operation;
@@ -378,7 +378,23 @@ impl<'arena> TapParser<'arena> {
             3 => TextDirection::BtLr,
             4 => TextDirection::LrBt,
             5 => TextDirection::TbLr,
-            _ => TextDirection::LrTb,
+            value => {
+                return Err(DocError::Corrupted(format!(
+                    "TC80 contains invalid textFlow value {value}"
+                )));
+            },
+        };
+
+        // Bits 5-6: vertical merge state.
+        props.vertical_merge_status = match (flags >> 5) & 0x03 {
+            0 => VerticalMergeStatus::None,
+            1 => VerticalMergeStatus::Merged,
+            3 => VerticalMergeStatus::First,
+            value => {
+                return Err(DocError::Corrupted(format!(
+                    "TC80 contains invalid vertMerge value {value}"
+                )));
+            },
         };
 
         // Bits 7-8: vertical alignment.
@@ -387,8 +403,16 @@ impl<'arena> TapParser<'arena> {
             0 => VerticalAlignment::Top,
             1 => VerticalAlignment::Center,
             2 => VerticalAlignment::Bottom,
-            _ => VerticalAlignment::Top,
+            value => {
+                return Err(DocError::Corrupted(format!(
+                    "TC80 contains invalid vertAlign value {value}"
+                )));
+            },
         };
+
+        props.fit_text = flags & 0x1000 != 0;
+        props.no_wrap = flags & 0x2000 != 0;
+        props.hide_mark = flags & 0x4000 != 0;
 
         // Read preferred width (bytes 2-3)
         let w_width = binary_to_doc_result(read_i16_le(data, offset + 2))?;
@@ -412,7 +436,11 @@ impl<'arena> TapParser<'arena> {
                 value: w_width,
                 width_type: WidthType::Twips,
             }),
-            _ => None,
+            value => {
+                return Err(DocError::Corrupted(format!(
+                    "TC80 contains invalid ftsWidth value {value}"
+                )));
+            },
         };
 
         // Read borders (4 bytes each)
@@ -684,6 +712,15 @@ mod tests {
         grpprl
     }
 
+    fn single_cell_definition_grpprl(flags: u16, width: i16) -> Vec<u8> {
+        let mut operand = vec![1, 0, 0];
+        operand.extend_from_slice(&width.to_le_bytes());
+        operand.extend_from_slice(&flags.to_le_bytes());
+        operand.extend_from_slice(&width.to_le_bytes());
+        operand.extend_from_slice(&[0; 16]);
+        table_definition_grpprl(&operand)
+    }
+
     #[test]
     fn test_tap_parser_creation() {
         let arena = Bump::new();
@@ -751,23 +788,41 @@ mod tests {
     fn decodes_tc80_layout_bits_and_width_type() {
         let arena = Bump::new();
         let parser = TapParser::new(&arena);
-        let mut operand = vec![1, 0, 0];
-        operand.extend_from_slice(&1440i16.to_le_bytes());
-        let flags = 2u16 | (3 << 2) | (2 << 7) | (3 << 9);
-        operand.extend_from_slice(&flags.to_le_bytes());
-        operand.extend_from_slice(&1440i16.to_le_bytes());
-        operand.extend_from_slice(&[0; 16]);
+        let flags = 2u16 | (3 << 2) | (3 << 5) | (2 << 7) | (3 << 9) | 0x7000;
 
         let tap = parser
-            .parse_tap(&table_definition_grpprl(&operand))
+            .parse_tap(&single_cell_definition_grpprl(flags, 1440))
             .unwrap();
         let cell = &tap.cell_properties[0];
         assert_eq!(cell.merge_status, CellMergeStatus::First);
+        assert_eq!(cell.vertical_merge_status, VerticalMergeStatus::First);
         assert_eq!(cell.text_direction, TextDirection::BtLr);
         assert_eq!(cell.vertical_alignment, VerticalAlignment::Bottom);
+        assert!(cell.fit_text);
+        assert!(cell.no_wrap);
+        assert!(cell.hide_mark);
         let width = cell.preferred_width.unwrap();
         assert_eq!(width.value, 1440);
         assert_eq!(width.width_type, WidthType::Twips);
+    }
+
+    #[test]
+    fn rejects_invalid_tc80_layout_values() {
+        let arena = Bump::new();
+        let parser = TapParser::new(&arena);
+        for flags in [2 << 2, 2 << 5, 3 << 7, 4 << 9] {
+            assert!(
+                parser
+                    .parse_tap(&single_cell_definition_grpprl(flags, 1440))
+                    .is_err(),
+                "flags {flags:#06x} should be rejected"
+            );
+        }
+        assert!(
+            parser
+                .parse_tap(&single_cell_definition_grpprl(3 << 9, -1))
+                .is_err()
+        );
     }
 
     #[test]

@@ -277,6 +277,26 @@ impl Cell {
         self.properties.as_ref().map(|p| p.vertical_alignment)
     }
 
+    /// Get the cell's vertical merge state.
+    pub fn vertical_merge_status(&self) -> Option<super::parts::tap::VerticalMergeStatus> {
+        self.properties.as_ref().map(|p| p.vertical_merge_status)
+    }
+
+    /// Whether the cell stretches its contents to use the full width.
+    pub fn fit_text(&self) -> Option<bool> {
+        self.properties.as_ref().map(|p| p.fit_text)
+    }
+
+    /// Whether the cell prefers a single unwrapped line.
+    pub fn no_wrap(&self) -> Option<bool> {
+        self.properties.as_ref().map(|p| p.no_wrap)
+    }
+
+    /// Whether an otherwise empty row can hide this cell's mark.
+    pub fn hide_mark(&self) -> Option<bool> {
+        self.properties.as_ref().map(|p| p.hide_mark)
+    }
+
     /// Get the cell's background color as RGB tuple.
     pub fn background_color(&self) -> Option<(u8, u8, u8)> {
         self.properties.as_ref().and_then(|p| p.background_color)

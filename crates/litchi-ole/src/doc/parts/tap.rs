@@ -56,8 +56,10 @@ pub struct TableProperties {
 /// Based on Apache POI's TableCellDescriptor class.
 #[derive(Debug, Clone, Default)]
 pub struct CellProperties {
-    /// Merged cell status
+    /// Horizontal merge status
     pub merge_status: CellMergeStatus,
+    /// Vertical merge status
+    pub vertical_merge_status: VerticalMergeStatus,
     /// Vertical alignment
     pub vertical_alignment: VerticalAlignment,
     /// Cell background color (RGB)
@@ -66,6 +68,12 @@ pub struct CellProperties {
     pub borders: CellBorders,
     /// Text direction
     pub text_direction: TextDirection,
+    /// Stretch contents to use the full cell width
+    pub fit_text: bool,
+    /// Prefer cell contents on a single unwrapped line
+    pub no_wrap: bool,
+    /// Hide the cell mark when every cell in the row is empty
+    pub hide_mark: bool,
     /// Preferred cell width
     pub preferred_width: Option<TableWidth>,
     /// Cell padding (in twips)
@@ -84,6 +92,18 @@ pub enum CellMergeStatus {
     /// First cell in a horizontal merge
     First,
     /// Continuation of a horizontal merge
+    Merged,
+}
+
+/// Vertical cell merge status.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum VerticalMergeStatus {
+    /// Not vertically merged
+    #[default]
+    None,
+    /// First cell in a vertical merge
+    First,
+    /// Continuation of a vertical merge
     Merged,
 }
 
