@@ -523,6 +523,12 @@ impl AttrParser {
                 let (r, g, b) = parse_color(value)?;
                 Ok(ParsedValue::Color(r, g, b))
             },
+            AttrType::Duration => {
+                let value = std::str::from_utf8(value)
+                    .map_err(|_| Error::InvalidFormat("Invalid UTF-8".to_string()))?;
+                crate::datatype::DurationOdf::decode_exact(value)?;
+                Ok(ParsedValue::String(value.to_string()))
+            },
             _ => Ok(ParsedValue::String(
                 String::from_utf8(value.to_vec())
                     .map_err(|_| Error::InvalidFormat("Invalid UTF-8".to_string()))?,
@@ -556,6 +562,16 @@ mod tests {
         assert!(parse_bool(b"true").unwrap());
         assert!(!parse_bool(b"false").unwrap());
         assert!(parse_bool(b"invalid").is_err());
+    }
+
+    #[test]
+    fn validates_exact_duration_attributes() {
+        assert_eq!(
+            AttrParser::parse_typed("office:time-value", b"P2Y3MT4.125S").unwrap(),
+            ParsedValue::String("P2Y3MT4.125S".to_string())
+        );
+        assert!(AttrParser::parse_typed("office:time-value", b"PT").is_err());
+        assert!(AttrParser::parse_typed("office:time-value", b"P1D2Y").is_err());
     }
 
     #[test]

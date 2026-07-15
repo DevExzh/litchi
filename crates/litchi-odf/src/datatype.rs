@@ -8,7 +8,7 @@
 //! ✅ COMPLETED: Boolean conversion (ODF "true"/"false" ↔ Rust bool)
 //! ✅ COMPLETED: Date conversion (ISO 8601 date ↔ chrono::NaiveDate)
 //! ✅ COMPLETED: DateTime conversion (ISO 8601 datetime ↔ chrono::DateTime)
-//! ✅ COMPLETED: Duration conversion (ISO 8601 duration ↔ chrono::Duration)
+//! ✅ COMPLETED: Exact XML Schema duration parsing plus checked chrono conversion
 //!
 //! # References
 //!
@@ -16,6 +16,7 @@
 
 use chrono::{DateTime, Duration, FixedOffset, NaiveDate, NaiveDateTime, Utc};
 use litchi_core::Result;
+use std::fmt;
 
 // ============================================================================
 // BOOLEAN CONVERSION
@@ -245,6 +246,159 @@ impl DateTimeOdf {
 /// Converts between ODF duration format (ISO 8601: "PT1H30M") and chrono::Duration.
 pub struct DurationOdf;
 
+/// Exact XML Schema duration value used by ODF.
+///
+/// Calendar years and months cannot be represented by [`chrono::Duration`]
+/// without a reference date. This type retains every component and its exact
+/// lexical representation, including arbitrary-width integers and fractional
+/// seconds.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct OdfDurationValue {
+    lexical: String,
+    negative: bool,
+    years: Option<String>,
+    months: Option<String>,
+    days: Option<String>,
+    hours: Option<String>,
+    minutes: Option<String>,
+    seconds: Option<String>,
+}
+
+impl OdfDurationValue {
+    /// Return the exact validated ODF lexical representation.
+    pub fn as_str(&self) -> &str {
+        &self.lexical
+    }
+
+    /// Whether the duration carries a negative sign.
+    pub fn is_negative(&self) -> bool {
+        self.negative
+    }
+
+    /// Calendar-year component, if present.
+    pub fn years(&self) -> Option<&str> {
+        self.years.as_deref()
+    }
+
+    /// Calendar-month component, if present.
+    pub fn months(&self) -> Option<&str> {
+        self.months.as_deref()
+    }
+
+    /// Day component, if present.
+    pub fn days(&self) -> Option<&str> {
+        self.days.as_deref()
+    }
+
+    /// Hour component, if present.
+    pub fn hours(&self) -> Option<&str> {
+        self.hours.as_deref()
+    }
+
+    /// Minute component, if present.
+    pub fn minutes(&self) -> Option<&str> {
+        self.minutes.as_deref()
+    }
+
+    /// Seconds component, including its fractional part, if present.
+    pub fn seconds(&self) -> Option<&str> {
+        self.seconds.as_deref()
+    }
+
+    /// Convert a day/time-only value to a checked [`chrono::Duration`].
+    ///
+    /// Non-zero calendar years or months require a reference date and are
+    /// rejected. Fractional precision beyond nanoseconds is accepted only when
+    /// the additional digits are zero.
+    pub fn to_chrono(&self) -> Result<Duration> {
+        if self.years.as_deref().is_some_and(component_is_nonzero)
+            || self.months.as_deref().is_some_and(component_is_nonzero)
+        {
+            return Err(litchi_core::Error::InvalidFormat(
+                "calendar years and months require a reference date".to_string(),
+            ));
+        }
+
+        let mut value = Duration::zero();
+        for (component, unit, description) in [
+            (
+                &self.days,
+                Duration::try_days as fn(i64) -> Option<Duration>,
+                "days",
+            ),
+            (&self.hours, Duration::try_hours, "hours"),
+            (&self.minutes, Duration::try_minutes, "minutes"),
+        ] {
+            if let Some(component) = component {
+                let amount = parse_duration_i64(component, description)?;
+                let part = unit(amount).ok_or_else(|| duration_range_error(description))?;
+                value = value
+                    .checked_add(&part)
+                    .ok_or_else(|| duration_range_error("total"))?;
+            }
+        }
+
+        if let Some(seconds) = &self.seconds {
+            let (whole, fraction) = seconds.split_once('.').unwrap_or((seconds, ""));
+            let whole = parse_duration_i64(whole, "seconds")?;
+            value = value
+                .checked_add(
+                    &Duration::try_seconds(whole).ok_or_else(|| duration_range_error("seconds"))?,
+                )
+                .ok_or_else(|| duration_range_error("total"))?;
+            if !fraction.is_empty() {
+                let significant = fraction.trim_end_matches('0');
+                if !significant.is_empty() {
+                    if significant.len() > 9 {
+                        return Err(litchi_core::Error::InvalidFormat(
+                            "duration fractional seconds exceed nanosecond precision".to_string(),
+                        ));
+                    }
+                    let mut nanoseconds = significant.parse::<i64>().map_err(|_| {
+                        litchi_core::Error::InvalidFormat(
+                            "duration fractional seconds are out of range".to_string(),
+                        )
+                    })?;
+                    for _ in significant.len()..9 {
+                        nanoseconds *= 10;
+                    }
+                    value = value
+                        .checked_add(&Duration::nanoseconds(nanoseconds))
+                        .ok_or_else(|| duration_range_error("total"))?;
+                }
+            }
+        }
+
+        if self.negative {
+            Duration::zero()
+                .checked_sub(&value)
+                .ok_or_else(|| duration_range_error("total"))
+        } else {
+            Ok(value)
+        }
+    }
+}
+
+impl fmt::Display for OdfDurationValue {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&self.lexical)
+    }
+}
+
+fn component_is_nonzero(component: &str) -> bool {
+    component.bytes().any(|byte| byte != b'0')
+}
+
+fn parse_duration_i64(component: &str, description: &str) -> Result<i64> {
+    component.parse::<i64>().map_err(|_| {
+        litchi_core::Error::InvalidFormat(format!("duration {description} are out of range"))
+    })
+}
+
+fn duration_range_error(component: &str) -> litchi_core::Error {
+    litchi_core::Error::InvalidFormat(format!("duration {component} is out of range"))
+}
+
 impl DurationOdf {
     /// Decode ODF duration string to chrono::Duration
     ///
@@ -271,86 +425,12 @@ impl DurationOdf {
     /// assert_eq!(dur_neg, Duration::minutes(-5));
     /// ```
     pub fn decode(data: &str) -> Result<Duration> {
-        let (sign, data) = if let Some(rest) = data.strip_prefix('-') {
-            (-1, rest)
-        } else {
-            (1, data)
-        };
+        Self::decode_exact(data)?.to_chrono()
+    }
 
-        if !data.starts_with('P') {
-            return Err(litchi_core::Error::Other(format!(
-                "Invalid duration format '{}', must start with 'P'",
-                data
-            )));
-        }
-
-        let mut days = 0i64;
-        let mut hours = 0i64;
-        let mut minutes = 0i64;
-        let mut seconds = 0i64;
-
-        let mut buffer = String::new();
-        let mut in_time = false;
-
-        for c in data.chars().skip(1) {
-            // Skip 'P'
-            match c {
-                '0'..='9' => buffer.push(c),
-                'D' => {
-                    days = buffer.parse().map_err(|_| {
-                        litchi_core::Error::Other("Invalid days in duration".to_string())
-                    })?;
-                    buffer.clear();
-                },
-                'T' => {
-                    in_time = true;
-                },
-                'H' => {
-                    if !in_time {
-                        return Err(litchi_core::Error::Other(
-                            "Hours must come after 'T' in duration".to_string(),
-                        ));
-                    }
-                    hours = buffer.parse().map_err(|_| {
-                        litchi_core::Error::Other("Invalid hours in duration".to_string())
-                    })?;
-                    buffer.clear();
-                },
-                'M' => {
-                    if in_time {
-                        minutes = buffer.parse().map_err(|_| {
-                            litchi_core::Error::Other("Invalid minutes in duration".to_string())
-                        })?;
-                    } else {
-                        // Months not supported in chrono::Duration
-                        return Err(litchi_core::Error::Other(
-                            "Months in duration not supported".to_string(),
-                        ));
-                    }
-                    buffer.clear();
-                },
-                'S' => {
-                    if !in_time {
-                        return Err(litchi_core::Error::Other(
-                            "Seconds must come after 'T' in duration".to_string(),
-                        ));
-                    }
-                    seconds = buffer.parse().map_err(|_| {
-                        litchi_core::Error::Other("Invalid seconds in duration".to_string())
-                    })?;
-                    buffer.clear();
-                },
-                _ => {
-                    return Err(litchi_core::Error::Other(format!(
-                        "Invalid character '{}' in duration",
-                        c
-                    )));
-                },
-            }
-        }
-
-        let total_seconds = days * 86400 + hours * 3600 + minutes * 60 + seconds;
-        Ok(Duration::seconds(total_seconds * sign))
+    /// Parse and retain a complete XML Schema duration without narrowing it.
+    pub fn decode_exact(data: &str) -> Result<OdfDurationValue> {
+        parse_exact_duration(data)
     }
 
     /// Encode chrono::Duration to ODF duration string
@@ -377,18 +457,134 @@ impl DurationOdf {
     /// ```
     pub fn encode(value: &Duration) -> String {
         let total_seconds = value.num_seconds();
-        let (sign, abs_seconds) = if total_seconds < 0 {
-            ("-", -total_seconds)
-        } else {
-            ("", total_seconds)
-        };
+        let subsecond_nanoseconds = value.subsec_nanos();
+        let negative = total_seconds < 0 || subsecond_nanoseconds < 0;
+        let sign = if negative { "-" } else { "" };
+        let abs_seconds = total_seconds.unsigned_abs();
+        let abs_nanoseconds = subsecond_nanoseconds.unsigned_abs();
 
         let hours = abs_seconds / 3600;
         let minutes = (abs_seconds % 3600) / 60;
         let seconds = abs_seconds % 60;
-
-        format!("{}PT{}H{}M{}S", sign, hours, minutes, seconds)
+        if abs_nanoseconds == 0 {
+            format!("{sign}PT{hours}H{minutes}M{seconds}S")
+        } else {
+            let fraction = format!("{abs_nanoseconds:09}");
+            format!(
+                "{sign}PT{hours}H{minutes}M{seconds}.{}S",
+                fraction.trim_end_matches('0')
+            )
+        }
     }
+}
+
+fn parse_exact_duration(data: &str) -> Result<OdfDurationValue> {
+    if data.len() > 1_048_576 {
+        return Err(litchi_core::Error::InvalidFormat(
+            "duration exceeds 1 MiB".to_string(),
+        ));
+    }
+    let (negative, body) = data
+        .strip_prefix('-')
+        .map_or((false, data), |body| (true, body));
+    let body = body.strip_prefix('P').ok_or_else(|| {
+        litchi_core::Error::InvalidFormat(format!(
+            "invalid duration '{data}': expected a 'P' designator"
+        ))
+    })?;
+
+    let mut value = OdfDurationValue {
+        lexical: data.to_string(),
+        negative,
+        years: None,
+        months: None,
+        days: None,
+        hours: None,
+        minutes: None,
+        seconds: None,
+    };
+    let bytes = body.as_bytes();
+    let mut position = 0usize;
+    let mut in_time = false;
+    let mut last_rank = 0u8;
+    let mut component_count = 0usize;
+    let mut time_component_count = 0usize;
+
+    while position < bytes.len() {
+        if bytes[position] == b'T' {
+            if in_time {
+                return Err(invalid_duration(data, "duplicate 'T' designator"));
+            }
+            in_time = true;
+            last_rank = 0;
+            position += 1;
+            continue;
+        }
+
+        let start = position;
+        while position < bytes.len() && bytes[position].is_ascii_digit() {
+            position += 1;
+        }
+        if position == start {
+            return Err(invalid_duration(data, "expected a numeric component"));
+        }
+        if position < bytes.len() && bytes[position] == b'.' {
+            position += 1;
+            let fraction_start = position;
+            while position < bytes.len() && bytes[position].is_ascii_digit() {
+                position += 1;
+            }
+            if position == fraction_start {
+                return Err(invalid_duration(data, "empty fractional seconds"));
+            }
+        }
+        if position == bytes.len() {
+            return Err(invalid_duration(data, "component has no designator"));
+        }
+
+        let component = &body[start..position];
+        let designator = bytes[position];
+        position += 1;
+        let (rank, slot): (u8, &mut Option<String>) = match (in_time, designator) {
+            (false, b'Y') => (1, &mut value.years),
+            (false, b'M') => (2, &mut value.months),
+            (false, b'D') => (3, &mut value.days),
+            (true, b'H') => (1, &mut value.hours),
+            (true, b'M') => (2, &mut value.minutes),
+            (true, b'S') => (3, &mut value.seconds),
+            _ => return Err(invalid_duration(data, "invalid or misplaced designator")),
+        };
+        if component.contains('.') && designator != b'S' {
+            return Err(invalid_duration(
+                data,
+                "only seconds may contain a fraction",
+            ));
+        }
+        if rank <= last_rank || slot.is_some() {
+            return Err(invalid_duration(
+                data,
+                "components are duplicated or unordered",
+            ));
+        }
+        last_rank = rank;
+        *slot = Some(component.to_string());
+        component_count += 1;
+        if in_time {
+            time_component_count += 1;
+        }
+    }
+
+    if component_count == 0 {
+        return Err(invalid_duration(data, "duration has no components"));
+    }
+    if in_time && time_component_count == 0 {
+        return Err(invalid_duration(data, "'T' has no time components"));
+    }
+    Ok(value)
+}
+
+fn invalid_duration(data: &str, description: &str) -> litchi_core::Error {
+    litchi_core::Error::InvalidFormat(format!("invalid duration '{data}': {description}"))
 }
 
 #[cfg(test)]
@@ -486,5 +682,88 @@ mod tests {
 
         let dur = Duration::days(1) + Duration::hours(2) + Duration::minutes(30);
         assert_eq!(DurationOdf::encode(&dur), "PT26H30M0S"); // 24+2 hours
+    }
+
+    #[test]
+    fn exact_duration_preserves_calendar_and_arbitrary_width_components() {
+        let lexical = "-P123456789012345678901234567890Y11M30DT23H59M59.123456789012S";
+        let duration = DurationOdf::decode_exact(lexical).unwrap();
+
+        assert_eq!(duration.as_str(), lexical);
+        assert_eq!(duration.to_string(), lexical);
+        assert!(duration.is_negative());
+        assert_eq!(duration.years(), Some("123456789012345678901234567890"));
+        assert_eq!(duration.months(), Some("11"));
+        assert_eq!(duration.days(), Some("30"));
+        assert_eq!(duration.hours(), Some("23"));
+        assert_eq!(duration.minutes(), Some("59"));
+        assert_eq!(duration.seconds(), Some("59.123456789012"));
+        assert!(duration.to_chrono().is_err());
+    }
+
+    #[test]
+    fn duration_fractional_seconds_convert_and_encode_without_truncation() {
+        assert_eq!(
+            DurationOdf::decode("PT1.125S").unwrap(),
+            Duration::milliseconds(1125)
+        );
+        assert_eq!(
+            DurationOdf::decode("-PT0.000000001S").unwrap(),
+            Duration::nanoseconds(-1)
+        );
+        assert_eq!(
+            DurationOdf::encode(&Duration::milliseconds(1125)),
+            "PT0H0M1.125S"
+        );
+        assert_eq!(
+            DurationOdf::encode(&Duration::nanoseconds(-1)),
+            "-PT0H0M0.000000001S"
+        );
+    }
+
+    #[test]
+    fn exact_duration_retains_precision_beyond_chrono() {
+        let exact = DurationOdf::decode_exact("PT0.123456789012300S").unwrap();
+        assert_eq!(exact.seconds(), Some("0.123456789012300"));
+        assert!(exact.to_chrono().is_err());
+
+        let exact_zero_tail = DurationOdf::decode_exact("PT0.123456789000S").unwrap();
+        assert_eq!(
+            exact_zero_tail.to_chrono().unwrap(),
+            Duration::nanoseconds(123_456_789)
+        );
+    }
+
+    #[test]
+    fn duration_parser_rejects_malformed_component_grammar() {
+        for value in [
+            "",
+            "P",
+            "PT",
+            "+P1D",
+            "P1H",
+            "PT1D",
+            "P1DT2D",
+            "P1D2Y",
+            "P1Y2Y",
+            "PT1M2H",
+            "PT1S2M",
+            "PT.5S",
+            "PT1.S",
+            "P1.5D",
+            "P1DT2H3M4S5S",
+        ] {
+            assert!(
+                DurationOdf::decode_exact(value).is_err(),
+                "accepted malformed duration {value}"
+            );
+        }
+    }
+
+    #[test]
+    fn duration_chrono_conversion_reports_range_errors() {
+        let huge = DurationOdf::decode_exact("P999999999999999999999999999D").unwrap();
+        assert!(huge.to_chrono().is_err());
+        assert!(DurationOdf::decode("P999999999999999999999999999D").is_err());
     }
 }
