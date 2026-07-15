@@ -2619,6 +2619,7 @@ mod page_layout;
 mod section_background;
 mod section_content;
 mod section_settings;
+mod text_box_create;
 mod types;
 
 #[cfg(test)]

@@ -82,6 +82,24 @@ pages.save("created.pages")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
 
+Scratch-created documents can also add independent, body-anchored text boxes;
+no existing drawable or template package is required:
+
+```rust
+use litchi_iwa::pages::PagesEditor;
+use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+
+let mut pages = PagesEditor::create_with_text("Quarterly report")?;
+pages.add_text_box(
+    "Quarterly report".encode_utf16().count(),
+    "Prepared from typed IWA objects",
+    DrawablePoint { x: 96.0, y: 144.0 },
+    DrawableSize { width: 240.0, height: 72.0 },
+)?;
+pages.save("created-with-text-box.pages")?;
+# Ok::<(), litchi_iwa::Error>(())
+```
+
 ### Edit existing documents
 
 ```rust

@@ -6,7 +6,7 @@ use prost::Message;
 use super::editor::{PagesEditor, PagesSectionPageNumbering, PagesSectionStart};
 use crate::archive::{Archive, ArchiveObject, RawMessage};
 use crate::identity::IWorkDocumentIdentity;
-use crate::protobuf::{tp, tsa, tsch, tsd, tsk, tsp, tss, tst, tswp};
+use crate::protobuf::{tp, tsa, tsd, tsk, tsp, tss, tswp};
 use crate::{IWorkPackage, IWorkThemeArchive, IWorkThemeExtensions, Result};
 
 const DOCUMENT_ARCHIVE_ENTRY: &str = "Index/Document.iwa";
@@ -20,6 +20,20 @@ const DEFAULT_LANGUAGE: &str = "en";
 const DEFAULT_LOCALE: &str = "en_US";
 const THEME_NAME: &str = "Litchi Blank";
 const SECTION_NAME: &str = "Blank";
+const LIST_STYLE_IDENTIFIER: &str = "text-0-liststyle-None";
+const PARAGRAPH_STYLE_IDENTIFIER: &str = "text-20-paragraphstyle-Body 1";
+const CHARACTER_STYLE_IDENTIFIER: &str = "character-style-null";
+const LINE_STYLE_IDENTIFIER: &str = "line-0-shapestyle";
+const SHAPE_STYLE_IDENTIFIER: &str = "shape-0-shapestyle";
+const TEXT_BOX_STYLE_IDENTIFIER: &str = "textbox-0-shapestyle";
+const IMAGE_STYLE_IDENTIFIER: &str = "image-0-imageStyle";
+const MOVIE_STYLE_IDENTIFIER: &str = "movie-0-movieStyle";
+const DRAWING_LINE_STYLE_IDENTIFIER: &str = "drawingline-0-drawinglineStyle";
+const TOC_ENTRY_STYLE_IDENTIFIER: &str = "toc-entry-style-default";
+const DROP_CAP_STYLE_IDENTIFIER: &str = "dropcap-style-0";
+const COLUMN_STYLE_IDENTIFIER: &str = "column-style-default";
+const CAPTION_STYLE_IDENTIFIER: &str = "captions-0-paragraphstyle-Caption Title";
+const SVG_IMPORT_STYLE_IDENTIFIER: &str = "svgimport-0-shapestyle";
 const BUILD_HISTORY_VALUE: &str = "Created by litchi-iwa";
 const FILE_FORMAT_VERSION_STRING: &str = "14.4.1";
 const FILE_FORMAT_VERSION: [u32; 3] = [14, 4, 1];
@@ -31,29 +45,32 @@ const LETTER_HEIGHT_POINTS: f32 = 792.0;
 const BODY_MARGIN_POINTS: f32 = 72.0;
 const HEADER_FOOTER_MARGIN_POINTS: f32 = 36.0;
 const DEFAULT_PAGE_SCALE: f32 = 1.0;
+const TEXT_BOX_PADDING_POINTS: f32 = 4.0;
+const TEXT_BOX_COLUMN_COUNT: u32 = 1;
+const DEFAULT_TEXT_PRESET_INDEX: u32 = 0;
+const DEFAULT_STYLE_OVERRIDE_COUNT: u32 = 0;
 const INITIAL_SAVE_TOKEN: u64 = 1;
 const INITIAL_REVISION_SEQUENCE: i32 = 0;
 const INITIAL_PAGE_NUMBER: u32 = 1;
+const COLLABORATION_DOCUMENT_SUPPORT_OBJECT_ID: u64 = 3;
 
 const COLOR_PRESET_COUNT: usize = 30;
 const GRADIENT_FILL_PRESET_COUNT: usize = 6;
 const IMAGE_FILL_PRESET_COUNT: usize = 6;
 const SHADOW_PRESET_COUNT: usize = 8;
-const LINE_STYLE_PRESET_COUNT: usize = 6;
-const SHAPE_STYLE_PRESET_COUNT: usize = 6;
+const LINE_STYLE_PRESET_COUNT: usize = 1;
+const SHAPE_STYLE_PRESET_COUNT: usize = 1;
 const TEXT_BOX_STYLE_PRESET_COUNT: usize = 1;
-const IMAGE_STYLE_PRESET_COUNT: usize = 6;
-const MOVIE_STYLE_PRESET_COUNT: usize = 6;
+const IMAGE_STYLE_PRESET_COUNT: usize = 1;
+const MOVIE_STYLE_PRESET_COUNT: usize = 1;
 const DRAWING_LINE_STYLE_PRESET_COUNT: usize = 1;
-const LIST_STYLE_PRESET_COUNT: usize = 9;
-const TOC_ENTRY_STYLE_PRESET_COUNT: usize = 5;
+const LIST_STYLE_PRESET_COUNT: usize = 1;
+const TOC_ENTRY_STYLE_PRESET_COUNT: usize = 1;
 const TOC_SETTINGS_PRESET_COUNT: usize = 1;
-const CHARACTER_STYLE_PRESET_COUNT: usize = 8;
-const PARAGRAPH_STYLE_PRESET_COUNT: usize = 12;
-const DROP_CAP_STYLE_PRESET_COUNT: usize = 6;
-const CHART_PRESET_COUNT: usize = 6;
-const TABLE_STYLE_PRESET_COUNT: usize = 6;
-const CAPTION_STYLE_PRESET_COUNT: usize = 2;
+const CHARACTER_STYLE_PRESET_COUNT: usize = 1;
+const PARAGRAPH_STYLE_PRESET_COUNT: usize = 1;
+const DROP_CAP_STYLE_PRESET_COUNT: usize = 1;
+const CAPTION_STYLE_PRESET_COUNT: usize = 1;
 const SVG_IMPORT_STYLE_PRESET_COUNT: usize = 1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -61,24 +78,35 @@ const SVG_IMPORT_STYLE_PRESET_COUNT: usize = 1;
 enum PagesObjectId {
     Document = 1,
     PackageMetadata = 2,
-    Stylesheet = 3,
-    Theme = 4,
-    Body = 5,
-    Settings = 6,
-    Section = 7,
-    SectionTemplate = 8,
-    ListStyle = 9,
-    ParagraphStyle = 10,
-    CharacterStyle = 11,
-    ShapeStyle = 12,
-    MediaStyle = 13,
-    TocEntryStyle = 14,
-    DropCapStyle = 15,
-    BaseColumnStyle = 16,
-    ColumnStyle = 17,
-    ChartPreset = 18,
-    TablePreset = 19,
-    TocSettings = 20,
+    // `COLLABORATION_DOCUMENT_SUPPORT_OBJECT_ID` is reserved for TSCKDocumentSupport.
+    Stylesheet = COLLABORATION_DOCUMENT_SUPPORT_OBJECT_ID + 1,
+    Theme = 5,
+    Body = 6,
+    Settings = 7,
+    Section = 8,
+    SectionTemplate = 9,
+    ListStyle = 10,
+    ParagraphStyle = 11,
+    CharacterStyle = 12,
+    LineStyle = 13,
+    ShapeStyle = 14,
+    TextBoxStyle = 15,
+    ImageStyle = 16,
+    MovieStyle = 17,
+    DrawingLineStyle = 18,
+    TocEntryStyle = 19,
+    DropCapStyle = 20,
+    BaseColumnStyle = 21,
+    ColumnStyle = 22,
+    TocSettings = 23,
+    CaptionStyle = 24,
+    SvgImportStyle = 25,
+    HeaderPrimary = 26,
+    HeaderEven = 27,
+    HeaderFirst = 28,
+    FooterPrimary = 29,
+    FooterEven = 30,
+    FooterFirst = 31,
 }
 
 impl PagesObjectId {
@@ -87,29 +115,59 @@ impl PagesObjectId {
     }
 }
 
-const STYLESHEET_OBJECTS: [PagesObjectId; 10] = [
+const STYLESHEET_OBJECTS: [PagesObjectId; 16] = [
     PagesObjectId::Stylesheet,
     PagesObjectId::ListStyle,
     PagesObjectId::ParagraphStyle,
     PagesObjectId::CharacterStyle,
+    PagesObjectId::LineStyle,
     PagesObjectId::ShapeStyle,
-    PagesObjectId::MediaStyle,
+    PagesObjectId::TextBoxStyle,
+    PagesObjectId::ImageStyle,
+    PagesObjectId::MovieStyle,
+    PagesObjectId::DrawingLineStyle,
     PagesObjectId::TocEntryStyle,
     PagesObjectId::DropCapStyle,
     PagesObjectId::BaseColumnStyle,
     PagesObjectId::ColumnStyle,
+    PagesObjectId::CaptionStyle,
+    PagesObjectId::SvgImportStyle,
 ];
 
-const DOCUMENT_OBJECTS: [PagesObjectId; 9] = [
+const DOCUMENT_OBJECTS: [PagesObjectId; 13] = [
     PagesObjectId::Document,
     PagesObjectId::Theme,
     PagesObjectId::Body,
     PagesObjectId::Settings,
     PagesObjectId::Section,
     PagesObjectId::SectionTemplate,
-    PagesObjectId::ChartPreset,
-    PagesObjectId::TablePreset,
     PagesObjectId::TocSettings,
+    PagesObjectId::HeaderPrimary,
+    PagesObjectId::HeaderEven,
+    PagesObjectId::HeaderFirst,
+    PagesObjectId::FooterPrimary,
+    PagesObjectId::FooterEven,
+    PagesObjectId::FooterFirst,
+];
+
+const IDENTIFIED_STYLES: [(PagesObjectId, &str); 14] = [
+    (PagesObjectId::ListStyle, LIST_STYLE_IDENTIFIER),
+    (PagesObjectId::ParagraphStyle, PARAGRAPH_STYLE_IDENTIFIER),
+    (PagesObjectId::CharacterStyle, CHARACTER_STYLE_IDENTIFIER),
+    (PagesObjectId::LineStyle, LINE_STYLE_IDENTIFIER),
+    (PagesObjectId::ShapeStyle, SHAPE_STYLE_IDENTIFIER),
+    (PagesObjectId::TextBoxStyle, TEXT_BOX_STYLE_IDENTIFIER),
+    (PagesObjectId::ImageStyle, IMAGE_STYLE_IDENTIFIER),
+    (PagesObjectId::MovieStyle, MOVIE_STYLE_IDENTIFIER),
+    (
+        PagesObjectId::DrawingLineStyle,
+        DRAWING_LINE_STYLE_IDENTIFIER,
+    ),
+    (PagesObjectId::TocEntryStyle, TOC_ENTRY_STYLE_IDENTIFIER),
+    (PagesObjectId::DropCapStyle, DROP_CAP_STYLE_IDENTIFIER),
+    (PagesObjectId::BaseColumnStyle, COLUMN_STYLE_IDENTIFIER),
+    (PagesObjectId::CaptionStyle, CAPTION_STYLE_IDENTIFIER),
+    (PagesObjectId::SvgImportStyle, SVG_IMPORT_STYLE_IDENTIFIER),
 ];
 
 #[derive(Debug, Clone, Copy)]
@@ -125,8 +183,6 @@ enum PagesMessageType {
     TocEntryStyle = 2_026,
     TocSettings = 2_051,
     MediaStyle = 3_016,
-    ChartPreset = 5_020,
-    TablePreset = 6_008,
     Document = 10_000,
     Theme = 10_001,
     Section = 10_011,
@@ -282,7 +338,7 @@ fn document_archive(body_text: &str, language: &str, locale: &str) -> Result<Arc
                 shadow_presets: repeated(SHADOW_PRESET_COUNT, tsd::ShadowArchive::default),
                 line_style_presets: repeated_reference(
                     LINE_STYLE_PRESET_COUNT,
-                    PagesObjectId::ShapeStyle,
+                    PagesObjectId::LineStyle,
                 ),
                 shape_style_presets: repeated_reference(
                     SHAPE_STYLE_PRESET_COUNT,
@@ -290,19 +346,19 @@ fn document_archive(body_text: &str, language: &str, locale: &str) -> Result<Arc
                 ),
                 textbox_style_presets: repeated_reference(
                     TEXT_BOX_STYLE_PRESET_COUNT,
-                    PagesObjectId::ShapeStyle,
+                    PagesObjectId::TextBoxStyle,
                 ),
                 image_style_presets: repeated_reference(
                     IMAGE_STYLE_PRESET_COUNT,
-                    PagesObjectId::MediaStyle,
+                    PagesObjectId::ImageStyle,
                 ),
                 movie_style_presets: repeated_reference(
                     MOVIE_STYLE_PRESET_COUNT,
-                    PagesObjectId::MediaStyle,
+                    PagesObjectId::MovieStyle,
                 ),
                 drawing_line_style_presets: repeated_reference(
                     DRAWING_LINE_STYLE_PRESET_COUNT,
-                    PagesObjectId::ShapeStyle,
+                    PagesObjectId::DrawingLineStyle,
                 ),
             }),
             text: Some(tswp::ThemePresetsArchive {
@@ -332,24 +388,16 @@ fn document_archive(body_text: &str, language: &str, locale: &str) -> Result<Arc
                 ),
                 ..Default::default()
             }),
-            chart: Some(tsch::ChartPresetsArchive {
-                chart_presets: repeated_reference(CHART_PRESET_COUNT, PagesObjectId::ChartPreset),
-            }),
-            table: Some(tst::ThemePresetsArchive {
-                table_style_presets: repeated_reference(
-                    TABLE_STYLE_PRESET_COUNT,
-                    PagesObjectId::TablePreset,
-                ),
-                ..Default::default()
-            }),
+            chart: None,
+            table: None,
             application: Some(tsa::ThemePresetsArchive {
                 caption_style_presets: repeated_reference(
                     CAPTION_STYLE_PRESET_COUNT,
-                    PagesObjectId::ParagraphStyle,
+                    PagesObjectId::CaptionStyle,
                 ),
                 svg_import_style_presets: repeated_reference(
                     SVG_IMPORT_STYLE_PRESET_COUNT,
-                    PagesObjectId::ShapeStyle,
+                    PagesObjectId::SvgImportStyle,
                 ),
             }),
         },
@@ -377,13 +425,17 @@ fn document_archive(body_text: &str, language: &str, locale: &str) -> Result<Arc
                     PagesObjectId::ListStyle,
                     PagesObjectId::ParagraphStyle,
                     PagesObjectId::CharacterStyle,
+                    PagesObjectId::LineStyle,
                     PagesObjectId::ShapeStyle,
-                    PagesObjectId::MediaStyle,
+                    PagesObjectId::TextBoxStyle,
+                    PagesObjectId::ImageStyle,
+                    PagesObjectId::MovieStyle,
+                    PagesObjectId::DrawingLineStyle,
                     PagesObjectId::TocEntryStyle,
                     PagesObjectId::TocSettings,
                     PagesObjectId::DropCapStyle,
-                    PagesObjectId::ChartPreset,
-                    PagesObjectId::TablePreset,
+                    PagesObjectId::CaptionStyle,
+                    PagesObjectId::SvgImportStyle,
                 ],
             )?,
             object(
@@ -436,28 +488,74 @@ fn document_archive(body_text: &str, language: &str, locale: &str) -> Result<Arc
             object(
                 PagesObjectId::SectionTemplate,
                 PagesMessageType::SectionTemplate,
-                tp::SectionTemplateArchive::default(),
-                &[],
+                tp::SectionTemplateArchive {
+                    headers: [
+                        PagesObjectId::HeaderPrimary,
+                        PagesObjectId::HeaderEven,
+                        PagesObjectId::HeaderFirst,
+                    ]
+                    .into_iter()
+                    .map(reference)
+                    .collect(),
+                    footers: [
+                        PagesObjectId::FooterPrimary,
+                        PagesObjectId::FooterEven,
+                        PagesObjectId::FooterFirst,
+                    ]
+                    .into_iter()
+                    .map(reference)
+                    .collect(),
+                    ..Default::default()
+                },
+                &[
+                    PagesObjectId::HeaderPrimary,
+                    PagesObjectId::HeaderEven,
+                    PagesObjectId::HeaderFirst,
+                    PagesObjectId::FooterPrimary,
+                    PagesObjectId::FooterEven,
+                    PagesObjectId::FooterFirst,
+                ],
+            )?,
+            object(
+                PagesObjectId::HeaderPrimary,
+                PagesMessageType::Storage,
+                header_footer_storage(),
+                &[PagesObjectId::ParagraphStyle, PagesObjectId::ListStyle],
+            )?,
+            object(
+                PagesObjectId::HeaderEven,
+                PagesMessageType::Storage,
+                header_footer_storage(),
+                &[PagesObjectId::ParagraphStyle, PagesObjectId::ListStyle],
+            )?,
+            object(
+                PagesObjectId::HeaderFirst,
+                PagesMessageType::Storage,
+                header_footer_storage(),
+                &[PagesObjectId::ParagraphStyle, PagesObjectId::ListStyle],
+            )?,
+            object(
+                PagesObjectId::FooterPrimary,
+                PagesMessageType::Storage,
+                header_footer_storage(),
+                &[PagesObjectId::ParagraphStyle, PagesObjectId::ListStyle],
+            )?,
+            object(
+                PagesObjectId::FooterEven,
+                PagesMessageType::Storage,
+                header_footer_storage(),
+                &[PagesObjectId::ParagraphStyle, PagesObjectId::ListStyle],
+            )?,
+            object(
+                PagesObjectId::FooterFirst,
+                PagesMessageType::Storage,
+                header_footer_storage(),
+                &[PagesObjectId::ParagraphStyle, PagesObjectId::ListStyle],
             )?,
             object(
                 PagesObjectId::TocSettings,
                 PagesMessageType::TocSettings,
                 tswp::TocSettingsArchive::default(),
-                &[],
-            )?,
-            object(
-                PagesObjectId::ChartPreset,
-                PagesMessageType::ChartPreset,
-                tsch::ChartStylePreset::default(),
-                &[],
-            )?,
-            object(
-                PagesObjectId::TablePreset,
-                PagesMessageType::TablePreset,
-                tst::TableStylePresetArchive {
-                    index: Some(0),
-                    ..Default::default()
-                },
                 &[],
             )?,
         ],
@@ -475,6 +573,15 @@ fn stylesheet_archive() -> Result<Archive> {
                 .skip(1)
                 .map(reference)
                 .collect(),
+            identifier_to_style_map: IDENTIFIED_STYLES
+                .iter()
+                .map(|(identifier, package_identifier)| {
+                    tss::stylesheet_archive::IdentifiedStyleEntry {
+                        identifier: (*package_identifier).to_owned(),
+                        style: reference(*identifier),
+                    }
+                })
+                .collect(),
             is_locked: Some(false),
             can_cull_styles: Some(true),
             ..Default::default()
@@ -486,8 +593,8 @@ fn stylesheet_archive() -> Result<Archive> {
             PagesObjectId::ListStyle,
             PagesMessageType::ListStyle,
             tswp::ListStyleArchive {
-                super_: style("None", "litchi-list-none"),
-                override_count: Some(0),
+                super_: style("None", LIST_STYLE_IDENTIFIER),
+                override_count: Some(DEFAULT_STYLE_OVERRIDE_COUNT),
                 ..Default::default()
             },
             &[PagesObjectId::Stylesheet],
@@ -496,8 +603,8 @@ fn stylesheet_archive() -> Result<Archive> {
             PagesObjectId::ParagraphStyle,
             PagesMessageType::ParagraphStyle,
             tswp::ParagraphStyleArchive {
-                super_: style("Body", "litchi-paragraph-body"),
-                override_count: Some(0),
+                super_: style("Body", PARAGRAPH_STYLE_IDENTIFIER),
+                override_count: Some(DEFAULT_STYLE_OVERRIDE_COUNT),
                 ..Default::default()
             },
             &[PagesObjectId::Stylesheet],
@@ -506,34 +613,66 @@ fn stylesheet_archive() -> Result<Archive> {
             PagesObjectId::CharacterStyle,
             PagesMessageType::CharacterStyle,
             tswp::CharacterStyleArchive {
-                super_: style("Default", "litchi-character-default"),
-                override_count: Some(0),
+                super_: style("None", CHARACTER_STYLE_IDENTIFIER),
+                override_count: Some(DEFAULT_STYLE_OVERRIDE_COUNT),
                 ..Default::default()
             },
             &[PagesObjectId::Stylesheet],
+        )?,
+        object(
+            PagesObjectId::LineStyle,
+            PagesMessageType::ShapeStyle,
+            shape_style_archive(
+                "Line",
+                LINE_STYLE_IDENTIFIER,
+                tsd::FillArchive::default(),
+                Some(PagesObjectId::ParagraphStyle),
+            ),
+            &[PagesObjectId::Stylesheet, PagesObjectId::ParagraphStyle],
         )?,
         object(
             PagesObjectId::ShapeStyle,
             PagesMessageType::ShapeStyle,
-            tswp::ShapeStyleArchive {
-                super_: tsd::ShapeStyleArchive {
-                    super_: style("Shape", "litchi-shape-default"),
-                    override_count: Some(0),
-                    ..Default::default()
-                },
-                override_count: Some(0),
-                ..Default::default()
-            },
+            shape_style_archive(
+                "Shape",
+                SHAPE_STYLE_IDENTIFIER,
+                solid_fill(),
+                Some(PagesObjectId::ParagraphStyle),
+            ),
+            &[PagesObjectId::Stylesheet, PagesObjectId::ParagraphStyle],
+        )?,
+        object(
+            PagesObjectId::TextBoxStyle,
+            PagesMessageType::ShapeStyle,
+            shape_style_archive(
+                "Text Box",
+                TEXT_BOX_STYLE_IDENTIFIER,
+                tsd::FillArchive::default(),
+                Some(PagesObjectId::ParagraphStyle),
+            ),
+            &[PagesObjectId::Stylesheet, PagesObjectId::ParagraphStyle],
+        )?,
+        object(
+            PagesObjectId::ImageStyle,
+            PagesMessageType::MediaStyle,
+            media_style_archive("Image", IMAGE_STYLE_IDENTIFIER),
             &[PagesObjectId::Stylesheet],
         )?,
         object(
-            PagesObjectId::MediaStyle,
+            PagesObjectId::MovieStyle,
             PagesMessageType::MediaStyle,
-            tsd::MediaStyleArchive {
-                super_: style("Media", "litchi-media-default"),
-                override_count: Some(0),
-                ..Default::default()
-            },
+            media_style_archive("Movie", MOVIE_STYLE_IDENTIFIER),
+            &[PagesObjectId::Stylesheet],
+        )?,
+        object(
+            PagesObjectId::DrawingLineStyle,
+            PagesMessageType::ShapeStyle,
+            shape_style_archive(
+                "Drawing Line",
+                DRAWING_LINE_STYLE_IDENTIFIER,
+                tsd::FillArchive::default(),
+                None,
+            ),
             &[PagesObjectId::Stylesheet],
         )?,
         object(
@@ -541,8 +680,8 @@ fn stylesheet_archive() -> Result<Archive> {
             PagesMessageType::TocEntryStyle,
             tswp::TocEntryStyleArchive {
                 super_: tswp::ParagraphStyleArchive {
-                    super_: style("TOC", "litchi-toc-entry"),
-                    override_count: Some(0),
+                    super_: style("TOC", TOC_ENTRY_STYLE_IDENTIFIER),
+                    override_count: Some(DEFAULT_STYLE_OVERRIDE_COUNT),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -553,8 +692,8 @@ fn stylesheet_archive() -> Result<Archive> {
             PagesObjectId::DropCapStyle,
             PagesMessageType::DropCapStyle,
             tswp::DropCapStyleArchive {
-                super_: style("Drop Cap", "litchi-dropcap"),
-                override_count: Some(0),
+                super_: style("Drop Cap", DROP_CAP_STYLE_IDENTIFIER),
+                override_count: Some(DEFAULT_STYLE_OVERRIDE_COUNT),
                 ..Default::default()
             },
             &[PagesObjectId::Stylesheet],
@@ -563,8 +702,8 @@ fn stylesheet_archive() -> Result<Archive> {
             PagesObjectId::BaseColumnStyle,
             PagesMessageType::ColumnStyle,
             tswp::ColumnStyleArchive {
-                super_: style("None", "litchi-column-default"),
-                override_count: Some(0),
+                super_: style("None", COLUMN_STYLE_IDENTIFIER),
+                override_count: Some(DEFAULT_STYLE_OVERRIDE_COUNT),
                 ..Default::default()
             },
             &[PagesObjectId::Stylesheet],
@@ -588,6 +727,27 @@ fn stylesheet_archive() -> Result<Archive> {
                 }),
             },
             &[PagesObjectId::Stylesheet, PagesObjectId::BaseColumnStyle],
+        )?,
+        object(
+            PagesObjectId::CaptionStyle,
+            PagesMessageType::ParagraphStyle,
+            tswp::ParagraphStyleArchive {
+                super_: style("Object Title", CAPTION_STYLE_IDENTIFIER),
+                override_count: Some(DEFAULT_STYLE_OVERRIDE_COUNT),
+                ..Default::default()
+            },
+            &[PagesObjectId::Stylesheet],
+        )?,
+        object(
+            PagesObjectId::SvgImportStyle,
+            PagesMessageType::ShapeStyle,
+            shape_style_archive(
+                "SVG Import",
+                SVG_IMPORT_STYLE_IDENTIFIER,
+                solid_fill(),
+                None,
+            ),
+            &[PagesObjectId::Stylesheet],
         )?,
     ]);
     Ok(Archive { objects })
@@ -613,7 +773,7 @@ fn metadata_archive(identity: &IWorkDocumentIdentity) -> Result<Archive> {
         .collect();
 
     let metadata = tsp::PackageMetadata {
-        last_object_identifier: PagesObjectId::TocSettings.value(),
+        last_object_identifier: PagesObjectId::FooterFirst.value(),
         revision: Some(tsp::DocumentRevision {
             sequence_32: Some(INITIAL_REVISION_SEQUENCE),
             identifier: Some(identity.version_uuid().to_owned()),
@@ -772,6 +932,20 @@ fn object_table(identifier: Option<PagesObjectId>) -> tswp::ObjectAttributeTable
     }
 }
 
+fn header_footer_storage() -> tswp::StorageArchive {
+    tswp::StorageArchive {
+        kind: Some(tswp::storage_archive::KindType::Header as i32),
+        style_sheet: Some(reference(PagesObjectId::Stylesheet)),
+        in_document: Some(true),
+        table_para_style: Some(object_table(Some(PagesObjectId::ParagraphStyle))),
+        table_para_data: Some(zero_para_data()),
+        table_list_style: Some(object_table(Some(PagesObjectId::ListStyle))),
+        table_para_starts: Some(zero_para_data()),
+        table_para_bidi: Some(zero_para_data()),
+        ..Default::default()
+    }
+}
+
 fn zero_para_data() -> tswp::ParaDataAttributeTable {
     tswp::ParaDataAttributeTable {
         entries: vec![tswp::para_data_attribute_table::ParaDataAttribute {
@@ -787,6 +961,57 @@ fn style(name: &str, identifier: &str) -> tss::StyleArchive {
         name: Some(name.to_owned()),
         style_identifier: Some(identifier.to_owned()),
         stylesheet: Some(reference(PagesObjectId::Stylesheet)),
+        ..Default::default()
+    }
+}
+
+fn shape_style_archive(
+    name: &str,
+    identifier: &str,
+    fill: tsd::FillArchive,
+    paragraph_style: Option<PagesObjectId>,
+) -> tswp::ShapeStyleArchive {
+    tswp::ShapeStyleArchive {
+        super_: tsd::ShapeStyleArchive {
+            super_: style(name, identifier),
+            override_count: Some(DEFAULT_STYLE_OVERRIDE_COUNT),
+            shape_properties: Some(tsd::ShapeStylePropertiesArchive {
+                fill: Some(fill),
+                opacity: Some(1.0),
+                ..Default::default()
+            }),
+        },
+        override_count: Some(DEFAULT_STYLE_OVERRIDE_COUNT),
+        shape_properties: Some(tswp::ShapeStylePropertiesArchive {
+            shrink_to_fit: Some(false),
+            vertical_alignment: Some(
+                tswp::shape_style_properties_archive::VerticalAlignmentType::KFrameAlignTop as i32,
+            ),
+            columns: Some(tswp::ColumnsArchive {
+                equal_columns: Some(tswp::columns_archive::EqualColumnsArchive {
+                    count: Some(TEXT_BOX_COLUMN_COUNT),
+                    gap: None,
+                }),
+                non_equal_columns: None,
+            }),
+            padding: Some(tswp::PaddingArchive {
+                left: Some(TEXT_BOX_PADDING_POINTS),
+                top: Some(TEXT_BOX_PADDING_POINTS),
+                right: Some(TEXT_BOX_PADDING_POINTS),
+                bottom: Some(TEXT_BOX_PADDING_POINTS),
+            }),
+            default_text_preset_index: Some(DEFAULT_TEXT_PRESET_INDEX),
+            paragraph_style: paragraph_style.map(reference),
+            vertical_text_40: Some(false),
+            ..Default::default()
+        }),
+    }
+}
+
+fn media_style_archive(name: &str, identifier: &str) -> tsd::MediaStyleArchive {
+    tsd::MediaStyleArchive {
+        super_: style(name, identifier),
+        override_count: Some(DEFAULT_STYLE_OVERRIDE_COUNT),
         ..Default::default()
     }
 }
@@ -874,6 +1099,56 @@ mod tests {
                 .unwrap(),
             ""
         );
+    }
+
+    #[test]
+    fn scratch_package_has_native_save_scaffolding() {
+        let package = PagesDocumentBuilder::new().build_package().unwrap();
+        assert!(package.iwa_entry_names().all(|member| {
+            package
+                .archive(member)
+                .unwrap()
+                .object(COLLABORATION_DOCUMENT_SUPPORT_OBJECT_ID)
+                .is_none()
+        }));
+
+        let document = package.archive(DOCUMENT_ARCHIVE_ENTRY).unwrap();
+        let template = document
+            .object(PagesObjectId::SectionTemplate.value())
+            .unwrap();
+        let template =
+            tp::SectionTemplateArchive::decode(template.messages.first().unwrap().data.as_slice())
+                .unwrap();
+        assert_eq!(template.headers.len(), 3);
+        assert_eq!(template.footers.len(), 3);
+        assert!(
+            template
+                .headers
+                .iter()
+                .chain(&template.footers)
+                .all(|reference| document.object(reference.identifier).is_some())
+        );
+
+        let stylesheet = package.archive(STYLESHEET_ARCHIVE_ENTRY).unwrap();
+        let stylesheet = tss::StylesheetArchive::decode(
+            stylesheet
+                .object(PagesObjectId::Stylesheet.value())
+                .unwrap()
+                .messages
+                .first()
+                .unwrap()
+                .data
+                .as_slice(),
+        )
+        .unwrap();
+        assert!(stylesheet.identifier_to_style_map.iter().any(|entry| {
+            entry.identifier == CHARACTER_STYLE_IDENTIFIER
+                && entry.style.identifier == PagesObjectId::CharacterStyle.value()
+        }));
+        assert!(stylesheet.identifier_to_style_map.iter().any(|entry| {
+            entry.identifier == TEXT_BOX_STYLE_IDENTIFIER
+                && entry.style.identifier == PagesObjectId::TextBoxStyle.value()
+        }));
     }
 
     #[test]
