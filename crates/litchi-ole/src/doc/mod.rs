@@ -76,6 +76,9 @@ pub use image::{Image, ImageError};
 pub use package::Package;
 pub use paragraph::{Paragraph, Run};
 pub use parts::numbering::{ListLevel, ListTables, NumberFormat};
+pub use parts::styles::{
+    StyleDefinition, StyleFlags, StyleKind, StylePost2000, StyleSheet, StyleSheetHeader,
+};
 pub use revision::{
     DisplayFieldRevisionMark, NumberingRevisionMark, RevisionKind, RevisionMark, RevisionReason,
     SectionRevisionMark,

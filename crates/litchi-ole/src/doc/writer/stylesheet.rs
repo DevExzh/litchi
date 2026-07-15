@@ -43,8 +43,7 @@ fn build_stdf_base(sti: u16, stk: u16, istd_base: u16, cupx: u16, istd_next: u16
     let info3: u16 = (cupx & 0x000F) | ((istd_next & 0x0FFF) << 4);
     buf[4..6].copy_from_slice(&info3.to_le_bytes());
 
-    // bchUpe = 0, grfstd = 0
-    // Already zero-initialized
+    // bchUpe is filled after the complete variable-size STD is built; grfstd = 0.
 
     buf
 }
@@ -78,18 +77,21 @@ fn build_normal_style_std() -> Vec<u8> {
     // UPX 2: Character formatting (CHPX) - empty
     std_data.extend_from_slice(&0u16.to_le_bytes()); // upxSize = 0
 
+    let size = std_data.len() as u16;
+    std_data[6..8].copy_from_slice(&size.to_le_bytes());
+
     std_data
 }
 
 /// Build the STD byte array for the Default Paragraph Font (istd=10) character style.
 ///
-/// This is a required built-in character style (sti=10, stk=2).
+/// This is a required built-in character style (sti=65, stk=2).
 fn build_default_paragraph_font_std() -> Vec<u8> {
     let mut std_data = Vec::new();
 
-    // StdfBase: sti=10, stk=2 (character), istdBase=0xFFF (none),
+    // StdfBase: sti=65, stk=2 (character), istdBase=0xFFF (none),
     //           cupx=1 (character UPX only), istdNext=10 (self)
-    let stdf_base = build_stdf_base(10, 2, 0x0FFF, 1, 10);
+    let stdf_base = build_stdf_base(65, 2, 0x0FFF, 1, 10);
     std_data.extend_from_slice(&stdf_base);
 
     // Style name
@@ -104,6 +106,9 @@ fn build_default_paragraph_font_std() -> Vec<u8> {
 
     // UPX 1: Character formatting (CHPX) - empty
     std_data.extend_from_slice(&0u16.to_le_bytes());
+
+    let size = std_data.len() as u16;
+    std_data[6..8].copy_from_slice(&size.to_le_bytes());
 
     std_data
 }
@@ -130,7 +135,7 @@ pub fn generate_minimal_stylesheet() -> Vec<u8> {
     stsh.extend_from_slice(&STDF_BASE_SIZE.to_le_bytes()); // cbSTDBaseInFile = 10
     stsh.extend_from_slice(&1u16.to_le_bytes()); // info3: fHasOriginalStyle=1
     stsh.extend_from_slice(&cstd.to_le_bytes()); // stiMaxWhenSaved
-    stsh.extend_from_slice(&(cstd - 1).to_le_bytes()); // istdMaxFixedWhenSaved
+    stsh.extend_from_slice(&cstd.to_le_bytes()); // istdMaxFixedWhenSaved
     stsh.extend_from_slice(&0u16.to_le_bytes()); // nVerBuiltInNamesWhenSaved
     stsh.extend_from_slice(&0u16.to_le_bytes()); // ftcAsci (default font)
     stsh.extend_from_slice(&0u16.to_le_bytes()); // ftcFE (default font)
@@ -146,10 +151,9 @@ pub fn generate_minimal_stylesheet() -> Vec<u8> {
         };
 
         if let Some(data) = std_data {
-            // cbStd: adjusted to word boundary per POI line 159
+            // cbStd excludes the outer alignment byte.
             let std_size = data.len() as u16;
-            let adjusted_size = std_size + (std_size % 2);
-            stsh.extend_from_slice(&adjusted_size.to_le_bytes());
+            stsh.extend_from_slice(&std_size.to_le_bytes());
             stsh.extend_from_slice(&data);
             // Pad to word boundary if needed
             if std_size % 2 == 1 {

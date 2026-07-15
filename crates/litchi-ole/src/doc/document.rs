@@ -21,6 +21,7 @@ use super::parts::paragraph_extractor::{ExtractedParagraph, ParagraphExtractor};
 use super::parts::piece_table::PieceTable;
 use super::parts::revisions::RevisionAuthorTable;
 use super::parts::sections::SectionRevisionsTable;
+use super::parts::styles::StyleSheet;
 use super::parts::text::TextExtractor;
 use super::table::Table;
 #[cfg(feature = "formula")]
@@ -96,6 +97,8 @@ pub struct Document {
     hyperlinks_table: Option<HyperlinksTable>,
     /// List/numbering tables
     list_tables: Option<ListTables>,
+    /// Word 97+ stylesheet, including raw style UPX property sets.
+    stylesheet: Option<StyleSheet>,
     /// Extracted MTEF data from OLE streams (stream_name -> mtef_data)
     #[allow(dead_code)] // Stored for debugging and raw access
     mtef_data: std::collections::HashMap<String, Vec<u8>>,
@@ -176,6 +179,12 @@ impl Document {
         // Parse list/numbering tables
         let list_tables = ListTables::parse(&fib, &table_stream).ok();
 
+        // Word 97+ files are required to carry a stylesheet. Older Word files use
+        // a different FIB and stylesheet representation that is not interpreted here.
+        let stylesheet = (fib.version() >= 0x00C1)
+            .then(|| StyleSheet::parse(&fib, &table_stream))
+            .transpose()?;
+
         // Extract MTEF data from OLE streams
         let mtef_data = Self::extract_mtef_data(ole)?;
 
@@ -214,6 +223,7 @@ impl Document {
             section_revisions,
             hyperlinks_table,
             list_tables,
+            stylesheet,
             mtef_data,
             #[cfg(feature = "formula")]
             formula_arenas,
@@ -488,6 +498,14 @@ impl Document {
     #[inline]
     pub fn fib(&self) -> &FileInformationBlock {
         &self.fib
+    }
+
+    /// Get the parsed Word 97+ stylesheet.
+    ///
+    /// Null fixed-index slots are retained, and each non-empty style exposes its
+    /// exact UPX property payloads for subsequent inheritance and formatting.
+    pub fn stylesheet(&self) -> Option<&StyleSheet> {
+        self.stylesheet.as_ref()
     }
 
     /// Get access to the fields table (if parsed).

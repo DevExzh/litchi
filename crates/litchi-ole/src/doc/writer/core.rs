@@ -3819,6 +3819,10 @@ mod tests {
             .unwrap();
 
         let assert_document = |document: crate::doc::Document| {
+            let stylesheet = document.stylesheet().unwrap();
+            assert_eq!(stylesheet.styles().len(), 15);
+            assert_eq!(stylesheet.get(0).unwrap().name, "Normal");
+            assert_eq!(stylesheet.get(10).unwrap().invariant_id, 65);
             let tables = document.tables().unwrap();
             assert_eq!(tables.len(), 2);
             assert_eq!(tables[0].row_count().unwrap(), 2);
