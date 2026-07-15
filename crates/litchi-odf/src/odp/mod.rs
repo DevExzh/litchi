@@ -61,6 +61,8 @@ mod presentation;
 mod slide;
 mod transition;
 
+pub(crate) use parser::OdpParser;
+
 pub use action::{
     DrawingHyperlink, HyperlinkShow, PresentationAction, PresentationEffect,
     PresentationEffectDirection, PresentationEventListener, ScriptEventListener,

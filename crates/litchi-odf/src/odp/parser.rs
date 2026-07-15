@@ -1266,10 +1266,13 @@ impl OdpParser {
         slide_text: &mut String,
         slide_has_segment: &mut bool,
         shapes: &mut Vec<Shape>,
+        retain_text_shapes: bool,
     ) {
         let is_title = builder.is_title;
         let shape = builder.build();
-        if is_title {
+        if retain_text_shapes {
+            shapes.push(shape);
+        } else if is_title {
             *slide_title = Some(shape.text);
         } else if matches!(
             shape.shape_type,
@@ -1616,6 +1619,22 @@ impl OdpParser {
     pub fn parse_slides_with_styles(
         xml_content: &str,
         styles_xml: Option<&str>,
+    ) -> Result<Vec<Slide>> {
+        Self::parse_pages_with_styles(xml_content, styles_xml, false)
+    }
+
+    /// Parse drawing pages while retaining title and text-box frames as shapes.
+    pub(crate) fn parse_drawing_pages(
+        xml_content: &str,
+        styles_xml: Option<&str>,
+    ) -> Result<Vec<Slide>> {
+        Self::parse_pages_with_styles(xml_content, styles_xml, true)
+    }
+
+    fn parse_pages_with_styles(
+        xml_content: &str,
+        styles_xml: Option<&str>,
+        retain_text_shapes: bool,
     ) -> Result<Vec<Slide>> {
         let (transition_styles, default_transition) =
             Self::resolved_transition_styles(xml_content, styles_xml)?;
@@ -2256,6 +2275,7 @@ impl OdpParser {
                                     &mut current_slide_text,
                                     &mut current_slide_has_segment,
                                     &mut current_shapes,
+                                    retain_text_shapes,
                                 );
                             }
                         },
@@ -2353,6 +2373,7 @@ impl OdpParser {
                                     &mut current_slide_text,
                                     &mut current_slide_has_segment,
                                     &mut current_shapes,
+                                    retain_text_shapes,
                                 );
                             }
                         },

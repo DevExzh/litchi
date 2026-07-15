@@ -155,12 +155,19 @@
 //! - ⚠️ Advanced shape properties
 //! - ⚠️ Slide master manipulation
 //!
+//! ## ✅ ODG - Drawings (READ-ONLY SEMANTIC MODEL)
+//!
+//! - ✅ Open drawings and drawing templates from paths, readers, or bytes
+//! - ✅ Namespace-aware page and standard 2D shape parsing
+//! - ✅ Nested groups, exact geometry attributes, and inert enhanced geometry
+//! - ✅ Text extraction, metadata, and package-contained media access
+//! - ✅ Lossless unmodified saving with exact original-byte retention
+//!
 //! ## 🚧 Additional ODF Formats (PACKAGE SUPPORT)
 //!
 //! All standard families and templates can be validated, inspected, extracted,
 //! and saved losslessly through [`OpenDocumentPackage`]. Specialized semantic
 //! object models remain in progress for:
-//! - ODG - OpenDocument Drawing (.odg/.otg)
 //! - ODC - OpenDocument Chart (.odc/.otc)
 //! - ODF - OpenDocument Formula (.odf/.otf)
 //! - ODI - OpenDocument Image (.odi/.oti)
@@ -237,6 +244,8 @@ pub mod datatype;
 pub mod elements;
 /// Format-neutral package access for every OpenDocument family.
 mod generic;
+/// OpenDocument drawing (.odg/.otg) support.
+mod odg;
 /// ODF presentation (.odp) support
 mod odp;
 /// ODF spreadsheet (.ods) support
@@ -253,6 +262,7 @@ pub use core::{
 pub use generic::{FlatOpenDocument, OpenDocumentFamily, OpenDocumentPackage};
 pub use litchi_core::RGBColor as Color;
 pub use litchi_core::unit::{Length, LengthUnit};
+pub use odg::{DrawingDocument, DrawingPage};
 
 // Re-export main types for convenience
 pub use odp::{
