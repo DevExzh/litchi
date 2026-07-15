@@ -233,6 +233,10 @@ impl<'arena> TapParser<'arena> {
             0x21 => {
                 self.handle_insert_cells(tap, sprm)?;
             },
+            0x22 => self.handle_delete_cells(tap, sprm)?,
+            0x23 => self.handle_column_width(tap, sprm)?,
+            0x24 => self.handle_horizontal_merge(tap, sprm, true)?,
+            0x25 => self.handle_horizontal_merge(tap, sprm, false)?,
             0x29 => self.parse_cell_text_flow(tap, sprm)?,
             0x2B => self.parse_vertical_merge(tap, sprm)?,
             0x2C => self.parse_vertical_alignment(tap, sprm)?,
@@ -299,7 +303,7 @@ impl<'arena> TapParser<'arena> {
                     },
                 };
             },
-            // Other table SPRMs (0x22-0x2C, etc.)
+            // Other table SPRMs.
             _ => {
                 // Unknown or unhandled SPRM - skip
             },
@@ -349,6 +353,14 @@ impl<'arena> TapParser<'arena> {
             if boundary_offset + 1 < data.len() {
                 boundaries.push(binary_to_doc_result(read_i16_le(data, boundary_offset))?);
             }
+        }
+        if boundaries
+            .iter()
+            .any(|boundary| !(-31_680..=31_680).contains(boundary))
+        {
+            return Err(DocError::Corrupted(
+                "sprmTDefTable cell boundary is outside the XAS range".to_string(),
+            ));
         }
         if boundaries.windows(2).any(|pair| pair[0] > pair[1]) {
             return Err(DocError::Corrupted(
@@ -882,46 +894,147 @@ impl<'arena> TapParser<'arena> {
     /// - byte 1: count (how many cells to insert)
     /// - bytes 2-3: width (width of new cells in twips)
     fn handle_insert_cells(&self, tap: &mut TableProperties, sprm: &Sprm) -> Result<()> {
-        if let Some(operand) = sprm.operand_dword() {
-            let index = ((operand >> 24) & 0xFF) as usize;
-            let count = ((operand >> 16) & 0xFF) as usize;
-            let width = (operand & 0xFFFF) as i16;
-
-            let itc_mac = tap.cell_count;
-            let insert_at = index.min(itc_mac);
-
-            // Create new arrays with space for inserted cells
-            let mut new_boundaries = Vec::with_capacity(itc_mac + count + 1);
-            let mut new_cells = Vec::with_capacity(itc_mac + count);
-
-            // Copy boundaries before insertion point
-            new_boundaries.extend_from_slice(&tap.cell_boundaries[..=insert_at]);
-
-            // Copy cells before insertion point
-            if insert_at < tap.cell_properties.len() {
-                new_cells.extend_from_slice(&tap.cell_properties[..insert_at]);
-            }
-
-            // Insert new cells
-            for _i in 0..count {
-                let prev_boundary = new_boundaries.last().copied().unwrap_or(0);
-                new_boundaries.push(prev_boundary + width);
-                new_cells.push(CellProperties::default());
-            }
-
-            // Copy remaining boundaries and cells
-            if insert_at < tap.cell_boundaries.len() {
-                new_boundaries.extend_from_slice(&tap.cell_boundaries[insert_at..]);
-            }
-            if insert_at < tap.cell_properties.len() {
-                new_cells.extend_from_slice(&tap.cell_properties[insert_at..]);
-            }
-
-            tap.cell_boundaries = new_boundaries;
-            tap.cell_properties = new_cells;
-            tap.cell_count = itc_mac + count;
+        let operand = sprm.operand_bytes();
+        if operand.len() != 4 {
+            return Err(DocError::Corrupted(
+                "DOC cell-insertion operand must contain 4 bytes".to_string(),
+            ));
+        }
+        let index = operand[0] as usize;
+        let count = operand[1] as usize;
+        let width = binary_to_doc_result(read_u16_le(operand, 2))?;
+        if index > tap.cell_count || count == 0 || tap.cell_count + count > 63 || width > 31_680 {
+            return Err(DocError::Corrupted(
+                "DOC cell insertion has an invalid index, count, or width".to_string(),
+            ));
+        }
+        let added_width = i32::from(width) * count as i32;
+        let first_boundary = i32::from(*tap.cell_boundaries.first().unwrap_or(&0));
+        let last_boundary = i32::from(*tap.cell_boundaries.last().unwrap_or(&0));
+        if last_boundary - first_boundary + added_width > 31_680
+            || last_boundary + added_width > 31_680
+        {
+            return Err(DocError::Corrupted(
+                "DOC cell insertion makes the table wider than 31680 twips".to_string(),
+            ));
         }
 
+        let insertion_x = i32::from(tap.cell_boundaries[index]);
+        let mut boundaries = Vec::with_capacity(tap.cell_count + count + 1);
+        boundaries.extend(tap.cell_boundaries[..=index].iter().copied().map(i32::from));
+        for inserted in 1..=count {
+            boundaries.push(insertion_x + i32::from(width) * inserted as i32);
+        }
+        boundaries.extend(
+            tap.cell_boundaries[index + 1..]
+                .iter()
+                .map(|boundary| i32::from(*boundary) + added_width),
+        );
+        tap.cell_boundaries = boundaries
+            .into_iter()
+            .map(|boundary| {
+                i16::try_from(boundary).map_err(|_| {
+                    DocError::Corrupted("DOC cell insertion overflows coordinates".to_string())
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        tap.cell_properties.splice(
+            index..index,
+            std::iter::repeat_n(CellProperties::default(), count),
+        );
+        tap.cell_count += count;
+
+        Ok(())
+    }
+
+    fn handle_delete_cells(&self, tap: &mut TableProperties, sprm: &Sprm) -> Result<()> {
+        let operand = sprm.operand_bytes();
+        if operand.len() != 2 {
+            return Err(DocError::Corrupted(
+                "DOC cell-deletion operand must contain 2 bytes".to_string(),
+            ));
+        }
+        let range = Self::cell_range(tap, operand)?;
+        if range.len() >= tap.cell_count {
+            return Err(DocError::Corrupted(
+                "DOC cell deletion must leave at least one cell".to_string(),
+            ));
+        }
+        if range.is_empty() {
+            return Ok(());
+        }
+        let first = range.start;
+        let limit = range.end;
+        tap.cell_properties.drain(range);
+        tap.cell_boundaries.drain(first..limit);
+        tap.cell_count = tap.cell_properties.len();
+        Ok(())
+    }
+
+    fn handle_column_width(&self, tap: &mut TableProperties, sprm: &Sprm) -> Result<()> {
+        let operand = sprm.operand_bytes();
+        if operand.len() != 4 {
+            return Err(DocError::Corrupted(
+                "DOC column-width operand must contain 4 bytes".to_string(),
+            ));
+        }
+        let range = Self::cell_range(tap, operand)?;
+        let width = binary_to_doc_result(read_u16_le(operand, 2))?;
+        if width > 31_680 {
+            return Err(DocError::Corrupted(
+                "DOC column width is outside its allowed range".to_string(),
+            ));
+        }
+        let mut boundaries: Vec<i32> = tap.cell_boundaries.iter().copied().map(i32::from).collect();
+        for index in range {
+            let current = boundaries[index + 1] - boundaries[index];
+            let delta = i32::from(width) - current;
+            for boundary in &mut boundaries[index + 1..] {
+                *boundary += delta;
+            }
+        }
+        if boundaries
+            .iter()
+            .any(|boundary| !(-31_680..=31_680).contains(boundary))
+        {
+            return Err(DocError::Corrupted(
+                "DOC column widths produce a coordinate outside the XAS range".to_string(),
+            ));
+        }
+        tap.cell_boundaries = boundaries
+            .into_iter()
+            .map(i16::try_from)
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(|_| {
+                DocError::Corrupted("DOC column widths overflow coordinates".to_string())
+            })?;
+        Ok(())
+    }
+
+    fn handle_horizontal_merge(
+        &self,
+        tap: &mut TableProperties,
+        sprm: &Sprm,
+        merge: bool,
+    ) -> Result<()> {
+        let operand = sprm.operand_bytes();
+        if operand.len() != 2 {
+            return Err(DocError::Corrupted(
+                "DOC horizontal merge operand must contain 2 bytes".to_string(),
+            ));
+        }
+        let range = Self::cell_range(tap, operand)?;
+        for (offset, cell) in tap.cell_properties[range].iter_mut().enumerate() {
+            cell.merge_status = if merge {
+                if offset == 0 {
+                    CellMergeStatus::First
+                } else {
+                    CellMergeStatus::Merged
+                }
+            } else {
+                CellMergeStatus::None
+            };
+        }
         Ok(())
     }
 
@@ -1289,6 +1402,11 @@ mod tests {
                 .parse_tap(&table_definition_grpprl(&[2, 0, 0, 200, 0, 100, 0]))
                 .is_err()
         );
+        assert!(
+            parser
+                .parse_tap(&table_definition_grpprl(&[1, 0x3F, 0x84, 0, 0]))
+                .is_err()
+        );
 
         let empty = parser
             .parse_tap(&table_definition_grpprl(&[0, 0, 0]))
@@ -1554,6 +1672,95 @@ mod tests {
         assert!(parse_fixed(0xF636, &[0, 2, 2]).is_err());
         assert!(parse_variable(0xD639, &[0, 3, 1]).is_err());
         assert!(parse_variable(0xD642, &[0, 2]).is_err());
+    }
+
+    #[test]
+    fn applies_structural_cell_modifiers_in_sequence() {
+        let arena = Bump::new();
+        let parser = TapParser::new(&arena);
+        let mut merged = table_definition_grpprl(&[3, 0, 0, 100, 0, 200, 0, 44, 1]);
+
+        // Mark the original last cell so insertion/deletion property movement is observable.
+        append_variable_sprm(&mut merged, 0xD639, &[2, 3, 1]);
+        append_fixed_sprm(&mut merged, 0x7621, &[1, 2, 50, 0]);
+        append_fixed_sprm(&mut merged, 0x7623, &[2, 4, 75, 0]);
+        append_fixed_sprm(&mut merged, 0x5624, &[1, 4]);
+
+        let tap = parser.parse_tap(&merged).unwrap();
+        assert_eq!(tap.cell_count, 5);
+        assert_eq!(tap.cell_boundaries, [0, 100, 150, 225, 300, 400]);
+        assert_eq!(tap.cell_properties.len(), 5);
+        assert!(tap.cell_properties[4].no_wrap);
+        assert_eq!(
+            tap.cell_properties
+                .iter()
+                .map(|cell| cell.merge_status)
+                .collect::<Vec<_>>(),
+            [
+                CellMergeStatus::None,
+                CellMergeStatus::First,
+                CellMergeStatus::Merged,
+                CellMergeStatus::Merged,
+                CellMergeStatus::None,
+            ]
+        );
+
+        append_fixed_sprm(&mut merged, 0x5625, &[1, 4]);
+        append_fixed_sprm(&mut merged, 0x5622, &[1, 3]);
+        let tap = parser.parse_tap(&merged).unwrap();
+        assert_eq!(tap.cell_count, 3);
+        assert_eq!(tap.cell_boundaries, [0, 225, 300, 400]);
+        assert_eq!(tap.cell_properties.len(), 3);
+        assert!(
+            tap.cell_properties
+                .iter()
+                .all(|cell| cell.merge_status == CellMergeStatus::None)
+        );
+        assert!(!tap.cell_properties[0].no_wrap);
+        assert!(!tap.cell_properties[1].no_wrap);
+        assert!(tap.cell_properties[2].no_wrap);
+
+        let mut empty = table_definition_grpprl(&[0, 0, 0]);
+        append_fixed_sprm(&mut empty, 0x7621, &[0, 2, 120, 0]);
+        let tap = parser.parse_tap(&empty).unwrap();
+        assert_eq!(tap.cell_count, 2);
+        assert_eq!(tap.cell_boundaries, [0, 120, 240]);
+    }
+
+    #[test]
+    fn rejects_malformed_structural_cell_modifiers() {
+        let arena = Bump::new();
+        let parser = TapParser::new(&arena);
+        let parse_with = |opcode, operand: &[u8]| {
+            let mut grpprl = table_definition_grpprl(&[3, 0, 0, 100, 0, 200, 0, 44, 1]);
+            append_fixed_sprm(&mut grpprl, opcode, operand);
+            parser.parse_tap(&grpprl)
+        };
+
+        assert!(parse_with(0x7621, &[4, 1, 10, 0]).is_err());
+        assert!(parse_with(0x7621, &[1, 0, 10, 0]).is_err());
+        assert!(parse_with(0x7621, &[1, 61, 10, 0]).is_err());
+        assert!(parse_with(0x7621, &[1, 1, 0xC1, 0x7B]).is_err());
+        assert!(parse_with(0x7621, &[1, 2, 0x80, 0x3E]).is_err());
+
+        assert!(parse_with(0x5622, &[0, 3]).is_err());
+        assert!(parse_with(0x5622, &[2, 1]).is_err());
+        assert!(parse_with(0x5622, &[3, 3]).is_err());
+
+        assert!(parse_with(0x7623, &[2, 1, 10, 0]).is_err());
+        assert!(parse_with(0x7623, &[0, 1, 0xC1, 0x7B]).is_err());
+        let mut overflowing = table_definition_grpprl(&[1, 0x30, 0x75, 0x94, 0x75]);
+        append_fixed_sprm(&mut overflowing, 0x7623, &[0, 1, 0xD0, 0x07]);
+        assert!(parser.parse_tap(&overflowing).is_err());
+
+        assert!(parse_with(0x5624, &[2, 1]).is_err());
+        assert!(parse_with(0x5624, &[3, 3]).is_err());
+        assert!(parse_with(0x5625, &[2, 4]).is_err());
+
+        // ItcFirstLim explicitly permits empty and one-cell ranges.
+        assert!(parse_with(0x5624, &[1, 1]).is_ok());
+        let tap = parse_with(0x5624, &[1, 2]).unwrap();
+        assert_eq!(tap.cell_properties[1].merge_status, CellMergeStatus::First);
     }
 
     #[test]
