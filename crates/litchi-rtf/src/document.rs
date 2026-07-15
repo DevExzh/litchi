@@ -1107,6 +1107,21 @@ mod tests {
     }
 
     #[test]
+    fn rejects_unclosed_document_and_destination_groups() {
+        for rtf in [
+            r#"{\rtf1 body"#,
+            r#"{\rtf1{\*\unknown destination"#,
+            r#"{\rtf1{\shp\shpleft1}"#,
+            r#"{\rtf1{\shp{\sp{\sn shapeType}{\sv 1}"#,
+        ] {
+            assert!(matches!(
+                RtfDocument::parse(rtf),
+                Err(RtfError::UnexpectedEof)
+            ));
+        }
+    }
+
+    #[test]
     fn parses_complete_document_info_without_leaking_into_body() {
         let rtf = r#"{\rtf1\ansi\ansicpg1252
             {\info

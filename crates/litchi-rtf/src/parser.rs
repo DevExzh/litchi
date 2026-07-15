@@ -720,19 +720,11 @@ impl<'a> Parser<'a> {
                         text_buffer.extend_from_slice(text.as_bytes());
                     }
                 },
-                Token::Binary(_) => {
-                    // Skip binary data for now
-                    self.pos += 1;
-                },
+                Token::Binary(_) => self.pos += 1,
             }
         }
 
-        // Flush remaining text
-        if !text_buffer.is_empty() {
-            self.flush_text_buffer(&mut text_buffer)?;
-        }
-
-        Ok(())
+        Err(RtfError::UnexpectedEof)
     }
 
     /// Flush text buffer to a style block.
@@ -2595,7 +2587,7 @@ impl<'a> Parser<'a> {
             self.pos += 1;
         }
 
-        Ok(())
+        (depth == 0).then_some(()).ok_or(RtfError::UnexpectedEof)
     }
 
     /// Skip an entire group starting from the OpenBrace token.
@@ -2617,7 +2609,7 @@ impl<'a> Parser<'a> {
             self.pos += 1;
         }
 
-        Ok(())
+        (depth == 0).then_some(()).ok_or(RtfError::UnexpectedEof)
     }
 
     /// Expect a specific token.
@@ -3064,6 +3056,7 @@ impl<'a> Parser<'a> {
         let mut text_depth = None;
         let mut right = None;
         let mut bottom = None;
+        let mut closed = false;
         self.pos += 1; // consume \shp
 
         while self.pos < self.tokens.len() {
@@ -3088,6 +3081,7 @@ impl<'a> Parser<'a> {
                 },
                 Token::CloseBrace if depth == 0 => {
                     self.pos += 1;
+                    closed = true;
                     break;
                 },
                 Token::CloseBrace => {
@@ -3186,6 +3180,9 @@ impl<'a> Parser<'a> {
                 _ => self.pos += 1,
             }
         }
+        if !closed {
+            return Err(RtfError::UnexpectedEof);
+        }
         if !text.is_empty() {
             shape.text = Cow::Owned(text);
             shape.text_formatting = self.current_state().ok().map(|state| state.formatting);
@@ -3221,7 +3218,7 @@ impl<'a> Parser<'a> {
                 },
                 Token::CloseBrace if depth == 0 => {
                     self.pos += 1;
-                    break;
+                    return Ok((name.trim().to_string(), value.trim().to_string()));
                 },
                 Token::CloseBrace => {
                     if part_depth == Some(depth) {
@@ -3265,7 +3262,7 @@ impl<'a> Parser<'a> {
                 ));
             }
         }
-        Ok((name.trim().to_string(), value.trim().to_string()))
+        Err(RtfError::UnexpectedEof)
     }
 
     fn apply_shape_property(shape: &mut super::shape::Shape<'a>, name: &str, value: &str) {
@@ -3401,6 +3398,7 @@ impl<'a> Parser<'a> {
         let mut depth = 0usize;
         let mut right = None;
         let mut bottom = None;
+        let mut closed = false;
         self.pos += 1; // consume \shpgrp
 
         while self.pos < self.tokens.len() {
@@ -3462,6 +3460,7 @@ impl<'a> Parser<'a> {
                 },
                 Token::CloseBrace if depth == 0 => {
                     self.pos += 1;
+                    closed = true;
                     break;
                 },
                 Token::CloseBrace => {
@@ -3502,6 +3501,9 @@ impl<'a> Parser<'a> {
                 },
                 _ => self.pos += 1,
             }
+        }
+        if !closed {
+            return Err(RtfError::UnexpectedEof);
         }
         if let Some(right) = right {
             group.geometry.width = right.saturating_sub(group.geometry.x);
