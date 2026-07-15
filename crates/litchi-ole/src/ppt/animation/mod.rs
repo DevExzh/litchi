@@ -19,7 +19,8 @@ pub use motion_path::{MotionPath, MotionPathBuilder, MotionPathType, PathCommand
 pub use parser::{
     parse_animation_info, parse_animation_info_atom, parse_build_list, parse_extended_time_node,
     parse_slide_animation_extension, parse_time_behavior, parse_time_behavior_atom,
-    parse_time_behavior_property_list, parse_time_node_atom, parse_time_node_property_list,
+    parse_time_behavior_property_list, parse_time_command_behavior,
+    parse_time_command_behavior_atom, parse_time_node_atom, parse_time_node_property_list,
     parse_time_rotation_behavior, parse_time_rotation_behavior_atom, parse_time_scale_behavior,
     parse_time_scale_behavior_atom, parse_time_visual_element,
 };
@@ -36,16 +37,17 @@ pub use types::{
     LegacyTextBuildSubEffect, ParagraphBuild, ParagraphBuildAtom, ParagraphBuildLevel,
     ParagraphBuildType, RestartMode, ShapeAnimation, SlideAnimationExtension, TimeBehavior,
     TimeBehaviorAdditive, TimeBehaviorAtom, TimeBehaviorProperty, TimeBehaviorPropertyList,
-    TimeColorDirection, TimeColorModel, TimeEffectNodeType, TimeEffectType, TimeMasterRelation,
-    TimeNodeAtom, TimeNodeContainer, TimeNodeFill, TimeNodeKind, TimeNodeProperty,
-    TimeNodePropertyList, TimeNodeRestart, TimeNodeType, TimePropertyListContext,
-    TimeRotationBehavior, TimeRotationBehaviorAtom, TimeRotationDirection, TimeScaleBehavior,
-    TimeScaleBehaviorAtom, TimeVisualElement, TimeVisualElementKind,
+    TimeColorDirection, TimeColorModel, TimeCommandBehavior, TimeCommandBehaviorAtom,
+    TimeCommandBehaviorType, TimeEffectNodeType, TimeEffectType, TimeMasterRelation, TimeNodeAtom,
+    TimeNodeContainer, TimeNodeFill, TimeNodeKind, TimeNodeProperty, TimeNodePropertyList,
+    TimeNodeRestart, TimeNodeType, TimePropertyListContext, TimeRotationBehavior,
+    TimeRotationBehaviorAtom, TimeRotationDirection, TimeScaleBehavior, TimeScaleBehaviorAtom,
+    TimeVisualElement, TimeVisualElementKind,
 };
 pub use writer::{
     write_animation_info, write_animation_info_atom, write_build_list, write_extended_time_node,
     write_time_behavior, write_time_behavior_atom, write_time_behavior_property_list,
-    write_time_node_atom, write_time_node_property_list, write_time_rotation_behavior,
-    write_time_rotation_behavior_atom, write_time_scale_behavior, write_time_scale_behavior_atom,
-    write_time_visual_element,
+    write_time_command_behavior, write_time_command_behavior_atom, write_time_node_atom,
+    write_time_node_property_list, write_time_rotation_behavior, write_time_rotation_behavior_atom,
+    write_time_scale_behavior, write_time_scale_behavior_atom, write_time_visual_element,
 };

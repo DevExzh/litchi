@@ -10,11 +10,12 @@ use super::types::{
     LegacyTextBuildSubEffect, ParagraphBuild, ParagraphBuildAtom, ParagraphBuildLevel,
     ParagraphBuildType, SlideAnimationExtension, TimeBehavior, TimeBehaviorAdditive,
     TimeBehaviorAtom, TimeBehaviorProperty, TimeBehaviorPropertyList, TimeColorDirection,
-    TimeColorModel, TimeEffectNodeType, TimeEffectType, TimeMasterRelation, TimeNodeAtom,
-    TimeNodeFill, TimeNodeKind, TimeNodeProperty, TimeNodePropertyList, TimeNodeRestart,
-    TimePropertyListContext, TimeRotationBehavior, TimeRotationBehaviorAtom, TimeRotationDirection,
-    TimeScaleBehavior, TimeScaleBehaviorAtom, TimeVisualElement, TimeVisualElementKind,
-    is_valid_runtime_context, is_valid_time_filter, is_valid_time_points_types,
+    TimeColorModel, TimeCommandBehavior, TimeCommandBehaviorAtom, TimeCommandBehaviorType,
+    TimeEffectNodeType, TimeEffectType, TimeMasterRelation, TimeNodeAtom, TimeNodeFill,
+    TimeNodeKind, TimeNodeProperty, TimeNodePropertyList, TimeNodeRestart, TimePropertyListContext,
+    TimeRotationBehavior, TimeRotationBehaviorAtom, TimeRotationDirection, TimeScaleBehavior,
+    TimeScaleBehaviorAtom, TimeVisualElement, TimeVisualElementKind, is_valid_runtime_context,
+    is_valid_time_filter, is_valid_time_points_types,
 };
 use crate::consts::PptRecordType;
 use crate::ppt::package::{PptError, Result};
@@ -995,6 +996,113 @@ fn validate_basic_behavior_properties(behavior: &TimeBehavior) -> Result<()> {
     Ok(())
 }
 
+/// Parse an exact command behavior container.
+pub fn parse_time_command_behavior(record: &PptRecord) -> Result<TimeCommandBehavior> {
+    require_container(
+        record,
+        PptRecordType::TimeCommandBehaviorContainer,
+        0,
+        "TimeCommandBehaviorContainer",
+    )?;
+    let atom = record
+        .children
+        .first()
+        .ok_or_else(|| PptError::InvalidFormat("command behavior has no atom".to_string()))
+        .and_then(parse_time_command_behavior_atom)?;
+    let mut index = 1;
+    let command =
+        if record.children.get(index).is_some_and(|child| {
+            child.record_type == PptRecordType::TimeVariant && child.instance == 1
+        }) {
+            let command = parse_time_variant_string(&record.children[index])?;
+            index += 1;
+            Some(command)
+        } else {
+            None
+        };
+    let behavior = record
+        .children
+        .get(index)
+        .ok_or_else(|| PptError::InvalidFormat("command behavior has no target".to_string()))
+        .and_then(parse_time_behavior)?;
+    index += 1;
+    if index != record.children.len() {
+        return Err(PptError::InvalidFormat(
+            "command behavior has invalid child order or extra children".to_string(),
+        ));
+    }
+    validate_basic_behavior_properties(&behavior)?;
+    if let Some(command) = &command {
+        validate_time_command(atom.command_type, command)?;
+    }
+    Ok(TimeCommandBehavior {
+        atom,
+        command,
+        behavior,
+    })
+}
+
+/// Parse an exact 8-byte `TimeCommandBehaviorAtom` payload.
+pub fn parse_time_command_behavior_atom(record: &PptRecord) -> Result<TimeCommandBehaviorAtom> {
+    require_atom(
+        record,
+        PptRecordType::TimeCommandBehavior,
+        0,
+        8,
+        "TimeCommandBehaviorAtom",
+    )?;
+    let flags = read_u32(&record.data, 0);
+    let value = read_u32(&record.data, 4);
+    let command_type = if flags & 0x01 != 0 {
+        Some(match value {
+            0 => TimeCommandBehaviorType::Event,
+            1 => TimeCommandBehaviorType::Call,
+            2 => TimeCommandBehaviorType::OleVerb,
+            value => {
+                return Err(PptError::InvalidFormat(format!(
+                    "invalid command behavior type {value}"
+                )));
+            },
+        })
+    } else if value == 1 {
+        None
+    } else {
+        return Err(PptError::InvalidFormat(
+            "command behavior type must be Call when unused".to_string(),
+        ));
+    };
+    Ok(TimeCommandBehaviorAtom {
+        command_type,
+        command_used: flags & 0x02 != 0,
+    })
+}
+
+fn validate_time_command(
+    command_type: Option<TimeCommandBehaviorType>,
+    command: &str,
+) -> Result<()> {
+    let valid = match command_type.unwrap_or(TimeCommandBehaviorType::Call) {
+        TimeCommandBehaviorType::Event => command == "onstopaudio",
+        TimeCommandBehaviorType::OleVerb => command.parse::<i32>().is_ok(),
+        TimeCommandBehaviorType::Call => {
+            matches!(
+                command,
+                "play" | "pause" | "resume" | "stop" | "togglePause"
+            ) || command
+                .strip_prefix("playFrom(")
+                .and_then(|value| value.strip_suffix(')'))
+                .and_then(|value| value.parse::<f64>().ok())
+                .is_some_and(|value| value.is_finite() && value >= 0.0)
+        },
+    };
+    if !valid {
+        return Err(PptError::InvalidFormat(
+            "invalid command for command behavior type".to_string(),
+        ));
+    }
+    Ok(())
+}
+
 /// Parse build list from BuildList container record.
 pub fn parse_build_list(record: &PptRecord) -> Result<BuildList> {
     if record.record_type != PptRecordType::BuildList {
@@ -1302,9 +1410,9 @@ mod tests {
         BuildInfo, ChartBuildType, DiagramBuildType, LegacyAnimationAtom, LegacyAnimationBuild,
         LegacyAnimationEffect, LegacyTextBuildSubEffect, ParagraphBuildType, write_animation_info,
         write_animation_info_atom, write_build_list, write_extended_time_node, write_time_behavior,
-        write_time_behavior_atom, write_time_behavior_property_list, write_time_node_atom,
-        write_time_node_property_list, write_time_rotation_behavior,
-        write_time_rotation_behavior_atom, write_time_scale_behavior,
+        write_time_behavior_atom, write_time_behavior_property_list, write_time_command_behavior,
+        write_time_command_behavior_atom, write_time_node_atom, write_time_node_property_list,
+        write_time_rotation_behavior, write_time_rotation_behavior_atom, write_time_scale_behavior,
         write_time_scale_behavior_atom, write_time_visual_element,
     };
 
@@ -1890,6 +1998,72 @@ mod tests {
         bytes[36] = 0;
         let (record, _) = PptRecord::parse(&bytes, 0).unwrap();
         assert!(parse_time_scale_behavior_atom(&record).is_err());
+    }
+
+    #[test]
+    fn round_trips_and_validates_command_behaviors() {
+        assert_eq!(PptRecordType::TimeCommandBehaviorContainer.as_u16(), 0xF132);
+        assert_eq!(PptRecordType::TimeCommandBehavior.as_u16(), 0xF13B);
+        let common = || TimeBehavior {
+            atom: TimeBehaviorAtom {
+                additive: None,
+                attribute_names_used: false,
+            },
+            attribute_names: None,
+            properties: None,
+            target: TimeVisualElement::Sound {
+                kind: TimeVisualElementKind::Audio,
+                sound_id_ref: 4,
+            },
+        };
+        for (command_type, command) in [
+            (Some(TimeCommandBehaviorType::Event), "onstopaudio"),
+            (Some(TimeCommandBehaviorType::Call), "playFrom(1.25)"),
+            (Some(TimeCommandBehaviorType::OleVerb), "-2"),
+            (None, "togglePause"),
+        ] {
+            let expected = TimeCommandBehavior {
+                atom: TimeCommandBehaviorAtom {
+                    command_type,
+                    command_used: true,
+                },
+                command: Some(command.to_string()),
+                behavior: common(),
+            };
+            let atom_bytes = write_time_command_behavior_atom(&expected.atom);
+            let (atom_record, _) = PptRecord::parse(&atom_bytes, 0).unwrap();
+            assert_eq!(
+                parse_time_command_behavior_atom(&atom_record).unwrap(),
+                expected.atom
+            );
+            let bytes = write_time_command_behavior(&expected).unwrap();
+            let (record, _) = PptRecord::parse(&bytes, 0).unwrap();
+            assert_eq!(parse_time_command_behavior(&record).unwrap(), expected);
+        }
+
+        for (command_type, command) in [
+            (TimeCommandBehaviorType::Event, "stop"),
+            (TimeCommandBehaviorType::Call, "playFrom(-1)"),
+            (TimeCommandBehaviorType::OleVerb, "verb"),
+        ] {
+            let invalid = TimeCommandBehavior {
+                atom: TimeCommandBehaviorAtom {
+                    command_type: Some(command_type),
+                    command_used: true,
+                },
+                command: Some(command.to_string()),
+                behavior: common(),
+            };
+            assert!(write_time_command_behavior(&invalid).is_err());
+        }
+
+        let mut atom = write_time_command_behavior_atom(&TimeCommandBehaviorAtom {
+            command_type: None,
+            command_used: false,
+        });
+        atom[12..16].copy_from_slice(&0u32.to_le_bytes());
+        let (record, _) = PptRecord::parse(&atom, 0).unwrap();
+        assert!(parse_time_command_behavior_atom(&record).is_err());
     }
 
     #[test]

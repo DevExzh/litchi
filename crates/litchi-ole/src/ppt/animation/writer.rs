@@ -8,11 +8,11 @@ use super::types::{
     LegacyAnimationBuild, LegacyAnimationEffect, LegacyTextBuildSubEffect, ParagraphBuild,
     ParagraphBuildLevel, TimeBehavior, TimeBehaviorAdditive, TimeBehaviorAtom,
     TimeBehaviorProperty, TimeBehaviorPropertyList, TimeColorDirection, TimeColorModel,
-    TimeEffectNodeType, TimeEffectType, TimeMasterRelation, TimeNodeAtom, TimeNodeProperty,
-    TimeNodePropertyList, TimePropertyListContext, TimeRotationBehavior, TimeRotationBehaviorAtom,
-    TimeRotationDirection, TimeScaleBehavior, TimeScaleBehaviorAtom, TimeVisualElement,
-    TimeVisualElementKind, is_valid_runtime_context, is_valid_time_filter,
-    is_valid_time_points_types,
+    TimeCommandBehavior, TimeCommandBehaviorAtom, TimeCommandBehaviorType, TimeEffectNodeType,
+    TimeEffectType, TimeMasterRelation, TimeNodeAtom, TimeNodeProperty, TimeNodePropertyList,
+    TimePropertyListContext, TimeRotationBehavior, TimeRotationBehaviorAtom, TimeRotationDirection,
+    TimeScaleBehavior, TimeScaleBehaviorAtom, TimeVisualElement, TimeVisualElementKind,
+    is_valid_runtime_context, is_valid_time_filter, is_valid_time_points_types,
 };
 use crate::consts::PptRecordType;
 use crate::ppt::package::{PptError, Result};
@@ -714,6 +714,74 @@ fn validate_basic_behavior_properties(behavior: &TimeBehavior) -> Result<()> {
     }) {
         return Err(PptError::InvalidFormat(
             "behavior contains properties reserved for color or motion behaviors".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+/// Serialize an exact command behavior container.
+pub fn write_time_command_behavior(behavior: &TimeCommandBehavior) -> Result<Vec<u8>> {
+    validate_basic_behavior_properties(&behavior.behavior)?;
+    if let Some(command) = &behavior.command {
+        validate_time_command(behavior.atom.command_type, command)?;
+    }
+    let mut children = write_time_command_behavior_atom(&behavior.atom);
+    if let Some(command) = &behavior.command {
+        let data = encode_time_variant_string(command);
+        let length = u32::try_from(data.len())
+            .map_err(|_| PptError::InvalidFormat("time command exceeds 4 GiB".to_string()))?;
+        children.extend(create_record_header(
+            PptRecordType::TimeVariant,
+            0,
+            1,
+            length,
+        ));
+        children.extend(data);
+    }
+    children.extend(write_time_behavior(&behavior.behavior)?);
+    wrap_record(
+        PptRecordType::TimeCommandBehaviorContainer,
+        0x0F,
+        0,
+        children,
+    )
+}
+
+/// Serialize an exact `TimeCommandBehaviorAtom`.
+pub fn write_time_command_behavior_atom(atom: &TimeCommandBehaviorAtom) -> Vec<u8> {
+    let flags = u32::from(atom.command_type.is_some()) | (u32::from(atom.command_used) << 1);
+    let command_type = atom.command_type.map_or(1u32, |value| match value {
+        TimeCommandBehaviorType::Event => 0,
+        TimeCommandBehaviorType::Call => 1,
+        TimeCommandBehaviorType::OleVerb => 2,
+    });
+    let mut result = create_record_header(PptRecordType::TimeCommandBehavior, 0, 0, 8);
+    result.extend(flags.to_le_bytes());
+    result.extend(command_type.to_le_bytes());
+    result
+}
+
+fn validate_time_command(
+    command_type: Option<TimeCommandBehaviorType>,
+    command: &str,
+) -> Result<()> {
+    let valid = match command_type.unwrap_or(TimeCommandBehaviorType::Call) {
+        TimeCommandBehaviorType::Event => command == "onstopaudio",
+        TimeCommandBehaviorType::OleVerb => command.parse::<i32>().is_ok(),
+        TimeCommandBehaviorType::Call => {
+            matches!(
+                command,
+                "play" | "pause" | "resume" | "stop" | "togglePause"
+            ) || command
+                .strip_prefix("playFrom(")
+                .and_then(|value| value.strip_suffix(')'))
+                .and_then(|value| value.parse::<f64>().ok())
+                .is_some_and(|value| value.is_finite() && value >= 0.0)
+        },
+    };
+    if !valid {
+        return Err(PptError::InvalidFormat(
+            "invalid command for command behavior type".to_string(),
         ));
     }
     Ok(())

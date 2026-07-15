@@ -830,6 +830,30 @@ pub struct TimeScaleBehaviorAtom {
     pub zoom_contents: Option<bool>,
 }
 
+/// A PowerPoint 2002 command behavior and its common target information.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TimeCommandBehavior {
+    pub atom: TimeCommandBehaviorAtom,
+    /// Optional command retained even when the atom marks it as ignored.
+    pub command: Option<String>,
+    pub behavior: TimeBehavior,
+}
+
+/// Flags and command kind from a `TimeCommandBehaviorAtom`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TimeCommandBehaviorAtom {
+    pub command_type: Option<TimeCommandBehaviorType>,
+    pub command_used: bool,
+}
+
+/// Operation performed by a command behavior.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TimeCommandBehaviorType {
+    Event,
+    Call,
+    OleVerb,
+}
+
 /// Typed properties stored in `TimePropertyList4TimeBehavior`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TimeBehaviorPropertyList {

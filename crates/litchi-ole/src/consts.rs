@@ -139,12 +139,16 @@ pub enum PptRecordType {
     TimeRotationBehaviorContainer = 0xF12F,
     /// Scale behavior container
     TimeScaleBehaviorContainer = 0xF130,
+    /// Command behavior container
+    TimeCommandBehaviorContainer = 0xF132,
     /// Shared animation behavior atom
     TimeBehavior = 0xF133,
     /// Rotation behavior atom
     TimeRotationBehavior = 0xF138,
     /// Scale behavior atom
     TimeScaleBehavior = 0xF139,
+    /// Command behavior atom
+    TimeCommandBehavior = 0xF13B,
     /// Animation target container
     TimeClientVisualElement = 0xF13C,
     /// Time property list record
@@ -232,9 +236,11 @@ impl From<u16> for PptRecordType {
             0xF12A => PptRecordType::TimeBehaviorContainer,
             0xF12F => PptRecordType::TimeRotationBehaviorContainer,
             0xF130 => PptRecordType::TimeScaleBehaviorContainer,
+            0xF132 => PptRecordType::TimeCommandBehaviorContainer,
             0xF133 => PptRecordType::TimeBehavior,
             0xF138 => PptRecordType::TimeRotationBehavior,
             0xF139 => PptRecordType::TimeScaleBehavior,
+            0xF13B => PptRecordType::TimeCommandBehavior,
             0xF13C => PptRecordType::TimeClientVisualElement,
             0xF13D => PptRecordType::TimePropertyList,
             0xF13E => PptRecordType::TimeVariantList,
