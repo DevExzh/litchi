@@ -401,6 +401,8 @@ struct TableCell {
 struct TableRow {
     /// Cells in the row
     cells: Vec<TableCell>,
+    /// Row and cell layout encoded in the row mark's TAP properties.
+    formatting: super::tap::TableRow,
 }
 
 /// Represents a table
@@ -1339,6 +1341,7 @@ impl DocWriter {
         revision_data: Option<&RevisionWriterData>,
     ) -> Result<(), DocWriteError> {
         for table in &self.tables {
+            let mut encountered_body_row = false;
             for row in &table.rows {
                 let column_count = row.cells.len();
                 if !(1..=63).contains(&column_count) {
@@ -1346,6 +1349,17 @@ impl DocWriter {
                         "DOC table rows must contain between 1 and 63 cells".to_string(),
                     ));
                 }
+                if row.formatting.cells.len() != column_count {
+                    return Err(DocWriteError::InvalidData(
+                        "DOC table row formatting must define every cell".to_string(),
+                    ));
+                }
+                if row.formatting.is_header && encountered_body_row {
+                    return Err(DocWriteError::InvalidData(
+                        "DOC header rows must form a contiguous prefix of the table".to_string(),
+                    ));
+                }
+                encountered_body_row |= !row.formatting.is_header;
                 for cell in &row.cells {
                     if cell.paragraphs.is_empty() {
                         return Err(DocWriteError::InvalidData(
@@ -1389,7 +1403,11 @@ impl DocWriter {
                     DocWriteError::InvalidData("DOC table row FC overflows".to_string())
                 })?;
                 chpx_entries.push((fc_start, fc_end, Vec::new()));
-                papx_entries.push((fc_start, fc_end, build_table_row_papx_grpprl(column_count)?));
+                papx_entries.push((
+                    fc_start,
+                    fc_end,
+                    build_table_row_papx_grpprl(&row.formatting)?,
+                ));
                 let cp_end = current_cp.checked_add(1).ok_or_else(|| {
                     DocWriteError::InvalidData("DOC table CP range overflows".to_string())
                 })?;
@@ -1727,7 +1745,14 @@ impl DocWriter {
         let mut table = WritableTable { rows: Vec::new() };
 
         for _ in 0..rows {
-            let mut row = TableRow { cells: Vec::new() };
+            let mut row = TableRow {
+                cells: Vec::new(),
+                formatting: super::tap::TableRow {
+                    cells: Vec::with_capacity(cols),
+                    height: 0,
+                    is_header: false,
+                },
+            };
             for _ in 0..cols {
                 row.cells.push(TableCell {
                     paragraphs: vec![WritableParagraph {
@@ -1737,6 +1762,15 @@ impl DocWriter {
                         }],
                         formatting: ParagraphFormatting::default(),
                     }],
+                });
+            }
+            for index in 0..cols {
+                const DEFAULT_TABLE_WIDTH: u32 = 8640;
+                let left = DEFAULT_TABLE_WIDTH * index as u32 / cols as u32;
+                let right = DEFAULT_TABLE_WIDTH * (index + 1) as u32 / cols as u32;
+                row.formatting.cells.push(super::tap::TableCell {
+                    width: (right - left) as u16,
+                    merged: false,
                 });
             }
             table.rows.push(row);
@@ -1793,6 +1827,34 @@ impl DocWriter {
             formatting: ParagraphFormatting::default(),
         }];
 
+        Ok(())
+    }
+
+    /// Set the widths, horizontal merges, height, and header state for a table row.
+    pub fn set_table_row_formatting(
+        &mut self,
+        table_idx: usize,
+        row: usize,
+        formatting: super::tap::TableRow,
+    ) -> Result<(), DocWriteError> {
+        let table = self
+            .tables
+            .get_mut(table_idx)
+            .ok_or_else(|| DocWriteError::InvalidData(format!("Table {table_idx} not found")))?;
+        let row_data = table
+            .rows
+            .get_mut(row)
+            .ok_or_else(|| DocWriteError::InvalidData(format!("Row {row} not found")))?;
+        if formatting.cells.len() != row_data.cells.len() {
+            return Err(DocWriteError::InvalidData(format!(
+                "Row {row} formatting has {} cells but the row contains {}",
+                formatting.cells.len(),
+                row_data.cells.len()
+            )));
+        }
+        super::tap::generate_row_sprms(&formatting)
+            .map_err(|error| DocWriteError::InvalidData(error.to_string()))?;
+        row_data.formatting = formatting;
         Ok(())
     }
 
@@ -3371,33 +3433,17 @@ fn append_table_depth_sprms(grp: &mut Vec<u8>) {
     grp.extend_from_slice(&1u32.to_le_bytes());
 }
 
-fn build_table_row_papx_grpprl(column_count: usize) -> Result<Vec<u8>, DocWriteError> {
-    if !(1..=63).contains(&column_count) {
-        return Err(DocWriteError::InvalidData(
-            "DOC table rows must contain between 1 and 63 cells".to_string(),
-        ));
-    }
+fn build_table_row_papx_grpprl(
+    formatting: &super::tap::TableRow,
+) -> Result<Vec<u8>, DocWriteError> {
     let mut grp = Vec::new();
     append_table_depth_sprms(&mut grp);
     grp.extend_from_slice(&SPRM_P_F_TTP.to_le_bytes());
     grp.push(1);
-
-    // TDefTableOperand: itcMac followed by one signed XAS boundary per
-    // column plus the initial left edge. Default descriptors are omitted,
-    // which the format explicitly permits.
-    let mut operand = Vec::with_capacity(1 + (column_count + 1) * 2);
-    operand.push(column_count as u8);
-    const TABLE_WIDTH_TWIPS: i32 = 8640;
-    for index in 0..=column_count {
-        let boundary = (TABLE_WIDTH_TWIPS * index as i32 / column_count as i32) as i16;
-        operand.extend_from_slice(&boundary.to_le_bytes());
-    }
-    let encoded_size = u16::try_from(operand.len() + 1).map_err(|_| {
-        DocWriteError::InvalidData("DOC TDefTable operand exceeds its size field".to_string())
-    })?;
-    grp.extend_from_slice(&SPRM_T_DEF_TABLE.to_le_bytes());
-    grp.extend_from_slice(&encoded_size.to_le_bytes());
-    grp.extend_from_slice(&operand);
+    grp.extend_from_slice(
+        &super::tap::generate_row_sprms(formatting)
+            .map_err(|error| DocWriteError::InvalidData(error.to_string()))?,
+    );
     Ok(grp)
 }
 
@@ -3577,6 +3623,26 @@ mod tests {
                 formatting: ParagraphFormatting::default(),
             });
         writer.set_table_cell_text(table, 0, 1, "B").unwrap();
+        writer
+            .set_table_row_formatting(
+                table,
+                0,
+                crate::doc::writer::TableRow {
+                    cells: vec![
+                        crate::doc::writer::TableCell {
+                            width: 2880,
+                            merged: false,
+                        },
+                        crate::doc::writer::TableCell {
+                            width: 5760,
+                            merged: true,
+                        },
+                    ],
+                    height: 360,
+                    is_header: true,
+                },
+            )
+            .unwrap();
         writer.set_table_cell_text(table, 1, 0, "C").unwrap();
         let second_table = writer.add_table(1, 1).unwrap();
         writer
@@ -3592,14 +3658,29 @@ mod tests {
             assert_eq!(rows[0].properties().unwrap().cell_count, 2);
             assert_eq!(
                 rows[0].properties().unwrap().cell_boundaries,
-                [0, 4320, 8640]
+                [0, 2880, 8640]
             );
+            assert_eq!(rows[0].properties().unwrap().row_height, Some(360));
+            assert!(rows[0].properties().unwrap().is_header_row);
             assert_eq!(
                 rows[0].cells().unwrap()[0].text().unwrap(),
                 "A😀\ncontinued"
             );
             assert_eq!(rows[0].cells().unwrap()[0].paragraphs().unwrap().len(), 2);
             assert_eq!(rows[0].cells().unwrap()[1].text().unwrap(), "B");
+            let first_cell_properties = rows[0].cells().unwrap()[0].properties().unwrap().clone();
+            assert_eq!(
+                first_cell_properties.merge_status,
+                crate::doc::parts::tap::CellMergeStatus::First
+            );
+            assert_eq!(first_cell_properties.preferred_width.unwrap().value, 2880);
+            assert_eq!(
+                rows[0].cells().unwrap()[1]
+                    .properties()
+                    .unwrap()
+                    .merge_status,
+                crate::doc::parts::tap::CellMergeStatus::Merged
+            );
             assert_eq!(rows[1].cells().unwrap()[0].text().unwrap(), "C");
             assert_eq!(rows[1].cells().unwrap()[1].text().unwrap(), "");
             assert_eq!(
@@ -3620,7 +3701,7 @@ mod tests {
                 .unwrap();
             assert_eq!(
                 element_table.properties().unwrap().cell_boundaries,
-                [0, 4320, 8640]
+                [0, 2880, 8640]
             );
         };
 
@@ -4539,5 +4620,59 @@ mod tests {
         assert!(writer.set_table_cell_text(idx, 2, 0, "Invalid").is_err());
         assert!(writer.set_table_cell_text(idx, 0, 2, "Invalid").is_err());
         assert!(writer.set_table_cell_text(999, 0, 0, "Invalid").is_err());
+    }
+
+    #[test]
+    fn rejects_invalid_table_row_formatting() {
+        let mut writer = DocWriter::new();
+        let table = writer.add_table(2, 2).unwrap();
+        let one_cell = crate::doc::writer::TableRow {
+            cells: vec![crate::doc::writer::TableCell {
+                width: 1000,
+                merged: false,
+            }],
+            height: 0,
+            is_header: false,
+        };
+        assert!(writer.set_table_row_formatting(table, 0, one_cell).is_err());
+
+        let invalid_merge = crate::doc::writer::TableRow {
+            cells: vec![
+                crate::doc::writer::TableCell {
+                    width: 1000,
+                    merged: true,
+                },
+                crate::doc::writer::TableCell {
+                    width: 1000,
+                    merged: false,
+                },
+            ],
+            height: 0,
+            is_header: false,
+        };
+        assert!(
+            writer
+                .set_table_row_formatting(table, 0, invalid_merge)
+                .is_err()
+        );
+
+        let late_header = crate::doc::writer::TableRow {
+            cells: vec![
+                crate::doc::writer::TableCell {
+                    width: 1000,
+                    merged: false,
+                },
+                crate::doc::writer::TableCell {
+                    width: 1000,
+                    merged: false,
+                },
+            ],
+            height: 0,
+            is_header: true,
+        };
+        writer
+            .set_table_row_formatting(table, 1, late_header)
+            .unwrap();
+        assert!(writer.write_to(&mut Cursor::new(Vec::new())).is_err());
     }
 }

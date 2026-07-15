@@ -27,7 +27,7 @@ pub struct TableProperties {
     pub indent_left: i16,
     /// Preferred table width
     pub preferred_width: Option<TableWidth>,
-    /// Row height (twips, negative = at least)
+    /// Row height in twips (positive = at least, negative = exact)
     pub row_height: Option<i16>,
     /// Row is header row
     pub is_header_row: bool,
@@ -78,12 +78,12 @@ pub struct CellProperties {
 /// Cell merge status.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum CellMergeStatus {
-    /// Not merged
+    /// Not horizontally merged
     #[default]
     None,
-    /// First cell in merge
+    /// First cell in a horizontal merge
     First,
-    /// Continuation of merged cell
+    /// Continuation of a horizontal merge
     Merged,
 }
 
@@ -229,135 +229,8 @@ impl TableProperties {
     ///
     /// * `grpprl` - Group of SPRMs (property modifications)
     pub fn from_sprm(grpprl: &[u8]) -> Result<Self> {
-        let mut tap = Self::default();
-        let mut offset = 0;
-
-        while offset < grpprl.len() {
-            if offset + 1 > grpprl.len() {
-                break;
-            }
-
-            // Read SPRM opcode
-            let sprm = u16::from_le_bytes([grpprl[offset], grpprl[offset + 1]]);
-            offset += 2;
-
-            match sprm {
-                // Table justification (sprmTJc)
-                0x5400 => {
-                    if offset < grpprl.len() {
-                        tap.justification = match grpprl[offset] {
-                            0 => TableJustification::Left,
-                            1 => TableJustification::Center,
-                            2 => TableJustification::Right,
-                            _ => TableJustification::Left,
-                        };
-                        offset += 1;
-                    }
-                },
-                // Table definition (sprmTDefTable)
-                0xD608 => {
-                    // This is complex - contains cell count and boundaries
-                    if offset + 1 < grpprl.len() {
-                        let size =
-                            u16::from_le_bytes([grpprl[offset], grpprl[offset + 1]]) as usize;
-                        offset += 2;
-
-                        if offset + size <= grpprl.len() {
-                            let def_data = &grpprl[offset..offset + size];
-                            tap.parse_table_definition(def_data)?;
-                            offset += size;
-                        }
-                    }
-                },
-                // Row height (sprmTDyaRowHeight)
-                0x9407 => {
-                    if offset + 1 < grpprl.len() {
-                        tap.row_height =
-                            Some(i16::from_le_bytes([grpprl[offset], grpprl[offset + 1]]));
-                        offset += 2;
-                    }
-                },
-                // Header row (sprmTTableHeader)
-                0x3403 => {
-                    if offset < grpprl.len() {
-                        tap.is_header_row = grpprl[offset] != 0;
-                        offset += 1;
-                    }
-                },
-                // Can't split row (sprmTFCantSplit)
-                0x3404 => {
-                    if offset < grpprl.len() {
-                        tap.allow_row_break = grpprl[offset] == 0;
-                        offset += 1;
-                    }
-                },
-                // Table indent (sprmTDxaLeft)
-                0x9601 => {
-                    if offset + 1 < grpprl.len() {
-                        tap.indent_left = i16::from_le_bytes([grpprl[offset], grpprl[offset + 1]]);
-                        offset += 2;
-                    }
-                },
-                // Cell properties (various sprmTCxxx)
-                0xD605..=0xD620 => {
-                    // Cell-specific SPRMs
-                    let size = Self::get_sprm_size(sprm);
-                    if offset + size <= grpprl.len() {
-                        // Parse cell properties if needed
-                        offset += size;
-                    }
-                },
-                // Unknown SPRM - skip
-                _ => {
-                    let size = Self::get_sprm_size(sprm);
-                    offset += size;
-                },
-            }
-        }
-
-        Ok(tap)
-    }
-
-    /// Parse table definition structure.
-    ///
-    /// Format: cell count (1 byte) + cell boundaries (2 bytes each)
-    fn parse_table_definition(&mut self, data: &[u8]) -> Result<()> {
-        if data.is_empty() {
-            return Ok(());
-        }
-
-        // Read cell count
-        self.cell_count = data[0] as usize;
-
-        // Read cell boundaries
-        let mut offset = 1;
-        self.cell_boundaries.clear();
-
-        for _ in 0..=self.cell_count {
-            if offset + 1 < data.len() {
-                let boundary = i16::from_le_bytes([data[offset], data[offset + 1]]);
-                self.cell_boundaries.push(boundary);
-                offset += 2;
-            }
-        }
-
-        // Initialize cell properties
-        self.cell_properties = vec![CellProperties::default(); self.cell_count];
-
-        Ok(())
-    }
-
-    /// Get the size of an SPRM operand.
-    fn get_sprm_size(sprm: u16) -> usize {
-        let sprm_type = sprm & 0x07;
-        match sprm_type {
-            0 | 1 => 1,
-            2 | 4 | 5 => 2,
-            3 => 4,
-            6 => 1, // Variable - simplified
-            7 => 3,
-            _ => 1,
-        }
+        let arena = bumpalo::Bump::new();
+        super::tap_parser::TapParser::new(&arena).parse_tap(grpprl)
     }
 
     /// Get cell width in twips for a given cell index.
@@ -398,18 +271,17 @@ mod tests {
 
     #[test]
     fn test_table_definition() {
-        let mut tap = TableProperties::new();
-
-        // Create simple table definition: 2 cells
-        // Format: count(1) + boundaries(3 * 2 bytes)
-        let data = vec![
+        let operand = vec![
             2, // 2 cells
             0, 0, // Start at 0
             100, 0, // First boundary at 100 twips
             200, 0, // End at 200 twips
         ];
+        let mut data = 0xD608u16.to_le_bytes().to_vec();
+        data.extend_from_slice(&u16::try_from(operand.len() + 1).unwrap().to_le_bytes());
+        data.extend_from_slice(&operand);
 
-        tap.parse_table_definition(&data).unwrap();
+        let tap = TableProperties::from_sprm(&data).unwrap();
         assert_eq!(tap.cell_count, 2);
         assert_eq!(tap.cell_boundaries.len(), 3);
         assert_eq!(tap.get_cell_width(0), Some(100));

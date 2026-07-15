@@ -363,13 +363,26 @@ impl<'arena> TapParser<'arena> {
         // Read flags (bytes 0-1)
         let flags = binary_to_doc_result(read_u16_le(data, offset))?;
 
-        // Bit 0: fVertical - vertical text
-        if (flags & 0x0001) != 0 {
-            props.text_direction = TextDirection::TbRl;
-        }
+        // Bits 0-1: horizontal merge state.
+        props.merge_status = match flags & 0x0003 {
+            0 => CellMergeStatus::None,
+            1 => CellMergeStatus::Merged,
+            2 | 3 => CellMergeStatus::First,
+            _ => unreachable!(),
+        };
 
-        // Bits 1-2: vertAlign - vertical alignment
-        let vert_align = (flags >> 4) & 0x03;
+        // Bits 2-4: text flow.
+        props.text_direction = match (flags >> 2) & 0x07 {
+            0 => TextDirection::LrTb,
+            1 => TextDirection::TbRl,
+            3 => TextDirection::BtLr,
+            4 => TextDirection::LrBt,
+            5 => TextDirection::TbLr,
+            _ => TextDirection::LrTb,
+        };
+
+        // Bits 7-8: vertical alignment.
+        let vert_align = (flags >> 7) & 0x03;
         props.vertical_alignment = match vert_align {
             0 => VerticalAlignment::Top,
             1 => VerticalAlignment::Center,
@@ -377,27 +390,30 @@ impl<'arena> TapParser<'arena> {
             _ => VerticalAlignment::Top,
         };
 
-        // Bits 3-4: fVertMerge/fVertRestart - cell merging
-        let merge_flags = (flags >> 3) & 0x03;
-        props.merge_status = match merge_flags {
-            0 => CellMergeStatus::None,
-            1 => CellMergeStatus::First,
-            3 => CellMergeStatus::Merged,
-            _ => CellMergeStatus::None,
-        };
-
         // Read preferred width (bytes 2-3)
-        let w_width = binary_to_doc_result(read_u16_le(data, offset + 2))? as i16;
-        let fts_width = (flags >> 6) & 0x07; // Width type from flags
-        props.preferred_width = Some(TableWidth {
-            value: w_width,
-            width_type: match fts_width {
-                0 => WidthType::Auto,
-                1 => WidthType::Twips,
-                2 => WidthType::Percentage,
-                _ => WidthType::Auto,
-            },
-        });
+        let w_width = binary_to_doc_result(read_i16_le(data, offset + 2))?;
+        if w_width < 0 {
+            return Err(DocError::Corrupted(
+                "TC80 preferred width is negative".to_string(),
+            ));
+        }
+        let fts_width = (flags >> 9) & 0x07;
+        props.preferred_width = match fts_width {
+            0 => None,
+            1 => Some(TableWidth {
+                value: w_width,
+                width_type: WidthType::Auto,
+            }),
+            2 => Some(TableWidth {
+                value: w_width,
+                width_type: WidthType::Percentage,
+            }),
+            3 => Some(TableWidth {
+                value: w_width,
+                width_type: WidthType::Twips,
+            }),
+            _ => None,
+        };
 
         // Read borders (4 bytes each)
         props.borders.top = Self::parse_border_code(data, offset + 4)?;
@@ -729,6 +745,29 @@ mod tests {
             .parse_tap(&table_definition_grpprl(&partial_descriptors))
             .unwrap();
         assert_eq!(tap.cell_properties.len(), 2);
+    }
+
+    #[test]
+    fn decodes_tc80_layout_bits_and_width_type() {
+        let arena = Bump::new();
+        let parser = TapParser::new(&arena);
+        let mut operand = vec![1, 0, 0];
+        operand.extend_from_slice(&1440i16.to_le_bytes());
+        let flags = 2u16 | (3 << 2) | (2 << 7) | (3 << 9);
+        operand.extend_from_slice(&flags.to_le_bytes());
+        operand.extend_from_slice(&1440i16.to_le_bytes());
+        operand.extend_from_slice(&[0; 16]);
+
+        let tap = parser
+            .parse_tap(&table_definition_grpprl(&operand))
+            .unwrap();
+        let cell = &tap.cell_properties[0];
+        assert_eq!(cell.merge_status, CellMergeStatus::First);
+        assert_eq!(cell.text_direction, TextDirection::BtLr);
+        assert_eq!(cell.vertical_alignment, VerticalAlignment::Bottom);
+        let width = cell.preferred_width.unwrap();
+        assert_eq!(width.value, 1440);
+        assert_eq!(width.width_type, WidthType::Twips);
     }
 
     #[test]
