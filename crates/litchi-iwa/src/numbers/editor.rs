@@ -141,14 +141,6 @@ pub struct NumbersEditor {
 }
 
 impl NumbersEditor {
-    /// Create an independent native blank Numbers spreadsheet from scratch.
-    ///
-    /// The document starts with one sheet and Apple's standard 22-by-7 table,
-    /// ready for cell, formula, table, and sheet CRUD.
-    pub fn create() -> Result<Self> {
-        Self::from_package(crate::templates::blank_numbers_package()?)
-    }
-
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         Self::from_package(IWorkPackage::open(path)?)
     }

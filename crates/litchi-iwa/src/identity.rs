@@ -18,8 +18,8 @@ const DOCUMENT_IDENTIFIER_ENTRY: &str = "Metadata/DocumentIdentifier";
 ///
 /// Apple stores the public document UUID, the current saved-version UUID, and
 /// a private UUID separately. Keeping these values distinct prevents two
-/// documents created from the same native template from being treated as
-/// revisions of one another by iWork or iCloud.
+/// documents derived from a common source from being treated as revisions of
+/// one another by iWork or iCloud.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IWorkDocumentIdentity {
     document_uuid: String,
@@ -202,12 +202,15 @@ fn generate_distinct_uuid(existing: &[&str]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::templates::blank_pages_package;
+    use crate::archive::{Archive, ArchiveObject};
+    use crate::protobuf::tsp::{DocumentRevision, PackageMetadata};
 
     #[test]
     fn regenerated_identity_is_unique_and_consistent() {
-        let first = blank_pages_package().unwrap();
-        let second = blank_pages_package().unwrap();
+        let mut first = identity_package();
+        let mut second = identity_package();
+        first.regenerate_document_identity().unwrap();
+        second.regenerate_document_identity().unwrap();
 
         let first_id = std::str::from_utf8(first.entry(DOCUMENT_IDENTIFIER_ENTRY).unwrap())
             .unwrap()
@@ -262,10 +265,72 @@ mod tests {
 
     #[test]
     fn malformed_identity_update_is_transactional() {
-        let mut package = blank_pages_package().unwrap();
+        let mut package = identity_package();
         package.remove_entry(PROPERTIES_ENTRY);
         let before = package.to_bytes().unwrap();
         assert!(package.regenerate_document_identity().is_err());
         assert_eq!(package.to_bytes().unwrap(), before);
+    }
+
+    fn identity_package() -> IWorkPackage {
+        let original_document = "00000000-0000-4000-8000-000000000001";
+        let original_version = "00000000-0000-4000-8000-000000000002";
+        let original_private = "00000000-0000-4000-8000-000000000003";
+        let mut properties = plist::Dictionary::new();
+        for key in ["documentUUID", "stableDocumentUUID", "shareUUID"] {
+            properties.insert(key.to_owned(), Value::String(original_document.to_owned()));
+        }
+        properties.insert(
+            "versionUUID".to_owned(),
+            Value::String(original_version.to_owned()),
+        );
+        properties.insert(
+            "privateUUID".to_owned(),
+            Value::String(original_private.to_owned()),
+        );
+        properties.insert(
+            "revision".to_owned(),
+            Value::String(format!("0::{original_version}")),
+        );
+        let mut properties_bytes = Vec::new();
+        Value::Dictionary(properties)
+            .to_writer_binary(&mut properties_bytes)
+            .unwrap();
+
+        let metadata = PackageMetadata {
+            last_object_identifier: 2,
+            revision: Some(DocumentRevision {
+                sequence_32: Some(0),
+                identifier: Some(original_version.to_owned()),
+                sequence_64: None,
+            }),
+            ..Default::default()
+        };
+        let archive = Archive {
+            objects: vec![
+                ArchiveObject::new(
+                    2,
+                    vec![RawMessage {
+                        type_: PACKAGE_METADATA_MESSAGE_TYPE,
+                        data: metadata.encode_to_vec(),
+                    }],
+                )
+                .unwrap(),
+            ],
+        };
+        let mut package = IWorkPackage::new();
+        package
+            .insert_entry(PROPERTIES_ENTRY, properties_bytes)
+            .unwrap();
+        package
+            .insert_entry(
+                DOCUMENT_IDENTIFIER_ENTRY,
+                original_document.as_bytes().to_vec(),
+            )
+            .unwrap();
+        package
+            .replace_archive(PACKAGE_METADATA_ENTRY, &archive)
+            .unwrap();
+        package
     }
 }

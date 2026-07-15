@@ -81,11 +81,6 @@ pub struct PagesEditor {
 }
 
 impl PagesEditor {
-    /// Create an independent native blank Pages document from scratch.
-    pub fn create() -> Result<Self> {
-        Self::from_package(crate::templates::blank_pages_package()?)
-    }
-
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         Self::from_package(IWorkPackage::open(path)?)
     }

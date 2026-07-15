@@ -140,7 +140,6 @@ pub mod ref_graph;
 pub mod registry;
 pub mod snappy;
 pub mod structured;
-mod templates;
 pub mod varint;
 pub(crate) mod wire;
 pub mod zip_utils;
