@@ -1156,6 +1156,71 @@ impl CellRecord {
         }
     }
 
+    pub(crate) fn parse_mul_rk(data: &[u8]) -> XlsResult<Vec<Self>> {
+        let (row, first_col, count) = Self::packed_cell_range(data, 6, "MulRk")?;
+        let mut cells = Vec::with_capacity(count);
+        for index in 0..count {
+            let offset = 4 + index * 6;
+            cells.push(Self::Rk {
+                row,
+                col: first_col + index as u16,
+                xf_index: binary::read_u16_le_at(data, offset)?,
+                value: utils::rk_to_f64(binary::read_u32_le_at(data, offset + 2)?),
+            });
+        }
+        Ok(cells)
+    }
+
+    pub(crate) fn parse_mul_blank(data: &[u8]) -> XlsResult<Vec<Self>> {
+        let (row, first_col, count) = Self::packed_cell_range(data, 2, "MulBlank")?;
+        let mut cells = Vec::with_capacity(count);
+        for index in 0..count {
+            cells.push(Self::Blank {
+                row,
+                col: first_col + index as u16,
+                xf_index: binary::read_u16_le_at(data, 4 + index * 2)?,
+            });
+        }
+        Ok(cells)
+    }
+
+    fn packed_cell_range(
+        data: &[u8],
+        item_size: usize,
+        record_name: &str,
+    ) -> XlsResult<(u16, u16, usize)> {
+        let Some(items_size) = data.len().checked_sub(6) else {
+            return Err(XlsError::InvalidLength {
+                expected: 6 + item_size * 2,
+                found: data.len(),
+            });
+        };
+        if items_size % item_size != 0 {
+            return Err(XlsError::InvalidData(format!(
+                "{record_name} payload does not contain whole packed cells"
+            )));
+        }
+        let count = items_size / item_size;
+        if !(2..=256).contains(&count) {
+            return Err(XlsError::InvalidData(format!(
+                "{record_name} contains {count} cells; expected 2 through 256"
+            )));
+        }
+
+        let row = binary::read_u16_le_at(data, 0)?;
+        let first_col = binary::read_u16_le_at(data, 2)?;
+        let last_col = binary::read_u16_le_at(data, data.len() - 2)?;
+        let expected_last = first_col
+            .checked_add((count - 1) as u16)
+            .ok_or_else(|| XlsError::InvalidData(format!("{record_name} column overflow")))?;
+        if first_col > 254 || last_col != expected_last || last_col > 255 {
+            return Err(XlsError::InvalidData(format!(
+                "{record_name} column range {first_col}..={last_col} does not match {count} cells"
+            )));
+        }
+        Ok((row, first_col, count))
+    }
+
     fn parse_blank(data: &[u8]) -> XlsResult<Self> {
         if data.len() < 6 {
             return Err(XlsError::InvalidLength {
@@ -1292,5 +1357,74 @@ impl CellRecord {
             value,
             formula,
         })
+    }
+}
+
+#[cfg(test)]
+mod packed_cell_tests {
+    use super::*;
+
+    #[test]
+    fn expands_mul_rk_into_individual_numeric_cells() {
+        let mut data = Vec::new();
+        data.extend_from_slice(&7u16.to_le_bytes());
+        data.extend_from_slice(&3u16.to_le_bytes());
+        data.extend_from_slice(&1u16.to_le_bytes());
+        data.extend_from_slice(&((42u32 << 2) | 0x02).to_le_bytes());
+        data.extend_from_slice(&2u16.to_le_bytes());
+        data.extend_from_slice(&((1234u32 << 2) | 0x03).to_le_bytes());
+        data.extend_from_slice(&4u16.to_le_bytes());
+
+        let cells = CellRecord::parse_mul_rk(&data).unwrap();
+
+        assert!(matches!(
+            cells[0],
+            CellRecord::Rk {
+                row: 7,
+                col: 3,
+                xf_index: 1,
+                value: 42.0
+            }
+        ));
+        assert!(matches!(
+            cells[1],
+            CellRecord::Rk {
+                row: 7,
+                col: 4,
+                xf_index: 2,
+                value
+            } if value == 12.34
+        ));
+    }
+
+    #[test]
+    fn expands_mul_blank_and_rejects_inconsistent_ranges() {
+        let mut data = Vec::new();
+        data.extend_from_slice(&9u16.to_le_bytes());
+        data.extend_from_slice(&5u16.to_le_bytes());
+        data.extend_from_slice(&11u16.to_le_bytes());
+        data.extend_from_slice(&12u16.to_le_bytes());
+        data.extend_from_slice(&6u16.to_le_bytes());
+
+        let cells = CellRecord::parse_mul_blank(&data).unwrap();
+        assert!(matches!(
+            cells.as_slice(),
+            [
+                CellRecord::Blank {
+                    row: 9,
+                    col: 5,
+                    xf_index: 11
+                },
+                CellRecord::Blank {
+                    row: 9,
+                    col: 6,
+                    xf_index: 12
+                }
+            ]
+        ));
+
+        let last_column_offset = data.len() - 2;
+        data[last_column_offset..].copy_from_slice(&7u16.to_le_bytes());
+        assert!(CellRecord::parse_mul_blank(&data).is_err());
     }
 }

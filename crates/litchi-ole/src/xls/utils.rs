@@ -99,36 +99,17 @@ pub fn parse_string_record(data: &[u8], _encoding: &XlsEncoding) -> XlsResult<St
 /// Convert RK value to f64
 ///
 /// RK values are compressed numeric values used in Excel.
-/// The format is: a 30-bit mantissa, 1 bit for 100x multiplier, 1 bit for int/float
+/// Bit 0 requests division by 100; bit 1 selects a signed 30-bit integer.
+/// Otherwise the upper 30 bits are the most-significant bits of an IEEE-754 double.
 pub fn rk_to_f64(rk: u32) -> f64 {
-    let d100 = (rk & 0x02) != 0;
-    let is_int = (rk & 0x01) != 0;
-
-    let mut value = if is_int {
-        // Integer value
-        let int_val = (rk >> 2) as i32;
-        if d100 {
-            if int_val % 100 != 0 {
-                int_val as f64 / 100.0
-            } else {
-                (int_val / 100) as f64
-            }
-        } else {
-            int_val as f64
-        }
+    let mut value = if rk & 0x02 != 0 {
+        f64::from((rk as i32) >> 2)
     } else {
-        // Float value - extract IEEE 754 double from 30 bits
-        let mut float_bits = [0u8; 8];
-        float_bits[0..4].copy_from_slice(&(rk & 0xFFFFFFFC).to_le_bytes());
-        // Set the exponent to proper range
-        float_bits[7] = 0x3C; // This is approximate
-        f64::from_le_bytes(float_bits)
+        f64::from_bits(u64::from(rk & 0xFFFF_FFFC) << 32)
     };
-
-    if d100 && !is_int {
+    if rk & 0x01 != 0 {
         value /= 100.0;
     }
-
     value
 }
 
@@ -280,6 +261,17 @@ mod tests {
     fn rejects_truncated_xl_unicode_string() {
         let truncated = [2, 0, 1, 0x22, 0x6F];
         assert!(parse_string_record(&truncated, &XlsEncoding::Utf16Le).is_err());
+    }
+
+    #[test]
+    fn decodes_all_rk_number_encodings() {
+        assert_eq!(rk_to_f64((42u32 << 2) | 0x02), 42.0);
+        assert_eq!(rk_to_f64(((-42i32) as u32) << 2 | 0x02), -42.0);
+        assert_eq!(rk_to_f64((1234u32 << 2) | 0x03), 12.34);
+
+        let encoded_float = ((1.5f64.to_bits() >> 32) as u32) & 0xFFFF_FFFC;
+        assert_eq!(rk_to_f64(encoded_float), 1.5);
+        assert_eq!(rk_to_f64(encoded_float | 0x01), 0.015);
     }
 
     #[test]

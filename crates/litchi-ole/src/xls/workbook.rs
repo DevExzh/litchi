@@ -268,12 +268,33 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                 0x0205 | // BoolErr
                 0x027E | // RK
                 0x00FD | // LabelSst
-                0x00BD | // MulRk
                 0x0006   // Formula
                 => {
                     let cell_record = CellRecord::parse(record.header.record_type, &record.data, encoding)?;
                     if let Some(cell) = XlsCell::from_record(&cell_record, worksheet.shared_strings()) {
                         worksheet.add_cell(cell);
+                    }
+                }
+
+                0x00BD => { // MulRk
+                    for cell_record in CellRecord::parse_mul_rk(&record.data)? {
+                        if let Some(cell) = XlsCell::from_record(
+                            &cell_record,
+                            worksheet.shared_strings(),
+                        ) {
+                            worksheet.add_cell(cell);
+                        }
+                    }
+                }
+
+                0x00BE => { // MulBlank
+                    for cell_record in CellRecord::parse_mul_blank(&record.data)? {
+                        if let Some(cell) = XlsCell::from_record(
+                            &cell_record,
+                            worksheet.shared_strings(),
+                        ) {
+                            worksheet.add_cell(cell);
+                        }
                     }
                 }
 
@@ -526,5 +547,62 @@ impl<'a> WorksheetIterator<'a> for XlsWorksheetIterator<'a> {
             // Return reference instead of clone - zero-copy!
             Some(Ok(Box::new(worksheet)))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use litchi_core::sheet::Cell;
+    use std::io::Cursor;
+
+    fn push_record(stream: &mut Vec<u8>, record_type: u16, data: &[u8]) {
+        stream.extend_from_slice(&record_type.to_le_bytes());
+        stream.extend_from_slice(&(data.len() as u16).to_le_bytes());
+        stream.extend_from_slice(data);
+    }
+
+    #[test]
+    fn worksheet_expands_packed_numeric_and_blank_cells() {
+        let mut mul_rk = Vec::new();
+        mul_rk.extend_from_slice(&2u16.to_le_bytes());
+        mul_rk.extend_from_slice(&4u16.to_le_bytes());
+        mul_rk.extend_from_slice(&0u16.to_le_bytes());
+        mul_rk.extend_from_slice(&((7u32 << 2) | 0x02).to_le_bytes());
+        mul_rk.extend_from_slice(&1u16.to_le_bytes());
+        mul_rk.extend_from_slice(&((250u32 << 2) | 0x03).to_le_bytes());
+        mul_rk.extend_from_slice(&5u16.to_le_bytes());
+
+        let mut mul_blank = Vec::new();
+        mul_blank.extend_from_slice(&3u16.to_le_bytes());
+        mul_blank.extend_from_slice(&1u16.to_le_bytes());
+        mul_blank.extend_from_slice(&2u16.to_le_bytes());
+        mul_blank.extend_from_slice(&3u16.to_le_bytes());
+        mul_blank.extend_from_slice(&2u16.to_le_bytes());
+
+        let mut stream = Vec::new();
+        push_record(&mut stream, 0x00BD, &mul_rk);
+        push_record(&mut stream, 0x00BE, &mul_blank);
+        push_record(&mut stream, 0x000A, &[]);
+        let mut records = RecordIter::new(Cursor::new(stream)).unwrap();
+
+        let worksheet = XlsWorkbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+            &mut records,
+            &XlsEncoding::Utf16Le,
+            "Sheet1",
+            Arc::new(Vec::new()),
+        )
+        .unwrap();
+
+        assert!(matches!(
+            worksheet.get_cell(2, 4).unwrap().value(),
+            litchi_core::sheet::CellValue::Float(value) if *value == 7.0
+        ));
+        assert!(matches!(
+            worksheet.get_cell(2, 5).unwrap().value(),
+            litchi_core::sheet::CellValue::Float(value) if *value == 2.5
+        ));
+        assert!(worksheet.get_cell(3, 1).unwrap().is_empty());
+        assert!(worksheet.get_cell(3, 2).unwrap().is_empty());
     }
 }
