@@ -80,8 +80,8 @@ pub use revision::{RevisionKind, RevisionMark};
 pub use shapes::DocShape;
 pub use table::{Cell, Row, Table};
 pub use writer::{
-    BookmarkEntry, CharacterFormatting, CommentEntry, DocWriteError, DocWriter, LineSpacing,
-    ParagraphFormatting, TextRevision,
+    BookmarkEntry, CharacterFormatting, CommentEntry, DocWriteError, DocWriter, FormattingRevision,
+    LineSpacing, ParagraphFormatting, TextRevision,
 };
 
 /// Crate-native ordered document element returned by [`Document::elements`].

@@ -124,6 +124,12 @@ pub struct CharacterProperties {
     pub deletion_timestamp: Option<u32>,
     /// Deletion revision identifier.
     pub deletion_revision_id: Option<u16>,
+    /// Whether this run has a tracked character-formatting change.
+    pub has_formatting_revision: Option<bool>,
+    /// Formatting revision author index in `SttbfRMark`.
+    pub formatting_revision_author_index: Option<u16>,
+    /// Packed formatting revision DTTM.
+    pub formatting_revision_timestamp: Option<u32>,
 }
 
 /// Underline styles supported in DOC format.
@@ -901,10 +907,8 @@ impl CharacterProperties {
                     chp.is_obj = val != 0;
                 }
             },
-            // Operation 0x57: sprmCPropRMark - Property revision mark
-            0x57 => {
-                // Revision mark properties
-            },
+            // Operations 0x57 and 0x89: sprmCPropRMark90 / sprmCPropRMark.
+            0x57 | 0x89 => Self::apply_property_revision(chp, sprm)?,
             // Operation 0x58: sprmCFEmboss - Emboss
             0x58 => {
                 if let Some(val) = sprm.operand_byte() {
@@ -1021,6 +1025,32 @@ impl CharacterProperties {
             .ok_or_else(|| DocError::Corrupted(format!("{name} is missing its author index")))?;
         u16::try_from(value)
             .map_err(|_| DocError::Corrupted(format!("{name} author index is negative")))
+    }
+
+    fn apply_property_revision(chp: &mut CharacterProperties, sprm: &Sprm) -> Result<()> {
+        let operand = sprm.operand_bytes();
+        if operand.len() != 7 {
+            return Err(DocError::Corrupted(
+                "sprmCPropRMark operand must contain exactly 7 bytes".to_string(),
+            ));
+        }
+        chp.has_formatting_revision = Some(match operand[0] {
+            0 => false,
+            1 => true,
+            _ => {
+                return Err(DocError::Corrupted(
+                    "sprmCPropRMark must begin with a Boolean8 value".to_string(),
+                ));
+            },
+        });
+        let author = i16::from_le_bytes([operand[1], operand[2]]);
+        chp.formatting_revision_author_index = Some(u16::try_from(author).map_err(|_| {
+            DocError::Corrupted("sprmCPropRMark author index is negative".to_string())
+        })?);
+        chp.formatting_revision_timestamp = Some(u32::from_le_bytes([
+            operand[3], operand[4], operand[5], operand[6],
+        ]));
+        Ok(())
     }
 
     fn parse_border(data: &[u8], palette_color: bool) -> Option<CharacterBorder> {
@@ -1201,6 +1231,34 @@ mod tests {
         malformed.extend_from_slice(&SPRM_C_IBST_RMARK.to_le_bytes());
         malformed.extend_from_slice(&(-1i16).to_le_bytes());
         assert!(CharacterProperties::from_sprm(&malformed).is_err());
+    }
+
+    #[test]
+    fn parses_both_character_formatting_revision_sprms_strictly() {
+        let timestamp =
+            30u32 | (14u32 << 6) | (15u32 << 11) | (7u32 << 16) | (126u32 << 20) | (3u32 << 29);
+        for opcode in [SPRM_C_PROP_RMARK90, SPRM_C_PROP_RMARK_CURRENT] {
+            let mut grpprl = opcode.to_le_bytes().to_vec();
+            grpprl.push(7);
+            grpprl.push(1);
+            grpprl.extend_from_slice(&2i16.to_le_bytes());
+            grpprl.extend_from_slice(&timestamp.to_le_bytes());
+            let properties = CharacterProperties::from_sprm(&grpprl).unwrap();
+            assert_eq!(properties.has_formatting_revision, Some(true));
+            assert_eq!(properties.formatting_revision_author_index, Some(2));
+            assert_eq!(properties.formatting_revision_timestamp, Some(timestamp));
+        }
+
+        for operand in [
+            vec![2, 0, 0, 0, 0, 0, 0],
+            vec![1, 0xFF, 0xFF, 0, 0, 0, 0],
+            vec![1, 0, 0, 0, 0, 0],
+        ] {
+            let mut grpprl = SPRM_C_PROP_RMARK_CURRENT.to_le_bytes().to_vec();
+            grpprl.push(operand.len() as u8);
+            grpprl.extend_from_slice(&operand);
+            assert!(CharacterProperties::from_sprm(&grpprl).is_err());
+        }
     }
 
     #[test]

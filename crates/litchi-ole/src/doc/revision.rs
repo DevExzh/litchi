@@ -8,6 +8,8 @@ pub enum RevisionKind {
     Insertion,
     /// Text deleted while revision tracking was enabled.
     Deletion,
+    /// Character formatting changed while revision tracking was enabled.
+    Formatting,
 }
 
 /// Tracked revision metadata attached to one character run.

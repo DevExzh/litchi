@@ -78,7 +78,7 @@ use super::font_table::FontTableBuilder;
 use super::footnotes::FootnoteEntry;
 use super::numbering::{ListFormatOverride, ListStructure, NumberingWriter};
 use super::piece_table::{Piece, PieceTableBuilder};
-use super::revisions::TextRevision;
+use super::revisions::{FormattingRevision, TextRevision};
 use crate::doc::CommentDateTime;
 use crate::sprm_operations::*;
 use litchi_cfb::writer::OleWriter;
@@ -131,7 +131,7 @@ fn utf16_code_unit_len(text: &str) -> Result<u32, DocWriteError> {
     Ok(length)
 }
 
-fn pack_comment_dttm(value: Option<CommentDateTime>) -> Result<u32, DocWriteError> {
+fn pack_dttm(value: Option<CommentDateTime>) -> Result<u32, DocWriteError> {
     let Some(value) = value else {
         return Ok(0);
     };
@@ -143,7 +143,7 @@ fn pack_comment_dttm(value: Option<CommentDateTime>) -> Result<u32, DocWriteErro
         || value.weekday > 6
     {
         return Err(DocWriteError::InvalidData(
-            "DOC comment timestamp is outside the DTTM field ranges".to_string(),
+            "DOC timestamp is outside the DTTM field ranges".to_string(),
         ));
     }
     Ok(u32::from(value.minute)
@@ -223,6 +223,8 @@ pub struct CharacterFormatting {
     pub insertion_revision: Option<TextRevision>,
     /// Mark this run as deleted text.
     pub deletion_revision: Option<TextRevision>,
+    /// Mark the run's character formatting as a tracked change.
+    pub formatting_revision: Option<FormattingRevision>,
     // Future enhancement: Additional properties (color, strikethrough, subscript, superscript, etc.)
 }
 
@@ -998,8 +1000,7 @@ impl DocWriter {
                     })?
                 },
             };
-            extended_metadata
-                .extend_from_slice(&pack_comment_dttm(metadata.modified_at)?.to_le_bytes());
+            extended_metadata.extend_from_slice(&pack_dttm(metadata.modified_at)?.to_le_bytes());
             extended_metadata.extend_from_slice(&0u16.to_le_bytes());
             extended_metadata.extend_from_slice(&metadata.depth.to_le_bytes());
             extended_metadata.extend_from_slice(&parent_delta.to_le_bytes());
@@ -1237,20 +1238,9 @@ impl DocWriter {
         let mut authors = vec!["Unknown".to_string()];
         let mut indexes = HashMap::from([("Unknown".to_string(), 0u16)]);
         let mut has_revisions = false;
-        for revision in paragraphs
-            .iter()
-            .flat_map(|paragraph| &paragraph.runs)
-            .flat_map(|run| {
-                [
-                    run.formatting.insertion_revision.as_ref(),
-                    run.formatting.deletion_revision.as_ref(),
-                ]
-                .into_iter()
-                .flatten()
-            })
-        {
+        let mut index_author = |author: &str| -> Result<(), DocWriteError> {
             has_revisions = true;
-            if !indexes.contains_key(&revision.author) {
+            if !indexes.contains_key(author) {
                 if authors.len() >= 0x8000 {
                     return Err(DocWriteError::InvalidData(
                         "DOC revision author table exceeds the signed author-index range"
@@ -1258,8 +1248,20 @@ impl DocWriter {
                     ));
                 }
                 let index = authors.len() as u16;
-                authors.push(revision.author.clone());
-                indexes.insert(revision.author.clone(), index);
+                authors.push(author.to_string());
+                indexes.insert(author.to_string(), index);
+            }
+            Ok(())
+        };
+        for run in paragraphs.iter().flat_map(|paragraph| &paragraph.runs) {
+            if let Some(revision) = &run.formatting.insertion_revision {
+                index_author(&revision.author)?;
+            }
+            if let Some(revision) = &run.formatting.deletion_revision {
+                index_author(&revision.author)?;
+            }
+            if let Some(revision) = &run.formatting.formatting_revision {
+                index_author(&revision.author)?;
             }
         }
         if !has_revisions {
@@ -2744,7 +2746,7 @@ fn build_revision_chpx_grpprl(
         grp.extend_from_slice(&author_index.to_le_bytes());
         if revision.timestamp.is_some() {
             grp.extend_from_slice(&time_opcode.to_le_bytes());
-            grp.extend_from_slice(&pack_comment_dttm(revision.timestamp)?.to_le_bytes());
+            grp.extend_from_slice(&pack_dttm(revision.timestamp)?.to_le_bytes());
         }
         if let Some(revision_id) = revision.revision_id {
             grp.extend_from_slice(&id_opcode.to_le_bytes());
@@ -2769,6 +2771,16 @@ fn build_revision_chpx_grpprl(
             SPRM_C_DTTM_RMARK_DEL,
             SPRM_C_IDSL_RMARK_DEL,
         )?;
+    }
+    if let Some(revision) = &fmt.formatting_revision {
+        let author_index = revisions.indexes.get(&revision.author).ok_or_else(|| {
+            DocWriteError::InvalidData("DOC revision author was not indexed".to_string())
+        })?;
+        grp.extend_from_slice(&SPRM_C_PROP_RMARK_CURRENT.to_le_bytes());
+        grp.push(7);
+        grp.push(1);
+        grp.extend_from_slice(&author_index.to_le_bytes());
+        grp.extend_from_slice(&pack_dttm(revision.timestamp)?.to_le_bytes());
     }
     Ok(grp)
 }
@@ -3572,6 +3584,16 @@ mod tests {
                             ..CharacterFormatting::default()
                         },
                     ),
+                    (
+                        " formatted".to_string(),
+                        CharacterFormatting {
+                            bold: Some(true),
+                            formatting_revision: Some(
+                                FormattingRevision::new("张三").with_timestamp(timestamp),
+                            ),
+                            ..CharacterFormatting::default()
+                        },
+                    ),
                 ],
                 ParagraphFormatting::default(),
             )
@@ -3582,7 +3604,10 @@ mod tests {
         let mut package =
             crate::doc::Package::from_reader(Cursor::new(cursor.into_inner())).unwrap();
         let document = package.document().unwrap();
-        assert_eq!(document.revision_authors(), ["Unknown", "Alice 😀", "Bob"]);
+        assert_eq!(
+            document.revision_authors(),
+            ["Unknown", "Alice 😀", "Bob", "张三"]
+        );
         let runs = document.paragraphs().unwrap()[0].runs().unwrap();
         let insertion = runs
             .iter()
@@ -3595,6 +3620,14 @@ mod tests {
         assert_eq!(deletion.author, "Bob");
         assert_eq!(deletion.timestamp, None);
         assert_eq!(deletion.revision_id, Some(7));
+        let formatting = runs
+            .iter()
+            .find_map(|run| run.formatting_revision())
+            .unwrap();
+        assert_eq!(formatting.kind, crate::doc::RevisionKind::Formatting);
+        assert_eq!(formatting.author, "张三");
+        assert_eq!(formatting.timestamp, Some(timestamp));
+        assert_eq!(formatting.revision_id, None);
 
         let path = std::env::temp_dir().join(format!(
             "litchi-doc-revisions-{}-{}.doc",
@@ -3607,13 +3640,23 @@ mod tests {
         writer.save(&path).unwrap();
         let mut package = crate::doc::Package::open(&path).unwrap();
         let document = package.document().unwrap();
-        assert_eq!(document.revision_authors(), ["Unknown", "Alice 😀", "Bob"]);
+        assert_eq!(
+            document.revision_authors(),
+            ["Unknown", "Alice 😀", "Bob", "张三"]
+        );
         assert!(
             document.paragraphs().unwrap()[0]
                 .runs()
                 .unwrap()
                 .iter()
                 .any(|run| run.deletion_revision().is_some())
+        );
+        assert!(
+            document.paragraphs().unwrap()[0]
+                .runs()
+                .unwrap()
+                .iter()
+                .any(|run| run.formatting_revision().is_some())
         );
         std::fs::remove_file(path).unwrap();
     }

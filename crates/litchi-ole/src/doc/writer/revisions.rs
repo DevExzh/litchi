@@ -35,3 +35,28 @@ impl TextRevision {
         self
     }
 }
+
+/// Metadata for a tracked character-formatting change.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FormattingRevision {
+    /// Revision author name.
+    pub author: String,
+    /// Revision timestamp.
+    pub timestamp: Option<CommentDateTime>,
+}
+
+impl FormattingRevision {
+    /// Create formatting-revision metadata for an author.
+    pub fn new(author: impl Into<String>) -> Self {
+        Self {
+            author: author.into(),
+            timestamp: None,
+        }
+    }
+
+    /// Set the revision timestamp.
+    pub fn with_timestamp(mut self, timestamp: CommentDateTime) -> Self {
+        self.timestamp = Some(timestamp);
+        self
+    }
+}

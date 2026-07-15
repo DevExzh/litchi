@@ -199,8 +199,14 @@ pub const SPRM_C_F_SPEC: u16 = 0x0855;
 /// sprmCFObj - Object flag (operation 0x56)
 pub const SPRM_C_F_OBJ: u16 = 0x0856;
 
-/// sprmCPropRMark - Property revision mark (operation 0x57)
-pub const SPRM_C_PROP_RMARK: u16 = 0xCA57;
+/// sprmCPropRMark90 - Word 97-era property revision mark (operation 0x57)
+pub const SPRM_C_PROP_RMARK90: u16 = 0xCA57;
+
+/// Backward-compatible name for the Word 97-era property revision mark.
+pub const SPRM_C_PROP_RMARK: u16 = SPRM_C_PROP_RMARK90;
+
+/// Current sprmCPropRMark property revision mark (operation 0x89)
+pub const SPRM_C_PROP_RMARK_CURRENT: u16 = 0xCA89;
 
 /// sprmCFEmboss - Emboss (operation 0x58)
 pub const SPRM_C_F_EMBOSS: u16 = 0x0858;

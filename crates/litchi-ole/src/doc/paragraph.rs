@@ -192,6 +192,8 @@ pub struct Run {
     insertion_revision: Option<RevisionMark>,
     /// Resolved deletion revision metadata.
     deletion_revision: Option<RevisionMark>,
+    /// Resolved character-formatting revision metadata.
+    formatting_revision: Option<RevisionMark>,
 }
 
 impl Run {
@@ -204,6 +206,7 @@ impl Run {
             image: None,
             insertion_revision: None,
             deletion_revision: None,
+            formatting_revision: None,
         }
     }
 
@@ -221,6 +224,7 @@ impl Run {
             image: None,
             insertion_revision: None,
             deletion_revision: None,
+            formatting_revision: None,
         }
     }
 
@@ -238,6 +242,7 @@ impl Run {
             image: None,
             insertion_revision: None,
             deletion_revision: None,
+            formatting_revision: None,
         }
     }
 
@@ -254,6 +259,7 @@ impl Run {
             image: Some(image),
             insertion_revision: None,
             deletion_revision: None,
+            formatting_revision: None,
         }
     }
 
@@ -353,6 +359,11 @@ impl Run {
         self.deletion_revision.as_ref()
     }
 
+    /// Character-formatting revision metadata for this run.
+    pub fn formatting_revision(&self) -> Option<&RevisionMark> {
+        self.formatting_revision.as_ref()
+    }
+
     pub(crate) fn resolve_revisions(&mut self, authors: &RevisionAuthorTable) -> Result<()> {
         if self.properties.is_revision_inserted == Some(true) {
             self.insertion_revision = Some(Self::revision_mark(
@@ -369,6 +380,17 @@ impl Run {
                 self.properties.deletion_author_index.unwrap_or(0),
                 self.properties.deletion_timestamp,
                 self.properties.deletion_revision_id,
+                authors,
+            )?);
+        }
+        if self.properties.has_formatting_revision == Some(true) {
+            self.formatting_revision = Some(Self::revision_mark(
+                RevisionKind::Formatting,
+                self.properties
+                    .formatting_revision_author_index
+                    .unwrap_or(0),
+                self.properties.formatting_revision_timestamp,
+                None,
                 authors,
             )?);
         }
@@ -528,6 +550,23 @@ mod tests {
         assert_eq!(revision.revision_id, Some(42));
         assert_eq!(revision.timestamp.unwrap().year, 2026);
         assert!(run.deletion_revision().is_none());
+        assert!(run.formatting_revision().is_none());
+
+        let mut formatted = Run::new(
+            "formatted".to_string(),
+            CharacterProperties {
+                has_formatting_revision: Some(true),
+                formatting_revision_author_index: Some(1),
+                formatting_revision_timestamp: Some(timestamp),
+                ..CharacterProperties::default()
+            },
+        );
+        formatted.resolve_revisions(&authors).unwrap();
+        let revision = formatted.formatting_revision().unwrap();
+        assert_eq!(revision.kind, RevisionKind::Formatting);
+        assert_eq!(revision.author, "Alice");
+        assert_eq!(revision.timestamp.unwrap().year, 2026);
+        assert_eq!(revision.revision_id, None);
 
         let mut bad_author = Run::new(
             "changed".to_string(),
