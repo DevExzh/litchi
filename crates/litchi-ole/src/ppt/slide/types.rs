@@ -1483,12 +1483,8 @@ mod tests {
     fn test_slide_with_cstring_record() {
         let doc_data = vec![0u8; 1024];
 
-        // Create CString record (null-terminated ASCII)
-        let cstring_data = vec![
-            0x48, // 'H'
-            0x69, // 'i'
-            0x00, // null terminator
-        ];
+        // CString records contain UTF-16LE text.
+        let cstring_data = "Hi😀".encode_utf16().flat_map(u16::to_le_bytes).collect();
         let cstring = create_test_record(PptRecordType::CString, cstring_data, Vec::new());
 
         let slide_record = create_test_record(PptRecordType::Slide, vec![], vec![cstring]);
@@ -1497,7 +1493,7 @@ mod tests {
         let slide = Slide::from_slide_data(slide_data, 1);
 
         let text = slide.text().unwrap();
-        assert_eq!(text, "Hi");
+        assert_eq!(text, "Hi😀");
     }
 
     #[test]

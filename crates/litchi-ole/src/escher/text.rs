@@ -190,33 +190,28 @@ fn is_ppt_container_record(record_type: u16) -> bool {
 }
 
 fn parse_text_chars_atom(data: &[u8]) -> Result<String> {
-    if data.len() < 2 || data.len() % 2 != 0 {
-        return Ok(String::new());
-    }
-
-    let utf16_data: Vec<u16> = data
-        .chunks_exact(2)
-        .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
-        .collect();
-
-    String::from_utf16(&utf16_data)
-        .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid UTF-16"))
+    Ok(crate::ppt::text::extractor::from_utf16le_lossy(data))
 }
 
 fn parse_text_bytes_atom(data: &[u8]) -> Result<String> {
-    Ok(String::from_utf8_lossy(data).into_owned())
+    Ok(crate::ppt::text::extractor::decode_text_bytes(data))
 }
 
 fn parse_cstring(data: &[u8]) -> Result<String> {
-    if data.len() < 2 || data.len() % 2 != 0 {
-        return Ok(String::new());
+    Ok(crate::ppt::text::extractor::from_utf16le_lossy(data))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn embedded_ppt_text_atoms_use_their_specified_unicode_encodings() {
+        assert_eq!(
+            parse_text_chars_atom(&[0x3D, 0xD8, 0x00, 0xDE]).unwrap(),
+            "😀"
+        );
+        assert_eq!(parse_text_bytes_atom(&[0x80, 0xE9]).unwrap(), "\u{80}é");
+        assert_eq!(parse_cstring(&[0x87, 0x65]).unwrap(), "文");
     }
-
-    let utf16_data: Vec<u16> = data
-        .chunks_exact(2)
-        .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
-        .collect();
-
-    String::from_utf16(&utf16_data)
-        .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid UTF-16"))
 }

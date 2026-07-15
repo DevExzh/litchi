@@ -58,29 +58,12 @@ pub fn parse_text_bytes_atom(data: &[u8]) -> Result<String> {
     Ok(text)
 }
 
-/// Parse CString record (null-terminated string).
+/// Parse a `CString` record containing a UTF-16LE string.
 pub fn parse_cstring(data: &[u8]) -> Result<String> {
-    // CString contains null-terminated ASCII text
-    let null_pos = data.iter().position(|&b| b == 0).unwrap_or(data.len());
-    let text = String::from_utf8_lossy(&data[..null_pos]).to_string();
+    let text = from_utf16le_lossy(data);
 
-    // POI strips the trailing return character if present
+    // Strip a non-conforming trailing return for compatibility with old producers.
     let text = text.trim_end_matches('\r').to_string();
-
-    // Filter out known garbage strings (from POI's QuickButCruddyTextExtractor)
-    if text == "___PPT10" || text == "Default Design" || text.is_empty() {
-        return Ok(String::new());
-    }
-
-    // Filter out non-printable/binary data - if more than 20% of characters are non-printable, skip it
-    let printable_count = text
-        .chars()
-        .filter(|c| c.is_alphanumeric() || c.is_whitespace() || c.is_ascii_punctuation())
-        .count();
-    let total_count = text.chars().count();
-    if total_count > 0 && (printable_count as f32 / total_count as f32) < 0.8 {
-        return Ok(String::new());
-    }
 
     Ok(text)
 }
@@ -127,17 +110,22 @@ mod tests {
     }
 
     #[test]
-    fn test_cstring_filtering() {
-        // Should filter out ___PPT10
-        let text = parse_cstring(b"___PPT10\0").unwrap();
-        assert_eq!(text, "");
+    fn cstring_decodes_all_utf16_content_without_policy_filtering() {
+        fn utf16(text: &str) -> Vec<u8> {
+            text.encode_utf16()
+                .flat_map(u16::to_le_bytes)
+                .collect::<Vec<_>>()
+        }
 
-        // Should filter out Default Design
-        let text = parse_cstring(b"Default Design\0").unwrap();
-        assert_eq!(text, "");
+        // Record parsing preserves internal tag names; callers decide whether to expose them.
+        let text = parse_cstring(&utf16("___PPT10")).unwrap();
+        assert_eq!(text, "___PPT10");
 
-        // Should keep normal text
-        let text = parse_cstring(b"Normal Text\0").unwrap();
-        assert_eq!(text, "Normal Text");
+        let text = parse_cstring(&utf16("Default Design")).unwrap();
+        assert_eq!(text, "Default Design");
+
+        // Should preserve the complete UTF-16 string, including surrogate pairs.
+        let text = parse_cstring(&utf16("普通の😀")).unwrap();
+        assert_eq!(text, "普通の😀");
     }
 }
