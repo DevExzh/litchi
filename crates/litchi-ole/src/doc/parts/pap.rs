@@ -82,6 +82,10 @@ pub struct ParagraphProperties {
     pub tab_stops: Vec<TabStop>,
     /// Borders
     pub borders: Borders,
+    /// Obsolete line style selected by `sprmPBrcl`
+    pub legacy_border_style: Option<LegacyBorderStyle>,
+    /// Obsolete border placement selected by `sprmPBrcp`
+    pub legacy_border_position: Option<LegacyBorderPosition>,
     /// Background shading
     pub shading: Option<Shading>,
     /// Paragraph is inside a table
@@ -587,6 +591,56 @@ pub enum TabLeader {
     DefaultLeader,
 }
 
+/// Line style used by the obsolete `sprmPBrcl` paragraph property.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum LegacyBorderStyle {
+    Single = 0,
+    Thick = 1,
+    Double = 2,
+    Shadow = 3,
+}
+
+impl TryFrom<u8> for LegacyBorderStyle {
+    type Error = u8;
+
+    fn try_from(value: u8) -> std::result::Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Self::Single),
+            1 => Ok(Self::Thick),
+            2 => Ok(Self::Double),
+            3 => Ok(Self::Shadow),
+            invalid => Err(invalid),
+        }
+    }
+}
+
+/// Placement used by the obsolete `sprmPBrcp` paragraph property.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum LegacyBorderPosition {
+    None = 0,
+    Above = 1,
+    Below = 2,
+    Box = 15,
+    LeftBar = 16,
+}
+
+impl TryFrom<u8> for LegacyBorderPosition {
+    type Error = u8;
+
+    fn try_from(value: u8) -> std::result::Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Self::None),
+            1 => Ok(Self::Above),
+            2 => Ok(Self::Below),
+            15 => Ok(Self::Box),
+            16 => Ok(Self::LeftBar),
+            invalid => Err(invalid),
+        }
+    }
+}
+
 /// Paragraph borders.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Borders {
@@ -1045,11 +1099,27 @@ impl ParagraphProperties {
             },
             // Operation 0x08: sprmPBrcl - Border location
             0x08 => {
-                // Border location code - not commonly used
+                let value = *sprm.operand_bytes().first().ok_or_else(|| {
+                    DocError::Corrupted("sprmPBrcl is missing its line style".to_string())
+                })?;
+                pap.legacy_border_style =
+                    Some(LegacyBorderStyle::try_from(value).map_err(|invalid| {
+                        DocError::Corrupted(format!(
+                            "sprmPBrcl has invalid legacy border style {invalid}"
+                        ))
+                    })?);
             },
             // Operation 0x09: sprmPBrcp - Border position
             0x09 => {
-                // Border position - not commonly used
+                let value = *sprm.operand_bytes().first().ok_or_else(|| {
+                    DocError::Corrupted("sprmPBrcp is missing its placement".to_string())
+                })?;
+                pap.legacy_border_position =
+                    Some(LegacyBorderPosition::try_from(value).map_err(|invalid| {
+                        DocError::Corrupted(format!(
+                            "sprmPBrcp has invalid legacy border placement {invalid}"
+                        ))
+                    })?);
             },
             // Operation 0x0A: sprmPIlvl - List level
             0x0A => {
@@ -2190,6 +2260,8 @@ impl ParagraphProperties {
             || self.mirror_indents
             || self.text_box_tight_wrap.is_some()
             || self.borders != Borders::default()
+            || self.legacy_border_style.is_some()
+            || self.legacy_border_position.is_some()
             || self.shading.is_some()
             || !self.tab_stops.is_empty()
             || self.legacy_autonumbering.is_some()
@@ -2223,6 +2295,56 @@ mod tests {
         assert_eq!(pap.justification, Justification::Left);
         assert!(!pap.keep_on_page);
         assert!(!pap.has_formatting());
+    }
+
+    #[test]
+    fn parses_legacy_paragraph_border_controls_strictly() {
+        for (encoded, expected) in [
+            (0, LegacyBorderStyle::Single),
+            (1, LegacyBorderStyle::Thick),
+            (2, LegacyBorderStyle::Double),
+            (3, LegacyBorderStyle::Shadow),
+        ] {
+            let properties = ParagraphProperties::from_sprm(
+                &[SPRM_P_BRCL.to_le_bytes().as_slice(), &[encoded]].concat(),
+            )
+            .unwrap();
+            assert_eq!(properties.legacy_border_style, Some(expected));
+            assert!(properties.has_formatting());
+        }
+        for (encoded, expected) in [
+            (0, LegacyBorderPosition::None),
+            (1, LegacyBorderPosition::Above),
+            (2, LegacyBorderPosition::Below),
+            (15, LegacyBorderPosition::Box),
+            (16, LegacyBorderPosition::LeftBar),
+        ] {
+            let properties = ParagraphProperties::from_sprm(
+                &[SPRM_P_BRCP.to_le_bytes().as_slice(), &[encoded]].concat(),
+            )
+            .unwrap();
+            assert_eq!(properties.legacy_border_position, Some(expected));
+            assert!(properties.has_formatting());
+        }
+
+        for encoded in 4..=u8::MAX {
+            assert!(
+                ParagraphProperties::from_sprm(
+                    &[SPRM_P_BRCL.to_le_bytes().as_slice(), &[encoded]].concat(),
+                )
+                .is_err()
+            );
+        }
+        for encoded in 0..=u8::MAX {
+            if !matches!(encoded, 0 | 1 | 2 | 15 | 16) {
+                assert!(
+                    ParagraphProperties::from_sprm(
+                        &[SPRM_P_BRCP.to_le_bytes().as_slice(), &[encoded]].concat(),
+                    )
+                    .is_err()
+                );
+            }
+        }
     }
 
     #[test]

@@ -84,8 +84,9 @@ use crate::doc::parts::pap::{
     AutoNumberAlignment, Border as ParagraphBorder, BorderStyle as ParagraphBorderStyle,
     Borders as ParagraphBorders, DropCap, FontAlignment, FrameAnchor, FrameHeight,
     FrameHorizontalAnchor, FrameHorizontalPosition, FrameTextFlow, FrameTextWrap,
-    FrameVerticalAnchor, FrameVerticalPosition, LegacyAutoNumbering, PhysicalJustification,
-    Shading as ParagraphShading, TabAlignment, TabLeader, TabStop, TextBoxTightWrap,
+    FrameVerticalAnchor, FrameVerticalPosition, LegacyAutoNumbering, LegacyBorderPosition,
+    LegacyBorderStyle, PhysicalJustification, Shading as ParagraphShading, TabAlignment, TabLeader,
+    TabStop, TextBoxTightWrap,
 };
 use crate::sprm_operations::*;
 use litchi_cfb::writer::OleWriter;
@@ -422,6 +423,10 @@ pub struct ParagraphFormatting {
     pub text_box_tight_wrap: Option<TextBoxTightWrap>,
     /// Paragraph borders
     pub borders: ParagraphBorders,
+    /// Obsolete paragraph-border line style retained for old DOC consumers
+    pub legacy_border_style: Option<LegacyBorderStyle>,
+    /// Obsolete paragraph-border placement retained for old DOC consumers
+    pub legacy_border_position: Option<LegacyBorderPosition>,
     /// Paragraph background shading
     pub shading: Option<ParagraphShading>,
     /// Line spacing descriptor
@@ -3446,6 +3451,12 @@ fn build_papx_grpprl(fmt: &ParagraphFormatting) -> Vec<u8> {
         };
         push_byte(&mut grp, SPRM_P_JC, code);
     }
+    if let Some(style) = fmt.legacy_border_style {
+        push_byte(&mut grp, SPRM_P_BRCL, style as u8);
+    }
+    if let Some(position) = fmt.legacy_border_position {
+        push_byte(&mut grp, SPRM_P_BRCP, position as u8);
+    }
     // Indents (twips). Emit legacy and modern variants. Values are signed twips.
     if let Some(dxa_left) = fmt.left_indent {
         let v = dxa_left.clamp(i16::MIN as i32, i16::MAX as i32) as i16;
@@ -4880,6 +4891,8 @@ mod tests {
                         }),
                         ..ParagraphBorders::default()
                     },
+                    legacy_border_style: Some(LegacyBorderStyle::Shadow),
+                    legacy_border_position: Some(LegacyBorderPosition::LeftBar),
                     shading: Some(ParagraphShading {
                         foreground_color: Some((1, 2, 3)),
                         background_color: None,
@@ -5065,6 +5078,14 @@ mod tests {
                 }),
                 ..ParagraphBorders::default()
             }
+        );
+        assert_eq!(
+            paragraphs[0].properties().legacy_border_style,
+            Some(LegacyBorderStyle::Shadow)
+        );
+        assert_eq!(
+            paragraphs[0].properties().legacy_border_position,
+            Some(LegacyBorderPosition::LeftBar)
         );
         assert_eq!(
             paragraphs[0].properties().shading,
