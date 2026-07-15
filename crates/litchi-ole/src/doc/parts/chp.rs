@@ -130,6 +130,21 @@ pub struct CharacterProperties {
     pub formatting_revision_author_index: Option<u16>,
     /// Packed formatting revision DTTM.
     pub formatting_revision_timestamp: Option<u32>,
+    /// Revision metadata for a LISTNUM display-field result.
+    pub display_field_revision: Option<DisplayFieldRevisionProperties>,
+}
+
+/// Parsed `DispFldRmOperand` state for a LISTNUM display-field result.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DisplayFieldRevisionProperties {
+    /// Whether the field result contains a revision.
+    pub active: bool,
+    /// Revision author index in `SttbfRMark`.
+    pub author_index: u16,
+    /// Packed revision DTTM.
+    pub timestamp: u32,
+    /// Previous LISTNUM field result.
+    pub previous_result: String,
 }
 
 /// Underline styles supported in DOC format.
@@ -945,6 +960,8 @@ impl CharacterProperties {
             0x60 => chp.color_index_bidi = sprm.operand_word(),
             // Operation 0x61: sprmCHpsBi - Complex-script size.
             0x61 => chp.font_size_bidi = sprm.operand_word(),
+            // Operation 0x62: sprmCDispFldRMark.
+            0x62 => chp.display_field_revision = Some(Self::parse_display_field_revision(sprm)?),
             // Operation 0x65: sprmCBrc80 - palette-based character border.
             0x65 => chp.border = Self::parse_border(sprm.operand_bytes(), true),
             // Operation 0x66: sprmCShd80 - palette-based character shading.
@@ -998,7 +1015,7 @@ impl CharacterProperties {
                     DocError::Corrupted("sprmCIdslRMarkDel is missing its identifier".to_string())
                 })?);
             },
-            0x5B | 0x62 | 0x68..=0x6C => {
+            0x5B | 0x68..=0x6C => {
                 // Retained for future structured border/revision metadata.
             },
             // Default: Unknown or unsupported SPRM
@@ -1051,6 +1068,39 @@ impl CharacterProperties {
             operand[3], operand[4], operand[5], operand[6],
         ]));
         Ok(())
+    }
+
+    fn parse_display_field_revision(sprm: &Sprm) -> Result<DisplayFieldRevisionProperties> {
+        let operand = sprm.operand_bytes();
+        if operand.len() != 39 {
+            return Err(DocError::Corrupted(
+                "sprmCDispFldRMark operand must contain exactly 39 bytes".to_string(),
+            ));
+        }
+        let active = operand[0] != 0;
+        let author_index = u16::from_le_bytes([operand[1], operand[2]]);
+        let timestamp = u32::from_le_bytes([operand[3], operand[4], operand[5], operand[6]]);
+        let string_length = usize::from(u16::from_le_bytes([operand[7], operand[8]]));
+        if string_length > 15 {
+            return Err(DocError::Corrupted(
+                "LISTNUM previous result exceeds its 15-code-unit XST".to_string(),
+            ));
+        }
+        let units = (0..string_length)
+            .map(|index| {
+                let offset = 9 + index * 2;
+                u16::from_le_bytes([operand[offset], operand[offset + 1]])
+            })
+            .collect::<Vec<_>>();
+        let previous_result = String::from_utf16(&units).map_err(|_| {
+            DocError::Corrupted("LISTNUM previous result is invalid UTF-16".to_string())
+        })?;
+        Ok(DisplayFieldRevisionProperties {
+            active,
+            author_index,
+            timestamp,
+            previous_result,
+        })
     }
 
     fn parse_border(data: &[u8], palette_color: bool) -> Option<CharacterBorder> {
@@ -1257,6 +1307,43 @@ mod tests {
             let mut grpprl = SPRM_C_PROP_RMARK_CURRENT.to_le_bytes().to_vec();
             grpprl.push(operand.len() as u8);
             grpprl.extend_from_slice(&operand);
+            assert!(CharacterProperties::from_sprm(&grpprl).is_err());
+        }
+    }
+
+    #[test]
+    fn parses_display_field_revision_strictly() {
+        let timestamp =
+            30u32 | (14u32 << 6) | (15u32 << 11) | (7u32 << 16) | (126u32 << 20) | (3u32 << 29);
+        let mut operand = [0u8; 39];
+        operand[0] = 2; // Any nonzero value means active.
+        operand[1..3].copy_from_slice(&2u16.to_le_bytes());
+        operand[3..7].copy_from_slice(&timestamp.to_le_bytes());
+        operand[7..9].copy_from_slice(&3u16.to_le_bytes());
+        for (index, unit) in "12.".encode_utf16().enumerate() {
+            let offset = 9 + index * 2;
+            operand[offset..offset + 2].copy_from_slice(&unit.to_le_bytes());
+        }
+        let mut grpprl = SPRM_C_DISP_FLD_RMARK.to_le_bytes().to_vec();
+        grpprl.push(39);
+        grpprl.extend_from_slice(&operand);
+        let properties = CharacterProperties::from_sprm(&grpprl).unwrap();
+        let revision = properties.display_field_revision.unwrap();
+        assert!(revision.active);
+        assert_eq!(revision.author_index, 2);
+        assert_eq!(revision.timestamp, timestamp);
+        assert_eq!(revision.previous_result, "12.");
+
+        for length in [16u8, 38] {
+            let mut invalid = operand.to_vec();
+            if length == 16 {
+                invalid[7..9].copy_from_slice(&16u16.to_le_bytes());
+            } else {
+                invalid.truncate(38);
+            }
+            let mut grpprl = SPRM_C_DISP_FLD_RMARK.to_le_bytes().to_vec();
+            grpprl.push(length);
+            grpprl.extend_from_slice(&invalid);
             assert!(CharacterProperties::from_sprm(&grpprl).is_err());
         }
     }

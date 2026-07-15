@@ -48,6 +48,19 @@ pub struct NumberingRevisionMark {
     pub format_string: String,
 }
 
+/// Resolved revision metadata for a LISTNUM display-field result.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DisplayFieldRevisionMark {
+    /// Index into the document revision-author table.
+    pub author_index: u16,
+    /// Resolved revision author name.
+    pub author: String,
+    /// Revision date and time, when the packed DTTM is not an ignored zero date.
+    pub timestamp: Option<CommentDateTime>,
+    /// Previous LISTNUM field result.
+    pub previous_result: String,
+}
+
 pub(crate) fn decode_dttm(value: u32) -> Result<Option<CommentDateTime>> {
     let minute = (value & 0x3F) as u8;
     let hour = ((value >> 6) & 0x1F) as u8;

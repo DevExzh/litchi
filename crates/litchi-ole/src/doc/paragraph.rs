@@ -2,7 +2,9 @@
 use super::package::Result;
 use super::parts::chp::{CharacterProperties, UnderlineStyle, VerticalPosition};
 use super::parts::revisions::RevisionAuthorTable;
-use super::revision::{NumberingRevisionMark, RevisionKind, RevisionMark, decode_dttm};
+use super::revision::{
+    DisplayFieldRevisionMark, NumberingRevisionMark, RevisionKind, RevisionMark, decode_dttm,
+};
 use std::sync::Arc;
 
 /// A paragraph in a Word document.
@@ -263,6 +265,8 @@ pub struct Run {
     deletion_revision: Option<RevisionMark>,
     /// Resolved character-formatting revision metadata.
     formatting_revision: Option<RevisionMark>,
+    /// Resolved LISTNUM display-field revision metadata.
+    display_field_revision: Option<DisplayFieldRevisionMark>,
 }
 
 impl Run {
@@ -276,6 +280,7 @@ impl Run {
             insertion_revision: None,
             deletion_revision: None,
             formatting_revision: None,
+            display_field_revision: None,
         }
     }
 
@@ -294,6 +299,7 @@ impl Run {
             insertion_revision: None,
             deletion_revision: None,
             formatting_revision: None,
+            display_field_revision: None,
         }
     }
 
@@ -312,6 +318,7 @@ impl Run {
             insertion_revision: None,
             deletion_revision: None,
             formatting_revision: None,
+            display_field_revision: None,
         }
     }
 
@@ -329,6 +336,7 @@ impl Run {
             insertion_revision: None,
             deletion_revision: None,
             formatting_revision: None,
+            display_field_revision: None,
         }
     }
 
@@ -433,6 +441,11 @@ impl Run {
         self.formatting_revision.as_ref()
     }
 
+    /// Revision metadata for a LISTNUM display-field result.
+    pub fn display_field_revision(&self) -> Option<&DisplayFieldRevisionMark> {
+        self.display_field_revision.as_ref()
+    }
+
     pub(crate) fn resolve_revisions(&mut self, authors: &RevisionAuthorTable) -> Result<()> {
         if self.properties.is_revision_inserted == Some(true) {
             self.insertion_revision = Some(Self::revision_mark(
@@ -462,6 +475,21 @@ impl Run {
                 None,
                 authors,
             )?);
+        }
+        if let Some(revision) = &self.properties.display_field_revision
+            && revision.active
+        {
+            let author = authors.get(revision.author_index).ok_or_else(|| {
+                super::package::DocError::Corrupted(
+                    "display-field revision author index exceeds SttbfRMark".to_string(),
+                )
+            })?;
+            self.display_field_revision = Some(DisplayFieldRevisionMark {
+                author_index: revision.author_index,
+                author: author.to_string(),
+                timestamp: decode_dttm(revision.timestamp)?,
+                previous_result: revision.previous_result.clone(),
+            });
         }
         Ok(())
     }

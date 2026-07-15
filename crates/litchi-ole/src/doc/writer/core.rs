@@ -78,7 +78,7 @@ use super::font_table::FontTableBuilder;
 use super::footnotes::FootnoteEntry;
 use super::numbering::{ListFormatOverride, ListStructure, NumberingWriter};
 use super::piece_table::{Piece, PieceTableBuilder};
-use super::revisions::{FormattingRevision, NumberingRevision, TextRevision};
+use super::revisions::{DisplayFieldRevision, FormattingRevision, NumberingRevision, TextRevision};
 use crate::doc::CommentDateTime;
 use crate::sprm_operations::*;
 use litchi_cfb::writer::OleWriter;
@@ -225,6 +225,8 @@ pub struct CharacterFormatting {
     pub deletion_revision: Option<TextRevision>,
     /// Mark the run's character formatting as a tracked change.
     pub formatting_revision: Option<FormattingRevision>,
+    /// Mark a LISTNUM display-field result as revised.
+    pub display_field_revision: Option<DisplayFieldRevision>,
     // Future enhancement: Additional properties (color, strikethrough, subscript, superscript, etc.)
 }
 
@@ -1274,6 +1276,9 @@ impl DocWriter {
                     index_author(&revision.author)?;
                 }
                 if let Some(revision) = &run.formatting.formatting_revision {
+                    index_author(&revision.author)?;
+                }
+                if let Some(revision) = &run.formatting.display_field_revision {
                     index_author(&revision.author)?;
                 }
             }
@@ -2798,6 +2803,31 @@ fn build_revision_chpx_grpprl(
         grp.extend_from_slice(&author_index.to_le_bytes());
         grp.extend_from_slice(&pack_dttm(revision.timestamp)?.to_le_bytes());
     }
+    if let Some(revision) = &fmt.display_field_revision {
+        let author_index = revisions.indexes.get(&revision.author).ok_or_else(|| {
+            DocWriteError::InvalidData(
+                "DOC display-field revision author was not indexed".to_string(),
+            )
+        })?;
+        let units = revision.previous_result.encode_utf16().collect::<Vec<_>>();
+        if units.len() > 15 {
+            return Err(DocWriteError::InvalidData(
+                "DOC LISTNUM previous result exceeds its 15-code-unit XST".to_string(),
+            ));
+        }
+        let mut operand = [0u8; 39];
+        operand[0] = 1;
+        operand[1..3].copy_from_slice(&author_index.to_le_bytes());
+        operand[3..7].copy_from_slice(&pack_dttm(revision.timestamp)?.to_le_bytes());
+        operand[7..9].copy_from_slice(&(units.len() as u16).to_le_bytes());
+        for (index, unit) in units.into_iter().enumerate() {
+            let offset = 9 + index * 2;
+            operand[offset..offset + 2].copy_from_slice(&unit.to_le_bytes());
+        }
+        grp.extend_from_slice(&SPRM_C_DISP_FLD_RMARK.to_le_bytes());
+        grp.push(39);
+        grp.extend_from_slice(&operand);
+    }
     Ok(grp)
 }
 
@@ -3671,6 +3701,44 @@ mod tests {
                             ..CharacterFormatting::default()
                         },
                     ),
+                    (
+                        "\u{13}".to_string(),
+                        CharacterFormatting {
+                            special: Some(true),
+                            ..CharacterFormatting::default()
+                        },
+                    ),
+                    (
+                        " LISTNUM ".to_string(),
+                        CharacterFormatting {
+                            field_vanish: Some(true),
+                            ..CharacterFormatting::default()
+                        },
+                    ),
+                    (
+                        "\u{14}".to_string(),
+                        CharacterFormatting {
+                            special: Some(true),
+                            ..CharacterFormatting::default()
+                        },
+                    ),
+                    (
+                        "12.".to_string(),
+                        CharacterFormatting {
+                            display_field_revision: Some(
+                                DisplayFieldRevision::new("Field Editor", "11.")
+                                    .with_timestamp(timestamp),
+                            ),
+                            ..CharacterFormatting::default()
+                        },
+                    ),
+                    (
+                        "\u{15}".to_string(),
+                        CharacterFormatting {
+                            special: Some(true),
+                            ..CharacterFormatting::default()
+                        },
+                    ),
                 ],
                 ParagraphFormatting {
                     alignment: Some(1),
@@ -3702,7 +3770,8 @@ mod tests {
                 "Numbering Editor",
                 "Alice 😀",
                 "Bob",
-                "张三"
+                "张三",
+                "Field Editor"
             ]
         );
         let paragraphs = document.paragraphs().unwrap();
@@ -3737,6 +3806,13 @@ mod tests {
         assert_eq!(formatting.author, "张三");
         assert_eq!(formatting.timestamp, Some(timestamp));
         assert_eq!(formatting.revision_id, None);
+        let display_field = runs
+            .iter()
+            .find_map(|run| run.display_field_revision())
+            .unwrap();
+        assert_eq!(display_field.author, "Field Editor");
+        assert_eq!(display_field.timestamp, Some(timestamp));
+        assert_eq!(display_field.previous_result, "11.");
 
         let path = std::env::temp_dir().join(format!(
             "litchi-doc-revisions-{}-{}.doc",
@@ -3757,7 +3833,8 @@ mod tests {
                 "Numbering Editor",
                 "Alice 😀",
                 "Bob",
-                "张三"
+                "张三",
+                "Field Editor"
             ]
         );
         assert!(
@@ -3783,6 +3860,13 @@ mod tests {
                 .unwrap()
                 .iter()
                 .any(|run| run.formatting_revision().is_some())
+        );
+        assert!(
+            document.paragraphs().unwrap()[0]
+                .runs()
+                .unwrap()
+                .iter()
+                .any(|run| run.display_field_revision().is_some())
         );
         std::fs::remove_file(path).unwrap();
     }
@@ -3841,6 +3925,12 @@ mod tests {
                 .to_string()
                 .contains("NumRM")
         );
+
+        let invalid_display = CharacterFormatting {
+            display_field_revision: Some(DisplayFieldRevision::new("Alice", "x".repeat(16))),
+            ..CharacterFormatting::default()
+        };
+        assert!(error_for(invalid_display).contains("LISTNUM"));
     }
 
     #[test]

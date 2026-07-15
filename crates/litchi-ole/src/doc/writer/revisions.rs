@@ -100,3 +100,31 @@ impl NumberingRevision {
         self
     }
 }
+
+/// Revision metadata for a LISTNUM display-field result.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DisplayFieldRevision {
+    /// Revision author name.
+    pub author: String,
+    /// Revision timestamp.
+    pub timestamp: Option<CommentDateTime>,
+    /// Previous LISTNUM display-field result.
+    pub previous_result: String,
+}
+
+impl DisplayFieldRevision {
+    /// Create display-field revision metadata.
+    pub fn new(author: impl Into<String>, previous_result: impl Into<String>) -> Self {
+        Self {
+            author: author.into(),
+            timestamp: None,
+            previous_result: previous_result.into(),
+        }
+    }
+
+    /// Set the revision timestamp.
+    pub fn with_timestamp(mut self, timestamp: CommentDateTime) -> Self {
+        self.timestamp = Some(timestamp);
+        self
+    }
+}

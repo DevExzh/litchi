@@ -69,6 +69,6 @@ pub use headers::{HeaderFooterEntry, HeaderFooterType, HeadersWriter};
 pub use hyperlinks::{HyperlinkEntry, HyperlinkType, HyperlinksWriter};
 pub use numbering::{ListFormatOverride, ListLevel, ListStructure, NumberFormat, NumberingWriter};
 pub use piece_table::{Piece, PieceTableBuilder};
-pub use revisions::{FormattingRevision, NumberingRevision, TextRevision};
+pub use revisions::{DisplayFieldRevision, FormattingRevision, NumberingRevision, TextRevision};
 pub use sprm::SprmBuilder;
 pub use tap::{TableCell, TableRow, TapBuilder};
