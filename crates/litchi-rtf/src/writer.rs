@@ -55,9 +55,6 @@ pub struct RtfWriter<W: Write> {
     /// List override table (reserved for writing lists)
     #[allow(dead_code)]
     list_override_table: ListOverrideTable,
-    /// Stylesheet (reserved for writing styles)
-    #[allow(dead_code)]
-    stylesheet: StyleSheet<'static>,
 }
 
 #[derive(Clone, Copy)]
@@ -91,7 +88,6 @@ impl<W: Write> RtfWriter<W> {
             color_table: ColorTable::new(),
             list_table: ListTable::new(),
             list_override_table: ListOverrideTable::new(),
-            stylesheet: StyleSheet::new(),
         }
     }
 
@@ -130,6 +126,9 @@ impl<W: Write> RtfWriter<W> {
 
         // Write color table
         self.write_color_table()?;
+
+        // Write named paragraph, character, section, and table styles.
+        self.write_stylesheet(doc.stylesheet())?;
 
         // Write document properties before body content.
         self.write_document_info(doc.info())?;
@@ -230,6 +229,100 @@ impl<W: Write> RtfWriter<W> {
         }
 
         self.write_str("}")?;
+        Ok(())
+    }
+
+    /// Write an RTF stylesheet destination.
+    pub fn write_stylesheet(&mut self, stylesheet: &StyleSheet<'_>) -> io::Result<()> {
+        if stylesheet.styles().is_empty() {
+            return Ok(());
+        }
+        if stylesheet.styles().len() > 65_536 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "RTF stylesheet exceeds the supported style count",
+            ));
+        }
+
+        self.write_str("{")?;
+        self.write_control_word("stylesheet", None)?;
+        for style in stylesheet.styles() {
+            self.write_style_definition(style)?;
+        }
+        self.write_str("}")?;
+        Ok(())
+    }
+
+    fn write_style_definition(&mut self, style: &Style<'_>) -> io::Result<()> {
+        if style.name.contains(';') {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "RTF style names cannot contain a semicolon",
+            ));
+        }
+        self.write_str("{")?;
+        let control = match style.style_type {
+            StyleType::Paragraph => "s",
+            StyleType::Character => "cs",
+            StyleType::Section => "ds",
+            StyleType::Table => "ts",
+        };
+        if style.style_type != StyleType::Paragraph {
+            self.write_str("\\*")?;
+        }
+        self.write_control_word(control, Some(i32::from(style.id)))?;
+        self.write_formatting(&style.formatting)?;
+        if let Some(paragraph) = &style.paragraph {
+            self.write_paragraph_properties(paragraph)?;
+        }
+        if let Some(value) = style.based_on {
+            self.write_control_word("sbasedon", Some(i32::from(value)))?;
+        }
+        if let Some(value) = style.next_style {
+            self.write_control_word("snext", Some(i32::from(value)))?;
+        }
+        if let Some(value) = style.linked_style {
+            self.write_control_word("slink", Some(i32::from(value)))?;
+        }
+        if style.additive {
+            self.write_control_word("additive", None)?;
+        }
+        if style.auto_update {
+            self.write_control_word("sautoupd", None)?;
+        }
+        if style.hidden {
+            self.write_control_word("shidden", None)?;
+        }
+        if style.locked {
+            self.write_control_word("slocked", None)?;
+        }
+        if style.semi_hidden {
+            self.write_control_word("ssemihidden", None)?;
+        }
+        if style.unhide_when_used {
+            self.write_control_word("sunhideused", None)?;
+        }
+        if style.quick_format {
+            self.write_control_word("sqformat", None)?;
+        }
+        if let Some(value) = style.priority {
+            self.write_control_word("spriority", Some(value))?;
+        }
+        if let Some(value) = style.revision_id {
+            self.write_control_word("styrsid", Some(value))?;
+        }
+        if style.personal {
+            self.write_control_word("spersonal", None)?;
+        }
+        if style.compose {
+            self.write_control_word("scompose", None)?;
+        }
+        if style.reply {
+            self.write_control_word("sreply", None)?;
+        }
+        self.write_str(" ")?;
+        self.write_text(style.name.as_ref())?;
+        self.write_str(";}")?;
         Ok(())
     }
 
@@ -1360,6 +1453,57 @@ mod tests {
         assert_eq!(
             section.get_header(HeaderFooterType::Footer).unwrap().text(),
             "Footer"
+        );
+    }
+
+    #[test]
+    fn document_writer_round_trips_stylesheets() {
+        let document = RtfDocument::parse(
+            r#"{\rtf1\ansi{\stylesheet{\s0\snext0 Normal;}{\s1\b\qc\sbasedon0\snext0\slink2\sautoupd\shidden\slocked\ssemihidden\sunhideused\sqformat\spriority9\styrsid42 Heading \u20320?;}{\*\cs2\i\additive\slink1 Emphasis;}{\*\ds3 Section;}{\*\ts4 Table;}}Body}"#,
+        )
+        .unwrap();
+        let mut output = Vec::new();
+        RtfWriter::new(&mut output)
+            .write_document(&document)
+            .unwrap();
+
+        let reparsed = RtfDocument::from_bytes(&output).unwrap();
+        assert_eq!(reparsed.text(), "Body");
+        assert_eq!(reparsed.stylesheet().styles().len(), 5);
+        let heading = reparsed
+            .stylesheet()
+            .get_typed(StyleType::Paragraph, 1)
+            .unwrap();
+        assert_eq!(heading.name, "Heading 你");
+        assert!(heading.formatting.bold);
+        assert_eq!(heading.paragraph.unwrap().alignment, Alignment::Center);
+        assert_eq!(heading.linked_style, Some(2));
+        assert!(heading.auto_update);
+        assert!(heading.hidden);
+        assert!(heading.locked);
+        assert!(heading.semi_hidden);
+        assert!(heading.unhide_when_used);
+        assert!(heading.quick_format);
+        assert_eq!(heading.priority, Some(9));
+        assert_eq!(heading.revision_id, Some(42));
+
+        let character = reparsed
+            .stylesheet()
+            .get_typed(StyleType::Character, 2)
+            .unwrap();
+        assert!(character.additive);
+        assert!(character.formatting.italic);
+        assert!(
+            reparsed
+                .stylesheet()
+                .get_typed(StyleType::Section, 3)
+                .is_some()
+        );
+        assert!(
+            reparsed
+                .stylesheet()
+                .get_typed(StyleType::Table, 4)
+                .is_some()
         );
     }
 

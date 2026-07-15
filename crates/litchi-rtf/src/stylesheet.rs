@@ -32,6 +32,8 @@ pub struct Style<'a> {
     pub based_on: Option<u16>,
     /// Next style ID (style for next paragraph)
     pub next_style: Option<u16>,
+    /// Linked paragraph or character style ID
+    pub linked_style: Option<u16>,
     /// Character formatting
     pub formatting: Formatting,
     /// Paragraph properties (for paragraph styles)
@@ -40,39 +42,84 @@ pub struct Style<'a> {
     pub builtin: bool,
     /// Whether this style is hidden
     pub hidden: bool,
+    /// Whether character properties are additive to the surrounding formatting
+    pub additive: bool,
+    /// Whether applications may automatically update the style definition
+    pub auto_update: bool,
+    /// Whether the style is locked against modification
+    pub locked: bool,
+    /// Whether the style is hidden until it is used
+    pub semi_hidden: bool,
+    /// Whether the style should become visible after it is used
+    pub unhide_when_used: bool,
+    /// Whether the style appears in the quick-style gallery
+    pub quick_format: bool,
+    /// Style UI sorting priority
+    pub priority: Option<i32>,
+    /// Style revision identifier
+    pub revision_id: Option<i32>,
+    /// Whether this is a personal e-mail style
+    pub personal: bool,
+    /// Whether this is an e-mail composition style
+    pub compose: bool,
+    /// Whether this is an e-mail reply style
+    pub reply: bool,
 }
 
 impl<'a> Style<'a> {
-    /// Create a new paragraph style
-    #[inline]
-    pub fn paragraph(id: u16, name: Cow<'a, str>) -> Self {
+    fn new(
+        id: u16,
+        name: Cow<'a, str>,
+        style_type: StyleType,
+        paragraph: Option<Paragraph>,
+    ) -> Self {
         Self {
             id,
             name,
-            style_type: StyleType::Paragraph,
+            style_type,
             based_on: None,
             next_style: None,
+            linked_style: None,
             formatting: Formatting::default(),
-            paragraph: Some(Paragraph::default()),
+            paragraph,
             builtin: false,
             hidden: false,
+            additive: false,
+            auto_update: false,
+            locked: false,
+            semi_hidden: false,
+            unhide_when_used: false,
+            quick_format: false,
+            priority: None,
+            revision_id: None,
+            personal: false,
+            compose: false,
+            reply: false,
         }
+    }
+
+    /// Create a new paragraph style
+    #[inline]
+    pub fn paragraph(id: u16, name: Cow<'a, str>) -> Self {
+        Self::new(id, name, StyleType::Paragraph, Some(Paragraph::default()))
     }
 
     /// Create a new character style
     #[inline]
     pub fn character(id: u16, name: Cow<'a, str>) -> Self {
-        Self {
-            id,
-            name,
-            style_type: StyleType::Character,
-            based_on: None,
-            next_style: None,
-            formatting: Formatting::default(),
-            paragraph: None,
-            builtin: false,
-            hidden: false,
-        }
+        Self::new(id, name, StyleType::Character, None)
+    }
+
+    /// Create a new section style.
+    #[inline]
+    pub fn section(id: u16, name: Cow<'a, str>) -> Self {
+        Self::new(id, name, StyleType::Section, None)
+    }
+
+    /// Create a new table style.
+    #[inline]
+    pub fn table(id: u16, name: Cow<'a, str>) -> Self {
+        Self::new(id, name, StyleType::Table, None)
     }
 
     /// Check if this is a paragraph style
@@ -111,6 +158,13 @@ impl<'a> StyleSheet<'a> {
     /// Get a style by ID
     pub fn get(&self, id: u16) -> Option<&Style<'a>> {
         self.styles.iter().find(|s| s.id == id)
+    }
+
+    /// Get a style by type and ID.
+    pub fn get_typed(&self, style_type: StyleType, id: u16) -> Option<&Style<'a>> {
+        self.styles
+            .iter()
+            .find(|style| style.style_type == style_type && style.id == id)
     }
 
     /// Get a style by name

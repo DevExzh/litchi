@@ -87,6 +87,8 @@ const MAX_BOOKMARK_NAME_BYTES: usize = 65_536;
 const MAX_ANNOTATIONS: usize = 65_536;
 const MAX_ANNOTATION_TEXT_BYTES: usize = 4 * 1_048_576;
 const MAX_SECTIONS: usize = 4_096;
+const MAX_STYLES: usize = 65_536;
+const MAX_STYLE_NAME_BYTES: usize = 65_536;
 
 struct OpenBookmark {
     name: String,
@@ -380,11 +382,11 @@ impl<'a> Parser<'a> {
                     return Ok(());
                 },
                 Token::Control(ControlWord::StyleSheet) => {
-                    // Mark as stylesheet destination and skip
+                    // Parse style definitions without adding their names to body text.
                     if let Some(state) = self.states.last_mut() {
                         state.destination = Destination::StyleSheet;
                     }
-                    self.skip_until_close_brace()?;
+                    self.parse_stylesheet()?;
                     self.states.pop();
                     return Ok(());
                 },
@@ -951,6 +953,295 @@ impl<'a> Parser<'a> {
             _ => {},
         }
         Ok(true)
+    }
+
+    /// Parse the standard RTF stylesheet destination.
+    fn parse_stylesheet(&mut self) -> RtfResult<()> {
+        self.pos += 1; // `stylesheet`
+        while self.pos < self.tokens.len() {
+            match self.tokens.get(self.pos) {
+                Some(Token::OpenBrace) => self.parse_style_entry()?,
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    return Ok(());
+                },
+                Some(_) => self.pos += 1,
+                None => break,
+            }
+        }
+        Err(RtfError::UnexpectedEof)
+    }
+
+    fn parse_style_entry(&mut self) -> RtfResult<()> {
+        self.pos += 1; // opening brace
+        let mut style_type = None;
+        let mut id = None;
+        let mut state = State::default();
+        let mut name = String::new();
+        let mut name_complete = false;
+        let mut based_on = None;
+        let mut next_style = None;
+        let mut linked_style = None;
+        let mut additive = false;
+        let mut auto_update = false;
+        let mut hidden = false;
+        let mut locked = false;
+        let mut semi_hidden = false;
+        let mut unhide_when_used = false;
+        let mut quick_format = false;
+        let mut priority = None;
+        let mut revision_id = None;
+        let mut personal = false;
+        let mut compose = false;
+        let mut reply = false;
+
+        while self.pos < self.tokens.len() {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    break;
+                },
+                Some(Token::OpenBrace) => {
+                    // Nested extension groups do not form part of the style name.
+                    self.skip_group()?;
+                    continue;
+                },
+                Some(Token::Text(text)) if !name_complete => {
+                    Self::append_style_name(&mut name, text, &mut name_complete);
+                },
+                Some(Token::Control(ControlWord::Unicode(first))) if !name_complete => {
+                    let decoded = self.parse_style_unicode(*first, state.unicode_skip)?;
+                    Self::append_style_name(&mut name, &decoded, &mut name_complete);
+                    if name.len() > MAX_STYLE_NAME_BYTES {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF style name exceeds the safety limit".to_string(),
+                        ));
+                    }
+                    continue;
+                },
+                Some(Token::Control(control)) => match control {
+                    ControlWord::ParagraphStyle(value) => {
+                        style_type = Some(super::stylesheet::StyleType::Paragraph);
+                        id = Some(Self::style_id(*value, "style")?);
+                    },
+                    ControlWord::CharacterStyle(value) => {
+                        style_type = Some(super::stylesheet::StyleType::Character);
+                        id = Some(Self::style_id(*value, "style")?);
+                    },
+                    ControlWord::SectionStyle(value) => {
+                        style_type = Some(super::stylesheet::StyleType::Section);
+                        id = Some(Self::style_id(*value, "style")?);
+                    },
+                    ControlWord::TableStyle(value) => {
+                        style_type = Some(super::stylesheet::StyleType::Table);
+                        id = Some(Self::style_id(*value, "style")?);
+                    },
+                    ControlWord::StyleBasedOn(value) => {
+                        based_on = Some(Self::style_id(*value, "based-on style")?);
+                    },
+                    ControlWord::StyleNext(value) => {
+                        next_style = Some(Self::style_id(*value, "next style")?);
+                    },
+                    ControlWord::StyleLink(value) => {
+                        linked_style = Some(Self::style_id(*value, "linked style")?);
+                    },
+                    ControlWord::StyleAdditive(value) => additive = *value,
+                    ControlWord::StyleAutoUpdate(value) => auto_update = *value,
+                    ControlWord::StyleHidden(value) => hidden = *value,
+                    ControlWord::StyleLocked(value) => locked = *value,
+                    ControlWord::StyleSemiHidden(value) => semi_hidden = *value,
+                    ControlWord::StyleUnhideWhenUsed(value) => unhide_when_used = *value,
+                    ControlWord::StyleQuickFormat(value) => quick_format = *value,
+                    ControlWord::StylePriority(value) => priority = Some(*value),
+                    ControlWord::StyleRevisionId(value) => revision_id = Some(*value),
+                    ControlWord::StylePersonal(value) => personal = *value,
+                    ControlWord::StyleCompose(value) => compose = *value,
+                    ControlWord::StyleReply(value) => reply = *value,
+                    ControlWord::UnicodeSkip(value) => state.unicode_skip = (*value).max(0),
+                    _ => {
+                        Self::apply_style_property(&mut state, control);
+                    },
+                },
+                Some(_) => {},
+                None => break,
+            }
+            self.pos += 1;
+            if name.len() > MAX_STYLE_NAME_BYTES {
+                return Err(RtfError::MalformedDocument(
+                    "RTF style name exceeds the safety limit".to_string(),
+                ));
+            }
+        }
+
+        let (Some(style_type), Some(id)) = (style_type, id) else {
+            // Unknown extension groups are permitted inside a stylesheet.
+            return Ok(());
+        };
+        if self.stylesheet.styles().len() >= MAX_STYLES {
+            return Err(RtfError::MalformedDocument(
+                "RTF style count exceeds the safety limit".to_string(),
+            ));
+        }
+        let name = name.trim().to_string();
+        let allocated = self.arena.alloc_str(&name);
+        let mut style = match style_type {
+            super::stylesheet::StyleType::Paragraph => {
+                super::stylesheet::Style::paragraph(id, Cow::Borrowed(allocated))
+            },
+            super::stylesheet::StyleType::Character => {
+                super::stylesheet::Style::character(id, Cow::Borrowed(allocated))
+            },
+            super::stylesheet::StyleType::Section => {
+                super::stylesheet::Style::section(id, Cow::Borrowed(allocated))
+            },
+            super::stylesheet::StyleType::Table => {
+                super::stylesheet::Style::table(id, Cow::Borrowed(allocated))
+            },
+        };
+        style.based_on = based_on;
+        style.next_style = next_style;
+        style.linked_style = linked_style;
+        style.formatting = state.formatting;
+        if style_type == super::stylesheet::StyleType::Paragraph {
+            style.paragraph = Some(state.paragraph);
+        }
+        style.hidden = hidden;
+        style.additive = additive;
+        style.auto_update = auto_update;
+        style.locked = locked;
+        style.semi_hidden = semi_hidden;
+        style.unhide_when_used = unhide_when_used;
+        style.quick_format = quick_format;
+        style.priority = priority;
+        style.revision_id = revision_id;
+        style.personal = personal;
+        style.compose = compose;
+        style.reply = reply;
+        self.stylesheet.add(style);
+        Ok(())
+    }
+
+    fn style_id(value: i32, field: &str) -> RtfResult<u16> {
+        u16::try_from(value).map_err(|_| {
+            RtfError::MalformedDocument(format!("RTF {field} ID is outside the supported range"))
+        })
+    }
+
+    fn append_style_name(name: &mut String, text: &str, complete: &mut bool) {
+        if let Some((prefix, _)) = text.split_once(';') {
+            name.push_str(prefix);
+            *complete = true;
+        } else {
+            name.push_str(text);
+        }
+    }
+
+    fn parse_style_unicode(&mut self, first_code: i32, unicode_skip: i32) -> RtfResult<String> {
+        let mut utf16 = SmallVec::<[u16; 4]>::new();
+        utf16.push(first_code as u16);
+        self.pos += 1;
+        while let Some(Token::Control(ControlWord::Unicode(code))) = self.tokens.get(self.pos) {
+            utf16.push(*code as u16);
+            self.pos += 1;
+        }
+
+        let mut fallback_skip = (unicode_skip.max(0) as usize).saturating_mul(utf16.len());
+        let mut remainder = String::new();
+        while fallback_skip > 0 && self.pos < self.tokens.len() {
+            match self.tokens.get(self.pos) {
+                Some(Token::Text(text)) => {
+                    let count = text.chars().count();
+                    if count <= fallback_skip {
+                        fallback_skip -= count;
+                    } else {
+                        remainder.extend(text.chars().skip(fallback_skip));
+                        fallback_skip = 0;
+                    }
+                    self.pos += 1;
+                },
+                Some(Token::Control(ControlWord::Unicode(_))) => break,
+                Some(_) => {
+                    fallback_skip -= 1;
+                    self.pos += 1;
+                },
+                None => break,
+            }
+        }
+        let mut decoded = String::from_utf16(&utf16)
+            .map_err(|error| RtfError::InvalidUnicode(format!("invalid style name: {error}")))?;
+        decoded.push_str(&remainder);
+        Ok(decoded)
+    }
+
+    fn apply_style_property(state: &mut State, control: &ControlWord<'_>) {
+        match control {
+            ControlWord::FontNumber(value) => state.formatting.font_ref = *value as FontRef,
+            ControlWord::FontSize(value) => {
+                if let Some(size) = NonZeroU16::new((*value).clamp(1, i32::from(u16::MAX)) as u16) {
+                    state.formatting.font_size = size;
+                }
+            },
+            ControlWord::ColorForeground(value) => {
+                state.formatting.color_ref = *value as ColorRef;
+            },
+            ControlWord::Highlight(value) => {
+                state.formatting.highlight_color = Some(*value as ColorRef);
+            },
+            ControlWord::Bold(value) => state.formatting.bold = *value,
+            ControlWord::Italic(value) => state.formatting.italic = *value,
+            ControlWord::Underline(value) => {
+                state.formatting.underline = if *value {
+                    UnderlineStyle::Single
+                } else {
+                    UnderlineStyle::None
+                };
+            },
+            ControlWord::UnderlineNone => state.formatting.underline = UnderlineStyle::None,
+            ControlWord::UnderlineDouble => state.formatting.underline = UnderlineStyle::Double,
+            ControlWord::UnderlineDotted => state.formatting.underline = UnderlineStyle::Dotted,
+            ControlWord::UnderlineDashed => state.formatting.underline = UnderlineStyle::Dashed,
+            ControlWord::UnderlineDashDot => state.formatting.underline = UnderlineStyle::DashDot,
+            ControlWord::UnderlineDashDotDot => {
+                state.formatting.underline = UnderlineStyle::DashDotDot;
+            },
+            ControlWord::UnderlineWords => state.formatting.underline = UnderlineStyle::Words,
+            ControlWord::UnderlineThick => state.formatting.underline = UnderlineStyle::Thick,
+            ControlWord::UnderlineWave => state.formatting.underline = UnderlineStyle::Wave,
+            ControlWord::Strike(value) => state.formatting.strike = *value,
+            ControlWord::DoubleStrike(value) => state.formatting.double_strike = *value,
+            ControlWord::Superscript(value) => state.formatting.superscript = *value,
+            ControlWord::Subscript(value) => state.formatting.subscript = *value,
+            ControlWord::SmallCaps(value) => state.formatting.smallcaps = *value,
+            ControlWord::AllCaps(value) => state.formatting.all_caps = *value,
+            ControlWord::Hidden(value) => state.formatting.hidden = *value,
+            ControlWord::Outline(value) => state.formatting.outline = *value,
+            ControlWord::Shadow(value) => state.formatting.shadow = *value,
+            ControlWord::Emboss(value) => state.formatting.emboss = *value,
+            ControlWord::Imprint(value) => state.formatting.imprint = *value,
+            ControlWord::CharSpacing(value) => state.formatting.char_spacing = *value,
+            ControlWord::CharScale(value) => state.formatting.char_scale = *value,
+            ControlWord::Kerning(value) => state.formatting.kerning = *value,
+            ControlWord::Plain => state.formatting = Formatting::default(),
+            ControlWord::LeftAlign => state.paragraph.alignment = Alignment::Left,
+            ControlWord::RightAlign => state.paragraph.alignment = Alignment::Right,
+            ControlWord::Center => state.paragraph.alignment = Alignment::Center,
+            ControlWord::Justify => state.paragraph.alignment = Alignment::Justify,
+            ControlWord::Pard => state.paragraph = Paragraph::default(),
+            ControlWord::SpaceBefore(value) => state.paragraph.spacing.before = *value,
+            ControlWord::SpaceAfter(value) => state.paragraph.spacing.after = *value,
+            ControlWord::SpaceBetween(value) => state.paragraph.spacing.line = *value,
+            ControlWord::LineMultiple(value) => state.paragraph.spacing.line_multiple = *value,
+            ControlWord::LeftIndent(value) => state.paragraph.indentation.left = *value,
+            ControlWord::RightIndent(value) => state.paragraph.indentation.right = *value,
+            ControlWord::FirstLineIndent(value) => {
+                state.paragraph.indentation.first_line = *value;
+            },
+            ControlWord::KeepTogether => state.paragraph.keep_together = true,
+            ControlWord::KeepNext => state.paragraph.keep_next = true,
+            ControlWord::PageBreakBefore => state.paragraph.page_break_before = true,
+            ControlWord::WidowControl => state.paragraph.widow_control = true,
+            _ => {},
+        }
     }
 
     /// Parse font table.

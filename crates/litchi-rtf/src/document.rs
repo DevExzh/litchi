@@ -601,12 +601,36 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Convert stylesheet to owned
-    #[allow(clippy::needless_pass_by_value)]
     fn convert_stylesheet_to_owned(
-        _stylesheet: super::stylesheet::StyleSheet<'_>,
+        stylesheet: super::stylesheet::StyleSheet<'_>,
     ) -> super::stylesheet::StyleSheet<'static> {
-        // TODO: Implement proper conversion when stylesheet parsing is fully implemented
-        super::stylesheet::StyleSheet::new()
+        let mut owned = super::stylesheet::StyleSheet::new();
+        for style in stylesheet.styles() {
+            owned.add(super::stylesheet::Style {
+                id: style.id,
+                name: Cow::Owned(style.name.clone().into_owned()),
+                style_type: style.style_type,
+                based_on: style.based_on,
+                next_style: style.next_style,
+                linked_style: style.linked_style,
+                formatting: style.formatting,
+                paragraph: style.paragraph,
+                builtin: style.builtin,
+                hidden: style.hidden,
+                additive: style.additive,
+                auto_update: style.auto_update,
+                locked: style.locked,
+                semi_hidden: style.semi_hidden,
+                unhide_when_used: style.unhide_when_used,
+                quick_format: style.quick_format,
+                priority: style.priority,
+                revision_id: style.revision_id,
+                personal: style.personal,
+                compose: style.compose,
+                reply: style.reply,
+            });
+        }
+        owned
     }
 
     /// Convert document info to owned
@@ -721,6 +745,7 @@ impl<'a> RtfDocument<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{Alignment, StyleType};
 
     #[test]
     fn test_simple_document() {
@@ -785,6 +810,55 @@ mod tests {
         let doc = RtfDocument::parse(rtf).unwrap();
         assert_eq!(doc.info().title.as_deref(), Some("Kept"));
         assert_eq!(doc.text(), "Text");
+    }
+
+    #[test]
+    fn parses_complete_stylesheet_without_leaking_names_into_body() {
+        let rtf = r#"{\rtf1\ansi
+            {\stylesheet
+                {\s0\fs22\ql\snext0\sqformat\spriority0 Normal;}
+                {\s1\b\qc\sb120\li240\keepn\sbasedon0\snext0\slink2
+                    \sautoupd\shidden\slocked\ssemihidden\sunhideused\sqformat
+                    \spriority9\styrsid42\spersonal\scompose\sreply Heading \u20320?;}
+                {\*\cs2\i\additive\sbasedon0\slink1 Emphasis;}
+                {\*\ds3 Section Style;}
+                {\*\ts4{\*\unknown ignored} Table Style;}
+            }
+            Body}"#;
+        let doc = RtfDocument::parse(rtf).unwrap();
+        assert_eq!(doc.text().trim(), "Body");
+        assert_eq!(doc.stylesheet().styles().len(), 5);
+
+        let heading = doc.stylesheet().get_typed(StyleType::Paragraph, 1).unwrap();
+        assert_eq!(heading.name, "Heading 你");
+        assert_eq!(heading.based_on, Some(0));
+        assert_eq!(heading.next_style, Some(0));
+        assert_eq!(heading.linked_style, Some(2));
+        assert!(heading.formatting.bold);
+        let paragraph = heading.paragraph.unwrap();
+        assert_eq!(paragraph.alignment, Alignment::Center);
+        assert_eq!(paragraph.spacing.before, 120);
+        assert_eq!(paragraph.indentation.left, 240);
+        assert!(paragraph.keep_next);
+        assert!(heading.auto_update);
+        assert!(heading.hidden);
+        assert!(heading.locked);
+        assert!(heading.semi_hidden);
+        assert!(heading.unhide_when_used);
+        assert!(heading.quick_format);
+        assert_eq!(heading.priority, Some(9));
+        assert_eq!(heading.revision_id, Some(42));
+        assert!(heading.personal);
+        assert!(heading.compose);
+        assert!(heading.reply);
+
+        let emphasis = doc.stylesheet().get_typed(StyleType::Character, 2).unwrap();
+        assert_eq!(emphasis.name, "Emphasis");
+        assert!(emphasis.formatting.italic);
+        assert!(emphasis.additive);
+        assert!(emphasis.paragraph.is_none());
+        assert!(doc.stylesheet().get_typed(StyleType::Section, 3).is_some());
+        assert!(doc.stylesheet().get_typed(StyleType::Table, 4).is_some());
     }
 
     #[test]
