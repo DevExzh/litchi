@@ -59,6 +59,22 @@ pub struct TablePositioning {
     pub horizontal_anchor: TableHorizontalAnchor,
 }
 
+/// Source of a DOC table's uniform inter-cell spacing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CellSpacingSource {
+    /// Explicit twip spacing (`ftsDxa`).
+    Explicit,
+    /// Spacing produced by table-border application (`ftsDxaSys`).
+    TableBorder,
+}
+
+/// Uniform spacing applied around every cell in a DOC table row.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CellSpacing {
+    pub width: u16,
+    pub source: CellSpacingSource,
+}
+
 /// Horizontal table position, including the special alignment sentinels.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum TableHorizontalPosition {
@@ -139,6 +155,8 @@ pub struct TableProperties {
     pub distance_from_text_top: u16,
     pub distance_from_text_right: u16,
     pub distance_from_text_bottom: u16,
+    /// Uniform spacing around every cell in this row
+    pub cell_spacing: Option<CellSpacing>,
     /// Row height in twips (positive = at least, negative = exact)
     pub row_height: Option<i16>,
     /// Row is header row
@@ -498,6 +516,7 @@ impl Default for TableProperties {
             distance_from_text_top: 0,
             distance_from_text_right: 0,
             distance_from_text_bottom: 0,
+            cell_spacing: None,
             row_height: None,
             is_header_row: false,
             allow_row_break: true,

@@ -6,10 +6,10 @@
 
 use super::sprm::SprmBuilder;
 use crate::doc::parts::tap::{
-    BorderStyle, BorderType, CellBorders, CellShading, TableHorizontalAnchor,
-    TableHorizontalPosition, TableLook, TablePositioning, TableVerticalAnchor,
-    TableVerticalPosition, TableWidth, TextDirection, VerticalAlignment, VerticalMergeStatus,
-    WidthType,
+    BorderStyle, BorderType, CellBorders, CellShading, CellSpacing, CellSpacingSource,
+    TableHorizontalAnchor, TableHorizontalPosition, TableLook, TablePositioning,
+    TableVerticalAnchor, TableVerticalPosition, TableWidth, TextDirection, VerticalAlignment,
+    VerticalMergeStatus, WidthType,
 };
 
 /// Error returned when table row properties cannot be represented in DOC TAP.
@@ -29,6 +29,8 @@ pub enum TapBuildError {
     InvalidBorderSpacing(u8),
     /// DOC cell padding cannot exceed 22 inches.
     InvalidCellPadding(u16),
+    /// DOC uniform cell spacing cannot exceed 11 inches.
+    InvalidCellSpacing(u16),
     /// A preferred-width property uses unsupported units or a value outside its context's range.
     InvalidPreferredWidth(&'static str, TableWidth),
     /// TLP contains bits outside the eleven-bit Fatl field.
@@ -66,6 +68,9 @@ impl std::fmt::Display for TapBuildError {
             },
             Self::InvalidCellPadding(padding) => {
                 write!(f, "DOC cell padding {padding} exceeds 31680 twips")
+            },
+            Self::InvalidCellSpacing(spacing) => {
+                write!(f, "DOC cell spacing {spacing} exceeds 15840 twips")
             },
             Self::InvalidPreferredWidth(property, width) => {
                 write!(f, "DOC {property} has an invalid preferred width {width:?}")
@@ -172,6 +177,8 @@ pub struct TableRow {
     pub distance_from_text_top: u16,
     pub distance_from_text_right: u16,
     pub distance_from_text_bottom: u16,
+    /// Uniform spacing around every cell in this row
+    pub cell_spacing: Option<CellSpacing>,
     /// Default outer and inside borders for this row
     pub borders: TableBorders,
 }
@@ -200,6 +207,7 @@ impl Default for TableRow {
             distance_from_text_top: 0,
             distance_from_text_right: 0,
             distance_from_text_bottom: 0,
+            cell_spacing: None,
             borders: TableBorders::default(),
         }
     }
@@ -589,6 +597,7 @@ pub(crate) fn generate_row_sprms(row: &TableRow) -> Result<Vec<u8>, TapBuildErro
     append_table_borders(&mut sprms, row.borders)?;
     append_cell_borders(&mut sprms, &row.cells)?;
     append_cell_shading(&mut sprms, &row.cells)?;
+    append_cell_spacing(&mut sprms, row.cell_spacing)?;
     append_cell_padding(&mut sprms, &row.cells)?;
     Ok(sprms)
 }
@@ -727,6 +736,27 @@ fn append_cell_padding(sprms: &mut Vec<u8>, cells: &[TableCell]) -> Result<(), T
         sprms.extend_from_slice(&[run.first, run.limit, run.sides, 0x03]);
         sprms.extend_from_slice(&run.width.to_le_bytes());
     }
+    Ok(())
+}
+
+fn append_cell_spacing(
+    sprms: &mut Vec<u8>,
+    spacing: Option<CellSpacing>,
+) -> Result<(), TapBuildError> {
+    let Some(spacing) = spacing else {
+        return Ok(());
+    };
+    if spacing.width > 15_840 {
+        return Err(TapBuildError::InvalidCellSpacing(spacing.width));
+    }
+    let units = match spacing.source {
+        CellSpacingSource::Explicit => 0x03,
+        CellSpacingSource::TableBorder => 0x13,
+    };
+    sprms.extend_from_slice(&0xD633u16.to_le_bytes());
+    sprms.push(6);
+    sprms.extend_from_slice(&[0, 1, 0x0F, units]);
+    sprms.extend_from_slice(&spacing.width.to_le_bytes());
     Ok(())
 }
 
@@ -1223,6 +1253,10 @@ mod tests {
             distance_from_text_top: 240,
             distance_from_text_right: 360,
             distance_from_text_bottom: 480,
+            cell_spacing: Some(CellSpacing {
+                width: 240,
+                source: CellSpacingSource::TableBorder,
+            }),
             ..TableRow::default()
         });
 
@@ -1257,6 +1291,7 @@ mod tests {
         assert_eq!(tap.distance_from_text_top, 240);
         assert_eq!(tap.distance_from_text_right, 360);
         assert_eq!(tap.distance_from_text_bottom, 480);
+        assert_eq!(tap.cell_spacing, builder.rows()[0].cell_spacing);
     }
 
     #[test]
@@ -1438,6 +1473,23 @@ mod tests {
         assert_eq!(
             builder.try_generate_row_sprms(0),
             Err(TapBuildError::InvalidWrapDistance("right", 31_681))
+        );
+
+        let mut builder = TapBuilder::new();
+        builder.add_row(TableRow {
+            cells: vec![TableCell {
+                width: 1000,
+                ..TableCell::default()
+            }],
+            cell_spacing: Some(CellSpacing {
+                width: 15_841,
+                source: CellSpacingSource::Explicit,
+            }),
+            ..TableRow::default()
+        });
+        assert_eq!(
+            builder.try_generate_row_sprms(0),
+            Err(TapBuildError::InvalidCellSpacing(15_841))
         );
 
         let mut builder = TapBuilder::new();

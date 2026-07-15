@@ -25,10 +25,11 @@ fn binary_to_doc_result<T>(result: BinaryResult<T>) -> Result<T> {
     result.map_err(|e| DocError::InvalidFormat(format!("Binary read error: {}", e)))
 }
 use super::tap::{
-    BorderStyle, BorderType, CellMergeStatus, CellProperties, CellShading, ShadingPattern,
-    TableHorizontalAnchor, TableHorizontalPosition, TableJustification, TableLook, TableLookFlags,
-    TablePositioning, TableProperties, TableVerticalAnchor, TableVerticalPosition, TableWidth,
-    TextDirection, VerticalAlignment, VerticalMergeStatus, WidthType,
+    BorderStyle, BorderType, CellMergeStatus, CellProperties, CellShading, CellSpacing,
+    CellSpacingSource, ShadingPattern, TableHorizontalAnchor, TableHorizontalPosition,
+    TableJustification, TableLook, TableLookFlags, TablePositioning, TableProperties,
+    TableVerticalAnchor, TableVerticalPosition, TableWidth, TextDirection, VerticalAlignment,
+    VerticalMergeStatus, WidthType,
 };
 use crate::sprm::{Sprm, parse_sprms};
 use crate::sprm_operations::get_sprm_operation;
@@ -547,6 +548,7 @@ impl<'arena> TapParser<'arena> {
             0x32 | 0x34 => {
                 self.parse_cell_padding(tap, sprm, grpprl)?;
             },
+            0x33 => self.parse_cell_spacing(tap, sprm)?,
             0x35 => self.parse_cell_width(tap, sprm)?,
             0x36 => self.parse_cell_range_bool(tap, sprm, CellBoolProperty::FitText)?,
             0x39 => self.parse_cell_range_bool(tap, sprm, CellBoolProperty::NoWrap)?,
@@ -1439,6 +1441,38 @@ impl<'arena> TapParser<'arena> {
         Ok(())
     }
 
+    fn parse_cell_spacing(&self, tap: &mut TableProperties, sprm: &Sprm) -> Result<()> {
+        let operand = sprm.operand_bytes();
+        if operand.len() != 6 || operand[0] != 0 || operand[1] != 1 || operand[2] != 0x0F {
+            return Err(DocError::Corrupted(
+                "DOC default cell spacing must target range 0..1 and all sides".to_string(),
+            ));
+        }
+        let width = binary_to_doc_result(read_u16_le(operand, 4))?;
+        if width > 15_840 {
+            return Err(DocError::Corrupted(
+                "DOC default cell spacing exceeds 15840 twips".to_string(),
+            ));
+        }
+        tap.cell_spacing = match operand[3] {
+            0 if width == 0 => None,
+            3 => Some(CellSpacing {
+                width,
+                source: CellSpacingSource::Explicit,
+            }),
+            0x13 => Some(CellSpacing {
+                width,
+                source: CellSpacingSource::TableBorder,
+            }),
+            _ => {
+                return Err(DocError::Corrupted(
+                    "DOC default cell spacing has invalid units or value".to_string(),
+                ));
+            },
+        };
+        Ok(())
+    }
+
     /// Convert ico (color index) to RGB.
     ///
     /// Based on POI's color index mapping.
@@ -1802,6 +1836,36 @@ mod tests {
     }
 
     #[test]
+    fn parses_and_resets_default_cell_spacing() {
+        let arena = Bump::new();
+        let parser = TapParser::new(&arena);
+        let mut grpprl = table_definition_grpprl(&[2, 0, 0, 100, 0, 200, 0]);
+        append_variable_sprm(&mut grpprl, 0xD633, &[0, 1, 0x0F, 0x13, 240, 0]);
+
+        let tap = parser.parse_tap(&grpprl).unwrap();
+        assert_eq!(
+            tap.cell_spacing,
+            Some(CellSpacing {
+                width: 240,
+                source: CellSpacingSource::TableBorder,
+            })
+        );
+
+        append_variable_sprm(&mut grpprl, 0xD633, &[0, 1, 0x0F, 3, 120, 0]);
+        let tap = parser.parse_tap(&grpprl).unwrap();
+        assert_eq!(
+            tap.cell_spacing,
+            Some(CellSpacing {
+                width: 120,
+                source: CellSpacingSource::Explicit,
+            })
+        );
+
+        append_variable_sprm(&mut grpprl, 0xD633, &[0, 1, 0x0F, 0, 0, 0]);
+        assert!(parser.parse_tap(&grpprl).unwrap().cell_spacing.is_none());
+    }
+
+    #[test]
     fn rejects_malformed_cell_padding_and_shading() {
         let arena = Bump::new();
         let parser = TapParser::new(&arena);
@@ -1817,6 +1881,11 @@ mod tests {
         assert!(parse_with(0xD632, &[0, 2, 0x0F, 1, 0, 0]).is_err());
         assert!(parse_with(0xD632, &[0, 2, 0x0F, 0, 1, 0]).is_err());
         assert!(parse_with(0xD632, &[0, 2, 0x0F, 3, 0xC1, 0x7B]).is_err());
+        assert!(parse_with(0xD633, &[1, 1, 0x0F, 3, 0, 0]).is_err());
+        assert!(parse_with(0xD633, &[0, 1, 0x0E, 3, 0, 0]).is_err());
+        assert!(parse_with(0xD633, &[0, 1, 0x0F, 0, 1, 0]).is_err());
+        assert!(parse_with(0xD633, &[0, 1, 0x0F, 1, 0, 0]).is_err());
+        assert!(parse_with(0xD633, &[0, 1, 0x0F, 3, 0xE1, 0x3D]).is_err());
         assert!(parse_with(0xD609, &[0]).is_err());
         assert!(parse_with(0xD609, &[0, 0, 0, 0, 0, 0]).is_err());
         assert!(parse_with(0xD609, &[17, 0]).is_err());
