@@ -83,34 +83,84 @@ impl TextPropCollection {
 pub fn parse_paragraph_properties(data: &[u8], offset: &mut usize, mask: u32) -> Vec<TextProp> {
     let mut props = Vec::new();
 
-    // Paragraph property definitions (from POI's TextPropCollection)
+    // The fields occur in TextPFException order, not numeric mask order.
     let prop_defs = [
-        ("alignment", 2, 0x0008),
+        ("paragraph.flags", 2, 0x000F),
+        ("bullet.char", 2, 0x0080),
+        ("bullet.font", 2, 0x0010),
+        ("bullet.size", 2, 0x0040),
+        ("bullet.color", 4, 0x0020),
+        ("alignment", 2, 0x0800),
         ("linespacing", 2, 0x1000),
         ("spacebefore", 2, 0x2000),
         ("spaceafter", 2, 0x4000),
         ("text.offset", 2, 0x0100),   // left margin
         ("bullet.offset", 2, 0x0400), // indent
         ("defaultTabSize", 2, 0x8000),
-        ("textDirection", 2, 0x200000),
     ];
 
-    for (name, size, prop_mask) in &prop_defs {
+    for (name, size, prop_mask) in prop_defs {
         if (mask & prop_mask) != 0 {
             if *offset + size > data.len() {
-                break;
+                *offset = data.len();
+                return props;
             }
 
             let value = match size {
-                2 => read_u16_le(data, *offset).unwrap_or(0) as i32,
+                2 => read_i16_le(data, *offset).unwrap_or(0) as i32,
                 4 => read_i32_le(data, *offset).unwrap_or(0),
                 _ => 0,
             };
 
-            let mut prop = TextProp::new(name, *size, *prop_mask);
+            let mut prop = TextProp::new(name, size, prop_mask);
             prop.value = value;
             props.push(prop);
+            *offset += size;
+        }
+    }
 
+    if (mask & 0x100000) != 0 {
+        if *offset + 2 > data.len() {
+            *offset = data.len();
+            return props;
+        }
+        let count = read_u16_le(data, *offset).unwrap_or(0) as usize;
+        let Some(size) = count.checked_mul(4).and_then(|size| size.checked_add(2)) else {
+            *offset = data.len();
+            return props;
+        };
+        if *offset + size > data.len() {
+            *offset = data.len();
+            return props;
+        }
+        let mut prop = TextProp::new("tabStops", size, 0x100000);
+        prop.value = count as i32;
+        props.push(prop);
+        *offset += size;
+    }
+
+    let trailing_defs = [
+        ("fontAlignment", 2, 0x10000),
+        ("wrapFlags", 2, 0xE0000),
+        ("textDirection", 2, 0x200000),
+    ];
+
+    for (name, size, prop_mask) in trailing_defs {
+        if (mask & prop_mask) != 0 {
+            if *offset + size > data.len() {
+                *offset = data.len();
+                return props;
+            }
+
+            let value = match size {
+                2 => read_i16_le(data, *offset).unwrap_or(0) as i32,
+                4 => read_i32_le(data, *offset).unwrap_or(0),
+                _ => 0,
+            };
+
+            let mut prop = TextProp::new(name, size, prop_mask);
+            prop.value = value;
+            props.push(prop);
             *offset += size;
         }
     }
@@ -126,7 +176,7 @@ pub fn parse_character_properties(data: &[u8], offset: &mut usize, mask: u32) ->
 
     // Character property definitions (from POI's TextPropCollection)
     let prop_defs = [
-        ("char.flags", 2, 0x0001), // bold, italic, underline, etc.
+        ("char.flags", 2, 0xFFFF), // bold, italic, underline, etc.
         ("font.index", 2, 0x10000),
         ("asian.font.index", 2, 0x200000),
         ("ansi.font.index", 2, 0x400000),
@@ -136,22 +186,22 @@ pub fn parse_character_properties(data: &[u8], offset: &mut usize, mask: u32) ->
         ("superscript", 2, 0x80000),
     ];
 
-    for (name, size, prop_mask) in &prop_defs {
+    for (name, size, prop_mask) in prop_defs {
         if (mask & prop_mask) != 0 {
             if *offset + size > data.len() {
-                break;
+                *offset = data.len();
+                return props;
             }
 
             let value = match size {
-                2 => read_u16_le(data, *offset).unwrap_or(0) as i32,
+                2 => read_i16_le(data, *offset).unwrap_or(0) as i32,
                 4 => read_i32_le(data, *offset).unwrap_or(0),
                 _ => 0,
             };
 
-            let mut prop = TextProp::new(name, *size, *prop_mask);
+            let mut prop = TextProp::new(name, size, prop_mask);
             prop.value = value;
             props.push(prop);
-
             *offset += size;
         }
     }
@@ -170,17 +220,22 @@ pub fn parse_style_text_prop_atom(
     let mut paragraph_styles = Vec::new();
     let mut character_styles = Vec::new();
 
-    if data.len() < 10 {
+    if data.len() < 8 {
         return (paragraph_styles, character_styles);
     }
 
     let mut offset = 0;
+    let style_length = u32::try_from(text_length)
+        .unwrap_or(u32::MAX)
+        .saturating_add(1);
 
     // Parse paragraph styles first
     let mut para_chars_covered = 0u32;
-    while para_chars_covered < text_length as u32 && offset + 6 <= data.len() {
+    while para_chars_covered < style_length && offset + 10 <= data.len() {
         // Read character count (4 bytes in POI's implementation)
-        let char_count = read_u32_le(data, offset).unwrap_or(0);
+        let char_count = read_u32_le(data, offset)
+            .unwrap_or(0)
+            .min(style_length - para_chars_covered);
         offset += 4;
 
         if char_count == 0 {
@@ -211,9 +266,11 @@ pub fn parse_style_text_prop_atom(
 
     // Parse character styles
     let mut char_chars_covered = 0u32;
-    while char_chars_covered < text_length as u32 && offset + 6 <= data.len() {
+    while char_chars_covered < style_length && offset + 8 <= data.len() {
         // Read character count (4 bytes)
-        let char_count = read_u32_le(data, offset).unwrap_or(0);
+        let char_count = read_u32_le(data, offset)
+            .unwrap_or(0)
+            .min(style_length - char_chars_covered);
         offset += 4;
 
         if char_count == 0 {
@@ -285,5 +342,36 @@ mod tests {
         assert!(bold);
         assert!(!italic);
         assert!(!underline);
+    }
+
+    #[test]
+    fn parses_paragraph_fields_in_record_order_before_character_runs() {
+        let mut data = Vec::new();
+        data.extend_from_slice(&5u32.to_le_bytes());
+        data.extend_from_slice(&0i16.to_le_bytes());
+        data.extend_from_slice(&0x0010_08FFu32.to_le_bytes());
+        data.extend_from_slice(&1i16.to_le_bytes());
+        data.extend_from_slice(&0x2022i16.to_le_bytes());
+        data.extend_from_slice(&2i16.to_le_bytes());
+        data.extend_from_slice(&4i16.to_le_bytes());
+        data.extend_from_slice(&0x0011_2233i32.to_le_bytes());
+        data.extend_from_slice(&2i16.to_le_bytes());
+        data.extend_from_slice(&1u16.to_le_bytes());
+        data.extend_from_slice(&720i16.to_le_bytes());
+        data.extend_from_slice(&0i16.to_le_bytes());
+        data.extend_from_slice(&5u32.to_le_bytes());
+        data.extend_from_slice(&0x20002u32.to_le_bytes());
+        data.extend_from_slice(&2i16.to_le_bytes());
+        data.extend_from_slice(&20i16.to_le_bytes());
+
+        let (paragraphs, characters) = parse_style_text_prop_atom(&data, 4);
+
+        assert_eq!(paragraphs.len(), 1);
+        assert_eq!(paragraphs[0].get_value("bullet.char"), Some(0x2022));
+        assert_eq!(paragraphs[0].get_value("alignment"), Some(2));
+        assert_eq!(paragraphs[0].get_value("tabStops"), Some(1));
+        assert_eq!(characters.len(), 1);
+        assert_eq!(characters[0].get_value("char.flags"), Some(2));
+        assert_eq!(characters[0].get_value("font.size"), Some(20));
     }
 }

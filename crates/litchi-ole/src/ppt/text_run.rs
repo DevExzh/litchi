@@ -232,43 +232,52 @@ impl TextRunExtractor {
     ///
     /// Based on Apache POI's StyleTextPropAtom parsing.
     fn apply_style_properties(&mut self, record: &PptRecord) -> Result<()> {
-        if record.data.len() < 10 {
+        if record.data.len() < 8 {
             return Ok(()); // Not enough data
         }
 
-        // Parse the StyleTextPropAtom using POI's logic
+        let Some(source_run) = self.runs.pop() else {
+            return Ok(());
+        };
+        let text_length = source_run.text.encode_utf16().count();
         let (_paragraph_styles, character_styles) =
-            super::text_prop::parse_style_text_prop_atom(&record.data, self.text.chars().count());
+            super::text_prop::parse_style_text_prop_atom(&record.data, text_length);
 
-        // Apply character styles to runs
-        for (style_idx, char_style) in character_styles.iter().enumerate() {
-            // Find the run that corresponds to this style
-            if style_idx < self.runs.len() {
-                let run = &mut self.runs[style_idx];
+        if character_styles.is_empty() {
+            self.runs.push(source_run);
+            return Ok(());
+        }
 
-                // Extract formatting from character properties
-                let mut formatting = TextRunFormatting::default();
-
-                // Font size
-                if let Some(size) = char_style.get_value("font.size") {
-                    formatting.font_size = Some(size as u16);
-                }
-
-                // Font color
-                if let Some(color) = char_style.get_value("font.color") {
-                    formatting.font_color = Some(color as u32);
-                }
-
-                // Character flags (bold, italic, underline)
-                if let Some(flags) = char_style.get_value("char.flags") {
-                    let (bold, italic, underline) = super::text_prop::extract_char_flags(flags);
-                    formatting.bold = bold;
-                    formatting.italic = italic;
-                    formatting.underline = underline;
-                }
-
-                run.formatting = formatting;
+        let mut remaining = source_run.text.as_str();
+        let mut character_offset = 0usize;
+        for char_style in &character_styles {
+            if remaining.is_empty() {
+                break;
             }
+
+            let requested_units = char_style.characters_covered as usize;
+            let (byte_count, character_count) = utf16_prefix(remaining, requested_units);
+            if byte_count == 0 {
+                continue;
+            }
+
+            let text = remaining[..byte_count].to_string();
+            let formatting = formatting_from_style(char_style);
+            self.runs.push(TextRun::with_formatting(
+                text,
+                source_run.start_index + character_offset,
+                formatting,
+            ));
+            remaining = &remaining[byte_count..];
+            character_offset += character_count;
+        }
+
+        if !remaining.is_empty() {
+            self.runs.push(TextRun::with_formatting(
+                remaining.to_string(),
+                source_run.start_index + character_offset,
+                source_run.formatting,
+            ));
         }
 
         Ok(())
@@ -288,6 +297,47 @@ impl TextRunExtractor {
     pub fn run_count(&self) -> usize {
         self.runs.len()
     }
+}
+
+fn formatting_from_style(style: &super::text_prop::TextPropCollection) -> TextRunFormatting {
+    let mut formatting = TextRunFormatting {
+        font_size: style
+            .get_value("font.size")
+            .and_then(|size| u16::try_from(size).ok()),
+        font_color: style.get_value("font.color").map(|color| color as u32),
+        ..TextRunFormatting::default()
+    };
+
+    if let Some(flags) = style.get_value("char.flags") {
+        let (bold, italic, underline) = super::text_prop::extract_char_flags(flags);
+        formatting.bold = bold;
+        formatting.italic = italic;
+        formatting.underline = underline;
+    }
+    formatting
+}
+
+fn utf16_prefix(text: &str, requested_units: usize) -> (usize, usize) {
+    if requested_units == 0 {
+        return (0, 0);
+    }
+
+    let mut units = 0usize;
+    let mut byte_count = 0usize;
+    let mut character_count = 0usize;
+    for (offset, character) in text.char_indices() {
+        let next_units = units + character.len_utf16();
+        if next_units > requested_units && byte_count != 0 {
+            break;
+        }
+        units = next_units;
+        byte_count = offset + character.len_utf8();
+        character_count += 1;
+        if units >= requested_units {
+            break;
+        }
+    }
+    (byte_count, character_count)
 }
 
 impl Default for TextRunExtractor {
@@ -368,5 +418,58 @@ mod tests {
         assert_eq!(extractor.runs()[0].length, 1);
         assert_eq!(extractor.runs()[1].start_index, 1);
         assert_eq!(extractor.runs()[1].length, 2);
+    }
+
+    #[test]
+    fn style_atom_splits_text_into_character_runs() {
+        let text_record = PptRecord {
+            record_type: PptRecordType::TextBytesAtom,
+            record_type_raw: 4008,
+            version: 0,
+            instance: 0,
+            data_length: 4,
+            data: b"abcd".to_vec(),
+            children: Vec::new(),
+        };
+        let mut style_data = Vec::new();
+        style_data.extend_from_slice(&5u32.to_le_bytes());
+        style_data.extend_from_slice(&0i16.to_le_bytes());
+        style_data.extend_from_slice(&0u32.to_le_bytes());
+        style_data.extend_from_slice(&2u32.to_le_bytes());
+        style_data.extend_from_slice(&0x0001u32.to_le_bytes());
+        style_data.extend_from_slice(&0x0001i16.to_le_bytes());
+        style_data.extend_from_slice(&3u32.to_le_bytes());
+        style_data.extend_from_slice(&0x0002u32.to_le_bytes());
+        style_data.extend_from_slice(&0x0002i16.to_le_bytes());
+        let style_record = PptRecord {
+            record_type: PptRecordType::StyleTextPropAtom,
+            record_type_raw: 4001,
+            version: 0,
+            instance: 0,
+            data_length: style_data.len() as u32,
+            data: style_data,
+            children: Vec::new(),
+        };
+        let mut extractor = TextRunExtractor::new();
+
+        extractor
+            .extract_from_records(&[text_record, style_record])
+            .unwrap();
+
+        assert_eq!(extractor.text(), "abcd");
+        assert_eq!(extractor.run_count(), 2);
+        assert_eq!(extractor.runs()[0].text, "ab");
+        assert!(extractor.runs()[0].formatting.bold);
+        assert!(!extractor.runs()[0].formatting.italic);
+        assert_eq!(extractor.runs()[1].text, "cd");
+        assert!(!extractor.runs()[1].formatting.bold);
+        assert!(extractor.runs()[1].formatting.italic);
+        assert_eq!(extractor.runs()[1].start_index, 2);
+    }
+
+    #[test]
+    fn style_spans_count_utf16_code_units_without_splitting_surrogates() {
+        assert_eq!(utf16_prefix("😀x", 2), ("😀".len(), 1));
+        assert_eq!(utf16_prefix("😀x", 3), ("😀x".len(), 2));
     }
 }
