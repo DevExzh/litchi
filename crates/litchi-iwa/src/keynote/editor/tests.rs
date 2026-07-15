@@ -4034,6 +4034,184 @@ fn reads_current_slide_layout_from_theme_relationship() {
 }
 
 #[test]
+fn updates_slide_layout_transactionally_without_replacing_user_content() {
+    let mut editor = KeynoteEditor::from_package(test_package_with_two_layouts()).unwrap();
+    let layouts = editor.slide_layouts().unwrap();
+    let title_only = layouts
+        .iter()
+        .find(|layout| layout.name == "Title Only")
+        .unwrap()
+        .id;
+    let title_and_bullets = layouts
+        .iter()
+        .find(|layout| layout.name == "Title & Bullets")
+        .unwrap()
+        .id;
+
+    editor.set_slide_layout(0, title_only).unwrap();
+    let slide = &editor.slides().unwrap()[0];
+    assert_eq!(
+        slide.layout.as_ref().map(|layout| layout.id),
+        Some(title_only)
+    );
+    assert_eq!(slide.is_title_visible, Some(true));
+    assert_eq!(slide.is_body_visible, Some(false));
+    assert_eq!(slide.title.as_deref(), Some("Old title"));
+    assert_eq!(slide.body.as_deref(), Some("Old body 🚀"));
+    assert_eq!(slide.notes.as_deref(), Some("Speaker 🚀"));
+
+    let graph = ObjectGraph::read(editor.package()).unwrap();
+    let native_slide: kn::SlideArchive = graph.decode_type(4, 5, "KN.SlideArchive").unwrap();
+    assert_eq!(native_slide.style.identifier, 60);
+    assert_eq!(native_slide.template_slide.unwrap().identifier, 38);
+    assert_eq!(native_slide.owned_drawables, vec![reference(5)]);
+    assert_eq!(native_slide.drawables_z_order, vec![reference(5)]);
+    let node: kn::SlideNodeArchive = graph.decode_type(3, 4, "KN.SlideNodeArchive").unwrap();
+    assert_eq!(node.template_slide_id, Some(test_uuid(3, 4)));
+    assert_eq!(node.thumbnails_are_dirty, Some(true));
+    assert!(node.thumbnails.is_empty());
+    let title: kn::PlaceholderArchive = graph
+        .decode_type(5, TEST_PLACEHOLDER_MESSAGE_TYPE, "KN.PlaceholderArchive")
+        .unwrap();
+    let body: kn::PlaceholderArchive = graph
+        .decode_type(6, TEST_PLACEHOLDER_MESSAGE_TYPE, "KN.PlaceholderArchive")
+        .unwrap();
+    assert_eq!(title.super_.owned_storage, Some(reference(7)));
+    assert_eq!(body.super_.owned_storage, Some(reference(8)));
+    assert_eq!(placeholder_x(&title), Some(300.0));
+    assert_eq!(placeholder_x(&body), Some(400.0));
+    assert_eq!(title.super_.super_.style, Some(reference(61)));
+    assert_eq!(body.super_.super_.style, Some(reference(62)));
+    assert_eq!(
+        title
+            .super_
+            .super_
+            .pathsource
+            .as_ref()
+            .and_then(|path| path.horizontal_flip),
+        Some(true)
+    );
+    let package = editor.package();
+    let slide_archive = package.archive("Index/Slide-4.iwa").unwrap();
+    let slide_object = slide_archive.object(4).unwrap();
+    assert_eq!(
+        slide_object.archive_info.message_infos[0].object_references,
+        [60, 38]
+    );
+
+    let no_op = editor.to_bytes().unwrap();
+    editor.set_slide_layout(0, title_only).unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), no_op);
+
+    editor.set_slide_layout(0, title_and_bullets).unwrap();
+    let slide = &editor.slides().unwrap()[0];
+    assert_eq!(slide.is_title_visible, Some(true));
+    assert_eq!(slide.is_body_visible, Some(true));
+    assert_eq!(slide.title.as_deref(), Some("Old title"));
+    assert_eq!(slide.body.as_deref(), Some("Old body 🚀"));
+    let graph = ObjectGraph::read(editor.package()).unwrap();
+    let native_slide: kn::SlideArchive = graph.decode_type(4, 5, "KN.SlideArchive").unwrap();
+    assert_eq!(
+        native_slide.owned_drawables,
+        vec![reference(5), reference(6)]
+    );
+    assert_eq!(
+        native_slide.drawables_z_order,
+        vec![reference(5), reference(6)]
+    );
+    let title: kn::PlaceholderArchive = graph
+        .decode_type(5, TEST_PLACEHOLDER_MESSAGE_TYPE, "KN.PlaceholderArchive")
+        .unwrap();
+    let body: kn::PlaceholderArchive = graph
+        .decode_type(6, TEST_PLACEHOLDER_MESSAGE_TYPE, "KN.PlaceholderArchive")
+        .unwrap();
+    assert_eq!(placeholder_x(&title), Some(100.0));
+    assert_eq!(placeholder_x(&body), Some(200.0));
+}
+
+#[test]
+fn slide_layout_update_rejects_invalid_inputs_without_mutation() {
+    let mut editor = KeynoteEditor::from_package(test_package_with_two_layouts()).unwrap();
+    let before = editor.to_bytes().unwrap();
+    assert!(
+        editor
+            .set_slide_layout(2, KeynoteSlideLayoutId(37))
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), before);
+    assert!(
+        editor
+            .set_slide_layout(0, KeynoteSlideLayoutId(999))
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
+fn slide_layout_update_hides_a_retained_placeholder_missing_from_the_layout() {
+    let mut package = test_package_with_two_layouts();
+    package
+        .update_archive("Index/TemplateSlide-38.iwa", |archive| {
+            let slide = archive.object_mut(38).unwrap();
+            let mut decoded = kn::SlideArchive::decode(slide.messages[0].data.as_slice())?;
+            decoded.body_placeholder = None;
+            slide.replace_message(
+                0,
+                RawMessage {
+                    type_: TEST_SLIDE_MESSAGE_TYPE,
+                    data: decoded.encode_to_vec(),
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    let mut editor = KeynoteEditor::from_package(package).unwrap();
+    editor
+        .set_slide_layout(0, KeynoteSlideLayoutId(37))
+        .unwrap();
+    let slide = &editor.slides().unwrap()[0];
+    assert_eq!(slide.is_body_visible, Some(false));
+    assert_eq!(slide.body.as_deref(), Some("Old body 🚀"));
+    let graph = ObjectGraph::read(editor.package()).unwrap();
+    let body: kn::PlaceholderArchive = graph
+        .decode_type(6, TEST_PLACEHOLDER_MESSAGE_TYPE, "KN.PlaceholderArchive")
+        .unwrap();
+    assert_eq!(placeholder_x(&body), Some(200.0));
+}
+
+#[test]
+fn slide_layout_update_rejects_ambiguous_wire_fields_transactionally() {
+    let mut package = test_package_with_two_layouts();
+    package
+        .update_archive("Index/Slide-4.iwa", |archive| {
+            let slide = archive.object_mut(4).unwrap();
+            let message = slide.messages[0].clone();
+            let data = append_repeated_length_delimited_field(
+                &message.data,
+                1,
+                &reference(50).encode_to_vec(),
+            )?;
+            slide.replace_message(
+                0,
+                RawMessage {
+                    type_: message.type_,
+                    data,
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    let mut editor = KeynoteEditor::from_package(package).unwrap();
+    let before = editor.to_bytes().unwrap();
+    assert!(
+        editor
+            .set_slide_layout(0, KeynoteSlideLayoutId(37))
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
 fn current_slide_layout_rejects_missing_theme_mapping() {
     let mut package = test_package_with_current_layout();
     package
@@ -5146,6 +5324,195 @@ fn test_package_with_current_layout() -> IWorkPackage {
         })
         .unwrap();
     package
+}
+
+fn test_package_with_two_layouts() -> IWorkPackage {
+    let mut package = test_package_with_current_layout();
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            let theme = archive.object_mut(29).unwrap();
+            let mut decoded = kn::ThemeArchive::decode(theme.messages[0].data.as_slice())?;
+            decoded.templates.push(reference(37));
+            theme.replace_message(
+                0,
+                RawMessage {
+                    type_: TEST_THEME_MESSAGE_TYPE,
+                    data: decoded.encode_to_vec(),
+                },
+            )?;
+
+            let source_node = archive.object_mut(30).unwrap();
+            let mut decoded =
+                kn::SlideNodeArchive::decode(source_node.messages[0].data.as_slice())?;
+            decoded.template_slide_id = Some(test_uuid(1, 2));
+            source_node.replace_message(
+                0,
+                RawMessage {
+                    type_: TEST_SLIDE_NODE_MESSAGE_TYPE,
+                    data: decoded.encode_to_vec(),
+                },
+            )?;
+
+            let live_node = archive.object_mut(3).unwrap();
+            let mut decoded = kn::SlideNodeArchive::decode(live_node.messages[0].data.as_slice())?;
+            decoded.template_slide_id = Some(test_uuid(1, 2));
+            live_node.replace_message(
+                0,
+                RawMessage {
+                    type_: TEST_SLIDE_NODE_MESSAGE_TYPE,
+                    data: decoded.encode_to_vec(),
+                },
+            )?;
+            archive.insert_object(object(
+                37,
+                TEST_SLIDE_NODE_MESSAGE_TYPE,
+                kn::SlideNodeArchive {
+                    slide: Some(reference(38)),
+                    template_slide_id: Some(test_uuid(3, 4)),
+                    ..Default::default()
+                },
+            ))?;
+            Ok(())
+        })
+        .unwrap();
+    package
+        .update_archive("Index/TemplateSlide-31.iwa", |archive| {
+            let slide = archive.object_mut(31).unwrap();
+            let mut decoded = kn::SlideArchive::decode(slide.messages[0].data.as_slice())?;
+            decoded.style = reference(50);
+            slide.replace_message(
+                0,
+                RawMessage {
+                    type_: TEST_SLIDE_MESSAGE_TYPE,
+                    data: decoded.encode_to_vec(),
+                },
+            )?;
+            set_test_placeholder_presentation(archive.object_mut(32).unwrap(), 100.0, 51, 2)?;
+            set_test_placeholder_presentation(archive.object_mut(33).unwrap(), 200.0, 52, 3)?;
+            Ok(())
+        })
+        .unwrap();
+    package
+        .update_archive("Index/Slide-4.iwa", |archive| {
+            let slide = archive.object_mut(4).unwrap();
+            let mut decoded = kn::SlideArchive::decode(slide.messages[0].data.as_slice())?;
+            decoded.style = reference(50);
+            slide.replace_message(
+                0,
+                RawMessage {
+                    type_: TEST_SLIDE_MESSAGE_TYPE,
+                    data: decoded.encode_to_vec(),
+                },
+            )?;
+            slide.archive_info.message_infos[0].object_references = vec![50, 31];
+            set_test_placeholder_presentation(archive.object_mut(5).unwrap(), 100.0, 51, 2)?;
+            set_test_placeholder_presentation(archive.object_mut(6).unwrap(), 200.0, 52, 3)?;
+            Ok(())
+        })
+        .unwrap();
+    package
+        .replace_archive(
+            "Index/TemplateSlide-38.iwa",
+            &Archive {
+                objects: vec![
+                    object(
+                        38,
+                        TEST_SLIDE_MESSAGE_TYPE,
+                        kn::SlideArchive {
+                            style: reference(60),
+                            title_placeholder: Some(reference(39)),
+                            body_placeholder: Some(reference(40)),
+                            owned_drawables: vec![reference(39)],
+                            drawables_z_order: vec![reference(39)],
+                            name: Some("Title Only".to_owned()),
+                            in_document: true,
+                            ..Default::default()
+                        },
+                    ),
+                    object(
+                        39,
+                        TEST_PLACEHOLDER_MESSAGE_TYPE,
+                        test_placeholder(None, 300.0, 61, 2),
+                    ),
+                    object(
+                        40,
+                        TEST_PLACEHOLDER_MESSAGE_TYPE,
+                        test_placeholder(None, 400.0, 62, 3),
+                    ),
+                ],
+            },
+        )
+        .unwrap();
+    package
+}
+
+fn set_test_placeholder_presentation(
+    object: &mut ArchiveObject,
+    x: f32,
+    style: u64,
+    kind: i32,
+) -> Result<()> {
+    let storage = kn::PlaceholderArchive::decode(object.messages[0].data.as_slice())?
+        .super_
+        .owned_storage;
+    object.replace_message(
+        0,
+        RawMessage {
+            type_: TEST_PLACEHOLDER_MESSAGE_TYPE,
+            data: test_placeholder(storage, x, style, kind).encode_to_vec(),
+        },
+    )?;
+    object.archive_info.message_infos[0].object_references = vec![style];
+    Ok(())
+}
+
+fn test_placeholder(
+    storage: Option<Reference>,
+    x: f32,
+    style: u64,
+    kind: i32,
+) -> kn::PlaceholderArchive {
+    kn::PlaceholderArchive {
+        super_: tswp::ShapeInfoArchive {
+            super_: tsd::ShapeArchive {
+                super_: tsd::DrawableArchive {
+                    geometry: Some(tsd::GeometryArchive {
+                        position: Some(crate::protobuf::tsp::Point { x, y: 10.0 }),
+                        size: Some(crate::protobuf::tsp::Size {
+                            width: 500.0,
+                            height: 100.0,
+                        }),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                },
+                style: Some(reference(style)),
+                pathsource: Some(tsd::PathSourceArchive {
+                    horizontal_flip: Some(x >= 300.0),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+            owned_storage: storage,
+            ..Default::default()
+        },
+        kind: Some(kind),
+    }
+}
+
+fn placeholder_x(placeholder: &kn::PlaceholderArchive) -> Option<f32> {
+    placeholder
+        .super_
+        .super_
+        .super_
+        .geometry
+        .as_ref()?
+        .position
+        .map(|point| point.x)
+}
+
+fn test_uuid(lower: u64, upper: u64) -> Uuid {
+    Uuid { lower, upper }
 }
 
 fn test_package_with_slide_number() -> IWorkPackage {

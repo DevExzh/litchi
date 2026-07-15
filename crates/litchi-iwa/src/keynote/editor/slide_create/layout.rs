@@ -9,17 +9,17 @@ const SLIDE_NODE_MESSAGE_TYPE: u32 = 4;
 const SLIDE_MESSAGE_TYPE: u32 = 5;
 const THEME_MESSAGE_TYPE: u32 = 10;
 
-pub(super) struct LayoutGraph {
-    pub(super) show_id: u64,
-    pub(super) show_archive_name: String,
-    pub(super) theme: kn::ThemeArchive,
+pub(in crate::keynote::editor) struct LayoutGraph {
+    pub(in crate::keynote::editor) show_id: u64,
+    pub(in crate::keynote::editor) show_archive_name: String,
+    pub(in crate::keynote::editor) theme: kn::ThemeArchive,
 }
 
-pub(super) struct ResolvedLayout {
-    pub(super) node_id: u64,
-    pub(super) slide_id: u64,
-    pub(super) archive_name: String,
-    pub(super) slide: kn::SlideArchive,
+pub(in crate::keynote::editor) struct ResolvedLayout {
+    pub(in crate::keynote::editor) node_id: u64,
+    pub(in crate::keynote::editor) slide_id: u64,
+    pub(in crate::keynote::editor) archive_name: String,
+    pub(in crate::keynote::editor) slide: kn::SlideArchive,
 }
 
 pub(in crate::keynote::editor) struct LayoutCatalog {
@@ -100,7 +100,7 @@ impl LayoutCatalog {
     }
 }
 
-pub(super) fn read_layout_graph(graph: &ObjectGraph) -> Result<LayoutGraph> {
+pub(in crate::keynote::editor) fn read_layout_graph(graph: &ObjectGraph) -> Result<LayoutGraph> {
     let document: kn::DocumentArchive = graph.decode_type(
         DOCUMENT_OBJECT_ID,
         DOCUMENT_MESSAGE_TYPE,
@@ -125,7 +125,10 @@ pub(super) fn default_layout_node_id(theme: &kn::ThemeArchive) -> Result<u64> {
         .ok_or_else(|| Error::InvalidFormat("Keynote theme has no default slide layout".to_owned()))
 }
 
-pub(super) fn resolve_layout(graph: &ObjectGraph, node_id: u64) -> Result<ResolvedLayout> {
+pub(in crate::keynote::editor) fn resolve_layout(
+    graph: &ObjectGraph,
+    node_id: u64,
+) -> Result<ResolvedLayout> {
     let node: kn::SlideNodeArchive =
         graph.decode_type(node_id, SLIDE_NODE_MESSAGE_TYPE, "KN.SlideNodeArchive")?;
     let slide_id = node

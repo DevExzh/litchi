@@ -8,7 +8,7 @@ use litchi_iwa::keynote::{
 };
 use litchi_iwa::protobuf::kn::{
     BuildArchive, BuildChunkArchive, DocumentArchive, PlaceholderArchive, ShowArchive,
-    SlideArchive, SlideNodeArchive, Soundtrack,
+    SlideArchive, SlideNodeArchive, Soundtrack, ThemeArchive,
 };
 use litchi_iwa::protobuf::tsp::PackageMetadata;
 use litchi_iwa::protobuf::tswp::{ShapeInfoArchive, StorageArchive};
@@ -70,6 +70,43 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         show.recording.as_ref().map(|r| r.identifier),
         show.soundtrack.as_ref().map(|r| r.identifier),
     );
+    let (_, theme_object) = objects
+        .get(&show.theme.identifier)
+        .ok_or("theme object is missing")?;
+    let theme = decode::<ThemeArchive>(theme_object).ok_or("no theme payload")?;
+    for layout_reference in &theme.templates {
+        let (_, node_object) = objects
+            .get(&layout_reference.identifier)
+            .ok_or("layout node is missing")?;
+        let node = decode::<SlideNodeArchive>(node_object).ok_or("no layout node payload")?;
+        let slide_id = node
+            .slide
+            .as_ref()
+            .ok_or("layout node has no slide")?
+            .identifier;
+        let (_, slide_object) = objects.get(&slide_id).ok_or("layout slide is missing")?;
+        let slide = decode::<SlideArchive>(slide_object).ok_or("no layout slide payload")?;
+        println!(
+            "layout node={} slide={} name={:?} uuid={:?} style={} placeholders=({:?},{:?},{:?},{:?}) owned={:?}",
+            layout_reference.identifier,
+            slide_id,
+            slide.name,
+            node.template_slide_id,
+            slide.style.identifier,
+            slide.title_placeholder.as_ref().map(|r| r.identifier),
+            slide.body_placeholder.as_ref().map(|r| r.identifier),
+            slide.object_placeholder.as_ref().map(|r| r.identifier),
+            slide
+                .slide_number_placeholder
+                .as_ref()
+                .map(|r| r.identifier),
+            slide
+                .owned_drawables
+                .iter()
+                .map(|r| r.identifier)
+                .collect::<Vec<_>>(),
+        );
+    }
     if let Some(reference) = &show.soundtrack {
         let (archive_name, object) = objects
             .get(&reference.identifier)
@@ -154,7 +191,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let slide = decode::<SlideArchive>(object).ok_or("no slide payload")?;
                 let note_id = slide.note.as_ref().map(|reference| reference.identifier);
                 println!(
-                    " slide={} archive={} name={:?} owned={:?} title={:?} body={:?} note={:?}",
+                    " slide={} archive={} name={:?} owned={:?} title={:?} body={:?} object={:?} slide_number={:?} note={:?}",
                     slide_ref.identifier,
                     name,
                     slide.name,
@@ -165,8 +202,35 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .collect::<Vec<_>>(),
                     slide.title_placeholder.as_ref().map(|r| r.identifier),
                     slide.body_placeholder.as_ref().map(|r| r.identifier),
+                    slide.object_placeholder.as_ref().map(|r| r.identifier),
+                    slide
+                        .slide_number_placeholder
+                        .as_ref()
+                        .map(|r| r.identifier),
                     note_id,
                 );
+                println!(
+                    "  layout style={} template={:?} z_order={:?} layer_with_template={:?} \
+                     title=(geometry={:?},shape_style={:?},text_style={:?},layout={:?}) \
+                     body=(geometry={:?},shape_style={:?},text_style={:?},layout={:?})",
+                    slide.style.identifier,
+                    slide.template_slide.as_ref().map(|r| r.identifier),
+                    slide
+                        .drawables_z_order
+                        .iter()
+                        .map(|r| r.identifier)
+                        .collect::<Vec<_>>(),
+                    slide.slide_objects_layer_with_template,
+                    slide.title_placeholder_geometry,
+                    slide.title_placeholder_shape_style_index,
+                    slide.title_placeholder_text_style_index,
+                    slide.title_layout_properties,
+                    slide.body_placeholder_geometry,
+                    slide.body_placeholder_shape_style_index,
+                    slide.body_placeholder_text_style_index,
+                    slide.body_layout_properties,
+                );
+                println!("  layout metadata={:?}", object.archive_info.message_infos);
                 let transition = &slide.transition.attributes;
                 println!(
                     "  transition modern={:?} custom=(timing={:?},delivery={:?},mosaic={:?}) legacy=({:?},{:?},{:?},{:?},{:?})",
@@ -212,6 +276,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         chunks,
                     );
                 }
+                let retained_placeholders = [
+                    slide.title_placeholder.as_ref(),
+                    slide.body_placeholder.as_ref(),
+                ]
+                .into_iter()
+                .flatten()
+                .filter(|placeholder| {
+                    !slide
+                        .owned_drawables
+                        .iter()
+                        .any(|owned| owned.identifier == placeholder.identifier)
+                })
+                .cloned()
+                .collect::<Vec<_>>();
                 for drawable in slide.owned_drawables {
                     let (name, object) = objects
                         .get(&drawable.identifier)
@@ -230,6 +308,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         object.messages.iter().map(|m| m.type_).collect::<Vec<_>>(),
                         storage
                     );
+                    if let Some(placeholder) = decode::<PlaceholderArchive>(object) {
+                        println!(
+                            "   placeholder kind={:?} geometry={:?} style={:?} metadata={:?}",
+                            placeholder.kind,
+                            placeholder.super_.super_.super_.geometry,
+                            placeholder.super_.super_.style,
+                            object.archive_info.message_infos,
+                        );
+                    }
                     if let Some(storage_id) = storage {
                         let (name, object) = objects
                             .get(&storage_id)
@@ -242,6 +329,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             decode::<StorageArchive>(object).map(|storage| storage.text)
                         );
                     }
+                }
+                for placeholder in retained_placeholders {
+                    let (_, object) = objects
+                        .get(&placeholder.identifier)
+                        .ok_or("retained placeholder object is missing")?;
+                    let placeholder_archive = decode::<PlaceholderArchive>(object)
+                        .ok_or("retained placeholder has no placeholder payload")?;
+                    println!(
+                        "  retained placeholder={} kind={:?} geometry={:?} style={:?} metadata={:?}",
+                        placeholder.identifier,
+                        placeholder_archive.kind,
+                        placeholder_archive.super_.super_.super_.geometry,
+                        placeholder_archive.super_.super_.style,
+                        object.archive_info.message_infos,
+                    );
                 }
                 if let Some(note_id) = note_id {
                     let (name, object) = objects.get(&note_id).ok_or("note object is missing")?;
