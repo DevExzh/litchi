@@ -34,6 +34,58 @@ pub struct TableLook {
     pub flags: TableLookFlags,
 }
 
+/// Vertical origin used for an absolutely positioned DOC table.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TableVerticalAnchor {
+    Margin,
+    Page,
+    Paragraph,
+    None,
+}
+
+/// Horizontal origin used for an absolutely positioned DOC table.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TableHorizontalAnchor {
+    Column,
+    Margin,
+    Page,
+    None,
+}
+
+/// Anchor origins for a floating DOC table (`PositionCodeOperand`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TablePositioning {
+    pub vertical_anchor: TableVerticalAnchor,
+    pub horizontal_anchor: TableHorizontalAnchor,
+}
+
+/// Horizontal table position, including the special alignment sentinels.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum TableHorizontalPosition {
+    #[default]
+    Left,
+    Center,
+    Right,
+    Inside,
+    Outside,
+    /// Physical offset in twips after decoding XAS_plusOne.
+    Offset(i16),
+}
+
+/// Vertical table position, including the special alignment sentinels.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum TableVerticalPosition {
+    #[default]
+    Inline,
+    Top,
+    Center,
+    Bottom,
+    Inside,
+    Outside,
+    /// Downward offset in twips after decoding YAS_plusOne.
+    Offset(i16),
+}
+
 /// Table Properties structure.
 ///
 /// Contains formatting and structural information for a table.
@@ -76,6 +128,17 @@ pub struct TableProperties {
     pub modern_right_to_left: bool,
     /// Whether this floating table may overlap other tables
     pub allow_overlap: bool,
+    /// Anchor origins when this table is absolutely positioned
+    pub positioning: Option<TablePositioning>,
+    /// Horizontal alignment or physical offset from the anchor
+    pub horizontal_position: TableHorizontalPosition,
+    /// Vertical alignment or downward offset from the anchor
+    pub vertical_position: TableVerticalPosition,
+    /// Minimum text-wrapping distances on the physical sides, in twips
+    pub distance_from_text_left: u16,
+    pub distance_from_text_top: u16,
+    pub distance_from_text_right: u16,
+    pub distance_from_text_bottom: u16,
     /// Row height in twips (positive = at least, negative = exact)
     pub row_height: Option<i16>,
     /// Row is header row
@@ -428,6 +491,13 @@ impl Default for TableProperties {
             legacy_right_to_left: false,
             modern_right_to_left: false,
             allow_overlap: true,
+            positioning: None,
+            horizontal_position: TableHorizontalPosition::Left,
+            vertical_position: TableVerticalPosition::Inline,
+            distance_from_text_left: 0,
+            distance_from_text_top: 0,
+            distance_from_text_right: 0,
+            distance_from_text_bottom: 0,
             row_height: None,
             is_header_row: false,
             allow_row_break: true,

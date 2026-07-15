@@ -6,8 +6,10 @@
 
 use super::sprm::SprmBuilder;
 use crate::doc::parts::tap::{
-    BorderStyle, BorderType, CellBorders, CellShading, TableLook, TableWidth, TextDirection,
-    VerticalAlignment, VerticalMergeStatus, WidthType,
+    BorderStyle, BorderType, CellBorders, CellShading, TableHorizontalAnchor,
+    TableHorizontalPosition, TableLook, TablePositioning, TableVerticalAnchor,
+    TableVerticalPosition, TableWidth, TextDirection, VerticalAlignment, VerticalMergeStatus,
+    WidthType,
 };
 
 /// Error returned when table row properties cannot be represented in DOC TAP.
@@ -31,6 +33,10 @@ pub enum TapBuildError {
     InvalidPreferredWidth(&'static str, TableWidth),
     /// TLP contains bits outside the eleven-bit Fatl field.
     InvalidTableLookFlags(u16),
+    /// A physical table offset cannot be represented by the plus-one operand.
+    InvalidTablePosition(&'static str, i16),
+    /// A wrapping distance exceeds the XAS/YAS_nonNeg range.
+    InvalidWrapDistance(&'static str, u16),
 }
 
 impl std::fmt::Display for TapBuildError {
@@ -66,6 +72,15 @@ impl std::fmt::Display for TapBuildError {
             },
             Self::InvalidTableLookFlags(flags) => {
                 write!(f, "DOC table look contains reserved flags {flags:#06x}")
+            },
+            Self::InvalidTablePosition(axis, value) => {
+                write!(f, "DOC {axis} table position {value} cannot be encoded")
+            },
+            Self::InvalidWrapDistance(side, value) => {
+                write!(
+                    f,
+                    "DOC {side} wrapping distance {value} exceeds 31680 twips"
+                )
             },
         }
     }
@@ -146,6 +161,17 @@ pub struct TableRow {
     pub right_to_left: bool,
     /// Whether this floating table may overlap other tables
     pub allow_overlap: bool,
+    /// Anchor origins when this table is absolutely positioned
+    pub positioning: Option<TablePositioning>,
+    /// Horizontal alignment or physical offset from the anchor
+    pub horizontal_position: TableHorizontalPosition,
+    /// Vertical alignment or downward offset from the anchor
+    pub vertical_position: TableVerticalPosition,
+    /// Minimum text-wrapping distances on the physical sides, in twips
+    pub distance_from_text_left: u16,
+    pub distance_from_text_top: u16,
+    pub distance_from_text_right: u16,
+    pub distance_from_text_bottom: u16,
     /// Default outer and inside borders for this row
     pub borders: TableBorders,
 }
@@ -167,6 +193,13 @@ impl Default for TableRow {
             table_style_index: None,
             right_to_left: false,
             allow_overlap: true,
+            positioning: None,
+            horizontal_position: TableHorizontalPosition::Left,
+            vertical_position: TableVerticalPosition::Inline,
+            distance_from_text_left: 0,
+            distance_from_text_top: 0,
+            distance_from_text_right: 0,
+            distance_from_text_bottom: 0,
             borders: TableBorders::default(),
         }
     }
@@ -219,6 +252,61 @@ fn encode_preferred_width(
     };
     let value = width.value.to_le_bytes();
     Ok(Some([units, value[0], value[1]]))
+}
+
+fn encode_horizontal_position(position: TableHorizontalPosition) -> Result<i16, TapBuildError> {
+    Ok(match position {
+        TableHorizontalPosition::Left => 0,
+        TableHorizontalPosition::Center => -4,
+        TableHorizontalPosition::Right => -8,
+        TableHorizontalPosition::Inside => -12,
+        TableHorizontalPosition::Outside => -16,
+        TableHorizontalPosition::Offset(value) => {
+            let stored = i32::from(value) + 1;
+            if !(-31_679..=31_681).contains(&i32::from(value))
+                || matches!(stored, 0 | -4 | -8 | -12 | -16)
+            {
+                return Err(TapBuildError::InvalidTablePosition("horizontal", value));
+            }
+            stored as i16
+        },
+    })
+}
+
+fn encode_vertical_position(position: TableVerticalPosition) -> Result<i16, TapBuildError> {
+    Ok(match position {
+        TableVerticalPosition::Inline => 0,
+        TableVerticalPosition::Top => -4,
+        TableVerticalPosition::Center => -8,
+        TableVerticalPosition::Bottom => -12,
+        TableVerticalPosition::Inside => -16,
+        TableVerticalPosition::Outside => -20,
+        TableVerticalPosition::Offset(value) => {
+            let stored = i32::from(value) + 1;
+            if !(-31_679..=31_681).contains(&i32::from(value))
+                || matches!(stored, 0 | -4 | -8 | -12 | -16 | -20)
+            {
+                return Err(TapBuildError::InvalidTablePosition("vertical", value));
+            }
+            stored as i16
+        },
+    })
+}
+
+fn encode_positioning(positioning: TablePositioning) -> u8 {
+    let vertical = match positioning.vertical_anchor {
+        TableVerticalAnchor::Margin => 0,
+        TableVerticalAnchor::Page => 1,
+        TableVerticalAnchor::Paragraph => 2,
+        TableVerticalAnchor::None => 3,
+    };
+    let horizontal = match positioning.horizontal_anchor {
+        TableHorizontalAnchor::Column => 0,
+        TableHorizontalAnchor::Margin => 1,
+        TableHorizontalAnchor::Page => 2,
+        TableHorizontalAnchor::None => 3,
+    };
+    (vertical << 4) | (horizontal << 6)
 }
 
 /// TAP (Table Properties) builder
@@ -342,11 +430,44 @@ pub(crate) fn generate_row_sprms(row: &TableRow) -> Result<Vec<u8>, TapBuildErro
             ));
         }
     }
+    for (side, distance) in [
+        ("left", row.distance_from_text_left),
+        ("top", row.distance_from_text_top),
+        ("right", row.distance_from_text_right),
+        ("bottom", row.distance_from_text_bottom),
+    ] {
+        if distance > 31_680 {
+            return Err(TapBuildError::InvalidWrapDistance(side, distance));
+        }
+    }
+    let horizontal_position = encode_horizontal_position(row.horizontal_position)?;
+    let vertical_position = encode_vertical_position(row.vertical_position)?;
 
     let mut builder = SprmBuilder::new();
     // Apply the style first so later SPRMs remain direct row formatting.
     if let Some(style_index) = row.table_style_index {
         builder.add_word(0x563A, style_index);
+    }
+    if let Some(positioning) = row.positioning {
+        builder.add_byte(0x360D, encode_positioning(positioning));
+    }
+    if row.horizontal_position != TableHorizontalPosition::Left {
+        builder.add_signed_word(0x940E, horizontal_position);
+    }
+    if row.vertical_position != TableVerticalPosition::Inline {
+        builder.add_signed_word(0x940F, vertical_position);
+    }
+    if row.distance_from_text_left != 0 {
+        builder.add_word(0x9410, row.distance_from_text_left);
+    }
+    if row.distance_from_text_top != 0 {
+        builder.add_word(0x9411, row.distance_from_text_top);
+    }
+    if row.distance_from_text_right != 0 {
+        builder.add_word(0x941E, row.distance_from_text_right);
+    }
+    if row.distance_from_text_bottom != 0 {
+        builder.add_word(0x941F, row.distance_from_text_bottom);
     }
     if !row.allow_break
         || row
@@ -1092,6 +1213,16 @@ mod tests {
             table_style_index: Some(0x1234),
             right_to_left: true,
             allow_overlap: false,
+            positioning: Some(TablePositioning {
+                vertical_anchor: TableVerticalAnchor::Paragraph,
+                horizontal_anchor: TableHorizontalAnchor::Page,
+            }),
+            horizontal_position: TableHorizontalPosition::Center,
+            vertical_position: TableVerticalPosition::Offset(720),
+            distance_from_text_left: 120,
+            distance_from_text_top: 240,
+            distance_from_text_right: 360,
+            distance_from_text_bottom: 480,
             ..TableRow::default()
         });
 
@@ -1116,6 +1247,16 @@ mod tests {
         assert_eq!(tap.table_style_index, Some(0x1234));
         assert!(tap.right_to_left);
         assert!(!tap.allow_overlap);
+        assert_eq!(tap.positioning, builder.rows()[0].positioning);
+        assert_eq!(
+            tap.horizontal_position,
+            builder.rows()[0].horizontal_position
+        );
+        assert_eq!(tap.vertical_position, builder.rows()[0].vertical_position);
+        assert_eq!(tap.distance_from_text_left, 120);
+        assert_eq!(tap.distance_from_text_top, 240);
+        assert_eq!(tap.distance_from_text_right, 360);
+        assert_eq!(tap.distance_from_text_bottom, 480);
     }
 
     #[test]
@@ -1250,6 +1391,53 @@ mod tests {
         assert_eq!(
             builder.try_generate_row_sprms(0),
             Err(TapBuildError::InvalidTableLookFlags(invalid_flags))
+        );
+
+        let mut builder = TapBuilder::new();
+        builder.add_row(TableRow {
+            cells: vec![TableCell {
+                width: 1000,
+                ..TableCell::default()
+            }],
+            horizontal_position: TableHorizontalPosition::Center,
+            ..TableRow::default()
+        });
+        assert!(builder.try_generate_row_sprms(0).is_ok());
+
+        let mut builder = TapBuilder::new();
+        builder.add_row(TableRow {
+            cells: vec![TableCell {
+                width: 1000,
+                ..TableCell::default()
+            }],
+            positioning: Some(TablePositioning {
+                vertical_anchor: TableVerticalAnchor::Margin,
+                horizontal_anchor: TableHorizontalAnchor::Column,
+            }),
+            horizontal_position: TableHorizontalPosition::Offset(-1),
+            ..TableRow::default()
+        });
+        assert_eq!(
+            builder.try_generate_row_sprms(0),
+            Err(TapBuildError::InvalidTablePosition("horizontal", -1))
+        );
+
+        let mut builder = TapBuilder::new();
+        builder.add_row(TableRow {
+            cells: vec![TableCell {
+                width: 1000,
+                ..TableCell::default()
+            }],
+            positioning: Some(TablePositioning {
+                vertical_anchor: TableVerticalAnchor::Margin,
+                horizontal_anchor: TableHorizontalAnchor::Column,
+            }),
+            distance_from_text_right: 31_681,
+            ..TableRow::default()
+        });
+        assert_eq!(
+            builder.try_generate_row_sprms(0),
+            Err(TapBuildError::InvalidWrapDistance("right", 31_681))
         );
 
         let mut builder = TapBuilder::new();

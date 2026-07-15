@@ -60,7 +60,9 @@ pub mod numbering;
 
 // Re-export public types
 pub use crate::doc::parts::tap::{
-    CellShading, ShadingPattern, TableLook, TableLookFlags, TableWidth, WidthType,
+    CellShading, ShadingPattern, TableHorizontalAnchor, TableHorizontalPosition, TableLook,
+    TableLookFlags, TablePositioning, TableVerticalAnchor, TableVerticalPosition, TableWidth,
+    WidthType,
 };
 pub use bookmarks::BookmarkEntry;
 pub use comments::CommentEntry;

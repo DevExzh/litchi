@@ -26,8 +26,9 @@ fn binary_to_doc_result<T>(result: BinaryResult<T>) -> Result<T> {
 }
 use super::tap::{
     BorderStyle, BorderType, CellMergeStatus, CellProperties, CellShading, ShadingPattern,
-    TableJustification, TableLook, TableLookFlags, TableProperties, TableWidth, TextDirection,
-    VerticalAlignment, VerticalMergeStatus, WidthType,
+    TableHorizontalAnchor, TableHorizontalPosition, TableJustification, TableLook, TableLookFlags,
+    TablePositioning, TableProperties, TableVerticalAnchor, TableVerticalPosition, TableWidth,
+    TextDirection, VerticalAlignment, VerticalMergeStatus, WidthType,
 };
 use crate::sprm::{Sprm, parse_sprms};
 use crate::sprm_operations::get_sprm_operation;
@@ -162,6 +163,75 @@ impl<'arena> TapParser<'arena> {
                 "{name} contains an invalid Bool16 value"
             ))),
         }
+    }
+
+    fn parse_horizontal_position(sprm: &Sprm) -> Result<TableHorizontalPosition> {
+        let operand = sprm.operand_bytes();
+        if operand.len() != 2 {
+            return Err(DocError::Corrupted(
+                "sprmTDxaAbs operand must contain 2 bytes".to_string(),
+            ));
+        }
+        let stored = binary_to_doc_result(read_i16_le(operand, 0))?;
+        Ok(match stored {
+            0 => TableHorizontalPosition::Left,
+            -4 => TableHorizontalPosition::Center,
+            -8 => TableHorizontalPosition::Right,
+            -12 => TableHorizontalPosition::Inside,
+            -16 => TableHorizontalPosition::Outside,
+            _ => {
+                let offset = i32::from(stored) - 1;
+                if !(-31_679..=31_681).contains(&offset) {
+                    return Err(DocError::Corrupted(
+                        "sprmTDxaAbs is outside the XAS_plusOne range".to_string(),
+                    ));
+                }
+                TableHorizontalPosition::Offset(offset as i16)
+            },
+        })
+    }
+
+    fn parse_vertical_position(sprm: &Sprm) -> Result<TableVerticalPosition> {
+        let operand = sprm.operand_bytes();
+        if operand.len() != 2 {
+            return Err(DocError::Corrupted(
+                "sprmTDyaAbs operand must contain 2 bytes".to_string(),
+            ));
+        }
+        let stored = binary_to_doc_result(read_i16_le(operand, 0))?;
+        Ok(match stored {
+            0 => TableVerticalPosition::Inline,
+            -4 => TableVerticalPosition::Top,
+            -8 => TableVerticalPosition::Center,
+            -12 => TableVerticalPosition::Bottom,
+            -16 => TableVerticalPosition::Inside,
+            -20 => TableVerticalPosition::Outside,
+            _ => {
+                let offset = i32::from(stored) - 1;
+                if !(-31_679..=31_681).contains(&offset) {
+                    return Err(DocError::Corrupted(
+                        "sprmTDyaAbs is outside the YAS_plusOne range".to_string(),
+                    ));
+                }
+                TableVerticalPosition::Offset(offset as i16)
+            },
+        })
+    }
+
+    fn parse_wrap_distance(sprm: &Sprm, name: &str) -> Result<u16> {
+        let operand = sprm.operand_bytes();
+        if operand.len() != 2 {
+            return Err(DocError::Corrupted(format!(
+                "{name} operand must contain 2 bytes"
+            )));
+        }
+        let value = binary_to_doc_result(read_u16_le(operand, 0))?;
+        if value > 31_680 {
+            return Err(DocError::Corrupted(format!(
+                "{name} is outside its nonnegative distance range"
+            )));
+        }
+        Ok(value)
     }
 
     fn parse_fts_width(sprm: &Sprm, usage: WidthUsage) -> Result<Option<TableWidth>> {
@@ -401,6 +471,38 @@ impl<'arena> TapParser<'arena> {
                 tap.legacy_right_to_left = Self::parse_bool16(sprm, "sprmTFBiDi")?;
                 tap.right_to_left = tap.legacy_right_to_left || tap.modern_right_to_left;
             },
+            0x0D => {
+                let operand = sprm.operand_bytes();
+                if operand.len() != 1 || operand[0] & 0x0F != 0 {
+                    return Err(DocError::Corrupted(
+                        "sprmTPc contains invalid PositionCode padding".to_string(),
+                    ));
+                }
+                tap.positioning = Some(TablePositioning {
+                    vertical_anchor: match (operand[0] >> 4) & 0x03 {
+                        0 => TableVerticalAnchor::Margin,
+                        1 => TableVerticalAnchor::Page,
+                        2 => TableVerticalAnchor::Paragraph,
+                        3 => TableVerticalAnchor::None,
+                        _ => unreachable!(),
+                    },
+                    horizontal_anchor: match operand[0] >> 6 {
+                        0 => TableHorizontalAnchor::Column,
+                        1 => TableHorizontalAnchor::Margin,
+                        2 => TableHorizontalAnchor::Page,
+                        3 => TableHorizontalAnchor::None,
+                        _ => unreachable!(),
+                    },
+                });
+            },
+            0x0E => tap.horizontal_position = Self::parse_horizontal_position(sprm)?,
+            0x0F => tap.vertical_position = Self::parse_vertical_position(sprm)?,
+            0x10 => {
+                tap.distance_from_text_left = Self::parse_wrap_distance(sprm, "sprmTDxaFromText")?
+            },
+            0x11 => {
+                tap.distance_from_text_top = Self::parse_wrap_distance(sprm, "sprmTDyaFromText")?
+            },
             0x12 => self.parse_full_cell_shading(tap, sprm, 0, false)?,
             // Full-color row border defaults.
             0x13 => self.parse_full_table_borders(tap, sprm)?,
@@ -412,6 +514,14 @@ impl<'arena> TapParser<'arena> {
             0x19 => tap.keep_with_next = Self::parse_bool8(sprm, "sprmTFKeepFollow")?,
             // Per-cell colors for top, left, bottom, and right borders.
             0x1A..=0x1D => self.parse_cell_border_colors(tap, sprm, operation)?,
+            0x1E => {
+                tap.distance_from_text_right =
+                    Self::parse_wrap_distance(sprm, "sprmTDxaFromTextRight")?
+            },
+            0x1F => {
+                tap.distance_from_text_bottom =
+                    Self::parse_wrap_distance(sprm, "sprmTDyaFromTextBottom")?
+            },
             // Legacy range border override.
             0x20 => self.parse_cell_border_range(tap, sprm, false)?,
             // sprmTInsert (0x7621) - Insert cells
@@ -2178,6 +2288,61 @@ mod tests {
         assert!(parse_with(0x560B, &[2, 0]).is_err());
         assert!(parse_with(0x5664, &[2, 0]).is_err());
         assert!(parse_with(0x3465, &[2]).is_err());
+    }
+
+    #[test]
+    fn parses_floating_table_position_and_wrap_distances() {
+        let arena = Bump::new();
+        let parser = TapParser::new(&arena);
+        let mut grpprl = table_definition_grpprl(&[1, 0, 0, 232, 3]);
+        append_fixed_sprm(&mut grpprl, 0x360D, &[0xA0]);
+        append_fixed_sprm(&mut grpprl, 0x940E, &(-4i16).to_le_bytes());
+        append_fixed_sprm(&mut grpprl, 0x940F, &721i16.to_le_bytes());
+        append_fixed_sprm(&mut grpprl, 0x9410, &120u16.to_le_bytes());
+        append_fixed_sprm(&mut grpprl, 0x9411, &240u16.to_le_bytes());
+        append_fixed_sprm(&mut grpprl, 0x941E, &360u16.to_le_bytes());
+        append_fixed_sprm(&mut grpprl, 0x941F, &480u16.to_le_bytes());
+
+        let tap = parser.parse_tap(&grpprl).unwrap();
+        assert_eq!(
+            tap.positioning,
+            Some(TablePositioning {
+                vertical_anchor: TableVerticalAnchor::Paragraph,
+                horizontal_anchor: TableHorizontalAnchor::Page,
+            })
+        );
+        assert_eq!(tap.horizontal_position, TableHorizontalPosition::Center);
+        assert_eq!(tap.vertical_position, TableVerticalPosition::Offset(720));
+        assert_eq!(tap.distance_from_text_left, 120);
+        assert_eq!(tap.distance_from_text_top, 240);
+        assert_eq!(tap.distance_from_text_right, 360);
+        assert_eq!(tap.distance_from_text_bottom, 480);
+
+        append_fixed_sprm(&mut grpprl, 0x940E, &(-16i16).to_le_bytes());
+        append_fixed_sprm(&mut grpprl, 0x940F, &(-20i16).to_le_bytes());
+        let tap = parser.parse_tap(&grpprl).unwrap();
+        assert_eq!(tap.horizontal_position, TableHorizontalPosition::Outside);
+        assert_eq!(tap.vertical_position, TableVerticalPosition::Outside);
+    }
+
+    #[test]
+    fn rejects_malformed_floating_table_position() {
+        let arena = Bump::new();
+        let parser = TapParser::new(&arena);
+        let parse_with = |opcode, operand: &[u8]| {
+            let mut grpprl = table_definition_grpprl(&[1, 0, 0, 232, 3]);
+            append_fixed_sprm(&mut grpprl, opcode, operand);
+            parser.parse_tap(&grpprl)
+        };
+
+        assert!(parse_with(0x360D, &[1]).is_err());
+        assert!(parse_with(0x940E, &i16::MIN.to_le_bytes()).is_err());
+        assert!(parse_with(0x940E, &i16::MAX.to_le_bytes()).is_err());
+        assert!(parse_with(0x940F, &i16::MIN.to_le_bytes()).is_err());
+        assert!(parse_with(0x940F, &i16::MAX.to_le_bytes()).is_err());
+        for opcode in [0x9410, 0x9411, 0x941E, 0x941F] {
+            assert!(parse_with(opcode, &31_681u16.to_le_bytes()).is_err());
+        }
     }
 
     #[test]
