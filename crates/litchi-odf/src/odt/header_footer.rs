@@ -10,6 +10,7 @@ use quick_xml::{
 
 const STYLE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:style:1.0";
 const TEXT_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:text:1.0";
+const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 
 /// One of the six header/footer regions supported by an ODF master page.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -43,6 +44,17 @@ impl HeaderFooterKind {
             Self::Footer => "footer",
             Self::FooterFirst => "footer-first",
             Self::FooterLeft => "footer-left",
+        }
+    }
+
+    fn order(self) -> u8 {
+        match self {
+            Self::Header => 0,
+            Self::HeaderLeft => 1,
+            Self::HeaderFirst => 2,
+            Self::Footer => 3,
+            Self::FooterLeft => 4,
+            Self::FooterFirst => 5,
         }
     }
 }
@@ -296,12 +308,185 @@ pub(crate) fn set_region_text(
     let Some(replacement) = replacement else {
         return Ok(xml.to_string());
     };
-    Ok(replace_range(
-        xml,
-        location.content_end,
-        location.content_end,
-        &replacement,
-    ))
+    let mut insertion = location.content_start;
+    for existing in &page.regions {
+        let content = &xml[location.content_start..location.content_end];
+        let relative = content.find(&existing.xml).ok_or_else(|| {
+            Error::InvalidFormat("header/footer XML is outside its master page".to_string())
+        })?;
+        let start = location.content_start + relative;
+        if existing.kind.order() > kind.order() {
+            insertion = start;
+            break;
+        }
+        insertion = start + existing.xml.len();
+    }
+    Ok(replace_range(xml, insertion, insertion, &replacement))
+}
+
+pub(crate) fn add_master_page(xml: &str, name: &str, page_layout_name: &str) -> Result<String> {
+    if name.is_empty() {
+        return Err(Error::InvalidFormat(
+            "master-page name must not be empty".to_string(),
+        ));
+    }
+    if page_layout_name.is_empty() {
+        return Err(Error::InvalidFormat(
+            "page-layout name must not be empty".to_string(),
+        ));
+    }
+    if parse_master_pages(xml)?
+        .iter()
+        .any(|page| page.name == name)
+    {
+        return Err(Error::InvalidFormat(format!(
+            "master page '{name}' already exists"
+        )));
+    }
+
+    let mut output = xml.to_string();
+    if !has_named_style_element(&output, b"page-layout", page_layout_name)? {
+        let layout = format!(
+            "<style:page-layout xmlns:style=\"{}\" style:name=\"{}\"/>",
+            String::from_utf8_lossy(STYLE_NAMESPACE),
+            litchi_core::xml::escape_xml(page_layout_name),
+        );
+        output = insert_container_child(&output, OFFICE_NAMESPACE, b"automatic-styles", &layout)?;
+    }
+    let master = format!(
+        "<style:master-page xmlns:style=\"{}\" style:name=\"{}\" style:page-layout-name=\"{}\"/>",
+        String::from_utf8_lossy(STYLE_NAMESPACE),
+        litchi_core::xml::escape_xml(name),
+        litchi_core::xml::escape_xml(page_layout_name),
+    );
+    insert_container_child(&output, OFFICE_NAMESPACE, b"master-styles", &master)
+}
+
+fn has_named_style_element(xml: &str, local_name: &[u8], expected_name: &str) -> Result<bool> {
+    let mut reader = NsReader::from_str(xml);
+    let mut buffer = Vec::new();
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| Error::InvalidFormat(format!("styles.xml parsing error: {error}")))?;
+        let style_element = bound_to(&namespace, STYLE_NAMESPACE);
+        match event {
+            Event::Start(element) | Event::Empty(element)
+                if style_element
+                    && element.local_name().as_ref() == local_name
+                    && style_attr(&reader, &element, b"name")?.as_deref()
+                        == Some(expected_name) =>
+            {
+                return Ok(true);
+            },
+            Event::Eof => return Ok(false),
+            _ => {},
+        }
+        buffer.clear();
+    }
+}
+
+struct ElementLocation {
+    start: usize,
+    end: usize,
+    content_end: usize,
+    qualified_name: String,
+    empty: bool,
+}
+
+fn insert_container_child(
+    xml: &str,
+    namespace: &[u8],
+    local_name: &[u8],
+    child: &str,
+) -> Result<String> {
+    let location = find_element(xml, namespace, local_name)?.ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "styles.xml is missing {}",
+            String::from_utf8_lossy(local_name)
+        ))
+    })?;
+    if !location.empty {
+        return Ok(replace_range(
+            xml,
+            location.content_end,
+            location.content_end,
+            child,
+        ));
+    }
+    let empty = &xml[location.start..location.end];
+    let marker = empty.rfind("/>").ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "malformed empty {} element",
+            String::from_utf8_lossy(local_name)
+        ))
+    })?;
+    let mut expanded = String::with_capacity(empty.len() + child.len() + 32);
+    expanded.push_str(&empty[..marker]);
+    expanded.push('>');
+    expanded.push_str(child);
+    expanded.push_str("</");
+    expanded.push_str(&location.qualified_name);
+    expanded.push('>');
+    Ok(replace_range(xml, location.start, location.end, &expanded))
+}
+
+fn find_element(xml: &str, namespace: &[u8], local_name: &[u8]) -> Result<Option<ElementLocation>> {
+    let mut reader = NsReader::from_str(xml);
+    let mut buffer = Vec::new();
+    let mut active: Option<(usize, usize, usize, String)> = None;
+    loop {
+        let event_start = reader.buffer_position() as usize;
+        let (resolved_namespace, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| Error::InvalidFormat(format!("styles.xml parsing error: {error}")))?;
+        let matches = bound_to(&resolved_namespace, namespace);
+        let event = event.into_owned();
+        let event_end = reader.buffer_position() as usize;
+        match event {
+            Event::Start(element)
+                if active.is_none() && matches && element.local_name().as_ref() == local_name =>
+            {
+                let qualified_name = String::from_utf8(element.name().as_ref().to_vec())
+                    .map_err(|_| Error::InvalidFormat("invalid element name".to_string()))?;
+                active = Some((event_start, event_end, 1, qualified_name));
+            },
+            Event::Empty(element)
+                if active.is_none() && matches && element.local_name().as_ref() == local_name =>
+            {
+                let qualified_name = String::from_utf8(element.name().as_ref().to_vec())
+                    .map_err(|_| Error::InvalidFormat("invalid element name".to_string()))?;
+                return Ok(Some(ElementLocation {
+                    start: event_start,
+                    end: event_end,
+                    content_end: event_end,
+                    qualified_name,
+                    empty: true,
+                }));
+            },
+            Event::Start(_) if active.is_some() => active.as_mut().unwrap().2 += 1,
+            Event::End(_) if active.is_some() => {
+                let current = active.as_mut().unwrap();
+                current.2 = current
+                    .2
+                    .checked_sub(1)
+                    .ok_or_else(|| Error::InvalidFormat("invalid element nesting".to_string()))?;
+                if current.2 == 0 {
+                    let (start, _, _, qualified_name) = active.take().unwrap();
+                    return Ok(Some(ElementLocation {
+                        start,
+                        end: event_end,
+                        content_end: event_start,
+                        qualified_name,
+                        empty: false,
+                    }));
+                }
+            },
+            Event::Eof => return Ok(None),
+            _ => {},
+        }
+        buffer.clear();
+    }
 }
 
 struct MasterPageLocation {
@@ -557,5 +742,24 @@ mod tests {
         let pages = parse_master_pages(&cleared).unwrap();
         assert!(pages[0].region(HeaderFooterKind::Header).is_none());
         assert!(cleared.contains("<s:region-left/>"));
+    }
+
+    #[test]
+    fn adds_master_pages_and_reuses_page_layouts_with_arbitrary_prefixes() {
+        let xml = r#"<o:document-styles xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0"><o:automatic-styles /><o:master-styles /></o:document-styles>"#;
+        let first = add_master_page(xml, "First & Main", "pm&1").unwrap();
+        let second = add_master_page(&first, "Second", "pm&1").unwrap();
+        let pages = parse_master_pages(&second).unwrap();
+
+        assert_eq!(pages.len(), 2);
+        assert_eq!(pages[0].name, "First & Main");
+        assert_eq!(pages[0].page_layout_name.as_deref(), Some("pm&1"));
+        assert_eq!(pages[1].name, "Second");
+        assert_eq!(second.matches("<style:page-layout ").count(), 1);
+        assert!(second.contains("</o:automatic-styles>"));
+        assert!(second.contains("</o:master-styles>"));
+        assert!(add_master_page(&second, "Second", "pm2").is_err());
+        assert!(add_master_page(&second, "", "pm2").is_err());
+        assert!(add_master_page(&second, "Third", "").is_err());
     }
 }

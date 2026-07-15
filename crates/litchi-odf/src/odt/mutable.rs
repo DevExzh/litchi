@@ -9,7 +9,7 @@ use crate::elements::table::Table;
 use crate::elements::text::{Heading, List, Paragraph};
 use crate::odt::Document;
 use crate::odt::header_footer::{
-    HeaderFooterKind, MasterPage, parse_master_pages, set_region_text,
+    HeaderFooterKind, MasterPage, add_master_page, parse_master_pages, set_region_text,
 };
 use litchi_core::{Metadata, Result, xml::escape_xml};
 use std::path::Path;
@@ -141,6 +141,18 @@ impl MutableDocument {
         self.styles_xml
             .as_deref()
             .map_or_else(|| Ok(Vec::new()), parse_master_pages)
+    }
+
+    /// Add an empty master page and its referenced page layout.
+    ///
+    /// A minimal page layout is created in `office:automatic-styles` when a
+    /// layout with `page_layout_name` does not already exist.
+    pub fn add_master_page(&mut self, name: &str, page_layout_name: &str) -> Result<()> {
+        let styles = self
+            .styles_xml
+            .get_or_insert_with(OdfStructure::default_styles_xml);
+        *styles = add_master_page(styles, name, page_layout_name)?;
+        Ok(())
     }
 
     /// Set plain text in one header/footer region of an existing master page.
@@ -953,5 +965,26 @@ mod tests {
                 .text,
             "New & <header>"
         );
+    }
+
+    #[test]
+    fn creates_a_master_page_and_header_in_a_new_document() {
+        let mut mutable = MutableDocument::new();
+        mutable.add_master_page("Standard", "pm1").unwrap();
+        mutable
+            .set_header_footer_text("Standard", HeaderFooterKind::Header, "Created header")
+            .unwrap();
+
+        let round_trip = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+        let pages = round_trip.master_pages().unwrap();
+        assert_eq!(pages.len(), 1);
+        assert_eq!(pages[0].name, "Standard");
+        assert_eq!(pages[0].page_layout_name.as_deref(), Some("pm1"));
+        assert_eq!(
+            pages[0].region(HeaderFooterKind::Header).unwrap().text,
+            "Created header"
+        );
+        let styles = String::from_utf8(round_trip.get_file("styles.xml").unwrap()).unwrap();
+        assert!(styles.contains("<style:page-layout"));
     }
 }
