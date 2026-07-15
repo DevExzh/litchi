@@ -123,6 +123,8 @@ pub enum PptRecordType {
     LevelInfoAtom = 0x2B0A,
     /// Extended time node container record
     ExtTimeNode = 0xF144,
+    /// Subordinate effect time node container record
+    TimeSubEffectContainer = 0xF145,
     /// Sound collection container
     SoundCollection = 2020,
     /// Sound collection atom
@@ -266,6 +268,7 @@ impl From<u16> for PptRecordType {
             0x2B09 => PptRecordType::ParaBuildAtom,
             0x2B0A => PptRecordType::LevelInfoAtom,
             0xF144 => PptRecordType::ExtTimeNode,
+            0xF145 => PptRecordType::TimeSubEffectContainer,
             0xF125 => PptRecordType::TimeConditionContainer,
             0xF127 => PptRecordType::TimeNode,
             0xF128 => PptRecordType::TimeCondition,

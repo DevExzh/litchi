@@ -627,6 +627,8 @@ pub struct ExtendedTimeNode {
     pub end_sync_condition: Option<TimeCondition>,
     /// Timing transformations applied to this node.
     pub modifiers: Vec<TimeModifier>,
+    /// Subordinate effects whose starts depend on this node.
+    pub sub_effects: Vec<TimeSubEffect>,
     /// Recursively nested time nodes.
     pub children: Vec<ExtendedTimeNode>,
 }
@@ -640,6 +642,26 @@ pub enum TimeNodeBehavior {
     Motion(TimeMotionBehavior),
     Rotation(TimeRotationBehavior),
     Scale(TimeScaleBehavior),
+    Set(TimeSetBehavior),
+    Command(TimeCommandBehavior),
+}
+
+/// A subordinate behavior or media node attached to a master time node.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TimeSubEffect {
+    pub atom: TimeNodeAtom,
+    pub properties: Option<TimeNodePropertyList>,
+    pub behavior: Option<TimeSubEffectBehavior>,
+    pub visual_target: Option<TimeVisualElement>,
+    pub begin_conditions: Vec<TimeCondition>,
+    pub end_conditions: Vec<TimeCondition>,
+    pub modifiers: Vec<TimeModifier>,
+}
+
+/// The mutually exclusive behavior slots supported by a subordinate effect.
+#[derive(Debug, Clone, PartialEq)]
+pub enum TimeSubEffectBehavior {
+    Color(TimeColorBehavior),
     Set(TimeSetBehavior),
     Command(TimeCommandBehavior),
 }

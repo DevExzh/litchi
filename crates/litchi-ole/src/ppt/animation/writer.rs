@@ -18,12 +18,12 @@ use super::types::{
     TimeNodeAtom, TimeNodeBehavior, TimeNodeKind, TimeNodeProperty, TimeNodePropertyList,
     TimePropertyListContext, TimeRotationBehavior, TimeRotationBehaviorAtom, TimeRotationDirection,
     TimeScaleBehavior, TimeScaleBehaviorAtom, TimeSequenceData, TimeSequenceNextAction,
-    TimeSequencePreviousAction, TimeSetBehavior, TimeSetBehaviorAtom, TimeTriggerEvent,
-    TimeTriggerObject, TimeVariantValue, TimeVisualElement, TimeVisualElementKind,
-    is_valid_animation_attribute_name, is_valid_motion_path, is_valid_runtime_context,
-    is_valid_time_animate_value, is_valid_time_filter, is_valid_time_formula,
-    is_valid_time_points_types, is_valid_time_set_value, time_animation_attribute_value_type,
-    time_set_attribute_value_type,
+    TimeSequencePreviousAction, TimeSetBehavior, TimeSetBehaviorAtom, TimeSubEffect,
+    TimeSubEffectBehavior, TimeTriggerEvent, TimeTriggerObject, TimeVariantValue,
+    TimeVisualElement, TimeVisualElementKind, is_valid_animation_attribute_name,
+    is_valid_motion_path, is_valid_runtime_context, is_valid_time_animate_value,
+    is_valid_time_filter, is_valid_time_formula, is_valid_time_points_types,
+    is_valid_time_set_value, time_animation_attribute_value_type, time_set_attribute_value_type,
 };
 use crate::consts::PptRecordType;
 use crate::ppt::package::{PptError, Result};
@@ -254,6 +254,9 @@ pub fn write_extended_time_node(node: &ExtendedTimeNode) -> Result<Vec<u8>> {
     for modifier in &node.modifiers {
         children.extend(write_time_modifier(modifier));
     }
+    for sub_effect in &node.sub_effects {
+        children.extend(write_time_sub_effect(sub_effect)?);
+    }
     for child in &node.children {
         children.extend(write_extended_time_node(child)?);
     }
@@ -309,6 +312,71 @@ fn validate_extended_time_node(node: &ExtendedTimeNode) -> Result<()> {
         ));
     }
     Ok(())
+}
+
+/// Serialize a canonically ordered subordinate time-node effect.
+pub fn write_time_sub_effect(sub_effect: &TimeSubEffect) -> Result<Vec<u8>> {
+    let kind = match sub_effect.atom.node_type {
+        Some(TimeNodeKind::Behavior) => TimeNodeKind::Behavior,
+        Some(TimeNodeKind::Media) => TimeNodeKind::Media,
+        _ => {
+            return Err(PptError::InvalidFormat(
+                "subeffect time-node type must explicitly be Behavior or Media".to_string(),
+            ));
+        },
+    };
+    if sub_effect.behavior.is_some() && kind != TimeNodeKind::Behavior {
+        return Err(PptError::InvalidFormat(
+            "subeffect behavior requires a behavior time node".to_string(),
+        ));
+    }
+    if sub_effect.visual_target.is_some() && kind != TimeNodeKind::Media {
+        return Err(PptError::InvalidFormat(
+            "subeffect visual target requires a media time node".to_string(),
+        ));
+    }
+    if sub_effect
+        .begin_conditions
+        .iter()
+        .any(|condition| condition.condition_type != TimeConditionType::Begin)
+        || sub_effect
+            .end_conditions
+            .iter()
+            .any(|condition| condition.condition_type != TimeConditionType::End)
+    {
+        return Err(PptError::InvalidFormat(
+            "subeffect condition arrays must contain only their matching Begin or End type"
+                .to_string(),
+        ));
+    }
+
+    let mut children = write_time_node_atom(&sub_effect.atom);
+    if let Some(properties) = &sub_effect.properties {
+        children.extend(write_time_node_property_list(
+            properties,
+            TimePropertyListContext::SubEffect,
+        )?);
+    }
+    if let Some(behavior) = &sub_effect.behavior {
+        children.extend(match behavior {
+            TimeSubEffectBehavior::Color(value) => write_time_color_behavior(value)?,
+            TimeSubEffectBehavior::Set(value) => write_time_set_behavior(value)?,
+            TimeSubEffectBehavior::Command(value) => write_time_command_behavior(value)?,
+        });
+    }
+    if let Some(target) = &sub_effect.visual_target {
+        children.extend(write_time_visual_element(target)?);
+    }
+    for condition in &sub_effect.begin_conditions {
+        children.extend(write_time_condition(condition)?);
+    }
+    for condition in &sub_effect.end_conditions {
+        children.extend(write_time_condition(condition)?);
+    }
+    for modifier in &sub_effect.modifiers {
+        children.extend(write_time_modifier(modifier));
+    }
+    wrap_record(PptRecordType::TimeSubEffectContainer, 0x0F, 1, children)
 }
 
 /// Serialize an exact 32-byte `TimeNodeAtom` payload.

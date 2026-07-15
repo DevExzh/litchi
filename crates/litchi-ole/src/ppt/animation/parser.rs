@@ -22,11 +22,11 @@ use super::types::{
     TimeNodeRestart, TimePropertyListContext, TimeRotationBehavior, TimeRotationBehaviorAtom,
     TimeRotationDirection, TimeScaleBehavior, TimeScaleBehaviorAtom, TimeSequenceData,
     TimeSequenceNextAction, TimeSequencePreviousAction, TimeSetBehavior, TimeSetBehaviorAtom,
-    TimeTriggerEvent, TimeTriggerObject, TimeVariantValue, TimeVisualElement,
-    TimeVisualElementKind, is_valid_animation_attribute_name, is_valid_motion_path,
-    is_valid_runtime_context, is_valid_time_animate_value, is_valid_time_filter,
-    is_valid_time_formula, is_valid_time_points_types, is_valid_time_set_value,
-    time_animation_attribute_value_type, time_set_attribute_value_type,
+    TimeSubEffect, TimeSubEffectBehavior, TimeTriggerEvent, TimeTriggerObject, TimeVariantValue,
+    TimeVisualElement, TimeVisualElementKind, is_valid_animation_attribute_name,
+    is_valid_motion_path, is_valid_runtime_context, is_valid_time_animate_value,
+    is_valid_time_filter, is_valid_time_formula, is_valid_time_points_types,
+    is_valid_time_set_value, time_animation_attribute_value_type, time_set_attribute_value_type,
 };
 use crate::consts::PptRecordType;
 use crate::ppt::package::{PptError, Result};
@@ -218,6 +218,7 @@ pub fn parse_extended_time_node(record: &PptRecord) -> Result<ExtendedTimeNode> 
     let mut end_conditions = Vec::new();
     let mut end_sync_condition = None;
     let mut modifiers = Vec::new();
+    let mut sub_effects = Vec::new();
     let mut children = Vec::new();
     let mut last_rank = 1u8;
     for child in &record.children[child_start..] {
@@ -341,14 +342,13 @@ pub fn parse_extended_time_node(record: &PptRecord) -> Result<ExtendedTimeNode> 
                 modifiers.push(parse_time_modifier(child)?);
                 16
             },
+            PptRecordType::TimeSubEffectContainer => {
+                sub_effects.push(parse_time_sub_effect(child)?);
+                17
+            },
             PptRecordType::ExtTimeNode => {
                 children.push(parse_extended_time_node(child)?);
                 18
-            },
-            _ if child.record_type_raw == 0xF145 => {
-                return Err(PptError::InvalidFormat(
-                    "SubEffectContainer is not yet supported".to_string(),
-                ));
             },
             other => {
                 return Err(PptError::InvalidFormat(format!(
@@ -389,8 +389,154 @@ pub fn parse_extended_time_node(record: &PptRecord) -> Result<ExtendedTimeNode> 
         end_conditions,
         end_sync_condition,
         modifiers,
+        sub_effects,
         children,
     })
+}
+
+/// Parse an exact, canonically ordered subordinate time-node effect.
+pub fn parse_time_sub_effect(record: &PptRecord) -> Result<TimeSubEffect> {
+    require_container(
+        record,
+        PptRecordType::TimeSubEffectContainer,
+        1,
+        "SubEffectContainer",
+    )?;
+    let atom = record
+        .children
+        .first()
+        .ok_or_else(|| PptError::Corrupted("SubEffectContainer has no TimeNodeAtom".to_string()))
+        .and_then(parse_time_node_atom)?;
+    let kind = match atom.node_type {
+        Some(TimeNodeKind::Behavior) => TimeNodeKind::Behavior,
+        Some(TimeNodeKind::Media) => TimeNodeKind::Media,
+        _ => {
+            return Err(PptError::InvalidFormat(
+                "subeffect time-node type must explicitly be Behavior or Media".to_string(),
+            ));
+        },
+    };
+    let (properties, child_start) = if record
+        .children
+        .get(1)
+        .is_some_and(|child| child.record_type == PptRecordType::TimePropertyList)
+    {
+        (
+            Some(parse_time_node_property_list(
+                &record.children[1],
+                TimePropertyListContext::SubEffect,
+            )?),
+            2,
+        )
+    } else {
+        (None, 1)
+    };
+    let mut behavior = None;
+    let mut visual_target = None;
+    let mut begin_conditions = Vec::new();
+    let mut end_conditions = Vec::new();
+    let mut modifiers = Vec::new();
+    let mut last_rank = 1u8;
+    for child in &record.children[child_start..] {
+        let rank = match child.record_type {
+            PptRecordType::TimeColorBehaviorContainer => {
+                set_subeffect_behavior(
+                    &mut behavior,
+                    TimeSubEffectBehavior::Color(parse_time_color_behavior(child)?),
+                )?;
+                2
+            },
+            PptRecordType::TimeSetBehaviorContainer => {
+                set_subeffect_behavior(
+                    &mut behavior,
+                    TimeSubEffectBehavior::Set(parse_time_set_behavior(child)?),
+                )?;
+                3
+            },
+            PptRecordType::TimeCommandBehaviorContainer => {
+                set_subeffect_behavior(
+                    &mut behavior,
+                    TimeSubEffectBehavior::Command(parse_time_command_behavior(child)?),
+                )?;
+                4
+            },
+            PptRecordType::TimeClientVisualElement => {
+                if visual_target
+                    .replace(parse_time_visual_element(child)?)
+                    .is_some()
+                {
+                    return Err(PptError::InvalidFormat(
+                        "SubEffectContainer has multiple visual targets".to_string(),
+                    ));
+                }
+                5
+            },
+            PptRecordType::TimeConditionContainer => {
+                let condition = parse_time_condition(child)?;
+                match condition.condition_type {
+                    TimeConditionType::Begin => {
+                        begin_conditions.push(condition);
+                        6
+                    },
+                    TimeConditionType::End => {
+                        end_conditions.push(condition);
+                        7
+                    },
+                    _ => {
+                        return Err(PptError::InvalidFormat(
+                            "subeffect conditions must be Begin or End".to_string(),
+                        ));
+                    },
+                }
+            },
+            PptRecordType::TimeModifier => {
+                modifiers.push(parse_time_modifier(child)?);
+                8
+            },
+            other => {
+                return Err(PptError::InvalidFormat(format!(
+                    "unexpected {other:?} child in SubEffectContainer"
+                )));
+            },
+        };
+        if rank < last_rank {
+            return Err(PptError::InvalidFormat(
+                "SubEffectContainer children are not in canonical order".to_string(),
+            ));
+        }
+        last_rank = rank;
+    }
+    if behavior.is_some() && kind != TimeNodeKind::Behavior {
+        return Err(PptError::InvalidFormat(
+            "subeffect behavior requires a behavior time node".to_string(),
+        ));
+    }
+    if visual_target.is_some() && kind != TimeNodeKind::Media {
+        return Err(PptError::InvalidFormat(
+            "subeffect visual target requires a media time node".to_string(),
+        ));
+    }
+    Ok(TimeSubEffect {
+        atom,
+        properties,
+        behavior,
+        visual_target,
+        begin_conditions,
+        end_conditions,
+        modifiers,
+    })
+}
+
+fn set_subeffect_behavior(
+    slot: &mut Option<TimeSubEffectBehavior>,
+    behavior: TimeSubEffectBehavior,
+) -> Result<()> {
+    if slot.replace(behavior).is_some() {
+        return Err(PptError::InvalidFormat(
+            "SubEffectContainer contains multiple animation behaviors".to_string(),
+        ));
+    }
+    Ok(())
 }
 
 fn set_time_node_behavior(
@@ -2707,7 +2853,7 @@ mod tests {
         write_time_node_atom, write_time_node_property_list, write_time_rotation_behavior,
         write_time_rotation_behavior_atom, write_time_scale_behavior,
         write_time_scale_behavior_atom, write_time_sequence_data, write_time_set_behavior,
-        write_time_set_behavior_atom, write_time_visual_element,
+        write_time_set_behavior_atom, write_time_sub_effect, write_time_visual_element,
     };
 
     fn sample_legacy_atom() -> LegacyAnimationAtom {
@@ -2911,6 +3057,25 @@ mod tests {
             }),
             ..ExtendedTimeNode::default()
         };
+        let TimeNodeBehavior::Set(subeffect_set) = sample_set_node_behavior() else {
+            unreachable!();
+        };
+        let sub_effect = TimeSubEffect {
+            atom: TimeNodeAtom {
+                node_type: Some(TimeNodeKind::Behavior),
+                ..TimeNodeAtom::default()
+            },
+            properties: Some(TimeNodePropertyList {
+                properties: vec![TimeNodeProperty::MasterRelation(
+                    TimeMasterRelation::StartWithMaster,
+                )],
+            }),
+            behavior: Some(TimeSubEffectBehavior::Set(subeffect_set)),
+            visual_target: None,
+            begin_conditions: vec![simple_condition(TimeConditionType::Begin)],
+            end_conditions: vec![simple_condition(TimeConditionType::End)],
+            modifiers: vec![TimeModifier::RepeatCount(2)],
+        };
         let node = ExtendedTimeNode {
             atom: TimeNodeAtom {
                 node_type: Some(TimeNodeKind::Sequential),
@@ -2937,6 +3102,7 @@ mod tests {
             ],
             end_sync_condition: Some(simple_condition(TimeConditionType::EndSync)),
             modifiers: vec![TimeModifier::Speed(100), TimeModifier::AutomaticReverse(1)],
+            sub_effects: vec![sub_effect],
             children: vec![behavior_child, media_child],
             ..ExtendedTimeNode::default()
         };
@@ -2960,6 +3126,7 @@ mod tests {
                 PptRecordType::TimeConditionContainer,
                 PptRecordType::TimeModifier,
                 PptRecordType::TimeModifier,
+                PptRecordType::TimeSubEffectContainer,
                 PptRecordType::ExtTimeNode,
                 PptRecordType::ExtTimeNode,
             ]
@@ -3069,6 +3236,55 @@ mod tests {
         let (mut record, _) = PptRecord::parse(&bytes, 0).unwrap();
         record.children.swap(1, 2);
         assert!(parse_extended_time_node(&record).is_err());
+    }
+
+    #[test]
+    fn round_trips_and_validates_subordinate_effects() {
+        assert_eq!(PptRecordType::TimeSubEffectContainer.as_u16(), 0xF145);
+        let media = TimeSubEffect {
+            atom: TimeNodeAtom {
+                node_type: Some(TimeNodeKind::Media),
+                duration_ms: Some(500),
+                ..TimeNodeAtom::default()
+            },
+            properties: Some(TimeNodePropertyList {
+                properties: vec![
+                    TimeNodeProperty::MasterRelation(TimeMasterRelation::DoNotStart),
+                    TimeNodeProperty::MediaMute(true),
+                ],
+            }),
+            behavior: None,
+            visual_target: Some(TimeVisualElement::Sound {
+                kind: TimeVisualElementKind::Audio,
+                sound_id_ref: 9,
+            }),
+            begin_conditions: vec![simple_condition(TimeConditionType::Begin)],
+            end_conditions: vec![simple_condition(TimeConditionType::End)],
+            modifiers: vec![TimeModifier::RepeatDuration(1_000)],
+        };
+        let bytes = write_time_sub_effect(&media).unwrap();
+        let (record, consumed) = PptRecord::parse(&bytes, 0).unwrap();
+        assert_eq!(consumed, bytes.len());
+        assert_eq!(parse_time_sub_effect(&record).unwrap(), media);
+
+        let mut invalid = media.clone();
+        invalid.atom.node_type = None;
+        assert!(write_time_sub_effect(&invalid).is_err());
+
+        invalid = media.clone();
+        let TimeNodeBehavior::Set(set) = sample_set_node_behavior() else {
+            unreachable!();
+        };
+        invalid.behavior = Some(TimeSubEffectBehavior::Set(set));
+        assert!(write_time_sub_effect(&invalid).is_err());
+
+        invalid = media.clone();
+        invalid.begin_conditions[0].condition_type = TimeConditionType::Next;
+        assert!(write_time_sub_effect(&invalid).is_err());
+
+        let mut record = record;
+        record.children.swap(2, 3);
+        assert!(parse_time_sub_effect(&record).is_err());
     }
 
     #[test]

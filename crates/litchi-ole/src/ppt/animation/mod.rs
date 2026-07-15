@@ -27,7 +27,8 @@ pub use parser::{
     parse_time_motion_behavior, parse_time_motion_behavior_atom, parse_time_node_atom,
     parse_time_node_property_list, parse_time_rotation_behavior, parse_time_rotation_behavior_atom,
     parse_time_scale_behavior, parse_time_scale_behavior_atom, parse_time_sequence_data,
-    parse_time_set_behavior, parse_time_set_behavior_atom, parse_time_visual_element,
+    parse_time_set_behavior, parse_time_set_behavior_atom, parse_time_sub_effect,
+    parse_time_visual_element,
 };
 pub use sound::{AnimationSound, BuiltinSound, SoundType};
 pub use triggers::{
@@ -54,8 +55,8 @@ pub use types::{
     TimeNodePropertyList, TimeNodeRestart, TimeNodeType, TimePropertyListContext,
     TimeRotationBehavior, TimeRotationBehaviorAtom, TimeRotationDirection, TimeScaleBehavior,
     TimeScaleBehaviorAtom, TimeSequenceData, TimeSequenceNextAction, TimeSequencePreviousAction,
-    TimeSetBehavior, TimeSetBehaviorAtom, TimeTriggerEvent, TimeTriggerObject, TimeVariantValue,
-    TimeVisualElement, TimeVisualElementKind,
+    TimeSetBehavior, TimeSetBehaviorAtom, TimeSubEffect, TimeSubEffectBehavior, TimeTriggerEvent,
+    TimeTriggerObject, TimeVariantValue, TimeVisualElement, TimeVisualElementKind,
 };
 pub use writer::{
     write_animation_info, write_animation_info_atom, write_build_list, write_extended_time_node,
@@ -68,5 +69,5 @@ pub use writer::{
     write_time_motion_behavior_atom, write_time_node_atom, write_time_node_property_list,
     write_time_rotation_behavior, write_time_rotation_behavior_atom, write_time_scale_behavior,
     write_time_scale_behavior_atom, write_time_sequence_data, write_time_set_behavior,
-    write_time_set_behavior_atom, write_time_visual_element,
+    write_time_set_behavior_atom, write_time_sub_effect, write_time_visual_element,
 };
