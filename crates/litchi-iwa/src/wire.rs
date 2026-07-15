@@ -583,7 +583,7 @@ fn require_wire_type(field: &WireField, expected: u8, name: &str) -> Result<()> 
     Ok(())
 }
 
-fn append_length_delimited_field(
+pub(crate) fn append_length_delimited_field(
     output: &mut Vec<u8>,
     field_number: u32,
     payload: &[u8],
