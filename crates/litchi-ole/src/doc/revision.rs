@@ -61,6 +61,21 @@ pub struct DisplayFieldRevisionMark {
     pub previous_result: String,
 }
 
+/// Resolved property revision metadata for a document section.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SectionRevisionMark {
+    /// First character position in the section.
+    pub start: u32,
+    /// Character position immediately after the section.
+    pub end: u32,
+    /// Index into the document revision-author table.
+    pub author_index: u16,
+    /// Resolved revision author name.
+    pub author: String,
+    /// Revision date and time, when the packed DTTM is not an ignored zero date.
+    pub timestamp: Option<CommentDateTime>,
+}
+
 pub(crate) fn decode_dttm(value: u32) -> Result<Option<CommentDateTime>> {
     let minute = (value & 0x3F) as u8;
     let hour = ((value >> 6) & 0x1F) as u8;

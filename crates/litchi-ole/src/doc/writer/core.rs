@@ -439,6 +439,8 @@ pub struct DocWriter {
     comments: Vec<CommentEntry>,
     /// Standard bookmarks
     bookmarks: Vec<BookmarkEntry>,
+    /// Property revision metadata for the writer's single document section
+    section_formatting_revision: Option<FormattingRevision>,
     /// Numbering writer for list tables
     numbering: NumberingWriter,
 }
@@ -460,6 +462,7 @@ impl DocWriter {
             endnotes: Vec::new(),
             comments: Vec::new(),
             bookmarks: Vec::new(),
+            section_formatting_revision: None,
             numbering: NumberingWriter::new(),
         }
     }
@@ -1240,9 +1243,7 @@ impl DocWriter {
         }))
     }
 
-    fn build_revision_writer_data(
-        paragraphs: &[WritableParagraph],
-    ) -> Result<Option<RevisionWriterData>, DocWriteError> {
+    fn build_revision_writer_data(&self) -> Result<Option<RevisionWriterData>, DocWriteError> {
         let mut authors = vec!["Unknown".to_string()];
         let mut indexes = HashMap::from([("Unknown".to_string(), 0u16)]);
         let mut has_revisions = false;
@@ -1261,7 +1262,10 @@ impl DocWriter {
             }
             Ok(())
         };
-        for paragraph in paragraphs {
+        if let Some(revision) = &self.section_formatting_revision {
+            index_author(&revision.author)?;
+        }
+        for paragraph in &self.paragraphs {
             if let Some(revision) = &paragraph.formatting.formatting_revision {
                 index_author(&revision.author)?;
             }
@@ -1522,6 +1526,14 @@ impl DocWriter {
         Ok(index)
     }
 
+    /// Mark the document section's properties as a tracked formatting change.
+    ///
+    /// The legacy writer currently emits one section spanning the document, so
+    /// this revision applies to that complete section.
+    pub fn set_section_formatting_revision(&mut self, revision: FormattingRevision) {
+        self.section_formatting_revision = Some(revision);
+    }
+
     /// Set text in a table cell
     ///
     /// # Arguments
@@ -1614,7 +1626,7 @@ impl DocWriter {
         let mut chpx_entries: Vec<(u32, u32, Vec<u8>)> = Vec::new();
         let mut papx_entries: Vec<(u32, u32, Vec<u8>)> = Vec::new();
         let mut font_builder = FontTableBuilder::new();
-        let revision_data = Self::build_revision_writer_data(&self.paragraphs)?;
+        let revision_data = self.build_revision_writer_data()?;
 
         // Pad to 512-byte boundary before writing text (POI line 428-433)
         let current_size = word_document_stream.len();
@@ -2069,7 +2081,24 @@ impl DocWriter {
             grpf_ihdt |= 0x20;
         }
         let first_page = self.header_first.is_some() || self.footer_first.is_some();
-        let sepx_data = crate::doc::writer::section::generate_sepx(first_page, grpf_ihdt);
+        let section_revision = self
+            .section_formatting_revision
+            .as_ref()
+            .map(|revision| {
+                Ok::<_, DocWriteError>((
+                    revision_data
+                        .as_ref()
+                        .expect("section revisions initialize revision writer data")
+                        .indexes[&revision.author],
+                    pack_dttm(revision.timestamp)?,
+                ))
+            })
+            .transpose()?;
+        let sepx_data = crate::doc::writer::section::generate_sepx_with_revision(
+            first_page,
+            grpf_ihdt,
+            section_revision,
+        );
         word_document_stream.extend_from_slice(&sepx_data);
 
         // 10c. Write section table to table stream with correct SEPX offset
@@ -2164,7 +2193,7 @@ impl DocWriter {
         let mut chpx_entries: Vec<(u32, u32, Vec<u8>)> = Vec::new();
         let mut papx_entries: Vec<(u32, u32, Vec<u8>)> = Vec::new();
         let mut font_builder = FontTableBuilder::new();
-        let revision_data = Self::build_revision_writer_data(&self.paragraphs)?;
+        let revision_data = self.build_revision_writer_data()?;
 
         // Pad to 512-byte boundary before text
         let current_size = word_document_stream.len();
@@ -2582,7 +2611,24 @@ impl DocWriter {
             grpf_ihdt |= 0x20;
         }
         let first_page = self.header_first.is_some() || self.footer_first.is_some();
-        let sepx_data = crate::doc::writer::section::generate_sepx(first_page, grpf_ihdt);
+        let section_revision = self
+            .section_formatting_revision
+            .as_ref()
+            .map(|revision| {
+                Ok::<_, DocWriteError>((
+                    revision_data
+                        .as_ref()
+                        .expect("section revisions initialize revision writer data")
+                        .indexes[&revision.author],
+                    pack_dttm(revision.timestamp)?,
+                ))
+            })
+            .transpose()?;
+        let sepx_data = crate::doc::writer::section::generate_sepx_with_revision(
+            first_page,
+            grpf_ihdt,
+            section_revision,
+        );
         word_document_stream.extend_from_slice(&sepx_data);
 
         // Write section table to table stream
@@ -3670,6 +3716,9 @@ mod tests {
             weekday: 3,
         };
         let mut writer = DocWriter::new();
+        writer.set_section_formatting_revision(
+            FormattingRevision::new("Section Editor").with_timestamp(timestamp),
+        );
         writer
             .add_paragraph_runs(
                 vec![
@@ -3766,6 +3815,7 @@ mod tests {
             document.revision_authors(),
             [
                 "Unknown",
+                "Section Editor",
                 "Paragraph Editor",
                 "Numbering Editor",
                 "Alice 😀",
@@ -3774,6 +3824,11 @@ mod tests {
                 "Field Editor"
             ]
         );
+        let section_revision = &document.section_revisions()[0];
+        assert_eq!(section_revision.start, 0);
+        assert!(section_revision.end > section_revision.start);
+        assert_eq!(section_revision.author, "Section Editor");
+        assert_eq!(section_revision.timestamp, Some(timestamp));
         let paragraphs = document.paragraphs().unwrap();
         let paragraph_revision = paragraphs[0].formatting_revision().unwrap();
         assert_eq!(paragraph_revision.author, "Paragraph Editor");
@@ -3829,6 +3884,7 @@ mod tests {
             document.revision_authors(),
             [
                 "Unknown",
+                "Section Editor",
                 "Paragraph Editor",
                 "Numbering Editor",
                 "Alice 😀",
@@ -3837,6 +3893,7 @@ mod tests {
                 "Field Editor"
             ]
         );
+        assert_eq!(document.section_revisions()[0].author, "Section Editor");
         assert!(
             document.paragraphs().unwrap()[0]
                 .formatting_revision()
@@ -3907,6 +3964,26 @@ mod tests {
             ..CharacterFormatting::default()
         };
         assert!(error_for(invalid_time).contains("timestamp"));
+
+        let mut writer = DocWriter::new();
+        writer.set_section_formatting_revision(FormattingRevision::new("Editor").with_timestamp(
+            crate::doc::CommentDateTime {
+                year: 2026,
+                month: 0,
+                day: 1,
+                hour: 0,
+                minute: 0,
+                weekday: 0,
+            },
+        ));
+        writer.add_paragraph("text").unwrap();
+        assert!(
+            writer
+                .write_to(&mut Cursor::new(Vec::new()))
+                .unwrap_err()
+                .to_string()
+                .contains("timestamp")
+        );
 
         let mut writer = DocWriter::new();
         writer

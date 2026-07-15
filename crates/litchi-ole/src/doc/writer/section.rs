@@ -11,6 +11,15 @@
 ///   Bits follow LibreOffice nsHdFtFlags/Word semantics:
 ///   0x01=HeaderEven, 0x02=HeaderOdd, 0x04=FooterEven, 0x08=FooterOdd, 0x10=HeaderFirst, 0x20=FooterFirst
 pub fn generate_sepx(first_page_header: bool, grpf_ihdt: u8) -> Vec<u8> {
+    generate_sepx_with_revision(first_page_header, grpf_ihdt, None)
+}
+
+/// Generate SEPX properties with an optional section property revision mark.
+pub(crate) fn generate_sepx_with_revision(
+    first_page_header: bool,
+    grpf_ihdt: u8,
+    revision: Option<(u16, u32)>,
+) -> Vec<u8> {
     let mut grpprl: Vec<u8> = Vec::with_capacity(8);
     if first_page_header {
         // sprmSFTitlePage (u16 opcode) + 1-byte operand (1)
@@ -21,6 +30,14 @@ pub fn generate_sepx(first_page_header: bool, grpf_ihdt: u8) -> Vec<u8> {
         // sprmSGprfIhdt (u16 opcode) + 1-byte operand (bitfield)
         grpprl.extend_from_slice(&crate::sprm_operations::SPRM_S_GPRF_IHDT.to_le_bytes());
         grpprl.push(grpf_ihdt);
+    }
+    if let Some((author_index, timestamp)) = revision {
+        // sprmSPropRMark + PropRMarkOperand(cb=7, active, ibstshort, DTTM)
+        grpprl.extend_from_slice(&0xD243u16.to_le_bytes());
+        grpprl.push(7);
+        grpprl.push(1);
+        grpprl.extend_from_slice(&author_index.to_le_bytes());
+        grpprl.extend_from_slice(&timestamp.to_le_bytes());
     }
     let size = grpprl.len() as u16;
     let mut sepx = Vec::with_capacity(2 + grpprl.len());

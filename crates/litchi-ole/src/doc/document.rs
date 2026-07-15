@@ -20,6 +20,7 @@ use super::parts::pap_bin_table::PapBinTable;
 use super::parts::paragraph_extractor::{ExtractedParagraph, ParagraphExtractor};
 use super::parts::piece_table::PieceTable;
 use super::parts::revisions::RevisionAuthorTable;
+use super::parts::sections::SectionRevisionsTable;
 use super::parts::text::TextExtractor;
 use super::table::Table;
 #[cfg(feature = "formula")]
@@ -89,6 +90,8 @@ pub struct Document {
     bookmarks_table: BookmarksTable,
     /// Revision-mark authors
     revision_authors: RevisionAuthorTable,
+    /// Section property revision marks
+    section_revisions: SectionRevisionsTable,
     /// Hyperlinks table
     hyperlinks_table: Option<HyperlinksTable>,
     /// List/numbering tables
@@ -159,6 +162,8 @@ impl Document {
         let comments_table = CommentsTable::parse(&fib, &table_stream)?;
         let bookmarks_table = BookmarksTable::parse(&fib, &table_stream)?;
         let revision_authors = RevisionAuthorTable::parse(&fib, &table_stream)?;
+        let section_revisions =
+            SectionRevisionsTable::parse(&fib, &table_stream, &word_document, &revision_authors)?;
 
         // Parse hyperlinks from fields table
         let hyperlinks_table = fields_table.as_ref().and_then(|ft| {
@@ -206,6 +211,7 @@ impl Document {
             comments_table,
             bookmarks_table,
             revision_authors,
+            section_revisions,
             hyperlinks_table,
             list_tables,
             mtef_data,
@@ -644,6 +650,11 @@ impl Document {
     /// Get author names used by tracked revisions and related annotations.
     pub fn revision_authors(&self) -> &[String] {
         self.revision_authors.authors()
+    }
+
+    /// Get section property revision marks in document order.
+    pub fn section_revisions(&self) -> &[super::revision::SectionRevisionMark] {
+        self.section_revisions.revisions()
     }
 
     // ──────────────────────────────────────────────────────────────────
