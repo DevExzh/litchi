@@ -77,7 +77,7 @@ pub use package::Package;
 pub use paragraph::{Paragraph, Run};
 pub use parts::numbering::{ListLevel, ListTables, NumberFormat};
 pub use revision::{
-    DisplayFieldRevisionMark, NumberingRevisionMark, RevisionKind, RevisionMark,
+    DisplayFieldRevisionMark, NumberingRevisionMark, RevisionKind, RevisionMark, RevisionReason,
     SectionRevisionMark,
 };
 pub use shapes::DocShape;

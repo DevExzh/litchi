@@ -320,7 +320,9 @@ mod tests {
             author_index: 1,
             author: "Editor".to_string(),
             timestamp: None,
+            reason: None,
             revision_id: None,
+            revision_save_id: None,
         };
         let row = Row::with_revision(vec![Cell::new("A".to_string())], Some(revision), true);
         assert_eq!(row.formatting_revision().unwrap().author, "Editor");

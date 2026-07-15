@@ -46,7 +46,7 @@ pub const SPRM_C_DTTM_RMARK: u16 = 0x6805;
 /// sprmCFData - Data flag (operation 0x06)
 pub const SPRM_C_F_DATA: u16 = 0x0806;
 
-/// sprmCIdslRMark - Revision mark ID (operation 0x07)
+/// sprmCIdslRMark - Insertion/modification reason code (operation 0x07)
 pub const SPRM_C_IDSL_RMARK: u16 = 0x4807;
 
 /// sprmCChs - Complex character set info (operation 0x08)

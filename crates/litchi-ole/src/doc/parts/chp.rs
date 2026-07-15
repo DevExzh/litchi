@@ -114,16 +114,22 @@ pub struct CharacterProperties {
     pub revision_author_index: Option<u16>,
     /// Packed insertion revision DTTM.
     pub revision_timestamp: Option<u32>,
-    /// Insertion revision identifier.
+    /// Insertion or modification reason code (`sprmCIdslRMark`).
     pub revision_id: Option<u16>,
+    /// Character-formatting revision-save ID.
+    pub formatting_revision_save_id: Option<u32>,
+    /// Insertion revision-save ID.
+    pub insertion_revision_save_id: Option<u32>,
     /// Whether this run is marked as a deleted revision.
     pub is_revision_deleted: Option<bool>,
     /// Deletion revision author index in `SttbfRMark`.
     pub deletion_author_index: Option<u16>,
     /// Packed deletion revision DTTM.
     pub deletion_timestamp: Option<u32>,
-    /// Deletion revision identifier.
+    /// Deletion reason code (`sprmCIdslRMarkDel`).
     pub deletion_revision_id: Option<u16>,
+    /// Deletion revision-save ID.
+    pub deletion_revision_save_id: Option<u32>,
     /// Whether this run has a tracked character-formatting change.
     pub has_formatting_revision: Option<bool>,
     /// Formatting revision author index in `SttbfRMark`.
@@ -561,11 +567,9 @@ impl CharacterProperties {
                     chp.is_data = val != 0;
                 }
             },
-            // Operation 0x07: sprmCIdslRMark - Revision mark ID
+            // Operation 0x07: sprmCIdslRMark - Revision edit reason.
             0x07 => {
-                chp.revision_id = Some(sprm.operand_word().ok_or_else(|| {
-                    DocError::Corrupted("sprmCIdslRMark is missing its identifier".to_string())
-                })?);
+                chp.revision_id = Some(Self::revision_reason(sprm, "sprmCIdslRMark")?);
             },
             // Operation 0x08: sprmCChs - Complex character set
             0x08 => {
@@ -619,12 +623,21 @@ impl CharacterProperties {
             },
             0x15 => {
                 // sprmCRsidProp - Revision save ID property
+                chp.formatting_revision_save_id = Some(sprm.operand_dword().ok_or_else(|| {
+                    DocError::Corrupted("sprmCRsidProp is missing its RSID".to_string())
+                })?);
             },
             0x16 => {
                 // sprmCRsidText - Revision save ID text
+                chp.insertion_revision_save_id = Some(sprm.operand_dword().ok_or_else(|| {
+                    DocError::Corrupted("sprmCRsidText is missing its RSID".to_string())
+                })?);
             },
             0x17 => {
                 // sprmCRsidRMDel - Revision save ID deletion
+                chp.deletion_revision_save_id = Some(sprm.operand_dword().ok_or_else(|| {
+                    DocError::Corrupted("sprmCRsidRMDel is missing its RSID".to_string())
+                })?);
             },
             0x18 => {
                 // sprmCFSpecVanish - Special vanish
@@ -1011,9 +1024,7 @@ impl CharacterProperties {
                 })?);
             },
             0x67 => {
-                chp.deletion_revision_id = Some(sprm.operand_word().ok_or_else(|| {
-                    DocError::Corrupted("sprmCIdslRMarkDel is missing its identifier".to_string())
-                })?);
+                chp.deletion_revision_id = Some(Self::revision_reason(sprm, "sprmCIdslRMarkDel")?);
             },
             0x5B | 0x68..=0x6C => {
                 // Retained for future structured border/revision metadata.
@@ -1042,6 +1053,18 @@ impl CharacterProperties {
             .ok_or_else(|| DocError::Corrupted(format!("{name} is missing its author index")))?;
         u16::try_from(value)
             .map_err(|_| DocError::Corrupted(format!("{name} author index is negative")))
+    }
+
+    fn revision_reason(sprm: &Sprm, name: &str) -> Result<u16> {
+        let value = sprm
+            .operand_word()
+            .ok_or_else(|| DocError::Corrupted(format!("{name} is missing its reason code")))?;
+        if value > super::super::revision::RevisionReason::MAX_VALUE {
+            return Err(DocError::Corrupted(format!(
+                "{name} contains an undefined reason code"
+            )));
+        }
+        Ok(value)
     }
 
     fn apply_property_revision(chp: &mut CharacterProperties, sprm: &Sprm) -> Result<()> {
@@ -1259,10 +1282,13 @@ mod tests {
             (SPRM_C_IBST_RMARK, 1u16.to_le_bytes().to_vec()),
             (SPRM_C_DTTM_RMARK, timestamp.to_le_bytes().to_vec()),
             (SPRM_C_IDSL_RMARK, 42u16.to_le_bytes().to_vec()),
+            (SPRM_C_RSID_PROP, 0x11223344u32.to_le_bytes().to_vec()),
+            (SPRM_C_RSID_TEXT, 0x55667788u32.to_le_bytes().to_vec()),
             (SPRM_C_F_RMARK_DEL, vec![1]),
             (SPRM_C_IBST_RMARK_DEL, 0u16.to_le_bytes().to_vec()),
             (SPRM_C_DTTM_RMARK_DEL, 0u32.to_le_bytes().to_vec()),
             (SPRM_C_IDSL_RMARK_DEL, 7u16.to_le_bytes().to_vec()),
+            (SPRM_C_RSID_RM_DEL, 0x99AABBCCu32.to_le_bytes().to_vec()),
         ] {
             grpprl.extend_from_slice(&opcode.to_le_bytes());
             grpprl.extend_from_slice(&operand);
@@ -1272,15 +1298,22 @@ mod tests {
         assert_eq!(properties.revision_author_index, Some(1));
         assert_eq!(properties.revision_timestamp, Some(timestamp));
         assert_eq!(properties.revision_id, Some(42));
+        assert_eq!(properties.formatting_revision_save_id, Some(0x11223344));
+        assert_eq!(properties.insertion_revision_save_id, Some(0x55667788));
         assert_eq!(properties.is_revision_deleted, Some(true));
         assert_eq!(properties.deletion_author_index, Some(0));
         assert_eq!(properties.deletion_timestamp, Some(0));
         assert_eq!(properties.deletion_revision_id, Some(7));
+        assert_eq!(properties.deletion_revision_save_id, Some(0x99AABBCC));
 
         let mut malformed = Vec::new();
         malformed.extend_from_slice(&SPRM_C_IBST_RMARK.to_le_bytes());
         malformed.extend_from_slice(&(-1i16).to_le_bytes());
         assert!(CharacterProperties::from_sprm(&malformed).is_err());
+
+        let mut undefined_reason = SPRM_C_IDSL_RMARK.to_le_bytes().to_vec();
+        undefined_reason.extend_from_slice(&0x002Cu16.to_le_bytes());
+        assert!(CharacterProperties::from_sprm(&undefined_reason).is_err());
     }
 
     #[test]

@@ -12,6 +12,32 @@ pub enum RevisionKind {
     Formatting,
 }
 
+/// Validated MS-DOC reason code for an inserted, modified, or deleted revision.
+///
+/// The binary format defines the contiguous values `0x0000..=0x002B`; use
+/// [`Self::raw`] to distinguish the individual auto-formatting reasons.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct RevisionReason(u16);
+
+impl RevisionReason {
+    /// A normal user edit (`0x0000`).
+    pub const NORMAL_EDIT: Self = Self(0);
+    /// A style was applied (`0x0001`).
+    pub const APPLIED_STYLE: Self = Self(1);
+    /// The maximum reason value defined by MS-DOC.
+    pub const MAX_VALUE: u16 = 0x002B;
+
+    /// Construct a reason from its MS-DOC value.
+    pub fn from_raw(value: u16) -> Option<Self> {
+        (value <= Self::MAX_VALUE).then_some(Self(value))
+    }
+
+    /// Return the underlying MS-DOC reason value.
+    pub fn raw(self) -> u16 {
+        self.0
+    }
+}
+
 /// Tracked revision metadata attached to text or formatted document properties.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RevisionMark {
@@ -23,8 +49,15 @@ pub struct RevisionMark {
     pub author: String,
     /// Revision date and time, when the DTTM is not an ignored zero date.
     pub timestamp: Option<CommentDateTime>,
-    /// Optional revision identifier.
+    /// Structured edit reason, when an Idsl reason operand is present.
+    pub reason: Option<RevisionReason>,
+    /// Legacy raw alias for [`Self::reason`].
+    ///
+    /// This field is retained for source compatibility with the original API;
+    /// it is a reason code, not a revision-save ID.
     pub revision_id: Option<u16>,
+    /// ECMA-376 single-session revision-save ID.
+    pub revision_save_id: Option<u32>,
 }
 
 /// Resolved numbering revision metadata for a paragraph.
@@ -99,4 +132,17 @@ pub(crate) fn decode_dttm(value: u32) -> Result<Option<CommentDateTime>> {
         minute,
         weekday,
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn validates_revision_reason_range() {
+        assert_eq!(RevisionReason::NORMAL_EDIT.raw(), 0);
+        assert_eq!(RevisionReason::APPLIED_STYLE.raw(), 1);
+        assert_eq!(RevisionReason::from_raw(0x002B).unwrap().raw(), 0x002B);
+        assert!(RevisionReason::from_raw(0x002C).is_none());
+    }
 }

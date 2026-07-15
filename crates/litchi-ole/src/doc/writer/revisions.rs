@@ -1,6 +1,6 @@
 //! Tracked text revision input types for the legacy Word writer.
 
-use crate::doc::CommentDateTime;
+use crate::doc::{CommentDateTime, RevisionReason};
 
 /// Metadata for an inserted or deleted text run.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -9,8 +9,12 @@ pub struct TextRevision {
     pub author: String,
     /// Revision timestamp.
     pub timestamp: Option<CommentDateTime>,
-    /// Optional revision identifier.
+    /// Legacy raw edit-reason code.
     pub revision_id: Option<u16>,
+    /// Structured edit reason.
+    pub reason: Option<RevisionReason>,
+    /// ECMA-376 single-session revision-save ID.
+    pub revision_save_id: Option<u32>,
 }
 
 impl TextRevision {
@@ -20,6 +24,8 @@ impl TextRevision {
             author: author.into(),
             timestamp: None,
             revision_id: None,
+            reason: None,
+            revision_save_id: None,
         }
     }
 
@@ -29,9 +35,23 @@ impl TextRevision {
         self
     }
 
-    /// Set the revision identifier.
+    /// Set a legacy raw edit-reason code.
+    ///
+    /// Prefer [`Self::with_reason`]; invalid raw values are rejected when writing.
     pub fn with_id(mut self, revision_id: u16) -> Self {
         self.revision_id = Some(revision_id);
+        self
+    }
+
+    /// Set the edit reason.
+    pub fn with_reason(mut self, reason: RevisionReason) -> Self {
+        self.reason = Some(reason);
+        self
+    }
+
+    /// Set the single-session revision-save ID.
+    pub fn with_revision_save_id(mut self, revision_save_id: u32) -> Self {
+        self.revision_save_id = Some(revision_save_id);
         self
     }
 }
@@ -43,6 +63,10 @@ pub struct FormattingRevision {
     pub author: String,
     /// Revision timestamp.
     pub timestamp: Option<CommentDateTime>,
+    /// ECMA-376 single-session revision-save ID for the formatting change.
+    pub revision_save_id: Option<u32>,
+    /// Edit reason for the formatting change.
+    pub reason: Option<RevisionReason>,
 }
 
 impl FormattingRevision {
@@ -51,12 +75,26 @@ impl FormattingRevision {
         Self {
             author: author.into(),
             timestamp: None,
+            revision_save_id: None,
+            reason: None,
         }
     }
 
     /// Set the revision timestamp.
     pub fn with_timestamp(mut self, timestamp: CommentDateTime) -> Self {
         self.timestamp = Some(timestamp);
+        self
+    }
+
+    /// Set the single-session revision-save ID.
+    pub fn with_revision_save_id(mut self, revision_save_id: u32) -> Self {
+        self.revision_save_id = Some(revision_save_id);
+        self
+    }
+
+    /// Set the edit reason.
+    pub fn with_reason(mut self, reason: RevisionReason) -> Self {
+        self.reason = Some(reason);
         self
     }
 }

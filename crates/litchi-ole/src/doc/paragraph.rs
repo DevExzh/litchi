@@ -3,7 +3,8 @@ use super::package::Result;
 use super::parts::chp::{CharacterProperties, UnderlineStyle, VerticalPosition};
 use super::parts::revisions::RevisionAuthorTable;
 use super::revision::{
-    DisplayFieldRevisionMark, NumberingRevisionMark, RevisionKind, RevisionMark, decode_dttm,
+    DisplayFieldRevisionMark, NumberingRevisionMark, RevisionKind, RevisionMark, RevisionReason,
+    decode_dttm,
 };
 use std::sync::Arc;
 
@@ -178,6 +179,8 @@ impl Paragraph {
                     .transpose()?
                     .flatten(),
                 revision_id: None,
+                reason: None,
+                revision_save_id: None,
             });
         }
         if let Some(revision) = &self.properties.numbering_revision {
@@ -218,6 +221,8 @@ impl Paragraph {
                     .transpose()?
                     .flatten(),
                 revision_id: None,
+                reason: None,
+                revision_save_id: None,
             });
         }
         Ok(())
@@ -485,6 +490,7 @@ impl Run {
                 self.properties.revision_author_index.unwrap_or(0),
                 self.properties.revision_timestamp,
                 self.properties.revision_id,
+                self.properties.insertion_revision_save_id,
                 authors,
             )?);
         }
@@ -494,6 +500,7 @@ impl Run {
                 self.properties.deletion_author_index.unwrap_or(0),
                 self.properties.deletion_timestamp,
                 self.properties.deletion_revision_id,
+                self.properties.deletion_revision_save_id,
                 authors,
             )?);
         }
@@ -504,7 +511,8 @@ impl Run {
                     .formatting_revision_author_index
                     .unwrap_or(0),
                 self.properties.formatting_revision_timestamp,
-                None,
+                self.properties.revision_id,
+                self.properties.formatting_revision_save_id,
                 authors,
             )?);
         }
@@ -531,6 +539,7 @@ impl Run {
         author_index: u16,
         packed_timestamp: Option<u32>,
         revision_id: Option<u16>,
+        revision_save_id: Option<u32>,
         authors: &RevisionAuthorTable,
     ) -> Result<RevisionMark> {
         let author = authors.get(author_index).ok_or_else(|| {
@@ -543,7 +552,9 @@ impl Run {
             author_index,
             author: author.to_string(),
             timestamp: packed_timestamp.map(decode_dttm).transpose()?.flatten(),
+            reason: revision_id.and_then(RevisionReason::from_raw),
             revision_id,
+            revision_save_id,
         })
     }
 
@@ -668,6 +679,7 @@ mod tests {
                 revision_author_index: Some(1),
                 revision_timestamp: Some(timestamp),
                 revision_id: Some(42),
+                insertion_revision_save_id: Some(0x11223344),
                 ..CharacterProperties::default()
             },
         );
@@ -677,6 +689,8 @@ mod tests {
         assert_eq!(revision.kind, RevisionKind::Insertion);
         assert_eq!(revision.author, "Alice");
         assert_eq!(revision.revision_id, Some(42));
+        assert_eq!(revision.reason.unwrap().raw(), 42);
+        assert_eq!(revision.revision_save_id, Some(0x11223344));
         assert_eq!(revision.timestamp.unwrap().year, 2026);
         assert!(run.deletion_revision().is_none());
         assert!(run.formatting_revision().is_none());
@@ -687,6 +701,7 @@ mod tests {
                 has_formatting_revision: Some(true),
                 formatting_revision_author_index: Some(1),
                 formatting_revision_timestamp: Some(timestamp),
+                formatting_revision_save_id: Some(0x55667788),
                 ..CharacterProperties::default()
             },
         );
@@ -696,6 +711,8 @@ mod tests {
         assert_eq!(revision.author, "Alice");
         assert_eq!(revision.timestamp.unwrap().year, 2026);
         assert_eq!(revision.revision_id, None);
+        assert_eq!(revision.reason, None);
+        assert_eq!(revision.revision_save_id, Some(0x55667788));
 
         let mut bad_author = Run::new(
             "changed".to_string(),

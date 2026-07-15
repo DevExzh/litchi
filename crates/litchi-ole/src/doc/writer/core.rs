@@ -2802,7 +2802,8 @@ fn build_revision_chpx_grpprl(
                       flag_opcode: u16,
                       author_opcode: u16,
                       time_opcode: u16,
-                      id_opcode: u16|
+                      reason_opcode: u16,
+                      rsid_opcode: u16|
      -> Result<(), DocWriteError> {
         let author_index = revisions.indexes.get(&revision.author).ok_or_else(|| {
             DocWriteError::InvalidData("DOC revision author was not indexed".to_string())
@@ -2815,9 +2816,26 @@ fn build_revision_chpx_grpprl(
             grp.extend_from_slice(&time_opcode.to_le_bytes());
             grp.extend_from_slice(&pack_dttm(revision.timestamp)?.to_le_bytes());
         }
-        if let Some(revision_id) = revision.revision_id {
-            grp.extend_from_slice(&id_opcode.to_le_bytes());
-            grp.extend_from_slice(&revision_id.to_le_bytes());
+        let structured_reason = revision.reason.map(crate::doc::RevisionReason::raw);
+        if let (Some(raw), Some(structured)) = (revision.revision_id, structured_reason)
+            && raw != structured
+        {
+            return Err(DocWriteError::InvalidData(
+                "DOC revision contains conflicting raw and structured reason codes".to_string(),
+            ));
+        }
+        if let Some(reason) = structured_reason.or(revision.revision_id) {
+            if reason > crate::doc::RevisionReason::MAX_VALUE {
+                return Err(DocWriteError::InvalidData(
+                    "DOC revision reason code is undefined".to_string(),
+                ));
+            }
+            grp.extend_from_slice(&reason_opcode.to_le_bytes());
+            grp.extend_from_slice(&reason.to_le_bytes());
+        }
+        if let Some(revision_save_id) = revision.revision_save_id {
+            grp.extend_from_slice(&rsid_opcode.to_le_bytes());
+            grp.extend_from_slice(&revision_save_id.to_le_bytes());
         }
         Ok(())
     };
@@ -2828,6 +2846,7 @@ fn build_revision_chpx_grpprl(
             SPRM_C_IBST_RMARK,
             SPRM_C_DTTM_RMARK,
             SPRM_C_IDSL_RMARK,
+            SPRM_C_RSID_TEXT,
         )?;
     }
     if let Some(revision) = &fmt.deletion_revision {
@@ -2837,6 +2856,7 @@ fn build_revision_chpx_grpprl(
             SPRM_C_IBST_RMARK_DEL,
             SPRM_C_DTTM_RMARK_DEL,
             SPRM_C_IDSL_RMARK_DEL,
+            SPRM_C_RSID_RM_DEL,
         )?;
     }
     if let Some(revision) = &fmt.formatting_revision {
@@ -2848,6 +2868,26 @@ fn build_revision_chpx_grpprl(
         grp.push(1);
         grp.extend_from_slice(&author_index.to_le_bytes());
         grp.extend_from_slice(&pack_dttm(revision.timestamp)?.to_le_bytes());
+        if let Some(reason) = revision.reason {
+            let insertion_reason = fmt.insertion_revision.as_ref().and_then(|insertion| {
+                insertion
+                    .reason
+                    .map(crate::doc::RevisionReason::raw)
+                    .or(insertion.revision_id)
+            });
+            if insertion_reason.is_some_and(|value| value != reason.raw()) {
+                return Err(DocWriteError::InvalidData(
+                    "DOC insertion and formatting revisions have conflicting reason codes"
+                        .to_string(),
+                ));
+            }
+            grp.extend_from_slice(&SPRM_C_IDSL_RMARK.to_le_bytes());
+            grp.extend_from_slice(&reason.raw().to_le_bytes());
+        }
+        if let Some(revision_save_id) = revision.revision_save_id {
+            grp.extend_from_slice(&SPRM_C_RSID_PROP.to_le_bytes());
+            grp.extend_from_slice(&revision_save_id.to_le_bytes());
+        }
     }
     if let Some(revision) = &fmt.display_field_revision {
         let author_index = revisions.indexes.get(&revision.author).ok_or_else(|| {
@@ -3728,7 +3768,8 @@ mod tests {
                             insertion_revision: Some(
                                 TextRevision::new("Alice 😀")
                                     .with_timestamp(timestamp)
-                                    .with_id(42),
+                                    .with_reason(crate::doc::RevisionReason::from_raw(42).unwrap())
+                                    .with_revision_save_id(0x11223344),
                             ),
                             ..CharacterFormatting::default()
                         },
@@ -3736,7 +3777,11 @@ mod tests {
                     (
                         "deleted".to_string(),
                         CharacterFormatting {
-                            deletion_revision: Some(TextRevision::new("Bob").with_id(7)),
+                            deletion_revision: Some(
+                                TextRevision::new("Bob")
+                                    .with_id(7)
+                                    .with_revision_save_id(0x55667788),
+                            ),
                             ..CharacterFormatting::default()
                         },
                     ),
@@ -3745,7 +3790,10 @@ mod tests {
                         CharacterFormatting {
                             bold: Some(true),
                             formatting_revision: Some(
-                                FormattingRevision::new("张三").with_timestamp(timestamp),
+                                FormattingRevision::new("张三")
+                                    .with_timestamp(timestamp)
+                                    .with_reason(crate::doc::RevisionReason::APPLIED_STYLE)
+                                    .with_revision_save_id(0x99AABBCC),
                             ),
                             ..CharacterFormatting::default()
                         },
@@ -3848,11 +3896,15 @@ mod tests {
             .unwrap();
         assert_eq!(insertion.author, "Alice 😀");
         assert_eq!(insertion.timestamp, Some(timestamp));
+        assert_eq!(insertion.reason.unwrap().raw(), 42);
         assert_eq!(insertion.revision_id, Some(42));
+        assert_eq!(insertion.revision_save_id, Some(0x11223344));
         let deletion = runs.iter().find_map(|run| run.deletion_revision()).unwrap();
         assert_eq!(deletion.author, "Bob");
         assert_eq!(deletion.timestamp, None);
+        assert_eq!(deletion.reason.unwrap().raw(), 7);
         assert_eq!(deletion.revision_id, Some(7));
+        assert_eq!(deletion.revision_save_id, Some(0x55667788));
         let formatting = runs
             .iter()
             .find_map(|run| run.formatting_revision())
@@ -3860,7 +3912,12 @@ mod tests {
         assert_eq!(formatting.kind, crate::doc::RevisionKind::Formatting);
         assert_eq!(formatting.author, "张三");
         assert_eq!(formatting.timestamp, Some(timestamp));
-        assert_eq!(formatting.revision_id, None);
+        assert_eq!(
+            formatting.reason,
+            Some(crate::doc::RevisionReason::APPLIED_STYLE)
+        );
+        assert_eq!(formatting.revision_id, Some(1));
+        assert_eq!(formatting.revision_save_id, Some(0x99AABBCC));
         let display_field = runs
             .iter()
             .find_map(|run| run.display_field_revision())
@@ -3949,6 +4006,34 @@ mod tests {
             ..CharacterFormatting::default()
         };
         assert!(error_for(both).contains("both an insertion and a deletion"));
+
+        let invalid_reason = CharacterFormatting {
+            insertion_revision: Some(TextRevision::new("Alice").with_id(0x002C)),
+            ..CharacterFormatting::default()
+        };
+        assert!(error_for(invalid_reason).contains("reason code is undefined"));
+
+        let conflicting_reason = CharacterFormatting {
+            insertion_revision: Some(
+                TextRevision::new("Alice")
+                    .with_id(1)
+                    .with_reason(crate::doc::RevisionReason::NORMAL_EDIT),
+            ),
+            ..CharacterFormatting::default()
+        };
+        assert!(error_for(conflicting_reason).contains("conflicting"));
+
+        let conflicting_formatting_reason = CharacterFormatting {
+            insertion_revision: Some(
+                TextRevision::new("Alice").with_reason(crate::doc::RevisionReason::NORMAL_EDIT),
+            ),
+            formatting_revision: Some(
+                FormattingRevision::new("Alice")
+                    .with_reason(crate::doc::RevisionReason::APPLIED_STYLE),
+            ),
+            ..CharacterFormatting::default()
+        };
+        assert!(error_for(conflicting_formatting_reason).contains("insertion and formatting"));
 
         let invalid_time = CharacterFormatting {
             insertion_revision: Some(TextRevision::new("Alice").with_timestamp(
