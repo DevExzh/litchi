@@ -100,6 +100,7 @@ struct ShapeBuilder {
     shape_type: ShapeType,
     drawing_kind: Option<DrawingShapeKind>,
     drawing_attributes: Vec<DrawingAttribute>,
+    children: Vec<Shape>,
     text: String,
     name: Option<String>,
     x: Option<String>,
@@ -170,6 +171,7 @@ impl ShapeBuilder {
             shape_type: ShapeType::AutoShape,
             drawing_kind: None,
             drawing_attributes: Vec::new(),
+            children: Vec::new(),
             text: String::new(),
             name: None,
             x: None,
@@ -199,6 +201,7 @@ impl ShapeBuilder {
             shape_type: self.shape_type,
             drawing_kind: self.drawing_kind,
             drawing_attributes: self.drawing_attributes,
+            children: self.children,
             text: self.text,
             name: self.name,
             x: self.x,
@@ -1502,14 +1505,15 @@ impl OdpParser {
         let mut animation_node_count = 0;
         let mut current_legacy_animation = None;
         let mut legacy_animation_node_count = 0;
+        let mut shape_node_count = 0usize;
 
         // Shape parsing state
-        let mut current_shape: Option<ShapeBuilder> = None;
-        let mut shape_depth = 0;
+        let mut shape_stack: Vec<ShapeBuilder> = Vec::new();
         let mut current_paragraph: Option<ParagraphText> = None;
         let mut in_media_plugin = false;
         let mut in_media_parameter = false;
         let mut current_hyperlink: Option<DrawingHyperlink> = None;
+        let mut hyperlink_parent_depth = None;
         let mut hyperlink_shape_seen = false;
 
         loop {
@@ -1562,7 +1566,7 @@ impl OdpParser {
                         OdpElement::LegacyAnimation(kind)
                             if in_slide
                                 && !in_notes
-                                && current_shape.is_none()
+                                && shape_stack.is_empty()
                                 && current_paragraph.is_none() =>
                         {
                             if kind != LegacyAnimationKind::Animations {
@@ -1587,8 +1591,8 @@ impl OdpParser {
                             validate_legacy_animation_root(&root)?;
                             current_legacy_animation = Some(root);
                         },
-                        OdpElement::Plugin if current_shape.is_some() => {
-                            let builder = current_shape.as_mut().expect("shape checked above");
+                        OdpElement::Plugin if !shape_stack.is_empty() => {
+                            let builder = shape_stack.last_mut().expect("shape checked above");
                             if !builder.is_frame {
                                 return Err(Error::InvalidFormat(
                                     "draw:plugin must be contained directly by draw:frame"
@@ -1612,22 +1616,20 @@ impl OdpParser {
                         OdpElement::PluginParameter
                             if in_media_plugin
                                 && !in_media_parameter
-                                && current_shape.is_some() =>
+                                && !shape_stack.is_empty() =>
                         {
-                            current_shape
-                                .as_mut()
+                            shape_stack
+                                .last_mut()
                                 .and_then(|builder| builder.media.as_mut())
                                 .expect("media plugin state checked above")
                                 .add_parameter(Self::media_parameter(&reader, element)?)?;
                             in_media_parameter = true;
                         },
                         OdpElement::DrawingHyperlink
-                            if in_slide
-                                && !in_notes
-                                && current_shape.is_none()
-                                && current_hyperlink.is_none() =>
+                            if in_slide && !in_notes && current_hyperlink.is_none() =>
                         {
                             current_hyperlink = Some(Self::drawing_hyperlink(&reader, element)?);
+                            hyperlink_parent_depth = Some(shape_stack.len());
                             hyperlink_shape_seen = false;
                         },
                         OdpElement::DrawingHyperlink if in_slide => {
@@ -1635,8 +1637,8 @@ impl OdpParser {
                                 "nested or misplaced draw:a presentation hyperlink".to_string(),
                             ));
                         },
-                        OdpElement::EventListeners if current_shape.is_some() => {
-                            let builder = current_shape.as_mut().expect("shape checked above");
+                        OdpElement::EventListeners if !shape_stack.is_empty() => {
+                            let builder = shape_stack.last_mut().expect("shape checked above");
                             if builder.event_listeners_seen {
                                 return Err(Error::InvalidFormat(
                                     "ODP shape contains multiple office:event-listeners elements"
@@ -1694,7 +1696,7 @@ impl OdpParser {
                         },
                         OdpElement::Animation(kind)
                             if in_slide
-                                && current_shape.is_none()
+                                && shape_stack.is_empty()
                                 && current_paragraph.is_none() =>
                         {
                             if !kind.allowed_at_page_root() {
@@ -1711,39 +1713,71 @@ impl OdpParser {
                             )?);
                         },
                         OdpElement::Shape(shape_element) => {
-                            if in_slide && current_shape.is_none() {
-                                if current_hyperlink.is_some() && hyperlink_shape_seen {
+                            shape_node_count =
+                                shape_node_count.checked_add(1).ok_or_else(|| {
+                                    Error::InvalidFormat("ODP shape count overflow".to_string())
+                                })?;
+                            if shape_node_count > 65_536 {
+                                return Err(Error::InvalidFormat(
+                                    "ODP document exceeds 65536 shapes".to_string(),
+                                ));
+                            }
+                            if shape_stack.len() >= 256 {
+                                return Err(Error::InvalidFormat(
+                                    "ODP shape groups exceed 256 levels".to_string(),
+                                ));
+                            }
+                            let hyperlink_applies = current_hyperlink.is_some()
+                                && hyperlink_parent_depth == Some(shape_stack.len());
+                            if hyperlink_applies && hyperlink_shape_seen {
+                                return Err(Error::InvalidFormat(
+                                    "draw:a must wrap exactly one drawing shape".to_string(),
+                                ));
+                            }
+                            if in_slide && shape_stack.is_empty() {
+                                if current_hyperlink.is_some() && !hyperlink_applies {
                                     return Err(Error::InvalidFormat(
-                                        "draw:a must wrap exactly one drawing shape".to_string(),
+                                        "misplaced draw:a presentation hyperlink".to_string(),
                                     ));
                                 }
                                 let mut builder =
                                     Self::shape_builder(&reader, element, shape_element)?;
-                                if let Some(hyperlink) = &current_hyperlink {
+                                if hyperlink_applies && let Some(hyperlink) = &current_hyperlink {
                                     builder.hyperlink = Some(hyperlink.clone());
                                     hyperlink_shape_seen = true;
                                 }
-                                current_shape = Some(builder);
-                                shape_depth = 0;
-                            } else if current_shape.is_some() {
-                                shape_depth += 1;
+                                shape_stack.push(builder);
+                            } else if let Some(parent) = shape_stack.last() {
+                                if parent.shape_type != ShapeType::Group {
+                                    return Err(Error::InvalidFormat(
+                                        "nested ODP drawing shapes require a draw:g parent"
+                                            .to_string(),
+                                    ));
+                                }
+                                let mut builder =
+                                    Self::shape_builder(&reader, element, shape_element)?;
+                                if hyperlink_applies && let Some(hyperlink) = &current_hyperlink {
+                                    builder.hyperlink = Some(hyperlink.clone());
+                                    hyperlink_shape_seen = true;
+                                }
+                                shape_stack.push(builder);
                             }
                         },
-                        OdpElement::Image if current_shape.is_some() => {
-                            let builder = current_shape.as_mut().expect("shape checked above");
+                        OdpElement::Image if !shape_stack.is_empty() => {
+                            let builder = shape_stack.last_mut().expect("shape checked above");
                             builder.shape_type = ShapeType::Picture;
                             builder.image_href =
                                 Self::get_attr(&reader, element, XLINK_NAMESPACE, b"href")?;
                         },
-                        OdpElement::Table if current_shape.is_some() => {
-                            current_shape
-                                .as_mut()
+                        OdpElement::Table if !shape_stack.is_empty() => {
+                            shape_stack
+                                .last_mut()
                                 .expect("shape checked above")
                                 .shape_type = ShapeType::Table;
                         },
-                        OdpElement::Object if current_shape.is_some() => {
-                            current_shape
-                                .as_mut()
+                        OdpElement::Object if !shape_stack.is_empty() => {
+                            shape_stack
+                                .last_mut()
                                 .expect("shape checked above")
                                 .shape_type = ShapeType::GraphicFrame;
                         },
@@ -1830,7 +1864,7 @@ impl OdpParser {
                             slide_index += 1;
                         },
                         OdpElement::Plugin => {
-                            if let Some(builder) = current_shape.as_mut() {
+                            if let Some(builder) = shape_stack.last_mut() {
                                 if !builder.is_frame {
                                     return Err(Error::InvalidFormat(
                                         "draw:plugin must be contained directly by draw:frame"
@@ -1856,8 +1890,8 @@ impl OdpParser {
                                 "draw:a must wrap exactly one non-empty drawing shape".to_string(),
                             ));
                         },
-                        OdpElement::EventListeners if current_shape.is_some() => {
-                            let builder = current_shape.as_mut().expect("shape checked above");
+                        OdpElement::EventListeners if !shape_stack.is_empty() => {
+                            let builder = shape_stack.last_mut().expect("shape checked above");
                             if builder.event_listeners_seen {
                                 return Err(Error::InvalidFormat(
                                     "ODP shape contains multiple office:event-listeners elements"
@@ -1880,10 +1914,10 @@ impl OdpParser {
                         OdpElement::PluginParameter
                             if in_media_plugin
                                 && !in_media_parameter
-                                && current_shape.is_some() =>
+                                && !shape_stack.is_empty() =>
                         {
-                            current_shape
-                                .as_mut()
+                            shape_stack
+                                .last_mut()
                                 .and_then(|builder| builder.media.as_mut())
                                 .expect("media plugin state checked above")
                                 .add_parameter(Self::media_parameter(&reader, element)?)?;
@@ -1904,7 +1938,7 @@ impl OdpParser {
                                 in_notes,
                                 &mut current_notes_text,
                                 &mut current_notes_has_paragraph,
-                                current_shape.as_mut(),
+                                shape_stack.last_mut(),
                                 &mut current_slide_text,
                                 &mut current_slide_has_segment,
                             );
@@ -1955,7 +1989,7 @@ impl OdpParser {
                         },
                         OdpElement::Animation(kind)
                             if in_slide
-                                && current_shape.is_none()
+                                && shape_stack.is_empty()
                                 && current_paragraph.is_none() =>
                         {
                             if !kind.allowed_at_page_root() {
@@ -1981,40 +2015,61 @@ impl OdpParser {
                             ));
                         },
                         OdpElement::Image => {
-                            if let Some(builder) = current_shape.as_mut() {
+                            if let Some(builder) = shape_stack.last_mut() {
                                 builder.shape_type = ShapeType::Picture;
                                 builder.image_href =
                                     Self::get_attr(&reader, element, XLINK_NAMESPACE, b"href")?;
                             }
                         },
                         OdpElement::Table => {
-                            if let Some(builder) = current_shape.as_mut() {
+                            if let Some(builder) = shape_stack.last_mut() {
                                 builder.shape_type = ShapeType::Table;
                             }
                         },
                         OdpElement::Object => {
-                            if let Some(builder) = current_shape.as_mut() {
+                            if let Some(builder) = shape_stack.last_mut() {
                                 builder.shape_type = ShapeType::GraphicFrame;
                             }
                         },
-                        OdpElement::Shape(shape_element) if in_slide && current_shape.is_none() => {
-                            if current_hyperlink.is_some() && hyperlink_shape_seen {
+                        OdpElement::Shape(shape_element) if in_slide => {
+                            shape_node_count =
+                                shape_node_count.checked_add(1).ok_or_else(|| {
+                                    Error::InvalidFormat("ODP shape count overflow".to_string())
+                                })?;
+                            if shape_node_count > 65_536 {
+                                return Err(Error::InvalidFormat(
+                                    "ODP document exceeds 65536 shapes".to_string(),
+                                ));
+                            }
+                            let hyperlink_applies = current_hyperlink.is_some()
+                                && hyperlink_parent_depth == Some(shape_stack.len());
+                            if hyperlink_applies && hyperlink_shape_seen {
                                 return Err(Error::InvalidFormat(
                                     "draw:a must wrap exactly one drawing shape".to_string(),
                                 ));
                             }
                             let mut builder = Self::shape_builder(&reader, element, shape_element)?;
-                            if let Some(hyperlink) = &current_hyperlink {
+                            if hyperlink_applies && let Some(hyperlink) = &current_hyperlink {
                                 builder.hyperlink = Some(hyperlink.clone());
                                 hyperlink_shape_seen = true;
                             }
-                            Self::finish_shape(
-                                builder,
-                                &mut current_slide_title,
-                                &mut current_slide_text,
-                                &mut current_slide_has_segment,
-                                &mut current_shapes,
-                            );
+                            if let Some(parent) = shape_stack.last_mut() {
+                                if parent.shape_type != ShapeType::Group {
+                                    return Err(Error::InvalidFormat(
+                                        "nested ODP drawing shapes require a draw:g parent"
+                                            .to_string(),
+                                    ));
+                                }
+                                parent.children.push(builder.build());
+                            } else {
+                                Self::finish_shape(
+                                    builder,
+                                    &mut current_slide_title,
+                                    &mut current_slide_text,
+                                    &mut current_slide_has_segment,
+                                    &mut current_shapes,
+                                );
+                            }
                         },
                         _ => {},
                     }
@@ -2033,7 +2088,7 @@ impl OdpParser {
                             in_notes,
                             &mut current_notes_text,
                             &mut current_notes_has_paragraph,
-                            current_shape.as_mut(),
+                            shape_stack.last_mut(),
                             &mut current_slide_text,
                             &mut current_slide_has_segment,
                         );
@@ -2061,13 +2116,16 @@ impl OdpParser {
                     }
                     match element_type {
                         OdpElement::DrawingHyperlink if current_hyperlink.is_some() => {
-                            if current_shape.is_some() || !hyperlink_shape_seen {
+                            if hyperlink_parent_depth != Some(shape_stack.len())
+                                || !hyperlink_shape_seen
+                            {
                                 return Err(Error::InvalidFormat(
                                     "draw:a must wrap exactly one complete drawing shape"
                                         .to_string(),
                                 ));
                             }
                             current_hyperlink = None;
+                            hyperlink_parent_depth = None;
                             hyperlink_shape_seen = false;
                         },
                         OdpElement::Page => {
@@ -2095,9 +2153,12 @@ impl OdpParser {
                             in_slide = false;
                         },
                         OdpElement::Shape(_) => {
-                            if shape_depth > 0 {
-                                shape_depth -= 1;
-                            } else if let Some(builder) = current_shape.take() {
+                            if let Some(builder) = shape_stack.pop() {
+                                if let Some(parent) = shape_stack.last_mut() {
+                                    parent.children.push(builder.build());
+                                    buf.clear();
+                                    continue;
+                                }
                                 Self::finish_shape(
                                     builder,
                                     &mut current_slide_title,
@@ -2513,8 +2574,8 @@ mod tests {
     }
 
     #[test]
-    fn identifies_shapes_that_cannot_be_losslessly_rebuilt() {
-        let xml = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:presentation><draw:page><draw:g draw:name="Group"><draw:rect/></draw:g><draw:frame draw:name="Table"><table:table/></draw:frame><draw:frame draw:name="Object"><draw:object/></draw:frame></draw:page></office:presentation></office:body></office:document-content>"#;
+    fn preserves_shape_groups_and_identifies_opaque_frames() {
+        let xml = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:xlink="http://www.w3.org/1999/xlink"><office:body><office:presentation><draw:page><draw:g draw:name="Group"><draw:a xlink:href="https://example.test/group-child" xlink:type="simple"><draw:rect/></draw:a></draw:g><draw:frame draw:name="Table"><table:table/></draw:frame><draw:frame draw:name="Object"><draw:object/></draw:frame></draw:page></office:presentation></office:body></office:document-content>"#;
 
         let slides = OdpParser::parse_slides(xml).unwrap();
         let types: Vec<_> = slides[0]
@@ -2526,6 +2587,36 @@ mod tests {
             types,
             [ShapeType::Group, ShapeType::Table, ShapeType::GraphicFrame]
         );
+        let group = &slides[0].shapes[0];
+        assert_eq!(group.children().len(), 1);
+        assert_eq!(
+            group.children()[0].drawing_kind(),
+            Some(DrawingShapeKind::Rectangle)
+        );
+        assert_eq!(
+            group.children()[0].hyperlink().map(DrawingHyperlink::href),
+            Some("https://example.test/group-child")
+        );
+        let regenerated = crate::odp::PresentationBuilder::generate_shape_xml(group, 0).unwrap();
+        assert!(regenerated.starts_with(r#"<draw:g draw:name="Group">"#));
+        assert!(regenerated.contains("<draw:rect"));
+        assert!(regenerated.contains("<draw:a"));
+    }
+
+    #[test]
+    fn bounds_nested_shape_group_depth() {
+        let mut xml = String::from(
+            r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"><o:body><o:presentation><d:page>"#,
+        );
+        for _ in 0..257 {
+            xml.push_str("<d:g>");
+        }
+        for _ in 0..257 {
+            xml.push_str("</d:g>");
+        }
+        xml.push_str("</d:page></o:presentation></o:body></o:document-content>");
+        let error = OdpParser::parse_slides(&xml).unwrap_err();
+        assert!(error.to_string().contains("256 levels"));
     }
 
     #[test]

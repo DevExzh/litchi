@@ -57,12 +57,14 @@ impl Slide {
         if !body.is_empty() {
             parts.push(body);
         }
-        parts.extend(
-            self.shapes
-                .iter()
-                .map(|shape| shape.text.trim())
-                .filter(|text| !text.is_empty()),
-        );
+        let mut shapes: Vec<&Shape> = self.shapes.iter().rev().collect();
+        while let Some(shape) = shapes.pop() {
+            let text = shape.text.trim();
+            if !text.is_empty() {
+                parts.push(text);
+            }
+            shapes.extend(shape.children.iter().rev());
+        }
         parts.join("\n")
     }
 
@@ -284,6 +286,8 @@ pub struct Shape {
     pub drawing_kind: Option<DrawingShapeKind>,
     /// Exact unmodeled `draw:*` and `svg:*` attributes.
     pub drawing_attributes: Vec<DrawingAttribute>,
+    /// Nested shapes when this is a `draw:g` group.
+    pub children: Vec<Shape>,
     /// Text content if the shape contains text
     pub text: String,
     /// Shape name/ID
@@ -330,6 +334,7 @@ impl Shape {
             shape_type: litchi_core::ShapeType::AutoShape,
             drawing_kind: None,
             drawing_attributes: Vec::new(),
+            children: Vec::new(),
             text: String::new(),
             name: None,
             x: None,
@@ -368,6 +373,16 @@ impl Shape {
     /// Return unmodeled drawing and SVG attributes in source order.
     pub fn drawing_attributes(&self) -> &[DrawingAttribute] {
         &self.drawing_attributes
+    }
+
+    /// Return nested group shapes in document order.
+    pub fn children(&self) -> &[Shape] {
+        &self.children
+    }
+
+    /// Return mutable nested group shapes.
+    pub fn children_mut(&mut self) -> &mut Vec<Shape> {
+        &mut self.children
     }
 
     /// Check if this is a text shape.

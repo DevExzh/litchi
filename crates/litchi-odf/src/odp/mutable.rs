@@ -673,7 +673,7 @@ mod tests {
     const CUSTOM: &[u8] = b"custom-presentation-data";
 
     fn presentation_bytes_with_image() -> Vec<u8> {
-        let content = r#"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink"><office:body><office:presentation><draw:page draw:name="Media"><draw:frame presentation:class="title"><draw:text-box><text:p>Visible Title</text:p></draw:text-box></draw:frame><draw:frame presentation:class="object"><draw:text-box><text:p>Body &amp; more</text:p></draw:text-box></draw:frame><draw:frame draw:name="Photo" draw:layer="controls" draw:z-index="184467440737095516160" draw:transform="rotate (0.5)" svg:x="1cm" svg:y="2cm" svg:width="3cm" svg:height="4cm"><draw:image xlink:href="Pictures/a&amp;b.png" xlink:type="simple" xlink:show="embed" xlink:actuate="onLoad"/></draw:frame><draw:rect draw:name="Labeled"><text:p>Shape label</text:p></draw:rect><draw:connector draw:name="Link" svg:x1="0cm" svg:y1="0cm" svg:x2="2cm" svg:y2="2cm"/><draw:line draw:name="Rule" svg:x1="1cm" svg:y1="1cm" svg:x2="5cm" svg:y2="1cm"/><draw:ellipse draw:name="Arc" draw:kind="section" draw:start-angle="15" draw:end-angle="275" svg:cx="3cm" svg:cy="4cm" svg:rx="2cm" svg:ry="1cm"/><draw:path draw:name="Route" svg:viewBox="0 0 100 100" svg:d="M 0 0 L 100 100"/><presentation:notes><draw:frame><draw:text-box><text:p>Speaker note</text:p></draw:text-box></draw:frame></presentation:notes></draw:page></office:presentation></office:body></office:document-content>"#;
+        let content = r#"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink"><office:body><office:presentation><draw:page draw:name="Media"><draw:frame presentation:class="title"><draw:text-box><text:p>Visible Title</text:p></draw:text-box></draw:frame><draw:frame presentation:class="object"><draw:text-box><text:p>Body &amp; more</text:p></draw:text-box></draw:frame><draw:frame draw:name="Photo" draw:layer="controls" draw:z-index="184467440737095516160" draw:transform="rotate (0.5)" svg:x="1cm" svg:y="2cm" svg:width="3cm" svg:height="4cm"><draw:image xlink:href="Pictures/a&amp;b.png" xlink:type="simple" xlink:show="embed" xlink:actuate="onLoad"/></draw:frame><draw:rect draw:name="Labeled"><text:p>Shape label</text:p></draw:rect><draw:connector draw:name="Link" svg:x1="0cm" svg:y1="0cm" svg:x2="2cm" svg:y2="2cm"/><draw:line draw:name="Rule" svg:x1="1cm" svg:y1="1cm" svg:x2="5cm" svg:y2="1cm"/><draw:ellipse draw:name="Arc" draw:kind="section" draw:start-angle="15" draw:end-angle="275" svg:cx="3cm" svg:cy="4cm" svg:rx="2cm" svg:ry="1cm"/><draw:path draw:name="Route" svg:viewBox="0 0 100 100" svg:d="M 0 0 L 100 100"/><draw:g draw:name="Outer"><draw:rect draw:name="Grouped"><text:p>Grouped text</text:p></draw:rect><draw:g draw:name="Inner"><draw:ellipse draw:name="Nested arc" draw:kind="arc"/></draw:g></draw:g><presentation:notes><draw:frame><draw:text-box><text:p>Speaker note</text:p></draw:text-box></draw:frame></presentation:notes></draw:page></office:presentation></office:body></office:document-content>"#;
         let mut writer = PackageWriter::new();
         writer
             .set_mimetype("application/vnd.oasis.opendocument.presentation")
@@ -733,6 +733,8 @@ mod tests {
         assert!(content.contains("<draw:path"));
         assert!(content.contains(r#"svg:viewBox="0 0 100 100""#));
         assert!(content.contains(r#"svg:d="M 0 0 L 100 100""#));
+        assert_eq!(content.matches("<draw:g").count(), 2);
+        assert!(content.contains("Grouped text"));
         assert_eq!(content.matches("Visible Title").count(), 1);
         assert_eq!(content.matches("Body &amp; more").count(), 1);
         assert_eq!(content.matches("Shape label").count(), 1);
@@ -745,7 +747,7 @@ mod tests {
         assert_eq!(slides[0].notes.as_deref(), Some("Speaker note"));
         assert_eq!(
             slides[0].all_text(),
-            "Visible Title\nBody & more\nShape label"
+            "Visible Title\nBody & more\nShape label\nGrouped text"
         );
         let picture = slides[0]
             .shapes
@@ -769,6 +771,13 @@ mod tests {
             .drawing_attributes()
             .iter()
             .any(|attribute| attribute.local_name() == "kind" && attribute.value() == "section"));
+        let group = slides[0]
+            .shapes
+            .iter()
+            .find(|shape| shape.name() == Some("Outer"))
+            .unwrap();
+        assert_eq!(group.children().len(), 2);
+        assert_eq!(group.children()[1].children().len(), 1);
     }
 
     #[test]

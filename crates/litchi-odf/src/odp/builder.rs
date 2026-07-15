@@ -343,10 +343,40 @@ impl PresentationBuilder {
 
     /// Generate XML for a shape
     pub(super) fn generate_shape_xml(shape: &crate::odp::Shape, idx: usize) -> Result<String> {
+        let mut node_count = 0usize;
+        Self::generate_shape_xml_at_depth(shape, idx, 0, &mut node_count)
+    }
+
+    fn generate_shape_xml_at_depth(
+        shape: &crate::odp::Shape,
+        idx: usize,
+        depth: usize,
+        node_count: &mut usize,
+    ) -> Result<String> {
         use crate::odp::DrawingShapeKind;
         use litchi_core::ShapeType;
 
-        let generated = shape.drawing_kind.is_none();
+        if depth > 256 {
+            return Err(litchi_core::Error::InvalidFormat(
+                "ODP shape groups exceed 256 levels".to_string(),
+            ));
+        }
+        *node_count = node_count.checked_add(1).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat("ODP shape count overflow".to_string())
+        })?;
+        if *node_count > 65_536 {
+            return Err(litchi_core::Error::InvalidFormat(
+                "ODP document exceeds 65536 shapes".to_string(),
+            ));
+        }
+        if shape.shape_type != ShapeType::Group && !shape.children.is_empty() {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "non-group ODP shape '{}' cannot contain nested shapes",
+                shape.name.as_deref().unwrap_or("unnamed")
+            )));
+        }
+
+        let generated = shape.drawing_kind.is_none() && shape.shape_type != ShapeType::Group;
         let x = shape.x.as_deref().or(generated.then_some("2cm"));
         let y = shape.y.as_deref().or(generated.then_some("8cm"));
         let width = shape.width.as_deref().or(generated.then_some("10cm"));
@@ -571,7 +601,29 @@ impl PresentationBuilder {
                     shape_attributes, position_attributes, plugin
                 )
             },
-            ShapeType::Group | ShapeType::Table | ShapeType::GraphicFrame | ShapeType::Unknown => {
+            ShapeType::Group => {
+                if shape.has_text() || shape.image_href.is_some() || shape.media.is_some() {
+                    return Err(litchi_core::Error::InvalidFormat(format!(
+                        "ODP group shape '{}' contains non-group payload",
+                        name
+                    )));
+                }
+                if shape.children.is_empty() {
+                    format!(r#"<draw:g{shape_attributes}/>"#)
+                } else {
+                    let mut children = String::new();
+                    for (child_index, child) in shape.children.iter().enumerate() {
+                        children.push_str(&Self::generate_shape_xml_at_depth(
+                            child,
+                            child_index,
+                            depth + 1,
+                            node_count,
+                        )?);
+                    }
+                    format!(r#"<draw:g{shape_attributes}>{children}</draw:g>"#)
+                }
+            },
+            ShapeType::Table | ShapeType::GraphicFrame | ShapeType::Unknown => {
                 return Err(litchi_core::Error::InvalidFormat(format!(
                     "ODP serialization does not have enough data to write {} shape '{}'",
                     shape.shape_type, name
@@ -939,7 +991,6 @@ mod tests {
     #[test]
     fn rejects_shapes_without_enough_serializable_data() {
         for shape_type in [
-            ShapeType::Group,
             ShapeType::Table,
             ShapeType::GraphicFrame,
             ShapeType::Unknown,
@@ -948,6 +999,42 @@ mod tests {
             shape.shape_type = shape_type;
             assert!(PresentationBuilder::generate_shape_xml(&shape, 0).is_err());
         }
+    }
+
+    #[test]
+    fn writes_nested_shape_groups_and_rejects_children_on_leaf_shapes() {
+        let mut leaf = Shape::new();
+        leaf.name = Some("Nested rectangle".to_string());
+        leaf.text = "Nested text".to_string();
+
+        let mut inner = Shape::new();
+        inner.shape_type = ShapeType::Group;
+        inner.drawing_kind = Some(crate::odp::DrawingShapeKind::Group);
+        inner.children.push(leaf.clone());
+
+        let mut outer = Shape::new();
+        outer.shape_type = ShapeType::Group;
+        outer.drawing_kind = Some(crate::odp::DrawingShapeKind::Group);
+        outer.name = Some("Outer".to_string());
+        outer.children.push(inner);
+
+        let xml = PresentationBuilder::generate_shape_xml(&outer, 0).unwrap();
+        assert_eq!(xml.matches("<draw:g").count(), 2);
+        assert!(xml.contains("<draw:rect"));
+        assert!(xml.contains("Nested text"));
+
+        leaf.children.push(Shape::new());
+        assert!(PresentationBuilder::generate_shape_xml(&leaf, 0).is_err());
+
+        let mut too_deep = Shape::new();
+        for _ in 0..258 {
+            let mut parent = Shape::new();
+            parent.shape_type = ShapeType::Group;
+            parent.drawing_kind = Some(crate::odp::DrawingShapeKind::Group);
+            parent.children.push(too_deep);
+            too_deep = parent;
+        }
+        assert!(PresentationBuilder::generate_shape_xml(&too_deep, 0).is_err());
     }
 
     #[test]
