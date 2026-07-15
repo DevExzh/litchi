@@ -5,6 +5,7 @@
 
 use crate::core::{OdfStructure, OwnedPackage, PackageWriter};
 use crate::odp::animation::validate_animation_roots;
+use crate::odp::legacy_animation::validate_legacy_animation_root;
 use crate::odp::media::{EmbeddedMedia, embed_media, validate_package_media_path};
 use crate::odp::{MediaReference, Presentation, Shape, Slide};
 use litchi_core::{Metadata, Result, xml::escape_xml};
@@ -177,6 +178,7 @@ impl MutablePresentation {
             notes: None,
             transition: None,
             animations: Vec::new(),
+            legacy_animation: None,
             shapes: Vec::new(),
         };
         self.slides.push(slide);
@@ -213,6 +215,7 @@ impl MutablePresentation {
                 notes: None,
                 transition: None,
                 animations: Vec::new(),
+                legacy_animation: None,
                 shapes: Vec::new(),
             };
             self.slides.insert(index, slide);
@@ -431,6 +434,10 @@ impl MutablePresentation {
             for animation in &slide.animations {
                 animation.collect_extension_namespaces(&mut extension_uris);
             }
+            if let Some(animation) = &slide.legacy_animation {
+                validate_legacy_animation_root(animation)?;
+                animation.collect_extension_namespaces(&mut extension_uris);
+            }
         }
         let extension_namespaces = extension_uris
             .into_iter()
@@ -511,6 +518,9 @@ impl MutablePresentation {
             }
 
             for animation in &slide.animations {
+                animation.write_xml(&mut body, &extension_namespaces)?;
+            }
+            if let Some(animation) = &slide.legacy_animation {
                 animation.write_xml(&mut body, &extension_namespaces)?;
             }
 
@@ -653,7 +663,7 @@ mod tests {
     use super::*;
     use crate::odp::{
         AnimationAttribute, AnimationAttributeNamespace, AnimationKind, AnimationNode,
-        PresentationBuilder,
+        LegacyAnimationKind, LegacyAnimationNode, PresentationBuilder,
     };
 
     const STYLES: &str = r#"<?xml version="1.0"?><office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><office:styles><office:marker>preserve-me</office:marker></office:styles></office:document-styles>"#;
@@ -781,6 +791,7 @@ mod tests {
             notes: None,
             transition: None,
             animations: vec![root.clone()],
+            legacy_animation: None,
             shapes: Vec::new(),
         };
         let mut builder = PresentationBuilder::new();
@@ -843,6 +854,7 @@ mod tests {
                 notes: None,
                 transition: None,
                 animations: Vec::new(),
+                legacy_animation: None,
                 shapes: vec![Shape::new().with_media(original)],
             })
             .unwrap();
@@ -883,6 +895,64 @@ mod tests {
         assert_eq!(
             slides[0].shapes[1].media().unwrap().href(),
             "Media/added.ogg"
+        );
+    }
+
+    #[test]
+    fn builder_and_mutable_round_trip_legacy_presentation_effects() {
+        let attr =
+            |namespace, name, value| AnimationAttribute::new(namespace, name, value).unwrap();
+        let mut sound = LegacyAnimationNode::new(LegacyAnimationKind::Sound);
+        sound.set_attribute(attr(
+            AnimationAttributeNamespace::Xlink,
+            "href",
+            "Sounds/chime.ogg",
+        ));
+        sound.set_attribute(attr(AnimationAttributeNamespace::Xlink, "type", "simple"));
+        let mut show = LegacyAnimationNode::new(LegacyAnimationKind::ShowShape);
+        show.set_attribute(attr(
+            AnimationAttributeNamespace::Draw,
+            "shape-id",
+            "shape1",
+        ));
+        show.set_attribute(attr(
+            AnimationAttributeNamespace::Presentation,
+            "effect",
+            "fade",
+        ));
+        show.add_child(sound).unwrap();
+        let mut root = LegacyAnimationNode::new(LegacyAnimationKind::Animations);
+        root.set_attribute(attr(
+            AnimationAttributeNamespace::Other("urn:example:legacy-effects".to_string()),
+            "mode",
+            "preserve",
+        ));
+        root.add_child(show).unwrap();
+
+        let mut builder = PresentationBuilder::new();
+        builder
+            .add_slide_element(Slide {
+                title: None,
+                text: String::new(),
+                index: 0,
+                notes: None,
+                transition: None,
+                animations: Vec::new(),
+                legacy_animation: Some(root.clone()),
+                shapes: Vec::new(),
+            })
+            .unwrap();
+        let presentation = Presentation::from_bytes(builder.build().unwrap()).unwrap();
+        assert_eq!(
+            presentation.slides().unwrap()[0].legacy_animation(),
+            Some(&root)
+        );
+
+        let mutable = MutablePresentation::from_presentation(presentation).unwrap();
+        let reparsed = Presentation::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reparsed.slides().unwrap()[0].legacy_animation(),
+            Some(&root)
         );
     }
 }

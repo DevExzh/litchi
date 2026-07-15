@@ -1,10 +1,12 @@
 //! ODP-specific parsing utilities.
 
 use super::animation::ANIMATION_NAMESPACE;
+use super::legacy_animation::validate_legacy_animation_root;
 use super::{
-    AnimationAttribute, AnimationAttributeNamespace, AnimationKind, AnimationNode, MediaActuate,
-    MediaParameter, MediaReference, MediaShow, Shape, Slide, SlideTransition, TransitionDirection,
-    TransitionSound, TransitionSoundShow, TransitionSpeed, TransitionStyle, TransitionType,
+    AnimationAttribute, AnimationAttributeNamespace, AnimationKind, AnimationNode,
+    LegacyAnimationKind, LegacyAnimationNode, MediaActuate, MediaParameter, MediaReference,
+    MediaShow, Shape, Slide, SlideTransition, TransitionDirection, TransitionSound,
+    TransitionSoundShow, TransitionSpeed, TransitionStyle, TransitionType,
 };
 use litchi_core::{Error, Result, ShapeType};
 use quick_xml::XmlVersion;
@@ -67,6 +69,7 @@ enum OdpElement {
     TextLineBreak,
     Animation(AnimationKind),
     UnknownAnimation,
+    LegacyAnimation(LegacyAnimationKind),
     Other,
 }
 
@@ -208,8 +211,14 @@ impl OdpParser {
                 b"param" => OdpElement::PluginParameter,
                 _ => OdpElement::Other,
             }
-        } else if Self::is_namespace(namespace, PRESENTATION_NAMESPACE) && local_name == b"notes" {
-            OdpElement::Notes
+        } else if Self::is_namespace(namespace, PRESENTATION_NAMESPACE) {
+            if local_name == b"notes" {
+                OdpElement::Notes
+            } else {
+                LegacyAnimationKind::from_local_name(local_name)
+                    .map(OdpElement::LegacyAnimation)
+                    .unwrap_or(OdpElement::Other)
+            }
         } else if Self::is_namespace(namespace, TABLE_NAMESPACE) && local_name == b"table" {
             OdpElement::Table
         } else if Self::is_namespace(namespace, TEXT_NAMESPACE) {
@@ -404,6 +413,121 @@ impl OdpParser {
                         "anim:{} cannot contain character references",
                         kind.local_name()
                     )));
+                },
+                _ => {},
+            }
+            buffer.clear();
+        }
+    }
+
+    fn parse_legacy_animation_node(
+        reader: &mut NsReader<&[u8]>,
+        start: &BytesStart<'_>,
+        kind: LegacyAnimationKind,
+        depth: usize,
+        node_count: &mut usize,
+    ) -> Result<LegacyAnimationNode> {
+        if depth > 128 {
+            return Err(Error::InvalidFormat(
+                "legacy ODP animation nesting exceeds 128 levels".to_string(),
+            ));
+        }
+        *node_count = node_count.checked_add(1).ok_or_else(|| {
+            Error::InvalidFormat("legacy ODP animation node count overflow".to_string())
+        })?;
+        if *node_count > 65_536 {
+            return Err(Error::InvalidFormat(
+                "legacy ODP animation tree exceeds 65536 nodes".to_string(),
+            ));
+        }
+        let attributes = Self::animation_attributes(reader, start)?;
+        let mut children = Vec::new();
+        let mut buffer = Vec::new();
+        loop {
+            let (namespace, event) = reader
+                .read_resolved_event_into(&mut buffer)
+                .map_err(|error| Error::InvalidFormat(format!("XML parsing error: {error}")))?;
+            match event {
+                Event::Start(ref child) | Event::Empty(ref child) => {
+                    if !Self::is_namespace(&namespace, PRESENTATION_NAMESPACE) {
+                        return Err(Error::InvalidFormat(format!(
+                            "presentation:{} contains a foreign element",
+                            kind.local_name()
+                        )));
+                    }
+                    let child_kind =
+                        LegacyAnimationKind::from_local_name(child.local_name().as_ref())
+                            .ok_or_else(|| {
+                                Error::InvalidFormat(format!(
+                                    "unknown legacy presentation animation element '{}'",
+                                    String::from_utf8_lossy(child.local_name().as_ref())
+                                ))
+                            })?;
+                    if !kind.allows_child(child_kind) {
+                        return Err(Error::InvalidFormat(format!(
+                            "presentation:{} cannot contain presentation:{}",
+                            kind.local_name(),
+                            child_kind.local_name()
+                        )));
+                    }
+                    let node = if matches!(event, Event::Empty(_)) {
+                        *node_count = node_count.checked_add(1).ok_or_else(|| {
+                            Error::InvalidFormat(
+                                "legacy ODP animation node count overflow".to_string(),
+                            )
+                        })?;
+                        if *node_count > 65_536 {
+                            return Err(Error::InvalidFormat(
+                                "legacy ODP animation tree exceeds 65536 nodes".to_string(),
+                            ));
+                        }
+                        LegacyAnimationNode::from_parsed(
+                            child_kind,
+                            Self::animation_attributes(reader, child)?,
+                            Vec::new(),
+                        )
+                    } else {
+                        Self::parse_legacy_animation_node(
+                            reader,
+                            child,
+                            child_kind,
+                            depth + 1,
+                            node_count,
+                        )?
+                    };
+                    children.push(node);
+                },
+                Event::End(ref end)
+                    if Self::is_namespace(&namespace, PRESENTATION_NAMESPACE)
+                        && end.local_name().as_ref() == kind.local_name().as_bytes() =>
+                {
+                    return Ok(LegacyAnimationNode::from_parsed(kind, attributes, children));
+                },
+                Event::Text(ref text) if !Self::decode_text(text)?.trim().is_empty() => {
+                    return Err(Error::InvalidFormat(
+                        "legacy presentation animations cannot contain text".to_string(),
+                    ));
+                },
+                Event::CData(ref text)
+                    if !text
+                        .xml_content(XmlVersion::Explicit1_0)
+                        .map_err(|error| Error::InvalidFormat(error.to_string()))?
+                        .trim()
+                        .is_empty() =>
+                {
+                    return Err(Error::InvalidFormat(
+                        "legacy presentation animations cannot contain text".to_string(),
+                    ));
+                },
+                Event::Eof => {
+                    return Err(Error::InvalidFormat(
+                        "unterminated legacy presentation animation tree".to_string(),
+                    ));
+                },
+                Event::End(_) | Event::GeneralRef(_) => {
+                    return Err(Error::InvalidFormat(
+                        "invalid content in legacy presentation animation tree".to_string(),
+                    ));
                 },
                 _ => {},
             }
@@ -878,6 +1002,8 @@ impl OdpParser {
         let mut current_transition: Option<SlideTransition> = None;
         let mut current_animations = Vec::new();
         let mut animation_node_count = 0;
+        let mut current_legacy_animation = None;
+        let mut legacy_animation_node_count = 0;
 
         // Shape parsing state
         let mut current_shape: Option<ShapeBuilder> = None;
@@ -914,6 +1040,7 @@ impl OdpParser {
                                         .then(|| std::mem::take(&mut current_notes_text)),
                                     transition: current_transition.take(),
                                     animations: std::mem::take(&mut current_animations),
+                                    legacy_animation: current_legacy_animation.take(),
                                     shapes: std::mem::take(&mut current_shapes),
                                 });
                                 slide_index += 1;
@@ -932,6 +1059,34 @@ impl OdpParser {
                             in_slide = true;
                         },
                         OdpElement::Notes if in_slide => in_notes = true,
+                        OdpElement::LegacyAnimation(kind)
+                            if in_slide
+                                && !in_notes
+                                && current_shape.is_none()
+                                && current_paragraph.is_none() =>
+                        {
+                            if kind != LegacyAnimationKind::Animations {
+                                return Err(Error::InvalidFormat(
+                                    "legacy presentation effects require a presentation:animations root"
+                                        .to_string(),
+                                ));
+                            }
+                            if current_legacy_animation.is_some() {
+                                return Err(Error::InvalidFormat(
+                                    "ODP slide contains multiple presentation:animations roots"
+                                        .to_string(),
+                                ));
+                            }
+                            let root = Self::parse_legacy_animation_node(
+                                &mut reader,
+                                element,
+                                kind,
+                                1,
+                                &mut legacy_animation_node_count,
+                            )?;
+                            validate_legacy_animation_root(&root)?;
+                            current_legacy_animation = Some(root);
+                        },
                         OdpElement::Plugin if current_shape.is_some() => {
                             let builder = current_shape.as_mut().expect("shape checked above");
                             if !builder.is_frame {
@@ -1123,6 +1278,7 @@ impl OdpParser {
                                 notes: None,
                                 transition: (!transition.is_empty()).then_some(transition),
                                 animations: Vec::new(),
+                                legacy_animation: None,
                                 shapes: Vec::new(),
                             });
                             slide_index += 1;
@@ -1192,6 +1348,33 @@ impl OdpParser {
                             )?;
                         },
                         _ if in_notes => {},
+                        OdpElement::LegacyAnimation(kind) if in_slide => {
+                            if kind != LegacyAnimationKind::Animations {
+                                return Err(Error::InvalidFormat(
+                                    "legacy presentation effects require a presentation:animations root"
+                                        .to_string(),
+                                ));
+                            }
+                            if current_legacy_animation.is_some() {
+                                return Err(Error::InvalidFormat(
+                                    "ODP slide contains multiple presentation:animations roots"
+                                        .to_string(),
+                                ));
+                            }
+                            legacy_animation_node_count =
+                                legacy_animation_node_count.checked_add(1).ok_or_else(|| {
+                                    Error::InvalidFormat(
+                                        "legacy ODP animation node count overflow".to_string(),
+                                    )
+                                })?;
+                            let root = LegacyAnimationNode::from_parsed(
+                                kind,
+                                Self::animation_attributes(&reader, element)?,
+                                Vec::new(),
+                            );
+                            validate_legacy_animation_root(&root)?;
+                            current_legacy_animation = Some(root);
+                        },
                         OdpElement::UnknownAnimation if in_slide => {
                             return Err(Error::InvalidFormat(format!(
                                 "unknown ODF animation element '{}'",
@@ -1305,6 +1488,7 @@ impl OdpParser {
                                         .then(|| std::mem::take(&mut current_notes_text)),
                                     transition: current_transition.take(),
                                     animations: std::mem::take(&mut current_animations),
+                                    legacy_animation: current_legacy_animation.take(),
                                     shapes: std::mem::take(&mut current_shapes),
                                 });
                                 slide_index += 1;
@@ -1482,6 +1666,7 @@ mod tests {
             notes: None,
             transition: None,
             animations: vec![],
+            legacy_animation: None,
             shapes: vec![],
         };
         let debug_str = format!("{:?}", slide);
@@ -1498,6 +1683,7 @@ mod tests {
             notes: None,
             transition: None,
             animations: vec![],
+            legacy_animation: None,
             shapes: vec![],
         };
         let cloned = slide.clone();
@@ -1828,6 +2014,54 @@ mod tests {
                 r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:x="http://www.w3.org/1999/xlink"><o:body><o:presentation><d:page>{plugin}</d:page></o:presentation></o:body></o:document-content>"#
             );
             assert!(OdpParser::parse_slides(&xml).is_err(), "accepted {plugin}");
+        }
+    }
+
+    #[test]
+    fn parses_legacy_presentation_effect_trees() {
+        let xml = r##"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:p="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:x="http://www.w3.org/1999/xlink" xmlns:e="urn:example:effects"><o:body><o:presentation><d:page><p:animations e:mode="legacy"><p:animation-group><p:show-shape d:shape-id="shape1" p:effect="fade" p:speed="fast"><p:sound x:href="Sounds/a&amp;b.ogg" x:type="simple" p:play-full="true"/></p:show-shape><p:dim d:shape-id="shape1" d:color="#808080"/><p:hide-text d:shape-id="shape2"/><p:play d:shape-id="movie1"/></p:animation-group></p:animations></d:page></o:presentation></o:body></o:document-content>"##;
+
+        let slides = OdpParser::parse_slides(xml).unwrap();
+        let root = slides[0].legacy_animation().unwrap();
+        assert_eq!(root.kind(), LegacyAnimationKind::Animations);
+        assert_eq!(
+            root.attribute(
+                &AnimationAttributeNamespace::Other("urn:example:effects".to_string()),
+                "mode"
+            ),
+            Some("legacy")
+        );
+        let group = &root.children()[0];
+        assert_eq!(group.kind(), LegacyAnimationKind::Group);
+        assert_eq!(group.children().len(), 4);
+        let show = &group.children()[0];
+        assert_eq!(show.kind(), LegacyAnimationKind::ShowShape);
+        assert_eq!(
+            show.attribute(&AnimationAttributeNamespace::Draw, "shape-id"),
+            Some("shape1")
+        );
+        assert_eq!(show.children()[0].kind(), LegacyAnimationKind::Sound);
+        assert_eq!(
+            show.children()[0].attribute(&AnimationAttributeNamespace::Xlink, "href"),
+            Some("Sounds/a&b.ogg")
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_legacy_presentation_effects() {
+        let invalid = [
+            r#"<p:show-shape d:shape-id="orphan"/>"#,
+            r#"<p:animations><p:show-shape/></p:animations>"#,
+            r#"<p:animations><p:dim d:shape-id="s"/></p:animations>"#,
+            r#"<p:animations><p:play d:shape-id="s"><p:sound x:href="a" x:type="simple"/></p:play></p:animations>"#,
+            r#"<p:animations><p:show-shape d:shape-id="s"><p:sound x:href="a" x:type="extended"/></p:show-shape></p:animations>"#,
+            r#"<p:animations>text</p:animations>"#,
+        ];
+        for effects in invalid {
+            let xml = format!(
+                r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:p="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:x="http://www.w3.org/1999/xlink"><o:body><o:presentation><d:page>{effects}</d:page></o:presentation></o:body></o:document-content>"#
+            );
+            assert!(OdpParser::parse_slides(&xml).is_err(), "accepted {effects}");
         }
     }
 }

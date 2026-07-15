@@ -6,6 +6,7 @@ use crate::core::{OdfStructure, PackageWriter};
 use crate::odp::MediaReference;
 use crate::odp::Slide;
 use crate::odp::animation::validate_animation_roots;
+use crate::odp::legacy_animation::validate_legacy_animation_root;
 use crate::odp::media::{EmbeddedMedia, embed_media};
 use litchi_core::{Metadata, Result, xml::escape_xml};
 use std::collections::{BTreeMap, BTreeSet};
@@ -266,6 +267,7 @@ impl PresentationBuilder {
             notes: None,
             transition: None,
             animations: Vec::new(),
+            legacy_animation: None,
             shapes: Vec::new(),
         };
         self.slides.push(slide);
@@ -297,6 +299,7 @@ impl PresentationBuilder {
             notes: None,
             transition: None,
             animations: Vec::new(),
+            legacy_animation: None,
             shapes: Vec::new(),
         };
         self.slides.push(slide);
@@ -323,6 +326,7 @@ impl PresentationBuilder {
     ///     notes: Some("Speaker notes".to_string()),
     ///     transition: None,
     ///     animations: vec![],
+    ///     legacy_animation: None,
     ///     shapes: vec![],
     /// };
     /// builder.add_slide_element(slide)?;
@@ -566,6 +570,9 @@ impl PresentationBuilder {
             for animation in &slide.animations {
                 animation.write_xml(&mut body, extension_namespaces)?;
             }
+            if let Some(animation) = &slide.legacy_animation {
+                animation.write_xml(&mut body, extension_namespaces)?;
+            }
 
             body.push_str(&Self::generate_notes_xml(slide.notes.as_deref()));
 
@@ -581,6 +588,10 @@ impl PresentationBuilder {
         for slide in &self.slides {
             validate_animation_roots(&slide.animations)?;
             for animation in &slide.animations {
+                animation.collect_extension_namespaces(&mut extension_uris);
+            }
+            if let Some(animation) = &slide.legacy_animation {
+                validate_legacy_animation_root(animation)?;
                 animation.collect_extension_namespaces(&mut extension_uris);
             }
         }
@@ -810,6 +821,7 @@ mod tests {
                 notes: None,
                 transition: None,
                 animations: Vec::new(),
+                legacy_animation: None,
                 shapes: vec![shape],
             })
             .unwrap();

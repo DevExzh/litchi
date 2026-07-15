@@ -7,6 +7,7 @@ pub(crate) const ANIMATION_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xm
 pub(crate) const SMIL_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:smil-compatible:1.0";
 pub(crate) const PRESENTATION_NAMESPACE: &str =
     "urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
+pub(crate) const DRAW_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
 pub(crate) const SVG_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0";
 pub(crate) const XLINK_NAMESPACE: &str = "http://www.w3.org/1999/xlink";
 pub(crate) const XML_NAMESPACE: &str = "http://www.w3.org/XML/1998/namespace";
@@ -104,6 +105,8 @@ pub enum AnimationAttributeNamespace {
     Smil,
     /// The ODF presentation namespace.
     Presentation,
+    /// The ODF drawing namespace.
+    Draw,
     /// The ODF SVG-compatible namespace.
     Svg,
     /// The W3C XLink namespace.
@@ -121,6 +124,7 @@ impl AnimationAttributeNamespace {
             Some(ANIMATION_NAMESPACE) => Self::Animation,
             Some(SMIL_NAMESPACE) => Self::Smil,
             Some(PRESENTATION_NAMESPACE) => Self::Presentation,
+            Some(DRAW_NAMESPACE) => Self::Draw,
             Some(SVG_NAMESPACE) => Self::Svg,
             Some(XLINK_NAMESPACE) => Self::Xlink,
             Some(XML_NAMESPACE) => Self::Xml,
@@ -128,12 +132,16 @@ impl AnimationAttributeNamespace {
         }
     }
 
-    fn prefix<'a>(&'a self, extensions: &'a BTreeMap<String, String>) -> Result<Option<&'a str>> {
+    pub(crate) fn prefix<'a>(
+        &'a self,
+        extensions: &'a BTreeMap<String, String>,
+    ) -> Result<Option<&'a str>> {
         match self {
             Self::None => Ok(None),
             Self::Animation => Ok(Some("anim")),
             Self::Smil => Ok(Some("smil")),
             Self::Presentation => Ok(Some("presentation")),
+            Self::Draw => Ok(Some("draw")),
             Self::Svg => Ok(Some("svg")),
             Self::Xlink => Ok(Some("xlink")),
             Self::Xml => Ok(Some("xml")),
@@ -448,6 +456,7 @@ fn validate_attribute_namespace(namespace: &AnimationAttributeNamespace) -> Resu
             ANIMATION_NAMESPACE
                 | SMIL_NAMESPACE
                 | PRESENTATION_NAMESPACE
+                | DRAW_NAMESPACE
                 | SVG_NAMESPACE
                 | XLINK_NAMESPACE
                 | XML_NAMESPACE

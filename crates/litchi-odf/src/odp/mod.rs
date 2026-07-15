@@ -20,7 +20,7 @@
 //! - ✅ Style parsing
 //! - ✅ Speaker notes
 //! - ✅ Slide transition and automatic-timing style resolution
-//! - ✅ Inert ODF/SMIL animation and timing trees
+//! - ✅ Inert ODF/SMIL timing trees and legacy presentation effects
 //! - ✅ Inert audio/video plugin references and parameters
 //!
 //! ## ✅ Writing (`builder.rs`, `mutable.rs`) - COMPLETE
@@ -32,7 +32,7 @@
 //! - ✅ `save()` / `to_bytes()` - Write to file or bytes
 //! - ✅ `MutablePresentation` - Modify existing presentations
 //! - ✅ Slide transitions, timings, and transition sounds
-//! - ✅ Animation tree creation and namespace-preserving round trips
+//! - ✅ Modern and legacy animation-tree creation and namespace-preserving round trips
 //! - ✅ Package-contained audio/video embedding and mutable preservation
 //!
 //! ## 🚧 TODO - Advanced Features
@@ -51,6 +51,7 @@
 
 mod animation;
 mod builder;
+mod legacy_animation;
 mod media;
 mod mutable;
 mod parser;
@@ -62,6 +63,7 @@ pub use animation::{
     AnimationAttribute, AnimationAttributeNamespace, AnimationKind, AnimationNode,
 };
 pub use builder::PresentationBuilder;
+pub use legacy_animation::{LegacyAnimationKind, LegacyAnimationNode};
 pub use media::{MediaActuate, MediaParameter, MediaReference, MediaShow};
 pub use mutable::MutablePresentation;
 pub use presentation::Presentation;

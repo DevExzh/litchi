@@ -132,7 +132,7 @@
 //! - ✅ Metadata extraction
 //! - ✅ Speaker notes extraction
 //! - ✅ Slide transition and automatic-timing style resolution
-//! - ✅ Inert ODF/SMIL animation and timing-tree parsing
+//! - ✅ Inert ODF/SMIL timing trees and legacy presentation effects
 //! - ✅ Inert audio/video plugin references and parameters
 //!
 //! ### Writing (`odp/builder.rs`, `odp/mutable.rs`)
@@ -144,7 +144,7 @@
 //! - ✅ Set metadata
 //! - ✅ Speaker notes
 //! - ✅ Slide transitions, timings, and transition sounds
-//! - ✅ Animation tree creation and namespace-preserving round trips
+//! - ✅ Modern and legacy animation-tree creation and namespace-preserving round trips
 //! - ✅ Package-contained audio/video embedding and mutable preservation
 //! - ✅ Save to file or bytes
 //!
@@ -242,10 +242,11 @@ pub use litchi_core::unit::{Length, LengthUnit};
 
 // Re-export main types for convenience
 pub use odp::{
-    AnimationAttribute, AnimationAttributeNamespace, AnimationKind, AnimationNode, MediaActuate,
-    MediaParameter, MediaReference, MediaShow, MutablePresentation, Presentation,
-    PresentationBuilder, SlideTransition, TransitionDirection, TransitionSound,
-    TransitionSoundShow, TransitionSpeed, TransitionStyle, TransitionType,
+    AnimationAttribute, AnimationAttributeNamespace, AnimationKind, AnimationNode,
+    LegacyAnimationKind, LegacyAnimationNode, MediaActuate, MediaParameter, MediaReference,
+    MediaShow, MutablePresentation, Presentation, PresentationBuilder, SlideTransition,
+    TransitionDirection, TransitionSound, TransitionSoundShow, TransitionSpeed, TransitionStyle,
+    TransitionType,
 };
 pub use ods::{
     AnnotationElement, AnnotationNode, CalculationIteration, CalculationNullDate,
