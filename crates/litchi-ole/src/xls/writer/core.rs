@@ -1802,6 +1802,9 @@ mod tests {
         writer.write_number(sheet, 0, 0, 2.0).unwrap();
         writer.write_number(sheet, 0, 1, 3.0).unwrap();
         writer.write_formula(sheet, 0, 2, "SUM(A1:B1)").unwrap();
+        writer
+            .write_formula(sheet, 0, 3, "IF(TRUE,\"a\"\"b\",FALSE)")
+            .unwrap();
 
         let mut output = Cursor::new(Vec::new());
         writer.write_to(&mut output).unwrap();
@@ -1812,6 +1815,15 @@ mod tests {
         assert!(formula_cell.is_formula());
         assert_eq!(formula_cell.formula(), Some("=SUM((A1:B1))"));
         assert!(!formula_cell.formula_bytes().unwrap().is_empty());
+        assert_eq!(
+            workbook
+                .xls_worksheet(0)
+                .unwrap()
+                .get_cell(0, 3)
+                .unwrap()
+                .formula(),
+            Some("=IF(TRUE,\"a\"\"b\",FALSE)")
+        );
     }
 
     #[test]

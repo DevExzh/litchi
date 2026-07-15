@@ -32,6 +32,8 @@ pub enum Ptg {
     PtgNum(f64),
     /// String constant
     PtgStr(String),
+    /// Boolean constant
+    PtgBool(bool),
     /// Cell reference (row, col, relative flags)
     PtgRef(u16, u16, bool, bool),
     /// Area reference (r1, c1, r2, c2)
@@ -232,14 +234,29 @@ impl FormulaTokenizer {
 
             // String literal
             if c == '"' {
-                i += 1; // Skip opening quote
-                let start = i;
-                while i < chars.len() && chars[i] != '"' {
+                i += 1;
+                let mut value = String::new();
+                let mut closed = false;
+                while i < chars.len() {
+                    if chars[i] == '"' {
+                        if i + 1 < chars.len() && chars[i + 1] == '"' {
+                            value.push('"');
+                            i += 2;
+                            continue;
+                        }
+                        i += 1;
+                        closed = true;
+                        break;
+                    }
+                    value.push(chars[i]);
                     i += 1;
                 }
-                let s: String = chars[start..i].iter().collect();
-                output.push(Ptg::PtgStr(s));
-                i += 1; // Skip closing quote
+                if !closed {
+                    return Err(XlsError::InvalidFormula(
+                        "Unterminated string literal".to_string(),
+                    ));
+                }
+                output.push(Ptg::PtgStr(value));
                 continue;
             }
 
@@ -266,6 +283,14 @@ impl FormulaTokenizer {
                     operators.push(("(", 0, 0));
                     i += 1; // Skip '('
                 } else {
+                    if token.eq_ignore_ascii_case("TRUE") {
+                        output.push(Ptg::PtgBool(true));
+                        continue;
+                    }
+                    if token.eq_ignore_ascii_case("FALSE") {
+                        output.push(Ptg::PtgBool(false));
+                        continue;
+                    }
                     // Try to parse as cell reference
                     match parse_cell_ref(&token) {
                         Ok(ptg) => output.push(ptg),
@@ -475,6 +500,9 @@ pub fn encode_ptg_tokens(tokens: &[Ptg]) -> Vec<u8> {
                     }
                 }
             },
+            Ptg::PtgBool(value) => {
+                bytes.extend_from_slice(&[0x1d, u8::from(*value)]);
+            },
             Ptg::PtgRef(row, col, row_rel, col_rel) => {
                 bytes.push(0x24); // PtgRef
                 bytes.extend_from_slice(&row.to_le_bytes());
@@ -630,6 +658,17 @@ mod tests {
     }
 
     #[test]
+    fn test_tokenize_escaped_string_and_booleans() {
+        let tokenizer = FormulaTokenizer::new();
+        let tokens = tokenizer.tokenize("IF(TRUE,\"a\"\"b\",FALSE)").unwrap();
+        assert!(matches!(tokens[0], Ptg::PtgBool(true)));
+        assert!(matches!(&tokens[1], Ptg::PtgStr(value) if value == "a\"b"));
+        assert!(matches!(tokens[2], Ptg::PtgBool(false)));
+        assert!(matches!(tokens[3], Ptg::PtgFunc(1, 3)));
+        assert!(tokenizer.tokenize("\"unterminated").is_err());
+    }
+
+    #[test]
     fn test_tokenize_subtraction() {
         let tokenizer = FormulaTokenizer::new();
         let tokens = tokenizer.tokenize("A1-B1").unwrap();
@@ -741,6 +780,7 @@ mod tests {
         let _ = Ptg::PtgInt(42);
         let _ = Ptg::PtgNum(std::f64::consts::PI);
         let _ = Ptg::PtgStr("test".to_string());
+        let _ = Ptg::PtgBool(true);
         let _ = Ptg::PtgRef(0, 0, true, true);
         let _ = Ptg::PtgArea(0, 0, 1, 1);
         let _ = Ptg::PtgArea3d(0, 0, 1, 0, 1);
@@ -822,6 +862,12 @@ mod tests {
     fn test_encode_ptg_str_as_utf16_when_required() {
         let bytes = encode_ptg_tokens(&[Ptg::PtgStr("你好".to_string())]);
         assert_eq!(bytes, [0x17, 2, 1, 0x60, 0x4f, 0x7d, 0x59]);
+    }
+
+    #[test]
+    fn test_encode_ptg_bool() {
+        assert_eq!(encode_ptg_tokens(&[Ptg::PtgBool(true)]), [0x1d, 1]);
+        assert_eq!(encode_ptg_tokens(&[Ptg::PtgBool(false)]), [0x1d, 0]);
     }
 
     #[test]
