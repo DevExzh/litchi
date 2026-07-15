@@ -635,7 +635,7 @@ impl<'arena> TapParser<'arena> {
                         "sprmTWall operand must contain exactly 1 byte".to_string(),
                     ));
                 }
-                tap.properties_preserved_for_revision = match operand[0] {
+                let enabled = match operand[0] {
                     0 => false,
                     1 => true,
                     _ => {
@@ -644,6 +644,15 @@ impl<'arena> TapParser<'arena> {
                         ));
                     },
                 };
+                tap.preserved_properties_for_revision = if enabled {
+                    let mut previous = tap.clone();
+                    previous.properties_preserved_for_revision = false;
+                    previous.preserved_properties_for_revision = None;
+                    Some(Box::new(previous))
+                } else {
+                    None
+                };
+                tap.properties_preserved_for_revision = enabled;
             },
             0x6A => {
                 if inside_conditional {
@@ -3069,11 +3078,18 @@ mod tests {
         assert_eq!(tap.formatting_revision_author_index, Some(1));
         assert_eq!(tap.formatting_revision_timestamp, Some(timestamp));
         assert!(tap.properties_preserved_for_revision);
+        let previous = tap.preserved_properties_for_revision.as_ref().unwrap();
+        assert_eq!(previous.has_formatting_revision, Some(true));
+        assert_eq!(previous.paragraph_group_id, None);
         assert_eq!(tap.paragraph_group_id, Some(0x1020_3040));
         assert_eq!(tap.revision_save_id, Some(0xA1B2_C3D4));
 
         let invalid_wall = [0x68, 0x36, 2];
         assert!(parser.parse_tap(&invalid_wall).is_err());
+        let reset_wall = [0x68, 0x36, 1, 0x68, 0x36, 0];
+        let reset = parser.parse_tap(&reset_wall).unwrap();
+        assert!(!reset.properties_preserved_for_revision);
+        assert!(reset.preserved_properties_for_revision.is_none());
         let zero_ipgp = [0x69, 0x74, 0, 0, 0, 0];
         assert!(parser.parse_tap(&zero_ipgp).is_err());
         let truncated_rsid = [0x79, 0x74, 1, 2, 3];

@@ -56,6 +56,8 @@ pub enum TapBuildError {
     InvalidTablePosition(&'static str, i16),
     /// A wrapping distance exceeds the XAS/YAS_nonNeg range.
     InvalidWrapDistance(&'static str, u16),
+    /// A preserved row state cannot itself contain a `sprmTWall` boundary.
+    NestedPreservedState,
 }
 
 impl std::fmt::Display for TapBuildError {
@@ -135,6 +137,12 @@ impl std::fmt::Display for TapBuildError {
                 write!(
                     f,
                     "DOC {side} wrapping distance {value} exceeds 31680 twips"
+                )
+            },
+            Self::NestedPreservedState => {
+                write!(
+                    f,
+                    "DOC table revisions cannot contain nested preserved states"
                 )
             },
         }
@@ -252,6 +260,8 @@ pub struct TableRow {
     pub formatting_revision: Option<TableRevisionMark>,
     /// Preserve pre-revision properties before the `sprmTWall` boundary
     pub properties_preserved_for_revision: bool,
+    /// Full row state retained before the `sprmTWall` boundary
+    pub preserved_properties_for_revision: Option<Box<TableRow>>,
     /// Default outer and inside borders for this row
     pub borders: TableBorders,
 }
@@ -286,6 +296,7 @@ impl Default for TableRow {
             revision_save_id: None,
             formatting_revision: None,
             properties_preserved_for_revision: false,
+            preserved_properties_for_revision: None,
             borders: TableBorders::default(),
         }
     }
@@ -613,6 +624,25 @@ impl TapBuilder {
 }
 
 pub(crate) fn generate_row_sprms(row: &TableRow) -> Result<Vec<u8>, TapBuildError> {
+    if let Some(previous) = &row.preserved_properties_for_revision {
+        if previous.preserved_properties_for_revision.is_some()
+            || previous.properties_preserved_for_revision
+        {
+            return Err(TapBuildError::NestedPreservedState);
+        }
+        let mut sprms = generate_current_row_sprms(previous)?;
+        sprms.extend_from_slice(&0x3668u16.to_le_bytes());
+        sprms.push(1);
+        let mut current = row.clone();
+        current.properties_preserved_for_revision = false;
+        current.preserved_properties_for_revision = None;
+        sprms.extend_from_slice(&generate_current_row_sprms(&current)?);
+        return Ok(sprms);
+    }
+    generate_current_row_sprms(row)
+}
+
+fn generate_current_row_sprms(row: &TableRow) -> Result<Vec<u8>, TapBuildError> {
     let cell_count = row.cells.len();
     if !(1..=63).contains(&cell_count) {
         return Err(TapBuildError::InvalidCellCount(cell_count));
@@ -1793,12 +1823,19 @@ mod tests {
                 ..TableCell::default()
             }],
             justification: TableJustification::Center,
-            formatting_revision: Some(TableRevisionMark {
-                active: true,
-                author_index: 12,
-                timestamp,
-            }),
-            properties_preserved_for_revision: true,
+            preserved_properties_for_revision: Some(Box::new(TableRow {
+                cells: vec![TableCell {
+                    width: 1000,
+                    ..TableCell::default()
+                }],
+                justification: TableJustification::Right,
+                formatting_revision: Some(TableRevisionMark {
+                    active: true,
+                    author_index: 12,
+                    timestamp,
+                }),
+                ..TableRow::default()
+            })),
             ..TableRow::default()
         });
 
@@ -1810,9 +1847,17 @@ mod tests {
                 .position(|sprm| sprm.opcode == opcode)
                 .unwrap()
         };
-        assert!(position(0xD667) < position(0x3668));
-        assert!(position(0x3668) < position(0x5400));
-        assert!(position(0x3668) < position(0x548A));
+        let wall = position(0x3668);
+        assert!(position(0xD667) < wall);
+        for opcode in [0x5400, 0x548A] {
+            let positions = parsed
+                .iter()
+                .enumerate()
+                .filter_map(|(index, sprm)| (sprm.opcode == opcode).then_some(index))
+                .collect::<Vec<_>>();
+            assert!(positions[0] < wall);
+            assert!(wall < positions[1]);
+        }
 
         let tap = crate::doc::parts::tap::TableProperties::from_sprm(&sprms).unwrap();
         assert_eq!(tap.has_formatting_revision, Some(true));
@@ -1820,6 +1865,9 @@ mod tests {
         assert_eq!(tap.formatting_revision_timestamp, Some(timestamp));
         assert!(tap.properties_preserved_for_revision);
         assert_eq!(tap.justification, TableJustification::Center);
+        let previous = tap.preserved_properties_for_revision.unwrap();
+        assert_eq!(previous.justification, TableJustification::Right);
+        assert_eq!(previous.formatting_revision_author_index, Some(12));
     }
 
     #[test]
@@ -1942,6 +1990,23 @@ mod tests {
 
     #[test]
     fn rejects_unrepresentable_rows() {
+        let mut builder = TapBuilder::new();
+        builder.add_row(TableRow {
+            cells: vec![TableCell {
+                width: 1000,
+                ..TableCell::default()
+            }],
+            preserved_properties_for_revision: Some(Box::new(TableRow {
+                properties_preserved_for_revision: true,
+                ..TableRow::default()
+            })),
+            ..TableRow::default()
+        });
+        assert_eq!(
+            builder.try_generate_row_sprms(0),
+            Err(TapBuildError::NestedPreservedState)
+        );
+
         let mut builder = TapBuilder::new();
         builder.add_row(TableRow {
             cells: vec![TableCell {

@@ -179,6 +179,8 @@ pub struct TableProperties {
     pub formatting_revision_timestamp: Option<u32>,
     /// Whether pre-revision table properties are preserved
     pub properties_preserved_for_revision: bool,
+    /// Table state immediately before the active `sprmTWall` boundary
+    pub preserved_properties_for_revision: Option<Box<TableProperties>>,
     /// Nonzero `PGPInfo.ipgpSelf` associated with this row
     pub paragraph_group_id: Option<u32>,
     /// Revision save ID associated with this table formatting
@@ -655,6 +657,7 @@ impl Default for TableProperties {
             formatting_revision_author_index: None,
             formatting_revision_timestamp: None,
             properties_preserved_for_revision: false,
+            preserved_properties_for_revision: None,
             paragraph_group_id: None,
             revision_save_id: None,
             border_top: None,
