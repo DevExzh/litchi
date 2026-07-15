@@ -3303,6 +3303,128 @@ fn column_insert_preserves_unknown_tile_header_and_dependency_record_fields() {
 }
 
 #[test]
+fn row_insert_then_delete_restores_exact_package_bytes() {
+    let mut editor = NumbersEditor::from_package(test_package_with_calculation_engine()).unwrap();
+    editor
+        .set_cell(10, 1, 1, CellValue::Text("Apples".to_owned()))
+        .unwrap();
+    editor
+        .set_formula(
+            10,
+            2,
+            2,
+            FormulaExpression::cell(crate::numbers::FormulaCellReference::relative(1, 1)),
+        )
+        .unwrap();
+    let baseline = editor.to_bytes().unwrap();
+
+    editor.insert_table_row(10, 1).unwrap();
+    editor.remove_table_row(10, 1).unwrap();
+
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+}
+
+#[test]
+fn column_insert_then_delete_restores_exact_package_bytes() {
+    let mut editor =
+        NumbersEditor::from_package(test_package_with_column_headers_and_engine()).unwrap();
+    editor
+        .set_cell(10, 1, 1, CellValue::Text("Apples".to_owned()))
+        .unwrap();
+    editor
+        .set_formula(
+            10,
+            2,
+            2,
+            FormulaExpression::cell(crate::numbers::FormulaCellReference::relative(1, 1)),
+        )
+        .unwrap();
+    let baseline = editor.to_bytes().unwrap();
+
+    editor.insert_table_column(10, 1).unwrap();
+    editor.remove_table_column(10, 1).unwrap();
+
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+}
+
+#[test]
+fn removes_populated_table_axes_with_reference_cleanup_and_formula_shifts() {
+    let mut editor =
+        NumbersEditor::from_package(test_package_with_column_headers_and_engine()).unwrap();
+    editor
+        .set_cell(10, 1, 1, CellValue::Text("discarded row".to_owned()))
+        .unwrap();
+    editor
+        .set_formula(10, 2, 2, FormulaExpression::Number(7.0))
+        .unwrap();
+    editor.remove_table_row(10, 1).unwrap();
+
+    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let table = &document.sheets().unwrap()[0].tables[0];
+    assert_eq!((table.row_count, table.column_count), (3, 4));
+    assert_eq!(table.get_cell(1, 1), None);
+    assert_eq!(
+        table.get_cell(1, 2),
+        Some(&CellValue::Formula("=7".to_owned()))
+    );
+
+    editor
+        .set_cell(10, 1, 1, CellValue::Text("discarded column".to_owned()))
+        .unwrap();
+    editor.remove_table_column(10, 1).unwrap();
+    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let table = &document.sheets().unwrap()[0].tables[0];
+    assert_eq!((table.row_count, table.column_count), (3, 3));
+    assert_eq!(
+        table.get_cell(1, 1),
+        Some(&CellValue::Formula("=7".to_owned()))
+    );
+}
+
+#[test]
+fn table_axis_delete_releases_comment_graphs() {
+    for remove_row in [true, false] {
+        let mut editor = NumbersEditor::from_package(test_package_with_comments(false)).unwrap();
+        if remove_row {
+            editor.remove_table_row(10, 0).unwrap();
+        } else {
+            editor.remove_table_column(10, 1).unwrap();
+        }
+
+        let archive = editor.package().archive("Index/Document.iwa").unwrap();
+        assert!(archive.object(61).is_none());
+        assert!(archive.object(70).is_none());
+        let list =
+            TableDataList::decode(archive.object(60).unwrap().messages[0].data.as_slice()).unwrap();
+        assert!(list.entries.is_empty());
+        let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert!(document.sheets().unwrap()[0].tables[0].comments.is_empty());
+    }
+}
+
+#[test]
+fn table_axis_delete_rejects_live_formula_references_transactionally() {
+    let mut editor = NumbersEditor::from_package(test_package_with_calculation_engine()).unwrap();
+    editor
+        .set_formula(
+            10,
+            2,
+            2,
+            FormulaExpression::cell(crate::numbers::FormulaCellReference::relative(1, 1)),
+        )
+        .unwrap();
+    let baseline = editor.to_bytes().unwrap();
+
+    assert!(editor.remove_table_row(10, 1).is_err());
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+    assert!(editor.remove_table_column(10, 1).is_err());
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+    assert!(editor.remove_table_row(10, 4).is_err());
+    assert!(editor.remove_table_column(10, 4).is_err());
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+}
+
+#[test]
 fn table_header_settings_are_typed_transactional_and_wire_exact() {
     let mut package = test_package();
     package

@@ -1792,6 +1792,7 @@ mod model;
 mod row_insert;
 mod sheet_duplicate;
 mod storage;
+mod table_delete;
 mod table_dimension;
 mod table_duplicate;
 mod table_headers;
