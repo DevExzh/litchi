@@ -441,6 +441,8 @@ pub struct ParagraphFormatting {
     pub ilfo: Option<u16>,
     /// Legacy autonumber descriptor for compatibility with pre-list-table documents
     pub legacy_autonumbering: Option<LegacyAutoNumbering>,
+    /// Revision save ID associated with this paragraph's formatting
+    pub revision_save_id: Option<u32>,
     /// Mark the paragraph formatting as a tracked change.
     pub formatting_revision: Option<FormattingRevision>,
     /// Whether a numbered list was applied after the previous revision.
@@ -3695,6 +3697,10 @@ fn build_papx_grpprl(fmt: &ParagraphFormatting) -> Vec<u8> {
     if let Some(autonumbering) = &fmt.legacy_autonumbering {
         append_legacy_autonumbering(&mut grp, autonumbering);
     }
+    if let Some(revision_save_id) = fmt.revision_save_id {
+        grp.extend_from_slice(&SPRM_P_RSID.to_le_bytes());
+        grp.extend_from_slice(&revision_save_id.to_le_bytes());
+    }
 
     // Line spacing (LSPD: 4 bytes = dyaLine (i16 LE), fMulti (i16 LE))
     if let Some(ls) = fmt.line_spacing {
@@ -4745,6 +4751,22 @@ mod tests {
     }
 
     #[test]
+    fn encodes_paragraph_revision_save_id() {
+        let encoded = build_papx_grpprl(&ParagraphFormatting {
+            revision_save_id: Some(0x1122_3344),
+            ..ParagraphFormatting::default()
+        });
+        assert_eq!(
+            encoded,
+            [
+                SPRM_P_RSID.to_le_bytes().as_slice(),
+                0x1122_3344u32.to_le_bytes().as_slice(),
+            ]
+            .concat()
+        );
+    }
+
+    #[test]
     fn test_line_spacing_constructors_and_sprm_encoding() {
         let cases = [
             (LineSpacing::single(), [0xf0, 0x00, 0x01, 0x00]),
@@ -4915,6 +4937,7 @@ mod tests {
                     ilvl: Some(8),
                     ilfo: Some(1),
                     legacy_autonumbering: Some(legacy_autonumbering.clone()),
+                    revision_save_id: Some(0x1122_3344),
                     ..ParagraphFormatting::default()
                 },
             )
@@ -4959,6 +4982,10 @@ mod tests {
         assert_eq!(
             paragraphs[0].properties().legacy_autonumbering,
             Some(legacy_autonumbering)
+        );
+        assert_eq!(
+            paragraphs[0].properties().revision_save_id,
+            Some(0x1122_3344)
         );
         assert_eq!(
             paragraphs[0].properties().tab_stops,
