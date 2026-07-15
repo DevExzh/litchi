@@ -101,6 +101,31 @@ pages.save("created-with-text-box.pages")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
 
+### Create Numbers spreadsheets from scratch
+
+Scratch-created spreadsheets can add ordinary text boxes directly to a sheet.
+The complete drawable graph and metadata are generated from typed values; no
+existing text box or blank package is required:
+
+```rust
+use litchi_iwa::numbers::NumbersDocumentBuilder;
+use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+
+let mut numbers = NumbersDocumentBuilder::new()
+    .sheet_name("Forecast")
+    .table_name("Revenue")
+    .build()?;
+let sheet_id = numbers.sheets()?[0].object_id;
+numbers.add_sheet_text_box(
+    sheet_id,
+    "Prepared from typed IWA objects",
+    DrawablePoint { x: 40.0, y: 300.0 },
+    DrawableSize { width: 300.0, height: 72.0 },
+)?;
+numbers.save("created-with-text-box.numbers")?;
+# Ok::<(), litchi_iwa::Error>(())
+```
+
 ### Create Keynote presentations from scratch
 
 Scratch-created presentations can add ordinary text boxes directly to any

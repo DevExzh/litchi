@@ -1894,6 +1894,7 @@ mod table_headers;
 mod table_move;
 mod table_title;
 mod table_topology;
+mod text_box_create;
 mod text_box_duplicate;
 
 use model::*;
