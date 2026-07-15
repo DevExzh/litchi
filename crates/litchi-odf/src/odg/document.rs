@@ -85,10 +85,55 @@ impl DrawingPageProperties {
     }
 }
 
+/// Visibility target of a declared drawing layer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DrawingLayerDisplay {
+    /// Visible on every output target.
+    Always,
+    /// Visible on screen output.
+    Screen,
+    /// Visible on printed output.
+    Printer,
+    /// Hidden on every standard output target.
+    None,
+}
+
+/// An ordered layer declaration from a page's optional `draw:layer-set`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DrawingLayer {
+    name: String,
+    protected: Option<bool>,
+    display: Option<DrawingLayerDisplay>,
+}
+
+impl DrawingLayer {
+    /// Return the required `draw:name` referenced by shape `draw:layer` values.
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Return the optional `draw:protected` flag.
+    pub fn protected(&self) -> Option<bool> {
+        self.protected
+    }
+
+    /// Return the optional `draw:display` output target.
+    pub fn display(&self) -> Option<DrawingLayerDisplay> {
+        self.display
+    }
+}
+
+struct DrawingPageData {
+    properties: DrawingPageProperties,
+    layers: Vec<DrawingLayer>,
+    layer_set_seen: bool,
+}
+
 /// A page in an OpenDocument drawing.
 #[derive(Debug, Clone)]
 pub struct DrawingPage {
     properties: DrawingPageProperties,
+    layers: Vec<DrawingLayer>,
     page: Slide,
 }
 
@@ -106,6 +151,16 @@ impl DrawingPage {
     /// Return all exact standard page attributes.
     pub fn properties(&self) -> &DrawingPageProperties {
         &self.properties
+    }
+
+    /// Return ordered layer declarations from `draw:layer-set`.
+    pub fn layers(&self) -> &[DrawingLayer] {
+        &self.layers
+    }
+
+    /// Resolve a layer declaration by its exact name.
+    pub fn layer(&self, name: &str) -> Option<&DrawingLayer> {
+        self.layers.iter().find(|layer| layer.name == name)
     }
 
     /// Return every top-level drawing shape on the page.
@@ -166,7 +221,11 @@ impl DrawingDocument {
         let pages = properties
             .into_iter()
             .zip(parsed)
-            .map(|(properties, page)| DrawingPage { properties, page })
+            .map(|(data, page)| DrawingPage {
+                properties: data.properties,
+                layers: data.layers,
+                page,
+            })
             .collect();
 
         Ok(Self { package, pages })
@@ -249,7 +308,7 @@ impl DrawingDocument {
     }
 }
 
-fn validate_drawing_content(xml: &str) -> Result<Vec<DrawingPageProperties>> {
+fn validate_drawing_content(xml: &str) -> Result<Vec<DrawingPageData>> {
     let mut reader = NsReader::from_str(xml);
     let mut buffer = Vec::new();
     let mut depth = 0usize;
@@ -260,6 +319,8 @@ fn validate_drawing_content(xml: &str) -> Result<Vec<DrawingPageProperties>> {
     let mut drawing_seen = false;
     let mut drawing_open = false;
     let mut pages = Vec::new();
+    let mut active_page = None;
+    let mut layer_set_open = false;
 
     loop {
         let (namespace, event) = reader
@@ -282,6 +343,15 @@ fn validate_drawing_content(xml: &str) -> Result<Vec<DrawingPageProperties>> {
                     &mut drawing_seen,
                     &mut drawing_open,
                     &mut pages,
+                )?;
+                handle_page_child_start(
+                    &reader,
+                    is_drawing,
+                    element,
+                    depth,
+                    &mut pages,
+                    &mut active_page,
+                    &mut layer_set_open,
                 )?;
                 depth = depth.checked_add(1).ok_or_else(|| {
                     Error::InvalidFormat("drawing XML nesting overflow".to_string())
@@ -311,6 +381,15 @@ fn validate_drawing_content(xml: &str) -> Result<Vec<DrawingPageProperties>> {
                     &mut empty_drawing_open,
                     &mut pages,
                 )?;
+                handle_empty_page_child(
+                    &reader,
+                    is_drawing,
+                    element,
+                    depth,
+                    &mut pages,
+                    active_page,
+                    layer_set_open,
+                )?;
             },
             Event::End(ref element) => {
                 depth = depth.checked_sub(1).ok_or_else(|| {
@@ -326,6 +405,17 @@ fn validate_drawing_content(xml: &str) -> Result<Vec<DrawingPageProperties>> {
                     && depth == 1
                 {
                     body_open = false;
+                }
+                if bound_to(&namespace, DRAW_NAMESPACE)
+                    && element.local_name().as_ref() == b"layer-set"
+                    && depth == 4
+                {
+                    layer_set_open = false;
+                } else if bound_to(&namespace, DRAW_NAMESPACE)
+                    && element.local_name().as_ref() == b"page"
+                    && depth == 3
+                {
+                    active_page = None;
                 }
                 if depth == 0 {
                     root_closed = true;
@@ -376,7 +466,7 @@ fn validate_start_position(
     body_open: &mut bool,
     drawing_seen: &mut bool,
     drawing_open: &mut bool,
-    pages: &mut Vec<DrawingPageProperties>,
+    pages: &mut Vec<DrawingPageData>,
 ) -> Result<()> {
     let local = element.local_name();
     if depth == 0 {
@@ -416,9 +506,180 @@ fn validate_start_position(
                 "drawing exceeds one million pages".to_string(),
             ));
         }
-        pages.push(drawing_page_properties(reader, element)?);
+        pages.push(DrawingPageData {
+            properties: drawing_page_properties(reader, element)?,
+            layers: Vec::new(),
+            layer_set_seen: false,
+        });
     }
     Ok(())
+}
+
+fn handle_page_child_start(
+    reader: &NsReader<&[u8]>,
+    is_drawing: bool,
+    element: &BytesStart<'_>,
+    depth: usize,
+    pages: &mut [DrawingPageData],
+    active_page: &mut Option<usize>,
+    layer_set_open: &mut bool,
+) -> Result<()> {
+    if !is_drawing {
+        return Ok(());
+    }
+    match element.local_name().as_ref() {
+        b"page" if depth == 3 => *active_page = pages.len().checked_sub(1),
+        b"layer-set" => {
+            let Some(index) = *active_page else {
+                return Err(Error::InvalidFormat(
+                    "draw:layer-set must be contained by draw:page".to_string(),
+                ));
+            };
+            if depth != 4 || pages[index].layer_set_seen || *layer_set_open {
+                return Err(Error::InvalidFormat(
+                    "draw:layer-set is misplaced or duplicated".to_string(),
+                ));
+            }
+            pages[index].layer_set_seen = true;
+            *layer_set_open = true;
+        },
+        b"layer" => {
+            let Some(index) = *active_page else {
+                return Err(Error::InvalidFormat(
+                    "draw:layer must be contained by draw:layer-set".to_string(),
+                ));
+            };
+            if depth != 5 || !*layer_set_open {
+                return Err(Error::InvalidFormat(
+                    "draw:layer must be a direct child of draw:layer-set".to_string(),
+                ));
+            }
+            pages[index].layers.push(drawing_layer(reader, element)?);
+        },
+        _ => {},
+    }
+    Ok(())
+}
+
+fn handle_empty_page_child(
+    reader: &NsReader<&[u8]>,
+    is_drawing: bool,
+    element: &BytesStart<'_>,
+    depth: usize,
+    pages: &mut [DrawingPageData],
+    active_page: Option<usize>,
+    layer_set_open: bool,
+) -> Result<()> {
+    if !is_drawing {
+        return Ok(());
+    }
+    match element.local_name().as_ref() {
+        b"layer-set" => {
+            let Some(index) = active_page else {
+                return Err(Error::InvalidFormat(
+                    "draw:layer-set must be contained by draw:page".to_string(),
+                ));
+            };
+            if depth != 4 || pages[index].layer_set_seen || layer_set_open {
+                return Err(Error::InvalidFormat(
+                    "draw:layer-set is misplaced or duplicated".to_string(),
+                ));
+            }
+            pages[index].layer_set_seen = true;
+        },
+        b"layer" => {
+            let Some(index) = active_page else {
+                return Err(Error::InvalidFormat(
+                    "draw:layer must be contained by draw:layer-set".to_string(),
+                ));
+            };
+            if depth != 5 || !layer_set_open {
+                return Err(Error::InvalidFormat(
+                    "draw:layer must be a direct child of draw:layer-set".to_string(),
+                ));
+            }
+            pages[index].layers.push(drawing_layer(reader, element)?);
+        },
+        _ => {},
+    }
+    Ok(())
+}
+
+fn drawing_layer(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<DrawingLayer> {
+    if element.attributes().count() > 256 {
+        return Err(Error::InvalidFormat(
+            "drawing layer exceeds 256 attributes".to_string(),
+        ));
+    }
+    let mut name = None;
+    let mut protected = None;
+    let mut display = None;
+    for attribute in element.attributes() {
+        let attribute = attribute
+            .map_err(|error| Error::InvalidFormat(format!("invalid layer attribute: {error}")))?;
+        let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
+        if !bound_to(&namespace, DRAW_NAMESPACE) {
+            continue;
+        }
+        let (duplicate, display_name) = match local.as_ref() {
+            b"name" => (name.is_some(), "draw:name"),
+            b"protected" => (protected.is_some(), "draw:protected"),
+            b"display" => (display.is_some(), "draw:display"),
+            _ => continue,
+        };
+        if duplicate {
+            return Err(Error::InvalidFormat(format!(
+                "drawing layer has duplicate {display_name} attributes"
+            )));
+        }
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+            .map_err(|error| {
+                Error::InvalidFormat(format!("invalid layer attribute {display_name}: {error}"))
+            })?
+            .into_owned();
+        if value.len() > 1_048_576 {
+            return Err(Error::InvalidFormat(
+                "drawing layer attribute exceeds 1 MiB".to_string(),
+            ));
+        }
+        match local.as_ref() {
+            b"name" => name = Some(value),
+            b"protected" => {
+                protected = Some(match value.as_str() {
+                    "true" | "1" => true,
+                    "false" | "0" => false,
+                    _ => {
+                        return Err(Error::InvalidFormat(format!(
+                            "invalid draw:protected value '{value}'"
+                        )));
+                    },
+                });
+            },
+            b"display" => {
+                display = Some(match value.as_str() {
+                    "always" => DrawingLayerDisplay::Always,
+                    "screen" => DrawingLayerDisplay::Screen,
+                    "printer" => DrawingLayerDisplay::Printer,
+                    "none" => DrawingLayerDisplay::None,
+                    _ => {
+                        return Err(Error::InvalidFormat(format!(
+                            "invalid draw:display value '{value}'"
+                        )));
+                    },
+                });
+            },
+            _ => unreachable!("layer attribute filtered above"),
+        }
+    }
+    let name = name.ok_or_else(|| {
+        Error::InvalidFormat("drawing layer is missing required draw:name".to_string())
+    })?;
+    Ok(DrawingLayer {
+        name,
+        protected,
+        display,
+    })
 }
 
 fn drawing_page_properties(
@@ -537,6 +798,7 @@ mod tests {
    d:style-name="dp1" d:master-page-name="Default" d:nav-order="shape1 shape2"
    p:presentation-page-layout-name="layout1" p:use-header-name="header1"
    p:use-footer-name="footer1" p:use-date-time-name="date1">
+   <d:layer-set><d:layer d:name="layout" d:protected="1" d:display="always"/><d:layer d:name="guides &amp; notes" d:protected="false" d:display="screen"/></d:layer-set>
    <d:frame d:name="Label" s:x="1cm" s:y="2cm"><d:text-box><t:p>Hello</t:p></d:text-box></d:frame>
    <d:g d:name="Group"><d:path d:name="Curve" s:d="M 0 0 L 1 1"/></d:g>
    <d:custom-shape><d:enhanced-geometry d:type="diamond"><d:equation d:name="f0" d:formula="$0/2"/><d:handle d:handle-position="$0 $1"/></d:enhanced-geometry></d:custom-shape>
@@ -566,6 +828,14 @@ mod tests {
         assert_eq!(properties.header_name(), Some("header1"));
         assert_eq!(properties.footer_name(), Some("footer1"));
         assert_eq!(properties.date_time_name(), Some("date1"));
+        assert_eq!(document.pages()[0].layers().len(), 2);
+        let layout = document.pages()[0].layer("layout").unwrap();
+        assert_eq!(layout.protected(), Some(true));
+        assert_eq!(layout.display(), Some(DrawingLayerDisplay::Always));
+        let guides = &document.pages()[0].layers()[1];
+        assert_eq!(guides.name(), "guides & notes");
+        assert_eq!(guides.protected(), Some(false));
+        assert_eq!(guides.display(), Some(DrawingLayerDisplay::Screen));
         assert_eq!(document.pages()[0].text(), "Hello");
         assert_eq!(document.text(), "Hello");
 
@@ -648,5 +918,24 @@ mod tests {
         assert!(
             DrawingDocument::from_bytes(package(constants::ODF_DRAWING, duplicate_name)).is_err()
         );
+    }
+
+    #[test]
+    fn rejects_malformed_or_misplaced_layer_declarations() {
+        for page_content in [
+            r#"<d:layer d:name="outside"/>"#,
+            r#"<d:layer-set><d:layer/></d:layer-set>"#,
+            r#"<d:layer-set><d:layer d:name="x" d:protected="yes"/></d:layer-set>"#,
+            r#"<d:layer-set><d:layer d:name="x" d:display="web"/></d:layer-set>"#,
+            r#"<d:layer-set/><d:layer-set/>"#,
+        ] {
+            let xml = format!(
+                r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"><o:body><o:drawing><d:page>{page_content}</d:page></o:drawing></o:body></o:document-content>"#
+            );
+            assert!(
+                DrawingDocument::from_bytes(package(constants::ODF_DRAWING, &xml)).is_err(),
+                "accepted {page_content}"
+            );
+        }
     }
 }

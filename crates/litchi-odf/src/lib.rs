@@ -262,7 +262,9 @@ pub use core::{
 pub use generic::{FlatOpenDocument, OpenDocumentFamily, OpenDocumentPackage};
 pub use litchi_core::RGBColor as Color;
 pub use litchi_core::unit::{Length, LengthUnit};
-pub use odg::{DrawingDocument, DrawingPage, DrawingPageProperties};
+pub use odg::{
+    DrawingDocument, DrawingLayer, DrawingLayerDisplay, DrawingPage, DrawingPageProperties,
+};
 
 // Re-export main types for convenience
 pub use odp::{
