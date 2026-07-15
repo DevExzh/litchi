@@ -1,169 +1,484 @@
-//! StyleSheet (STSH) generation for DOC files
-//!
-//! The StyleSheet contains style definitions required for document formatting.
-//! Based on Microsoft's "[MS-DOC]" specification Section 2.9.271 and
-//! Apache POI's StyleSheet.java / StdfBaseAbstractType.java.
-//!
-//! # Structure
-//!
-//! The STSH (Style Sheet) consists of:
-//! - `cbStshi` (u16): Size of the STSHI header
-//! - STSHI header (Stshif): General stylesheet information
-//! - Array of LPStd entries: Each is a 2-byte size followed by STD data
-//!
-//! The StdfBase within each STD uses **bit-packed** fields, not separate u16s.
+//! Validated Word 97+ stylesheet (`STSH`) generation.
 
-/// Minimum number of styles required by the MS-DOC spec.
-/// Per spec: "cstd MUST be equal to or greater than 0x000F"
-const MIN_CSTD: u16 = 0x000F;
+use crate::doc::parts::styles::{StyleFlags, StyleKind, StylePost2000, StyleSheet};
+use crate::sprm::parse_sprms;
+use crate::sprm_operations::{SPRM_C_CNF, SPRM_P_CNF, get_sprm_type};
 
-/// StdfBase size in bytes (5 packed shorts = 10 bytes)
-const STDF_BASE_SIZE: u16 = 10;
+const MIN_STYLE_COUNT: usize = 15;
+const MAX_STYLE_COUNT: usize = 0x0FFD;
+const NIL_STYLE: u16 = 0x0FFF;
+const USER_STYLE_ID: u16 = 0x0FFE;
 
-/// Build a bit-packed StdfBase (10 bytes) for a style definition.
-///
-/// # Layout (per `StdfBaseAbstractType.java`):
-/// - Word 0 (info1): sti[11:0], fScratch[12], fInvalHeight[13], fHasUpe[14], fMassCopy[15]
-/// - Word 1 (info2): stk[3:0], istdBase[15:4]
-/// - Word 2 (info3): cupx[3:0], istdNext[15:4]
-/// - Word 3: bchUpe (u16)
-/// - Word 4: grfstd (u16)
-fn build_stdf_base(sti: u16, stk: u16, istd_base: u16, cupx: u16, istd_next: u16) -> [u8; 10] {
-    let mut buf = [0u8; 10];
-
-    // info1: sti in bits 0-11, flags in bits 12-15 (all 0)
-    let info1: u16 = sti & 0x0FFF;
-    buf[0..2].copy_from_slice(&info1.to_le_bytes());
-
-    // info2: stk in bits 0-3, istdBase in bits 4-15
-    let info2: u16 = (stk & 0x000F) | ((istd_base & 0x0FFF) << 4);
-    buf[2..4].copy_from_slice(&info2.to_le_bytes());
-
-    // info3: cupx in bits 0-3, istdNext in bits 4-15
-    let info3: u16 = (cupx & 0x000F) | ((istd_next & 0x0FFF) << 4);
-    buf[4..6].copy_from_slice(&info3.to_le_bytes());
-
-    // bchUpe is filled after the complete variable-size STD is built; grfstd = 0.
-
-    buf
+/// A custom style appended after the fifteen fixed DOC style slots.
+#[derive(Debug, Clone)]
+pub struct DocStyleDefinition {
+    /// Invariant built-in identifier, or `0x0FFE` for a user-defined style.
+    pub invariant_id: u16,
+    /// Paragraph, character, table, or numbering style.
+    pub kind: StyleKind,
+    /// Optional parent style index.
+    pub base_style: Option<u16>,
+    /// Style used for the paragraph following this style.
+    pub next_style: u16,
+    /// Primary style name.
+    pub name: String,
+    /// Alternate comma-free names.
+    pub aliases: Vec<String>,
+    /// Kind-specific UPX payloads in TAP/PAP/CHP order prescribed by MS-DOC.
+    pub property_sets: Vec<Vec<u8>>,
+    /// Optional Word 2000-and-later style metadata.
+    pub post_2000: Option<StylePost2000>,
+    /// Style behavior flags.
+    pub flags: StyleFlags,
 }
 
-/// Build the STD byte array for the Normal (istd=0) paragraph style.
-///
-/// Based on Apache POI's `StyleDescription.toByteArray()`.
-/// For a paragraph style, cupx=2 means two UPXs: one for paragraph (PAPX) and
-/// one for character (CHPX). Both are empty (size 0) in a minimal stylesheet.
-fn build_normal_style_std() -> Vec<u8> {
-    let mut std_data = Vec::new();
-
-    // StdfBase: sti=0 (Normal), stk=1 (paragraph), istdBase=0xFFF (none),
-    //           cupx=2 (paragraph+character UPX), istdNext=0 (Normal)
-    let stdf_base = build_stdf_base(0, 1, 0x0FFF, 2, 0);
-    std_data.extend_from_slice(&stdf_base);
-
-    // Style name: length (u16) + UTF-16LE chars + null terminator (u16)
-    let name = "Normal";
-    let name_len = name.len() as u16;
-    std_data.extend_from_slice(&name_len.to_le_bytes());
-    for c in name.encode_utf16() {
-        std_data.extend_from_slice(&c.to_le_bytes());
-    }
-    // Null terminator after name (UTF-16LE)
-    std_data.extend_from_slice(&0u16.to_le_bytes());
-
-    // UPX 1: Paragraph formatting (PAPX) - empty
-    std_data.extend_from_slice(&0u16.to_le_bytes()); // upxSize = 0
-
-    // UPX 2: Character formatting (CHPX) - empty
-    std_data.extend_from_slice(&0u16.to_le_bytes()); // upxSize = 0
-
-    let size = std_data.len() as u16;
-    std_data[6..8].copy_from_slice(&size.to_le_bytes());
-
-    std_data
-}
-
-/// Build the STD byte array for the Default Paragraph Font (istd=10) character style.
-///
-/// This is a required built-in character style (sti=65, stk=2).
-fn build_default_paragraph_font_std() -> Vec<u8> {
-    let mut std_data = Vec::new();
-
-    // StdfBase: sti=65, stk=2 (character), istdBase=0xFFF (none),
-    //           cupx=1 (character UPX only), istdNext=10 (self)
-    let stdf_base = build_stdf_base(65, 2, 0x0FFF, 1, 10);
-    std_data.extend_from_slice(&stdf_base);
-
-    // Style name
-    let name = "Default Paragraph Font";
-    let name_len = name.len() as u16;
-    std_data.extend_from_slice(&name_len.to_le_bytes());
-    for c in name.encode_utf16() {
-        std_data.extend_from_slice(&c.to_le_bytes());
-    }
-    // Null terminator
-    std_data.extend_from_slice(&0u16.to_le_bytes());
-
-    // UPX 1: Character formatting (CHPX) - empty
-    std_data.extend_from_slice(&0u16.to_le_bytes());
-
-    let size = std_data.len() as u16;
-    std_data[6..8].copy_from_slice(&size.to_le_bytes());
-
-    std_data
-}
-
-/// Generate a minimal but spec-compliant stylesheet.
-///
-/// Creates a stylesheet with:
-/// - Normal style (istd=0, paragraph style)
-/// - Default Paragraph Font (istd=10, character style)
-/// - All other required slots (istd 1-14) as null entries
-///
-/// Based on Apache POI's `StyleSheet.writeTo()` and MS-DOC spec Section 2.9.271.
-pub fn generate_minimal_stylesheet() -> Vec<u8> {
-    let mut stsh = Vec::new();
-
-    // cbStshi (size of STSHI = Stshif) = 18 bytes
-    let cb_stshi = 18u16;
-    stsh.extend_from_slice(&cb_stshi.to_le_bytes());
-
-    // Stshif (18 bytes) - General stylesheet information
-    // Per StshifAbstractType.java: 9 fields × 2 bytes = 18 bytes
-    let cstd = MIN_CSTD; // Must be >= 0x000F
-    stsh.extend_from_slice(&cstd.to_le_bytes()); // cstd
-    stsh.extend_from_slice(&STDF_BASE_SIZE.to_le_bytes()); // cbSTDBaseInFile = 10
-    stsh.extend_from_slice(&1u16.to_le_bytes()); // info3: fHasOriginalStyle=1
-    stsh.extend_from_slice(&cstd.to_le_bytes()); // stiMaxWhenSaved
-    stsh.extend_from_slice(&cstd.to_le_bytes()); // istdMaxFixedWhenSaved
-    stsh.extend_from_slice(&0u16.to_le_bytes()); // nVerBuiltInNamesWhenSaved
-    stsh.extend_from_slice(&0u16.to_le_bytes()); // ftcAsci (default font)
-    stsh.extend_from_slice(&0u16.to_le_bytes()); // ftcFE (default font)
-    stsh.extend_from_slice(&0u16.to_le_bytes()); // ftcOther (default font)
-
-    // Write LPStd array (cstd entries)
-    // Each entry: 2-byte cbStd + STD data (or cbStd=0 for null entry)
-    for istd in 0..cstd {
-        let std_data = match istd {
-            0 => Some(build_normal_style_std()),
-            10 => Some(build_default_paragraph_font_std()),
-            _ => None, // Null entry
+impl DocStyleDefinition {
+    /// Create an empty user-defined style with the required UPX count.
+    pub fn new(kind: StyleKind, name: impl Into<String>) -> Self {
+        let property_count = match kind {
+            StyleKind::Paragraph => 2,
+            StyleKind::Character | StyleKind::Numbering => 1,
+            StyleKind::Table => 3,
         };
-
-        if let Some(data) = std_data {
-            // cbStd excludes the outer alignment byte.
-            let std_size = data.len() as u16;
-            stsh.extend_from_slice(&std_size.to_le_bytes());
-            stsh.extend_from_slice(&data);
-            // Pad to word boundary if needed
-            if std_size % 2 == 1 {
-                stsh.push(0);
-            }
-        } else {
-            // Null style entry: cbStd = 0
-            stsh.extend_from_slice(&0u16.to_le_bytes());
+        Self {
+            invariant_id: USER_STYLE_ID,
+            kind,
+            base_style: None,
+            next_style: 0,
+            name: name.into(),
+            aliases: Vec::new(),
+            property_sets: vec![Vec::new(); property_count],
+            post_2000: None,
+            flags: StyleFlags::default(),
         }
     }
 
-    stsh
+    /// Set the parent style index.
+    pub fn with_base_style(mut self, index: u16) -> Self {
+        self.base_style = Some(index);
+        self
+    }
+
+    /// Set the following-paragraph style index.
+    pub fn with_next_style(mut self, index: u16) -> Self {
+        self.next_style = index;
+        self
+    }
+
+    /// Add an alternate style name.
+    pub fn with_alias(mut self, alias: impl Into<String>) -> Self {
+        self.aliases.push(alias.into());
+        self
+    }
+
+    /// Replace the kind-specific raw UPX payloads.
+    pub fn with_property_sets(mut self, property_sets: Vec<Vec<u8>>) -> Self {
+        self.property_sets = property_sets;
+        self
+    }
+
+    /// Attach Word 2000-and-later metadata.
+    pub fn with_post_2000(mut self, metadata: StylePost2000) -> Self {
+        self.post_2000 = Some(metadata);
+        self
+    }
+}
+
+/// Error returned when a custom DOC stylesheet cannot be represented safely.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StyleWriteError(String);
+
+impl std::fmt::Display for StyleWriteError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+impl std::error::Error for StyleWriteError {}
+
+fn invalid(message: impl Into<String>) -> StyleWriteError {
+    StyleWriteError(message.into())
+}
+
+fn required_property_count(style: &DocStyleDefinition) -> Result<usize, StyleWriteError> {
+    let revision_marked = style
+        .post_2000
+        .as_ref()
+        .is_some_and(|metadata| metadata.has_original_style);
+    if revision_marked {
+        return Err(invalid(
+            "revision-marked DOC style emission requires typed revision metadata",
+        ));
+    }
+    match (style.kind, revision_marked) {
+        (StyleKind::Paragraph, false) => Ok(2),
+        (StyleKind::Character, false) => Ok(1),
+        (StyleKind::Table, false) => Ok(3),
+        (StyleKind::Numbering, false) => Ok(1),
+        (_, true) => unreachable!(),
+    }
+}
+
+fn validate_grpprl(
+    bytes: &[u8],
+    expected_type: u8,
+    forbidden_conditional: Option<u16>,
+    description: &str,
+) -> Result<(), StyleWriteError> {
+    let sprms = parse_sprms(bytes);
+    let consumed = sprms.last().map_or(0, |sprm| sprm.offset + sprm.size);
+    if consumed != bytes.len() {
+        return Err(invalid(format!("{description} contains a truncated SPRM")));
+    }
+    if sprms
+        .iter()
+        .any(|sprm| get_sprm_type(sprm.opcode) != expected_type)
+    {
+        return Err(invalid(format!(
+            "{description} contains an SPRM for the wrong property group"
+        )));
+    }
+    if forbidden_conditional.is_some_and(|opcode| sprms.iter().any(|sprm| sprm.opcode == opcode)) {
+        return Err(invalid(format!(
+            "{description} contains conditional formatting outside a table style"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_style(style: &DocStyleDefinition, index: u16) -> Result<(), StyleWriteError> {
+    if style.invariant_id > USER_STYLE_ID {
+        return Err(invalid(
+            "DOC style invariant identifiers cannot exceed 0x0FFE",
+        ));
+    }
+    if style.name.is_empty()
+        || style.name.contains(',')
+        || style
+            .aliases
+            .iter()
+            .any(|alias| alias.is_empty() || alias.contains(','))
+    {
+        return Err(invalid(
+            "DOC style names and aliases must be nonempty and cannot contain commas",
+        ));
+    }
+    if style.next_style > USER_STYLE_ID || style.base_style.is_some_and(|base| base > USER_STYLE_ID)
+    {
+        return Err(invalid("DOC style references cannot exceed 0x0FFE"));
+    }
+    let expected = required_property_count(style)?;
+    if style.property_sets.len() != expected {
+        return Err(invalid(format!(
+            "DOC style {index} has {} UPX records; expected {expected}",
+            style.property_sets.len()
+        )));
+    }
+    if let Some(metadata) = &style.post_2000 {
+        if metadata.priority > 99 || metadata.html_font_category > 7 {
+            return Err(invalid(
+                "DOC post-2000 style metadata is outside its bit-field range",
+            ));
+        }
+        if metadata
+            .linked_style
+            .is_some_and(|linked| linked == 0 || linked > USER_STYLE_ID)
+        {
+            return Err(invalid(
+                "DOC linked style index must be between 1 and 0x0FFE",
+            ));
+        }
+    }
+    match style.kind {
+        StyleKind::Paragraph => {
+            validate_grpprl(
+                &style.property_sets[0],
+                1,
+                Some(SPRM_P_CNF),
+                "paragraph-style UpxPapx",
+            )?;
+            validate_grpprl(
+                &style.property_sets[1],
+                2,
+                Some(SPRM_C_CNF),
+                "paragraph-style UpxChpx",
+            )?;
+        },
+        StyleKind::Character => validate_grpprl(
+            &style.property_sets[0],
+            2,
+            Some(SPRM_C_CNF),
+            "character-style UpxChpx",
+        )?,
+        StyleKind::Table => {
+            validate_grpprl(&style.property_sets[0], 5, None, "table-style UpxTapx")?;
+            validate_grpprl(&style.property_sets[1], 1, None, "table-style UpxPapx")?;
+            validate_grpprl(&style.property_sets[2], 2, None, "table-style UpxChpx")?;
+        },
+        StyleKind::Numbering => validate_grpprl(
+            &style.property_sets[0],
+            1,
+            Some(SPRM_P_CNF),
+            "numbering-style UpxPapx",
+        )?,
+    }
+    Ok(())
+}
+
+fn kind_code(kind: StyleKind) -> u16 {
+    match kind {
+        StyleKind::Paragraph => 1,
+        StyleKind::Character => 2,
+        StyleKind::Table => 3,
+        StyleKind::Numbering => 4,
+    }
+}
+
+fn flags_word(flags: &StyleFlags) -> u16 {
+    u16::from(flags.auto_redefine)
+        | (u16::from(flags.hidden) << 1)
+        | (u16::from(flags.legacy_languages_set) << 2)
+        | (u16::from(flags.copy_language) << 3)
+        | (u16::from(flags.personal_compose) << 4)
+        | (u16::from(flags.personal_reply) << 5)
+        | (u16::from(flags.personal) << 6)
+        | (u16::from(flags.semi_hidden) << 8)
+        | (u16::from(flags.locked) << 9)
+        | (u16::from(flags.unhide_when_used) << 11)
+        | (u16::from(flags.quick_format) << 12)
+}
+
+fn serialize_style(
+    style: &DocStyleDefinition,
+    index: u16,
+    stdf_size: usize,
+) -> Result<Vec<u8>, StyleWriteError> {
+    validate_style(style, index)?;
+    let property_count = style.property_sets.len();
+    let mut bytes = vec![0u8; stdf_size];
+    let info1 = style.invariant_id | (u16::from(style.flags.invalidate_height) << 13);
+    let info2 = kind_code(style.kind) | (style.base_style.unwrap_or(NIL_STYLE) << 4);
+    let info3 = property_count as u16 | (style.next_style << 4);
+    bytes[0..2].copy_from_slice(&info1.to_le_bytes());
+    bytes[2..4].copy_from_slice(&info2.to_le_bytes());
+    bytes[4..6].copy_from_slice(&info3.to_le_bytes());
+    bytes[8..10].copy_from_slice(&flags_word(&style.flags).to_le_bytes());
+    if stdf_size == 18
+        && let Some(metadata) = &style.post_2000
+    {
+        let post_info1 =
+            metadata.linked_style.unwrap_or(0) | (u16::from(metadata.has_original_style) << 12);
+        let post_info3 = u16::from(metadata.html_font_category) | (metadata.priority << 4);
+        bytes[10..12].copy_from_slice(&post_info1.to_le_bytes());
+        bytes[12..16].copy_from_slice(&metadata.revision_id.to_le_bytes());
+        bytes[16..18].copy_from_slice(&post_info3.to_le_bytes());
+    }
+
+    let combined_name = std::iter::once(style.name.as_str())
+        .chain(style.aliases.iter().map(String::as_str))
+        .collect::<Vec<_>>()
+        .join(",");
+    let name = combined_name.encode_utf16().collect::<Vec<_>>();
+    let name_len = u16::try_from(name.len()).map_err(|_| invalid("DOC style name is too long"))?;
+    bytes.extend_from_slice(&name_len.to_le_bytes());
+    bytes.extend(name.into_iter().flat_map(u16::to_le_bytes));
+    bytes.extend_from_slice(&0u16.to_le_bytes());
+    for property_set in &style.property_sets {
+        let size = u16::try_from(property_set.len())
+            .map_err(|_| invalid("DOC style UPX payload exceeds 65535 bytes"))?;
+        bytes.extend_from_slice(&size.to_le_bytes());
+        bytes.extend_from_slice(property_set);
+        if size % 2 != 0 {
+            bytes.push(0);
+        }
+    }
+    let size = u16::try_from(bytes.len())
+        .map_err(|_| invalid("DOC STD exceeds the 65535-byte representation limit"))?;
+    if size > i16::MAX as u16 {
+        return Err(invalid("DOC STD exceeds the signed LPStd size range"));
+    }
+    bytes[6..8].copy_from_slice(&size.to_le_bytes());
+    Ok(bytes)
+}
+
+fn normal_style() -> DocStyleDefinition {
+    let mut style = DocStyleDefinition::new(StyleKind::Paragraph, "Normal");
+    style.invariant_id = 0;
+    style.next_style = 0;
+    style
+}
+
+fn default_font_style() -> DocStyleDefinition {
+    let mut style = DocStyleDefinition::new(StyleKind::Character, "Default Paragraph Font");
+    style.invariant_id = 65;
+    style.next_style = 10;
+    style
+}
+
+/// Generate a complete stylesheet containing required built-ins and custom styles.
+pub fn generate_stylesheet(
+    custom_styles: &[DocStyleDefinition],
+) -> Result<Vec<u8>, StyleWriteError> {
+    let style_count = MIN_STYLE_COUNT
+        .checked_add(custom_styles.len())
+        .ok_or_else(|| invalid("DOC stylesheet style count overflows"))?;
+    if style_count > MAX_STYLE_COUNT {
+        return Err(invalid("DOC stylesheet exceeds 4093 style slots"));
+    }
+    let stdf_size = if custom_styles.iter().any(|style| style.post_2000.is_some()) {
+        18usize
+    } else {
+        10
+    };
+    let mut stsh = Vec::new();
+    stsh.extend_from_slice(&18u16.to_le_bytes());
+    stsh.extend_from_slice(&(style_count as u16).to_le_bytes());
+    stsh.extend_from_slice(&(stdf_size as u16).to_le_bytes());
+    stsh.extend_from_slice(&1u16.to_le_bytes());
+    stsh.extend_from_slice(&15u16.to_le_bytes());
+    stsh.extend_from_slice(&15u16.to_le_bytes());
+    stsh.extend_from_slice(&0u16.to_le_bytes());
+    stsh.extend_from_slice(&0i16.to_le_bytes());
+    stsh.extend_from_slice(&0i16.to_le_bytes());
+    stsh.extend_from_slice(&0i16.to_le_bytes());
+
+    for index in 0..style_count {
+        let style = match index {
+            0 => Some(normal_style()),
+            10 => Some(default_font_style()),
+            15.. => Some(custom_styles[index - 15].clone()),
+            _ => None,
+        };
+        if let Some(style) = style {
+            let bytes = serialize_style(&style, index as u16, stdf_size)?;
+            stsh.extend_from_slice(&(bytes.len() as u16).to_le_bytes());
+            stsh.extend_from_slice(&bytes);
+            if bytes.len() % 2 != 0 {
+                stsh.push(0);
+            }
+        } else {
+            stsh.extend_from_slice(&0u16.to_le_bytes());
+        }
+    }
+    StyleSheet::parse_data(&stsh, 0)
+        .map_err(|error| invalid(format!("generated DOC stylesheet is invalid: {error}")))?;
+    Ok(stsh)
+}
+
+/// Generate the mandatory minimal Word 97+ stylesheet.
+pub fn generate_minimal_stylesheet() -> Vec<u8> {
+    generate_stylesheet(&[]).expect("the built-in DOC stylesheet is valid")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::doc::parts::chp::CharacterProperties;
+    use crate::doc::parts::pap::ParagraphProperties;
+    use crate::doc::parts::tap::{
+        TableConditionalFormatting, TableStyleCondition, TableStyleDefaults,
+    };
+    use crate::doc::writer::tap::generate_table_style_sprms_with_conditionals;
+    use crate::sprm_operations::{SPRM_C_F_BOLD, SPRM_P_F_KEEP};
+
+    fn conditional(opcode: u16, condition: u16, nested: &[u8]) -> Vec<u8> {
+        let mut bytes = opcode.to_le_bytes().to_vec();
+        bytes.push((nested.len() + 2) as u8);
+        bytes.extend_from_slice(&condition.to_le_bytes());
+        bytes.extend_from_slice(nested);
+        bytes
+    }
+
+    #[test]
+    fn minimal_stylesheet_round_trips() {
+        let bytes = generate_minimal_stylesheet();
+        let parsed = StyleSheet::parse_data(&bytes, 0).unwrap();
+        assert_eq!(parsed.styles().len(), 15);
+        assert_eq!(parsed.get(0).unwrap().name, "Normal");
+        assert_eq!(parsed.get(10).unwrap().name, "Default Paragraph Font");
+    }
+
+    #[test]
+    fn custom_table_style_round_trips_all_conditional_domains() {
+        let tapx = generate_table_style_sprms_with_conditionals(
+            &TableStyleDefaults::default(),
+            &[TableConditionalFormatting {
+                condition: TableStyleCondition::HeaderRow,
+                properties: TableStyleDefaults {
+                    no_wrap: Some(true),
+                    ..TableStyleDefaults::default()
+                },
+                raw_grpprl: Vec::new(),
+            }],
+        )
+        .unwrap();
+        let pap_nested = [SPRM_P_F_KEEP.to_le_bytes().as_slice(), &[1]].concat();
+        let papx = conditional(SPRM_P_CNF, 0x0001, &pap_nested);
+        let chp_nested = [SPRM_C_F_BOLD.to_le_bytes().as_slice(), &[1]].concat();
+        let chpx = conditional(SPRM_C_CNF, 0x0008, &chp_nested);
+        let style = DocStyleDefinition::new(StyleKind::Table, "Grid Accent")
+            .with_alias("Accent Grid")
+            .with_property_sets(vec![tapx, papx, chpx])
+            .with_post_2000(StylePost2000 {
+                linked_style: None,
+                has_original_style: false,
+                revision_id: 0x1122_3344,
+                html_font_category: 2,
+                priority: 42,
+            });
+
+        let bytes = generate_stylesheet(&[style]).unwrap();
+        let parsed = StyleSheet::parse_data(&bytes, 0).unwrap();
+        assert_eq!(parsed.header().stdf_size, 18);
+        let style = parsed.get(15).unwrap();
+        assert_eq!(style.aliases, ["Accent Grid"]);
+        assert_eq!(style.post_2000.as_ref().unwrap().priority, 42);
+        let (_, table) = parsed.resolve_table_properties(15).unwrap();
+        assert_eq!(table.conditional_formats.len(), 1);
+        assert_eq!(table.conditional_formats[0].properties.no_wrap, Some(true));
+        let paragraph =
+            ParagraphProperties::from_sprm(style.paragraph_properties().unwrap()).unwrap();
+        assert!(paragraph.conditional_formats[0].properties.keep_on_page);
+        let character =
+            CharacterProperties::from_sprm(style.character_properties().unwrap()).unwrap();
+        assert_eq!(
+            character.conditional_formats[0].properties.is_bold,
+            Some(true)
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_custom_styles() {
+        let wrong_count =
+            DocStyleDefinition::new(StyleKind::Table, "Wrong").with_property_sets(vec![Vec::new()]);
+        assert!(generate_stylesheet(&[wrong_count]).is_err());
+
+        let wrong_type = DocStyleDefinition::new(StyleKind::Table, "Wrong Type")
+            .with_property_sets(vec![
+                [SPRM_C_F_BOLD.to_le_bytes().as_slice(), &[1]].concat(),
+                Vec::new(),
+                Vec::new(),
+            ]);
+        assert!(generate_stylesheet(&[wrong_type]).is_err());
+
+        let conditional_paragraph = DocStyleDefinition::new(StyleKind::Paragraph, "Not Table")
+            .with_property_sets(vec![conditional(SPRM_P_CNF, 1, &[]), Vec::new()]);
+        assert!(generate_stylesheet(&[conditional_paragraph]).is_err());
+
+        let self_based = DocStyleDefinition::new(StyleKind::Table, "Cycle").with_base_style(15);
+        assert!(generate_stylesheet(&[self_based]).is_err());
+
+        let duplicate = DocStyleDefinition::new(StyleKind::Table, "Normal");
+        assert!(generate_stylesheet(&[duplicate]).is_err());
+
+        let revision_marked = DocStyleDefinition::new(StyleKind::Character, "Revised")
+            .with_post_2000(StylePost2000 {
+                linked_style: None,
+                has_original_style: true,
+                revision_id: 1,
+                html_font_category: 0,
+                priority: 0,
+            });
+        assert!(generate_stylesheet(&[revision_marked]).is_err());
+    }
 }

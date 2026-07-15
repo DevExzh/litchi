@@ -90,12 +90,13 @@ pub use shapes::DocShape;
 pub use table::{Cell, Row, Table};
 pub use writer::{
     AutoNumberAlignment, BookmarkEntry, CharacterFormatting, CommentEntry, DisplayFieldRevision,
-    DocWriteError, DocWriter, DropCap, DropCapType, FontAlignment, FormattingRevision, FrameAnchor,
-    FrameHeight, FrameHorizontalAnchor, FrameHorizontalPosition, FrameTextFlow, FrameTextWrap,
-    FrameVerticalAnchor, FrameVerticalPosition, LegacyAutoNumbering, LegacyBorderPosition,
-    LegacyBorderStyle, LineSpacing, NumberingRevision, ParagraphBorder, ParagraphBorderStyle,
-    ParagraphBorders, ParagraphFormatting, ParagraphShading, PhysicalJustification, TabAlignment,
-    TabLeader, TabStop, TextBoxTightWrap, TextRevision,
+    DocStyleDefinition, DocWriteError, DocWriter, DropCap, DropCapType, FontAlignment,
+    FormattingRevision, FrameAnchor, FrameHeight, FrameHorizontalAnchor, FrameHorizontalPosition,
+    FrameTextFlow, FrameTextWrap, FrameVerticalAnchor, FrameVerticalPosition, LegacyAutoNumbering,
+    LegacyBorderPosition, LegacyBorderStyle, LineSpacing, NumberingRevision, ParagraphBorder,
+    ParagraphBorderStyle, ParagraphBorders, ParagraphFormatting, ParagraphShading,
+    PhysicalJustification, StyleWriteError, TabAlignment, TabLeader, TabStop, TextBoxTightWrap,
+    TextRevision,
 };
 
 /// Crate-native ordered document element returned by [`Document::elements`].

@@ -197,6 +197,8 @@ enum MainReferenceKind {
 /// Character formatting properties
 #[derive(Debug, Clone, Default)]
 pub struct CharacterFormatting {
+    /// Style-sheet index of the applied character style.
+    pub style_index: Option<u16>,
     /// Bold
     pub bold: Option<bool>,
     /// Italic
@@ -323,6 +325,8 @@ impl Default for LineSpacing {
 /// Paragraph formatting properties
 #[derive(Debug, Clone, Default)]
 pub struct ParagraphFormatting {
+    /// Style-sheet index of the applied paragraph style.
+    pub style_index: Option<u16>,
     /// Alignment (0=left, 1=center, 2=right, 3=justify)
     pub alignment: Option<u8>,
     /// Explicit Word 97 physical justification for compatibility readers
@@ -548,6 +552,8 @@ pub struct DocWriter {
     section_formatting_revision: Option<FormattingRevision>,
     /// Numbering writer for list tables
     numbering: NumberingWriter,
+    /// User-defined styles appended after the fifteen fixed style slots
+    styles: Vec<super::stylesheet::DocStyleDefinition>,
 }
 
 impl DocWriter {
@@ -569,7 +575,27 @@ impl DocWriter {
             bookmarks: Vec::new(),
             section_formatting_revision: None,
             numbering: NumberingWriter::new(),
+            styles: Vec::new(),
         }
+    }
+
+    /// Add a custom paragraph, character, table, or numbering style.
+    ///
+    /// Custom styles occupy consecutive indices beginning at 15. The returned
+    /// index can be used by the corresponding formatting properties.
+    pub fn add_style(
+        &mut self,
+        style: super::stylesheet::DocStyleDefinition,
+    ) -> Result<u16, DocWriteError> {
+        let index = 15usize
+            .checked_add(self.styles.len())
+            .and_then(|index| u16::try_from(index).ok())
+            .filter(|index| *index <= 0x0FFC)
+            .ok_or_else(|| {
+                DocWriteError::InvalidData("DOC stylesheet exceeds 4093 style slots".to_string())
+            })?;
+        self.styles.push(style);
+        Ok(index)
     }
 
     /// Add a paragraph with plain text
@@ -1428,6 +1454,104 @@ impl DocWriter {
         Ok(Some(RevisionWriterData { indexes, table }))
     }
 
+    fn validate_style_reference(
+        &self,
+        index: u16,
+        expected_kind: crate::doc::StyleKind,
+        context: &str,
+    ) -> Result<(), DocWriteError> {
+        let actual_kind = match index {
+            0 => Some(crate::doc::StyleKind::Paragraph),
+            10 => Some(crate::doc::StyleKind::Character),
+            15..=0x0FFC => self
+                .styles
+                .get(usize::from(index - 15))
+                .map(|style| style.kind),
+            _ => None,
+        };
+        let Some(actual_kind) = actual_kind else {
+            return Err(DocWriteError::InvalidData(format!(
+                "{context} references undefined DOC style index {index}"
+            )));
+        };
+        if actual_kind != expected_kind {
+            return Err(DocWriteError::InvalidData(format!(
+                "{context} references {actual_kind:?} DOC style {index}, expected {expected_kind:?}"
+            )));
+        }
+        Ok(())
+    }
+
+    fn validate_character_style_references(
+        &self,
+        formatting: &CharacterFormatting,
+        context: &str,
+    ) -> Result<(), DocWriteError> {
+        if let Some(index) = formatting.style_index {
+            self.validate_style_reference(index, crate::doc::StyleKind::Character, context)?;
+        }
+        if let Some(previous) = &formatting.preserved_properties_for_revision {
+            self.validate_character_style_references(previous, context)?;
+        }
+        Ok(())
+    }
+
+    fn validate_paragraph_style_references(
+        &self,
+        formatting: &ParagraphFormatting,
+        context: &str,
+    ) -> Result<(), DocWriteError> {
+        if let Some(index) = formatting.style_index {
+            self.validate_style_reference(index, crate::doc::StyleKind::Paragraph, context)?;
+        }
+        if let Some(previous) = &formatting.preserved_properties_for_revision {
+            self.validate_paragraph_style_references(previous, context)?;
+        }
+        Ok(())
+    }
+
+    fn validate_table_style_references(
+        &self,
+        formatting: &super::tap::TableRow,
+        context: &str,
+    ) -> Result<(), DocWriteError> {
+        if let Some(index) = formatting.table_style_index {
+            self.validate_style_reference(index, crate::doc::StyleKind::Table, context)?;
+        }
+        if let Some(previous) = &formatting.preserved_properties_for_revision {
+            self.validate_table_style_references(previous, context)?;
+        }
+        Ok(())
+    }
+
+    fn validate_style_references(&self) -> Result<(), DocWriteError> {
+        let table_paragraphs = self.tables.iter().flat_map(|table| {
+            table
+                .rows
+                .iter()
+                .flat_map(|row| row.cells.iter())
+                .flat_map(|cell| cell.paragraphs.iter())
+        });
+        for paragraph in self.paragraphs.iter().chain(table_paragraphs) {
+            self.validate_paragraph_style_references(
+                &paragraph.formatting,
+                "DOC paragraph formatting",
+            )?;
+            for run in &paragraph.runs {
+                self.validate_character_style_references(
+                    &run.formatting,
+                    "DOC character formatting",
+                )?;
+            }
+        }
+        for table in &self.tables {
+            for row in &table.rows {
+                self.validate_table_style_references(&row.formatting, "DOC table row formatting")?;
+            }
+        }
+        Ok(())
+    }
+
     fn append_revision_author_table(
         fib: &mut FibBuilder,
         table_stream: &mut Vec<u8>,
@@ -2054,6 +2178,8 @@ impl DocWriter {
     /// - Text stream with piece table - [MS-DOC] Section 2.8
     /// - Character and paragraph formatting via SPRMs - [MS-DOC] Section 2.6.1
     pub fn save<P: AsRef<std::path::Path>>(&mut self, path: P) -> Result<(), DocWriteError> {
+        self.validate_style_references()?;
+
         // Based on Apache POI's HWPFDocument.write() implementation
         // This includes ALL mandatory structures required by Microsoft Word
 
@@ -2337,7 +2463,8 @@ impl DocWriter {
         let mut table_offset = 0u32;
 
         // 3. Write StyleSheet to table stream (MANDATORY - POI line 681-684)
-        let stylesheet_data = crate::doc::writer::stylesheet::generate_minimal_stylesheet();
+        let stylesheet_data = crate::doc::writer::stylesheet::generate_stylesheet(&self.styles)
+            .map_err(|error| DocWriteError::InvalidData(error.to_string()))?;
         fib.set_stshf(table_offset, stylesheet_data.len() as u32);
         table_stream.extend_from_slice(&stylesheet_data);
         table_offset = table_stream.len() as u32;
@@ -2648,6 +2775,8 @@ impl DocWriter {
         &mut self,
         writer: &mut W,
     ) -> Result<(), DocWriteError> {
+        self.validate_style_references()?;
+
         // Same implementation as save() but writes to a writer
         // Based on Apache POI's HWPFDocument.write() implementation
 
@@ -2909,7 +3038,8 @@ impl DocWriter {
 
         let mut table_offset = 0u32;
 
-        let stylesheet_data = crate::doc::writer::stylesheet::generate_minimal_stylesheet();
+        let stylesheet_data = crate::doc::writer::stylesheet::generate_stylesheet(&self.styles)
+            .map_err(|error| DocWriteError::InvalidData(error.to_string()))?;
         fib.set_stshf(table_offset, stylesheet_data.len() as u32);
         table_stream.extend_from_slice(&stylesheet_data);
         table_offset = table_stream.len() as u32;
@@ -3215,6 +3345,9 @@ fn build_chpx_grpprl(fmt: &CharacterFormatting, font_builder: &mut FontTableBuil
         grp.extend_from_slice(&val.to_le_bytes());
     }
 
+    if let Some(style_index) = fmt.style_index {
+        push_word(&mut grp, SPRM_C_ISTD, style_index);
+    }
     // Bold
     if let Some(b) = fmt.bold {
         push_byte(&mut grp, SPRM_C_F_BOLD, if b { 1 } else { 0 });
@@ -3458,6 +3591,9 @@ fn build_papx_grpprl(fmt: &ParagraphFormatting) -> Vec<u8> {
         grp.push(if val { 1 } else { 0 });
     }
 
+    if let Some(style_index) = fmt.style_index {
+        push_u16(&mut grp, SPRM_P_ISTD, style_index);
+    }
     // Alignment. Emit a compatible physical value before the authoritative logical value.
     if let Some(jc) = fmt.alignment {
         let physical = match jc {
@@ -4248,6 +4384,135 @@ mod tests {
         let writer = DocWriter::new();
         assert_eq!(writer.paragraphs.len(), 0);
         assert_eq!(writer.tables.len(), 0);
+    }
+
+    #[test]
+    fn writes_custom_styles_into_document_stylesheet() {
+        let mut writer = DocWriter::new();
+        let paragraph_style = writer
+            .add_style(super::super::stylesheet::DocStyleDefinition::new(
+                crate::doc::StyleKind::Paragraph,
+                "Custom Body",
+            ))
+            .unwrap();
+        let character_style = writer
+            .add_style(super::super::stylesheet::DocStyleDefinition::new(
+                crate::doc::StyleKind::Character,
+                "Custom Emphasis",
+            ))
+            .unwrap();
+        let table_style = writer
+            .add_style(super::super::stylesheet::DocStyleDefinition::new(
+                crate::doc::StyleKind::Table,
+                "Custom Grid",
+            ))
+            .unwrap();
+        assert_eq!(
+            (paragraph_style, character_style, table_style),
+            (15, 16, 17)
+        );
+        writer
+            .add_paragraph_with_format(
+                "Styled document",
+                CharacterFormatting {
+                    style_index: Some(character_style),
+                    ..CharacterFormatting::default()
+                },
+                ParagraphFormatting {
+                    style_index: Some(paragraph_style),
+                    ..ParagraphFormatting::default()
+                },
+            )
+            .unwrap();
+        let table = writer.add_table(1, 1).unwrap();
+        writer
+            .set_table_row_formatting(
+                table,
+                0,
+                super::super::tap::TableRow {
+                    cells: vec![super::super::tap::TableCell::default()],
+                    table_style_index: Some(table_style),
+                    ..super::super::tap::TableRow::default()
+                },
+            )
+            .unwrap();
+
+        let mut cursor = Cursor::new(Vec::new());
+        writer.write_to(&mut cursor).unwrap();
+        let mut package =
+            crate::doc::Package::from_reader(Cursor::new(cursor.into_inner())).unwrap();
+        let document = package.document().unwrap();
+        let stylesheet = document.stylesheet().unwrap();
+        assert_eq!(stylesheet.styles().len(), 18);
+        assert_eq!(stylesheet.get(paragraph_style).unwrap().name, "Custom Body");
+        assert_eq!(
+            stylesheet.get(character_style).unwrap().name,
+            "Custom Emphasis"
+        );
+        assert_eq!(stylesheet.get(table_style).unwrap().name, "Custom Grid");
+        assert_eq!(
+            stylesheet.get(table_style).unwrap().kind,
+            crate::doc::StyleKind::Table
+        );
+        let paragraphs = document.paragraphs().unwrap();
+        assert_eq!(
+            paragraphs[0].properties().style_index,
+            Some(paragraph_style)
+        );
+        assert_eq!(
+            paragraphs[0].runs().unwrap()[0].properties().style_index,
+            Some(character_style)
+        );
+        assert_eq!(
+            document.tables().unwrap()[0].rows().unwrap()[0]
+                .properties()
+                .unwrap()
+                .table_style_index,
+            Some(table_style)
+        );
+    }
+
+    #[test]
+    fn rejects_undefined_or_wrong_kind_style_references() {
+        let error_for_paragraph_style = |style_index| {
+            let mut writer = DocWriter::new();
+            writer
+                .add_formatted_paragraph(
+                    "text",
+                    ParagraphFormatting {
+                        style_index: Some(style_index),
+                        ..ParagraphFormatting::default()
+                    },
+                )
+                .unwrap();
+            writer
+                .write_to(&mut Cursor::new(Vec::new()))
+                .unwrap_err()
+                .to_string()
+        };
+        assert!(error_for_paragraph_style(14).contains("undefined DOC style index 14"));
+
+        let mut writer = DocWriter::new();
+        let character_style = writer
+            .add_style(super::super::stylesheet::DocStyleDefinition::new(
+                crate::doc::StyleKind::Character,
+                "Wrong Kind",
+            ))
+            .unwrap();
+        writer
+            .add_formatted_paragraph(
+                "text",
+                ParagraphFormatting {
+                    style_index: Some(character_style),
+                    ..ParagraphFormatting::default()
+                },
+            )
+            .unwrap();
+        let error = writer
+            .write_to(&mut Cursor::new(Vec::new()))
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("Character DOC style 15, expected Paragraph"));
     }
 
     #[test]

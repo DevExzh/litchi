@@ -47,7 +47,7 @@ pub enum StyleKind {
 }
 
 /// Miscellaneous flags stored in `StdfBase` and `GRFSTD`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct StyleFlags {
     /// Paragraph heights for this style need to be recalculated.
     pub invalidate_height: bool,
@@ -310,7 +310,7 @@ impl StyleSheet {
         }
     }
 
-    fn parse_data(data: &[u8], stream_offset: usize) -> Result<Self> {
+    pub(crate) fn parse_data(data: &[u8], stream_offset: usize) -> Result<Self> {
         let cb_stshi = usize::from(read_u16(data, 0, "cbStshi")?);
         if cb_stshi < STSHIF_SIZE {
             return Err(corrupted("cbStshi is shorter than Stshif"));
