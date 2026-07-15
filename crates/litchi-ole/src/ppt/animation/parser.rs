@@ -15,12 +15,14 @@ use super::types::{
     TimeCondition, TimeConditionAtom, TimeConditionType, TimeEffectBehavior,
     TimeEffectBehaviorAtom, TimeEffectFilter, TimeEffectNodeType, TimeEffectTransition,
     TimeEffectType, TimeIterateData, TimeIterateDirection, TimeIterateIntervalType,
-    TimeIterateType, TimeMasterRelation, TimeModifier, TimeNodeAtom, TimeNodeFill, TimeNodeKind,
-    TimeNodeProperty, TimeNodePropertyList, TimeNodeRestart, TimePropertyListContext,
-    TimeRotationBehavior, TimeRotationBehaviorAtom, TimeRotationDirection, TimeScaleBehavior,
-    TimeScaleBehaviorAtom, TimeSequenceData, TimeSequenceNextAction, TimeSequencePreviousAction,
-    TimeTriggerEvent, TimeTriggerObject, TimeVisualElement, TimeVisualElementKind,
-    is_valid_runtime_context, is_valid_time_filter, is_valid_time_points_types,
+    TimeIterateType, TimeMasterRelation, TimeModifier, TimeMotionBehavior, TimeMotionBehaviorAtom,
+    TimeMotionOrigin, TimeNodeAtom, TimeNodeFill, TimeNodeKind, TimeNodeProperty,
+    TimeNodePropertyList, TimeNodeRestart, TimePropertyListContext, TimeRotationBehavior,
+    TimeRotationBehaviorAtom, TimeRotationDirection, TimeScaleBehavior, TimeScaleBehaviorAtom,
+    TimeSequenceData, TimeSequenceNextAction, TimeSequencePreviousAction, TimeTriggerEvent,
+    TimeTriggerObject, TimeVisualElement, TimeVisualElementKind, is_valid_animation_attribute_name,
+    is_valid_motion_path, is_valid_runtime_context, is_valid_time_filter,
+    is_valid_time_points_types,
 };
 use crate::consts::PptRecordType;
 use crate::ppt::package::{PptError, Result};
@@ -883,6 +885,182 @@ fn validate_effect_behavior(effect: &TimeEffectBehavior) -> Result<()> {
         ));
     }
     validate_basic_behavior_properties(&effect.behavior)
+}
+
+/// Parse an exact motion-path behavior container.
+pub fn parse_time_motion_behavior(record: &PptRecord) -> Result<TimeMotionBehavior> {
+    require_container(
+        record,
+        PptRecordType::TimeMotionBehaviorContainer,
+        0,
+        "TimeMotionBehaviorContainer",
+    )?;
+    let atom = record
+        .children
+        .first()
+        .ok_or_else(|| PptError::InvalidFormat("motion behavior has no atom".to_string()))
+        .and_then(parse_time_motion_behavior_atom)?;
+    let mut index = 1;
+    let path =
+        if record.children.get(index).is_some_and(|child| {
+            child.record_type == PptRecordType::TimeVariant && child.instance == 1
+        }) {
+            let value = parse_time_variant_string(&record.children[index])?;
+            index += 1;
+            Some(value)
+        } else {
+            None
+        };
+    let reserved =
+        if record.children.get(index).is_some_and(|child| {
+            child.record_type == PptRecordType::TimeVariant && child.instance == 2
+        }) {
+            let value = parse_time_variant_i32(&record.children[index])?;
+            index += 1;
+            Some(value)
+        } else {
+            None
+        };
+    let behavior = record
+        .children
+        .get(index)
+        .ok_or_else(|| PptError::InvalidFormat("motion behavior has no target".to_string()))
+        .and_then(parse_time_behavior)?;
+    index += 1;
+    if index != record.children.len() {
+        return Err(PptError::InvalidFormat(
+            "motion behavior has invalid child order or extra children".to_string(),
+        ));
+    }
+    let motion = TimeMotionBehavior {
+        atom,
+        path,
+        reserved,
+        behavior,
+    };
+    validate_motion_behavior(&motion)?;
+    Ok(motion)
+}
+
+/// Parse an exact 32-byte `TimeMotionBehaviorAtom` payload.
+pub fn parse_time_motion_behavior_atom(record: &PptRecord) -> Result<TimeMotionBehaviorAtom> {
+    require_atom(
+        record,
+        PptRecordType::TimeMotionBehavior,
+        0,
+        32,
+        "TimeMotionBehaviorAtom",
+    )?;
+    let flags = read_u32(&record.data, 0);
+    let by = (flags & 0x01 != 0).then(|| (read_f32(&record.data, 4), read_f32(&record.data, 8)));
+    let from =
+        (flags & 0x02 != 0).then(|| (read_f32(&record.data, 12), read_f32(&record.data, 16)));
+    let to = (flags & 0x04 != 0).then(|| (read_f32(&record.data, 20), read_f32(&record.data, 24)));
+    if from.is_some() && by.is_none() && to.is_none() {
+        return Err(PptError::InvalidFormat(
+            "motion from values require by or to values".to_string(),
+        ));
+    }
+    let origin_value = read_u32(&record.data, 28);
+    let origin = if flags & 0x08 != 0 {
+        Some(match origin_value {
+            0 => TimeMotionOrigin::Slide,
+            1 => TimeMotionOrigin::SlideLegacy,
+            2 => TimeMotionOrigin::ObjectCenter,
+            value => {
+                return Err(PptError::InvalidFormat(format!(
+                    "invalid motion origin {value}"
+                )));
+            },
+        })
+    } else if origin_value == 2 {
+        None
+    } else {
+        return Err(PptError::InvalidFormat(
+            "motion origin must be object center when unused".to_string(),
+        ));
+    };
+    Ok(TimeMotionBehaviorAtom {
+        by,
+        from,
+        to,
+        origin,
+        path_used: flags & 0x10 != 0,
+        edit_rotation_used: flags & 0x40 != 0,
+        points_types_used: flags & 0x80 != 0,
+    })
+}
+
+fn validate_motion_behavior(motion: &TimeMotionBehavior) -> Result<()> {
+    if motion.atom.path_used && motion.path.is_none() {
+        return Err(PptError::InvalidFormat(
+            "motion path-use flag requires a path".to_string(),
+        ));
+    }
+    if motion
+        .path
+        .as_deref()
+        .is_some_and(|path| !is_valid_motion_path(path))
+    {
+        return Err(PptError::InvalidFormat(
+            "invalid motion path syntax".to_string(),
+        ));
+    }
+    let properties = motion
+        .behavior
+        .properties
+        .as_ref()
+        .map_or(&[][..], |list| list.properties.as_slice());
+    if properties.iter().any(|property| {
+        matches!(
+            property,
+            TimeBehaviorProperty::ColorModel(_) | TimeBehaviorProperty::ColorDirection(_)
+        )
+    }) {
+        return Err(PptError::InvalidFormat(
+            "motion behavior contains a color-only property".to_string(),
+        ));
+    }
+    let has_angle = properties
+        .iter()
+        .any(|property| matches!(property, TimeBehaviorProperty::PathEditRotationAngle(_)));
+    let has_x = properties
+        .iter()
+        .any(|property| matches!(property, TimeBehaviorProperty::PathEditRotationX(_)));
+    let has_y = properties
+        .iter()
+        .any(|property| matches!(property, TimeBehaviorProperty::PathEditRotationY(_)));
+    if motion.atom.edit_rotation_used && !(has_angle && has_x && has_y) {
+        return Err(PptError::InvalidFormat(
+            "motion edit-rotation flag requires angle, X, and Y properties".to_string(),
+        ));
+    }
+    if motion.atom.points_types_used
+        && !properties
+            .iter()
+            .any(|property| matches!(property, TimeBehaviorProperty::PointsTypes(_)))
+    {
+        return Err(PptError::InvalidFormat(
+            "motion points-types flag requires a points-types property".to_string(),
+        ));
+    }
+    if motion.behavior.atom.attribute_names_used
+        && motion
+            .behavior
+            .attribute_names
+            .as_ref()
+            .is_some_and(|names| {
+                names.len() > 2
+                    || names
+                        .iter()
+                        .any(|name| !is_valid_animation_attribute_name(name))
+            })
+    {
+        return Err(PptError::InvalidFormat(
+            "motion behavior requires at most two supported attribute names".to_string(),
+        ));
+    }
+    Ok(())
 }
 
 /// Parse a `TimePropertyList4TimeBehavior` record.
@@ -1953,8 +2131,9 @@ mod tests {
         write_time_color_behavior_atom, write_time_command_behavior,
         write_time_command_behavior_atom, write_time_condition, write_time_condition_atom,
         write_time_effect_behavior, write_time_effect_behavior_atom, write_time_iterate_data,
-        write_time_modifier, write_time_node_atom, write_time_node_property_list,
-        write_time_rotation_behavior, write_time_rotation_behavior_atom, write_time_scale_behavior,
+        write_time_modifier, write_time_motion_behavior, write_time_motion_behavior_atom,
+        write_time_node_atom, write_time_node_property_list, write_time_rotation_behavior,
+        write_time_rotation_behavior_atom, write_time_scale_behavior,
         write_time_scale_behavior_atom, write_time_sequence_data, write_time_visual_element,
     };
 
@@ -2785,6 +2964,182 @@ mod tests {
         let (mut record, _) = PptRecord::parse(&bytes, 0).unwrap();
         record.children.swap(1, 2);
         assert!(parse_time_effect_behavior(&record).is_err());
+    }
+
+    #[test]
+    fn round_trips_motion_behaviors_and_formula_paths() {
+        assert_eq!(PptRecordType::TimeMotionBehaviorContainer.as_u16(), 0xF12E);
+        assert_eq!(PptRecordType::TimeMotionBehavior.as_u16(), 0xF137);
+        let path = "M 0 0 L 1.0 (ppt_x+$) C 0 0.5 (sin(pi)) 1 1 (max(#ppt_y,0.25)) Z E ignored";
+        let expected = TimeMotionBehavior {
+            atom: TimeMotionBehaviorAtom {
+                by: Some((0.25, -0.5)),
+                from: Some((0.0, 0.0)),
+                to: Some((1.0, 1.0)),
+                origin: Some(TimeMotionOrigin::ObjectCenter),
+                path_used: true,
+                edit_rotation_used: true,
+                points_types_used: true,
+            },
+            path: Some(path.to_string()),
+            reserved: Some(-7),
+            behavior: TimeBehavior {
+                atom: TimeBehaviorAtom {
+                    additive: Some(TimeBehaviorAdditive::Add),
+                    attribute_names_used: true,
+                },
+                attribute_names: Some(vec!["ppt_x".to_string(), "ppt_y".to_string()]),
+                properties: Some(TimeBehaviorPropertyList {
+                    properties: vec![
+                        TimeBehaviorProperty::MotionPathEditRelative(true),
+                        TimeBehaviorProperty::PathEditRotationAngle(45.0),
+                        TimeBehaviorProperty::PathEditRotationX(0.5),
+                        TimeBehaviorProperty::PathEditRotationY(0.5),
+                        TimeBehaviorProperty::PointsTypes("AaFfTtSs".to_string()),
+                    ],
+                }),
+                target: TimeVisualElement::Shape {
+                    kind: TimeVisualElementKind::Shape,
+                    shape_id_ref: 22,
+                    data1: 0,
+                    data2: 0,
+                },
+            },
+        };
+        let bytes = write_time_motion_behavior(&expected).unwrap();
+        let (record, consumed) = PptRecord::parse(&bytes, 0).unwrap();
+        assert_eq!(consumed, bytes.len());
+        assert_eq!(parse_time_motion_behavior(&record).unwrap(), expected);
+
+        for origin in [
+            None,
+            Some(TimeMotionOrigin::Slide),
+            Some(TimeMotionOrigin::SlideLegacy),
+            Some(TimeMotionOrigin::ObjectCenter),
+        ] {
+            let expected = TimeMotionBehaviorAtom {
+                by: None,
+                from: None,
+                to: None,
+                origin,
+                path_used: false,
+                edit_rotation_used: false,
+                points_types_used: false,
+            };
+            let bytes = write_time_motion_behavior_atom(&expected).unwrap();
+            let (record, _) = PptRecord::parse(&bytes, 0).unwrap();
+            assert_eq!(parse_time_motion_behavior_atom(&record).unwrap(), expected);
+        }
+    }
+
+    #[test]
+    fn rejects_malformed_motion_behaviors_and_paths() {
+        let common = || TimeBehavior {
+            atom: TimeBehaviorAtom {
+                additive: None,
+                attribute_names_used: false,
+            },
+            attribute_names: None,
+            properties: None,
+            target: TimeVisualElement::Page,
+        };
+        let atom = TimeMotionBehaviorAtom {
+            by: Some((1.0, 1.0)),
+            from: None,
+            to: None,
+            origin: None,
+            path_used: true,
+            edit_rotation_used: false,
+            points_types_used: false,
+        };
+        for path in [
+            "",
+            "Q 0 0",
+            "M -1 0",
+            "M .5 0",
+            "M 1. 0",
+            "M (unknown) 0",
+            "M (max(1,2,3)) 0",
+            "M (sin( 1)) 0",
+            "C 0 0 1 1",
+            "M 0 0 X",
+        ] {
+            let invalid = TimeMotionBehavior {
+                atom: atom.clone(),
+                path: Some(path.to_string()),
+                reserved: None,
+                behavior: common(),
+            };
+            assert!(write_time_motion_behavior(&invalid).is_err(), "{path}");
+        }
+
+        let mut invalid_atom = atom.clone();
+        invalid_atom.by = None;
+        invalid_atom.from = Some((0.0, 0.0));
+        assert!(write_time_motion_behavior_atom(&invalid_atom).is_err());
+        let mut bytes = write_time_motion_behavior_atom(&TimeMotionBehaviorAtom {
+            path_used: false,
+            ..atom.clone()
+        })
+        .unwrap();
+        bytes[36..40].copy_from_slice(&0u32.to_le_bytes());
+        let (record, _) = PptRecord::parse(&bytes, 0).unwrap();
+        assert!(parse_time_motion_behavior_atom(&record).is_err());
+
+        for invalid in [
+            TimeMotionBehavior {
+                atom: atom.clone(),
+                path: None,
+                reserved: None,
+                behavior: common(),
+            },
+            TimeMotionBehavior {
+                atom: TimeMotionBehaviorAtom {
+                    edit_rotation_used: true,
+                    ..atom.clone()
+                },
+                path: Some("M 0 0".to_string()),
+                reserved: None,
+                behavior: common(),
+            },
+            TimeMotionBehavior {
+                atom: TimeMotionBehaviorAtom {
+                    points_types_used: true,
+                    ..atom.clone()
+                },
+                path: Some("M 0 0".to_string()),
+                reserved: None,
+                behavior: common(),
+            },
+            TimeMotionBehavior {
+                atom: atom.clone(),
+                path: Some("M 0 0".to_string()),
+                reserved: None,
+                behavior: TimeBehavior {
+                    properties: Some(TimeBehaviorPropertyList {
+                        properties: vec![TimeBehaviorProperty::ColorDirection(
+                            TimeColorDirection::Clockwise,
+                        )],
+                    }),
+                    ..common()
+                },
+            },
+            TimeMotionBehavior {
+                atom,
+                path: Some("M 0 0".to_string()),
+                reserved: None,
+                behavior: TimeBehavior {
+                    atom: TimeBehaviorAtom {
+                        additive: None,
+                        attribute_names_used: true,
+                    },
+                    attribute_names: Some(vec!["ppt_x".into(), "ppt_y".into(), "ppt_w".into()]),
+                    ..common()
+                },
+            },
+        ] {
+            assert!(write_time_motion_behavior(&invalid).is_err());
+        }
     }
 
     #[test]

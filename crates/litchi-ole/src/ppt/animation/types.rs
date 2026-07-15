@@ -1191,6 +1191,37 @@ impl TimeEffectFilter {
     }
 }
 
+/// A PowerPoint 2002 motion-path behavior.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TimeMotionBehavior {
+    pub atom: TimeMotionBehaviorAtom,
+    /// Optional path retained even when its use flag is clear.
+    pub path: Option<String>,
+    /// Optional obsolete integer record retained for round-trip fidelity.
+    pub reserved: Option<i32>,
+    pub behavior: TimeBehavior,
+}
+
+/// Values and property-use flags from a `TimeMotionBehaviorAtom`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TimeMotionBehaviorAtom {
+    pub by: Option<(f32, f32)>,
+    pub from: Option<(f32, f32)>,
+    pub to: Option<(f32, f32)>,
+    pub origin: Option<TimeMotionOrigin>,
+    pub path_used: bool,
+    pub edit_rotation_used: bool,
+    pub points_types_used: bool,
+}
+
+/// Wire-level origin of a motion path.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TimeMotionOrigin {
+    Slide,
+    SlideLegacy,
+    ObjectCenter,
+}
+
 /// Animation target stored in a `ClientVisualElementContainer`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TimeVisualElement {
@@ -1327,6 +1358,390 @@ pub(crate) fn is_valid_time_filter(value: &str) -> bool {
                     if normalized_time(time) && normalized_time(transformed)
             )
         })
+}
+
+pub(crate) fn is_valid_motion_path(value: &str) -> bool {
+    fn spaces(bytes: &[u8], position: &mut usize) -> bool {
+        let start = *position;
+        while bytes.get(*position) == Some(&b' ') {
+            *position += 1;
+        }
+        *position != start
+    }
+
+    fn coordinate(bytes: &[u8], position: &mut usize) -> bool {
+        if bytes.get(*position) == Some(&b'(') {
+            let start = *position + 1;
+            let mut depth = 1usize;
+            let mut end = start;
+            while end < bytes.len() && depth != 0 {
+                match bytes[end] {
+                    b'(' => depth += 1,
+                    b')' => depth -= 1,
+                    _ => {},
+                }
+                end += 1;
+            }
+            if depth != 0 || !is_valid_time_formula_bytes(&bytes[start..end - 1]) {
+                return false;
+            }
+            *position = end;
+            true
+        } else {
+            let start = *position;
+            while bytes.get(*position).is_some_and(u8::is_ascii_digit) {
+                *position += 1;
+            }
+            if *position == start {
+                return false;
+            }
+            if bytes.get(*position) == Some(&b'.') {
+                *position += 1;
+                let fraction = *position;
+                while bytes.get(*position).is_some_and(u8::is_ascii_digit) {
+                    *position += 1;
+                }
+                if *position == fraction {
+                    return false;
+                }
+            }
+            true
+        }
+    }
+
+    let bytes = value.as_bytes();
+    let mut position = 0usize;
+    let mut commands = 0usize;
+    spaces(bytes, &mut position);
+    while let Some(command) = bytes.get(position).copied() {
+        position += 1;
+        commands += 1;
+        let coordinates = match command {
+            b'm' | b'M' | b'l' | b'L' => 2,
+            b'c' | b'C' => 6,
+            b'z' | b'Z' => 0,
+            b'e' | b'E' => return true,
+            _ => return false,
+        };
+        for _ in 0..coordinates {
+            if !spaces(bytes, &mut position) || !coordinate(bytes, &mut position) {
+                return false;
+            }
+        }
+        spaces(bytes, &mut position);
+    }
+    commands != 0
+}
+
+fn is_valid_time_formula_bytes(value: &[u8]) -> bool {
+    struct Parser<'a> {
+        value: &'a [u8],
+        position: usize,
+    }
+
+    impl Parser<'_> {
+        fn expression(&mut self) -> bool {
+            if !self.term() {
+                return false;
+            }
+            while matches!(self.peek(), Some(b'+' | b'-')) {
+                self.position += 1;
+                if !self.term() {
+                    return false;
+                }
+            }
+            true
+        }
+
+        fn term(&mut self) -> bool {
+            if !self.power() {
+                return false;
+            }
+            while matches!(self.peek(), Some(b'*' | b'/' | b'%')) {
+                self.position += 1;
+                if !self.power() {
+                    return false;
+                }
+            }
+            true
+        }
+
+        fn power(&mut self) -> bool {
+            if !self.unary() {
+                return false;
+            }
+            while self.peek() == Some(b'^') {
+                self.position += 1;
+                if !self.unary() {
+                    return false;
+                }
+            }
+            true
+        }
+
+        fn unary(&mut self) -> bool {
+            if matches!(self.peek(), Some(b'+' | b'-')) {
+                self.position += 1;
+            }
+            self.factor()
+        }
+
+        fn factor(&mut self) -> bool {
+            if self.peek() == Some(b'$') {
+                self.position += 1;
+                return true;
+            }
+            if self.peek() == Some(b'(') {
+                self.position += 1;
+                return self.expression() && self.take(b')');
+            }
+            if self.peek().is_some_and(|byte| byte.is_ascii_digit()) {
+                return self.number();
+            }
+            let prefixed = self.peek() == Some(b'#');
+            if prefixed {
+                self.position += 1;
+            }
+            let start = self.position;
+            while self
+                .peek()
+                .is_some_and(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_'))
+            {
+                self.position += 1;
+            }
+            if self.position == start {
+                return false;
+            }
+            let name = std::str::from_utf8(&self.value[start..self.position]).expect("ASCII only");
+            if !prefixed && self.peek() == Some(b'(') && is_time_formula_function(name) {
+                self.position += 1;
+                if !self.expression() {
+                    return false;
+                }
+                if self.peek() == Some(b',') {
+                    self.position += 1;
+                    if !self.expression() {
+                        return false;
+                    }
+                }
+                self.take(b')')
+            } else {
+                matches!(name, "pi" | "e") && !prefixed || is_time_formula_attribute(name)
+            }
+        }
+
+        fn number(&mut self) -> bool {
+            let start = self.position;
+            while self.peek().is_some_and(|byte| byte.is_ascii_digit()) {
+                self.position += 1;
+            }
+            if self.position == start {
+                return false;
+            }
+            if self.peek() == Some(b'.') {
+                self.position += 1;
+                let fraction = self.position;
+                while self.peek().is_some_and(|byte| byte.is_ascii_digit()) {
+                    self.position += 1;
+                }
+                if self.position == fraction {
+                    return false;
+                }
+            }
+            if matches!(self.peek(), Some(b'e' | b'E')) {
+                self.position += 1;
+                if self.peek() == Some(b'-') {
+                    self.position += 1;
+                }
+                let exponent = self.position;
+                while self.peek().is_some_and(|byte| byte.is_ascii_digit()) {
+                    self.position += 1;
+                }
+                if self.position == exponent {
+                    return false;
+                }
+            }
+            true
+        }
+
+        fn peek(&self) -> Option<u8> {
+            self.value.get(self.position).copied()
+        }
+
+        fn take(&mut self, expected: u8) -> bool {
+            if self.peek() == Some(expected) {
+                self.position += 1;
+                true
+            } else {
+                false
+            }
+        }
+    }
+
+    let mut parser = Parser { value, position: 0 };
+    !value.is_empty() && parser.expression() && parser.position == value.len()
+}
+
+fn is_time_formula_function(value: &str) -> bool {
+    matches!(
+        value,
+        "abs"
+            | "acos"
+            | "asin"
+            | "atan"
+            | "ceil"
+            | "cos"
+            | "cosh"
+            | "deg"
+            | "exp"
+            | "floor"
+            | "ln"
+            | "max"
+            | "min"
+            | "rad"
+            | "rand"
+            | "sin"
+            | "sinh"
+            | "sqrt"
+            | "tan"
+            | "tanh"
+    )
+}
+
+fn is_time_formula_attribute(value: &str) -> bool {
+    matches!(
+        value,
+        "ppt_x"
+            | "ppt_y"
+            | "ppt_w"
+            | "ppt_h"
+            | "ScaleX"
+            | "ScaleY"
+            | "stype.rotation"
+            | "style.opacity"
+            | "style.visibility"
+            | "ppt_r"
+            | "r"
+            | "style.fontSize"
+            | "style.fontWeight"
+            | "style.fontStyle"
+            | "style.fontFamily"
+            | "style.textEffectEmboss"
+            | "style.textShadow"
+            | "style.textTransform"
+            | "style.textDecorationUnderline"
+            | "style.textEffectOutline"
+            | "style.textDecorationLineThrough"
+            | "style.sRotation"
+            | "imageData.cropTop"
+            | "imageData.cropBottom"
+            | "imageData.cropLeft"
+            | "imageData.cropRight"
+            | "imageData.gain"
+            | "imageData.blackleve"
+            | "imageData.gamma"
+            | "imageData.grayscale"
+            | "fill.on"
+            | "fill.type"
+            | "fill.opacity"
+            | "fill.method"
+            | "fill.opacity2"
+            | "fill.angle"
+            | "fill.focus"
+            | "fill.focusposition.x"
+            | "fill.focusposition.y"
+            | "fill.focussize.x"
+            | "fill.focussize.y"
+            | "stroke.on"
+            | "stroke.weight"
+            | "stroke.opacity"
+            | "stroke.linestyle"
+            | "stroke.dashstyle"
+            | "stroke.filltype"
+            | "stroke.imagesize.x"
+            | "stroke.imagesize.y"
+            | "stroke.startArrow"
+            | "stroke.endArrow"
+            | "stroke.startArrowWidth"
+            | "stroke.startArrowLength"
+            | "stroke.endArrowWidth"
+            | "stroke.endArrowLength"
+            | "shadow.on"
+            | "shadow.type"
+            | "shadow.opacity"
+            | "shadow.offset.x"
+            | "shadow.offset.y"
+            | "shadow.offset2.x"
+            | "shadow.offset2.y"
+            | "shadow.origin.x"
+            | "shadow.origin.y"
+            | "shadow.matrix.xtox"
+            | "shadow.matrix.ytox"
+            | "shadow.matrix.ytoy"
+            | "shadow.matrix.perspectiveX"
+            | "shadow.matrix.perspectiveY"
+            | "skew.on"
+            | "skew.offset.x"
+            | "skew.offset.y"
+            | "skew.origin.x"
+            | "skew.origin.y"
+            | "skew.matrix.xtox"
+            | "skew.matrix.ytox"
+            | "skew.matrix.ytoy"
+            | "skew.matrix.perspectiveX"
+            | "skew.matrix.perspectiveY"
+            | "extrusion.on"
+            | "extrusion.type"
+            | "extrusion.render"
+            | "extrusion.viewpointorigin.x"
+            | "extrusion.viewpointorigin.y"
+            | "extrusion.viewpoint.x"
+            | "extrusion.viewpoint.y"
+            | "extrusion.viewpoint.z"
+            | "extrusion.plane"
+            | "extrusion.skewangle"
+            | "extrusion.skewamt"
+            | "extrusion.backdepth"
+            | "extrusion.foredepth"
+            | "extrusion.orientation.x"
+            | "extrusion.orientation.y"
+            | "extrusion.orientation.z"
+            | "extrusion.orientationangle"
+            | "extrusion.rotationangle.x"
+            | "extrusion.rotationangle.y"
+            | "extrusion.lockrotationcenter"
+            | "extrusion.autorotationcenter"
+            | "extrusion.rotationcenter.x"
+            | "extrusion.rotationcenter.y"
+            | "extrusion.rotationcenter.z"
+            | "extrusion.colormode"
+    )
+}
+
+pub(crate) fn is_valid_animation_attribute_name(value: &str) -> bool {
+    (value != "stype.rotation"
+        && value != "imageData.blackleve"
+        && is_time_formula_attribute(value))
+        || matches!(
+            value,
+            "ppt_c"
+                | "xshear"
+                | "yshear"
+                | "image"
+                | "fillcolor"
+                | "style.rotation"
+                | "style.color"
+                | "imageData.blacklevel"
+                | "imageData.chromakey"
+                | "fill.color"
+                | "fill.color2"
+                | "stroke.color"
+                | "stroke.src"
+                | "stroke.color2"
+                | "shadow.color"
+                | "shadow.color2"
+                | "extrusion.color"
+        )
 }
 
 impl TimeNodeFill {

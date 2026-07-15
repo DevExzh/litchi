@@ -12,12 +12,13 @@ use super::types::{
     TimeCommandBehaviorAtom, TimeCommandBehaviorType, TimeCondition, TimeConditionAtom,
     TimeConditionType, TimeEffectBehavior, TimeEffectBehaviorAtom, TimeEffectNodeType,
     TimeEffectTransition, TimeEffectType, TimeIterateData, TimeIterateDirection,
-    TimeIterateIntervalType, TimeIterateType, TimeMasterRelation, TimeModifier, TimeNodeAtom,
-    TimeNodeProperty, TimeNodePropertyList, TimePropertyListContext, TimeRotationBehavior,
-    TimeRotationBehaviorAtom, TimeRotationDirection, TimeScaleBehavior, TimeScaleBehaviorAtom,
-    TimeSequenceData, TimeSequenceNextAction, TimeSequencePreviousAction, TimeTriggerEvent,
-    TimeTriggerObject, TimeVisualElement, TimeVisualElementKind, is_valid_runtime_context,
-    is_valid_time_filter, is_valid_time_points_types,
+    TimeIterateIntervalType, TimeIterateType, TimeMasterRelation, TimeModifier, TimeMotionBehavior,
+    TimeMotionBehaviorAtom, TimeMotionOrigin, TimeNodeAtom, TimeNodeProperty, TimeNodePropertyList,
+    TimePropertyListContext, TimeRotationBehavior, TimeRotationBehaviorAtom, TimeRotationDirection,
+    TimeScaleBehavior, TimeScaleBehaviorAtom, TimeSequenceData, TimeSequenceNextAction,
+    TimeSequencePreviousAction, TimeTriggerEvent, TimeTriggerObject, TimeVisualElement,
+    TimeVisualElementKind, is_valid_animation_attribute_name, is_valid_motion_path,
+    is_valid_runtime_context, is_valid_time_filter, is_valid_time_points_types,
 };
 use crate::consts::PptRecordType;
 use crate::ppt::package::{PptError, Result};
@@ -665,6 +666,137 @@ fn validate_effect_behavior(effect: &TimeEffectBehavior) -> Result<()> {
         ));
     }
     validate_basic_behavior_properties(&effect.behavior)
+}
+
+/// Serialize an exact motion-path behavior container.
+pub fn write_time_motion_behavior(motion: &TimeMotionBehavior) -> Result<Vec<u8>> {
+    validate_motion_behavior(motion)?;
+    let mut children = write_time_motion_behavior_atom(&motion.atom)?;
+    if let Some(path) = &motion.path {
+        append_time_variant(&mut children, 1, encode_time_variant_string(path))?;
+    }
+    if let Some(reserved) = motion.reserved {
+        let mut data = vec![1];
+        data.extend(reserved.to_le_bytes());
+        append_time_variant(&mut children, 2, data)?;
+    }
+    children.extend(write_time_behavior(&motion.behavior)?);
+    wrap_record(
+        PptRecordType::TimeMotionBehaviorContainer,
+        0x0F,
+        0,
+        children,
+    )
+}
+
+/// Serialize an exact `TimeMotionBehaviorAtom`.
+pub fn write_time_motion_behavior_atom(atom: &TimeMotionBehaviorAtom) -> Result<Vec<u8>> {
+    if atom.from.is_some() && atom.by.is_none() && atom.to.is_none() {
+        return Err(PptError::InvalidFormat(
+            "motion from values require by or to values".to_string(),
+        ));
+    }
+    let flags = u32::from(atom.by.is_some())
+        | (u32::from(atom.from.is_some()) << 1)
+        | (u32::from(atom.to.is_some()) << 2)
+        | (u32::from(atom.origin.is_some()) << 3)
+        | (u32::from(atom.path_used) << 4)
+        | (u32::from(atom.edit_rotation_used) << 6)
+        | (u32::from(atom.points_types_used) << 7);
+    let mut data = Vec::with_capacity(32);
+    data.extend(flags.to_le_bytes());
+    for values in [
+        atom.by.unwrap_or((0.0, 0.0)),
+        atom.from.unwrap_or((0.0, 0.0)),
+        atom.to.unwrap_or((0.0, 0.0)),
+    ] {
+        data.extend(values.0.to_le_bytes());
+        data.extend(values.1.to_le_bytes());
+    }
+    data.extend(
+        atom.origin
+            .map_or(2u32, |origin| match origin {
+                TimeMotionOrigin::Slide => 0,
+                TimeMotionOrigin::SlideLegacy => 1,
+                TimeMotionOrigin::ObjectCenter => 2,
+            })
+            .to_le_bytes(),
+    );
+    let mut result = create_record_header(PptRecordType::TimeMotionBehavior, 0, 0, 32);
+    result.extend(data);
+    Ok(result)
+}
+
+fn validate_motion_behavior(motion: &TimeMotionBehavior) -> Result<()> {
+    if motion.atom.path_used && motion.path.is_none() {
+        return Err(PptError::InvalidFormat(
+            "motion path-use flag requires a path".to_string(),
+        ));
+    }
+    if motion
+        .path
+        .as_deref()
+        .is_some_and(|path| !is_valid_motion_path(path))
+    {
+        return Err(PptError::InvalidFormat(
+            "invalid motion path syntax".to_string(),
+        ));
+    }
+    let properties = motion
+        .behavior
+        .properties
+        .as_ref()
+        .map_or(&[][..], |list| list.properties.as_slice());
+    if properties.iter().any(|property| {
+        matches!(
+            property,
+            TimeBehaviorProperty::ColorModel(_) | TimeBehaviorProperty::ColorDirection(_)
+        )
+    }) {
+        return Err(PptError::InvalidFormat(
+            "motion behavior contains a color-only property".to_string(),
+        ));
+    }
+    let has_angle = properties
+        .iter()
+        .any(|property| matches!(property, TimeBehaviorProperty::PathEditRotationAngle(_)));
+    let has_x = properties
+        .iter()
+        .any(|property| matches!(property, TimeBehaviorProperty::PathEditRotationX(_)));
+    let has_y = properties
+        .iter()
+        .any(|property| matches!(property, TimeBehaviorProperty::PathEditRotationY(_)));
+    if motion.atom.edit_rotation_used && !(has_angle && has_x && has_y) {
+        return Err(PptError::InvalidFormat(
+            "motion edit-rotation flag requires angle, X, and Y properties".to_string(),
+        ));
+    }
+    if motion.atom.points_types_used
+        && !properties
+            .iter()
+            .any(|property| matches!(property, TimeBehaviorProperty::PointsTypes(_)))
+    {
+        return Err(PptError::InvalidFormat(
+            "motion points-types flag requires a points-types property".to_string(),
+        ));
+    }
+    if motion.behavior.atom.attribute_names_used
+        && motion
+            .behavior
+            .attribute_names
+            .as_ref()
+            .is_some_and(|names| {
+                names.len() > 2
+                    || names
+                        .iter()
+                        .any(|name| !is_valid_animation_attribute_name(name))
+            })
+    {
+        return Err(PptError::InvalidFormat(
+            "motion behavior requires at most two supported attribute names".to_string(),
+        ));
+    }
+    Ok(())
 }
 
 fn append_time_variant(children: &mut Vec<u8>, instance: u16, data: Vec<u8>) -> Result<()> {

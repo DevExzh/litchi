@@ -22,10 +22,10 @@ pub use parser::{
     parse_time_behavior_property_list, parse_time_color_behavior, parse_time_color_behavior_atom,
     parse_time_command_behavior, parse_time_command_behavior_atom, parse_time_condition,
     parse_time_condition_atom, parse_time_effect_behavior, parse_time_effect_behavior_atom,
-    parse_time_iterate_data, parse_time_modifier, parse_time_node_atom,
-    parse_time_node_property_list, parse_time_rotation_behavior, parse_time_rotation_behavior_atom,
-    parse_time_scale_behavior, parse_time_scale_behavior_atom, parse_time_sequence_data,
-    parse_time_visual_element,
+    parse_time_iterate_data, parse_time_modifier, parse_time_motion_behavior,
+    parse_time_motion_behavior_atom, parse_time_node_atom, parse_time_node_property_list,
+    parse_time_rotation_behavior, parse_time_rotation_behavior_atom, parse_time_scale_behavior,
+    parse_time_scale_behavior_atom, parse_time_sequence_data, parse_time_visual_element,
 };
 pub use sound::{AnimationSound, BuiltinSound, SoundType};
 pub use triggers::{
@@ -45,12 +45,12 @@ pub use types::{
     TimeCondition, TimeConditionAtom, TimeConditionType, TimeEffectBehavior,
     TimeEffectBehaviorAtom, TimeEffectFilter, TimeEffectNodeType, TimeEffectTransition,
     TimeEffectType, TimeIterateData, TimeIterateDirection, TimeIterateIntervalType,
-    TimeIterateType, TimeMasterRelation, TimeModifier, TimeNodeAtom, TimeNodeContainer,
-    TimeNodeFill, TimeNodeKind, TimeNodeProperty, TimeNodePropertyList, TimeNodeRestart,
-    TimeNodeType, TimePropertyListContext, TimeRotationBehavior, TimeRotationBehaviorAtom,
-    TimeRotationDirection, TimeScaleBehavior, TimeScaleBehaviorAtom, TimeSequenceData,
-    TimeSequenceNextAction, TimeSequencePreviousAction, TimeTriggerEvent, TimeTriggerObject,
-    TimeVisualElement, TimeVisualElementKind,
+    TimeIterateType, TimeMasterRelation, TimeModifier, TimeMotionBehavior, TimeMotionBehaviorAtom,
+    TimeMotionOrigin, TimeNodeAtom, TimeNodeContainer, TimeNodeFill, TimeNodeKind,
+    TimeNodeProperty, TimeNodePropertyList, TimeNodeRestart, TimeNodeType, TimePropertyListContext,
+    TimeRotationBehavior, TimeRotationBehaviorAtom, TimeRotationDirection, TimeScaleBehavior,
+    TimeScaleBehaviorAtom, TimeSequenceData, TimeSequenceNextAction, TimeSequencePreviousAction,
+    TimeTriggerEvent, TimeTriggerObject, TimeVisualElement, TimeVisualElementKind,
 };
 pub use writer::{
     write_animation_info, write_animation_info_atom, write_build_list, write_extended_time_node,
@@ -58,7 +58,8 @@ pub use writer::{
     write_time_color_behavior, write_time_color_behavior_atom, write_time_command_behavior,
     write_time_command_behavior_atom, write_time_condition, write_time_condition_atom,
     write_time_effect_behavior, write_time_effect_behavior_atom, write_time_iterate_data,
-    write_time_modifier, write_time_node_atom, write_time_node_property_list,
-    write_time_rotation_behavior, write_time_rotation_behavior_atom, write_time_scale_behavior,
-    write_time_scale_behavior_atom, write_time_sequence_data, write_time_visual_element,
+    write_time_modifier, write_time_motion_behavior, write_time_motion_behavior_atom,
+    write_time_node_atom, write_time_node_property_list, write_time_rotation_behavior,
+    write_time_rotation_behavior_atom, write_time_scale_behavior, write_time_scale_behavior_atom,
+    write_time_sequence_data, write_time_visual_element,
 };

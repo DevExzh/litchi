@@ -145,6 +145,8 @@ pub enum PptRecordType {
     TimeColorBehaviorContainer = 0xF12C,
     /// Image effect behavior container
     TimeEffectBehaviorContainer = 0xF12D,
+    /// Motion-path behavior container
+    TimeMotionBehaviorContainer = 0xF12E,
     /// Rotation behavior container
     TimeRotationBehaviorContainer = 0xF12F,
     /// Scale behavior container
@@ -157,6 +159,8 @@ pub enum PptRecordType {
     TimeColorBehavior = 0xF135,
     /// Image effect behavior atom
     TimeEffectBehavior = 0xF136,
+    /// Motion-path behavior atom
+    TimeMotionBehavior = 0xF137,
     /// Rotation behavior atom
     TimeRotationBehavior = 0xF138,
     /// Scale behavior atom
@@ -257,12 +261,14 @@ impl From<u16> for PptRecordType {
             0xF12A => PptRecordType::TimeBehaviorContainer,
             0xF12C => PptRecordType::TimeColorBehaviorContainer,
             0xF12D => PptRecordType::TimeEffectBehaviorContainer,
+            0xF12E => PptRecordType::TimeMotionBehaviorContainer,
             0xF12F => PptRecordType::TimeRotationBehaviorContainer,
             0xF130 => PptRecordType::TimeScaleBehaviorContainer,
             0xF132 => PptRecordType::TimeCommandBehaviorContainer,
             0xF133 => PptRecordType::TimeBehavior,
             0xF135 => PptRecordType::TimeColorBehavior,
             0xF136 => PptRecordType::TimeEffectBehavior,
+            0xF137 => PptRecordType::TimeMotionBehavior,
             0xF138 => PptRecordType::TimeRotationBehavior,
             0xF139 => PptRecordType::TimeScaleBehavior,
             0xF13B => PptRecordType::TimeCommandBehavior,
