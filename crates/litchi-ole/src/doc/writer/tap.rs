@@ -7,10 +7,10 @@
 use super::sprm::SprmBuilder;
 use crate::doc::parts::tap::{
     BorderStyle, BorderType, CellBorderTypes, CellBorders, CellShading, CellSpacing,
-    CellSpacingSource, TableHorizontalAnchor, TableHorizontalPosition, TableJustification,
-    TableLook, TablePositioning, TableStyleBorder, TableStyleDefaults, TableStyleShading,
-    TableVerticalAnchor, TableVerticalPosition, TableWidth, TextDirection, VerticalAlignment,
-    VerticalMergeStatus, WidthType,
+    CellSpacingSource, TableConditionalFormatting, TableHorizontalAnchor, TableHorizontalPosition,
+    TableJustification, TableLook, TablePositioning, TableStyleBorder, TableStyleDefaults,
+    TableStyleShading, TableVerticalAnchor, TableVerticalPosition, TableWidth, TextDirection,
+    VerticalAlignment, VerticalMergeStatus, WidthType,
 };
 
 /// Error returned when table row properties cannot be represented in DOC TAP.
@@ -40,6 +40,12 @@ pub enum TapBuildError {
     InvalidRevisionTimestamp(u32),
     /// Table-style band sizes are limited to one through three cells.
     InvalidStyleBandSize(&'static str, u8),
+    /// Style border defaults are only legal inside a TCnf property list.
+    StyleBorderOutsideConditional,
+    /// A conditional nested grpprl is malformed.
+    InvalidConditionalProperties(String),
+    /// CNFOperand uses a one-byte total operand length.
+    ConditionalPropertiesTooLong(usize),
     /// A TCellBrcType prefix requires four explicit types for every included cell.
     IncompleteCellBorderTypes(usize),
     /// A preferred-width property uses unsupported units or a value outside its context's range.
@@ -96,6 +102,21 @@ impl std::fmt::Display for TapBuildError {
                 write!(
                     f,
                     "DOC table-style {axis} band size {size} is outside 1..=3"
+                )
+            },
+            Self::StyleBorderOutsideConditional => {
+                write!(f, "DOC table-style borders must be placed inside sprmTCnf")
+            },
+            Self::InvalidConditionalProperties(error) => {
+                write!(
+                    f,
+                    "DOC conditional table-style properties are invalid: {error}"
+                )
+            },
+            Self::ConditionalPropertiesTooLong(size) => {
+                write!(
+                    f,
+                    "DOC conditional table-style grpprl is {size} bytes; maximum is 253"
                 )
             },
             Self::IncompleteCellBorderTypes(index) => {
@@ -394,8 +415,62 @@ fn physical_justification(logical: TableJustification, right_to_left: bool) -> T
     }
 }
 
-/// Serialize scalar table-style defaults for the `grpprlTapx` member of an `UpxTapx`.
+/// Serialize non-conditional table-style defaults for an `UpxTapx`.
 pub fn generate_table_style_sprms(defaults: &TableStyleDefaults) -> Result<Vec<u8>, TapBuildError> {
+    generate_table_style_properties(defaults, false)
+}
+
+/// Serialize table-style defaults and their conditional `sprmTCnf` entries.
+pub fn generate_table_style_sprms_with_conditionals(
+    defaults: &TableStyleDefaults,
+    conditional_formats: &[TableConditionalFormatting],
+) -> Result<Vec<u8>, TapBuildError> {
+    let mut sprms = generate_table_style_properties(defaults, false)?;
+    for conditional in conditional_formats {
+        if conditional.raw_grpprl.len() > 253 {
+            return Err(TapBuildError::ConditionalPropertiesTooLong(
+                conditional.raw_grpprl.len(),
+            ));
+        }
+        let nested = if conditional.raw_grpprl.is_empty() {
+            generate_table_style_properties(&conditional.properties, true)?
+        } else {
+            let arena = bumpalo::Bump::new();
+            crate::doc::parts::tap_parser::TapParser::new(&arena)
+                .parse_conditional_tap(&conditional.raw_grpprl)
+                .map_err(|error| TapBuildError::InvalidConditionalProperties(error.to_string()))?;
+            conditional.raw_grpprl.clone()
+        };
+        if nested.len() > 253 {
+            return Err(TapBuildError::ConditionalPropertiesTooLong(nested.len()));
+        }
+        sprms.extend_from_slice(&0xD66Au16.to_le_bytes());
+        sprms.push((nested.len() + 2) as u8);
+        sprms.extend_from_slice(&conditional.condition.code().to_le_bytes());
+        sprms.extend_from_slice(&nested);
+    }
+    Ok(sprms)
+}
+
+fn generate_table_style_properties(
+    defaults: &TableStyleDefaults,
+    inside_conditional: bool,
+) -> Result<Vec<u8>, TapBuildError> {
+    let has_style_border = [
+        defaults.border_top,
+        defaults.border_bottom,
+        defaults.border_left,
+        defaults.border_right,
+        defaults.border_inside_horizontal,
+        defaults.border_inside_vertical,
+        defaults.border_diagonal_down,
+        defaults.border_diagonal_up,
+    ]
+    .iter()
+    .any(Option::is_some);
+    if has_style_border && !inside_conditional {
+        return Err(TapBuildError::StyleBorderOutsideConditional);
+    }
     for (axis, size) in [
         ("horizontal", defaults.horizontal_band_size),
         ("vertical", defaults.vertical_band_size),
@@ -1251,7 +1326,7 @@ pub fn create_simple_table(rows: usize, cols: usize, cell_width: u16) -> TapBuil
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::doc::parts::tap::{ShadingPattern, TableLookFlags};
+    use crate::doc::parts::tap::{ShadingPattern, TableLookFlags, TableStyleCondition};
 
     #[test]
     fn test_tap_builder() {
@@ -1486,14 +1561,33 @@ mod tests {
             pattern: ShadingPattern::DarkCross,
         };
         let defaults = TableStyleDefaults {
-            border_top: Some(TableStyleBorder::NoBorder),
-            border_inside_vertical: Some(TableStyleBorder::Border(border)),
             shading: Some(TableStyleShading::Shading(shading)),
             ..TableStyleDefaults::default()
         };
-        let sprms = generate_table_style_sprms(&defaults).unwrap();
+        let conditional_properties = TableStyleDefaults {
+            border_top: Some(TableStyleBorder::NoBorder),
+            border_inside_vertical: Some(TableStyleBorder::Border(border)),
+            ..TableStyleDefaults::default()
+        };
+        let conditional = TableConditionalFormatting {
+            condition: TableStyleCondition::HeaderRow,
+            properties: conditional_properties,
+            raw_grpprl: Vec::new(),
+        };
+        let sprms =
+            generate_table_style_sprms_with_conditionals(&defaults, &[conditional]).unwrap();
         let tap = crate::doc::parts::tap::TableProperties::from_sprm(&sprms).unwrap();
         assert_eq!(tap.style_defaults, defaults);
+        assert_eq!(tap.conditional_formats.len(), 1);
+        assert_eq!(
+            tap.conditional_formats[0].condition,
+            TableStyleCondition::HeaderRow
+        );
+        assert_eq!(
+            tap.conditional_formats[0].properties,
+            conditional_properties
+        );
+        assert!(!tap.conditional_formats[0].raw_grpprl.is_empty());
 
         let clear = TableStyleDefaults {
             shading: Some(TableStyleShading::NoShading),
@@ -1519,7 +1613,49 @@ mod tests {
         };
         assert_eq!(
             generate_table_style_sprms(&defaults),
+            Err(TapBuildError::StyleBorderOutsideConditional)
+        );
+        let conditional = TableConditionalFormatting {
+            condition: TableStyleCondition::HeaderRow,
+            properties: defaults,
+            raw_grpprl: Vec::new(),
+        };
+        assert_eq!(
+            generate_table_style_sprms_with_conditionals(
+                &TableStyleDefaults::default(),
+                &[conditional],
+            ),
             Err(TapBuildError::InvalidBorderSpacing(32))
+        );
+
+        let mut recursive = Vec::new();
+        recursive.extend_from_slice(&0xD66Au16.to_le_bytes());
+        recursive.push(2);
+        recursive.extend_from_slice(&1u16.to_le_bytes());
+        let recursive = TableConditionalFormatting {
+            condition: TableStyleCondition::HeaderRow,
+            properties: TableStyleDefaults::default(),
+            raw_grpprl: recursive,
+        };
+        assert!(matches!(
+            generate_table_style_sprms_with_conditionals(
+                &TableStyleDefaults::default(),
+                &[recursive],
+            ),
+            Err(TapBuildError::InvalidConditionalProperties(_))
+        ));
+
+        let oversized = TableConditionalFormatting {
+            condition: TableStyleCondition::HeaderRow,
+            properties: TableStyleDefaults::default(),
+            raw_grpprl: vec![0; 254],
+        };
+        assert_eq!(
+            generate_table_style_sprms_with_conditionals(
+                &TableStyleDefaults::default(),
+                &[oversized],
+            ),
+            Err(TapBuildError::ConditionalPropertiesTooLong(254))
         );
     }
 

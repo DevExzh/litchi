@@ -122,6 +122,8 @@ pub struct TableProperties {
     pub modern_logical_justification: Option<TableJustification>,
     /// Scalar defaults parsed from a table style's `UpxTapx`
     pub style_defaults: TableStyleDefaults,
+    /// Conditional table-style property lists in source order
+    pub conditional_formats: Vec<TableConditionalFormatting>,
     /// Half the width of spacing between cells (dxaGapHalf)
     pub gap_half: i16,
     /// Table indent from left margin (twips)
@@ -276,6 +278,70 @@ pub enum TableStyleShading {
     NoShading,
     /// Apply this shading descriptor.
     Shading(CellShading),
+}
+
+/// A location or band condition within a DOC table style.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum TableStyleCondition {
+    HeaderRow,
+    FooterRow,
+    FirstColumn,
+    LastColumn,
+    OddColumnBand,
+    EvenColumnBand,
+    OddRowBand,
+    EvenRowBand,
+    TopRightCell,
+    TopLeftCell,
+    BottomRightCell,
+    BottomLeftCell,
+}
+
+impl TableStyleCondition {
+    pub(crate) fn from_code(code: u16) -> Option<Self> {
+        Some(match code {
+            0x0001 => Self::HeaderRow,
+            0x0002 => Self::FooterRow,
+            0x0004 => Self::FirstColumn,
+            0x0008 => Self::LastColumn,
+            0x0010 => Self::OddColumnBand,
+            0x0020 => Self::EvenColumnBand,
+            0x0040 => Self::OddRowBand,
+            0x0080 => Self::EvenRowBand,
+            0x0100 => Self::TopRightCell,
+            0x0200 => Self::TopLeftCell,
+            0x0400 => Self::BottomRightCell,
+            0x0800 => Self::BottomLeftCell,
+            _ => return None,
+        })
+    }
+
+    pub(crate) const fn code(self) -> u16 {
+        match self {
+            Self::HeaderRow => 0x0001,
+            Self::FooterRow => 0x0002,
+            Self::FirstColumn => 0x0004,
+            Self::LastColumn => 0x0008,
+            Self::OddColumnBand => 0x0010,
+            Self::EvenColumnBand => 0x0020,
+            Self::OddRowBand => 0x0040,
+            Self::EvenRowBand => 0x0080,
+            Self::TopRightCell => 0x0100,
+            Self::TopLeftCell => 0x0200,
+            Self::BottomRightCell => 0x0400,
+            Self::BottomLeftCell => 0x0800,
+        }
+    }
+}
+
+/// Conditional table formatting carried by `sprmTCnf`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TableConditionalFormatting {
+    pub condition: TableStyleCondition,
+    /// Typed style properties currently understood by the TAP parser.
+    pub properties: TableStyleDefaults,
+    /// Exact nested grpprl, retained so unknown allowed properties are not lost.
+    pub raw_grpprl: Vec<u8>,
 }
 
 /// Legacy Word table-cell shading.
@@ -559,6 +625,7 @@ impl Default for TableProperties {
             legacy_physical_justification: None,
             modern_logical_justification: None,
             style_defaults: TableStyleDefaults::default(),
+            conditional_formats: Vec::new(),
             gap_half: 0,
             indent_left: 0,
             preferred_width: None,

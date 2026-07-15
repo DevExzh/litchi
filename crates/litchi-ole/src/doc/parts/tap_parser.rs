@@ -26,10 +26,11 @@ fn binary_to_doc_result<T>(result: BinaryResult<T>) -> Result<T> {
 }
 use super::tap::{
     BorderStyle, BorderType, CellBorderTypes, CellMergeStatus, CellProperties, CellShading,
-    CellSpacing, CellSpacingSource, ShadingPattern, TableHorizontalAnchor, TableHorizontalPosition,
-    TableJustification, TableLook, TableLookFlags, TablePositioning, TableProperties,
-    TableVerticalAnchor, TableVerticalPosition, TableWidth, TextDirection, VerticalAlignment,
-    VerticalMergeStatus, WidthType,
+    CellSpacing, CellSpacingSource, ShadingPattern, TableConditionalFormatting,
+    TableHorizontalAnchor, TableHorizontalPosition, TableJustification, TableLook, TableLookFlags,
+    TablePositioning, TableProperties, TableStyleCondition, TableVerticalAnchor,
+    TableVerticalPosition, TableWidth, TextDirection, VerticalAlignment, VerticalMergeStatus,
+    WidthType,
 };
 use crate::sprm::{Sprm, parse_sprms};
 use crate::sprm_operations::get_sprm_operation;
@@ -83,6 +84,18 @@ impl<'arena> TapParser<'arena> {
     ///
     /// Parsed TableProperties structure
     pub fn parse_tap(&self, grpprl: &[u8]) -> Result<TableProperties> {
+        self.parse_tap_context(grpprl, false)
+    }
+
+    pub(crate) fn parse_conditional_tap(&self, grpprl: &[u8]) -> Result<TableProperties> {
+        self.parse_tap_context(grpprl, true)
+    }
+
+    fn parse_tap_context(
+        &self,
+        grpprl: &[u8],
+        inside_conditional: bool,
+    ) -> Result<TableProperties> {
         // Parse all SPRMs using arena for temporary storage
         let sprms = parse_sprms(grpprl);
         let consumed = sprms.last().map_or(0, |sprm| sprm.offset + sprm.size);
@@ -98,7 +111,7 @@ impl<'arena> TapParser<'arena> {
         // Apply each TAP-type SPRM to the table properties
         for sprm in sprms {
             if Self::is_tap_sprm(sprm.opcode) {
-                self.apply_sprm_to_tap(&mut tap, &sprm, grpprl)?;
+                self.apply_sprm_to_tap(&mut tap, &sprm, grpprl, inside_conditional)?;
             }
         }
 
@@ -314,6 +327,7 @@ impl<'arena> TapParser<'arena> {
         tap: &mut TableProperties,
         sprm: &Sprm,
         grpprl: &[u8],
+        inside_conditional: bool,
     ) -> Result<()> {
         // Use shared SPRM operation extraction
         let operation = get_sprm_operation(sprm.opcode);
@@ -613,6 +627,14 @@ impl<'arena> TapParser<'arena> {
                     },
                 };
             },
+            0x6A => {
+                if inside_conditional {
+                    return Err(DocError::Corrupted(
+                        "sprmTCnf cannot be nested inside another sprmTCnf".to_string(),
+                    ));
+                }
+                self.parse_conditional_formatting(tap, sprm)?;
+            },
             0x69 => {
                 let operand = sprm.operand_bytes();
                 if operand.len() != 4 {
@@ -653,7 +675,14 @@ impl<'arena> TapParser<'arena> {
             0x7D => {
                 tap.style_defaults.no_wrap = Some(Self::parse_bool8(sprm, "sprmTCellNoWrapStyle")?);
             },
-            0x7F..=0x86 => self.parse_style_border(tap, sprm, operation)?,
+            0x7F..=0x86 => {
+                if !inside_conditional {
+                    return Err(DocError::Corrupted(
+                        "DOC table-style border SPRMs are only valid inside sprmTCnf".to_string(),
+                    ));
+                }
+                self.parse_style_border(tap, sprm, operation)?;
+            },
             0x87 => self.parse_style_shading(tap, sprm)?,
             0x88 => {
                 tap.style_defaults.horizontal_band_size =
@@ -1604,6 +1633,27 @@ impl<'arena> TapParser<'arena> {
             _ => unreachable!(),
         };
         *target = Some(border);
+        Ok(())
+    }
+
+    fn parse_conditional_formatting(&self, tap: &mut TableProperties, sprm: &Sprm) -> Result<()> {
+        let operand = sprm.operand_bytes();
+        if operand.len() < 2 {
+            return Err(DocError::Corrupted(
+                "sprmTCnf must contain a 2-byte condition".to_string(),
+            ));
+        }
+        let code = binary_to_doc_result(read_u16_le(operand, 0))?;
+        let condition = TableStyleCondition::from_code(code).ok_or_else(|| {
+            DocError::Corrupted(format!("sprmTCnf contains invalid condition {code:#06x}"))
+        })?;
+        let raw_grpprl = operand[2..].to_vec();
+        let nested = self.parse_conditional_tap(&raw_grpprl)?;
+        tap.conditional_formats.push(TableConditionalFormatting {
+            condition,
+            properties: nested.style_defaults,
+            raw_grpprl,
+        });
         Ok(())
     }
 
@@ -2677,8 +2727,8 @@ mod tests {
     fn parses_visual_table_style_defaults() {
         let arena = Bump::new();
         let parser = TapParser::new(&arena);
-        let mut grpprl = Vec::new();
-        append_variable_sprm(&mut grpprl, 0xD47F, &[0; 8]);
+        let mut nested = Vec::new();
+        append_variable_sprm(&mut nested, 0xD47F, &[0; 8]);
         for (opcode, border_type) in [
             (0xD680, 1),
             (0xD681, 3),
@@ -2689,11 +2739,15 @@ mod tests {
             (0xD686, 0x1B),
         ] {
             append_variable_sprm(
-                &mut grpprl,
+                &mut nested,
                 opcode,
                 &full_border([1, 2, 3, 0], 8, border_type, 0),
             );
         }
+        let mut grpprl = Vec::new();
+        let mut conditional = 0x0001u16.to_le_bytes().to_vec();
+        conditional.extend_from_slice(&nested);
+        append_variable_sprm(&mut grpprl, 0xD66A, &conditional);
         let shading = CellShading {
             foreground_color: Some((4, 5, 6)),
             background_color: Some((7, 8, 9)),
@@ -2708,26 +2762,30 @@ mod tests {
         append_variable_sprm(&mut grpprl, 0xD687, &full_shading([0xFF; 4], [0xFF; 4], 0));
 
         let tap = parser.parse_tap(&grpprl).unwrap();
+        assert_eq!(tap.conditional_formats.len(), 1);
         assert_eq!(
-            tap.style_defaults.border_top,
-            Some(TableStyleBorder::NoBorder)
+            tap.conditional_formats[0].condition,
+            TableStyleCondition::HeaderRow
         );
+        assert_eq!(tap.conditional_formats[0].raw_grpprl, nested);
+        let conditional = &tap.conditional_formats[0].properties;
+        assert_eq!(conditional.border_top, Some(TableStyleBorder::NoBorder));
         assert!(matches!(
-            tap.style_defaults.border_bottom,
+            conditional.border_bottom,
             Some(TableStyleBorder::Border(BorderStyle {
                 border_type: BorderType::Single,
                 ..
             }))
         ));
         assert!(matches!(
-            tap.style_defaults.border_diagonal_down,
+            conditional.border_diagonal_down,
             Some(TableStyleBorder::Border(BorderStyle {
                 border_type: BorderType::Outset,
                 ..
             }))
         ));
         assert!(matches!(
-            tap.style_defaults.border_diagonal_up,
+            conditional.border_diagonal_up,
             Some(TableStyleBorder::Border(BorderStyle {
                 border_type: BorderType::Inset,
                 ..
@@ -2759,11 +2817,64 @@ mod tests {
             append_variable_sprm(&mut grpprl, opcode, operand);
             parser.parse_tap(&grpprl)
         };
-        assert!(parse_with(0xD47F, &[0; 7]).is_err());
-        assert!(parse_with(0xD47F, &[0, 0, 0, 0, 0xFF, 0xFF, 0xFF, 0xFF]).is_err());
-        assert!(parse_with(0xD47F, &full_border([0; 4], 8, 2, 0)).is_err());
+        // Style borders are invalid in the outer UpxTapx property list.
+        assert!(parse_with(0xD47F, &[0; 8]).is_err());
+        let parse_border = |operand: &[u8]| {
+            let mut nested = Vec::new();
+            append_variable_sprm(&mut nested, 0xD47F, operand);
+            let mut conditional = 0x0001u16.to_le_bytes().to_vec();
+            conditional.extend_from_slice(&nested);
+            parse_with(0xD66A, &conditional)
+        };
+        assert!(parse_border(&[0; 7]).is_err());
+        assert!(parse_border(&[0, 0, 0, 0, 0xFF, 0xFF, 0xFF, 0xFF]).is_err());
+        assert!(parse_border(&full_border([0; 4], 8, 2, 0)).is_err());
         assert!(parse_with(0xD687, &[0; 9]).is_err());
         assert!(parse_with(0xD687, &full_shading([0; 4], [0; 4], 99)).is_err());
+
+        assert!(parse_with(0xD66A, &[0, 0]).is_err());
+        assert!(parse_with(0xD66A, &[1]).is_err());
+        let mut malformed_nested = 0x0001u16.to_le_bytes().to_vec();
+        append_variable_sprm(&mut malformed_nested, 0xD47F, &[0; 7]);
+        assert!(parse_with(0xD66A, &malformed_nested).is_err());
+        let mut recursive = 0x0001u16.to_le_bytes().to_vec();
+        append_variable_sprm(&mut recursive, 0xD66A, &[1, 0]);
+        assert!(parse_with(0xD66A, &recursive).is_err());
+    }
+
+    #[test]
+    fn parses_all_table_style_conditions() {
+        let arena = Bump::new();
+        let parser = TapParser::new(&arena);
+        let expected: [(u16, TableStyleCondition); 12] = [
+            (0x0001, TableStyleCondition::HeaderRow),
+            (0x0002, TableStyleCondition::FooterRow),
+            (0x0004, TableStyleCondition::FirstColumn),
+            (0x0008, TableStyleCondition::LastColumn),
+            (0x0010, TableStyleCondition::OddColumnBand),
+            (0x0020, TableStyleCondition::EvenColumnBand),
+            (0x0040, TableStyleCondition::OddRowBand),
+            (0x0080, TableStyleCondition::EvenRowBand),
+            (0x0100, TableStyleCondition::TopRightCell),
+            (0x0200, TableStyleCondition::TopLeftCell),
+            (0x0400, TableStyleCondition::BottomRightCell),
+            (0x0800, TableStyleCondition::BottomLeftCell),
+        ];
+        let mut grpprl = Vec::new();
+        for (code, _) in expected {
+            append_variable_sprm(&mut grpprl, 0xD66A, &code.to_le_bytes());
+        }
+        let tap = parser.parse_tap(&grpprl).unwrap();
+        assert_eq!(
+            tap.conditional_formats
+                .iter()
+                .map(|format| format.condition)
+                .collect::<Vec<_>>(),
+            expected
+                .into_iter()
+                .map(|(_, condition)| condition)
+                .collect::<Vec<_>>()
+        );
     }
 
     #[test]

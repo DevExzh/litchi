@@ -61,9 +61,10 @@ pub mod numbering;
 // Re-export public types
 pub use crate::doc::parts::tap::{
     CellBorderTypes, CellShading, CellSpacing, CellSpacingSource, ShadingPattern,
-    TableHorizontalAnchor, TableHorizontalPosition, TableJustification, TableLook, TableLookFlags,
-    TablePositioning, TableStyleBorder, TableStyleDefaults, TableStyleShading, TableVerticalAnchor,
-    TableVerticalPosition, TableWidth, WidthType,
+    TableConditionalFormatting, TableHorizontalAnchor, TableHorizontalPosition, TableJustification,
+    TableLook, TableLookFlags, TablePositioning, TableStyleBorder, TableStyleCondition,
+    TableStyleDefaults, TableStyleShading, TableVerticalAnchor, TableVerticalPosition, TableWidth,
+    WidthType,
 };
 pub use bookmarks::BookmarkEntry;
 pub use comments::CommentEntry;
@@ -79,5 +80,5 @@ pub use revisions::{DisplayFieldRevision, FormattingRevision, NumberingRevision,
 pub use sprm::SprmBuilder;
 pub use tap::{
     TableBorders, TableCell, TableRevisionMark, TableRow, TapBuildError, TapBuilder,
-    generate_table_style_sprms,
+    generate_table_style_sprms, generate_table_style_sprms_with_conditionals,
 };
