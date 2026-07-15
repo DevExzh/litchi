@@ -62,7 +62,8 @@ pub mod numbering;
 pub use crate::doc::parts::tap::{
     CellBorderTypes, CellShading, CellSpacing, CellSpacingSource, ShadingPattern,
     TableHorizontalAnchor, TableHorizontalPosition, TableJustification, TableLook, TableLookFlags,
-    TablePositioning, TableVerticalAnchor, TableVerticalPosition, TableWidth, WidthType,
+    TablePositioning, TableStyleDefaults, TableVerticalAnchor, TableVerticalPosition, TableWidth,
+    WidthType,
 };
 pub use bookmarks::BookmarkEntry;
 pub use comments::CommentEntry;
@@ -76,4 +77,7 @@ pub use numbering::{ListFormatOverride, ListLevel, ListStructure, NumberFormat, 
 pub use piece_table::{Piece, PieceTableBuilder};
 pub use revisions::{DisplayFieldRevision, FormattingRevision, NumberingRevision, TextRevision};
 pub use sprm::SprmBuilder;
-pub use tap::{TableBorders, TableCell, TableRevisionMark, TableRow, TapBuildError, TapBuilder};
+pub use tap::{
+    TableBorders, TableCell, TableRevisionMark, TableRow, TapBuildError, TapBuilder,
+    generate_table_style_sprms,
+};

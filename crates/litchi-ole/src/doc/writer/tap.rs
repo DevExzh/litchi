@@ -8,8 +8,8 @@ use super::sprm::SprmBuilder;
 use crate::doc::parts::tap::{
     BorderStyle, BorderType, CellBorderTypes, CellBorders, CellShading, CellSpacing,
     CellSpacingSource, TableHorizontalAnchor, TableHorizontalPosition, TableJustification,
-    TableLook, TablePositioning, TableVerticalAnchor, TableVerticalPosition, TableWidth,
-    TextDirection, VerticalAlignment, VerticalMergeStatus, WidthType,
+    TableLook, TablePositioning, TableStyleDefaults, TableVerticalAnchor, TableVerticalPosition,
+    TableWidth, TextDirection, VerticalAlignment, VerticalMergeStatus, WidthType,
 };
 
 /// Error returned when table row properties cannot be represented in DOC TAP.
@@ -37,6 +37,8 @@ pub enum TapBuildError {
     InvalidRevisionAuthorIndex(u16),
     /// PropRMark contains an invalid packed DTTM.
     InvalidRevisionTimestamp(u32),
+    /// Table-style band sizes are limited to one through three cells.
+    InvalidStyleBandSize(&'static str, u8),
     /// A TCellBrcType prefix requires four explicit types for every included cell.
     IncompleteCellBorderTypes(usize),
     /// A preferred-width property uses unsupported units or a value outside its context's range.
@@ -88,6 +90,12 @@ impl std::fmt::Display for TapBuildError {
             },
             Self::InvalidRevisionTimestamp(timestamp) => {
                 write!(f, "DOC table revision DTTM {timestamp:#010x} is invalid")
+            },
+            Self::InvalidStyleBandSize(axis, size) => {
+                write!(
+                    f,
+                    "DOC table-style {axis} band size {size} is outside 1..=3"
+                )
             },
             Self::IncompleteCellBorderTypes(index) => {
                 write!(f, "DOC cell {index} has an incomplete border-type override")
@@ -383,6 +391,73 @@ fn physical_justification(logical: TableJustification, right_to_left: bool) -> T
     } else {
         logical
     }
+}
+
+/// Serialize scalar table-style defaults for the `grpprlTapx` member of an `UpxTapx`.
+pub fn generate_table_style_sprms(defaults: &TableStyleDefaults) -> Result<Vec<u8>, TapBuildError> {
+    for (axis, size) in [
+        ("horizontal", defaults.horizontal_band_size),
+        ("vertical", defaults.vertical_band_size),
+    ] {
+        if let Some(size) = size
+            && !(1..=3).contains(&size)
+        {
+            return Err(TapBuildError::InvalidStyleBandSize(axis, size));
+        }
+    }
+
+    let mut padding_groups = Vec::<(u16, u8)>::with_capacity(4);
+    for (mask, padding) in [
+        (0x01, defaults.padding_top),
+        (0x02, defaults.padding_left),
+        (0x04, defaults.padding_bottom),
+        (0x08, defaults.padding_right),
+    ] {
+        let Some(padding) = padding else {
+            continue;
+        };
+        if padding > 31_680 {
+            return Err(TapBuildError::InvalidCellPadding(padding));
+        }
+        if let Some((_, sides)) = padding_groups
+            .iter_mut()
+            .find(|(width, _)| *width == padding)
+        {
+            *sides |= mask;
+        } else {
+            padding_groups.push((padding, mask));
+        }
+    }
+
+    let mut sprms = Vec::with_capacity(padding_groups.len() * 9 + 12);
+    for (width, sides) in padding_groups {
+        sprms.extend_from_slice(&0xD63Eu16.to_le_bytes());
+        sprms.push(6);
+        sprms.extend_from_slice(&[0, 1, sides, 3]);
+        sprms.extend_from_slice(&width.to_le_bytes());
+    }
+    if let Some(alignment) = defaults.vertical_alignment {
+        let value = match alignment {
+            VerticalAlignment::Top => 0,
+            VerticalAlignment::Center => 1,
+            VerticalAlignment::Bottom => 2,
+        };
+        sprms.extend_from_slice(&0x347Cu16.to_le_bytes());
+        sprms.push(value);
+    }
+    if let Some(no_wrap) = defaults.no_wrap {
+        sprms.extend_from_slice(&0x347Du16.to_le_bytes());
+        sprms.push(u8::from(no_wrap));
+    }
+    if let Some(size) = defaults.horizontal_band_size {
+        sprms.extend_from_slice(&0x3488u16.to_le_bytes());
+        sprms.push(size);
+    }
+    if let Some(size) = defaults.vertical_band_size {
+        sprms.extend_from_slice(&0x3489u16.to_le_bytes());
+        sprms.push(size);
+    }
+    Ok(sprms)
 }
 
 /// TAP (Table Properties) builder
@@ -1306,6 +1381,57 @@ mod tests {
         assert_eq!(tap.cell_properties[22].shading, Some(shading));
         assert_eq!(tap.cell_properties[44].shading, Some(shading));
         assert!(tap.cell_properties[43].shading.is_none());
+    }
+
+    #[test]
+    fn round_trips_scalar_table_style_defaults() {
+        let defaults = TableStyleDefaults {
+            padding_top: Some(120),
+            padding_left: Some(240),
+            padding_bottom: Some(120),
+            padding_right: Some(240),
+            vertical_alignment: Some(VerticalAlignment::Bottom),
+            no_wrap: Some(false),
+            horizontal_band_size: Some(2),
+            vertical_band_size: Some(3),
+        };
+        let sprms = generate_table_style_sprms(&defaults).unwrap();
+        let parsed_sprms = crate::sprm::parse_sprms(&sprms);
+        assert_eq!(
+            parsed_sprms
+                .iter()
+                .filter(|sprm| sprm.opcode == 0xD63E)
+                .count(),
+            2
+        );
+
+        let tap = crate::doc::parts::tap::TableProperties::from_sprm(&sprms).unwrap();
+        assert_eq!(tap.style_defaults, defaults);
+    }
+
+    #[test]
+    fn rejects_invalid_scalar_table_style_defaults() {
+        assert_eq!(
+            generate_table_style_sprms(&TableStyleDefaults {
+                padding_top: Some(31_681),
+                ..TableStyleDefaults::default()
+            }),
+            Err(TapBuildError::InvalidCellPadding(31_681))
+        );
+        assert_eq!(
+            generate_table_style_sprms(&TableStyleDefaults {
+                horizontal_band_size: Some(0),
+                ..TableStyleDefaults::default()
+            }),
+            Err(TapBuildError::InvalidStyleBandSize("horizontal", 0))
+        );
+        assert_eq!(
+            generate_table_style_sprms(&TableStyleDefaults {
+                vertical_band_size: Some(4),
+                ..TableStyleDefaults::default()
+            }),
+            Err(TapBuildError::InvalidStyleBandSize("vertical", 4))
+        );
     }
 
     #[test]

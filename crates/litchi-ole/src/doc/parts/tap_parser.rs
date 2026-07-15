@@ -550,6 +550,7 @@ impl<'arena> TapParser<'arena> {
                 }
                 tap.table_style_index = Some(binary_to_doc_result(read_u16_le(operand, 0))?);
             },
+            0x3E => self.parse_style_cell_padding(tap, sprm)?,
             0x42 => self.parse_cell_range_bool(tap, sprm, CellBoolProperty::HideMark)?,
             0x64 => {
                 tap.modern_right_to_left = Self::parse_bool16(sprm, "sprmTFBiDi90")?;
@@ -636,6 +637,30 @@ impl<'arena> TapParser<'arena> {
                 }
                 tap.revision_save_id = Some(binary_to_doc_result(read_u32_le(operand, 0))?);
             },
+            0x7C => {
+                tap.style_defaults.vertical_alignment =
+                    Some(match Self::parse_byte(sprm, "sprmTCellVertAlignStyle")? {
+                        0 => VerticalAlignment::Top,
+                        1 => VerticalAlignment::Center,
+                        2 => VerticalAlignment::Bottom,
+                        _ => {
+                            return Err(DocError::Corrupted(
+                                "sprmTCellVertAlignStyle contains an invalid alignment".to_string(),
+                            ));
+                        },
+                    });
+            },
+            0x7D => {
+                tap.style_defaults.no_wrap = Some(Self::parse_bool8(sprm, "sprmTCellNoWrapStyle")?);
+            },
+            0x88 => {
+                tap.style_defaults.horizontal_band_size =
+                    Some(Self::parse_band_size(sprm, "sprmTCHorzBands")?);
+            },
+            0x89 => {
+                tap.style_defaults.vertical_band_size =
+                    Some(Self::parse_band_size(sprm, "sprmTCVertBands")?);
+            },
             0x8A => {
                 tap.modern_logical_justification =
                     Some(Self::parse_justification(sprm, "sprmTJc")?);
@@ -665,6 +690,26 @@ impl<'arena> TapParser<'arena> {
                 "{name} contains an invalid justification"
             ))),
         }
+    }
+
+    fn parse_byte(sprm: &Sprm, name: &str) -> Result<u8> {
+        let operand = sprm.operand_bytes();
+        if operand.len() != 1 {
+            return Err(DocError::Corrupted(format!(
+                "{name} operand must contain exactly 1 byte"
+            )));
+        }
+        Ok(operand[0])
+    }
+
+    fn parse_band_size(sprm: &Sprm, name: &str) -> Result<u8> {
+        let size = Self::parse_byte(sprm, name)?;
+        if !(1..=3).contains(&size) {
+            return Err(DocError::Corrupted(format!(
+                "{name} band size must be in 1..=3"
+            )));
+        }
+        Ok(size)
     }
 
     fn resolve_justification(tap: &mut TableProperties) {
@@ -1495,6 +1540,38 @@ impl<'arena> TapParser<'arena> {
         Ok(())
     }
 
+    fn parse_style_cell_padding(&self, tap: &mut TableProperties, sprm: &Sprm) -> Result<()> {
+        let operand = sprm.operand_bytes();
+        if operand.len() != 6
+            || operand[0] != 0
+            || operand[1] != 1
+            || operand[2] == 0
+            || operand[2] & !0x0F != 0
+            || operand[3] != 0x03
+        {
+            return Err(DocError::Corrupted(
+                "sprmTCellPaddingStyle contains an invalid CSSA".to_string(),
+            ));
+        }
+        let width = binary_to_doc_result(read_u16_le(operand, 4))?;
+        if width > 31_680 {
+            return Err(DocError::Corrupted(
+                "sprmTCellPaddingStyle exceeds 31680 twips".to_string(),
+            ));
+        }
+        for (mask, padding) in [
+            (0x01, &mut tap.style_defaults.padding_top),
+            (0x02, &mut tap.style_defaults.padding_left),
+            (0x04, &mut tap.style_defaults.padding_bottom),
+            (0x08, &mut tap.style_defaults.padding_right),
+        ] {
+            if operand[2] & mask != 0 {
+                *padding = Some(width);
+            }
+        }
+        Ok(())
+    }
+
     fn parse_cell_spacing(&self, tap: &mut TableProperties, sprm: &Sprm) -> Result<()> {
         let operand = sprm.operand_bytes();
         if operand.len() != 6 || operand[0] != 0 || operand[1] != 1 || operand[2] != 0x0F {
@@ -1756,6 +1833,7 @@ impl<'arena> TapParser<'arena> {
 
 #[cfg(test)]
 mod tests {
+    use super::super::tap::TableStyleDefaults;
     use super::*;
 
     fn table_definition_grpprl(operand: &[u8]) -> Vec<u8> {
@@ -2474,6 +2552,59 @@ mod tests {
         append_fixed_sprm(&mut beyond_right_edge, 0xF661, &[3, 0xF8, 0x77]);
         append_fixed_sprm(&mut beyond_right_edge, 0xF614, &[3, 0xE8, 0x03]);
         assert!(parser.parse_tap(&beyond_right_edge).is_err());
+    }
+
+    #[test]
+    fn parses_scalar_table_style_defaults() {
+        let arena = Bump::new();
+        let parser = TapParser::new(&arena);
+        let mut grpprl = Vec::new();
+        append_variable_sprm(&mut grpprl, 0xD63E, &[0, 1, 0x05, 3, 120, 0]);
+        append_variable_sprm(&mut grpprl, 0xD63E, &[0, 1, 0x0A, 3, 240, 0]);
+        append_fixed_sprm(&mut grpprl, 0x347C, &[2]);
+        append_fixed_sprm(&mut grpprl, 0x347D, &[0]);
+        append_fixed_sprm(&mut grpprl, 0x3488, &[2]);
+        append_fixed_sprm(&mut grpprl, 0x3489, &[3]);
+
+        let tap = parser.parse_tap(&grpprl).unwrap();
+        assert_eq!(
+            tap.style_defaults,
+            TableStyleDefaults {
+                padding_top: Some(120),
+                padding_left: Some(240),
+                padding_bottom: Some(120),
+                padding_right: Some(240),
+                vertical_alignment: Some(VerticalAlignment::Bottom),
+                no_wrap: Some(false),
+                horizontal_band_size: Some(2),
+                vertical_band_size: Some(3),
+            }
+        );
+    }
+
+    #[test]
+    fn rejects_malformed_scalar_table_style_defaults() {
+        let arena = Bump::new();
+        let parser = TapParser::new(&arena);
+        let parse_variable = |operand: &[u8]| {
+            let mut grpprl = Vec::new();
+            append_variable_sprm(&mut grpprl, 0xD63E, operand);
+            parser.parse_tap(&grpprl)
+        };
+        assert!(parse_variable(&[1, 1, 1, 3, 0, 0]).is_err());
+        assert!(parse_variable(&[0, 1, 0, 3, 0, 0]).is_err());
+        assert!(parse_variable(&[0, 1, 1, 0, 0, 0]).is_err());
+        assert!(parse_variable(&[0, 1, 1, 3, 0xC1, 0x7B]).is_err());
+
+        let parse_fixed = |opcode, operand: &[u8]| {
+            let mut grpprl = Vec::new();
+            append_fixed_sprm(&mut grpprl, opcode, operand);
+            parser.parse_tap(&grpprl)
+        };
+        assert!(parse_fixed(0x347C, &[3]).is_err());
+        assert!(parse_fixed(0x347D, &[2]).is_err());
+        assert!(parse_fixed(0x3488, &[0]).is_err());
+        assert!(parse_fixed(0x3489, &[4]).is_err());
     }
 
     #[test]

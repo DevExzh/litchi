@@ -120,6 +120,8 @@ pub struct TableProperties {
     pub legacy_physical_justification: Option<TableJustification>,
     /// Modern logical justification source, if explicitly specified
     pub modern_logical_justification: Option<TableJustification>,
+    /// Scalar defaults parsed from a table style's `UpxTapx`
+    pub style_defaults: TableStyleDefaults,
     /// Half the width of spacing between cells (dxaGapHalf)
     pub gap_half: i16,
     /// Table indent from left margin (twips)
@@ -234,6 +236,19 @@ pub struct CellBorderTypes {
     pub left: Option<BorderType>,
     pub bottom: Option<BorderType>,
     pub right: Option<BorderType>,
+}
+
+/// Scalar cell and band defaults stored in a DOC table style.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct TableStyleDefaults {
+    pub padding_top: Option<u16>,
+    pub padding_left: Option<u16>,
+    pub padding_bottom: Option<u16>,
+    pub padding_right: Option<u16>,
+    pub vertical_alignment: Option<VerticalAlignment>,
+    pub no_wrap: Option<bool>,
+    pub horizontal_band_size: Option<u8>,
+    pub vertical_band_size: Option<u8>,
 }
 
 /// Legacy Word table-cell shading.
@@ -516,6 +531,7 @@ impl Default for TableProperties {
             justification: TableJustification::Left,
             legacy_physical_justification: None,
             modern_logical_justification: None,
+            style_defaults: TableStyleDefaults::default(),
             gap_half: 0,
             indent_left: 0,
             preferred_width: None,
