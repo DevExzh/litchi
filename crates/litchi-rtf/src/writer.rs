@@ -110,6 +110,9 @@ impl<W: Write> RtfWriter<W> {
         // Write color table
         self.write_color_table()?;
 
+        // Write document properties before body content.
+        self.write_document_info(doc.info())?;
+
         // Write document content
         for block in doc.blocks() {
             self.write_style_block(block)?;
@@ -203,6 +206,111 @@ impl<W: Write> RtfWriter<W> {
         }
 
         self.write_str("}")?;
+        Ok(())
+    }
+
+    /// Write the standard RTF document-information destination.
+    pub fn write_document_info(&mut self, info: &DocumentInfo<'_>) -> io::Result<()> {
+        let has_info = info.title.is_some()
+            || info.subject.is_some()
+            || info.author.is_some()
+            || info.manager.is_some()
+            || info.company.is_some()
+            || info.operator.is_some()
+            || info.category.is_some()
+            || info.keywords.is_some()
+            || info.comment.is_some()
+            || info.version.is_some()
+            || info.revision.is_some()
+            || info.creation_time.is_some()
+            || info.revision_time.is_some()
+            || info.print_time.is_some()
+            || info.backup_time.is_some()
+            || info.editing_time.is_some()
+            || info.pages.is_some()
+            || info.words.is_some()
+            || info.characters.is_some()
+            || info.characters_with_spaces.is_some()
+            || info.id.is_some();
+        if !has_info {
+            return Ok(());
+        }
+
+        self.write_str("{")?;
+        self.write_control_word("info", None)?;
+        self.write_info_text("title", info.title.as_deref())?;
+        self.write_info_text("subject", info.subject.as_deref())?;
+        self.write_info_text("author", info.author.as_deref())?;
+        self.write_info_text("manager", info.manager.as_deref())?;
+        self.write_info_text("company", info.company.as_deref())?;
+        self.write_info_text("operator", info.operator.as_deref())?;
+        self.write_info_text("category", info.category.as_deref())?;
+        self.write_info_text("keywords", info.keywords.as_deref())?;
+        self.write_info_text("comment", info.comment.as_deref())?;
+        self.write_info_time("creatim", info.creation_time.as_deref())?;
+        self.write_info_time("revtim", info.revision_time.as_deref())?;
+        self.write_info_time("printim", info.print_time.as_deref())?;
+        self.write_info_time("buptim", info.backup_time.as_deref())?;
+        self.write_optional_i32("version", info.version)?;
+        self.write_optional_i32("vern", info.revision)?;
+        self.write_optional_i32("edmins", info.editing_time)?;
+        self.write_optional_i32("nofpages", info.pages)?;
+        self.write_optional_i32("nofwords", info.words)?;
+        self.write_optional_i32("nofchars", info.characters)?;
+        self.write_optional_i32("nofcharsws", info.characters_with_spaces)?;
+        self.write_optional_i32("id", info.id)?;
+        self.write_str("}")
+    }
+
+    fn write_info_text(&mut self, control: &str, value: Option<&str>) -> io::Result<()> {
+        let Some(value) = value else { return Ok(()) };
+        self.write_str("{")?;
+        self.write_control_word(control, None)?;
+        self.write_str(" ")?;
+        self.write_text(value)?;
+        self.write_str("}")
+    }
+
+    fn write_info_time(&mut self, control: &str, value: Option<&str>) -> io::Result<()> {
+        let Some(value) = value else { return Ok(()) };
+        let (date, time) = value.split_once('T').ok_or_else(|| {
+            io::Error::new(io::ErrorKind::InvalidInput, "RTF info time must contain T")
+        })?;
+        let date: Vec<i32> = date
+            .split('-')
+            .map(|part| part.parse())
+            .collect::<Result<_, _>>()
+            .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid RTF info date"))?;
+        let time: Vec<i32> = time
+            .split(':')
+            .map(|part| part.parse())
+            .collect::<Result<_, _>>()
+            .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid RTF info time"))?;
+        if date.len() != 3 || time.len() != 3 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "RTF info time must use YYYY-MM-DDTHH:MM:SS",
+            ));
+        }
+        self.write_str("{")?;
+        self.write_control_word(control, None)?;
+        for (name, value) in [
+            ("yr", date[0]),
+            ("mo", date[1]),
+            ("dy", date[2]),
+            ("hr", time[0]),
+            ("min", time[1]),
+            ("sec", time[2]),
+        ] {
+            self.write_control_word(name, Some(value))?;
+        }
+        self.write_str("}")
+    }
+
+    fn write_optional_i32(&mut self, control: &str, value: Option<i32>) -> io::Result<()> {
+        if let Some(value) = value {
+            self.write_control_word(control, Some(value))?;
+        }
         Ok(())
     }
 
@@ -840,5 +948,33 @@ mod tests {
 
         let result = String::from_utf8(output).unwrap();
         assert_eq!(result, "\\test42\\flag");
+    }
+
+    #[test]
+    fn document_info_writer_round_trips() {
+        let mut info = DocumentInfo::new().with_title(std::borrow::Cow::Borrowed("Résumé 你"));
+        info.author = Some(std::borrow::Cow::Borrowed("Ada"));
+        info.creation_time = Some(std::borrow::Cow::Borrowed("2026-07-15T12:34:56"));
+        info.pages = Some(3);
+        info.characters_with_spaces = Some(42);
+
+        let mut output = Vec::new();
+        let mut writer = RtfWriter::new(&mut output);
+        writer.write_document_header().unwrap();
+        writer.write_document_info(&info).unwrap();
+        writer.write_text("Body").unwrap();
+        writer.write_str("}").unwrap();
+
+        let rtf = String::from_utf8(output).unwrap();
+        let parsed = RtfDocument::parse(&rtf).unwrap();
+        assert_eq!(parsed.info().title.as_deref(), Some("Résumé 你"));
+        assert_eq!(parsed.info().author.as_deref(), Some("Ada"));
+        assert_eq!(
+            parsed.info().creation_time.as_deref(),
+            Some("2026-07-15T12:34:56")
+        );
+        assert_eq!(parsed.info().pages, Some(3));
+        assert_eq!(parsed.info().characters_with_spaces, Some(42));
+        assert_eq!(parsed.text(), "Body");
     }
 }

@@ -49,6 +49,39 @@ enum Destination {
     Other,
 }
 
+#[derive(Clone, Copy)]
+enum InfoTextField {
+    Title,
+    Subject,
+    Author,
+    Manager,
+    Company,
+    Operator,
+    Category,
+    Keywords,
+    Comment,
+}
+
+#[derive(Clone, Copy)]
+enum InfoTimeField {
+    Creation,
+    Revision,
+    Print,
+    Backup,
+}
+
+#[derive(Default)]
+struct InfoTimestamp {
+    year: Option<i32>,
+    month: Option<i32>,
+    day: Option<i32>,
+    hour: Option<i32>,
+    minute: Option<i32>,
+    second: Option<i32>,
+}
+
+const MAX_INFO_TEXT_BYTES: usize = 1_048_576;
+
 /// Parser state for tracking formatting context.
 #[derive(Debug, Clone)]
 struct State {
@@ -271,11 +304,11 @@ impl<'a> Parser<'a> {
                     return Ok(());
                 },
                 Token::Control(ControlWord::Info) => {
-                    // Mark as info destination and skip
+                    // Parse document metadata without adding it to body text.
                     if let Some(state) = self.states.last_mut() {
                         state.destination = Destination::Info;
                     }
-                    self.skip_until_close_brace()?;
+                    self.parse_info()?;
                     self.states.pop();
                     return Ok(());
                 },
@@ -838,6 +871,211 @@ impl<'a> Parser<'a> {
         }
 
         Ok(())
+    }
+
+    /// Parse the standard RTF `info` destination.
+    fn parse_info(&mut self) -> RtfResult<()> {
+        self.pos += 1; // `info`
+        while self.pos < self.tokens.len() {
+            match self.tokens.get(self.pos) {
+                Some(Token::OpenBrace) => {
+                    self.pos += 1;
+                    let control = self.tokens.get(self.pos).cloned();
+                    match control {
+                        Some(Token::Control(ControlWord::Title)) => {
+                            self.parse_info_text(InfoTextField::Title)?;
+                        },
+                        Some(Token::Control(ControlWord::Subject)) => {
+                            self.parse_info_text(InfoTextField::Subject)?;
+                        },
+                        Some(Token::Control(ControlWord::Author)) => {
+                            self.parse_info_text(InfoTextField::Author)?;
+                        },
+                        Some(Token::Control(ControlWord::Manager)) => {
+                            self.parse_info_text(InfoTextField::Manager)?;
+                        },
+                        Some(Token::Control(ControlWord::Company)) => {
+                            self.parse_info_text(InfoTextField::Company)?;
+                        },
+                        Some(Token::Control(ControlWord::Operator)) => {
+                            self.parse_info_text(InfoTextField::Operator)?;
+                        },
+                        Some(Token::Control(ControlWord::Category)) => {
+                            self.parse_info_text(InfoTextField::Category)?;
+                        },
+                        Some(Token::Control(ControlWord::Keywords)) => {
+                            self.parse_info_text(InfoTextField::Keywords)?;
+                        },
+                        Some(Token::Control(ControlWord::Comment | ControlWord::DocComment)) => {
+                            self.parse_info_text(InfoTextField::Comment)?;
+                        },
+                        Some(Token::Control(ControlWord::CreationTime)) => {
+                            self.parse_info_time(InfoTimeField::Creation)?;
+                        },
+                        Some(Token::Control(ControlWord::RevisionTime)) => {
+                            self.parse_info_time(InfoTimeField::Revision)?;
+                        },
+                        Some(Token::Control(ControlWord::PrintTime)) => {
+                            self.parse_info_time(InfoTimeField::Print)?;
+                        },
+                        Some(Token::Control(ControlWord::BackupTime)) => {
+                            self.parse_info_time(InfoTimeField::Backup)?;
+                        },
+                        _ => self.skip_open_info_group()?,
+                    }
+                },
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    return Ok(());
+                },
+                Some(Token::Control(control)) => {
+                    match control {
+                        ControlWord::InfoVersion(value) => self.info.version = Some(*value),
+                        ControlWord::InfoRevision(value) => self.info.revision = Some(*value),
+                        ControlWord::EditingTime(value) => self.info.editing_time = Some(*value),
+                        ControlWord::NumberOfPages(value) => self.info.pages = Some(*value),
+                        ControlWord::NumberOfWords(value) => self.info.words = Some(*value),
+                        ControlWord::NumberOfCharacters(value) => {
+                            self.info.characters = Some(*value);
+                        },
+                        ControlWord::NumberOfCharactersWithSpaces(value) => {
+                            self.info.characters_with_spaces = Some(*value);
+                        },
+                        ControlWord::DocumentId(value) => self.info.id = Some(*value),
+                        _ => {},
+                    }
+                    self.pos += 1;
+                },
+                Some(_) => self.pos += 1,
+                None => break,
+            }
+        }
+        Err(RtfError::UnexpectedEof)
+    }
+
+    fn parse_info_text(&mut self, field: InfoTextField) -> RtfResult<()> {
+        self.pos += 1; // destination control word
+        let mut value = String::new();
+        let mut depth = 1usize;
+        let mut fallback_skip = 0usize;
+        while self.pos < self.tokens.len() && depth > 0 {
+            match self.tokens.get(self.pos) {
+                Some(Token::OpenBrace) => {
+                    depth += 1;
+                    self.pos += 1;
+                },
+                Some(Token::CloseBrace) => {
+                    depth -= 1;
+                    self.pos += 1;
+                },
+                Some(Token::Text(text)) => {
+                    let skipped = fallback_skip.min(text.chars().count());
+                    fallback_skip -= skipped;
+                    let remainder: String = text.chars().skip(skipped).collect();
+                    value.push_str(&remainder);
+                    self.pos += 1;
+                },
+                Some(Token::Control(ControlWord::Unicode(_))) => {
+                    let mut utf16 = SmallVec::<[u16; 4]>::new();
+                    while let Some(Token::Control(ControlWord::Unicode(code))) =
+                        self.tokens.get(self.pos)
+                    {
+                        utf16.push(*code as u16);
+                        self.pos += 1;
+                    }
+                    value.push_str(&String::from_utf16(&utf16).map_err(|error| {
+                        RtfError::InvalidUnicode(format!("Invalid info Unicode: {error}"))
+                    })?);
+                    fallback_skip =
+                        self.current_state()?.unicode_skip.max(0) as usize * utf16.len();
+                },
+                Some(Token::Control(ControlWord::UnicodeSkip(count))) => {
+                    self.current_state_mut()?.unicode_skip = *count;
+                    self.pos += 1;
+                },
+                Some(_) => self.pos += 1,
+                None => break,
+            }
+            if value.len() > MAX_INFO_TEXT_BYTES {
+                return Err(RtfError::MalformedDocument(
+                    "RTF info text exceeds the metadata safety limit".to_string(),
+                ));
+            }
+        }
+        if depth != 0 {
+            return Err(RtfError::UnexpectedEof);
+        }
+        let allocated = self.arena.alloc_str(value.trim_end_matches(['\r', '\n']));
+        let value = Some(Cow::Borrowed(&*allocated));
+        match field {
+            InfoTextField::Title => self.info.title = value,
+            InfoTextField::Subject => self.info.subject = value,
+            InfoTextField::Author => self.info.author = value,
+            InfoTextField::Manager => self.info.manager = value,
+            InfoTextField::Company => self.info.company = value,
+            InfoTextField::Operator => self.info.operator = value,
+            InfoTextField::Category => self.info.category = value,
+            InfoTextField::Keywords => self.info.keywords = value,
+            InfoTextField::Comment => self.info.comment = value,
+        }
+        Ok(())
+    }
+
+    fn parse_info_time(&mut self, field: InfoTimeField) -> RtfResult<()> {
+        self.pos += 1; // time destination
+        let mut timestamp = InfoTimestamp::default();
+        let mut depth = 1usize;
+        while self.pos < self.tokens.len() && depth > 0 {
+            match self.tokens.get(self.pos) {
+                Some(Token::OpenBrace) => depth += 1,
+                Some(Token::CloseBrace) => depth -= 1,
+                Some(Token::Control(control)) => match control {
+                    ControlWord::Year(value) => timestamp.year = Some(*value),
+                    ControlWord::Month(value) => timestamp.month = Some(*value),
+                    ControlWord::Day(value) => timestamp.day = Some(*value),
+                    ControlWord::Hour(value) => timestamp.hour = Some(*value),
+                    ControlWord::Minute(value) => timestamp.minute = Some(*value),
+                    ControlWord::Second(value) => timestamp.second = Some(*value),
+                    _ => {},
+                },
+                _ => {},
+            }
+            self.pos += 1;
+        }
+        if depth != 0 {
+            return Err(RtfError::UnexpectedEof);
+        }
+        let serialized = format!(
+            "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}",
+            timestamp.year.unwrap_or(0),
+            timestamp.month.unwrap_or(0),
+            timestamp.day.unwrap_or(0),
+            timestamp.hour.unwrap_or(0),
+            timestamp.minute.unwrap_or(0),
+            timestamp.second.unwrap_or(0),
+        );
+        let allocated = self.arena.alloc_str(&serialized);
+        let value = Some(Cow::Borrowed(&*allocated));
+        match field {
+            InfoTimeField::Creation => self.info.creation_time = value,
+            InfoTimeField::Revision => self.info.revision_time = value,
+            InfoTimeField::Print => self.info.print_time = value,
+            InfoTimeField::Backup => self.info.backup_time = value,
+        }
+        Ok(())
+    }
+
+    fn skip_open_info_group(&mut self) -> RtfResult<()> {
+        let mut depth = 1usize;
+        while self.pos < self.tokens.len() && depth > 0 {
+            match self.tokens.get(self.pos) {
+                Some(Token::OpenBrace) => depth += 1,
+                Some(Token::CloseBrace) => depth -= 1,
+                _ => {},
+            }
+            self.pos += 1;
+        }
+        (depth == 0).then_some(()).ok_or(RtfError::UnexpectedEof)
     }
 
     /// Skip tokens until closing brace.

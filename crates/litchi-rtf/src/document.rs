@@ -582,12 +582,36 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Convert document info to owned
-    #[allow(clippy::needless_pass_by_value)]
     fn convert_info_to_owned(
-        _info: super::info::DocumentInfo<'_>,
+        info: super::info::DocumentInfo<'_>,
     ) -> super::info::DocumentInfo<'static> {
-        // TODO: Implement proper conversion when info parsing is fully implemented
-        super::info::DocumentInfo::new()
+        super::info::DocumentInfo {
+            title: info.title.map(|value| Cow::Owned(value.into_owned())),
+            subject: info.subject.map(|value| Cow::Owned(value.into_owned())),
+            author: info.author.map(|value| Cow::Owned(value.into_owned())),
+            manager: info.manager.map(|value| Cow::Owned(value.into_owned())),
+            company: info.company.map(|value| Cow::Owned(value.into_owned())),
+            operator: info.operator.map(|value| Cow::Owned(value.into_owned())),
+            category: info.category.map(|value| Cow::Owned(value.into_owned())),
+            keywords: info.keywords.map(|value| Cow::Owned(value.into_owned())),
+            comment: info.comment.map(|value| Cow::Owned(value.into_owned())),
+            version: info.version,
+            revision: info.revision,
+            creation_time: info
+                .creation_time
+                .map(|value| Cow::Owned(value.into_owned())),
+            revision_time: info
+                .revision_time
+                .map(|value| Cow::Owned(value.into_owned())),
+            print_time: info.print_time.map(|value| Cow::Owned(value.into_owned())),
+            backup_time: info.backup_time.map(|value| Cow::Owned(value.into_owned())),
+            editing_time: info.editing_time,
+            pages: info.pages,
+            words: info.words,
+            characters: info.characters,
+            characters_with_spaces: info.characters_with_spaces,
+            id: info.id,
+        }
     }
 
     /// Convert annotations to owned
@@ -669,5 +693,54 @@ mod tests {
         let doc = RtfDocument::parse(rtf).unwrap();
         let runs = doc.runs();
         assert!(!runs.is_empty());
+    }
+
+    #[test]
+    fn parses_complete_document_info_without_leaking_into_body() {
+        let rtf = r#"{\rtf1\ansi\ansicpg1252
+            {\info
+                {\title Annual \u20320? Report}
+                {\subject Results}{\author Ada}{\manager Grace}
+                {\company Caf\'e9 Corp \u8364?}{\operator Linus}{\category Finance}
+                {\keywords alpha; beta}{\comment Reviewed}
+                {\creatim\yr2025\mo7\dy14\hr9\min8\sec7}
+                {\revtim\yr2026\mo1\dy2\hr3\min4\sec5}
+                {\printim\yr2026\mo2\dy3}{\buptim\yr2024\mo12\dy31}
+                \version4\vern9\edmins120\nofpages8\nofwords900
+                \nofchars4200\nofcharsws5000\id77
+            }
+            Body text\par}"#;
+        let doc = RtfDocument::parse(rtf).unwrap();
+        let info = doc.info();
+        assert_eq!(info.title.as_deref(), Some("Annual 你 Report"));
+        assert_eq!(info.subject.as_deref(), Some("Results"));
+        assert_eq!(info.author.as_deref(), Some("Ada"));
+        assert_eq!(info.manager.as_deref(), Some("Grace"));
+        assert_eq!(info.company.as_deref(), Some("Café Corp €"));
+        assert_eq!(info.operator.as_deref(), Some("Linus"));
+        assert_eq!(info.category.as_deref(), Some("Finance"));
+        assert_eq!(info.keywords.as_deref(), Some("alpha; beta"));
+        assert_eq!(info.comment.as_deref(), Some("Reviewed"));
+        assert_eq!(info.creation_time.as_deref(), Some("2025-07-14T09:08:07"));
+        assert_eq!(info.revision_time.as_deref(), Some("2026-01-02T03:04:05"));
+        assert_eq!(info.print_time.as_deref(), Some("2026-02-03T00:00:00"));
+        assert_eq!(info.backup_time.as_deref(), Some("2024-12-31T00:00:00"));
+        assert_eq!(info.version, Some(4));
+        assert_eq!(info.revision, Some(9));
+        assert_eq!(info.editing_time, Some(120));
+        assert_eq!(info.pages, Some(8));
+        assert_eq!(info.words, Some(900));
+        assert_eq!(info.characters, Some(4200));
+        assert_eq!(info.characters_with_spaces, Some(5000));
+        assert_eq!(info.id, Some(77));
+        assert_eq!(doc.text().trim(), "Body text");
+    }
+
+    #[test]
+    fn ignores_unknown_nested_info_destinations() {
+        let rtf = r#"{\rtf1{\info{\*\unknown nested {data}}{\title Kept}}Text}"#;
+        let doc = RtfDocument::parse(rtf).unwrap();
+        assert_eq!(doc.info().title.as_deref(), Some("Kept"));
+        assert_eq!(doc.text(), "Text");
     }
 }

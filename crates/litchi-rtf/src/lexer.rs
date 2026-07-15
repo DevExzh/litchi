@@ -230,12 +230,34 @@ pub enum ControlWord<'a> {
     ShapeGroup,
 
     // Document info
-    Title(&'a str),
-    Subject(&'a str),
-    Author(&'a str),
-    Keywords(&'a str),
-    Comment(&'a str),
-    DocComment(&'a str),
+    Title,
+    Subject,
+    Author,
+    Manager,
+    Company,
+    Operator,
+    Category,
+    Keywords,
+    Comment,
+    DocComment,
+    CreationTime,
+    RevisionTime,
+    PrintTime,
+    BackupTime,
+    InfoVersion(i32),
+    InfoRevision(i32),
+    EditingTime(i32),
+    NumberOfPages(i32),
+    NumberOfWords(i32),
+    NumberOfCharacters(i32),
+    NumberOfCharactersWithSpaces(i32),
+    DocumentId(i32),
+    Year(i32),
+    Month(i32),
+    Day(i32),
+    Hour(i32),
+    Minute(i32),
+    Second(i32),
 
     // Unicode
     Unicode(i32),
@@ -298,6 +320,8 @@ pub struct Lexer<'a> {
     arena: &'a Bump,
     /// Current character set
     charset: CharacterSet,
+    /// A control symbol does not consume a following space as a delimiter.
+    preserve_next_whitespace: bool,
 }
 
 impl<'a> Lexer<'a> {
@@ -309,6 +333,7 @@ impl<'a> Lexer<'a> {
             pos: 0,
             arena,
             charset: CharacterSet::default(),
+            preserve_next_whitespace: false,
         }
     }
 
@@ -336,7 +361,11 @@ impl<'a> Lexer<'a> {
 
     /// Get the next token.
     fn next_token(&mut self) -> RtfResult<Token<'a>> {
-        self.skip_whitespace();
+        if self.preserve_next_whitespace {
+            self.preserve_next_whitespace = false;
+        } else {
+            self.skip_whitespace();
+        }
 
         if self.pos >= self.input.len() {
             return Err(RtfError::UnexpectedEof);
@@ -372,6 +401,7 @@ impl<'a> Lexer<'a> {
             '\\' | '{' | '}' => {
                 let text = self.arena.alloc_str(&ch.to_string());
                 self.advance();
+                self.preserve_next_whitespace = true;
                 return Ok(Token::Text(Cow::Borrowed(text)));
             },
             '\'' => return self.parse_hex_char(),
@@ -386,16 +416,19 @@ impl<'a> Lexer<'a> {
             '~' => {
                 self.advance();
                 let text = self.arena.alloc_str("\u{00A0}"); // Non-breaking space
+                self.preserve_next_whitespace = true;
                 return Ok(Token::Text(Cow::Borrowed(text)));
             },
             '-' => {
                 self.advance();
                 let text = self.arena.alloc_str("\u{00AD}"); // Optional hyphen
+                self.preserve_next_whitespace = true;
                 return Ok(Token::Text(Cow::Borrowed(text)));
             },
             '_' => {
                 self.advance();
                 let text = self.arena.alloc_str("\u{2011}"); // Non-breaking hyphen
+                self.preserve_next_whitespace = true;
                 return Ok(Token::Text(Cow::Borrowed(text)));
             },
             _ => {},
@@ -698,12 +731,34 @@ impl<'a> Lexer<'a> {
             "shpz" => ControlWord::ShapeZOrder(param_value),
 
             // Document info
-            "title" => ControlWord::Title(word),
-            "subject" => ControlWord::Subject(word),
-            "author" => ControlWord::Author(word),
-            "keywords" => ControlWord::Keywords(word),
-            "comment" => ControlWord::Comment(word),
-            "doccomm" => ControlWord::DocComment(word),
+            "title" => ControlWord::Title,
+            "subject" => ControlWord::Subject,
+            "author" => ControlWord::Author,
+            "manager" => ControlWord::Manager,
+            "company" => ControlWord::Company,
+            "operator" => ControlWord::Operator,
+            "category" => ControlWord::Category,
+            "keywords" => ControlWord::Keywords,
+            "comment" => ControlWord::Comment,
+            "doccomm" => ControlWord::DocComment,
+            "creatim" => ControlWord::CreationTime,
+            "revtim" => ControlWord::RevisionTime,
+            "printim" => ControlWord::PrintTime,
+            "buptim" => ControlWord::BackupTime,
+            "version" => ControlWord::InfoVersion(param_value),
+            "vern" => ControlWord::InfoRevision(param_value),
+            "edmins" => ControlWord::EditingTime(param_value),
+            "nofpages" => ControlWord::NumberOfPages(param_value),
+            "nofwords" => ControlWord::NumberOfWords(param_value),
+            "nofchars" => ControlWord::NumberOfCharacters(param_value),
+            "nofcharsws" => ControlWord::NumberOfCharactersWithSpaces(param_value),
+            "id" => ControlWord::DocumentId(param_value),
+            "yr" => ControlWord::Year(param_value),
+            "mo" => ControlWord::Month(param_value),
+            "dy" => ControlWord::Day(param_value),
+            "hr" => ControlWord::Hour(param_value),
+            "min" => ControlWord::Minute(param_value),
+            "sec" => ControlWord::Second(param_value),
 
             // Unicode
             "u" => ControlWord::Unicode(param_value),
@@ -745,6 +800,7 @@ impl<'a> Lexer<'a> {
         // Decode based on character set
         let ch = self.decode_byte(byte);
         let text = self.arena.alloc_str(&ch.to_string());
+        self.preserve_next_whitespace = true;
         Ok(Token::Text(Cow::Borrowed(text)))
     }
 
@@ -1005,6 +1061,16 @@ mod tests {
         let tokens = lexer.tokenize().unwrap();
         assert_eq!(tokens.len(), 1);
         assert!(matches!(tokens[0], Token::Text(_)));
+    }
+
+    #[test]
+    fn test_hex_escape_preserves_following_literal_space() {
+        let arena = Bump::new();
+        let mut lexer = Lexer::new(r"\'80 value", &arena);
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens.len(), 2);
+        assert_eq!(tokens[0], Token::Text(Cow::Borrowed("€")));
+        assert_eq!(tokens[1], Token::Text(Cow::Borrowed(" value")));
     }
 
     #[test]
