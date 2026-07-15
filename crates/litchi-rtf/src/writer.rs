@@ -57,6 +57,8 @@ enum BodyEventKind<'b, 'a> {
     BookmarkEnd(&'b Bookmark<'a>),
     AnnotationStart(&'b Annotation<'a>),
     AnnotationEnd(&'b Annotation<'a>),
+    RevisionStart(&'b Revision<'a>),
+    RevisionEnd,
 }
 
 #[derive(Clone, Copy)]
@@ -126,6 +128,9 @@ impl<W: Write> RtfWriter<W> {
         self.write_list_table(doc.list_table())?;
         self.write_list_override_table(doc.list_override_table())?;
 
+        // Revision controls reference this author table by numeric index.
+        self.write_revision_table(doc.revisions())?;
+
         // Write document properties before body content.
         self.write_document_info(doc.info())?;
 
@@ -135,7 +140,12 @@ impl<W: Write> RtfWriter<W> {
         }
 
         // Write document content and reinsert positional bookmark/comment markers.
-        self.write_blocks_with_markup(doc.blocks(), doc.bookmarks(), doc.annotations())?;
+        self.write_blocks_with_markup(
+            doc.blocks(),
+            doc.bookmarks(),
+            doc.annotations(),
+            doc.revisions(),
+        )?;
 
         // Write tables
         for table in doc.tables() {
@@ -409,6 +419,54 @@ impl<W: Write> RtfWriter<W> {
             }
             self.write_control_word("ls", Some(entry.index))?;
             self.write_str("}")?;
+        }
+        self.write_str("}")?;
+        Ok(())
+    }
+
+    /// Write the revision-author table referenced by tracked-change runs.
+    pub fn write_revision_table(&mut self, revisions: &[Revision<'_>]) -> io::Result<()> {
+        if revisions.is_empty() {
+            return Ok(());
+        }
+        let max_id = revisions.iter().try_fold(0usize, |maximum, revision| {
+            let id = usize::try_from(revision.id).map_err(|_| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF revision author indices cannot be negative",
+                )
+            })?;
+            if id >= 65_536 {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF revision author index exceeds the safety limit",
+                ));
+            }
+            Ok(maximum.max(id))
+        })?;
+        let mut authors = vec![None::<&str>; max_id + 1];
+        for revision in revisions {
+            let index = revision.id as usize;
+            let author = revision.author.as_ref();
+            if let Some(existing) = authors[index]
+                && !author.is_empty()
+                && existing != author
+            {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF revisions assign different authors to the same author index",
+                ));
+            }
+            if !author.is_empty() {
+                authors[index] = Some(author);
+            }
+        }
+
+        self.write_str("{\\*\\revtbl")?;
+        for author in authors {
+            self.write_str("{")?;
+            self.write_text(author.unwrap_or("Unknown"))?;
+            self.write_str(";}")?;
         }
         self.write_str("}")?;
         Ok(())
@@ -700,8 +758,9 @@ impl<W: Write> RtfWriter<W> {
         blocks: &[StyleBlock<'_>],
         bookmarks: &BookmarkTable<'_>,
         annotations: &[Annotation<'_>],
+        revisions: &[Revision<'_>],
     ) -> io::Result<()> {
-        if bookmarks.bookmarks().is_empty() && annotations.is_empty() {
+        if bookmarks.bookmarks().is_empty() && annotations.is_empty() && revisions.is_empty() {
             for block in blocks {
                 self.write_style_block(block)?;
             }
@@ -713,6 +772,7 @@ impl<W: Write> RtfWriter<W> {
             .bookmarks()
             .len()
             .saturating_add(annotations.len())
+            .saturating_add(revisions.len())
             .saturating_mul(2);
         let mut events = Vec::with_capacity(event_count);
         for bookmark in bookmarks.bookmarks() {
@@ -769,6 +829,38 @@ impl<W: Write> RtfWriter<W> {
                 kind: BodyEventKind::AnnotationEnd(annotation),
             });
         }
+        let mut revision_ranges: Vec<&Revision<'_>> = revisions.iter().collect();
+        revision_ranges.sort_by_key(|revision| (revision.position, revision.range_end));
+        let mut previous_end = 0usize;
+        for revision in revision_ranges {
+            if revision.range_end <= revision.position
+                || revision.position < previous_end
+                || body.get(revision.position..revision.range_end).is_none()
+            {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF revision ranges overlap, leave the body, or split a character",
+                ));
+            }
+            let content = &body[revision.position..revision.range_end];
+            if content != revision.content {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF revision content does not match its body range",
+                ));
+            }
+            previous_end = revision.range_end;
+            events.push(BodyEvent {
+                offset: revision.position,
+                order: 1,
+                kind: BodyEventKind::RevisionStart(revision),
+            });
+            events.push(BodyEvent {
+                offset: revision.range_end,
+                order: 0,
+                kind: BodyEventKind::RevisionEnd,
+            });
+        }
         events.sort_by_key(|event| (event.offset, event.order));
 
         let mut event_index = 0usize;
@@ -818,6 +910,8 @@ impl<W: Write> RtfWriter<W> {
             BodyEventKind::BookmarkEnd(bookmark) => self.write_bookmark_end(bookmark.name.as_ref()),
             BodyEventKind::AnnotationStart(annotation) => self.write_annotation_start(annotation),
             BodyEventKind::AnnotationEnd(annotation) => self.write_annotation_end(annotation),
+            BodyEventKind::RevisionStart(revision) => self.write_revision_start(revision),
+            BodyEventKind::RevisionEnd => self.write_str("}"),
         }
     }
 
@@ -1398,39 +1492,36 @@ impl<W: Write> RtfWriter<W> {
 
     /// Write a revision mark (track changes)
     pub fn write_revision(&mut self, revision: &Revision) -> io::Result<()> {
-        self.write_str("{")?;
-
-        // Write revision type control word
-        match revision.revision_type {
-            RevisionType::Insertion => {
-                self.write_control_word("revised", None)?;
-                self.write_control_word("revauth", Some(revision.id))?;
-                if !revision.author.is_empty() {
-                    // Write author in annotation
-                    self.write_str("{\\*\\atnauthor ")?;
-                    self.write_text(revision.author.as_ref())?;
-                    self.write_str("}")?;
-                }
-            },
-            RevisionType::Deletion => {
-                self.write_control_word("deleted", None)?;
-                self.write_control_word("revauthdel", Some(revision.id))?;
-            },
-            RevisionType::FormatChange => {
-                self.write_control_word("revprop", None)?;
-            },
-            RevisionType::MovedFrom => {
-                self.write_control_word("movedfrom", None)?;
-            },
-            RevisionType::MovedTo => {
-                self.write_control_word("movedto", None)?;
-            },
-        }
-
-        // Write content
+        self.write_revision_start(revision)?;
         self.write_text(revision.content.as_ref())?;
-
         self.write_str("}")?;
+        Ok(())
+    }
+
+    fn write_revision_start(&mut self, revision: &Revision<'_>) -> io::Result<()> {
+        self.write_str("{")?;
+        let (kind, author, date) = match revision.revision_type {
+            RevisionType::Insertion => ("revised", "revauth", "revdttm"),
+            RevisionType::Deletion => ("deleted", "revauthdel", "revdttmdel"),
+            RevisionType::FormatChange | RevisionType::MovedFrom | RevisionType::MovedTo => {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "this RTF revision kind has no lossless scoped-run representation",
+                ));
+            },
+        };
+        self.write_control_word(kind, None)?;
+        self.write_control_word(author, Some(revision.id))?;
+        if let Some(date_value) = revision.date.as_deref() {
+            let packed = date_value.parse::<i32>().map_err(|_| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF revision dates must contain the packed signed DTTM value",
+                )
+            })?;
+            self.write_control_word(date, Some(packed))?;
+        }
+        self.write_str(" ")?;
         Ok(())
     }
 
@@ -1732,6 +1823,31 @@ mod tests {
         assert_eq!(list_override.list_id, 77);
         assert_eq!(list_override.level_count_override, Some(1));
         assert_eq!(list_override.start_at_override, Some(9));
+    }
+
+    #[test]
+    fn document_writer_round_trips_tracked_revision_ranges() {
+        let document = RtfDocument::parse(
+            r#"{\rtf1\ansi{\*\revtbl{Unknown;}{Ada;}}Before {\deleted\revauthdel1\revdttmdel123 old}{\revised\revauth1\revdttm-456 new \u20320?} after}"#,
+        )
+        .unwrap();
+        let mut output = Vec::new();
+        RtfWriter::new(&mut output)
+            .write_document(&document)
+            .unwrap();
+
+        let reparsed = RtfDocument::from_bytes(&output).unwrap();
+        assert_eq!(reparsed.text(), document.text());
+        assert_eq!(reparsed.revisions().len(), 2);
+        for (actual, expected) in reparsed.revisions().iter().zip(document.revisions()) {
+            assert_eq!(actual.revision_type, expected.revision_type);
+            assert_eq!(actual.id, expected.id);
+            assert_eq!(actual.author, expected.author);
+            assert_eq!(actual.date, expected.date);
+            assert_eq!(actual.content, expected.content);
+            assert_eq!(actual.position, expected.position);
+            assert_eq!(actual.range_end, expected.range_end);
+        }
     }
 
     #[test]

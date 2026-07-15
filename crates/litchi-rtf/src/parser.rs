@@ -92,6 +92,9 @@ const MAX_STYLE_NAME_BYTES: usize = 65_536;
 const MAX_LISTS: usize = 65_536;
 const MAX_LIST_LEVELS: usize = 9;
 const MAX_LIST_TEXT_BYTES: usize = 65_536;
+const MAX_REVISION_AUTHORS: usize = 65_536;
+const MAX_REVISION_AUTHOR_BYTES: usize = 65_536;
+const MAX_REVISIONS: usize = 65_536;
 
 struct OpenBookmark {
     name: String,
@@ -124,6 +127,12 @@ struct State {
     destination: Destination,
     /// Current text encoding
     encoding: &'static Encoding,
+    /// Active tracked-change kind for text emitted in this state
+    revision_type: Option<super::annotation::RevisionType>,
+    /// Revision-author table index
+    revision_author_id: Option<i32>,
+    /// Packed RTF revision timestamp
+    revision_date: Option<i32>,
 }
 
 impl Default for State {
@@ -136,6 +145,9 @@ impl Default for State {
             cell_boundaries: SmallVec::new(),
             destination: Destination::DocumentBody,
             encoding: encoding_rs::WINDOWS_1252, // Default ANSI encoding
+            revision_type: None,
+            revision_author_id: None,
+            revision_date: None,
         }
     }
 }
@@ -206,6 +218,8 @@ pub struct Parser<'a> {
     notes: Vec<super::section::Note<'a>>,
     /// Track changes/revisions
     revisions: Vec<super::annotation::Revision<'a>>,
+    /// Authors referenced by tracked-change author indices
+    revision_authors: Vec<Cow<'a, str>>,
     /// Current header/footer being parsed
     #[allow(dead_code)]
     current_header_footer: Option<super::section::HeaderFooter<'a>>,
@@ -251,6 +265,7 @@ impl<'a> Parser<'a> {
             pending_annotation_initials: String::new(),
             notes: Vec::new(),
             revisions: Vec::new(),
+            revision_authors: Vec::new(),
             current_header_footer: None,
             current_note_buffer: SmallVec::new(),
             current_hf_type: None,
@@ -359,6 +374,12 @@ impl<'a> Parser<'a> {
                             self.states.pop();
                             return Ok(());
                         },
+                        Some(Token::Control(ControlWord::RevisionTable)) => {
+                            self.pos += 1;
+                            self.parse_revision_table()?;
+                            self.states.pop();
+                            return Ok(());
+                        },
                         Some(Token::Control(ControlWord::AnnotationAuthor)) => {
                             self.pending_annotation_author =
                                 self.parse_ignorable_text_destination()?;
@@ -412,6 +433,11 @@ impl<'a> Parser<'a> {
                 },
                 Token::Control(ControlWord::ListOverrideTable) => {
                     self.parse_list_override_table()?;
+                    self.states.pop();
+                    return Ok(());
+                },
+                Token::Control(ControlWord::RevisionTable) => {
+                    self.parse_revision_table()?;
                     self.states.pop();
                     return Ok(());
                 },
@@ -625,6 +651,18 @@ impl<'a> Parser<'a> {
                             }
                             self.parse_unicode_sequence(*code)?;
                         },
+                        ControlWord::Revised(_)
+                        | ControlWord::Deleted(_)
+                        | ControlWord::RevisionAuthor(_)
+                        | ControlWord::DeletedRevisionAuthor(_)
+                        | ControlWord::RevisionDate(_)
+                        | ControlWord::DeletedRevisionDate(_) => {
+                            if !text_buffer.is_empty() {
+                                self.flush_text_buffer(&mut text_buffer)?;
+                            }
+                            self.pos += 1;
+                            self.apply_control_word(control)?;
+                        },
                         _ => {
                             self.pos += 1;
                             // Apply formatting changes
@@ -668,7 +706,7 @@ impl<'a> Parser<'a> {
             return Ok(());
         }
 
-        let state = self.current_state()?;
+        let state = self.current_state()?.clone();
 
         // Only create blocks for text in the document body
         // Skip text from font tables, color tables, stylesheets, etc.
@@ -694,13 +732,62 @@ impl<'a> Parser<'a> {
             // Allocate in arena and create block
             let text = self.arena.alloc_str(&decoded_str);
             let block = StyleBlock::new(Cow::Borrowed(text), state.formatting, state.paragraph);
+            let start = self.body_text_len;
             self.body_text_len = self.body_text_len.checked_add(text.len()).ok_or_else(|| {
                 RtfError::MalformedDocument("RTF body text length overflow".to_string())
             })?;
             self.blocks.push(block);
+            self.append_revision_text(&state, text, start, self.body_text_len)?;
         }
 
         buffer.clear();
+        Ok(())
+    }
+
+    fn append_revision_text(
+        &mut self,
+        state: &State,
+        text: &str,
+        start: usize,
+        end: usize,
+    ) -> RtfResult<()> {
+        let Some(revision_type) = state.revision_type else {
+            return Ok(());
+        };
+        let id = state.revision_author_id.unwrap_or(0);
+        let author = usize::try_from(id)
+            .ok()
+            .and_then(|index| self.revision_authors.get(index))
+            .map_or_else(|| Cow::Borrowed("Unknown"), Clone::clone);
+        let date = state
+            .revision_date
+            .map(|value| Cow::Owned(value.to_string()));
+
+        if let Some(previous) = self.revisions.last_mut()
+            && previous.revision_type == revision_type
+            && previous.id == id
+            && previous.author == author
+            && previous.date == date
+            && previous.range_end == start
+        {
+            previous.content.to_mut().push_str(text);
+            previous.range_end = end;
+            return Ok(());
+        }
+        if self.revisions.len() >= MAX_REVISIONS {
+            return Err(RtfError::MalformedDocument(
+                "RTF revision count exceeds the safety limit".to_string(),
+            ));
+        }
+        self.revisions.push(super::annotation::Revision {
+            revision_type,
+            author,
+            date,
+            id,
+            content: Cow::Owned(text.to_string()),
+            position: start,
+            range_end: end,
+        });
         Ok(())
     }
 
@@ -824,6 +911,28 @@ impl<'a> Parser<'a> {
                     ));
                 }
                 state.paragraph.list_level = Some(level);
+            },
+
+            // Tracked revisions
+            ControlWord::Revised(value) => {
+                if *value {
+                    state.revision_type = Some(super::annotation::RevisionType::Insertion);
+                } else if state.revision_type == Some(super::annotation::RevisionType::Insertion) {
+                    state.revision_type = None;
+                }
+            },
+            ControlWord::Deleted(value) => {
+                if *value {
+                    state.revision_type = Some(super::annotation::RevisionType::Deletion);
+                } else if state.revision_type == Some(super::annotation::RevisionType::Deletion) {
+                    state.revision_type = None;
+                }
+            },
+            ControlWord::RevisionAuthor(value) | ControlWord::DeletedRevisionAuthor(value) => {
+                state.revision_author_id = Some(*value);
+            },
+            ControlWord::RevisionDate(value) | ControlWord::DeletedRevisionDate(value) => {
+                state.revision_date = Some(*value);
             },
 
             // Unicode
@@ -995,6 +1104,111 @@ impl<'a> Parser<'a> {
             _ => {},
         }
         Ok(true)
+    }
+
+    fn parse_revision_table(&mut self) -> RtfResult<()> {
+        self.pos += 1; // `revtbl`
+        let mut direct_text = String::new();
+        let mut unicode_skip = self.current_state()?.unicode_skip.max(0);
+        while self.pos < self.tokens.len() {
+            match self.tokens.get(self.pos) {
+                Some(Token::OpenBrace) => {
+                    self.push_direct_revision_authors(&mut direct_text)?;
+                    let author = self.parse_revision_author_group()?;
+                    self.push_revision_author(author)?;
+                    continue;
+                },
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    self.push_direct_revision_authors(&mut direct_text)?;
+                    if !direct_text.trim().is_empty() {
+                        self.push_revision_author(direct_text.trim().to_string())?;
+                    }
+                    return Ok(());
+                },
+                Some(Token::Text(text)) => direct_text.push_str(text),
+                Some(Token::Control(ControlWord::Unicode(first))) => {
+                    let decoded = self.parse_style_unicode(*first, unicode_skip)?;
+                    direct_text.push_str(&decoded);
+                    continue;
+                },
+                Some(Token::Control(ControlWord::UnicodeSkip(value))) => {
+                    unicode_skip = (*value).max(0);
+                },
+                Some(_) => {},
+                None => break,
+            }
+            self.pos += 1;
+            if direct_text.len() > MAX_REVISION_AUTHOR_BYTES {
+                return Err(RtfError::MalformedDocument(
+                    "RTF revision author exceeds the safety limit".to_string(),
+                ));
+            }
+            self.push_direct_revision_authors(&mut direct_text)?;
+        }
+        Err(RtfError::UnexpectedEof)
+    }
+
+    fn parse_revision_author_group(&mut self) -> RtfResult<String> {
+        self.pos += 1; // opening brace
+        let mut author = String::new();
+        let mut unicode_skip = self.current_state()?.unicode_skip.max(0);
+        while self.pos < self.tokens.len() {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    return Ok(author
+                        .trim_end_matches(['\r', '\n', ' '])
+                        .strip_suffix(';')
+                        .unwrap_or(author.trim_end_matches(['\r', '\n', ' ']))
+                        .trim()
+                        .to_string());
+                },
+                Some(Token::OpenBrace) => {
+                    self.skip_group()?;
+                    continue;
+                },
+                Some(Token::Text(text)) => author.push_str(text),
+                Some(Token::Control(ControlWord::Unicode(first))) => {
+                    let decoded = self.parse_style_unicode(*first, unicode_skip)?;
+                    author.push_str(&decoded);
+                    continue;
+                },
+                Some(Token::Control(ControlWord::UnicodeSkip(value))) => {
+                    unicode_skip = (*value).max(0);
+                },
+                Some(_) => {},
+                None => break,
+            }
+            self.pos += 1;
+            if author.len() > MAX_REVISION_AUTHOR_BYTES {
+                return Err(RtfError::MalformedDocument(
+                    "RTF revision author exceeds the safety limit".to_string(),
+                ));
+            }
+        }
+        Err(RtfError::UnexpectedEof)
+    }
+
+    fn push_direct_revision_authors(&mut self, text: &mut String) -> RtfResult<()> {
+        while let Some(separator) = text.find(';') {
+            let remainder = text.split_off(separator + 1);
+            let author = text[..separator].trim().to_string();
+            self.push_revision_author(author)?;
+            *text = remainder;
+        }
+        Ok(())
+    }
+
+    fn push_revision_author(&mut self, author: String) -> RtfResult<()> {
+        if self.revision_authors.len() >= MAX_REVISION_AUTHORS {
+            return Err(RtfError::MalformedDocument(
+                "RTF revision author count exceeds the safety limit".to_string(),
+            ));
+        }
+        self.revision_authors
+            .push(Cow::Borrowed(self.arena.alloc_str(&author)));
+        Ok(())
     }
 
     fn parse_list_table(&mut self) -> RtfResult<()> {
@@ -2477,6 +2691,7 @@ impl<'a> Parser<'a> {
             let allocated = self.arena.alloc_str(&unicode_str);
             let block =
                 StyleBlock::new(Cow::Borrowed(allocated), state.formatting, state.paragraph);
+            let start = self.body_text_len;
             self.body_text_len =
                 self.body_text_len
                     .checked_add(allocated.len())
@@ -2484,6 +2699,7 @@ impl<'a> Parser<'a> {
                         RtfError::MalformedDocument("RTF body text length overflow".into())
                     })?;
             self.blocks.push(block);
+            self.append_revision_text(&state, allocated, start, self.body_text_len)?;
 
             // A fallback and subsequent text often share one lexer token. Preserve
             // the portion after the configured fallback character count.

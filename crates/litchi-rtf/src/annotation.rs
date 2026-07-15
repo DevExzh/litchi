@@ -103,12 +103,16 @@ pub struct Revision<'a> {
     pub revision_type: RevisionType,
     /// Author name
     pub author: Cow<'a, str>,
-    /// Date of revision
+    /// Packed signed RTF DTTM value, stored as a decimal string
     pub date: Option<Cow<'a, str>>,
-    /// Revision ID
+    /// Revision-author table index
     pub id: i32,
     /// Text content affected by revision
     pub content: Cow<'a, str>,
+    /// UTF-8 byte offset where the revised range starts
+    pub position: usize,
+    /// UTF-8 byte offset where the revised range ends
+    pub range_end: usize,
 }
 
 impl<'a> Revision<'a> {
@@ -121,6 +125,8 @@ impl<'a> Revision<'a> {
             date: None,
             id: 0,
             content,
+            position: 0,
+            range_end: 0,
         }
     }
 

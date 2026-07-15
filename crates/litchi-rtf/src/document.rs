@@ -741,6 +741,8 @@ impl<'a> RtfDocument<'a> {
                 date: rev.date.map(|d| Cow::Owned(d.into_owned())),
                 id: rev.id,
                 content: Cow::Owned(rev.content.into_owned()),
+                position: rev.position,
+                range_end: rev.range_end,
             })
             .collect()
     }
@@ -769,7 +771,7 @@ impl<'a> RtfDocument<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Alignment, ListFollow, ListJustification, ListLevelType, StyleType};
+    use crate::{Alignment, ListFollow, ListJustification, ListLevelType, RevisionType, StyleType};
 
     #[test]
     fn test_simple_document() {
@@ -938,6 +940,52 @@ mod tests {
         let paragraph = doc.blocks().last().unwrap().paragraph;
         assert_eq!(paragraph.list_override, Some(4));
         assert_eq!(paragraph.list_level, Some(2));
+    }
+
+    #[test]
+    fn parses_tracked_insertions_and_deletions_with_author_ranges() {
+        let rtf = r#"{\rtf1\ansi
+            {\*\revtbl {Unknown;}{Max \u20320?;}}
+            Before {\deleted\revauthdel1\revdttmdel1199059860 old \u20320? text}
+            and {\revised\revauth1\revdttm-1501115711 new text} after}"#;
+        let doc = RtfDocument::parse(rtf).unwrap();
+        let body = doc.text();
+        assert!(body.contains("Before old 你 text"));
+        assert!(body.contains("and new text after"));
+        assert_eq!(doc.revisions().len(), 2);
+
+        let deletion = &doc.revisions()[0];
+        assert_eq!(deletion.revision_type, RevisionType::Deletion);
+        assert_eq!(deletion.id, 1);
+        assert_eq!(deletion.author, "Max 你");
+        assert_eq!(deletion.date.as_deref(), Some("1199059860"));
+        assert_eq!(deletion.content, "old 你 text");
+        assert_eq!(
+            body.get(deletion.position..deletion.range_end),
+            Some(deletion.content.as_ref())
+        );
+
+        let insertion = &doc.revisions()[1];
+        assert_eq!(insertion.revision_type, RevisionType::Insertion);
+        assert_eq!(insertion.author, "Max 你");
+        assert_eq!(insertion.date.as_deref(), Some("-1501115711"));
+        assert_eq!(insertion.content, "new text");
+        assert_eq!(
+            body.get(insertion.position..insertion.range_end),
+            Some(insertion.content.as_ref())
+        );
+    }
+
+    #[test]
+    fn revision_toggle_boundaries_flush_preceding_text() {
+        let doc = RtfDocument::parse(
+            r#"{\rtf1{\*\revtbl Unknown;}plain \revised\revauth0 changed\revised0 plain}"#,
+        )
+        .unwrap();
+        assert_eq!(doc.text(), "plain changedplain");
+        assert_eq!(doc.revisions().len(), 1);
+        assert_eq!(doc.revisions()[0].content, "changed");
+        assert_eq!(doc.revisions()[0].author, "Unknown");
     }
 
     #[test]

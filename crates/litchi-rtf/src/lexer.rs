@@ -277,6 +277,16 @@ pub enum ControlWord<'a> {
     AnnotationTime,
     AnnotationMark,
 
+    // Tracked revisions
+    RevisionTable,
+    Revised(bool),
+    Deleted(bool),
+    RevisionAuthor(i32),
+    DeletedRevisionAuthor(i32),
+    RevisionDate(i32),
+    DeletedRevisionDate(i32),
+    RevisionProperty(i32),
+
     // Shapes
     Shape,
     ShapeType(i32),
@@ -825,6 +835,16 @@ impl<'a> Lexer<'a> {
             "atnicn" => ControlWord::AnnotationIcon,
             "atntime" => ControlWord::AnnotationTime,
             "chatn" => ControlWord::AnnotationMark,
+
+            // Tracked revisions
+            "revtbl" => ControlWord::RevisionTable,
+            "revised" => ControlWord::Revised(param_bool),
+            "deleted" => ControlWord::Deleted(param_bool),
+            "revauth" => ControlWord::RevisionAuthor(param_value),
+            "revauthdel" => ControlWord::DeletedRevisionAuthor(param_value),
+            "revdttm" => ControlWord::RevisionDate(param_value),
+            "revdttmdel" => ControlWord::DeletedRevisionDate(param_value),
+            "revprop" => ControlWord::RevisionProperty(param_value),
 
             // Shapes
             "shp" => ControlWord::Shape,
