@@ -389,6 +389,23 @@ struct WritableParagraph {
     formatting: ParagraphFormatting,
 }
 
+fn writable_paragraph_from_runs(
+    runs: Vec<(String, CharacterFormatting)>,
+    formatting: ParagraphFormatting,
+) -> WritableParagraph {
+    let runs = if runs.is_empty() {
+        vec![TextRun {
+            text: String::new(),
+            formatting: CharacterFormatting::default(),
+        }]
+    } else {
+        runs.into_iter()
+            .map(|(text, formatting)| TextRun { text, formatting })
+            .collect()
+    };
+    WritableParagraph { runs, formatting }
+}
+
 /// Represents a table cell
 #[derive(Debug, Clone)]
 struct TableCell {
@@ -1828,6 +1845,51 @@ impl DocWriter {
         col: usize,
         text: &str,
     ) -> Result<(), DocWriteError> {
+        self.set_table_cell_paragraph_runs(
+            table_idx,
+            row,
+            col,
+            vec![(text.to_string(), CharacterFormatting::default())],
+            ParagraphFormatting::default(),
+        )
+    }
+
+    /// Replace a table cell with one paragraph composed of formatted runs.
+    pub fn set_table_cell_paragraph_runs(
+        &mut self,
+        table_idx: usize,
+        row: usize,
+        col: usize,
+        runs: Vec<(String, CharacterFormatting)>,
+        formatting: ParagraphFormatting,
+    ) -> Result<(), DocWriteError> {
+        let paragraph = writable_paragraph_from_runs(runs, formatting);
+        self.table_cell_mut(table_idx, row, col)?.paragraphs = vec![paragraph];
+        Ok(())
+    }
+
+    /// Append a paragraph composed of formatted runs to a table cell.
+    pub fn append_table_cell_paragraph_runs(
+        &mut self,
+        table_idx: usize,
+        row: usize,
+        col: usize,
+        runs: Vec<(String, CharacterFormatting)>,
+        formatting: ParagraphFormatting,
+    ) -> Result<(), DocWriteError> {
+        let paragraph = writable_paragraph_from_runs(runs, formatting);
+        self.table_cell_mut(table_idx, row, col)?
+            .paragraphs
+            .push(paragraph);
+        Ok(())
+    }
+
+    fn table_cell_mut(
+        &mut self,
+        table_idx: usize,
+        row: usize,
+        col: usize,
+    ) -> Result<&mut TableCell, DocWriteError> {
         let table = self
             .tables
             .get_mut(table_idx)
@@ -1842,16 +1904,7 @@ impl DocWriter {
             .cells
             .get_mut(col)
             .ok_or_else(|| DocWriteError::InvalidData(format!("Column {} not found", col)))?;
-
-        cell.paragraphs = vec![WritableParagraph {
-            runs: vec![TextRun {
-                text: text.to_string(),
-                formatting: CharacterFormatting::default(),
-            }],
-            formatting: ParagraphFormatting::default(),
-        }];
-
-        Ok(())
+        Ok(cell)
     }
 
     /// Set the widths, horizontal merges, height, and header state for a table row.
@@ -3636,16 +3689,36 @@ mod tests {
         let mut writer = DocWriter::new();
         writer.add_paragraph("Before table").unwrap();
         let table = writer.add_table(2, 2).unwrap();
-        writer.set_table_cell_text(table, 0, 0, "A😀").unwrap();
-        writer.tables[table].rows[0].cells[0]
-            .paragraphs
-            .push(WritableParagraph {
-                runs: vec![TextRun {
-                    text: "continued".to_string(),
-                    formatting: CharacterFormatting::default(),
-                }],
-                formatting: ParagraphFormatting::default(),
-            });
+        writer
+            .set_table_cell_paragraph_runs(
+                table,
+                0,
+                0,
+                vec![(
+                    "A😀".to_string(),
+                    CharacterFormatting {
+                        bold: Some(true),
+                        ..CharacterFormatting::default()
+                    },
+                )],
+                ParagraphFormatting::default(),
+            )
+            .unwrap();
+        writer
+            .append_table_cell_paragraph_runs(
+                table,
+                0,
+                0,
+                vec![(
+                    "continued".to_string(),
+                    CharacterFormatting {
+                        italic: Some(true),
+                        ..CharacterFormatting::default()
+                    },
+                )],
+                ParagraphFormatting::default(),
+            )
+            .unwrap();
         writer.set_table_cell_text(table, 0, 1, "B").unwrap();
         writer
             .set_table_row_formatting(
@@ -3735,6 +3808,9 @@ mod tests {
                 "A😀\ncontinued"
             );
             assert_eq!(rows[0].cells().unwrap()[0].paragraphs().unwrap().len(), 2);
+            let cell_paragraphs = rows[0].cells().unwrap()[0].paragraphs().unwrap();
+            assert_eq!(cell_paragraphs[0].runs().unwrap()[0].bold(), Some(true));
+            assert_eq!(cell_paragraphs[1].runs().unwrap()[0].italic(), Some(true));
             assert_eq!(rows[0].cells().unwrap()[1].text().unwrap(), "B");
             let first_cell_properties = rows[0].cells().unwrap()[0].properties().unwrap().clone();
             assert_eq!(
