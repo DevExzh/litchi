@@ -3,7 +3,7 @@
 use litchi_core::{Error, Result};
 use quick_xml::{
     XmlVersion,
-    events::{BytesStart, Event},
+    events::{BytesRef, BytesStart, Event},
     name::{Namespace, ResolveResult},
     reader::NsReader,
 };
@@ -32,6 +32,17 @@ impl HeaderFooterKind {
             b"footer-first" => Some(Self::FooterFirst),
             b"footer-left" => Some(Self::FooterLeft),
             _ => None,
+        }
+    }
+
+    fn element_name(self) -> &'static str {
+        match self {
+            Self::Header => "header",
+            Self::HeaderFirst => "header-first",
+            Self::HeaderLeft => "header-left",
+            Self::Footer => "footer",
+            Self::FooterFirst => "footer-first",
+            Self::FooterLeft => "footer-left",
         }
     }
 }
@@ -163,10 +174,14 @@ pub(crate) fn parse_master_pages(xml: &str) -> Result<Vec<MasterPage>> {
                     .map_err(|error| {
                         Error::InvalidFormat(format!("invalid header text: {error}"))
                     })?;
-                let decoded = quick_xml::escape::unescape(&decoded).map_err(|error| {
-                    Error::InvalidFormat(format!("invalid header character reference: {error}"))
-                })?;
                 region.as_mut().unwrap().text.push_str(&decoded);
+            },
+            Event::GeneralRef(reference) if region.is_some() => {
+                region
+                    .as_mut()
+                    .unwrap()
+                    .text
+                    .push_str(&decode_reference(&reference)?);
             },
             Event::CData(value) if region.is_some() => {
                 let decoded = value
@@ -218,6 +233,159 @@ pub(crate) fn parse_master_pages(xml: &str) -> Result<Vec<MasterPage>> {
         ));
     }
     Ok(pages)
+}
+
+pub(crate) fn set_region_text(
+    xml: &str,
+    master_page_name: &str,
+    kind: HeaderFooterKind,
+    text: Option<&str>,
+) -> Result<String> {
+    let pages = parse_master_pages(xml)?;
+    let page = pages
+        .iter()
+        .find(|page| page.name == master_page_name)
+        .ok_or_else(|| {
+            Error::InvalidFormat(format!("master page '{master_page_name}' does not exist"))
+        })?;
+    let location = find_master_page(xml, master_page_name)?.ok_or_else(|| {
+        Error::InvalidFormat(format!("master page '{master_page_name}' does not exist"))
+    })?;
+    let replacement = text.map(|text| {
+        format!(
+            "<style:{name} xmlns:style=\"{style}\" xmlns:text=\"{text_ns}\"><text:p>{value}</text:p></style:{name}>",
+            name = kind.element_name(),
+            style = String::from_utf8_lossy(STYLE_NAMESPACE),
+            text_ns = String::from_utf8_lossy(TEXT_NAMESPACE),
+            value = litchi_core::xml::escape_xml(text),
+        )
+    });
+
+    if location.empty {
+        let Some(replacement) = replacement else {
+            return Ok(xml.to_string());
+        };
+        let empty = &xml[location.start..location.end];
+        let marker = empty.rfind("/>").ok_or_else(|| {
+            Error::InvalidFormat("malformed empty style:master-page element".to_string())
+        })?;
+        let mut expanded = String::with_capacity(empty.len() + replacement.len() + 32);
+        expanded.push_str(&empty[..marker]);
+        expanded.push('>');
+        expanded.push_str(&replacement);
+        expanded.push_str("</");
+        expanded.push_str(&location.qualified_name);
+        expanded.push('>');
+        return Ok(replace_range(xml, location.start, location.end, &expanded));
+    }
+
+    if let Some(region) = page.region(kind) {
+        let content = &xml[location.content_start..location.content_end];
+        let relative = content.find(&region.xml).ok_or_else(|| {
+            Error::InvalidFormat("header/footer XML is outside its master page".to_string())
+        })?;
+        let start = location.content_start + relative;
+        let end = start + region.xml.len();
+        return Ok(replace_range(
+            xml,
+            start,
+            end,
+            replacement.as_deref().unwrap_or(""),
+        ));
+    }
+    let Some(replacement) = replacement else {
+        return Ok(xml.to_string());
+    };
+    Ok(replace_range(
+        xml,
+        location.content_end,
+        location.content_end,
+        &replacement,
+    ))
+}
+
+struct MasterPageLocation {
+    start: usize,
+    end: usize,
+    content_start: usize,
+    content_end: usize,
+    qualified_name: String,
+    empty: bool,
+}
+
+fn find_master_page(xml: &str, expected_name: &str) -> Result<Option<MasterPageLocation>> {
+    let mut reader = NsReader::from_str(xml);
+    let mut buffer = Vec::new();
+    let mut active: Option<(usize, usize, usize, String)> = None;
+    loop {
+        let event_start = reader.buffer_position() as usize;
+        let (namespace, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| Error::InvalidFormat(format!("styles.xml parsing error: {error}")))?;
+        let style_element = bound_to(&namespace, STYLE_NAMESPACE);
+        let event = event.into_owned();
+        let event_end = reader.buffer_position() as usize;
+        match event {
+            Event::Start(element)
+                if active.is_none()
+                    && style_element
+                    && element.local_name().as_ref() == b"master-page"
+                    && style_attr(&reader, &element, b"name")?.as_deref()
+                        == Some(expected_name) =>
+            {
+                let qualified_name = String::from_utf8(element.name().as_ref().to_vec())
+                    .map_err(|_| Error::InvalidFormat("invalid master-page name".to_string()))?;
+                active = Some((event_start, event_end, 1, qualified_name));
+            },
+            Event::Empty(element)
+                if active.is_none()
+                    && style_element
+                    && element.local_name().as_ref() == b"master-page"
+                    && style_attr(&reader, &element, b"name")?.as_deref()
+                        == Some(expected_name) =>
+            {
+                let qualified_name = String::from_utf8(element.name().as_ref().to_vec())
+                    .map_err(|_| Error::InvalidFormat("invalid master-page name".to_string()))?;
+                return Ok(Some(MasterPageLocation {
+                    start: event_start,
+                    end: event_end,
+                    content_start: event_end,
+                    content_end: event_end,
+                    qualified_name,
+                    empty: true,
+                }));
+            },
+            Event::Start(_) if active.is_some() => active.as_mut().unwrap().2 += 1,
+            Event::End(_) if active.is_some() => {
+                let current = active.as_mut().unwrap();
+                current.2 = current.2.checked_sub(1).ok_or_else(|| {
+                    Error::InvalidFormat("invalid master-page nesting".to_string())
+                })?;
+                if current.2 == 0 {
+                    let (start, content_start, _, qualified_name) = active.take().unwrap();
+                    return Ok(Some(MasterPageLocation {
+                        start,
+                        end: event_end,
+                        content_start,
+                        content_end: event_start,
+                        qualified_name,
+                        empty: false,
+                    }));
+                }
+            },
+            Event::Eof => return Ok(None),
+            _ => {},
+        }
+        buffer.clear();
+    }
+}
+
+fn replace_range(xml: &str, start: usize, end: usize, replacement: &str) -> String {
+    let mut output = String::with_capacity(xml.len() - (end - start) + replacement.len());
+    output.push_str(&xml[..start]);
+    output.push_str(replacement);
+    output.push_str(&xml[end..]);
+    output
 }
 
 fn parse_master_page(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<MasterPage> {
@@ -304,6 +472,27 @@ fn bound_to(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool {
     matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == expected)
 }
 
+fn decode_reference(reference: &BytesRef<'_>) -> Result<String> {
+    if let Some(character) = reference.resolve_char_ref().map_err(|error| {
+        Error::InvalidFormat(format!("invalid header character reference: {error}"))
+    })? {
+        return Ok(character.to_string());
+    }
+    let name = reference
+        .decode()
+        .map_err(|error| Error::InvalidFormat(format!("invalid header entity: {error}")))?;
+    match name.as_ref() {
+        "amp" => Ok("&".to_string()),
+        "lt" => Ok("<".to_string()),
+        "gt" => Ok(">".to_string()),
+        "quot" => Ok("\"".to_string()),
+        "apos" => Ok("'".to_string()),
+        _ => Err(Error::InvalidFormat(format!(
+            "unsupported header entity '&{name};'"
+        ))),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -332,5 +521,41 @@ mod tests {
         assert!(parse_master_pages(duplicate).is_err());
         let missing = r#"<o:document-styles xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0"><o:master-styles><s:master-page/></o:master-styles></o:document-styles>"#;
         assert!(parse_master_pages(missing).is_err());
+    }
+
+    #[test]
+    fn inserts_replaces_and_clears_regions_without_rewriting_other_styles() {
+        let xml = r#"<o:document-styles xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><o:styles><s:style s:name="keep"/></o:styles><o:master-styles><s:master-page s:name="A"><s:header><t:p>Old</t:p></s:header><s:region-left/></s:master-page><s:master-page s:name="B" /></o:master-styles></o:document-styles>"#;
+        let replaced =
+            set_region_text(xml, "A", HeaderFooterKind::Header, Some("A & <B>")).unwrap();
+        assert!(replaced.contains("<s:style s:name=\"keep\"/>"));
+        assert!(replaced.contains("<s:region-left/>"));
+        let pages = parse_master_pages(&replaced).unwrap();
+        assert_eq!(
+            pages[0].region(HeaderFooterKind::Header).unwrap().text,
+            "A & <B>"
+        );
+
+        let inserted =
+            set_region_text(&replaced, "A", HeaderFooterKind::FooterLeft, Some("Left")).unwrap();
+        let pages = parse_master_pages(&inserted).unwrap();
+        assert_eq!(
+            pages[0].region(HeaderFooterKind::FooterLeft).unwrap().text,
+            "Left"
+        );
+
+        let expanded =
+            set_region_text(&inserted, "B", HeaderFooterKind::Footer, Some("B footer")).unwrap();
+        assert!(expanded.contains("</s:master-page>"));
+        let pages = parse_master_pages(&expanded).unwrap();
+        assert_eq!(
+            pages[1].region(HeaderFooterKind::Footer).unwrap().text,
+            "B footer"
+        );
+
+        let cleared = set_region_text(&expanded, "A", HeaderFooterKind::Header, None).unwrap();
+        let pages = parse_master_pages(&cleared).unwrap();
+        assert!(pages[0].region(HeaderFooterKind::Header).is_none());
+        assert!(cleared.contains("<s:region-left/>"));
     }
 }

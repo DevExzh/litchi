@@ -8,6 +8,9 @@ use crate::elements::parser::DocumentOrderElement;
 use crate::elements::table::Table;
 use crate::elements::text::{Heading, List, Paragraph};
 use crate::odt::Document;
+use crate::odt::header_footer::{
+    HeaderFooterKind, MasterPage, parse_master_pages, set_region_text,
+};
 use litchi_core::{Metadata, Result, xml::escape_xml};
 use std::path::Path;
 
@@ -131,6 +134,46 @@ impl MutableDocument {
             styles_xml: None,
             source_package: None,
         }
+    }
+
+    /// Parse the document's master pages and current header/footer regions.
+    pub fn master_pages(&self) -> Result<Vec<MasterPage>> {
+        self.styles_xml
+            .as_deref()
+            .map_or_else(|| Ok(Vec::new()), parse_master_pages)
+    }
+
+    /// Set plain text in one header/footer region of an existing master page.
+    ///
+    /// Only the selected region is rewritten; all unrelated style XML is preserved.
+    pub fn set_header_footer_text(
+        &mut self,
+        master_page_name: &str,
+        kind: HeaderFooterKind,
+        text: &str,
+    ) -> Result<()> {
+        let styles = self.styles_xml.as_deref().ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(
+                "document has no styles.xml master page to modify".to_string(),
+            )
+        })?;
+        self.styles_xml = Some(set_region_text(styles, master_page_name, kind, Some(text))?);
+        Ok(())
+    }
+
+    /// Remove one header/footer region from an existing master page.
+    pub fn clear_header_footer(
+        &mut self,
+        master_page_name: &str,
+        kind: HeaderFooterKind,
+    ) -> Result<()> {
+        let styles = self.styles_xml.as_deref().ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(
+                "document has no styles.xml master page to modify".to_string(),
+            )
+        })?;
+        self.styles_xml = Some(set_region_text(styles, master_page_name, kind, None)?);
+        Ok(())
     }
 
     /// Get all paragraphs in the document.
@@ -866,6 +909,49 @@ mod tests {
         assert_eq!(
             package.manifest().get_media_type("custom/data.bin"),
             Some("application/x-litchi-test")
+        );
+    }
+
+    #[test]
+    fn edits_master_page_regions_through_the_public_mutable_document_api() {
+        const STYLES: &str = r#"<?xml version="1.0"?><office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><office:styles><style:style style:name="preserved"/></office:styles><office:master-styles><style:master-page style:name="Standard"><style:header><text:p>Old header</text:p></style:header><style:footer><text:p>Old footer</text:p></style:footer><style:region-left/></style:master-page></office:master-styles></office:document-styles>"#;
+
+        let mut writer = PackageWriter::new();
+        writer
+            .set_mimetype("application/vnd.oasis.opendocument.text")
+            .unwrap();
+        writer
+            .add_file("content.xml", MINIMAL_CONTENT.as_bytes())
+            .unwrap();
+        writer.add_file("styles.xml", STYLES.as_bytes()).unwrap();
+        let source = Document::from_bytes(writer.finish_to_bytes().unwrap()).unwrap();
+        let mut mutable = MutableDocument::from_document(source).unwrap();
+
+        mutable
+            .set_header_footer_text("Standard", HeaderFooterKind::Header, "New & <header>")
+            .unwrap();
+        mutable
+            .clear_header_footer("Standard", HeaderFooterKind::Footer)
+            .unwrap();
+        let pages = mutable.master_pages().unwrap();
+        assert_eq!(
+            pages[0].region(HeaderFooterKind::Header).unwrap().text,
+            "New & <header>"
+        );
+        assert!(pages[0].region(HeaderFooterKind::Footer).is_none());
+
+        let output = OwnedPackage::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+        let styles = String::from_utf8(output.get_file("styles.xml").unwrap()).unwrap();
+        assert!(styles.contains("<style:style style:name=\"preserved\"/>"));
+        assert!(styles.contains("<style:region-left/>"));
+        assert!(!styles.contains("Old footer"));
+        let round_trip = Document::from_bytes(output.as_bytes().to_vec()).unwrap();
+        assert_eq!(
+            round_trip.master_pages().unwrap()[0]
+                .region(HeaderFooterKind::Header)
+                .unwrap()
+                .text,
+            "New & <header>"
         );
     }
 }
