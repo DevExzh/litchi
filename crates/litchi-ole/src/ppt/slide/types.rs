@@ -1564,6 +1564,7 @@ mod tests {
                 duration_ms: Some(2_000),
                 ..TimeNodeAtom::default()
             },
+            properties: None,
             children: Vec::new(),
         };
         let comment = SlideComment::new("Ada Lovelace", "Animate this", 12, 34);

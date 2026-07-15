@@ -134,7 +134,9 @@ pub enum PptRecordType {
     /// Time node record
     TimeNode = 0xF127,
     /// Time property list record
-    TimePropertyList = 4115,
+    TimePropertyList = 0xF13D,
+    /// Time variant atom record
+    TimeVariant = 0xF142,
     /// Time behavior record
     TimeBehavior = 4112,
     /// Named shows container (custom slide shows)
@@ -209,7 +211,8 @@ impl From<u16> for PptRecordType {
             0x2B0A => PptRecordType::LevelInfoAtom,
             0xF144 => PptRecordType::ExtTimeNode,
             0xF127 => PptRecordType::TimeNode,
-            4115 => PptRecordType::TimePropertyList,
+            0xF13D => PptRecordType::TimePropertyList,
+            0xF142 => PptRecordType::TimeVariant,
             4112 => PptRecordType::TimeBehavior,
             1040 => PptRecordType::NamedShows,
             1041 => PptRecordType::NamedShow,

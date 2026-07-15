@@ -6,7 +6,8 @@ use super::types::{
     AfterEffect, AnimationEffect, AnimationInfo, BuildAtom, BuildKind, BuildList, BuildListEntry,
     ChartBuild, DiagramBuild, EffectDirection, ExtendedTimeNode, LegacyAnimationAtom,
     LegacyAnimationBuild, LegacyAnimationEffect, LegacyTextBuildSubEffect, ParagraphBuild,
-    ParagraphBuildLevel, TimeNodeAtom,
+    ParagraphBuildLevel, TimeEffectNodeType, TimeEffectType, TimeMasterRelation, TimeNodeAtom,
+    TimeNodeProperty, TimeNodePropertyList, TimePropertyListContext, is_valid_time_filter,
 };
 use crate::consts::PptRecordType;
 use crate::ppt::package::{PptError, Result};
@@ -197,10 +198,20 @@ pub fn write_animation_info_atom(atom: &LegacyAnimationAtom) -> Result<Vec<u8>> 
 /// Serialize an exact PowerPoint 2002 extended time-node envelope.
 pub fn write_extended_time_node(node: &ExtendedTimeNode) -> Result<Vec<u8>> {
     let mut children = write_time_node_atom(&node.atom);
+    if let Some(properties) = &node.properties {
+        children.extend(write_time_node_property_list(
+            properties,
+            TimePropertyListContext::TimeNode,
+        )?);
+    }
     for child in &node.children {
-        if child.record_type == PptRecordType::TimeNode {
+        if matches!(
+            child.record_type,
+            PptRecordType::TimeNode | PptRecordType::TimePropertyList
+        ) {
             return Err(PptError::InvalidFormat(
-                "extended time-node children cannot contain another TimeNodeAtom".to_string(),
+                "extended time-node raw children cannot contain atom/property-list records"
+                    .to_string(),
             ));
         }
         if child.data_length as usize != child.data.len() {
@@ -236,6 +247,145 @@ pub fn write_time_node_atom(atom: &TimeNodeAtom) -> Vec<u8> {
     let mut result = create_record_header(PptRecordType::TimeNode, 0, 0, 32);
     result.extend(data);
     result
+}
+
+/// Serialize a typed `TimePropertyList4TimeNodeContainer`.
+pub fn write_time_node_property_list(
+    list: &TimeNodePropertyList,
+    context: TimePropertyListContext,
+) -> Result<Vec<u8>> {
+    let mut seen = std::collections::HashSet::with_capacity(list.properties.len());
+    let has_interactive_sequence = list.properties.iter().any(|property| {
+        matches!(
+            property,
+            TimeNodeProperty::EffectNodeType(TimeEffectNodeType::InteractiveSequence)
+        )
+    });
+    let mut children = Vec::new();
+    for property in &list.properties {
+        let (id, data) = encode_time_node_property(property)?;
+        if !seen.insert(id) {
+            return Err(PptError::InvalidFormat(format!(
+                "duplicate time property {id:#X}"
+            )));
+        }
+        validate_time_property_context(id, context)?;
+        if matches!(property, TimeNodeProperty::EventFilter(_)) && !has_interactive_sequence {
+            return Err(PptError::InvalidFormat(
+                "event filter requires an interactive sequence".to_string(),
+            ));
+        }
+        let length = u32::try_from(data.len()).map_err(|_| {
+            PptError::InvalidFormat("time property exceeds 4 GiB record limit".to_string())
+        })?;
+        children.extend(create_record_header(
+            PptRecordType::TimeVariant,
+            0,
+            id,
+            length,
+        ));
+        children.extend(data);
+    }
+    wrap_record(PptRecordType::TimePropertyList, 0x0F, 0, children)
+}
+
+fn encode_time_node_property(property: &TimeNodeProperty) -> Result<(u16, Vec<u8>)> {
+    let integer = |value: i32| {
+        let mut data = vec![1];
+        data.extend(value.to_le_bytes());
+        data
+    };
+    let boolean = |value: bool| vec![0, u8::from(value)];
+    let string = |value: &str| {
+        let mut data = Vec::with_capacity(1 + value.len().saturating_mul(2));
+        data.push(3);
+        data.extend(value.encode_utf16().flat_map(u16::to_le_bytes));
+        data
+    };
+    Ok(match property {
+        TimeNodeProperty::DisplayHidden(value) => (0x02, integer(i32::from(*value))),
+        TimeNodeProperty::MasterRelation(value) => (
+            0x05,
+            integer(match value {
+                TimeMasterRelation::DoNotStart => 0,
+                TimeMasterRelation::StartWithMaster => 2,
+            }),
+        ),
+        TimeNodeProperty::SubType => (0x06, integer(1)),
+        TimeNodeProperty::EffectId(value) => (0x09, integer(*value)),
+        TimeNodeProperty::EffectDirection(value) => (0x0A, integer(*value)),
+        TimeNodeProperty::EffectType(value) => (
+            0x0B,
+            integer(match value {
+                TimeEffectType::Entrance => 1,
+                TimeEffectType::Exit => 2,
+                TimeEffectType::Emphasis => 3,
+                TimeEffectType::MotionPath => 4,
+                TimeEffectType::ActionVerb => 5,
+                TimeEffectType::MediaCommand => 6,
+            }),
+        ),
+        TimeNodeProperty::AfterEffect(value) => (0x0D, boolean(*value)),
+        TimeNodeProperty::SlideCount(value) => (0x0F, integer(*value)),
+        TimeNodeProperty::TimeFilter(value) => {
+            if !is_valid_time_filter(value) {
+                return Err(PptError::InvalidFormat("invalid time filter".to_string()));
+            }
+            (0x10, string(value))
+        },
+        TimeNodeProperty::EventFilter(value) => {
+            if value != "cancelBubble" {
+                return Err(PptError::InvalidFormat(
+                    "event filter must be cancelBubble".to_string(),
+                ));
+            }
+            (0x11, string(value))
+        },
+        TimeNodeProperty::HideWhenStopped(value) => (0x12, boolean(*value)),
+        TimeNodeProperty::GroupId(value) => (0x13, integer(*value)),
+        TimeNodeProperty::EffectNodeType(value) => (
+            0x14,
+            integer(match value {
+                TimeEffectNodeType::ClickEffect => 1,
+                TimeEffectNodeType::WithPrevious => 2,
+                TimeEffectNodeType::AfterPrevious => 3,
+                TimeEffectNodeType::MainSequence => 4,
+                TimeEffectNodeType::InteractiveSequence => 5,
+                TimeEffectNodeType::ClickParallel => 6,
+                TimeEffectNodeType::WithGroup => 7,
+                TimeEffectNodeType::AfterGroup => 8,
+                TimeEffectNodeType::TimingRoot => 9,
+            }),
+        ),
+        TimeNodeProperty::PlaceholderNode(value) => (0x15, boolean(*value)),
+        TimeNodeProperty::MediaVolume(value) => {
+            if !value.is_finite() || !(0.0..=100_000.0).contains(value) {
+                return Err(PptError::InvalidFormat(
+                    "media volume out of range".to_string(),
+                ));
+            }
+            let mut data = vec![2];
+            data.extend(value.to_le_bytes());
+            (0x16, data)
+        },
+        TimeNodeProperty::MediaMute(value) => (0x17, boolean(*value)),
+        TimeNodeProperty::ZoomToFullScreen(value) => (0x1A, boolean(*value)),
+    })
+}
+
+fn validate_time_property_context(id: u16, context: TimePropertyListContext) -> Result<()> {
+    let invalid = match context {
+        TimePropertyListContext::TimeNode => matches!(id, 0x05 | 0x06),
+        TimePropertyListContext::SubEffect => {
+            matches!(id, 0x09..=0x0B | 0x0F..=0x14 | 0x1A)
+        },
+    };
+    if invalid {
+        return Err(PptError::InvalidFormat(format!(
+            "time property {id:#X} is invalid in {context:?} context"
+        )));
+    }
+    Ok(())
 }
 
 /// Map a high-level animation effect to PPT97 fly method and direction codes.
@@ -557,6 +707,7 @@ mod tests {
     fn rejects_invalid_paragraph_builds() {
         let time_node = ExtendedTimeNode {
             atom: TimeNodeAtom::default(),
+            properties: None,
             children: Vec::new(),
         };
         let level = ParagraphBuildLevel {

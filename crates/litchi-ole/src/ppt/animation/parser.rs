@@ -8,8 +8,9 @@ use super::types::{
     ChartBuildAtom, ChartBuildType, DiagramBuild, DiagramBuildAtom, DiagramBuildType,
     ExtendedTimeNode, LegacyAnimationAtom, LegacyAnimationBuild, LegacyAnimationEffect,
     LegacyTextBuildSubEffect, ParagraphBuild, ParagraphBuildAtom, ParagraphBuildLevel,
-    ParagraphBuildType, SlideAnimationExtension, TimeNodeAtom, TimeNodeFill, TimeNodeKind,
-    TimeNodeRestart,
+    ParagraphBuildType, SlideAnimationExtension, TimeEffectNodeType, TimeEffectType,
+    TimeMasterRelation, TimeNodeAtom, TimeNodeFill, TimeNodeKind, TimeNodeProperty,
+    TimeNodePropertyList, TimeNodeRestart, TimePropertyListContext, is_valid_time_filter,
 };
 use crate::consts::PptRecordType;
 use crate::ppt::package::{PptError, Result};
@@ -177,9 +178,33 @@ pub fn parse_extended_time_node(record: &PptRecord) -> Result<ExtendedTimeNode> 
             "ExtTimeNode contains multiple TimeNodeAtom records".to_string(),
         ));
     }
+    let (properties, child_start) = if record
+        .children
+        .get(1)
+        .is_some_and(|child| child.record_type == PptRecordType::TimePropertyList)
+    {
+        (
+            Some(parse_time_node_property_list(
+                &record.children[1],
+                TimePropertyListContext::TimeNode,
+            )?),
+            2,
+        )
+    } else {
+        (None, 1)
+    };
+    if record.children[child_start..]
+        .iter()
+        .any(|child| child.record_type == PptRecordType::TimePropertyList)
+    {
+        return Err(PptError::InvalidFormat(
+            "TimePropertyList must immediately follow TimeNodeAtom".to_string(),
+        ));
+    }
     Ok(ExtendedTimeNode {
         atom,
-        children: record.children[1..].to_vec(),
+        properties,
+        children: record.children[child_start..].to_vec(),
     })
 }
 
@@ -264,6 +289,182 @@ pub fn parse_slide_animation_extension(data: &[u8]) -> Result<SlideAnimationExte
             .ok_or_else(|| PptError::Corrupted("slide binary tag offset overflow".to_string()))?;
     }
     Ok(extension)
+}
+
+/// Parse a time-node property list in its containing-node context.
+pub fn parse_time_node_property_list(
+    record: &PptRecord,
+    context: TimePropertyListContext,
+) -> Result<TimeNodePropertyList> {
+    require_container(
+        record,
+        PptRecordType::TimePropertyList,
+        0,
+        "TimePropertyList",
+    )?;
+    let mut seen = std::collections::HashSet::with_capacity(record.children.len());
+    let mut properties = Vec::with_capacity(record.children.len());
+    for child in &record.children {
+        if child.record_type != PptRecordType::TimeVariant || child.version != 0 {
+            return Err(PptError::InvalidFormat(
+                "invalid TimePropertyList child".to_string(),
+            ));
+        }
+        let id = child.instance;
+        if !seen.insert(id) {
+            return Err(PptError::InvalidFormat(format!(
+                "duplicate time property {id:#X}"
+            )));
+        }
+        let property = parse_time_node_property(child)?;
+        if matches!(context, TimePropertyListContext::TimeNode) && matches!(id, 0x05 | 0x06) {
+            return Err(PptError::InvalidFormat(
+                "subeffect-only property on time node".to_string(),
+            ));
+        }
+        if matches!(context, TimePropertyListContext::SubEffect)
+            && matches!(id, 0x09..=0x0B | 0x0F..=0x14 | 0x1A)
+        {
+            return Err(PptError::InvalidFormat(
+                "time-node-only property on subeffect".to_string(),
+            ));
+        }
+        properties.push(property);
+    }
+    if properties
+        .iter()
+        .any(|p| matches!(p, TimeNodeProperty::EventFilter(_)))
+        && !properties.iter().any(|p| {
+            matches!(
+                p,
+                TimeNodeProperty::EffectNodeType(TimeEffectNodeType::InteractiveSequence)
+            )
+        })
+    {
+        return Err(PptError::InvalidFormat(
+            "event filter requires an interactive sequence".to_string(),
+        ));
+    }
+    Ok(TimeNodePropertyList { properties })
+}
+
+fn parse_time_node_property(record: &PptRecord) -> Result<TimeNodeProperty> {
+    let data = &record.data;
+    let int = || -> Result<i32> {
+        if data.len() != 5 || data[0] != 1 {
+            return Err(PptError::InvalidFormat(
+                "invalid integer time variant".to_string(),
+            ));
+        }
+        Ok(i32::from_le_bytes(
+            data[1..5].try_into().expect("length checked"),
+        ))
+    };
+    let boolean = || -> Result<bool> {
+        if data.len() != 2 || data[0] != 0 {
+            return Err(PptError::InvalidFormat(
+                "invalid boolean time variant".to_string(),
+            ));
+        }
+        parse_bool1(data[1], "TimeVariant.boolValue")
+    };
+    let string = || -> Result<String> {
+        if data.len() < 3 || data.len() % 2 != 1 || data[0] != 3 {
+            return Err(PptError::InvalidFormat(
+                "invalid string time variant".to_string(),
+            ));
+        }
+        String::from_utf16(
+            &data[1..]
+                .chunks_exact(2)
+                .map(|b| u16::from_le_bytes([b[0], b[1]]))
+                .collect::<Vec<_>>(),
+        )
+        .map_err(|_| PptError::InvalidFormat("invalid UTF-16 time variant".to_string()))
+    };
+    Ok(match record.instance {
+        0x02 => TimeNodeProperty::DisplayHidden(match int()? {
+            0 => false,
+            1 => true,
+            v => return Err(PptError::InvalidFormat(format!("invalid display type {v}"))),
+        }),
+        0x05 => TimeNodeProperty::MasterRelation(match int()? {
+            0 => TimeMasterRelation::DoNotStart,
+            2 => TimeMasterRelation::StartWithMaster,
+            v => {
+                return Err(PptError::InvalidFormat(format!(
+                    "invalid master relation {v}"
+                )));
+            },
+        }),
+        0x06 if int()? == 1 => TimeNodeProperty::SubType,
+        0x06 => return Err(PptError::InvalidFormat("invalid time subtype".to_string())),
+        0x09 => TimeNodeProperty::EffectId(int()?),
+        0x0A => TimeNodeProperty::EffectDirection(int()?),
+        0x0B => TimeNodeProperty::EffectType(match int()? {
+            1 => TimeEffectType::Entrance,
+            2 => TimeEffectType::Exit,
+            3 => TimeEffectType::Emphasis,
+            4 => TimeEffectType::MotionPath,
+            5 => TimeEffectType::ActionVerb,
+            6 => TimeEffectType::MediaCommand,
+            v => return Err(PptError::InvalidFormat(format!("invalid effect type {v}"))),
+        }),
+        0x0D => TimeNodeProperty::AfterEffect(boolean()?),
+        0x0F => TimeNodeProperty::SlideCount(int()?),
+        0x10 => {
+            let value = string()?;
+            if !is_valid_time_filter(&value) {
+                return Err(PptError::InvalidFormat("invalid time filter".to_string()));
+            }
+            TimeNodeProperty::TimeFilter(value)
+        },
+        0x11 => {
+            let value = string()?;
+            if value != "cancelBubble" {
+                return Err(PptError::InvalidFormat("invalid event filter".to_string()));
+            }
+            TimeNodeProperty::EventFilter(value)
+        },
+        0x12 => TimeNodeProperty::HideWhenStopped(boolean()?),
+        0x13 => TimeNodeProperty::GroupId(int()?),
+        0x14 => TimeNodeProperty::EffectNodeType(match int()? {
+            1 => TimeEffectNodeType::ClickEffect,
+            2 => TimeEffectNodeType::WithPrevious,
+            3 => TimeEffectNodeType::AfterPrevious,
+            4 => TimeEffectNodeType::MainSequence,
+            5 => TimeEffectNodeType::InteractiveSequence,
+            6 => TimeEffectNodeType::ClickParallel,
+            7 => TimeEffectNodeType::WithGroup,
+            8 => TimeEffectNodeType::AfterGroup,
+            9 => TimeEffectNodeType::TimingRoot,
+            v => {
+                return Err(PptError::InvalidFormat(format!(
+                    "invalid effect node type {v}"
+                )));
+            },
+        }),
+        0x15 => TimeNodeProperty::PlaceholderNode(boolean()?),
+        0x16 => {
+            if data.len() != 5 || data[0] != 2 {
+                return Err(PptError::InvalidFormat("invalid media volume".to_string()));
+            }
+            let v = f32::from_le_bytes(data[1..5].try_into().expect("length checked"));
+            if !v.is_finite() || !(0.0..=100000.0).contains(&v) {
+                return Err(PptError::InvalidFormat(
+                    "media volume out of range".to_string(),
+                ));
+            }
+            TimeNodeProperty::MediaVolume(v)
+        },
+        0x17 => TimeNodeProperty::MediaMute(boolean()?),
+        0x1A => TimeNodeProperty::ZoomToFullScreen(boolean()?),
+        id => {
+            return Err(PptError::InvalidFormat(format!(
+                "unknown time property {id:#X}"
+            )));
+        },
+    })
 }
 
 /// Parse build list from BuildList container record.
@@ -565,7 +766,7 @@ mod tests {
         BuildInfo, ChartBuildType, DiagramBuildType, LegacyAnimationAtom, LegacyAnimationBuild,
         LegacyAnimationEffect, LegacyTextBuildSubEffect, ParagraphBuildType, write_animation_info,
         write_animation_info_atom, write_build_list, write_extended_time_node,
-        write_time_node_atom,
+        write_time_node_atom, write_time_node_property_list,
     };
 
     fn sample_legacy_atom() -> LegacyAnimationAtom {
@@ -595,6 +796,7 @@ mod tests {
     fn empty_time_node() -> ExtendedTimeNode {
         ExtendedTimeNode {
             atom: TimeNodeAtom::default(),
+            properties: None,
             children: Vec::new(),
         }
     }
@@ -724,6 +926,12 @@ mod tests {
         };
         let node = ExtendedTimeNode {
             atom,
+            properties: Some(TimeNodePropertyList {
+                properties: vec![
+                    TimeNodeProperty::EffectType(TimeEffectType::Entrance),
+                    TimeNodeProperty::EffectNodeType(TimeEffectNodeType::ClickEffect),
+                ],
+            }),
             children: vec![raw_child],
         };
         let bytes = write_extended_time_node(&node).unwrap();
@@ -799,12 +1007,109 @@ mod tests {
     }
 
     #[test]
+    fn round_trips_all_time_node_property_variants() {
+        assert_eq!(PptRecordType::TimePropertyList.as_u16(), 0xF13D);
+        assert_eq!(PptRecordType::TimeVariant.as_u16(), 0xF142);
+        let root = TimeNodePropertyList {
+            properties: vec![
+                TimeNodeProperty::DisplayHidden(true),
+                TimeNodeProperty::EffectId(42),
+                TimeNodeProperty::EffectDirection(-7),
+                TimeNodeProperty::EffectType(TimeEffectType::Entrance),
+                TimeNodeProperty::AfterEffect(true),
+                TimeNodeProperty::SlideCount(3),
+                TimeNodeProperty::TimeFilter("0.0,0.5;1.0,1.0".to_string()),
+                TimeNodeProperty::EventFilter("cancelBubble".to_string()),
+                TimeNodeProperty::HideWhenStopped(false),
+                TimeNodeProperty::GroupId(9),
+                TimeNodeProperty::EffectNodeType(TimeEffectNodeType::InteractiveSequence),
+                TimeNodeProperty::PlaceholderNode(true),
+                TimeNodeProperty::MediaVolume(100_000.0),
+                TimeNodeProperty::MediaMute(true),
+                TimeNodeProperty::ZoomToFullScreen(false),
+            ],
+        };
+        let bytes =
+            write_time_node_property_list(&root, TimePropertyListContext::TimeNode).unwrap();
+        let (record, consumed) = PptRecord::parse(&bytes, 0).unwrap();
+        assert_eq!(consumed, bytes.len());
+        assert_eq!(
+            parse_time_node_property_list(&record, TimePropertyListContext::TimeNode).unwrap(),
+            root
+        );
+
+        let subeffect = TimeNodePropertyList {
+            properties: vec![
+                TimeNodeProperty::DisplayHidden(false),
+                TimeNodeProperty::MasterRelation(TimeMasterRelation::StartWithMaster),
+                TimeNodeProperty::SubType,
+                TimeNodeProperty::AfterEffect(false),
+                TimeNodeProperty::PlaceholderNode(false),
+                TimeNodeProperty::MediaVolume(0.0),
+                TimeNodeProperty::MediaMute(false),
+            ],
+        };
+        let bytes =
+            write_time_node_property_list(&subeffect, TimePropertyListContext::SubEffect).unwrap();
+        let (record, _) = PptRecord::parse(&bytes, 0).unwrap();
+        assert_eq!(
+            parse_time_node_property_list(&record, TimePropertyListContext::SubEffect).unwrap(),
+            subeffect
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_time_node_property_lists() {
+        let duplicate = TimeNodePropertyList {
+            properties: vec![
+                TimeNodeProperty::MediaMute(false),
+                TimeNodeProperty::MediaMute(true),
+            ],
+        };
+        assert!(
+            write_time_node_property_list(&duplicate, TimePropertyListContext::TimeNode).is_err()
+        );
+        let wrong_context = TimeNodePropertyList {
+            properties: vec![TimeNodeProperty::MasterRelation(
+                TimeMasterRelation::DoNotStart,
+            )],
+        };
+        assert!(
+            write_time_node_property_list(&wrong_context, TimePropertyListContext::TimeNode)
+                .is_err()
+        );
+        for invalid in [
+            TimeNodeProperty::MediaVolume(f32::NAN),
+            TimeNodeProperty::MediaVolume(100_001.0),
+            TimeNodeProperty::TimeFilter("0.0,2.0".to_string()),
+            TimeNodeProperty::EventFilter("other".to_string()),
+        ] {
+            let list = TimeNodePropertyList {
+                properties: vec![invalid],
+            };
+            assert!(
+                write_time_node_property_list(&list, TimePropertyListContext::TimeNode).is_err()
+            );
+        }
+
+        let valid = TimeNodePropertyList {
+            properties: vec![TimeNodeProperty::MediaMute(true)],
+        };
+        let bytes =
+            write_time_node_property_list(&valid, TimePropertyListContext::TimeNode).unwrap();
+        let (mut record, _) = PptRecord::parse(&bytes, 0).unwrap();
+        record.children[0].data[0] = 1;
+        assert!(parse_time_node_property_list(&record, TimePropertyListContext::TimeNode).is_err());
+    }
+
+    #[test]
     fn parses_slide_animation_extensions_and_rejects_duplicates_or_truncation() {
         let node = ExtendedTimeNode {
             atom: TimeNodeAtom {
                 node_type: Some(TimeNodeKind::Sequential),
                 ..TimeNodeAtom::default()
             },
+            properties: None,
             children: Vec::new(),
         };
         let build_list = BuildList::new();

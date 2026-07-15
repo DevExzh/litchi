@@ -338,14 +338,14 @@ impl BuildInfo {
 }
 
 /// Exact PowerPoint 2002 build-list record for a slide.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct BuildList {
     /// Paragraph, chart, and diagram build subcontainers in file order.
     pub builds: Vec<BuildListEntry>,
 }
 
 /// PowerPoint 2002 animation metadata stored in a slide's `___PPT10` tag.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct SlideAnimationExtension {
     /// Optional root animation timing tree.
     pub time_node: Option<ExtendedTimeNode>,
@@ -448,7 +448,7 @@ pub struct ParagraphBuildAtom {
 }
 
 /// Template effect for one paragraph level.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ParagraphBuildLevel {
     /// Paragraph level, at most 9.
     pub level: u32,
@@ -457,7 +457,7 @@ pub struct ParagraphBuildLevel {
 }
 
 /// Text paragraph build subcontainer.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ParagraphBuild {
     pub atom: BuildAtom,
     pub paragraph: ParagraphBuildAtom,
@@ -597,7 +597,7 @@ pub struct DiagramBuild {
 }
 
 /// One spec-defined PowerPoint 2002 build-list child.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum BuildListEntry {
     Paragraph(ParagraphBuild),
     Chart(ChartBuild),
@@ -605,10 +605,12 @@ pub enum BuildListEntry {
 }
 
 /// Exact PowerPoint 2002 extended time-node container envelope.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ExtendedTimeNode {
     /// Required first atom containing time-node attributes.
     pub atom: TimeNodeAtom,
+    /// Optional typed properties immediately following the atom.
+    pub properties: Option<TimeNodePropertyList>,
     /// Remaining property, behavior, condition, modifier, and child records.
     pub children: Vec<PptRecord>,
 }
@@ -694,6 +696,92 @@ pub enum TimeNodeFill {
     HoldUntilNext,
     HoldUntilParentEndsLegacy,
     ResetWhenInactiveLegacy,
+}
+
+/// Context in which a time-node property list occurs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TimePropertyListContext {
+    TimeNode,
+    SubEffect,
+}
+
+/// Typed properties stored in `TimePropertyList4TimeNodeContainer`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TimeNodePropertyList {
+    pub properties: Vec<TimeNodeProperty>,
+}
+
+/// One time-node property, identified by its record instance.
+#[derive(Debug, Clone, PartialEq)]
+pub enum TimeNodeProperty {
+    DisplayHidden(bool),
+    MasterRelation(TimeMasterRelation),
+    SubType,
+    EffectId(i32),
+    EffectDirection(i32),
+    EffectType(TimeEffectType),
+    AfterEffect(bool),
+    SlideCount(i32),
+    TimeFilter(String),
+    EventFilter(String),
+    HideWhenStopped(bool),
+    GroupId(i32),
+    EffectNodeType(TimeEffectNodeType),
+    PlaceholderNode(bool),
+    MediaVolume(f32),
+    MediaMute(bool),
+    ZoomToFullScreen(bool),
+}
+
+/// Relationship of a subordinate node to its master node.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TimeMasterRelation {
+    DoNotStart,
+    StartWithMaster,
+}
+
+/// Animation effect category.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TimeEffectType {
+    Entrance,
+    Exit,
+    Emphasis,
+    MotionPath,
+    ActionVerb,
+    MediaCommand,
+}
+
+/// Role of a time node in the timing structure.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TimeEffectNodeType {
+    ClickEffect,
+    WithPrevious,
+    AfterPrevious,
+    MainSequence,
+    InteractiveSequence,
+    ClickParallel,
+    WithGroup,
+    AfterGroup,
+    TimingRoot,
+}
+
+pub(crate) fn is_valid_time_filter(value: &str) -> bool {
+    fn normalized_time(value: &str) -> bool {
+        value == "1.0"
+            || value.strip_prefix("0.").is_some_and(|digits| {
+                !digits.is_empty() && digits.bytes().all(|b| b.is_ascii_digit())
+            })
+    }
+
+    !value.is_empty()
+        && value.split(';').all(|entry| {
+            let mut fields = entry.split(',');
+            matches!(
+                (fields.next(), fields.next(), fields.next()),
+                (Some(time), Some(transformed), None)
+                    if normalized_time(time) && normalized_time(transformed)
+            )
+        })
 }
 
 impl TimeNodeFill {
