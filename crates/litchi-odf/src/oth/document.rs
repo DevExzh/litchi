@@ -264,10 +264,7 @@ mod tests {
         let document = WebDocument::from_bytes(bytes.clone()).unwrap();
         assert!(document.is_template());
         assert_eq!(document.mimetype(), constants::ODF_WEB);
-        let text = document.text().unwrap();
-        assert!(text.contains("Web template"));
-        assert!(text.contains("Body"));
-        assert!(text.contains("links"));
+        assert_eq!(document.text().unwrap(), "Web template\nBody & links");
         assert_eq!(document.document().paragraph_count().unwrap(), 1);
         assert_eq!(document.as_bytes(), bytes);
         assert_eq!(document.to_bytes(), bytes);
@@ -275,10 +272,10 @@ mod tests {
 
     #[test]
     fn accepts_readers_empty_text_and_arbitrary_container_prefixes() {
-        let xml = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><o:body><o:text/></o:body></o:document-content>"#;
+        let xml = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><o:body><o:text><t:p>A &amp; B<t:s t:c="2"/>C</t:p></o:text></o:body></o:document-content>"#;
         let bytes = package(constants::ODF_WEB, xml);
         let document = WebDocument::from_reader(Cursor::new(bytes.clone())).unwrap();
-        assert!(document.text().unwrap().is_empty());
+        assert_eq!(document.text().unwrap(), "A & B  C");
         assert_eq!(document.as_bytes(), bytes);
     }
 

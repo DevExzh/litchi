@@ -694,6 +694,20 @@ mod tests {
     }
 
     #[test]
+    fn reused_text_model_accepts_arbitrary_prefixes_and_decodes_text() {
+        let xml = format!(
+            r#"<o:document-content xmlns:o="{OFFICE_NAMESPACE}" xmlns:t="{TEXT_NAMESPACE}"><o:body><o:text t:global="true"><t:h t:outline-level="2">Master &amp; Cache</t:h><t:p>A<t:span>B</t:span>C<t:s t:c="2"/>D</t:p></o:text></o:body></o:document-content>"#
+        );
+        let document = MasterDocument::from_bytes(package(constants::ODF_MASTER, &xml)).unwrap();
+        assert_eq!(document.text().unwrap(), "Master & Cache\nABC  D");
+        assert_eq!(document.document().paragraph_count().unwrap(), 1);
+        assert_eq!(
+            document.document().paragraphs().unwrap()[0].text().unwrap(),
+            "ABC  D"
+        );
+    }
+
+    #[test]
     fn rejects_other_families_and_invalid_master_hierarchy() {
         assert!(MasterDocument::from_bytes(package(constants::ODF_TEXT, master_xml())).is_err());
         for xml in [

@@ -5,6 +5,18 @@
 
 use super::element::{Element, ElementBase};
 use litchi_core::{Error, Result};
+use quick_xml::XmlVersion;
+use quick_xml::events::{BytesRef, BytesStart, Event};
+use quick_xml::name::{Namespace, ResolveResult};
+use quick_xml::reader::NsReader;
+
+const TEXT_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:text:1.0";
+const XLINK_NAMESPACE: &[u8] = b"http://www.w3.org/1999/xlink";
+const XML_NAMESPACE: &[u8] = b"http://www.w3.org/XML/1998/namespace";
+const MAX_TEXT_BLOCKS: usize = 1_000_000;
+const MAX_TEXT_DEPTH: usize = 4_096;
+const MAX_TEXT_BYTES: usize = 64 * 1024 * 1024;
+const MAX_SPACE_COUNT: usize = 1_000_000;
 
 /// A text paragraph element
 #[derive(Debug, Clone)]
@@ -543,107 +555,37 @@ pub struct TextElements;
 impl TextElements {
     /// Parse all paragraphs from an XML reader
     pub fn parse_paragraphs(xml_content: &str) -> Result<Vec<Paragraph>> {
-        let mut reader = quick_xml::Reader::from_str(xml_content);
-        let mut buf = Vec::new();
-        let mut paragraphs = Vec::new();
-        let mut current_para: Option<Element> = None;
-
-        loop {
-            match reader.read_event_into(&mut buf) {
-                Ok(quick_xml::events::Event::Start(ref e)) => {
-                    let tag_name =
-                        String::from_utf8(e.name().as_ref().to_vec()).unwrap_or_default();
-
-                    if tag_name == "text:p" || tag_name == "text:h" {
-                        if let Some(para) = current_para.take()
-                            && let Ok(p) = Paragraph::from_element(para)
-                        {
-                            paragraphs.push(p);
-                        }
-
-                        let mut element = Element::new(&tag_name);
-
-                        // Parse attributes
-                        for attr_result in e.attributes() {
-                            if let Ok(attr) = attr_result
-                                && let (Ok(key), Ok(value)) = (
-                                    String::from_utf8(attr.key.as_ref().to_vec()),
-                                    String::from_utf8(attr.value.to_vec()),
-                                )
-                            {
-                                element.set_attribute(&key, &value);
-                            }
-                        }
-
-                        current_para = Some(element);
-                    }
-                },
-                Ok(quick_xml::events::Event::Text(ref t)) => {
-                    if let Some(ref mut para) = current_para
-                        && let Ok(text) = String::from_utf8(t.to_vec())
-                    {
-                        let current_text = para.text().to_string();
-                        para.set_text(&format!("{}{}", current_text, text));
-                    }
-                },
-                Ok(quick_xml::events::Event::End(ref e)) => {
-                    let tag_name =
-                        String::from_utf8(e.name().as_ref().to_vec()).unwrap_or_default();
-
-                    if (tag_name == "text:p" || tag_name == "text:h")
-                        && current_para.is_some()
-                        && let Some(para) = current_para.take()
-                        && let Ok(p) = Paragraph::from_element(para)
-                    {
-                        paragraphs.push(p);
-                    }
-                },
-                Ok(quick_xml::events::Event::Eof) => break,
-                Err(_) => break,
-                _ => {},
-            }
-            buf.clear();
-        }
-
-        // Handle any remaining paragraph
-        if let Some(para) = current_para
-            && let Ok(p) = Paragraph::from_element(para)
-        {
-            paragraphs.push(p);
-        }
-
-        Ok(paragraphs)
+        parse_text_blocks(xml_content).map(|blocks| {
+            blocks
+                .into_iter()
+                .filter_map(|block| match block {
+                    TextBlock::Paragraph(paragraph) => Some(paragraph),
+                    TextBlock::Heading(_) => None,
+                })
+                .collect()
+        })
     }
 
     /// Parse all headings from XML content
     #[allow(dead_code)]
     pub fn parse_headings(xml_content: &str) -> Result<Vec<Heading>> {
-        let paragraphs = Self::parse_paragraphs(xml_content)?;
-        let mut headings = Vec::new();
-
-        for para in paragraphs {
-            let element = para.element;
-            if element.tag_name() == "text:h"
-                && let Ok(heading) = Heading::from_element(element)
-            {
-                headings.push(heading);
-            }
-        }
-
-        Ok(headings)
+        parse_text_blocks(xml_content).map(|blocks| {
+            blocks
+                .into_iter()
+                .filter_map(|block| match block {
+                    TextBlock::Paragraph(_) => None,
+                    TextBlock::Heading(heading) => Some(heading),
+                })
+                .collect()
+        })
     }
 
     /// Extract all text content from XML with improved handling of nested elements.
     ///
-    /// This method handles various text elements including:
-    /// - Paragraphs (text:p) and headings (text:h)
-    /// - Lists (text:list) with automatic bullet points
-    /// - Sections (text:section)
-    /// - Annotations/comments (office:annotation)
-    /// - Line breaks (text:line-break) and tabs (text:tab)
-    /// - Text boxes and frames (draw:text-box)
-    /// - Soft page breaks (text:soft-page-break)
-    /// - Spaces (text:s)
+    /// This method finds paragraphs and headings by namespace URI, including those
+    /// nested in lists, sections, and text boxes. It preserves inline mixed content,
+    /// XML entities and CDATA, plus ODF spaces, tabs, and line breaks. Stored tracked
+    /// change definitions are excluded from visible text.
     ///
     /// # Arguments
     ///
@@ -653,236 +595,350 @@ impl TextElements {
     ///
     /// Extracted plain text with paragraph breaks preserved
     pub fn extract_text(xml_content: &str) -> Result<String> {
-        let mut reader = quick_xml::Reader::from_str(xml_content);
-        let mut buf = Vec::new();
-        let mut text = String::new();
-        let mut in_text_context = false;
-        let mut paragraph_text = String::new();
-        let mut depth_stack: Vec<String> = Vec::new();
-        let mut skip_depth = 0; // Depth to skip content (e.g., inside tracked-changes)
-
-        loop {
-            match reader.read_event_into(&mut buf) {
-                Ok(quick_xml::events::Event::Start(ref e)) => {
-                    let tag_name =
-                        String::from_utf8(e.name().as_ref().to_vec()).unwrap_or_default();
-
-                    depth_stack.push(tag_name.clone());
-
-                    // Skip certain elements that shouldn't contribute to text
-                    if skip_depth > 0 {
-                        skip_depth += 1;
-                        continue;
-                    }
-
-                    match tag_name.as_str() {
-                        // Skip tracked changes and their content
-                        "text:tracked-changes" | "text:change-start" | "text:change-end" => {
-                            skip_depth = 1;
-                        },
-                        // Text containers
-                        "text:p" | "text:h" => {
-                            if in_text_context && !paragraph_text.is_empty() {
-                                if !text.is_empty() {
-                                    text.push('\n');
-                                }
-                                text.push_str(&paragraph_text);
-                                paragraph_text.clear();
-                            }
-                            in_text_context = true;
-                        },
-                        // Lists - handle list items within paragraphs
-                        "text:list" => {
-                            if in_text_context && !paragraph_text.is_empty() {
-                                if !text.is_empty() {
-                                    text.push('\n');
-                                }
-                                text.push_str(&paragraph_text);
-                                paragraph_text.clear();
-                            }
-                            in_text_context = false;
-                        },
-                        "text:list-item" => {
-                            // Start list item
-                            if !paragraph_text.is_empty() {
-                                if !text.is_empty() {
-                                    text.push('\n');
-                                }
-                                text.push_str(&paragraph_text);
-                                paragraph_text.clear();
-                            }
-                            in_text_context = true;
-                            paragraph_text.push_str("• ");
-                        },
-                        // Sections
-                        "text:section" => {
-                            // Sections are transparent containers, just continue
-                        },
-                        // Text boxes and frames
-                        "draw:text-box"
-                            // Text boxes should contribute their text content
-                            if !paragraph_text.is_empty() => {
-                                if !text.is_empty() {
-                                    text.push('\n');
-                                }
-                                text.push_str(&paragraph_text);
-                                paragraph_text.clear();
-                            },
-                        // Annotations (comments)
-                        "office:annotation" => {
-                            // Optionally include annotations
-                            // For now, we'll skip them (set skip_depth if desired)
-                            // skip_depth = 1;
-                        },
-                        // Line breaks and formatting
-                        "text:line-break"
-                            if in_text_context => {
-                                paragraph_text.push('\n');
-                            },
-                        "text:tab"
-                            if in_text_context => {
-                                paragraph_text.push('\t');
-                            },
-                        "text:s"
-                            // Repeated space element
-                            if in_text_context => {
-                                // Get the count attribute (defaults to 1)
-                                let count = e
-                                    .attributes()
-                                    .find_map(|attr| {
-                                        if let Ok(a) = attr {
-                                            let key = String::from_utf8(a.key.as_ref().to_vec())
-                                                .unwrap_or_default();
-                                            if key.ends_with(":c") || key == "text:c" {
-                                                let val = String::from_utf8(a.value.to_vec())
-                                                    .unwrap_or_default();
-                                                return val.parse::<usize>().ok();
-                                            }
-                                        }
-                                        None
-                                    })
-                                    .unwrap_or(1);
-                                for _ in 0..count {
-                                    paragraph_text.push(' ');
-                                }
-                            },
-                        "text:soft-page-break"
-                            // Soft page breaks can be treated as paragraph breaks
-                            if in_text_context && !paragraph_text.is_empty() => {
-                                if !text.is_empty() {
-                                    text.push('\n');
-                                }
-                                text.push_str(&paragraph_text);
-                                paragraph_text.clear();
-                            },
-                        _ => {}, // Ignore other elements
-                    }
-                },
-                Ok(quick_xml::events::Event::Empty(ref e)) => {
-                    // Handle empty/self-closing elements
-                    let tag_name =
-                        String::from_utf8(e.name().as_ref().to_vec()).unwrap_or_default();
-
-                    if skip_depth > 0 {
-                        continue;
-                    }
-
-                    match tag_name.as_str() {
-                        "text:line-break"
-                            if in_text_context => {
-                                paragraph_text.push('\n');
-                            },
-                        "text:tab"
-                            if in_text_context => {
-                                paragraph_text.push('\t');
-                            },
-                        "text:s"
-                            // Repeated space element
-                            if in_text_context => {
-                                let count = e
-                                    .attributes()
-                                    .find_map(|attr| {
-                                        if let Ok(a) = attr {
-                                            let key = String::from_utf8(a.key.as_ref().to_vec())
-                                                .unwrap_or_default();
-                                            if key.ends_with(":c") || key == "text:c" {
-                                                let val = String::from_utf8(a.value.to_vec())
-                                                    .unwrap_or_default();
-                                                return val.parse::<usize>().ok();
-                                            }
-                                        }
-                                        None
-                                    })
-                                    .unwrap_or(1);
-                                for _ in 0..count {
-                                    paragraph_text.push(' ');
-                                }
-                            },
-                        _ => {},
-                    }
-                },
-                Ok(quick_xml::events::Event::Text(ref t)) => {
-                    if skip_depth == 0
-                        && in_text_context
-                        && let Ok(text_content) = String::from_utf8(t.to_vec())
-                    {
-                        paragraph_text.push_str(&text_content);
-                    }
-                },
-                Ok(quick_xml::events::Event::End(ref e)) => {
-                    let tag_name =
-                        String::from_utf8(e.name().as_ref().to_vec()).unwrap_or_default();
-
-                    // Pop from depth stack
-                    if let Some(last) = depth_stack.last()
-                        && last == &tag_name
-                    {
-                        depth_stack.pop();
-                    }
-
-                    // Handle skip depth
-                    if skip_depth > 0 {
-                        skip_depth -= 1;
-                        continue;
-                    }
-
-                    match tag_name.as_str() {
-                        "text:p" | "text:h" | "text:list-item" => {
-                            if in_text_context && !paragraph_text.is_empty() {
-                                if !text.is_empty() {
-                                    text.push('\n');
-                                }
-                                text.push_str(&paragraph_text);
-                                paragraph_text.clear();
-                            }
-                            // Check if we're still in a text context by examining the stack
-                            in_text_context = depth_stack
-                                .iter()
-                                .any(|t| t == "text:p" || t == "text:h" || t == "text:list-item");
-                        },
-                        "text:list" => {
-                            in_text_context = false;
-                        },
-                        _ => {},
-                    }
-                },
-                Ok(quick_xml::events::Event::Eof) => {
-                    // Handle any remaining paragraph text
-                    if in_text_context && !paragraph_text.is_empty() {
-                        if !text.is_empty() {
-                            text.push('\n');
-                        }
-                        text.push_str(&paragraph_text);
-                    }
-                    break;
-                },
-                Err(_) => break,
-                _ => {},
+        let mut output = String::new();
+        for (index, block) in parse_text_blocks(xml_content)?.into_iter().enumerate() {
+            let block_text = match block {
+                TextBlock::Paragraph(paragraph) => paragraph.text()?,
+                TextBlock::Heading(heading) => heading.text()?,
+            };
+            if index > 0 {
+                output.push('\n');
             }
-            buf.clear();
+            output.push_str(&block_text);
         }
+        Ok(output)
+    }
+}
 
-        Ok(text)
+pub(crate) enum TextBlock {
+    Paragraph(Paragraph),
+    Heading(Heading),
+}
+
+struct ActiveTextBlock {
+    element: Element,
+    depth: usize,
+    text: String,
+}
+
+pub(crate) fn parse_text_blocks(xml_content: &str) -> Result<Vec<TextBlock>> {
+    let mut reader = NsReader::from_str(xml_content);
+    let mut buffer = Vec::new();
+    let mut blocks = Vec::new();
+    let mut active: Option<ActiveTextBlock> = None;
+    let mut document_depth = 0usize;
+    let mut tracked_changes_depth = 0usize;
+    let mut total_text_bytes = 0usize;
+
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| Error::InvalidFormat(format!("invalid ODF text XML: {error}")))?;
+        let text_namespace =
+            matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == TEXT_NAMESPACE);
+        match event {
+            Event::Start(ref element) => {
+                document_depth = document_depth.checked_add(1).ok_or_else(|| {
+                    Error::InvalidFormat("ODF text nesting depth overflow".to_string())
+                })?;
+                if document_depth > MAX_TEXT_DEPTH {
+                    return Err(Error::InvalidFormat(format!(
+                        "ODF text nesting exceeds {MAX_TEXT_DEPTH} levels"
+                    )));
+                }
+
+                if tracked_changes_depth > 0 {
+                    tracked_changes_depth += 1;
+                } else if is_text_element(text_namespace, element, b"tracked-changes") {
+                    tracked_changes_depth = 1;
+                } else if let Some(current) = active.as_mut() {
+                    if is_text_block(text_namespace, element) {
+                        return Err(Error::InvalidFormat(
+                            "nested ODF paragraphs or headings are not allowed".to_string(),
+                        ));
+                    }
+                    current.depth += 1;
+                    append_text_control(&reader, text_namespace, element, &mut current.text)?;
+                } else if is_text_block(text_namespace, element) {
+                    active = Some(ActiveTextBlock {
+                        element: make_text_block_element(&reader, element)?,
+                        depth: 1,
+                        text: String::new(),
+                    });
+                }
+            },
+            Event::Empty(ref element) if tracked_changes_depth == 0 => {
+                if let Some(current) = active.as_mut() {
+                    if is_text_block(text_namespace, element) {
+                        return Err(Error::InvalidFormat(
+                            "nested ODF paragraphs or headings are not allowed".to_string(),
+                        ));
+                    }
+                    append_text_control(&reader, text_namespace, element, &mut current.text)?;
+                } else if is_text_block(text_namespace, element) {
+                    push_text_block(
+                        make_text_block_element(&reader, element)?,
+                        String::new(),
+                        &mut blocks,
+                        &mut total_text_bytes,
+                    )?;
+                }
+            },
+            Event::Text(ref value) if tracked_changes_depth == 0 && active.is_some() => {
+                let decoded = value
+                    .xml_content(XmlVersion::Explicit1_0)
+                    .map_err(|error| {
+                        Error::InvalidFormat(format!("invalid ODF text content: {error}"))
+                    })?;
+                append_checked(
+                    &mut active.as_mut().expect("checked active block").text,
+                    &decoded,
+                )?;
+            },
+            Event::CData(ref value) if tracked_changes_depth == 0 && active.is_some() => {
+                let decoded = value
+                    .xml_content(XmlVersion::Explicit1_0)
+                    .map_err(|error| {
+                        Error::InvalidFormat(format!("invalid ODF text CDATA: {error}"))
+                    })?;
+                append_checked(
+                    &mut active.as_mut().expect("checked active block").text,
+                    &decoded,
+                )?;
+            },
+            Event::GeneralRef(ref reference) if tracked_changes_depth == 0 && active.is_some() => {
+                let decoded = decode_reference(reference)?;
+                append_checked(
+                    &mut active.as_mut().expect("checked active block").text,
+                    &decoded,
+                )?;
+            },
+            Event::End(_) => {
+                document_depth = document_depth.checked_sub(1).ok_or_else(|| {
+                    Error::InvalidFormat("ODF text element stack underflow".to_string())
+                })?;
+                if tracked_changes_depth > 0 {
+                    tracked_changes_depth -= 1;
+                } else if let Some(current) = active.as_mut() {
+                    current.depth = current.depth.checked_sub(1).ok_or_else(|| {
+                        Error::InvalidFormat("ODF text block stack underflow".to_string())
+                    })?;
+                    if current.depth == 0 {
+                        let current = active.take().expect("checked active block");
+                        push_text_block(
+                            current.element,
+                            current.text,
+                            &mut blocks,
+                            &mut total_text_bytes,
+                        )?;
+                    }
+                }
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+        buffer.clear();
+    }
+
+    if active.is_some() || tracked_changes_depth != 0 || document_depth != 0 {
+        return Err(Error::InvalidFormat(
+            "incomplete ODF text XML structure".to_string(),
+        ));
+    }
+    Ok(blocks)
+}
+
+fn is_text_element(text_namespace: bool, element: &BytesStart<'_>, local_name: &[u8]) -> bool {
+    text_namespace && element.local_name().as_ref() == local_name
+}
+
+fn is_text_block(text_namespace: bool, element: &BytesStart<'_>) -> bool {
+    matches!(element.local_name().as_ref(), b"p" | b"h") && text_namespace
+}
+
+fn make_text_block_element(reader: &NsReader<&[u8]>, source: &BytesStart<'_>) -> Result<Element> {
+    let tag_name = match source.local_name().as_ref() {
+        b"p" => "text:p",
+        b"h" => "text:h",
+        _ => {
+            return Err(Error::InvalidFormat(
+                "element is not an ODF paragraph or heading".to_string(),
+            ));
+        },
+    };
+    let mut element = Element::new(tag_name);
+    for attribute in source.attributes() {
+        let attribute = attribute.map_err(|error| {
+            Error::InvalidFormat(format!("invalid ODF text attribute: {error}"))
+        })?;
+        if attribute.key.as_ref() == b"xmlns" || attribute.key.as_ref().starts_with(b"xmlns:") {
+            continue;
+        }
+        let (namespace, local_name) = reader.resolver().resolve_attribute(attribute.key);
+        let local_name = std::str::from_utf8(local_name.as_ref())
+            .map_err(|_| Error::InvalidFormat("non-UTF-8 ODF text attribute name".to_string()))?;
+        let name = match namespace {
+            ResolveResult::Bound(Namespace(uri)) if uri == TEXT_NAMESPACE => {
+                format!("text:{local_name}")
+            },
+            ResolveResult::Bound(Namespace(uri)) if uri == XLINK_NAMESPACE => {
+                format!("xlink:{local_name}")
+            },
+            ResolveResult::Bound(Namespace(uri)) if uri == XML_NAMESPACE => {
+                format!("xml:{local_name}")
+            },
+            ResolveResult::Bound(_) | ResolveResult::Unbound => {
+                std::str::from_utf8(attribute.key.as_ref())
+                    .map_err(|_| {
+                        Error::InvalidFormat("non-UTF-8 ODF text attribute name".to_string())
+                    })?
+                    .to_string()
+            },
+            ResolveResult::Unknown(prefix) => {
+                return Err(Error::InvalidFormat(format!(
+                    "unknown ODF text attribute namespace prefix '{}'",
+                    String::from_utf8_lossy(&prefix)
+                )));
+            },
+        };
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+            .map_err(|error| {
+                Error::InvalidFormat(format!("invalid ODF text attribute value: {error}"))
+            })?;
+        if element.has_attribute(&name) {
+            return Err(Error::InvalidFormat(format!(
+                "duplicate ODF text attribute '{name}'"
+            )));
+        }
+        element.set_attribute(&name, &value);
+    }
+    Ok(element)
+}
+
+fn append_text_control(
+    reader: &NsReader<&[u8]>,
+    text_namespace: bool,
+    element: &BytesStart<'_>,
+    output: &mut String,
+) -> Result<()> {
+    if !text_namespace {
+        return Ok(());
+    }
+    match element.local_name().as_ref() {
+        b"s" => {
+            let count = text_space_count(reader, element)?.unwrap_or(1);
+            if count > MAX_SPACE_COUNT {
+                return Err(Error::InvalidFormat(format!(
+                    "text:s count exceeds {MAX_SPACE_COUNT}"
+                )));
+            }
+            let new_len = output
+                .len()
+                .checked_add(count)
+                .ok_or_else(|| Error::InvalidFormat("ODF text size overflow".to_string()))?;
+            if new_len > MAX_TEXT_BYTES {
+                return Err(Error::InvalidFormat(format!(
+                    "ODF text exceeds {MAX_TEXT_BYTES} bytes"
+                )));
+            }
+            output.extend(std::iter::repeat_n(' ', count));
+        },
+        b"tab" => append_checked(output, "\t")?,
+        b"line-break" => append_checked(output, "\n")?,
+        _ => {},
+    }
+    Ok(())
+}
+
+fn text_space_count(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Option<usize>> {
+    let mut count = None;
+    for attribute in element.attributes() {
+        let attribute = attribute
+            .map_err(|error| Error::InvalidFormat(format!("invalid text:s attribute: {error}")))?;
+        let (namespace, local_name) = reader.resolver().resolve_attribute(attribute.key);
+        if matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == TEXT_NAMESPACE)
+            && local_name.as_ref() == b"c"
+        {
+            if count.is_some() {
+                return Err(Error::InvalidFormat(
+                    "duplicate expanded text:c attribute".to_string(),
+                ));
+            }
+            let value = attribute
+                .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                .map_err(|error| {
+                    Error::InvalidFormat(format!("invalid text:c attribute: {error}"))
+                })?;
+            let value = value.parse().map_err(|_| {
+                Error::InvalidFormat("text:c must be a non-negative integer".to_string())
+            })?;
+            count = Some(value);
+        }
+    }
+    Ok(count)
+}
+
+fn append_checked(output: &mut String, value: &str) -> Result<()> {
+    let new_len = output
+        .len()
+        .checked_add(value.len())
+        .ok_or_else(|| Error::InvalidFormat("ODF text size overflow".to_string()))?;
+    if new_len > MAX_TEXT_BYTES {
+        return Err(Error::InvalidFormat(format!(
+            "ODF text exceeds {MAX_TEXT_BYTES} bytes"
+        )));
+    }
+    output.push_str(value);
+    Ok(())
+}
+
+fn push_text_block(
+    mut element: Element,
+    text: String,
+    blocks: &mut Vec<TextBlock>,
+    total_text_bytes: &mut usize,
+) -> Result<()> {
+    if blocks.len() >= MAX_TEXT_BLOCKS {
+        return Err(Error::InvalidFormat(format!(
+            "ODF text exceeds {MAX_TEXT_BLOCKS} paragraphs and headings"
+        )));
+    }
+    *total_text_bytes = total_text_bytes
+        .checked_add(text.len())
+        .ok_or_else(|| Error::InvalidFormat("ODF text size overflow".to_string()))?;
+    if *total_text_bytes > MAX_TEXT_BYTES {
+        return Err(Error::InvalidFormat(format!(
+            "ODF text exceeds {MAX_TEXT_BYTES} bytes"
+        )));
+    }
+    element.set_text(&text);
+    match element.tag_name() {
+        "text:p" => blocks.push(TextBlock::Paragraph(Paragraph::from_element(element)?)),
+        "text:h" => blocks.push(TextBlock::Heading(Heading::from_element(element)?)),
+        _ => unreachable!("text block elements are canonicalized"),
+    }
+    Ok(())
+}
+
+fn decode_reference(reference: &BytesRef<'_>) -> Result<String> {
+    if let Some(character) = reference.resolve_char_ref().map_err(|error| {
+        Error::InvalidFormat(format!("invalid ODF text character reference: {error}"))
+    })? {
+        return Ok(character.to_string());
+    }
+    let name = reference
+        .decode()
+        .map_err(|error| Error::InvalidFormat(format!("invalid ODF text entity: {error}")))?;
+    match name.as_ref() {
+        "amp" => Ok("&".to_string()),
+        "lt" => Ok("<".to_string()),
+        "gt" => Ok(">".to_string()),
+        "quot" => Ok("\"".to_string()),
+        "apos" => Ok("'".to_string()),
+        _ => Err(Error::InvalidFormat(format!(
+            "unsupported ODF text entity '&{name};'"
+        ))),
     }
 }
 
@@ -1112,22 +1168,17 @@ mod tests {
 
     #[test]
     fn test_text_elements_parse_headings() {
-        // Note: The current parse_headings implementation has a bug
-        // where it tries to convert paragraphs to headings incorrectly.
-        // This test documents the expected behavior.
         let xml = r#"<office:text xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">
             <text:h text:outline-level="1">Heading 1</text:h>
             <text:p>Paragraph</text:p>
             <text:h text:outline-level="2">Heading 2</text:h>
         </office:text>"#;
 
-        // Currently returns empty due to implementation bug
-        // Should return headings when fixed
         let headings = TextElements::parse_headings(xml).unwrap();
-        // The implementation has an issue, so we just check it doesn't panic
-        // Expected: 2 headings
-        // Actual: 0 headings (known issue)
-        assert_eq!(headings.len(), 0); // Documenting current behavior
+        assert_eq!(headings.len(), 2);
+        assert_eq!(headings[0].level(), Some(1));
+        assert_eq!(headings[0].text().unwrap(), "Heading 1");
+        assert_eq!(headings[1].level(), Some(2));
     }
 
     #[test]
@@ -1146,13 +1197,49 @@ mod tests {
     fn test_text_elements_extract_text_with_lists() {
         let xml = r#"<office:text xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">
             <text:list>
-                <text:list-item>Item 1</text:list-item>
-                <text:list-item>Item 2</text:list-item>
+                <text:list-item><text:p>Item 1</text:p></text:list-item>
+                <text:list-item><text:p>Item 2</text:p></text:list-item>
             </text:list>
         </office:text>"#;
 
         let text = TextElements::extract_text(xml).unwrap();
         assert!(text.contains("Item 1"));
         assert!(text.contains("Item 2"));
+    }
+
+    #[test]
+    fn parses_arbitrary_prefixes_entities_cdata_and_odf_whitespace() {
+        let xml = r#"<o:text xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><t:h t:outline-level="3">A &amp; <![CDATA[B]]></t:h><t:p t:style-name="Body">C<t:s t:c="2"/>D<t:tab/>E<t:line-break/>F&#x21;</t:p><t:p/></o:text>"#;
+
+        assert_eq!(
+            TextElements::extract_text(xml).unwrap(),
+            "A & B\nC  D\tE\nF!\n"
+        );
+        let paragraphs = TextElements::parse_paragraphs(xml).unwrap();
+        assert_eq!(paragraphs.len(), 2);
+        assert_eq!(paragraphs[0].style_name(), Some("Body"));
+        assert_eq!(paragraphs[0].text().unwrap(), "C  D\tE\nF!");
+        let headings = TextElements::parse_headings(xml).unwrap();
+        assert_eq!(headings.len(), 1);
+        assert_eq!(headings[0].level(), Some(3));
+    }
+
+    #[test]
+    fn skips_tracked_change_definitions_and_rejects_malformed_or_excessive_text() {
+        let tracked = r#"<o:text xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><t:tracked-changes><t:changed-region><t:deletion><t:p>Deleted</t:p></t:deletion></t:changed-region></t:tracked-changes><t:p>Visible</t:p></o:text>"#;
+        assert_eq!(TextElements::extract_text(tracked).unwrap(), "Visible");
+
+        assert!(TextElements::extract_text("<t:p>").is_err());
+        let excessive = format!(
+            r#"<t:p xmlns:t="{}">A<t:s t:c="{}"/></t:p>"#,
+            std::str::from_utf8(TEXT_NAMESPACE).unwrap(),
+            MAX_SPACE_COUNT + 1
+        );
+        assert!(TextElements::extract_text(&excessive).is_err());
+        let zero = format!(
+            r#"<t:p xmlns:t="{}">A<t:s t:c="0"/>B</t:p>"#,
+            std::str::from_utf8(TEXT_NAMESPACE).unwrap()
+        );
+        assert_eq!(TextElements::extract_text(&zero).unwrap(), "AB");
     }
 }

@@ -10,9 +10,17 @@
 use crate::elements::element::ElementBase;
 use crate::elements::table::Table;
 use crate::elements::text::{Heading, List, Paragraph};
-use litchi_core::Result;
-use quick_xml::Reader;
-use quick_xml::events::Event;
+use litchi_core::{Error, Result};
+use quick_xml::XmlVersion;
+use quick_xml::events::{BytesRef, BytesStart, Event};
+use quick_xml::name::{Namespace, ResolveResult};
+use quick_xml::reader::NsReader;
+
+const TEXT_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:text:1.0";
+const TABLE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:table:1.0";
+const XLINK_NAMESPACE: &[u8] = b"http://www.w3.org/1999/xlink";
+const XML_NAMESPACE: &[u8] = b"http://www.w3.org/XML/1998/namespace";
+const MAX_DOCUMENT_DEPTH: usize = 4_096;
 
 /// Represents a document element in its original position
 #[derive(Debug, Clone)]
@@ -69,7 +77,8 @@ impl DocumentParser {
     /// assert_eq!(elements.len(), 3);
     /// ```
     pub fn parse_elements_in_order(xml_content: &str) -> Result<Vec<DocumentOrderElement>> {
-        let mut reader = Reader::from_str(xml_content);
+        let mut reader = NsReader::from_str(xml_content);
+        reader.config_mut().expand_empty_elements = true;
         let mut buf = Vec::new();
         let mut elements = Vec::new();
 
@@ -78,23 +87,35 @@ impl DocumentParser {
         // Depth tracking to avoid parsing nested elements when inside a parent element
         let mut table_depth = 0;
         let mut list_depth = 0;
+        let mut document_depth = 0usize;
 
         loop {
-            match reader.read_event_into(&mut buf) {
-                Ok(Event::Start(ref e)) => {
-                    let tag_name = String::from_utf8_lossy(e.name().as_ref()).to_string();
+            let (namespace, event) =
+                reader.read_resolved_event_into(&mut buf).map_err(|error| {
+                    Error::InvalidFormat(format!("invalid ODF document XML: {error}"))
+                })?;
+            match event {
+                Event::Start(ref e) => {
+                    document_depth = document_depth.checked_add(1).ok_or_else(|| {
+                        Error::InvalidFormat("ODF document nesting depth overflow".to_string())
+                    })?;
+                    if document_depth > MAX_DOCUMENT_DEPTH {
+                        return Err(Error::InvalidFormat(format!(
+                            "ODF document nesting exceeds {MAX_DOCUMENT_DEPTH} levels"
+                        )));
+                    }
+                    let tag_name = canonical_element_name(
+                        &namespace,
+                        e.local_name().as_ref(),
+                        e.name().as_ref(),
+                    )?;
 
                     match tag_name.as_str() {
                         "text:p" if table_depth == 0 && list_depth == 0 => {
                             // Start a paragraph outside of tables and lists
                             let mut element = super::element::Element::new(&tag_name);
 
-                            // Parse attributes
-                            for attr in e.attributes().flatten() {
-                                let key = String::from_utf8_lossy(attr.key.as_ref());
-                                let value = String::from_utf8_lossy(&attr.value);
-                                element.set_attribute(&key, &value);
-                            }
+                            copy_attributes(&reader, e, &mut element)?;
 
                             element_stack.push((tag_name, element));
                         },
@@ -102,12 +123,7 @@ impl DocumentParser {
                             // Start a heading outside of tables and lists
                             let mut element = super::element::Element::new(&tag_name);
 
-                            // Parse attributes
-                            for attr in e.attributes().flatten() {
-                                let key = String::from_utf8_lossy(attr.key.as_ref());
-                                let value = String::from_utf8_lossy(&attr.value);
-                                element.set_attribute(&key, &value);
-                            }
+                            copy_attributes(&reader, e, &mut element)?;
 
                             element_stack.push((tag_name, element));
                         },
@@ -116,12 +132,7 @@ impl DocumentParser {
                             table_depth += 1;
                             let mut element = super::element::Element::new(&tag_name);
 
-                            // Parse attributes
-                            for attr in e.attributes().flatten() {
-                                let key = String::from_utf8_lossy(attr.key.as_ref());
-                                let value = String::from_utf8_lossy(&attr.value);
-                                element.set_attribute(&key, &value);
-                            }
+                            copy_attributes(&reader, e, &mut element)?;
 
                             element_stack.push((tag_name, element));
                         },
@@ -134,12 +145,7 @@ impl DocumentParser {
                             list_depth += 1;
                             let mut element = super::element::Element::new(&tag_name);
 
-                            // Parse attributes
-                            for attr in e.attributes().flatten() {
-                                let key = String::from_utf8_lossy(attr.key.as_ref());
-                                let value = String::from_utf8_lossy(&attr.value);
-                                element.set_attribute(&key, &value);
-                            }
+                            copy_attributes(&reader, e, &mut element)?;
 
                             element_stack.push((tag_name, element));
                         },
@@ -147,32 +153,63 @@ impl DocumentParser {
                             // Nested list
                             list_depth += 1;
                         },
+                        _ if matches!(
+                            element_stack.first().map(|(tag, _)| tag.as_str()),
+                            Some("text:p" | "text:h")
+                        ) =>
+                        {
+                            if let Some((_, element)) = element_stack.last_mut() {
+                                append_text_control(&reader, &tag_name, e, element)?;
+                            }
+                        },
                         // Handle nested elements within tracked elements
                         _ if !element_stack.is_empty() && table_depth <= 1 && list_depth <= 1 => {
                             let mut element = super::element::Element::new(&tag_name);
 
-                            // Parse attributes
-                            for attr in e.attributes().flatten() {
-                                let key = String::from_utf8_lossy(attr.key.as_ref());
-                                let value = String::from_utf8_lossy(&attr.value);
-                                element.set_attribute(&key, &value);
-                            }
+                            copy_attributes(&reader, e, &mut element)?;
 
                             element_stack.push((tag_name, element));
                         },
                         _ => {},
                     }
                 },
-                Ok(Event::Text(ref t)) => {
+                Event::Text(ref t) => {
                     // Add text content to the current element
                     if let Some((_, element)) = element_stack.last_mut() {
-                        let text = String::from_utf8_lossy(t).to_string();
+                        let text = t.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
+                            Error::InvalidFormat(format!("invalid ODF element text: {error}"))
+                        })?;
                         let current_text = element.text().to_string();
                         element.set_text(&format!("{}{}", current_text, text));
                     }
                 },
-                Ok(Event::End(ref e)) => {
-                    let tag_name = String::from_utf8_lossy(e.name().as_ref()).to_string();
+                Event::CData(ref value) => {
+                    if let Some((_, element)) = element_stack.last_mut() {
+                        let text = value
+                            .xml_content(XmlVersion::Explicit1_0)
+                            .map_err(|error| {
+                                Error::InvalidFormat(format!("invalid ODF element CDATA: {error}"))
+                            })?;
+                        let current_text = element.text().to_string();
+                        element.set_text(&format!("{}{}", current_text, text));
+                    }
+                },
+                Event::GeneralRef(ref reference) => {
+                    if let Some((_, element)) = element_stack.last_mut() {
+                        let text = decode_reference(reference)?;
+                        let current_text = element.text().to_string();
+                        element.set_text(&format!("{}{}", current_text, text));
+                    }
+                },
+                Event::End(ref e) => {
+                    document_depth = document_depth.checked_sub(1).ok_or_else(|| {
+                        Error::InvalidFormat("ODF document element stack underflow".to_string())
+                    })?;
+                    let tag_name = canonical_element_name(
+                        &namespace,
+                        e.local_name().as_ref(),
+                        e.name().as_ref(),
+                    )?;
 
                     match tag_name.as_str() {
                         "text:p" if table_depth == 0 && list_depth == 0 => {
@@ -240,13 +277,17 @@ impl DocumentParser {
                         },
                     }
                 },
-                Ok(Event::Eof) => break,
-                Err(_) => break,
+                Event::Eof => break,
                 _ => {},
             }
             buf.clear();
         }
 
+        if document_depth != 0 || !element_stack.is_empty() || table_depth != 0 || list_depth != 0 {
+            return Err(Error::InvalidFormat(
+                "incomplete ODF document element structure".to_string(),
+            ));
+        }
         Ok(elements)
     }
 
@@ -294,5 +335,154 @@ impl DocumentParser {
         }
 
         Ok(tables)
+    }
+}
+
+fn canonical_element_name(
+    namespace: &ResolveResult<'_>,
+    local_name: &[u8],
+    qualified_name: &[u8],
+) -> Result<String> {
+    let local_name = std::str::from_utf8(local_name)
+        .map_err(|_| Error::InvalidFormat("non-UTF-8 ODF element name".to_string()))?;
+    match namespace {
+        ResolveResult::Bound(Namespace(uri)) if *uri == TEXT_NAMESPACE => {
+            Ok(format!("text:{local_name}"))
+        },
+        ResolveResult::Bound(Namespace(uri)) if *uri == TABLE_NAMESPACE => {
+            Ok(format!("table:{local_name}"))
+        },
+        ResolveResult::Bound(_) | ResolveResult::Unbound => std::str::from_utf8(qualified_name)
+            .map(str::to_string)
+            .map_err(|_| Error::InvalidFormat("non-UTF-8 ODF element name".to_string())),
+        ResolveResult::Unknown(prefix) => Err(Error::InvalidFormat(format!(
+            "unknown ODF element namespace prefix '{}'",
+            String::from_utf8_lossy(prefix)
+        ))),
+    }
+}
+
+fn copy_attributes(
+    reader: &NsReader<&[u8]>,
+    source: &BytesStart<'_>,
+    element: &mut super::element::Element,
+) -> Result<()> {
+    for attribute in source.attributes() {
+        let attribute = attribute
+            .map_err(|error| Error::InvalidFormat(format!("invalid ODF attribute: {error}")))?;
+        if attribute.key.as_ref() == b"xmlns" || attribute.key.as_ref().starts_with(b"xmlns:") {
+            continue;
+        }
+        let (namespace, local_name) = reader.resolver().resolve_attribute(attribute.key);
+        let local_name = std::str::from_utf8(local_name.as_ref())
+            .map_err(|_| Error::InvalidFormat("non-UTF-8 ODF attribute name".to_string()))?;
+        let name = match namespace {
+            ResolveResult::Bound(Namespace(uri)) if uri == TEXT_NAMESPACE => {
+                format!("text:{local_name}")
+            },
+            ResolveResult::Bound(Namespace(uri)) if uri == TABLE_NAMESPACE => {
+                format!("table:{local_name}")
+            },
+            ResolveResult::Bound(Namespace(uri)) if uri == XLINK_NAMESPACE => {
+                format!("xlink:{local_name}")
+            },
+            ResolveResult::Bound(Namespace(uri)) if uri == XML_NAMESPACE => {
+                format!("xml:{local_name}")
+            },
+            ResolveResult::Bound(_) | ResolveResult::Unbound => {
+                std::str::from_utf8(attribute.key.as_ref())
+                    .map(str::to_string)
+                    .map_err(|_| Error::InvalidFormat("non-UTF-8 ODF attribute name".to_string()))?
+            },
+            ResolveResult::Unknown(prefix) => {
+                return Err(Error::InvalidFormat(format!(
+                    "unknown ODF attribute namespace prefix '{}'",
+                    String::from_utf8_lossy(&prefix)
+                )));
+            },
+        };
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+            .map_err(|error| {
+                Error::InvalidFormat(format!("invalid ODF attribute value: {error}"))
+            })?;
+        if element.has_attribute(&name) {
+            return Err(Error::InvalidFormat(format!(
+                "duplicate ODF attribute '{name}'"
+            )));
+        }
+        element.set_attribute(&name, &value);
+    }
+    Ok(())
+}
+
+fn append_text_control(
+    reader: &NsReader<&[u8]>,
+    tag_name: &str,
+    source: &BytesStart<'_>,
+    element: &mut super::element::Element,
+) -> Result<()> {
+    let value = match tag_name {
+        "text:s" => {
+            let mut count = 1usize;
+            let mut count_seen = false;
+            for attribute in source.attributes() {
+                let attribute = attribute.map_err(|error| {
+                    Error::InvalidFormat(format!("invalid text:s attribute: {error}"))
+                })?;
+                let (namespace, local_name) = reader.resolver().resolve_attribute(attribute.key);
+                if matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == TEXT_NAMESPACE)
+                    && local_name.as_ref() == b"c"
+                {
+                    if count_seen {
+                        return Err(Error::InvalidFormat(
+                            "duplicate expanded text:c attribute".to_string(),
+                        ));
+                    }
+                    let decoded = attribute
+                        .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                        .map_err(|error| {
+                            Error::InvalidFormat(format!("invalid text:c value: {error}"))
+                        })?;
+                    count = decoded.parse().map_err(|_| {
+                        Error::InvalidFormat("text:c must be a non-negative integer".to_string())
+                    })?;
+                    count_seen = true;
+                }
+            }
+            if count > 1_000_000 {
+                return Err(Error::InvalidFormat(
+                    "text:s count exceeds 1000000".to_string(),
+                ));
+            }
+            " ".repeat(count)
+        },
+        "text:tab" => "\t".to_string(),
+        "text:line-break" => "\n".to_string(),
+        _ => return Ok(()),
+    };
+    let current = element.text().to_string();
+    element.set_text(&format!("{current}{value}"));
+    Ok(())
+}
+
+fn decode_reference(reference: &BytesRef<'_>) -> Result<String> {
+    if let Some(character) = reference.resolve_char_ref().map_err(|error| {
+        Error::InvalidFormat(format!("invalid ODF character reference: {error}"))
+    })? {
+        return Ok(character.to_string());
+    }
+    let name = reference
+        .decode()
+        .map_err(|error| Error::InvalidFormat(format!("invalid ODF entity: {error}")))?;
+    match name.as_ref() {
+        "amp" => Ok("&".to_string()),
+        "lt" => Ok("<".to_string()),
+        "gt" => Ok(">".to_string()),
+        "quot" => Ok("\"".to_string()),
+        "apos" => Ok("'".to_string()),
+        _ => Err(Error::InvalidFormat(format!(
+            "unsupported ODF entity '&{name};'"
+        ))),
     }
 }

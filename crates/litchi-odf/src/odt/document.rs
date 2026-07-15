@@ -890,3 +890,40 @@ impl Document {
     //   3. Save: `mutable.save("output.odt")?`
     // Available methods: remove_paragraph, remove_table, update_paragraph, clear_content, etc.
 }
+
+#[cfg(test)]
+mod text_model_tests {
+    use super::*;
+    use crate::constants;
+    use crate::core::PackageWriter;
+    use crate::elements::parser::DocumentOrderElement;
+
+    #[test]
+    fn text_model_accepts_arbitrary_prefixes_and_decodes_mixed_text() {
+        let content = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><o:body><o:text><t:h t:outline-level="2">Title &amp; More</t:h><t:p t:style-name="Body">A<t:span>B</t:span>C<t:s t:c="2"/>D<![CDATA[!]]></t:p></o:text></o:body></o:document-content>"#;
+        let mut writer = PackageWriter::new();
+        writer.set_mimetype(constants::ODF_TEXT).unwrap();
+        writer
+            .add_file(constants::ODF_CONTENT, content.as_bytes())
+            .unwrap();
+        let document = Document::from_bytes(writer.finish_to_bytes().unwrap()).unwrap();
+
+        assert_eq!(document.text().unwrap(), "Title & More\nABC  D!");
+        assert_eq!(document.paragraph_count().unwrap(), 1);
+        let paragraph = document.paragraphs().unwrap().remove(0);
+        assert_eq!(paragraph.style_name(), Some("Body"));
+        assert_eq!(paragraph.text().unwrap(), "ABC  D!");
+
+        let elements = document.elements().unwrap();
+        assert_eq!(elements.len(), 2);
+        let DocumentOrderElement::Heading(heading) = &elements[0] else {
+            panic!("first document element is not a heading");
+        };
+        assert_eq!(heading.level(), Some(2));
+        assert_eq!(heading.text().unwrap(), "Title & More");
+        let DocumentOrderElement::Paragraph(paragraph) = &elements[1] else {
+            panic!("second document element is not a paragraph");
+        };
+        assert_eq!(paragraph.text().unwrap(), "ABC  D!");
+    }
+}
