@@ -8,7 +8,7 @@
 /// - Embedded objects and pictures
 ///
 /// Based on Apache POI's CharacterSprmUncompressor and CharacterProperties.
-use super::super::package::Result;
+use super::super::package::{DocError, Result};
 use crate::sprm::{Sprm, parse_sprms};
 use crate::sprm_operations::*;
 
@@ -108,6 +108,22 @@ pub struct CharacterProperties {
     pub style_index: Option<u16>,
     /// Vanish (hidden)
     pub is_vanish: Option<bool>,
+    /// Whether this run is marked as an inserted revision.
+    pub is_revision_inserted: Option<bool>,
+    /// Insertion revision author index in `SttbfRMark`.
+    pub revision_author_index: Option<u16>,
+    /// Packed insertion revision DTTM.
+    pub revision_timestamp: Option<u32>,
+    /// Insertion revision identifier.
+    pub revision_id: Option<u16>,
+    /// Whether this run is marked as a deleted revision.
+    pub is_revision_deleted: Option<bool>,
+    /// Deletion revision author index in `SttbfRMark`.
+    pub deletion_author_index: Option<u16>,
+    /// Packed deletion revision DTTM.
+    pub deletion_timestamp: Option<u32>,
+    /// Deletion revision identifier.
+    pub deletion_revision_id: Option<u16>,
 }
 
 /// Underline styles supported in DOC format.
@@ -467,7 +483,7 @@ impl CharacterProperties {
 
         for sprm in &sprms {
             if get_sprm_type(sprm.opcode) == 2 {
-                Self::apply_sprm(&mut chp, sprm);
+                Self::apply_sprm(&mut chp, sprm)?;
             }
         }
 
@@ -482,18 +498,18 @@ impl CharacterProperties {
     ///
     /// * `chp` - The character properties to modify
     /// * `sprm` - The SPRM operation to apply
-    fn apply_sprm(chp: &mut CharacterProperties, sprm: &Sprm) {
+    fn apply_sprm(chp: &mut CharacterProperties, sprm: &Sprm) -> Result<()> {
         // Extract operation code (bits 0-8 of opcode)
         let operation = get_sprm_operation(sprm.opcode);
 
         match operation {
             // Operation 0x00: sprmCFRMarkDel - Mark deleted revision
             0x00 => {
-                // Not commonly used in basic text extraction
+                chp.is_revision_deleted = Some(Self::revision_flag(sprm, "sprmCFRMarkDel")?);
             },
             // Operation 0x01: sprmCFRMark - Mark revision
             0x01 => {
-                // Not commonly used in basic text extraction
+                chp.is_revision_inserted = Some(Self::revision_flag(sprm, "sprmCFRMark")?);
             },
             // Operation 0x02: sprmCFFldVanish - Field vanish flag
             0x02 => {
@@ -508,11 +524,13 @@ impl CharacterProperties {
             },
             // Operation 0x04: sprmCIbstRMark - Revision mark author
             0x04 => {
-                // Not commonly used in basic text extraction
+                chp.revision_author_index = Some(Self::revision_author(sprm, "sprmCIbstRMark")?);
             },
             // Operation 0x05: sprmCDttmRMark - Revision mark date/time
             0x05 => {
-                // Not commonly used in basic text extraction
+                chp.revision_timestamp = Some(sprm.operand_dword().ok_or_else(|| {
+                    DocError::Corrupted("sprmCDttmRMark is missing its DTTM".to_string())
+                })?);
             },
             // Operation 0x06: sprmCFData - Data flag
             0x06 => {
@@ -524,7 +542,9 @@ impl CharacterProperties {
             },
             // Operation 0x07: sprmCIdslRMark - Revision mark ID
             0x07 => {
-                // Not commonly used in basic text extraction
+                chp.revision_id = Some(sprm.operand_word().ok_or_else(|| {
+                    DocError::Corrupted("sprmCIdslRMark is missing its identifier".to_string())
+                })?);
             },
             // Operation 0x08: sprmCChs - Complex character set
             0x08 => {
@@ -961,7 +981,20 @@ impl CharacterProperties {
                 }
             },
             // Remaining border, shading, and revision SPRMs.
-            0x5B | 0x62..=0x64 | 0x67..=0x6C => {
+            0x63 => {
+                chp.deletion_author_index = Some(Self::revision_author(sprm, "sprmCIbstRMarkDel")?);
+            },
+            0x64 => {
+                chp.deletion_timestamp = Some(sprm.operand_dword().ok_or_else(|| {
+                    DocError::Corrupted("sprmCDttmRMarkDel is missing its DTTM".to_string())
+                })?);
+            },
+            0x67 => {
+                chp.deletion_revision_id = Some(sprm.operand_word().ok_or_else(|| {
+                    DocError::Corrupted("sprmCIdslRMarkDel is missing its identifier".to_string())
+                })?);
+            },
+            0x5B | 0x62 | 0x68..=0x6C => {
                 // Retained for future structured border/revision metadata.
             },
             // Default: Unknown or unsupported SPRM
@@ -969,6 +1002,25 @@ impl CharacterProperties {
                 // Silently ignore unknown SPRMs
             },
         }
+        Ok(())
+    }
+
+    fn revision_flag(sprm: &Sprm, name: &str) -> Result<bool> {
+        match sprm.operand_byte() {
+            Some(0) => Ok(false),
+            Some(1) => Ok(true),
+            _ => Err(DocError::Corrupted(format!(
+                "{name} must contain a Boolean8 value"
+            ))),
+        }
+    }
+
+    fn revision_author(sprm: &Sprm, name: &str) -> Result<u16> {
+        let value = sprm
+            .operand_i16()
+            .ok_or_else(|| DocError::Corrupted(format!("{name} is missing its author index")))?;
+        u16::try_from(value)
+            .map_err(|_| DocError::Corrupted(format!("{name} author index is negative")))
     }
 
     fn parse_border(data: &[u8], palette_color: bool) -> Option<CharacterBorder> {
@@ -1116,6 +1168,40 @@ impl CharacterProperties {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parses_insertion_and_deletion_revision_sprms() {
+        let timestamp =
+            30u32 | (14u32 << 6) | (15u32 << 11) | (7u32 << 16) | (126u32 << 20) | (3u32 << 29);
+        let mut grpprl = Vec::new();
+        for (opcode, operand) in [
+            (SPRM_C_F_RMARK, vec![1]),
+            (SPRM_C_IBST_RMARK, 1u16.to_le_bytes().to_vec()),
+            (SPRM_C_DTTM_RMARK, timestamp.to_le_bytes().to_vec()),
+            (SPRM_C_IDSL_RMARK, 42u16.to_le_bytes().to_vec()),
+            (SPRM_C_F_RMARK_DEL, vec![1]),
+            (SPRM_C_IBST_RMARK_DEL, 0u16.to_le_bytes().to_vec()),
+            (SPRM_C_DTTM_RMARK_DEL, 0u32.to_le_bytes().to_vec()),
+            (SPRM_C_IDSL_RMARK_DEL, 7u16.to_le_bytes().to_vec()),
+        ] {
+            grpprl.extend_from_slice(&opcode.to_le_bytes());
+            grpprl.extend_from_slice(&operand);
+        }
+        let properties = CharacterProperties::from_sprm(&grpprl).unwrap();
+        assert_eq!(properties.is_revision_inserted, Some(true));
+        assert_eq!(properties.revision_author_index, Some(1));
+        assert_eq!(properties.revision_timestamp, Some(timestamp));
+        assert_eq!(properties.revision_id, Some(42));
+        assert_eq!(properties.is_revision_deleted, Some(true));
+        assert_eq!(properties.deletion_author_index, Some(0));
+        assert_eq!(properties.deletion_timestamp, Some(0));
+        assert_eq!(properties.deletion_revision_id, Some(7));
+
+        let mut malformed = Vec::new();
+        malformed.extend_from_slice(&SPRM_C_IBST_RMARK.to_le_bytes());
+        malformed.extend_from_slice(&(-1i16).to_le_bytes());
+        assert!(CharacterProperties::from_sprm(&malformed).is_err());
+    }
 
     #[test]
     fn test_default_chp() {

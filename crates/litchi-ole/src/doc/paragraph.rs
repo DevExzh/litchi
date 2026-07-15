@@ -1,6 +1,8 @@
 /// Paragraph and Run structures for legacy Word documents.
 use super::package::Result;
 use super::parts::chp::{CharacterProperties, UnderlineStyle, VerticalPosition};
+use super::parts::revisions::RevisionAuthorTable;
+use super::revision::{RevisionKind, RevisionMark, decode_dttm};
 use std::sync::Arc;
 
 /// A paragraph in a Word document.
@@ -186,6 +188,10 @@ pub struct Run {
     mtef_formula_ast: Option<Arc<Vec<()>>>,
     /// Embedded image (metadata only, data loaded lazily via Document::image_data)
     image: Option<super::image::Image>,
+    /// Resolved insertion revision metadata.
+    insertion_revision: Option<RevisionMark>,
+    /// Resolved deletion revision metadata.
+    deletion_revision: Option<RevisionMark>,
 }
 
 impl Run {
@@ -196,6 +202,8 @@ impl Run {
             properties,
             mtef_formula_ast: None,
             image: None,
+            insertion_revision: None,
+            deletion_revision: None,
         }
     }
 
@@ -211,6 +219,8 @@ impl Run {
             properties,
             mtef_formula_ast: Some(mtef_ast),
             image: None,
+            insertion_revision: None,
+            deletion_revision: None,
         }
     }
 
@@ -226,6 +236,8 @@ impl Run {
             properties,
             mtef_formula_ast: None,
             image: None,
+            insertion_revision: None,
+            deletion_revision: None,
         }
     }
 
@@ -240,6 +252,8 @@ impl Run {
             properties,
             mtef_formula_ast: None,
             image: Some(image),
+            insertion_revision: None,
+            deletion_revision: None,
         }
     }
 
@@ -327,6 +341,59 @@ impl Run {
     /// Provides access to all formatting properties.
     pub fn properties(&self) -> &CharacterProperties {
         &self.properties
+    }
+
+    /// Insertion revision metadata for this run.
+    pub fn insertion_revision(&self) -> Option<&RevisionMark> {
+        self.insertion_revision.as_ref()
+    }
+
+    /// Deletion revision metadata for this run.
+    pub fn deletion_revision(&self) -> Option<&RevisionMark> {
+        self.deletion_revision.as_ref()
+    }
+
+    pub(crate) fn resolve_revisions(&mut self, authors: &RevisionAuthorTable) -> Result<()> {
+        if self.properties.is_revision_inserted == Some(true) {
+            self.insertion_revision = Some(Self::revision_mark(
+                RevisionKind::Insertion,
+                self.properties.revision_author_index.unwrap_or(0),
+                self.properties.revision_timestamp,
+                self.properties.revision_id,
+                authors,
+            )?);
+        }
+        if self.properties.is_revision_deleted == Some(true) {
+            self.deletion_revision = Some(Self::revision_mark(
+                RevisionKind::Deletion,
+                self.properties.deletion_author_index.unwrap_or(0),
+                self.properties.deletion_timestamp,
+                self.properties.deletion_revision_id,
+                authors,
+            )?);
+        }
+        Ok(())
+    }
+
+    fn revision_mark(
+        kind: RevisionKind,
+        author_index: u16,
+        packed_timestamp: Option<u32>,
+        revision_id: Option<u16>,
+        authors: &RevisionAuthorTable,
+    ) -> Result<RevisionMark> {
+        let author = authors.get(author_index).ok_or_else(|| {
+            super::package::DocError::Corrupted(
+                "revision author index exceeds SttbfRMark".to_string(),
+            )
+        })?;
+        Ok(RevisionMark {
+            kind,
+            author_index,
+            author: author.to_string(),
+            timestamp: packed_timestamp.map(decode_dttm).transpose()?.flatten(),
+            revision_id,
+        })
     }
 
     /// Check if this run contains an MTEF formula.
@@ -438,6 +505,50 @@ impl Run {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn resolves_run_revision_authors_and_timestamps() {
+        let timestamp =
+            30u32 | (14u32 << 6) | (15u32 << 11) | (7u32 << 16) | (126u32 << 20) | (3u32 << 29);
+        let mut run = Run::new(
+            "changed".to_string(),
+            CharacterProperties {
+                is_revision_inserted: Some(true),
+                revision_author_index: Some(1),
+                revision_timestamp: Some(timestamp),
+                revision_id: Some(42),
+                ..CharacterProperties::default()
+            },
+        );
+        let authors = RevisionAuthorTable::from_authors(&["Unknown", "Alice"]);
+        run.resolve_revisions(&authors).unwrap();
+        let revision = run.insertion_revision().unwrap();
+        assert_eq!(revision.kind, RevisionKind::Insertion);
+        assert_eq!(revision.author, "Alice");
+        assert_eq!(revision.revision_id, Some(42));
+        assert_eq!(revision.timestamp.unwrap().year, 2026);
+        assert!(run.deletion_revision().is_none());
+
+        let mut bad_author = Run::new(
+            "changed".to_string(),
+            CharacterProperties {
+                is_revision_inserted: Some(true),
+                revision_author_index: Some(2),
+                ..CharacterProperties::default()
+            },
+        );
+        assert!(bad_author.resolve_revisions(&authors).is_err());
+
+        let mut bad_time = Run::new(
+            "changed".to_string(),
+            CharacterProperties {
+                is_revision_inserted: Some(true),
+                revision_timestamp: Some(63),
+                ..CharacterProperties::default()
+            },
+        );
+        assert!(bad_time.resolve_revisions(&authors).is_err());
+    }
 
     #[test]
     fn test_paragraph_text() {

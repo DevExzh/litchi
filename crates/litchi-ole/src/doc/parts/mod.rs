@@ -23,6 +23,7 @@ pub mod pap;
 pub mod pap_bin_table;
 pub mod paragraph_extractor;
 pub mod piece_table;
+pub mod revisions;
 pub mod tap;
 pub mod tap_parser;
 pub mod text;

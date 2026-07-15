@@ -19,6 +19,7 @@ use super::parts::numbering::ListTables;
 use super::parts::pap_bin_table::PapBinTable;
 use super::parts::paragraph_extractor::{ExtractedParagraph, ParagraphExtractor};
 use super::parts::piece_table::PieceTable;
+use super::parts::revisions::RevisionAuthorTable;
 use super::parts::text::TextExtractor;
 use super::table::Table;
 #[cfg(feature = "formula")]
@@ -86,6 +87,8 @@ pub struct Document {
     comments_table: CommentsTable,
     /// Standard bookmark tables
     bookmarks_table: BookmarksTable,
+    /// Revision-mark authors
+    revision_authors: RevisionAuthorTable,
     /// Hyperlinks table
     hyperlinks_table: Option<HyperlinksTable>,
     /// List/numbering tables
@@ -155,6 +158,7 @@ impl Document {
         let endnotes_table = EndnotesTable::parse(&fib, &table_stream).ok();
         let comments_table = CommentsTable::parse(&fib, &table_stream)?;
         let bookmarks_table = BookmarksTable::parse(&fib, &table_stream)?;
+        let revision_authors = RevisionAuthorTable::parse(&fib, &table_stream)?;
 
         // Parse hyperlinks from fields table
         let hyperlinks_table = fields_table.as_ref().and_then(|ft| {
@@ -201,6 +205,7 @@ impl Document {
             endnotes_table,
             comments_table,
             bookmarks_table,
+            revision_authors,
             hyperlinks_table,
             list_tables,
             mtef_data,
@@ -636,6 +641,11 @@ impl Document {
         Ok(self.bookmarks_table.bookmarks().to_vec())
     }
 
+    /// Get author names used by tracked revisions and related annotations.
+    pub fn revision_authors(&self) -> &[String] {
+        self.revision_authors.authors()
+    }
+
     // ──────────────────────────────────────────────────────────────────
     // Comments
     // ──────────────────────────────────────────────────────────────────
@@ -832,7 +842,7 @@ impl Document {
 
         let extracted = para_extractor.extract_paragraphs()?;
         let mut paragraphs = Vec::with_capacity(extracted.len());
-        self.convert_to_paragraphs(extracted, &mut paragraphs);
+        self.convert_to_paragraphs(extracted, &mut paragraphs)?;
         Ok(paragraphs)
     }
 
@@ -956,7 +966,7 @@ impl Document {
             let extracted_paras = para_extractor.extract_paragraphs()?;
 
             // Convert to Paragraph objects and add to result
-            self.convert_to_paragraphs(extracted_paras, &mut all_paragraphs);
+            self.convert_to_paragraphs(extracted_paras, &mut all_paragraphs)?;
         }
 
         Ok(all_paragraphs)
@@ -972,7 +982,7 @@ impl Document {
         &self,
         extracted_paras: Vec<ExtractedParagraph>,
         output: &mut Vec<Paragraph>,
-    ) {
+    ) -> Result<()> {
         use super::image::extract_image;
 
         // Pre-allocate run vectors based on estimated size
@@ -1028,6 +1038,10 @@ impl Document {
                 run_objects.push(Run::new(text, props));
             }
 
+            for run in &mut run_objects {
+                run.resolve_revisions(&self.revision_authors)?;
+            }
+
             // Create paragraph with runs and properties
             // Following Apache POI's design: text is stored in runs, not duplicated in paragraph
             // Pass empty string since runs contain all the text
@@ -1036,6 +1050,7 @@ impl Document {
             para.set_properties(para_props);
             output.push(para);
         }
+        Ok(())
     }
 
     /// Get all tables in the document.

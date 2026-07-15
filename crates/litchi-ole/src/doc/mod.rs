@@ -59,6 +59,7 @@ pub mod image;
 pub mod package;
 pub mod paragraph;
 pub mod parts;
+pub mod revision;
 pub mod shapes;
 pub mod table;
 
@@ -75,6 +76,7 @@ pub use image::{Image, ImageError};
 pub use package::Package;
 pub use paragraph::{Paragraph, Run};
 pub use parts::numbering::{ListLevel, ListTables, NumberFormat};
+pub use revision::{RevisionKind, RevisionMark};
 pub use shapes::DocShape;
 pub use table::{Cell, Row, Table};
 pub use writer::{
