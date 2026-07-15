@@ -90,6 +90,15 @@ pub struct FibBuilder {
     /// Endnote text PLCF (PlcfendTxt) offset and size
     fc_plcfend_txt: u32,
     lcb_plcfend_txt: u32,
+    /// Comment reference PLCF (PlcfandRef) offset and size
+    fc_plcfand_ref: u32,
+    lcb_plcfand_ref: u32,
+    /// Comment text PLCF (PlcfandTxt) offset and size
+    fc_plcfand_txt: u32,
+    lcb_plcfand_txt: u32,
+    /// Comment-owner XST array offset and size
+    fc_grp_xst_atn_owners: u32,
+    lcb_grp_xst_atn_owners: u32,
     /// List table (PlfLst) offset and size
     fc_plflst: u32,
     lcb_plflst: u32,
@@ -149,6 +158,12 @@ impl FibBuilder {
             lcb_plcfend_ref: 0,
             fc_plcfend_txt: 0,
             lcb_plcfend_txt: 0,
+            fc_plcfand_ref: 0,
+            lcb_plcfand_ref: 0,
+            fc_plcfand_txt: 0,
+            lcb_plcfand_txt: 0,
+            fc_grp_xst_atn_owners: 0,
+            lcb_grp_xst_atn_owners: 0,
             fc_plflst: 0,
             lcb_plflst: 0,
             fc_plflfo: 0,
@@ -236,6 +251,11 @@ impl FibBuilder {
         self.endnote_length = length;
     }
 
+    /// Set ccpAtn (comment subdocument character count).
+    pub fn set_ccp_atn(&mut self, length: u32) {
+        self.comment_length = length;
+    }
+
     /// Set footnote reference PLCF (PlcffndRef) offset and size
     pub fn set_plcffnd_ref(&mut self, offset: u32, size: u32) {
         self.fc_plcffnd_ref = offset;
@@ -258,6 +278,24 @@ impl FibBuilder {
     pub fn set_plcfend_txt(&mut self, offset: u32, size: u32) {
         self.fc_plcfend_txt = offset;
         self.lcb_plcfend_txt = size;
+    }
+
+    /// Set the comment reference PLCF (`PlcfandRef`).
+    pub fn set_plcfand_ref(&mut self, offset: u32, size: u32) {
+        self.fc_plcfand_ref = offset;
+        self.lcb_plcfand_ref = size;
+    }
+
+    /// Set the comment text PLCF (`PlcfandTxt`).
+    pub fn set_plcfand_txt(&mut self, offset: u32, size: u32) {
+        self.fc_plcfand_txt = offset;
+        self.lcb_plcfand_txt = size;
+    }
+
+    /// Set the comment-owner XST array.
+    pub fn set_grp_xst_atn_owners(&mut self, offset: u32, size: u32) {
+        self.fc_grp_xst_atn_owners = offset;
+        self.lcb_grp_xst_atn_owners = size;
     }
 
     /// Set list table (PlfLst) offset and size
@@ -489,9 +527,12 @@ impl FibBuilder {
         // Each field occupies 8 bytes (fc: u32 + lcb: u32) starting at buf[0]
         const PLCFFNDREF: usize = 2; // Footnote reference PLCF
         const PLCFFNDTXT: usize = 3; // Footnote text PLCF
+        const PLCFANDREF: usize = 4; // Comment reference PLCF
+        const PLCFANDTXT: usize = 5; // Comment text PLCF
         const PLCFHDD: usize = 11; // Headers/Footers PLCF
         const STTBFFFN: usize = 15; // Font table
         const PLCFFLDMOM: usize = 16; // Main document field table
+        const GRPXSTATNOWNERS: usize = 36; // Comment-owner XST array
         const PLCFENDREF: usize = 46; // Endnote reference PLCF
         const PLCFENDTXT: usize = 47; // Endnote text PLCF
         const PLFLST: usize = 73; // List table (PlfLst)
@@ -501,6 +542,8 @@ impl FibBuilder {
         set_field(buf, STSHF, self.fc_stshf, self.lcb_stshf);
         set_field(buf, PLCFFNDREF, self.fc_plcffnd_ref, self.lcb_plcffnd_ref);
         set_field(buf, PLCFFNDTXT, self.fc_plcffnd_txt, self.lcb_plcffnd_txt);
+        set_field(buf, PLCFANDREF, self.fc_plcfand_ref, self.lcb_plcfand_ref);
+        set_field(buf, PLCFANDTXT, self.fc_plcfand_txt, self.lcb_plcfand_txt);
         set_field(buf, PLCFENDREF, self.fc_plcfend_ref, self.lcb_plcfend_ref);
         set_field(buf, PLCFENDTXT, self.fc_plcfend_txt, self.lcb_plcfend_txt);
         set_field(buf, PLCFSED, self.fc_plcfsed, self.lcb_plcfsed);
@@ -519,6 +562,12 @@ impl FibBuilder {
         );
         set_field(buf, STTBFFFN, self.fc_sttbfffn, self.lcb_sttbfffn);
         set_field(buf, PLCFFLDMOM, self.fc_plcffld_mom, self.lcb_plcffld_mom);
+        set_field(
+            buf,
+            GRPXSTATNOWNERS,
+            self.fc_grp_xst_atn_owners,
+            self.lcb_grp_xst_atn_owners,
+        );
         set_field(buf, PLFLST, self.fc_plflst, self.lcb_plflst);
         set_field(buf, PLFLFO, self.fc_plflfo, self.lcb_plflfo);
         set_field(buf, DOP, self.fc_dop, self.lcb_dop);
@@ -652,6 +701,29 @@ mod tests {
 
         let fib_bytes = fib.generate().unwrap();
         assert_eq!(fib_bytes.len(), 1248);
+    }
+
+    #[test]
+    fn test_fib_with_comments() {
+        let mut fib = FibBuilder::new();
+        fib.set_main_text(0, 1000);
+        fib.set_ccp_atn(17);
+        fib.set_plcfand_ref(3200, 38);
+        fib.set_plcfand_txt(3238, 12);
+        fib.set_grp_xst_atn_owners(3250, 14);
+
+        let bytes = fib.generate().unwrap();
+        assert_eq!(u32::from_le_bytes(bytes[92..96].try_into().unwrap()), 17);
+        let field = |index: usize| {
+            let offset = 154 + index * 8;
+            (
+                u32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap()),
+                u32::from_le_bytes(bytes[offset + 4..offset + 8].try_into().unwrap()),
+            )
+        };
+        assert_eq!(field(4), (3200, 38));
+        assert_eq!(field(5), (3238, 12));
+        assert_eq!(field(36), (3250, 14));
     }
 
     #[test]

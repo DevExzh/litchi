@@ -71,6 +71,7 @@
 //! - Apache POI (HWPF)
 //! - Other OLE2-based Word readers
 
+use super::comments::CommentEntry;
 use super::fib::FibBuilder;
 use super::font_table::FontTableBuilder;
 use super::footnotes::FootnoteEntry;
@@ -129,6 +130,20 @@ fn utf16_code_unit_len(text: &str) -> Result<u32, DocWriteError> {
 
 type NoteStoryData = (Vec<u8>, Vec<u8>, u32);
 type HeaderStoryData = (Vec<u8>, u32);
+
+struct CommentStoryData {
+    owners: Vec<u8>,
+    references: Vec<u8>,
+    text_positions: Vec<u8>,
+    char_count: u32,
+}
+
+#[derive(Clone, Copy)]
+enum MainReferenceKind {
+    Footnote,
+    Endnote,
+    Comment,
+}
 
 /// Character formatting properties
 #[derive(Debug, Clone, Default)]
@@ -365,6 +380,8 @@ pub struct DocWriter {
     footnotes: Vec<FootnoteEntry>,
     /// Endnote entries
     endnotes: Vec<FootnoteEntry>,
+    /// Point comments
+    comments: Vec<CommentEntry>,
     /// Numbering writer for list tables
     numbering: NumberingWriter,
 }
@@ -384,6 +401,7 @@ impl DocWriter {
             footer_first: None,
             footnotes: Vec::new(),
             endnotes: Vec::new(),
+            comments: Vec::new(),
             numbering: NumberingWriter::new(),
         }
     }
@@ -566,6 +584,11 @@ impl DocWriter {
         self.endnotes.push(entry);
     }
 
+    /// Add a point comment to the document.
+    pub fn add_comment(&mut self, entry: CommentEntry) {
+        self.comments.push(entry);
+    }
+
     /// Add a list structure definition.
     pub fn add_list(&mut self, list: ListStructure) {
         self.numbering.add_list(list);
@@ -729,6 +752,183 @@ impl DocWriter {
         }
 
         Ok(Some((plcf_ref, plcf_txt, note_cp)))
+    }
+
+    /// Append the comment subdocument and build its owner, reference, and text tables.
+    #[allow(clippy::too_many_arguments)]
+    fn build_comment_story(
+        entries: &[CommentEntry],
+        actual_ref_cps: &[u32],
+        ccp_text: u32,
+        text_fc_start: u32,
+        text_stream: &mut Vec<u8>,
+        chpx_entries: &mut Vec<(u32, u32, Vec<u8>)>,
+        papx_entries: &mut Vec<(u32, u32, Vec<u8>)>,
+        pieces: &mut Vec<Piece>,
+        current_cp_total: &mut u32,
+        font_builder: &mut FontTableBuilder,
+    ) -> Result<Option<CommentStoryData>, DocWriteError> {
+        if entries.is_empty() {
+            return Ok(None);
+        }
+        if entries.len() != actual_ref_cps.len() {
+            return Err(DocWriteError::InvalidData(
+                "every DOC comment must have a reference in the main document".to_string(),
+            ));
+        }
+
+        let mut ordered = entries
+            .iter()
+            .zip(actual_ref_cps.iter().copied())
+            .collect::<Vec<_>>();
+        ordered.sort_by_key(|(_, cp)| *cp);
+        if ordered.windows(2).any(|pair| pair[0].1 == pair[1].1) {
+            return Err(DocWriteError::InvalidData(
+                "DOC comment references must have unique character positions".to_string(),
+            ));
+        }
+        if ordered.iter().any(|(_, cp)| *cp >= ccp_text) {
+            return Err(DocWriteError::InvalidData(
+                "DOC comment reference lies outside the main document".to_string(),
+            ));
+        }
+
+        let mut owners = Vec::<String>::new();
+        let mut owner_indexes = Vec::with_capacity(ordered.len());
+        for (entry, _) in &ordered {
+            let author_len = entry.author.encode_utf16().count();
+            if author_len >= 56 {
+                return Err(DocWriteError::InvalidData(
+                    "DOC comment author names must contain fewer than 56 UTF-16 code units"
+                        .to_string(),
+                ));
+            }
+            let initials_len = entry.initials.encode_utf16().count();
+            if initials_len > 9 {
+                return Err(DocWriteError::InvalidData(
+                    "DOC comment initials must contain at most nine UTF-16 code units".to_string(),
+                ));
+            }
+            let index = if let Some(index) = owners.iter().position(|owner| owner == &entry.author)
+            {
+                index
+            } else {
+                if owners.len() >= 0x7FFF {
+                    return Err(DocWriteError::InvalidData(
+                        "DOC comment owner array exceeds 0x7FFF entries".to_string(),
+                    ));
+                }
+                owners.push(entry.author.clone());
+                owners.len() - 1
+            };
+            owner_indexes.push(index as u16);
+        }
+
+        let mut owner_bytes = Vec::new();
+        for owner in &owners {
+            let units = owner.encode_utf16().collect::<Vec<_>>();
+            owner_bytes.extend_from_slice(&(units.len() as u16).to_le_bytes());
+            owner_bytes.extend(units.into_iter().flat_map(u16::to_le_bytes));
+        }
+
+        let mut comment_cp = 0u32;
+        let mut text_cps = vec![0u32];
+        for (entry, _) in &ordered {
+            let fc_story_start = text_fc_start + text_stream.len() as u32;
+            text_stream.extend_from_slice(&0x0005u16.to_le_bytes());
+            let fc_marker_end = fc_story_start + 2;
+            let marker_grpprl = build_chpx_grpprl(
+                &CharacterFormatting {
+                    special: Some(true),
+                    ..Default::default()
+                },
+                font_builder,
+            );
+            chpx_entries.push((fc_story_start, fc_marker_end, marker_grpprl));
+
+            let body_chars = utf16_code_unit_len(&entry.text)?;
+            let fc_body_start = text_fc_start + text_stream.len() as u32;
+            text_stream.extend(entry.text.encode_utf16().flat_map(u16::to_le_bytes));
+            text_stream.extend_from_slice(&0x000Du16.to_le_bytes());
+            let fc_story_end = text_fc_start + text_stream.len() as u32;
+            chpx_entries.push((
+                fc_body_start,
+                fc_story_end,
+                build_chpx_grpprl(&CharacterFormatting::default(), font_builder),
+            ));
+            papx_entries.push((
+                fc_story_start,
+                fc_story_end,
+                build_papx_grpprl(&ParagraphFormatting::default()),
+            ));
+
+            let story_chars = body_chars.checked_add(2).ok_or_else(|| {
+                DocWriteError::InvalidData("DOC comment story CP overflows".to_string())
+            })?;
+            let story_end = current_cp_total.checked_add(story_chars).ok_or_else(|| {
+                DocWriteError::InvalidData("DOC comment subdocument CP overflows".to_string())
+            })?;
+            pieces.push(Piece::new(
+                *current_cp_total,
+                story_end,
+                fc_story_start,
+                true,
+            ));
+            *current_cp_total = story_end;
+            comment_cp = comment_cp.checked_add(story_chars).ok_or_else(|| {
+                DocWriteError::InvalidData("DOC comment subdocument CP overflows".to_string())
+            })?;
+            text_cps.push(comment_cp);
+        }
+
+        let fc_guard = text_fc_start + text_stream.len() as u32;
+        text_stream.extend_from_slice(&0x000Du16.to_le_bytes());
+        let fc_guard_end = fc_guard + 2;
+        chpx_entries.push((fc_guard, fc_guard_end, Vec::new()));
+        papx_entries.push((
+            fc_guard,
+            fc_guard_end,
+            build_papx_grpprl(&ParagraphFormatting::default()),
+        ));
+        let guard_end = current_cp_total.checked_add(1).ok_or_else(|| {
+            DocWriteError::InvalidData("DOC comment subdocument CP overflows".to_string())
+        })?;
+        pieces.push(Piece::new(*current_cp_total, guard_end, fc_guard, true));
+        *current_cp_total = guard_end;
+        comment_cp = comment_cp.checked_add(1).ok_or_else(|| {
+            DocWriteError::InvalidData("DOC comment subdocument CP overflows".to_string())
+        })?;
+        text_cps.push(comment_cp);
+
+        let mut references = Vec::with_capacity((ordered.len() + 1) * 4 + ordered.len() * 30);
+        for (_, cp) in &ordered {
+            references.extend_from_slice(&cp.to_le_bytes());
+        }
+        references.extend_from_slice(&ccp_text.to_le_bytes());
+        for ((entry, _), author_index) in ordered.iter().zip(owner_indexes) {
+            let initials = entry.initials.encode_utf16().collect::<Vec<_>>();
+            references.extend_from_slice(&(initials.len() as u16).to_le_bytes());
+            for index in 0..9 {
+                references
+                    .extend_from_slice(&initials.get(index).copied().unwrap_or(0).to_le_bytes());
+            }
+            references.extend_from_slice(&author_index.to_le_bytes());
+            references.extend_from_slice(&0u16.to_le_bytes());
+            references.extend_from_slice(&0u16.to_le_bytes());
+            references.extend_from_slice(&(-1i32).to_le_bytes());
+        }
+
+        let mut text_positions = Vec::with_capacity(text_cps.len() * 4);
+        for cp in text_cps {
+            text_positions.extend_from_slice(&cp.to_le_bytes());
+        }
+
+        Ok(Some(CommentStoryData {
+            owners: owner_bytes,
+            references,
+            text_positions,
+            char_count: comment_cp,
+        }))
     }
 
     /// Build header/footer story text and PlcfHdd
@@ -1025,24 +1225,27 @@ impl DocWriter {
         // Align fcMin to actual (padded) start of text
         let fc_min: u32 = text_fc_start;
 
-        // Build sorted list of note references with type tracking.
-        // Each entry: (ref_position, is_footnote, original_index_in_vec)
-        let mut note_refs: Vec<(u32, bool, usize)> = Vec::new();
+        // Build one sorted list for all main-story reference characters.
+        let mut main_refs: Vec<(u32, MainReferenceKind, usize)> = Vec::new();
         for (idx, entry) in self.footnotes.iter().enumerate() {
-            note_refs.push((entry.ref_position, true, idx));
+            main_refs.push((entry.ref_position, MainReferenceKind::Footnote, idx));
         }
         for (idx, entry) in self.endnotes.iter().enumerate() {
-            note_refs.push((entry.ref_position, false, idx));
+            main_refs.push((entry.ref_position, MainReferenceKind::Endnote, idx));
         }
-        note_refs.sort_by_key(|r| r.0);
+        for (idx, entry) in self.comments.iter().enumerate() {
+            main_refs.push((entry.ref_position, MainReferenceKind::Comment, idx));
+        }
+        main_refs.sort_by_key(|reference| reference.0);
 
         // Track field character CPs for PlcfFldMom
         let mut field_char_cps: Vec<(u32, u16)> = Vec::new();
 
-        // Track actual CPs where U+0002 was injected, keyed by (is_footnote, entry_index)
+        // Track actual CPs by source-vector index for each reference kind.
         let mut footnote_actual_cps: Vec<(usize, u32)> = Vec::new();
         let mut endnote_actual_cps: Vec<(usize, u32)> = Vec::new();
-        let mut note_inject_idx: usize = 0;
+        let mut comment_actual_cps: Vec<(usize, u32)> = Vec::new();
+        let mut reference_inject_idx: usize = 0;
 
         for paragraph in &self.paragraphs {
             let fc_para_start = text_fc_start + text_stream.len() as u32;
@@ -1077,14 +1280,17 @@ impl DocWriter {
                 last_run_index_for_para = Some(chpx_entries.len() - 1);
             }
 
-            // Inject U+0002 reference characters for notes whose ref_position
-            // falls within this paragraph's CP range
-            while note_inject_idx < note_refs.len() {
-                let (ref_cp, is_footnote, entry_idx) = note_refs[note_inject_idx];
+            // Inject special reference characters whose requested CP falls in this paragraph.
+            while reference_inject_idx < main_refs.len() {
+                let (ref_cp, kind, entry_idx) = main_refs[reference_inject_idx];
                 if ref_cp <= current_cp + para_chars {
                     let actual_cp = current_cp + para_chars;
                     let fc_ref = text_fc_start + text_stream.len() as u32;
-                    text_stream.extend_from_slice(&0x0002u16.to_le_bytes());
+                    let marker = match kind {
+                        MainReferenceKind::Footnote | MainReferenceKind::Endnote => 0x0002u16,
+                        MainReferenceKind::Comment => 0x0005u16,
+                    };
+                    text_stream.extend_from_slice(&marker.to_le_bytes());
                     let fc_ref_end = fc_ref + 2;
                     let ref_grpprl = build_chpx_grpprl(
                         &CharacterFormatting {
@@ -1096,13 +1302,18 @@ impl DocWriter {
                     chpx_entries.push((fc_ref, fc_ref_end, ref_grpprl));
                     para_chars += 1;
                     last_run_index_for_para = Some(chpx_entries.len() - 1);
-                    // Record actual CP for PlcffndRef/PlcfendRef
-                    if is_footnote {
-                        footnote_actual_cps.push((entry_idx, actual_cp));
-                    } else {
-                        endnote_actual_cps.push((entry_idx, actual_cp));
+                    match kind {
+                        MainReferenceKind::Footnote => {
+                            footnote_actual_cps.push((entry_idx, actual_cp));
+                        },
+                        MainReferenceKind::Endnote => {
+                            endnote_actual_cps.push((entry_idx, actual_cp));
+                        },
+                        MainReferenceKind::Comment => {
+                            comment_actual_cps.push((entry_idx, actual_cp));
+                        },
                     }
-                    note_inject_idx += 1;
+                    reference_inject_idx += 1;
                 } else {
                     break;
                 }
@@ -1132,10 +1343,12 @@ impl DocWriter {
         // Sort actual CPs by entry index to match footnote/endnote entry order
         footnote_actual_cps.sort_by_key(|&(idx, _)| idx);
         endnote_actual_cps.sort_by_key(|&(idx, _)| idx);
+        comment_actual_cps.sort_by_key(|&(idx, _)| idx);
         let ftn_ref_cps: Vec<u32> = footnote_actual_cps.iter().map(|&(_, cp)| cp).collect();
         let edn_ref_cps: Vec<u32> = endnote_actual_cps.iter().map(|&(_, cp)| cp).collect();
+        let comment_ref_cps: Vec<u32> = comment_actual_cps.iter().map(|&(_, cp)| cp).collect();
 
-        // Subdocument order: main text → footnotes → headers/footers → endnotes
+        // Subdocument order: main text → footnotes → headers/footers → comments → endnotes.
         let footnote_plcfs = Self::build_note_story(
             &self.footnotes,
             &ftn_ref_cps,
@@ -1163,7 +1376,21 @@ impl DocWriter {
             header_plcfhdd = Some((plcf_bytes, header_cp));
         }
 
-        // Build endnote story (appends endnote text after headers)
+        // Comments follow headers and precede endnotes in the concatenated CP space.
+        let comment_story = Self::build_comment_story(
+            &self.comments,
+            &comment_ref_cps,
+            text_length,
+            text_fc_start,
+            &mut text_stream,
+            &mut chpx_entries,
+            &mut papx_entries,
+            &mut pieces,
+            &mut current_cp,
+            &mut font_builder,
+        )?;
+
+        // Build endnote story (appends endnote text after comments)
         let endnote_plcfs = Self::build_note_story(
             &self.endnotes,
             &edn_ref_cps,
@@ -1181,8 +1408,10 @@ impl DocWriter {
         // Per MS-DOC spec: "The total number of character positions is
         // ccpText + ccpFtn + ccpHdd + ... + 1 if any of ccpFtn, ccpHdd, etc. are nonzero."
         // This extra character MUST be present; Word uses it as a sentinel.
-        let has_subdocs =
-            footnote_plcfs.is_some() || header_plcfhdd.is_some() || endnote_plcfs.is_some();
+        let has_subdocs = footnote_plcfs.is_some()
+            || header_plcfhdd.is_some()
+            || comment_story.is_some()
+            || endnote_plcfs.is_some();
         if has_subdocs {
             let fc_trailing = text_fc_start + text_stream.len() as u32;
             text_stream.extend_from_slice(&0x000Du16.to_le_bytes());
@@ -1205,6 +1434,9 @@ impl DocWriter {
         }
         if let Some((_, header_cp)) = &header_plcfhdd {
             fib.set_ccp_hdd(*header_cp);
+        }
+        if let Some(comment) = &comment_story {
+            fib.set_ccp_atn(comment.char_count);
         }
         if let Some((_, _, edn_cp)) = &endnote_plcfs {
             fib.set_ccp_edn(*edn_cp);
@@ -1281,6 +1513,20 @@ impl DocWriter {
 
             fib.set_plcfend_txt(table_offset, txt_bytes.len() as u32);
             table_stream.extend_from_slice(txt_bytes);
+            table_offset = table_stream.len() as u32;
+        }
+
+        if let Some(comment) = &comment_story {
+            fib.set_grp_xst_atn_owners(table_offset, comment.owners.len() as u32);
+            table_stream.extend_from_slice(&comment.owners);
+            table_offset = table_stream.len() as u32;
+
+            fib.set_plcfand_ref(table_offset, comment.references.len() as u32);
+            table_stream.extend_from_slice(&comment.references);
+            table_offset = table_stream.len() as u32;
+
+            fib.set_plcfand_txt(table_offset, comment.text_positions.len() as u32);
+            table_stream.extend_from_slice(&comment.text_positions);
             table_offset = table_stream.len() as u32;
         }
 
@@ -1522,20 +1768,24 @@ impl DocWriter {
         let text_fc_start = word_document_stream.len() as u32;
         let fc_min: u32 = text_fc_start;
 
-        // Build sorted list of note references with type tracking
-        let mut note_refs: Vec<(u32, bool, usize)> = Vec::new();
+        // Build one sorted list for all main-story reference characters.
+        let mut main_refs: Vec<(u32, MainReferenceKind, usize)> = Vec::new();
         for (idx, entry) in self.footnotes.iter().enumerate() {
-            note_refs.push((entry.ref_position, true, idx));
+            main_refs.push((entry.ref_position, MainReferenceKind::Footnote, idx));
         }
         for (idx, entry) in self.endnotes.iter().enumerate() {
-            note_refs.push((entry.ref_position, false, idx));
+            main_refs.push((entry.ref_position, MainReferenceKind::Endnote, idx));
         }
-        note_refs.sort_by_key(|r| r.0);
+        for (idx, entry) in self.comments.iter().enumerate() {
+            main_refs.push((entry.ref_position, MainReferenceKind::Comment, idx));
+        }
+        main_refs.sort_by_key(|reference| reference.0);
 
         let mut field_char_cps: Vec<(u32, u16)> = Vec::new();
         let mut footnote_actual_cps: Vec<(usize, u32)> = Vec::new();
         let mut endnote_actual_cps: Vec<(usize, u32)> = Vec::new();
-        let mut note_inject_idx: usize = 0;
+        let mut comment_actual_cps: Vec<(usize, u32)> = Vec::new();
+        let mut reference_inject_idx: usize = 0;
 
         for paragraph in &self.paragraphs {
             let fc_para_start = text_fc_start + text_stream.len() as u32;
@@ -1569,12 +1819,16 @@ impl DocWriter {
                 last_run_index_for_para = Some(chpx_entries.len() - 1);
             }
 
-            while note_inject_idx < note_refs.len() {
-                let (ref_cp, is_footnote, entry_idx) = note_refs[note_inject_idx];
+            while reference_inject_idx < main_refs.len() {
+                let (ref_cp, kind, entry_idx) = main_refs[reference_inject_idx];
                 if ref_cp <= current_cp + para_chars {
                     let actual_cp = current_cp + para_chars;
                     let fc_ref = text_fc_start + text_stream.len() as u32;
-                    text_stream.extend_from_slice(&0x0002u16.to_le_bytes());
+                    let marker = match kind {
+                        MainReferenceKind::Footnote | MainReferenceKind::Endnote => 0x0002u16,
+                        MainReferenceKind::Comment => 0x0005u16,
+                    };
+                    text_stream.extend_from_slice(&marker.to_le_bytes());
                     let fc_ref_end = fc_ref + 2;
                     let ref_grpprl = build_chpx_grpprl(
                         &CharacterFormatting {
@@ -1586,12 +1840,18 @@ impl DocWriter {
                     chpx_entries.push((fc_ref, fc_ref_end, ref_grpprl));
                     para_chars += 1;
                     last_run_index_for_para = Some(chpx_entries.len() - 1);
-                    if is_footnote {
-                        footnote_actual_cps.push((entry_idx, actual_cp));
-                    } else {
-                        endnote_actual_cps.push((entry_idx, actual_cp));
+                    match kind {
+                        MainReferenceKind::Footnote => {
+                            footnote_actual_cps.push((entry_idx, actual_cp));
+                        },
+                        MainReferenceKind::Endnote => {
+                            endnote_actual_cps.push((entry_idx, actual_cp));
+                        },
+                        MainReferenceKind::Comment => {
+                            comment_actual_cps.push((entry_idx, actual_cp));
+                        },
                     }
-                    note_inject_idx += 1;
+                    reference_inject_idx += 1;
                 } else {
                     break;
                 }
@@ -1619,8 +1879,10 @@ impl DocWriter {
 
         footnote_actual_cps.sort_by_key(|&(idx, _)| idx);
         endnote_actual_cps.sort_by_key(|&(idx, _)| idx);
+        comment_actual_cps.sort_by_key(|&(idx, _)| idx);
         let ftn_ref_cps: Vec<u32> = footnote_actual_cps.iter().map(|&(_, cp)| cp).collect();
         let edn_ref_cps: Vec<u32> = endnote_actual_cps.iter().map(|&(_, cp)| cp).collect();
+        let comment_ref_cps: Vec<u32> = comment_actual_cps.iter().map(|&(_, cp)| cp).collect();
 
         let footnote_plcfs = Self::build_note_story(
             &self.footnotes,
@@ -1648,6 +1910,19 @@ impl DocWriter {
             header_plcfhdd = Some((plcf_bytes, header_cp));
         }
 
+        let comment_story = Self::build_comment_story(
+            &self.comments,
+            &comment_ref_cps,
+            text_length,
+            text_fc_start,
+            &mut text_stream,
+            &mut chpx_entries,
+            &mut papx_entries,
+            &mut pieces,
+            &mut current_cp,
+            &mut font_builder,
+        )?;
+
         let endnote_plcfs = Self::build_note_story(
             &self.endnotes,
             &edn_ref_cps,
@@ -1662,8 +1937,10 @@ impl DocWriter {
         )?;
 
         // Mandatory trailing paragraph mark when ANY subdocument exists (same as save()).
-        let has_subdocs =
-            footnote_plcfs.is_some() || header_plcfhdd.is_some() || endnote_plcfs.is_some();
+        let has_subdocs = footnote_plcfs.is_some()
+            || header_plcfhdd.is_some()
+            || comment_story.is_some()
+            || endnote_plcfs.is_some();
         if has_subdocs {
             let fc_trailing = text_fc_start + text_stream.len() as u32;
             text_stream.extend_from_slice(&0x000Du16.to_le_bytes());
@@ -1685,6 +1962,9 @@ impl DocWriter {
         }
         if let Some((_, header_cp)) = &header_plcfhdd {
             fib.set_ccp_hdd(*header_cp);
+        }
+        if let Some(comment) = &comment_story {
+            fib.set_ccp_atn(comment.char_count);
         }
         if let Some((_, _, edn_cp)) = &endnote_plcfs {
             fib.set_ccp_edn(*edn_cp);
@@ -1758,6 +2038,20 @@ impl DocWriter {
 
             fib.set_plcfend_txt(table_offset, txt_bytes.len() as u32);
             table_stream.extend_from_slice(txt_bytes);
+            table_offset = table_stream.len() as u32;
+        }
+
+        if let Some(comment) = &comment_story {
+            fib.set_grp_xst_atn_owners(table_offset, comment.owners.len() as u32);
+            table_stream.extend_from_slice(&comment.owners);
+            table_offset = table_stream.len() as u32;
+
+            fib.set_plcfand_ref(table_offset, comment.references.len() as u32);
+            table_stream.extend_from_slice(&comment.references);
+            table_offset = table_stream.len() as u32;
+
+            fib.set_plcfand_txt(table_offset, comment.text_positions.len() as u32);
+            table_stream.extend_from_slice(&comment.text_positions);
             table_offset = table_stream.len() as u32;
         }
 
@@ -2574,6 +2868,60 @@ mod tests {
         let endnotes = document.endnotes().unwrap();
         assert_eq!(endnotes[0].number, 1);
         assert!(endnotes[0].text().contains("Endnote 😀"));
+    }
+
+    #[test]
+    fn comments_round_trip_with_other_subdocuments() {
+        let mut writer = DocWriter::new();
+        writer.add_paragraph("Main 😀").unwrap();
+        writer.add_footnote(FootnoteEntry::new(0, "Footnote", 1));
+        writer.add_comment(CommentEntry::new(1, "Review 🦀", "Alice 😀", "A😀"));
+        writer.add_comment(CommentEntry::new(3, "Second review", "Alice 😀", "AL"));
+        writer.add_endnote(FootnoteEntry::new(2, "Endnote", 1));
+        writer.set_odd_header("Header");
+
+        let mut cursor = Cursor::new(Vec::new());
+        writer.write_to(&mut cursor).unwrap();
+        let mut package =
+            crate::doc::Package::from_reader(Cursor::new(cursor.into_inner())).unwrap();
+        let document = package.document().unwrap();
+
+        assert_eq!(document.footnotes().unwrap().len(), 1);
+        assert_eq!(document.headers().unwrap().len(), 1);
+        assert_eq!(document.endnotes().unwrap().len(), 1);
+        let comments = document.comments().unwrap();
+        assert_eq!(comments.len(), 2);
+        assert_eq!(comments[0].author, "Alice 😀");
+        assert_eq!(comments[0].initials, "A😀");
+        assert_eq!(comments[0].bookmark_tag, None);
+        assert!(comments[0].text().contains("Review 🦀"));
+        assert_eq!(comments[0].paragraphs().unwrap().len(), 1);
+        assert_eq!(comments[1].author, "Alice 😀");
+        assert_eq!(comments[1].initials, "AL");
+        assert!(comments[1].text().contains("Second review"));
+
+        let path = std::env::temp_dir().join(format!(
+            "litchi-doc-comments-{}-{}.doc",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        writer.save(&path).unwrap();
+        let mut package = crate::doc::Package::open(&path).unwrap();
+        assert_eq!(package.document().unwrap().comments().unwrap().len(), 2);
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn rejects_comment_metadata_outside_binary_limits() {
+        let mut writer = DocWriter::new();
+        writer.add_paragraph("Main").unwrap();
+        writer.add_comment(CommentEntry::new(0, "Body", "Author", "0123456789"));
+
+        let error = writer.write_to(&mut Cursor::new(Vec::new())).unwrap_err();
+        assert!(error.to_string().contains("at most nine"));
     }
 
     #[test]

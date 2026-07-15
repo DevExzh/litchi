@@ -6,6 +6,9 @@
 /// Core DOC writer implementation
 mod core;
 
+/// Comments writer input types
+pub mod comments;
+
 /// FIB (File Information Block) generation
 pub mod fib;
 
@@ -52,6 +55,7 @@ pub mod hyperlinks;
 pub mod numbering;
 
 // Re-export public types
+pub use comments::CommentEntry;
 pub use core::{CharacterFormatting, DocWriteError, DocWriter, LineSpacing, ParagraphFormatting};
 pub use fib::FibBuilder;
 pub use fkp::{ChpxFkpBuilder, PapxFkpBuilder};
