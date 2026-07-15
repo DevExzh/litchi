@@ -108,6 +108,27 @@ fn push_optional_attribute(output: &mut String, name: &str, value: Option<&str>)
     }
 }
 
+fn push_drawing_attributes(
+    output: &mut String,
+    attributes: &[crate::odp::DrawingAttribute],
+) -> Result<()> {
+    let mut names = BTreeSet::new();
+    for attribute in attributes {
+        let qualified_name = format!("{}:{}", attribute.namespace.prefix(), attribute.local_name);
+        if !names.insert(qualified_name.clone()) {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "duplicate drawing attribute '{qualified_name}'"
+            )));
+        }
+        output.push(' ');
+        output.push_str(&qualified_name);
+        output.push_str("=\"");
+        output.push_str(&escape_xml(&attribute.value));
+        output.push('"');
+    }
+    Ok(())
+}
+
 pub(super) fn slide_style_name(slide: &Slide, index: usize) -> String {
     if slide
         .transition
@@ -204,6 +225,46 @@ impl Default for PresentationBuilder {
 }
 
 impl PresentationBuilder {
+    fn generate_enhanced_geometry_xml(geometry: &crate::odp::EnhancedGeometry) -> Result<String> {
+        if geometry.children.len() > 65_536 {
+            return Err(litchi_core::Error::InvalidFormat(
+                "enhanced geometry exceeds 65536 equations and handles".to_string(),
+            ));
+        }
+        let mut output = String::from("<draw:enhanced-geometry");
+        push_drawing_attributes(&mut output, &geometry.attributes)?;
+        if geometry.children.is_empty() {
+            output.push_str("/>");
+            return Ok(output);
+        }
+        output.push('>');
+        let mut handle_seen = false;
+        for child in &geometry.children {
+            if child.kind == crate::odp::EnhancedGeometryChildKind::Equation && handle_seen {
+                return Err(litchi_core::Error::InvalidFormat(
+                    "draw:equation cannot follow draw:handle".to_string(),
+                ));
+            }
+            if child.kind == crate::odp::EnhancedGeometryChildKind::Handle {
+                handle_seen = true;
+            }
+            if child.attributes.iter().any(|attribute| {
+                attribute.namespace != crate::odp::DrawingAttributeNamespace::Drawing
+            }) {
+                return Err(litchi_core::Error::InvalidFormat(format!(
+                    "{} attributes must use the drawing namespace",
+                    child.kind.element_name()
+                )));
+            }
+            output.push('<');
+            output.push_str(child.kind.element_name());
+            push_drawing_attributes(&mut output, &child.attributes)?;
+            output.push_str("/>");
+        }
+        output.push_str("</draw:enhanced-geometry>");
+        Ok(output)
+    }
+
     /// Create a new presentation builder
     ///
     /// # Examples
@@ -356,9 +417,9 @@ impl PresentationBuilder {
         use crate::odp::DrawingShapeKind;
         use litchi_core::ShapeType;
 
-        if depth > 256 {
+        if depth > 64 {
             return Err(litchi_core::Error::InvalidFormat(
-                "ODP shape groups exceed 256 levels".to_string(),
+                "ODP shape groups exceed 64 levels".to_string(),
             ));
         }
         *node_count = node_count.checked_add(1).ok_or_else(|| {
@@ -462,6 +523,7 @@ impl PresentationBuilder {
                     attribute.local_name.as_str(),
                     "x" | "y" | "width" | "height" | "x1" | "y1" | "x2" | "y2"
                 ),
+                crate::odp::DrawingAttributeNamespace::Dr3d => false,
             };
             if modeled {
                 return Err(litchi_core::Error::InvalidFormat(format!(
@@ -533,6 +595,12 @@ impl PresentationBuilder {
                 name
             )));
         }
+        if shape.enhanced_geometry.is_some() && element_kind != DrawingShapeKind::CustomShape {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "enhanced geometry requires draw:custom-shape for shape '{}'",
+                name
+            )));
+        }
         let element_name = element_kind.element_name();
         let mut xml = match shape.shape_type {
             ShapeType::TextBox | ShapeType::Placeholder => {
@@ -552,14 +620,22 @@ impl PresentationBuilder {
                 }
             },
             ShapeType::AutoShape => {
-                if shape.has_text() {
+                let geometry = shape
+                    .enhanced_geometry
+                    .as_ref()
+                    .map(Self::generate_enhanced_geometry_xml)
+                    .transpose()?
+                    .unwrap_or_default();
+                if shape.has_text() || !geometry.is_empty() {
+                    let mut contents = if shape.has_text() {
+                        generate_text_paragraphs(&shape.text, Some("P2"))
+                    } else {
+                        String::new()
+                    };
+                    contents.push_str(&geometry);
                     format!(
                         r#"<{}{}{}>{}</{}>"#,
-                        element_name,
-                        shape_attributes,
-                        position_attributes,
-                        generate_text_paragraphs(&shape.text, Some("P2")),
-                        element_name
+                        element_name, shape_attributes, position_attributes, contents, element_name
                     )
                 } else {
                     format!(
@@ -602,7 +678,11 @@ impl PresentationBuilder {
                 )
             },
             ShapeType::Group => {
-                if shape.has_text() || shape.image_href.is_some() || shape.media.is_some() {
+                if shape.has_text()
+                    || shape.image_href.is_some()
+                    || shape.media.is_some()
+                    || shape.enhanced_geometry.is_some()
+                {
                     return Err(litchi_core::Error::InvalidFormat(format!(
                         "ODP group shape '{}' contains non-group payload",
                         name
@@ -1027,7 +1107,7 @@ mod tests {
         assert!(PresentationBuilder::generate_shape_xml(&leaf, 0).is_err());
 
         let mut too_deep = Shape::new();
-        for _ in 0..258 {
+        for _ in 0..66 {
             let mut parent = Shape::new();
             parent.shape_type = ShapeType::Group;
             parent.drawing_kind = Some(crate::odp::DrawingShapeKind::Group);

@@ -4,7 +4,8 @@ use super::animation::ANIMATION_NAMESPACE;
 use super::legacy_animation::validate_legacy_animation_root;
 use super::{
     AnimationAttribute, AnimationAttributeNamespace, AnimationKind, AnimationNode,
-    DrawingAttribute, DrawingAttributeNamespace, DrawingHyperlink, DrawingShapeKind, HyperlinkShow,
+    DrawingAttribute, DrawingAttributeNamespace, DrawingHyperlink, DrawingShapeKind,
+    EnhancedGeometry, EnhancedGeometryChild, EnhancedGeometryChildKind, HyperlinkShow,
     LegacyAnimationKind, LegacyAnimationNode, MediaActuate, MediaParameter, MediaReference,
     MediaShow, PresentationAction, PresentationEffect, PresentationEffectDirection,
     PresentationEventListener, ScriptEventListener, Shape, ShapeEventListener, Slide,
@@ -19,6 +20,7 @@ use quick_xml::reader::NsReader;
 use std::collections::{HashMap, HashSet};
 
 const DRAW_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
+const DR3D_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:dr3d:1.0";
 const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const PRESENTATION_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
 const SCRIPT_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:script:1.0";
@@ -74,6 +76,9 @@ enum OdpElement {
     Plugin,
     PluginParameter,
     DrawingHyperlink,
+    EnhancedGeometry,
+    EnhancedEquation,
+    EnhancedHandle,
     EventListeners,
     PresentationEventListener,
     ScriptEventListener,
@@ -101,6 +106,7 @@ struct ShapeBuilder {
     drawing_kind: Option<DrawingShapeKind>,
     drawing_attributes: Vec<DrawingAttribute>,
     children: Vec<Shape>,
+    enhanced_geometry: Option<EnhancedGeometry>,
     text: String,
     name: Option<String>,
     x: Option<String>,
@@ -172,6 +178,7 @@ impl ShapeBuilder {
             drawing_kind: None,
             drawing_attributes: Vec::new(),
             children: Vec::new(),
+            enhanced_geometry: None,
             text: String::new(),
             name: None,
             x: None,
@@ -202,6 +209,7 @@ impl ShapeBuilder {
             drawing_kind: self.drawing_kind,
             drawing_attributes: self.drawing_attributes,
             children: self.children,
+            enhanced_geometry: self.enhanced_geometry,
             text: self.text,
             name: self.name,
             x: self.x,
@@ -265,6 +273,9 @@ impl OdpParser {
                 b"plugin" => OdpElement::Plugin,
                 b"param" => OdpElement::PluginParameter,
                 b"a" => OdpElement::DrawingHyperlink,
+                b"enhanced-geometry" => OdpElement::EnhancedGeometry,
+                b"equation" => OdpElement::EnhancedEquation,
+                b"handle" => OdpElement::EnhancedHandle,
                 _ => OdpElement::Other,
             }
         } else if Self::is_namespace(namespace, OFFICE_NAMESPACE)
@@ -690,6 +701,8 @@ impl OdpParser {
                 DrawingAttributeNamespace::Drawing
             } else if Self::is_namespace(&namespace, SVG_NAMESPACE) {
                 DrawingAttributeNamespace::Svg
+            } else if Self::is_namespace(&namespace, DR3D_NAMESPACE) {
+                DrawingAttributeNamespace::Dr3d
             } else {
                 continue;
             };
@@ -703,6 +716,7 @@ impl OdpParser {
                     local_name,
                     b"x" | b"y" | b"width" | b"height" | b"x1" | b"y1" | b"x2" | b"y2"
                 ),
+                DrawingAttributeNamespace::Dr3d => false,
             };
             if modeled {
                 continue;
@@ -722,6 +736,125 @@ impl OdpParser {
             )?);
         }
         Ok(attributes)
+    }
+
+    fn exact_geometry_attributes(
+        reader: &NsReader<&[u8]>,
+        element: &BytesStart<'_>,
+    ) -> Result<Vec<DrawingAttribute>> {
+        let mut attributes = Vec::new();
+        for attribute in element.attributes() {
+            let attribute = attribute.map_err(|error| {
+                Error::InvalidFormat(format!("invalid enhanced-geometry attribute: {error}"))
+            })?;
+            let (namespace, local_name) = reader.resolver().resolve_attribute(attribute.key);
+            let namespace = if Self::is_namespace(&namespace, DRAW_NAMESPACE) {
+                DrawingAttributeNamespace::Drawing
+            } else if Self::is_namespace(&namespace, SVG_NAMESPACE) {
+                DrawingAttributeNamespace::Svg
+            } else if Self::is_namespace(&namespace, DR3D_NAMESPACE) {
+                DrawingAttributeNamespace::Dr3d
+            } else {
+                continue;
+            };
+            let value = attribute
+                .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                .map_err(|error| {
+                    Error::InvalidFormat(format!(
+                        "invalid enhanced-geometry attribute value: {error}"
+                    ))
+                })?
+                .into_owned();
+            attributes.push(DrawingAttribute::new(
+                namespace,
+                String::from_utf8(local_name.as_ref().to_vec()).map_err(|_| {
+                    Error::InvalidFormat("non-UTF-8 enhanced-geometry attribute name".to_string())
+                })?,
+                value,
+            )?);
+        }
+        Ok(attributes)
+    }
+
+    fn parse_enhanced_geometry(
+        reader: &mut NsReader<&[u8]>,
+        element: &BytesStart<'_>,
+    ) -> Result<EnhancedGeometry> {
+        let attributes = Self::exact_geometry_attributes(reader, element)?;
+        let mut children = Vec::new();
+        let mut handle_seen = false;
+        let mut buffer = Vec::new();
+        loop {
+            let (namespace, event) =
+                reader
+                    .read_resolved_event_into(&mut buffer)
+                    .map_err(|error| {
+                        Error::InvalidFormat(format!("invalid enhanced geometry XML: {error}"))
+                    })?;
+            match event {
+                Event::Start(ref child) | Event::Empty(ref child)
+                    if Self::is_namespace(&namespace, DRAW_NAMESPACE)
+                        && matches!(child.local_name().as_ref(), b"equation" | b"handle") =>
+                {
+                    if children.len() >= 65_536 {
+                        return Err(Error::InvalidFormat(
+                            "enhanced geometry exceeds 65536 equations and handles".to_string(),
+                        ));
+                    }
+                    let kind = if child.local_name().as_ref() == b"equation" {
+                        if handle_seen {
+                            return Err(Error::InvalidFormat(
+                                "draw:equation cannot follow draw:handle".to_string(),
+                            ));
+                        }
+                        EnhancedGeometryChildKind::Equation
+                    } else {
+                        handle_seen = true;
+                        EnhancedGeometryChildKind::Handle
+                    };
+                    children.push(EnhancedGeometryChild {
+                        kind,
+                        attributes: Self::exact_geometry_attributes(reader, child)?,
+                    });
+                    if matches!(event, Event::Start(_)) {
+                        Self::consume_empty_content(
+                            reader,
+                            DRAW_NAMESPACE,
+                            child.local_name().as_ref(),
+                            kind.element_name(),
+                        )?;
+                    }
+                },
+                Event::End(ref end)
+                    if Self::is_namespace(&namespace, DRAW_NAMESPACE)
+                        && end.local_name().as_ref() == b"enhanced-geometry" =>
+                {
+                    return Ok(EnhancedGeometry {
+                        attributes,
+                        children,
+                    });
+                },
+                Event::Text(ref text) if Self::decode_text(text)?.trim().is_empty() => {},
+                Event::CData(ref text)
+                    if text
+                        .xml_content(XmlVersion::Explicit1_0)
+                        .map_err(|error| Error::InvalidFormat(error.to_string()))?
+                        .trim()
+                        .is_empty() => {},
+                Event::Comment(_) | Event::PI(_) => {},
+                Event::Eof => {
+                    return Err(Error::InvalidFormat(
+                        "unterminated draw:enhanced-geometry".to_string(),
+                    ));
+                },
+                _ => {
+                    return Err(Error::InvalidFormat(
+                        "draw:enhanced-geometry may only contain equations and handles".to_string(),
+                    ));
+                },
+            }
+            buffer.clear();
+        }
     }
 
     fn media_reference(
@@ -1563,6 +1696,34 @@ impl OdpParser {
                             in_slide = true;
                         },
                         OdpElement::Notes if in_slide => in_notes = true,
+                        OdpElement::EnhancedGeometry if !shape_stack.is_empty() => {
+                            let builder = shape_stack.last().expect("shape checked above");
+                            if builder.drawing_kind != Some(DrawingShapeKind::CustomShape) {
+                                return Err(Error::InvalidFormat(
+                                    "draw:enhanced-geometry requires draw:custom-shape".to_string(),
+                                ));
+                            }
+                            if builder.enhanced_geometry.is_some() {
+                                return Err(Error::InvalidFormat(
+                                    "draw:custom-shape contains multiple enhanced geometries"
+                                        .to_string(),
+                                ));
+                            }
+                            let geometry = Self::parse_enhanced_geometry(&mut reader, element)?;
+                            shape_stack
+                                .last_mut()
+                                .expect("shape checked above")
+                                .enhanced_geometry = Some(geometry);
+                        },
+                        OdpElement::EnhancedGeometry
+                        | OdpElement::EnhancedEquation
+                        | OdpElement::EnhancedHandle
+                            if in_slide =>
+                        {
+                            return Err(Error::InvalidFormat(
+                                "misplaced custom-shape enhanced geometry".to_string(),
+                            ));
+                        },
                         OdpElement::LegacyAnimation(kind)
                             if in_slide
                                 && !in_notes
@@ -1722,9 +1883,9 @@ impl OdpParser {
                                     "ODP document exceeds 65536 shapes".to_string(),
                                 ));
                             }
-                            if shape_stack.len() >= 256 {
+                            if shape_stack.len() >= 64 {
                                 return Err(Error::InvalidFormat(
-                                    "ODP shape groups exceed 256 levels".to_string(),
+                                    "ODP shape groups exceed 64 levels".to_string(),
                                 ));
                             }
                             let hyperlink_applies = current_hyperlink.is_some()
@@ -1862,6 +2023,33 @@ impl OdpParser {
                                 shapes: Vec::new(),
                             });
                             slide_index += 1;
+                        },
+                        OdpElement::EnhancedGeometry if !shape_stack.is_empty() => {
+                            let builder = shape_stack.last_mut().expect("shape checked above");
+                            if builder.drawing_kind != Some(DrawingShapeKind::CustomShape) {
+                                return Err(Error::InvalidFormat(
+                                    "draw:enhanced-geometry requires draw:custom-shape".to_string(),
+                                ));
+                            }
+                            if builder.enhanced_geometry.is_some() {
+                                return Err(Error::InvalidFormat(
+                                    "draw:custom-shape contains multiple enhanced geometries"
+                                        .to_string(),
+                                ));
+                            }
+                            builder.enhanced_geometry = Some(EnhancedGeometry {
+                                attributes: Self::exact_geometry_attributes(&reader, element)?,
+                                children: Vec::new(),
+                            });
+                        },
+                        OdpElement::EnhancedGeometry
+                        | OdpElement::EnhancedEquation
+                        | OdpElement::EnhancedHandle
+                            if in_slide =>
+                        {
+                            return Err(Error::InvalidFormat(
+                                "misplaced custom-shape enhanced geometry".to_string(),
+                            ));
                         },
                         OdpElement::Plugin => {
                             if let Some(builder) = shape_stack.last_mut() {
@@ -2244,7 +2432,8 @@ mod tests {
     fn preserves_drawing_element_kinds_and_unmodeled_geometry_attributes() {
         let xml = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
             xmlns:d="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"
-            xmlns:s="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0">
+            xmlns:s="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0"
+            xmlns:r="urn:oasis:names:tc:opendocument:xmlns:dr3d:1.0">
             <o:body><o:presentation><d:page>
               <d:rect d:name="rect" d:corner-radius="2mm"/>
               <d:ellipse d:name="ellipse" d:kind="section" d:start-angle="30" s:rx="2cm" s:ry="1cm"/>
@@ -2258,7 +2447,13 @@ mod tests {
               <d:caption d:name="caption" d:caption-point-x="1cm" d:caption-point-y="2cm"/>
               <d:connector d:name="connector" d:type="curve" d:start-shape="a" d:end-shape="b" s:x1="0cm" s:y1="0cm" s:x2="1cm" s:y2="1cm"/>
               <d:control d:name="control" d:control="control1"/>
-              <d:custom-shape d:name="custom" d:engine="vendor" d:data="opaque"/>
+              <d:custom-shape d:name="custom" d:engine="vendor" d:data="opaque" r:transform="rotatex(0.5)">
+                <d:enhanced-geometry d:type="non-primitive" s:viewBox="0 0 21600 21600"
+                  d:modifiers="10800" d:enhanced-path="M 0 0 L ?f0 21600 Z" r:projection="perspective">
+                  <d:equation d:name="f0" d:formula="$0 * 2 &amp; 21600"/>
+                  <d:handle d:handle-position="$0 10800" d:handle-range-x-minimum="0" d:handle-range-x-maximum="21600"/>
+                </d:enhanced-geometry>
+              </d:custom-shape>
             </d:page></o:presentation></o:body>
         </o:document-content>"#;
         let slides = OdpParser::parse_slides(xml).unwrap();
@@ -2297,6 +2492,42 @@ mod tests {
             crate::odp::PresentationBuilder::generate_shape_xml(&shapes[10], 10).unwrap();
         assert!(connector.contains(r#"draw:type="curve""#));
         assert!(connector.contains(r#"draw:start-shape="a""#));
+        let custom = &shapes[12];
+        assert!(custom.drawing_attributes().iter().any(|attribute| {
+            attribute.namespace() == DrawingAttributeNamespace::Dr3d
+                && attribute.local_name() == "transform"
+                && attribute.value() == "rotatex(0.5)"
+        }));
+        let geometry = custom.enhanced_geometry().unwrap();
+        assert_eq!(geometry.children().len(), 2);
+        assert_eq!(
+            geometry.children()[0].kind(),
+            EnhancedGeometryChildKind::Equation
+        );
+        assert_eq!(
+            geometry.children()[1].kind(),
+            EnhancedGeometryChildKind::Handle
+        );
+        let regenerated = crate::odp::PresentationBuilder::generate_shape_xml(custom, 12).unwrap();
+        assert!(regenerated.contains("<draw:enhanced-geometry"));
+        assert!(regenerated.contains(r#"dr3d:projection="perspective""#));
+        assert!(regenerated.contains(r#"draw:formula="$0 * 2 &amp; 21600""#));
+        assert!(regenerated.contains(r#"draw:handle-position="$0 10800""#));
+    }
+
+    #[test]
+    fn rejects_misplaced_or_invalid_enhanced_geometry() {
+        for shape in [
+            "<d:rect><d:enhanced-geometry/></d:rect>",
+            "<d:custom-shape><d:enhanced-geometry/><d:enhanced-geometry/></d:custom-shape>",
+            "<d:custom-shape><d:enhanced-geometry><d:handle/><d:equation/></d:enhanced-geometry></d:custom-shape>",
+            "<d:custom-shape><d:equation/></d:custom-shape>",
+        ] {
+            let xml = format!(
+                r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"><o:body><o:presentation><d:page>{shape}</d:page></o:presentation></o:body></o:document-content>"#
+            );
+            assert!(OdpParser::parse_slides(&xml).is_err(), "accepted {shape}");
+        }
     }
 
     const TEST_EMPTY_PRESENTATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -2608,15 +2839,15 @@ mod tests {
         let mut xml = String::from(
             r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"><o:body><o:presentation><d:page>"#,
         );
-        for _ in 0..257 {
+        for _ in 0..65 {
             xml.push_str("<d:g>");
         }
-        for _ in 0..257 {
+        for _ in 0..65 {
             xml.push_str("</d:g>");
         }
         xml.push_str("</d:page></o:presentation></o:body></o:document-content>");
         let error = OdpParser::parse_slides(&xml).unwrap_err();
-        assert!(error.to_string().contains("256 levels"));
+        assert!(error.to_string().contains("64 levels"));
     }
 
     #[test]

@@ -781,6 +781,45 @@ mod tests {
     }
 
     #[test]
+    fn mutable_presentation_preserves_inert_custom_shape_geometry() {
+        let content = br#"<o:document-content
+            xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+            xmlns:d="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"
+            xmlns:s="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0"
+            xmlns:r="urn:oasis:names:tc:opendocument:xmlns:dr3d:1.0">
+          <o:body><o:presentation><d:page>
+            <d:custom-shape d:name="Gear" r:transform="rotatex(0.25)">
+              <d:enhanced-geometry d:type="gear" s:viewBox="0 0 21600 21600"
+                d:enhanced-path="M 0 0 L ?f0 21600 Z" r:projection="parallel">
+                <d:equation d:name="f0" d:formula="$0 + 1200"/>
+                <d:handle d:handle-position="$0 10800"/>
+              </d:enhanced-geometry>
+            </d:custom-shape>
+          </d:page></o:presentation></o:body>
+        </o:document-content>"#;
+        let mut writer = PackageWriter::new();
+        writer
+            .set_mimetype("application/vnd.oasis.opendocument.presentation")
+            .unwrap();
+        writer.add_file("content.xml", content).unwrap();
+        let presentation = Presentation::from_bytes(writer.finish_to_bytes().unwrap()).unwrap();
+        let mutable = MutablePresentation::from_presentation(presentation).unwrap();
+        let bytes = mutable.to_bytes().unwrap();
+        let package = OwnedPackage::from_bytes(bytes.clone()).unwrap();
+        let regenerated = String::from_utf8(package.get_file("content.xml").unwrap()).unwrap();
+        assert!(regenerated.contains("<draw:enhanced-geometry"));
+        assert!(regenerated.contains(r#"draw:enhanced-path="M 0 0 L ?f0 21600 Z""#));
+        assert!(regenerated.contains(r#"dr3d:projection="parallel""#));
+        assert!(regenerated.contains(r#"draw:formula="$0 + 1200""#));
+        assert!(regenerated.contains(r#"draw:handle-position="$0 10800""#));
+
+        let reparsed = Presentation::from_bytes(bytes).unwrap();
+        let slides = reparsed.slides().unwrap();
+        let geometry = slides[0].shapes[0].enhanced_geometry().unwrap();
+        assert_eq!(geometry.children().len(), 2);
+    }
+
+    #[test]
     fn builder_and_mutable_presentation_round_trip_animation_trees() {
         let mut parameter = AnimationNode::new(AnimationKind::Parameter);
         parameter.set_attribute(

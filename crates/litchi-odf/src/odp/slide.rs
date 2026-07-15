@@ -210,6 +210,8 @@ pub enum DrawingAttributeNamespace {
     Drawing,
     /// ODF SVG-compatible namespace (`svg:*`).
     Svg,
+    /// OpenDocument 3D namespace (`dr3d:*`).
+    Dr3d,
 }
 
 impl DrawingAttributeNamespace {
@@ -217,6 +219,7 @@ impl DrawingAttributeNamespace {
         match self {
             Self::Drawing => "draw",
             Self::Svg => "svg",
+            Self::Dr3d => "dr3d",
         }
     }
 }
@@ -265,6 +268,90 @@ impl DrawingAttribute {
     }
 }
 
+/// Child kind within `draw:enhanced-geometry`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EnhancedGeometryChildKind {
+    /// Inert `draw:equation` formula declaration.
+    Equation,
+    /// Inert `draw:handle` adjustment handle.
+    Handle,
+}
+
+impl EnhancedGeometryChildKind {
+    pub(crate) fn element_name(self) -> &'static str {
+        match self {
+            Self::Equation => "draw:equation",
+            Self::Handle => "draw:handle",
+        }
+    }
+}
+
+/// An inert equation or handle declaration in custom-shape geometry.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EnhancedGeometryChild {
+    pub(crate) kind: EnhancedGeometryChildKind,
+    pub(crate) attributes: Vec<DrawingAttribute>,
+}
+
+impl EnhancedGeometryChild {
+    /// Create an empty equation or handle declaration.
+    pub fn new(kind: EnhancedGeometryChildKind) -> Self {
+        Self {
+            kind,
+            attributes: Vec::new(),
+        }
+    }
+
+    /// Return the child kind.
+    pub fn kind(&self) -> EnhancedGeometryChildKind {
+        self.kind
+    }
+
+    /// Return exact attributes in document order.
+    pub fn attributes(&self) -> &[DrawingAttribute] {
+        &self.attributes
+    }
+
+    /// Return mutable exact attributes.
+    pub fn attributes_mut(&mut self) -> &mut Vec<DrawingAttribute> {
+        &mut self.attributes
+    }
+}
+
+/// Inert `draw:enhanced-geometry` data for a custom shape.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct EnhancedGeometry {
+    pub(crate) attributes: Vec<DrawingAttribute>,
+    pub(crate) children: Vec<EnhancedGeometryChild>,
+}
+
+impl EnhancedGeometry {
+    /// Create an empty enhanced-geometry declaration.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Return exact geometry attributes in document order.
+    pub fn attributes(&self) -> &[DrawingAttribute] {
+        &self.attributes
+    }
+
+    /// Return mutable exact geometry attributes.
+    pub fn attributes_mut(&mut self) -> &mut Vec<DrawingAttribute> {
+        &mut self.attributes
+    }
+
+    /// Return inert equations and handles in document order.
+    pub fn children(&self) -> &[EnhancedGeometryChild] {
+        &self.children
+    }
+
+    /// Return mutable inert equations and handles.
+    pub fn children_mut(&mut self) -> &mut Vec<EnhancedGeometryChild> {
+        &mut self.children
+    }
+}
+
 fn is_xml_local_name(value: &str) -> bool {
     let mut characters = value.chars();
     characters
@@ -288,6 +375,8 @@ pub struct Shape {
     pub drawing_attributes: Vec<DrawingAttribute>,
     /// Nested shapes when this is a `draw:g` group.
     pub children: Vec<Shape>,
+    /// Inert enhanced geometry for `draw:custom-shape`.
+    pub enhanced_geometry: Option<EnhancedGeometry>,
     /// Text content if the shape contains text
     pub text: String,
     /// Shape name/ID
@@ -335,6 +424,7 @@ impl Shape {
             drawing_kind: None,
             drawing_attributes: Vec::new(),
             children: Vec::new(),
+            enhanced_geometry: None,
             text: String::new(),
             name: None,
             x: None,
@@ -383,6 +473,16 @@ impl Shape {
     /// Return mutable nested group shapes.
     pub fn children_mut(&mut self) -> &mut Vec<Shape> {
         &mut self.children
+    }
+
+    /// Return inert custom-shape enhanced geometry.
+    pub fn enhanced_geometry(&self) -> Option<&EnhancedGeometry> {
+        self.enhanced_geometry.as_ref()
+    }
+
+    /// Return mutable inert custom-shape enhanced geometry.
+    pub fn enhanced_geometry_mut(&mut self) -> Option<&mut EnhancedGeometry> {
+        self.enhanced_geometry.as_mut()
     }
 
     /// Check if this is a text shape.

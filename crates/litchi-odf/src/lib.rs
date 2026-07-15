@@ -257,7 +257,8 @@ pub use litchi_core::unit::{Length, LengthUnit};
 // Re-export main types for convenience
 pub use odp::{
     AnimationAttribute, AnimationAttributeNamespace, AnimationKind, AnimationNode,
-    DrawingAttribute, DrawingAttributeNamespace, DrawingHyperlink, DrawingShapeKind, HyperlinkShow,
+    DrawingAttribute, DrawingAttributeNamespace, DrawingHyperlink, DrawingShapeKind,
+    EnhancedGeometry, EnhancedGeometryChild, EnhancedGeometryChildKind, HyperlinkShow,
     LegacyAnimationKind, LegacyAnimationNode, MediaActuate, MediaParameter, MediaReference,
     MediaShow, MutablePresentation, Presentation, PresentationAction, PresentationBuilder,
     PresentationEffect, PresentationEffectDirection, PresentationEventListener,
