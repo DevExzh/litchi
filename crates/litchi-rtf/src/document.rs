@@ -191,6 +191,8 @@ impl<'a> RtfDocument<'a> {
                 locked: object.locked,
                 update_requested: object.update_requested,
                 set_size: object.set_size,
+                result_text: Cow::Owned(object.result_text.into_owned()),
+                result_picture_indices: object.result_picture_indices,
                 data: object.data,
             })
             .collect();
@@ -1040,7 +1042,7 @@ mod tests {
             {\*\objdata
                 01050000 02000000 08000000 5061636b61676500
                 00000000 00000000 08000000 d0cf11e0a1b11ae1}
-            {\result fallback}} After}"#;
+            {\result fallback {\pict\pngblip\picw10\pich20 89504e470d0a1a0a}}} After}"#;
         let doc = RtfDocument::parse(rtf).unwrap();
 
         assert_eq!(doc.text(), "Before  After");
@@ -1055,6 +1057,13 @@ mod tests {
         assert!(object.update_requested);
         assert!(object.set_size);
         assert!(matches!(object.class_name, Cow::Owned(_)));
+        assert_eq!(object.result_text, "fallback");
+        assert_eq!(object.result_picture_indices, [0]);
+        assert!(matches!(object.result_text, Cow::Owned(_)));
+        assert_eq!(doc.pictures().len(), 1);
+        assert_eq!(doc.pictures()[0].image_type, crate::ImageType::Png);
+        assert_eq!(doc.pictures()[0].width, Some(10));
+        assert_eq!(doc.pictures()[0].height, Some(20));
 
         let header = object.ole_header().unwrap();
         assert_eq!(header.ole_version, 0x501);

@@ -64,6 +64,10 @@ pub struct EmbeddedObject<'a> {
     pub update_requested: bool,
     /// Whether the producer requested size synchronization
     pub set_size: bool,
+    /// Plain-text rendered fallback from the `result` destination
+    pub result_text: Cow<'a, str>,
+    /// Indices into `RtfDocument::pictures()` for rendered fallback images
+    pub result_picture_indices: Vec<usize>,
     /// Decoded `objdata`, including the OLE ObjectHeader
     pub data: Vec<u8>,
 }
@@ -81,6 +85,8 @@ impl<'a> EmbeddedObject<'a> {
             locked: false,
             update_requested: false,
             set_size: false,
+            result_text: Cow::Borrowed(""),
+            result_picture_indices: Vec::new(),
             data: Vec::new(),
         }
     }

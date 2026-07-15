@@ -2827,6 +2827,11 @@ impl<'a> Parser<'a> {
                 Token::OpenBrace if self.nested_control_word() == Some(ControlWord::ObjectData) => {
                     object.data = self.parse_object_hex_destination()?;
                 },
+                Token::OpenBrace if self.nested_control_word() == Some(ControlWord::Result) => {
+                    let (text, pictures) = self.parse_object_result_destination()?;
+                    object.result_text = Cow::Owned(text);
+                    object.result_picture_indices = pictures;
+                },
                 Token::OpenBrace => {
                     depth += 1;
                     self.pos += 1;
@@ -2876,6 +2881,64 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 _ => self.pos += 1,
+            }
+        }
+        Err(RtfError::UnexpectedEof)
+    }
+
+    fn parse_object_result_destination(&mut self) -> RtfResult<(String, Vec<usize>)> {
+        let mut text = String::new();
+        let mut picture_indices = Vec::new();
+        self.pos += 1; // opening brace
+        if matches!(
+            self.tokens.get(self.pos),
+            Some(Token::Control(ControlWord::IgnorableDestination))
+        ) {
+            self.pos += 1;
+        }
+        if !matches!(
+            self.tokens.get(self.pos),
+            Some(Token::Control(ControlWord::Result))
+        ) {
+            return Err(RtfError::MalformedDocument(
+                "invalid RTF object result destination".to_string(),
+            ));
+        }
+        self.pos += 1;
+
+        while self.pos < self.tokens.len() {
+            match &self.tokens[self.pos] {
+                Token::CloseBrace => {
+                    self.pos += 1;
+                    return Ok((text.trim().to_string(), picture_indices));
+                },
+                Token::OpenBrace if self.nested_control_word() == Some(ControlWord::Picture) => {
+                    let first_picture = self.pictures.len();
+                    self.parse_group()?;
+                    picture_indices.extend(first_picture..self.pictures.len());
+                },
+                Token::OpenBrace => self.skip_group()?,
+                Token::Control(ControlWord::Unicode(code)) => {
+                    text.push_str(&self.parse_destination_unicode_sequence(*code)?);
+                },
+                Token::Control(ControlWord::Par | ControlWord::Line) => {
+                    text.push('\n');
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::Tab) => {
+                    text.push('\t');
+                    self.pos += 1;
+                },
+                Token::Text(value) => {
+                    text.push_str(value);
+                    self.pos += 1;
+                },
+                _ => self.pos += 1,
+            }
+            if text.len() > MAX_OBJECT_TEXT_BYTES {
+                return Err(RtfError::MalformedDocument(
+                    "RTF object result text exceeds the safety limit".to_string(),
+                ));
             }
         }
         Err(RtfError::UnexpectedEof)
