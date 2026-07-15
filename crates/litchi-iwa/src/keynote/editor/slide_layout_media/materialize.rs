@@ -1,7 +1,7 @@
-//! Root-object materialization for layout-owned images and live video.
+//! Root-object materialization for layout-owned images and movies.
 
 use super::*;
-use graph::LayoutMediaRoots;
+use graph::{LayoutMediaRoots, is_movie_placeholder};
 
 const IMAGE_MESSAGE_TYPE: u32 = 3_005;
 const MOVIE_MESSAGE_TYPE: u32 = 3_007;
@@ -39,10 +39,9 @@ pub(super) fn materialize_media_object(object: &mut ArchiveObject, slide_id: u64
         .count();
     match (image_count, movie_count) {
         (1, 0) => materialize_image_object(object, slide_id),
-        (0, 1) => materialize_live_video_object(object, slide_id),
+        (0, 1) => materialize_movie_object(object, slide_id),
         _ => Err(Error::InvalidFormat(
-            "Keynote layout media root must contain exactly one image or live-video payload"
-                .to_owned(),
+            "Keynote layout media root must contain exactly one image or movie payload".to_owned(),
         )),
     }
 }
@@ -82,19 +81,20 @@ fn materialize_image_object(object: &mut ArchiveObject, slide_id: u64) -> Result
     Ok(())
 }
 
-fn materialize_live_video_object(object: &mut ArchiveObject, slide_id: u64) -> Result<()> {
+fn materialize_movie_object(object: &mut ArchiveObject, slide_id: u64) -> Result<()> {
     let message = object
         .messages
         .iter()
         .find(|message| message.type_ == MOVIE_MESSAGE_TYPE)
         .ok_or_else(|| {
-            Error::InvalidFormat("Keynote layout live-video payload is missing".to_owned())
+            Error::InvalidFormat("Keynote layout movie payload is missing".to_owned())
         })?;
     let movie = tsd::MovieArchive::decode(message.data.as_slice())?;
-    validate_parent(&movie.super_, slide_id, "live video")?;
-    if movie.is_live_video != Some(true) {
+    validate_parent(&movie.super_, slide_id, "movie")?;
+    if movie.is_live_video != Some(true) && !is_movie_placeholder(&movie) {
         return Err(Error::InvalidFormat(
-            "Keynote layout movie is not marked as live video".to_owned(),
+            "Keynote layout movie is neither live video nor a file-backed media placeholder"
+                .to_owned(),
         ));
     }
     Ok(())

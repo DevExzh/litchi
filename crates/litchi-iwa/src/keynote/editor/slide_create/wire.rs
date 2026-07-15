@@ -28,6 +28,8 @@ const SLIDE_NUMBER_LAYOUT_FIELD: u32 = 26;
 const SLIDE_NOTE_FIELD: u32 = 27;
 const SLIDE_CLASSIC_STYLESHEET_FIELD: u32 = 29;
 const SLIDE_OBJECT_PLACEHOLDER_FIELD: u32 = 30;
+const SLIDE_OWNED_DRAWABLES_FIELD: u32 = 7;
+const SLIDE_DRAWABLES_Z_ORDER_FIELD: u32 = 42;
 const SLIDE_BODY_PARAGRAPH_STYLES_FIELD: u32 = 31;
 const SLIDE_DEPRECATED_OBJECT_VISIBLE_FIELD: u32 = 34;
 const SLIDE_BODY_LIST_STYLES_FIELD: u32 = 35;
@@ -118,6 +120,7 @@ pub(super) fn materialize_slide_object(
     object: &mut ArchiveObject,
     template_slide_id: u64,
     note_id: u64,
+    template_only_drawables: &[u64],
 ) -> Result<()> {
     let indexes = object
         .messages
@@ -134,7 +137,12 @@ pub(super) fn materialize_slide_object(
     let message_index = *message_index;
     let original = object.messages[message_index].data.as_slice();
     let original_slide = kn::SlideArchive::decode(original)?;
-    let removed_references = removed_layout_references(&original_slide);
+    let template_only = template_only_drawables
+        .iter()
+        .copied()
+        .collect::<HashSet<_>>();
+    let mut removed_references = removed_layout_references(&original_slide);
+    removed_references.extend(&template_only);
     let mut expected = original_slide.clone();
 
     expected.builds.clear();
@@ -175,6 +183,12 @@ pub(super) fn materialize_slide_object(
     expected.deprecated_object_placeholder_visible_for_export = None;
     expected.info_using_object_placeholder_geometry = None;
     expected.info_using_object_placeholder_geometry_matches_object_placeholder_geometry = None;
+    expected
+        .owned_drawables
+        .retain(|reference| !template_only.contains(&reference.identifier));
+    expected
+        .drawables_z_order
+        .retain(|reference| !template_only.contains(&reference.identifier));
 
     let mut data = original.to_vec();
     for field in [
@@ -187,6 +201,16 @@ pub(super) fn materialize_slide_object(
         SLIDE_INFOS_USING_OBJECT_GEOMETRY_FIELD,
     ] {
         data = rewrite_repeated_length_delimited_fields(&data, field, &[])?;
+    }
+    for (field, references) in [
+        (SLIDE_OWNED_DRAWABLES_FIELD, &expected.owned_drawables),
+        (SLIDE_DRAWABLES_Z_ORDER_FIELD, &expected.drawables_z_order),
+    ] {
+        let values = references
+            .iter()
+            .map(Message::encode_to_vec)
+            .collect::<Vec<_>>();
+        data = rewrite_repeated_length_delimited_fields(&data, field, &values)?;
     }
     for (field, was_present) in [
         (SLIDE_NAME_FIELD, original_slide.name.is_some()),

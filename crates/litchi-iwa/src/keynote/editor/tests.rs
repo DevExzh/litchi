@@ -4294,34 +4294,122 @@ fn creates_slide_with_materialized_layout_live_video_graph() {
 }
 
 #[test]
-fn slide_layout_update_rejects_non_live_layout_movies_transactionally() {
-    let mut package = test_package_with_live_video_layout();
-    package
-        .update_archive("Index/TemplateSlide-38.iwa", |archive| {
-            let movie = archive.object_mut(70).unwrap();
-            let mut decoded = tsd::MovieArchive::decode(movie.messages[0].data.as_slice())?;
-            decoded.is_live_video = Some(false);
-            movie.replace_message(
-                0,
-                RawMessage {
-                    type_: TEST_MOVIE_MESSAGE_TYPE,
-                    data: decoded.encode_to_vec(),
-                },
-            )?;
-            Ok(())
-        })
+fn slide_layout_update_materializes_and_removes_file_movie_placeholders() {
+    let mut editor = KeynoteEditor::from_package(test_package_with_file_movie_layout(1)).unwrap();
+    let layouts = editor.slide_layouts().unwrap();
+    let movie_layout = layouts
+        .iter()
+        .find(|layout| layout.name == "Title & Movie Placeholder")
+        .unwrap()
+        .id;
+    let bullets = layouts
+        .iter()
+        .find(|layout| layout.name == "Title & Bullets")
+        .unwrap()
+        .id;
+
+    editor.set_slide_layout(0, movie_layout).unwrap();
+    let graph = ObjectGraph::read(editor.package()).unwrap();
+    let slide: kn::SlideArchive = graph.decode_type(4, 5, "KN.SlideArchive").unwrap();
+    assert_eq!(
+        slide
+            .owned_drawables
+            .iter()
+            .map(|reference| reference.identifier)
+            .collect::<Vec<_>>(),
+        [73]
+    );
+    let movie: tsd::MovieArchive = graph
+        .decode_type(73, TEST_MOVIE_MESSAGE_TYPE, "TSD.MovieArchive")
         .unwrap();
-    let mut editor = KeynoteEditor::from_package(package).unwrap();
-    let live_video = editor
+    assert_eq!(movie.super_.parent, Some(reference(4)));
+    assert_eq!(movie.super_.title, Some(reference(74)));
+    assert_eq!(movie.super_.caption, Some(reference(75)));
+    assert_eq!(
+        movie.movie_data,
+        Some(tsp::DataReference { identifier: 2_002 })
+    );
+    assert_eq!(
+        movie.poster_image_data,
+        Some(tsp::DataReference { identifier: 2_001 })
+    );
+    assert_eq!(movie.flags, Some(1));
+    assert_ne!(movie.is_live_video, Some(true));
+
+    editor.set_slide_layout(0, bullets).unwrap();
+    let graph = ObjectGraph::read(editor.package()).unwrap();
+    let slide: kn::SlideArchive = graph.decode_type(4, 5, "KN.SlideArchive").unwrap();
+    assert_eq!(slide.owned_drawables, [reference(5), reference(6)]);
+    for identifier in 73..=75 {
+        assert!(!graph.objects.contains_key(&identifier));
+    }
+}
+
+#[test]
+fn creates_slide_with_materialized_file_movie_placeholder_graph() {
+    let mut editor = KeynoteEditor::from_package(test_package_with_file_movie_layout(1)).unwrap();
+    let movie_layout = editor
         .slide_layouts()
         .unwrap()
         .into_iter()
-        .find(|layout| layout.name == "Title & Live Video")
+        .find(|layout| layout.name == "Title & Movie Placeholder")
         .unwrap()
         .id;
-    let before = editor.to_bytes().unwrap();
-    assert!(editor.set_slide_layout(0, live_video).is_err());
-    assert_eq!(editor.to_bytes().unwrap(), before);
+    let created = editor.insert_slide(1, movie_layout).unwrap();
+    let graph = ObjectGraph::read(editor.package()).unwrap();
+    let slide: kn::SlideArchive = graph
+        .decode_type(created.slide_id, TEST_SLIDE_MESSAGE_TYPE, "KN.SlideArchive")
+        .unwrap();
+    let movie_id = slide.owned_drawables[0].identifier;
+    let movie: tsd::MovieArchive = graph
+        .decode_type(movie_id, TEST_MOVIE_MESSAGE_TYPE, "TSD.MovieArchive")
+        .unwrap();
+    assert_eq!(movie.super_.parent, Some(reference(created.slide_id)));
+    assert_ne!(movie.super_.title, Some(reference(71)));
+    assert_ne!(movie.super_.caption, Some(reference(72)));
+    assert_eq!(movie.flags, Some(1));
+    assert_eq!(created.title, None);
+    assert_eq!(created.body, None);
+}
+
+#[test]
+fn static_layout_movies_remain_template_only_for_update_and_creation() {
+    let mut editor = KeynoteEditor::from_package(test_package_with_file_movie_layout(0)).unwrap();
+    let movie_layout = editor
+        .slide_layouts()
+        .unwrap()
+        .into_iter()
+        .find(|layout| layout.name == "Title & Static Movie")
+        .unwrap()
+        .id;
+
+    editor.set_slide_layout(0, movie_layout).unwrap();
+    let created = editor.insert_slide(1, movie_layout).unwrap();
+    let graph = ObjectGraph::read(editor.package()).unwrap();
+    for slide_id in [4, created.slide_id] {
+        let slide: kn::SlideArchive = graph
+            .decode_type(slide_id, TEST_SLIDE_MESSAGE_TYPE, "KN.SlideArchive")
+            .unwrap();
+        assert_eq!(
+            slide
+                .owned_drawables
+                .iter()
+                .filter(|reference| graph
+                    .message_data_type(
+                        reference.identifier,
+                        TEST_MOVIE_MESSAGE_TYPE,
+                        "TSD.MovieArchive"
+                    )
+                    .is_ok())
+                .count(),
+            0
+        );
+        assert_eq!(slide.template_slide, Some(reference(38)));
+    }
+    let template_movie: tsd::MovieArchive = graph
+        .decode_type(70, TEST_MOVIE_MESSAGE_TYPE, "TSD.MovieArchive")
+        .unwrap();
+    assert_eq!(template_movie.flags, Some(0));
 }
 
 #[test]
@@ -5869,6 +5957,80 @@ fn test_package_with_live_video_layout() -> IWorkPackage {
             )?;
             movie.archive_info.message_infos[0].object_references = vec![72, 71, 60];
             movie.archive_info.message_infos[0].data_references = vec![2_001];
+            archive.insert_object(movie)?;
+            archive.insert_object(object(
+                71,
+                STANDIN_CAPTION_MESSAGE_TYPE,
+                tsd::StandinCaptionArchive::default(),
+            ))?;
+            archive.insert_object(object(
+                72,
+                STANDIN_CAPTION_MESSAGE_TYPE,
+                tsd::StandinCaptionArchive::default(),
+            ))?;
+            Ok(())
+        })
+        .unwrap();
+    package
+}
+
+fn test_package_with_file_movie_layout(flags: u32) -> IWorkPackage {
+    let mut package = test_package_with_two_layouts();
+    package
+        .update_archive("Index/TemplateSlide-38.iwa", |archive| {
+            let slide = archive.object_mut(38).unwrap();
+            let mut decoded = kn::SlideArchive::decode(slide.messages[0].data.as_slice())?;
+            decoded.name = Some(if flags & 1 == 0 {
+                "Title & Static Movie".to_owned()
+            } else {
+                "Title & Movie Placeholder".to_owned()
+            });
+            decoded.owned_drawables = vec![reference(70)];
+            decoded.drawables_z_order = decoded.owned_drawables.clone();
+            slide.replace_message(
+                0,
+                RawMessage {
+                    type_: TEST_SLIDE_MESSAGE_TYPE,
+                    data: decoded.encode_to_vec(),
+                },
+            )?;
+
+            let mut movie = object(
+                70,
+                TEST_MOVIE_MESSAGE_TYPE,
+                tsd::MovieArchive {
+                    super_: tsd::DrawableArchive {
+                        geometry: Some(tsd::GeometryArchive {
+                            position: Some(tsp::Point { x: 500.0, y: 100.0 }),
+                            size: Some(tsp::Size {
+                                width: 800.0,
+                                height: 300.0,
+                            }),
+                            ..Default::default()
+                        }),
+                        parent: Some(reference(38)),
+                        title: Some(reference(71)),
+                        caption: Some(reference(72)),
+                        accessibility_description: Some("Test movie".to_owned()),
+                        ..Default::default()
+                    },
+                    movie_data: Some(tsp::DataReference { identifier: 2_002 }),
+                    poster_image_data: Some(tsp::DataReference { identifier: 2_001 }),
+                    style: Some(reference(60)),
+                    original_size: Some(tsp::Size {
+                        width: 800.0,
+                        height: 300.0,
+                    }),
+                    natural_size: Some(tsp::Size {
+                        width: 800.0,
+                        height: 300.0,
+                    }),
+                    flags: Some(flags),
+                    ..Default::default()
+                },
+            );
+            movie.archive_info.message_infos[0].object_references = vec![72, 71, 60];
+            movie.archive_info.message_infos[0].data_references = vec![2_001, 2_002];
             archive.insert_object(movie)?;
             archive.insert_object(object(
                 71,

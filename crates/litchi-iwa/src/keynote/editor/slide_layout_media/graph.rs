@@ -7,20 +7,31 @@ const SLIDE_MESSAGE_TYPE: u32 = 5;
 const IMAGE_MESSAGE_TYPE: u32 = 3_005;
 const MOVIE_MESSAGE_TYPE: u32 = 3_007;
 const LIVE_VIDEO_INFO_FIELD: u32 = 100;
+const MOVIE_MEDIA_PLACEHOLDER_FLAG: u32 = 1;
 
 #[derive(Debug, Default)]
 pub(in crate::keynote::editor) struct LayoutMediaRoots {
     pub(super) images: Vec<u64>,
     pub(super) live_videos: Vec<u64>,
+    pub(super) movie_placeholders: Vec<u64>,
+    template_movies: Vec<u64>,
 }
 
 impl LayoutMediaRoots {
     pub(super) fn is_empty(&self) -> bool {
-        self.images.is_empty() && self.live_videos.is_empty()
+        self.images.is_empty() && self.live_videos.is_empty() && self.movie_placeholders.is_empty()
     }
 
     pub(super) fn identifiers(&self) -> impl Iterator<Item = u64> + '_ {
-        self.images.iter().chain(&self.live_videos).copied()
+        self.images
+            .iter()
+            .chain(&self.live_videos)
+            .chain(&self.movie_placeholders)
+            .copied()
+    }
+
+    pub(in crate::keynote::editor) fn template_movies(&self) -> &[u64] {
+        &self.template_movies
     }
 }
 
@@ -29,20 +40,25 @@ pub(in crate::keynote::editor) fn layout_media_roots(
     slide: &kn::SlideArchive,
     context: &str,
 ) -> Result<LayoutMediaRoots> {
-    media_roots(graph, slide, MoviePolicy::RequireLiveVideo, context)
+    media_roots(graph, slide, MoviePolicy::CollectTemplateMovies, context)
 }
 
 fn live_slide_media_candidates(
     graph: &ObjectGraph,
     slide: &kn::SlideArchive,
 ) -> Result<LayoutMediaRoots> {
-    media_roots(graph, slide, MoviePolicy::IgnoreNonLiveVideo, "live slide")
+    media_roots(
+        graph,
+        slide,
+        MoviePolicy::IgnoreTemplateMovies,
+        "live slide",
+    )
 }
 
 #[derive(Clone, Copy)]
 enum MoviePolicy {
-    RequireLiveVideo,
-    IgnoreNonLiveVideo,
+    CollectTemplateMovies,
+    IgnoreTemplateMovies,
 }
 
 fn media_roots(
@@ -78,10 +94,10 @@ fn media_roots(
                 graph.decode_type(reference.identifier, MOVIE_MESSAGE_TYPE, "TSD.MovieArchive")?;
             if movie.is_live_video == Some(true) {
                 roots.live_videos.push(reference.identifier);
-            } else if matches!(movie_policy, MoviePolicy::RequireLiveVideo) {
-                return Err(Error::InvalidFormat(format!(
-                    "Keynote {context} contains a non-live movie that cannot yet be materialized safely"
-                )));
+            } else if is_movie_placeholder(&movie) {
+                roots.movie_placeholders.push(reference.identifier);
+            } else if matches!(movie_policy, MoviePolicy::CollectTemplateMovies) {
+                roots.template_movies.push(reference.identifier);
             }
         }
     }
@@ -119,6 +135,13 @@ pub(super) fn match_live_media_roots(
             |identifier| live_video_signature(graph, identifier),
             "live video",
         )?,
+        movie_placeholders: match_roots(
+            &templates.movie_placeholders,
+            &candidates.movie_placeholders,
+            |identifier| movie_placeholder_signature(graph, identifier),
+            "movie placeholder",
+        )?,
+        template_movies: Vec::new(),
     })
 }
 
@@ -168,12 +191,12 @@ fn image_signature(graph: &ObjectGraph, identifier: u64) -> Result<tsd::ImageArc
 }
 
 #[derive(PartialEq)]
-struct LiveVideoSignature {
+struct MovieSignature {
     movie: tsd::MovieArchive,
     extension_payloads: Vec<Vec<u8>>,
 }
 
-fn live_video_signature(graph: &ObjectGraph, identifier: u64) -> Result<LiveVideoSignature> {
+fn live_video_signature(graph: &ObjectGraph, identifier: u64) -> Result<MovieSignature> {
     let data = graph.message_data_type(identifier, MOVIE_MESSAGE_TYPE, "TSD.MovieArchive")?;
     let mut movie = tsd::MovieArchive::decode(data)?;
     if movie.is_live_video != Some(true) {
@@ -182,13 +205,37 @@ fn live_video_signature(graph: &ObjectGraph, identifier: u64) -> Result<LiveVide
         )));
     }
     clear_instance_references(&mut movie.super_);
-    Ok(LiveVideoSignature {
+    Ok(MovieSignature {
         movie,
         extension_payloads: repeated_length_delimited_payloads(data, LIVE_VIDEO_INFO_FIELD)?
             .into_iter()
             .map(ToOwned::to_owned)
             .collect(),
     })
+}
+
+fn movie_placeholder_signature(graph: &ObjectGraph, identifier: u64) -> Result<MovieSignature> {
+    let data = graph.message_data_type(identifier, MOVIE_MESSAGE_TYPE, "TSD.MovieArchive")?;
+    let mut movie = tsd::MovieArchive::decode(data)?;
+    if movie.is_live_video == Some(true) || !is_movie_placeholder(&movie) {
+        return Err(Error::InvalidFormat(format!(
+            "Keynote layout movie {identifier} is not a file-backed media placeholder"
+        )));
+    }
+    clear_instance_references(&mut movie.super_);
+    Ok(MovieSignature {
+        movie,
+        extension_payloads: repeated_length_delimited_payloads(data, LIVE_VIDEO_INFO_FIELD)?
+            .into_iter()
+            .map(ToOwned::to_owned)
+            .collect(),
+    })
+}
+
+pub(super) fn is_movie_placeholder(movie: &tsd::MovieArchive) -> bool {
+    movie
+        .flags
+        .is_some_and(|flags| flags & MOVIE_MEDIA_PLACEHOLDER_FLAG != 0)
 }
 
 fn clear_instance_references(drawable: &mut tsd::DrawableArchive) {

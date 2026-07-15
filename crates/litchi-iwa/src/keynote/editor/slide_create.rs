@@ -12,6 +12,8 @@ use graph::{find_note_source, take_identifier, template_clone_object_ids};
 use layout::{LayoutCatalog, default_layout_node_id, read_layout_graph, resolve_layout};
 use wire::{clear_user_guides, insert_slide_node, materialize_slide_object, prepare_slide_number};
 
+const SLIDE_MESSAGE_TYPE: u32 = 5;
+
 impl KeynoteEditor {
     /// List the slide layouts stored by the presentation theme.
     pub fn slide_layouts(&self) -> Result<Vec<KeynoteSlideLayoutInfo>> {
@@ -77,8 +79,12 @@ impl KeynoteEditor {
             &resolved.slide,
             "slide-creation layout",
         )?;
-        let template_ids =
-            template_clone_object_ids(&template_archive, resolved.slide_id, &resolved.slide)?;
+        let template_ids = template_clone_object_ids(
+            &template_archive,
+            resolved.slide_id,
+            &resolved.slide,
+            layout_media_roots.template_movies(),
+        )?;
         let note_source = find_note_source(self, &graph, &slides)?;
         let note_archive = self.package().archive(&note_source.archive_name)?;
 
@@ -127,6 +133,7 @@ impl KeynoteEditor {
             })?,
             resolved.slide_id,
             new_note_id,
+            layout_media_roots.template_movies(),
         )?;
         slide_layout_media::materialize_cloned_media(
             &mut new_archive,
@@ -187,11 +194,23 @@ impl KeynoteEditor {
         set_package_last_object_identifier(&mut staged, next_identifier - 1)?;
 
         let preview = KeynoteEditor::from_package(staged.clone())?;
-        let text_storage_ids = preview
+        let mut text_storage_ids = preview
             .slide_text_storages(index)?
             .into_iter()
             .map(|storage| storage.storage.object_id)
-            .collect::<Vec<_>>();
+            .collect::<HashSet<_>>();
+        let preview_graph = ObjectGraph::read(preview.package())?;
+        let created_slide: kn::SlideArchive =
+            preview_graph.decode_type(new_slide_id, SLIDE_MESSAGE_TYPE, "KN.SlideArchive")?;
+        for placeholder in created_slide
+            .title_placeholder
+            .iter()
+            .chain(created_slide.body_placeholder.iter())
+        {
+            if let Some(storage_id) = preview_graph.drawable_storage(placeholder.identifier)? {
+                text_storage_ids.insert(storage_id);
+            }
+        }
         let mut text = IWorkTextEditor::from_package(staged);
         for storage_id in text_storage_ids {
             text.set_text(storage_id, "")?;

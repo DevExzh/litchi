@@ -76,6 +76,7 @@ pub(super) fn template_clone_object_ids(
     archive: &Archive,
     template_slide_id: u64,
     template: &kn::SlideArchive,
+    template_only_drawables: &[u64],
 ) -> Result<Vec<u64>> {
     if !template.builds.is_empty()
         || !template.build_chunks.is_empty()
@@ -105,24 +106,26 @@ pub(super) fn template_clone_object_ids(
         .iter()
         .map(|reference| reference.identifier)
         .collect::<HashSet<_>>();
-    for (label, reference) in [
-        ("title", template.title_placeholder.as_ref()),
-        ("body", template.body_placeholder.as_ref()),
-    ] {
-        if let Some(reference) = reference
-            && !owned.contains(&reference.identifier)
-        {
-            return Err(Error::InvalidFormat(format!(
-                "Keynote layout {label} placeholder {} is not an owned drawable",
-                reference.identifier
-            )));
-        }
+    let template_only = template_only_drawables
+        .iter()
+        .copied()
+        .collect::<HashSet<_>>();
+    if template_only.len() != template_only_drawables.len()
+        || !template_only
+            .iter()
+            .all(|identifier| owned.contains(identifier))
+    {
+        return Err(Error::InvalidFormat(
+            "Keynote template-only drawable selection is invalid".to_owned(),
+        ));
     }
-
     let mut selected = HashSet::from([template_slide_id]);
     let mut pending = template
         .owned_drawables
         .iter()
+        .filter(|reference| !template_only.contains(&reference.identifier))
+        .chain(template.title_placeholder.iter())
+        .chain(template.body_placeholder.iter())
         .chain(template.slide_number_placeholder.iter())
         .chain(template.user_defined_guide_storage.iter())
         .map(|reference| reference.identifier)
