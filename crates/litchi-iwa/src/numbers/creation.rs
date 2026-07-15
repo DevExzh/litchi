@@ -8,6 +8,7 @@ use plist::Value;
 use prost::Message;
 
 use super::editor::NumbersEditor;
+use super::formula_owner::{empty_table_formula_owner, uuid_as_cfuuid};
 
 const DOCUMENT_ARCHIVE_ENTRY: &str = "Index/Document.iwa";
 const CALCULATION_ARCHIVE_ENTRY: &str = "Index/CalculationEngine.iwa";
@@ -66,7 +67,6 @@ const DOCUMENT_METADATA: u64 = 38;
 const FORMULA_OWNER: u64 = 39;
 
 const TABLE_FORMULA_OWNER_INTERNAL_ID: u32 = 6;
-const TABLE_FORMULA_OWNER_KIND: u32 = 1;
 
 #[derive(Debug, Clone, Copy)]
 #[repr(u32)]
@@ -742,34 +742,8 @@ fn document_metadata_archive() -> Result<Archive> {
 }
 
 fn calculation_archive(locale: &str, table_uuid: &tsp::Uuid) -> Result<Archive> {
-    let formula_owner_uuid = formula_owner_uuid_for_table(table_uuid);
-    let formula_owner = tsce::FormulaOwnerDependenciesArchive {
-        formula_owner_uid: formula_owner_uuid,
-        internal_formula_owner_id: TABLE_FORMULA_OWNER_INTERNAL_ID,
-        owner_kind: Some(TABLE_FORMULA_OWNER_KIND),
-        cell_dependencies: Some(tsce::CellDependenciesExpandedArchive::default()),
-        range_dependencies: Some(tsce::RangeDependenciesArchive::default()),
-        volatile_dependencies: Some(tsce::VolatileDependenciesExpandedArchive {
-            volatile_time_cells: Some(tsce::CellCoordSetArchive::default()),
-            volatile_random_cells: Some(tsce::CellCoordSetArchive::default()),
-            volatile_locale_cells: Some(tsce::CellCoordSetArchive::default()),
-            volatile_sheet_table_name_cells: Some(tsce::CellCoordSetArchive::default()),
-            volatile_remote_data_cells: Some(tsce::CellCoordSetArchive::default()),
-            volatile_geometry_cell_refs: Some(tsce::InternalCellRefSetArchive::default()),
-        }),
-        spanning_column_dependencies: Some(tsce::SpanningDependenciesExpandedArchive::default()),
-        spanning_row_dependencies: Some(tsce::SpanningDependenciesExpandedArchive::default()),
-        whole_owner_dependencies: Some(tsce::WholeOwnerDependenciesExpandedArchive {
-            dependent_cells: Some(tsce::InternalCellRefSetArchive::default()),
-        }),
-        cell_errors: Some(tsce::CellErrorsArchive::default()),
-        formula_owner: Some(reference(TABLE_INFO)),
-        tiled_cell_dependencies: Some(tsce::CellDependenciesTiledArchive::default()),
-        uuid_references: Some(tsce::UuidReferencesArchive::default()),
-        tiled_range_dependencies: Some(tsce::RangeDependenciesTiledArchive::default()),
-        spill_range_sizes: Some(tsce::CellSpillSizesArchive::default()),
-        ..Default::default()
-    };
+    let formula_owner =
+        empty_table_formula_owner(table_uuid, TABLE_INFO, TABLE_FORMULA_OWNER_INTERNAL_ID);
     Ok(Archive {
         objects: vec![
             object(
@@ -780,7 +754,7 @@ fn calculation_archive(locale: &str, table_uuid: &tsp::Uuid) -> Result<Archive> 
                         owner_id_map: Some(tsce::OwnerIdMapArchive {
                             map_entry: vec![tsce::owner_id_map_archive::OwnerIdMapArchiveEntry {
                                 internal_owner_id: TABLE_FORMULA_OWNER_INTERNAL_ID,
-                                owner_id: uuid_as_cfuuid(&formula_owner_uuid),
+                                owner_id: uuid_as_cfuuid(&formula_owner.formula_owner_uid),
                             }],
                             ..Default::default()
                         }),
@@ -1167,23 +1141,6 @@ fn format_tsp_uuid(uuid: &tsp::Uuid) -> String {
     )
 }
 
-fn formula_owner_uuid_for_table(table: &tsp::Uuid) -> tsp::Uuid {
-    tsp::Uuid {
-        lower: table.upper.swap_bytes(),
-        upper: table.lower.swap_bytes(),
-    }
-}
-
-fn uuid_as_cfuuid(uuid: &tsp::Uuid) -> tsp::CfuuidArchive {
-    tsp::CfuuidArchive {
-        uuid_bytes: None,
-        uuid_w0: Some(uuid.lower as u32),
-        uuid_w1: Some((uuid.lower >> 32) as u32),
-        uuid_w2: Some(uuid.upper as u32),
-        uuid_w3: Some((uuid.upper >> 32) as u32),
-    }
-}
-
 fn object(
     identifier: u64,
     message_type: NumbersMessageType,
@@ -1380,6 +1337,147 @@ mod tests {
         );
 
         editor.clear_cell(table_id, 0, 2).unwrap();
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
+    }
+
+    #[test]
+    fn generated_added_table_supports_formula_crud() {
+        let mut editor = NumbersEditor::create().unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let table = editor
+            .add_empty_table(sheet_id, "Calculated", 4, 3)
+            .unwrap();
+        editor
+            .set_cell(table.object_id, 0, 0, CellValue::Number(21.0))
+            .unwrap();
+        editor
+            .set_cell(table.object_id, 0, 1, CellValue::Number(2.0))
+            .unwrap();
+        let baseline = editor.to_bytes().unwrap();
+
+        editor
+            .set_formula(
+                table.object_id,
+                0,
+                2,
+                FormulaExpression::binary(
+                    FormulaBinaryOperator::Multiply,
+                    FormulaExpression::cell(FormulaCellReference::relative(0, 0)),
+                    FormulaExpression::cell(FormulaCellReference::relative(0, 1)),
+                ),
+            )
+            .unwrap();
+        let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let sheets = document.sheets().unwrap();
+        let added = sheets[0]
+            .tables
+            .iter()
+            .find(|candidate| candidate.name == table.name)
+            .unwrap();
+        assert_eq!(
+            added.get_cell(0, 2),
+            Some(&CellValue::Formula("=(A1*B1)".to_owned()))
+        );
+
+        editor.clear_cell(table.object_id, 0, 2).unwrap();
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
+    }
+
+    #[test]
+    fn generated_added_table_removes_its_formula_owner() {
+        let mut editor = NumbersEditor::create().unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let table = editor
+            .add_empty_table(sheet_id, "Disposable", 3, 2)
+            .unwrap();
+        editor
+            .set_formula(
+                table.object_id,
+                0,
+                0,
+                FormulaExpression::binary(
+                    FormulaBinaryOperator::Add,
+                    FormulaExpression::Number(1.0),
+                    FormulaExpression::Number(2.0),
+                ),
+            )
+            .unwrap();
+        let before = editor.package().archive(CALCULATION_ARCHIVE_ENTRY).unwrap();
+        assert_eq!(
+            before
+                .objects
+                .iter()
+                .flat_map(|object| &object.messages)
+                .filter(
+                    |message| message.type_ == NumbersMessageType::FormulaOwnerDependencies.value()
+                )
+                .count(),
+            2
+        );
+
+        editor.remove_table(table.object_id).unwrap();
+        let calculation = editor.package().archive(CALCULATION_ARCHIVE_ENTRY).unwrap();
+        let engine = calculation
+            .objects
+            .iter()
+            .flat_map(|object| &object.messages)
+            .find(|message| message.type_ == NumbersMessageType::CalculationEngine.value())
+            .map(|message| tsce::CalculationEngineArchive::decode(message.data.as_slice()).unwrap())
+            .unwrap();
+        assert_eq!(engine.dependency_tracker.number_of_formulas, Some(0));
+        assert_eq!(
+            engine.dependency_tracker.formula_owner_dependencies.len(),
+            1
+        );
+        assert_eq!(
+            calculation
+                .objects
+                .iter()
+                .flat_map(|object| &object.messages)
+                .filter(
+                    |message| message.type_ == NumbersMessageType::FormulaOwnerDependencies.value()
+                )
+                .count(),
+            1
+        );
+        let package = editor.package();
+        let maximum_identifier = package
+            .iwa_entry_names()
+            .flat_map(|name| package.archive(name).unwrap().objects)
+            .filter_map(|object| object.archive_info.identifier)
+            .max()
+            .unwrap();
+        assert_eq!(
+            crate::package_metadata::package_last_object_identifier(package).unwrap(),
+            Some(maximum_identifier)
+        );
+    }
+
+    #[test]
+    fn generated_table_removal_rejects_incoming_formula_references() {
+        let mut editor = NumbersEditor::create().unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let source_table_id = editor.tables().unwrap()[0].object_id;
+        let target = editor
+            .add_empty_table(sheet_id, "Referenced", 2, 2)
+            .unwrap();
+        editor
+            .set_cell(target.object_id, 0, 0, CellValue::Number(7.0))
+            .unwrap();
+        editor
+            .set_formula(
+                source_table_id,
+                0,
+                0,
+                FormulaExpression::table_cell(
+                    target.object_id,
+                    FormulaCellReference::relative(0, 0),
+                ),
+            )
+            .unwrap();
+        let baseline = editor.to_bytes().unwrap();
+
+        assert!(editor.remove_table(target.object_id).is_err());
         assert_eq!(editor.to_bytes().unwrap(), baseline);
     }
 

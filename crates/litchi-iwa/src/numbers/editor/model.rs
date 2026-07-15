@@ -1005,12 +1005,12 @@ pub(super) fn remap_optional_table_reference(
 pub(super) fn prepare_empty_table_model(
     model: &mut TableModelArchive,
     remap: &HashMap<u64, u64>,
-    table_uuid: String,
+    table_uuid: &str,
     name: &str,
     rows: u32,
     columns: u32,
 ) -> Result<()> {
-    model.table_id = table_uuid;
+    model.table_id = table_uuid.to_owned();
     model.from_table_id = None;
     model.was_cut = Some(false);
     model.table_name = name.to_owned();

@@ -86,6 +86,65 @@ pub(super) fn append_formula_owners_to_engine(
     Ok(data)
 }
 
+pub(super) fn remove_formula_owners_from_engine(
+    original: &[u8],
+    owner_ids: &HashSet<u64>,
+    internal_owner_ids: &HashSet<u32>,
+    formula_count: u64,
+) -> Result<Vec<u8>> {
+    let previous = tsce::CalculationEngineArchive::decode(original)?;
+    let mut expected = previous.clone();
+    expected
+        .dependency_tracker
+        .formula_owner_dependencies
+        .retain(|reference| !owner_ids.contains(&reference.identifier));
+    if let Some(owner_map) = &mut expected.dependency_tracker.owner_id_map {
+        owner_map
+            .map_entry
+            .retain(|entry| !internal_owner_ids.contains(&entry.internal_owner_id));
+    }
+    let previous_count = previous
+        .dependency_tracker
+        .number_of_formulas
+        .unwrap_or_default();
+    expected.dependency_tracker.number_of_formulas = Some(
+        previous_count
+            .checked_sub(formula_count)
+            .ok_or_else(|| Error::InvalidFormat("Numbers formula count underflow".to_owned()))?,
+    );
+
+    let data = transform_length_delimited_field(original, 2, |tracker_data| {
+        let tracker = tsce::DependencyTrackerArchive::decode(tracker_data)?;
+        let mut data = crate::wire::remove_repeated_length_delimited_field_where(
+            tracker_data,
+            6,
+            |payload| Ok(owner_ids.contains(&tsp::Reference::decode(payload)?.identifier)),
+        )?;
+        if tracker.owner_id_map.is_some() {
+            data = transform_length_delimited_field(&data, 3, |map_data| {
+                crate::wire::remove_repeated_length_delimited_field_where(map_data, 1, |payload| {
+                    Ok(internal_owner_ids.contains(
+                        &tsce::owner_id_map_archive::OwnerIdMapArchiveEntry::decode(payload)?
+                            .internal_owner_id,
+                    ))
+                })
+            })?;
+        }
+        patch_varint_field(
+            &data,
+            5,
+            tracker.number_of_formulas.is_some(),
+            expected.dependency_tracker.number_of_formulas,
+        )
+    })?;
+    if tsce::CalculationEngineArchive::decode(data.as_slice())? != expected {
+        return Err(Error::InvalidFormat(
+            "Numbers CalculationEngine formula-owner removal failed validation".to_owned(),
+        ));
+    }
+    Ok(data)
+}
+
 pub(super) fn remap_formula_owner(
     owner: &mut tsce::FormulaOwnerDependenciesArchive,
     new_table_info_id: u64,

@@ -2,8 +2,12 @@
 
 mod dependency_wire;
 mod formula_storage;
+mod removal;
 
 use super::*;
+use crate::numbers::formula_owner::{
+    empty_table_formula_owner, formula_owner_uuid_for_table, uuid_as_cfuuid,
+};
 use crate::wire::{
     append_repeated_length_delimited_field, patch_nested_varint_field, patch_varint_field,
     transform_length_delimited_field, transform_length_delimited_fields_at_path,
@@ -15,6 +19,7 @@ use dependency_wire::{
 pub(super) use formula_storage::{
     remap_cloned_formula_owner_storage, remap_cloned_formula_storage,
 };
+pub(super) use removal::remove_table_formula_graph;
 
 const CALCULATION_ENGINE_ENTRY: &str = "Index/CalculationEngine.iwa";
 const CALCULATION_ENGINE_MESSAGE_TYPE: u32 = 4_000;
@@ -31,6 +36,71 @@ struct CellTileSource {
     object: ArchiveObject,
     message_index: usize,
     tile: tsce::CellRecordTileArchive,
+}
+
+/// Attach an independent, empty CalculationEngine owner to a newly created table.
+///
+/// Minimal legacy packages may omit a CalculationEngine entirely. They remain
+/// editable, but there is no component in which to register formula state.
+pub(super) fn create_empty_table_formula_graph(
+    package: &mut IWorkPackage,
+    table_info_id: u64,
+    table_uuid: &str,
+) -> Result<Option<u64>> {
+    if !package.contains_entry(CALCULATION_ENGINE_ENTRY) {
+        return Ok(None);
+    }
+    let table_uuid = parse_table_uuid(table_uuid)?;
+    let archive = package.archive(CALCULATION_ENGINE_ENTRY)?;
+    calculation_engine_location(&archive)?;
+    let internal_owner_id = next_internal_owner_id(&archive)?;
+    let owner_id = next_object_identifier(package)?;
+    let owner = empty_table_formula_owner(&table_uuid, table_info_id, internal_owner_id);
+    let owner_map_entry = tsce::owner_id_map_archive::OwnerIdMapArchiveEntry {
+        internal_owner_id,
+        owner_id: uuid_as_cfuuid(&owner.formula_owner_uid),
+    };
+
+    package.update_archive(CALCULATION_ENGINE_ENTRY, |archive| {
+        let (engine_id, engine_message_index) = calculation_engine_location(archive)?;
+        let engine_object = archive.object_mut(engine_id).ok_or_else(|| {
+            Error::InvalidFormat("Numbers CalculationEngine root is missing".to_owned())
+        })?;
+        let original = engine_object.messages[engine_message_index].clone();
+        let data = append_formula_owners_to_engine(
+            original.data.as_slice(),
+            &[owner_id],
+            &[owner_map_entry],
+            0,
+        )?;
+        engine_object.replace_message(
+            engine_message_index,
+            RawMessage {
+                type_: original.type_,
+                data,
+            },
+        )?;
+        let info = &mut engine_object.archive_info.message_infos[engine_message_index];
+        if !info.object_references.contains(&owner_id) {
+            info.object_references.push(owner_id);
+        }
+
+        let mut owner_object = ArchiveObject::new(
+            owner_id,
+            vec![RawMessage {
+                type_: FORMULA_OWNER_MESSAGE_TYPE,
+                data: owner.encode_to_vec(),
+            }],
+        )?;
+        owner_object.archive_info.message_infos[0].versions = vec![3, 2, 10];
+        archive.insert_object(owner_object)
+    })?;
+
+    set_package_last_object_identifier(package, owner_id)?;
+    if let Some(component) = component_identifier_for_entry(package, CALCULATION_ENGINE_ENTRY)? {
+        add_component_object_uuids(package, component, &[owner_id])?;
+    }
+    Ok(Some(owner_id))
 }
 
 /// Clone the CalculationEngine owner family associated with one table.
@@ -78,20 +148,7 @@ pub(super) fn clone_table_formula_graph(
         object_remap.insert(identifier, take_identifier(&mut next_identifier)?);
     }
 
-    let mut next_internal_owner_id = archive
-        .objects
-        .iter()
-        .flat_map(|object| &object.messages)
-        .filter(|message| message.type_ == FORMULA_OWNER_MESSAGE_TYPE)
-        .filter_map(|message| {
-            tsce::FormulaOwnerDependenciesArchive::decode(message.data.as_slice())
-                .ok()
-                .map(|owner| owner.internal_formula_owner_id)
-        })
-        .max()
-        .unwrap_or(0)
-        .checked_add(1)
-        .ok_or_else(|| Error::ParseError("Numbers formula owner ID overflow".to_owned()))?;
+    let mut next_internal_owner_id = next_internal_owner_id(&archive)?;
     let mut internal_remap = HashMap::with_capacity(owners.len());
     for source in &owners {
         let replacement = next_internal_owner_id;
@@ -520,6 +577,23 @@ fn calculation_engine_location(archive: &Archive) -> Result<(u64, usize)> {
     }
 }
 
+fn next_internal_owner_id(archive: &Archive) -> Result<u32> {
+    archive
+        .objects
+        .iter()
+        .flat_map(|object| &object.messages)
+        .filter(|message| message.type_ == FORMULA_OWNER_MESSAGE_TYPE)
+        .filter_map(|message| {
+            tsce::FormulaOwnerDependenciesArchive::decode(message.data.as_slice())
+                .ok()
+                .map(|owner| owner.internal_formula_owner_id)
+        })
+        .max()
+        .unwrap_or(0)
+        .checked_add(1)
+        .ok_or_else(|| Error::ParseError("Numbers formula owner ID overflow".to_owned()))
+}
+
 fn formula_cell_count(
     owner: &tsce::FormulaOwnerDependenciesArchive,
     tiles: &[CellTileSource],
@@ -602,25 +676,8 @@ fn translate_owner_uuid(
     }
 }
 
-fn formula_owner_uuid_for_table(table: &tsp::Uuid) -> tsp::Uuid {
-    tsp::Uuid {
-        lower: table.upper.swap_bytes(),
-        upper: table.lower.swap_bytes(),
-    }
-}
-
 fn uuid_key(uuid: &tsp::Uuid) -> (u64, u64) {
     (uuid.lower, uuid.upper)
-}
-
-fn uuid_as_cfuuid(uuid: &tsp::Uuid) -> tsp::CfuuidArchive {
-    tsp::CfuuidArchive {
-        uuid_bytes: None,
-        uuid_w0: Some(uuid.lower as u32),
-        uuid_w1: Some((uuid.lower >> 32) as u32),
-        uuid_w2: Some(uuid.upper as u32),
-        uuid_w3: Some((uuid.upper >> 32) as u32),
-    }
 }
 
 fn copy_archive_object(source: &ArchiveObject) -> Result<ArchiveObject> {
@@ -634,21 +691,4 @@ fn copy_archive_object(source: &ArchiveObject) -> Result<ArchiveObject> {
     copied.data_offset = source.data_offset;
     copied.data_length = source.data_length;
     Ok(copied)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn native_formula_owner_uuid_reverses_table_uuid_bytes() {
-        let table = parse_table_uuid("68B384C7-9E7F-4B90-A1F5-067B81524A6A").unwrap();
-        assert_eq!(
-            formula_owner_uuid_for_table(&table),
-            tsp::Uuid {
-                lower: 0x904b_7f9e_c784_b368,
-                upper: 0x6a4a_5281_7b06_f5a1,
-            }
-        );
-    }
 }

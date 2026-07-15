@@ -25,7 +25,7 @@ use crate::package_metadata::{
     add_component_external_reference, add_component_object_uuids, component_identifier_for_entry,
     component_uuid_identifiers, next_object_identifier, release_package_identifier_suffix,
     remove_component_external_references_to_object, remove_component_object_uuids,
-    set_package_last_object_identifier,
+    remove_component_registration, set_package_last_object_identifier,
 };
 use crate::protobuf::tst::{
     self, TableDataList, TableDataListSegment, TableModelArchive, Tile, TileRowInfo,
@@ -46,8 +46,9 @@ use crate::wire::{
 };
 use crate::{EmbeddedMediaAsset, Error, IWorkMediaEditor, IWorkPackage, Result};
 use formula_clone::{
-    clone_table_formula_graph, formula_graph_owner_uuids, remap_cloned_formula_owner_storage,
-    remap_cloned_formula_storage, table_formula_graph_is_self_contained,
+    clone_table_formula_graph, create_empty_table_formula_graph, formula_graph_owner_uuids,
+    remap_cloned_formula_owner_storage, remap_cloned_formula_storage, remove_table_formula_graph,
+    table_formula_graph_is_self_contained,
 };
 
 const MAX_TABLE_UIDS: usize = 1_100_000;
@@ -1057,9 +1058,10 @@ impl NumbersEditor {
 
     /// Unlink and remove a table model from its owning sheet.
     ///
-    /// Shared styles and data-list objects are retained because other table
-    /// structures may legally reference them. Dedicated now-empty IWA members
-    /// containing the table-info or model object are removed.
+    /// Private storage, formula dependency owners, UUID registrations, and
+    /// now-empty component members are removed. Shared storage and styles are
+    /// retained. Deletion is rejected while another table has a formula edge
+    /// targeting this table.
     pub fn remove_table(&mut self, table_id: u64) -> Result<NumbersTableInfo> {
         let table = self
             .tables()?
@@ -1070,10 +1072,31 @@ impl NumbersEditor {
             })?;
         let owner = find_table_owner(&self.package, table_id)?;
         let locations = object_locations(&self.package)?;
+        let descriptors = table_models(&self.package)?;
+        let descriptor = descriptors
+            .iter()
+            .find(|descriptor| descriptor.object_id == table_id)
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!("Numbers table model {table_id} is missing"))
+            })?;
+        let owned_graph = table_owned_graph(&self.package, &locations, &descriptor.model)?;
+        let mut shared_owned_ids = HashSet::new();
+        for other in descriptors
+            .iter()
+            .filter(|candidate| candidate.object_id != table_id)
+        {
+            shared_owned_ids
+                .extend(table_owned_graph(&self.package, &locations, &other.model)?.into_keys());
+        }
+        let private_owned_ids = owned_graph
+            .into_keys()
+            .filter(|identifier| !shared_owned_ids.contains(identifier))
+            .collect::<Vec<_>>();
         let sheet_archive = locations.get(&owner.sheet_id).ok_or_else(|| {
             Error::InvalidFormat(format!("Numbers sheet {} is missing", owner.sheet_id))
         })?;
         let mut staged = self.package.clone();
+        let mut removed_identifiers = remove_table_formula_graph(&mut staged, owner.table_info_id)?;
         staged.update_archive(sheet_archive, |archive| {
             let object = archive.object_mut(owner.sheet_id).ok_or_else(|| {
                 Error::InvalidFormat(format!("Numbers sheet {} is missing", owner.sheet_id))
@@ -1115,6 +1138,35 @@ impl NumbersEditor {
         let model_archive = locations.get(&table_id).ok_or_else(|| {
             Error::InvalidFormat(format!("Numbers table model {table_id} is missing"))
         })?;
+        let private_owned_locations = private_owned_ids
+            .iter()
+            .map(|identifier| {
+                locations
+                    .get(identifier)
+                    .map(|entry| (entry.as_str(), *identifier))
+                    .ok_or_else(|| {
+                        Error::InvalidFormat(format!(
+                            "Numbers table storage object {identifier} is missing"
+                        ))
+                    })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let mut affected_components = HashMap::<String, u64>::new();
+        for (entry, identifier) in std::iter::once((info_archive.as_str(), owner.table_info_id))
+            .chain(std::iter::once((model_archive.as_str(), table_id)))
+            .chain(private_owned_locations)
+        {
+            let Some(component) = component_identifier_for_entry(&staged, entry)? else {
+                continue;
+            };
+            affected_components.insert(entry.to_owned(), component);
+            remove_component_external_references_to_object(&mut staged, component, identifier)?;
+            if component_uuid_identifiers(&staged, component)?
+                .is_some_and(|identifiers| identifiers.contains(&identifier))
+            {
+                remove_component_object_uuids(&mut staged, component, &[identifier])?;
+            }
+        }
         let dedicated_component = format!("Index/Tables/Table-{}.iwa", owner.table_info_id);
         if info_archive == model_archive && info_archive == &dedicated_component {
             staged.remove_entry(info_archive).ok_or_else(|| {
@@ -1124,6 +1176,17 @@ impl NumbersEditor {
             remove_object_or_empty_entry(&mut staged, &locations, owner.table_info_id)?;
             remove_object_or_empty_entry(&mut staged, &locations, table_id)?;
         }
+        for identifier in &private_owned_ids {
+            remove_object_or_empty_entry(&mut staged, &locations, *identifier)?;
+        }
+        for (entry, component) in affected_components {
+            if !staged.contains_entry(&entry) {
+                remove_component_registration(&mut staged, component)?;
+            }
+        }
+        removed_identifiers.extend([owner.table_info_id, table_id]);
+        removed_identifiers.extend(private_owned_ids);
+        release_package_identifier_suffix(&mut staged, &removed_identifiers)?;
 
         let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
         if verified
@@ -1216,7 +1279,9 @@ impl NumbersEditor {
     /// Add an empty table to an existing sheet using another table as a style template.
     ///
     /// Cell stores, data lists, row/column UIDs, headers, and stroke state are
-    /// allocated independently. Workbook styles are shared intentionally.
+    /// allocated independently in their corresponding native components. A
+    /// fresh CalculationEngine owner makes the table immediately formula-ready.
+    /// Workbook styles are shared intentionally.
     #[allow(deprecated)]
     pub fn add_empty_table(
         &mut self,
@@ -1263,7 +1328,9 @@ impl NumbersEditor {
         let new_info_id = take_identifier(&mut next_identifier)?;
         let new_model_id = take_identifier(&mut next_identifier)?;
         let owned_kinds = table_owned_objects(&template.model)?;
-        let mut remap = HashMap::with_capacity(owned_kinds.len());
+        let mut remap = HashMap::with_capacity(owned_kinds.len() + 2);
+        remap.insert(template_owner.table_info_id, new_info_id);
+        remap.insert(template.object_id, new_model_id);
         for &identifier in owned_kinds.keys() {
             remap.insert(identifier, take_identifier(&mut next_identifier)?);
         }
@@ -1274,7 +1341,7 @@ impl NumbersEditor {
             .collect::<HashSet<_>>();
         let table_uuid = allocate_table_uuid(new_model_id, &existing_table_ids);
         let mut model = template.model.clone();
-        prepare_empty_table_model(&mut model, &remap, table_uuid, name, rows_u32, columns_u32)?;
+        prepare_empty_table_model(&mut model, &remap, &table_uuid, name, rows_u32, columns_u32)?;
 
         table_info.super_.parent = Some(crate::protobuf::tsp::Reference {
             identifier: sheet_id,
@@ -1305,28 +1372,33 @@ impl NumbersEditor {
         table_info.pivot_data_model = None;
         table_info.pivot_order = None;
 
-        let mut objects = Vec::with_capacity(owned_kinds.len() + 2);
         let mut info_remap = remap.clone();
-        info_remap.insert(template.object_id, new_model_id);
         info_remap.insert(template_owner.sheet_id, sheet_id);
-        objects.push(clone_single_payload_object(
-            template_info_object,
-            new_info_id,
-            info_message_index,
-            table_info.encode_to_vec(),
-            vec![sheet_id, new_model_id],
-            &info_remap,
-            false,
-        )?);
-        objects.push(clone_single_payload_object(
-            template_model_object,
-            new_model_id,
-            model_message_index,
-            model.encode_to_vec(),
-            table_model_references(&model),
-            &remap,
-            false,
-        )?);
+        let mut objects = Vec::with_capacity(owned_kinds.len() + 2);
+        objects.push((
+            template_info_archive.clone(),
+            clone_single_payload_object(
+                template_info_object,
+                new_info_id,
+                info_message_index,
+                table_info.encode_to_vec(),
+                vec![sheet_id, new_model_id],
+                &info_remap,
+                false,
+            )?,
+        ));
+        objects.push((
+            template_model_archive.clone(),
+            clone_single_payload_object(
+                template_model_object,
+                new_model_id,
+                model_message_index,
+                model.encode_to_vec(),
+                table_model_references(&model),
+                &remap,
+                false,
+            )?,
+        ));
         for (&source_id, &kind) in &owned_kinds {
             let archive_name = locations.get(&source_id).ok_or_else(|| {
                 Error::InvalidFormat(format!(
@@ -1339,19 +1411,24 @@ impl NumbersEditor {
                     "Numbers table storage object {source_id} is missing"
                 ))
             })?;
-            objects.push(clone_empty_table_storage(
-                source,
-                remap[&source_id],
-                kind,
-                rows_u32,
-                columns_u32,
-                new_model_id,
-            )?);
+            objects.push((
+                archive_name.clone(),
+                clone_empty_table_storage(
+                    source,
+                    remap[&source_id],
+                    kind,
+                    rows_u32,
+                    columns_u32,
+                    new_model_id,
+                )?,
+            ));
         }
 
         let mut staged = self.package.clone();
-        let component = format!("Index/Tables/Table-{new_info_id}.iwa");
-        staged.replace_archive(&component, &Archive { objects })?;
+        for (archive_name, object) in objects {
+            staged.update_archive(&archive_name, |archive| archive.insert_object(object))?;
+        }
+        register_cloned_numbers_objects(&mut staged, &self.package, &locations, &remap)?;
         let sheet_archive_name = locations
             .get(&sheet_id)
             .ok_or_else(|| Error::InvalidFormat(format!("Numbers sheet {sheet_id} is missing")))?;
@@ -1391,6 +1468,24 @@ impl NumbersEditor {
             }
             Ok(())
         })?;
+        register_numbers_component_reference(
+            &mut staged,
+            sheet_archive_name,
+            template_info_archive,
+            new_info_id,
+        )?;
+        let table_last_identifier = next_identifier.checked_sub(1).ok_or_else(|| {
+            Error::InvalidFormat("Numbers table creation allocated no identifiers".to_owned())
+        })?;
+        set_package_last_object_identifier(&mut staged, table_last_identifier)?;
+        if create_empty_table_formula_graph(&mut staged, new_info_id, &table_uuid)?.is_some() {
+            register_numbers_component_reference(
+                &mut staged,
+                "Index/CalculationEngine.iwa",
+                template_info_archive,
+                new_info_id,
+            )?;
+        }
 
         let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
         let created = verified

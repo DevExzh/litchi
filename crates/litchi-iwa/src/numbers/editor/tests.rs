@@ -4169,12 +4169,9 @@ fn creates_independent_empty_table_on_an_existing_sheet() {
     assert_eq!((created.rows, created.columns), (3, 2));
     assert_eq!(created.name, "Created Table");
     assert_eq!(editor.tables().unwrap().len(), 2);
-    let component_name = editor
-        .package()
-        .entry_names()
-        .find(|name| name.starts_with("Index/Tables/Table-"))
-        .unwrap();
-    let component = editor.package().archive(component_name).unwrap();
+    let locations = object_locations(editor.package()).unwrap();
+    let component_name = locations[&created.object_id].clone();
+    let component = editor.package().archive(&component_name).unwrap();
     let model_object = component.object(created.object_id).unwrap();
     let cloned_model = TableModelArchive::decode(model_object.messages[0].data.as_slice()).unwrap();
     assert_eq!(
@@ -4201,15 +4198,16 @@ fn creates_independent_empty_table_on_an_existing_sheet() {
         "Independent"
     );
 
-    let component = editor
-        .package()
-        .entry_names()
-        .find(|name| name.starts_with("Index/Tables/Table-"))
-        .unwrap()
-        .to_owned();
     editor.remove_table(created.object_id).unwrap();
     assert_eq!(editor.tables().unwrap().len(), 1);
-    assert!(!editor.package().contains_entry(&component));
+    assert!(
+        editor
+            .package()
+            .archive(&component_name)
+            .unwrap()
+            .object(created.object_id)
+            .is_none()
+    );
     let before = editor.to_bytes().unwrap();
     assert!(editor.add_empty_table(999, "Missing", 2, 2).is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
