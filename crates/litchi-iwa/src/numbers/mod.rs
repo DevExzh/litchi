@@ -30,6 +30,7 @@
 //! ```
 
 pub mod cell;
+pub mod creation;
 pub mod document;
 pub mod editor;
 pub mod formula;
@@ -41,6 +42,7 @@ mod bnc;
 mod function_map;
 
 pub use cell::{APPLE_EPOCH_UNIX_OFFSET_SECONDS, CellType, CellValue};
+pub use creation::NumbersDocumentBuilder;
 pub use document::NumbersDocument;
 pub use editor::{
     NumbersCellCommentInfo, NumbersCellCommentReplyInfo, NumbersEditor, NumbersPivotCategoryInfo,

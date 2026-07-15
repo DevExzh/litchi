@@ -15,6 +15,7 @@ use litchi_iwa::protobuf::tsk::{AnnotationAuthorArchive, AnnotationAuthorStorage
 use litchi_iwa::protobuf::tsp::PackageMetadata;
 use litchi_iwa::protobuf::tss::StylesheetArchive;
 use litchi_iwa::protobuf::tst::TableDataList;
+use litchi_iwa::protobuf::tst::{TableInfoArchive, TableModelArchive};
 use litchi_iwa::protobuf::tswp::{ShapeInfoArchive, StorageArchive};
 use prost::Message;
 
@@ -73,7 +74,7 @@ fn print_archive(archive: litchi_iwa::archive::Archive, object_id: Option<u64>) 
             }
         }
         for message in &object.messages {
-            if matches!(message.type_, 0 | 8 | 153 | 212 | 213 | 3_056) {
+            if matches!(message.type_, 0 | 8 | 153 | 205 | 212 | 213 | 3_056) {
                 let hex = message
                     .data
                     .iter()
@@ -132,6 +133,23 @@ fn print_archive(archive: litchi_iwa::archive::Archive, object_id: Option<u64>) 
             {
                 println!("  numbers_document={document:#?}");
             }
+            if message.type_ == 2
+                && let Ok(sheet) = tn::SheetArchive::decode(message.data.as_slice())
+            {
+                println!("  numbers_sheet={sheet:#?}");
+            }
+            if message.type_ == 601
+                && let Ok(state) = litchi_iwa::protobuf::tsa::FunctionBrowserStateArchive::decode(
+                    message.data.as_slice(),
+                )
+            {
+                println!("  function_browser_state={state:#?}");
+            }
+            if message.type_ == 12_009
+                && let Ok(theme) = tn::ThemeArchive::decode(message.data.as_slice())
+            {
+                println!("  numbers_theme={theme:#?}");
+            }
             if message.type_ == 4
                 && let Ok(node) = kn::SlideNodeArchive::decode(message.data.as_slice())
             {
@@ -176,10 +194,14 @@ fn print_archive(archive: litchi_iwa::archive::Archive, object_id: Option<u64>) 
                 println!("  formula_owner_dependencies={owner:#?}");
             }
             if matches!(message.type_, 6_000 | 6_001)
-                && let Ok(model) =
-                    litchi_iwa::protobuf::tst::TableModelArchive::decode(message.data.as_slice())
+                && let Ok(model) = TableModelArchive::decode(message.data.as_slice())
             {
                 println!("  table_model={model:#?}");
+            }
+            if message.type_ == 6_000
+                && let Ok(info) = TableInfoArchive::decode(message.data.as_slice())
+            {
+                println!("  table_info={info:#?}");
             }
             if message.type_ == 6_220
                 && let Ok(filter) =
@@ -222,17 +244,26 @@ fn print_archive(archive: litchi_iwa::archive::Archive, object_id: Option<u64>) 
                 && let Ok(metadata) = PackageMetadata::decode(message.data.as_slice())
             {
                 println!(
-                    "  package_last_object_identifier={} save_token={:?} revision={:?}",
-                    metadata.last_object_identifier, metadata.save_token, metadata.revision
+                    "  package_last_object_identifier={} save_token={:?} revision={:?} package_type={:?} versions={:?}/{:?}/{:?}",
+                    metadata.last_object_identifier,
+                    metadata.save_token,
+                    metadata.revision,
+                    metadata.preferred_package_type,
+                    metadata.read_version,
+                    metadata.write_version,
+                    metadata.file_format_version,
                 );
                 for component in metadata.components {
                     println!(
-                        "  component={} locator={:?} uuid_objects={:?} external_refs={:?}",
+                        "  component={} locator={:?} versions={:?}/{:?}/{:?} uuid_objects={:?} external_refs={:?}",
                         component.identifier,
                         component
                             .locator
                             .as_deref()
                             .unwrap_or(&component.preferred_locator),
+                        component.document_read_version,
+                        component.document_write_version,
+                        component.component_read_version,
                         component
                             .object_uuid_map_entries
                             .iter()
