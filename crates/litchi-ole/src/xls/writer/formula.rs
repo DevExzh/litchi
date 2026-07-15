@@ -70,6 +70,12 @@ pub enum Ptg {
     PtgNE,
     /// Range operator
     PtgRange,
+    /// Unary plus operator
+    PtgUnaryPlus,
+    /// Unary minus operator
+    PtgUnaryMinus,
+    /// Percent postfix operator
+    PtgPercent,
     /// Function call (function index, arg count)
     PtgFunc(u16, u8),
     /// Parentheses
@@ -81,7 +87,8 @@ pub enum Ptg {
 /// Operator precedence
 fn get_precedence(op: &str) -> u8 {
     match op {
-        ":" => 5,
+        ":" => 6,
+        "u+" | "u-" => 5,
         "^" => 4,
         "*" | "/" => 3,
         "+" | "-" => 2,
@@ -200,6 +207,7 @@ impl FormulaTokenizer {
         let mut output = Vec::new();
         let mut operators = Vec::new();
         let mut i = 0;
+        let mut expect_operand = true;
         let chars: Vec<char> = formula.chars().collect();
 
         while i < chars.len() {
@@ -229,6 +237,7 @@ impl FormulaTokenizer {
                     })?;
                     output.push(Ptg::PtgInt(num));
                 }
+                expect_operand = false;
                 continue;
             }
 
@@ -257,6 +266,7 @@ impl FormulaTokenizer {
                     ));
                 }
                 output.push(Ptg::PtgStr(value));
+                expect_operand = false;
                 continue;
             }
 
@@ -282,13 +292,16 @@ impl FormulaTokenizer {
                     operators.push(("FUNC", func_idx, argc));
                     operators.push(("(", 0, 0));
                     i += 1; // Skip '('
+                    expect_operand = true;
                 } else {
                     if token.eq_ignore_ascii_case("TRUE") {
                         output.push(Ptg::PtgBool(true));
+                        expect_operand = false;
                         continue;
                     }
                     if token.eq_ignore_ascii_case("FALSE") {
                         output.push(Ptg::PtgBool(false));
+                        expect_operand = false;
                         continue;
                     }
                     // Try to parse as cell reference
@@ -298,6 +311,7 @@ impl FormulaTokenizer {
                             return Err(XlsError::InvalidData(format!("Unknown token: {}", token)));
                         },
                     }
+                    expect_operand = false;
                 }
                 continue;
             }
@@ -306,7 +320,13 @@ impl FormulaTokenizer {
             if i + 1 < chars.len() {
                 let two_char: String = chars[i..i + 2].iter().collect();
                 if two_char == "<>" || two_char == "<=" || two_char == ">=" {
+                    if expect_operand {
+                        return Err(XlsError::InvalidFormula(format!(
+                            "Operator {two_char} is missing its left operand"
+                        )));
+                    }
                     self.handle_operator(&mut output, &mut operators, &two_char)?;
+                    expect_operand = true;
                     i += 2;
                     continue;
                 }
@@ -315,8 +335,18 @@ impl FormulaTokenizer {
             let op_str = c.to_string();
 
             match op_str.as_str() {
-                "(" => operators.push(("(", 0, 0)),
+                "(" => {
+                    operators.push(("(", 0, 0));
+                    expect_operand = true;
+                },
                 ")" => {
+                    let zero_arg_function = operators.last().is_some_and(|(op, _, _)| *op == "(")
+                        && operators
+                            .get(operators.len().saturating_sub(2))
+                            .is_some_and(|(op, _, argc)| *op == "FUNC" && *argc == 0);
+                    if expect_operand && !zero_arg_function {
+                        output.push(Ptg::PtgMissArg);
+                    }
                     while let Some((op, func_idx, argc)) = operators.pop() {
                         if op == "(" {
                             break;
@@ -331,11 +361,36 @@ impl FormulaTokenizer {
                         let (_, func_idx, argc) = operators.pop().unwrap();
                         output.push(Ptg::PtgFunc(func_idx, argc));
                     }
+                    expect_operand = false;
                 },
                 "+" | "-" | "*" | "/" | "^" | "&" | "=" | "<" | ">" | ":" => {
-                    self.handle_operator(&mut output, &mut operators, &op_str)?;
+                    if expect_operand && (op_str == "+" || op_str == "-") {
+                        self.handle_operator(
+                            &mut output,
+                            &mut operators,
+                            if op_str == "+" { "u+" } else { "u-" },
+                        )?;
+                    } else if expect_operand {
+                        return Err(XlsError::InvalidFormula(format!(
+                            "Operator {op_str} is missing its left operand"
+                        )));
+                    } else {
+                        self.handle_operator(&mut output, &mut operators, &op_str)?;
+                        expect_operand = true;
+                    }
+                },
+                "%" => {
+                    if expect_operand {
+                        return Err(XlsError::InvalidFormula(
+                            "Percent operator is missing its operand".to_string(),
+                        ));
+                    }
+                    output.push(Ptg::PtgPercent);
                 },
                 "," => {
+                    if expect_operand {
+                        output.push(Ptg::PtgMissArg);
+                    }
                     // Argument separator - pop operators until '('
                     while let Some(&(top_op, _, _)) = operators.last() {
                         if top_op == "(" {
@@ -366,6 +421,7 @@ impl FormulaTokenizer {
                     *argc = argc.checked_add(1).ok_or_else(|| {
                         XlsError::InvalidData("Too many function arguments".to_string())
                     })?;
+                    expect_operand = true;
                 },
                 _ => {
                     return Err(XlsError::InvalidData(format!(
@@ -377,6 +433,12 @@ impl FormulaTokenizer {
 
             // CRITICAL: Increment index after processing operator to avoid infinite loop
             i += 1;
+        }
+
+        if expect_operand && !output.is_empty() {
+            return Err(XlsError::InvalidFormula(
+                "Formula ends with an operator".to_string(),
+            ));
         }
 
         // Pop remaining operators
@@ -409,6 +471,8 @@ impl FormulaTokenizer {
             ">" => Ptg::PtgGT,
             ">=" => Ptg::PtgGE,
             ":" => Ptg::PtgRange,
+            "u+" => Ptg::PtgUnaryPlus,
+            "u-" => Ptg::PtgUnaryMinus,
             _ => return Err(XlsError::InvalidData(format!("Unknown operator: {}", op))),
         };
         output.push(ptg);
@@ -436,6 +500,8 @@ impl FormulaTokenizer {
             ">" => ">",
             ">=" => ">=",
             ":" => ":",
+            "u+" => "u+",
+            "u-" => "u-",
             _ => return Err(XlsError::InvalidData(format!("Unknown operator: {}", op))),
         };
 
@@ -444,7 +510,9 @@ impl FormulaTokenizer {
             if top_op == "(" {
                 break;
             }
-            if get_precedence(top_op) >= prec {
+            let left_associative = !matches!(op, "u+" | "u-" | "^");
+            if get_precedence(top_op) > prec || (left_associative && get_precedence(top_op) == prec)
+            {
                 let (op, func_idx, argc) = operators.pop().unwrap();
                 if op == "FUNC" {
                     output.push(Ptg::PtgFunc(func_idx, argc));
@@ -555,6 +623,9 @@ pub fn encode_ptg_tokens(tokens: &[Ptg]) -> Vec<u8> {
             Ptg::PtgGT => bytes.push(0x0D),
             Ptg::PtgNE => bytes.push(0x0E),
             Ptg::PtgRange => bytes.push(0x11),
+            Ptg::PtgUnaryPlus => bytes.push(0x12),
+            Ptg::PtgUnaryMinus => bytes.push(0x13),
+            Ptg::PtgPercent => bytes.push(0x14),
             Ptg::PtgFunc(func_idx, argc) => {
                 bytes.push(0x42); // PtgFuncVar, value operand class
                 bytes.push(*argc);
@@ -666,6 +737,26 @@ mod tests {
         assert!(matches!(tokens[2], Ptg::PtgBool(false)));
         assert!(matches!(tokens[3], Ptg::PtgFunc(1, 3)));
         assert!(tokenizer.tokenize("\"unterminated").is_err());
+    }
+
+    #[test]
+    fn test_tokenize_unary_percent_and_missing_arguments() {
+        let tokenizer = FormulaTokenizer::new();
+        let tokens = tokenizer.tokenize("--A1+50%").unwrap();
+        assert!(matches!(tokens[0], Ptg::PtgRef(..)));
+        assert!(matches!(tokens[1], Ptg::PtgUnaryMinus));
+        assert!(matches!(tokens[2], Ptg::PtgUnaryMinus));
+        assert!(matches!(tokens[3], Ptg::PtgInt(50)));
+        assert!(matches!(tokens[4], Ptg::PtgPercent));
+        assert!(matches!(tokens[5], Ptg::PtgAdd));
+
+        let tokens = tokenizer.tokenize("IF(,A1,)").unwrap();
+        assert!(matches!(tokens[0], Ptg::PtgMissArg));
+        assert!(matches!(tokens[1], Ptg::PtgRef(..)));
+        assert!(matches!(tokens[2], Ptg::PtgMissArg));
+        assert!(matches!(tokens[3], Ptg::PtgFunc(1, 3)));
+        assert!(tokenizer.tokenize("A1+").is_err());
+        assert!(tokenizer.tokenize("*A1").is_err());
     }
 
     #[test]
@@ -797,6 +888,9 @@ mod tests {
         let _ = Ptg::PtgGT;
         let _ = Ptg::PtgNE;
         let _ = Ptg::PtgRange;
+        let _ = Ptg::PtgUnaryPlus;
+        let _ = Ptg::PtgUnaryMinus;
+        let _ = Ptg::PtgPercent;
         let _ = Ptg::PtgFunc(0, 1);
         let _ = Ptg::PtgParen;
         let _ = Ptg::PtgMissArg;
@@ -918,6 +1012,9 @@ mod tests {
             (Ptg::PtgGT, 0x0D),
             (Ptg::PtgNE, 0x0E),
             (Ptg::PtgRange, 0x11),
+            (Ptg::PtgUnaryPlus, 0x12),
+            (Ptg::PtgUnaryMinus, 0x13),
+            (Ptg::PtgPercent, 0x14),
             (Ptg::PtgParen, 0x15),
             (Ptg::PtgMissArg, 0x16),
         ];
