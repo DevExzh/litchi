@@ -12,6 +12,8 @@ pub(crate) const STYLE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmln
 pub(crate) const NUMBER_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0";
 pub(crate) const XLINK_NAMESPACE: &[u8] = b"http://www.w3.org/1999/xlink";
 pub(crate) const XML_NAMESPACE: &[u8] = b"http://www.w3.org/XML/1998/namespace";
+pub(crate) const DC_NAMESPACE: &[u8] = b"http://purl.org/dc/elements/1.1/";
+pub(crate) const META_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:meta:1.0";
 
 const MAX_INLINE_TEXT_BYTES: usize = 64 * 1024 * 1024;
 const MAX_SPACE_COUNT: usize = 1_000_000;
