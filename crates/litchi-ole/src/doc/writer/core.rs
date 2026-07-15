@@ -139,7 +139,7 @@ fn utf16_code_unit_len(text: &str) -> Result<u32, DocWriteError> {
     Ok(length)
 }
 
-fn pack_dttm(value: Option<CommentDateTime>) -> Result<u32, DocWriteError> {
+pub(super) fn pack_dttm(value: Option<CommentDateTime>) -> Result<u32, DocWriteError> {
     let Some(value) = value else {
         return Ok(0);
     };
@@ -1396,6 +1396,11 @@ impl DocWriter {
         if let Some(revision) = &self.section_formatting_revision {
             index_author(&revision.author)?;
         }
+        for style in &self.styles {
+            if let Some(revision) = &style.revision {
+                index_author(&revision.author)?;
+            }
+        }
         let table_paragraphs = self.tables.iter().flat_map(|table| {
             table
                 .rows
@@ -2463,8 +2468,11 @@ impl DocWriter {
         let mut table_offset = 0u32;
 
         // 3. Write StyleSheet to table stream (MANDATORY - POI line 681-684)
-        let stylesheet_data = crate::doc::writer::stylesheet::generate_stylesheet(&self.styles)
-            .map_err(|error| DocWriteError::InvalidData(error.to_string()))?;
+        let stylesheet_data = crate::doc::writer::stylesheet::generate_stylesheet(
+            &self.styles,
+            revision_data.as_ref().map(|data| &data.indexes),
+        )
+        .map_err(|error| DocWriteError::InvalidData(error.to_string()))?;
         fib.set_stshf(table_offset, stylesheet_data.len() as u32);
         table_stream.extend_from_slice(&stylesheet_data);
         table_offset = table_stream.len() as u32;
@@ -3038,8 +3046,11 @@ impl DocWriter {
 
         let mut table_offset = 0u32;
 
-        let stylesheet_data = crate::doc::writer::stylesheet::generate_stylesheet(&self.styles)
-            .map_err(|error| DocWriteError::InvalidData(error.to_string()))?;
+        let stylesheet_data = crate::doc::writer::stylesheet::generate_stylesheet(
+            &self.styles,
+            revision_data.as_ref().map(|data| &data.indexes),
+        )
+        .map_err(|error| DocWriteError::InvalidData(error.to_string()))?;
         fib.set_stshf(table_offset, stylesheet_data.len() as u32);
         table_stream.extend_from_slice(&stylesheet_data);
         table_offset = table_stream.len() as u32;
@@ -4469,6 +4480,72 @@ mod tests {
                 .unwrap()
                 .table_style_index,
             Some(table_style)
+        );
+    }
+
+    #[test]
+    fn writes_revision_marked_style_and_author_table() {
+        let timestamp = crate::doc::CommentDateTime {
+            year: 2026,
+            month: 7,
+            day: 16,
+            hour: 11,
+            minute: 45,
+            weekday: 4,
+        };
+        let previous_papx = [SPRM_P_F_KEEP.to_le_bytes().as_slice(), &[0]].concat();
+        let previous_chpx = [SPRM_C_F_BOLD.to_le_bytes().as_slice(), &[0]].concat();
+        let mut writer = DocWriter::new();
+        let style_index = writer
+            .add_style(
+                super::super::stylesheet::DocStyleDefinition::new(
+                    crate::doc::StyleKind::Paragraph,
+                    "Tracked Body",
+                )
+                .with_revision(
+                    super::super::stylesheet::DocStyleRevision::paragraph(
+                        "Style Editor",
+                        previous_papx.clone(),
+                        previous_chpx.clone(),
+                    )
+                    .with_timestamp(timestamp),
+                ),
+            )
+            .unwrap();
+        writer
+            .add_formatted_paragraph(
+                "Tracked style",
+                ParagraphFormatting {
+                    style_index: Some(style_index),
+                    ..ParagraphFormatting::default()
+                },
+            )
+            .unwrap();
+
+        let mut cursor = Cursor::new(Vec::new());
+        writer.write_to(&mut cursor).unwrap();
+        let mut package =
+            crate::doc::Package::from_reader(Cursor::new(cursor.into_inner())).unwrap();
+        let document = package.document().unwrap();
+        assert_eq!(document.revision_authors(), ["Unknown", "Style Editor"]);
+        let stylesheet = document.stylesheet().unwrap();
+        let revision = stylesheet
+            .get(style_index)
+            .unwrap()
+            .revision
+            .as_ref()
+            .unwrap();
+        assert_eq!(revision.author_index, 1);
+        assert_eq!(revision.author.as_deref(), Some("Style Editor"));
+        assert_eq!(revision.timestamp, Some(timestamp));
+        assert_eq!(
+            revision.paragraph_properties.as_deref(),
+            Some(previous_papx.as_slice())
+        );
+        assert_eq!(revision.character_properties, previous_chpx);
+        assert_eq!(
+            document.paragraphs().unwrap()[0].properties().style_index,
+            Some(style_index)
         );
     }
 

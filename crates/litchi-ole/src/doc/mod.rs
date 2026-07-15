@@ -79,7 +79,8 @@ pub use parts::chp::CharacterConditionalFormatting;
 pub use parts::numbering::{ListLevel, ListTables, NumberFormat};
 pub use parts::pap::ParagraphConditionalFormatting;
 pub use parts::styles::{
-    StyleDefinition, StyleFlags, StyleKind, StylePost2000, StyleSheet, StyleSheetHeader,
+    StyleDefinition, StyleFlags, StyleKind, StylePost2000, StyleRevisionMark, StyleSheet,
+    StyleSheetHeader,
 };
 pub use parts::tap::TableStyleCondition;
 pub use revision::{
@@ -90,13 +91,13 @@ pub use shapes::DocShape;
 pub use table::{Cell, Row, Table};
 pub use writer::{
     AutoNumberAlignment, BookmarkEntry, CharacterFormatting, CommentEntry, DisplayFieldRevision,
-    DocStyleDefinition, DocWriteError, DocWriter, DropCap, DropCapType, FontAlignment,
-    FormattingRevision, FrameAnchor, FrameHeight, FrameHorizontalAnchor, FrameHorizontalPosition,
-    FrameTextFlow, FrameTextWrap, FrameVerticalAnchor, FrameVerticalPosition, LegacyAutoNumbering,
-    LegacyBorderPosition, LegacyBorderStyle, LineSpacing, NumberingRevision, ParagraphBorder,
-    ParagraphBorderStyle, ParagraphBorders, ParagraphFormatting, ParagraphShading,
-    PhysicalJustification, StyleWriteError, TabAlignment, TabLeader, TabStop, TextBoxTightWrap,
-    TextRevision,
+    DocStyleDefinition, DocStyleRevision, DocWriteError, DocWriter, DropCap, DropCapType,
+    FontAlignment, FormattingRevision, FrameAnchor, FrameHeight, FrameHorizontalAnchor,
+    FrameHorizontalPosition, FrameTextFlow, FrameTextWrap, FrameVerticalAnchor,
+    FrameVerticalPosition, LegacyAutoNumbering, LegacyBorderPosition, LegacyBorderStyle,
+    LineSpacing, NumberingRevision, ParagraphBorder, ParagraphBorderStyle, ParagraphBorders,
+    ParagraphFormatting, ParagraphShading, PhysicalJustification, StyleWriteError, TabAlignment,
+    TabLeader, TabStop, TextBoxTightWrap, TextRevision,
 };
 
 /// Crate-native ordered document element returned by [`Document::elements`].

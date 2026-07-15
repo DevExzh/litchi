@@ -86,7 +86,7 @@ pub use numbering::{ListFormatOverride, ListLevel, ListStructure, NumberFormat, 
 pub use piece_table::{Piece, PieceTableBuilder};
 pub use revisions::{DisplayFieldRevision, FormattingRevision, NumberingRevision, TextRevision};
 pub use sprm::SprmBuilder;
-pub use stylesheet::{DocStyleDefinition, StyleWriteError};
+pub use stylesheet::{DocStyleDefinition, DocStyleRevision, StyleWriteError};
 pub use tap::{
     TableBorders, TableCell, TableRevisionMark, TableRow, TapBuildError, TapBuilder,
     generate_table_style_sprms, generate_table_style_sprms_with_conditionals,

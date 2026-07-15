@@ -1,13 +1,60 @@
 //! Validated Word 97+ stylesheet (`STSH`) generation.
 
+use crate::doc::CommentDateTime;
 use crate::doc::parts::styles::{StyleFlags, StyleKind, StylePost2000, StyleSheet};
 use crate::sprm::parse_sprms;
 use crate::sprm_operations::{SPRM_C_CNF, SPRM_P_CNF, get_sprm_type};
+use std::collections::HashMap;
 
 const MIN_STYLE_COUNT: usize = 15;
 const MAX_STYLE_COUNT: usize = 0x0FFD;
 const NIL_STYLE: u16 = 0x0FFF;
 const USER_STYLE_ID: u16 = 0x0FFE;
+
+/// Previous formatting and attribution retained by a revision-marked style.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DocStyleRevision {
+    /// Revision author name, stored through the document's `SttbfRMark` table.
+    pub author: String,
+    /// Date and time at which the style was revision-marked.
+    pub timestamp: Option<CommentDateTime>,
+    /// Previous paragraph formatting; present only for a paragraph style.
+    pub paragraph_properties: Option<Vec<u8>>,
+    /// Previous character formatting.
+    pub character_properties: Vec<u8>,
+}
+
+impl DocStyleRevision {
+    /// Create revision state for a paragraph style.
+    pub fn paragraph(
+        author: impl Into<String>,
+        paragraph_properties: Vec<u8>,
+        character_properties: Vec<u8>,
+    ) -> Self {
+        Self {
+            author: author.into(),
+            timestamp: None,
+            paragraph_properties: Some(paragraph_properties),
+            character_properties,
+        }
+    }
+
+    /// Create revision state for a character style.
+    pub fn character(author: impl Into<String>, character_properties: Vec<u8>) -> Self {
+        Self {
+            author: author.into(),
+            timestamp: None,
+            paragraph_properties: None,
+            character_properties,
+        }
+    }
+
+    /// Set the style-revision timestamp.
+    pub fn with_timestamp(mut self, timestamp: CommentDateTime) -> Self {
+        self.timestamp = Some(timestamp);
+        self
+    }
+}
 
 /// A custom style appended after the fifteen fixed DOC style slots.
 #[derive(Debug, Clone)]
@@ -28,6 +75,8 @@ pub struct DocStyleDefinition {
     pub property_sets: Vec<Vec<u8>>,
     /// Optional Word 2000-and-later style metadata.
     pub post_2000: Option<StylePost2000>,
+    /// Previous formatting and attribution for a revision-marked style.
+    pub revision: Option<DocStyleRevision>,
     /// Style behavior flags.
     pub flags: StyleFlags,
 }
@@ -49,6 +98,7 @@ impl DocStyleDefinition {
             aliases: Vec::new(),
             property_sets: vec![Vec::new(); property_count],
             post_2000: None,
+            revision: None,
             flags: StyleFlags::default(),
         }
     }
@@ -82,6 +132,21 @@ impl DocStyleDefinition {
         self.post_2000 = Some(metadata);
         self
     }
+
+    /// Mark this paragraph or character style as revised and retain its prior formatting.
+    pub fn with_revision(mut self, revision: DocStyleRevision) -> Self {
+        self.revision = Some(revision);
+        self.post_2000
+            .get_or_insert(StylePost2000 {
+                linked_style: None,
+                has_original_style: true,
+                revision_id: 0,
+                html_font_category: 0,
+                priority: 0,
+            })
+            .has_original_style = true;
+        self
+    }
 }
 
 /// Error returned when a custom DOC stylesheet cannot be represented safely.
@@ -105,17 +170,29 @@ fn required_property_count(style: &DocStyleDefinition) -> Result<usize, StyleWri
         .post_2000
         .as_ref()
         .is_some_and(|metadata| metadata.has_original_style);
-    if revision_marked {
+    if revision_marked != style.revision.is_some() {
         return Err(invalid(
-            "revision-marked DOC style emission requires typed revision metadata",
+            "DOC style revision metadata and fHasOriginalStyle must be present together",
         ));
     }
     match (style.kind, revision_marked) {
         (StyleKind::Paragraph, false) => Ok(2),
+        (StyleKind::Paragraph, true) => Ok(3),
         (StyleKind::Character, false) => Ok(1),
+        (StyleKind::Character, true) => Ok(2),
         (StyleKind::Table, false) => Ok(3),
         (StyleKind::Numbering, false) => Ok(1),
-        (_, true) => unreachable!(),
+        (StyleKind::Table | StyleKind::Numbering, true) => Err(invalid(
+            "DOC table and numbering styles cannot be revision-marked",
+        )),
+    }
+}
+
+fn current_property_count(kind: StyleKind) -> usize {
+    match kind {
+        StyleKind::Paragraph => 2,
+        StyleKind::Character | StyleKind::Numbering => 1,
+        StyleKind::Table => 3,
     }
 }
 
@@ -168,9 +245,10 @@ fn validate_style(style: &DocStyleDefinition, index: u16) -> Result<(), StyleWri
         return Err(invalid("DOC style references cannot exceed 0x0FFE"));
     }
     let expected = required_property_count(style)?;
-    if style.property_sets.len() != expected {
+    let expected_current = current_property_count(style.kind);
+    if style.property_sets.len() != expected_current {
         return Err(invalid(format!(
-            "DOC style {index} has {} UPX records; expected {expected}",
+            "DOC style {index} has {} current UPX records; expected {expected_current}",
             style.property_sets.len()
         )));
     }
@@ -222,6 +300,41 @@ fn validate_style(style: &DocStyleDefinition, index: u16) -> Result<(), StyleWri
             "numbering-style UpxPapx",
         )?,
     }
+    if let Some(revision) = &style.revision {
+        if revision.author.is_empty() {
+            return Err(invalid("DOC style revision author must not be empty"));
+        }
+        match (style.kind, &revision.paragraph_properties) {
+            (StyleKind::Paragraph, Some(paragraph)) => validate_grpprl(
+                paragraph,
+                1,
+                Some(SPRM_P_CNF),
+                "revision-marked paragraph-style UpxPapxRM",
+            )?,
+            (StyleKind::Character, None) => {},
+            (StyleKind::Paragraph, None) => {
+                return Err(invalid(
+                    "paragraph style revision is missing prior paragraph formatting",
+                ));
+            },
+            (StyleKind::Character, Some(_)) => {
+                return Err(invalid(
+                    "character style revision cannot contain paragraph formatting",
+                ));
+            },
+            (StyleKind::Table | StyleKind::Numbering, _) => unreachable!(),
+        }
+        validate_grpprl(
+            &revision.character_properties,
+            2,
+            Some(SPRM_C_CNF),
+            "revision-marked style UpxChpxRM",
+        )?;
+    }
+    debug_assert_eq!(
+        expected,
+        style.property_sets.len() + usize::from(style.revision.is_some())
+    );
     Ok(())
 }
 
@@ -252,9 +365,10 @@ fn serialize_style(
     style: &DocStyleDefinition,
     index: u16,
     stdf_size: usize,
+    revision_authors: Option<&HashMap<String, u16>>,
 ) -> Result<Vec<u8>, StyleWriteError> {
     validate_style(style, index)?;
-    let property_count = style.property_sets.len();
+    let property_count = required_property_count(style)?;
     let mut bytes = vec![0u8; stdf_size];
     let info1 = style.invariant_id | (u16::from(style.flags.invalidate_height) << 13);
     let info2 = kind_code(style.kind) | (style.base_style.unwrap_or(NIL_STYLE) << 4);
@@ -292,6 +406,34 @@ fn serialize_style(
             bytes.push(0);
         }
     }
+    if let Some(revision) = &style.revision {
+        let author_index = revision_authors
+            .and_then(|authors| authors.get(&revision.author))
+            .copied()
+            .ok_or_else(|| invalid("DOC style revision author was not indexed"))?;
+        if author_index > i16::MAX as u16 {
+            return Err(invalid(
+                "DOC style revision author exceeds the signed author-index range",
+            ));
+        }
+        let mut revision_payload = Vec::new();
+        revision_payload.extend_from_slice(&6u16.to_le_bytes());
+        revision_payload.extend_from_slice(
+            &super::core::pack_dttm(revision.timestamp)
+                .map_err(|error| invalid(error.to_string()))?
+                .to_le_bytes(),
+        );
+        revision_payload.extend_from_slice(&(author_index as i16).to_le_bytes());
+        if let Some(paragraph) = &revision.paragraph_properties {
+            append_inner_upx(&mut revision_payload, paragraph)?;
+        }
+        append_inner_upx(&mut revision_payload, &revision.character_properties)?;
+        debug_assert_eq!(revision_payload.len() % 2, 0);
+        let size = u16::try_from(revision_payload.len())
+            .map_err(|_| invalid("DOC style revision payload exceeds 65535 bytes"))?;
+        bytes.extend_from_slice(&size.to_le_bytes());
+        bytes.extend_from_slice(&revision_payload);
+    }
     let size = u16::try_from(bytes.len())
         .map_err(|_| invalid("DOC STD exceeds the 65535-byte representation limit"))?;
     if size > i16::MAX as u16 {
@@ -299,6 +441,17 @@ fn serialize_style(
     }
     bytes[6..8].copy_from_slice(&size.to_le_bytes());
     Ok(bytes)
+}
+
+fn append_inner_upx(output: &mut Vec<u8>, property_set: &[u8]) -> Result<(), StyleWriteError> {
+    let size = u16::try_from(property_set.len())
+        .map_err(|_| invalid("DOC revision-marked style UPX exceeds 65535 bytes"))?;
+    output.extend_from_slice(&size.to_le_bytes());
+    output.extend_from_slice(property_set);
+    if size % 2 != 0 {
+        output.push(0);
+    }
+    Ok(())
 }
 
 fn normal_style() -> DocStyleDefinition {
@@ -318,6 +471,7 @@ fn default_font_style() -> DocStyleDefinition {
 /// Generate a complete stylesheet containing required built-ins and custom styles.
 pub fn generate_stylesheet(
     custom_styles: &[DocStyleDefinition],
+    revision_authors: Option<&HashMap<String, u16>>,
 ) -> Result<Vec<u8>, StyleWriteError> {
     let style_count = MIN_STYLE_COUNT
         .checked_add(custom_styles.len())
@@ -350,7 +504,7 @@ pub fn generate_stylesheet(
             _ => None,
         };
         if let Some(style) = style {
-            let bytes = serialize_style(&style, index as u16, stdf_size)?;
+            let bytes = serialize_style(&style, index as u16, stdf_size, revision_authors)?;
             stsh.extend_from_slice(&(bytes.len() as u16).to_le_bytes());
             stsh.extend_from_slice(&bytes);
             if bytes.len() % 2 != 0 {
@@ -367,7 +521,7 @@ pub fn generate_stylesheet(
 
 /// Generate the mandatory minimal Word 97+ stylesheet.
 pub fn generate_minimal_stylesheet() -> Vec<u8> {
-    generate_stylesheet(&[]).expect("the built-in DOC stylesheet is valid")
+    generate_stylesheet(&[], None).expect("the built-in DOC stylesheet is valid")
 }
 
 #[cfg(test)]
@@ -427,7 +581,7 @@ mod tests {
                 priority: 42,
             });
 
-        let bytes = generate_stylesheet(&[style]).unwrap();
+        let bytes = generate_stylesheet(&[style], None).unwrap();
         let parsed = StyleSheet::parse_data(&bytes, 0).unwrap();
         assert_eq!(parsed.header().stdf_size, 18);
         let style = parsed.get(15).unwrap();
@@ -448,10 +602,68 @@ mod tests {
     }
 
     #[test]
+    fn revision_marked_paragraph_style_round_trips_nested_upx() {
+        let current_papx = [SPRM_P_F_KEEP.to_le_bytes().as_slice(), &[1]].concat();
+        let current_chpx = [SPRM_C_F_BOLD.to_le_bytes().as_slice(), &[1]].concat();
+        let previous_papx = [SPRM_P_F_KEEP.to_le_bytes().as_slice(), &[0]].concat();
+        let previous_chpx = [SPRM_C_F_BOLD.to_le_bytes().as_slice(), &[0]].concat();
+        let timestamp = CommentDateTime {
+            year: 2026,
+            month: 7,
+            day: 16,
+            hour: 10,
+            minute: 30,
+            weekday: 4,
+        };
+        let style = DocStyleDefinition::new(StyleKind::Paragraph, "Tracked Body")
+            .with_property_sets(vec![current_papx, current_chpx])
+            .with_revision(
+                DocStyleRevision::paragraph(
+                    "Style Editor",
+                    previous_papx.clone(),
+                    previous_chpx.clone(),
+                )
+                .with_timestamp(timestamp),
+            );
+        let authors = HashMap::from([("Style Editor".to_string(), 3u16)]);
+
+        let bytes = generate_stylesheet(&[style], Some(&authors)).unwrap();
+        let parsed = StyleSheet::parse_data(&bytes, 0).unwrap();
+        let style = parsed.get(15).unwrap();
+        assert!(style.post_2000.as_ref().unwrap().has_original_style);
+        assert_eq!(style.property_sets.len(), 3);
+        let revision = style.revision.as_ref().unwrap();
+        assert_eq!(revision.author_index, 3);
+        assert_eq!(revision.timestamp, Some(timestamp));
+        assert_eq!(
+            revision.paragraph_properties.as_deref(),
+            Some(previous_papx.as_slice())
+        );
+        assert_eq!(revision.character_properties, previous_chpx);
+    }
+
+    #[test]
+    fn revision_marked_character_style_round_trips_nested_upx() {
+        let previous = [SPRM_C_F_BOLD.to_le_bytes().as_slice(), &[0]].concat();
+        let style =
+            DocStyleDefinition::new(StyleKind::Character, "Tracked Emphasis").with_revision(
+                DocStyleRevision::character("Style Editor", previous.clone()),
+            );
+        let authors = HashMap::from([("Style Editor".to_string(), 1u16)]);
+
+        let bytes = generate_stylesheet(&[style], Some(&authors)).unwrap();
+        let parsed = StyleSheet::parse_data(&bytes, 0).unwrap();
+        let revision = parsed.get(15).unwrap().revision.as_ref().unwrap();
+        assert_eq!(revision.author_index, 1);
+        assert_eq!(revision.paragraph_properties, None);
+        assert_eq!(revision.character_properties, previous);
+    }
+
+    #[test]
     fn rejects_invalid_custom_styles() {
         let wrong_count =
             DocStyleDefinition::new(StyleKind::Table, "Wrong").with_property_sets(vec![Vec::new()]);
-        assert!(generate_stylesheet(&[wrong_count]).is_err());
+        assert!(generate_stylesheet(&[wrong_count], None).is_err());
 
         let wrong_type = DocStyleDefinition::new(StyleKind::Table, "Wrong Type")
             .with_property_sets(vec![
@@ -459,17 +671,17 @@ mod tests {
                 Vec::new(),
                 Vec::new(),
             ]);
-        assert!(generate_stylesheet(&[wrong_type]).is_err());
+        assert!(generate_stylesheet(&[wrong_type], None).is_err());
 
         let conditional_paragraph = DocStyleDefinition::new(StyleKind::Paragraph, "Not Table")
             .with_property_sets(vec![conditional(SPRM_P_CNF, 1, &[]), Vec::new()]);
-        assert!(generate_stylesheet(&[conditional_paragraph]).is_err());
+        assert!(generate_stylesheet(&[conditional_paragraph], None).is_err());
 
         let self_based = DocStyleDefinition::new(StyleKind::Table, "Cycle").with_base_style(15);
-        assert!(generate_stylesheet(&[self_based]).is_err());
+        assert!(generate_stylesheet(&[self_based], None).is_err());
 
         let duplicate = DocStyleDefinition::new(StyleKind::Table, "Normal");
-        assert!(generate_stylesheet(&[duplicate]).is_err());
+        assert!(generate_stylesheet(&[duplicate], None).is_err());
 
         let revision_marked = DocStyleDefinition::new(StyleKind::Character, "Revised")
             .with_post_2000(StylePost2000 {
@@ -479,6 +691,6 @@ mod tests {
                 html_font_category: 0,
                 priority: 0,
             });
-        assert!(generate_stylesheet(&[revision_marked]).is_err());
+        assert!(generate_stylesheet(&[revision_marked], None).is_err());
     }
 }

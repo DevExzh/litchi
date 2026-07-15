@@ -90,6 +90,21 @@ pub struct StylePost2000 {
     pub priority: u16,
 }
 
+/// Previous formatting and attribution stored by a revision-marked style.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StyleRevisionMark {
+    /// Date and time at which the style was revision-marked.
+    pub timestamp: Option<super::super::CommentDateTime>,
+    /// Signed index into the document's `SttbfRMark` author table.
+    pub author_index: i16,
+    /// Resolved revision author when the stylesheet belongs to a complete document.
+    pub author: Option<String>,
+    /// Previous paragraph formatting for a paragraph style.
+    pub paragraph_properties: Option<Vec<u8>>,
+    /// Previous character formatting.
+    pub character_properties: Vec<u8>,
+}
+
 /// One non-empty style definition from the stylesheet.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StyleDefinition {
@@ -111,6 +126,8 @@ pub struct StyleDefinition {
     pub property_sets: Vec<Vec<u8>>,
     /// Optional Word 2000-and-later metadata.
     pub post_2000: Option<StylePost2000>,
+    /// Parsed revision attribution and previous formatting, when present.
+    pub revision: Option<StyleRevisionMark>,
     /// Style behavior flags.
     pub flags: StyleFlags,
     /// Exact `STD` bytes, excluding the `LPStd` length and outer alignment byte.
@@ -193,6 +210,25 @@ impl StyleSheet {
     /// Uninterpreted STSHI extension bytes following the 18-byte `Stshif`.
     pub fn stshi_tail(&self) -> &[u8] {
         &self.stshi_tail
+    }
+
+    pub(crate) fn resolve_revision_authors(
+        &mut self,
+        authors: &super::revisions::RevisionAuthorTable,
+    ) -> Result<()> {
+        for style in self.styles.iter_mut().flatten() {
+            let Some(revision) = &mut style.revision else {
+                continue;
+            };
+            let index = u16::try_from(revision.author_index).map_err(|_| {
+                corrupted("revision-marked style author index must not be negative")
+            })?;
+            let author = authors.get(index).ok_or_else(|| {
+                corrupted("revision-marked style author index is outside SttbfRMark")
+            })?;
+            revision.author = Some(author.to_string());
+        }
+        Ok(())
     }
 
     /// Resolve the table-property differences for a requested table style.
@@ -529,6 +565,20 @@ fn parse_style(std: &[u8], index: u16, cb_std: u16, stdf_size: u16) -> Result<St
     if offset != std.len() {
         return Err(corrupted("STD has trailing bytes"));
     }
+    let revision = if revision_marked {
+        let revision_index = match kind {
+            StyleKind::Paragraph => 2,
+            StyleKind::Character => 1,
+            StyleKind::Table | StyleKind::Numbering => unreachable!(),
+        };
+        Some(parse_style_revision(
+            &property_sets[revision_index],
+            kind,
+            index,
+        )?)
+    } else {
+        None
+    };
 
     Ok(StyleDefinition {
         index,
@@ -540,6 +590,7 @@ fn parse_style(std: &[u8], index: u16, cb_std: u16, stdf_size: u16) -> Result<St
         aliases,
         property_sets,
         post_2000,
+        revision,
         flags: StyleFlags {
             invalidate_height: info1 & 0x2000 != 0,
             auto_redefine: grfstd & 0x0001 != 0,
@@ -557,6 +608,70 @@ fn parse_style(std: &[u8], index: u16, cb_std: u16, stdf_size: u16) -> Result<St
         raw_std: std.to_vec(),
         outer_padding: None,
     })
+}
+
+fn parse_style_revision(
+    data: &[u8],
+    kind: StyleKind,
+    style_index: u16,
+) -> Result<StyleRevisionMark> {
+    if data.len() % 2 != 0 {
+        return Err(corrupted(
+            "revision-marked style payload is not even-length",
+        ));
+    }
+    if read_u16(data, 0, "LPUpxRm.cbUpx")? != 6 {
+        return Err(corrupted("LPUpxRm.cbUpx is not 6"));
+    }
+    let timestamp = super::super::revision::decode_dttm(read_u32(data, 2, "UpxRm.date")?)?;
+    let author_index = read_i16(data, 6, "UpxRm.ibstAuthor")?;
+    let mut offset = 8usize;
+    let paragraph_properties = if kind == StyleKind::Paragraph {
+        let paragraph = read_revision_property_set(data, &mut offset, "LPUpxPapxRM")?;
+        let sprms = strip_paragraph_style_index(&paragraph, style_index)?;
+        validate_style_sprms(sprms, 1, "UpxPapxRM")?;
+        Some(paragraph)
+    } else {
+        None
+    };
+    let character_properties = read_revision_property_set(data, &mut offset, "LPUpxChpxRM")?;
+    validate_style_sprms(&character_properties, 2, "UpxChpxRM")?;
+    if offset != data.len() {
+        return Err(corrupted(
+            "revision-marked style payload has trailing bytes",
+        ));
+    }
+    Ok(StyleRevisionMark {
+        timestamp,
+        author_index,
+        author: None,
+        paragraph_properties,
+        character_properties,
+    })
+}
+
+fn read_revision_property_set(data: &[u8], offset: &mut usize, structure: &str) -> Result<Vec<u8>> {
+    let size = usize::from(read_u16(data, *offset, &format!("{structure}.cbUpx"))?);
+    *offset = offset
+        .checked_add(2)
+        .ok_or_else(|| corrupted("revision-marked style offset overflows"))?;
+    let end = offset
+        .checked_add(size)
+        .ok_or_else(|| corrupted("revision-marked style property range overflows"))?;
+    let properties = data
+        .get(*offset..end)
+        .ok_or_else(|| corrupted("revision-marked style property set is truncated"))?
+        .to_vec();
+    *offset = end;
+    if size % 2 != 0 {
+        if data.get(*offset).copied() != Some(0) {
+            return Err(corrupted(
+                "revision-marked style property padding must be zero",
+            ));
+        }
+        *offset += 1;
+    }
+    Ok(properties)
 }
 
 fn strip_paragraph_style_index(properties: &[u8], style_index: u16) -> Result<&[u8]> {
@@ -800,7 +915,14 @@ mod tests {
 
     #[test]
     fn parses_post_2000_metadata_and_preserves_stshi_extensions() {
-        let normal = std_record(0, 1, NIL_STYLE, 0, "Normal", &[&[1], &[2], &[3]]);
+        let revision = [
+            6, 0, // LPUpxRm.cbUpx
+            0, 0, 0, 0, // UpxRm.date
+            0, 0, // UpxRm.ibstAuthor
+            0, 0, // LPUpxPapxRM.cbUpx
+            0, 0, // LPUpxChpxRM.cbUpx
+        ];
+        let normal = std_record(0, 1, NIL_STYLE, 0, "Normal", &[&[], &[], &revision]);
         let normal = with_post_2000(normal, 10 | 0x1000, 0x1234_5678, (42 << 4) | 5);
         let default_font = std_record(65, 2, NIL_STYLE, 10, "Default Font", &[&[]]);
         let default_font = with_post_2000(default_font, 0, 0, 0);
@@ -820,6 +942,43 @@ mod tests {
         assert_eq!(post.revision_id, 0x1234_5678);
         assert_eq!(post.html_font_category, 5);
         assert_eq!(post.priority, 42);
+    }
+
+    #[test]
+    fn validates_revision_marked_style_nested_records() {
+        use crate::sprm_operations::{SPRM_C_F_BOLD, SPRM_P_F_KEEP};
+
+        let papx = [SPRM_P_F_KEEP.to_le_bytes().as_slice(), &[1]].concat();
+        let chpx = [SPRM_C_F_BOLD.to_le_bytes().as_slice(), &[0]].concat();
+        let mut revision = Vec::new();
+        revision.extend_from_slice(&6u16.to_le_bytes());
+        revision.extend_from_slice(&0u32.to_le_bytes());
+        revision.extend_from_slice(&2i16.to_le_bytes());
+        revision.extend_from_slice(&(papx.len() as u16).to_le_bytes());
+        revision.extend_from_slice(&papx);
+        revision.push(0);
+        revision.extend_from_slice(&(chpx.len() as u16).to_le_bytes());
+        revision.extend_from_slice(&chpx);
+        revision.push(0);
+
+        let parsed = parse_style_revision(&revision, StyleKind::Paragraph, 15).unwrap();
+        assert_eq!(parsed.author_index, 2);
+        assert_eq!(parsed.author, None);
+        assert_eq!(parsed.timestamp, None);
+        assert_eq!(parsed.paragraph_properties, Some(papx));
+        assert_eq!(parsed.character_properties, chpx);
+
+        let mut wrong_rm_size = revision.clone();
+        wrong_rm_size[0..2].copy_from_slice(&5u16.to_le_bytes());
+        assert!(parse_style_revision(&wrong_rm_size, StyleKind::Paragraph, 15).is_err());
+
+        let mut bad_inner_padding = revision.clone();
+        bad_inner_padding[8 + 2 + 3] = 0xA5;
+        assert!(parse_style_revision(&bad_inner_padding, StyleKind::Paragraph, 15).is_err());
+
+        let mut trailing = revision;
+        trailing.extend_from_slice(&[0, 0]);
+        assert!(parse_style_revision(&trailing, StyleKind::Paragraph, 15).is_err());
     }
 
     #[test]
