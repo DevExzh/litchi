@@ -267,6 +267,93 @@ pub(crate) fn parse_page_layouts(xml: &str) -> Result<Vec<PageLayout>> {
     Ok(layouts)
 }
 
+pub(crate) fn set_page_layout_xml(
+    styles_xml: &str,
+    page_layout_name: &str,
+    page_layout_xml: &str,
+) -> Result<String> {
+    validate_page_layout_xml(page_layout_name, page_layout_xml)?;
+    if !parse_page_layouts(styles_xml)?
+        .iter()
+        .any(|layout| layout.name == page_layout_name)
+    {
+        return Err(Error::InvalidFormat(format!(
+            "page layout '{page_layout_name}' does not exist"
+        )));
+    }
+    let (start, end) = find_page_layout(styles_xml, page_layout_name)?.ok_or_else(|| {
+        Error::InvalidFormat(format!("page layout '{page_layout_name}' does not exist"))
+    })?;
+    let mut output =
+        String::with_capacity(styles_xml.len() - (end - start) + page_layout_xml.len());
+    output.push_str(&styles_xml[..start]);
+    output.push_str(page_layout_xml);
+    output.push_str(&styles_xml[end..]);
+    Ok(output)
+}
+
+fn validate_page_layout_xml(expected_name: &str, page_layout_xml: &str) -> Result<()> {
+    let wrapper = format!(
+        "<office:document-styles xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" xmlns:style=\"{}\"><office:automatic-styles>{page_layout_xml}</office:automatic-styles></office:document-styles>",
+        String::from_utf8_lossy(STYLE_NAMESPACE),
+    );
+    let layouts = parse_page_layouts(&wrapper)?;
+    if layouts.len() != 1 || layouts[0].name != expected_name || layouts[0].xml != page_layout_xml {
+        return Err(Error::InvalidFormat(format!(
+            "page-layout XML must be exactly one style:page-layout named '{expected_name}'"
+        )));
+    }
+    Ok(())
+}
+
+fn find_page_layout(xml: &str, expected_name: &str) -> Result<Option<(usize, usize)>> {
+    let mut reader = NsReader::from_str(xml);
+    let mut buffer = Vec::new();
+    let mut active: Option<(usize, usize)> = None;
+    loop {
+        let event_start = reader.buffer_position() as usize;
+        let (namespace, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| Error::InvalidFormat(format!("styles.xml parsing error: {error}")))?;
+        let style_element = bound_to(&namespace, STYLE_NAMESPACE);
+        let event = event.into_owned();
+        let event_end = reader.buffer_position() as usize;
+        match event {
+            Event::Start(element)
+                if active.is_none()
+                    && style_element
+                    && element.local_name().as_ref() == b"page-layout"
+                    && style_attr(&reader, &element, b"name")?.as_deref()
+                        == Some(expected_name) =>
+            {
+                active = Some((event_start, 1));
+            },
+            Event::Empty(element)
+                if active.is_none()
+                    && style_element
+                    && element.local_name().as_ref() == b"page-layout"
+                    && style_attr(&reader, &element, b"name")?.as_deref()
+                        == Some(expected_name) =>
+            {
+                return Ok(Some((event_start, event_end)));
+            },
+            Event::Start(_) if active.is_some() => active.as_mut().unwrap().1 += 1,
+            Event::End(_) if active.is_some() => {
+                let current = active.as_mut().unwrap();
+                current.1 = current.1.checked_sub(1).ok_or_else(|| {
+                    Error::InvalidFormat("invalid page-layout nesting".to_string())
+                })?;
+                if current.1 == 0 {
+                    return Ok(Some((current.0, event_end)));
+                }
+            },
+            Event::Eof => return Ok(None),
+            _ => {},
+        }
+        buffer.clear();
+    }
+}
+
 fn parse_page_layout(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<PageLayout> {
     let name = style_attr(reader, element, b"name")?.ok_or_else(|| {
         Error::InvalidFormat("style:page-layout is missing style:name".to_string())
@@ -497,6 +584,26 @@ mod tests {
             ))
             .is_err()
         );
+    }
+
+    #[test]
+    fn replaces_one_complete_page_layout_without_rewriting_siblings() {
+        let styles = r#"<o:document-styles xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0"><o:styles><s:style s:name="keep"/></o:styles><o:automatic-styles><s:page-layout s:name="pm1"/><s:page-layout s:name="pm2" s:page-usage="right"/></o:automatic-styles></o:document-styles>"#;
+        let replacement = r#"<x:page-layout xmlns:x="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:f="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" x:name="pm1" x:page-usage="mirrored"><x:page-layout-properties f:page-width="21cm" f:margin="2cm"/><x:header-style><x:header-footer-properties f:min-height="1cm"/></x:header-style></x:page-layout>"#;
+        let updated = set_page_layout_xml(styles, "pm1", replacement).unwrap();
+        let layouts = parse_page_layouts(&updated).unwrap();
+
+        assert_eq!(layouts.len(), 2);
+        assert_eq!(layouts[0].xml, replacement);
+        assert_eq!(layouts[0].page_usage, PageUsage::Mirrored);
+        assert_eq!(
+            layouts[1].xml,
+            "<s:page-layout s:name=\"pm2\" s:page-usage=\"right\"/>"
+        );
+        assert!(updated.contains("<s:style s:name=\"keep\"/>"));
+        assert!(set_page_layout_xml(styles, "pm1", "not XML").is_err());
+        assert!(set_page_layout_xml(styles, "pm1", "<s:page-layout s:name=\"renamed\"/>").is_err());
+        assert!(set_page_layout_xml(styles, "missing", replacement).is_err());
     }
 
     const STYLE_NAMESPACE_STR: &str = "urn:oasis:names:tc:opendocument:xmlns:style:1.0";

@@ -12,7 +12,7 @@ use crate::odt::header_footer::{
     HeaderFooterKind, MasterPage, add_master_page, parse_master_pages, set_region_text,
     set_region_xml,
 };
-use crate::odt::page_layout::{PageLayout, parse_page_layouts};
+use crate::odt::page_layout::{PageLayout, parse_page_layouts, set_page_layout_xml};
 use litchi_core::{Metadata, Result, xml::escape_xml};
 use std::path::Path;
 
@@ -150,6 +150,30 @@ impl MutableDocument {
         self.styles_xml
             .as_deref()
             .map_or_else(|| Ok(Vec::new()), parse_page_layouts)
+    }
+
+    /// Replace one page layout with a complete XML fragment.
+    ///
+    /// The fragment must be exactly one self-contained `style:page-layout`
+    /// element whose `style:name` matches `page_layout_name`. This supports all
+    /// page properties and nested header/footer styles while preserving every
+    /// unrelated byte in `styles.xml`.
+    pub fn set_page_layout_xml(
+        &mut self,
+        page_layout_name: &str,
+        page_layout_xml: &str,
+    ) -> Result<()> {
+        let styles = self.styles_xml.as_deref().ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(
+                "document has no styles.xml page layout to modify".to_string(),
+            )
+        })?;
+        self.styles_xml = Some(set_page_layout_xml(
+            styles,
+            page_layout_name,
+            page_layout_xml,
+        )?);
+        Ok(())
     }
 
     /// Add an empty master page and its referenced page layout.
@@ -1010,6 +1034,8 @@ mod tests {
     fn creates_a_master_page_and_header_in_a_new_document() {
         let mut mutable = MutableDocument::new();
         mutable.add_master_page("Standard", "pm1").unwrap();
+        let layout = r#"<s:page-layout xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:f="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" s:name="pm1" s:page-usage="mirrored"><s:page-layout-properties f:page-width="21cm" f:page-height="29.7cm"/></s:page-layout>"#;
+        mutable.set_page_layout_xml("pm1", layout).unwrap();
         mutable
             .set_header_footer_text("Standard", HeaderFooterKind::Header, "Created header")
             .unwrap();
@@ -1020,6 +1046,10 @@ mod tests {
 
         let round_trip = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();
         let pages = round_trip.master_pages().unwrap();
+        let layouts = round_trip.page_layouts().unwrap();
+        assert_eq!(layouts.len(), 1);
+        assert_eq!(layouts[0].xml, layout);
+        assert_eq!(layouts[0].page_usage, PageUsage::Mirrored);
         assert_eq!(pages.len(), 1);
         assert_eq!(pages[0].name, "Standard");
         assert_eq!(pages[0].page_layout_name.as_deref(), Some("pm1"));
@@ -1029,6 +1059,6 @@ mod tests {
         );
         assert_eq!(pages[0].region(HeaderFooterKind::Header).unwrap().xml, rich);
         let styles = String::from_utf8(round_trip.get_file("styles.xml").unwrap()).unwrap();
-        assert!(styles.contains("<style:page-layout"));
+        assert!(styles.contains(layout));
     }
 }
