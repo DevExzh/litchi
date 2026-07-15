@@ -5,7 +5,6 @@
 
 use super::error::{RtfError, RtfResult};
 use bumpalo::Bump;
-use smallvec::SmallVec;
 use std::borrow::Cow;
 
 /// Control word with optional parameter.
@@ -361,6 +360,9 @@ pub enum ControlWord<'a> {
     Page,
     Section,
     SectionDefault,
+    NonBreakingSpace,
+    OptionalHyphen,
+    NonBreakingHyphen,
 
     // Binary data
     Binary(i32),
@@ -409,8 +411,6 @@ pub struct Lexer<'a> {
     pos: usize,
     /// Arena allocator for temporary strings
     arena: &'a Bump,
-    /// Current character set
-    charset: CharacterSet,
 }
 
 impl<'a> Lexer<'a> {
@@ -421,18 +421,7 @@ impl<'a> Lexer<'a> {
             input,
             pos: 0,
             arena,
-            charset: CharacterSet::default(),
         }
-    }
-
-    /// Set the character set for hex escape decoding.
-    ///
-    /// This can be used to properly decode hex escapes based on the document's
-    /// declared character set (\ansi, \mac, \pc, \pca).
-    #[inline]
-    #[allow(dead_code)] // Reserved for future use when charset detection is implemented
-    pub fn set_charset(&mut self, charset: CharacterSet) {
-        self.charset = charset;
     }
 
     /// Tokenize the entire input.
@@ -496,18 +485,15 @@ impl<'a> Lexer<'a> {
             },
             '~' => {
                 self.advance();
-                let text = self.arena.alloc_str("\u{00A0}"); // Non-breaking space
-                return Ok(Token::Text(Cow::Borrowed(text)));
+                return Ok(Token::Control(ControlWord::NonBreakingSpace));
             },
             '-' => {
                 self.advance();
-                let text = self.arena.alloc_str("\u{00AD}"); // Optional hyphen
-                return Ok(Token::Text(Cow::Borrowed(text)));
+                return Ok(Token::Control(ControlWord::OptionalHyphen));
             },
             '_' => {
                 self.advance();
-                let text = self.arena.alloc_str("\u{2011}"); // Non-breaking hyphen
-                return Ok(Token::Text(Cow::Borrowed(text)));
+                return Ok(Token::Control(ControlWord::NonBreakingHyphen));
             },
             _ => {},
         }
@@ -963,89 +949,35 @@ impl<'a> Lexer<'a> {
 
     /// Parse hexadecimal character escape (\').
     fn parse_hex_char(&mut self) -> RtfResult<Token<'a>> {
-        self.advance(); // Skip '\''
-
-        if self.pos + 1 >= self.input.len() {
-            return Err(RtfError::InvalidUnicode(
-                "Incomplete hex escape".to_string(),
-            ));
+        let mut bytes = String::new();
+        loop {
+            self.advance(); // Skip '\''
+            if self.pos + 1 >= self.input.len() {
+                return Err(RtfError::InvalidUnicode(
+                    "Incomplete hex escape".to_string(),
+                ));
+            }
+            let hex = &self.input[self.pos..self.pos + 2];
+            self.pos += 2;
+            let byte = u8::from_str_radix(hex, 16)
+                .map_err(|_| RtfError::InvalidUnicode(format!("Invalid hex escape: {hex}")))?;
+            bytes.push(char::from(byte));
+            if !self.input[self.pos..].starts_with("\\'") {
+                break;
+            }
+            self.advance(); // Skip the next backslash; the loop skips its quote.
         }
 
-        let hex = &self.input[self.pos..self.pos + 2];
-        self.pos += 2;
-
-        let byte = u8::from_str_radix(hex, 16)
-            .map_err(|_| RtfError::InvalidUnicode(format!("Invalid hex escape: {}", hex)))?;
-
-        // Decode based on character set
-        let ch = self.decode_byte(byte);
-        let text = self.arena.alloc_str(&ch.to_string());
+        // Preserve source bytes. The parser applies the active code page after
+        // interpreting document and group-level encoding controls. Consecutive
+        // escapes stay together so multibyte encodings decode atomically.
+        let text = self.arena.alloc_str(&bytes);
         Ok(Token::Text(Cow::Borrowed(text)))
-    }
-
-    /// Decode a byte according to the current character set.
-    ///
-    /// This handles Windows-1252 (ANSI), Mac Roman, and DOS codepages.
-    fn decode_byte(&self, byte: u8) -> char {
-        match self.charset {
-            CharacterSet::Ansi => {
-                // Windows-1252 / CP1252
-                // Bytes 0x00-0x7F are ASCII
-                // Bytes 0x80-0x9F have special mappings
-                // Bytes 0xA0-0xFF are mostly Latin-1 with some exceptions
-                match byte {
-                    0x80 => '€',
-                    0x82 => '‚',
-                    0x83 => 'ƒ',
-                    0x84 => '„',
-                    0x85 => '…',
-                    0x86 => '†',
-                    0x87 => '‡',
-                    0x88 => 'ˆ',
-                    0x89 => '‰',
-                    0x8A => 'Š',
-                    0x8B => '‹',
-                    0x8C => 'Œ',
-                    0x8E => 'Ž',
-                    0x91 => '\u{2018}', // Left single quotation mark
-                    0x92 => '\u{2019}', // Right single quotation mark
-                    0x93 => '\u{201C}', // Left double quotation mark
-                    0x94 => '\u{201D}', // Right double quotation mark
-                    0x95 => '•',
-                    0x96 => '–',
-                    0x97 => '—',
-                    0x98 => '˜',
-                    0x99 => '™',
-                    0x9A => 'š',
-                    0x9B => '›',
-                    0x9C => 'œ',
-                    0x9E => 'ž',
-                    0x9F => 'Ÿ',
-                    // Others map to Latin-1
-                    _ => byte as char,
-                }
-            },
-            CharacterSet::Mac | CharacterSet::Pc | CharacterSet::Pca => {
-                // For Mac Roman and DOS codepages, basic ASCII is the same
-                // Extended characters would need full codepage tables
-                // For now, use simple Latin-1 mapping as fallback
-                if byte < 0x80 {
-                    byte as char
-                } else {
-                    // Would need proper Mac Roman / CP437 / CP850 tables
-                    // Fallback to Latin-1 for now
-                    byte as char
-                }
-            },
-        }
     }
 
     /// Parse plain text until special character.
     fn parse_text(&mut self) -> RtfResult<Token<'a>> {
-        let _start = self.pos;
-
-        // Use smallvec for efficient text accumulation
-        let mut text = SmallVec::<[u8; 64]>::new();
+        let mut text = String::new();
 
         while self.pos < self.input.len() {
             let ch = self.current_char();
@@ -1060,7 +992,7 @@ impl<'a> Lexer<'a> {
                     }
                 },
                 _ => {
-                    text.push(ch as u8);
+                    text.push(ch);
                     self.advance();
                 },
             }
@@ -1081,8 +1013,7 @@ impl<'a> Lexer<'a> {
             return Ok(Token::Text(Cow::Borrowed(allocated)));
         }
 
-        let text_str = std::str::from_utf8(&text)?;
-        let allocated = self.arena.alloc_str(text_str);
+        let allocated = self.arena.alloc_str(&text);
         Ok(Token::Text(Cow::Borrowed(allocated)))
     }
 
@@ -1239,7 +1170,7 @@ mod tests {
         let mut lexer = Lexer::new(r"\'80 value", &arena);
         let tokens = lexer.tokenize().unwrap();
         assert_eq!(tokens.len(), 2);
-        assert_eq!(tokens[0], Token::Text(Cow::Borrowed("€")));
+        assert_eq!(tokens[0], Token::Text(Cow::Borrowed("\u{0080}")));
         assert_eq!(tokens[1], Token::Text(Cow::Borrowed(" value")));
     }
 
@@ -1273,7 +1204,7 @@ mod tests {
         let mut lexer = Lexer::new(input, &arena);
         let tokens = lexer.tokenize().unwrap();
         assert_eq!(tokens.len(), 1);
-        assert!(matches!(tokens[0], Token::Text(_)));
+        assert_eq!(tokens[0], Token::Control(ControlWord::NonBreakingSpace));
     }
 
     #[test]
@@ -1283,7 +1214,7 @@ mod tests {
         let mut lexer = Lexer::new(input, &arena);
         let tokens = lexer.tokenize().unwrap();
         assert_eq!(tokens.len(), 1);
-        assert!(matches!(tokens[0], Token::Text(_)));
+        assert_eq!(tokens[0], Token::Control(ControlWord::OptionalHyphen));
     }
 
     #[test]
@@ -1293,7 +1224,7 @@ mod tests {
         let mut lexer = Lexer::new(input, &arena);
         let tokens = lexer.tokenize().unwrap();
         assert_eq!(tokens.len(), 1);
-        assert!(matches!(tokens[0], Token::Text(_)));
+        assert_eq!(tokens[0], Token::Control(ControlWord::NonBreakingHyphen));
     }
 
     #[test]

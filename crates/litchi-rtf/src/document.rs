@@ -1410,4 +1410,54 @@ mod tests {
             "Page footer"
         );
     }
+
+    #[test]
+    fn decodes_hex_escapes_after_declared_codepage() {
+        let cyrillic =
+            RtfDocument::parse(r#"{\rtf1\ansi\ansicpg1251 \'cf\'f0\'e8\'e2\'e5\'f2}"#).unwrap();
+        assert_eq!(cyrillic.text(), "Привет");
+
+        let japanese = RtfDocument::parse(r#"{\rtf1\ansi\ansicpg932 \'82\'a0\'82\'a2}"#).unwrap();
+        assert_eq!(japanese.text(), "あい");
+    }
+
+    #[test]
+    fn decodes_macintosh_and_exact_dos_character_sets() {
+        let scoped = RtfDocument::parse(r#"{\rtf1\ansi \'80{\mac \'80}\'80}"#).unwrap();
+        assert_eq!(scoped.text(), "€Ä€");
+
+        let cp437 = RtfDocument::parse(r#"{\rtf1\pc \'9b}"#).unwrap();
+        assert_eq!(cp437.text(), "¢");
+        let cp850 = RtfDocument::parse(r#"{\rtf1\pca \'9b}"#).unwrap();
+        assert_eq!(cp850.text(), "ø");
+        let explicit_cp437 = RtfDocument::parse(r#"{\rtf1\ansi\ansicpg437 \'9b}"#).unwrap();
+        assert_eq!(explicit_cp437.text(), "¢");
+    }
+
+    #[test]
+    fn decodes_unescaped_legacy_bytes_and_semantic_control_symbols() {
+        let mut bytes = br#"{\rtf1\ansi\ansicpg1252 "#.to_vec();
+        bytes.push(0xE9);
+        bytes.push(b'}');
+        assert_eq!(RtfDocument::parse_bytes(&bytes).unwrap().text(), "é");
+
+        let symbols = RtfDocument::parse(r#"{\rtf1\pc A\~B\-C\_D}"#).unwrap();
+        assert_eq!(symbols.text(), "A\u{00A0}B\u{00AD}C\u{2011}D");
+    }
+
+    #[test]
+    fn decodes_declared_codepage_in_semantic_destinations() {
+        let doc = RtfDocument::parse(
+            r#"{\rtf1\ansi\ansicpg1251{\info{\author \'cf\'f0\'e8\'e2\'e5\'f2\~X}}{\*\revtbl {\'cf\'f0\'e8\'e2\'e5\'f2;}}{\header \'cf\'f0\'e8\'e2\'e5\'f2\_X}Body{\footnote \'cf\'f0\'e8\'e2\'e5\'f2\~X}{\revised\revauth0 X}}"#,
+        )
+        .unwrap();
+
+        assert_eq!(doc.info().author.as_deref(), Some("Привет\u{00A0}X"));
+        assert_eq!(
+            doc.sections()[0].headers_footers[0].text(),
+            "Привет\u{2011}X"
+        );
+        assert_eq!(doc.notes()[0].content, "Привет\u{00A0}X");
+        assert_eq!(doc.revisions()[0].author, "Привет");
+    }
 }

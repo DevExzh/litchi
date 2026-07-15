@@ -12,6 +12,97 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::num::NonZeroU16;
 
+#[derive(Debug, Clone, Copy)]
+enum RtfEncoding {
+    Standard(&'static Encoding),
+    Cp437,
+    Cp850,
+}
+
+impl RtfEncoding {
+    fn decode(self, bytes: &[u8]) -> Cow<'_, str> {
+        match self {
+            Self::Standard(encoding) => encoding.decode(bytes).0,
+            Self::Cp437 => decode_dos_codepage(bytes, &CP437_HIGH),
+            Self::Cp850 => decode_dos_codepage(bytes, &CP850_HIGH),
+        }
+    }
+}
+
+fn decode_dos_codepage<'a>(bytes: &'a [u8], high: &[char; 128]) -> Cow<'a, str> {
+    if bytes.iter().all(u8::is_ascii) {
+        return String::from_utf8_lossy(bytes);
+    }
+    let mut output = String::with_capacity(bytes.len());
+    for &byte in bytes {
+        if byte.is_ascii() {
+            output.push(char::from(byte));
+        } else {
+            output.push(high[usize::from(byte - 0x80)]);
+        }
+    }
+    Cow::Owned(output)
+}
+
+const CP437_HIGH: [char; 128] = [
+    '\u{00C7}', '\u{00FC}', '\u{00E9}', '\u{00E2}', '\u{00E4}', '\u{00E0}', '\u{00E5}', '\u{00E7}',
+    '\u{00EA}', '\u{00EB}', '\u{00E8}', '\u{00EF}', '\u{00EE}', '\u{00EC}', '\u{00C4}', '\u{00C5}',
+    '\u{00C9}', '\u{00E6}', '\u{00C6}', '\u{00F4}', '\u{00F6}', '\u{00F2}', '\u{00FB}', '\u{00F9}',
+    '\u{00FF}', '\u{00D6}', '\u{00DC}', '\u{00A2}', '\u{00A3}', '\u{00A5}', '\u{20A7}', '\u{0192}',
+    '\u{00E1}', '\u{00ED}', '\u{00F3}', '\u{00FA}', '\u{00F1}', '\u{00D1}', '\u{00AA}', '\u{00BA}',
+    '\u{00BF}', '\u{2310}', '\u{00AC}', '\u{00BD}', '\u{00BC}', '\u{00A1}', '\u{00AB}', '\u{00BB}',
+    '\u{2591}', '\u{2592}', '\u{2593}', '\u{2502}', '\u{2524}', '\u{2561}', '\u{2562}', '\u{2556}',
+    '\u{2555}', '\u{2563}', '\u{2551}', '\u{2557}', '\u{255D}', '\u{255C}', '\u{255B}', '\u{2510}',
+    '\u{2514}', '\u{2534}', '\u{252C}', '\u{251C}', '\u{2500}', '\u{253C}', '\u{255E}', '\u{255F}',
+    '\u{255A}', '\u{2554}', '\u{2569}', '\u{2566}', '\u{2560}', '\u{2550}', '\u{256C}', '\u{2567}',
+    '\u{2568}', '\u{2564}', '\u{2565}', '\u{2559}', '\u{2558}', '\u{2552}', '\u{2553}', '\u{256B}',
+    '\u{256A}', '\u{2518}', '\u{250C}', '\u{2588}', '\u{2584}', '\u{258C}', '\u{2590}', '\u{2580}',
+    '\u{03B1}', '\u{00DF}', '\u{0393}', '\u{03C0}', '\u{03A3}', '\u{03C3}', '\u{00B5}', '\u{03C4}',
+    '\u{03A6}', '\u{0398}', '\u{03A9}', '\u{03B4}', '\u{221E}', '\u{03C6}', '\u{03B5}', '\u{2229}',
+    '\u{2261}', '\u{00B1}', '\u{2265}', '\u{2264}', '\u{2320}', '\u{2321}', '\u{00F7}', '\u{2248}',
+    '\u{00B0}', '\u{2219}', '\u{00B7}', '\u{221A}', '\u{207F}', '\u{00B2}', '\u{25A0}', '\u{00A0}',
+];
+
+const CP850_HIGH: [char; 128] = [
+    '\u{00C7}', '\u{00FC}', '\u{00E9}', '\u{00E2}', '\u{00E4}', '\u{00E0}', '\u{00E5}', '\u{00E7}',
+    '\u{00EA}', '\u{00EB}', '\u{00E8}', '\u{00EF}', '\u{00EE}', '\u{00EC}', '\u{00C4}', '\u{00C5}',
+    '\u{00C9}', '\u{00E6}', '\u{00C6}', '\u{00F4}', '\u{00F6}', '\u{00F2}', '\u{00FB}', '\u{00F9}',
+    '\u{00FF}', '\u{00D6}', '\u{00DC}', '\u{00F8}', '\u{00A3}', '\u{00D8}', '\u{00D7}', '\u{0192}',
+    '\u{00E1}', '\u{00ED}', '\u{00F3}', '\u{00FA}', '\u{00F1}', '\u{00D1}', '\u{00AA}', '\u{00BA}',
+    '\u{00BF}', '\u{00AE}', '\u{00AC}', '\u{00BD}', '\u{00BC}', '\u{00A1}', '\u{00AB}', '\u{00BB}',
+    '\u{2591}', '\u{2592}', '\u{2593}', '\u{2502}', '\u{2524}', '\u{00C1}', '\u{00C2}', '\u{00C0}',
+    '\u{00A9}', '\u{2563}', '\u{2551}', '\u{2557}', '\u{255D}', '\u{00A2}', '\u{00A5}', '\u{2510}',
+    '\u{2514}', '\u{2534}', '\u{252C}', '\u{251C}', '\u{2500}', '\u{253C}', '\u{00E3}', '\u{00C3}',
+    '\u{255A}', '\u{2554}', '\u{2569}', '\u{2566}', '\u{2560}', '\u{2550}', '\u{256C}', '\u{00A4}',
+    '\u{00F0}', '\u{00D0}', '\u{00CA}', '\u{00CB}', '\u{00C8}', '\u{0131}', '\u{00CD}', '\u{00CE}',
+    '\u{00CF}', '\u{2518}', '\u{250C}', '\u{2588}', '\u{2584}', '\u{00A6}', '\u{00CC}', '\u{2580}',
+    '\u{00D3}', '\u{00DF}', '\u{00D4}', '\u{00D2}', '\u{00F5}', '\u{00D5}', '\u{00B5}', '\u{00FE}',
+    '\u{00DE}', '\u{00DA}', '\u{00DB}', '\u{00D9}', '\u{00FD}', '\u{00DD}', '\u{00AF}', '\u{00B4}',
+    '\u{00AD}', '\u{00B1}', '\u{2017}', '\u{00BE}', '\u{00B6}', '\u{00A7}', '\u{00F7}', '\u{00B8}',
+    '\u{00B0}', '\u{00A8}', '\u{00B7}', '\u{00B9}', '\u{00B3}', '\u{00B2}', '\u{25A0}', '\u{00A0}',
+];
+
+fn append_transport_bytes(buffer: &mut impl Extend<u8>, text: &str) -> RtfResult<()> {
+    for character in text.chars() {
+        let byte = u8::try_from(character as u32).map_err(|_| {
+            RtfError::InvalidUnicode(
+                "RTF source text is not a byte-preserving transport string".to_string(),
+            )
+        })?;
+        buffer.extend(std::iter::once(byte));
+    }
+    Ok(())
+}
+
+fn control_symbol_text(control: &ControlWord<'_>) -> Option<&'static str> {
+    match control {
+        ControlWord::NonBreakingSpace => Some("\u{00A0}"),
+        ControlWord::OptionalHyphen => Some("\u{00AD}"),
+        ControlWord::NonBreakingHyphen => Some("\u{2011}"),
+        _ => None,
+    }
+}
+
 /// RTF destination type - determines if we're in document body or header
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Destination {
@@ -136,7 +227,7 @@ struct State {
     /// Current destination (for skipping non-document content)
     destination: Destination,
     /// Current text encoding
-    encoding: &'static Encoding,
+    encoding: RtfEncoding,
     /// Active tracked-change kind for text emitted in this state
     revision_type: Option<super::annotation::RevisionType>,
     /// Revision-author table index
@@ -154,7 +245,7 @@ impl Default for State {
             in_table: false,
             cell_boundaries: SmallVec::new(),
             destination: Destination::DocumentBody,
-            encoding: encoding_rs::WINDOWS_1252, // Default ANSI encoding
+            encoding: RtfEncoding::Standard(encoding_rs::WINDOWS_1252),
             revision_type: None,
             revision_author_id: None,
             revision_date: None,
@@ -686,6 +777,31 @@ impl<'a> Parser<'a> {
                             }
                             self.parse_unicode_sequence(*code)?;
                         },
+                        ControlWord::Ansi
+                        | ControlWord::AnsiCodePage(_)
+                        | ControlWord::Mac
+                        | ControlWord::Pc
+                        | ControlWord::Pca => {
+                            if !text_buffer.is_empty() {
+                                self.flush_text_buffer(&mut text_buffer)?;
+                            }
+                            self.pos += 1;
+                            self.apply_control_word(control)?;
+                        },
+                        ControlWord::NonBreakingSpace
+                        | ControlWord::OptionalHyphen
+                        | ControlWord::NonBreakingHyphen => {
+                            if !text_buffer.is_empty() {
+                                self.flush_text_buffer(&mut text_buffer)?;
+                            }
+                            let text = control_symbol_text(control).ok_or_else(|| {
+                                RtfError::MalformedDocument(
+                                    "missing RTF control-symbol text".to_string(),
+                                )
+                            })?;
+                            self.pos += 1;
+                            self.append_semantic_text(text)?;
+                        },
                         ControlWord::Revised(_)
                         | ControlWord::Deleted(_)
                         | ControlWord::RevisionAuthor(_)
@@ -713,11 +829,13 @@ impl<'a> Parser<'a> {
                     }
                     // Check if we're in a table
                     if self.current_state().map(|s| s.in_table).unwrap_or(false) {
-                        // Accumulate in cell text buffer
-                        self.current_cell_text.extend_from_slice(text.as_bytes());
+                        let encoding = self.current_state()?.encoding;
+                        let mut bytes = SmallVec::<[u8; 64]>::new();
+                        append_transport_bytes(&mut bytes, text)?;
+                        self.current_cell_text
+                            .extend_from_slice(encoding.decode(&bytes).as_bytes());
                     } else {
-                        // Regular text accumulation
-                        text_buffer.extend_from_slice(text.as_bytes());
+                        append_transport_bytes(&mut text_buffer, text)?;
                     }
                 },
                 Token::Binary(_) => self.pos += 1,
@@ -738,23 +856,7 @@ impl<'a> Parser<'a> {
         // Only create blocks for text in the document body
         // Skip text from font tables, color tables, stylesheets, etc.
         if state.destination == Destination::DocumentBody {
-            // The bytes in the buffer came from a string that was decoded with Windows-1252.
-            // Each character in that string represents a byte value (0x00-0xFF).
-            // We need to recover the original bytes, then decode with the correct encoding.
-            //
-            // Since Windows-1252 characters U+0000-U+00FF map 1:1 to byte values 0x00-0xFF
-            // (with some exceptions in the 0x80-0x9F range), we can reconstruct the
-            // original bytes by taking the lower 8 bits of each character's code point.
-            //
-            // Note: buffer contains UTF-8 bytes of the string. We need to decode to chars first.
-            let original_bytes: SmallVec<[u8; 256]> = std::str::from_utf8(buffer)
-                .unwrap_or("")
-                .chars()
-                .map(|c| c as u8) // Take lower 8 bits
-                .collect();
-
-            // Now decode using the correct encoding
-            let (decoded_str, _, _) = state.encoding.decode(&original_bytes);
+            let decoded_str = state.encoding.decode(buffer);
 
             // Allocate in arena and create block
             let text = self.arena.alloc_str(&decoded_str);
@@ -769,6 +871,34 @@ impl<'a> Parser<'a> {
 
         buffer.clear();
         Ok(())
+    }
+
+    fn decode_transport_text(&self, text: &str) -> RtfResult<String> {
+        let mut bytes = SmallVec::<[u8; 64]>::new();
+        append_transport_bytes(&mut bytes, text)?;
+        Ok(self.current_state()?.encoding.decode(&bytes).into_owned())
+    }
+
+    fn append_semantic_text(&mut self, text: &str) -> RtfResult<()> {
+        let state = self.current_state()?.clone();
+        if state.in_table {
+            self.current_cell_text.extend_from_slice(text.as_bytes());
+            return Ok(());
+        }
+        if state.destination != Destination::DocumentBody {
+            return Ok(());
+        }
+        let text = self.arena.alloc_str(text);
+        let start = self.body_text_len;
+        self.body_text_len = self.body_text_len.checked_add(text.len()).ok_or_else(|| {
+            RtfError::MalformedDocument("RTF body text length overflow".to_string())
+        })?;
+        self.blocks.push(StyleBlock::new(
+            Cow::Borrowed(text),
+            state.formatting,
+            state.paragraph,
+        ));
+        self.append_revision_text(&state, text, start, self.body_text_len)
     }
 
     fn append_revision_text(
@@ -972,12 +1102,27 @@ impl<'a> Parser<'a> {
             },
 
             // Character encoding
+            ControlWord::Ansi => {
+                state.encoding = RtfEncoding::Standard(encoding_rs::WINDOWS_1252);
+            },
             ControlWord::AnsiCodePage(cp) => {
-                // Set encoding based on Windows code page
-                if let Some(encoding) = codepage_to_encoding(*cp as u32) {
-                    state.encoding = encoding;
+                state.encoding = match *cp {
+                    437 => RtfEncoding::Cp437,
+                    850 => RtfEncoding::Cp850,
+                    _ => {
+                        if let Some(encoding) = codepage_to_encoding(*cp as u32) {
+                            RtfEncoding::Standard(encoding)
+                        } else {
+                            state.encoding
+                        }
+                    },
                 }
             },
+            ControlWord::Mac => {
+                state.encoding = RtfEncoding::Standard(encoding_rs::MACINTOSH);
+            },
+            ControlWord::Pc => state.encoding = RtfEncoding::Cp437,
+            ControlWord::Pca => state.encoding = RtfEncoding::Cp850,
 
             // Table control words
             ControlWord::InTable => {
@@ -1153,7 +1298,7 @@ impl<'a> Parser<'a> {
                     }
                     return Ok(());
                 },
-                Some(Token::Text(text)) => direct_text.push_str(text),
+                Some(Token::Text(text)) => direct_text.push_str(&self.decode_transport_text(text)?),
                 Some(Token::Control(ControlWord::Unicode(first))) => {
                     let decoded = self.parse_style_unicode(*first, unicode_skip)?;
                     direct_text.push_str(&decoded);
@@ -1161,6 +1306,9 @@ impl<'a> Parser<'a> {
                 },
                 Some(Token::Control(ControlWord::UnicodeSkip(value))) => {
                     unicode_skip = (*value).max(0);
+                },
+                Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
+                    direct_text.push_str(control_symbol_text(control).unwrap_or_default());
                 },
                 Some(_) => {},
                 None => break,
@@ -1195,7 +1343,7 @@ impl<'a> Parser<'a> {
                     self.skip_group()?;
                     continue;
                 },
-                Some(Token::Text(text)) => author.push_str(text),
+                Some(Token::Text(text)) => author.push_str(&self.decode_transport_text(text)?),
                 Some(Token::Control(ControlWord::Unicode(first))) => {
                     let decoded = self.parse_style_unicode(*first, unicode_skip)?;
                     author.push_str(&decoded);
@@ -1203,6 +1351,9 @@ impl<'a> Parser<'a> {
                 },
                 Some(Token::Control(ControlWord::UnicodeSkip(value))) => {
                     unicode_skip = (*value).max(0);
+                },
+                Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
+                    author.push_str(control_symbol_text(control).unwrap_or_default());
                 },
                 Some(_) => {},
                 None => break,
@@ -1448,7 +1599,7 @@ impl<'a> Parser<'a> {
                     self.skip_group()?;
                     continue;
                 },
-                Some(Token::Text(text)) => value.push_str(text),
+                Some(Token::Text(text)) => value.push_str(&self.decode_transport_text(text)?),
                 Some(Token::Control(ControlWord::Unicode(first))) => {
                     let decoded = self.parse_style_unicode(*first, unicode_skip)?;
                     value.push_str(&decoded);
@@ -1461,6 +1612,9 @@ impl<'a> Parser<'a> {
                 },
                 Some(Token::Control(ControlWord::UnicodeSkip(value))) => {
                     unicode_skip = (*value).max(0);
+                },
+                Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
+                    value.push_str(control_symbol_text(control).unwrap_or_default());
                 },
                 Some(_) => {},
                 None => break,
@@ -1649,7 +1803,8 @@ impl<'a> Parser<'a> {
                     continue;
                 },
                 Some(Token::Text(text)) if !name_complete => {
-                    Self::append_style_name(&mut name, text, &mut name_complete);
+                    let decoded = self.decode_transport_text(text)?;
+                    Self::append_style_name(&mut name, &decoded, &mut name_complete);
                 },
                 Some(Token::Control(ControlWord::Unicode(first))) if !name_complete => {
                     let decoded = self.parse_style_unicode(*first, state.unicode_skip)?;
@@ -1662,6 +1817,13 @@ impl<'a> Parser<'a> {
                     continue;
                 },
                 Some(Token::Control(control)) => match control {
+                    control if !name_complete && control_symbol_text(control).is_some() => {
+                        Self::append_style_name(
+                            &mut name,
+                            control_symbol_text(control).unwrap_or_default(),
+                            &mut name_complete,
+                        );
+                    },
                     ControlWord::ParagraphStyle(value) => {
                         style_type = Some(super::stylesheet::StyleType::Paragraph);
                         id = Some(Self::style_id(*value, "style")?);
@@ -1811,7 +1973,7 @@ impl<'a> Parser<'a> {
         }
         let mut decoded = String::from_utf16(&utf16)
             .map_err(|error| RtfError::InvalidUnicode(format!("invalid style name: {error}")))?;
-        decoded.push_str(&remainder);
+        decoded.push_str(&self.decode_transport_text(&remainder)?);
         Ok(decoded)
     }
 
@@ -1922,7 +2084,7 @@ impl<'a> Parser<'a> {
         let mut font_num = 0;
         let mut font_family = FontFamily::Nil;
         let mut charset = 0;
-        let mut name_parts = SmallVec::<[&str; 4]>::new();
+        let mut name_parts = SmallVec::<[String; 4]>::new();
 
         while self.pos < self.tokens.len() {
             match &self.tokens[self.pos] {
@@ -1956,9 +2118,10 @@ impl<'a> Parser<'a> {
                 },
                 Token::Text(text) => {
                     // Font name (may contain semicolon at the end)
-                    let trimmed = text.trim_end_matches(';').trim();
+                    let decoded = self.decode_transport_text(text)?;
+                    let trimmed = decoded.trim_end_matches(';').trim();
                     if !trimmed.is_empty() {
-                        name_parts.push(trimmed);
+                        name_parts.push(trimmed.to_string());
                     }
                     self.pos += 1;
                 },
@@ -2136,7 +2299,8 @@ impl<'a> Parser<'a> {
                 Some(Token::Text(text)) => {
                     let skipped = fallback_skip.min(text.chars().count());
                     fallback_skip -= skipped;
-                    name.extend(text.chars().skip(skipped));
+                    let remainder: String = text.chars().skip(skipped).collect();
+                    name.push_str(&self.decode_transport_text(&remainder)?);
                 },
                 Some(Token::Control(ControlWord::BookmarkFirstColumn(value))) => {
                     first_column = Some(*value);
@@ -2161,6 +2325,9 @@ impl<'a> Parser<'a> {
                 },
                 Some(Token::Control(ControlWord::UnicodeSkip(value))) => {
                     unicode_skip = (*value).max(0) as usize;
+                },
+                Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
+                    name.push_str(control_symbol_text(control).unwrap_or_default());
                 },
                 _ => {},
             }
@@ -2252,7 +2419,8 @@ impl<'a> Parser<'a> {
                 Some(Token::Text(text)) => {
                     let skipped = fallback_skip.min(text.chars().count());
                     fallback_skip -= skipped;
-                    value.extend(text.chars().skip(skipped));
+                    let remainder: String = text.chars().skip(skipped).collect();
+                    value.push_str(&self.decode_transport_text(&remainder)?);
                 },
                 Some(Token::Control(ControlWord::Unicode(_))) => {
                     let mut utf16 = SmallVec::<[u16; 4]>::new();
@@ -2272,6 +2440,9 @@ impl<'a> Parser<'a> {
                 },
                 Some(Token::Control(ControlWord::UnicodeSkip(count))) => {
                     unicode_skip = (*count).max(0) as usize;
+                },
+                Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
+                    value.push_str(control_symbol_text(control).unwrap_or_default());
                 },
                 _ => {},
             }
@@ -2367,7 +2538,8 @@ impl<'a> Parser<'a> {
                 Some(Token::Text(value)) => {
                     let skipped = fallback_skip.min(value.chars().count());
                     fallback_skip -= skipped;
-                    text.extend(value.chars().skip(skipped));
+                    let remainder: String = value.chars().skip(skipped).collect();
+                    text.push_str(&self.decode_transport_text(&remainder)?);
                 },
                 Some(Token::Control(ControlWord::Unicode(_))) => {
                     let mut utf16 = SmallVec::<[u16; 4]>::new();
@@ -2390,6 +2562,9 @@ impl<'a> Parser<'a> {
                 },
                 Some(Token::Control(ControlWord::Par | ControlWord::Line)) => text.push('\n'),
                 Some(Token::Control(ControlWord::Tab)) => text.push('\t'),
+                Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
+                    text.push_str(control_symbol_text(control).unwrap_or_default());
+                },
                 _ => {},
             }
             self.pos += 1;
@@ -2433,7 +2608,10 @@ impl<'a> Parser<'a> {
             match self.tokens.get(self.pos) {
                 Some(Token::OpenBrace) => depth += 1,
                 Some(Token::CloseBrace) => depth -= 1,
-                Some(Token::Text(text)) => value.push_str(text),
+                Some(Token::Text(text)) => value.push_str(&self.decode_transport_text(text)?),
+                Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
+                    value.push_str(control_symbol_text(control).unwrap_or_default());
+                },
                 _ => {},
             }
             self.pos += 1;
@@ -2468,7 +2646,7 @@ impl<'a> Parser<'a> {
                     let skipped = fallback_skip.min(text.chars().count());
                     fallback_skip -= skipped;
                     let remainder: String = text.chars().skip(skipped).collect();
-                    value.push_str(&remainder);
+                    value.push_str(&self.decode_transport_text(&remainder)?);
                     self.pos += 1;
                 },
                 Some(Token::Control(ControlWord::Unicode(_))) => {
@@ -2487,6 +2665,10 @@ impl<'a> Parser<'a> {
                 },
                 Some(Token::Control(ControlWord::UnicodeSkip(count))) => {
                     self.current_state_mut()?.unicode_skip = *count;
+                    self.pos += 1;
+                },
+                Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
+                    value.push_str(control_symbol_text(control).unwrap_or_default());
                     self.pos += 1;
                 },
                 Some(_) => self.pos += 1,
@@ -2731,7 +2913,8 @@ impl<'a> Parser<'a> {
             // A fallback and subsequent text often share one lexer token. Preserve
             // the portion after the configured fallback character count.
             if let Some(remainder) = fallback_remainder {
-                let mut buffer = SmallVec::<[u8; 256]>::from_slice(remainder.as_bytes());
+                let mut buffer = SmallVec::<[u8; 256]>::new();
+                append_transport_bytes(&mut buffer, &remainder)?;
                 self.flush_text_buffer(&mut buffer)?;
             }
         }
@@ -2922,8 +3105,12 @@ impl<'a> Parser<'a> {
                     text.push('\t');
                     self.pos += 1;
                 },
+                Token::Control(control) if control_symbol_text(control).is_some() => {
+                    text.push_str(control_symbol_text(control).unwrap_or_default());
+                    self.pos += 1;
+                },
                 Token::Text(value) => {
-                    text.push_str(value);
+                    text.push_str(&self.decode_transport_text(value)?);
                     self.pos += 1;
                 },
                 _ => self.pos += 1,
@@ -2958,8 +3145,12 @@ impl<'a> Parser<'a> {
                 Token::Control(ControlWord::Unicode(code)) => {
                     text.push_str(&self.parse_destination_unicode_sequence(*code)?);
                 },
+                Token::Control(control) if control_symbol_text(control).is_some() => {
+                    text.push_str(control_symbol_text(control).unwrap_or_default());
+                    self.pos += 1;
+                },
                 Token::Text(value) => {
-                    text.push_str(value);
+                    text.push_str(&self.decode_transport_text(value)?);
                     self.pos += 1;
                 },
                 _ => self.pos += 1,
@@ -3168,8 +3359,14 @@ impl<'a> Parser<'a> {
                     text.push('\t');
                     self.pos += 1;
                 },
+                Token::Control(control)
+                    if text_depth.is_some() && control_symbol_text(control).is_some() =>
+                {
+                    text.push_str(control_symbol_text(control).unwrap_or_default());
+                    self.pos += 1;
+                },
                 Token::Text(value) if text_depth.is_some() => {
-                    text.push_str(value);
+                    text.push_str(&self.decode_transport_text(value)?);
                     if text.len() > MAX_SHAPE_TEXT_BYTES {
                         return Err(RtfError::MalformedDocument(
                             "RTF shape text exceeds the safety limit".to_string(),
@@ -3246,10 +3443,22 @@ impl<'a> Parser<'a> {
                         None => {},
                     }
                 },
-                Token::Text(text) => {
+                Token::Control(control)
+                    if part.is_some() && control_symbol_text(control).is_some() =>
+                {
+                    let decoded = control_symbol_text(control).unwrap_or_default();
                     match part {
-                        Some(PropertyPart::Name) => name.push_str(text),
-                        Some(PropertyPart::Value) => value.push_str(text),
+                        Some(PropertyPart::Name) => name.push_str(decoded),
+                        Some(PropertyPart::Value) => value.push_str(decoded),
+                        None => {},
+                    }
+                    self.pos += 1;
+                },
+                Token::Text(text) => {
+                    let decoded = self.decode_transport_text(text)?;
+                    match part {
+                        Some(PropertyPart::Name) => name.push_str(&decoded),
+                        Some(PropertyPart::Value) => value.push_str(&decoded),
                         None => {},
                     }
                     self.pos += 1;
@@ -3728,10 +3937,22 @@ impl<'a> Parser<'a> {
                                     break;
                                 },
                                 Token::Text(text) => {
+                                    let decoded = self.decode_transport_text(text)?;
                                     if in_instruction {
-                                        instruction.extend_from_slice(text.as_bytes());
+                                        instruction.extend_from_slice(decoded.as_bytes());
                                     } else if in_result {
-                                        result.extend_from_slice(text.as_bytes());
+                                        result.extend_from_slice(decoded.as_bytes());
+                                    }
+                                    self.pos += 1;
+                                },
+                                Token::Control(control)
+                                    if control_symbol_text(control).is_some() =>
+                                {
+                                    let decoded = control_symbol_text(control).unwrap_or_default();
+                                    if in_instruction {
+                                        instruction.extend_from_slice(decoded.as_bytes());
+                                    } else if in_result {
+                                        result.extend_from_slice(decoded.as_bytes());
                                     }
                                     self.pos += 1;
                                 },
@@ -3846,13 +4067,20 @@ impl<'a> Parser<'a> {
                     let decoded = self.parse_destination_unicode_sequence(*code)?;
                     text_buffer.extend_from_slice(decoded.as_bytes());
                 },
+                Token::Control(control) if control_symbol_text(control).is_some() => {
+                    self.pos += 1;
+                    text_buffer.extend_from_slice(
+                        control_symbol_text(control).unwrap_or_default().as_bytes(),
+                    );
+                },
                 Token::Control(control) => {
                     self.pos += 1;
                     self.apply_control_word(control)?;
                 },
                 Token::Text(text) => {
+                    let decoded = self.decode_transport_text(text)?;
                     self.pos += 1;
-                    text_buffer.extend_from_slice(text.as_bytes());
+                    text_buffer.extend_from_slice(decoded.as_bytes());
                 },
                 _ => {
                     self.pos += 1;
@@ -3908,7 +4136,7 @@ impl<'a> Parser<'a> {
         let mut decoded = String::from_utf16(&utf16).map_err(|error| {
             RtfError::InvalidUnicode(format!("invalid destination Unicode: {error}"))
         })?;
-        decoded.push_str(&remainder);
+        decoded.push_str(&self.decode_transport_text(&remainder)?);
         Ok(decoded)
     }
 
@@ -3934,13 +4162,21 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                     self.current_note_buffer.push(b'\t');
                 },
+                Token::Control(control) if control_symbol_text(control).is_some() => {
+                    self.pos += 1;
+                    self.current_note_buffer.extend_from_slice(
+                        control_symbol_text(control).unwrap_or_default().as_bytes(),
+                    );
+                },
                 Token::Control(control) => {
                     self.pos += 1;
                     self.apply_control_word(control)?;
                 },
                 Token::Text(text) => {
+                    let decoded = self.decode_transport_text(text)?;
                     self.pos += 1;
-                    self.current_note_buffer.extend_from_slice(text.as_bytes());
+                    self.current_note_buffer
+                        .extend_from_slice(decoded.as_bytes());
                 },
                 _ => {
                     self.pos += 1;
