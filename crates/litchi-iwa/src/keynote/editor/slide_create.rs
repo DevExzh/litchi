@@ -4,12 +4,12 @@ use super::*;
 
 mod component;
 mod graph;
-mod layout;
+pub(super) mod layout;
 mod wire;
 
 use component::register_created_slide;
 use graph::{find_note_source, take_identifier, template_clone_object_ids};
-use layout::{default_layout_node_id, read_layout_graph, resolve_layout};
+use layout::{LayoutCatalog, default_layout_node_id, read_layout_graph, resolve_layout};
 use wire::{clear_user_guides, insert_slide_node, materialize_slide_object, prepare_slide_number};
 
 impl KeynoteEditor {
@@ -17,38 +17,7 @@ impl KeynoteEditor {
     pub fn slide_layouts(&self) -> Result<Vec<KeynoteSlideLayoutInfo>> {
         let graph = ObjectGraph::read(self.package())?;
         let layout_graph = read_layout_graph(&graph)?;
-        let default = default_layout_node_id(&layout_graph.theme)?;
-        let mut seen = HashSet::with_capacity(layout_graph.theme.templates.len());
-        layout_graph
-            .theme
-            .templates
-            .iter()
-            .map(|reference| {
-                if !seen.insert(reference.identifier) {
-                    return Err(Error::InvalidFormat(format!(
-                        "Keynote theme duplicates layout node {}",
-                        reference.identifier
-                    )));
-                }
-                let layout = resolve_layout(&graph, reference.identifier)?;
-                let name = layout
-                    .slide
-                    .name
-                    .clone()
-                    .filter(|name| !name.is_empty())
-                    .ok_or_else(|| {
-                        Error::InvalidFormat(format!(
-                            "Keynote layout slide {} has no name",
-                            layout.slide_id
-                        ))
-                    })?;
-                Ok(KeynoteSlideLayoutInfo {
-                    id: KeynoteSlideLayoutId(reference.identifier),
-                    name,
-                    is_default: reference.identifier == default,
-                })
-            })
-            .collect()
+        LayoutCatalog::read(&graph, &layout_graph.theme).map(LayoutCatalog::into_infos)
     }
 
     /// Return the theme's default slide layout.

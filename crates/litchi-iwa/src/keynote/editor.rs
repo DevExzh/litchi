@@ -64,6 +64,10 @@ pub struct KeynoteSlideInfo {
     pub node_id: u64,
     pub slide_id: u64,
     pub name: Option<String>,
+    /// Theme layout currently selected for this slide.
+    ///
+    /// Legacy slides without a template relationship report `None`.
+    pub layout: Option<KeynoteSlideLayoutInfo>,
     pub is_skipped: bool,
     pub is_slide_number_visible: Option<bool>,
     /// Whether the layout-provided title placeholder participates in this slide.
@@ -102,7 +106,7 @@ impl KeynoteSlideLayoutId {
     }
 }
 
-/// A theme-provided layout that can create a fresh Keynote slide.
+/// A theme-provided Keynote slide layout.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KeynoteSlideLayoutInfo {
     pub id: KeynoteSlideLayoutId,
@@ -807,6 +811,7 @@ impl KeynoteEditor {
         let show: kn::ShowArchive = graph.decode(document.show.identifier, "KN.ShowArchive")?;
 
         let mut slides = Vec::with_capacity(show.slide_tree.slides.len());
+        let mut layout_catalog = None;
         for (index, node_reference) in show.slide_tree.slides.into_iter().enumerate() {
             let node: kn::SlideNodeArchive =
                 graph.decode(node_reference.identifier, "KN.SlideNodeArchive")?;
@@ -818,6 +823,20 @@ impl KeynoteEditor {
             })?;
             let slide: kn::SlideArchive =
                 graph.decode(slide_reference.identifier, "KN.SlideArchive")?;
+            let layout = match slide.template_slide.as_ref() {
+                Some(template_slide) => {
+                    let catalog = match layout_catalog.as_ref() {
+                        Some(catalog) => catalog,
+                        None => {
+                            let theme = graph.decode(show.theme.identifier, "KN.ThemeArchive")?;
+                            layout_catalog
+                                .insert(slide_create::layout::LayoutCatalog::read(&graph, &theme)?)
+                        },
+                    };
+                    Some(catalog.current(template_slide.identifier)?)
+                },
+                None => None,
+            };
             let is_title_visible = slide
                 .title_placeholder
                 .as_ref()
@@ -884,6 +903,7 @@ impl KeynoteEditor {
                 node_id: node_reference.identifier,
                 slide_id: slide_reference.identifier,
                 name: slide.name.filter(|name| !name.is_empty()),
+                layout,
                 is_skipped: node.is_skipped,
                 is_slide_number_visible: node.is_slide_number_visible,
                 is_title_visible,

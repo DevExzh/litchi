@@ -6,6 +6,8 @@ use crate::protobuf::tswp::StorageArchive;
 use crate::shapes::{DrawablePoint, DrawableSize};
 
 const TEST_SLIDE_MESSAGE_TYPE: u32 = 5;
+const TEST_SLIDE_NODE_MESSAGE_TYPE: u32 = 4;
+const TEST_THEME_MESSAGE_TYPE: u32 = 10;
 const TEST_PLACEHOLDER_MESSAGE_TYPE: u32 = 7;
 const TEST_TITLE_PLACEHOLDER_FIELD: u32 = 5;
 const TEST_SLIDE_NUMBER_PLACEHOLDER_FIELD: u32 = 20;
@@ -3718,6 +3720,71 @@ fn removes_slide_tree_node_and_slide_transactionally() {
 }
 
 #[test]
+fn reads_current_slide_layout_from_theme_relationship() {
+    let editor = KeynoteEditor::from_package(test_package_with_current_layout()).unwrap();
+    let slides = editor.slides().unwrap();
+    assert_eq!(
+        slides[0].layout,
+        Some(KeynoteSlideLayoutInfo {
+            id: KeynoteSlideLayoutId(30),
+            name: "Title & Bullets".to_owned(),
+            is_default: true,
+        })
+    );
+    assert_eq!(slides[1].layout, None);
+}
+
+#[test]
+fn current_slide_layout_rejects_missing_theme_mapping() {
+    let mut package = test_package_with_current_layout();
+    package
+        .update_archive("Index/Slide-4.iwa", |archive| {
+            let slide = archive.object_mut(4).unwrap();
+            let mut decoded = kn::SlideArchive::decode(slide.messages[0].data.as_slice())?;
+            decoded.template_slide = Some(reference(999));
+            slide.replace_message(
+                0,
+                RawMessage {
+                    type_: TEST_SLIDE_MESSAGE_TYPE,
+                    data: decoded.encode_to_vec(),
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    assert!(KeynoteEditor::from_package(package).is_err());
+}
+
+#[test]
+fn current_slide_layout_rejects_multiple_theme_mappings() {
+    let mut package = test_package_with_current_layout();
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            let theme = archive.object_mut(29).unwrap();
+            let mut decoded = kn::ThemeArchive::decode(theme.messages[0].data.as_slice())?;
+            decoded.templates.push(reference(37));
+            theme.replace_message(
+                0,
+                RawMessage {
+                    type_: TEST_THEME_MESSAGE_TYPE,
+                    data: decoded.encode_to_vec(),
+                },
+            )?;
+            archive.insert_object(object(
+                37,
+                TEST_SLIDE_NODE_MESSAGE_TYPE,
+                kn::SlideNodeArchive {
+                    slide: Some(reference(31)),
+                    ..Default::default()
+                },
+            ))?;
+            Ok(())
+        })
+        .unwrap();
+    assert!(KeynoteEditor::from_package(package).is_err());
+}
+
+#[test]
 fn creates_empty_slide_from_typed_theme_layout_transactionally() {
     let mut editor = KeynoteEditor::from_package(test_package_with_theme()).unwrap();
     let layouts = editor.slide_layouts().unwrap();
@@ -3738,6 +3805,7 @@ fn creates_empty_slide_from_typed_theme_layout_transactionally() {
 
     let created = editor.insert_slide(1, layouts[0].id).unwrap();
     assert_eq!(created.index, 1);
+    assert_eq!(created.layout, Some(layouts[0].clone()));
     assert_eq!(created.title.as_deref(), Some(""));
     assert_eq!(created.body.as_deref(), Some(""));
     assert_eq!(created.notes.as_deref(), Some(""));
@@ -4669,6 +4737,29 @@ fn test_package_with_theme() -> IWorkPackage {
                 ],
             },
         )
+        .unwrap();
+    package
+}
+
+fn test_package_with_current_layout() -> IWorkPackage {
+    let mut package = test_package_with_theme();
+    package
+        .update_archive("Index/Slide-4.iwa", |archive| {
+            let slide = archive.object_mut(4).unwrap();
+            let mut decoded = kn::SlideArchive::decode(slide.messages[0].data.as_slice())?;
+            decoded.template_slide = Some(reference(31));
+            slide.replace_message(
+                0,
+                RawMessage {
+                    type_: TEST_SLIDE_MESSAGE_TYPE,
+                    data: decoded.encode_to_vec(),
+                },
+            )?;
+            slide.archive_info.message_infos[0]
+                .object_references
+                .push(31);
+            Ok(())
+        })
         .unwrap();
     package
 }

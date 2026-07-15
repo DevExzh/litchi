@@ -4,7 +4,7 @@ use std::env;
 use litchi_iwa::IWorkPackage;
 use litchi_iwa::archive::ArchiveObject;
 use litchi_iwa::keynote::{
-    KeynoteShowMode, KeynoteTransitionAcceleration, KeynoteTransitionTextDelivery,
+    KeynoteEditor, KeynoteShowMode, KeynoteTransitionAcceleration, KeynoteTransitionTextDelivery,
 };
 use litchi_iwa::protobuf::kn::{
     BuildArchive, BuildChunkArchive, DocumentArchive, PlaceholderArchive, ShowArchive,
@@ -18,6 +18,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let path = env::args()
         .nth(1)
         .ok_or("usage: inspect_keynote_structure <file>")?;
+    for slide in KeynoteEditor::open(&path)?.slides()? {
+        println!(
+            "slide {} current layout: {:?}",
+            slide.index + 1,
+            slide.layout
+        );
+    }
     let package = IWorkPackage::open(path)?;
     let mut objects: HashMap<u64, (String, ArchiveObject)> = HashMap::new();
     for name in package.entry_names().filter(|name| name.ends_with(".iwa")) {
