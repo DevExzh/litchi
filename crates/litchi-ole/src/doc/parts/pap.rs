@@ -899,27 +899,19 @@ impl ParagraphProperties {
             },
             // Operation 0x04: sprmPFSideBySide - Side-by-side
             0x04 => {
-                if let Some(val) = sprm.operand_byte() {
-                    pap.side_by_side = val != 0;
-                }
+                pap.side_by_side = Self::strict_bool8(sprm, "sprmPFSideBySide")?;
             },
             // Operation 0x05: sprmPFKeep - Keep paragraph intact
             0x05 => {
-                if let Some(val) = sprm.operand_byte() {
-                    pap.keep_on_page = val != 0;
-                }
+                pap.keep_on_page = Self::strict_bool8(sprm, "sprmPFKeep")?;
             },
             // Operation 0x06: sprmPFKeepFollow - Keep with next
             0x06 => {
-                if let Some(val) = sprm.operand_byte() {
-                    pap.keep_with_next = val != 0;
-                }
+                pap.keep_with_next = Self::strict_bool8(sprm, "sprmPFKeepFollow")?;
             },
             // Operation 0x07: sprmPFPageBreakBefore - Page break before
             0x07 => {
-                if let Some(val) = sprm.operand_byte() {
-                    pap.page_break_before = val != 0;
-                }
+                pap.page_break_before = Self::strict_bool8(sprm, "sprmPFPageBreakBefore")?;
             },
             // Operation 0x08: sprmPBrcl - Border location
             0x08 => {
@@ -1120,14 +1112,15 @@ impl ParagraphProperties {
                 });
             },
             // Operations 0x1C-0x21: Old border formats (Word 6.0)
-            0x1C..=0x21 => {
-                // BrcXXX10 - older version borders
-            },
+            0x1C => pap.borders.top = Self::parse_border10(sprm)?,
+            0x1D => pap.borders.left = Self::parse_border10(sprm)?,
+            0x1E => pap.borders.bottom = Self::parse_border10(sprm)?,
+            0x1F => pap.borders.right = Self::parse_border10(sprm)?,
+            0x20 => pap.borders.between = Self::parse_border10(sprm)?,
+            0x21 => pap.borders.bar = Self::parse_border10(sprm)?,
             // Operation 0x22: sprmPDxaFromText10 - Distance from text (Word 6.0)
             0x22 => {
-                if let Some(val) = sprm.operand_i16() {
-                    pap.dxa_from_text = Some(val);
-                }
+                pap.dxa_from_text = Some(Self::nonnegative_distance(sprm, "sprmPDxaFromText10")?);
             },
             // Operation 0x23: sprmPWr - Text wrapping
             0x23 => {
@@ -1651,6 +1644,52 @@ impl ParagraphProperties {
         }
         pap.tab_stops = tab_map.into_values().collect();
         Ok(())
+    }
+
+    /// Parse a Word 6/7 `BRC10` paragraph border and normalize it to `Brc80` units.
+    fn parse_border10(sprm: &Sprm) -> Result<Option<Border>> {
+        let raw = sprm.operand_word().ok_or_else(|| {
+            DocError::Corrupted("DOC paragraph BRC10 must contain exactly 2 bytes".to_string())
+        })?;
+        let width_code = (raw & 0x07) as u8;
+        let type_code = ((raw >> 3) & 0x03) as u8;
+        if type_code != 0 && width_code == 0 {
+            return Err(DocError::Corrupted(
+                "DOC paragraph BRC10 has a border type with zero line width".to_string(),
+            ));
+        }
+        let (style, width) = match width_code {
+            6 => (BorderStyle::Dotted, 6),
+            7 => (BorderStyle::Dashed, 6),
+            width => {
+                let style = match type_code {
+                    0 => return Ok(None),
+                    1 => BorderStyle::Single,
+                    2 => BorderStyle::Thick,
+                    3 => BorderStyle::Double,
+                    _ => unreachable!(),
+                };
+                (style, width * 6)
+            },
+        };
+        let color_index = ((raw >> 6) & 0x1F) as u8;
+        let color = match color_index {
+            0 => None,
+            index @ 1..=16 => Some(Self::get_ico_color(index)),
+            invalid => {
+                return Err(DocError::Corrupted(format!(
+                    "DOC paragraph BRC10 has invalid color index {invalid}"
+                )));
+            },
+        };
+        Ok(Some(Border {
+            style,
+            width,
+            color,
+            spacing: ((raw >> 11) & 0x1F) as u8,
+            shadow: raw & 0x20 != 0,
+            frame: false,
+        }))
     }
 
     /// Parse a Word 97 `Brc80` paragraph border.
@@ -2302,6 +2341,88 @@ mod tests {
 
         for operand in [[8, 1, 17, 0], [8, 26, 1, 0]] {
             let invalid = [SPRM_P_BRC_TOP80.to_le_bytes().as_slice(), &operand].concat();
+            assert!(ParagraphProperties::from_sprm(&invalid).is_err());
+        }
+    }
+
+    #[test]
+    fn parses_word6_paragraph_borders_and_pagination_controls_strictly() {
+        let single = 2u16 | (1 << 3) | (1 << 5) | (6 << 6) | (7 << 11);
+        let dotted = 6u16 | (2 << 6) | (3 << 11);
+        let mut grpprl = Vec::new();
+        for (opcode, border) in [
+            (SPRM_P_BRC_TOP10, single),
+            (SPRM_P_BRC_LEFT10, dotted),
+            (SPRM_P_BRC_BOTTOM10, single),
+            (SPRM_P_BRC_RIGHT10, single),
+            (SPRM_P_BRC_BETWEEN10, single),
+            (SPRM_P_BRC_BAR10, single),
+        ] {
+            grpprl.extend_from_slice(&opcode.to_le_bytes());
+            grpprl.extend_from_slice(&border.to_le_bytes());
+        }
+        grpprl.extend_from_slice(&SPRM_P_DXA_FROM_TEXT10.to_le_bytes());
+        grpprl.extend_from_slice(&720i16.to_le_bytes());
+        for opcode in [
+            SPRM_P_F_SIDE_BY_SIDE,
+            SPRM_P_F_KEEP,
+            SPRM_P_F_KEEP_FOLLOW,
+            SPRM_P_F_PAGE_BREAK_BEFORE,
+        ] {
+            grpprl.extend_from_slice(&opcode.to_le_bytes());
+            grpprl.push(1);
+        }
+
+        let properties = ParagraphProperties::from_sprm(&grpprl).unwrap();
+        assert_eq!(
+            properties.borders.top,
+            Some(Border {
+                style: BorderStyle::Single,
+                width: 12,
+                color: Some((255, 0, 0)),
+                spacing: 7,
+                shadow: true,
+                frame: false,
+            })
+        );
+        assert_eq!(
+            properties.borders.left,
+            Some(Border {
+                style: BorderStyle::Dotted,
+                width: 6,
+                color: Some((0, 0, 255)),
+                spacing: 3,
+                shadow: false,
+                frame: false,
+            })
+        );
+        assert_eq!(properties.dxa_from_text, Some(720));
+        assert!(properties.side_by_side);
+        assert!(properties.keep_on_page);
+        assert!(properties.keep_with_next);
+        assert!(properties.page_break_before);
+
+        for raw in [1u16 << 3, 2 | (1 << 3) | (17 << 6)] {
+            let invalid = [
+                SPRM_P_BRC_TOP10.to_le_bytes().as_slice(),
+                raw.to_le_bytes().as_slice(),
+            ]
+            .concat();
+            assert!(ParagraphProperties::from_sprm(&invalid).is_err());
+        }
+        let negative_distance = [
+            SPRM_P_DXA_FROM_TEXT10.to_le_bytes().as_slice(),
+            (-1i16).to_le_bytes().as_slice(),
+        ]
+        .concat();
+        assert!(ParagraphProperties::from_sprm(&negative_distance).is_err());
+        for opcode in [
+            SPRM_P_F_SIDE_BY_SIDE,
+            SPRM_P_F_KEEP,
+            SPRM_P_F_KEEP_FOLLOW,
+            SPRM_P_F_PAGE_BREAK_BEFORE,
+        ] {
+            let invalid = [opcode.to_le_bytes().as_slice(), &[2]].concat();
             assert!(ParagraphProperties::from_sprm(&invalid).is_err());
         }
     }

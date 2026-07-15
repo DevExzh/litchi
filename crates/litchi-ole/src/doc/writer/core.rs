@@ -394,6 +394,8 @@ pub struct ParagraphFormatting {
     pub drop_cap: Option<DropCap>,
     /// Disable automatic hyphenation for this paragraph
     pub no_auto_hyphenation: Option<bool>,
+    /// Lay this paragraph out side-by-side with adjacent paragraphs
+    pub side_by_side: Option<bool>,
     /// Keep the paragraph on one page
     pub keep: Option<bool>,
     /// Keep the paragraph with the next paragraph
@@ -3476,7 +3478,10 @@ fn build_papx_grpprl(fmt: &ParagraphFormatting) -> Vec<u8> {
         push_bool(&mut grp, SPRM_P_F_OPEN_TCH, open);
     }
 
-    // Keep, keep-with-next, page break before
+    // Side-by-side and pagination controls
+    if let Some(side_by_side) = fmt.side_by_side {
+        push_bool(&mut grp, SPRM_P_F_SIDE_BY_SIDE, side_by_side);
+    }
     if let Some(keep) = fmt.keep {
         push_bool(&mut grp, SPRM_P_F_KEEP, keep);
     }
@@ -4689,6 +4694,7 @@ mod tests {
                         lines: 3,
                     }),
                     no_auto_hyphenation: Some(true),
+                    side_by_side: Some(true),
                     use_page_setup_settings: Some(true),
                     adjust_right_indent: Some(false),
                     no_allow_overlap: Some(true),
@@ -4860,6 +4866,7 @@ mod tests {
             })
         );
         assert!(paragraphs[0].properties().no_auto_hyph);
+        assert!(paragraphs[0].properties().side_by_side);
         assert_eq!(
             paragraphs[0].properties().use_page_setup_settings,
             Some(true)
