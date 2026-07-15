@@ -624,12 +624,27 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Convert annotations to owned
-    #[allow(clippy::needless_pass_by_value)]
     fn convert_annotations_to_owned(
-        _annotations: Vec<super::annotation::Annotation<'_>>,
+        annotations: Vec<super::annotation::Annotation<'_>>,
     ) -> Vec<super::annotation::Annotation<'static>> {
-        // TODO: Implement proper conversion when annotation parsing is fully implemented
-        Vec::new()
+        annotations
+            .into_iter()
+            .map(|annotation| super::annotation::Annotation {
+                annotation_type: annotation.annotation_type,
+                id: annotation.id,
+                author: Cow::Owned(annotation.author.into_owned()),
+                initials: Cow::Owned(annotation.initials.into_owned()),
+                date: annotation.date.map(|value| Cow::Owned(value.into_owned())),
+                text: Cow::Owned(annotation.text.into_owned()),
+                position: annotation.position,
+                range_end: annotation.range_end,
+                parent_id: annotation
+                    .parent_id
+                    .map(|value| Cow::Owned(value.into_owned())),
+                icon: annotation.icon.map(|value| Cow::Owned(value.into_owned())),
+                time: annotation.time.map(|value| Cow::Owned(value.into_owned())),
+            })
+            .collect()
     }
 
     /// Convert notes to owned
@@ -769,5 +784,25 @@ mod tests {
         let inner = doc.bookmarks().get("Inner").unwrap();
         assert_eq!(inner.position, "Before alpha ".len());
         assert_eq!(inner.content, "你");
+    }
+
+    #[test]
+    fn parses_annotation_range_author_and_body_without_text_leakage() {
+        let rtf = r#"{\rtf1\ansi aaa {\*\atrfstart 7}bbb{\*\atrfend 7}{\*\atnid MM}{\*\atnauthor Max Mustermann}\chatn{\*\annotation{\*\atnref 7}{\*\atndate 667322855}{\*\atnparent root}{\*\atnicn 2}{\*\atntime 42}Comment \u20320?} ccc}"#;
+        let doc = RtfDocument::parse(rtf).unwrap();
+        assert_eq!(doc.text(), "aaa bbb ccc");
+        assert_eq!(doc.annotations().len(), 1);
+
+        let annotation = &doc.annotations()[0];
+        assert_eq!(annotation.id, 7);
+        assert_eq!(annotation.author, "Max Mustermann");
+        assert_eq!(annotation.initials, "MM");
+        assert_eq!(annotation.date.as_deref(), Some("667322855"));
+        assert_eq!(annotation.text, "Comment 你");
+        assert_eq!(annotation.position, "aaa ".len());
+        assert_eq!(annotation.range_end, "aaa bbb".len());
+        assert_eq!(annotation.parent_id.as_deref(), Some("root"));
+        assert_eq!(annotation.icon.as_deref(), Some("2"));
+        assert_eq!(annotation.time.as_deref(), Some("42"));
     }
 }

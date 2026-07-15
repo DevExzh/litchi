@@ -84,6 +84,8 @@ struct InfoTimestamp {
 const MAX_INFO_TEXT_BYTES: usize = 1_048_576;
 const MAX_BOOKMARKS: usize = 65_536;
 const MAX_BOOKMARK_NAME_BYTES: usize = 65_536;
+const MAX_ANNOTATIONS: usize = 65_536;
+const MAX_ANNOTATION_TEXT_BYTES: usize = 4 * 1_048_576;
 
 struct OpenBookmark {
     name: String,
@@ -186,6 +188,12 @@ pub struct Parser<'a> {
     info: super::info::DocumentInfo<'a>,
     /// Annotations
     annotations: Vec<super::annotation::Annotation<'a>>,
+    /// Parsed annotation reference ranges by numeric identifier.
+    annotation_ranges: HashMap<i32, (usize, Option<usize>)>,
+    /// Author metadata immediately preceding an annotation destination.
+    pending_annotation_author: String,
+    /// Author initials immediately preceding an annotation destination.
+    pending_annotation_initials: String,
     /// Footnotes and endnotes
     notes: Vec<super::section::Note<'a>>,
     /// Track changes/revisions
@@ -229,6 +237,9 @@ impl<'a> Parser<'a> {
             stylesheet: super::stylesheet::StyleSheet::new(),
             info: super::info::DocumentInfo::new(),
             annotations: Vec::new(),
+            annotation_ranges: HashMap::new(),
+            pending_annotation_author: String::new(),
+            pending_annotation_initials: String::new(),
             notes: Vec::new(),
             revisions: Vec::new(),
             current_header_footer: None,
@@ -325,6 +336,36 @@ impl<'a> Parser<'a> {
                         self.parse_bookmark_destination()?;
                         self.states.pop();
                         return Ok(());
+                    }
+                    match self.tokens.get(self.pos + 1) {
+                        Some(Token::Control(ControlWord::AnnotationAuthor)) => {
+                            self.pending_annotation_author =
+                                self.parse_ignorable_text_destination()?;
+                            self.states.pop();
+                            return Ok(());
+                        },
+                        Some(Token::Control(ControlWord::AnnotationInitials)) => {
+                            self.pending_annotation_initials =
+                                self.parse_ignorable_text_destination()?;
+                            self.states.pop();
+                            return Ok(());
+                        },
+                        Some(Token::Control(ControlWord::AnnotationRangeStart)) => {
+                            self.parse_annotation_range_marker(true)?;
+                            self.states.pop();
+                            return Ok(());
+                        },
+                        Some(Token::Control(ControlWord::AnnotationRangeEnd)) => {
+                            self.parse_annotation_range_marker(false)?;
+                            self.states.pop();
+                            return Ok(());
+                        },
+                        Some(Token::Control(ControlWord::Annotation)) => {
+                            self.parse_annotation_destination()?;
+                            self.states.pop();
+                            return Ok(());
+                        },
+                        _ => {},
                     }
                     // Mark as other destination and skip
                     if let Some(state) = self.states.last_mut() {
@@ -1124,6 +1165,216 @@ impl<'a> Parser<'a> {
             });
         }
         Ok(())
+    }
+
+    fn parse_ignorable_text_destination(&mut self) -> RtfResult<String> {
+        self.pos += 2; // ignorable marker and destination control word
+        let mut value = String::new();
+        let mut depth = 1usize;
+        let mut unicode_skip = self.current_state()?.unicode_skip.max(0) as usize;
+        let mut fallback_skip = 0usize;
+        while self.pos < self.tokens.len() && depth > 0 {
+            match self.tokens.get(self.pos) {
+                Some(Token::OpenBrace) => depth += 1,
+                Some(Token::CloseBrace) => depth -= 1,
+                Some(Token::Text(text)) => {
+                    let skipped = fallback_skip.min(text.chars().count());
+                    fallback_skip -= skipped;
+                    value.extend(text.chars().skip(skipped));
+                },
+                Some(Token::Control(ControlWord::Unicode(_))) => {
+                    let mut utf16 = SmallVec::<[u16; 4]>::new();
+                    while let Some(Token::Control(ControlWord::Unicode(code))) =
+                        self.tokens.get(self.pos)
+                    {
+                        utf16.push(*code as u16);
+                        self.pos += 1;
+                    }
+                    value.push_str(&String::from_utf16(&utf16).map_err(|error| {
+                        RtfError::InvalidUnicode(format!(
+                            "invalid Unicode annotation metadata: {error}"
+                        ))
+                    })?);
+                    fallback_skip = unicode_skip.saturating_mul(utf16.len());
+                    continue;
+                },
+                Some(Token::Control(ControlWord::UnicodeSkip(count))) => {
+                    unicode_skip = (*count).max(0) as usize;
+                },
+                _ => {},
+            }
+            self.pos += 1;
+            if value.len() > MAX_BOOKMARK_NAME_BYTES {
+                return Err(RtfError::MalformedDocument(
+                    "RTF annotation destination exceeds the safety limit".to_string(),
+                ));
+            }
+        }
+        if depth != 0 {
+            return Err(RtfError::UnexpectedEof);
+        }
+        Ok(value.trim_end_matches(['\r', '\n']).to_string())
+    }
+
+    fn parse_annotation_range_marker(&mut self, is_start: bool) -> RtfResult<()> {
+        let value = self.parse_ignorable_text_destination()?;
+        let Ok(reference) = value.trim().parse::<i32>() else {
+            return Ok(());
+        };
+        if !self.annotation_ranges.contains_key(&reference)
+            && self.annotation_ranges.len() >= MAX_ANNOTATIONS
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF annotation range count exceeds the safety limit".to_string(),
+            ));
+        }
+        if is_start {
+            self.annotation_ranges
+                .insert(reference, (self.body_text_len, None));
+        } else {
+            self.annotation_ranges
+                .entry(reference)
+                .and_modify(|range| range.1 = Some(self.body_text_len))
+                .or_insert((self.body_text_len, Some(self.body_text_len)));
+        }
+        Ok(())
+    }
+
+    fn parse_annotation_destination(&mut self) -> RtfResult<()> {
+        if self.annotations.len() >= MAX_ANNOTATIONS {
+            return Err(RtfError::MalformedDocument(
+                "RTF annotation count exceeds the safety limit".to_string(),
+            ));
+        }
+        self.pos += 2; // ignorable marker and annotation destination
+        let mut reference = None;
+        let mut date = None;
+        let mut parent_id = None;
+        let mut icon = None;
+        let mut time = None;
+        let mut text = String::new();
+        let mut depth = 1usize;
+        let mut unicode_skip = self.current_state()?.unicode_skip.max(0) as usize;
+        let mut fallback_skip = 0usize;
+        while self.pos < self.tokens.len() && depth > 0 {
+            match self.tokens.get(self.pos) {
+                Some(Token::OpenBrace) => {
+                    let nested =
+                        match (self.tokens.get(self.pos + 1), self.tokens.get(self.pos + 2)) {
+                            (
+                                Some(Token::Control(ControlWord::IgnorableDestination)),
+                                Some(Token::Control(control)),
+                            ) => Some(*control),
+                            _ => None,
+                        };
+                    match nested {
+                        Some(ControlWord::AnnotationReference) => {
+                            let value = self.parse_nested_annotation_value()?;
+                            reference = value.trim().parse::<i32>().ok();
+                        },
+                        Some(ControlWord::AnnotationDate) => {
+                            date = Some(self.parse_nested_annotation_value()?);
+                        },
+                        Some(ControlWord::AnnotationParent) => {
+                            parent_id = Some(self.parse_nested_annotation_value()?);
+                        },
+                        Some(ControlWord::AnnotationIcon) => {
+                            icon = Some(self.parse_nested_annotation_value()?);
+                        },
+                        Some(ControlWord::AnnotationTime) => {
+                            time = Some(self.parse_nested_annotation_value()?);
+                        },
+                        _ => {
+                            depth += 1;
+                            self.pos += 1;
+                        },
+                    }
+                    continue;
+                },
+                Some(Token::CloseBrace) => depth -= 1,
+                Some(Token::Text(value)) => {
+                    let skipped = fallback_skip.min(value.chars().count());
+                    fallback_skip -= skipped;
+                    text.extend(value.chars().skip(skipped));
+                },
+                Some(Token::Control(ControlWord::Unicode(_))) => {
+                    let mut utf16 = SmallVec::<[u16; 4]>::new();
+                    while let Some(Token::Control(ControlWord::Unicode(code))) =
+                        self.tokens.get(self.pos)
+                    {
+                        utf16.push(*code as u16);
+                        self.pos += 1;
+                    }
+                    text.push_str(&String::from_utf16(&utf16).map_err(|error| {
+                        RtfError::InvalidUnicode(format!(
+                            "invalid Unicode annotation text: {error}"
+                        ))
+                    })?);
+                    fallback_skip = unicode_skip.saturating_mul(utf16.len());
+                    continue;
+                },
+                Some(Token::Control(ControlWord::UnicodeSkip(count))) => {
+                    unicode_skip = (*count).max(0) as usize;
+                },
+                Some(Token::Control(ControlWord::Par | ControlWord::Line)) => text.push('\n'),
+                Some(Token::Control(ControlWord::Tab)) => text.push('\t'),
+                _ => {},
+            }
+            self.pos += 1;
+            if text.len() > MAX_ANNOTATION_TEXT_BYTES {
+                return Err(RtfError::MalformedDocument(
+                    "RTF annotation text exceeds the safety limit".to_string(),
+                ));
+            }
+        }
+        if depth != 0 {
+            return Err(RtfError::UnexpectedEof);
+        }
+
+        let id = reference.unwrap_or(0);
+        let (position, range_end) = self
+            .annotation_ranges
+            .get(&id)
+            .map(|(start, end)| (*start, end.unwrap_or(*start)))
+            .unwrap_or((self.body_text_len, self.body_text_len));
+        self.annotations.push(super::annotation::Annotation {
+            annotation_type: super::annotation::AnnotationType::Comment,
+            id,
+            author: Cow::Owned(std::mem::take(&mut self.pending_annotation_author)),
+            initials: Cow::Owned(std::mem::take(&mut self.pending_annotation_initials)),
+            date: date.map(Cow::Owned),
+            text: Cow::Owned(text.trim_end_matches(['\r', '\n']).to_string()),
+            position,
+            range_end,
+            parent_id: parent_id.map(Cow::Owned),
+            icon: icon.map(Cow::Owned),
+            time: time.map(Cow::Owned),
+        });
+        Ok(())
+    }
+
+    fn parse_nested_annotation_value(&mut self) -> RtfResult<String> {
+        self.pos += 3; // opening brace, ignorable marker, destination
+        let mut value = String::new();
+        let mut depth = 1usize;
+        while self.pos < self.tokens.len() && depth > 0 {
+            match self.tokens.get(self.pos) {
+                Some(Token::OpenBrace) => depth += 1,
+                Some(Token::CloseBrace) => depth -= 1,
+                Some(Token::Text(text)) => value.push_str(text),
+                _ => {},
+            }
+            self.pos += 1;
+            if value.len() > MAX_BOOKMARK_NAME_BYTES {
+                return Err(RtfError::MalformedDocument(
+                    "RTF annotation metadata exceeds the safety limit".to_string(),
+                ));
+            }
+        }
+        if depth != 0 {
+            return Err(RtfError::UnexpectedEof);
+        }
+        Ok(value.trim_end_matches(['\r', '\n']).to_string())
     }
 
     fn parse_info_text(&mut self, field: InfoTextField) -> RtfResult<()> {

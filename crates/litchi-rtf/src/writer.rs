@@ -60,6 +60,21 @@ pub struct RtfWriter<W: Write> {
     stylesheet: StyleSheet<'static>,
 }
 
+#[derive(Clone, Copy)]
+enum BodyEventKind<'b, 'a> {
+    BookmarkStart(&'b Bookmark<'a>),
+    BookmarkEnd(&'b Bookmark<'a>),
+    AnnotationStart(&'b Annotation<'a>),
+    AnnotationEnd(&'b Annotation<'a>),
+}
+
+#[derive(Clone, Copy)]
+struct BodyEvent<'b, 'a> {
+    offset: usize,
+    order: u8,
+    kind: BodyEventKind<'b, 'a>,
+}
+
 impl<W: Write> RtfWriter<W> {
     /// Create a new RTF writer
     pub fn new(writer: W) -> Self {
@@ -113,8 +128,8 @@ impl<W: Write> RtfWriter<W> {
         // Write document properties before body content.
         self.write_document_info(doc.info())?;
 
-        // Write document content and reinsert positional bookmark markers.
-        self.write_blocks_with_bookmarks(doc.blocks(), doc.bookmarks())?;
+        // Write document content and reinsert positional bookmark/comment markers.
+        self.write_blocks_with_markup(doc.blocks(), doc.bookmarks(), doc.annotations())?;
 
         // Write tables
         for table in doc.tables() {
@@ -347,25 +362,60 @@ impl<W: Write> RtfWriter<W> {
         self.write_str("}")
     }
 
-    fn write_blocks_with_bookmarks(
+    /// Write an annotation range-start destination.
+    pub fn write_annotation_start(&mut self, annotation: &Annotation<'_>) -> io::Result<()> {
+        self.write_str("{\\*")?;
+        self.write_control_word("atrfstart", None)?;
+        self.write_str(" ")?;
+        write!(self.writer, "{}", annotation.id)?;
+        self.write_str("}")
+    }
+
+    /// Write an annotation range end, author metadata, and inert comment body.
+    pub fn write_annotation_end(&mut self, annotation: &Annotation<'_>) -> io::Result<()> {
+        if annotation.annotation_type != AnnotationType::Comment {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "only comment annotations use the RTF annotation destination",
+            ));
+        }
+        self.write_str("{\\*")?;
+        self.write_control_word("atrfend", None)?;
+        self.write_str(" ")?;
+        write!(self.writer, "{}", annotation.id)?;
+        self.write_str("}")?;
+        self.write_annotation_value("atnid", Some(annotation.initials.as_ref()))?;
+        self.write_annotation_value("atnauthor", Some(annotation.author.as_ref()))?;
+        self.write_control_word("chatn", None)?;
+        self.write_str("{\\*")?;
+        self.write_control_word("annotation", None)?;
+        self.write_annotation_value("atnref", Some(&annotation.id.to_string()))?;
+        self.write_annotation_value("atndate", annotation.date.as_deref())?;
+        self.write_annotation_value("atnparent", annotation.parent_id.as_deref())?;
+        self.write_annotation_value("atnicn", annotation.icon.as_deref())?;
+        self.write_annotation_value("atntime", annotation.time.as_deref())?;
+        self.write_text(annotation.text.as_ref())?;
+        self.write_str("}")
+    }
+
+    fn write_annotation_value(&mut self, control: &str, value: Option<&str>) -> io::Result<()> {
+        let Some(value) = value.filter(|value| !value.is_empty()) else {
+            return Ok(());
+        };
+        self.write_str("{\\*")?;
+        self.write_control_word(control, None)?;
+        self.write_str(" ")?;
+        self.write_text(value)?;
+        self.write_str("}")
+    }
+
+    fn write_blocks_with_markup(
         &mut self,
         blocks: &[StyleBlock<'_>],
         bookmarks: &BookmarkTable<'_>,
+        annotations: &[Annotation<'_>],
     ) -> io::Result<()> {
-        #[derive(Clone, Copy)]
-        enum EventKind {
-            Start,
-            End,
-        }
-        #[derive(Clone, Copy)]
-        struct Event<'b, 'a> {
-            offset: usize,
-            order: u8,
-            kind: EventKind,
-            bookmark: &'b Bookmark<'a>,
-        }
-
-        if bookmarks.bookmarks().is_empty() {
+        if bookmarks.bookmarks().is_empty() && annotations.is_empty() {
             for block in blocks {
                 self.write_style_block(block)?;
             }
@@ -373,7 +423,12 @@ impl<W: Write> RtfWriter<W> {
         }
 
         let body: String = blocks.iter().map(|block| block.text.as_ref()).collect();
-        let mut events = Vec::with_capacity(bookmarks.bookmarks().len().saturating_mul(2));
+        let event_count = bookmarks
+            .bookmarks()
+            .len()
+            .saturating_add(annotations.len())
+            .saturating_mul(2);
+        let mut events = Vec::with_capacity(event_count);
         for bookmark in bookmarks.bookmarks() {
             let end = bookmark
                 .position
@@ -394,17 +449,38 @@ impl<W: Write> RtfWriter<W> {
                 ));
             }
             let empty = bookmark.content.is_empty();
-            events.push(Event {
+            events.push(BodyEvent {
                 offset: bookmark.position,
                 order: 1,
-                kind: EventKind::Start,
-                bookmark,
+                kind: BodyEventKind::BookmarkStart(bookmark),
             });
-            events.push(Event {
+            events.push(BodyEvent {
                 offset: end,
                 order: if empty { 2 } else { 0 },
-                kind: EventKind::End,
-                bookmark,
+                kind: BodyEventKind::BookmarkEnd(bookmark),
+            });
+        }
+        for annotation in annotations {
+            if annotation.range_end < annotation.position
+                || body
+                    .get(annotation.position..annotation.range_end)
+                    .is_none()
+            {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF annotation range is outside body text or splits a character",
+                ));
+            }
+            let empty = annotation.position == annotation.range_end;
+            events.push(BodyEvent {
+                offset: annotation.position,
+                order: 1,
+                kind: BodyEventKind::AnnotationStart(annotation),
+            });
+            events.push(BodyEvent {
+                offset: annotation.range_end,
+                order: if empty { 2 } else { 0 },
+                kind: BodyEventKind::AnnotationEnd(annotation),
             });
         }
         events.sort_by_key(|event| (event.offset, event.order));
@@ -428,11 +504,7 @@ impl<W: Write> RtfWriter<W> {
                     local_offset = local_end;
                 }
                 while event_index < events.len() && events[event_index].offset == event_offset {
-                    let event = events[event_index];
-                    match event.kind {
-                        EventKind::Start => self.write_bookmark_start(event.bookmark)?,
-                        EventKind::End => self.write_bookmark_end(event.bookmark.name.as_ref())?,
-                    }
+                    self.write_body_event(events[event_index])?;
                     event_index += 1;
                 }
             }
@@ -442,11 +514,7 @@ impl<W: Write> RtfWriter<W> {
             body_offset = block_end;
         }
         while event_index < events.len() && events[event_index].offset == body_offset {
-            let event = events[event_index];
-            match event.kind {
-                EventKind::Start => self.write_bookmark_start(event.bookmark)?,
-                EventKind::End => self.write_bookmark_end(event.bookmark.name.as_ref())?,
-            }
+            self.write_body_event(events[event_index])?;
             event_index += 1;
         }
         if event_index != events.len() {
@@ -456,6 +524,15 @@ impl<W: Write> RtfWriter<W> {
             ));
         }
         Ok(())
+    }
+
+    fn write_body_event(&mut self, event: BodyEvent<'_, '_>) -> io::Result<()> {
+        match event.kind {
+            BodyEventKind::BookmarkStart(bookmark) => self.write_bookmark_start(bookmark),
+            BodyEventKind::BookmarkEnd(bookmark) => self.write_bookmark_end(bookmark.name.as_ref()),
+            BodyEventKind::AnnotationStart(annotation) => self.write_annotation_start(annotation),
+            BodyEventKind::AnnotationEnd(annotation) => self.write_annotation_end(annotation),
+        }
     }
 
     fn write_style_block_fragment(
@@ -1177,5 +1254,30 @@ mod tests {
         assert_eq!(bookmark.position, 0);
         assert!(bookmark.content.is_empty());
         assert!(reparsed.text().is_empty());
+    }
+
+    #[test]
+    fn document_writer_round_trips_annotations() {
+        let source = r#"{\rtf1\ansi Before {\*\atrfstart 12}range{\*\atrfend 12}{\*\atnid AM}{\*\atnauthor Ada M}\chatn{\*\annotation{\*\atnref 12}{\*\atndate 12345}{\*\atnparent 4}{\*\atnicn 3}{\*\atntime 99}Review \u20320? now} after}"#;
+        let document = RtfDocument::parse(source).unwrap();
+        let mut output = Vec::new();
+        RtfWriter::new(&mut output)
+            .write_document(&document)
+            .unwrap();
+
+        let reparsed = RtfDocument::from_bytes(&output).unwrap();
+        assert_eq!(reparsed.text(), document.text());
+        assert_eq!(reparsed.annotations().len(), 1);
+        let annotation = &reparsed.annotations()[0];
+        assert_eq!(annotation.id, 12);
+        assert_eq!(annotation.author, "Ada M");
+        assert_eq!(annotation.initials, "AM");
+        assert_eq!(annotation.date.as_deref(), Some("12345"));
+        assert_eq!(annotation.parent_id.as_deref(), Some("4"));
+        assert_eq!(annotation.icon.as_deref(), Some("3"));
+        assert_eq!(annotation.time.as_deref(), Some("99"));
+        assert_eq!(annotation.text, "Review 你 now");
+        assert_eq!(annotation.position, "Before ".len());
+        assert_eq!(annotation.range_end, "Before range".len());
     }
 }

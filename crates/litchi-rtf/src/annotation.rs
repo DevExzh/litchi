@@ -40,12 +40,22 @@ pub struct Annotation<'a> {
     pub id: i32,
     /// Author name
     pub author: Cow<'a, str>,
+    /// Author initials from the `atnid` destination.
+    pub initials: Cow<'a, str>,
     /// Creation date (RTF datetime format)
     pub date: Option<Cow<'a, str>>,
     /// Comment text
     pub text: Cow<'a, str>,
-    /// Reference position in document
+    /// UTF-8 byte offset where the annotated range starts.
     pub position: usize,
+    /// UTF-8 byte offset where the annotated range ends.
+    pub range_end: usize,
+    /// Parent annotation identifier for threaded comments.
+    pub parent_id: Option<Cow<'a, str>>,
+    /// Annotation icon identifier, preserved from `atnicn`.
+    pub icon: Option<Cow<'a, str>>,
+    /// Annotation time value, preserved from `atntime`.
+    pub time: Option<Cow<'a, str>>,
 }
 
 impl<'a> Annotation<'a> {
@@ -56,9 +66,14 @@ impl<'a> Annotation<'a> {
             annotation_type: AnnotationType::Comment,
             id,
             author,
+            initials: Cow::Borrowed(""),
             date: None,
             text,
             position: 0,
+            range_end: 0,
+            parent_id: None,
+            icon: None,
+            time: None,
         }
     }
 
@@ -69,9 +84,14 @@ impl<'a> Annotation<'a> {
             annotation_type: AnnotationType::Revision,
             id,
             author,
+            initials: Cow::Borrowed(""),
             date: None,
             text: Cow::Borrowed(""),
             position: 0,
+            range_end: 0,
+            parent_id: None,
+            icon: None,
+            time: None,
         }
     }
 }

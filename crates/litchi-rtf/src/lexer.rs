@@ -217,9 +217,16 @@ pub enum ControlWord<'a> {
 
     // Annotations/comments
     Annotation,
-    AnnotationDate(&'a str),
-    AnnotationAuthor(&'a str),
-    AnnotationRef(i32),
+    AnnotationDate,
+    AnnotationAuthor,
+    AnnotationInitials,
+    AnnotationReference,
+    AnnotationParent,
+    AnnotationRangeStart,
+    AnnotationRangeEnd,
+    AnnotationIcon,
+    AnnotationTime,
+    AnnotationMark,
 
     // Shapes
     Shape,
@@ -707,10 +714,17 @@ impl<'a> Lexer<'a> {
             "bkmkpub" => ControlWord::BookmarkPublic,
 
             // Annotations
-            "atn" => ControlWord::Annotation,
-            "atndate" => ControlWord::AnnotationDate(word),
-            "atnauthor" => ControlWord::AnnotationAuthor(word),
-            "atnid" => ControlWord::AnnotationRef(param_value),
+            "atn" | "annotation" => ControlWord::Annotation,
+            "atndate" => ControlWord::AnnotationDate,
+            "atnauthor" => ControlWord::AnnotationAuthor,
+            "atnid" => ControlWord::AnnotationInitials,
+            "atnref" => ControlWord::AnnotationReference,
+            "atnparent" => ControlWord::AnnotationParent,
+            "atrfstart" => ControlWord::AnnotationRangeStart,
+            "atrfend" => ControlWord::AnnotationRangeEnd,
+            "atnicn" => ControlWord::AnnotationIcon,
+            "atntime" => ControlWord::AnnotationTime,
+            "chatn" => ControlWord::AnnotationMark,
 
             // Shapes
             "shp" => ControlWord::Shape,
