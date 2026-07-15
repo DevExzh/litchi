@@ -2,4 +2,4 @@
 
 mod document;
 
-pub use document::{DrawingDocument, DrawingPage};
+pub use document::{DrawingDocument, DrawingPage, DrawingPageProperties};

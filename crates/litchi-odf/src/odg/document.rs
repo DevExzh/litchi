@@ -12,11 +12,83 @@ use std::path::Path;
 
 const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const DRAW_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
+const PRESENTATION_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
+const XML_NAMESPACE: &[u8] = b"http://www.w3.org/XML/1998/namespace";
+
+/// Exact standard attributes attached to an OpenDocument drawing page.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct DrawingPageProperties {
+    name: Option<String>,
+    draw_id: Option<String>,
+    xml_id: Option<String>,
+    style_name: Option<String>,
+    master_page_name: Option<String>,
+    navigation_order: Option<String>,
+    presentation_layout_name: Option<String>,
+    header_name: Option<String>,
+    footer_name: Option<String>,
+    date_time_name: Option<String>,
+}
+
+impl DrawingPageProperties {
+    /// Return `draw:name`.
+    pub fn name(&self) -> Option<&str> {
+        self.name.as_deref()
+    }
+
+    /// Return the legacy `draw:id` identifier.
+    pub fn draw_id(&self) -> Option<&str> {
+        self.draw_id.as_deref()
+    }
+
+    /// Return the namespace-defined `xml:id` identifier.
+    pub fn xml_id(&self) -> Option<&str> {
+        self.xml_id.as_deref()
+    }
+
+    /// Return the drawing-page `draw:style-name` reference.
+    pub fn style_name(&self) -> Option<&str> {
+        self.style_name.as_deref()
+    }
+
+    /// Return the required-by-schema `draw:master-page-name` reference.
+    ///
+    /// The value remains optional in the API so legacy or producer-specific
+    /// documents that omit it can still be inspected.
+    pub fn master_page_name(&self) -> Option<&str> {
+        self.master_page_name.as_deref()
+    }
+
+    /// Return the exact whitespace-separated `draw:nav-order` IDREFS value.
+    pub fn navigation_order(&self) -> Option<&str> {
+        self.navigation_order.as_deref()
+    }
+
+    /// Return `presentation:presentation-page-layout-name`.
+    pub fn presentation_layout_name(&self) -> Option<&str> {
+        self.presentation_layout_name.as_deref()
+    }
+
+    /// Return `presentation:use-header-name`.
+    pub fn header_name(&self) -> Option<&str> {
+        self.header_name.as_deref()
+    }
+
+    /// Return `presentation:use-footer-name`.
+    pub fn footer_name(&self) -> Option<&str> {
+        self.footer_name.as_deref()
+    }
+
+    /// Return `presentation:use-date-time-name`.
+    pub fn date_time_name(&self) -> Option<&str> {
+        self.date_time_name.as_deref()
+    }
+}
 
 /// A page in an OpenDocument drawing.
 #[derive(Debug, Clone)]
 pub struct DrawingPage {
-    name: Option<String>,
+    properties: DrawingPageProperties,
     page: Slide,
 }
 
@@ -28,7 +100,12 @@ impl DrawingPage {
 
     /// Return the exact optional `draw:name` value.
     pub fn name(&self) -> Option<&str> {
-        self.name.as_deref()
+        self.properties.name()
+    }
+
+    /// Return all exact standard page attributes.
+    pub fn properties(&self) -> &DrawingPageProperties {
+        &self.properties
     }
 
     /// Return every top-level drawing shape on the page.
@@ -78,18 +155,18 @@ impl DrawingDocument {
         }
 
         let content = package.content_xml()?;
-        let names = validate_drawing_content(&content)?;
+        let properties = validate_drawing_content(&content)?;
         let styles = package.styles_xml()?;
         let parsed = OdpParser::parse_drawing_pages(&content, styles.as_deref())?;
-        if parsed.len() != names.len() {
+        if parsed.len() != properties.len() {
             return Err(Error::InvalidFormat(
                 "drawing page structure changed during semantic parsing".to_string(),
             ));
         }
-        let pages = names
+        let pages = properties
             .into_iter()
             .zip(parsed)
-            .map(|(name, page)| DrawingPage { name, page })
+            .map(|(properties, page)| DrawingPage { properties, page })
             .collect();
 
         Ok(Self { package, pages })
@@ -172,7 +249,7 @@ impl DrawingDocument {
     }
 }
 
-fn validate_drawing_content(xml: &str) -> Result<Vec<Option<String>>> {
+fn validate_drawing_content(xml: &str) -> Result<Vec<DrawingPageProperties>> {
     let mut reader = NsReader::from_str(xml);
     let mut buffer = Vec::new();
     let mut depth = 0usize;
@@ -182,7 +259,7 @@ fn validate_drawing_content(xml: &str) -> Result<Vec<Option<String>>> {
     let mut body_open = false;
     let mut drawing_seen = false;
     let mut drawing_open = false;
-    let mut names = Vec::new();
+    let mut pages = Vec::new();
 
     loop {
         let (namespace, event) = reader
@@ -204,7 +281,7 @@ fn validate_drawing_content(xml: &str) -> Result<Vec<Option<String>>> {
                     &mut body_open,
                     &mut drawing_seen,
                     &mut drawing_open,
-                    &mut names,
+                    &mut pages,
                 )?;
                 depth = depth.checked_add(1).ok_or_else(|| {
                     Error::InvalidFormat("drawing XML nesting overflow".to_string())
@@ -232,7 +309,7 @@ fn validate_drawing_content(xml: &str) -> Result<Vec<Option<String>>> {
                     &mut empty_body_open,
                     &mut drawing_seen,
                     &mut empty_drawing_open,
-                    &mut names,
+                    &mut pages,
                 )?;
             },
             Event::End(ref element) => {
@@ -283,7 +360,7 @@ fn validate_drawing_content(xml: &str) -> Result<Vec<Option<String>>> {
                 .to_string(),
         ));
     }
-    Ok(names)
+    Ok(pages)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -299,7 +376,7 @@ fn validate_start_position(
     body_open: &mut bool,
     drawing_seen: &mut bool,
     drawing_open: &mut bool,
-    names: &mut Vec<Option<String>>,
+    pages: &mut Vec<DrawingPageProperties>,
 ) -> Result<()> {
     let local = element.local_name();
     if depth == 0 {
@@ -334,43 +411,87 @@ fn validate_start_position(
                 "draw:page must be a direct child of office:drawing".to_string(),
             ));
         }
-        if names.len() >= 1_000_000 {
+        if pages.len() >= 1_000_000 {
             return Err(Error::InvalidFormat(
                 "drawing exceeds one million pages".to_string(),
             ));
         }
-        names.push(drawing_name(reader, element)?);
+        pages.push(drawing_page_properties(reader, element)?);
     }
     Ok(())
 }
 
-fn drawing_name(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Option<String>> {
-    let mut name = None;
+fn drawing_page_properties(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+) -> Result<DrawingPageProperties> {
+    if element.attributes().count() > 256 {
+        return Err(Error::InvalidFormat(
+            "drawing page exceeds 256 attributes".to_string(),
+        ));
+    }
+    let mut properties = DrawingPageProperties::default();
     for attribute in element.attributes() {
         let attribute = attribute
             .map_err(|error| Error::InvalidFormat(format!("invalid page attribute: {error}")))?;
         let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
-        if bound_to(&namespace, DRAW_NAMESPACE) && local.as_ref() == b"name" {
-            if name.is_some() {
-                return Err(Error::InvalidFormat(
-                    "drawing page has duplicate draw:name attributes".to_string(),
-                ));
+        let target = if bound_to(&namespace, DRAW_NAMESPACE) {
+            match local.as_ref() {
+                b"name" => Some((&mut properties.name, "draw:name")),
+                b"id" => Some((&mut properties.draw_id, "draw:id")),
+                b"style-name" => Some((&mut properties.style_name, "draw:style-name")),
+                b"master-page-name" => {
+                    Some((&mut properties.master_page_name, "draw:master-page-name"))
+                },
+                b"nav-order" => Some((&mut properties.navigation_order, "draw:nav-order")),
+                _ => None,
+            }
+        } else if bound_to(&namespace, PRESENTATION_NAMESPACE) {
+            match local.as_ref() {
+                b"presentation-page-layout-name" => Some((
+                    &mut properties.presentation_layout_name,
+                    "presentation:presentation-page-layout-name",
+                )),
+                b"use-header-name" => {
+                    Some((&mut properties.header_name, "presentation:use-header-name"))
+                },
+                b"use-footer-name" => {
+                    Some((&mut properties.footer_name, "presentation:use-footer-name"))
+                },
+                b"use-date-time-name" => Some((
+                    &mut properties.date_time_name,
+                    "presentation:use-date-time-name",
+                )),
+                _ => None,
+            }
+        } else if bound_to(&namespace, XML_NAMESPACE) && local.as_ref() == b"id" {
+            Some((&mut properties.xml_id, "xml:id"))
+        } else {
+            None
+        };
+        if let Some((slot, display_name)) = target {
+            if slot.is_some() {
+                return Err(Error::InvalidFormat(format!(
+                    "drawing page has duplicate {display_name} attributes"
+                )));
             }
             let value = attribute
                 .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
                 .map_err(|error| {
-                    Error::InvalidFormat(format!("invalid drawing page name: {error}"))
+                    Error::InvalidFormat(format!(
+                        "invalid drawing page attribute {display_name}: {error}"
+                    ))
                 })?
                 .into_owned();
             if value.len() > 1_048_576 {
                 return Err(Error::InvalidFormat(
-                    "drawing page name exceeds 1 MiB".to_string(),
+                    "drawing page attribute exceeds 1 MiB".to_string(),
                 ));
             }
-            name = Some(value);
+            *slot = Some(value);
         }
     }
-    Ok(name)
+    Ok(properties)
 }
 
 fn bound_to(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool {
@@ -408,9 +529,13 @@ mod tests {
 <o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
  xmlns:d="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"
  xmlns:s="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0"
- xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0">
+ xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+ xmlns:p="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0">
  <o:body><o:drawing>
-  <d:page d:name="First &amp; Best">
+  <d:page d:name="First &amp; Best" d:id="legacy1" xml:id="page1"
+   d:style-name="dp1" d:master-page-name="Default" d:nav-order="shape1 shape2"
+   p:presentation-page-layout-name="layout1" p:use-header-name="header1"
+   p:use-footer-name="footer1" p:use-date-time-name="date1">
    <d:frame d:name="Label" s:x="1cm" s:y="2cm"><d:text-box><t:p>Hello</t:p></d:text-box></d:frame>
    <d:g d:name="Group"><d:path d:name="Curve" s:d="M 0 0 L 1 1"/></d:g>
    <d:custom-shape><d:enhanced-geometry d:type="diamond"><d:equation d:name="f0" d:formula="$0/2"/><d:handle d:handle-position="$0 $1"/></d:enhanced-geometry></d:custom-shape>
@@ -429,6 +554,16 @@ mod tests {
         assert_eq!(document.pages()[0].index(), 0);
         assert_eq!(document.pages()[0].name(), Some("First & Best"));
         assert_eq!(document.pages()[1].name(), None);
+        let properties = document.pages()[0].properties();
+        assert_eq!(properties.draw_id(), Some("legacy1"));
+        assert_eq!(properties.xml_id(), Some("page1"));
+        assert_eq!(properties.style_name(), Some("dp1"));
+        assert_eq!(properties.master_page_name(), Some("Default"));
+        assert_eq!(properties.navigation_order(), Some("shape1 shape2"));
+        assert_eq!(properties.presentation_layout_name(), Some("layout1"));
+        assert_eq!(properties.header_name(), Some("header1"));
+        assert_eq!(properties.footer_name(), Some("footer1"));
+        assert_eq!(properties.date_time_name(), Some("date1"));
         assert_eq!(document.pages()[0].text(), "Hello");
         assert_eq!(document.text(), "Hello");
 
