@@ -75,6 +75,7 @@ pub use hyperlink::Hyperlink;
 pub use image::{Image, ImageError};
 pub use package::Package;
 pub use paragraph::{Paragraph, Run};
+pub use parts::chp::CharacterConditionalFormatting;
 pub use parts::numbering::{ListLevel, ListTables, NumberFormat};
 pub use parts::pap::ParagraphConditionalFormatting;
 pub use parts::styles::{

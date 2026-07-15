@@ -235,6 +235,8 @@ pub struct CharacterFormatting {
     pub formatting_revision: Option<FormattingRevision>,
     /// Mark a LISTNUM display-field result as revised.
     pub display_field_revision: Option<DisplayFieldRevision>,
+    /// Formatting state retained before a tracked character-property change.
+    pub preserved_properties_for_revision: Option<Box<CharacterFormatting>>,
     // Future enhancement: Additional properties (color, strikethrough, subscript, superscript, etc.)
 }
 
@@ -1387,17 +1389,21 @@ impl DocWriter {
                 formatting = current.preserved_properties_for_revision.as_deref();
             }
             for run in &paragraph.runs {
-                if let Some(revision) = &run.formatting.insertion_revision {
-                    index_author(&revision.author)?;
-                }
-                if let Some(revision) = &run.formatting.deletion_revision {
-                    index_author(&revision.author)?;
-                }
-                if let Some(revision) = &run.formatting.formatting_revision {
-                    index_author(&revision.author)?;
-                }
-                if let Some(revision) = &run.formatting.display_field_revision {
-                    index_author(&revision.author)?;
+                let mut formatting = Some(&run.formatting);
+                while let Some(current) = formatting {
+                    if let Some(revision) = &current.insertion_revision {
+                        index_author(&revision.author)?;
+                    }
+                    if let Some(revision) = &current.deletion_revision {
+                        index_author(&revision.author)?;
+                    }
+                    if let Some(revision) = &current.formatting_revision {
+                        index_author(&revision.author)?;
+                    }
+                    if let Some(revision) = &current.display_field_revision {
+                        index_author(&revision.author)?;
+                    }
+                    formatting = current.preserved_properties_for_revision.as_deref();
                 }
             }
         }
@@ -3279,12 +3285,29 @@ fn build_revision_chpx_grpprl(
     font_builder: &mut FontTableBuilder,
     revisions: Option<&RevisionWriterData>,
 ) -> Result<Vec<u8>, DocWriteError> {
+    if fmt
+        .preserved_properties_for_revision
+        .as_ref()
+        .is_some_and(|previous| previous.preserved_properties_for_revision.is_some())
+    {
+        return Err(DocWriteError::InvalidData(
+            "DOC character property revisions cannot contain nested preserved states".to_string(),
+        ));
+    }
     if fmt.insertion_revision.is_some() && fmt.deletion_revision.is_some() {
         return Err(DocWriteError::InvalidData(
             "a DOC character run cannot be both an insertion and a deletion".to_string(),
         ));
     }
-    let mut grp = build_chpx_grpprl(fmt, font_builder);
+    let mut grp = if let Some(previous) = &fmt.preserved_properties_for_revision {
+        let mut grp = build_revision_chpx_grpprl(previous, font_builder, revisions)?;
+        grp.extend_from_slice(&SPRM_C_WALL.to_le_bytes());
+        grp.push(1);
+        grp.extend_from_slice(&build_chpx_grpprl(fmt, font_builder));
+        grp
+    } else {
+        build_chpx_grpprl(fmt, font_builder)
+    };
     let Some(revisions) = revisions else {
         return Ok(grp);
     };
@@ -5915,6 +5938,50 @@ mod tests {
     }
 
     #[test]
+    fn preserves_ordered_character_property_revision_state() {
+        let formatting = CharacterFormatting {
+            italic: Some(true),
+            preserved_properties_for_revision: Some(Box::new(CharacterFormatting {
+                bold: Some(true),
+                ..CharacterFormatting::default()
+            })),
+            ..CharacterFormatting::default()
+        };
+        let mut fonts = FontTableBuilder::new();
+        let grpprl = build_revision_chpx_grpprl(&formatting, &mut fonts, None).unwrap();
+        let properties = crate::doc::parts::chp::CharacterProperties::from_sprm(&grpprl).unwrap();
+        assert_eq!(properties.is_bold, Some(true));
+        assert_eq!(properties.is_italic, Some(true));
+        let previous = properties.preserved_properties_for_revision.unwrap();
+        assert_eq!(previous.is_bold, Some(true));
+        assert_eq!(previous.is_italic, None);
+
+        let mut writer = DocWriter::new();
+        writer
+            .add_paragraph_runs(
+                vec![("Tracked".to_string(), formatting)],
+                ParagraphFormatting::default(),
+            )
+            .unwrap();
+        let mut cursor = Cursor::new(Vec::new());
+        writer.write_to(&mut cursor).unwrap();
+        let mut package =
+            crate::doc::Package::from_reader(Cursor::new(cursor.into_inner())).unwrap();
+        let document = package.document().unwrap();
+        let paragraphs = document.paragraphs().unwrap();
+        let runs = paragraphs[0].runs().unwrap();
+        let properties = runs[0].properties();
+        assert_eq!(properties.is_bold, Some(true));
+        assert_eq!(properties.is_italic, Some(true));
+        let previous = properties
+            .preserved_properties_for_revision
+            .as_ref()
+            .unwrap();
+        assert_eq!(previous.is_bold, Some(true));
+        assert_eq!(previous.is_italic, None);
+    }
+
+    #[test]
     fn rejects_invalid_writer_revision_metadata() {
         let error_for = |formatting: CharacterFormatting| {
             let mut writer = DocWriter::new();
@@ -5935,6 +6002,15 @@ mod tests {
             ..CharacterFormatting::default()
         };
         assert!(error_for(both).contains("both an insertion and a deletion"));
+
+        let nested = CharacterFormatting {
+            preserved_properties_for_revision: Some(Box::new(CharacterFormatting {
+                preserved_properties_for_revision: Some(Box::new(CharacterFormatting::default())),
+                ..CharacterFormatting::default()
+            })),
+            ..CharacterFormatting::default()
+        };
+        assert!(error_for(nested).contains("nested preserved states"));
 
         let invalid_reason = CharacterFormatting {
             insertion_revision: Some(TextRevision::new("Alice").with_id(0x002C)),

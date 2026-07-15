@@ -295,6 +295,12 @@ pub const SPRM_C_CV_UL: u16 = 0x6877;
 /// sprmCFComplexScripts - Force complex-script formatting (operation 0x82)
 pub const SPRM_C_F_COMPLEX_SCRIPTS: u16 = 0x0882;
 
+/// sprmCWall - Preserve pre-revision character properties (operation 0x83)
+pub const SPRM_C_WALL: u16 = 0x2A83;
+
+/// sprmCCnf - Conditional table-style character formatting (operation 0x85)
+pub const SPRM_C_CNF: u16 = 0xCA85;
+
 // PAP (Paragraph Properties) SPRM opcodes
 // Based on Apache POI's ParagraphProperties and ParagraphSprmUncompressor
 

@@ -9,6 +9,7 @@
 ///
 /// Based on Apache POI's CharacterSprmUncompressor and CharacterProperties.
 use super::super::package::{DocError, Result};
+use super::tap::TableStyleCondition;
 use crate::sprm::{Sprm, parse_sprms};
 use crate::sprm_operations::*;
 
@@ -106,6 +107,12 @@ pub struct CharacterProperties {
     pub is_complex_scripts: Option<bool>,
     /// Style index (istd)
     pub style_index: Option<u16>,
+    /// Whether character properties before a tracked change are preserved.
+    pub properties_preserved_for_revision: bool,
+    /// Character state immediately before the active `sprmCWall` boundary.
+    pub preserved_properties_for_revision: Option<Box<CharacterProperties>>,
+    /// Conditional character formatting definitions carried by a table style.
+    pub conditional_formats: Vec<CharacterConditionalFormatting>,
     /// Vanish (hidden)
     pub is_vanish: Option<bool>,
     /// Whether this run is marked as an inserted revision.
@@ -138,6 +145,17 @@ pub struct CharacterProperties {
     pub formatting_revision_timestamp: Option<u32>,
     /// Revision metadata for a LISTNUM display-field result.
     pub display_field_revision: Option<DisplayFieldRevisionProperties>,
+}
+
+/// Conditional character formatting carried by `sprmCCnf` in a table style.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CharacterConditionalFormatting {
+    /// Table location or band for which the nested properties apply.
+    pub condition: TableStyleCondition,
+    /// Typed character properties decoded from the nested grpprl.
+    pub properties: Box<CharacterProperties>,
+    /// Exact nested grpprl retained for lossless preservation.
+    pub raw_grpprl: Vec<u8>,
 }
 
 /// Parsed `DispFldRmOperand` state for a LISTNUM display-field result.
@@ -507,6 +525,12 @@ impl CharacterProperties {
     pub fn from_sprm(grpprl: &[u8]) -> Result<Self> {
         let mut chp = Self::default();
         let sprms = parse_sprms(grpprl);
+        let consumed = sprms.last().map_or(0, |sprm| sprm.offset + sprm.size);
+        if consumed != grpprl.len() {
+            return Err(DocError::Corrupted(
+                "CHP grpprl does not contain a whole number of SPRMs".to_string(),
+            ));
+        }
 
         for sprm in &sprms {
             if get_sprm_type(sprm.opcode) == 2 {
@@ -1014,6 +1038,23 @@ impl CharacterProperties {
                         Some(Self::get_toggle_value(value, chp.is_complex_scripts));
                 }
             },
+            // Operation 0x83: sprmCWall - Preserve pre-revision character properties.
+            0x83 => {
+                let enabled = Self::strict_bool8(sprm, "sprmCWall")?;
+                chp.preserved_properties_for_revision = if enabled {
+                    let mut previous = chp.clone();
+                    previous.properties_preserved_for_revision = false;
+                    previous.preserved_properties_for_revision = None;
+                    Some(Box::new(previous))
+                } else {
+                    None
+                };
+                chp.properties_preserved_for_revision = enabled;
+            },
+            // Operation 0x85: sprmCCnf - Conditional table-style character formatting.
+            0x85 => chp
+                .conditional_formats
+                .push(Self::parse_conditional_formatting(sprm)?),
             // Remaining border, shading, and revision SPRMs.
             0x63 => {
                 chp.deletion_author_index = Some(Self::revision_author(sprm, "sprmCIbstRMarkDel")?);
@@ -1045,6 +1086,58 @@ impl CharacterProperties {
                 "{name} must contain a Boolean8 value"
             ))),
         }
+    }
+
+    fn strict_bool8(sprm: &Sprm, name: &str) -> Result<bool> {
+        match sprm.operand_byte() {
+            Some(0) => Ok(false),
+            Some(1) => Ok(true),
+            _ => Err(DocError::Corrupted(format!(
+                "{name} must contain a Boolean8 value"
+            ))),
+        }
+    }
+
+    fn parse_conditional_formatting(sprm: &Sprm) -> Result<CharacterConditionalFormatting> {
+        let operand = sprm.operand_bytes();
+        if operand.len() < 2 {
+            return Err(DocError::Corrupted(
+                "sprmCCnf must contain a 2-byte condition".to_string(),
+            ));
+        }
+        let code = u16::from_le_bytes([operand[0], operand[1]]);
+        let condition = TableStyleCondition::from_code(code).ok_or_else(|| {
+            DocError::Corrupted(format!("sprmCCnf contains invalid condition {code:#06x}"))
+        })?;
+        let raw_grpprl = operand[2..].to_vec();
+        let nested = parse_sprms(&raw_grpprl);
+        let consumed = nested
+            .last()
+            .map_or(0, |nested| nested.offset + nested.size);
+        if consumed != raw_grpprl.len() {
+            return Err(DocError::Corrupted(
+                "sprmCCnf nested grpprl is truncated".to_string(),
+            ));
+        }
+        if nested.iter().any(|nested| nested.opcode == SPRM_C_CNF) {
+            return Err(DocError::Corrupted(
+                "sprmCCnf cannot be nested inside another sprmCCnf".to_string(),
+            ));
+        }
+        if nested
+            .iter()
+            .any(|nested| get_sprm_type(nested.opcode) != 2)
+        {
+            return Err(DocError::Corrupted(
+                "sprmCCnf can contain only character SPRMs".to_string(),
+            ));
+        }
+        let properties = Box::new(Self::from_sprm(&raw_grpprl)?);
+        Ok(CharacterConditionalFormatting {
+            condition,
+            properties,
+            raw_grpprl,
+        })
     }
 
     fn revision_author(sprm: &Sprm, name: &str) -> Result<u16> {
@@ -1265,6 +1358,8 @@ impl CharacterProperties {
             || self.script_hint.is_some()
             || self.is_no_proof.is_some()
             || self.is_complex_scripts.is_some()
+            || self.properties_preserved_for_revision
+            || !self.conditional_formats.is_empty()
     }
 }
 
@@ -1388,6 +1483,63 @@ mod tests {
         assert_eq!(chp.is_italic, None);
         assert_eq!(chp.underline, UnderlineStyle::None);
         assert!(!chp.has_formatting());
+    }
+
+    #[test]
+    fn preserves_ordered_character_revision_state() {
+        let mut grpprl = SPRM_C_F_BOLD.to_le_bytes().to_vec();
+        grpprl.push(1);
+        grpprl.extend_from_slice(&SPRM_C_WALL.to_le_bytes());
+        grpprl.push(1);
+        grpprl.extend_from_slice(&SPRM_C_F_ITALIC.to_le_bytes());
+        grpprl.push(1);
+
+        let properties = CharacterProperties::from_sprm(&grpprl).unwrap();
+        assert_eq!(properties.is_bold, Some(true));
+        assert_eq!(properties.is_italic, Some(true));
+        assert!(properties.properties_preserved_for_revision);
+        let previous = properties.preserved_properties_for_revision.unwrap();
+        assert_eq!(previous.is_bold, Some(true));
+        assert_eq!(previous.is_italic, None);
+
+        grpprl.extend_from_slice(&SPRM_C_WALL.to_le_bytes());
+        grpprl.push(0);
+        let properties = CharacterProperties::from_sprm(&grpprl).unwrap();
+        assert!(!properties.properties_preserved_for_revision);
+        assert!(properties.preserved_properties_for_revision.is_none());
+
+        let invalid = [SPRM_C_WALL.to_le_bytes().as_slice(), &[2]].concat();
+        assert!(CharacterProperties::from_sprm(&invalid).is_err());
+    }
+
+    #[test]
+    fn parses_conditional_table_style_character_formatting_strictly() {
+        let wrap = |condition: u16, nested: &[u8]| {
+            let mut grpprl = SPRM_C_CNF.to_le_bytes().to_vec();
+            grpprl.push((nested.len() + 2) as u8);
+            grpprl.extend_from_slice(&condition.to_le_bytes());
+            grpprl.extend_from_slice(nested);
+            grpprl
+        };
+        let nested = [SPRM_C_F_BOLD.to_le_bytes().as_slice(), &[1]].concat();
+        let properties = CharacterProperties::from_sprm(&wrap(0x0008, &nested)).unwrap();
+        let conditional = &properties.conditional_formats[0];
+        assert_eq!(conditional.condition, TableStyleCondition::LastColumn);
+        assert_eq!(conditional.raw_grpprl, nested);
+        assert_eq!(conditional.properties.is_bold, Some(true));
+
+        let recursive = wrap(0x0002, &[]);
+        let paragraph = [SPRM_P_F_KEEP.to_le_bytes().as_slice(), &[1]].concat();
+        let truncated = SPRM_C_F_BOLD.to_le_bytes();
+        for invalid in [
+            [SPRM_C_CNF.to_le_bytes().as_slice(), &[0]].concat(),
+            wrap(0x0003, &[]),
+            wrap(0x0001, &recursive),
+            wrap(0x0001, &paragraph),
+            wrap(0x0001, &truncated),
+        ] {
+            assert!(CharacterProperties::from_sprm(&invalid).is_err());
+        }
     }
 
     #[test]
