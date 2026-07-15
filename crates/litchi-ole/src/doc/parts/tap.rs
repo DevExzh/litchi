@@ -64,6 +64,8 @@ pub struct CellProperties {
     pub vertical_alignment: VerticalAlignment,
     /// Cell background color (RGB)
     pub background_color: Option<(u8, u8, u8)>,
+    /// Complete legacy cell shading descriptor
+    pub shading: Option<CellShading>,
     /// Cell borders
     pub borders: CellBorders,
     /// Text direction
@@ -81,6 +83,138 @@ pub struct CellProperties {
     pub padding_left: Option<i16>,
     pub padding_bottom: Option<i16>,
     pub padding_right: Option<i16>,
+}
+
+/// Legacy Word table-cell shading.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct CellShading {
+    /// Pattern foreground color, or automatic when absent
+    pub foreground_color: Option<(u8, u8, u8)>,
+    /// Pattern background color, or automatic when absent
+    pub background_color: Option<(u8, u8, u8)>,
+    /// Pattern used to combine the foreground and background colors
+    pub pattern: ShadingPattern,
+}
+
+/// Shading patterns representable by the two-byte DOC `Shd80` structure.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[repr(u8)]
+pub enum ShadingPattern {
+    #[default]
+    Auto = 0x00,
+    Solid = 0x01,
+    Percent5 = 0x02,
+    Percent10 = 0x03,
+    Percent20 = 0x04,
+    Percent25 = 0x05,
+    Percent30 = 0x06,
+    Percent40 = 0x07,
+    Percent50 = 0x08,
+    Percent60 = 0x09,
+    Percent70 = 0x0A,
+    Percent75 = 0x0B,
+    Percent80 = 0x0C,
+    Percent90 = 0x0D,
+    DarkHorizontal = 0x0E,
+    DarkVertical = 0x0F,
+    DarkReverseDiagonal = 0x10,
+    DarkDiagonal = 0x11,
+    DarkCross = 0x12,
+    DarkDiagonalCross = 0x13,
+    Horizontal = 0x14,
+    Vertical = 0x15,
+    ReverseDiagonal = 0x16,
+    Diagonal = 0x17,
+    Cross = 0x18,
+    DiagonalCross = 0x19,
+    Percent2Point5 = 0x23,
+    Percent7Point5 = 0x24,
+    Percent12Point5 = 0x25,
+    Percent15 = 0x26,
+    Percent17Point5 = 0x27,
+    Percent22Point5 = 0x28,
+    Percent27Point5 = 0x29,
+    Percent32Point5 = 0x2A,
+    Percent35 = 0x2B,
+    Percent37Point5 = 0x2C,
+    Percent42Point5 = 0x2D,
+    Percent45 = 0x2E,
+    Percent47Point5 = 0x2F,
+    Percent52Point5 = 0x30,
+    Percent55 = 0x31,
+    Percent57Point5 = 0x32,
+    Percent62Point5 = 0x33,
+    Percent65 = 0x34,
+    Percent67Point5 = 0x35,
+    Percent72Point5 = 0x36,
+    Percent77Point5 = 0x37,
+    Percent82Point5 = 0x38,
+    Percent85 = 0x39,
+    Percent87Point5 = 0x3A,
+    Percent92Point5 = 0x3B,
+    Percent95 = 0x3C,
+    Percent97Point5 = 0x3D,
+}
+
+impl ShadingPattern {
+    pub(crate) fn from_u8(value: u8) -> Option<Self> {
+        Some(match value {
+            0x00 => Self::Auto,
+            0x01 => Self::Solid,
+            0x02 => Self::Percent5,
+            0x03 => Self::Percent10,
+            0x04 => Self::Percent20,
+            0x05 => Self::Percent25,
+            0x06 => Self::Percent30,
+            0x07 => Self::Percent40,
+            0x08 => Self::Percent50,
+            0x09 => Self::Percent60,
+            0x0A => Self::Percent70,
+            0x0B => Self::Percent75,
+            0x0C => Self::Percent80,
+            0x0D => Self::Percent90,
+            0x0E => Self::DarkHorizontal,
+            0x0F => Self::DarkVertical,
+            0x10 => Self::DarkReverseDiagonal,
+            0x11 => Self::DarkDiagonal,
+            0x12 => Self::DarkCross,
+            0x13 => Self::DarkDiagonalCross,
+            0x14 => Self::Horizontal,
+            0x15 => Self::Vertical,
+            0x16 => Self::ReverseDiagonal,
+            0x17 => Self::Diagonal,
+            0x18 => Self::Cross,
+            0x19 => Self::DiagonalCross,
+            0x23 => Self::Percent2Point5,
+            0x24 => Self::Percent7Point5,
+            0x25 => Self::Percent12Point5,
+            0x26 => Self::Percent15,
+            0x27 => Self::Percent17Point5,
+            0x28 => Self::Percent22Point5,
+            0x29 => Self::Percent27Point5,
+            0x2A => Self::Percent32Point5,
+            0x2B => Self::Percent35,
+            0x2C => Self::Percent37Point5,
+            0x2D => Self::Percent42Point5,
+            0x2E => Self::Percent45,
+            0x2F => Self::Percent47Point5,
+            0x30 => Self::Percent52Point5,
+            0x31 => Self::Percent55,
+            0x32 => Self::Percent57Point5,
+            0x33 => Self::Percent62Point5,
+            0x34 => Self::Percent65,
+            0x35 => Self::Percent67Point5,
+            0x36 => Self::Percent72Point5,
+            0x37 => Self::Percent77Point5,
+            0x38 => Self::Percent82Point5,
+            0x39 => Self::Percent85,
+            0x3A => Self::Percent87Point5,
+            0x3B => Self::Percent92Point5,
+            0x3C => Self::Percent95,
+            0x3D => Self::Percent97Point5,
+            _ => return None,
+        })
+    }
 }
 
 /// Cell merge status.

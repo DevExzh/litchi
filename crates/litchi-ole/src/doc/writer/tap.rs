@@ -6,7 +6,8 @@
 
 use super::sprm::SprmBuilder;
 use crate::doc::parts::tap::{
-    BorderStyle, BorderType, CellBorders, TextDirection, VerticalAlignment, VerticalMergeStatus,
+    BorderStyle, BorderType, CellBorders, CellShading, TextDirection, VerticalAlignment,
+    VerticalMergeStatus,
 };
 
 /// Error returned when table row properties cannot be represented in DOC TAP.
@@ -22,8 +23,12 @@ pub enum TapBuildError {
     MergeWithoutPrecedingCell,
     /// Brc80 supports only the legacy 16-color palette.
     UnsupportedBorderColor((u8, u8, u8)),
+    /// Shd80 supports only the legacy 16-color palette.
+    UnsupportedShadingColor((u8, u8, u8)),
     /// Brc80 spacing is a five-bit value.
     InvalidBorderSpacing(u8),
+    /// DOC cell padding cannot exceed 22 inches.
+    InvalidCellPadding(u16),
 }
 
 impl std::fmt::Display for TapBuildError {
@@ -48,8 +53,14 @@ impl std::fmt::Display for TapBuildError {
             Self::UnsupportedBorderColor(color) => {
                 write!(f, "DOC Brc80 cannot represent RGB color {color:?}")
             },
+            Self::UnsupportedShadingColor(color) => {
+                write!(f, "DOC Shd80 cannot represent RGB color {color:?}")
+            },
             Self::InvalidBorderSpacing(spacing) => {
                 write!(f, "DOC Brc80 spacing {spacing} exceeds 31 points")
+            },
+            Self::InvalidCellPadding(padding) => {
+                write!(f, "DOC cell padding {padding} exceeds 31680 twips")
             },
         }
     }
@@ -79,6 +90,13 @@ pub struct TableCell {
     pub hide_mark: bool,
     /// Cell edge borders
     pub borders: CellBorders,
+    /// Complete legacy cell shading
+    pub shading: Option<CellShading>,
+    /// Cell padding in twips
+    pub padding_top: Option<u16>,
+    pub padding_left: Option<u16>,
+    pub padding_bottom: Option<u16>,
+    pub padding_right: Option<u16>,
 }
 
 /// Table row properties
@@ -252,7 +270,91 @@ pub(crate) fn generate_row_sprms(row: &TableRow) -> Result<Vec<u8>, TapBuildErro
     sprms.extend_from_slice(&0xD608u16.to_le_bytes());
     sprms.extend_from_slice(&encoded_size.to_le_bytes());
     sprms.extend_from_slice(&operand);
+
+    append_cell_shading(&mut sprms, &row.cells)?;
+    append_cell_padding(&mut sprms, &row.cells)?;
     Ok(sprms)
+}
+
+fn append_cell_shading(sprms: &mut Vec<u8>, cells: &[TableCell]) -> Result<(), TapBuildError> {
+    if !cells.iter().any(|cell| cell.shading.is_some()) {
+        return Ok(());
+    }
+    sprms.extend_from_slice(&0xD609u16.to_le_bytes());
+    sprms.push((cells.len() * 2) as u8);
+    for cell in cells {
+        let descriptor = match cell.shading {
+            None => u16::MAX,
+            Some(shading) => {
+                let foreground = rgb_to_ico(shading.foreground_color)
+                    .map_err(TapBuildError::UnsupportedShadingColor)?;
+                let background = rgb_to_ico(shading.background_color)
+                    .map_err(TapBuildError::UnsupportedShadingColor)?;
+                u16::from(foreground)
+                    | (u16::from(background) << 5)
+                    | ((shading.pattern as u16) << 10)
+            },
+        };
+        sprms.extend_from_slice(&descriptor.to_le_bytes());
+    }
+    Ok(())
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct PaddingRun {
+    first: u8,
+    limit: u8,
+    sides: u8,
+    width: u16,
+}
+
+type PaddingGetter = fn(&TableCell) -> Option<u16>;
+
+fn append_cell_padding(sprms: &mut Vec<u8>, cells: &[TableCell]) -> Result<(), TapBuildError> {
+    let sides: [(u8, PaddingGetter); 4] = [
+        (0x01, |cell| cell.padding_top),
+        (0x02, |cell| cell.padding_left),
+        (0x04, |cell| cell.padding_bottom),
+        (0x08, |cell| cell.padding_right),
+    ];
+    let mut runs = Vec::<PaddingRun>::new();
+    for (side, get_width) in sides {
+        let mut first = 0;
+        while first < cells.len() {
+            let Some(width) = get_width(&cells[first]) else {
+                first += 1;
+                continue;
+            };
+            if width > 31_680 {
+                return Err(TapBuildError::InvalidCellPadding(width));
+            }
+            let mut limit = first + 1;
+            while limit < cells.len() && get_width(&cells[limit]) == Some(width) {
+                limit += 1;
+            }
+            if let Some(existing) = runs.iter_mut().find(|run| {
+                run.first == first as u8 && run.limit == limit as u8 && run.width == width
+            }) {
+                existing.sides |= side;
+            } else {
+                runs.push(PaddingRun {
+                    first: first as u8,
+                    limit: limit as u8,
+                    sides: side,
+                    width,
+                });
+            }
+            first = limit;
+        }
+    }
+
+    for run in runs {
+        sprms.extend_from_slice(&0xD632u16.to_le_bytes());
+        sprms.push(6);
+        sprms.extend_from_slice(&[run.first, run.limit, run.sides, 0x03]);
+        sprms.extend_from_slice(&run.width.to_le_bytes());
+    }
+    Ok(())
 }
 
 fn encode_border(border: Option<BorderStyle>) -> Result<[u8; 4], TapBuildError> {
@@ -293,7 +395,13 @@ fn encode_border(border: Option<BorderStyle>) -> Result<[u8; 4], TapBuildError> 
         BorderType::Outset => 26,
         BorderType::Inset => 27,
     };
-    let ico = match border.color {
+    let ico = rgb_to_ico(border.color).map_err(TapBuildError::UnsupportedBorderColor)?;
+    let effects = border.spacing | (u8::from(border.shadow) << 5) | (u8::from(border.frame) << 6);
+    Ok([border.width, border_type, ico, effects])
+}
+
+fn rgb_to_ico(color: Option<(u8, u8, u8)>) -> Result<u8, (u8, u8, u8)> {
+    Ok(match color {
         None => 0,
         Some((0, 0, 0)) => 1,
         Some((0, 0, 255)) => 2,
@@ -311,10 +419,8 @@ fn encode_border(border: Option<BorderStyle>) -> Result<[u8; 4], TapBuildError> 
         Some((128, 128, 0)) => 14,
         Some((128, 128, 128)) => 15,
         Some((192, 192, 192)) => 16,
-        Some(color) => return Err(TapBuildError::UnsupportedBorderColor(color)),
-    };
-    let effects = border.spacing | (u8::from(border.shadow) << 5) | (u8::from(border.frame) << 6);
-    Ok([border.width, border_type, ico, effects])
+        Some(color) => return Err(color),
+    })
 }
 
 impl Default for TapBuilder {
@@ -350,6 +456,7 @@ pub fn create_simple_table(rows: usize, cols: usize, cell_width: u16) -> TapBuil
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::doc::parts::tap::ShadingPattern;
 
     #[test]
     fn test_tap_builder() {
@@ -376,6 +483,15 @@ mod tests {
                         }),
                         ..CellBorders::default()
                     },
+                    shading: Some(CellShading {
+                        foreground_color: Some((0, 0, 255)),
+                        background_color: Some((255, 255, 0)),
+                        pattern: ShadingPattern::DarkCross,
+                    }),
+                    padding_top: Some(120),
+                    padding_left: Some(240),
+                    padding_bottom: Some(120),
+                    padding_right: Some(240),
                 },
                 TableCell {
                     width: 1000,
@@ -410,6 +526,18 @@ mod tests {
         assert_eq!(border.color, Some((255, 0, 0)));
         assert_eq!(border.spacing, 2);
         assert!(border.shadow);
+        assert_eq!(
+            tap.cell_properties[0].shading,
+            Some(CellShading {
+                foreground_color: Some((0, 0, 255)),
+                background_color: Some((255, 255, 0)),
+                pattern: ShadingPattern::DarkCross,
+            })
+        );
+        assert_eq!(tap.cell_properties[0].padding_top, Some(120));
+        assert_eq!(tap.cell_properties[0].padding_left, Some(240));
+        assert_eq!(tap.cell_properties[0].padding_bottom, Some(120));
+        assert_eq!(tap.cell_properties[0].padding_right, Some(240));
         assert_eq!(
             tap.cell_properties[0].preferred_width.unwrap().width_type,
             crate::doc::parts::tap::WidthType::Twips
@@ -541,6 +669,37 @@ mod tests {
         assert_eq!(
             builder.try_generate_row_sprms(0),
             Err(TapBuildError::UnsupportedBorderColor((1, 2, 3)))
+        );
+
+        let mut builder = TapBuilder::new();
+        builder.add_row(TableRow {
+            cells: vec![TableCell {
+                width: 1000,
+                shading: Some(CellShading {
+                    foreground_color: Some((1, 2, 3)),
+                    ..CellShading::default()
+                }),
+                ..TableCell::default()
+            }],
+            ..TableRow::default()
+        });
+        assert_eq!(
+            builder.try_generate_row_sprms(0),
+            Err(TapBuildError::UnsupportedShadingColor((1, 2, 3)))
+        );
+
+        let mut builder = TapBuilder::new();
+        builder.add_row(TableRow {
+            cells: vec![TableCell {
+                width: 1000,
+                padding_left: Some(31_681),
+                ..TableCell::default()
+            }],
+            ..TableRow::default()
+        });
+        assert_eq!(
+            builder.try_generate_row_sprms(0),
+            Err(TapBuildError::InvalidCellPadding(31_681))
         );
     }
 }

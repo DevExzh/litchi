@@ -301,6 +301,31 @@ impl Cell {
     pub fn background_color(&self) -> Option<(u8, u8, u8)> {
         self.properties.as_ref().and_then(|p| p.background_color)
     }
+
+    /// Get the cell's complete legacy shading descriptor.
+    pub fn shading(&self) -> Option<super::parts::tap::CellShading> {
+        self.properties.as_ref().and_then(|p| p.shading)
+    }
+
+    /// Get the cell's top padding in twips.
+    pub fn padding_top(&self) -> Option<i16> {
+        self.properties.as_ref().and_then(|p| p.padding_top)
+    }
+
+    /// Get the cell's left padding in twips.
+    pub fn padding_left(&self) -> Option<i16> {
+        self.properties.as_ref().and_then(|p| p.padding_left)
+    }
+
+    /// Get the cell's bottom padding in twips.
+    pub fn padding_bottom(&self) -> Option<i16> {
+        self.properties.as_ref().and_then(|p| p.padding_bottom)
+    }
+
+    /// Get the cell's right padding in twips.
+    pub fn padding_right(&self) -> Option<i16> {
+        self.properties.as_ref().and_then(|p| p.padding_right)
+    }
 }
 
 #[cfg(test)]

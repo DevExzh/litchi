@@ -25,8 +25,9 @@ fn binary_to_doc_result<T>(result: BinaryResult<T>) -> Result<T> {
     result.map_err(|e| DocError::InvalidFormat(format!("Binary read error: {}", e)))
 }
 use super::tap::{
-    BorderStyle, BorderType, CellMergeStatus, CellProperties, TableJustification, TableProperties,
-    TableWidth, TextDirection, VerticalAlignment, VerticalMergeStatus, WidthType,
+    BorderStyle, BorderType, CellMergeStatus, CellProperties, CellShading, ShadingPattern,
+    TableJustification, TableProperties, TableWidth, TextDirection, VerticalAlignment,
+    VerticalMergeStatus, WidthType,
 };
 use crate::sprm::{Sprm, parse_sprms};
 use crate::sprm_operations::get_sprm_operation;
@@ -193,15 +194,15 @@ impl<'arena> TapParser<'arena> {
             0x08 => {
                 self.parse_table_definition(tap, sprm, grpprl)?;
             },
-            // sprmTDefTableShd (0xD609 / 0xD60A) - Table shading
-            0x09 | 0x0A => {
+            // sprmTDefTableShd80 (0xD609) - Table shading
+            0x09 => {
                 // Parse cell shading information
                 // Format: variable length array of ShadingDescriptor80 (2 bytes each)
                 // Based on Apache POI's handling of sprmTDefTableShd
                 self.parse_cell_shading(tap, sprm, grpprl)?;
             },
-            // sprmTTlp (0x740B) - Table look specifier
-            0x0B => {
+            // sprmTTlp (0x740A) - Table look specifier
+            0x0A => {
                 // Table look specifier for table styles
                 // This is a complex structure that defines table style properties
                 // For basic parsing, we can skip this as it's mainly for styling
@@ -215,8 +216,8 @@ impl<'arena> TapParser<'arena> {
             0x21 => {
                 self.handle_insert_cells(tap, sprm)?;
             },
-            // sprmTCellPaddingDefault (0xD634) - Default cell padding
-            0x34 => {
+            // sprmTCellPadding / sprmTCellPaddingDefault
+            0x32 | 0x34 => {
                 self.parse_cell_padding(tap, sprm, grpprl)?;
             },
             // sprmTPropRMark (0xD667) - Row property revision mark
@@ -514,7 +515,7 @@ impl<'arena> TapParser<'arena> {
         let color = if ico == 0 {
             None
         } else if ico <= 16 {
-            Some(Self::ico_to_rgb(ico))
+            Self::ico_to_rgb(ico)
         } else {
             return Err(DocError::Corrupted(format!(
                 "Brc80 contains invalid color index {ico}"
@@ -619,39 +620,73 @@ impl<'arena> TapParser<'arena> {
         &self,
         tap: &mut TableProperties,
         sprm: &Sprm,
-        grpprl: &[u8],
+        _grpprl: &[u8],
     ) -> Result<()> {
-        let offset = sprm.offset + 3; // Skip SPRM header
-        if offset + 6 > grpprl.len() {
-            return Ok(());
+        let operand = sprm.operand_bytes();
+        if operand.len() != 6 {
+            return Err(DocError::Corrupted(
+                "DOC cell padding operand must contain exactly 6 bytes".to_string(),
+            ));
         }
 
-        let itc_first = binary_to_doc_result(read_byte(grpprl, offset))? as usize;
-        let itc_lim = binary_to_doc_result(read_byte(grpprl, offset + 1))? as usize;
-        let grf_brc = binary_to_doc_result(read_byte(grpprl, offset + 2))?;
-        let _fts_width = binary_to_doc_result(read_byte(grpprl, offset + 3))?;
-        let w_width = binary_to_doc_result(read_u16_le(grpprl, offset + 4))? as i16;
+        let itc_first = operand[0] as usize;
+        let itc_lim = operand[1] as usize;
+        let grf_brc = operand[2];
+        let fts_width = operand[3];
+        let w_width = binary_to_doc_result(read_u16_le(operand, 4))?;
+        if grf_brc & !0x0F != 0 {
+            return Err(DocError::Corrupted(
+                "DOC cell padding side mask contains reserved bits".to_string(),
+            ));
+        }
+        if !matches!(fts_width, 0x00 | 0x03) {
+            return Err(DocError::Corrupted(
+                "DOC cell padding width type must be ftsNil or ftsDxa".to_string(),
+            ));
+        }
+        if (fts_width == 0x00 && w_width != 0) || w_width > 31_680 {
+            return Err(DocError::Corrupted(
+                "DOC cell padding width is outside its allowed range".to_string(),
+            ));
+        }
+
+        let is_default = sprm.opcode == 0xD634;
+        let range = if is_default {
+            if itc_first != 0 || itc_lim != 1 {
+                return Err(DocError::Corrupted(
+                    "DOC default cell padding range must be 0..1".to_string(),
+                ));
+            }
+            0..tap.cell_properties.len()
+        } else {
+            if itc_first >= tap.cell_properties.len()
+                || itc_lim < itc_first
+                || itc_lim > tap.cell_properties.len()
+            {
+                return Err(DocError::Corrupted(
+                    "DOC cell padding range exceeds the table row".to_string(),
+                ));
+            }
+            itc_first..itc_lim
+        };
+        let padding = (fts_width == 0x03).then_some(w_width as i16);
 
         // Apply padding to specified cells
-        for c in itc_first..itc_lim {
-            if c >= tap.cell_properties.len() {
-                break;
-            }
-
+        for c in range {
             let cell = &mut tap.cell_properties[c];
 
             // Apply padding based on grfbrc flags
             if (grf_brc & 0x01) != 0 {
-                cell.padding_top = Some(w_width);
+                cell.padding_top = padding;
             }
             if (grf_brc & 0x02) != 0 {
-                cell.padding_left = Some(w_width);
+                cell.padding_left = padding;
             }
             if (grf_brc & 0x04) != 0 {
-                cell.padding_bottom = Some(w_width);
+                cell.padding_bottom = padding;
             }
             if (grf_brc & 0x08) != 0 {
-                cell.padding_right = Some(w_width);
+                cell.padding_right = padding;
             }
         }
 
@@ -661,30 +696,30 @@ impl<'arena> TapParser<'arena> {
     /// Convert ico (color index) to RGB.
     ///
     /// Based on POI's color index mapping.
-    fn ico_to_rgb(ico: u8) -> (u8, u8, u8) {
-        match ico {
-            0 => (0, 0, 0),        // Auto/Black
-            1 => (0, 0, 0),        // Black
-            2 => (0, 0, 255),      // Blue
-            3 => (0, 255, 255),    // Cyan
-            4 => (0, 255, 0),      // Green
-            5 => (255, 0, 255),    // Magenta
-            6 => (255, 0, 0),      // Red
-            7 => (255, 255, 0),    // Yellow
-            8 => (255, 255, 255),  // White
-            9 => (0, 0, 128),      // Dark Blue
-            10 => (0, 128, 128),   // Dark Cyan
-            11 => (0, 128, 0),     // Dark Green
-            12 => (128, 0, 128),   // Dark Magenta
-            13 => (128, 0, 0),     // Dark Red
-            14 => (128, 128, 0),   // Dark Yellow
-            15 => (128, 128, 128), // Dark Gray
-            16 => (192, 192, 192), // Light Gray
-            _ => (0, 0, 0),        // Default to black
-        }
+    fn ico_to_rgb(ico: u8) -> Option<(u8, u8, u8)> {
+        Some(match ico {
+            0 => return None,
+            1 => (0, 0, 0),
+            2 => (0, 0, 255),
+            3 => (0, 255, 255),
+            4 => (0, 255, 0),
+            5 => (255, 0, 255),
+            6 => (255, 0, 0),
+            7 => (255, 255, 0),
+            8 => (255, 255, 255),
+            9 => (0, 0, 128),
+            10 => (0, 128, 128),
+            11 => (0, 128, 0),
+            12 => (128, 0, 128),
+            13 => (128, 0, 0),
+            14 => (128, 128, 0),
+            15 => (128, 128, 128),
+            16 => (192, 192, 192),
+            _ => return None,
+        })
     }
 
-    /// Parse cell shading (sprmTDefTableShd).
+    /// Parse cell shading (`sprmTDefTableShd80`).
     ///
     /// This SPRM contains an array of ShadingDescriptor80 structures (2 bytes each),
     /// one for each cell in the table.
@@ -697,29 +732,38 @@ impl<'arena> TapParser<'arena> {
         _grpprl: &[u8],
     ) -> Result<()> {
         let bytes = sprm.operand_bytes();
-        let shd_size = 2; // ShadingDescriptor80 is 2 bytes
+        if bytes.len() % 2 != 0 || bytes.len() / 2 > tap.cell_properties.len() {
+            return Err(DocError::Corrupted(
+                "DOC Shd80 array has an invalid size for the table row".to_string(),
+            ));
+        }
 
         // Parse shading descriptors for each cell
-        let num_shd = bytes.len() / shd_size;
-        for i in 0..num_shd.min(tap.cell_count) {
-            let offset = i * shd_size;
-            if offset + 1 < bytes.len()
-                && let Ok(shd) = read_u16_le(bytes, offset)
-            {
-                // Parse Shd80 structure
-                let ico_fore = (shd & 0x1F) as u8;
-                let ico_back = ((shd >> 5) & 0x1F) as u8;
-                let ipat = ((shd >> 10) & 0x3F) as u8;
-
-                // Apply shading to cell if pattern is not Clear
-                if ipat != 0 && i < tap.cell_properties.len() {
-                    let _fg_color = Self::ico_to_rgb(ico_fore);
-                    let _bg_color = Self::ico_to_rgb(ico_back);
-                    // Store shading info in cell properties if needed
-                    // For now, we mainly extract structure without applying
-                    let _ = ipat;
-                }
+        for (i, descriptor) in bytes.chunks_exact(2).enumerate() {
+            let shd = binary_to_doc_result(read_u16_le(descriptor, 0))?;
+            if shd == u16::MAX {
+                tap.cell_properties[i].shading = None;
+                tap.cell_properties[i].background_color = None;
+                continue;
             }
+            let ico_fore = (shd & 0x1F) as u8;
+            let ico_back = ((shd >> 5) & 0x1F) as u8;
+            let ipat = ((shd >> 10) & 0x3F) as u8;
+            if ico_fore > 16 || ico_back > 16 {
+                return Err(DocError::Corrupted(
+                    "DOC Shd80 contains an invalid palette index".to_string(),
+                ));
+            }
+            let pattern = ShadingPattern::from_u8(ipat).ok_or_else(|| {
+                DocError::Corrupted("DOC Shd80 contains an invalid pattern index".to_string())
+            })?;
+            let shading = CellShading {
+                foreground_color: Self::ico_to_rgb(ico_fore),
+                background_color: Self::ico_to_rgb(ico_back),
+                pattern,
+            };
+            tap.cell_properties[i].background_color = shading.background_color;
+            tap.cell_properties[i].shading = Some(shading);
         }
 
         Ok(())
@@ -744,6 +788,12 @@ mod tests {
         operand.extend_from_slice(&width.to_le_bytes());
         operand.extend_from_slice(&[0; 16]);
         table_definition_grpprl(&operand)
+    }
+
+    fn append_variable_sprm(grpprl: &mut Vec<u8>, opcode: u16, operand: &[u8]) {
+        grpprl.extend_from_slice(&opcode.to_le_bytes());
+        grpprl.push(u8::try_from(operand.len()).unwrap());
+        grpprl.extend_from_slice(operand);
     }
 
     #[test]
@@ -848,6 +898,49 @@ mod tests {
                 .parse_tap(&single_cell_definition_grpprl(3 << 9, -1))
                 .is_err()
         );
+    }
+
+    #[test]
+    fn parses_default_and_cell_range_padding() {
+        let arena = Bump::new();
+        let parser = TapParser::new(&arena);
+        let mut grpprl = table_definition_grpprl(&[2, 0, 0, 100, 0, 200, 0]);
+        append_variable_sprm(&mut grpprl, 0xD634, &[0, 1, 0x0F, 3, 108, 0]);
+        append_variable_sprm(&mut grpprl, 0xD632, &[1, 2, 0x08, 3, 240, 0]);
+
+        let tap = parser.parse_tap(&grpprl).unwrap();
+        assert_eq!(tap.cell_properties[0].padding_top, Some(108));
+        assert_eq!(tap.cell_properties[0].padding_right, Some(108));
+        assert_eq!(tap.cell_properties[1].padding_left, Some(108));
+        assert_eq!(tap.cell_properties[1].padding_right, Some(240));
+    }
+
+    #[test]
+    fn rejects_malformed_cell_padding_and_shading() {
+        let arena = Bump::new();
+        let parser = TapParser::new(&arena);
+        let parse_with = |opcode, operand: &[u8]| {
+            let mut grpprl = table_definition_grpprl(&[2, 0, 0, 100, 0, 200, 0]);
+            append_variable_sprm(&mut grpprl, opcode, operand);
+            parser.parse_tap(&grpprl)
+        };
+
+        assert!(parse_with(0xD634, &[0, 2, 0x0F, 3, 0, 0]).is_err());
+        assert!(parse_with(0xD632, &[2, 2, 0x0F, 3, 0, 0]).is_err());
+        assert!(parse_with(0xD632, &[0, 2, 0x10, 3, 0, 0]).is_err());
+        assert!(parse_with(0xD632, &[0, 2, 0x0F, 1, 0, 0]).is_err());
+        assert!(parse_with(0xD632, &[0, 2, 0x0F, 0, 1, 0]).is_err());
+        assert!(parse_with(0xD632, &[0, 2, 0x0F, 3, 0xC1, 0x7B]).is_err());
+        assert!(parse_with(0xD609, &[0]).is_err());
+        assert!(parse_with(0xD609, &[0, 0, 0, 0, 0, 0]).is_err());
+        assert!(parse_with(0xD609, &[17, 0]).is_err());
+        assert!(parse_with(0xD609, &[0, 0x68]).is_err());
+
+        // sprmTTlp has operation 0x0A and must not be interpreted as Shd80.
+        let mut grpprl = table_definition_grpprl(&[1, 0, 0, 100, 0]);
+        grpprl.extend_from_slice(&0x740Au16.to_le_bytes());
+        grpprl.extend_from_slice(&0u32.to_le_bytes());
+        assert!(parser.parse_tap(&grpprl).is_ok());
     }
 
     #[test]
