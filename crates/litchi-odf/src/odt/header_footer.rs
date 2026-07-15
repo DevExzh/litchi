@@ -11,6 +11,7 @@ use quick_xml::{
 const STYLE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:style:1.0";
 const TEXT_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:text:1.0";
 const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
+const DRAW_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
 
 /// One of the six header/footer regions supported by an ODF master page.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -75,8 +76,11 @@ pub struct MasterPage {
     pub name: String,
     pub display_name: Option<String>,
     pub page_layout_name: Option<String>,
+    pub drawing_style_name: Option<String>,
     pub next_style_name: Option<String>,
     pub regions: Vec<HeaderFooter>,
+    /// The exact master-page element bytes, including shapes and extension content.
+    pub xml: String,
 }
 
 impl MasterPage {
@@ -88,6 +92,7 @@ impl MasterPage {
 
 struct MasterPageBuilder {
     page: MasterPage,
+    start: usize,
     depth: usize,
 }
 
@@ -126,13 +131,16 @@ pub(crate) fn parse_master_pages(xml: &str) -> Result<Vec<MasterPage>> {
                 }
                 master = Some(MasterPageBuilder {
                     page: parse_master_page(&reader, &element)?,
+                    start: event_start,
                     depth: 1,
                 });
             },
             Event::Empty(element)
                 if style_element && element.local_name().as_ref() == b"master-page" =>
             {
-                pages.push(parse_master_page(&reader, &element)?);
+                let mut page = parse_master_page(&reader, &element)?;
+                page.xml = xml[event_start..event_end].to_string();
+                pages.push(page);
             },
             Event::Start(element) if master.is_some() => {
                 let master = master.as_mut().expect("checked master page");
@@ -231,7 +239,9 @@ pub(crate) fn parse_master_pages(xml: &str) -> Result<Vec<MasterPage>> {
                             "malformed style:master-page element".to_string(),
                         ));
                     }
-                    pages.push(master.take().expect("checked master page").page);
+                    let mut finished = master.take().expect("checked master page");
+                    finished.page.xml = xml[finished.start..event_end].to_string();
+                    pages.push(finished.page);
                 }
             },
             Event::Eof => break,
@@ -581,8 +591,10 @@ fn parse_master_page(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Resu
         name,
         display_name: style_attr(reader, element, b"display-name")?,
         page_layout_name: style_attr(reader, element, b"page-layout-name")?,
+        drawing_style_name: namespaced_attr(reader, element, DRAW_NAMESPACE, b"style-name")?,
         next_style_name: style_attr(reader, element, b"next-style-name")?,
         regions: Vec::new(),
+        xml: String::new(),
     })
 }
 
@@ -591,12 +603,21 @@ fn style_attr(
     element: &BytesStart<'_>,
     local_name: &[u8],
 ) -> Result<Option<String>> {
+    namespaced_attr(reader, element, STYLE_NAMESPACE, local_name)
+}
+
+fn namespaced_attr(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    expected_namespace: &[u8],
+    local_name: &[u8],
+) -> Result<Option<String>> {
     for attribute in element.attributes() {
         let attribute = attribute.map_err(|error| {
             Error::InvalidFormat(format!("invalid master-page attribute: {error}"))
         })?;
         let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
-        if matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == STYLE_NAMESPACE)
+        if matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == expected_namespace)
             && local.as_ref() == local_name
         {
             return attribute
@@ -684,20 +705,24 @@ mod tests {
 
     #[test]
     fn parses_all_master_page_regions_losslessly_with_arbitrary_prefixes() {
-        let xml = r#"<o:document-styles xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><o:master-styles><s:master-page s:name="Standard" s:display-name="Default &amp; Main" s:page-layout-name="pm1" s:next-style-name="Next"><s:header><t:p>Page <t:page-number/></t:p><t:p>A<t:s t:c="2"/>B<t:tab/>C<t:line-break/>D</t:p></s:header><s:header-first><t:p>First</t:p></s:header-first><s:header-left><t:p>Left</t:p></s:header-left><s:footer><t:p>Footer</t:p></s:footer><s:footer-first><t:p>First footer</t:p></s:footer-first><s:footer-left><t:p>Left footer</t:p></s:footer-left></s:master-page><s:master-page s:name="Empty"/></o:master-styles></o:document-styles>"#;
+        let xml = r#"<o:document-styles xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"><o:master-styles><s:master-page s:name="Standard" s:display-name="Default &amp; Main" s:page-layout-name="pm1" d:style-name="drawing1" s:next-style-name="Next"><s:header><t:p>Page <t:page-number/></t:p><t:p>A<t:s t:c="2"/>B<t:tab/>C<t:line-break/>D</t:p></s:header><s:header-first><t:p>First</t:p></s:header-first><s:header-left><t:p>Left</t:p></s:header-left><s:footer><t:p>Footer</t:p></s:footer><s:footer-first><t:p>First footer</t:p></s:footer-first><s:footer-left><t:p>Left footer</t:p></s:footer-left></s:master-page><s:master-page s:name="Empty"/></o:master-styles></o:document-styles>"#;
         let pages = parse_master_pages(xml).unwrap();
         assert_eq!(pages.len(), 2);
         assert_eq!(pages[0].name, "Standard");
         assert_eq!(pages[0].display_name.as_deref(), Some("Default & Main"));
         assert_eq!(pages[0].page_layout_name.as_deref(), Some("pm1"));
+        assert_eq!(pages[0].drawing_style_name.as_deref(), Some("drawing1"));
         assert_eq!(pages[0].next_style_name.as_deref(), Some("Next"));
         assert_eq!(pages[0].regions.len(), 6);
         let header = pages[0].region(HeaderFooterKind::Header).unwrap();
         assert_eq!(header.text, "Page \nA  B\tC\nD");
         assert!(header.xml.starts_with("<s:header>"));
         assert!(header.xml.contains("<t:page-number/>"));
+        assert!(pages[0].xml.starts_with("<s:master-page"));
+        assert!(pages[0].xml.ends_with("</s:master-page>"));
         assert_eq!(pages[1].name, "Empty");
         assert!(pages[1].regions.is_empty());
+        assert_eq!(pages[1].xml, "<s:master-page s:name=\"Empty\"/>");
     }
 
     #[test]
