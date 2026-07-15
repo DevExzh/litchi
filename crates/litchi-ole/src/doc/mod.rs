@@ -87,9 +87,9 @@ pub use shapes::DocShape;
 pub use table::{Cell, Row, Table};
 pub use writer::{
     BookmarkEntry, CharacterFormatting, CommentEntry, DisplayFieldRevision, DocWriteError,
-    DocWriter, FontAlignment, FormattingRevision, FrameTextFlow, LineSpacing, NumberingRevision,
-    ParagraphBorder, ParagraphBorderStyle, ParagraphBorders, ParagraphFormatting, ParagraphShading,
-    TextBoxTightWrap, TextRevision,
+    DocWriter, DropCap, DropCapType, FontAlignment, FormattingRevision, FrameHeight, FrameTextFlow,
+    FrameTextWrap, LineSpacing, NumberingRevision, ParagraphBorder, ParagraphBorderStyle,
+    ParagraphBorders, ParagraphFormatting, ParagraphShading, TextBoxTightWrap, TextRevision,
 };
 
 /// Crate-native ordered document element returned by [`Document::elements`].

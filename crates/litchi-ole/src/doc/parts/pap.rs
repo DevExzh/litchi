@@ -135,10 +135,12 @@ pub struct ParagraphProperties {
     pub dya_abs: Option<i16>,
     /// Absolute width
     pub dxa_width: Option<i16>,
-    /// Row height (for table rows)
-    pub row_height: Option<u16>,
+    /// Height constraint for the paragraph frame
+    pub frame_height: Option<FrameHeight>,
     /// Text wrapping
-    pub text_wrap: Option<u8>,
+    pub text_wrap: Option<FrameTextWrap>,
+    /// Drop-cap formatting
+    pub drop_cap: Option<DropCap>,
     /// Horizontal distance from text
     pub dxa_from_text: Option<i16>,
     /// Vertical distance from text
@@ -266,6 +268,55 @@ pub struct FrameTextFlow {
     pub vertical: bool,
     pub backwards: bool,
     pub rotate_font: bool,
+}
+
+/// Text wrapping around a paragraph frame.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum FrameTextWrap {
+    Auto = 0,
+    NotBeside = 1,
+    Around = 2,
+    None = 3,
+    Tight = 4,
+    Through = 5,
+}
+
+impl TryFrom<u8> for FrameTextWrap {
+    type Error = u8;
+
+    fn try_from(value: u8) -> std::result::Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Self::Auto),
+            1 => Ok(Self::NotBeside),
+            2 => Ok(Self::Around),
+            3 => Ok(Self::None),
+            4 => Ok(Self::Tight),
+            5 => Ok(Self::Through),
+            invalid => Err(invalid),
+        }
+    }
+}
+
+/// Height constraint for a paragraph frame.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FrameHeight {
+    pub height_twips: u16,
+    pub minimum: bool,
+}
+
+/// Drop-cap placement.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DropCapType {
+    Regular,
+    Margin,
+}
+
+/// Drop-cap placement and number of occupied lines.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DropCap {
+    pub kind: DropCapType,
+    pub lines: u8,
 }
 
 /// Line spacing type.
@@ -960,9 +1011,12 @@ impl ParagraphProperties {
             },
             // Operation 0x23: sprmPWr - Text wrapping
             0x23 => {
-                if let Some(val) = sprm.operand_byte() {
-                    pap.text_wrap = Some(val);
-                }
+                let value = sprm.operand_byte().ok_or_else(|| {
+                    DocError::Corrupted("sprmPWr is missing its wrap mode".to_string())
+                })?;
+                pap.text_wrap = Some(FrameTextWrap::try_from(value).map_err(|invalid| {
+                    DocError::Corrupted(format!("sprmPWr has invalid wrap mode {invalid}"))
+                })?);
             },
             // Operations 0x24-0x29: Word 97 Brc80 borders
             0x24 => pap.borders.top = Self::parse_border80(sprm)?,
@@ -973,19 +1027,49 @@ impl ParagraphProperties {
             0x29 => pap.borders.bar = Self::parse_border80(sprm)?,
             // Operation 0x2A: sprmPFNoAutoHyph - No auto hyphenation
             0x2A => {
-                if let Some(val) = sprm.operand_byte() {
-                    pap.no_auto_hyph = val != 0;
-                }
+                pap.no_auto_hyph = Self::strict_bool8(sprm, "sprmPFNoAutoHyph")?;
             },
-            // Operation 0x2B: sprmPWHeightAbs - Row height (for table rows)
+            // Operation 0x2B: sprmPWHeightAbs - Frame height
             0x2B => {
-                if let Some(val) = sprm.operand_word() {
-                    pap.row_height = Some(val);
+                let value = sprm.operand_word().ok_or_else(|| {
+                    DocError::Corrupted("sprmPWHeightAbs is missing its frame height".to_string())
+                })?;
+                let frame_height = FrameHeight {
+                    height_twips: value & 0x7FFF,
+                    minimum: value & 0x8000 != 0,
+                };
+                if frame_height.minimum && frame_height.height_twips == 0 {
+                    return Err(DocError::Corrupted(
+                        "sprmPWHeightAbs minimum frame height cannot be zero".to_string(),
+                    ));
                 }
+                pap.frame_height = Some(frame_height);
             },
             // Operation 0x2C: sprmPDcs - Drop cap
             0x2C => {
-                // Drop cap specifier - not commonly used
+                let value = sprm.operand_word().ok_or_else(|| {
+                    DocError::Corrupted("sprmPDcs is missing its drop-cap descriptor".to_string())
+                })?;
+                if value == 0 {
+                    pap.drop_cap = None;
+                } else {
+                    let kind = match value & 0x07 {
+                        1 => DropCapType::Regular,
+                        2 => DropCapType::Margin,
+                        invalid => {
+                            return Err(DocError::Corrupted(format!(
+                                "sprmPDcs has invalid drop-cap type {invalid}"
+                            )));
+                        },
+                    };
+                    let lines = ((value >> 3) & 0x1F) as u8;
+                    if !(1..=10).contains(&lines) {
+                        return Err(DocError::Corrupted(format!(
+                            "sprmPDcs has invalid drop-cap line count {lines}"
+                        )));
+                    }
+                    pap.drop_cap = Some(DropCap { kind, lines });
+                }
             },
             // Operation 0x2D: sprmPShd80 - Shading (Word 97-2000)
             0x2D => {
@@ -996,15 +1080,11 @@ impl ParagraphProperties {
             },
             // Operation 0x2E: sprmPDyaFromText - Vertical distance from text
             0x2E => {
-                if let Some(val) = sprm.operand_i16() {
-                    pap.dya_from_text = Some(val);
-                }
+                pap.dya_from_text = Some(Self::nonnegative_distance(sprm, "sprmPDyaFromText")?);
             },
             // Operation 0x2F: sprmPDxaFromText - Horizontal distance from text
             0x2F => {
-                if let Some(val) = sprm.operand_i16() {
-                    pap.dxa_from_text = Some(val);
-                }
+                pap.dxa_from_text = Some(Self::nonnegative_distance(sprm, "sprmPDxaFromText")?);
             },
             // Operation 0x30: sprmPFLocked - Locked paragraph
             0x30 => {
@@ -1221,6 +1301,16 @@ impl ParagraphProperties {
         if !(-20..=31_680).contains(&value) {
             return Err(DocError::Corrupted(format!(
                 "{name} value {value} is outside -20..=31680"
+            )));
+        }
+        Ok(value)
+    }
+
+    fn nonnegative_distance(sprm: &Sprm, name: &str) -> Result<i16> {
+        let value = Self::required_i16(sprm, name)?;
+        if !(0..=31_680).contains(&value) {
+            return Err(DocError::Corrupted(format!(
+                "{name} value {value} is outside 0..=31680"
             )));
         }
         Ok(value)
@@ -1587,6 +1677,12 @@ impl ParagraphProperties {
             || self.widow_control
             || self.use_page_setup_settings.is_some()
             || self.adjust_right_indent.is_some()
+            || self.frame_height.is_some()
+            || self.text_wrap.is_some()
+            || self.drop_cap.is_some()
+            || self.dxa_from_text.is_some()
+            || self.dya_from_text.is_some()
+            || self.no_auto_hyph
             || self.no_allow_overlap
             || self.contextual_spacing
             || self.mirror_indents
@@ -2072,5 +2168,58 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn parses_frame_wrap_height_drop_cap_and_distances_strictly() {
+        let mut grpprl = Vec::new();
+        grpprl.extend_from_slice(&SPRM_P_WR.to_le_bytes());
+        grpprl.push(5);
+        grpprl.extend_from_slice(&SPRM_P_W_HEIGHT_ABS.to_le_bytes());
+        grpprl.extend_from_slice(&(0x8000u16 | 720).to_le_bytes());
+        grpprl.extend_from_slice(&SPRM_P_DCS.to_le_bytes());
+        grpprl.extend_from_slice(&(2u16 | (3u16 << 3)).to_le_bytes());
+        grpprl.extend_from_slice(&SPRM_P_DYA_FROM_TEXT.to_le_bytes());
+        grpprl.extend_from_slice(&240i16.to_le_bytes());
+        grpprl.extend_from_slice(&SPRM_P_DXA_FROM_TEXT.to_le_bytes());
+        grpprl.extend_from_slice(&480i16.to_le_bytes());
+        grpprl.extend_from_slice(&SPRM_P_F_NO_AUTO_HYPH.to_le_bytes());
+        grpprl.push(1);
+
+        let properties = ParagraphProperties::from_sprm(&grpprl).unwrap();
+        assert_eq!(properties.text_wrap, Some(FrameTextWrap::Through));
+        assert_eq!(
+            properties.frame_height,
+            Some(FrameHeight {
+                height_twips: 720,
+                minimum: true,
+            })
+        );
+        assert_eq!(
+            properties.drop_cap,
+            Some(DropCap {
+                kind: DropCapType::Margin,
+                lines: 3,
+            })
+        );
+        assert_eq!(properties.dya_from_text, Some(240));
+        assert_eq!(properties.dxa_from_text, Some(480));
+        assert!(properties.no_auto_hyph);
+
+        let invalid_word =
+            |opcode: u16, value: u16| [opcode.to_le_bytes(), value.to_le_bytes()].concat();
+        assert!(ParagraphProperties::from_sprm(&[0x23, 0x24, 6]).is_err());
+        assert!(
+            ParagraphProperties::from_sprm(&invalid_word(SPRM_P_W_HEIGHT_ABS, 0x8000)).is_err()
+        );
+        assert!(ParagraphProperties::from_sprm(&invalid_word(SPRM_P_DCS, 3 | (2 << 3))).is_err());
+        assert!(ParagraphProperties::from_sprm(&invalid_word(SPRM_P_DCS, 1 | (11 << 3))).is_err());
+        assert!(
+            ParagraphProperties::from_sprm(&invalid_word(SPRM_P_DYA_FROM_TEXT, 31_681)).is_err()
+        );
+        assert!(
+            ParagraphProperties::from_sprm(&invalid_word(SPRM_P_DXA_FROM_TEXT, u16::MAX)).is_err()
+        );
+        assert!(ParagraphProperties::from_sprm(&[0x2A, 0x24, 2]).is_err());
     }
 }

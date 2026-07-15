@@ -82,7 +82,8 @@ use super::revisions::{DisplayFieldRevision, FormattingRevision, NumberingRevisi
 use crate::doc::CommentDateTime;
 use crate::doc::parts::pap::{
     Border as ParagraphBorder, BorderStyle as ParagraphBorderStyle, Borders as ParagraphBorders,
-    FontAlignment, FrameTextFlow, Shading as ParagraphShading, TextBoxTightWrap,
+    DropCap, FontAlignment, FrameHeight, FrameTextFlow, FrameTextWrap, Shading as ParagraphShading,
+    TextBoxTightWrap,
 };
 use crate::sprm_operations::*;
 use litchi_cfb::writer::OleWriter;
@@ -375,6 +376,18 @@ pub struct ParagraphFormatting {
     pub font_alignment: Option<FontAlignment>,
     /// Direction and glyph rotation of text in a frame
     pub frame_text_flow: Option<FrameTextFlow>,
+    /// Wrapping of surrounding text around the paragraph frame
+    pub frame_text_wrap: Option<FrameTextWrap>,
+    /// Paragraph frame height
+    pub frame_height: Option<FrameHeight>,
+    /// Minimum horizontal distance between frame and surrounding text
+    pub frame_horizontal_text_distance: Option<i16>,
+    /// Minimum vertical distance between frame and surrounding text
+    pub frame_vertical_text_distance: Option<i16>,
+    /// Drop-cap placement and line count
+    pub drop_cap: Option<DropCap>,
+    /// Disable automatic hyphenation for this paragraph
+    pub no_auto_hyphenation: Option<bool>,
     /// Keep the paragraph on one page
     pub keep: Option<bool>,
     /// Keep the paragraph with the next paragraph
@@ -3487,6 +3500,36 @@ fn build_papx_grpprl(fmt: &ParagraphFormatting) -> Vec<u8> {
             | (u16::from(flow.rotate_font) << 2);
         push_u16(&mut grp, SPRM_P_FRAME_TEXT_FLOW, value);
     }
+    if let Some(wrap) = fmt.frame_text_wrap {
+        push_byte(&mut grp, SPRM_P_WR, wrap as u8);
+    }
+    if let Some(height) = fmt.frame_height {
+        push_u16(
+            &mut grp,
+            SPRM_P_W_HEIGHT_ABS,
+            height.height_twips | (u16::from(height.minimum) << 15),
+        );
+    }
+    if let Some(distance) = fmt.frame_horizontal_text_distance {
+        push_i16(&mut grp, SPRM_P_DXA_FROM_TEXT, distance);
+    }
+    if let Some(distance) = fmt.frame_vertical_text_distance {
+        push_i16(&mut grp, SPRM_P_DYA_FROM_TEXT, distance);
+    }
+    if let Some(drop_cap) = fmt.drop_cap {
+        let kind = match drop_cap.kind {
+            crate::doc::parts::pap::DropCapType::Regular => 1u16,
+            crate::doc::parts::pap::DropCapType::Margin => 2,
+        };
+        push_u16(
+            &mut grp,
+            SPRM_P_DCS,
+            kind | (u16::from(drop_cap.lines) << 3),
+        );
+    }
+    if let Some(disabled) = fmt.no_auto_hyphenation {
+        push_bool(&mut grp, SPRM_P_F_NO_AUTO_HYPH, disabled);
+    }
 
     // BiDi paragraph
     if let Some(bidi) = fmt.bidi {
@@ -3630,6 +3673,41 @@ fn build_revision_papx_grpprl(
     {
         return Err(DocWriteError::InvalidData(
             "DOC backwards frame text flow requires vertical flow".to_string(),
+        ));
+    }
+    if let Some(height) = fmt.frame_height
+        && (height.height_twips > 0x7FFF || (height.minimum && height.height_twips == 0))
+    {
+        return Err(DocWriteError::InvalidData(
+            "DOC paragraph frame height is outside the WHeightAbs range".to_string(),
+        ));
+    }
+    if let Some(drop_cap) = fmt.drop_cap
+        && !(1..=10).contains(&drop_cap.lines)
+    {
+        return Err(DocWriteError::InvalidData(format!(
+            "DOC drop-cap line count {} is outside 1..=10",
+            drop_cap.lines
+        )));
+    }
+    for (name, distance) in [
+        ("horizontal", fmt.frame_horizontal_text_distance),
+        ("vertical", fmt.frame_vertical_text_distance),
+    ] {
+        if let Some(distance) = distance
+            && !(0..=31_680).contains(&distance)
+        {
+            return Err(DocWriteError::InvalidData(format!(
+                "DOC {name} frame text distance {distance} is outside 0..=31680"
+            )));
+        }
+    }
+    if fmt.frame_text_flow.is_some()
+        && !matches!(fmt.frame_text_wrap, Some(wrap) if wrap != FrameTextWrap::Auto)
+        && !matches!(fmt.frame_height, Some(height) if height.height_twips != 0)
+    {
+        return Err(DocWriteError::InvalidData(
+            "DOC frame text flow requires a non-default frame property".to_string(),
         ));
     }
     for (name, value) in [
@@ -4355,6 +4433,18 @@ mod tests {
                         backwards: true,
                         rotate_font: false,
                     }),
+                    frame_text_wrap: Some(FrameTextWrap::Through),
+                    frame_height: Some(FrameHeight {
+                        height_twips: 720,
+                        minimum: true,
+                    }),
+                    frame_horizontal_text_distance: Some(480),
+                    frame_vertical_text_distance: Some(240),
+                    drop_cap: Some(DropCap {
+                        kind: crate::doc::parts::pap::DropCapType::Margin,
+                        lines: 3,
+                    }),
+                    no_auto_hyphenation: Some(true),
                     use_page_setup_settings: Some(true),
                     adjust_right_indent: Some(false),
                     no_allow_overlap: Some(true),
@@ -4454,6 +4544,27 @@ mod tests {
             })
         );
         assert_eq!(
+            paragraphs[0].properties().text_wrap,
+            Some(FrameTextWrap::Through)
+        );
+        assert_eq!(
+            paragraphs[0].properties().frame_height,
+            Some(FrameHeight {
+                height_twips: 720,
+                minimum: true,
+            })
+        );
+        assert_eq!(paragraphs[0].properties().dxa_from_text, Some(480));
+        assert_eq!(paragraphs[0].properties().dya_from_text, Some(240));
+        assert_eq!(
+            paragraphs[0].properties().drop_cap,
+            Some(DropCap {
+                kind: crate::doc::parts::pap::DropCapType::Margin,
+                lines: 3,
+            })
+        );
+        assert!(paragraphs[0].properties().no_auto_hyph);
+        assert_eq!(
             paragraphs[0].properties().use_page_setup_settings,
             Some(true)
         );
@@ -4527,6 +4638,32 @@ mod tests {
                 frame_text_flow: Some(FrameTextFlow {
                     vertical: false,
                     backwards: true,
+                    rotate_font: false,
+                }),
+                ..ParagraphFormatting::default()
+            },
+            ParagraphFormatting {
+                frame_height: Some(FrameHeight {
+                    height_twips: 32_768,
+                    minimum: false,
+                }),
+                ..ParagraphFormatting::default()
+            },
+            ParagraphFormatting {
+                drop_cap: Some(DropCap {
+                    kind: crate::doc::parts::pap::DropCapType::Regular,
+                    lines: 0,
+                }),
+                ..ParagraphFormatting::default()
+            },
+            ParagraphFormatting {
+                frame_horizontal_text_distance: Some(-1),
+                ..ParagraphFormatting::default()
+            },
+            ParagraphFormatting {
+                frame_text_flow: Some(FrameTextFlow {
+                    vertical: true,
+                    backwards: false,
                     rotate_font: false,
                 }),
                 ..ParagraphFormatting::default()
