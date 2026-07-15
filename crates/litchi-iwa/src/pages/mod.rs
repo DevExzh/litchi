@@ -36,7 +36,8 @@ pub mod section;
 pub use document::PagesDocument;
 pub use editor::{
     PagesDrawableTextInfo, PagesEditor, PagesHeaderFooterInfo, PagesHeaderFooterKind,
-    PagesPageLayout, PagesRgbColorSpace, PagesRgbaColor, PagesSectionBackground, PagesSectionInfo,
-    PagesSectionSettings, PagesTemplateKind, RemovedPagesTextBox,
+    PagesPageLayout, PagesPageNumber, PagesPageOrientation, PagesRgbColorSpace, PagesRgbaColor,
+    PagesSectionBackground, PagesSectionInfo, PagesSectionPageNumbering, PagesSectionSettings,
+    PagesSectionStart, PagesTemplateKind, RemovedPagesTextBox,
 };
 pub use section::{PagesSection, PagesSectionType};

@@ -3,6 +3,9 @@ use std::env;
 
 use litchi_iwa::IWorkPackage;
 use litchi_iwa::archive::ArchiveObject;
+use litchi_iwa::pages::{
+    PagesPageNumber, PagesPageOrientation, PagesSectionPageNumbering, PagesSectionStart,
+};
 use litchi_iwa::protobuf::tp::{DocumentArchive, SectionArchive, SectionTemplateArchive};
 use litchi_iwa::protobuf::tswp::StorageArchive;
 use prost::Message;
@@ -40,7 +43,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         document.bottom_margin,
         document.header_margin,
         document.footer_margin,
-        document.orientation,
+        document.orientation.map(PagesPageOrientation::from_raw),
         document.uses_single_header_footer,
     );
 
@@ -89,9 +92,18 @@ fn inspect_section(
         .get(&identifier)
         .ok_or("section object is missing")?;
     let section = decode::<SectionArchive>(object).ok_or("section payload is invalid")?;
+    let starting_page_number = section
+        .section_page_number_start
+        .map(PagesPageNumber::new)
+        .transpose()?;
     println!(
-        "section={identifier} at={character_index} archive={name} name={:?} first={:?} even={:?} odd={:?}",
+        "section={identifier} at={character_index} archive={name} name={:?} start={:?} \
+         numbering={:?} starting_page={starting_page_number:?} first={:?} even={:?} odd={:?}",
         section.name,
+        section.section_start_kind.map(PagesSectionStart::from_raw),
+        section
+            .section_page_number_kind
+            .map(PagesSectionPageNumbering::from_raw),
         section
             .first_section_template_page
             .as_ref()

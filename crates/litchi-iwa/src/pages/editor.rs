@@ -36,6 +36,9 @@ use crate::wire::{
 };
 use crate::{EmbeddedMediaAsset, Error, IWorkMediaEditor, IWorkPackage, Result};
 
+const DOCUMENT_ARCHIVE_NAME: &str = "Index/Document.iwa";
+const DOCUMENT_OBJECT_ID: u64 = 1;
+const DOCUMENT_MESSAGE_TYPE: u32 = 10000;
 const SECTION_MESSAGE_TYPE: u32 = 10011;
 const SECTION_TEMPLATE_MESSAGE_TYPE: u32 = 10143;
 const USER_DEFINED_GUIDE_MAP_MESSAGE_TYPE: u32 = 10016;
@@ -49,8 +52,9 @@ const TEXT_BOX_DUPLICATE_OFFSET: f32 = 12.0;
 
 pub use types::{
     PagesDrawableTextInfo, PagesHeaderFooterInfo, PagesHeaderFooterKind, PagesPageLayout,
-    PagesRgbColorSpace, PagesRgbaColor, PagesSectionBackground, PagesSectionInfo,
-    PagesSectionSettings, PagesTemplateKind, RemovedPagesTextBox,
+    PagesPageNumber, PagesPageOrientation, PagesRgbColorSpace, PagesRgbaColor,
+    PagesSectionBackground, PagesSectionInfo, PagesSectionPageNumbering, PagesSectionSettings,
+    PagesSectionStart, PagesTemplateKind, RemovedPagesTextBox,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -480,277 +484,6 @@ impl PagesEditor {
     /// List body section boundaries in UTF-16 document order.
     pub fn sections(&self) -> &[PagesSectionInfo] {
         &self.sections
-    }
-
-    /// Read the lossless settings payload of a reachable Pages section.
-    pub fn section_settings(&self, section_id: u64) -> Result<PagesSectionSettings> {
-        if !self
-            .sections
-            .iter()
-            .any(|section| section.object_id == section_id)
-        {
-            return Err(Error::ParseError(format!(
-                "Section {section_id} is not reachable from the Pages body"
-            )));
-        }
-        let archive_name = find_section_archive(self.text.package(), section_id)?;
-        let archive = self.text.package().archive(&archive_name)?;
-        let object = archive.object(section_id).ok_or_else(|| {
-            Error::InvalidFormat(format!("Pages section object {section_id} is missing"))
-        })?;
-        let messages = object
-            .messages
-            .iter()
-            .filter(|message| message.type_ == SECTION_MESSAGE_TYPE)
-            .collect::<Vec<_>>();
-        if messages.len() != 1 {
-            return Err(Error::InvalidFormat(format!(
-                "Pages section object {section_id} must have one section payload, found {}",
-                messages.len()
-            )));
-        }
-        decode_section_settings(messages[0].data.as_slice())
-    }
-
-    /// Replace the settings stored directly on a reachable Pages section.
-    ///
-    /// The update is transactional and patches only changed protobuf fields,
-    /// preserving unknown fields, raw background-fill bytes, and field order.
-    pub fn set_section_settings(
-        &mut self,
-        section_id: u64,
-        settings: PagesSectionSettings,
-    ) -> Result<()> {
-        validate_section_settings(&settings)?;
-        let current = self.section_settings(section_id)?;
-        if current == settings {
-            return Ok(());
-        }
-
-        let mut staged = self.text.package().clone();
-        let archive_name = find_section_archive(&staged, section_id)?;
-        staged.update_archive(&archive_name, |archive| {
-            let object = archive.object_mut(section_id).ok_or_else(|| {
-                Error::InvalidFormat(format!("Pages section object {section_id} is missing"))
-            })?;
-            let message_indexes = object
-                .messages
-                .iter()
-                .enumerate()
-                .filter_map(|(index, message)| {
-                    (message.type_ == SECTION_MESSAGE_TYPE).then_some(index)
-                })
-                .collect::<Vec<_>>();
-            if message_indexes.len() != 1 {
-                return Err(Error::InvalidFormat(format!(
-                    "Pages section object {section_id} must have one section payload, found {}",
-                    message_indexes.len()
-                )));
-            }
-            let message_index = message_indexes[0];
-            let original = object.messages[message_index].data.as_slice();
-            let decoded_current = decode_section_settings(original)?;
-            if decoded_current != current {
-                return Err(Error::InvalidFormat(format!(
-                    "Pages section {section_id} changed during mutation"
-                )));
-            }
-
-            let mut data = original.to_vec();
-            for (field_number, before, after) in [
-                (
-                    17,
-                    current.inherit_previous_header_footer,
-                    settings.inherit_previous_header_footer,
-                ),
-                (
-                    18,
-                    current.first_page_different,
-                    settings.first_page_different,
-                ),
-                (
-                    19,
-                    current.even_odd_pages_different,
-                    settings.even_odd_pages_different,
-                ),
-                (
-                    28,
-                    current.first_page_hides_header_footer,
-                    settings.first_page_hides_header_footer,
-                ),
-            ] {
-                if before != after {
-                    data = patch_varint_field(
-                        &data,
-                        field_number,
-                        before.is_some(),
-                        after.map(u64::from),
-                    )?;
-                }
-            }
-            for (field_number, before, after) in [
-                (20, current.start_kind, settings.start_kind),
-                (21, current.page_number_kind, settings.page_number_kind),
-                (22, current.page_number_start, settings.page_number_start),
-            ] {
-                if before != after {
-                    data = patch_varint_field(
-                        &data,
-                        field_number,
-                        before.is_some(),
-                        after.map(u64::from),
-                    )?;
-                }
-            }
-            if current.name != settings.name {
-                data = patch_length_delimited_field(
-                    &data,
-                    26,
-                    current.name.is_some(),
-                    settings.name.as_deref().map(str::as_bytes),
-                )?;
-            }
-            if current.background_fill_payload != settings.background_fill_payload {
-                data = patch_length_delimited_field(
-                    &data,
-                    30,
-                    current.background_fill_payload.is_some(),
-                    settings.background_fill_payload.as_deref(),
-                )?;
-            }
-            if decode_section_settings(&data)? != settings {
-                return Err(Error::InvalidFormat(format!(
-                    "Pages section {section_id} settings patch failed validation"
-                )));
-            }
-            object.replace_message(
-                message_index,
-                RawMessage {
-                    type_: SECTION_MESSAGE_TYPE,
-                    data,
-                },
-            )?;
-            Ok(())
-        })?;
-        *self = Self::from_package(staged)?;
-        Ok(())
-    }
-
-    /// Read a section background as a semantic solid color when possible.
-    pub fn section_background(&self, section_id: u64) -> Result<PagesSectionBackground> {
-        let settings = self.section_settings(section_id)?;
-        settings
-            .background_fill_payload
-            .as_deref()
-            .map(decode_section_background)
-            .transpose()
-            .map(|background| background.unwrap_or(PagesSectionBackground::None))
-    }
-
-    /// Set, clear, or losslessly replace a section background fill.
-    ///
-    /// Editing an existing solid color patches only changed nested color
-    /// scalars, preserving unknown protobuf fields in the fill and color.
-    pub fn set_section_background(
-        &mut self,
-        section_id: u64,
-        background: PagesSectionBackground,
-    ) -> Result<()> {
-        validate_section_background(&background)?;
-        let mut settings = self.section_settings(section_id)?;
-        let current = settings
-            .background_fill_payload
-            .as_deref()
-            .map(decode_section_background)
-            .transpose()?
-            .unwrap_or(PagesSectionBackground::None);
-        if current == background {
-            return Ok(());
-        }
-
-        settings.background_fill_payload = match background {
-            PagesSectionBackground::None => None,
-            PagesSectionBackground::Opaque(payload) => Some(payload),
-            PagesSectionBackground::Solid(color) => {
-                let payload = match (current, settings.background_fill_payload.as_deref()) {
-                    (PagesSectionBackground::Solid(current), Some(payload)) => {
-                        patch_solid_background(payload, current, color)?
-                    },
-                    _ => encode_solid_background(color),
-                };
-                Some(payload)
-            },
-        };
-        self.set_section_settings(section_id, settings)
-    }
-
-    /// Read the page geometry fields from the Pages document root.
-    pub fn page_layout(&self) -> Result<PagesPageLayout> {
-        Ok(PagesPageLayout::from(&root_document(self.text.package())?))
-    }
-
-    /// Replace the page geometry fields transactionally.
-    pub fn set_page_layout(&mut self, layout: PagesPageLayout) -> Result<()> {
-        validate_page_layout(&layout)?;
-        let mut staged = self.text.package().clone();
-        staged.update_archive("Index/Document.iwa", |archive| {
-            let object = archive
-                .object_mut(1)
-                .ok_or_else(|| Error::InvalidFormat("Pages root object 1 is missing".to_owned()))?;
-            let message_index = object
-                .messages
-                .iter()
-                .position(|message| message.type_ == 10000)
-                .ok_or_else(|| {
-                    Error::InvalidFormat("Pages root has no TP.DocumentArchive payload".to_owned())
-                })?;
-            let original = &object.messages[message_index].data;
-            let document = DocumentArchive::decode(original.as_slice())?;
-            let mut data = original.clone();
-            for (field_number, current, replacement) in [
-                (30, document.page_width, layout.page_width),
-                (31, document.page_height, layout.page_height),
-                (32, document.left_margin, layout.left_margin),
-                (33, document.right_margin, layout.right_margin),
-                (34, document.top_margin, layout.top_margin),
-                (35, document.bottom_margin, layout.bottom_margin),
-                (36, document.header_margin, layout.header_margin),
-                (37, document.footer_margin, layout.footer_margin),
-                (38, document.page_scale, layout.page_scale),
-            ] {
-                data = patch_fixed32_field(
-                    &data,
-                    field_number,
-                    current.is_some(),
-                    replacement.map(f32::to_bits),
-                )?;
-            }
-            data = patch_varint_field(
-                &data,
-                39,
-                document.lays_out_body_vertically.is_some(),
-                layout.lays_out_body_vertically.map(u64::from),
-            )?;
-            data = patch_varint_field(
-                &data,
-                42,
-                document.orientation.is_some(),
-                layout.orientation.map(u64::from),
-            )?;
-            let verified = DocumentArchive::decode(data.as_slice())?;
-            if PagesPageLayout::from(&verified) != layout {
-                return Err(Error::InvalidFormat(
-                    "Pages page-layout wire patch failed validation".to_owned(),
-                ));
-            }
-            object.replace_message(
-                message_index,
-                crate::archive::RawMessage { type_: 10000, data },
-            )?;
-            Ok(())
-        })?;
-        *self = Self::from_package(staged)?;
-        Ok(())
     }
 
     /// Set or clear the display name of a reachable Pages section.
@@ -2610,326 +2343,32 @@ fn body_storage_id(package: &IWorkPackage) -> Result<u64> {
 }
 
 fn root_document(package: &IWorkPackage) -> Result<DocumentArchive> {
-    let archive = package.archive("Index/Document.iwa")?;
-    let object = archive
-        .object(1)
-        .ok_or_else(|| Error::InvalidFormat("Pages root object 1 is missing".to_owned()))?;
+    let archive = package.archive(DOCUMENT_ARCHIVE_NAME)?;
+    let object = archive.object(DOCUMENT_OBJECT_ID).ok_or_else(|| {
+        Error::InvalidFormat(format!("Pages root object {DOCUMENT_OBJECT_ID} is missing"))
+    })?;
     object
         .messages
         .iter()
-        .find(|message| message.type_ == 10000)
+        .find(|message| message.type_ == DOCUMENT_MESSAGE_TYPE)
         .and_then(|message| DocumentArchive::decode(message.data.as_slice()).ok())
         .ok_or_else(|| {
             Error::InvalidFormat("Pages root has no TP.DocumentArchive payload".to_owned())
         })
 }
 
-fn validate_page_layout(layout: &PagesPageLayout) -> Result<()> {
-    for (name, value) in [
-        ("page width", layout.page_width),
-        ("page height", layout.page_height),
-        ("page scale", layout.page_scale),
-    ] {
-        if value.is_some_and(|value| !value.is_finite() || value <= 0.0) {
-            return Err(Error::ParseError(format!(
-                "Pages {name} must be finite and greater than zero"
-            )));
-        }
-    }
-    for (name, value) in [
-        ("left margin", layout.left_margin),
-        ("right margin", layout.right_margin),
-        ("top margin", layout.top_margin),
-        ("bottom margin", layout.bottom_margin),
-        ("header margin", layout.header_margin),
-        ("footer margin", layout.footer_margin),
-    ] {
-        if value.is_some_and(|value| !value.is_finite() || value < 0.0) {
-            return Err(Error::ParseError(format!(
-                "Pages {name} must be finite and non-negative"
-            )));
-        }
-    }
-    if let (Some(width), Some(left), Some(right)) =
-        (layout.page_width, layout.left_margin, layout.right_margin)
-        && left + right >= width
-    {
-        return Err(Error::ParseError(
-            "Pages horizontal margins must leave positive body width".to_owned(),
-        ));
-    }
-    if let (Some(height), Some(top), Some(bottom)) =
-        (layout.page_height, layout.top_margin, layout.bottom_margin)
-        && top + bottom >= height
-    {
-        return Err(Error::ParseError(
-            "Pages vertical margins must leave positive body height".to_owned(),
-        ));
-    }
-    Ok(())
-}
-
-fn validate_section_settings(settings: &PagesSectionSettings) -> Result<()> {
-    if settings
-        .name
-        .as_deref()
-        .is_some_and(|name| name.contains('\0'))
-    {
-        return Err(Error::ParseError(
-            "Pages section names cannot contain NUL".to_owned(),
-        ));
-    }
-    if let Some(payload) = settings.background_fill_payload.as_deref() {
-        tsd::FillArchive::decode(payload).map_err(|error| {
-            Error::ParseError(format!(
-                "Pages section background fill is not a TSD.FillArchive: {error}"
-            ))
-        })?;
-    }
-    Ok(())
-}
-
-fn decode_section_settings(data: &[u8]) -> Result<PagesSectionSettings> {
-    let section = SectionArchive::decode(data)?;
-
-    // Validate raw singularity and wire types even though prost accepts the
-    // final occurrence of duplicate scalar fields.
-    for (field_number, present, value) in [
-        (
-            17,
-            section.inherit_previous_header_footer.is_some(),
-            section.inherit_previous_header_footer.map(u64::from),
-        ),
-        (
-            18,
-            section.section_template_first_page_different.is_some(),
-            section.section_template_first_page_different.map(u64::from),
-        ),
-        (
-            19,
-            section.section_template_even_odd_pages_different.is_some(),
-            section
-                .section_template_even_odd_pages_different
-                .map(u64::from),
-        ),
-        (
-            20,
-            section.section_start_kind.is_some(),
-            section.section_start_kind.map(u64::from),
-        ),
-        (
-            21,
-            section.section_page_number_kind.is_some(),
-            section.section_page_number_kind.map(u64::from),
-        ),
-        (
-            22,
-            section.section_page_number_start.is_some(),
-            section.section_page_number_start.map(u64::from),
-        ),
-        (
-            28,
-            section
-                .section_template_first_page_hides_header_footer
-                .is_some(),
-            section
-                .section_template_first_page_hides_header_footer
-                .map(u64::from),
-        ),
-    ] {
-        patch_varint_field(data, field_number, present, value)?;
-    }
-    patch_length_delimited_field(
-        data,
-        26,
-        section.name.is_some(),
-        section.name.as_deref().map(str::as_bytes),
-    )?;
-
-    let background_payloads = repeated_length_delimited_payloads(data, 30)?;
-    if background_payloads.len() > 1 {
-        return Err(Error::InvalidFormat(format!(
-            "singular protobuf field 30 occurs {} times",
-            background_payloads.len()
-        )));
-    }
-    if background_payloads.is_empty() != section.background_fill.is_none() {
-        return Err(Error::InvalidFormat(
-            "Pages section background-fill presence changed during decoding".to_owned(),
-        ));
-    }
-    let background_fill_payload = background_payloads.first().map(|payload| payload.to_vec());
-    if let Some(payload) = background_fill_payload.as_deref() {
-        tsd::FillArchive::decode(payload)?;
-    }
-    patch_length_delimited_field(
-        data,
-        30,
-        section.background_fill.is_some(),
-        background_fill_payload.as_deref(),
-    )?;
-
-    Ok(PagesSectionSettings {
-        name: section.name,
-        inherit_previous_header_footer: section.inherit_previous_header_footer,
-        first_page_different: section.section_template_first_page_different,
-        even_odd_pages_different: section.section_template_even_odd_pages_different,
-        start_kind: section.section_start_kind,
-        page_number_kind: section.section_page_number_kind,
-        page_number_start: section.section_page_number_start,
-        first_page_hides_header_footer: section.section_template_first_page_hides_header_footer,
-        background_fill_payload,
-    })
-}
-
-fn validate_section_background(background: &PagesSectionBackground) -> Result<()> {
-    match background {
-        PagesSectionBackground::None => Ok(()),
-        PagesSectionBackground::Solid(color) => validate_pages_color(*color),
-        PagesSectionBackground::Opaque(payload) => {
-            tsd::FillArchive::decode(payload.as_slice()).map_err(|error| {
-                Error::ParseError(format!(
-                    "Opaque Pages section background is not a TSD.FillArchive: {error}"
-                ))
-            })?;
-            Ok(())
-        },
-    }
-}
-
-fn validate_pages_color(color: PagesRgbaColor) -> Result<()> {
-    for (name, value) in [
-        ("red", color.red),
-        ("green", color.green),
-        ("blue", color.blue),
-        ("alpha", color.alpha),
-    ] {
-        if !value.is_finite() || !(0.0..=1.0).contains(&value) {
-            return Err(Error::ParseError(format!(
-                "Pages section background {name} must be finite and between zero and one"
-            )));
-        }
-    }
-    Ok(())
-}
-
-fn decode_section_background(payload: &[u8]) -> Result<PagesSectionBackground> {
-    let fill = tsd::FillArchive::decode(payload)?;
-    let Some(color) = fill.color.as_ref() else {
-        return Ok(PagesSectionBackground::Opaque(payload.to_vec()));
-    };
-    if fill.gradient.is_some()
-        || fill.image.is_some()
-        || color.model != tsp::color::ColorModel::Rgb as i32
-        || color.c.is_some()
-        || color.m.is_some()
-        || color.y.is_some()
-        || color.k.is_some()
-        || color.w.is_some()
-    {
-        return Ok(PagesSectionBackground::Opaque(payload.to_vec()));
-    }
-    let Some((red, green, blue)) = color
-        .r
-        .zip(color.g)
-        .zip(color.b)
-        .map(|((r, g), b)| (r, g, b))
-    else {
-        return Ok(PagesSectionBackground::Opaque(payload.to_vec()));
-    };
-    let color_space = match color.rgbspace {
-        None => PagesRgbColorSpace::Srgb,
-        Some(value) if value == tsp::color::RgbColorSpace::Srgb as i32 => PagesRgbColorSpace::Srgb,
-        Some(value) if value == tsp::color::RgbColorSpace::P3 as i32 => {
-            PagesRgbColorSpace::DisplayP3
-        },
-        _ => return Ok(PagesSectionBackground::Opaque(payload.to_vec())),
-    };
-    let semantic = PagesRgbaColor {
-        red,
-        green,
-        blue,
-        alpha: color.a.unwrap_or(1.0),
-        color_space,
-    };
-    if validate_pages_color(semantic).is_err() {
-        return Ok(PagesSectionBackground::Opaque(payload.to_vec()));
-    }
-    Ok(PagesSectionBackground::Solid(semantic))
-}
-
-fn encode_solid_background(color: PagesRgbaColor) -> Vec<u8> {
-    tsd::FillArchive {
-        color: Some(tsp::Color {
-            model: tsp::color::ColorModel::Rgb as i32,
-            r: Some(color.red),
-            g: Some(color.green),
-            b: Some(color.blue),
-            rgbspace: Some(match color.color_space {
-                PagesRgbColorSpace::Srgb => tsp::color::RgbColorSpace::Srgb as i32,
-                PagesRgbColorSpace::DisplayP3 => tsp::color::RgbColorSpace::P3 as i32,
-            }),
-            a: Some(color.alpha),
-            ..Default::default()
-        }),
-        ..Default::default()
-    }
-    .encode_to_vec()
-}
-
-fn patch_solid_background(
-    payload: &[u8],
-    current: PagesRgbaColor,
-    replacement: PagesRgbaColor,
-) -> Result<Vec<u8>> {
-    let fill = tsd::FillArchive::decode(payload)?;
-    let color = fill.color.ok_or_else(|| {
-        Error::InvalidFormat("Pages solid section background lost its color".to_owned())
-    })?;
-    let mut data = payload.to_vec();
-    for (field_number, present, before, after) in [
-        (3, color.r.is_some(), current.red, replacement.red),
-        (4, color.g.is_some(), current.green, replacement.green),
-        (5, color.b.is_some(), current.blue, replacement.blue),
-        (6, color.a.is_some(), current.alpha, replacement.alpha),
-    ] {
-        if before != after {
-            data = patch_nested_fixed32_field(
-                &data,
-                &[1, field_number],
-                present,
-                Some(after.to_bits()),
-            )?;
-        }
-    }
-    if current.color_space != replacement.color_space {
-        let rgbspace = match replacement.color_space {
-            PagesRgbColorSpace::Srgb => tsp::color::RgbColorSpace::Srgb as u64,
-            PagesRgbColorSpace::DisplayP3 => tsp::color::RgbColorSpace::P3 as u64,
-        };
-        data =
-            patch_nested_varint_field(&data, &[1, 12], color.rgbspace.is_some(), Some(rgbspace))?;
-    }
-    if decode_section_background(&data)? != PagesSectionBackground::Solid(replacement) {
-        return Err(Error::InvalidFormat(
-            "Pages solid section background patch failed validation".to_owned(),
-        ));
-    }
-    Ok(data)
-}
-
 fn discover_structure(
     package: &IWorkPackage,
     body_storage_id: u64,
 ) -> Result<(Vec<PagesSectionInfo>, Vec<HeaderFooterLocation>)> {
-    let document_archive = package.archive("Index/Document.iwa")?;
+    let document_archive = package.archive(DOCUMENT_ARCHIVE_NAME)?;
     let document = document_archive
-        .object(1)
+        .object(DOCUMENT_OBJECT_ID)
         .and_then(|object| {
             object
                 .messages
                 .iter()
-                .find(|message| message.type_ == 10000)
+                .find(|message| message.type_ == DOCUMENT_MESSAGE_TYPE)
         })
         .and_then(|message| DocumentArchive::decode(message.data.as_slice()).ok())
         .ok_or_else(|| {
@@ -3157,7 +2596,10 @@ fn insert_unique<T>(
     Ok(())
 }
 
+mod page_layout;
+mod section_background;
 mod section_content;
+mod section_settings;
 mod types;
 
 #[cfg(test)]

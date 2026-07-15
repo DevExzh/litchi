@@ -9,6 +9,37 @@ use crate::protobuf::tswp::{
 use crate::shapes::{DrawablePoint, DrawableSize};
 
 #[test]
+fn pages_native_discriminants_are_typed_and_lossless() {
+    for (raw, value) in [
+        (0, PagesSectionStart::NextPage),
+        (1, PagesSectionStart::RightPage),
+        (2, PagesSectionStart::LeftPage),
+        (7, PagesSectionStart::Unknown(7)),
+    ] {
+        assert_eq!(PagesSectionStart::from_raw(raw), value);
+        assert_eq!(value.as_raw(), raw);
+    }
+    for (raw, value) in [
+        (0, PagesSectionPageNumbering::ContinueFromPrevious),
+        (1, PagesSectionPageNumbering::Restart),
+        (3, PagesSectionPageNumbering::Unknown(3)),
+    ] {
+        assert_eq!(PagesSectionPageNumbering::from_raw(raw), value);
+        assert_eq!(value.as_raw(), raw);
+    }
+    for (raw, value) in [
+        (0, PagesPageOrientation::Portrait),
+        (1, PagesPageOrientation::Landscape),
+        (9, PagesPageOrientation::Unknown(9)),
+    ] {
+        assert_eq!(PagesPageOrientation::from_raw(raw), value);
+        assert_eq!(value.as_raw(), raw);
+    }
+    assert!(PagesPageNumber::new(0).is_err());
+    assert_eq!(PagesPageNumber::new(42).unwrap().get(), 42);
+}
+
+#[test]
 fn semantic_body_update_and_clear_are_transactional() {
     let mut editor = PagesEditor::from_package(test_package("A🚀B")).unwrap();
     let before = editor.to_bytes().unwrap();
@@ -57,7 +88,7 @@ fn page_layout_crud_preserves_unknown_wire_and_restores_exact_bytes() {
         header_margin: Some(24.0),
         footer_margin: Some(24.0),
         page_scale: Some(1.0),
-        orientation: Some(1),
+        orientation: Some(PagesPageOrientation::Landscape),
         lays_out_body_vertically: Some(false),
     };
     editor.set_page_layout(layout.clone()).unwrap();
@@ -78,6 +109,15 @@ fn page_layout_crud_preserves_unknown_wire_and_restores_exact_bytes() {
             .count(),
         1
     );
+
+    let mut unknown_orientation = layout.clone();
+    unknown_orientation.orientation = Some(PagesPageOrientation::Unknown(9));
+    editor.set_page_layout(unknown_orientation.clone()).unwrap();
+    assert_eq!(editor.page_layout().unwrap(), unknown_orientation);
+    let before_invalid = editor.to_bytes().unwrap();
+    unknown_orientation.orientation = Some(PagesPageOrientation::Unknown(0));
+    assert!(editor.set_page_layout(unknown_orientation).is_err());
+    assert_eq!(editor.to_bytes().unwrap(), before_invalid);
 
     editor
         .set_page_layout(PagesPageLayout::from(
@@ -130,9 +170,9 @@ fn section_settings_crud_is_lossless_validated_and_transactional() {
         inherit_previous_header_footer: Some(true),
         section_template_first_page_different: Some(false),
         section_template_even_odd_pages_different: Some(false),
-        section_start_kind: Some(0),
-        section_page_number_kind: Some(0),
-        section_page_number_start: Some(1),
+        section_start_kind: Some(PagesSectionStart::NextPage.as_raw()),
+        section_page_number_kind: Some(PagesSectionPageNumbering::ContinueFromPrevious.as_raw()),
+        section_page_number_start: Some(PagesPageNumber::new(1).unwrap().get()),
         name: Some("Blank".to_owned()),
         section_template_first_page_hides_header_footer: Some(false),
         background_fill: Some(tsd::FillArchive::default()),
@@ -160,9 +200,9 @@ fn section_settings_crud_is_lossless_validated_and_transactional() {
         inherit_previous_header_footer: Some(true),
         first_page_different: Some(false),
         even_odd_pages_different: Some(false),
-        start_kind: Some(0),
-        page_number_kind: Some(0),
-        page_number_start: Some(1),
+        start: Some(PagesSectionStart::NextPage),
+        page_numbering: Some(PagesSectionPageNumbering::ContinueFromPrevious),
+        starting_page_number: Some(PagesPageNumber::new(1).unwrap()),
         first_page_hides_header_footer: Some(false),
         background_fill_payload: Some(fill_payload),
     };
@@ -178,9 +218,9 @@ fn section_settings_crud_is_lossless_validated_and_transactional() {
     updated.inherit_previous_header_footer = Some(false);
     updated.first_page_different = Some(true);
     updated.even_odd_pages_different = Some(true);
-    updated.start_kind = Some(7);
-    updated.page_number_kind = Some(3);
-    updated.page_number_start = Some(42);
+    updated.start = Some(PagesSectionStart::LeftPage);
+    updated.page_numbering = Some(PagesSectionPageNumbering::Restart);
+    updated.starting_page_number = Some(PagesPageNumber::new(42).unwrap());
     updated.first_page_hides_header_footer = Some(true);
     editor
         .set_section_settings(section_id, updated.clone())
@@ -188,6 +228,10 @@ fn section_settings_crud_is_lossless_validated_and_transactional() {
     assert_eq!(editor.section_settings(section_id).unwrap(), updated);
     let archive = editor.package().archive("Index/Document.iwa").unwrap();
     let section_payload = &archive.object(section_id).unwrap().messages[0].data;
+    let section = SectionArchive::decode(section_payload.as_slice()).unwrap();
+    assert_eq!(section.section_start_kind, Some(2));
+    assert_eq!(section.section_page_number_kind, Some(1));
+    assert_eq!(section.section_page_number_start, Some(42));
     assert!(
         section_payload
             .windows(unknown_section_field.len())
@@ -195,6 +239,27 @@ fn section_settings_crud_is_lossless_validated_and_transactional() {
     );
     let reparsed = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(reparsed.section_settings(section_id).unwrap(), updated);
+
+    updated.start = Some(PagesSectionStart::Unknown(7));
+    updated.page_numbering = Some(PagesSectionPageNumbering::Unknown(3));
+    editor
+        .set_section_settings(section_id, updated.clone())
+        .unwrap();
+    assert_eq!(editor.section_settings(section_id).unwrap(), updated);
+    let section = SectionArchive::decode(
+        editor
+            .package()
+            .archive("Index/Document.iwa")
+            .unwrap()
+            .object(section_id)
+            .unwrap()
+            .messages[0]
+            .data
+            .as_slice(),
+    )
+    .unwrap();
+    assert_eq!(section.section_start_kind, Some(7));
+    assert_eq!(section.section_page_number_kind, Some(3));
 
     editor
         .set_section_settings(section_id, original.clone())
@@ -207,6 +272,14 @@ fn section_settings_crud_is_lossless_validated_and_transactional() {
         },
         PagesSectionSettings {
             background_fill_payload: Some(vec![0xff]),
+            ..original.clone()
+        },
+        PagesSectionSettings {
+            start: Some(PagesSectionStart::Unknown(0)),
+            ..original.clone()
+        },
+        PagesSectionSettings {
+            page_numbering: Some(PagesSectionPageNumbering::Unknown(1)),
             ..original.clone()
         },
     ] {
@@ -236,6 +309,53 @@ fn section_settings_crud_is_lossless_validated_and_transactional() {
             .is_err()
     );
     assert_eq!(malformed.to_bytes().unwrap(), malformed_baseline);
+}
+
+#[test]
+fn section_settings_reject_zero_starting_page_number_transactionally() {
+    let body_id = 42;
+    let section_id = 43;
+    let root = DocumentArchive {
+        body_storage: Some(reference(body_id)),
+        section: Some(reference(section_id)),
+        ..Default::default()
+    };
+    let section = SectionArchive {
+        section_start_kind: Some(PagesSectionStart::NextPage.as_raw()),
+        section_page_number_kind: Some(PagesSectionPageNumbering::Restart.as_raw()),
+        section_page_number_start: Some(0),
+        ..Default::default()
+    };
+    let mut package = IWorkPackage::new();
+    package
+        .replace_archive(
+            "Index/Document.iwa",
+            &Archive {
+                objects: vec![
+                    object(1, 10000, root.encode_to_vec()),
+                    object(
+                        body_id,
+                        2001,
+                        StorageArchive {
+                            text: vec!["Body".to_owned()],
+                            ..Default::default()
+                        }
+                        .encode_to_vec(),
+                    ),
+                    object(section_id, SECTION_MESSAGE_TYPE, section.encode_to_vec()),
+                ],
+            },
+        )
+        .unwrap();
+    let mut editor = PagesEditor::from_package(package).unwrap();
+    let before = editor.to_bytes().unwrap();
+    assert!(editor.section_settings(section_id).is_err());
+    assert!(
+        editor
+            .set_section_settings(section_id, PagesSectionSettings::default())
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), before);
 }
 
 #[test]

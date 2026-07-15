@@ -1,7 +1,18 @@
 //! Public semantic value types used by the Pages editor.
 
+use std::num::NonZeroU32;
+
 use crate::protobuf::tp::DocumentArchive;
 use crate::text::TextStorageInfo;
+use crate::{Error, Result};
+
+const RAW_SECTION_START_NEXT_PAGE: u32 = 0;
+const RAW_SECTION_START_RIGHT_PAGE: u32 = 1;
+const RAW_SECTION_START_LEFT_PAGE: u32 = 2;
+const RAW_PAGE_NUMBERING_CONTINUE: u32 = 0;
+const RAW_PAGE_NUMBERING_RESTART: u32 = 1;
+const RAW_PAGE_ORIENTATION_PORTRAIT: u32 = 0;
+const RAW_PAGE_ORIENTATION_LANDSCAPE: u32 = 1;
 
 /// Which page variant owns a Pages header/footer storage.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -60,20 +71,127 @@ pub struct PagesSectionInfo {
     pub odd_template_id: Option<u64>,
 }
 
+/// Page on which a Pages section begins when facing pages are enabled.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PagesSectionStart {
+    NextPage,
+    RightPage,
+    LeftPage,
+    /// A value written by a newer Pages version.
+    Unknown(u32),
+}
+
+impl PagesSectionStart {
+    /// Decode the lossless protobuf representation.
+    pub const fn from_raw(raw: u32) -> Self {
+        match raw {
+            RAW_SECTION_START_NEXT_PAGE => Self::NextPage,
+            RAW_SECTION_START_RIGHT_PAGE => Self::RightPage,
+            RAW_SECTION_START_LEFT_PAGE => Self::LeftPage,
+            unknown => Self::Unknown(unknown),
+        }
+    }
+
+    /// Return the lossless protobuf representation.
+    pub const fn as_raw(self) -> u32 {
+        match self {
+            Self::NextPage => RAW_SECTION_START_NEXT_PAGE,
+            Self::RightPage => RAW_SECTION_START_RIGHT_PAGE,
+            Self::LeftPage => RAW_SECTION_START_LEFT_PAGE,
+            Self::Unknown(raw) => raw,
+        }
+    }
+
+    pub(super) const fn is_canonical(self) -> bool {
+        match self {
+            Self::Unknown(raw) => matches!(Self::from_raw(raw), Self::Unknown(_)),
+            _ => true,
+        }
+    }
+}
+
+/// Whether a Pages section continues or restarts page numbering.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PagesSectionPageNumbering {
+    ContinueFromPrevious,
+    Restart,
+    /// A value written by a newer Pages version.
+    Unknown(u32),
+}
+
+impl PagesSectionPageNumbering {
+    /// Decode the lossless protobuf representation.
+    pub const fn from_raw(raw: u32) -> Self {
+        match raw {
+            RAW_PAGE_NUMBERING_CONTINUE => Self::ContinueFromPrevious,
+            RAW_PAGE_NUMBERING_RESTART => Self::Restart,
+            unknown => Self::Unknown(unknown),
+        }
+    }
+
+    /// Return the lossless protobuf representation.
+    pub const fn as_raw(self) -> u32 {
+        match self {
+            Self::ContinueFromPrevious => RAW_PAGE_NUMBERING_CONTINUE,
+            Self::Restart => RAW_PAGE_NUMBERING_RESTART,
+            Self::Unknown(raw) => raw,
+        }
+    }
+
+    pub(super) const fn is_canonical(self) -> bool {
+        match self {
+            Self::Unknown(raw) => matches!(Self::from_raw(raw), Self::Unknown(_)),
+            _ => true,
+        }
+    }
+}
+
+/// A validated, non-zero Pages page number.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct PagesPageNumber(NonZeroU32);
+
+impl PagesPageNumber {
+    /// Validate and construct a page number.
+    pub fn new(value: u32) -> Result<Self> {
+        NonZeroU32::new(value).map(Self).ok_or_else(|| {
+            Error::ParseError("Pages page numbers must be greater than zero".to_owned())
+        })
+    }
+
+    /// Return the numeric page number.
+    pub const fn get(self) -> u32 {
+        self.0.get()
+    }
+}
+
+impl TryFrom<u32> for PagesPageNumber {
+    type Error = Error;
+
+    fn try_from(value: u32) -> Result<Self> {
+        Self::new(value)
+    }
+}
+
+impl From<PagesPageNumber> for u32 {
+    fn from(value: PagesPageNumber) -> Self {
+        value.get()
+    }
+}
+
 /// Writable settings stored directly on a Pages section.
 ///
-/// Numeric kinds remain raw so newer iWork values can round-trip without an
-/// artificial enum rejecting them. `background_fill_payload`, when present,
-/// is the exact encoded `TSD.FillArchive` payload.
+/// Unknown native discriminants remain lossless through their typed `Unknown`
+/// variants. `background_fill_payload`, when present, is the exact encoded
+/// `TSD.FillArchive` payload.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct PagesSectionSettings {
     pub name: Option<String>,
     pub inherit_previous_header_footer: Option<bool>,
     pub first_page_different: Option<bool>,
     pub even_odd_pages_different: Option<bool>,
-    pub start_kind: Option<u32>,
-    pub page_number_kind: Option<u32>,
-    pub page_number_start: Option<u32>,
+    pub start: Option<PagesSectionStart>,
+    pub page_numbering: Option<PagesSectionPageNumbering>,
+    pub starting_page_number: Option<PagesPageNumber>,
     pub first_page_hides_header_footer: Option<bool>,
     pub background_fill_payload: Option<Vec<u8>>,
 }
@@ -106,6 +224,42 @@ pub enum PagesSectionBackground {
     Opaque(Vec<u8>),
 }
 
+/// Physical orientation of a Pages document.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PagesPageOrientation {
+    Portrait,
+    Landscape,
+    /// A value written by a newer Pages version.
+    Unknown(u32),
+}
+
+impl PagesPageOrientation {
+    /// Decode the lossless protobuf representation.
+    pub const fn from_raw(raw: u32) -> Self {
+        match raw {
+            RAW_PAGE_ORIENTATION_PORTRAIT => Self::Portrait,
+            RAW_PAGE_ORIENTATION_LANDSCAPE => Self::Landscape,
+            unknown => Self::Unknown(unknown),
+        }
+    }
+
+    /// Return the lossless protobuf representation.
+    pub const fn as_raw(self) -> u32 {
+        match self {
+            Self::Portrait => RAW_PAGE_ORIENTATION_PORTRAIT,
+            Self::Landscape => RAW_PAGE_ORIENTATION_LANDSCAPE,
+            Self::Unknown(raw) => raw,
+        }
+    }
+
+    pub(super) const fn is_canonical(self) -> bool {
+        match self {
+            Self::Unknown(raw) => matches!(Self::from_raw(raw), Self::Unknown(_)),
+            _ => true,
+        }
+    }
+}
+
 /// Writable page geometry stored on the Pages document root.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PagesPageLayout {
@@ -118,8 +272,7 @@ pub struct PagesPageLayout {
     pub header_margin: Option<f32>,
     pub footer_margin: Option<f32>,
     pub page_scale: Option<f32>,
-    /// Raw Pages orientation value; `0` is the default used by portrait files.
-    pub orientation: Option<u32>,
+    pub orientation: Option<PagesPageOrientation>,
     pub lays_out_body_vertically: Option<bool>,
 }
 
@@ -135,7 +288,7 @@ impl From<&DocumentArchive> for PagesPageLayout {
             header_margin: document.header_margin,
             footer_margin: document.footer_margin,
             page_scale: document.page_scale,
-            orientation: document.orientation,
+            orientation: document.orientation.map(PagesPageOrientation::from_raw),
             lays_out_body_vertically: document.lays_out_body_vertically,
         }
     }

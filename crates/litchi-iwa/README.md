@@ -189,6 +189,13 @@ pages.set_section_name(section_id, Some("Executive summary"))?;
 let mut section_settings = pages.section_settings(section_id)?;
 section_settings.inherit_previous_header_footer = Some(false);
 section_settings.first_page_hides_header_footer = Some(true);
+section_settings.start = Some(litchi_iwa::pages::PagesSectionStart::NextPage);
+section_settings.page_numbering = Some(
+    litchi_iwa::pages::PagesSectionPageNumbering::Restart,
+);
+section_settings.starting_page_number = Some(
+    litchi_iwa::pages::PagesPageNumber::new(3)?,
+);
 pages.set_section_settings(section_id, section_settings)?;
 pages.set_section_background(
     section_id,
@@ -206,6 +213,7 @@ let appended = pages.append_section(section_id, "Appendix")?;
 pages.remove_section(appended.object_id)?;
 let mut layout = pages.page_layout()?;
 layout.top_margin = Some(54.0);
+layout.orientation = Some(litchi_iwa::pages::PagesPageOrientation::Portrait);
 pages.set_page_layout(layout)?;
 if let Some(text_box) = pages.drawable_text_storages()?.first() {
     pages.set_drawable_text(text_box.drawable_object_id, "Updated text box")?;
@@ -488,7 +496,11 @@ Pages page dimensions, margins, scale, orientation, and vertical-layout flags
 are also patched directly in the protobuf wire stream. Unknown Apple fields
 retain their original bytes and positions; duplicate singular fields, wrong
 wire types, and truncated payloads fail transactionally instead of being
-normalized by a decode/re-encode cycle.
+normalized by a decode/re-encode cycle. Page orientation, facing-page section
+starts, and continue/restart numbering behavior use lossless enums; future
+native values remain available as typed `Unknown` variants. Starting page
+numbers use a validated non-zero type. See `edit_pages_layout` and
+`edit_pages_section_pagination`.
 Reachable `TP.PlaceholderArchive` and `TSWP.ShapeInfoArchive` drawables expose
 their owned text storages in stable object order. Text-box content supports
 UTF-16 range replacement, whole-value update, and clear operations; detached
