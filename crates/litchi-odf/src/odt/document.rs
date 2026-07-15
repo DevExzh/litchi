@@ -8,6 +8,7 @@ use litchi_core::{Error, Metadata, Result};
 use std::path::Path;
 
 use super::header_footer::{MasterPage, parse_master_pages};
+use super::page_layout::{PageLayout, parse_page_layouts};
 
 /// An OpenDocument text document (.odt).
 ///
@@ -388,6 +389,14 @@ impl Document {
         self.styles.as_ref().map_or_else(
             || Ok(Vec::new()),
             |styles| parse_master_pages(styles.xml_content()),
+        )
+    }
+
+    /// Parse automatic page layouts, their properties, and header/footer styles.
+    pub fn page_layouts(&self) -> Result<Vec<PageLayout>> {
+        self.styles.as_ref().map_or_else(
+            || Ok(Vec::new()),
+            |styles| parse_page_layouts(styles.xml_content()),
         )
     }
 

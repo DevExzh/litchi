@@ -278,6 +278,7 @@ pub use ods::{
 };
 pub use odt::{
     Document, DocumentBuilder, HeaderFooter, HeaderFooterKind, MasterPage, MutableDocument,
+    PageLayout, PageLayoutAttribute, PageLayoutProperties, PageUsage,
 };
 
 // Re-export shapes for presentations

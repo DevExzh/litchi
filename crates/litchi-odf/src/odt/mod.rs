@@ -53,12 +53,14 @@ mod builder;
 mod document;
 mod header_footer;
 mod mutable;
+mod page_layout;
 mod parser;
 
 pub use builder::DocumentBuilder;
 pub use document::Document;
 pub use header_footer::{HeaderFooter, HeaderFooterKind, MasterPage};
 pub use mutable::MutableDocument;
+pub use page_layout::{PageLayout, PageLayoutAttribute, PageLayoutProperties, PageUsage};
 
 // Re-export ODT-specific types for external use
 #[allow(unused_imports)] // Library public API
