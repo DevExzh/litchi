@@ -82,7 +82,7 @@ use super::revisions::{DisplayFieldRevision, FormattingRevision, NumberingRevisi
 use crate::doc::CommentDateTime;
 use crate::doc::parts::pap::{
     Border as ParagraphBorder, BorderStyle as ParagraphBorderStyle, Borders as ParagraphBorders,
-    Shading as ParagraphShading, TextBoxTightWrap,
+    FontAlignment, FrameTextFlow, Shading as ParagraphShading, TextBoxTightWrap,
 };
 use crate::sprm_operations::*;
 use litchi_cfb::writer::OleWriter;
@@ -357,6 +357,24 @@ pub struct ParagraphFormatting {
     pub open_table_cell_mark: Option<bool>,
     /// Widow/orphan control
     pub widow_control: Option<bool>,
+    /// Lock the paragraph frame anchor
+    pub frame_anchor_locked: Option<bool>,
+    /// Use East Asian line-breaking rules
+    pub kinsoku: Option<bool>,
+    /// Prefer word-level wrapping
+    pub word_wrap: Option<bool>,
+    /// Permit punctuation to overflow the line extent
+    pub overflow_punctuation: Option<bool>,
+    /// Compress punctuation at the beginning of a line
+    pub top_line_punctuation: Option<bool>,
+    /// Automatically space East Asian and Latin text
+    pub auto_space_east_asian_latin: Option<bool>,
+    /// Automatically space East Asian text and numbers
+    pub auto_space_east_asian_numbers: Option<bool>,
+    /// Vertical character alignment within a line
+    pub font_alignment: Option<FontAlignment>,
+    /// Direction and glyph rotation of text in a frame
+    pub frame_text_flow: Option<FrameTextFlow>,
     /// Keep the paragraph on one page
     pub keep: Option<bool>,
     /// Keep the paragraph with the next paragraph
@@ -3447,6 +3465,28 @@ fn build_papx_grpprl(fmt: &ParagraphFormatting) -> Vec<u8> {
     if let Some(wc) = fmt.widow_control {
         push_bool(&mut grp, SPRM_P_F_WIDOW_CONTROL, wc);
     }
+    for (opcode, value) in [
+        (SPRM_P_F_LOCKED, fmt.frame_anchor_locked),
+        (SPRM_P_F_KINSOKU, fmt.kinsoku),
+        (SPRM_P_F_WORD_WRAP, fmt.word_wrap),
+        (SPRM_P_F_OVERFLOW_PUNCT, fmt.overflow_punctuation),
+        (SPRM_P_F_TOP_LINE_PUNCT, fmt.top_line_punctuation),
+        (SPRM_P_F_AUTO_SPACE_DE, fmt.auto_space_east_asian_latin),
+        (SPRM_P_F_AUTO_SPACE_DN, fmt.auto_space_east_asian_numbers),
+    ] {
+        if let Some(value) = value {
+            push_bool(&mut grp, opcode, value);
+        }
+    }
+    if let Some(alignment) = fmt.font_alignment {
+        push_u16(&mut grp, SPRM_P_W_ALIGN_FONT, alignment as u16);
+    }
+    if let Some(flow) = fmt.frame_text_flow {
+        let value = u16::from(flow.vertical)
+            | (u16::from(flow.backwards) << 1)
+            | (u16::from(flow.rotate_font) << 2);
+        push_u16(&mut grp, SPRM_P_FRAME_TEXT_FLOW, value);
+    }
 
     // BiDi paragraph
     if let Some(bidi) = fmt.bidi {
@@ -3583,6 +3623,14 @@ fn build_revision_papx_grpprl(
         return Err(DocWriteError::InvalidData(format!(
             "DOC paragraph outline level {outline_level} is outside 0..=9"
         )));
+    }
+    if let Some(flow) = fmt.frame_text_flow
+        && flow.backwards
+        && !flow.vertical
+    {
+        return Err(DocWriteError::InvalidData(
+            "DOC backwards frame text flow requires vertical flow".to_string(),
+        ));
     }
     for (name, value) in [
         ("space_before_lines", fmt.space_before_lines),
@@ -4294,6 +4342,19 @@ mod tests {
                     space_before_auto: Some(true),
                     space_after_auto: Some(true),
                     open_table_cell_mark: Some(true),
+                    frame_anchor_locked: Some(true),
+                    kinsoku: Some(true),
+                    word_wrap: Some(false),
+                    overflow_punctuation: Some(true),
+                    top_line_punctuation: Some(true),
+                    auto_space_east_asian_latin: Some(true),
+                    auto_space_east_asian_numbers: Some(false),
+                    font_alignment: Some(FontAlignment::Bottom),
+                    frame_text_flow: Some(FrameTextFlow {
+                        vertical: true,
+                        backwards: true,
+                        rotate_font: false,
+                    }),
                     use_page_setup_settings: Some(true),
                     adjust_right_indent: Some(false),
                     no_allow_overlap: Some(true),
@@ -4373,6 +4434,25 @@ mod tests {
         assert!(paragraphs[0].properties().space_before_auto);
         assert!(paragraphs[0].properties().space_after_auto);
         assert!(paragraphs[0].properties().open_table_cell_mark);
+        assert!(paragraphs[0].properties().locked);
+        assert!(paragraphs[0].properties().kinsoku);
+        assert!(!paragraphs[0].properties().word_wrap);
+        assert!(paragraphs[0].properties().overflow_punct);
+        assert!(paragraphs[0].properties().top_line_punct);
+        assert!(paragraphs[0].properties().auto_space_de);
+        assert!(!paragraphs[0].properties().auto_space_dn);
+        assert_eq!(
+            paragraphs[0].properties().font_align,
+            Some(FontAlignment::Bottom)
+        );
+        assert_eq!(
+            paragraphs[0].properties().frame_text_flow,
+            Some(FrameTextFlow {
+                vertical: true,
+                backwards: true,
+                rotate_font: false,
+            })
+        );
         assert_eq!(
             paragraphs[0].properties().use_page_setup_settings,
             Some(true)
@@ -4441,6 +4521,14 @@ mod tests {
             },
             ParagraphFormatting {
                 outline_level: Some(10),
+                ..ParagraphFormatting::default()
+            },
+            ParagraphFormatting {
+                frame_text_flow: Some(FrameTextFlow {
+                    vertical: false,
+                    backwards: true,
+                    rotate_font: false,
+                }),
                 ..ParagraphFormatting::default()
             },
             ParagraphFormatting {

@@ -125,10 +125,10 @@ pub struct ParagraphProperties {
     pub auto_space_de: bool,
     /// Auto space DN (Asian)
     pub auto_space_dn: bool,
-    /// Font alignment
-    pub font_align: Option<u16>,
+    /// Vertical font alignment
+    pub font_align: Option<FontAlignment>,
     /// Frame text flow
-    pub frame_text_flow: Option<u16>,
+    pub frame_text_flow: Option<FrameTextFlow>,
     /// Absolute horizontal position (for positioned paragraphs)
     pub dxa_abs: Option<i16>,
     /// Absolute vertical position
@@ -232,6 +232,40 @@ impl TryFrom<u8> for Justification {
             invalid => Err(invalid),
         }
     }
+}
+
+/// Vertical alignment of characters within a line.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u16)]
+pub enum FontAlignment {
+    Top = 0,
+    Center = 1,
+    Baseline = 2,
+    Bottom = 3,
+    Auto = 4,
+}
+
+impl TryFrom<u16> for FontAlignment {
+    type Error = u16;
+
+    fn try_from(value: u16) -> std::result::Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Self::Top),
+            1 => Ok(Self::Center),
+            2 => Ok(Self::Baseline),
+            3 => Ok(Self::Bottom),
+            4 => Ok(Self::Auto),
+            invalid => Err(invalid),
+        }
+    }
+}
+
+/// Direction and glyph rotation used by text in a paragraph frame.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct FrameTextFlow {
+    pub vertical: bool,
+    pub backwards: bool,
+    pub rotate_font: bool,
 }
 
 /// Line spacing type.
@@ -974,63 +1008,61 @@ impl ParagraphProperties {
             },
             // Operation 0x30: sprmPFLocked - Locked paragraph
             0x30 => {
-                if let Some(val) = sprm.operand_byte() {
-                    pap.locked = val != 0;
-                }
+                pap.locked = Self::strict_bool8(sprm, "sprmPFLocked")?;
             },
             // Operation 0x31: sprmPFWidowControl - Widow/orphan control
             0x31 => {
-                if let Some(val) = sprm.operand_byte() {
-                    pap.widow_control = val != 0;
-                }
+                pap.widow_control = Self::strict_bool8(sprm, "sprmPFWidowControl")?;
             },
             // Operation 0x33: sprmPFKinsoku - Kinsoku
             0x33 => {
-                if let Some(val) = sprm.operand_byte() {
-                    pap.kinsoku = val != 0;
-                }
+                pap.kinsoku = Self::strict_bool8(sprm, "sprmPFKinsoku")?;
             },
             // Operation 0x34: sprmPFWordWrap - Word wrap
             0x34 => {
-                if let Some(val) = sprm.operand_byte() {
-                    pap.word_wrap = val != 0;
-                }
+                pap.word_wrap = Self::strict_bool8(sprm, "sprmPFWordWrap")?;
             },
             // Operation 0x35: sprmPFOverflowPunct - Overflow punctuation
             0x35 => {
-                if let Some(val) = sprm.operand_byte() {
-                    pap.overflow_punct = val != 0;
-                }
+                pap.overflow_punct = Self::strict_bool8(sprm, "sprmPFOverflowPunct")?;
             },
             // Operation 0x36: sprmPFTopLinePunct - Top line punctuation
             0x36 => {
-                if let Some(val) = sprm.operand_byte() {
-                    pap.top_line_punct = val != 0;
-                }
+                pap.top_line_punct = Self::strict_bool8(sprm, "sprmPFTopLinePunct")?;
             },
             // Operation 0x37: sprmPFAutoSpaceDE - Auto space DE
             0x37 => {
-                if let Some(val) = sprm.operand_byte() {
-                    pap.auto_space_de = val != 0;
-                }
+                pap.auto_space_de = Self::strict_bool8(sprm, "sprmPFAutoSpaceDE")?;
             },
             // Operation 0x38: sprmPFAutoSpaceDN - Auto space DN
             0x38 => {
-                if let Some(val) = sprm.operand_byte() {
-                    pap.auto_space_dn = val != 0;
-                }
+                pap.auto_space_dn = Self::strict_bool8(sprm, "sprmPFAutoSpaceDN")?;
             },
             // Operation 0x39: sprmPWAlignFont - Font alignment
             0x39 => {
-                if let Some(val) = sprm.operand_word() {
-                    pap.font_align = Some(val);
-                }
+                let value = sprm.operand_word().ok_or_else(|| {
+                    DocError::Corrupted("sprmPWAlignFont is missing its alignment".to_string())
+                })?;
+                pap.font_align = Some(FontAlignment::try_from(value).map_err(|invalid| {
+                    DocError::Corrupted(format!("sprmPWAlignFont has invalid alignment {invalid}"))
+                })?);
             },
             // Operation 0x3A: sprmPFrameTextFlow - Frame text flow
             0x3A => {
-                if let Some(val) = sprm.operand_word() {
-                    pap.frame_text_flow = Some(val);
+                let value = sprm.operand_word().ok_or_else(|| {
+                    DocError::Corrupted("sprmPFrameTextFlow is missing its flags".to_string())
+                })?;
+                let flow = FrameTextFlow {
+                    vertical: value & 1 != 0,
+                    backwards: value & 2 != 0,
+                    rotate_font: value & 4 != 0,
+                };
+                if flow.backwards && !flow.vertical {
+                    return Err(DocError::Corrupted(
+                        "sprmPFrameTextFlow backwards flow requires vertical flow".to_string(),
+                    ));
                 }
+                pap.frame_text_flow = Some(flow);
             },
             // Operation 0x3B: sprmPISnapBaseLine - Snap to baseline
             0x3B => {
@@ -1977,6 +2009,66 @@ mod tests {
         assert!(
             ParagraphProperties::from_sprm(
                 &[SPRM_P_F_BI_DI.to_le_bytes().as_slice(), &[2]].concat()
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn parses_asian_and_frame_controls_strictly() {
+        let mut grpprl = Vec::new();
+        for opcode in [
+            SPRM_P_F_LOCKED,
+            SPRM_P_F_WIDOW_CONTROL,
+            SPRM_P_F_KINSOKU,
+            SPRM_P_F_WORD_WRAP,
+            SPRM_P_F_OVERFLOW_PUNCT,
+            SPRM_P_F_TOP_LINE_PUNCT,
+            SPRM_P_F_AUTO_SPACE_DE,
+            SPRM_P_F_AUTO_SPACE_DN,
+        ] {
+            grpprl.extend_from_slice(&opcode.to_le_bytes());
+            grpprl.push(1);
+        }
+        grpprl.extend_from_slice(&SPRM_P_W_ALIGN_FONT.to_le_bytes());
+        grpprl.extend_from_slice(&4u16.to_le_bytes());
+        grpprl.extend_from_slice(&SPRM_P_FRAME_TEXT_FLOW.to_le_bytes());
+        grpprl.extend_from_slice(&7u16.to_le_bytes());
+
+        let properties = ParagraphProperties::from_sprm(&grpprl).unwrap();
+        assert!(properties.locked);
+        assert!(properties.widow_control);
+        assert!(properties.kinsoku);
+        assert!(properties.word_wrap);
+        assert!(properties.overflow_punct);
+        assert!(properties.top_line_punct);
+        assert!(properties.auto_space_de);
+        assert!(properties.auto_space_dn);
+        assert_eq!(properties.font_align, Some(FontAlignment::Auto));
+        assert_eq!(
+            properties.frame_text_flow,
+            Some(FrameTextFlow {
+                vertical: true,
+                backwards: true,
+                rotate_font: true,
+            })
+        );
+
+        for opcode in [SPRM_P_F_LOCKED, SPRM_P_F_AUTO_SPACE_DN] {
+            assert!(
+                ParagraphProperties::from_sprm(&[opcode.to_le_bytes().as_slice(), &[2]].concat())
+                    .is_err()
+            );
+        }
+        assert!(
+            ParagraphProperties::from_sprm(
+                &[SPRM_P_W_ALIGN_FONT.to_le_bytes(), 5u16.to_le_bytes()].concat()
+            )
+            .is_err()
+        );
+        assert!(
+            ParagraphProperties::from_sprm(
+                &[SPRM_P_FRAME_TEXT_FLOW.to_le_bytes(), 2u16.to_le_bytes()].concat()
             )
             .is_err()
         );

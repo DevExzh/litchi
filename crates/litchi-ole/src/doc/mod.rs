@@ -87,8 +87,8 @@ pub use shapes::DocShape;
 pub use table::{Cell, Row, Table};
 pub use writer::{
     BookmarkEntry, CharacterFormatting, CommentEntry, DisplayFieldRevision, DocWriteError,
-    DocWriter, FormattingRevision, LineSpacing, NumberingRevision, ParagraphBorder,
-    ParagraphBorderStyle, ParagraphBorders, ParagraphFormatting, ParagraphShading,
+    DocWriter, FontAlignment, FormattingRevision, FrameTextFlow, LineSpacing, NumberingRevision,
+    ParagraphBorder, ParagraphBorderStyle, ParagraphBorders, ParagraphFormatting, ParagraphShading,
     TextBoxTightWrap, TextRevision,
 };
 
