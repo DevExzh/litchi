@@ -5,7 +5,7 @@ use super::super::consts::PptRecordType;
 /// provides proper text extraction with formatting from PPT files.
 use super::package::Result;
 use super::records::PptRecord;
-use litchi_core::binary::{parse_utf16le_string, parse_windows1252_string_len};
+use super::text::extractor::{decode_text_bytes, from_utf16le_lossy};
 
 /// Text formatting properties for a text run.
 ///
@@ -197,18 +197,18 @@ impl TextRunExtractor {
         match record.record_type {
             PptRecordType::TextCharsAtom => {
                 // UTF-16LE text
-                let text = parse_utf16le_string(&record.data);
+                let text = from_utf16le_lossy(&record.data);
                 if !text.is_empty() {
-                    let start_index = self.text.len();
+                    let start_index = self.text.chars().count();
                     self.text.push_str(&text);
                     self.runs.push(TextRun::new(text, start_index));
                 }
             },
             PptRecordType::TextBytesAtom => {
-                // Windows-1252 text
-                let text = parse_windows1252_string_len(&record.data, 0, record.data.len());
+                // Low bytes of UTF-16 characters
+                let text = decode_text_bytes(&record.data);
                 if !text.is_empty() {
-                    let start_index = self.text.len();
+                    let start_index = self.text.chars().count();
                     self.text.push_str(&text);
                     self.runs.push(TextRun::new(text, start_index));
                 }
@@ -335,5 +335,38 @@ mod tests {
         extractor.extract_from_records(&[record]).unwrap();
         assert_eq!(extractor.text(), "Hello");
         assert_eq!(extractor.run_count(), 1);
+    }
+
+    #[test]
+    fn text_run_extractor_uses_ppt_unicode_encodings_and_character_offsets() {
+        let unicode_record = PptRecord {
+            record_type: PptRecordType::TextCharsAtom,
+            record_type_raw: 4000,
+            version: 0,
+            instance: 0,
+            data_length: 4,
+            data: vec![0x3D, 0xD8, 0x00, 0xDE],
+            children: Vec::new(),
+        };
+        let byte_record = PptRecord {
+            record_type: PptRecordType::TextBytesAtom,
+            record_type_raw: 4008,
+            version: 0,
+            instance: 0,
+            data_length: 2,
+            data: vec![0x80, 0xE9],
+            children: Vec::new(),
+        };
+        let mut extractor = TextRunExtractor::new();
+
+        extractor
+            .extract_from_records(&[unicode_record, byte_record])
+            .unwrap();
+
+        assert_eq!(extractor.text(), "😀\u{80}é");
+        assert_eq!(extractor.runs()[0].start_index, 0);
+        assert_eq!(extractor.runs()[0].length, 1);
+        assert_eq!(extractor.runs()[1].start_index, 1);
+        assert_eq!(extractor.runs()[1].length, 2);
     }
 }

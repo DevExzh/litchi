@@ -4,48 +4,6 @@
 //! including TextCharsAtom (UTF-16LE), TextBytesAtom (ISO-8859-1), and CString.
 
 use crate::ppt::package::Result;
-use zerocopy::{
-    FromBytes,
-    byteorder::{LittleEndian, U16},
-};
-
-/// Actions for processing UTF-16LE text characters.
-#[derive(Debug, Clone, Copy)]
-pub(crate) enum TextCharAction {
-    /// Add the character to the result
-    Add(char),
-    /// Stop processing (null terminator found)
-    Stop,
-    /// Skip this character (invalid)
-    Skip,
-}
-
-impl TextCharAction {
-    /// Process a UTF-16LE code unit and determine the appropriate action.
-    pub(crate) fn process_utf16_char(code_unit: u16) -> Self {
-        match code_unit {
-            // Null terminator - stop processing
-            0 => TextCharAction::Stop,
-            // ASCII range (0x00-0x7F) - add as character
-            0x01..=0x7F => {
-                if let Some(ch) = char::from_u32(code_unit as u32) {
-                    TextCharAction::Add(ch)
-                } else {
-                    TextCharAction::Skip
-                }
-            },
-            // Unicode range (0x80 and above) - try to decode as Unicode
-            0x80.. => {
-                if let Some(ch) = char::from_u32(code_unit as u32) {
-                    TextCharAction::Add(ch)
-                } else {
-                    TextCharAction::Skip
-                }
-            },
-        }
-    }
-}
-
 /// Parse TextCharsAtom record (UTF-16LE text content).
 /// Based on POI's TextCharsAtom.getText() method.
 pub fn parse_text_chars_atom(data: &[u8]) -> Result<String> {
@@ -58,10 +16,7 @@ pub fn parse_text_chars_atom(data: &[u8]) -> Result<String> {
     let text = from_utf16le_lossy(data);
 
     // POI strips the trailing return character and null terminator if present
-    let text = text
-        .trim_end_matches('\r')
-        .trim_end_matches('\u{0}')
-        .to_string();
+    let text = text.trim_end_matches(['\r', '\u{0}']).to_string();
 
     Ok(text)
 }
@@ -74,29 +29,17 @@ pub fn from_utf16le_lossy(bytes: &[u8]) -> String {
         return String::new();
     }
 
-    // Pre-calculate capacity for the result string
-    let estimated_chars = bytes.len() / 2;
-    let mut result = String::with_capacity(estimated_chars);
+    let code_units = bytes
+        .chunks_exact(2)
+        .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+        .take_while(|&code_unit| code_unit != 0)
+        .collect::<Vec<_>>();
+    String::from_utf16_lossy(&code_units)
+}
 
-    // Process in chunks of 2 bytes for better performance
-    let mut i = 0;
-    while i + 1 < bytes.len() {
-        let code_unit = U16::<LittleEndian>::read_from_bytes(&bytes[i..i + 2])
-            .map(|v| v.get())
-            .unwrap_or(0);
-        i += 2;
-
-        // Use match expression for cleaner character processing
-        match TextCharAction::process_utf16_char(code_unit) {
-            TextCharAction::Add(ch) => result.push(ch),
-            TextCharAction::Stop => break,
-            TextCharAction::Skip => continue,
-        }
-    }
-
-    // Shrink to fit if we over-allocated
-    result.shrink_to_fit();
-    result
+/// Decode the low bytes of UTF-16 characters stored by `TextBytesAtom`.
+pub(crate) fn decode_text_bytes(data: &[u8]) -> String {
+    data.iter().map(|&byte| char::from(byte)).collect()
 }
 
 /// Parse TextBytesAtom record (byte text content).
@@ -106,15 +49,11 @@ pub fn parse_text_bytes_atom(data: &[u8]) -> Result<String> {
         return Ok(String::new());
     }
 
-    // TextBytesAtom contains text in "compressed unicode" format (ISO-8859-1)
-    // This follows POI's StringUtil.getFromCompressedUnicode logic
-    let text = data.iter().map(|&b| b as char).collect::<String>();
+    // Each byte is the low byte of a UTF-16 character whose high byte is zero.
+    let text = decode_text_bytes(data);
 
     // POI strips the trailing return character and null terminator if present
-    let text = text
-        .trim_end_matches('\r')
-        .trim_end_matches('\u{0}')
-        .to_string();
+    let text = text.trim_end_matches(['\r', '\u{0}']).to_string();
 
     Ok(text)
 }
@@ -167,10 +106,24 @@ mod tests {
     }
 
     #[test]
+    fn text_chars_atom_decodes_utf16_surrogate_pairs() {
+        let text = parse_text_chars_atom(&[0x3D, 0xD8, 0x00, 0xDE, b'A', 0]).unwrap();
+
+        assert_eq!(text, "😀A");
+    }
+
+    #[test]
     fn test_text_bytes_atom_parsing() {
         let text_data = b"Hello World";
         let text = parse_text_bytes_atom(text_data).unwrap();
         assert_eq!(text, "Hello World");
+    }
+
+    #[test]
+    fn text_bytes_atom_maps_bytes_directly_to_unicode() {
+        let text = parse_text_bytes_atom(&[0x80, 0x91, 0xE9]).unwrap();
+
+        assert_eq!(text, "\u{80}\u{91}é");
     }
 
     #[test]
