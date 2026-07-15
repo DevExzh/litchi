@@ -388,6 +388,18 @@ pub(crate) fn apply_table_cell_styles(rows: &mut [Row]) {
                                 .filter(|format| format.condition == condition)
                             {
                                 overlay_style_defaults(&mut style, conditional.properties);
+                                if row_index + 1 < properties.len()
+                                    && conditional.properties.border_inside_horizontal.is_some()
+                                {
+                                    style.border_bottom =
+                                        conditional.properties.border_inside_horizontal;
+                                }
+                                if logical_index + 1 < row.cell_count
+                                    && conditional.properties.border_inside_vertical.is_some()
+                                {
+                                    style.border_right =
+                                        conditional.properties.border_inside_vertical;
+                                }
                             }
                         }
                         style.horizontal_band_size = None;
@@ -616,6 +628,8 @@ mod tests {
                 condition: TableStyleCondition::HeaderRow,
                 properties: TableStyleDefaults {
                     padding_left: Some(24),
+                    border_inside_horizontal: Some(TableStyleBorder::Border(border(4))),
+                    border_inside_vertical: Some(TableStyleBorder::Border(border(5))),
                     shading: Some(TableStyleShading::Shading(shading((255, 0, 0)))),
                     ..TableStyleDefaults::default()
                 },
@@ -661,14 +675,16 @@ mod tests {
         assert_eq!(first.padding_left, Some(24));
         assert_eq!(first.background_color, Some((255, 0, 0)));
         assert_eq!(first.borders.top.unwrap().width, 9);
-        assert_eq!(first.borders.bottom.unwrap().width, 3);
+        assert_eq!(first.borders.bottom.unwrap().width, 4);
+        assert_eq!(first.borders.right.unwrap().width, 5);
 
         let top_second = rows[0].cells[1].properties.as_ref().unwrap();
         assert!(top_second.no_wrap);
         assert_eq!(top_second.padding_top, Some(12));
         assert_eq!(top_second.background_color, Some((255, 0, 0)));
         assert_eq!(top_second.borders.top.unwrap().width, 1);
-        assert_eq!(top_second.borders.bottom.unwrap().width, 3);
+        assert_eq!(top_second.borders.bottom.unwrap().width, 4);
+        assert!(top_second.borders.right.is_none());
 
         let bottom = rows[1].cells[0].properties.as_ref().unwrap();
         assert_eq!(bottom.background_color, Some((0, 0, 255)));
