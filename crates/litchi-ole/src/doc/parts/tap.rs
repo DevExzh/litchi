@@ -114,8 +114,12 @@ pub struct TableProperties {
     pub cell_boundaries: Vec<i16>,
     /// Cell properties for each cell
     pub cell_properties: Vec<CellProperties>,
-    /// Table justification (alignment)
+    /// Resolved logical table justification
     pub justification: TableJustification,
+    /// Legacy physical justification source, if explicitly specified
+    pub legacy_physical_justification: Option<TableJustification>,
+    /// Modern logical justification source, if explicitly specified
+    pub modern_logical_justification: Option<TableJustification>,
     /// Half the width of spacing between cells (dxaGapHalf)
     pub gap_half: i16,
     /// Table indent from left margin (twips)
@@ -510,6 +514,8 @@ impl Default for TableProperties {
             cell_boundaries: Vec::new(),
             cell_properties: Vec::new(),
             justification: TableJustification::Left,
+            legacy_physical_justification: None,
+            modern_logical_justification: None,
             gap_half: 0,
             indent_left: 0,
             preferred_width: None,

@@ -7,9 +7,9 @@
 use super::sprm::SprmBuilder;
 use crate::doc::parts::tap::{
     BorderStyle, BorderType, CellBorderTypes, CellBorders, CellShading, CellSpacing,
-    CellSpacingSource, TableHorizontalAnchor, TableHorizontalPosition, TableLook, TablePositioning,
-    TableVerticalAnchor, TableVerticalPosition, TableWidth, TextDirection, VerticalAlignment,
-    VerticalMergeStatus, WidthType,
+    CellSpacingSource, TableHorizontalAnchor, TableHorizontalPosition, TableJustification,
+    TableLook, TablePositioning, TableVerticalAnchor, TableVerticalPosition, TableWidth,
+    TextDirection, VerticalAlignment, VerticalMergeStatus, WidthType,
 };
 
 /// Error returned when table row properties cannot be represented in DOC TAP.
@@ -158,6 +158,8 @@ pub struct TableRow {
     pub is_header: bool,
     /// Whether the row may split across page breaks
     pub allow_break: bool,
+    /// Logical table justification
+    pub justification: TableJustification,
     /// Preferred total table width
     pub preferred_width: Option<TableWidth>,
     /// Automatically resize columns to fit table contents
@@ -206,6 +208,7 @@ impl Default for TableRow {
             height: 0,
             is_header: false,
             allow_break: true,
+            justification: TableJustification::Left,
             preferred_width: None,
             auto_fit: false,
             width_before: None,
@@ -333,6 +336,26 @@ fn encode_positioning(positioning: TablePositioning) -> u8 {
         TableHorizontalAnchor::None => 3,
     };
     (vertical << 4) | (horizontal << 6)
+}
+
+fn justification_code(justification: TableJustification) -> u16 {
+    match justification {
+        TableJustification::Left => 0,
+        TableJustification::Center => 1,
+        TableJustification::Right => 2,
+    }
+}
+
+fn physical_justification(logical: TableJustification, right_to_left: bool) -> TableJustification {
+    if right_to_left {
+        match logical {
+            TableJustification::Left => TableJustification::Right,
+            TableJustification::Center => TableJustification::Center,
+            TableJustification::Right => TableJustification::Left,
+        }
+    } else {
+        logical
+    }
 }
 
 /// TAP (Table Properties) builder
@@ -476,6 +499,13 @@ pub(crate) fn generate_row_sprms(row: &TableRow) -> Result<Vec<u8>, TapBuildErro
     // Apply the style first so later SPRMs remain direct row formatting.
     if let Some(style_index) = row.table_style_index {
         builder.add_word(0x563A, style_index);
+    }
+    if row.justification != TableJustification::Left || row.right_to_left {
+        builder.add_word(
+            0x5400,
+            justification_code(physical_justification(row.justification, row.right_to_left)),
+        );
+        builder.add_word(0x548A, justification_code(row.justification));
     }
     if let Some(positioning) = row.positioning {
         builder.add_byte(0x360D, encode_positioning(positioning));
@@ -1318,6 +1348,38 @@ mod tests {
         let tap = crate::doc::parts::tap::TableProperties::from_sprm(&sprms).unwrap();
         assert_eq!(tap.paragraph_group_id, Some(0x1020_3040));
         assert_eq!(tap.revision_save_id, Some(0xA1B2_C3D4));
+    }
+
+    #[test]
+    fn round_trips_logical_justification_for_rtl_tables() {
+        let mut builder = TapBuilder::new();
+        builder.add_row(TableRow {
+            cells: vec![TableCell {
+                width: 1000,
+                ..TableCell::default()
+            }],
+            justification: TableJustification::Right,
+            right_to_left: true,
+            ..TableRow::default()
+        });
+
+        let sprms = builder.try_generate_row_sprms(0).unwrap();
+        let parsed = crate::sprm::parse_sprms(&sprms);
+        let legacy = parsed.iter().find(|sprm| sprm.opcode == 0x5400).unwrap();
+        let modern = parsed.iter().find(|sprm| sprm.opcode == 0x548A).unwrap();
+        assert_eq!(legacy.operand_bytes(), &[0, 0]);
+        assert_eq!(modern.operand_bytes(), &[2, 0]);
+
+        let tap = crate::doc::parts::tap::TableProperties::from_sprm(&sprms).unwrap();
+        assert_eq!(tap.justification, TableJustification::Right);
+        assert_eq!(
+            tap.legacy_physical_justification,
+            Some(TableJustification::Left)
+        );
+        assert_eq!(
+            tap.modern_logical_justification,
+            Some(TableJustification::Right)
+        );
     }
 
     #[test]

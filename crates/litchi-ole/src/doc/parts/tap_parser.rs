@@ -321,22 +321,9 @@ impl<'arena> TapParser<'arena> {
         match operation {
             // sprmTJc90 (0x5400) - Physical table justification
             0x00 => {
-                let operand = sprm.operand_bytes();
-                if operand.len() != 2 {
-                    return Err(DocError::Corrupted(
-                        "sprmTJc90 operand must contain 2 bytes".to_string(),
-                    ));
-                }
-                tap.justification = match binary_to_doc_result(read_u16_le(operand, 0))? {
-                    0 => TableJustification::Left,
-                    1 => TableJustification::Center,
-                    2 => TableJustification::Right,
-                    _ => {
-                        return Err(DocError::Corrupted(
-                            "sprmTJc90 contains an invalid justification".to_string(),
-                        ));
-                    },
-                };
+                tap.legacy_physical_justification =
+                    Some(Self::parse_justification(sprm, "sprmTJc90")?);
+                Self::resolve_justification(tap);
             },
             // sprmTDxaLeft (0x9601) - Table indent from left
             0x01 => {
@@ -471,6 +458,7 @@ impl<'arena> TapParser<'arena> {
             0x0B => {
                 tap.legacy_right_to_left = Self::parse_bool16(sprm, "sprmTFBiDi")?;
                 tap.right_to_left = tap.legacy_right_to_left || tap.modern_right_to_left;
+                Self::resolve_justification(tap);
             },
             0x0D => {
                 let operand = sprm.operand_bytes();
@@ -566,6 +554,7 @@ impl<'arena> TapParser<'arena> {
             0x64 => {
                 tap.modern_right_to_left = Self::parse_bool16(sprm, "sprmTFBiDi90")?;
                 tap.right_to_left = tap.legacy_right_to_left || tap.modern_right_to_left;
+                Self::resolve_justification(tap);
             },
             0x65 => {
                 tap.allow_overlap = !Self::parse_bool8(sprm, "sprmTFNoAllowOverlap")?;
@@ -646,6 +635,11 @@ impl<'arena> TapParser<'arena> {
                 }
                 tap.revision_save_id = Some(binary_to_doc_result(read_u32_le(operand, 0))?);
             },
+            0x8A => {
+                tap.modern_logical_justification =
+                    Some(Self::parse_justification(sprm, "sprmTJc")?);
+                Self::resolve_justification(tap);
+            },
             // Other table SPRMs.
             _ => {
                 // Unknown or unhandled SPRM - skip
@@ -653,6 +647,40 @@ impl<'arena> TapParser<'arena> {
         }
 
         Ok(())
+    }
+
+    fn parse_justification(sprm: &Sprm, name: &str) -> Result<TableJustification> {
+        let operand = sprm.operand_bytes();
+        if operand.len() != 2 {
+            return Err(DocError::Corrupted(format!(
+                "{name} operand must contain 2 bytes"
+            )));
+        }
+        match binary_to_doc_result(read_u16_le(operand, 0))? {
+            0 => Ok(TableJustification::Left),
+            1 => Ok(TableJustification::Center),
+            2 => Ok(TableJustification::Right),
+            _ => Err(DocError::Corrupted(format!(
+                "{name} contains an invalid justification"
+            ))),
+        }
+    }
+
+    fn resolve_justification(tap: &mut TableProperties) {
+        tap.justification = tap.modern_logical_justification.unwrap_or_else(|| {
+            let Some(physical) = tap.legacy_physical_justification else {
+                return TableJustification::Left;
+            };
+            if tap.right_to_left {
+                match physical {
+                    TableJustification::Left => TableJustification::Right,
+                    TableJustification::Center => TableJustification::Center,
+                    TableJustification::Right => TableJustification::Left,
+                }
+            } else {
+                physical
+            }
+        });
     }
 
     /// Parse table definition (sprmTDefTable - 0xD608).
@@ -2281,6 +2309,38 @@ mod tests {
     }
 
     #[test]
+    fn resolves_physical_and_logical_table_justification() {
+        let arena = Bump::new();
+        let parser = TapParser::new(&arena);
+        let mut physical = table_definition_grpprl(&[1, 0, 0, 100, 0]);
+        append_fixed_sprm(&mut physical, 0x5400, &[2, 0]);
+        append_fixed_sprm(&mut physical, 0x560B, &[1, 0]);
+
+        let tap = parser.parse_tap(&physical).unwrap();
+        assert_eq!(tap.justification, TableJustification::Left);
+        assert_eq!(
+            tap.legacy_physical_justification,
+            Some(TableJustification::Right)
+        );
+        assert_eq!(tap.modern_logical_justification, None);
+
+        let mut logical = physical;
+        append_fixed_sprm(&mut logical, 0x548A, &[2, 0]);
+        // A later compatibility property cannot override the modern logical one.
+        append_fixed_sprm(&mut logical, 0x5400, &[1, 0]);
+        let tap = parser.parse_tap(&logical).unwrap();
+        assert_eq!(tap.justification, TableJustification::Right);
+        assert_eq!(
+            tap.legacy_physical_justification,
+            Some(TableJustification::Center)
+        );
+        assert_eq!(
+            tap.modern_logical_justification,
+            Some(TableJustification::Right)
+        );
+    }
+
+    #[test]
     fn rejects_malformed_core_row_geometry_and_pagination() {
         let arena = Bump::new();
         let parser = TapParser::new(&arena);
@@ -2291,6 +2351,7 @@ mod tests {
         };
 
         assert!(parse_with(0x5400, &[3, 0]).is_err());
+        assert!(parse_with(0x548A, &[3, 0]).is_err());
         assert!(parse_with(0x9601, &(-31_681i16).to_le_bytes()).is_err());
         assert!(parse_with(0x9602, &(-1i16).to_le_bytes()).is_err());
         assert!(parse_with(0x9602, &31_681i16.to_le_bytes()).is_err());
