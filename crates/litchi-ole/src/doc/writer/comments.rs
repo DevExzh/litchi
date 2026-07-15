@@ -1,10 +1,8 @@
 //! Comment input types for the legacy Word writer.
 
-/// A point comment to add to a DOC main story.
-///
-/// The writer emits a U+0005 reference at the requested position and stores the
-/// body in the comment subdocument. Range comments require annotation bookmark
-/// tables and are not represented by this type.
+use crate::doc::CommentExtendedMetadata;
+
+/// A comment to add to a DOC main story.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommentEntry {
     /// Requested UTF-16 CP in the main document.
@@ -15,6 +13,17 @@ pub struct CommentEntry {
     pub author: String,
     /// Author initials (at most nine UTF-16 code units).
     pub initials: String,
+    /// Optional `(start, exclusive_end)` range in the emitted main-story CP space.
+    ///
+    /// When absent, the writer creates a point comment. Both positions must be
+    /// within the final main-document character count.
+    pub range: Option<(u32, u32)>,
+    /// Optional Word 2002+ timestamp, reply-tree, and ink metadata.
+    ///
+    /// Parent indexes refer to comments in emitted main-document reference
+    /// order. The writer emits a default top-level metadata record when this is
+    /// absent because `AtrdExtra` is parallel to all comment descriptors.
+    pub extended_metadata: Option<CommentExtendedMetadata>,
 }
 
 impl CommentEntry {
@@ -30,7 +39,21 @@ impl CommentEntry {
             text: text.into(),
             author: author.into(),
             initials: initials.into(),
+            range: None,
+            extended_metadata: None,
         }
+    }
+
+    /// Attach this comment to a main-document range.
+    pub fn with_range(mut self, start: u32, exclusive_end: u32) -> Self {
+        self.range = Some((start, exclusive_end));
+        self
+    }
+
+    /// Set Word 2002+ timestamp, reply-tree, and ink metadata.
+    pub fn with_extended_metadata(mut self, metadata: CommentExtendedMetadata) -> Self {
+        self.extended_metadata = Some(metadata);
+        self
     }
 }
 
@@ -45,5 +68,7 @@ mod tests {
         assert_eq!(entry.text, "检查 😀");
         assert_eq!(entry.author, "张三");
         assert_eq!(entry.initials, "张");
+        assert_eq!(entry.range, None);
+        assert_eq!(entry.extended_metadata, None);
     }
 }

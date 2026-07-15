@@ -99,6 +99,18 @@ pub struct FibBuilder {
     /// Comment-owner XST array offset and size
     fc_grp_xst_atn_owners: u32,
     lcb_grp_xst_atn_owners: u32,
+    /// Annotation bookmark name table (`SttbfAtnBkmk`)
+    fc_sttbf_atn_bkmk: u32,
+    lcb_sttbf_atn_bkmk: u32,
+    /// Annotation bookmark start PLCF (`PlcfAtnBkf`)
+    fc_plcf_atn_bkf: u32,
+    lcb_plcf_atn_bkf: u32,
+    /// Annotation bookmark end PLCF (`PlcfAtnBkl`)
+    fc_plcf_atn_bkl: u32,
+    lcb_plcf_atn_bkl: u32,
+    /// Word 2002+ extended comment metadata (`AtrdExtra`)
+    fc_atrd_extra: u32,
+    lcb_atrd_extra: u32,
     /// List table (PlfLst) offset and size
     fc_plflst: u32,
     lcb_plflst: u32,
@@ -164,6 +176,14 @@ impl FibBuilder {
             lcb_plcfand_txt: 0,
             fc_grp_xst_atn_owners: 0,
             lcb_grp_xst_atn_owners: 0,
+            fc_sttbf_atn_bkmk: 0,
+            lcb_sttbf_atn_bkmk: 0,
+            fc_plcf_atn_bkf: 0,
+            lcb_plcf_atn_bkf: 0,
+            fc_plcf_atn_bkl: 0,
+            lcb_plcf_atn_bkl: 0,
+            fc_atrd_extra: 0,
+            lcb_atrd_extra: 0,
             fc_plflst: 0,
             lcb_plflst: 0,
             fc_plflfo: 0,
@@ -296,6 +316,30 @@ impl FibBuilder {
     pub fn set_grp_xst_atn_owners(&mut self, offset: u32, size: u32) {
         self.fc_grp_xst_atn_owners = offset;
         self.lcb_grp_xst_atn_owners = size;
+    }
+
+    /// Set the annotation-bookmark name table (`SttbfAtnBkmk`).
+    pub fn set_sttbf_atn_bkmk(&mut self, offset: u32, size: u32) {
+        self.fc_sttbf_atn_bkmk = offset;
+        self.lcb_sttbf_atn_bkmk = size;
+    }
+
+    /// Set the annotation-bookmark start table (`PlcfAtnBkf`).
+    pub fn set_plcf_atn_bkf(&mut self, offset: u32, size: u32) {
+        self.fc_plcf_atn_bkf = offset;
+        self.lcb_plcf_atn_bkf = size;
+    }
+
+    /// Set the annotation-bookmark end table (`PlcfAtnBkl`).
+    pub fn set_plcf_atn_bkl(&mut self, offset: u32, size: u32) {
+        self.fc_plcf_atn_bkl = offset;
+        self.lcb_plcf_atn_bkl = size;
+    }
+
+    /// Set the Word 2002+ extended comment metadata (`AtrdExtra`).
+    pub fn set_atrd_extra(&mut self, offset: u32, size: u32) {
+        self.fc_atrd_extra = offset;
+        self.lcb_atrd_extra = size;
     }
 
     /// Set list table (PlfLst) offset and size
@@ -533,10 +577,14 @@ impl FibBuilder {
         const STTBFFFN: usize = 15; // Font table
         const PLCFFLDMOM: usize = 16; // Main document field table
         const GRPXSTATNOWNERS: usize = 36; // Comment-owner XST array
+        const STTBFATNBKMK: usize = 37; // Annotation bookmark names
+        const PLCFATNBKF: usize = 42; // Annotation bookmark starts
+        const PLCFATNBKL: usize = 43; // Annotation bookmark ends
         const PLCFENDREF: usize = 46; // Endnote reference PLCF
         const PLCFENDTXT: usize = 47; // Endnote text PLCF
         const PLFLST: usize = 73; // List table (PlfLst)
         const PLFLFO: usize = 74; // List format override table (PlfLfo)
+        const ATRDEXTRA: usize = 112; // Extended comment metadata
 
         // Write field offsets and sizes
         set_field(buf, STSHF, self.fc_stshf, self.lcb_stshf);
@@ -554,6 +602,15 @@ impl FibBuilder {
             self.fc_plcfbte_chpx,
             self.lcb_plcfbte_chpx,
         );
+        set_field(
+            buf,
+            STTBFATNBKMK,
+            self.fc_sttbf_atn_bkmk,
+            self.lcb_sttbf_atn_bkmk,
+        );
+        set_field(buf, PLCFATNBKF, self.fc_plcf_atn_bkf, self.lcb_plcf_atn_bkf);
+        set_field(buf, PLCFATNBKL, self.fc_plcf_atn_bkl, self.lcb_plcf_atn_bkl);
+        set_field(buf, ATRDEXTRA, self.fc_atrd_extra, self.lcb_atrd_extra);
         set_field(
             buf,
             PLCFBTEPAPX,
@@ -711,6 +768,10 @@ mod tests {
         fib.set_plcfand_ref(3200, 38);
         fib.set_plcfand_txt(3238, 12);
         fib.set_grp_xst_atn_owners(3250, 14);
+        fib.set_sttbf_atn_bkmk(3264, 18);
+        fib.set_plcf_atn_bkf(3282, 12);
+        fib.set_plcf_atn_bkl(3294, 8);
+        fib.set_atrd_extra(3302, 18);
 
         let bytes = fib.generate().unwrap();
         assert_eq!(u32::from_le_bytes(bytes[92..96].try_into().unwrap()), 17);
@@ -724,6 +785,10 @@ mod tests {
         assert_eq!(field(4), (3200, 38));
         assert_eq!(field(5), (3238, 12));
         assert_eq!(field(36), (3250, 14));
+        assert_eq!(field(37), (3264, 18));
+        assert_eq!(field(42), (3282, 12));
+        assert_eq!(field(43), (3294, 8));
+        assert_eq!(field(112), (3302, 18));
     }
 
     #[test]

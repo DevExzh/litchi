@@ -77,6 +77,7 @@ use super::font_table::FontTableBuilder;
 use super::footnotes::FootnoteEntry;
 use super::numbering::{ListFormatOverride, ListStructure, NumberingWriter};
 use super::piece_table::{Piece, PieceTableBuilder};
+use crate::doc::CommentDateTime;
 use crate::sprm_operations::*;
 use litchi_cfb::writer::OleWriter;
 use std::collections::HashMap;
@@ -128,6 +129,29 @@ fn utf16_code_unit_len(text: &str) -> Result<u32, DocWriteError> {
     Ok(length)
 }
 
+fn pack_comment_dttm(value: Option<CommentDateTime>) -> Result<u32, DocWriteError> {
+    let Some(value) = value else {
+        return Ok(0);
+    };
+    if !(1900..=2411).contains(&value.year)
+        || !(1..=12).contains(&value.month)
+        || !(1..=31).contains(&value.day)
+        || value.hour > 23
+        || value.minute > 59
+        || value.weekday > 6
+    {
+        return Err(DocWriteError::InvalidData(
+            "DOC comment timestamp is outside the DTTM field ranges".to_string(),
+        ));
+    }
+    Ok(u32::from(value.minute)
+        | (u32::from(value.hour) << 6)
+        | (u32::from(value.day) << 11)
+        | (u32::from(value.month) << 16)
+        | (u32::from(value.year - 1900) << 20)
+        | (u32::from(value.weekday) << 29))
+}
+
 type NoteStoryData = (Vec<u8>, Vec<u8>, u32);
 type HeaderStoryData = (Vec<u8>, u32);
 
@@ -135,6 +159,10 @@ struct CommentStoryData {
     owners: Vec<u8>,
     references: Vec<u8>,
     text_positions: Vec<u8>,
+    bookmark_names: Vec<u8>,
+    bookmark_starts: Vec<u8>,
+    bookmark_ends: Vec<u8>,
+    extended_metadata: Vec<u8>,
     char_count: u32,
 }
 
@@ -380,7 +408,7 @@ pub struct DocWriter {
     footnotes: Vec<FootnoteEntry>,
     /// Endnote entries
     endnotes: Vec<FootnoteEntry>,
-    /// Point comments
+    /// Comments
     comments: Vec<CommentEntry>,
     /// Numbering writer for list tables
     numbering: NumberingWriter,
@@ -584,7 +612,7 @@ impl DocWriter {
         self.endnotes.push(entry);
     }
 
-    /// Add a point comment to the document.
+    /// Add a point or ranged comment to the document.
     pub fn add_comment(&mut self, entry: CommentEntry) {
         self.comments.push(entry);
     }
@@ -831,6 +859,129 @@ impl DocWriter {
             owner_bytes.extend(units.into_iter().flat_map(u16::to_le_bytes));
         }
 
+        let ranged_count = ordered
+            .iter()
+            .filter(|(entry, _)| entry.range.is_some())
+            .count();
+        if ranged_count > 0x3FFC {
+            return Err(DocWriteError::InvalidData(
+                "DOC annotation bookmark table exceeds 0x3FFC entries".to_string(),
+            ));
+        }
+        let bookmark_sentinel = ccp_text.checked_add(1).ok_or_else(|| {
+            DocWriteError::InvalidData("DOC annotation bookmark sentinel overflows".to_string())
+        })?;
+        let mut bookmark_tags = vec![None; ordered.len()];
+        let mut ranges = Vec::<(u32, u32, u32)>::with_capacity(ranged_count);
+        for (index, (entry, _)) in ordered.iter().enumerate() {
+            let Some((start, end)) = entry.range else {
+                continue;
+            };
+            if start > end || end > ccp_text {
+                return Err(DocWriteError::InvalidData(
+                    "DOC comment range must be ordered and inside the main document".to_string(),
+                ));
+            }
+            let tag = i32::try_from(index).map_err(|_| {
+                DocWriteError::InvalidData("DOC comment bookmark tag overflows".to_string())
+            })? as u32;
+            bookmark_tags[index] = Some(tag);
+            ranges.push((tag, start, end));
+        }
+
+        let mut bookmark_names = Vec::new();
+        let mut bookmark_starts = Vec::new();
+        let mut bookmark_ends = Vec::new();
+        if !ranges.is_empty() {
+            let mut start_order = ranges.clone();
+            start_order.sort_by_key(|&(tag, start, _)| (start, tag));
+            let mut end_order = ranges.clone();
+            end_order.sort_by_key(|&(tag, _, end)| (end, tag));
+            let end_indexes = end_order
+                .iter()
+                .enumerate()
+                .map(|(index, &(tag, _, _))| (tag, index as u16))
+                .collect::<HashMap<_, _>>();
+
+            bookmark_names.extend_from_slice(&0xFFFFu16.to_le_bytes());
+            bookmark_names.extend_from_slice(&(ranges.len() as u16).to_le_bytes());
+            bookmark_names.extend_from_slice(&10u16.to_le_bytes());
+            for &(tag, _, _) in &start_order {
+                bookmark_names.extend_from_slice(&0u16.to_le_bytes());
+                bookmark_names.extend_from_slice(&0x0100u16.to_le_bytes());
+                bookmark_names.extend_from_slice(&tag.to_le_bytes());
+                bookmark_names.extend_from_slice(&(-1i32).to_le_bytes());
+            }
+
+            for &(_, start, _) in &start_order {
+                bookmark_starts.extend_from_slice(&start.to_le_bytes());
+            }
+            bookmark_starts.extend_from_slice(&bookmark_sentinel.to_le_bytes());
+            for &(tag, _, _) in &start_order {
+                bookmark_starts.extend_from_slice(&end_indexes[&tag].to_le_bytes());
+                bookmark_starts.extend_from_slice(&0u16.to_le_bytes());
+            }
+
+            for &(_, _, end) in &end_order {
+                bookmark_ends.extend_from_slice(&end.to_le_bytes());
+            }
+            bookmark_ends.extend_from_slice(&bookmark_sentinel.to_le_bytes());
+        }
+
+        let mut extended_metadata = Vec::with_capacity(ordered.len() * 18);
+        let mut active_ancestors = Vec::<usize>::new();
+        for (index, (entry, _)) in ordered.iter().enumerate() {
+            let metadata = entry
+                .extended_metadata
+                .unwrap_or(crate::doc::CommentExtendedMetadata {
+                    modified_at: None,
+                    depth: 0,
+                    parent_index: None,
+                    is_ink: false,
+                });
+            let depth = usize::try_from(metadata.depth).map_err(|_| {
+                DocWriteError::InvalidData("DOC comment reply depth is too large".to_string())
+            })?;
+            if depth > active_ancestors.len() {
+                return Err(DocWriteError::InvalidData(
+                    "DOC comment reply tree must be in pre-order".to_string(),
+                ));
+            }
+            active_ancestors.truncate(depth);
+            let parent_delta = match (depth, metadata.parent_index) {
+                (0, None) => 0,
+                (0, Some(_)) | (_, None) => {
+                    return Err(DocWriteError::InvalidData(
+                        "DOC comment parent and reply depth are inconsistent".to_string(),
+                    ));
+                },
+                (_, Some(parent)) => {
+                    let expected = active_ancestors.get(depth - 1).copied().ok_or_else(|| {
+                        DocWriteError::InvalidData(
+                            "DOC comment reply tree is malformed".to_string(),
+                        )
+                    })?;
+                    if parent != expected {
+                        return Err(DocWriteError::InvalidData(
+                            "DOC comment parent does not match pre-order reply depth".to_string(),
+                        ));
+                    }
+                    i32::try_from(parent as i64 - index as i64).map_err(|_| {
+                        DocWriteError::InvalidData(
+                            "DOC comment parent offset exceeds the binary format".to_string(),
+                        )
+                    })?
+                },
+            };
+            extended_metadata
+                .extend_from_slice(&pack_comment_dttm(metadata.modified_at)?.to_le_bytes());
+            extended_metadata.extend_from_slice(&0u16.to_le_bytes());
+            extended_metadata.extend_from_slice(&metadata.depth.to_le_bytes());
+            extended_metadata.extend_from_slice(&parent_delta.to_le_bytes());
+            extended_metadata.extend_from_slice(&(u32::from(metadata.is_ink) << 1).to_le_bytes());
+            active_ancestors.push(index);
+        }
+
         let mut comment_cp = 0u32;
         let mut text_cps = vec![0u32];
         for (entry, _) in &ordered {
@@ -905,7 +1056,7 @@ impl DocWriter {
             references.extend_from_slice(&cp.to_le_bytes());
         }
         references.extend_from_slice(&ccp_text.to_le_bytes());
-        for ((entry, _), author_index) in ordered.iter().zip(owner_indexes) {
+        for (index, ((entry, _), author_index)) in ordered.iter().zip(owner_indexes).enumerate() {
             let initials = entry.initials.encode_utf16().collect::<Vec<_>>();
             references.extend_from_slice(&(initials.len() as u16).to_le_bytes());
             for index in 0..9 {
@@ -915,7 +1066,8 @@ impl DocWriter {
             references.extend_from_slice(&author_index.to_le_bytes());
             references.extend_from_slice(&0u16.to_le_bytes());
             references.extend_from_slice(&0u16.to_le_bytes());
-            references.extend_from_slice(&(-1i32).to_le_bytes());
+            let tag = bookmark_tags[index].map_or(-1, |tag| tag as i32);
+            references.extend_from_slice(&tag.to_le_bytes());
         }
 
         let mut text_positions = Vec::with_capacity(text_cps.len() * 4);
@@ -927,8 +1079,48 @@ impl DocWriter {
             owners: owner_bytes,
             references,
             text_positions,
+            bookmark_names,
+            bookmark_starts,
+            bookmark_ends,
+            extended_metadata,
             char_count: comment_cp,
         }))
+    }
+
+    fn append_comment_tables(
+        fib: &mut FibBuilder,
+        table_stream: &mut Vec<u8>,
+        comment: &CommentStoryData,
+    ) {
+        let mut offset = table_stream.len() as u32;
+        fib.set_grp_xst_atn_owners(offset, comment.owners.len() as u32);
+        table_stream.extend_from_slice(&comment.owners);
+
+        offset = table_stream.len() as u32;
+        fib.set_plcfand_ref(offset, comment.references.len() as u32);
+        table_stream.extend_from_slice(&comment.references);
+
+        offset = table_stream.len() as u32;
+        fib.set_plcfand_txt(offset, comment.text_positions.len() as u32);
+        table_stream.extend_from_slice(&comment.text_positions);
+
+        if !comment.bookmark_names.is_empty() {
+            offset = table_stream.len() as u32;
+            fib.set_sttbf_atn_bkmk(offset, comment.bookmark_names.len() as u32);
+            table_stream.extend_from_slice(&comment.bookmark_names);
+
+            offset = table_stream.len() as u32;
+            fib.set_plcf_atn_bkf(offset, comment.bookmark_starts.len() as u32);
+            table_stream.extend_from_slice(&comment.bookmark_starts);
+
+            offset = table_stream.len() as u32;
+            fib.set_plcf_atn_bkl(offset, comment.bookmark_ends.len() as u32);
+            table_stream.extend_from_slice(&comment.bookmark_ends);
+        }
+
+        offset = table_stream.len() as u32;
+        fib.set_atrd_extra(offset, comment.extended_metadata.len() as u32);
+        table_stream.extend_from_slice(&comment.extended_metadata);
     }
 
     /// Build header/footer story text and PlcfHdd
@@ -1517,16 +1709,7 @@ impl DocWriter {
         }
 
         if let Some(comment) = &comment_story {
-            fib.set_grp_xst_atn_owners(table_offset, comment.owners.len() as u32);
-            table_stream.extend_from_slice(&comment.owners);
-            table_offset = table_stream.len() as u32;
-
-            fib.set_plcfand_ref(table_offset, comment.references.len() as u32);
-            table_stream.extend_from_slice(&comment.references);
-            table_offset = table_stream.len() as u32;
-
-            fib.set_plcfand_txt(table_offset, comment.text_positions.len() as u32);
-            table_stream.extend_from_slice(&comment.text_positions);
+            Self::append_comment_tables(&mut fib, &mut table_stream, comment);
             table_offset = table_stream.len() as u32;
         }
 
@@ -2042,16 +2225,7 @@ impl DocWriter {
         }
 
         if let Some(comment) = &comment_story {
-            fib.set_grp_xst_atn_owners(table_offset, comment.owners.len() as u32);
-            table_stream.extend_from_slice(&comment.owners);
-            table_offset = table_stream.len() as u32;
-
-            fib.set_plcfand_ref(table_offset, comment.references.len() as u32);
-            table_stream.extend_from_slice(&comment.references);
-            table_offset = table_stream.len() as u32;
-
-            fib.set_plcfand_txt(table_offset, comment.text_positions.len() as u32);
-            table_stream.extend_from_slice(&comment.text_positions);
+            Self::append_comment_tables(&mut fib, &mut table_stream, comment);
             table_offset = table_stream.len() as u32;
         }
 
@@ -2875,8 +3049,33 @@ mod tests {
         let mut writer = DocWriter::new();
         writer.add_paragraph("Main 😀").unwrap();
         writer.add_footnote(FootnoteEntry::new(0, "Footnote", 1));
-        writer.add_comment(CommentEntry::new(1, "Review 🦀", "Alice 😀", "A😀"));
-        writer.add_comment(CommentEntry::new(3, "Second review", "Alice 😀", "AL"));
+        writer.add_comment(
+            CommentEntry::new(1, "Review 🦀", "Alice 😀", "A😀")
+                .with_range(2, 6)
+                .with_extended_metadata(crate::doc::CommentExtendedMetadata {
+                    modified_at: Some(crate::doc::CommentDateTime {
+                        year: 2026,
+                        month: 7,
+                        day: 15,
+                        hour: 14,
+                        minute: 30,
+                        weekday: 3,
+                    }),
+                    depth: 0,
+                    parent_index: None,
+                    is_ink: false,
+                }),
+        );
+        writer.add_comment(
+            CommentEntry::new(3, "Second review", "Alice 😀", "AL")
+                .with_range(0, 7)
+                .with_extended_metadata(crate::doc::CommentExtendedMetadata {
+                    modified_at: None,
+                    depth: 1,
+                    parent_index: Some(0),
+                    is_ink: true,
+                }),
+        );
         writer.add_endnote(FootnoteEntry::new(2, "Endnote", 1));
         writer.set_odd_header("Header");
 
@@ -2893,11 +3092,35 @@ mod tests {
         assert_eq!(comments.len(), 2);
         assert_eq!(comments[0].author, "Alice 😀");
         assert_eq!(comments[0].initials, "A😀");
-        assert_eq!(comments[0].bookmark_tag, None);
+        assert_eq!(comments[0].bookmark_tag, Some(0));
+        assert_eq!(
+            (comments[0].range_start, comments[0].range_end),
+            (Some(2), Some(6))
+        );
+        let first_metadata = comments[0].extended_metadata.unwrap();
+        assert_eq!(first_metadata.depth, 0);
+        assert_eq!(first_metadata.parent_index, None);
+        assert_eq!(
+            first_metadata.modified_at,
+            Some(crate::doc::CommentDateTime {
+                year: 2026,
+                month: 7,
+                day: 15,
+                hour: 14,
+                minute: 30,
+                weekday: 3,
+            })
+        );
         assert!(comments[0].text().contains("Review 🦀"));
         assert_eq!(comments[0].paragraphs().unwrap().len(), 1);
         assert_eq!(comments[1].author, "Alice 😀");
         assert_eq!(comments[1].initials, "AL");
+        assert_eq!(
+            (comments[1].range_start, comments[1].range_end),
+            (Some(0), Some(7))
+        );
+        assert_eq!(comments[1].extended_metadata.unwrap().parent_index, Some(0));
+        assert!(comments[1].extended_metadata.unwrap().is_ink);
         assert!(comments[1].text().contains("Second review"));
 
         let path = std::env::temp_dir().join(format!(
@@ -2910,7 +3133,13 @@ mod tests {
         ));
         writer.save(&path).unwrap();
         let mut package = crate::doc::Package::open(&path).unwrap();
-        assert_eq!(package.document().unwrap().comments().unwrap().len(), 2);
+        let comments = package.document().unwrap().comments().unwrap();
+        assert_eq!(comments.len(), 2);
+        assert_eq!(
+            (comments[0].range_start, comments[0].range_end),
+            (Some(2), Some(6))
+        );
+        assert_eq!(comments[1].extended_metadata.unwrap().parent_index, Some(0));
         std::fs::remove_file(path).unwrap();
     }
 
@@ -2922,6 +3151,53 @@ mod tests {
 
         let error = writer.write_to(&mut Cursor::new(Vec::new())).unwrap_err();
         assert!(error.to_string().contains("at most nine"));
+    }
+
+    #[test]
+    fn rejects_invalid_comment_ranges_timestamps_and_reply_trees() {
+        let write_error = |entry: CommentEntry| {
+            let mut writer = DocWriter::new();
+            writer.add_paragraph("Main").unwrap();
+            writer.add_comment(entry);
+            writer
+                .write_to(&mut Cursor::new(Vec::new()))
+                .unwrap_err()
+                .to_string()
+        };
+
+        let error = write_error(CommentEntry::new(0, "Body", "Author", "A").with_range(4, 2));
+        assert!(error.contains("range must be ordered"));
+
+        let error = write_error(
+            CommentEntry::new(0, "Body", "Author", "A").with_extended_metadata(
+                crate::doc::CommentExtendedMetadata {
+                    modified_at: Some(crate::doc::CommentDateTime {
+                        year: 2026,
+                        month: 13,
+                        day: 1,
+                        hour: 0,
+                        minute: 0,
+                        weekday: 0,
+                    }),
+                    depth: 0,
+                    parent_index: None,
+                    is_ink: false,
+                },
+            ),
+        );
+        assert!(error.contains("DTTM"));
+
+        let error = write_error(
+            CommentEntry::new(0, "Body", "Author", "A").with_extended_metadata(
+                crate::doc::CommentExtendedMetadata {
+                    modified_at: None,
+                    depth: 1,
+                    parent_index: Some(0),
+                    is_ink: false,
+                },
+            ),
+        );
+        assert!(error.contains("pre-order"));
     }
 
     #[test]
