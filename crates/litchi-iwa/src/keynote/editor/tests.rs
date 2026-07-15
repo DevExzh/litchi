@@ -26,6 +26,10 @@ const TEST_SOUNDTRACK_MODE_FIELD: u32 = 2;
 const TEST_SOUNDTRACK_PLAY_ONCE_MODE: i32 = 0;
 const TEST_SOUNDTRACK_LOOP_MODE: i32 = 1;
 const TEST_SOUNDTRACK_MEDIA_IDS: [u64; 2] = [91, 92];
+const TEST_MOVIE_VIDEO: &[u8] = b"\0\0\0\x18ftypqt  movie-data";
+const TEST_MOVIE_VIDEO_REPLACEMENT: &[u8] = b"\0\0\0\x18ftypqt  replacement";
+const TEST_MOVIE_POSTER: &[u8] = b"\x89PNG\r\n\x1a\nmovie-poster";
+const TEST_MOVIE_POSTER_REPLACEMENT: &[u8] = b"\x89PNG\r\n\x1a\nreplacement";
 
 #[test]
 fn slide_background_crud_inherits_and_culls_native_variations() {
@@ -4413,6 +4417,188 @@ fn static_layout_movies_remain_template_only_for_update_and_creation() {
 }
 
 #[test]
+fn slide_movie_crud_preserves_shared_assets_and_culls_final_references() {
+    let mut editor = KeynoteEditor::from_package(test_package_with_slide_movie()).unwrap();
+    let movies = editor.slide_movies(0).unwrap();
+    assert_eq!(movies.len(), 1);
+    let original = movies[0].clone();
+    assert_eq!(original.kind, KeynoteSlideMovieKind::File);
+    assert_eq!(original.drawable_object_id, 70);
+    assert_eq!(original.movie_data_identifier, Some(1));
+    assert_eq!(original.poster_image_data_identifier, Some(2));
+    assert_eq!(
+        original.original_size,
+        Some(DrawableSize {
+            width: 800.0,
+            height: 300.0,
+        })
+    );
+    assert_eq!(
+        original.natural_size,
+        Some(DrawableSize {
+            width: 800.0,
+            height: 300.0,
+        })
+    );
+    assert_eq!(editor.slide_builds(0).unwrap()[0].chunks.len(), 1);
+
+    let baseline = editor.to_bytes().unwrap();
+    let moved = DrawableGeometry {
+        position: Some(DrawablePoint { x: 120.0, y: 130.0 }),
+        ..original.geometry
+    };
+    editor.set_slide_movie_geometry(0, 70, moved).unwrap();
+    assert_eq!(editor.slide_movie_geometry(0, 70).unwrap(), moved);
+    editor
+        .set_slide_movie_geometry(0, 70, original.geometry)
+        .unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+    let duplicate = editor.duplicate_slide_movie(0, 70).unwrap();
+    assert_ne!(duplicate.drawable_object_id, 70);
+    assert_eq!(
+        duplicate.movie_data_identifier,
+        original.movie_data_identifier
+    );
+    assert_eq!(
+        duplicate.poster_image_data_identifier,
+        original.poster_image_data_identifier
+    );
+    assert_eq!(
+        duplicate.geometry.position,
+        Some(DrawablePoint { x: 110.0, y: 210.0 })
+    );
+    let duplicate_build = editor
+        .slide_builds(0)
+        .unwrap()
+        .into_iter()
+        .find(|build| build.drawable_object_id == duplicate.drawable_object_id)
+        .unwrap();
+    assert_eq!(duplicate_build.chunks.len(), 1);
+    let graph = ObjectGraph::read(editor.package()).unwrap();
+    let source_chunk: kn::BuildChunkArchive = graph
+        .decode_type(74, BUILD_CHUNK_MESSAGE_TYPE, "KN.BuildChunkArchive")
+        .unwrap();
+    let cloned_chunk: kn::BuildChunkArchive = graph
+        .decode_type(
+            duplicate_build.chunks[0].object_id,
+            BUILD_CHUNK_MESSAGE_TYPE,
+            "KN.BuildChunkArchive",
+        )
+        .unwrap();
+    assert_ne!(source_chunk.build_id, cloned_chunk.build_id);
+    assert_eq!(
+        cloned_chunk.build_id,
+        cloned_chunk
+            .build_chunk_identifier
+            .as_ref()
+            .and_then(|identifier| identifier.build_id)
+    );
+    let assets = editor.media_assets().unwrap();
+    for identifier in [1, 2] {
+        let asset = assets
+            .iter()
+            .find(|asset| asset.data_identifier == identifier)
+            .unwrap_or_else(|| panic!("missing media {identifier} in {assets:?}"));
+        assert_eq!(asset.component_reference_count, 2);
+        assert_eq!(asset.message_reference_count, 2);
+    }
+
+    assert_eq!(
+        editor
+            .replace_slide_movie_data(
+                0,
+                duplicate.drawable_object_id,
+                TEST_MOVIE_VIDEO_REPLACEMENT,
+            )
+            .unwrap(),
+        TEST_MOVIE_VIDEO
+    );
+    assert_eq!(
+        editor.extract_media(1).unwrap(),
+        TEST_MOVIE_VIDEO_REPLACEMENT
+    );
+    assert_eq!(
+        editor
+            .replace_slide_movie_poster(0, 70, TEST_MOVIE_POSTER_REPLACEMENT)
+            .unwrap(),
+        TEST_MOVIE_POSTER
+    );
+    assert_eq!(
+        editor.extract_media(2).unwrap(),
+        TEST_MOVIE_POSTER_REPLACEMENT
+    );
+
+    let removed_duplicate = editor
+        .remove_slide_movie(0, duplicate.drawable_object_id)
+        .unwrap();
+    assert!(removed_duplicate.removed_data_identifiers.is_empty());
+    let remaining = editor.slide_movies(0).unwrap();
+    assert_eq!(remaining.len(), 1);
+    assert_eq!(remaining[0], original);
+    assert_eq!(editor.media_assets().unwrap().len(), 2);
+    assert_eq!(editor.slide_builds(0).unwrap().len(), 1);
+
+    let removed_original = editor.remove_slide_movie(0, 70).unwrap();
+    assert_eq!(removed_original.movie, original);
+    assert_eq!(removed_original.removed_data_identifiers, [1, 2]);
+    assert!(editor.slide_movies(0).unwrap().is_empty());
+    assert!(editor.slide_builds(0).unwrap().is_empty());
+    assert!(editor.media_assets().unwrap().is_empty());
+}
+
+#[test]
+fn slide_movie_mutations_reject_wrong_targets_transactionally() {
+    let mut editor = KeynoteEditor::from_package(test_package_with_slide_movie()).unwrap();
+    let before = editor.to_bytes().unwrap();
+    assert!(editor.slide_movies(2).is_err());
+    assert!(editor.slide_movie_geometry(0, 5).is_err());
+    assert!(editor.duplicate_slide_movie(0, 5).is_err());
+    assert!(editor.remove_slide_movie(0, 5).is_err());
+    assert!(
+        editor
+            .replace_slide_movie_data(0, 70, TEST_MOVIE_POSTER)
+            .is_err()
+    );
+    assert!(
+        editor
+            .replace_slide_movie_poster(0, 70, TEST_MOVIE_VIDEO)
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), before);
+
+    let mut placeholder =
+        KeynoteEditor::from_package(test_package_with_file_movie_layout(1)).unwrap();
+    let layout = placeholder
+        .slide_layouts()
+        .unwrap()
+        .into_iter()
+        .find(|layout| layout.name == "Title & Movie Placeholder")
+        .unwrap()
+        .id;
+    placeholder.set_slide_layout(0, layout).unwrap();
+    let movie = placeholder.slide_movies(0).unwrap().remove(0);
+    assert_eq!(movie.kind, KeynoteSlideMovieKind::MediaPlaceholder);
+    let before = placeholder.to_bytes().unwrap();
+    assert!(
+        placeholder
+            .set_slide_movie_geometry(0, movie.drawable_object_id, movie.geometry)
+            .is_err()
+    );
+    assert!(
+        placeholder
+            .duplicate_slide_movie(0, movie.drawable_object_id)
+            .is_err()
+    );
+    assert!(
+        placeholder
+            .remove_slide_movie(0, movie.drawable_object_id)
+            .is_err()
+    );
+    assert_eq!(placeholder.to_bytes().unwrap(), before);
+}
+
+#[test]
 fn slide_layout_update_rejects_ambiguous_live_videos_transactionally() {
     let mut editor = KeynoteEditor::from_package(test_package_with_live_video_layout()).unwrap();
     let layouts = editor.slide_layouts().unwrap();
@@ -5465,10 +5651,10 @@ fn test_package_with_empty_soundtrack() -> IWorkPackage {
             PACKAGE_METADATA_ENTRY,
             &Archive {
                 objects: vec![object(
-                    100,
+                    69,
                     PACKAGE_METADATA_MESSAGE_TYPE,
                     PackageMetadata {
-                        last_object_identifier: 100,
+                        last_object_identifier: 74,
                         components: vec![ComponentInfo {
                             identifier: 1,
                             preferred_locator: "Document".to_owned(),
@@ -6042,6 +6228,193 @@ fn test_package_with_file_movie_layout(flags: u32) -> IWorkPackage {
                 STANDIN_CAPTION_MESSAGE_TYPE,
                 tsd::StandinCaptionArchive::default(),
             ))?;
+            Ok(())
+        })
+        .unwrap();
+    package
+}
+
+#[allow(deprecated)]
+fn test_package_with_slide_movie() -> IWorkPackage {
+    let mut package = test_package_with_two_layouts();
+    package
+        .replace_archive(
+            PACKAGE_METADATA_ENTRY,
+            &Archive {
+                objects: vec![object(
+                    100,
+                    PACKAGE_METADATA_MESSAGE_TYPE,
+                    PackageMetadata {
+                        last_object_identifier: 100,
+                        components: vec![ComponentInfo {
+                            identifier: 4,
+                            preferred_locator: "Slide-4".to_owned(),
+                            object_uuid_map_entries: [4, 5, 6, 70, 71, 72, 73]
+                                .into_iter()
+                                .map(|identifier| ObjectUuidMapEntry {
+                                    identifier,
+                                    uuid: test_uuid(identifier, identifier + 100),
+                                })
+                                .collect(),
+                            ..Default::default()
+                        }],
+                        ..Default::default()
+                    },
+                )],
+            },
+        )
+        .unwrap();
+    let mut media = IWorkMediaEditor::from_package(package).unwrap();
+    let video = media
+        .insert_unreferenced("movie.mov", TEST_MOVIE_VIDEO)
+        .unwrap();
+    let poster = media
+        .insert_unreferenced("poster.png", TEST_MOVIE_POSTER)
+        .unwrap();
+    let mut package = media.into_package();
+    package
+        .update_archive("Index/Slide-4.iwa", |archive| {
+            let slide = archive.object_mut(4).unwrap();
+            let mut decoded = kn::SlideArchive::decode(slide.messages[0].data.as_slice())?;
+            decoded.owned_drawables.push(reference(70));
+            decoded.drawables_z_order.push(reference(70));
+            decoded.builds.push(reference(73));
+            decoded.build_chunks.push(reference(74));
+            slide.replace_message(
+                0,
+                RawMessage {
+                    type_: TEST_SLIDE_MESSAGE_TYPE,
+                    data: decoded.encode_to_vec(),
+                },
+            )?;
+            slide.archive_info.message_infos[0]
+                .object_references
+                .extend([70, 73, 74]);
+
+            let mut movie = object(
+                70,
+                TEST_MOVIE_MESSAGE_TYPE,
+                tsd::MovieArchive {
+                    super_: tsd::DrawableArchive {
+                        geometry: Some(tsd::GeometryArchive {
+                            position: Some(tsp::Point { x: 100.0, y: 200.0 }),
+                            size: Some(tsp::Size {
+                                width: 800.0,
+                                height: 300.0,
+                            }),
+                            ..Default::default()
+                        }),
+                        parent: Some(reference(4)),
+                        title: Some(reference(71)),
+                        caption: Some(reference(72)),
+                        accessibility_description: Some("Test movie".to_owned()),
+                        ..Default::default()
+                    },
+                    movie_data: Some(tsp::DataReference {
+                        identifier: video.data_identifier,
+                    }),
+                    poster_image_data: Some(tsp::DataReference {
+                        identifier: poster.data_identifier,
+                    }),
+                    style: Some(reference(50)),
+                    original_size: Some(tsp::Size {
+                        width: 800.0,
+                        height: 300.0,
+                    }),
+                    natural_size: Some(tsp::Size {
+                        width: 800.0,
+                        height: 300.0,
+                    }),
+                    flags: Some(0),
+                    ..Default::default()
+                },
+            );
+            movie.archive_info.message_infos[0].object_references = vec![71, 72, 50];
+            movie.archive_info.message_infos[0].data_references =
+                vec![video.data_identifier, poster.data_identifier];
+            archive.insert_object(movie)?;
+            archive.insert_object(object(
+                71,
+                STANDIN_CAPTION_MESSAGE_TYPE,
+                tsd::StandinCaptionArchive::default(),
+            ))?;
+            archive.insert_object(object(
+                72,
+                STANDIN_CAPTION_MESSAGE_TYPE,
+                tsd::StandinCaptionArchive::default(),
+            ))?;
+            let mut build = object(
+                73,
+                BUILD_MESSAGE_TYPE,
+                kn::BuildArchive {
+                    drawable: Some(reference(70)),
+                    delivery: "All at Once".to_owned(),
+                    duration: Some(0.0),
+                    attributes: kn::BuildAttributesArchive {
+                        animation_attributes: Some(kn::AnimationAttributesArchive {
+                            animation_type: Some("In".to_owned()),
+                            effect: Some("apple:movie-start".to_owned()),
+                            duration: Some(0.5),
+                            delay: Some(0.0),
+                            random_number_seed: Some(160_812_089),
+                            ..Default::default()
+                        }),
+                        event_trigger: Some(1),
+                        ..Default::default()
+                    },
+                    chunk_id_seed: Some(1),
+                },
+            );
+            build.archive_info.message_infos[0]
+                .object_references
+                .push(70);
+            archive.insert_object(build)?;
+            let build_uuid = test_uuid(7_001, 7_002);
+            let mut chunk = object(
+                74,
+                BUILD_CHUNK_MESSAGE_TYPE,
+                kn::BuildChunkArchive {
+                    build: Some(reference(73)),
+                    delay: Some(0.0),
+                    duration: Some(0.5),
+                    automatic: Some(false),
+                    referent: Some(true),
+                    build_chunk_identifier: Some(kn::BuildChunkIdentifierArchive {
+                        build_id: Some(build_uuid),
+                        build_chunk_id: Some(1),
+                    }),
+                    build_id: Some(build_uuid),
+                    ..Default::default()
+                },
+            );
+            chunk.archive_info.message_infos[0]
+                .object_references
+                .push(73);
+            archive.insert_object(chunk)
+        })
+        .unwrap();
+    crate::data_reference_registry::add_component_data_reference(
+        &mut package,
+        4,
+        video.data_identifier,
+        70,
+    )
+    .unwrap();
+    crate::data_reference_registry::add_component_data_reference(
+        &mut package,
+        4,
+        poster.data_identifier,
+        70,
+    )
+    .unwrap();
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            archive.object_mut(1).unwrap().archive_info.message_infos[0].object_references =
+                vec![2];
+            archive.object_mut(2).unwrap().archive_info.message_infos[0].object_references =
+                vec![3];
+            archive.object_mut(3).unwrap().archive_info.message_infos[0].object_references =
+                vec![4];
             Ok(())
         })
         .unwrap();

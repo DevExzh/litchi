@@ -2927,6 +2927,7 @@ mod slide_create;
 mod slide_graph;
 mod slide_layout_media;
 mod slide_layout_update;
+mod slide_movies;
 mod slide_number;
 mod slide_preview;
 mod slide_style_graph;
@@ -2948,6 +2949,7 @@ pub use slide_background_gradient::{
     KeynoteGradient, KeynoteGradientAngle, KeynoteGradientKind, KeynoteGradientStop,
 };
 use slide_graph::*;
+pub use slide_movies::{KeynoteSlideMovieInfo, KeynoteSlideMovieKind, RemovedKeynoteSlideMovie};
 pub use soundtrack::{KeynoteSoundtrackMode, KeynoteSoundtrackSettings};
 pub use soundtrack_items::KeynoteSoundtrackItemInfo;
 pub use transition::{

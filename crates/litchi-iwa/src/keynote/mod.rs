@@ -46,13 +46,13 @@ pub use editor::{
     KeynoteMoveAction, KeynoteObjectBuildEffect, KeynoteOpacityAction, KeynoteRgbColorSpace,
     KeynoteRgbaColor, KeynoteRotationAction, KeynoteRotationDirection, KeynoteScaleAction,
     KeynoteShowMode, KeynoteShowSettings, KeynoteSlideBackground, KeynoteSlideInfo,
-    KeynoteSlideLayoutId, KeynoteSlideLayoutInfo, KeynoteSlideTextInfo,
-    KeynoteSlideTextPlaceholder, KeynoteSlideTextRole, KeynoteSoundtrackItemInfo,
-    KeynoteSoundtrackMode, KeynoteSoundtrackSettings, KeynoteSwooshDirection,
-    KeynoteTransitionAcceleration, KeynoteTransitionAnimationParameters,
+    KeynoteSlideLayoutId, KeynoteSlideLayoutInfo, KeynoteSlideMovieInfo, KeynoteSlideMovieKind,
+    KeynoteSlideTextInfo, KeynoteSlideTextPlaceholder, KeynoteSlideTextRole,
+    KeynoteSoundtrackItemInfo, KeynoteSoundtrackMode, KeynoteSoundtrackSettings,
+    KeynoteSwooshDirection, KeynoteTransitionAcceleration, KeynoteTransitionAnimationParameters,
     KeynoteTransitionCustomParameters, KeynoteTransitionDirection, KeynoteTransitionEffect,
     KeynoteTransitionMosaicType, KeynoteTransitionSettings, KeynoteTransitionTextDelivery,
-    RemovedKeynoteTextBox,
+    RemovedKeynoteSlideMovie, RemovedKeynoteTextBox,
 };
 pub use show::KeynoteShow;
 pub use slide::{BuildAnimation, KeynoteSlide, SlideTransition};

@@ -87,7 +87,7 @@ pub(crate) fn shape_geometry(
         )));
     }
     let shape = tswp::ShapeInfoArchive::decode(messages[0].data.as_slice())?;
-    geometry_from_shape(&shape)
+    geometry_from_drawable(&shape.super_.super_)
 }
 
 pub(crate) fn set_shape_geometry(
@@ -123,13 +123,11 @@ pub(crate) fn set_shape_geometry(
         }
         let data = transform_length_delimited_field(original, 1, |shape_archive| {
             transform_length_delimited_field(shape_archive, 1, |drawable_archive| {
-                transform_length_delimited_field(drawable_archive, 1, |geometry| {
-                    patch_geometry(geometry, replacement)
-                })
+                patch_drawable_geometry(drawable_archive, replacement)
             })
         })?;
         let verified = tswp::ShapeInfoArchive::decode(data.as_slice())?;
-        if geometry_from_shape(&verified)? != replacement {
+        if geometry_from_drawable(&verified.super_.super_)? != replacement {
             return Err(Error::InvalidFormat(
                 "iWork drawable geometry patch failed validation".to_owned(),
             ));
@@ -145,10 +143,11 @@ pub(crate) fn set_shape_geometry(
     })
 }
 
-fn geometry_from_shape(shape: &tswp::ShapeInfoArchive) -> Result<DrawableGeometry> {
-    let geometry = shape.super_.super_.geometry.as_ref().ok_or_else(|| {
-        Error::InvalidFormat("iWork text-box shape has no geometry payload".to_owned())
-    })?;
+pub(crate) fn geometry_from_drawable(drawable: &tsd::DrawableArchive) -> Result<DrawableGeometry> {
+    let geometry = drawable
+        .geometry
+        .as_ref()
+        .ok_or_else(|| Error::InvalidFormat("iWork drawable has no geometry payload".to_owned()))?;
     DrawableGeometry {
         position: geometry.position.as_ref().map(|position| DrawablePoint {
             x: position.x,
@@ -162,6 +161,29 @@ fn geometry_from_shape(shape: &tswp::ShapeInfoArchive) -> Result<DrawableGeometr
         angle: geometry.angle,
     }
     .validate()
+}
+
+pub(crate) fn patch_drawable_geometry(
+    data: &[u8],
+    replacement: DrawableGeometry,
+) -> Result<Vec<u8>> {
+    let replacement = replacement.validate()?;
+    let drawable = tsd::DrawableArchive::decode(data)?;
+    if drawable.geometry.is_none() {
+        return Err(Error::InvalidFormat(
+            "iWork drawable has no geometry payload".to_owned(),
+        ));
+    }
+    let data = transform_length_delimited_field(data, 1, |geometry| {
+        patch_geometry(geometry, replacement)
+    })?;
+    let verified = tsd::DrawableArchive::decode(data.as_slice())?;
+    if geometry_from_drawable(&verified)? != replacement {
+        return Err(Error::InvalidFormat(
+            "iWork drawable geometry patch failed validation".to_owned(),
+        ));
+    }
+    Ok(data)
 }
 
 fn patch_geometry(data: &[u8], replacement: DrawableGeometry) -> Result<Vec<u8>> {
@@ -258,14 +280,8 @@ mod tests {
         .unwrap();
         append_unknown_varint(&mut original, 99, 990);
 
-        let baseline = geometry_from_shape(&tswp::ShapeInfoArchive {
-            super_: tsd::ShapeArchive {
-                super_: tsd::DrawableArchive {
-                    geometry: Some(tsd::GeometryArchive::decode(original.as_slice()).unwrap()),
-                    ..Default::default()
-                },
-                ..Default::default()
-            },
+        let baseline = geometry_from_drawable(&tsd::DrawableArchive {
+            geometry: Some(tsd::GeometryArchive::decode(original.as_slice()).unwrap()),
             ..Default::default()
         })
         .unwrap();
