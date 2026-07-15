@@ -1989,6 +1989,10 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                     text_buffer.push(b'\t');
                 },
+                Token::Control(ControlWord::Unicode(code)) => {
+                    let decoded = self.parse_destination_unicode_sequence(*code)?;
+                    text_buffer.extend_from_slice(decoded.as_bytes());
+                },
                 Token::Control(control) => {
                     self.pos += 1;
                     self.apply_control_word(control)?;
@@ -2014,6 +2018,45 @@ impl<'a> Parser<'a> {
 
         self.current_hf_type = None;
         Ok(())
+    }
+
+    fn parse_destination_unicode_sequence(&mut self, first_code: i32) -> RtfResult<String> {
+        let skip_count = self.current_state()?.unicode_skip.max(0) as usize;
+        let mut utf16 = SmallVec::<[u16; 4]>::new();
+        utf16.push(first_code as u16);
+        self.pos += 1;
+        while let Some(Token::Control(ControlWord::Unicode(code))) = self.tokens.get(self.pos) {
+            utf16.push(*code as u16);
+            self.pos += 1;
+        }
+
+        let mut fallback_skip = skip_count.saturating_mul(utf16.len());
+        let mut remainder = String::new();
+        while fallback_skip > 0 && self.pos < self.tokens.len() {
+            match self.tokens.get(self.pos) {
+                Some(Token::Text(text)) => {
+                    let count = text.chars().count();
+                    if count <= fallback_skip {
+                        fallback_skip -= count;
+                    } else {
+                        remainder.extend(text.chars().skip(fallback_skip));
+                        fallback_skip = 0;
+                    }
+                    self.pos += 1;
+                },
+                Some(Token::Control(ControlWord::Unicode(_))) => break,
+                Some(_) => {
+                    fallback_skip = fallback_skip.saturating_sub(1);
+                    self.pos += 1;
+                },
+                None => break,
+            }
+        }
+        let mut decoded = String::from_utf16(&utf16).map_err(|error| {
+            RtfError::InvalidUnicode(format!("invalid destination Unicode: {error}"))
+        })?;
+        decoded.push_str(&remainder);
+        Ok(decoded)
     }
 
     /// Parse footnote or endnote content.

@@ -537,12 +537,31 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Convert sections to owned
-    #[allow(clippy::needless_pass_by_value)]
     fn convert_sections_to_owned(
-        _sections: Vec<super::section::Section<'_>>,
+        sections: Vec<super::section::Section<'_>>,
     ) -> Vec<super::section::Section<'static>> {
-        // TODO: Implement proper conversion when section parsing is fully implemented
-        Vec::new()
+        sections
+            .into_iter()
+            .map(|section| super::section::Section {
+                properties: section.properties,
+                headers_footers: section
+                    .headers_footers
+                    .into_iter()
+                    .map(|header_footer| super::section::HeaderFooter {
+                        header_type: header_footer.header_type,
+                        paragraphs: header_footer
+                            .paragraphs
+                            .into_iter()
+                            .map(|paragraph| super::section::HeaderFooterParagraph {
+                                text: Cow::Owned(paragraph.text.into_owned()),
+                                formatting: paragraph.formatting,
+                                paragraph: paragraph.paragraph,
+                            })
+                            .collect(),
+                    })
+                    .collect(),
+            })
+            .collect()
     }
 
     /// Convert bookmarks to owned
@@ -804,5 +823,28 @@ mod tests {
         assert_eq!(annotation.parent_id.as_deref(), Some("root"));
         assert_eq!(annotation.icon.as_deref(), Some("2"));
         assert_eq!(annotation.time.as_deref(), Some("42"));
+    }
+
+    #[test]
+    fn preserves_parsed_headers_and_footers_in_owned_document() {
+        let rtf = r#"{\rtf1\ansi{\header Main \u20320? header\par Second line}{\footer Page footer}Body}"#;
+        let doc = RtfDocument::parse(rtf).unwrap();
+        assert_eq!(doc.text(), "Body");
+        assert_eq!(doc.sections().len(), 1);
+        let section = &doc.sections()[0];
+        assert_eq!(
+            section
+                .get_header(super::super::section::HeaderFooterType::Header)
+                .unwrap()
+                .text(),
+            "Main 你 header\nSecond line"
+        );
+        assert_eq!(
+            section
+                .get_header(super::super::section::HeaderFooterType::Footer)
+                .unwrap()
+                .text(),
+            "Page footer"
+        );
     }
 }

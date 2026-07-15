@@ -128,6 +128,11 @@ impl<W: Write> RtfWriter<W> {
         // Write document properties before body content.
         self.write_document_info(doc.info())?;
 
+        // Headers and footers belong to the section definition before body text.
+        for section in doc.sections() {
+            self.write_section(section)?;
+        }
+
         // Write document content and reinsert positional bookmark/comment markers.
         self.write_blocks_with_markup(doc.blocks(), doc.bookmarks(), doc.annotations())?;
 
@@ -1019,11 +1024,10 @@ impl<W: Write> RtfWriter<W> {
 
         // Write paragraphs
         for para in &hf.paragraphs {
-            self.write_str(" {")?;
             self.write_formatting(&para.formatting)?;
             self.write_paragraph_properties(&para.paragraph)?;
+            self.write_str(" ")?;
             self.write_text(para.text.as_ref())?;
-            self.write_str("}")?;
             self.write_control_word("par", None)?;
         }
 
@@ -1279,5 +1283,30 @@ mod tests {
         assert_eq!(annotation.text, "Review 你 now");
         assert_eq!(annotation.position, "Before ".len());
         assert_eq!(annotation.range_end, "Before range".len());
+    }
+
+    #[test]
+    fn document_writer_round_trips_headers_and_footers() {
+        let document = RtfDocument::parse(
+            r#"{\rtf1\ansi{\header Header \u20320? one\par Header two}{\footer Footer}Body}"#,
+        )
+        .unwrap();
+        let mut output = Vec::new();
+        RtfWriter::new(&mut output)
+            .write_document(&document)
+            .unwrap();
+
+        let reparsed = RtfDocument::from_bytes(&output).unwrap();
+        assert_eq!(reparsed.text(), "Body");
+        assert_eq!(reparsed.sections().len(), 1);
+        let section = &reparsed.sections()[0];
+        assert_eq!(
+            section.get_header(HeaderFooterType::Header).unwrap().text(),
+            "Header 你 one\nHeader two"
+        );
+        assert_eq!(
+            section.get_header(HeaderFooterType::Footer).unwrap().text(),
+            "Footer"
+        );
     }
 }
