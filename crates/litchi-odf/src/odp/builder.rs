@@ -5,6 +5,7 @@
 use crate::core::{OdfStructure, PackageWriter};
 use crate::odp::MediaReference;
 use crate::odp::Slide;
+use crate::odp::action::write_event_listeners;
 use crate::odp::animation::validate_animation_roots;
 use crate::odp::legacy_animation::validate_legacy_animation_root;
 use crate::odp::media::{EmbeddedMedia, embed_media};
@@ -365,7 +366,17 @@ impl PresentationBuilder {
             )));
         }
 
-        let xml = match shape.shape_type {
+        let element_name = match shape.shape_type {
+            ShapeType::TextBox
+            | ShapeType::Placeholder
+            | ShapeType::Picture
+            | ShapeType::GraphicFrame => "draw:frame",
+            ShapeType::AutoShape => "draw:rect",
+            ShapeType::Line => "draw:line",
+            ShapeType::Connector => "draw:connector",
+            _ => "",
+        };
+        let mut xml = match shape.shape_type {
             ShapeType::TextBox | ShapeType::Placeholder => {
                 let presentation_class = if shape.shape_type == ShapeType::Placeholder {
                     r#" presentation:class="object""#
@@ -494,6 +505,31 @@ impl PresentationBuilder {
                 )));
             },
         };
+        if !shape.event_listeners.is_empty() {
+            let mut listeners = String::new();
+            write_event_listeners(&mut listeners, &shape.event_listeners)?;
+            let closing = format!("</{element_name}>");
+            if xml.ends_with("/>") {
+                xml.truncate(xml.len() - 2);
+                xml.push('>');
+                xml.push_str(&listeners);
+                xml.push_str(&closing);
+            } else if xml.ends_with(&closing) {
+                let insertion = xml.len() - closing.len();
+                xml.insert_str(insertion, &listeners);
+            } else {
+                return Err(litchi_core::Error::InvalidFormat(format!(
+                    "cannot attach ODP event listeners to shape '{name}'"
+                )));
+            }
+        }
+        if let Some(hyperlink) = &shape.hyperlink {
+            let mut wrapped = String::with_capacity(xml.len() + 128);
+            hyperlink.write_open_xml(&mut wrapped)?;
+            wrapped.push_str(&xml);
+            wrapped.push_str("</draw:a>");
+            xml = wrapped;
+        }
         Ok(xml)
     }
 
@@ -716,8 +752,10 @@ mod tests {
     use super::*;
     use crate::core::OwnedPackage;
     use crate::odp::{
-        MediaParameter, Presentation, Shape, TransitionDirection, TransitionSound,
-        TransitionSoundShow, TransitionSpeed, TransitionStyle, TransitionType,
+        DrawingHyperlink, HyperlinkShow, MediaParameter, Presentation, PresentationAction,
+        PresentationEffect, PresentationEventListener, ScriptEventListener, Shape,
+        ShapeEventListener, TransitionDirection, TransitionSound, TransitionSoundShow,
+        TransitionSpeed, TransitionStyle, TransitionType,
     };
     use litchi_core::ShapeType;
 
@@ -851,6 +889,78 @@ mod tests {
                 .unwrap(),
             Some(VIDEO.to_vec())
         );
+    }
+
+    #[test]
+    fn shape_hyperlinks_and_actions_round_trip_through_a_package() {
+        let mut hyperlink = DrawingHyperlink::new("#page2").unwrap();
+        hyperlink.set_actuate_on_request(true);
+        hyperlink.set_show(Some(HyperlinkShow::Replace));
+        hyperlink
+            .set_title(Some("Next & details".to_string()))
+            .unwrap();
+        hyperlink
+            .set_xml_id(Some("actionLink1".to_string()))
+            .unwrap();
+
+        let mut action =
+            PresentationEventListener::new("dom:click", PresentationAction::Sound).unwrap();
+        action.effect = Some(PresentationEffect::new("fade").unwrap());
+        action.speed = Some(TransitionSpeed::Fast);
+        let mut sound = TransitionSound::new("Sounds/click.ogg");
+        sound.play_full = Some(true);
+        sound.actuate_on_request = true;
+        sound.xml_id = Some("clickSound".to_string());
+        action.sound = Some(sound);
+
+        let mut shape = Shape::new();
+        shape.name = Some("Action button".to_string());
+        shape.text = "Continue".to_string();
+        shape.set_hyperlink(Some(hyperlink.clone()));
+        shape
+            .add_event_listener(ShapeEventListener::Script(
+                ScriptEventListener::macro_binding(
+                    "dom:mouseover",
+                    "ooo:script",
+                    "Standard.Module1.Hover",
+                )
+                .unwrap(),
+            ))
+            .unwrap();
+        shape
+            .add_event_listener(ShapeEventListener::Presentation(Box::new(action)))
+            .unwrap();
+
+        let mut builder = PresentationBuilder::new();
+        builder
+            .add_slide_element(Slide {
+                title: None,
+                text: String::new(),
+                index: 0,
+                notes: None,
+                transition: None,
+                animations: Vec::new(),
+                legacy_animation: None,
+                shapes: vec![shape],
+            })
+            .unwrap();
+        let bytes = builder.build().unwrap();
+        let package = OwnedPackage::from_bytes(bytes.clone()).unwrap();
+        let content = String::from_utf8(package.get_file("content.xml").unwrap()).unwrap();
+        assert!(content.contains(r##"<draw:a xlink:type="simple" xlink:href="#page2""##));
+        assert!(content.contains(r#"presentation:action="sound""#));
+        assert!(content.contains(r#"script:macro-name="Standard.Module1.Hover""#));
+
+        let presentation = Presentation::from_bytes(bytes).unwrap();
+        let slides = presentation.slides().unwrap();
+        let parsed = &slides[0].shapes[0];
+        assert_eq!(parsed.hyperlink(), Some(&hyperlink));
+        assert_eq!(parsed.event_listeners().len(), 2);
+        let ShapeEventListener::Presentation(action) = &parsed.event_listeners()[1] else {
+            panic!("expected presentation action");
+        };
+        assert_eq!(action.action, PresentationAction::Sound);
+        assert_eq!(action.sound.as_ref().unwrap().href, "Sounds/click.ogg");
     }
 
     #[test]

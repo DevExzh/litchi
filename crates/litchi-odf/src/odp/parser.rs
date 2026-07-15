@@ -4,8 +4,10 @@ use super::animation::ANIMATION_NAMESPACE;
 use super::legacy_animation::validate_legacy_animation_root;
 use super::{
     AnimationAttribute, AnimationAttributeNamespace, AnimationKind, AnimationNode,
-    LegacyAnimationKind, LegacyAnimationNode, MediaActuate, MediaParameter, MediaReference,
-    MediaShow, Shape, Slide, SlideTransition, TransitionDirection, TransitionSound,
+    DrawingHyperlink, HyperlinkShow, LegacyAnimationKind, LegacyAnimationNode, MediaActuate,
+    MediaParameter, MediaReference, MediaShow, PresentationAction, PresentationEffect,
+    PresentationEffectDirection, PresentationEventListener, ScriptEventListener, Shape,
+    ShapeEventListener, Slide, SlideTransition, TransitionDirection, TransitionSound,
     TransitionSoundShow, TransitionSpeed, TransitionStyle, TransitionType,
 };
 use litchi_core::{Error, Result, ShapeType};
@@ -16,7 +18,9 @@ use quick_xml::reader::NsReader;
 use std::collections::{HashMap, HashSet};
 
 const DRAW_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
+const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const PRESENTATION_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
+const SCRIPT_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:script:1.0";
 const STYLE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:style:1.0";
 const SMIL_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:smil-compatible:1.0";
 const SVG_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0";
@@ -63,6 +67,11 @@ enum OdpElement {
     Object,
     Plugin,
     PluginParameter,
+    DrawingHyperlink,
+    EventListeners,
+    PresentationEventListener,
+    ScriptEventListener,
+    PresentationSound,
     TextParagraph,
     TextSpace,
     TextTab,
@@ -92,6 +101,9 @@ struct ShapeBuilder {
     style_name: Option<String>,
     image_href: Option<String>,
     media: Option<MediaReference>,
+    hyperlink: Option<DrawingHyperlink>,
+    event_listeners: Vec<ShapeEventListener>,
+    event_listeners_seen: bool,
     is_frame: bool,
     is_title: bool,
     has_paragraph: bool,
@@ -151,6 +163,9 @@ impl ShapeBuilder {
             style_name: None,
             image_href: None,
             media: None,
+            hyperlink: None,
+            event_listeners: Vec::new(),
+            event_listeners_seen: false,
             is_frame: false,
             is_title: false,
             has_paragraph: false,
@@ -169,6 +184,8 @@ impl ShapeBuilder {
             style_name: self.style_name,
             image_href: self.image_href,
             media: self.media,
+            hyperlink: self.hyperlink,
+            event_listeners: self.event_listeners,
         }
     }
 
@@ -209,16 +226,28 @@ impl OdpParser {
                 b"object" | b"object-ole" => OdpElement::Object,
                 b"plugin" => OdpElement::Plugin,
                 b"param" => OdpElement::PluginParameter,
+                b"a" => OdpElement::DrawingHyperlink,
                 _ => OdpElement::Other,
             }
+        } else if Self::is_namespace(namespace, OFFICE_NAMESPACE)
+            && local_name == b"event-listeners"
+        {
+            OdpElement::EventListeners
         } else if Self::is_namespace(namespace, PRESENTATION_NAMESPACE) {
             if local_name == b"notes" {
                 OdpElement::Notes
+            } else if local_name == b"event-listener" {
+                OdpElement::PresentationEventListener
+            } else if local_name == b"sound" {
+                OdpElement::PresentationSound
             } else {
                 LegacyAnimationKind::from_local_name(local_name)
                     .map(OdpElement::LegacyAnimation)
                     .unwrap_or(OdpElement::Other)
             }
+        } else if Self::is_namespace(namespace, SCRIPT_NAMESPACE) && local_name == b"event-listener"
+        {
+            OdpElement::ScriptEventListener
         } else if Self::is_namespace(namespace, TABLE_NAMESPACE) && local_name == b"table" {
             OdpElement::Table
         } else if Self::is_namespace(namespace, TEXT_NAMESPACE) {
@@ -618,6 +647,355 @@ impl OdpParser {
         MediaParameter::new(name, value)
     }
 
+    fn required_attr(
+        reader: &NsReader<&[u8]>,
+        element: &BytesStart<'_>,
+        namespace: &[u8],
+        local_name: &[u8],
+        qualified_name: &str,
+    ) -> Result<String> {
+        Self::get_attr(reader, element, namespace, local_name)?.ok_or_else(|| {
+            Error::InvalidFormat(format!("element is missing required {qualified_name}"))
+        })
+    }
+
+    fn require_simple_xlink(
+        reader: &NsReader<&[u8]>,
+        element: &BytesStart<'_>,
+        description: &str,
+    ) -> Result<()> {
+        let link_type =
+            Self::required_attr(reader, element, XLINK_NAMESPACE, b"type", "xlink:type")?;
+        if link_type != "simple" {
+            return Err(Error::InvalidFormat(format!(
+                "{description} xlink:type must be 'simple', found '{link_type}'"
+            )));
+        }
+        Ok(())
+    }
+
+    fn parse_on_request(value: Option<String>, description: &str) -> Result<bool> {
+        match value.as_deref() {
+            None => Ok(false),
+            Some("onRequest") => Ok(true),
+            Some(value) => Err(Error::InvalidFormat(format!(
+                "invalid {description} xlink:actuate '{value}'"
+            ))),
+        }
+    }
+
+    fn drawing_hyperlink(
+        reader: &NsReader<&[u8]>,
+        element: &BytesStart<'_>,
+    ) -> Result<DrawingHyperlink> {
+        Self::require_simple_xlink(reader, element, "draw:a")?;
+        let href = Self::required_attr(reader, element, XLINK_NAMESPACE, b"href", "xlink:href")?;
+        let mut hyperlink = DrawingHyperlink::new(href)?;
+        hyperlink.set_actuate_on_request(Self::parse_on_request(
+            Self::get_attr(reader, element, XLINK_NAMESPACE, b"actuate")?,
+            "draw:a",
+        )?);
+        hyperlink.set_show(
+            Self::get_attr(reader, element, XLINK_NAMESPACE, b"show")?
+                .map(|value| HyperlinkShow::parse(&value))
+                .transpose()?,
+        );
+        hyperlink.set_target_frame_name(Self::get_attr(
+            reader,
+            element,
+            OFFICE_NAMESPACE,
+            b"target-frame-name",
+        )?)?;
+        hyperlink.set_name(Self::get_attr(reader, element, OFFICE_NAMESPACE, b"name")?)?;
+        hyperlink.set_title(Self::get_attr(reader, element, OFFICE_NAMESPACE, b"title")?)?;
+        hyperlink.set_server_map(Self::parse_optional_bool(
+            Self::get_attr(reader, element, OFFICE_NAMESPACE, b"server-map")?,
+            "office:server-map",
+        )?);
+        hyperlink.set_xml_id(Self::get_attr(reader, element, XML_NAMESPACE, b"id")?)?;
+        Ok(hyperlink)
+    }
+
+    fn script_event_listener(
+        reader: &NsReader<&[u8]>,
+        element: &BytesStart<'_>,
+    ) -> Result<ScriptEventListener> {
+        let event_name = Self::required_attr(
+            reader,
+            element,
+            SCRIPT_NAMESPACE,
+            b"event-name",
+            "script:event-name",
+        )?;
+        let language = Self::required_attr(
+            reader,
+            element,
+            SCRIPT_NAMESPACE,
+            b"language",
+            "script:language",
+        )?;
+        let macro_name = Self::get_attr(reader, element, SCRIPT_NAMESPACE, b"macro-name")?;
+        let href = Self::get_attr(reader, element, XLINK_NAMESPACE, b"href")?;
+        let link_type = Self::get_attr(reader, element, XLINK_NAMESPACE, b"type")?;
+        if href.is_some() {
+            Self::require_simple_xlink(reader, element, "script:event-listener")?;
+        } else if link_type.is_some() {
+            return Err(Error::InvalidFormat(
+                "script:event-listener xlink:type requires xlink:href".to_string(),
+            ));
+        }
+        let listener = ScriptEventListener {
+            event_name,
+            language,
+            macro_name,
+            href,
+            actuate_on_request: Self::parse_on_request(
+                Self::get_attr(reader, element, XLINK_NAMESPACE, b"actuate")?,
+                "script:event-listener",
+            )?,
+        };
+        listener.validate()?;
+        Ok(listener)
+    }
+
+    fn presentation_event_listener(
+        reader: &NsReader<&[u8]>,
+        element: &BytesStart<'_>,
+    ) -> Result<PresentationEventListener> {
+        let event_name = Self::required_attr(
+            reader,
+            element,
+            SCRIPT_NAMESPACE,
+            b"event-name",
+            "script:event-name",
+        )?;
+        let action = PresentationAction::parse(&Self::required_attr(
+            reader,
+            element,
+            PRESENTATION_NAMESPACE,
+            b"action",
+            "presentation:action",
+        )?)?;
+        let mut listener = PresentationEventListener::new(event_name, action)?;
+        listener.effect = Self::get_attr(reader, element, PRESENTATION_NAMESPACE, b"effect")?
+            .map(PresentationEffect::new)
+            .transpose()?;
+        listener.direction = Self::get_attr(reader, element, PRESENTATION_NAMESPACE, b"direction")?
+            .map(PresentationEffectDirection::new)
+            .transpose()?;
+        listener.speed = Self::get_attr(reader, element, PRESENTATION_NAMESPACE, b"speed")?
+            .map(|value| TransitionSpeed::parse(&value))
+            .transpose()?;
+        listener.start_scale =
+            Self::get_attr(reader, element, PRESENTATION_NAMESPACE, b"start-scale")?;
+        listener.href = Self::get_attr(reader, element, XLINK_NAMESPACE, b"href")?;
+        let link_type = Self::get_attr(reader, element, XLINK_NAMESPACE, b"type")?;
+        if listener.href.is_some() {
+            Self::require_simple_xlink(reader, element, "presentation:event-listener")?;
+        } else if link_type.is_some() {
+            return Err(Error::InvalidFormat(
+                "presentation:event-listener xlink:type requires xlink:href".to_string(),
+            ));
+        }
+        listener.show_embed =
+            match Self::get_attr(reader, element, XLINK_NAMESPACE, b"show")?.as_deref() {
+                None => false,
+                Some("embed") => true,
+                Some(value) => {
+                    return Err(Error::InvalidFormat(format!(
+                        "invalid presentation:event-listener xlink:show '{value}'"
+                    )));
+                },
+            };
+        listener.actuate_on_request = Self::parse_on_request(
+            Self::get_attr(reader, element, XLINK_NAMESPACE, b"actuate")?,
+            "presentation:event-listener",
+        )?;
+        listener.verb = Self::get_attr(reader, element, PRESENTATION_NAMESPACE, b"verb")?
+            .map(|value| {
+                value.parse::<u64>().map_err(|_| {
+                    Error::InvalidFormat(format!("invalid presentation:verb '{value}'"))
+                })
+            })
+            .transpose()?;
+        listener.validate()?;
+        Ok(listener)
+    }
+
+    fn consume_empty_content(
+        reader: &mut NsReader<&[u8]>,
+        namespace_uri: &[u8],
+        local_name: &[u8],
+        description: &str,
+    ) -> Result<()> {
+        let mut buffer = Vec::new();
+        loop {
+            let (namespace, event) = reader
+                .read_resolved_event_into(&mut buffer)
+                .map_err(|error| Error::InvalidFormat(format!("XML parsing error: {error}")))?;
+            match event {
+                Event::End(ref end)
+                    if Self::is_namespace(&namespace, namespace_uri)
+                        && end.local_name().as_ref() == local_name =>
+                {
+                    return Ok(());
+                },
+                Event::Text(ref text) if Self::decode_text(text)?.trim().is_empty() => {},
+                Event::CData(ref text)
+                    if text
+                        .xml_content(XmlVersion::Explicit1_0)
+                        .map_err(|error| Error::InvalidFormat(error.to_string()))?
+                        .trim()
+                        .is_empty() => {},
+                Event::Eof => {
+                    return Err(Error::InvalidFormat(format!(
+                        "unterminated {description} element"
+                    )));
+                },
+                _ => {
+                    return Err(Error::InvalidFormat(format!(
+                        "{description} must not contain content"
+                    )));
+                },
+            }
+            buffer.clear();
+        }
+    }
+
+    fn parse_presentation_listener_body(
+        reader: &mut NsReader<&[u8]>,
+        mut listener: PresentationEventListener,
+    ) -> Result<PresentationEventListener> {
+        let mut buffer = Vec::new();
+        loop {
+            let (namespace, event) = reader
+                .read_resolved_event_into(&mut buffer)
+                .map_err(|error| Error::InvalidFormat(format!("XML parsing error: {error}")))?;
+            match event {
+                Event::Start(ref element) | Event::Empty(ref element)
+                    if Self::is_namespace(&namespace, PRESENTATION_NAMESPACE)
+                        && element.local_name().as_ref() == b"sound" =>
+                {
+                    if listener.sound.is_some() {
+                        return Err(Error::InvalidFormat(
+                            "presentation event listener contains multiple sounds".to_string(),
+                        ));
+                    }
+                    Self::require_simple_xlink(reader, element, "presentation:sound")?;
+                    listener.sound = Some(Self::parse_transition_sound(reader, element)?);
+                    if matches!(event, Event::Start(_)) {
+                        Self::consume_empty_content(
+                            reader,
+                            PRESENTATION_NAMESPACE,
+                            b"sound",
+                            "presentation:sound",
+                        )?;
+                    }
+                },
+                Event::End(ref end)
+                    if Self::is_namespace(&namespace, PRESENTATION_NAMESPACE)
+                        && end.local_name().as_ref() == b"event-listener" =>
+                {
+                    listener.validate()?;
+                    return Ok(listener);
+                },
+                Event::Text(ref text) if Self::decode_text(text)?.trim().is_empty() => {},
+                Event::CData(ref text)
+                    if text
+                        .xml_content(XmlVersion::Explicit1_0)
+                        .map_err(|error| Error::InvalidFormat(error.to_string()))?
+                        .trim()
+                        .is_empty() => {},
+                Event::Eof => {
+                    return Err(Error::InvalidFormat(
+                        "unterminated presentation:event-listener".to_string(),
+                    ));
+                },
+                _ => {
+                    return Err(Error::InvalidFormat(
+                        "presentation:event-listener may only contain presentation:sound"
+                            .to_string(),
+                    ));
+                },
+            }
+            buffer.clear();
+        }
+    }
+
+    fn parse_event_listeners(reader: &mut NsReader<&[u8]>) -> Result<Vec<ShapeEventListener>> {
+        let mut listeners = Vec::new();
+        let mut buffer = Vec::new();
+        loop {
+            let (namespace, event) = reader
+                .read_resolved_event_into(&mut buffer)
+                .map_err(|error| Error::InvalidFormat(format!("XML parsing error: {error}")))?;
+            match event {
+                Event::Start(ref element) | Event::Empty(ref element)
+                    if Self::is_namespace(&namespace, SCRIPT_NAMESPACE)
+                        && element.local_name().as_ref() == b"event-listener" =>
+                {
+                    if listeners.len() >= 4096 {
+                        return Err(Error::InvalidFormat(
+                            "ODP shape exceeds 4096 event listeners".to_string(),
+                        ));
+                    }
+                    let listener = Self::script_event_listener(reader, element)?;
+                    if matches!(event, Event::Start(_)) {
+                        Self::consume_empty_content(
+                            reader,
+                            SCRIPT_NAMESPACE,
+                            b"event-listener",
+                            "script:event-listener",
+                        )?;
+                    }
+                    listeners.push(ShapeEventListener::Script(listener));
+                },
+                Event::Start(ref element) | Event::Empty(ref element)
+                    if Self::is_namespace(&namespace, PRESENTATION_NAMESPACE)
+                        && element.local_name().as_ref() == b"event-listener" =>
+                {
+                    if listeners.len() >= 4096 {
+                        return Err(Error::InvalidFormat(
+                            "ODP shape exceeds 4096 event listeners".to_string(),
+                        ));
+                    }
+                    let listener = Self::presentation_event_listener(reader, element)?;
+                    let listener = if matches!(event, Event::Start(_)) {
+                        Self::parse_presentation_listener_body(reader, listener)?
+                    } else {
+                        listener
+                    };
+                    listeners.push(ShapeEventListener::Presentation(Box::new(listener)));
+                },
+                Event::End(ref end)
+                    if Self::is_namespace(&namespace, OFFICE_NAMESPACE)
+                        && end.local_name().as_ref() == b"event-listeners" =>
+                {
+                    return Ok(listeners);
+                },
+                Event::Text(ref text) if Self::decode_text(text)?.trim().is_empty() => {},
+                Event::CData(ref text)
+                    if text
+                        .xml_content(XmlVersion::Explicit1_0)
+                        .map_err(|error| Error::InvalidFormat(error.to_string()))?
+                        .trim()
+                        .is_empty() => {},
+                Event::Eof => {
+                    return Err(Error::InvalidFormat(
+                        "unterminated office:event-listeners".to_string(),
+                    ));
+                },
+                _ => {
+                    return Err(Error::InvalidFormat(
+                        "office:event-listeners may only contain script or presentation listeners"
+                            .to_string(),
+                    ));
+                },
+            }
+            buffer.clear();
+        }
+    }
+
     fn append_segment(target: &mut String, has_segment: &mut bool, text: &str) {
         if *has_segment {
             target.push('\n');
@@ -1011,6 +1389,8 @@ impl OdpParser {
         let mut current_paragraph: Option<ParagraphText> = None;
         let mut in_media_plugin = false;
         let mut in_media_parameter = false;
+        let mut current_hyperlink: Option<DrawingHyperlink> = None;
+        let mut hyperlink_shape_seen = false;
 
         loop {
             let (namespace, event) = reader
@@ -1121,6 +1501,42 @@ impl OdpParser {
                                 .add_parameter(Self::media_parameter(&reader, element)?)?;
                             in_media_parameter = true;
                         },
+                        OdpElement::DrawingHyperlink
+                            if in_slide
+                                && !in_notes
+                                && current_shape.is_none()
+                                && current_hyperlink.is_none() =>
+                        {
+                            current_hyperlink = Some(Self::drawing_hyperlink(&reader, element)?);
+                            hyperlink_shape_seen = false;
+                        },
+                        OdpElement::DrawingHyperlink if in_slide => {
+                            return Err(Error::InvalidFormat(
+                                "nested or misplaced draw:a presentation hyperlink".to_string(),
+                            ));
+                        },
+                        OdpElement::EventListeners if current_shape.is_some() => {
+                            let builder = current_shape.as_mut().expect("shape checked above");
+                            if builder.event_listeners_seen {
+                                return Err(Error::InvalidFormat(
+                                    "ODP shape contains multiple office:event-listeners elements"
+                                        .to_string(),
+                                ));
+                            }
+                            builder.event_listeners = Self::parse_event_listeners(&mut reader)?;
+                            builder.event_listeners_seen = true;
+                        },
+                        OdpElement::EventListeners
+                        | OdpElement::PresentationEventListener
+                        | OdpElement::ScriptEventListener
+                        | OdpElement::PresentationSound
+                            if in_slide =>
+                        {
+                            return Err(Error::InvalidFormat(
+                                "presentation event metadata must be contained by a shape's office:event-listeners"
+                                    .to_string(),
+                            ));
+                        },
                         _ if in_media_parameter => {
                             return Err(Error::InvalidFormat(
                                 "draw:param cannot contain child elements".to_string(),
@@ -1176,8 +1592,18 @@ impl OdpParser {
                         },
                         OdpElement::Shape(shape_element) => {
                             if in_slide && current_shape.is_none() {
-                                current_shape =
-                                    Some(Self::shape_builder(&reader, element, shape_element)?);
+                                if current_hyperlink.is_some() && hyperlink_shape_seen {
+                                    return Err(Error::InvalidFormat(
+                                        "draw:a must wrap exactly one drawing shape".to_string(),
+                                    ));
+                                }
+                                let mut builder =
+                                    Self::shape_builder(&reader, element, shape_element)?;
+                                if let Some(hyperlink) = &current_hyperlink {
+                                    builder.hyperlink = Some(hyperlink.clone());
+                                    hyperlink_shape_seen = true;
+                                }
+                                current_shape = Some(builder);
                                 shape_depth = 0;
                             } else if current_shape.is_some() {
                                 shape_depth += 1;
@@ -1305,6 +1731,32 @@ impl OdpParser {
                                 ));
                             }
                         },
+                        OdpElement::DrawingHyperlink if in_slide => {
+                            return Err(Error::InvalidFormat(
+                                "draw:a must wrap exactly one non-empty drawing shape".to_string(),
+                            ));
+                        },
+                        OdpElement::EventListeners if current_shape.is_some() => {
+                            let builder = current_shape.as_mut().expect("shape checked above");
+                            if builder.event_listeners_seen {
+                                return Err(Error::InvalidFormat(
+                                    "ODP shape contains multiple office:event-listeners elements"
+                                        .to_string(),
+                                ));
+                            }
+                            builder.event_listeners_seen = true;
+                        },
+                        OdpElement::EventListeners
+                        | OdpElement::PresentationEventListener
+                        | OdpElement::ScriptEventListener
+                        | OdpElement::PresentationSound
+                            if in_slide =>
+                        {
+                            return Err(Error::InvalidFormat(
+                                "presentation event metadata must be contained by a shape's office:event-listeners"
+                                    .to_string(),
+                            ));
+                        },
                         OdpElement::PluginParameter
                             if in_media_plugin
                                 && !in_media_parameter
@@ -1426,8 +1878,18 @@ impl OdpParser {
                             }
                         },
                         OdpElement::Shape(shape_element) if in_slide && current_shape.is_none() => {
+                            if current_hyperlink.is_some() && hyperlink_shape_seen {
+                                return Err(Error::InvalidFormat(
+                                    "draw:a must wrap exactly one drawing shape".to_string(),
+                                ));
+                            }
+                            let mut builder = Self::shape_builder(&reader, element, shape_element)?;
+                            if let Some(hyperlink) = &current_hyperlink {
+                                builder.hyperlink = Some(hyperlink.clone());
+                                hyperlink_shape_seen = true;
+                            }
                             Self::finish_shape(
-                                Self::shape_builder(&reader, element, shape_element)?,
+                                builder,
                                 &mut current_slide_title,
                                 &mut current_slide_text,
                                 &mut current_slide_has_segment,
@@ -1478,8 +1940,23 @@ impl OdpParser {
                         continue;
                     }
                     match element_type {
+                        OdpElement::DrawingHyperlink if current_hyperlink.is_some() => {
+                            if current_shape.is_some() || !hyperlink_shape_seen {
+                                return Err(Error::InvalidFormat(
+                                    "draw:a must wrap exactly one complete drawing shape"
+                                        .to_string(),
+                                ));
+                            }
+                            current_hyperlink = None;
+                            hyperlink_shape_seen = false;
+                        },
                         OdpElement::Page => {
                             if in_slide {
+                                if current_hyperlink.is_some() {
+                                    return Err(Error::InvalidFormat(
+                                        "unterminated draw:a presentation hyperlink".to_string(),
+                                    ));
+                                }
                                 slides.push(Slide {
                                     title: current_slide_title.take(),
                                     text: std::mem::take(&mut current_slide_text),
@@ -1704,6 +2181,8 @@ mod tests {
             style_name: Some("Style1".to_string()),
             image_href: None,
             media: None,
+            hyperlink: None,
+            event_listeners: Vec::new(),
         };
         let debug_str = format!("{:?}", shape);
         assert!(debug_str.contains("Shape"));
@@ -1723,6 +2202,8 @@ mod tests {
             style_name: None,
             image_href: None,
             media: None,
+            hyperlink: None,
+            event_listeners: Vec::new(),
         };
         let cloned = shape.clone();
         assert_eq!(shape.shape_type, cloned.shape_type);
@@ -1757,6 +2238,8 @@ mod tests {
                 style_name: None,
                 image_href: None,
                 media: None,
+                hyperlink: None,
+                event_listeners: Vec::new(),
             };
             let _ = format!("{:?}", shape);
         }
@@ -2014,6 +2497,64 @@ mod tests {
                 r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:x="http://www.w3.org/1999/xlink"><o:body><o:presentation><d:page>{plugin}</d:page></o:presentation></o:body></o:document-content>"#
             );
             assert!(OdpParser::parse_slides(&xml).is_err(), "accepted {plugin}");
+        }
+    }
+
+    #[test]
+    fn parses_shape_hyperlinks_and_inert_event_bindings() {
+        let xml = r##"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:p="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:sc="urn:oasis:names:tc:opendocument:xmlns:script:1.0" xmlns:x="http://www.w3.org/1999/xlink" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0"><o:body><o:presentation><d:page><d:a x:type="simple" x:href="#page2" x:actuate="onRequest" x:show="replace" o:target-frame-name="_self" o:name="jump" o:title="Jump &amp; return" o:server-map="true" xml:id="link1"><d:rect d:name="Action" s:x="1cm"><o:event-listeners><sc:event-listener sc:event-name="dom:click" sc:language="ooo:script" sc:macro-name="Standard.Module1.Main"/><sc:event-listener sc:event-name="dom:mouseover" sc:language="javascript" x:type="simple" x:href="Scripts/hover.js" x:actuate="onRequest"/><p:event-listener sc:event-name="dom:click" p:action="show" p:effect="fade" p:direction="from-left" p:speed="fast" p:start-scale="50%" x:type="simple" x:href="#page3" x:show="embed" x:actuate="onRequest" p:verb="2"><p:sound x:type="simple" x:href="Sounds/click.ogg" x:actuate="onRequest" x:show="replace" p:play-full="true" xml:id="sound1"/></p:event-listener></o:event-listeners></d:rect></d:a></d:page></o:presentation></o:body></o:document-content>"##;
+
+        let slides = OdpParser::parse_slides(xml).unwrap();
+        let shape = &slides[0].shapes[0];
+        let hyperlink = shape.hyperlink().unwrap();
+        assert_eq!(hyperlink.href(), "#page2");
+        assert!(hyperlink.actuate_on_request());
+        assert_eq!(hyperlink.show(), Some(HyperlinkShow::Replace));
+        assert_eq!(hyperlink.target_frame_name(), Some("_self"));
+        assert_eq!(hyperlink.title(), Some("Jump & return"));
+        assert_eq!(hyperlink.server_map(), Some(true));
+        assert_eq!(hyperlink.xml_id(), Some("link1"));
+
+        assert_eq!(shape.event_listeners().len(), 3);
+        let ShapeEventListener::Script(macro_listener) = &shape.event_listeners()[0] else {
+            panic!("expected script listener");
+        };
+        assert_eq!(
+            macro_listener.macro_name.as_deref(),
+            Some("Standard.Module1.Main")
+        );
+        let ShapeEventListener::Presentation(action) = &shape.event_listeners()[2] else {
+            panic!("expected presentation listener");
+        };
+        assert_eq!(action.action, PresentationAction::Show);
+        assert_eq!(action.effect.as_ref().unwrap().as_str(), "fade");
+        assert_eq!(action.direction.as_ref().unwrap().as_str(), "from-left");
+        assert_eq!(action.speed, Some(TransitionSpeed::Fast));
+        assert_eq!(action.start_scale.as_deref(), Some("50%"));
+        assert_eq!(action.verb, Some(2));
+        assert_eq!(action.sound.as_ref().unwrap().href, "Sounds/click.ogg");
+    }
+
+    #[test]
+    fn rejects_invalid_shape_hyperlinks_and_event_bindings() {
+        let invalid = [
+            r##"<d:a x:href="#p"><d:rect/></d:a>"##,
+            r##"<d:a x:type="simple" x:href="#p"/>"##,
+            r##"<d:a x:type="simple" x:href="#p"><d:rect/><d:rect/></d:a>"##,
+            r#"<p:event-listener sc:event-name="dom:click" p:action="next-page"/>"#,
+            r#"<d:rect><o:event-listeners><sc:event-listener sc:event-name="dom:click" sc:language="ooo:script" sc:macro-name="M" x:type="simple" x:href="S"/></o:event-listeners></d:rect>"#,
+            r#"<d:rect><o:event-listeners><p:event-listener sc:event-name="dom:click" p:action="invalid"/></o:event-listeners></d:rect>"#,
+            r#"<d:rect><o:event-listeners><p:event-listener sc:event-name="dom:click" p:action="sound"><p:sound x:href="a" x:type="extended"/></p:event-listener></o:event-listeners></d:rect>"#,
+            r#"<d:rect><o:event-listeners/><o:event-listeners/></d:rect>"#,
+        ];
+        for fragment in invalid {
+            let xml = format!(
+                r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:p="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:sc="urn:oasis:names:tc:opendocument:xmlns:script:1.0" xmlns:x="http://www.w3.org/1999/xlink"><o:body><o:presentation><d:page>{fragment}</d:page></o:presentation></o:body></o:document-content>"#
+            );
+            assert!(
+                OdpParser::parse_slides(&xml).is_err(),
+                "accepted {fragment}"
+            );
         }
     }
 

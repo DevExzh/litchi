@@ -1,6 +1,10 @@
 //! Slide and shape structures for ODP presentations.
 
-use super::{AnimationNode, LegacyAnimationNode, MediaReference, SlideTransition};
+use super::{
+    AnimationNode, DrawingHyperlink, LegacyAnimationNode, MediaReference, ShapeEventListener,
+    SlideTransition,
+};
+use crate::odp::action::validate_event_listeners;
 use litchi_core::Result;
 
 /// A slide in an ODP presentation.
@@ -160,6 +164,10 @@ pub struct Shape {
     pub image_href: Option<String>,
     /// Inert audio/video plugin referenced by this frame.
     pub media: Option<MediaReference>,
+    /// Optional hyperlink wrapping this shape.
+    pub hyperlink: Option<DrawingHyperlink>,
+    /// Inert event listeners attached directly to this shape.
+    pub event_listeners: Vec<ShapeEventListener>,
 }
 
 impl Shape {
@@ -176,6 +184,8 @@ impl Shape {
             style_name: None,
             image_href: None,
             media: None,
+            hyperlink: None,
+            event_listeners: Vec::new(),
         }
     }
 
@@ -225,6 +235,38 @@ impl Shape {
         self.image_href = None;
         self.media = Some(media);
         self
+    }
+
+    /// Return the optional hyperlink wrapping this shape.
+    pub fn hyperlink(&self) -> Option<&DrawingHyperlink> {
+        self.hyperlink.as_ref()
+    }
+
+    /// Attach or remove a hyperlink wrapper.
+    pub fn set_hyperlink(&mut self, hyperlink: Option<DrawingHyperlink>) {
+        self.hyperlink = hyperlink;
+    }
+
+    /// Return inert event bindings attached to the shape.
+    pub fn event_listeners(&self) -> &[ShapeEventListener] {
+        &self.event_listeners
+    }
+
+    /// Return mutable inert event bindings.
+    pub fn event_listeners_mut(&mut self) -> &mut Vec<ShapeEventListener> {
+        &mut self.event_listeners
+    }
+
+    /// Add an inert event binding, subject to the per-shape safety limit.
+    pub fn add_event_listener(&mut self, listener: ShapeEventListener) -> Result<()> {
+        if self.event_listeners.len() >= 4096 {
+            return Err(litchi_core::Error::InvalidFormat(
+                "ODP shape exceeds 4096 event listeners".to_string(),
+            ));
+        }
+        validate_event_listeners(std::slice::from_ref(&listener))?;
+        self.event_listeners.push(listener);
+        Ok(())
     }
 
     /// Set the image source and mark this shape as a picture.
@@ -338,6 +380,8 @@ mod tests {
             style_name: None,
             image_href: None,
             media: None,
+            hyperlink: None,
+            event_listeners: Vec::new(),
         }];
         let slide = Slide {
             title: None,
@@ -448,6 +492,8 @@ mod tests {
             style_name: None,
             image_href: None,
             media: None,
+            hyperlink: None,
+            event_listeners: Vec::new(),
         };
         assert_eq!(shape.text().unwrap(), "Hello");
     }
@@ -465,6 +511,8 @@ mod tests {
             style_name: None,
             image_href: None,
             media: None,
+            hyperlink: None,
+            event_listeners: Vec::new(),
         };
         assert_eq!(shape.shape_type(), litchi_core::ShapeType::Picture);
     }
@@ -494,6 +542,8 @@ mod tests {
             style_name: None,
             image_href: None,
             media: None,
+            hyperlink: None,
+            event_listeners: Vec::new(),
         };
         assert_eq!(shape.name(), Some("MyShape"));
     }
@@ -511,6 +561,8 @@ mod tests {
             style_name: None,
             image_href: None,
             media: None,
+            hyperlink: None,
+            event_listeners: Vec::new(),
         };
         assert_eq!(shape.name(), None);
     }
@@ -528,6 +580,8 @@ mod tests {
             style_name: None,
             image_href: None,
             media: None,
+            hyperlink: None,
+            event_listeners: Vec::new(),
         };
         let (x, y) = shape.position();
         assert_eq!(x, Some("10cm"));
@@ -547,6 +601,8 @@ mod tests {
             style_name: None,
             image_href: None,
             media: None,
+            hyperlink: None,
+            event_listeners: Vec::new(),
         };
         let (w, h) = shape.dimensions();
         assert_eq!(w, Some("20cm"));
@@ -566,6 +622,8 @@ mod tests {
             style_name: Some("Style1".to_string()),
             image_href: None,
             media: None,
+            hyperlink: None,
+            event_listeners: Vec::new(),
         };
         let cloned = shape.clone();
         assert_eq!(shape.shape_type, cloned.shape_type);

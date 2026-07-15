@@ -533,7 +533,7 @@ impl MutablePresentation {
 
         let transition_styles = super::builder::generate_transition_styles(&self.slides);
         Ok(format!(
-            r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:anim="urn:oasis:names:tc:opendocument:xmlns:animation:1.0" xmlns:smil="urn:oasis:names:tc:opendocument:xmlns:smil-compatible:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink"{} office:version="1.3"><office:scripts/><office:font-face-decls/><office:automatic-styles>{}</office:automatic-styles><office:body><office:presentation>{}</office:presentation></office:body></office:document-content>"#,
+            r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:anim="urn:oasis:names:tc:opendocument:xmlns:animation:1.0" xmlns:smil="urn:oasis:names:tc:opendocument:xmlns:smil-compatible:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:script="urn:oasis:names:tc:opendocument:xmlns:script:1.0"{} office:version="1.3"><office:scripts/><office:font-face-decls/><office:automatic-styles>{}</office:automatic-styles><office:body><office:presentation>{}</office:presentation></office:body></office:document-content>"#,
             extension_declarations, transition_styles, body
         ))
     }
@@ -663,7 +663,8 @@ mod tests {
     use super::*;
     use crate::odp::{
         AnimationAttribute, AnimationAttributeNamespace, AnimationKind, AnimationNode,
-        LegacyAnimationKind, LegacyAnimationNode, PresentationBuilder,
+        DrawingHyperlink, LegacyAnimationKind, LegacyAnimationNode, PresentationAction,
+        PresentationBuilder, PresentationEventListener, ScriptEventListener, ShapeEventListener,
     };
 
     const STYLES: &str = r#"<?xml version="1.0"?><office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><office:styles><office:marker>preserve-me</office:marker></office:styles></office:document-styles>"#;
@@ -954,5 +955,46 @@ mod tests {
             reparsed.slides().unwrap()[0].legacy_animation(),
             Some(&root)
         );
+    }
+
+    #[test]
+    fn mutable_presentation_preserves_shape_links_and_inert_actions() {
+        let mut shape = Shape::new();
+        shape.set_hyperlink(Some(DrawingHyperlink::new("#page2").unwrap()));
+        shape
+            .add_event_listener(ShapeEventListener::Script(
+                ScriptEventListener::external_binding(
+                    "dom:mouseover",
+                    "javascript",
+                    "Scripts/hover.js",
+                )
+                .unwrap(),
+            ))
+            .unwrap();
+        shape
+            .add_event_listener(ShapeEventListener::Presentation(Box::new(
+                PresentationEventListener::new("dom:click", PresentationAction::NextPage).unwrap(),
+            )))
+            .unwrap();
+
+        let mut builder = PresentationBuilder::new();
+        builder
+            .add_slide_element(Slide {
+                title: None,
+                text: String::new(),
+                index: 0,
+                notes: None,
+                transition: None,
+                animations: Vec::new(),
+                legacy_animation: None,
+                shapes: vec![shape.clone()],
+            })
+            .unwrap();
+        let presentation = Presentation::from_bytes(builder.build().unwrap()).unwrap();
+        let mutable = MutablePresentation::from_presentation(presentation).unwrap();
+        let reparsed = Presentation::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+        let parsed = &reparsed.slides().unwrap()[0].shapes[0];
+        assert_eq!(parsed.hyperlink(), shape.hyperlink());
+        assert_eq!(parsed.event_listeners(), shape.event_listeners());
     }
 }

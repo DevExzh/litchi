@@ -22,6 +22,7 @@
 //! - ✅ Slide transition and automatic-timing style resolution
 //! - ✅ Inert ODF/SMIL timing trees and legacy presentation effects
 //! - ✅ Inert audio/video plugin references and parameters
+//! - ✅ Inert shape hyperlinks, presentation actions, and script bindings
 //!
 //! ## ✅ Writing (`builder.rs`, `mutable.rs`) - COMPLETE
 //! - ✅ `PresentationBuilder::new()` - Create new presentations
@@ -34,13 +35,13 @@
 //! - ✅ Slide transitions, timings, and transition sounds
 //! - ✅ Modern and legacy animation-tree creation and namespace-preserving round trips
 //! - ✅ Package-contained audio/video embedding and mutable preservation
+//! - ✅ Shape hyperlink/action creation and inert round trips
 //!
 //! ## 🚧 TODO - Advanced Features
 //! - ⚠️ Custom slide layouts
 //! - ⚠️ Advanced shape properties (gradients, shadows, 3D effects)
 //! - ⚠️ Slide master editing
 //! - ⚠️ SmartArt/diagrams
-//! - ⚠️ Action buttons and hyperlinks
 //! - ⚠️ Embedded charts
 //! - ⚠️ Presentation protection
 //!
@@ -49,6 +50,7 @@
 //! - odfpy: `odf/draw.py`, `odf/presentation.py`
 //! - ODF Toolkit: Simple API - Presentation class
 
+mod action;
 mod animation;
 mod builder;
 mod legacy_animation;
@@ -59,6 +61,11 @@ mod presentation;
 mod slide;
 mod transition;
 
+pub use action::{
+    DrawingHyperlink, HyperlinkShow, PresentationAction, PresentationEffect,
+    PresentationEffectDirection, PresentationEventListener, ScriptEventListener,
+    ShapeEventListener,
+};
 pub use animation::{
     AnimationAttribute, AnimationAttributeNamespace, AnimationKind, AnimationNode,
 };

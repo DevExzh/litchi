@@ -134,6 +134,7 @@
 //! - ✅ Slide transition and automatic-timing style resolution
 //! - ✅ Inert ODF/SMIL timing trees and legacy presentation effects
 //! - ✅ Inert audio/video plugin references and parameters
+//! - ✅ Inert shape hyperlinks, presentation actions, and script bindings
 //!
 //! ### Writing (`odp/builder.rs`, `odp/mutable.rs`)
 //! - ✅ PresentationBuilder for creating new ODP files
@@ -146,6 +147,7 @@
 //! - ✅ Slide transitions, timings, and transition sounds
 //! - ✅ Modern and legacy animation-tree creation and namespace-preserving round trips
 //! - ✅ Package-contained audio/video embedding and mutable preservation
+//! - ✅ Shape hyperlink/action creation and inert round trips
 //! - ✅ Save to file or bytes
 //!
 //! ### TODO - Advanced Features
@@ -243,8 +245,10 @@ pub use litchi_core::unit::{Length, LengthUnit};
 // Re-export main types for convenience
 pub use odp::{
     AnimationAttribute, AnimationAttributeNamespace, AnimationKind, AnimationNode,
-    LegacyAnimationKind, LegacyAnimationNode, MediaActuate, MediaParameter, MediaReference,
-    MediaShow, MutablePresentation, Presentation, PresentationBuilder, SlideTransition,
+    DrawingHyperlink, HyperlinkShow, LegacyAnimationKind, LegacyAnimationNode, MediaActuate,
+    MediaParameter, MediaReference, MediaShow, MutablePresentation, Presentation,
+    PresentationAction, PresentationBuilder, PresentationEffect, PresentationEffectDirection,
+    PresentationEventListener, ScriptEventListener, ShapeEventListener, SlideTransition,
     TransitionDirection, TransitionSound, TransitionSoundShow, TransitionSpeed, TransitionStyle,
     TransitionType,
 };

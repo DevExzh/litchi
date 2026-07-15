@@ -417,7 +417,7 @@ pub(crate) fn validate_media_type(media_type: &str) -> Result<()> {
     Ok(())
 }
 
-fn validate_href(href: &str) -> Result<()> {
+pub(crate) fn validate_href(href: &str) -> Result<()> {
     if href.is_empty() {
         return Err(Error::InvalidFormat(
             "ODP media href cannot be empty".to_string(),
@@ -426,7 +426,7 @@ fn validate_href(href: &str) -> Result<()> {
     validate_bounded_xml_value(href, "ODP media href")
 }
 
-fn validate_bounded_xml_value(value: &str, description: &str) -> Result<()> {
+pub(crate) fn validate_bounded_xml_value(value: &str, description: &str) -> Result<()> {
     if value.len() > 1_048_576 {
         return Err(Error::InvalidFormat(format!("{description} exceeds 1 MiB")));
     }
@@ -443,7 +443,7 @@ fn validate_bounded_xml_value(value: &str, description: &str) -> Result<()> {
     Ok(())
 }
 
-fn validate_ncname(value: &str, description: &str) -> Result<()> {
+pub(crate) fn validate_ncname(value: &str, description: &str) -> Result<()> {
     let mut chars = value.chars();
     let Some(first) = chars.next() else {
         return Err(Error::InvalidFormat(format!(
