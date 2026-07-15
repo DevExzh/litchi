@@ -1751,6 +1751,7 @@ impl DocWriter {
                     cells: Vec::with_capacity(cols),
                     height: 0,
                     is_header: false,
+                    allow_break: true,
                 },
             };
             for _ in 0..cols {
@@ -3640,10 +3641,32 @@ mod tests {
                     ],
                     height: 360,
                     is_header: true,
+                    allow_break: true,
                 },
             )
             .unwrap();
         writer.set_table_cell_text(table, 1, 0, "C").unwrap();
+        writer
+            .set_table_row_formatting(
+                table,
+                1,
+                crate::doc::writer::TableRow {
+                    cells: vec![
+                        crate::doc::writer::TableCell {
+                            width: 4320,
+                            merged: false,
+                        },
+                        crate::doc::writer::TableCell {
+                            width: 4320,
+                            merged: false,
+                        },
+                    ],
+                    height: -480,
+                    is_header: false,
+                    allow_break: false,
+                },
+            )
+            .unwrap();
         let second_table = writer.add_table(1, 1).unwrap();
         writer
             .set_table_cell_text(second_table, 0, 0, "Separate")
@@ -3662,6 +3685,7 @@ mod tests {
             );
             assert_eq!(rows[0].properties().unwrap().row_height, Some(360));
             assert!(rows[0].properties().unwrap().is_header_row);
+            assert!(!rows[0].properties().unwrap().allow_row_break);
             assert_eq!(
                 rows[0].cells().unwrap()[0].text().unwrap(),
                 "A😀\ncontinued"
@@ -3683,6 +3707,8 @@ mod tests {
             );
             assert_eq!(rows[1].cells().unwrap()[0].text().unwrap(), "C");
             assert_eq!(rows[1].cells().unwrap()[1].text().unwrap(), "");
+            assert_eq!(rows[1].properties().unwrap().row_height, Some(-480));
+            assert!(!rows[1].properties().unwrap().allow_row_break);
             assert_eq!(
                 tables[1].rows().unwrap()[0].cells().unwrap()[0]
                     .text()
@@ -4633,6 +4659,7 @@ mod tests {
             }],
             height: 0,
             is_header: false,
+            allow_break: true,
         };
         assert!(writer.set_table_row_formatting(table, 0, one_cell).is_err());
 
@@ -4649,6 +4676,7 @@ mod tests {
             ],
             height: 0,
             is_header: false,
+            allow_break: true,
         };
         assert!(
             writer
@@ -4669,6 +4697,7 @@ mod tests {
             ],
             height: 0,
             is_header: true,
+            allow_break: true,
         };
         writer
             .set_table_row_formatting(table, 1, late_header)

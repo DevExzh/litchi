@@ -15,8 +15,6 @@ pub enum TapBuildError {
     InvalidCellCount(usize),
     /// Cumulative cell boundaries exceed signed 16-bit twip coordinates.
     CellWidthsOverflow,
-    /// Positive row heights are limited to signed 16-bit twip values.
-    InvalidRowHeight(u16),
     /// A merge continuation cannot occur in the first cell.
     MergeWithoutPrecedingCell,
 }
@@ -36,9 +34,6 @@ impl std::fmt::Display for TapBuildError {
                     f,
                     "DOC cell widths exceed the signed 16-bit coordinate range"
                 )
-            },
-            Self::InvalidRowHeight(height) => {
-                write!(f, "DOC row height {height} exceeds 32767 twips")
             },
             Self::MergeWithoutPrecedingCell => {
                 write!(f, "the first DOC table cell cannot be a merge continuation")
@@ -60,14 +55,27 @@ pub struct TableCell {
 }
 
 /// Table row properties
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct TableRow {
     /// Cells in this row
     pub cells: Vec<TableCell>,
-    /// Row height (in twips)
-    pub height: u16,
+    /// Row height in twips (positive = at least, negative = exact, zero = auto)
+    pub height: i16,
     /// Header row flag
     pub is_header: bool,
+    /// Whether the row may split across page breaks
+    pub allow_break: bool,
+}
+
+impl Default for TableRow {
+    fn default() -> Self {
+        Self {
+            cells: Vec::new(),
+            height: 0,
+            is_header: false,
+            allow_break: true,
+        }
+    }
 }
 
 /// TAP (Table Properties) builder
@@ -120,10 +128,6 @@ pub(crate) fn generate_row_sprms(row: &TableRow) -> Result<Vec<u8>, TapBuildErro
     if row.cells.first().is_some_and(|cell| cell.merged) {
         return Err(TapBuildError::MergeWithoutPrecedingCell);
     }
-    if row.height > i16::MAX as u16 {
-        return Err(TapBuildError::InvalidRowHeight(row.height));
-    }
-
     let effective_widths = if row.cells.iter().all(|cell| cell.width == 0) {
         const DEFAULT_TABLE_WIDTH: u32 = 8640;
         (0..cell_count)
@@ -148,11 +152,14 @@ pub(crate) fn generate_row_sprms(row: &TableRow) -> Result<Vec<u8>, TapBuildErro
     }
 
     let mut builder = SprmBuilder::new();
+    if !row.allow_break || row.cells.iter().any(|cell| cell.merged) {
+        builder.add_bool(0x3403, true);
+    }
     if row.is_header {
         builder.add_bool(0x3404, true);
     }
-    if row.height > 0 {
-        builder.add_word(0x9407, row.height);
+    if row.height != 0 {
+        builder.add_signed_word(0x9407, row.height);
     }
     let mut sprms = builder.build();
 
@@ -205,6 +212,7 @@ pub fn create_simple_table(rows: usize, cols: usize, cell_width: u16) -> TapBuil
             cells,
             height: 0, // Auto height
             is_header: false,
+            allow_break: true,
         });
     }
 
@@ -229,15 +237,17 @@ mod tests {
                     merged: false,
                 },
             ],
-            height: 200,
+            height: -200,
             is_header: true,
+            allow_break: false,
         });
 
         let sprms = builder.try_generate_row_sprms(0).unwrap();
         let tap = crate::doc::parts::tap::TableProperties::from_sprm(&sprms).unwrap();
         assert_eq!(tap.cell_boundaries, [0, 1000, 2000]);
-        assert_eq!(tap.row_height, Some(200));
+        assert_eq!(tap.row_height, Some(-200));
         assert!(tap.is_header_row);
+        assert!(!tap.allow_row_break);
         assert_eq!(
             tap.cell_properties[0].preferred_width.unwrap().width_type,
             crate::doc::parts::tap::WidthType::Twips
@@ -273,8 +283,9 @@ mod tests {
                         merged: false,
                     },
                 ],
-                height: 200 + (i as u16 * 50),
+                height: 200 + (i as i16 * 50),
                 is_header: i == 0,
+                allow_break: true,
             });
         }
 
@@ -319,6 +330,7 @@ mod tests {
             }],
             height: 0,
             is_header: false,
+            allow_break: true,
         });
         assert_eq!(
             builder.try_generate_row_sprms(0),
@@ -333,6 +345,7 @@ mod tests {
             }],
             height: 0,
             is_header: false,
+            allow_break: true,
         });
         assert_eq!(
             builder.try_generate_row_sprms(0),
