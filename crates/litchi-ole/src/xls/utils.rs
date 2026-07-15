@@ -122,27 +122,18 @@ pub fn parse_formula_value(data: &[u8]) -> XlsResult<FormulaValue> {
         });
     }
 
-    match data[6] {
-        0x00 => {
-            // String (will be in next record)
-            Ok(FormulaValue::Empty)
-        },
-        0x01 => {
-            // Boolean
-            Ok(FormulaValue::Bool(data[2] != 0))
-        },
-        0x02 => {
-            // Error
-            Ok(FormulaValue::Error(data[2]))
-        },
-        0x03 => {
-            // Empty string
-            Ok(FormulaValue::String(String::new()))
-        },
-        _ => {
-            // Number
-            Ok(FormulaValue::Number(binary::read_f64_le_at(data, 0)?))
-        },
+    if data[6..8] != [0xFF, 0xFF] {
+        return Ok(FormulaValue::Number(binary::read_f64_le_at(data, 0)?));
+    }
+
+    match data[0] {
+        0x00 => Ok(FormulaValue::StringPending),
+        0x01 => Ok(FormulaValue::Bool(data[2] != 0)),
+        0x02 => Ok(FormulaValue::Error(data[2])),
+        0x03 => Ok(FormulaValue::String(String::new())),
+        value_type => Err(XlsError::InvalidData(format!(
+            "Invalid formula cached-value type: {value_type}"
+        ))),
     }
 }
 
@@ -272,6 +263,32 @@ mod tests {
         let encoded_float = ((1.5f64.to_bits() >> 32) as u32) & 0xFFFF_FFFC;
         assert_eq!(rk_to_f64(encoded_float), 1.5);
         assert_eq!(rk_to_f64(encoded_float | 0x01), 0.015);
+    }
+
+    #[test]
+    fn decodes_formula_cached_value_marker_and_types() {
+        assert!(matches!(
+            parse_formula_value(&[0, 0, 0, 0, 0, 0, 0xFF, 0xFF]).unwrap(),
+            FormulaValue::StringPending
+        ));
+        assert!(matches!(
+            parse_formula_value(&[1, 0, 1, 0, 0, 0, 0xFF, 0xFF]).unwrap(),
+            FormulaValue::Bool(true)
+        ));
+        assert!(matches!(
+            parse_formula_value(&[2, 0, 0x07, 0, 0, 0, 0xFF, 0xFF]).unwrap(),
+            FormulaValue::Error(0x07)
+        ));
+        assert!(matches!(
+            parse_formula_value(&[3, 0, 0, 0, 0, 0, 0xFF, 0xFF]).unwrap(),
+            FormulaValue::String(value) if value.is_empty()
+        ));
+
+        let numeric = 3.5f64.to_le_bytes();
+        assert!(matches!(
+            parse_formula_value(&numeric).unwrap(),
+            FormulaValue::Number(value) if value == 3.5
+        ));
     }
 
     #[test]

@@ -100,6 +100,7 @@ impl XlsCell {
             } => {
                 let cell_value = match value {
                     FormulaValue::Number(n) => CellValue::Float(*n),
+                    FormulaValue::StringPending => CellValue::Empty,
                     FormulaValue::String(s) => CellValue::String(s.clone()),
                     FormulaValue::Bool(b) => CellValue::Bool(*b),
                     FormulaValue::Error(e) => CellValue::Error(format!("Error {}", e)),

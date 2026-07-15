@@ -1109,6 +1109,8 @@ pub enum BoolErrValue {
 #[derive(Debug, Clone)]
 pub enum FormulaValue {
     Number(f64),
+    /// String value stored in the immediately following BIFF String record.
+    StringPending,
     String(String),
     Bool(bool),
     Error(u8),
@@ -1337,9 +1339,9 @@ impl CellRecord {
     }
 
     fn parse_formula(data: &[u8]) -> XlsResult<Self> {
-        if data.len() < 20 {
+        if data.len() < 22 {
             return Err(XlsError::InvalidLength {
-                expected: 20,
+                expected: 22,
                 found: data.len(),
             });
         }
@@ -1348,7 +1350,17 @@ impl CellRecord {
         let col = binary::read_u16_le_at(data, 2)?;
         let xf_index = binary::read_u16_le_at(data, 4)?;
         let value = utils::parse_formula_value(&data[6..14])?;
-        let formula = data[20..].to_vec();
+        let formula_len = binary::read_u16_le_at(data, 20)? as usize;
+        let formula_end = 22usize
+            .checked_add(formula_len)
+            .ok_or_else(|| XlsError::InvalidData("Formula token length overflow".to_string()))?;
+        if formula_end > data.len() {
+            return Err(XlsError::InvalidLength {
+                expected: formula_end,
+                found: data.len(),
+            });
+        }
+        let formula = data[22..formula_end].to_vec();
 
         Ok(CellRecord::Formula {
             row,
@@ -1426,5 +1438,29 @@ mod packed_cell_tests {
         let last_column_offset = data.len() - 2;
         data[last_column_offset..].copy_from_slice(&7u16.to_le_bytes());
         assert!(CellRecord::parse_mul_blank(&data).is_err());
+    }
+
+    #[test]
+    fn formula_uses_declared_token_length() {
+        let mut data = Vec::new();
+        data.extend_from_slice(&1u16.to_le_bytes());
+        data.extend_from_slice(&2u16.to_le_bytes());
+        data.extend_from_slice(&3u16.to_le_bytes());
+        data.extend_from_slice(&4.5f64.to_le_bytes());
+        data.extend_from_slice(&0u16.to_le_bytes());
+        data.extend_from_slice(&0u32.to_le_bytes());
+        data.extend_from_slice(&3u16.to_le_bytes());
+        data.extend_from_slice(&[0x1E, 0x2A, 0x00, 0xFF]);
+
+        let formula = CellRecord::parse(0x0006, &data, &XlsEncoding::Utf16Le).unwrap();
+
+        assert!(matches!(
+            formula,
+            CellRecord::Formula {
+                value: FormulaValue::Number(4.5),
+                formula,
+                ..
+            } if formula == [0x1E, 0x2A, 0x00]
+        ));
     }
 }

@@ -4,11 +4,11 @@ use crate::xls::cell::XlsCell;
 use crate::xls::error::{XlsError, XlsResult};
 use crate::xls::pivot_table::PivotTable;
 use crate::xls::records::{
-    BiffVersion, BofRecord, BoundSheetRecord, CellRecord, DimensionsRecord, RecordIter,
-    SharedStringProperties, SharedStringTable, XlsEncoding,
+    BiffVersion, BofRecord, BoundSheetRecord, CellRecord, DimensionsRecord, FormulaValue,
+    RecordIter, SharedStringProperties, SharedStringTable, XlsEncoding,
 };
 use crate::xls::worksheet::XlsWorksheet;
-use crate::xls::{autofilter, comments, hyperlinks, merged_cells, pivot_table, protection};
+use crate::xls::{autofilter, comments, hyperlinks, merged_cells, pivot_table, protection, utils};
 use litchi_cfb::OleFile;
 use litchi_core::sheet::{Result, Worksheet as SheetTrait, WorksheetIterator};
 use std::io::{Read, Seek};
@@ -240,9 +240,28 @@ impl<R: Read + Seek> XlsWorkbook<R> {
 
         // Collector for TXO comment text: tracks OBJ→TXO→CONTINUE sequences.
         let mut txo_collector = comments::TxoCollector::new();
+        let mut pending_string_formula: Option<CellRecord> = None;
 
         for record_result in record_iter.by_ref() {
             let record = record_result?;
+
+            if let Some(mut formula) = pending_string_formula.take() {
+                if record.header.record_type != 0x0207 {
+                    return Err(XlsError::InvalidRecord {
+                        record_type: record.header.record_type,
+                        message: "String-valued Formula must be followed by a String record"
+                            .to_string(),
+                    });
+                }
+                let text = utils::parse_string_record(&record.data, encoding)?;
+                if let CellRecord::Formula { value, .. } = &mut formula {
+                    *value = FormulaValue::String(text);
+                }
+                if let Some(cell) = XlsCell::from_record(&formula, worksheet.shared_strings()) {
+                    worksheet.add_cell(cell);
+                }
+                continue;
+            }
 
             match record.header.record_type {
                 0x0809 => { // BOF - Beginning of worksheet
@@ -271,7 +290,18 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                 0x0006   // Formula
                 => {
                     let cell_record = CellRecord::parse(record.header.record_type, &record.data, encoding)?;
-                    if let Some(cell) = XlsCell::from_record(&cell_record, worksheet.shared_strings()) {
+                    if matches!(
+                        &cell_record,
+                        CellRecord::Formula {
+                            value: FormulaValue::StringPending,
+                            ..
+                        }
+                    ) {
+                        pending_string_formula = Some(cell_record);
+                    } else if let Some(cell) = XlsCell::from_record(
+                        &cell_record,
+                        worksheet.shared_strings(),
+                    ) {
                         worksheet.add_cell(cell);
                     }
                 }
@@ -562,6 +592,18 @@ mod tests {
         stream.extend_from_slice(data);
     }
 
+    fn string_formula_data(row: u16, col: u16) -> Vec<u8> {
+        let mut data = Vec::new();
+        data.extend_from_slice(&row.to_le_bytes());
+        data.extend_from_slice(&col.to_le_bytes());
+        data.extend_from_slice(&0u16.to_le_bytes());
+        data.extend_from_slice(&[0, 0, 0, 0, 0, 0, 0xFF, 0xFF]);
+        data.extend_from_slice(&0u16.to_le_bytes());
+        data.extend_from_slice(&0u32.to_le_bytes());
+        data.extend_from_slice(&0u16.to_le_bytes());
+        data
+    }
+
     #[test]
     fn worksheet_expands_packed_numeric_and_blank_cells() {
         let mut mul_rk = Vec::new();
@@ -604,5 +646,53 @@ mod tests {
         ));
         assert!(worksheet.get_cell(3, 1).unwrap().is_empty());
         assert!(worksheet.get_cell(3, 2).unwrap().is_empty());
+    }
+
+    #[test]
+    fn worksheet_resolves_formula_value_from_following_string_record() {
+        let mut string_data = Vec::new();
+        string_data.extend_from_slice(&3u16.to_le_bytes());
+        string_data.push(1);
+        for code_unit in "文😀".encode_utf16() {
+            string_data.extend_from_slice(&code_unit.to_le_bytes());
+        }
+
+        let mut stream = Vec::new();
+        push_record(&mut stream, 0x0006, &string_formula_data(4, 5));
+        push_record(&mut stream, 0x0207, &string_data);
+        push_record(&mut stream, 0x000A, &[]);
+        let mut records = RecordIter::new(Cursor::new(stream)).unwrap();
+
+        let worksheet = XlsWorkbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+            &mut records,
+            &XlsEncoding::Utf16Le,
+            "Sheet1",
+            Arc::new(Vec::new()),
+        )
+        .unwrap();
+        let cell = worksheet.get_cell(4, 5).unwrap();
+
+        assert!(cell.is_formula());
+        assert!(matches!(
+            cell.value(),
+            litchi_core::sheet::CellValue::String(value) if value == "文😀"
+        ));
+    }
+
+    #[test]
+    fn worksheet_rejects_formula_missing_its_string_record() {
+        let mut stream = Vec::new();
+        push_record(&mut stream, 0x0006, &string_formula_data(0, 0));
+        push_record(&mut stream, 0x000A, &[]);
+        let mut records = RecordIter::new(Cursor::new(stream)).unwrap();
+
+        let result = XlsWorkbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+            &mut records,
+            &XlsEncoding::Utf16Le,
+            "Sheet1",
+            Arc::new(Vec::new()),
+        );
+
+        assert!(result.is_err());
     }
 }
