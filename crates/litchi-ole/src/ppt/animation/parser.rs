@@ -8,22 +8,25 @@ use super::types::{
     ChartBuildAtom, ChartBuildType, DiagramBuild, DiagramBuildAtom, DiagramBuildType,
     ExtendedTimeNode, LegacyAnimationAtom, LegacyAnimationBuild, LegacyAnimationEffect,
     LegacyTextBuildSubEffect, ParagraphBuild, ParagraphBuildAtom, ParagraphBuildLevel,
-    ParagraphBuildType, SlideAnimationExtension, TimeAnimateColor, TimeAnimateColorBy,
-    TimeAnimateValueType, TimeBehavior, TimeBehaviorAdditive, TimeBehaviorAtom,
-    TimeBehaviorProperty, TimeBehaviorPropertyList, TimeColorBehavior, TimeColorBehaviorAtom,
-    TimeColorDirection, TimeColorModel, TimeCommandBehavior, TimeCommandBehaviorAtom,
-    TimeCommandBehaviorType, TimeCondition, TimeConditionAtom, TimeConditionType,
-    TimeEffectBehavior, TimeEffectBehaviorAtom, TimeEffectFilter, TimeEffectNodeType,
-    TimeEffectTransition, TimeEffectType, TimeIterateData, TimeIterateDirection,
-    TimeIterateIntervalType, TimeIterateType, TimeMasterRelation, TimeModifier, TimeMotionBehavior,
-    TimeMotionBehaviorAtom, TimeMotionOrigin, TimeNodeAtom, TimeNodeFill, TimeNodeKind,
-    TimeNodeProperty, TimeNodePropertyList, TimeNodeRestart, TimePropertyListContext,
-    TimeRotationBehavior, TimeRotationBehaviorAtom, TimeRotationDirection, TimeScaleBehavior,
-    TimeScaleBehaviorAtom, TimeSequenceData, TimeSequenceNextAction, TimeSequencePreviousAction,
-    TimeSetBehavior, TimeSetBehaviorAtom, TimeTriggerEvent, TimeTriggerObject, TimeVisualElement,
-    TimeVisualElementKind, is_valid_animation_attribute_name, is_valid_motion_path,
-    is_valid_runtime_context, is_valid_time_filter, is_valid_time_points_types,
-    is_valid_time_set_value, time_set_attribute_value_type,
+    ParagraphBuildType, SlideAnimationExtension, TimeAnimateBehavior, TimeAnimateBehaviorAtom,
+    TimeAnimateCalculationMode, TimeAnimateColor, TimeAnimateColorBy, TimeAnimateValueType,
+    TimeAnimationValue, TimeAnimationValueList, TimeBehavior, TimeBehaviorAdditive,
+    TimeBehaviorAtom, TimeBehaviorProperty, TimeBehaviorPropertyList, TimeColorBehavior,
+    TimeColorBehaviorAtom, TimeColorDirection, TimeColorModel, TimeCommandBehavior,
+    TimeCommandBehaviorAtom, TimeCommandBehaviorType, TimeCondition, TimeConditionAtom,
+    TimeConditionType, TimeEffectBehavior, TimeEffectBehaviorAtom, TimeEffectFilter,
+    TimeEffectNodeType, TimeEffectTransition, TimeEffectType, TimeIterateData,
+    TimeIterateDirection, TimeIterateIntervalType, TimeIterateType, TimeMasterRelation,
+    TimeModifier, TimeMotionBehavior, TimeMotionBehaviorAtom, TimeMotionOrigin, TimeNodeAtom,
+    TimeNodeFill, TimeNodeKind, TimeNodeProperty, TimeNodePropertyList, TimeNodeRestart,
+    TimePropertyListContext, TimeRotationBehavior, TimeRotationBehaviorAtom, TimeRotationDirection,
+    TimeScaleBehavior, TimeScaleBehaviorAtom, TimeSequenceData, TimeSequenceNextAction,
+    TimeSequencePreviousAction, TimeSetBehavior, TimeSetBehaviorAtom, TimeTriggerEvent,
+    TimeTriggerObject, TimeVariantValue, TimeVisualElement, TimeVisualElementKind,
+    is_valid_animation_attribute_name, is_valid_motion_path, is_valid_runtime_context,
+    is_valid_time_animate_value, is_valid_time_filter, is_valid_time_formula,
+    is_valid_time_points_types, is_valid_time_set_value, time_animation_attribute_value_type,
+    time_set_attribute_value_type,
 };
 use crate::consts::PptRecordType;
 use crate::ppt::package::{PptError, Result};
@@ -573,6 +576,272 @@ pub fn parse_time_behavior_atom(record: &PptRecord) -> Result<TimeBehaviorAtom> 
         additive,
         attribute_names_used: flags & 0x04 != 0,
     })
+}
+
+/// Parse an exact generic property-animation behavior container.
+pub fn parse_time_animate_behavior(record: &PptRecord) -> Result<TimeAnimateBehavior> {
+    require_container(
+        record,
+        PptRecordType::TimeAnimateBehaviorContainer,
+        0,
+        "TimeAnimateBehaviorContainer",
+    )?;
+    let atom = record
+        .children
+        .first()
+        .ok_or_else(|| PptError::InvalidFormat("animate behavior has no atom".to_string()))
+        .and_then(parse_time_animate_behavior_atom)?;
+    let mut index = 1;
+    let values = if record
+        .children
+        .get(index)
+        .is_some_and(|child| child.record_type == PptRecordType::TimeAnimationValueList)
+    {
+        let values = parse_time_animation_value_list(&record.children[index])?;
+        index += 1;
+        Some(values)
+    } else {
+        None
+    };
+    let mut take_string = |instance| -> Result<Option<String>> {
+        if record.children.get(index).is_some_and(|child| {
+            child.record_type == PptRecordType::TimeVariant && child.instance == instance
+        }) {
+            let value = parse_time_variant_string(&record.children[index])?;
+            index += 1;
+            Ok(Some(value))
+        } else {
+            Ok(None)
+        }
+    };
+    let by = take_string(1)?;
+    let from = take_string(2)?;
+    let to = take_string(3)?;
+    let behavior = record
+        .children
+        .get(index)
+        .ok_or_else(|| PptError::InvalidFormat("animate behavior has no target".to_string()))
+        .and_then(parse_time_behavior)?;
+    index += 1;
+    if index != record.children.len() {
+        return Err(PptError::InvalidFormat(
+            "animate behavior has invalid child order or extra children".to_string(),
+        ));
+    }
+    let animate = TimeAnimateBehavior {
+        atom,
+        values,
+        by,
+        from,
+        to,
+        behavior,
+    };
+    validate_animate_behavior(&animate)?;
+    Ok(animate)
+}
+
+/// Parse an exact 12-byte `TimeAnimateBehaviorAtom` payload.
+pub fn parse_time_animate_behavior_atom(record: &PptRecord) -> Result<TimeAnimateBehaviorAtom> {
+    require_atom(
+        record,
+        PptRecordType::TimeAnimateBehavior,
+        0,
+        12,
+        "TimeAnimateBehaviorAtom",
+    )?;
+    let mode_value = read_u32(&record.data, 0);
+    let flags = read_u32(&record.data, 4);
+    let calculation_mode = if flags & 0x08 != 0 {
+        Some(match mode_value {
+            0 => TimeAnimateCalculationMode::Discrete,
+            1 => TimeAnimateCalculationMode::Linear,
+            2 => TimeAnimateCalculationMode::Formula,
+            value => {
+                return Err(PptError::InvalidFormat(format!(
+                    "invalid animate calculation mode {value}"
+                )));
+            },
+        })
+    } else if mode_value == 1 {
+        None
+    } else {
+        return Err(PptError::InvalidFormat(
+            "animate calculation mode must be linear when unused".to_string(),
+        ));
+    };
+    let type_value = read_u32(&record.data, 8);
+    let value_type = if flags & 0x20 != 0 {
+        Some(match type_value {
+            0 => TimeAnimateValueType::String,
+            1 => TimeAnimateValueType::Number,
+            2 => TimeAnimateValueType::Color,
+            value => {
+                return Err(PptError::InvalidFormat(format!(
+                    "invalid animate value type {value}"
+                )));
+            },
+        })
+    } else if type_value == 1 {
+        None
+    } else {
+        return Err(PptError::InvalidFormat(
+            "animate value type must be numeric when unused".to_string(),
+        ));
+    };
+    Ok(TimeAnimateBehaviorAtom {
+        calculation_mode,
+        by_used: flags & 0x01 != 0,
+        from_used: flags & 0x02 != 0,
+        to_used: flags & 0x04 != 0,
+        animation_values_used: flags & 0x10 != 0,
+        value_type,
+    })
+}
+
+/// Parse a generic animation keyframe list.
+pub fn parse_time_animation_value_list(record: &PptRecord) -> Result<TimeAnimationValueList> {
+    require_container(
+        record,
+        PptRecordType::TimeAnimationValueList,
+        0,
+        "TimeAnimationValueListContainer",
+    )?;
+    let mut entries = Vec::new();
+    let mut index = 0;
+    while index < record.children.len() {
+        let time = parse_time_animation_value_atom(&record.children[index])?;
+        index += 1;
+        let value = if record.children.get(index).is_some_and(|child| {
+            child.record_type == PptRecordType::TimeVariant && child.instance == 0
+        }) {
+            let value = parse_generic_time_variant(&record.children[index])?;
+            index += 1;
+            Some(value)
+        } else {
+            None
+        };
+        let formula = if record.children.get(index).is_some_and(|child| {
+            child.record_type == PptRecordType::TimeVariant && child.instance == 1
+        }) {
+            let formula = parse_time_variant_string(&record.children[index])?;
+            if !is_valid_time_formula(&formula) {
+                return Err(PptError::InvalidFormat(
+                    "invalid animation keyframe formula".to_string(),
+                ));
+            }
+            index += 1;
+            Some(formula)
+        } else {
+            None
+        };
+        entries.push(TimeAnimationValue {
+            time,
+            value,
+            formula,
+        });
+    }
+    Ok(TimeAnimationValueList { entries })
+}
+
+/// Parse an exact 4-byte `TimeAnimationValueAtom` payload.
+pub fn parse_time_animation_value_atom(record: &PptRecord) -> Result<i32> {
+    require_atom(
+        record,
+        PptRecordType::TimeAnimationValue,
+        0,
+        4,
+        "TimeAnimationValueAtom",
+    )?;
+    let time = read_i32(&record.data, 0);
+    if time != -1000 && !(0..=1000).contains(&time) {
+        return Err(PptError::InvalidFormat(
+            "animation keyframe time is out of range".to_string(),
+        ));
+    }
+    Ok(time)
+}
+
+fn parse_generic_time_variant(record: &PptRecord) -> Result<TimeVariantValue> {
+    match record.data.first() {
+        Some(0) => parse_time_variant_bool(record).map(TimeVariantValue::Boolean),
+        Some(1) => parse_time_variant_i32(record).map(TimeVariantValue::Integer),
+        Some(2) => parse_time_variant_f32(record).map(TimeVariantValue::Float),
+        Some(3) => parse_time_variant_string(record).map(TimeVariantValue::String),
+        _ => Err(PptError::InvalidFormat(
+            "invalid animation keyframe value type".to_string(),
+        )),
+    }
+}
+
+fn validate_animate_behavior(animate: &TimeAnimateBehavior) -> Result<()> {
+    for (used, value, field) in [
+        (animate.atom.by_used, animate.by.as_ref(), "by"),
+        (animate.atom.from_used, animate.from.as_ref(), "from"),
+        (animate.atom.to_used, animate.to.as_ref(), "to"),
+    ] {
+        if used && value.is_none() {
+            return Err(PptError::InvalidFormat(format!(
+                "animate {field}-use flag requires a value"
+            )));
+        }
+    }
+    if animate.atom.animation_values_used && animate.values.is_none() {
+        return Err(PptError::InvalidFormat(
+            "animate-values-use flag requires a keyframe list".to_string(),
+        ));
+    }
+    if animate.from.is_some() && animate.by.is_none() && animate.to.is_none() {
+        return Err(PptError::InvalidFormat(
+            "animate from value requires a by or to value".to_string(),
+        ));
+    }
+    if !animate.behavior.atom.attribute_names_used {
+        return Err(PptError::InvalidFormat(
+            "animate behavior requires an explicit attribute name".to_string(),
+        ));
+    }
+    let attribute = match animate.behavior.attribute_names.as_deref() {
+        Some([attribute]) => attribute.as_str(),
+        _ => {
+            return Err(PptError::InvalidFormat(
+                "animate behavior requires exactly one attribute name".to_string(),
+            ));
+        },
+    };
+    let expected_type = time_animation_attribute_value_type(attribute).ok_or_else(|| {
+        PptError::InvalidFormat(format!(
+            "unsupported animate behavior attribute {attribute}"
+        ))
+    })?;
+    let actual_type = animate
+        .atom
+        .value_type
+        .unwrap_or(TimeAnimateValueType::Number);
+    if actual_type != expected_type {
+        return Err(PptError::InvalidFormat(
+            "animate value type does not match its attribute".to_string(),
+        ));
+    }
+    if [&animate.by, &animate.from, &animate.to]
+        .into_iter()
+        .flatten()
+        .any(|value| !is_valid_time_animate_value(attribute, actual_type, value))
+    {
+        return Err(PptError::InvalidFormat(
+            "animate value is invalid for its attribute".to_string(),
+        ));
+    }
+    if animate.atom.calculation_mode == Some(TimeAnimateCalculationMode::Formula)
+        && !animate
+            .values
+            .as_ref()
+            .is_some_and(|list| list.entries.iter().any(|entry| entry.formula.is_some()))
+    {
+        return Err(PptError::InvalidFormat(
+            "formula calculation mode requires a keyframe formula".to_string(),
+        ));
+    }
+    validate_basic_behavior_properties(&animate.behavior)
 }
 
 /// Parse an exact color behavior container.
@@ -2242,7 +2511,9 @@ mod tests {
     use crate::ppt::animation::{
         BuildInfo, ChartBuildType, DiagramBuildType, LegacyAnimationAtom, LegacyAnimationBuild,
         LegacyAnimationEffect, LegacyTextBuildSubEffect, ParagraphBuildType, write_animation_info,
-        write_animation_info_atom, write_build_list, write_extended_time_node, write_time_behavior,
+        write_animation_info_atom, write_build_list, write_extended_time_node,
+        write_time_animate_behavior, write_time_animate_behavior_atom,
+        write_time_animation_value_atom, write_time_animation_value_list, write_time_behavior,
         write_time_behavior_atom, write_time_behavior_property_list, write_time_color_behavior,
         write_time_color_behavior_atom, write_time_command_behavior,
         write_time_command_behavior_atom, write_time_condition, write_time_condition_atom,
@@ -3361,6 +3632,225 @@ mod tests {
         bytes[36] = 0;
         let (record, _) = PptRecord::parse(&bytes, 0).unwrap();
         assert!(parse_time_scale_behavior_atom(&record).is_err());
+    }
+
+    #[test]
+    fn round_trips_generic_animate_behaviors_and_keyframes() {
+        assert_eq!(PptRecordType::TimeAnimateBehaviorContainer.as_u16(), 0xF12B);
+        assert_eq!(PptRecordType::TimeAnimateBehavior.as_u16(), 0xF134);
+        assert_eq!(PptRecordType::TimeAnimationValueList.as_u16(), 0xF13F);
+        assert_eq!(PptRecordType::TimeAnimationValue.as_u16(), 0xF143);
+        let common = |attribute: &str| TimeBehavior {
+            atom: TimeBehaviorAtom {
+                additive: Some(TimeBehaviorAdditive::Override),
+                attribute_names_used: true,
+            },
+            attribute_names: Some(vec![attribute.to_string()]),
+            properties: Some(TimeBehaviorPropertyList {
+                properties: vec![TimeBehaviorProperty::RuntimeContext("ppt".to_string())],
+            }),
+            target: TimeVisualElement::Shape {
+                kind: TimeVisualElementKind::Shape,
+                shape_id_ref: 24,
+                data1: 0,
+                data2: 0,
+            },
+        };
+        let values = TimeAnimationValueList {
+            entries: vec![
+                TimeAnimationValue {
+                    time: -1000,
+                    value: Some(TimeVariantValue::Boolean(true)),
+                    formula: None,
+                },
+                TimeAnimationValue {
+                    time: 333,
+                    value: Some(TimeVariantValue::Integer(-2)),
+                    formula: Some("max($,#ppt_y)".to_string()),
+                },
+                TimeAnimationValue {
+                    time: 667,
+                    value: Some(TimeVariantValue::Float(1.25)),
+                    formula: None,
+                },
+                TimeAnimationValue {
+                    time: 1000,
+                    value: Some(TimeVariantValue::String("2".to_string())),
+                    formula: None,
+                },
+            ],
+        };
+        let expected = TimeAnimateBehavior {
+            atom: TimeAnimateBehaviorAtom {
+                calculation_mode: Some(TimeAnimateCalculationMode::Formula),
+                by_used: true,
+                from_used: true,
+                to_used: true,
+                animation_values_used: true,
+                value_type: None,
+            },
+            values: Some(values.clone()),
+            by: Some("1".to_string()),
+            from: Some("0".to_string()),
+            to: Some("2".to_string()),
+            behavior: common("ppt_x"),
+        };
+        let bytes = write_time_animate_behavior(&expected).unwrap();
+        let (record, consumed) = PptRecord::parse(&bytes, 0).unwrap();
+        assert_eq!(consumed, bytes.len());
+        assert_eq!(parse_time_animate_behavior(&record).unwrap(), expected);
+
+        let bytes = write_time_animation_value_list(&values).unwrap();
+        let (record, _) = PptRecord::parse(&bytes, 0).unwrap();
+        assert_eq!(parse_time_animation_value_list(&record).unwrap(), values);
+
+        for (attribute, value_type, value) in [
+            ("image", TimeAnimateValueType::String, "arbitrary 👋"),
+            ("fill.color", TimeAnimateValueType::Color, "#A0b1C2"),
+        ] {
+            let expected = TimeAnimateBehavior {
+                atom: TimeAnimateBehaviorAtom {
+                    calculation_mode: Some(TimeAnimateCalculationMode::Discrete),
+                    by_used: true,
+                    from_used: false,
+                    to_used: true,
+                    animation_values_used: false,
+                    value_type: Some(value_type),
+                },
+                values: None,
+                by: Some(value.to_string()),
+                from: None,
+                to: Some(value.to_string()),
+                behavior: common(attribute),
+            };
+            let bytes = write_time_animate_behavior(&expected).unwrap();
+            let (record, _) = PptRecord::parse(&bytes, 0).unwrap();
+            assert_eq!(parse_time_animate_behavior(&record).unwrap(), expected);
+        }
+
+        for mode in [
+            None,
+            Some(TimeAnimateCalculationMode::Discrete),
+            Some(TimeAnimateCalculationMode::Linear),
+            Some(TimeAnimateCalculationMode::Formula),
+        ] {
+            for value_type in [
+                None,
+                Some(TimeAnimateValueType::String),
+                Some(TimeAnimateValueType::Number),
+                Some(TimeAnimateValueType::Color),
+            ] {
+                let expected = TimeAnimateBehaviorAtom {
+                    calculation_mode: mode,
+                    by_used: false,
+                    from_used: false,
+                    to_used: false,
+                    animation_values_used: false,
+                    value_type,
+                };
+                let bytes = write_time_animate_behavior_atom(&expected);
+                let (record, _) = PptRecord::parse(&bytes, 0).unwrap();
+                assert_eq!(parse_time_animate_behavior_atom(&record).unwrap(), expected);
+            }
+        }
+    }
+
+    #[test]
+    fn rejects_malformed_generic_animate_behaviors() {
+        let common = |attribute: &str| TimeBehavior {
+            atom: TimeBehaviorAtom {
+                additive: None,
+                attribute_names_used: true,
+            },
+            attribute_names: Some(vec![attribute.to_string()]),
+            properties: None,
+            target: TimeVisualElement::Page,
+        };
+        let valid = TimeAnimateBehavior {
+            atom: TimeAnimateBehaviorAtom {
+                calculation_mode: None,
+                by_used: true,
+                from_used: false,
+                to_used: false,
+                animation_values_used: false,
+                value_type: None,
+            },
+            values: None,
+            by: Some("1".to_string()),
+            from: None,
+            to: None,
+            behavior: common("ppt_x"),
+        };
+        for invalid in [
+            TimeAnimateBehavior {
+                by: None,
+                ..valid.clone()
+            },
+            TimeAnimateBehavior {
+                atom: TimeAnimateBehaviorAtom {
+                    animation_values_used: true,
+                    ..valid.atom.clone()
+                },
+                ..valid.clone()
+            },
+            TimeAnimateBehavior {
+                atom: TimeAnimateBehaviorAtom {
+                    by_used: false,
+                    ..valid.atom.clone()
+                },
+                by: None,
+                from: Some("0".to_string()),
+                ..valid.clone()
+            },
+            TimeAnimateBehavior {
+                atom: TimeAnimateBehaviorAtom {
+                    value_type: Some(TimeAnimateValueType::Color),
+                    ..valid.atom.clone()
+                },
+                ..valid.clone()
+            },
+            TimeAnimateBehavior {
+                by: Some("invalid".to_string()),
+                ..valid.clone()
+            },
+            TimeAnimateBehavior {
+                behavior: common("unsupported.attribute"),
+                ..valid.clone()
+            },
+            TimeAnimateBehavior {
+                atom: TimeAnimateBehaviorAtom {
+                    calculation_mode: Some(TimeAnimateCalculationMode::Formula),
+                    ..valid.atom.clone()
+                },
+                ..valid.clone()
+            },
+        ] {
+            assert!(write_time_animate_behavior(&invalid).is_err());
+        }
+
+        for time in [-1001, 1001] {
+            assert!(write_time_animation_value_atom(time).is_err());
+        }
+        let invalid_list = TimeAnimationValueList {
+            entries: vec![TimeAnimationValue {
+                time: 0,
+                value: None,
+                formula: Some("unknown+1".to_string()),
+            }],
+        };
+        assert!(write_time_animation_value_list(&invalid_list).is_err());
+
+        let mut atom = write_time_animate_behavior_atom(&TimeAnimateBehaviorAtom {
+            calculation_mode: None,
+            by_used: false,
+            from_used: false,
+            to_used: false,
+            animation_values_used: false,
+            value_type: None,
+        });
+        atom[8..12].copy_from_slice(&0u32.to_le_bytes());
+        let (record, _) = PptRecord::parse(&atom, 0).unwrap();
+        assert!(parse_time_animate_behavior_atom(&record).is_err());
     }
 
     #[test]

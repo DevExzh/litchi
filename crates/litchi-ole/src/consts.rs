@@ -141,6 +141,8 @@ pub enum PptRecordType {
     TimeModifier = 0xF129,
     /// Shared animation behavior container
     TimeBehaviorContainer = 0xF12A,
+    /// Generic property animation behavior container
+    TimeAnimateBehaviorContainer = 0xF12B,
     /// Color behavior container
     TimeColorBehaviorContainer = 0xF12C,
     /// Image effect behavior container
@@ -157,6 +159,8 @@ pub enum PptRecordType {
     TimeCommandBehaviorContainer = 0xF132,
     /// Shared animation behavior atom
     TimeBehavior = 0xF133,
+    /// Generic property animation behavior atom
+    TimeAnimateBehavior = 0xF134,
     /// Color behavior atom
     TimeColorBehavior = 0xF135,
     /// Image effect behavior atom
@@ -177,12 +181,16 @@ pub enum PptRecordType {
     TimePropertyList = 0xF13D,
     /// Time string-list container
     TimeVariantList = 0xF13E,
+    /// Generic animation keyframe list container
+    TimeAnimationValueList = 0xF13F,
     /// Time iterate-data atom
     TimeIterateData = 0xF140,
     /// Time sequence-data atom
     TimeSequenceData = 0xF141,
     /// Time variant atom record
     TimeVariant = 0xF142,
+    /// Generic animation keyframe time atom
+    TimeAnimationValue = 0xF143,
     /// Shape or sound animation target atom
     VisualShapeAtom = 0x2AFB,
     /// Slide animation target atom
@@ -263,6 +271,7 @@ impl From<u16> for PptRecordType {
             0xF128 => PptRecordType::TimeCondition,
             0xF129 => PptRecordType::TimeModifier,
             0xF12A => PptRecordType::TimeBehaviorContainer,
+            0xF12B => PptRecordType::TimeAnimateBehaviorContainer,
             0xF12C => PptRecordType::TimeColorBehaviorContainer,
             0xF12D => PptRecordType::TimeEffectBehaviorContainer,
             0xF12E => PptRecordType::TimeMotionBehaviorContainer,
@@ -271,6 +280,7 @@ impl From<u16> for PptRecordType {
             0xF131 => PptRecordType::TimeSetBehaviorContainer,
             0xF132 => PptRecordType::TimeCommandBehaviorContainer,
             0xF133 => PptRecordType::TimeBehavior,
+            0xF134 => PptRecordType::TimeAnimateBehavior,
             0xF135 => PptRecordType::TimeColorBehavior,
             0xF136 => PptRecordType::TimeEffectBehavior,
             0xF137 => PptRecordType::TimeMotionBehavior,
@@ -281,9 +291,11 @@ impl From<u16> for PptRecordType {
             0xF13C => PptRecordType::TimeClientVisualElement,
             0xF13D => PptRecordType::TimePropertyList,
             0xF13E => PptRecordType::TimeVariantList,
+            0xF13F => PptRecordType::TimeAnimationValueList,
             0xF140 => PptRecordType::TimeIterateData,
             0xF141 => PptRecordType::TimeSequenceData,
             0xF142 => PptRecordType::TimeVariant,
+            0xF143 => PptRecordType::TimeAnimationValue,
             0x2AFB => PptRecordType::VisualShapeAtom,
             0x2B01 => PptRecordType::VisualPageAtom,
             1040 => PptRecordType::NamedShows,

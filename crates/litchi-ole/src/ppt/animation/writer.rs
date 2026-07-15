@@ -6,21 +6,23 @@ use super::types::{
     AfterEffect, AnimationEffect, AnimationInfo, BuildAtom, BuildKind, BuildList, BuildListEntry,
     ChartBuild, DiagramBuild, EffectDirection, ExtendedTimeNode, LegacyAnimationAtom,
     LegacyAnimationBuild, LegacyAnimationEffect, LegacyTextBuildSubEffect, ParagraphBuild,
-    ParagraphBuildLevel, TimeAnimateColor, TimeAnimateColorBy, TimeAnimateValueType, TimeBehavior,
-    TimeBehaviorAdditive, TimeBehaviorAtom, TimeBehaviorProperty, TimeBehaviorPropertyList,
-    TimeColorBehavior, TimeColorBehaviorAtom, TimeColorDirection, TimeColorModel,
-    TimeCommandBehavior, TimeCommandBehaviorAtom, TimeCommandBehaviorType, TimeCondition,
-    TimeConditionAtom, TimeConditionType, TimeEffectBehavior, TimeEffectBehaviorAtom,
-    TimeEffectNodeType, TimeEffectTransition, TimeEffectType, TimeIterateData,
-    TimeIterateDirection, TimeIterateIntervalType, TimeIterateType, TimeMasterRelation,
-    TimeModifier, TimeMotionBehavior, TimeMotionBehaviorAtom, TimeMotionOrigin, TimeNodeAtom,
-    TimeNodeProperty, TimeNodePropertyList, TimePropertyListContext, TimeRotationBehavior,
-    TimeRotationBehaviorAtom, TimeRotationDirection, TimeScaleBehavior, TimeScaleBehaviorAtom,
-    TimeSequenceData, TimeSequenceNextAction, TimeSequencePreviousAction, TimeSetBehavior,
-    TimeSetBehaviorAtom, TimeTriggerEvent, TimeTriggerObject, TimeVisualElement,
-    TimeVisualElementKind, is_valid_animation_attribute_name, is_valid_motion_path,
-    is_valid_runtime_context, is_valid_time_filter, is_valid_time_points_types,
-    is_valid_time_set_value, time_set_attribute_value_type,
+    ParagraphBuildLevel, TimeAnimateBehavior, TimeAnimateBehaviorAtom, TimeAnimateCalculationMode,
+    TimeAnimateColor, TimeAnimateColorBy, TimeAnimateValueType, TimeAnimationValueList,
+    TimeBehavior, TimeBehaviorAdditive, TimeBehaviorAtom, TimeBehaviorProperty,
+    TimeBehaviorPropertyList, TimeColorBehavior, TimeColorBehaviorAtom, TimeColorDirection,
+    TimeColorModel, TimeCommandBehavior, TimeCommandBehaviorAtom, TimeCommandBehaviorType,
+    TimeCondition, TimeConditionAtom, TimeConditionType, TimeEffectBehavior,
+    TimeEffectBehaviorAtom, TimeEffectNodeType, TimeEffectTransition, TimeEffectType,
+    TimeIterateData, TimeIterateDirection, TimeIterateIntervalType, TimeIterateType,
+    TimeMasterRelation, TimeModifier, TimeMotionBehavior, TimeMotionBehaviorAtom, TimeMotionOrigin,
+    TimeNodeAtom, TimeNodeProperty, TimeNodePropertyList, TimePropertyListContext,
+    TimeRotationBehavior, TimeRotationBehaviorAtom, TimeRotationDirection, TimeScaleBehavior,
+    TimeScaleBehaviorAtom, TimeSequenceData, TimeSequenceNextAction, TimeSequencePreviousAction,
+    TimeSetBehavior, TimeSetBehaviorAtom, TimeTriggerEvent, TimeTriggerObject, TimeVariantValue,
+    TimeVisualElement, TimeVisualElementKind, is_valid_animation_attribute_name,
+    is_valid_motion_path, is_valid_runtime_context, is_valid_time_animate_value,
+    is_valid_time_filter, is_valid_time_formula, is_valid_time_points_types,
+    is_valid_time_set_value, time_animation_attribute_value_type, time_set_attribute_value_type,
 };
 use crate::consts::PptRecordType;
 use crate::ppt::package::{PptError, Result};
@@ -432,6 +434,172 @@ pub fn write_time_behavior_atom(atom: &TimeBehaviorAtom) -> Vec<u8> {
     let mut result = create_record_header(PptRecordType::TimeBehavior, 0, 0, 16);
     result.extend(data);
     result
+}
+
+/// Serialize an exact generic property-animation behavior container.
+pub fn write_time_animate_behavior(animate: &TimeAnimateBehavior) -> Result<Vec<u8>> {
+    validate_animate_behavior(animate)?;
+    let mut children = write_time_animate_behavior_atom(&animate.atom);
+    if let Some(values) = &animate.values {
+        children.extend(write_time_animation_value_list(values)?);
+    }
+    for (instance, value) in [(1, &animate.by), (2, &animate.from), (3, &animate.to)] {
+        if let Some(value) = value {
+            append_time_variant(&mut children, instance, encode_time_variant_string(value))?;
+        }
+    }
+    children.extend(write_time_behavior(&animate.behavior)?);
+    wrap_record(
+        PptRecordType::TimeAnimateBehaviorContainer,
+        0x0F,
+        0,
+        children,
+    )
+}
+
+/// Serialize an exact `TimeAnimateBehaviorAtom`.
+pub fn write_time_animate_behavior_atom(atom: &TimeAnimateBehaviorAtom) -> Vec<u8> {
+    let mode = atom.calculation_mode.map_or(1u32, |mode| match mode {
+        TimeAnimateCalculationMode::Discrete => 0,
+        TimeAnimateCalculationMode::Linear => 1,
+        TimeAnimateCalculationMode::Formula => 2,
+    });
+    let flags = u32::from(atom.by_used)
+        | (u32::from(atom.from_used) << 1)
+        | (u32::from(atom.to_used) << 2)
+        | (u32::from(atom.calculation_mode.is_some()) << 3)
+        | (u32::from(atom.animation_values_used) << 4)
+        | (u32::from(atom.value_type.is_some()) << 5);
+    let value_type = atom.value_type.map_or(1u32, |value| match value {
+        TimeAnimateValueType::String => 0,
+        TimeAnimateValueType::Number => 1,
+        TimeAnimateValueType::Color => 2,
+    });
+    let mut result = create_record_header(PptRecordType::TimeAnimateBehavior, 0, 0, 12);
+    result.extend(mode.to_le_bytes());
+    result.extend(flags.to_le_bytes());
+    result.extend(value_type.to_le_bytes());
+    result
+}
+
+/// Serialize a generic animation keyframe list.
+pub fn write_time_animation_value_list(list: &TimeAnimationValueList) -> Result<Vec<u8>> {
+    let mut children = Vec::new();
+    for entry in &list.entries {
+        children.extend(write_time_animation_value_atom(entry.time)?);
+        if let Some(value) = &entry.value {
+            append_time_variant(&mut children, 0, encode_generic_time_variant(value))?;
+        }
+        if let Some(formula) = &entry.formula {
+            if !is_valid_time_formula(formula) {
+                return Err(PptError::InvalidFormat(
+                    "invalid animation keyframe formula".to_string(),
+                ));
+            }
+            append_time_variant(&mut children, 1, encode_time_variant_string(formula))?;
+        }
+    }
+    wrap_record(PptRecordType::TimeAnimationValueList, 0x0F, 0, children)
+}
+
+/// Serialize an exact `TimeAnimationValueAtom`.
+pub fn write_time_animation_value_atom(time: i32) -> Result<Vec<u8>> {
+    if time != -1000 && !(0..=1000).contains(&time) {
+        return Err(PptError::InvalidFormat(
+            "animation keyframe time is out of range".to_string(),
+        ));
+    }
+    let mut result = create_record_header(PptRecordType::TimeAnimationValue, 0, 0, 4);
+    result.extend(time.to_le_bytes());
+    Ok(result)
+}
+
+fn encode_generic_time_variant(value: &TimeVariantValue) -> Vec<u8> {
+    match value {
+        TimeVariantValue::Boolean(value) => vec![0, u8::from(*value)],
+        TimeVariantValue::Integer(value) => {
+            let mut data = vec![1];
+            data.extend(value.to_le_bytes());
+            data
+        },
+        TimeVariantValue::Float(value) => {
+            let mut data = vec![2];
+            data.extend(value.to_le_bytes());
+            data
+        },
+        TimeVariantValue::String(value) => encode_time_variant_string(value),
+    }
+}
+
+fn validate_animate_behavior(animate: &TimeAnimateBehavior) -> Result<()> {
+    for (used, value, field) in [
+        (animate.atom.by_used, animate.by.as_ref(), "by"),
+        (animate.atom.from_used, animate.from.as_ref(), "from"),
+        (animate.atom.to_used, animate.to.as_ref(), "to"),
+    ] {
+        if used && value.is_none() {
+            return Err(PptError::InvalidFormat(format!(
+                "animate {field}-use flag requires a value"
+            )));
+        }
+    }
+    if animate.atom.animation_values_used && animate.values.is_none() {
+        return Err(PptError::InvalidFormat(
+            "animate-values-use flag requires a keyframe list".to_string(),
+        ));
+    }
+    if animate.from.is_some() && animate.by.is_none() && animate.to.is_none() {
+        return Err(PptError::InvalidFormat(
+            "animate from value requires a by or to value".to_string(),
+        ));
+    }
+    if !animate.behavior.atom.attribute_names_used {
+        return Err(PptError::InvalidFormat(
+            "animate behavior requires an explicit attribute name".to_string(),
+        ));
+    }
+    let attribute = match animate.behavior.attribute_names.as_deref() {
+        Some([attribute]) => attribute.as_str(),
+        _ => {
+            return Err(PptError::InvalidFormat(
+                "animate behavior requires exactly one attribute name".to_string(),
+            ));
+        },
+    };
+    let expected_type = time_animation_attribute_value_type(attribute).ok_or_else(|| {
+        PptError::InvalidFormat(format!(
+            "unsupported animate behavior attribute {attribute}"
+        ))
+    })?;
+    let actual_type = animate
+        .atom
+        .value_type
+        .unwrap_or(TimeAnimateValueType::Number);
+    if actual_type != expected_type {
+        return Err(PptError::InvalidFormat(
+            "animate value type does not match its attribute".to_string(),
+        ));
+    }
+    if [&animate.by, &animate.from, &animate.to]
+        .into_iter()
+        .flatten()
+        .any(|value| !is_valid_time_animate_value(attribute, actual_type, value))
+    {
+        return Err(PptError::InvalidFormat(
+            "animate value is invalid for its attribute".to_string(),
+        ));
+    }
+    if animate.atom.calculation_mode == Some(TimeAnimateCalculationMode::Formula)
+        && !animate
+            .values
+            .as_ref()
+            .is_some_and(|list| list.entries.iter().any(|entry| entry.formula.is_some()))
+    {
+        return Err(PptError::InvalidFormat(
+            "formula calculation mode requires a keyframe formula".to_string(),
+        ));
+    }
+    validate_basic_behavior_properties(&animate.behavior)
 }
 
 /// Serialize an exact color behavior container.

@@ -1247,6 +1247,62 @@ pub enum TimeAnimateValueType {
     Color,
 }
 
+/// A generic PowerPoint 2002 property animation.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TimeAnimateBehavior {
+    pub atom: TimeAnimateBehaviorAtom,
+    pub values: Option<TimeAnimationValueList>,
+    /// Optional values retained even when their corresponding use flags are clear.
+    pub by: Option<String>,
+    pub from: Option<String>,
+    pub to: Option<String>,
+    pub behavior: TimeBehavior,
+}
+
+/// Calculation mode and use flags from a `TimeAnimateBehaviorAtom`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TimeAnimateBehaviorAtom {
+    /// Explicit interpolation mode, or `None` for linear interpolation.
+    pub calculation_mode: Option<TimeAnimateCalculationMode>,
+    pub by_used: bool,
+    pub from_used: bool,
+    pub to_used: bool,
+    pub animation_values_used: bool,
+    /// Explicit value type, or `None` for the default numeric type.
+    pub value_type: Option<TimeAnimateValueType>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TimeAnimateCalculationMode {
+    Discrete,
+    Linear,
+    Formula,
+}
+
+/// Key points in a generic property animation.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct TimeAnimationValueList {
+    pub entries: Vec<TimeAnimationValue>,
+}
+
+/// One animation key point.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TimeAnimationValue {
+    /// Thousandths of the animation duration, or -1000 for even partitioning.
+    pub time: i32,
+    pub value: Option<TimeVariantValue>,
+    pub formula: Option<String>,
+}
+
+/// Value kinds supported by a generic `TimeVariant` keyframe child.
+#[derive(Debug, Clone, PartialEq)]
+pub enum TimeVariantValue {
+    Boolean(bool),
+    Integer(i32),
+    Float(f32),
+    String(String),
+}
+
 /// Animation target stored in a `ClientVisualElementContainer`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TimeVisualElement {
@@ -1767,6 +1823,29 @@ pub(crate) fn is_valid_animation_attribute_name(value: &str) -> bool {
                 | "shadow.color2"
                 | "extrusion.color"
         )
+}
+
+pub(crate) fn time_animation_attribute_value_type(attribute: &str) -> Option<TimeAnimateValueType> {
+    time_set_attribute_value_type(attribute).or_else(|| {
+        is_valid_animation_attribute_name(attribute).then_some(TimeAnimateValueType::String)
+    })
+}
+
+pub(crate) fn is_valid_time_animate_value(
+    attribute: &str,
+    value_type: TimeAnimateValueType,
+    value: &str,
+) -> bool {
+    match value_type {
+        TimeAnimateValueType::String => true,
+        TimeAnimateValueType::Number | TimeAnimateValueType::Color => {
+            is_valid_time_set_value(attribute, value)
+        },
+    }
+}
+
+pub(crate) fn is_valid_time_formula(value: &str) -> bool {
+    is_valid_time_formula_bytes(value.as_bytes())
 }
 
 pub(crate) fn time_set_attribute_value_type(attribute: &str) -> Option<TimeAnimateValueType> {
