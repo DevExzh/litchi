@@ -82,8 +82,9 @@ use super::revisions::{DisplayFieldRevision, FormattingRevision, NumberingRevisi
 use crate::doc::CommentDateTime;
 use crate::doc::parts::pap::{
     Border as ParagraphBorder, BorderStyle as ParagraphBorderStyle, Borders as ParagraphBorders,
-    DropCap, FontAlignment, FrameHeight, FrameTextFlow, FrameTextWrap, Shading as ParagraphShading,
-    TextBoxTightWrap,
+    DropCap, FontAlignment, FrameAnchor, FrameHeight, FrameHorizontalAnchor,
+    FrameHorizontalPosition, FrameTextFlow, FrameTextWrap, FrameVerticalAnchor,
+    FrameVerticalPosition, Shading as ParagraphShading, TextBoxTightWrap,
 };
 use crate::sprm_operations::*;
 use litchi_cfb::writer::OleWriter;
@@ -376,6 +377,18 @@ pub struct ParagraphFormatting {
     pub font_alignment: Option<FontAlignment>,
     /// Direction and glyph rotation of text in a frame
     pub frame_text_flow: Option<FrameTextFlow>,
+    /// Horizontal paragraph-frame position
+    pub frame_horizontal_position: Option<FrameHorizontalPosition>,
+    /// Vertical paragraph-frame position
+    pub frame_vertical_position: Option<FrameVerticalPosition>,
+    /// Paragraph-frame width in twips, where zero means automatic
+    pub frame_width: Option<u16>,
+    /// Reference points used by paragraph-frame coordinates
+    pub frame_anchor: Option<FrameAnchor>,
+    /// Explicit table membership flag
+    pub in_table: Option<bool>,
+    /// Mark a cell mark as a table-terminating paragraph
+    pub table_terminating_paragraph: Option<bool>,
     /// Wrapping of surrounding text around the paragraph frame
     pub frame_text_wrap: Option<FrameTextWrap>,
     /// Paragraph frame height
@@ -3500,6 +3513,53 @@ fn build_papx_grpprl(fmt: &ParagraphFormatting) -> Vec<u8> {
             | (u16::from(flow.rotate_font) << 2);
         push_u16(&mut grp, SPRM_P_FRAME_TEXT_FLOW, value);
     }
+    if let Some(position) = fmt.frame_horizontal_position {
+        let value = match position {
+            FrameHorizontalPosition::Left => 0,
+            FrameHorizontalPosition::Center => -4,
+            FrameHorizontalPosition::Right => -8,
+            FrameHorizontalPosition::Inside => -12,
+            FrameHorizontalPosition::Outside => -16,
+            FrameHorizontalPosition::Offset(offset) => offset + 1,
+        };
+        push_i16(&mut grp, SPRM_P_DXA_ABS, value);
+    }
+    if let Some(position) = fmt.frame_vertical_position {
+        let value = match position {
+            FrameVerticalPosition::Inline => 0,
+            FrameVerticalPosition::Top => -4,
+            FrameVerticalPosition::Center => -8,
+            FrameVerticalPosition::Bottom => -12,
+            FrameVerticalPosition::Inside => -16,
+            FrameVerticalPosition::Outside => -20,
+            FrameVerticalPosition::Offset(offset) => offset + 1,
+        };
+        push_i16(&mut grp, SPRM_P_DYA_ABS, value);
+    }
+    if let Some(width) = fmt.frame_width {
+        push_u16(&mut grp, SPRM_P_DXA_WIDTH, width);
+    }
+    if let Some(anchor) = fmt.frame_anchor {
+        let vertical = match anchor.vertical {
+            FrameVerticalAnchor::Margin => 0,
+            FrameVerticalAnchor::Page => 1,
+            FrameVerticalAnchor::Paragraph => 2,
+            FrameVerticalAnchor::None => 3,
+        };
+        let horizontal = match anchor.horizontal {
+            FrameHorizontalAnchor::Column => 0,
+            FrameHorizontalAnchor::Margin => 1,
+            FrameHorizontalAnchor::Page => 2,
+            FrameHorizontalAnchor::None => 3,
+        };
+        push_byte(&mut grp, SPRM_P_PC, (vertical << 4) | (horizontal << 6));
+    }
+    if let Some(in_table) = fmt.in_table {
+        push_bool(&mut grp, SPRM_P_F_IN_TABLE, in_table);
+    }
+    if let Some(terminating) = fmt.table_terminating_paragraph {
+        push_bool(&mut grp, SPRM_P_F_TTP, terminating);
+    }
     if let Some(wrap) = fmt.frame_text_wrap {
         push_byte(&mut grp, SPRM_P_WR, wrap as u8);
     }
@@ -3702,9 +3762,59 @@ fn build_revision_papx_grpprl(
             )));
         }
     }
+    for (name, offset) in [
+        (
+            "horizontal",
+            match fmt.frame_horizontal_position {
+                Some(FrameHorizontalPosition::Offset(value)) => Some(value),
+                _ => None,
+            },
+        ),
+        (
+            "vertical",
+            match fmt.frame_vertical_position {
+                Some(FrameVerticalPosition::Offset(value)) => Some(value),
+                _ => None,
+            },
+        ),
+    ] {
+        if let Some(offset) = offset
+            && !(-31_679..=31_681).contains(&offset)
+        {
+            return Err(DocWriteError::InvalidData(format!(
+                "DOC {name} frame offset {offset} is outside the plus-one range"
+            )));
+        }
+        if let Some(offset) = offset {
+            let stored = offset + 1;
+            let is_special =
+                matches!(stored, 0 | -4 | -8 | -12 | -16) || (name == "vertical" && stored == -20);
+            if is_special {
+                return Err(DocWriteError::InvalidData(format!(
+                    "DOC {name} frame offset {offset} encodes a reserved alignment value"
+                )));
+            }
+        }
+    }
+    if let Some(width) = fmt.frame_width
+        && width > 31_680
+    {
+        return Err(DocWriteError::InvalidData(format!(
+            "DOC paragraph frame width {width} exceeds 31680"
+        )));
+    }
+    if fmt.table_terminating_paragraph == Some(true) && fmt.in_table != Some(true) {
+        return Err(DocWriteError::InvalidData(
+            "DOC table-terminating paragraph requires in_table=true".to_string(),
+        ));
+    }
     if fmt.frame_text_flow.is_some()
         && !matches!(fmt.frame_text_wrap, Some(wrap) if wrap != FrameTextWrap::Auto)
         && !matches!(fmt.frame_height, Some(height) if height.height_twips != 0)
+        && fmt.frame_horizontal_position.is_none()
+        && fmt.frame_vertical_position.is_none()
+        && fmt.frame_width.is_none()
+        && fmt.frame_anchor.is_none()
     {
         return Err(DocWriteError::InvalidData(
             "DOC frame text flow requires a non-default frame property".to_string(),
@@ -4433,6 +4543,15 @@ mod tests {
                         backwards: true,
                         rotate_font: false,
                     }),
+                    frame_horizontal_position: Some(FrameHorizontalPosition::Right),
+                    frame_vertical_position: Some(FrameVerticalPosition::Offset(300)),
+                    frame_width: Some(1_440),
+                    frame_anchor: Some(FrameAnchor {
+                        vertical: FrameVerticalAnchor::Paragraph,
+                        horizontal: FrameHorizontalAnchor::Margin,
+                    }),
+                    in_table: Some(false),
+                    table_terminating_paragraph: Some(false),
                     frame_text_wrap: Some(FrameTextWrap::Through),
                     frame_height: Some(FrameHeight {
                         height_twips: 720,
@@ -4543,6 +4662,24 @@ mod tests {
                 rotate_font: false,
             })
         );
+        assert_eq!(
+            paragraphs[0].properties().frame_horizontal_position,
+            Some(FrameHorizontalPosition::Right)
+        );
+        assert_eq!(
+            paragraphs[0].properties().frame_vertical_position,
+            Some(FrameVerticalPosition::Offset(300))
+        );
+        assert_eq!(paragraphs[0].properties().frame_width, Some(1_440));
+        assert_eq!(
+            paragraphs[0].properties().frame_anchor,
+            Some(FrameAnchor {
+                vertical: FrameVerticalAnchor::Paragraph,
+                horizontal: FrameHorizontalAnchor::Margin,
+            })
+        );
+        assert!(!paragraphs[0].properties().in_table);
+        assert!(!paragraphs[0].properties().is_table_row_end);
         assert_eq!(
             paragraphs[0].properties().text_wrap,
             Some(FrameTextWrap::Through)
@@ -4658,6 +4795,22 @@ mod tests {
             },
             ParagraphFormatting {
                 frame_horizontal_text_distance: Some(-1),
+                ..ParagraphFormatting::default()
+            },
+            ParagraphFormatting {
+                frame_horizontal_position: Some(FrameHorizontalPosition::Offset(i16::MAX)),
+                ..ParagraphFormatting::default()
+            },
+            ParagraphFormatting {
+                frame_horizontal_position: Some(FrameHorizontalPosition::Offset(-5)),
+                ..ParagraphFormatting::default()
+            },
+            ParagraphFormatting {
+                frame_width: Some(31_681),
+                ..ParagraphFormatting::default()
+            },
+            ParagraphFormatting {
+                table_terminating_paragraph: Some(true),
                 ..ParagraphFormatting::default()
             },
             ParagraphFormatting {

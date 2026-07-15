@@ -129,12 +129,14 @@ pub struct ParagraphProperties {
     pub font_align: Option<FontAlignment>,
     /// Frame text flow
     pub frame_text_flow: Option<FrameTextFlow>,
-    /// Absolute horizontal position (for positioned paragraphs)
-    pub dxa_abs: Option<i16>,
-    /// Absolute vertical position
-    pub dya_abs: Option<i16>,
-    /// Absolute width
-    pub dxa_width: Option<i16>,
+    /// Horizontal position of the paragraph frame
+    pub frame_horizontal_position: Option<FrameHorizontalPosition>,
+    /// Vertical position of the paragraph frame
+    pub frame_vertical_position: Option<FrameVerticalPosition>,
+    /// Frame width in twips, where zero means automatic
+    pub frame_width: Option<u16>,
+    /// Anchors used to interpret the frame positions
+    pub frame_anchor: Option<FrameAnchor>,
     /// Height constraint for the paragraph frame
     pub frame_height: Option<FrameHeight>,
     /// Text wrapping
@@ -317,6 +319,54 @@ pub enum DropCapType {
 pub struct DropCap {
     pub kind: DropCapType,
     pub lines: u8,
+}
+
+/// Horizontal position of a paragraph frame.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FrameHorizontalPosition {
+    Left,
+    Center,
+    Right,
+    Inside,
+    Outside,
+    Offset(i16),
+}
+
+/// Vertical position of a paragraph frame.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FrameVerticalPosition {
+    Inline,
+    Top,
+    Center,
+    Bottom,
+    Inside,
+    Outside,
+    Offset(i16),
+}
+
+/// Vertical reference for an absolutely positioned frame.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FrameVerticalAnchor {
+    Margin,
+    Page,
+    Paragraph,
+    None,
+}
+
+/// Horizontal reference for an absolutely positioned frame.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FrameHorizontalAnchor {
+    Column,
+    Margin,
+    Page,
+    None,
+}
+
+/// Reference points used by paragraph-frame coordinates.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FrameAnchor {
+    pub vertical: FrameVerticalAnchor,
+    pub horizontal: FrameHorizontalAnchor,
 }
 
 /// Line spacing type.
@@ -962,42 +1012,93 @@ impl ParagraphProperties {
             },
             // Operation 0x16: sprmPFInTable - In table flag
             0x16 => {
-                if let Some(val) = sprm.operand_byte() {
-                    pap.in_table = val != 0;
-                }
+                pap.in_table = Self::strict_bool8(sprm, "sprmPFInTable")?;
             },
             // Operation 0x17: sprmPFTtp - Table row end
             0x17 => {
-                if let Some(val) = sprm.operand_byte() {
-                    pap.is_table_row_end = val != 0;
+                let value = Self::strict_bool8(sprm, "sprmPFTtp")?;
+                if value && !pap.in_table {
+                    return Err(DocError::Corrupted(
+                        "sprmPFTtp requires sprmPFInTable to be enabled".to_string(),
+                    ));
                 }
+                pap.is_table_row_end = value;
             },
             // Operation 0x18: sprmPDxaAbs - Absolute horizontal position
             0x18 => {
-                if let Some(val) = sprm.operand_i16() {
-                    pap.dxa_abs = Some(val);
-                }
+                let raw = Self::required_i16(sprm, "sprmPDxaAbs")?;
+                pap.frame_horizontal_position = Some(match raw {
+                    0 => FrameHorizontalPosition::Left,
+                    -4 => FrameHorizontalPosition::Center,
+                    -8 => FrameHorizontalPosition::Right,
+                    -12 => FrameHorizontalPosition::Inside,
+                    -16 => FrameHorizontalPosition::Outside,
+                    value if (-31_678..=31_682).contains(&value) => {
+                        FrameHorizontalPosition::Offset(value - 1)
+                    },
+                    invalid => {
+                        return Err(DocError::Corrupted(format!(
+                            "sprmPDxaAbs stored position {invalid} is outside XAS_plusOne"
+                        )));
+                    },
+                });
             },
             // Operation 0x19: sprmPDyaAbs - Absolute vertical position
             0x19 => {
-                if let Some(val) = sprm.operand_i16() {
-                    pap.dya_abs = Some(val);
-                }
+                let raw = Self::required_i16(sprm, "sprmPDyaAbs")?;
+                pap.frame_vertical_position = Some(match raw {
+                    0 => FrameVerticalPosition::Inline,
+                    -4 => FrameVerticalPosition::Top,
+                    -8 => FrameVerticalPosition::Center,
+                    -12 => FrameVerticalPosition::Bottom,
+                    -16 => FrameVerticalPosition::Inside,
+                    -20 => FrameVerticalPosition::Outside,
+                    value if (-31_678..=31_682).contains(&value) => {
+                        FrameVerticalPosition::Offset(value - 1)
+                    },
+                    invalid => {
+                        return Err(DocError::Corrupted(format!(
+                            "sprmPDyaAbs stored position {invalid} is outside YAS_plusOne"
+                        )));
+                    },
+                });
             },
             // Operation 0x1A: sprmPDxaWidth - Absolute width
             0x1A => {
-                if let Some(val) = sprm.operand_i16() {
-                    pap.dxa_width = Some(val);
+                let width = sprm.operand_word().ok_or_else(|| {
+                    DocError::Corrupted("sprmPDxaWidth is missing its frame width".to_string())
+                })?;
+                if width > 31_680 {
+                    return Err(DocError::Corrupted(format!(
+                        "sprmPDxaWidth value {width} exceeds 31680"
+                    )));
                 }
+                pap.frame_width = Some(width);
             },
             // Operation 0x1B: sprmPPc - Positioning code
             0x1B => {
-                if let Some(param) = sprm.operand_byte() {
-                    let pc_vert = (param & 0x0C) >> 2;
-                    let pc_horz = param & 0x03;
-                    // Store positioning codes if needed
-                    let _ = (pc_vert, pc_horz);
+                let value = sprm.operand_byte().ok_or_else(|| {
+                    DocError::Corrupted("sprmPPc is missing its anchor code".to_string())
+                })?;
+                if value & 0x0F != 0 {
+                    return Err(DocError::Corrupted(
+                        "sprmPPc padding bits must be zero".to_string(),
+                    ));
                 }
+                pap.frame_anchor = Some(FrameAnchor {
+                    vertical: match (value >> 4) & 0x03 {
+                        0 => FrameVerticalAnchor::Margin,
+                        1 => FrameVerticalAnchor::Page,
+                        2 => FrameVerticalAnchor::Paragraph,
+                        _ => FrameVerticalAnchor::None,
+                    },
+                    horizontal: match value >> 6 {
+                        0 => FrameHorizontalAnchor::Column,
+                        1 => FrameHorizontalAnchor::Margin,
+                        2 => FrameHorizontalAnchor::Page,
+                        _ => FrameHorizontalAnchor::None,
+                    },
+                });
             },
             // Operations 0x1C-0x21: Old border formats (Word 6.0)
             0x1C..=0x21 => {
@@ -1678,6 +1779,10 @@ impl ParagraphProperties {
             || self.use_page_setup_settings.is_some()
             || self.adjust_right_indent.is_some()
             || self.frame_height.is_some()
+            || self.frame_horizontal_position.is_some()
+            || self.frame_vertical_position.is_some()
+            || self.frame_width.is_some()
+            || self.frame_anchor.is_some()
             || self.text_wrap.is_some()
             || self.drop_cap.is_some()
             || self.dxa_from_text.is_some()
@@ -2221,5 +2326,58 @@ mod tests {
             ParagraphProperties::from_sprm(&invalid_word(SPRM_P_DXA_FROM_TEXT, u16::MAX)).is_err()
         );
         assert!(ParagraphProperties::from_sprm(&[0x2A, 0x24, 2]).is_err());
+    }
+
+    #[test]
+    fn parses_table_markers_and_frame_positioning_strictly() {
+        let mut grpprl = Vec::new();
+        for (opcode, value) in [(SPRM_P_F_IN_TABLE, 1), (SPRM_P_F_TTP, 0)] {
+            grpprl.extend_from_slice(&opcode.to_le_bytes());
+            grpprl.push(value);
+        }
+        grpprl.extend_from_slice(&SPRM_P_DXA_ABS.to_le_bytes());
+        grpprl.extend_from_slice(&301i16.to_le_bytes());
+        grpprl.extend_from_slice(&SPRM_P_DYA_ABS.to_le_bytes());
+        grpprl.extend_from_slice(&(-20i16).to_le_bytes());
+        grpprl.extend_from_slice(&SPRM_P_DXA_WIDTH.to_le_bytes());
+        grpprl.extend_from_slice(&31_680u16.to_le_bytes());
+        grpprl.extend_from_slice(&SPRM_P_PC.to_le_bytes());
+        grpprl.push(0x90);
+
+        let properties = ParagraphProperties::from_sprm(&grpprl).unwrap();
+        assert!(properties.in_table);
+        assert!(!properties.is_table_row_end);
+        assert_eq!(
+            properties.frame_horizontal_position,
+            Some(FrameHorizontalPosition::Offset(300))
+        );
+        assert_eq!(
+            properties.frame_vertical_position,
+            Some(FrameVerticalPosition::Outside)
+        );
+        assert_eq!(properties.frame_width, Some(31_680));
+        assert_eq!(
+            properties.frame_anchor,
+            Some(FrameAnchor {
+                vertical: FrameVerticalAnchor::Page,
+                horizontal: FrameHorizontalAnchor::Page,
+            })
+        );
+
+        assert!(ParagraphProperties::from_sprm(&[0x16, 0x24, 2]).is_err());
+        assert!(ParagraphProperties::from_sprm(&[0x17, 0x24, 1]).is_err());
+        assert!(
+            ParagraphProperties::from_sprm(
+                &[SPRM_P_DXA_ABS.to_le_bytes(), i16::MIN.to_le_bytes()].concat()
+            )
+            .is_err()
+        );
+        assert!(
+            ParagraphProperties::from_sprm(
+                &[SPRM_P_DXA_WIDTH.to_le_bytes(), 31_681u16.to_le_bytes()].concat()
+            )
+            .is_err()
+        );
+        assert!(ParagraphProperties::from_sprm(&[0x1B, 0x26, 0x01]).is_err());
     }
 }
