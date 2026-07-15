@@ -4,8 +4,100 @@
 //! in RTF documents.
 
 use super::border::Border;
-use super::types::{ColorRef, Formatting};
+use super::types::Formatting;
 use std::borrow::Cow;
+
+/// Raw 32-bit OfficeArt color value used by RTF shape properties.
+///
+/// The low three bytes contain blue, green, and red respectively. The high
+/// byte contains the palette, scheme, and system-color flags defined by
+/// `OfficeArtCOLORREF` in MS-ODRAW.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct OfficeArtColor(pub u32);
+
+impl OfficeArtColor {
+    /// Default OfficeArt white.
+    pub const WHITE: Self = Self(0x00FF_FFFF);
+    /// Default OfficeArt black.
+    pub const BLACK: Self = Self(0);
+
+    /// Construct a direct RGB color.
+    #[inline]
+    pub const fn from_rgb(red: u8, green: u8, blue: u8) -> Self {
+        Self((blue as u32) | ((green as u32) << 8) | ((red as u32) << 16))
+    }
+
+    /// Return the unmodified OfficeArt value, including its high-byte flags.
+    #[inline]
+    pub const fn raw(self) -> u32 {
+        self.0
+    }
+
+    /// Whether the high byte marks this color as ignored.
+    #[inline]
+    pub const fn is_ignored(self) -> bool {
+        self.0 >> 24 == 0xFF
+    }
+
+    /// Red component of a direct RGB value.
+    #[inline]
+    pub const fn red(self) -> u8 {
+        (self.0 >> 16) as u8
+    }
+
+    /// Green component of a direct RGB value.
+    #[inline]
+    pub const fn green(self) -> u8 {
+        (self.0 >> 8) as u8
+    }
+
+    /// Blue component of a direct RGB value.
+    #[inline]
+    pub const fn blue(self) -> u8 {
+        self.0 as u8
+    }
+}
+
+impl From<u32> for OfficeArtColor {
+    fn from(value: u32) -> Self {
+        Self(value)
+    }
+}
+
+impl From<u16> for OfficeArtColor {
+    fn from(value: u16) -> Self {
+        Self(u32::from(value))
+    }
+}
+
+/// Unsigned 16.16 fixed-point value used by OfficeArt opacity properties.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct OfficeArtOpacity(pub u32);
+
+impl OfficeArtOpacity {
+    /// Fully transparent.
+    pub const TRANSPARENT: Self = Self(0);
+    /// Fully opaque.
+    pub const OPAQUE: Self = Self(0x0001_0000);
+
+    /// Return the unmodified unsigned 16.16 value.
+    #[inline]
+    pub const fn raw(self) -> u32 {
+        self.0
+    }
+
+    /// Convert the fixed-point value to a fraction.
+    #[inline]
+    pub fn as_fraction(self) -> f64 {
+        f64::from(self.0) / 65_536.0
+    }
+}
+
+impl Default for OfficeArtOpacity {
+    fn default() -> Self {
+        Self::OPAQUE
+    }
+}
 
 /// Shape type
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -29,7 +121,9 @@ pub enum ShapeType {
     PictureFrame,
     /// Group of shapes
     Group,
-    /// Unknown or custom shape
+    /// A valid OfficeArt shape type not represented by a named variant
+    Custom(i32),
+    /// No usable shape type was specified
     Unknown,
 }
 
@@ -37,9 +131,9 @@ pub enum ShapeType {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum FillType {
     /// No fill
-    #[default]
     None,
     /// Solid color fill
+    #[default]
     Solid,
     /// Gradient fill
     Gradient,
@@ -47,6 +141,10 @@ pub enum FillType {
     Pattern,
     /// Texture/image fill
     Texture,
+    /// Picture fill
+    Picture,
+    /// Inherit the application background fill
+    Background,
 }
 
 /// Gradient direction
@@ -71,23 +169,23 @@ pub struct Fill {
     /// Fill type
     pub fill_type: FillType,
     /// Primary fill color
-    pub color: ColorRef,
+    pub color: OfficeArtColor,
     /// Secondary color (for gradients)
-    pub color2: Option<ColorRef>,
+    pub color2: Option<OfficeArtColor>,
     /// Gradient direction
     pub gradient_direction: GradientDirection,
-    /// Fill opacity (0-100%)
-    pub opacity: u8,
+    /// Exact OfficeArt 16.16 fill opacity
+    pub opacity: OfficeArtOpacity,
 }
 
 impl Default for Fill {
     fn default() -> Self {
         Self {
             fill_type: FillType::default(),
-            color: 0,
+            color: OfficeArtColor::WHITE,
             color2: None,
             gradient_direction: GradientDirection::default(),
-            opacity: 100,
+            opacity: OfficeArtOpacity::OPAQUE,
         }
     }
 }
@@ -95,24 +193,66 @@ impl Default for Fill {
 impl Fill {
     /// Create a solid fill
     #[inline]
-    pub fn solid(color: ColorRef) -> Self {
+    pub fn solid(color: impl Into<OfficeArtColor>) -> Self {
         Self {
             fill_type: FillType::Solid,
-            color,
+            color: color.into(),
             ..Default::default()
         }
     }
 
     /// Create a gradient fill
     #[inline]
-    pub fn gradient(color1: ColorRef, color2: ColorRef, direction: GradientDirection) -> Self {
+    pub fn gradient<C1, C2>(color1: C1, color2: C2, direction: GradientDirection) -> Self
+    where
+        C1: Into<OfficeArtColor>,
+        C2: Into<OfficeArtColor>,
+    {
         Self {
             fill_type: FillType::Gradient,
-            color: color1,
-            color2: Some(color2),
+            color: color1.into(),
+            color2: Some(color2.into()),
             gradient_direction: direction,
             ..Default::default()
         }
+    }
+}
+
+/// Exact OfficeArt line properties used by a shape.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ShapeLine {
+    /// Whether the line is enabled (`fLine`)
+    pub visible: bool,
+    /// Raw OfficeArt foreground color
+    pub color: OfficeArtColor,
+    /// Width in English Metric Units (EMUs)
+    pub width_emu: i32,
+}
+
+impl Default for ShapeLine {
+    fn default() -> Self {
+        Self {
+            visible: true,
+            color: OfficeArtColor::BLACK,
+            width_emu: 0x2535,
+        }
+    }
+}
+
+/// A scalar OfficeArt property retained from an RTF `sp` destination.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ShapeProperty<'a> {
+    /// OfficeArt property name from the `sn` destination
+    pub name: Cow<'a, str>,
+    /// Text value from the `sv` destination
+    pub value: Cow<'a, str>,
+}
+
+impl<'a> ShapeProperty<'a> {
+    /// Construct a scalar shape property.
+    #[inline]
+    pub fn new(name: Cow<'a, str>, value: Cow<'a, str>) -> Self {
+        Self { name, value }
     }
 }
 
@@ -179,6 +319,8 @@ pub struct Shape<'a> {
     pub fill: Fill,
     /// Border
     pub border: Border,
+    /// Exact OfficeArt line properties
+    pub line: ShapeLine,
     /// Text content (for text boxes)
     pub text: Cow<'a, str>,
     /// Text formatting (for text boxes)
@@ -191,6 +333,8 @@ pub struct Shape<'a> {
     pub locked: bool,
     /// Shape name/identifier
     pub name: Cow<'a, str>,
+    /// All scalar OfficeArt properties, including properties unknown to this crate
+    pub properties: Vec<ShapeProperty<'a>>,
 }
 
 impl<'a> Shape<'a> {
@@ -202,12 +346,14 @@ impl<'a> Shape<'a> {
             geometry: ShapeGeometry::default(),
             fill: Fill::default(),
             border: Border::default(),
+            line: ShapeLine::default(),
             text: Cow::Borrowed(""),
             text_formatting: None,
             wrap_mode: WrapMode::default(),
             behind_doc: false,
             locked: false,
             name: Cow::Borrowed(""),
+            properties: Vec::new(),
         }
     }
 
@@ -226,6 +372,16 @@ impl<'a> Shape<'a> {
     pub fn is_text_box(&self) -> bool {
         self.shape_type == ShapeType::TextBox
     }
+
+    /// Return the last scalar OfficeArt property with the requested name.
+    #[inline]
+    pub fn property(&self, name: &str) -> Option<&str> {
+        self.properties
+            .iter()
+            .rev()
+            .find(|property| property.name == name)
+            .map(|property| property.value.as_ref())
+    }
 }
 
 /// Group of shapes
@@ -237,6 +393,8 @@ pub struct ShapeGroup<'a> {
     pub shapes: Vec<Shape<'a>>,
     /// Group geometry (bounding box)
     pub geometry: ShapeGeometry,
+    /// All scalar OfficeArt properties attached to the group
+    pub properties: Vec<ShapeProperty<'a>>,
 }
 
 impl<'a> ShapeGroup<'a> {
@@ -247,6 +405,7 @@ impl<'a> ShapeGroup<'a> {
             name: Cow::Borrowed(""),
             shapes: Vec::new(),
             geometry: ShapeGeometry::default(),
+            properties: Vec::new(),
         }
     }
 
@@ -260,6 +419,16 @@ impl<'a> ShapeGroup<'a> {
     #[inline]
     pub fn shapes(&self) -> &[Shape<'a>] {
         &self.shapes
+    }
+
+    /// Return the last scalar OfficeArt property with the requested name.
+    #[inline]
+    pub fn property(&self, name: &str) -> Option<&str> {
+        self.properties
+            .iter()
+            .rev()
+            .find(|property| property.name == name)
+            .map(|property| property.value.as_ref())
     }
 }
 

@@ -630,6 +630,11 @@ impl<'a> RtfDocument<'a> {
                     .map(Self::convert_shape_to_owned)
                     .collect(),
                 geometry: group.geometry,
+                properties: group
+                    .properties
+                    .into_iter()
+                    .map(Self::convert_shape_property_to_owned)
+                    .collect(),
             })
             .collect()
     }
@@ -640,12 +645,27 @@ impl<'a> RtfDocument<'a> {
             geometry: shape.geometry,
             fill: shape.fill,
             border: shape.border,
+            line: shape.line,
             text: Cow::Owned(shape.text.into_owned()),
             text_formatting: shape.text_formatting,
             wrap_mode: shape.wrap_mode,
             behind_doc: shape.behind_doc,
             locked: shape.locked,
             name: Cow::Owned(shape.name.into_owned()),
+            properties: shape
+                .properties
+                .into_iter()
+                .map(Self::convert_shape_property_to_owned)
+                .collect(),
+        }
+    }
+
+    fn convert_shape_property_to_owned(
+        property: super::shape::ShapeProperty<'_>,
+    ) -> super::shape::ShapeProperty<'static> {
+        super::shape::ShapeProperty {
+            name: Cow::Owned(property.name.into_owned()),
+            value: Cow::Owned(property.value.into_owned()),
         }
     }
 
@@ -822,7 +842,15 @@ mod tests {
                     {\sp{\sn shapeType}{\sv 202}}
                     {\sp{\sn wzName}{\sv Owned Text Box}}
                     {\sp{\sn fBehindDocument}{\sv 1}}
-                    {\sp{\sn fLockPosition}{\sv 1}}}
+                    {\sp{\sn fLockPosition}{\sv 1}}
+                    {\sp{\sn fillType}{\sv 7}}
+                    {\sp{\sn fillColor}{\sv 66051}}
+                    {\sp{\sn fillBackColor}{\sv 263430}}
+                    {\sp{\sn fillOpacity}{\sv 32768}}
+                    {\sp{\sn fLine}{\sv 0}}
+                    {\sp{\sn lineColor}{\sv 460809}}
+                    {\sp{\sn lineWidth}{\sv 12700}}
+                    {\sp{\sn futureOfficeArtProperty}{\sv retained}}}
                 {\shptxt Hello \u20320?}}
             {\shpgrp\shpleft1\shptop2\shpright801\shpbottom602
                 {\sp{\sn wzName}{\sv Owned Group}}
@@ -844,6 +872,26 @@ mod tests {
         assert!(shape.behind_doc);
         assert!(shape.locked);
         assert_eq!(shape.wrap_mode, crate::WrapMode::Tight);
+        assert_eq!(shape.fill.fill_type, crate::FillType::Gradient);
+        assert_eq!(shape.fill.color.raw(), 66_051);
+        assert_eq!(shape.fill.color.red(), 1);
+        assert_eq!(shape.fill.color.green(), 2);
+        assert_eq!(shape.fill.color.blue(), 3);
+        assert_eq!(shape.fill.color2.unwrap().raw(), 263_430);
+        assert_eq!(shape.fill.opacity.raw(), 32_768);
+        assert_eq!(shape.fill.opacity.as_fraction(), 0.5);
+        assert!(!shape.line.visible);
+        assert_eq!(shape.line.color.raw(), 460_809);
+        assert_eq!(shape.line.width_emu, 12_700);
+        assert!(shape.properties.iter().any(|property| {
+            property.name == "futureOfficeArtProperty" && property.value == "retained"
+        }));
+        assert!(
+            shape
+                .properties
+                .iter()
+                .all(|property| matches!(property.name, Cow::Owned(_)))
+        );
         assert!(matches!(shape.text, Cow::Owned(_)));
 
         let group = &doc.shape_groups()[0];
@@ -855,6 +903,12 @@ mod tests {
         assert_eq!(group.shapes[1].shape_type, crate::ShapeType::Ellipse);
         assert_eq!(group.name, "Owned Group");
         assert!(matches!(group.name, Cow::Owned(_)));
+        assert!(
+            group
+                .properties
+                .iter()
+                .all(|property| matches!(property.value, Cow::Owned(_)))
+        );
     }
 
     #[test]
@@ -865,12 +919,33 @@ mod tests {
         assert_eq!(doc.shapes().len(), 2);
         assert_eq!(doc.shapes()[0].geometry.x, 2633);
         assert_eq!(doc.shapes()[0].geometry.width, 2220);
+        assert_eq!(doc.shapes()[0].fill.color.raw(), 5_880_731);
+        assert_eq!(doc.shapes()[0].fill.fill_type, crate::FillType::Solid);
+        assert_eq!(doc.shapes()[0].properties.len(), 4);
         assert_eq!(doc.shapes()[1].geometry.x, 488);
         assert_eq!(doc.shapes()[1].geometry.width, 1515);
+        assert_eq!(doc.shapes()[1].fill.color.raw(), 5_066_944);
         assert_eq!(
             doc.text(),
             "First should be foreground, the second should be background.\n"
         );
+    }
+
+    #[test]
+    fn preserves_real_watermark_office_art_properties() {
+        let rtf = include_str!("../../../test-data/rtf/watermark.rtf");
+        let doc = RtfDocument::parse(rtf).unwrap();
+
+        assert_eq!(doc.shapes().len(), 3);
+        let shape = &doc.shapes()[0];
+        assert_eq!(shape.shape_type, crate::ShapeType::Custom(136));
+        assert_eq!(shape.geometry.rotation, 315);
+        assert_eq!(shape.fill.color.raw(), 6_108_695);
+        assert_eq!(shape.fill.opacity.raw(), 32_768);
+        assert!(!shape.line.visible);
+        assert_eq!(shape.name, "PowerPlusWaterMarkObject142907");
+        assert!(shape.behind_doc);
+        assert_eq!(shape.property("gtextUNICODE"), Some("ASAP"));
     }
 
     #[test]

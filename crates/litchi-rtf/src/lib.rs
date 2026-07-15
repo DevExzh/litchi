@@ -67,7 +67,8 @@ pub use section::{
     Section, SectionBreakType, SectionProperties, VerticalAlignment,
 };
 pub use shape::{
-    Fill, FillType, GradientDirection, Shape, ShapeGeometry, ShapeGroup, ShapeType, WrapMode,
+    Fill, FillType, GradientDirection, OfficeArtColor, OfficeArtOpacity, Shape, ShapeGeometry,
+    ShapeGroup, ShapeLine, ShapeProperty, ShapeType, WrapMode,
 };
 pub use stylesheet::{Style, StyleSheet, StyleType};
 pub use table::{Cell, Row, Table};

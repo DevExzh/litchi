@@ -95,6 +95,12 @@ const MAX_LIST_TEXT_BYTES: usize = 65_536;
 const MAX_REVISION_AUTHORS: usize = 65_536;
 const MAX_REVISION_AUTHOR_BYTES: usize = 65_536;
 const MAX_REVISIONS: usize = 65_536;
+const MAX_SHAPES: usize = 65_536;
+const MAX_SHAPE_GROUPS: usize = 16_384;
+const MAX_SHAPES_PER_GROUP: usize = 65_536;
+const MAX_SHAPE_PROPERTIES: usize = 65_536;
+const MAX_SHAPE_PROPERTY_BYTES: usize = 1_048_576;
+const MAX_SHAPE_TEXT_BYTES: usize = 16 * 1_048_576;
 
 struct OpenBookmark {
     name: String,
@@ -451,12 +457,22 @@ impl<'a> Parser<'a> {
                     return Ok(());
                 },
                 Token::Control(ControlWord::Shape) => {
+                    if self.shapes.len() >= MAX_SHAPES {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF shape count exceeds the safety limit".to_string(),
+                        ));
+                    }
                     let shape = self.parse_shape_destination()?;
                     self.shapes.push(shape);
                     self.states.pop();
                     return Ok(());
                 },
                 Token::Control(ControlWord::ShapeGroup) => {
+                    if self.shape_groups.len() >= MAX_SHAPE_GROUPS {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF shape group count exceeds the safety limit".to_string(),
+                        ));
+                    }
                     let group = self.parse_shape_group_destination()?;
                     self.shape_groups.push(group);
                     self.states.pop();
@@ -2801,8 +2817,16 @@ impl<'a> Parser<'a> {
                 Token::OpenBrace
                     if self.nested_control_word() == Some(ControlWord::ShapeProperty) =>
                 {
+                    if shape.properties.len() >= MAX_SHAPE_PROPERTIES {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF shape property count exceeds the safety limit".to_string(),
+                        ));
+                    }
                     let (name, value) = self.parse_shape_property_group()?;
-                    Self::apply_shape_property(&mut shape, &name, &value);
+                    shape.properties.push(super::shape::ShapeProperty::new(
+                        Cow::Owned(name),
+                        Cow::Owned(value),
+                    ));
                 },
                 Token::OpenBrace => {
                     depth += 1;
@@ -2882,6 +2906,11 @@ impl<'a> Parser<'a> {
                 },
                 Token::Control(ControlWord::Unicode(code)) if text_depth.is_some() => {
                     text.push_str(&self.parse_destination_unicode_sequence(*code)?);
+                    if text.len() > MAX_SHAPE_TEXT_BYTES {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF shape text exceeds the safety limit".to_string(),
+                        ));
+                    }
                 },
                 Token::Control(ControlWord::Par | ControlWord::Line) if text_depth.is_some() => {
                     text.push('\n');
@@ -2893,6 +2922,11 @@ impl<'a> Parser<'a> {
                 },
                 Token::Text(value) if text_depth.is_some() => {
                     text.push_str(value);
+                    if text.len() > MAX_SHAPE_TEXT_BYTES {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF shape text exceeds the safety limit".to_string(),
+                        ));
+                    }
                     self.pos += 1;
                 },
                 _ => self.pos += 1,
@@ -2902,6 +2936,7 @@ impl<'a> Parser<'a> {
             shape.text = Cow::Owned(text);
             shape.text_formatting = self.current_state().ok().map(|state| state.formatting);
         }
+        Self::apply_shape_properties(&mut shape);
         if let Some(right) = right {
             shape.geometry.width = right.saturating_sub(shape.geometry.x);
         }
@@ -2970,6 +3005,11 @@ impl<'a> Parser<'a> {
                 },
                 _ => self.pos += 1,
             }
+            if name.len().saturating_add(value.len()) > MAX_SHAPE_PROPERTY_BYTES {
+                return Err(RtfError::MalformedDocument(
+                    "RTF shape property exceeds the safety limit".to_string(),
+                ));
+            }
         }
         Ok((name.trim().to_string(), value.trim().to_string()))
     }
@@ -2982,17 +3022,107 @@ impl<'a> Parser<'a> {
                 }
             },
             "wzName" => shape.name = Cow::Owned(value.to_string()),
-            "fBehindDocument" => shape.behind_doc = value != "0",
-            "fLockPosition" | "fLockAgainstGrouping" => shape.locked = value != "0",
-            "fFilled" => {
-                shape.fill.fill_type = if value == "0" {
-                    super::shape::FillType::None
-                } else {
-                    super::shape::FillType::Solid
-                };
+            "fBehindDocument" => {
+                if let Some(value) = Self::parse_shape_bool(value) {
+                    shape.behind_doc = value;
+                }
+            },
+            "fLockPosition" | "fLockAgainstGrouping" => {
+                if let Some(value) = Self::parse_shape_bool(value) {
+                    shape.locked |= value;
+                }
+            },
+            "fillType" => {
+                if let Ok(value) = value.parse::<i32>() {
+                    shape.fill.fill_type = match value {
+                        0 => super::shape::FillType::Solid,
+                        1 => super::shape::FillType::Pattern,
+                        2 => super::shape::FillType::Texture,
+                        3 => super::shape::FillType::Picture,
+                        4..=8 => super::shape::FillType::Gradient,
+                        9 => super::shape::FillType::Background,
+                        _ => shape.fill.fill_type,
+                    };
+                }
+            },
+            "fillColor" => {
+                if let Some(value) = Self::parse_office_art_u32(value) {
+                    shape.fill.color = super::shape::OfficeArtColor(value);
+                }
+            },
+            "fillBackColor" => {
+                if let Some(value) = Self::parse_office_art_u32(value) {
+                    shape.fill.color2 = Some(super::shape::OfficeArtColor(value));
+                }
+            },
+            "fillOpacity" => {
+                if let Some(value) = Self::parse_office_art_u32(value) {
+                    shape.fill.opacity = super::shape::OfficeArtOpacity(value);
+                }
+            },
+            "lineColor" => {
+                if let Some(value) = Self::parse_office_art_u32(value) {
+                    shape.line.color = super::shape::OfficeArtColor(value);
+                }
+            },
+            "lineWidth" => {
+                if let Ok(value) = value.parse() {
+                    shape.line.width_emu = value;
+                }
+            },
+            "rotation" => {
+                if let Ok(value) = value.parse::<i32>() {
+                    shape.geometry.rotation = value / 65_536;
+                }
             },
             _ => {},
         }
+    }
+
+    fn apply_shape_properties(shape: &mut super::shape::Shape<'a>) {
+        for index in 0..shape.properties.len() {
+            let name = shape.properties[index].name.to_string();
+            let value = shape.properties[index].value.to_string();
+            Self::apply_shape_property(shape, &name, &value);
+        }
+
+        if let Some(value) = shape
+            .properties
+            .iter()
+            .rev()
+            .find(|property| property.name == "fFilled")
+            .and_then(|property| Self::parse_shape_bool(&property.value))
+        {
+            if value {
+                if shape.fill.fill_type == super::shape::FillType::None {
+                    shape.fill.fill_type = super::shape::FillType::Solid;
+                }
+            } else {
+                shape.fill.fill_type = super::shape::FillType::None;
+            }
+        }
+
+        if let Some(value) = shape
+            .properties
+            .iter()
+            .rev()
+            .find(|property| property.name == "fLine")
+            .and_then(|property| Self::parse_shape_bool(&property.value))
+        {
+            shape.line.visible = value;
+        }
+    }
+
+    fn parse_shape_bool(value: &str) -> Option<bool> {
+        value.trim().parse::<i32>().ok().map(|value| value != 0)
+    }
+
+    fn parse_office_art_u32(value: &str) -> Option<u32> {
+        let value = value.trim();
+        value
+            .parse::<u32>()
+            .ok()
+            .or_else(|| value.parse::<i32>().ok().map(|value| value as u32))
     }
 
     fn parse_shape_group_destination(&mut self) -> RtfResult<super::shape::ShapeGroup<'a>> {
@@ -3007,12 +3137,26 @@ impl<'a> Parser<'a> {
                 Token::OpenBrace
                     if self.nested_control_word() == Some(ControlWord::ShapeProperty) =>
                 {
+                    if group.properties.len() >= MAX_SHAPE_PROPERTIES {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF shape group property count exceeds the safety limit".to_string(),
+                        ));
+                    }
                     let (name, value) = self.parse_shape_property_group()?;
                     if name == "wzName" {
-                        group.name = Cow::Owned(value);
+                        group.name = Cow::Owned(value.clone());
                     }
+                    group.properties.push(super::shape::ShapeProperty::new(
+                        Cow::Owned(name),
+                        Cow::Owned(value),
+                    ));
                 },
                 Token::OpenBrace if self.nested_shape_control() == Some(ControlWord::Shape) => {
+                    if group.shapes.len() >= MAX_SHAPES_PER_GROUP {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF shape group child count exceeds the safety limit".to_string(),
+                        ));
+                    }
                     self.pos += 1;
                     if matches!(
                         self.tokens.get(self.pos),
@@ -3032,9 +3176,14 @@ impl<'a> Parser<'a> {
                     ) {
                         self.pos += 1;
                     }
-                    group
-                        .shapes
-                        .extend(self.parse_shape_group_destination()?.shapes);
+                    let nested = self.parse_shape_group_destination()?;
+                    if group.shapes.len().saturating_add(nested.shapes.len()) > MAX_SHAPES_PER_GROUP
+                    {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF shape group child count exceeds the safety limit".to_string(),
+                        ));
+                    }
+                    group.shapes.extend(nested.shapes);
                 },
                 Token::OpenBrace => {
                     depth += 1;
@@ -3123,8 +3272,8 @@ impl<'a> Parser<'a> {
             20 => ShapeType::Line,
             75 => ShapeType::PictureFrame,
             202 => ShapeType::TextBox,
-            0 => ShapeType::Polygon,
-            _ => ShapeType::Unknown,
+            0 => ShapeType::Group,
+            value => ShapeType::Custom(value),
         }
     }
 
