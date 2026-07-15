@@ -104,6 +104,7 @@ const MAX_SHAPE_TEXT_BYTES: usize = 16 * 1_048_576;
 const MAX_OBJECTS: usize = 65_536;
 const MAX_OBJECT_TEXT_BYTES: usize = 1_048_576;
 const MAX_OBJECT_DATA_BYTES: usize = 256 * 1_048_576;
+const MAX_PICTURE_DATA_BYTES: usize = 256 * 1_048_576;
 
 struct OpenBookmark {
     name: String,
@@ -3024,6 +3025,20 @@ impl<'a> Parser<'a> {
                     }
                     self.pos += 1;
                 },
+                Token::Binary(bytes) => {
+                    if high_nibble.is_some() {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF objdata binary payload splits a hexadecimal byte".to_string(),
+                        ));
+                    }
+                    data.extend_from_slice(bytes);
+                    if data.len() > MAX_OBJECT_DATA_BYTES {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF embedded object data exceeds the safety limit".to_string(),
+                        ));
+                    }
+                    self.pos += 1;
+                },
                 _ => self.pos += 1,
             }
         }
@@ -3547,7 +3562,8 @@ impl<'a> Parser<'a> {
         let mut goal_height = None;
         let mut scale_x = None;
         let mut scale_y = None;
-        let mut hex_data = SmallVec::<[u8; 512]>::new();
+        let mut data = Vec::new();
+        let mut high_nibble = None;
 
         // Parse picture properties and data
         while self.pos < self.tokens.len() {
@@ -3578,12 +3594,37 @@ impl<'a> Parser<'a> {
                     }
                 },
                 Token::Text(text) => {
-                    // Accumulate hex-encoded image data
-                    hex_data.extend_from_slice(text.as_bytes());
+                    for byte in text.bytes().filter(|byte| !byte.is_ascii_whitespace()) {
+                        let nibble = Self::hex_nibble(byte).ok_or_else(|| {
+                            RtfError::MalformedDocument(
+                                "RTF picture contains a non-hexadecimal character".to_string(),
+                            )
+                        })?;
+                        if let Some(high) = high_nibble.take() {
+                            data.push((high << 4) | nibble);
+                        } else {
+                            high_nibble = Some(nibble);
+                        }
+                    }
+                    if data.len() > MAX_PICTURE_DATA_BYTES {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF picture data exceeds the safety limit".to_string(),
+                        ));
+                    }
                     self.pos += 1;
                 },
-                Token::Binary(_) => {
-                    // Skip binary data for now
+                Token::Binary(bytes) => {
+                    if high_nibble.is_some() {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF picture binary payload splits a hexadecimal byte".to_string(),
+                        ));
+                    }
+                    data.extend_from_slice(bytes);
+                    if data.len() > MAX_PICTURE_DATA_BYTES {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF picture data exceeds the safety limit".to_string(),
+                        ));
+                    }
                     self.pos += 1;
                 },
                 Token::OpenBrace => {
@@ -3593,18 +3634,20 @@ impl<'a> Parser<'a> {
             }
         }
 
-        // Decode hex data to binary
-        if !hex_data.is_empty()
-            && let Ok(hex_str) = std::str::from_utf8(&hex_data)
-            && let Ok(decoded) = litchi_core::encoding::decode_hex_data(hex_str)
-        {
+        if high_nibble.is_some() {
+            return Err(RtfError::MalformedDocument(
+                "RTF picture contains an odd number of hexadecimal digits".to_string(),
+            ));
+        }
+
+        if !data.is_empty() {
             // If type not specified, try to detect from data
             if image_type == super::picture::ImageType::Unknown {
-                image_type = super::picture::detect_image_type(&decoded);
+                image_type = super::picture::detect_image_type(&data);
             }
 
             // Allocate in arena and create picture
-            let data_alloc = self.arena.alloc_slice_copy(&decoded);
+            let data_alloc = self.arena.alloc_slice_copy(&data);
             let mut picture = super::picture::Picture::new(image_type, Cow::Borrowed(data_alloc));
             picture.width = width;
             picture.height = height;

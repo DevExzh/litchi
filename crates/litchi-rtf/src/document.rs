@@ -70,6 +70,14 @@ impl<'a> RtfDocument<'a> {
         Self::parse_internal(input.as_bytes())
     }
 
+    /// Parse RTF from its original byte representation.
+    ///
+    /// Use this entry point when the document can contain `bin` destinations or
+    /// legacy-code-page bytes that are not valid UTF-8.
+    pub fn parse_bytes(input: &[u8]) -> RtfResult<RtfDocument<'static>> {
+        Self::parse_internal(input)
+    }
+
     /// Parse RTF from bytes (handles both compressed and uncompressed)
     fn parse_internal(bytes: &[u8]) -> RtfResult<RtfDocument<'static>> {
         // Check if it's compressed RTF
@@ -89,7 +97,7 @@ impl<'a> RtfDocument<'a> {
         // 3. We can recover original bytes and decode them with correct encoding later
         //
         // The parser will detect \ansicpg and use the proper encoding for text.
-        let (input_str, _, _) = encoding_rs::WINDOWS_1252.decode(&input_bytes);
+        let input_str: String = input_bytes.iter().map(|byte| char::from(*byte)).collect();
 
         Self::parse_string(&input_str)
     }
@@ -1081,6 +1089,21 @@ mod tests {
         assert!(
             matches!(error, RtfError::MalformedDocument(message) if message.contains("non-hexadecimal"))
         );
+    }
+
+    #[test]
+    fn preserves_exact_binary_picture_payload() {
+        let payload = [
+            0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, b'{', b'\\', b'}',
+        ];
+        let mut rtf = br"{\rtf1{\pict\pngblip\bin11 ".to_vec();
+        rtf.extend_from_slice(&payload);
+        rtf.extend_from_slice(b"}}");
+
+        let doc = RtfDocument::parse_bytes(&rtf).unwrap();
+        assert_eq!(doc.pictures().len(), 1);
+        assert_eq!(doc.pictures()[0].image_type, crate::ImageType::Png);
+        assert_eq!(doc.pictures()[0].data(), payload);
     }
 
     #[test]

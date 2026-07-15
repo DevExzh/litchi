@@ -383,9 +383,8 @@ pub enum Token<'a> {
     Control(ControlWord<'a>),
     /// Plain text
     Text(Cow<'a, str>),
-    /// Binary data (skipped for now)
-    #[allow(dead_code)]
-    Binary(usize),
+    /// Exact payload consumed by a `binN` control word
+    Binary(Cow<'a, [u8]>),
 }
 
 /// Character set encoding for RTF.
@@ -542,16 +541,27 @@ impl<'a> Lexer<'a> {
         // Match control word to enum variant
         let control = self.match_control_word(word, param)?;
 
-        // Handle binary data immediately after \bin
-        if let ControlWord::Binary(size) = control
-            && size > 0
-        {
-            // Skip the binary data bytes
-            let skip_bytes = size as usize;
-            if self.pos + skip_bytes <= self.input.len() {
-                self.pos += skip_bytes;
+        // Handle binary data immediately after \bin. The input uses a one-byte
+        // Latin-1 transport mapping, so each scalar maps back to its source byte.
+        if let ControlWord::Binary(size) = control {
+            let size = usize::try_from(size).map_err(|_| {
+                RtfError::MalformedDocument("RTF binary length cannot be negative".to_string())
+            })?;
+            let mut data = Vec::with_capacity(size);
+            for _ in 0..size {
+                if self.pos >= self.input.len() {
+                    return Err(RtfError::UnexpectedEof);
+                }
+                let value = u8::try_from(self.current_char() as u32).map_err(|_| {
+                    RtfError::MalformedDocument(
+                        "RTF binary payload is not byte-preserving".to_string(),
+                    )
+                })?;
+                data.push(value);
+                self.advance();
             }
-            return Ok(Token::Binary(skip_bytes));
+            let allocated = self.arena.alloc_slice_copy(&data);
+            return Ok(Token::Binary(Cow::Borrowed(allocated)));
         }
 
         Ok(Token::Control(control))
@@ -1569,7 +1579,14 @@ mod tests {
         let input = r"\bin4 ABCD"; // 4 bytes of binary data
         let mut lexer = Lexer::new(input, &arena);
         let tokens = lexer.tokenize().unwrap();
-        assert!(matches!(tokens[0], Token::Binary(4)));
+        assert!(matches!(&tokens[0], Token::Binary(data) if data.as_ref() == b"ABCD"));
+    }
+
+    #[test]
+    fn test_rejects_truncated_binary_data() {
+        let arena = Bump::new();
+        let mut lexer = Lexer::new(r"\bin4 AB", &arena);
+        assert!(matches!(lexer.tokenize(), Err(RtfError::UnexpectedEof)));
     }
 
     #[test]
