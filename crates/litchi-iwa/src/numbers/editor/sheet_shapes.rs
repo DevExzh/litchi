@@ -5,8 +5,8 @@ use std::ops::Range;
 
 use super::*;
 use crate::shapes::{
-    DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, ShapePathKind,
-    shape_path_kind,
+    DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, ShapePathKind, ShapePreset,
+    set_shape_preset, shape_path_kind, shape_preset,
 };
 
 use super::text_box_create::{
@@ -25,6 +25,8 @@ pub struct NumbersSheetShapeInfo {
     pub sheet_id: u64,
     pub drawable_object_id: u64,
     pub kind: NumbersSheetShapeKind,
+    /// Source-buildable preset and its native controls, when recognized.
+    pub preset: Option<ShapePreset>,
     pub storage: TextStorageInfo,
     pub geometry: DrawableGeometry,
     pub properties: DrawableProperties,
@@ -63,7 +65,23 @@ impl NumbersEditor {
         position: DrawablePoint,
         size: DrawableSize,
     ) -> Result<NumbersSheetShapeInfo> {
-        let geometry = rectangle_geometry(position, size)?;
+        self.add_sheet_shape(sheet_id, text, position, size, ShapePreset::Rectangle)
+    }
+
+    /// Add a typed preset shape with independent writable text to one sheet.
+    ///
+    /// The path, storage, title/caption stand-ins, sheet ownership, UUIDs,
+    /// style relationship, and package high-water mark are built directly
+    /// from typed values. No source drawable or package template is copied.
+    pub fn add_sheet_shape(
+        &mut self,
+        sheet_id: u64,
+        text: &str,
+        position: DrawablePoint,
+        size: DrawableSize,
+        preset: ShapePreset,
+    ) -> Result<NumbersSheetShapeInfo> {
+        let geometry = new_shape_geometry(position, size)?;
         let (archive_name, _, _) = numbers_sheet(&self.package, sheet_id)?;
         let document = numbers_document(&self.package)?;
         let styles = text_box_theme_styles(
@@ -73,7 +91,15 @@ impl NumbersEditor {
         )?;
         let storage = text_box_storage(text, &styles);
         let ids = TextBoxObjectIds::allocate(next_object_identifier(&self.package)?)?;
-        let objects = text_box_objects(ids, sheet_id, styles.shape, geometry, storage, false)?;
+        let objects = text_box_objects(
+            ids,
+            sheet_id,
+            styles.shape,
+            geometry,
+            storage,
+            preset,
+            false,
+        )?;
         let component_id = component_identifier_for_entry(&self.package, &archive_name)?
             .ok_or_else(|| {
                 Error::InvalidFormat(format!(
@@ -124,21 +150,55 @@ impl NumbersEditor {
             .into_iter()
             .find(|shape| shape.drawable_object_id == ids.drawable)
             .ok_or_else(|| {
-                Error::InvalidFormat("Numbers rectangle creation failed validation".to_owned())
+                Error::InvalidFormat("Numbers shape creation failed validation".to_owned())
             })?;
         let created_graph = shape_graph(&verified, sheet_id, ids.drawable)?;
-        if created.kind != NumbersSheetShapeKind::Rectangle
+        if created.preset != Some(preset)
             || created.storage.object_id != ids.storage
             || created.storage.text != text
             || created.geometry != geometry
             || created_graph.object_ids != ids.all()
         {
             return Err(Error::InvalidFormat(
-                "Numbers rectangle creation produced an inconsistent graph".to_owned(),
+                "Numbers shape creation produced an inconsistent graph".to_owned(),
             ));
         }
         *self = verified;
         Ok(created)
+    }
+
+    /// Read the recognized preset and native controls for one sheet shape.
+    pub fn sheet_shape_preset(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<Option<ShapePreset>> {
+        Ok(shape_graph(self, sheet_id, drawable_object_id)?.info.preset)
+    }
+
+    /// Replace a sheet shape's preset path while retaining its text and style.
+    pub fn set_sheet_shape_preset(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        preset: ShapePreset,
+    ) -> Result<()> {
+        let source = shape_graph(self, sheet_id, drawable_object_id)?;
+        let mut staged = self.package.clone();
+        set_shape_preset(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            preset,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.sheet_shape_preset(sheet_id, drawable_object_id)? != Some(preset) {
+            return Err(Error::InvalidFormat(
+                "Numbers shape preset update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
     }
 
     /// Read typed geometry for one ordinary sheet shape.
@@ -314,7 +374,7 @@ impl NumbersEditor {
     }
 }
 
-fn rectangle_geometry(position: DrawablePoint, size: DrawableSize) -> Result<DrawableGeometry> {
+fn new_shape_geometry(position: DrawablePoint, size: DrawableSize) -> Result<DrawableGeometry> {
     if !position.x.is_finite()
         || !position.y.is_finite()
         || !size.width.is_finite()
@@ -323,8 +383,7 @@ fn rectangle_geometry(position: DrawablePoint, size: DrawableSize) -> Result<Dra
         || size.height <= 0.0
     {
         return Err(Error::ParseError(
-            "Numbers rectangle position must be finite and size must be finite and positive"
-                .to_owned(),
+            "Numbers shape position must be finite and size must be finite and positive".to_owned(),
         ));
     }
     DrawableGeometry {
@@ -634,6 +693,7 @@ fn shape_info(
         sheet_id,
         drawable_object_id,
         kind: shape_path_kind(shape)?,
+        preset: shape_preset(shape)?,
         storage: text.storage(storage_id)?,
         geometry: shape_geometry(editor.package(), archive_name, drawable_object_id)?,
         properties: shape_properties(editor.package(), archive_name, drawable_object_id)?,
@@ -644,6 +704,7 @@ fn shape_info(
 mod tests {
     use super::*;
     use crate::numbers::NumbersDocumentBuilder;
+    use crate::shapes::ShapeCornerRadius;
 
     const POSITION: DrawablePoint = DrawablePoint { x: 420.0, y: 300.0 };
     const SIZE: DrawableSize = DrawableSize {
@@ -666,6 +727,7 @@ mod tests {
             .add_sheet_rectangle(sheet_id, "Built from typed objects", POSITION, SIZE)
             .unwrap();
         assert_eq!(created.kind, NumbersSheetShapeKind::Rectangle);
+        assert_eq!(created.preset, Some(ShapePreset::Rectangle));
         assert_eq!(created.storage.text, "Built from typed objects");
         editor
             .replace_sheet_shape_text(sheet_id, created.drawable_object_id, 0..5, "Made")
@@ -706,6 +768,55 @@ mod tests {
     }
 
     #[test]
+    fn scratch_spreadsheet_supports_typed_preset_shape_crud() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .sheet_name("Preset Shapes")
+            .table_name("Source Data")
+            .build()
+            .unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let baseline = editor.to_bytes().unwrap();
+        let created = editor
+            .add_sheet_shape(
+                sheet_id,
+                "Rounded",
+                POSITION,
+                SIZE,
+                ShapePreset::ROUNDED_RECTANGLE,
+            )
+            .unwrap();
+        assert_eq!(created.kind, NumbersSheetShapeKind::RoundedRectangle);
+        assert_eq!(created.preset, Some(ShapePreset::ROUNDED_RECTANGLE));
+
+        let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .sheet_shape_preset(sheet_id, created.drawable_object_id)
+                .unwrap(),
+            Some(ShapePreset::ROUNDED_RECTANGLE)
+        );
+
+        for (preset, kind) in [
+            (ShapePreset::Ellipse, NumbersSheetShapeKind::Ellipse),
+            (ShapePreset::PENTAGON, NumbersSheetShapeKind::RegularPolygon),
+            (ShapePreset::STAR, NumbersSheetShapeKind::Star),
+        ] {
+            editor
+                .set_sheet_shape_preset(sheet_id, created.drawable_object_id, preset)
+                .unwrap();
+            let shape = &editor.sheet_shapes(sheet_id).unwrap()[0];
+            assert_eq!(shape.kind, kind);
+            assert_eq!(shape.preset, Some(preset));
+            assert_eq!(shape.storage.text, "Rounded");
+        }
+
+        editor
+            .remove_sheet_shape(sheet_id, created.drawable_object_id)
+            .unwrap();
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
+    }
+
+    #[test]
     fn invalid_rectangle_creation_and_cross_type_updates_are_transactional() {
         let mut editor = NumbersDocumentBuilder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
@@ -724,6 +835,20 @@ mod tests {
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), baseline);
+        assert!(
+            editor
+                .add_sheet_shape(
+                    sheet_id,
+                    "invalid radius",
+                    POSITION,
+                    SIZE,
+                    ShapePreset::RoundedRectangle {
+                        corner_radius: ShapeCornerRadius::new(SIZE.height).unwrap(),
+                    },
+                )
+                .is_err()
+        );
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
 
         let text_box = editor
             .add_sheet_text_box(sheet_id, "not a shape", POSITION, SIZE)
@@ -732,6 +857,16 @@ mod tests {
         assert!(
             editor
                 .set_sheet_shape_text(sheet_id, text_box.drawable_object_id, "wrong type")
+                .is_err()
+        );
+        assert_eq!(editor.to_bytes().unwrap(), before);
+        assert!(
+            editor
+                .set_sheet_shape_preset(
+                    sheet_id,
+                    text_box.drawable_object_id,
+                    ShapePreset::Ellipse,
+                )
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), before);

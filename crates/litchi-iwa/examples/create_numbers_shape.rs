@@ -1,9 +1,9 @@
-//! Create a Numbers spreadsheet and editable rectangle without an input package.
+//! Create a Numbers spreadsheet and editable preset shape without an input package.
 
 use std::env;
 
 use litchi_iwa::numbers::NumbersDocumentBuilder;
-use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_iwa::shapes::{DrawablePoint, DrawableSize, ShapePreset};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -22,7 +22,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .table_name("Scratch Table")
         .build()?;
     let sheet_id = editor.sheets()?[0].object_id;
-    let created = editor.add_sheet_rectangle(
+    let created = editor.add_sheet_shape(
         sheet_id,
         &text,
         DrawablePoint { x: 420.0, y: 300.0 },
@@ -30,11 +30,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             width: 300.0,
             height: 150.0,
         },
+        ShapePreset::ROUNDED_RECTANGLE,
     )?;
     editor.save(output)?;
     println!(
-        "created Numbers {:?} {} with storage {} on sheet {}",
-        created.kind, created.drawable_object_id, created.storage.object_id, sheet_id
+        "created Numbers {:?} {:?} {} with storage {} on sheet {}",
+        created.kind,
+        created.preset,
+        created.drawable_object_id,
+        created.storage.object_id,
+        sheet_id
     );
     Ok(())
 }

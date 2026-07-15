@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::IWorkThemeArchive;
-use crate::shapes::{DrawablePoint, DrawableSize};
+use crate::shapes::{DrawablePoint, DrawableSize, ShapePreset, shape_path_source};
 
 const NUMBERS_THEME_MESSAGE_TYPE: u32 = 12_009;
 const DEFAULT_DRAWABLE_FLAGS: u32 = 3;
@@ -93,7 +93,15 @@ impl NumbersEditor {
         )?;
         let storage = text_box_storage(text, &styles);
         let ids = TextBoxObjectIds::allocate(next_object_identifier(&self.package)?)?;
-        let objects = text_box_objects(ids, sheet_id, styles.shape, geometry, storage, true)?;
+        let objects = text_box_objects(
+            ids,
+            sheet_id,
+            styles.shape,
+            geometry,
+            storage,
+            ShapePreset::Rectangle,
+            true,
+        )?;
 
         let mut staged = self.package.clone();
         staged.update_archive(&archive_name, |archive| {
@@ -270,6 +278,7 @@ pub(super) fn text_box_objects(
     style_id: u64,
     geometry: DrawableGeometry,
     storage: tswp::StorageArchive,
+    preset: ShapePreset,
     is_text_box: bool,
 ) -> Result<[ArchiveObject; 4]> {
     let position = geometry.position.ok_or_else(|| {
@@ -312,7 +321,7 @@ pub(super) fn text_box_objects(
                 ..Default::default()
             },
             style: Some(reference(style_id)),
-            pathsource: Some(rectangle_path_source(size)),
+            pathsource: Some(shape_path_source(preset, size)?),
             stroke_pattern_offset_distance: Some(0.0),
             ..Default::default()
         },
@@ -351,38 +360,6 @@ pub(super) fn text_box_objects(
             &storage_references,
         )?,
     ])
-}
-
-fn rectangle_path_source(size: DrawableSize) -> tsd::PathSourceArchive {
-    use tsp::path::{Element, ElementType};
-
-    let point = |x, y| tsp::Point { x, y };
-    let element = |r#type: ElementType, points| Element {
-        r#type: r#type as i32,
-        points,
-    };
-    tsd::PathSourceArchive {
-        horizontal_flip: Some(false),
-        vertical_flip: Some(false),
-        bezier_path_source: Some(tsd::BezierPathSourceArchive {
-            natural_size: Some(tsp::Size {
-                width: size.width,
-                height: size.height,
-            }),
-            path: Some(tsp::Path {
-                elements: vec![
-                    element(ElementType::MoveTo, vec![point(0.0, 0.0)]),
-                    element(ElementType::LineTo, vec![point(size.width, 0.0)]),
-                    element(ElementType::LineTo, vec![point(size.width, size.height)]),
-                    element(ElementType::LineTo, vec![point(0.0, size.height)]),
-                    element(ElementType::CloseSubpath, Vec::new()),
-                    element(ElementType::MoveTo, vec![point(0.0, 0.0)]),
-                ],
-            }),
-            ..Default::default()
-        }),
-        ..Default::default()
-    }
 }
 
 fn storage_references(storage: &tswp::StorageArchive) -> Vec<u64> {

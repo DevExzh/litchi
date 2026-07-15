@@ -170,23 +170,26 @@ numbers.save("created-with-text-box.numbers")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
 
-Ordinary text-bearing rectangles have independent shape CRUD. Their Bézier
-path, storage, stand-ins, style relationship, ownership, and UUIDs are also
-constructed directly from typed values:
+Ordinary text-bearing shapes have independent CRUD. Rectangle, rounded
+rectangle, ellipse, regular-polygon, and star paths are constructed from typed,
+validated presets together with their storage, stand-ins, style relationship,
+ownership, and UUIDs. No source drawable or package is copied:
 
 ```rust
 use litchi_iwa::numbers::NumbersDocumentBuilder;
-use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_iwa::shapes::{DrawablePoint, DrawableSize, ShapePreset};
 
 let mut numbers = NumbersDocumentBuilder::new().build()?;
 let sheet_id = numbers.sheets()?[0].object_id;
-let rectangle = numbers.add_sheet_rectangle(
+let shape = numbers.add_sheet_shape(
     sheet_id,
     "A fully editable shape",
     DrawablePoint { x: 420.0, y: 300.0 },
     DrawableSize { width: 300.0, height: 150.0 },
+    ShapePreset::ROUNDED_RECTANGLE,
 )?;
-numbers.set_sheet_shape_text(sheet_id, rectangle.drawable_object_id, "Updated")?;
+numbers.set_sheet_shape_text(sheet_id, shape.drawable_object_id, "Updated")?;
+numbers.set_sheet_shape_preset(sheet_id, shape.drawable_object_id, ShapePreset::STAR)?;
 numbers.save("created-with-shape.numbers")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
