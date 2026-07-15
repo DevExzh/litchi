@@ -3752,6 +3752,8 @@ mod tests {
                                 }),
                                 ..crate::doc::parts::tap::CellBorders::default()
                             },
+                            border_type_overrides: crate::doc::parts::tap::CellBorderTypes::default(
+                            ),
                             shading: Some(crate::doc::parts::tap::CellShading {
                                 foreground_color: Some((1, 2, 3)),
                                 background_color: Some((250, 240, 230)),

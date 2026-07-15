@@ -25,8 +25,8 @@ fn binary_to_doc_result<T>(result: BinaryResult<T>) -> Result<T> {
     result.map_err(|e| DocError::InvalidFormat(format!("Binary read error: {}", e)))
 }
 use super::tap::{
-    BorderStyle, BorderType, CellMergeStatus, CellProperties, CellShading, CellSpacing,
-    CellSpacingSource, ShadingPattern, TableHorizontalAnchor, TableHorizontalPosition,
+    BorderStyle, BorderType, CellBorderTypes, CellMergeStatus, CellProperties, CellShading,
+    CellSpacing, CellSpacingSource, ShadingPattern, TableHorizontalAnchor, TableHorizontalPosition,
     TableJustification, TableLook, TableLookFlags, TablePositioning, TableProperties,
     TableVerticalAnchor, TableVerticalPosition, TableWidth, TextDirection, VerticalAlignment,
     VerticalMergeStatus, WidthType,
@@ -544,6 +544,7 @@ impl<'arena> TapParser<'arena> {
             // Full-color shading applied to every cell in the table row.
             0x60 => self.parse_full_table_shading(tap, sprm)?,
             0x61 => tap.preferred_indent = Self::parse_fts_width(sprm, WidthUsage::Indent)?,
+            0x62 => self.parse_cell_border_types(tap, sprm)?,
             // sprmTCellPadding / sprmTCellPaddingDefault
             0x32 | 0x34 => {
                 self.parse_cell_padding(tap, sprm, grpprl)?;
@@ -1473,6 +1474,39 @@ impl<'arena> TapParser<'arena> {
         Ok(())
     }
 
+    fn parse_cell_border_types(&self, tap: &mut TableProperties, sprm: &Sprm) -> Result<()> {
+        let operand = sprm.operand_bytes();
+        if operand.len() % 4 != 0 || operand.len() / 4 > tap.cell_properties.len() {
+            return Err(DocError::Corrupted(
+                "DOC cell border-type array has an invalid size for the row".to_string(),
+            ));
+        }
+        for (cell, types) in tap.cell_properties.iter_mut().zip(operand.chunks_exact(4)) {
+            let top = Self::parse_border_type(types[0], true)?;
+            let left = Self::parse_border_type(types[1], true)?;
+            let bottom = Self::parse_border_type(types[2], true)?;
+            let right = Self::parse_border_type(types[3], true)?;
+            let overrides = CellBorderTypes {
+                top: Some(top),
+                left: Some(left),
+                bottom: Some(bottom),
+                right: Some(right),
+            };
+            cell.border_type_overrides = overrides;
+            for (border, border_type) in [
+                (&mut cell.borders.top, top),
+                (&mut cell.borders.left, left),
+                (&mut cell.borders.bottom, bottom),
+                (&mut cell.borders.right, right),
+            ] {
+                if let Some(border) = border {
+                    border.border_type = border_type;
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Convert ico (color index) to RGB.
     ///
     /// Based on POI's color index mapping.
@@ -1999,6 +2033,51 @@ mod tests {
         assert!(parse_with(0xD62F, &[0, 2, 1, 0, 0, 0, 1, 8, 1, 0, 0]).is_err());
         assert!(parse_with(0xD62F, &[0, 2, 1, 0, 0, 0, 0xFF, 8, 2, 0, 0]).is_err());
         assert!(TapParser::parse_border_code(&[8, 0x1A, 1, 0], 0).is_err());
+    }
+
+    #[test]
+    fn parses_cell_border_type_prefix_overrides() {
+        let arena = Bump::new();
+        let parser = TapParser::new(&arena);
+        let mut grpprl = table_definition_grpprl(&[2, 0, 0, 100, 0, 200, 0]);
+        let mut top_border = vec![0, 1, 0x01];
+        top_border.extend_from_slice(&full_border([1, 2, 3, 0], 8, 1, 0));
+        append_variable_sprm(&mut grpprl, 0xD62F, &top_border);
+        append_variable_sprm(&mut grpprl, 0xD662, &[3, 6, 0, 0x1A]);
+
+        let tap = parser.parse_tap(&grpprl).unwrap();
+        assert_eq!(
+            tap.cell_properties[0].border_type_overrides,
+            CellBorderTypes {
+                top: Some(BorderType::Double),
+                left: Some(BorderType::Dotted),
+                bottom: Some(BorderType::None),
+                right: Some(BorderType::Outset),
+            }
+        );
+        assert_eq!(
+            tap.cell_properties[0].borders.top.unwrap().border_type,
+            BorderType::Double
+        );
+        assert_eq!(
+            tap.cell_properties[1].border_type_overrides,
+            CellBorderTypes::default()
+        );
+    }
+
+    #[test]
+    fn rejects_malformed_cell_border_type_prefixes() {
+        let arena = Bump::new();
+        let parser = TapParser::new(&arena);
+        let parse_with = |operand: &[u8]| {
+            let mut grpprl = table_definition_grpprl(&[2, 0, 0, 100, 0, 200, 0]);
+            append_variable_sprm(&mut grpprl, 0xD662, operand);
+            parser.parse_tap(&grpprl)
+        };
+        assert!(parse_with(&[1, 1, 1]).is_err());
+        assert!(parse_with(&[1; 12]).is_err());
+        assert!(parse_with(&[2, 1, 1, 1]).is_err());
+        assert!(parse_with(&[0x1C, 1, 1, 1]).is_err());
     }
 
     #[test]

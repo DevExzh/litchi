@@ -200,6 +200,8 @@ pub struct CellProperties {
     pub shading_inherits_from_style: bool,
     /// Cell borders
     pub borders: CellBorders,
+    /// Border-type-only overrides; `None` means inherit that side's type
+    pub border_type_overrides: CellBorderTypes,
     /// Text direction
     pub text_direction: TextDirection,
     /// Stretch contents to use the full cell width
@@ -215,6 +217,15 @@ pub struct CellProperties {
     pub padding_left: Option<i16>,
     pub padding_bottom: Option<i16>,
     pub padding_right: Option<i16>,
+}
+
+/// Per-side border type overrides from `sprmTCellBrcType`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct CellBorderTypes {
+    pub top: Option<BorderType>,
+    pub left: Option<BorderType>,
+    pub bottom: Option<BorderType>,
+    pub right: Option<BorderType>,
 }
 
 /// Legacy Word table-cell shading.

@@ -6,8 +6,8 @@
 
 use super::sprm::SprmBuilder;
 use crate::doc::parts::tap::{
-    BorderStyle, BorderType, CellBorders, CellShading, CellSpacing, CellSpacingSource,
-    TableHorizontalAnchor, TableHorizontalPosition, TableLook, TablePositioning,
+    BorderStyle, BorderType, CellBorderTypes, CellBorders, CellShading, CellSpacing,
+    CellSpacingSource, TableHorizontalAnchor, TableHorizontalPosition, TableLook, TablePositioning,
     TableVerticalAnchor, TableVerticalPosition, TableWidth, TextDirection, VerticalAlignment,
     VerticalMergeStatus, WidthType,
 };
@@ -31,6 +31,8 @@ pub enum TapBuildError {
     InvalidCellPadding(u16),
     /// DOC uniform cell spacing cannot exceed 11 inches.
     InvalidCellSpacing(u16),
+    /// A TCellBrcType prefix requires four explicit types for every included cell.
+    IncompleteCellBorderTypes(usize),
     /// A preferred-width property uses unsupported units or a value outside its context's range.
     InvalidPreferredWidth(&'static str, TableWidth),
     /// TLP contains bits outside the eleven-bit Fatl field.
@@ -71,6 +73,9 @@ impl std::fmt::Display for TapBuildError {
             },
             Self::InvalidCellSpacing(spacing) => {
                 write!(f, "DOC cell spacing {spacing} exceeds 15840 twips")
+            },
+            Self::IncompleteCellBorderTypes(index) => {
+                write!(f, "DOC cell {index} has an incomplete border-type override")
             },
             Self::InvalidPreferredWidth(property, width) => {
                 write!(f, "DOC {property} has an invalid preferred width {width:?}")
@@ -115,6 +120,8 @@ pub struct TableCell {
     pub hide_mark: bool,
     /// Cell edge borders
     pub borders: CellBorders,
+    /// Border-type-only overrides; `None` inherits that side's type
+    pub border_type_overrides: CellBorderTypes,
     /// Complete legacy cell shading
     pub shading: Option<CellShading>,
     /// Cell padding in twips
@@ -596,6 +603,7 @@ pub(crate) fn generate_row_sprms(row: &TableRow) -> Result<Vec<u8>, TapBuildErro
 
     append_table_borders(&mut sprms, row.borders)?;
     append_cell_borders(&mut sprms, &row.cells)?;
+    append_cell_border_types(&mut sprms, &row.cells)?;
     append_cell_shading(&mut sprms, &row.cells)?;
     append_cell_spacing(&mut sprms, row.cell_spacing)?;
     append_cell_padding(&mut sprms, &row.cells)?;
@@ -757,6 +765,37 @@ fn append_cell_spacing(
     sprms.push(6);
     sprms.extend_from_slice(&[0, 1, 0x0F, units]);
     sprms.extend_from_slice(&spacing.width.to_le_bytes());
+    Ok(())
+}
+
+fn append_cell_border_types(sprms: &mut Vec<u8>, cells: &[TableCell]) -> Result<(), TapBuildError> {
+    let Some(last) = cells.iter().rposition(|cell| {
+        let types = cell.border_type_overrides;
+        types.top.is_some()
+            || types.left.is_some()
+            || types.bottom.is_some()
+            || types.right.is_some()
+    }) else {
+        return Ok(());
+    };
+    let mut operand = Vec::with_capacity((last + 1) * 4);
+    for (index, cell) in cells[..=last].iter().enumerate() {
+        let types = cell.border_type_overrides;
+        let (Some(top), Some(left), Some(bottom), Some(right)) =
+            (types.top, types.left, types.bottom, types.right)
+        else {
+            return Err(TapBuildError::IncompleteCellBorderTypes(index));
+        };
+        operand.extend_from_slice(&[
+            border_type_code(top),
+            border_type_code(left),
+            border_type_code(bottom),
+            border_type_code(right),
+        ]);
+    }
+    sprms.extend_from_slice(&0xD662u16.to_le_bytes());
+    sprms.push(operand.len() as u8);
+    sprms.extend_from_slice(&operand);
     Ok(())
 }
 
@@ -1038,6 +1077,7 @@ mod tests {
                         }),
                         ..CellBorders::default()
                     },
+                    border_type_overrides: CellBorderTypes::default(),
                     shading: Some(CellShading {
                         foreground_color: Some((0, 0, 255)),
                         background_color: Some((255, 255, 0)),
@@ -1200,6 +1240,45 @@ mod tests {
         assert_eq!(builder.row_count(), 5);
         let sprms = builder.generate_row_sprms(0);
         assert!(!sprms.is_empty());
+    }
+
+    #[test]
+    fn round_trips_cell_border_type_prefix_overrides() {
+        let overrides = CellBorderTypes {
+            top: Some(BorderType::Double),
+            left: Some(BorderType::Dotted),
+            bottom: Some(BorderType::None),
+            right: Some(BorderType::Outset),
+        };
+        let mut builder = TapBuilder::new();
+        builder.add_row(TableRow {
+            cells: vec![
+                TableCell {
+                    width: 1000,
+                    border_type_overrides: overrides,
+                    ..TableCell::default()
+                },
+                TableCell {
+                    width: 1000,
+                    ..TableCell::default()
+                },
+            ],
+            ..TableRow::default()
+        });
+
+        let sprms = builder.try_generate_row_sprms(0).unwrap();
+        let border_type_sprm = crate::sprm::parse_sprms(&sprms)
+            .into_iter()
+            .find(|sprm| sprm.opcode == 0xD662)
+            .unwrap();
+        assert_eq!(border_type_sprm.operand_bytes(), &[3, 6, 0, 0x1A]);
+
+        let tap = crate::doc::parts::tap::TableProperties::from_sprm(&sprms).unwrap();
+        assert_eq!(tap.cell_properties[0].border_type_overrides, overrides);
+        assert_eq!(
+            tap.cell_properties[1].border_type_overrides,
+            CellBorderTypes::default()
+        );
     }
 
     #[test]
@@ -1490,6 +1569,48 @@ mod tests {
         assert_eq!(
             builder.try_generate_row_sprms(0),
             Err(TapBuildError::InvalidCellSpacing(15_841))
+        );
+
+        let mut builder = TapBuilder::new();
+        builder.add_row(TableRow {
+            cells: vec![TableCell {
+                width: 1000,
+                border_type_overrides: CellBorderTypes {
+                    top: Some(BorderType::Single),
+                    ..CellBorderTypes::default()
+                },
+                ..TableCell::default()
+            }],
+            ..TableRow::default()
+        });
+        assert_eq!(
+            builder.try_generate_row_sprms(0),
+            Err(TapBuildError::IncompleteCellBorderTypes(0))
+        );
+
+        let mut builder = TapBuilder::new();
+        builder.add_row(TableRow {
+            cells: vec![
+                TableCell {
+                    width: 1000,
+                    ..TableCell::default()
+                },
+                TableCell {
+                    width: 1000,
+                    border_type_overrides: CellBorderTypes {
+                        top: Some(BorderType::Single),
+                        left: Some(BorderType::Single),
+                        bottom: Some(BorderType::Single),
+                        right: Some(BorderType::Single),
+                    },
+                    ..TableCell::default()
+                },
+            ],
+            ..TableRow::default()
+        });
+        assert_eq!(
+            builder.try_generate_row_sprms(0),
+            Err(TapBuildError::IncompleteCellBorderTypes(0))
         );
 
         let mut builder = TapBuilder::new();
