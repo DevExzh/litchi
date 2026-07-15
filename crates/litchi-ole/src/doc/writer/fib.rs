@@ -105,6 +105,9 @@ pub struct FibBuilder {
     lcb_plcf_bkf: u32,
     fc_plcf_bkl: u32,
     lcb_plcf_bkl: u32,
+    /// Tracked-revision author table (`SttbfRMark`)
+    fc_sttbf_rmark: u32,
+    lcb_sttbf_rmark: u32,
     /// Annotation bookmark name table (`SttbfAtnBkmk`)
     fc_sttbf_atn_bkmk: u32,
     lcb_sttbf_atn_bkmk: u32,
@@ -188,6 +191,8 @@ impl FibBuilder {
             lcb_plcf_bkf: 0,
             fc_plcf_bkl: 0,
             lcb_plcf_bkl: 0,
+            fc_sttbf_rmark: 0,
+            lcb_sttbf_rmark: 0,
             fc_sttbf_atn_bkmk: 0,
             lcb_sttbf_atn_bkmk: 0,
             fc_plcf_atn_bkf: 0,
@@ -343,6 +348,12 @@ impl FibBuilder {
     pub fn set_plcf_bkl(&mut self, offset: u32, size: u32) {
         self.fc_plcf_bkl = offset;
         self.lcb_plcf_bkl = size;
+    }
+
+    /// Set the tracked-revision author table (`SttbfRMark`).
+    pub fn set_sttbf_rmark(&mut self, offset: u32, size: u32) {
+        self.fc_sttbf_rmark = offset;
+        self.lcb_sttbf_rmark = size;
     }
 
     /// Set the annotation-bookmark name table (`SttbfAtnBkmk`).
@@ -612,6 +623,7 @@ impl FibBuilder {
         const PLCFATNBKL: usize = 43; // Annotation bookmark ends
         const PLCFENDREF: usize = 46; // Endnote reference PLCF
         const PLCFENDTXT: usize = 47; // Endnote text PLCF
+        const STTBFRMARK: usize = 51; // Revision author table
         const PLFLST: usize = 73; // List table (PlfLst)
         const PLFLFO: usize = 74; // List format override table (PlfLfo)
         const ATRDEXTRA: usize = 112; // Extended comment metadata
@@ -627,6 +639,7 @@ impl FibBuilder {
         set_field(buf, PLCFBKL, self.fc_plcf_bkl, self.lcb_plcf_bkl);
         set_field(buf, PLCFENDREF, self.fc_plcfend_ref, self.lcb_plcfend_ref);
         set_field(buf, PLCFENDTXT, self.fc_plcfend_txt, self.lcb_plcfend_txt);
+        set_field(buf, STTBFRMARK, self.fc_sttbf_rmark, self.lcb_sttbf_rmark);
         set_field(buf, PLCFSED, self.fc_plcfsed, self.lcb_plcfsed);
         set_field(buf, PLCFHDD, self.fc_plcfhdd, self.lcb_plcfhdd);
         set_field(

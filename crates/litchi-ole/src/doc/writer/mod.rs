@@ -16,6 +16,9 @@ pub mod fib;
 /// Piece table for text storage
 pub mod piece_table;
 
+/// Tracked revision writer input types
+pub mod revisions;
+
 /// FKP (Formatted Disk Pages) structures
 pub mod fkp;
 
@@ -66,5 +69,6 @@ pub use headers::{HeaderFooterEntry, HeaderFooterType, HeadersWriter};
 pub use hyperlinks::{HyperlinkEntry, HyperlinkType, HyperlinksWriter};
 pub use numbering::{ListFormatOverride, ListLevel, ListStructure, NumberFormat, NumberingWriter};
 pub use piece_table::{Piece, PieceTableBuilder};
+pub use revisions::TextRevision;
 pub use sprm::SprmBuilder;
 pub use tap::{TableCell, TableRow, TapBuilder};

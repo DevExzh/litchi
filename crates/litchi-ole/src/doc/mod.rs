@@ -81,7 +81,7 @@ pub use shapes::DocShape;
 pub use table::{Cell, Row, Table};
 pub use writer::{
     BookmarkEntry, CharacterFormatting, CommentEntry, DocWriteError, DocWriter, LineSpacing,
-    ParagraphFormatting,
+    ParagraphFormatting, TextRevision,
 };
 
 /// Crate-native ordered document element returned by [`Document::elements`].

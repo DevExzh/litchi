@@ -78,6 +78,7 @@ use super::font_table::FontTableBuilder;
 use super::footnotes::FootnoteEntry;
 use super::numbering::{ListFormatOverride, ListStructure, NumberingWriter};
 use super::piece_table::{Piece, PieceTableBuilder};
+use super::revisions::TextRevision;
 use crate::doc::CommentDateTime;
 use crate::sprm_operations::*;
 use litchi_cfb::writer::OleWriter;
@@ -173,6 +174,11 @@ struct BookmarkTableData {
     ends: Vec<u8>,
 }
 
+struct RevisionWriterData {
+    indexes: HashMap<String, u16>,
+    table: Vec<u8>,
+}
+
 #[derive(Clone, Copy)]
 enum MainReferenceKind {
     Footnote,
@@ -213,6 +219,10 @@ pub struct CharacterFormatting {
     pub font_name: Option<String>,
     /// Text color as (R,G,B)
     pub color: Option<(u8, u8, u8)>,
+    /// Mark this run as inserted text.
+    pub insertion_revision: Option<TextRevision>,
+    /// Mark this run as deleted text.
+    pub deletion_revision: Option<TextRevision>,
     // Future enhancement: Additional properties (color, strikethrough, subscript, superscript, etc.)
 }
 
@@ -1221,6 +1231,68 @@ impl DocWriter {
         }))
     }
 
+    fn build_revision_writer_data(
+        paragraphs: &[WritableParagraph],
+    ) -> Result<Option<RevisionWriterData>, DocWriteError> {
+        let mut authors = vec!["Unknown".to_string()];
+        let mut indexes = HashMap::from([("Unknown".to_string(), 0u16)]);
+        let mut has_revisions = false;
+        for revision in paragraphs
+            .iter()
+            .flat_map(|paragraph| &paragraph.runs)
+            .flat_map(|run| {
+                [
+                    run.formatting.insertion_revision.as_ref(),
+                    run.formatting.deletion_revision.as_ref(),
+                ]
+                .into_iter()
+                .flatten()
+            })
+        {
+            has_revisions = true;
+            if !indexes.contains_key(&revision.author) {
+                if authors.len() >= 0x8000 {
+                    return Err(DocWriteError::InvalidData(
+                        "DOC revision author table exceeds the signed author-index range"
+                            .to_string(),
+                    ));
+                }
+                let index = authors.len() as u16;
+                authors.push(revision.author.clone());
+                indexes.insert(revision.author.clone(), index);
+            }
+        }
+        if !has_revisions {
+            return Ok(None);
+        }
+
+        let mut table = Vec::new();
+        table.extend_from_slice(&0xFFFFu16.to_le_bytes());
+        table.extend_from_slice(&(authors.len() as u16).to_le_bytes());
+        table.extend_from_slice(&0u16.to_le_bytes());
+        for author in authors {
+            let units = author.encode_utf16().collect::<Vec<_>>();
+            let length = u16::try_from(units.len()).map_err(|_| {
+                DocWriteError::InvalidData(
+                    "DOC revision author exceeds the STTB string-length limit".to_string(),
+                )
+            })?;
+            table.extend_from_slice(&length.to_le_bytes());
+            table.extend(units.into_iter().flat_map(u16::to_le_bytes));
+        }
+        Ok(Some(RevisionWriterData { indexes, table }))
+    }
+
+    fn append_revision_author_table(
+        fib: &mut FibBuilder,
+        table_stream: &mut Vec<u8>,
+        revisions: &RevisionWriterData,
+    ) {
+        let offset = table_stream.len() as u32;
+        fib.set_sttbf_rmark(offset, revisions.table.len() as u32);
+        table_stream.extend_from_slice(&revisions.table);
+    }
+
     fn append_bookmark_tables(
         fib: &mut FibBuilder,
         table_stream: &mut Vec<u8>,
@@ -1521,6 +1593,7 @@ impl DocWriter {
         let mut chpx_entries: Vec<(u32, u32, Vec<u8>)> = Vec::new();
         let mut papx_entries: Vec<(u32, u32, Vec<u8>)> = Vec::new();
         let mut font_builder = FontTableBuilder::new();
+        let revision_data = Self::build_revision_writer_data(&self.paragraphs)?;
 
         // Pad to 512-byte boundary before writing text (POI line 428-433)
         let current_size = word_document_stream.len();
@@ -1561,7 +1634,11 @@ impl DocWriter {
                 let run_fc_start = text_fc_start + text_stream.len() as u32;
                 let run_text = &run.text;
                 let run_len_chars = utf16_code_unit_len(run_text)?;
-                let grpprl = build_chpx_grpprl(&run.formatting, &mut font_builder);
+                let grpprl = build_revision_chpx_grpprl(
+                    &run.formatting,
+                    &mut font_builder,
+                    revision_data.as_ref(),
+                )?;
 
                 // Track field characters in this run
                 let mut utf16_offset = 0u32;
@@ -1831,6 +1908,10 @@ impl DocWriter {
             Self::append_bookmark_tables(&mut fib, &mut table_stream, bookmarks);
             table_offset = table_stream.len() as u32;
         }
+        if let Some(revisions) = &revision_data {
+            Self::append_revision_author_table(&mut fib, &mut table_stream, revisions);
+            table_offset = table_stream.len() as u32;
+        }
 
         // Write PlcfFldMom (main document field table) if there are field characters
         // Structure: (n+1) CPs + n FLD descriptors (2 bytes each)
@@ -2061,6 +2142,7 @@ impl DocWriter {
         let mut chpx_entries: Vec<(u32, u32, Vec<u8>)> = Vec::new();
         let mut papx_entries: Vec<(u32, u32, Vec<u8>)> = Vec::new();
         let mut font_builder = FontTableBuilder::new();
+        let revision_data = Self::build_revision_writer_data(&self.paragraphs)?;
 
         // Pad to 512-byte boundary before text
         let current_size = word_document_stream.len();
@@ -2097,7 +2179,11 @@ impl DocWriter {
                 let run_fc_start = text_fc_start + text_stream.len() as u32;
                 let run_text = &run.text;
                 let run_len_chars = utf16_code_unit_len(run_text)?;
-                let grpprl = build_chpx_grpprl(&run.formatting, &mut font_builder);
+                let grpprl = build_revision_chpx_grpprl(
+                    &run.formatting,
+                    &mut font_builder,
+                    revision_data.as_ref(),
+                )?;
 
                 let mut utf16_offset = 0u32;
                 for ch in run_text.chars() {
@@ -2350,6 +2436,10 @@ impl DocWriter {
         }
         if let Some(bookmarks) = &bookmark_tables {
             Self::append_bookmark_tables(&mut fib, &mut table_stream, bookmarks);
+            table_offset = table_stream.len() as u32;
+        }
+        if let Some(revisions) = &revision_data {
+            Self::append_revision_author_table(&mut fib, &mut table_stream, revisions);
             table_offset = table_stream.len() as u32;
         }
 
@@ -2623,6 +2713,64 @@ fn build_chpx_grpprl(fmt: &CharacterFormatting, font_builder: &mut FontTableBuil
     }
 
     grp
+}
+
+fn build_revision_chpx_grpprl(
+    fmt: &CharacterFormatting,
+    font_builder: &mut FontTableBuilder,
+    revisions: Option<&RevisionWriterData>,
+) -> Result<Vec<u8>, DocWriteError> {
+    if fmt.insertion_revision.is_some() && fmt.deletion_revision.is_some() {
+        return Err(DocWriteError::InvalidData(
+            "a DOC character run cannot be both an insertion and a deletion".to_string(),
+        ));
+    }
+    let mut grp = build_chpx_grpprl(fmt, font_builder);
+    let Some(revisions) = revisions else {
+        return Ok(grp);
+    };
+    let mut append = |revision: &TextRevision,
+                      flag_opcode: u16,
+                      author_opcode: u16,
+                      time_opcode: u16,
+                      id_opcode: u16|
+     -> Result<(), DocWriteError> {
+        let author_index = revisions.indexes.get(&revision.author).ok_or_else(|| {
+            DocWriteError::InvalidData("DOC revision author was not indexed".to_string())
+        })?;
+        grp.extend_from_slice(&flag_opcode.to_le_bytes());
+        grp.push(1);
+        grp.extend_from_slice(&author_opcode.to_le_bytes());
+        grp.extend_from_slice(&author_index.to_le_bytes());
+        if revision.timestamp.is_some() {
+            grp.extend_from_slice(&time_opcode.to_le_bytes());
+            grp.extend_from_slice(&pack_comment_dttm(revision.timestamp)?.to_le_bytes());
+        }
+        if let Some(revision_id) = revision.revision_id {
+            grp.extend_from_slice(&id_opcode.to_le_bytes());
+            grp.extend_from_slice(&revision_id.to_le_bytes());
+        }
+        Ok(())
+    };
+    if let Some(revision) = &fmt.insertion_revision {
+        append(
+            revision,
+            SPRM_C_F_RMARK,
+            SPRM_C_IBST_RMARK,
+            SPRM_C_DTTM_RMARK,
+            SPRM_C_IDSL_RMARK,
+        )?;
+    }
+    if let Some(revision) = &fmt.deletion_revision {
+        append(
+            revision,
+            SPRM_C_F_RMARK_DEL,
+            SPRM_C_IBST_RMARK_DEL,
+            SPRM_C_DTTM_RMARK_DEL,
+            SPRM_C_IDSL_RMARK_DEL,
+        )?;
+    }
+    Ok(grp)
 }
 
 /// Build a PAPX grpprl (group of SPRMs) from ParagraphFormatting
@@ -3390,6 +3538,122 @@ mod tests {
             ])
             .contains("column")
         );
+    }
+
+    #[test]
+    fn tracked_text_revisions_round_trip_through_both_output_paths() {
+        let timestamp = crate::doc::CommentDateTime {
+            year: 2026,
+            month: 7,
+            day: 15,
+            hour: 14,
+            minute: 30,
+            weekday: 3,
+        };
+        let mut writer = DocWriter::new();
+        writer
+            .add_paragraph_runs(
+                vec![
+                    (
+                        "inserted ".to_string(),
+                        CharacterFormatting {
+                            insertion_revision: Some(
+                                TextRevision::new("Alice 😀")
+                                    .with_timestamp(timestamp)
+                                    .with_id(42),
+                            ),
+                            ..CharacterFormatting::default()
+                        },
+                    ),
+                    (
+                        "deleted".to_string(),
+                        CharacterFormatting {
+                            deletion_revision: Some(TextRevision::new("Bob").with_id(7)),
+                            ..CharacterFormatting::default()
+                        },
+                    ),
+                ],
+                ParagraphFormatting::default(),
+            )
+            .unwrap();
+
+        let mut cursor = Cursor::new(Vec::new());
+        writer.write_to(&mut cursor).unwrap();
+        let mut package =
+            crate::doc::Package::from_reader(Cursor::new(cursor.into_inner())).unwrap();
+        let document = package.document().unwrap();
+        assert_eq!(document.revision_authors(), ["Unknown", "Alice 😀", "Bob"]);
+        let runs = document.paragraphs().unwrap()[0].runs().unwrap();
+        let insertion = runs
+            .iter()
+            .find_map(|run| run.insertion_revision())
+            .unwrap();
+        assert_eq!(insertion.author, "Alice 😀");
+        assert_eq!(insertion.timestamp, Some(timestamp));
+        assert_eq!(insertion.revision_id, Some(42));
+        let deletion = runs.iter().find_map(|run| run.deletion_revision()).unwrap();
+        assert_eq!(deletion.author, "Bob");
+        assert_eq!(deletion.timestamp, None);
+        assert_eq!(deletion.revision_id, Some(7));
+
+        let path = std::env::temp_dir().join(format!(
+            "litchi-doc-revisions-{}-{}.doc",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        writer.save(&path).unwrap();
+        let mut package = crate::doc::Package::open(&path).unwrap();
+        let document = package.document().unwrap();
+        assert_eq!(document.revision_authors(), ["Unknown", "Alice 😀", "Bob"]);
+        assert!(
+            document.paragraphs().unwrap()[0]
+                .runs()
+                .unwrap()
+                .iter()
+                .any(|run| run.deletion_revision().is_some())
+        );
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn rejects_invalid_writer_revision_metadata() {
+        let error_for = |formatting: CharacterFormatting| {
+            let mut writer = DocWriter::new();
+            writer
+                .add_paragraph_runs(
+                    vec![("text".to_string(), formatting)],
+                    ParagraphFormatting::default(),
+                )
+                .unwrap();
+            writer
+                .write_to(&mut Cursor::new(Vec::new()))
+                .unwrap_err()
+                .to_string()
+        };
+        let both = CharacterFormatting {
+            insertion_revision: Some(TextRevision::new("Alice")),
+            deletion_revision: Some(TextRevision::new("Alice")),
+            ..CharacterFormatting::default()
+        };
+        assert!(error_for(both).contains("both an insertion and a deletion"));
+
+        let invalid_time = CharacterFormatting {
+            insertion_revision: Some(TextRevision::new("Alice").with_timestamp(
+                crate::doc::CommentDateTime {
+                    year: 2026,
+                    month: 13,
+                    day: 1,
+                    hour: 0,
+                    minute: 0,
+                    weekday: 0,
+                },
+            )),
+            ..CharacterFormatting::default()
+        };
+        assert!(error_for(invalid_time).contains("timestamp"));
     }
 
     #[test]

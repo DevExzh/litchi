@@ -289,14 +289,10 @@ impl<'a> ParagraphExtractor<'a> {
                 continue;
             }
 
-            // Compare only visual formatting properties (not object markers)
-            // pic_offset and is_ole2 are position/reference markers, not formatting
-            let props_match = props.is_bold == current_props.is_bold
-                && props.is_italic == current_props.is_italic
-                && props.underline == current_props.underline
-                && props.is_strikethrough == current_props.is_strikethrough;
-
-            if props_match {
+            // Every CHP field affects the meaning of a run. In particular,
+            // revision and object-reference metadata must remain attached to
+            // its exact text range even when the visible formatting matches.
+            if props == current_props {
                 // Same formatting - append to current run
                 current_text.push_str(&text);
             } else {
@@ -315,5 +311,33 @@ impl<'a> ParagraphExtractor<'a> {
         }
 
         consolidated
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn consolidation_preserves_non_visual_character_metadata_boundaries() {
+        let inserted = CharacterProperties {
+            is_revision_inserted: Some(true),
+            revision_author_index: Some(1),
+            ..CharacterProperties::default()
+        };
+        let deleted = CharacterProperties {
+            is_revision_deleted: Some(true),
+            deletion_author_index: Some(2),
+            ..CharacterProperties::default()
+        };
+
+        let runs = ParagraphExtractor::consolidate_runs(vec![
+            ("inserted ".to_string(), inserted.clone()),
+            ("deleted".to_string(), deleted.clone()),
+        ]);
+
+        assert_eq!(runs.len(), 2);
+        assert_eq!(runs[0], ("inserted ".to_string(), inserted));
+        assert_eq!(runs[1], ("deleted".to_string(), deleted));
     }
 }

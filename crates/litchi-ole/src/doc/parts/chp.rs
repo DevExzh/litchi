@@ -16,7 +16,7 @@ use crate::sprm_operations::*;
 ///
 /// Contains formatting information for a run of text.
 /// Based on Apache POI's CharacterProperties implementation.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct CharacterProperties {
     /// Bold text
     pub is_bold: Option<bool>,
