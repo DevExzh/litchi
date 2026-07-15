@@ -3,7 +3,7 @@
 use super::*;
 
 mod component;
-mod graph;
+pub(super) mod graph;
 pub(super) mod layout;
 mod wire;
 
@@ -72,6 +72,8 @@ impl KeynoteEditor {
         }
         let resolved = resolve_layout(&graph, layout.0)?;
         let template_archive = self.package().archive(&resolved.archive_name)?;
+        let layout_image_roots =
+            slide_layout_media::template_image_roots(&template_archive, &resolved.slide);
         let template_ids =
             template_clone_object_ids(&template_archive, resolved.slide_id, &resolved.slide)?;
         let note_source = find_note_source(self, &graph, &slides)?;
@@ -122,6 +124,12 @@ impl KeynoteEditor {
             })?,
             resolved.slide_id,
             new_note_id,
+        )?;
+        slide_layout_media::materialize_cloned_images(
+            &mut new_archive,
+            &layout_image_roots,
+            &remap,
+            new_slide_id,
         )?;
         if let Some(reference) = &resolved.slide.user_defined_guide_storage {
             clear_user_guides(&mut new_archive, remap[&reference.identifier])?;

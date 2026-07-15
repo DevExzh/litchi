@@ -518,6 +518,56 @@ pub(super) fn remap_placeholder_archive_wire(
     Ok(data)
 }
 
+fn remap_drawable_archive(drawable: &mut tsd::DrawableArchive, remap: &HashMap<u64, u64>) {
+    remap_optional_reference(&mut drawable.parent, remap);
+    remap_optional_reference(&mut drawable.comment, remap);
+    remap_references(&mut drawable.pencil_annotations, remap);
+    remap_optional_reference(&mut drawable.title, remap);
+    remap_optional_reference(&mut drawable.caption, remap);
+}
+
+pub(super) fn remap_image_archive_wire(data: &[u8], remap: &HashMap<u64, u64>) -> Result<Vec<u8>> {
+    const REFERENCE_PATHS: &[&[u32]] = &[
+        &[1, 2],
+        &[1, 6],
+        &[1, 9],
+        &[1, 10],
+        &[1, 11],
+        &[2],
+        &[3],
+        &[5],
+        &[6],
+        &[8],
+    ];
+    let mut expected = tsd::ImageArchive::decode(data)?;
+    remap_drawable_archive(&mut expected.super_, remap);
+    remap_optional_reference(&mut expected.database_data, remap);
+    remap_optional_reference(&mut expected.style, remap);
+    remap_optional_reference(&mut expected.mask, remap);
+    remap_optional_reference(&mut expected.database_thumbnail_data, remap);
+    remap_optional_reference(&mut expected.database_original_data, remap);
+    let data = remap_reference_paths(data, REFERENCE_PATHS, remap)?;
+    if tsd::ImageArchive::decode(data.as_slice())? != expected {
+        return Err(Error::InvalidFormat(
+            "Keynote ImageArchive wire remap failed validation".to_owned(),
+        ));
+    }
+    Ok(data)
+}
+
+pub(super) fn remap_mask_archive_wire(data: &[u8], remap: &HashMap<u64, u64>) -> Result<Vec<u8>> {
+    const REFERENCE_PATHS: &[&[u32]] = &[&[1, 2], &[1, 6], &[1, 9], &[1, 10], &[1, 11]];
+    let mut expected = tsd::MaskArchive::decode(data)?;
+    remap_drawable_archive(&mut expected.super_, remap);
+    let data = remap_reference_paths(data, REFERENCE_PATHS, remap)?;
+    if tsd::MaskArchive::decode(data.as_slice())? != expected {
+        return Err(Error::InvalidFormat(
+            "Keynote MaskArchive wire remap failed validation".to_owned(),
+        ));
+    }
+    Ok(data)
+}
+
 pub(super) fn remap_note_archive_wire(data: &[u8], remap: &HashMap<u64, u64>) -> Result<Vec<u8>> {
     let mut expected = kn::NoteArchive::decode(data)?;
     remap_reference(&mut expected.contained_storage, remap);
@@ -575,6 +625,8 @@ pub(super) fn clone_slide_object(
             5 => remap_slide_archive_wire(&message.data, remap)?,
             7 => remap_placeholder_archive_wire(&message.data, remap)?,
             15 => remap_note_archive_wire(&message.data, remap)?,
+            3005 => remap_image_archive_wire(&message.data, remap)?,
+            3006 => remap_mask_archive_wire(&message.data, remap)?,
             2001 | 2022 => remap_storage_archive_wire(&message.data, remap)?,
             2011 => remap_shape_info_wire(&message.data, remap)?,
             _ => {

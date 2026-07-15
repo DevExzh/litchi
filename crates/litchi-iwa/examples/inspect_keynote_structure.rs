@@ -10,6 +10,7 @@ use litchi_iwa::protobuf::kn::{
     BuildArchive, BuildChunkArchive, DocumentArchive, PlaceholderArchive, ShowArchive,
     SlideArchive, SlideNodeArchive, Soundtrack, ThemeArchive,
 };
+use litchi_iwa::protobuf::tsd::ImageArchive;
 use litchi_iwa::protobuf::tsp::PackageMetadata;
 use litchi_iwa::protobuf::tswp::{ShapeInfoArchive, StorageArchive};
 use prost::Message;
@@ -41,6 +42,37 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             };
             objects.insert(identifier, (name.to_owned(), object));
         }
+    }
+    let package_metadata = objects
+        .values()
+        .find_map(|(_, object)| {
+            object
+                .messages
+                .iter()
+                .find(|message| message.type_ == PACKAGE_METADATA_MESSAGE_TYPE)
+        })
+        .map(|message| PackageMetadata::decode(message.data.as_slice()))
+        .transpose()?
+        .ok_or("package metadata payload is missing")?;
+    for component in package_metadata
+        .components
+        .iter()
+        .filter(|component| component.preferred_locator == "Slide")
+    {
+        println!(
+            "component {} locator={:?}/{:?} uuids={:?} external={:?} data={:?} ambiguous={:?}",
+            component.identifier,
+            component.preferred_locator,
+            component.locator,
+            component
+                .object_uuid_map_entries
+                .iter()
+                .map(|entry| entry.identifier)
+                .collect::<Vec<_>>(),
+            component.external_references,
+            component.data_references,
+            component.ambiguous_object_identifiers,
+        );
     }
     let (_, root) = objects.get(&1).ok_or("document object 1 is missing")?;
     let document = decode::<DocumentArchive>(root).ok_or("no document payload")?;
@@ -106,6 +138,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .map(|r| r.identifier)
                 .collect::<Vec<_>>(),
         );
+        for drawable in &slide.owned_drawables {
+            let (archive_name, object) = objects
+                .get(&drawable.identifier)
+                .ok_or("layout drawable is missing")?;
+            if let Some(image) = decode::<ImageArchive>(object) {
+                println!(
+                    " layout image={} archive={} parent={:?} style={:?} mask={:?} data={:?}/{:?} flags={:?} metadata={:?}",
+                    drawable.identifier,
+                    archive_name,
+                    image.super_.parent.map(|reference| reference.identifier),
+                    image.style.map(|reference| reference.identifier),
+                    image.mask.map(|reference| reference.identifier),
+                    image.data.map(|reference| reference.identifier),
+                    image.thumbnail_data.map(|reference| reference.identifier),
+                    image.flags,
+                    object.archive_info.message_infos,
+                );
+            }
+        }
     }
     if let Some(reference) = &show.soundtrack {
         let (archive_name, object) = objects
@@ -125,21 +176,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .find(|asset| asset.data_identifier == media.identifier)
             );
         }
-        let metadata = objects
-            .values()
-            .find_map(|(_, object)| {
-                object
-                    .messages
-                    .iter()
-                    .find(|message| message.type_ == PACKAGE_METADATA_MESSAGE_TYPE)
-            })
-            .map(|message| PackageMetadata::decode(message.data.as_slice()))
-            .transpose()?
-            .ok_or("package metadata payload is missing")?;
-        for component in metadata
+        for component in package_metadata
             .components
             .iter()
-            .chain(&metadata.versioned_components)
+            .chain(&package_metadata.versioned_components)
             .filter(|component| {
                 component.data_references.iter().any(|data| {
                     soundtrack
@@ -314,6 +354,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             placeholder.kind,
                             placeholder.super_.super_.super_.geometry,
                             placeholder.super_.super_.style,
+                            object.archive_info.message_infos,
+                        );
+                    }
+                    if let Some(image) = decode::<ImageArchive>(object) {
+                        println!(
+                            "   image parent={:?} style={:?} mask={:?} data={:?}/{:?} flags={:?} metadata={:?}",
+                            image.super_.parent.map(|reference| reference.identifier),
+                            image.style.map(|reference| reference.identifier),
+                            image.mask.map(|reference| reference.identifier),
+                            image.data.map(|reference| reference.identifier),
+                            image.thumbnail_data.map(|reference| reference.identifier),
+                            image.flags,
                             object.archive_info.message_infos,
                         );
                     }

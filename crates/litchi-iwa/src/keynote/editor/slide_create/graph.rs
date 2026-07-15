@@ -14,12 +14,61 @@ pub(super) struct NoteSource {
     pub(super) object_ids: Vec<u64>,
 }
 
-pub(super) fn take_identifier(next: &mut u64) -> Result<u64> {
+pub(in crate::keynote::editor) fn take_identifier(next: &mut u64) -> Result<u64> {
     let identifier = *next;
     *next = next
         .checked_add(1)
         .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))?;
     Ok(identifier)
+}
+
+/// Select private objects reachable from one or more roots inside one component.
+pub(in crate::keynote::editor) fn private_clone_object_ids(
+    archive: &Archive,
+    roots: impl IntoIterator<Item = u64>,
+    context: &str,
+) -> Result<Vec<u64>> {
+    let internal = archive
+        .objects
+        .iter()
+        .map(|object| {
+            object.archive_info.identifier.ok_or_else(|| {
+                Error::InvalidFormat(format!("Keynote {context} object has no identifier"))
+            })
+        })
+        .collect::<Result<HashSet<_>>>()?;
+    let mut selected = HashSet::new();
+    let mut pending = roots.into_iter().collect::<VecDeque<_>>();
+    while let Some(identifier) = pending.pop_front() {
+        if !internal.contains(&identifier) {
+            return Err(Error::InvalidFormat(format!(
+                "Keynote {context} object {identifier} is outside its component"
+            )));
+        }
+        if !selected.insert(identifier) {
+            continue;
+        }
+        let object = archive.object(identifier).ok_or_else(|| {
+            Error::InvalidFormat(format!("Keynote {context} object {identifier} is missing"))
+        })?;
+        for reference in object.archive_info.message_infos.iter().flat_map(|info| {
+            info.object_references.iter().chain(
+                info.field_infos
+                    .iter()
+                    .flat_map(|field| &field.object_references),
+            )
+        }) {
+            if internal.contains(reference) && !selected.contains(reference) {
+                pending.push_back(*reference);
+            }
+        }
+    }
+    Ok(archive
+        .objects
+        .iter()
+        .filter_map(|object| object.archive_info.identifier)
+        .filter(|identifier| selected.contains(identifier))
+        .collect())
 }
 
 #[allow(deprecated)]

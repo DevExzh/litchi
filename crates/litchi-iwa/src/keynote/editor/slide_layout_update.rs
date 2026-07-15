@@ -24,7 +24,8 @@ impl KeynoteEditor {
     ///
     /// Keynote retains the slide's text, notes, builds, transition, and ordinary
     /// drawables during this operation. The selected layout supplies the slide
-    /// style and the title/body placeholder presentation and visibility.
+    /// style, title/body placeholder presentation and visibility, and cloned
+    /// layout-owned images. Replaced layout image graphs are removed safely.
     pub fn set_slide_layout(
         &mut self,
         slide_index: usize,
@@ -118,6 +119,13 @@ impl KeynoteEditor {
                 )?;
             }
         }
+        slide_layout_media::materialize(
+            &mut staged,
+            &graph,
+            before.slide_id,
+            &current_slide,
+            &target,
+        )?;
         patch_node_template_uuid(
             &mut staged,
             &graph,

@@ -9,6 +9,7 @@ const TEST_SLIDE_MESSAGE_TYPE: u32 = 5;
 const TEST_SLIDE_NODE_MESSAGE_TYPE: u32 = 4;
 const TEST_THEME_MESSAGE_TYPE: u32 = 10;
 const TEST_PLACEHOLDER_MESSAGE_TYPE: u32 = 7;
+const TEST_IMAGE_MESSAGE_TYPE: u32 = 3_005;
 const TEST_TITLE_PLACEHOLDER_FIELD: u32 = 5;
 const TEST_SLIDE_NUMBER_PLACEHOLDER_FIELD: u32 = 20;
 const TEST_SLIDE_OWNED_DRAWABLES_FIELD: u32 = 7;
@@ -4130,6 +4131,129 @@ fn updates_slide_layout_transactionally_without_replacing_user_content() {
 }
 
 #[test]
+fn slide_layout_update_materializes_and_removes_image_graphs() {
+    let mut editor = KeynoteEditor::from_package(test_package_with_image_layout()).unwrap();
+    let layouts = editor.slide_layouts().unwrap();
+    let photo = layouts
+        .iter()
+        .find(|layout| layout.name == "Title & Photo")
+        .unwrap()
+        .id;
+    let bullets = layouts
+        .iter()
+        .find(|layout| layout.name == "Title & Bullets")
+        .unwrap()
+        .id;
+
+    editor.set_slide_layout(0, photo).unwrap();
+    let graph = ObjectGraph::read(editor.package()).unwrap();
+    let slide: kn::SlideArchive = graph.decode_type(4, 5, "KN.SlideArchive").unwrap();
+    assert_eq!(
+        slide
+            .owned_drawables
+            .iter()
+            .map(|reference| reference.identifier)
+            .collect::<Vec<_>>(),
+        [74, 5, 6]
+    );
+    let image: tsd::ImageArchive = graph
+        .decode_type(74, TEST_IMAGE_MESSAGE_TYPE, "TSD.ImageArchive")
+        .unwrap();
+    assert_eq!(image.super_.parent, Some(reference(4)));
+    assert_eq!(image.super_.title, Some(reference(75)));
+    assert_eq!(image.super_.caption, Some(reference(76)));
+    assert_eq!(image.mask, Some(reference(77)));
+    assert_eq!(image.flags, Some(1));
+    assert_eq!(image.data, Some(tsp::DataReference { identifier: 1_001 }));
+    assert_eq!(
+        editor.slides().unwrap()[0].title.as_deref(),
+        Some("Old title")
+    );
+    assert_eq!(
+        editor.slides().unwrap()[0].body.as_deref(),
+        Some("Old body 🚀")
+    );
+
+    editor.set_slide_layout(0, bullets).unwrap();
+    let graph = ObjectGraph::read(editor.package()).unwrap();
+    let slide: kn::SlideArchive = graph.decode_type(4, 5, "KN.SlideArchive").unwrap();
+    assert_eq!(slide.owned_drawables, [reference(5), reference(6)]);
+    for identifier in 74..=77 {
+        assert!(!graph.objects.contains_key(&identifier));
+    }
+}
+
+#[test]
+fn creates_slide_with_materialized_layout_image_graph() {
+    let mut editor = KeynoteEditor::from_package(test_package_with_image_layout()).unwrap();
+    let photo = editor
+        .slide_layouts()
+        .unwrap()
+        .into_iter()
+        .find(|layout| layout.name == "Title & Photo")
+        .unwrap()
+        .id;
+    let created = editor.insert_slide(1, photo).unwrap();
+    let graph = ObjectGraph::read(editor.package()).unwrap();
+    let slide: kn::SlideArchive = graph
+        .decode_type(created.slide_id, TEST_SLIDE_MESSAGE_TYPE, "KN.SlideArchive")
+        .unwrap();
+    let image_id = slide.owned_drawables[0].identifier;
+    let image: tsd::ImageArchive = graph
+        .decode_type(image_id, TEST_IMAGE_MESSAGE_TYPE, "TSD.ImageArchive")
+        .unwrap();
+    assert_eq!(image.super_.parent, Some(reference(created.slide_id)));
+    assert_eq!(image.flags, Some(1));
+    assert_eq!(created.title, None);
+    assert_eq!(created.body, None);
+}
+
+#[test]
+fn slide_layout_update_rejects_ambiguous_materialized_images_transactionally() {
+    let mut editor = KeynoteEditor::from_package(test_package_with_image_layout()).unwrap();
+    let layouts = editor.slide_layouts().unwrap();
+    let photo = layouts
+        .iter()
+        .find(|layout| layout.name == "Title & Photo")
+        .unwrap()
+        .id;
+    let bullets = layouts
+        .iter()
+        .find(|layout| layout.name == "Title & Bullets")
+        .unwrap()
+        .id;
+    editor.set_slide_layout(0, photo).unwrap();
+    let mut package = editor.package().clone();
+    package
+        .update_archive("Index/Slide-4.iwa", |archive| {
+            let source = archive.object(74).unwrap();
+            let duplicate =
+                clone_object_metadata(source, 78, source.messages.clone(), &HashMap::new(), false)?;
+            archive.insert_object(duplicate)?;
+            let slide = archive.object_mut(4).unwrap();
+            let mut decoded = kn::SlideArchive::decode(slide.messages[0].data.as_slice())?;
+            decoded.owned_drawables.push(reference(78));
+            decoded.drawables_z_order.push(reference(78));
+            slide.replace_message(
+                0,
+                RawMessage {
+                    type_: TEST_SLIDE_MESSAGE_TYPE,
+                    data: decoded.encode_to_vec(),
+                },
+            )?;
+            slide.archive_info.message_infos[0]
+                .object_references
+                .push(78);
+            Ok(())
+        })
+        .unwrap();
+    editor = KeynoteEditor::from_package(package).unwrap();
+    let before = editor.to_bytes().unwrap();
+    assert!(editor.set_slide_layout(0, bullets).is_err());
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
 fn slide_layout_update_rejects_invalid_inputs_without_mutation() {
     let mut editor = KeynoteEditor::from_package(test_package_with_two_layouts()).unwrap();
     let before = editor.to_bytes().unwrap();
@@ -5442,6 +5566,88 @@ fn test_package_with_two_layouts() -> IWorkPackage {
                 ],
             },
         )
+        .unwrap();
+    package
+}
+
+fn test_package_with_image_layout() -> IWorkPackage {
+    let mut package = test_package_with_two_layouts();
+    package
+        .update_archive("Index/TemplateSlide-38.iwa", |archive| {
+            let slide = archive.object_mut(38).unwrap();
+            let mut decoded = kn::SlideArchive::decode(slide.messages[0].data.as_slice())?;
+            decoded.name = Some("Title & Photo".to_owned());
+            decoded.owned_drawables = vec![reference(70), reference(39), reference(40)];
+            decoded.drawables_z_order = decoded.owned_drawables.clone();
+            slide.replace_message(
+                0,
+                RawMessage {
+                    type_: TEST_SLIDE_MESSAGE_TYPE,
+                    data: decoded.encode_to_vec(),
+                },
+            )?;
+
+            let mut image = object(
+                70,
+                TEST_IMAGE_MESSAGE_TYPE,
+                tsd::ImageArchive {
+                    super_: tsd::DrawableArchive {
+                        geometry: Some(tsd::GeometryArchive {
+                            position: Some(tsp::Point { x: 0.0, y: 0.0 }),
+                            size: Some(tsp::Size {
+                                width: 1_024.0,
+                                height: 768.0,
+                            }),
+                            ..Default::default()
+                        }),
+                        parent: Some(reference(38)),
+                        title: Some(reference(71)),
+                        caption: Some(reference(72)),
+                        accessibility_description: Some("Test photo".to_owned()),
+                        ..Default::default()
+                    },
+                    data: Some(tsp::DataReference { identifier: 1_001 }),
+                    thumbnail_data: Some(tsp::DataReference { identifier: 1_002 }),
+                    style: Some(reference(60)),
+                    mask: Some(reference(73)),
+                    original_size: Some(tsp::Size {
+                        width: 1_024.0,
+                        height: 768.0,
+                    }),
+                    natural_size: Some(tsp::Size {
+                        width: 2_048.0,
+                        height: 1_536.0,
+                    }),
+                    flags: Some(3),
+                    ..Default::default()
+                },
+            );
+            image.archive_info.message_infos[0].object_references = vec![72, 71, 60, 73];
+            image.archive_info.message_infos[0].data_references = vec![1_001, 1_002];
+            archive.insert_object(image)?;
+            archive.insert_object(object(
+                71,
+                STANDIN_CAPTION_MESSAGE_TYPE,
+                tsd::StandinCaptionArchive::default(),
+            ))?;
+            archive.insert_object(object(
+                72,
+                STANDIN_CAPTION_MESSAGE_TYPE,
+                tsd::StandinCaptionArchive::default(),
+            ))?;
+            archive.insert_object(object(
+                73,
+                3_006,
+                tsd::MaskArchive {
+                    super_: tsd::DrawableArchive {
+                        parent: Some(reference(70)),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+            ))?;
+            Ok(())
+        })
         .unwrap();
     package
 }

@@ -2925,6 +2925,7 @@ mod slide_background_reset;
 mod slide_background_wire;
 mod slide_create;
 mod slide_graph;
+mod slide_layout_media;
 mod slide_layout_update;
 mod slide_number;
 mod slide_preview;
