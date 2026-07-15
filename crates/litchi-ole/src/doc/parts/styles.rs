@@ -4,6 +4,7 @@ use std::collections::HashSet;
 
 use super::super::package::{DocError, Result};
 use super::fib::FileInformationBlock;
+use super::tap::TableProperties;
 
 const STSH_POINTER_INDEX: usize = 1;
 const STSHIF_SIZE: usize = 18;
@@ -192,6 +193,56 @@ impl StyleSheet {
     /// Uninterpreted STSHI extension bytes following the 18-byte `Stshif`.
     pub fn stshi_tail(&self) -> &[u8] {
         &self.stshi_tail
+    }
+
+    /// Resolve the table-property differences for a requested table style.
+    ///
+    /// The returned index is the effective style index. MS-DOC defines an
+    /// empty, missing, or non-table style reference as the default table style
+    /// at fixed index 11. Property arrays are concatenated parent-first, then
+    /// parsed from defaults so the derived style overrides its ancestors.
+    pub fn resolve_table_properties(&self, requested_index: u16) -> Result<(u16, TableProperties)> {
+        let effective_index = self.effective_table_style_index(requested_index);
+        let mut chain = Vec::new();
+        let mut current = self.get(effective_index);
+        while let Some(style) = current {
+            chain.push(style);
+            current = style.base_style.and_then(|index| self.get(index));
+        }
+        chain.reverse();
+
+        let byte_count = chain
+            .iter()
+            .filter_map(|style| style.table_properties())
+            .try_fold(0usize, |total, properties| {
+                total
+                    .checked_add(properties.len())
+                    .ok_or_else(|| corrupted("resolved table style is too large"))
+            })?;
+        let mut grpprl = Vec::with_capacity(byte_count);
+        for properties in chain
+            .into_iter()
+            .filter_map(StyleDefinition::table_properties)
+        {
+            grpprl.extend_from_slice(properties);
+        }
+
+        let arena = bumpalo::Bump::new();
+        let mut properties = super::tap_parser::TapParser::new(&arena).parse_tap(&grpprl)?;
+        // A sprmTIstd inside UpxTapx is explicitly ignored by MS-DOC.
+        properties.table_style_index = None;
+        Ok((effective_index, properties))
+    }
+
+    fn effective_table_style_index(&self, requested_index: u16) -> u16 {
+        if self
+            .get(requested_index)
+            .is_some_and(|style| style.kind == StyleKind::Table)
+        {
+            requested_index
+        } else {
+            11
+        }
     }
 
     fn parse_data(data: &[u8], stream_offset: usize) -> Result<Self> {
@@ -455,6 +506,16 @@ fn validate_styles(styles: &[Option<StyleDefinition>]) -> Result<()> {
             if style.invariant_id != expected_id {
                 return Err(corrupted("fixed-index style has the wrong invariant ID"));
             }
+            let expected_kind = match index {
+                0..=9 => StyleKind::Paragraph,
+                10 => StyleKind::Character,
+                11 => StyleKind::Table,
+                12 => StyleKind::Numbering,
+                _ => unreachable!(),
+            };
+            if style.kind != expected_kind {
+                return Err(corrupted("fixed-index style has the wrong kind"));
+            }
         }
     }
 
@@ -556,7 +617,9 @@ mod tests {
     }
 
     fn stylesheet(mut slots: Vec<Option<Vec<u8>>>) -> Vec<u8> {
-        slots.resize(15, None);
+        if slots.len() < 15 {
+            slots.resize(15, None);
+        }
         let mut data = Vec::new();
         data.extend_from_slice(&18u16.to_le_bytes());
         data.extend_from_slice(&(slots.len() as u16).to_le_bytes());
@@ -716,5 +779,52 @@ mod tests {
         table[padding] = 1;
         slots[11] = Some(table);
         assert!(parse(&stylesheet(slots)).is_err());
+    }
+
+    #[test]
+    fn resolves_table_style_inheritance_and_default_fallback() {
+        let mut slots = vec![None; 17];
+        slots[0] = Some(std_record(0, 1, NIL_STYLE, 0, "Normal", &[&[], &[]]));
+        slots[10] = Some(std_record(65, 2, NIL_STYLE, 10, "Font", &[&[]]));
+        slots[11] = Some(std_record(
+            105,
+            3,
+            NIL_STYLE,
+            0,
+            "Normal Table",
+            &[&[0x00, 0x54, 0x01, 0x00], &[], &[]],
+        ));
+        slots[15] = Some(std_record(
+            0x0FFE,
+            3,
+            11,
+            0,
+            "Base Table",
+            &[&[0x7D, 0x34, 0x01], &[], &[]],
+        ));
+        slots[16] = Some(std_record(
+            0x0FFE,
+            3,
+            15,
+            0,
+            "Derived Table",
+            &[&[0x00, 0x54, 0x02, 0x00], &[], &[]],
+        ));
+        let parsed = parse(&stylesheet(slots)).unwrap();
+
+        let (effective, properties) = parsed.resolve_table_properties(16).unwrap();
+        assert_eq!(effective, 16);
+        assert_eq!(
+            properties.justification,
+            super::super::tap::TableJustification::Right
+        );
+        assert_eq!(properties.style_defaults.no_wrap, Some(true));
+
+        let (effective, fallback) = parsed.resolve_table_properties(999).unwrap();
+        assert_eq!(effective, 11);
+        assert_eq!(
+            fallback.justification,
+            super::super::tap::TableJustification::Center
+        );
     }
 }
