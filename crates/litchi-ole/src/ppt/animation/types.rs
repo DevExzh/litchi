@@ -443,8 +443,8 @@ pub struct ParagraphBuildAtom {
 pub struct ParagraphBuildLevel {
     /// Paragraph level, at most 9.
     pub level: u32,
-    /// Inert extended time-node record retained without executing actions.
-    pub time_node: PptRecord,
+    /// Inert extended time node retained without executing actions.
+    pub time_node: ExtendedTimeNode,
 }
 
 /// Text paragraph build subcontainer.
@@ -593,6 +593,121 @@ pub enum BuildListEntry {
     Paragraph(ParagraphBuild),
     Chart(ChartBuild),
     Diagram(DiagramBuild),
+}
+
+/// Exact PowerPoint 2002 extended time-node container envelope.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExtendedTimeNode {
+    /// Required first atom containing time-node attributes.
+    pub atom: TimeNodeAtom,
+    /// Remaining property, behavior, condition, modifier, and child records.
+    pub children: Vec<PptRecord>,
+}
+
+/// Exact fields controlled by a PowerPoint 2002 `TimeNodeAtom`.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct TimeNodeAtom {
+    /// Fill behavior when explicitly set; otherwise the format default applies.
+    pub fill: Option<TimeNodeFill>,
+    /// Restart behavior when explicitly set; otherwise the format default applies.
+    pub restart: Option<TimeNodeRestart>,
+    /// Node kind when explicitly set; otherwise `Parallel` applies.
+    pub node_type: Option<TimeNodeKind>,
+    /// Signed duration in milliseconds when explicitly set.
+    pub duration_ms: Option<i32>,
+}
+
+/// Exact time-node kind values.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TimeNodeKind {
+    Parallel,
+    Sequential,
+    Behavior,
+    Media,
+}
+
+impl TimeNodeKind {
+    pub(crate) fn parse(value: u32) -> Option<Self> {
+        match value {
+            0 => Some(Self::Parallel),
+            1 => Some(Self::Sequential),
+            3 => Some(Self::Behavior),
+            4 => Some(Self::Media),
+            _ => None,
+        }
+    }
+
+    pub(crate) const fn as_u32(self) -> u32 {
+        match self {
+            Self::Parallel => 0,
+            Self::Sequential => 1,
+            Self::Behavior => 3,
+            Self::Media => 4,
+        }
+    }
+}
+
+/// Exact restart values, including the legacy alias for `Never`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TimeNodeRestart {
+    Never,
+    Always,
+    WhenNotActive,
+    NeverLegacy,
+}
+
+impl TimeNodeRestart {
+    pub(crate) fn parse(value: u32) -> Option<Self> {
+        match value {
+            0 => Some(Self::Never),
+            1 => Some(Self::Always),
+            2 => Some(Self::WhenNotActive),
+            3 => Some(Self::NeverLegacy),
+            _ => None,
+        }
+    }
+
+    pub(crate) const fn as_u32(self) -> u32 {
+        match self {
+            Self::Never => 0,
+            Self::Always => 1,
+            Self::WhenNotActive => 2,
+            Self::NeverLegacy => 3,
+        }
+    }
+}
+
+/// Exact fill values, including the two legacy aliases.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TimeNodeFill {
+    HoldUntilParentEnds,
+    ResetWhenInactive,
+    HoldUntilNext,
+    HoldUntilParentEndsLegacy,
+    ResetWhenInactiveLegacy,
+}
+
+impl TimeNodeFill {
+    pub(crate) fn parse(value: u32) -> Option<Self> {
+        match value {
+            0 => Some(Self::HoldUntilParentEnds),
+            1 => Some(Self::ResetWhenInactive),
+            2 => Some(Self::HoldUntilNext),
+            3 => Some(Self::HoldUntilParentEndsLegacy),
+            4 => Some(Self::ResetWhenInactiveLegacy),
+            _ => None,
+        }
+    }
+
+    pub(crate) const fn as_u32(self) -> u32 {
+        match self {
+            Self::HoldUntilParentEnds => 0,
+            Self::ResetWhenInactive => 1,
+            Self::HoldUntilNext => 2,
+            Self::HoldUntilParentEndsLegacy => 3,
+            Self::ResetWhenInactiveLegacy => 4,
+        }
+    }
 }
 
 /// A single build level (animation step).

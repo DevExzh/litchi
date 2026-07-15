@@ -4,8 +4,9 @@
 
 use super::types::{
     AfterEffect, AnimationEffect, AnimationInfo, BuildAtom, BuildKind, BuildList, BuildListEntry,
-    ChartBuild, DiagramBuild, EffectDirection, LegacyAnimationAtom, LegacyAnimationBuild,
-    LegacyAnimationEffect, LegacyTextBuildSubEffect, ParagraphBuild, ParagraphBuildLevel,
+    ChartBuild, DiagramBuild, EffectDirection, ExtendedTimeNode, LegacyAnimationAtom,
+    LegacyAnimationBuild, LegacyAnimationEffect, LegacyTextBuildSubEffect, ParagraphBuild,
+    ParagraphBuildLevel, TimeNodeAtom,
 };
 use crate::consts::PptRecordType;
 use crate::ppt::package::{PptError, Result};
@@ -193,6 +194,50 @@ pub fn write_animation_info_atom(atom: &LegacyAnimationAtom) -> Result<Vec<u8>> 
     Ok(result)
 }
 
+/// Serialize an exact PowerPoint 2002 extended time-node envelope.
+pub fn write_extended_time_node(node: &ExtendedTimeNode) -> Result<Vec<u8>> {
+    let mut children = write_time_node_atom(&node.atom);
+    for child in &node.children {
+        if child.record_type == PptRecordType::TimeNode {
+            return Err(PptError::InvalidFormat(
+                "extended time-node children cannot contain another TimeNodeAtom".to_string(),
+            ));
+        }
+        if child.data_length as usize != child.data.len() {
+            return Err(PptError::InvalidFormat(format!(
+                "extended time-node child {:?} has a truncated payload",
+                child.record_type
+            )));
+        }
+        children.extend(serialize_raw_record(child));
+    }
+    wrap_record(PptRecordType::ExtTimeNode, 0x0F, 1, children)
+}
+
+/// Serialize an exact 32-byte `TimeNodeAtom` payload.
+pub fn write_time_node_atom(atom: &TimeNodeAtom) -> Vec<u8> {
+    let mut data = Vec::with_capacity(32);
+    data.extend(0u32.to_le_bytes());
+    data.extend(atom.restart.map_or(0, |value| value.as_u32()).to_le_bytes());
+    data.extend(
+        atom.node_type
+            .map_or(0, |value| value.as_u32())
+            .to_le_bytes(),
+    );
+    data.extend(atom.fill.map_or(0, |value| value.as_u32()).to_le_bytes());
+    data.extend(0u32.to_le_bytes());
+    data.extend(0u32.to_le_bytes());
+    data.extend(atom.duration_ms.unwrap_or(0).to_le_bytes());
+    let flags = u32::from(atom.fill.is_some())
+        | (u32::from(atom.restart.is_some()) << 1)
+        | (u32::from(atom.node_type.is_some()) << 3)
+        | (u32::from(atom.duration_ms.is_some()) << 4);
+    data.extend(flags.to_le_bytes());
+    let mut result = create_record_header(PptRecordType::TimeNode, 0, 0, 32);
+    result.extend(data);
+    result
+}
+
 /// Map a high-level animation effect to PPT97 fly method and direction codes.
 /// Based on LibreOffice ppt97animations.cxx mapping.
 fn map_effect_to_ppt97(effect: AnimationEffect, direction: EffectDirection) -> (u8, u8) {
@@ -347,7 +392,7 @@ pub fn write_build_list(build_info: &BuildList) -> Result<Vec<u8>> {
             BuildListEntry::Diagram(build) => write_diagram_build(build)?,
         });
     }
-    wrap_record(PptRecordType::BuildList, 0x0F, children)
+    wrap_record(PptRecordType::BuildList, 0x0F, 0, children)
 }
 
 fn write_build_atom(atom: &BuildAtom, kind: BuildKind) -> Vec<u8> {
@@ -379,10 +424,9 @@ fn write_paragraph_build(build: &ParagraphBuild) -> Result<Vec<u8>> {
     for level in &build.levels {
         children.extend(create_record_header(PptRecordType::LevelInfoAtom, 0, 0, 4));
         children.extend(level.level.to_le_bytes());
-        validate_time_node(&level.time_node)?;
-        children.extend(serialize_raw_record(&level.time_node));
+        children.extend(write_extended_time_node(&level.time_node)?);
     }
-    wrap_record(PptRecordType::ParaBuild, 0x0F, children)
+    wrap_record(PptRecordType::ParaBuild, 0x0F, 0, children)
 }
 
 fn write_chart_build(build: &ChartBuild) -> Result<Vec<u8>> {
@@ -393,7 +437,7 @@ fn write_chart_build(build: &ChartBuild) -> Result<Vec<u8>> {
     atom.extend([0, 0, 0]);
     children.extend(create_record_header(PptRecordType::ChartBuildAtom, 0, 0, 8));
     children.extend(atom);
-    wrap_record(PptRecordType::ChartBuild, 0x0F, children)
+    wrap_record(PptRecordType::ChartBuild, 0x0F, 0, children)
 }
 
 fn write_diagram_build(build: &DiagramBuild) -> Result<Vec<u8>> {
@@ -405,7 +449,7 @@ fn write_diagram_build(build: &DiagramBuild) -> Result<Vec<u8>> {
         4,
     ));
     children.extend(build.diagram.build_type.as_u32().to_le_bytes());
-    wrap_record(PptRecordType::DiagramBuild, 0x0F, children)
+    wrap_record(PptRecordType::DiagramBuild, 0x0F, 0, children)
 }
 
 fn validate_paragraph_levels(
@@ -438,48 +482,16 @@ fn validate_paragraph_levels(
     Ok(())
 }
 
-fn validate_time_node(record: &crate::ppt::records::PptRecord) -> Result<()> {
-    if record.record_type != PptRecordType::ExtTimeNode
-        || record.version != 0x0F
-        || record.instance != 1
-        || record.data_length as usize != record.data.len()
-    {
-        return Err(PptError::InvalidFormat(
-            "paragraph level requires an ExtTimeNode container".to_string(),
-        ));
-    }
-    let encoded_children_length = record.children.iter().try_fold(0usize, |length, child| {
-        length.checked_add(8 + child.data.len())
-    });
-    if encoded_children_length != Some(record.data.len()) {
-        return Err(PptError::InvalidFormat(
-            "ExtTimeNode child records do not cover its complete payload".to_string(),
-        ));
-    }
-    let time_node = record.children.first().ok_or_else(|| {
-        PptError::InvalidFormat("ExtTimeNode is missing its TimeNodeAtom".to_string())
-    })?;
-    if time_node.record_type != PptRecordType::TimeNode
-        || time_node.version != 0
-        || time_node.instance != 0
-        || time_node.data.len() != 32
-        || time_node.data_length != 32
-    {
-        return Err(PptError::InvalidFormat(
-            "ExtTimeNode must begin with a 32-byte TimeNodeAtom payload".to_string(),
-        ));
-    }
-    u32::try_from(record.data.len()).map_err(|_| {
-        PptError::InvalidFormat("ExtTimeNode data exceeds 4 GiB record limit".to_string())
-    })?;
-    Ok(())
-}
-
-fn wrap_record(record_type: PptRecordType, version: u16, data: Vec<u8>) -> Result<Vec<u8>> {
+fn wrap_record(
+    record_type: PptRecordType,
+    version: u16,
+    instance: u16,
+    data: Vec<u8>,
+) -> Result<Vec<u8>> {
     let length = u32::try_from(data.len()).map_err(|_| {
         PptError::InvalidFormat(format!("{record_type:?} data exceeds 4 GiB record limit"))
     })?;
-    let mut result = create_record_header(record_type, version, 0, length);
+    let mut result = create_record_header(record_type, version, instance, length);
     result.extend(data);
     Ok(result)
 }
@@ -543,13 +555,8 @@ mod tests {
 
     #[test]
     fn rejects_invalid_paragraph_builds() {
-        let time_node = crate::ppt::records::PptRecord {
-            record_type: PptRecordType::ExtTimeNode,
-            record_type_raw: PptRecordType::ExtTimeNode.as_u16(),
-            version: 0x0F,
-            instance: 0,
-            data_length: 0,
-            data: Vec::new(),
+        let time_node = ExtendedTimeNode {
+            atom: TimeNodeAtom::default(),
             children: Vec::new(),
         };
         let level = ParagraphBuildLevel {

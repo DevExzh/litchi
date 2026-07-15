@@ -6,8 +6,9 @@ use super::triggers::IterationType;
 use super::types::{
     AfterEffect, AnimationInfo, BuildAtom, BuildKind, BuildList, BuildListEntry, ChartBuild,
     ChartBuildAtom, ChartBuildType, DiagramBuild, DiagramBuildAtom, DiagramBuildType,
-    LegacyAnimationAtom, LegacyAnimationBuild, LegacyAnimationEffect, LegacyTextBuildSubEffect,
-    ParagraphBuild, ParagraphBuildAtom, ParagraphBuildLevel, ParagraphBuildType,
+    ExtendedTimeNode, LegacyAnimationAtom, LegacyAnimationBuild, LegacyAnimationEffect,
+    LegacyTextBuildSubEffect, ParagraphBuild, ParagraphBuildAtom, ParagraphBuildLevel,
+    ParagraphBuildType, TimeNodeAtom, TimeNodeFill, TimeNodeKind, TimeNodeRestart,
 };
 use crate::consts::PptRecordType;
 use crate::ppt::package::{PptError, Result};
@@ -160,6 +161,67 @@ pub fn parse_animation_info_atom(record: &PptRecord) -> Result<LegacyAnimationAt
     })
 }
 
+/// Parse the exact envelope and atom of an extended PowerPoint 2002 time node.
+pub fn parse_extended_time_node(record: &PptRecord) -> Result<ExtendedTimeNode> {
+    require_container(record, PptRecordType::ExtTimeNode, 1, "ExtTimeNode")?;
+    let atom_record = record.children.first().ok_or_else(|| {
+        PptError::Corrupted("ExtTimeNode is missing its TimeNodeAtom".to_string())
+    })?;
+    let atom = parse_time_node_atom(atom_record)?;
+    if record.children[1..]
+        .iter()
+        .any(|child| child.record_type == PptRecordType::TimeNode)
+    {
+        return Err(PptError::InvalidFormat(
+            "ExtTimeNode contains multiple TimeNodeAtom records".to_string(),
+        ));
+    }
+    Ok(ExtendedTimeNode {
+        atom,
+        children: record.children[1..].to_vec(),
+    })
+}
+
+/// Parse the exact 32-byte payload of a `TimeNodeAtom`.
+pub fn parse_time_node_atom(record: &PptRecord) -> Result<TimeNodeAtom> {
+    require_atom(record, PptRecordType::TimeNode, 0, 32, "TimeNodeAtom")?;
+    let flags = read_u32(&record.data, 28);
+    let fill = parse_optional_time_value(
+        flags & 0x01 != 0,
+        read_u32(&record.data, 12),
+        TimeNodeFill::parse,
+        "TimeNodeAtom fill",
+    )?;
+    let restart = parse_optional_time_value(
+        flags & 0x02 != 0,
+        read_u32(&record.data, 4),
+        TimeNodeRestart::parse,
+        "TimeNodeAtom restart",
+    )?;
+    let node_type = parse_optional_time_value(
+        flags & 0x08 != 0,
+        read_u32(&record.data, 8),
+        TimeNodeKind::parse,
+        "TimeNodeAtom type",
+    )?;
+    let duration = i32::from_le_bytes(record.data[24..28].try_into().expect("length checked"));
+    let duration_ms = if flags & 0x10 != 0 {
+        Some(duration)
+    } else if duration == 0 {
+        None
+    } else {
+        return Err(PptError::InvalidFormat(
+            "TimeNodeAtom duration must be zero when not explicitly set".to_string(),
+        ));
+    };
+    Ok(TimeNodeAtom {
+        fill,
+        restart,
+        node_type,
+        duration_ms,
+    })
+}
+
 /// Parse build list from BuildList container record.
 pub fn parse_build_list(record: &PptRecord) -> Result<BuildList> {
     if record.record_type != PptRecordType::BuildList {
@@ -238,8 +300,7 @@ fn parse_paragraph_build(record: &PptRecord) -> Result<ParagraphBuild> {
     let mut levels = Vec::with_capacity((record.children.len() - 2) / 2);
     for pair in record.children[2..].chunks_exact(2) {
         let level = parse_level_info_atom(&pair[0])?;
-        let time_node = &pair[1];
-        require_ext_time_node(time_node)?;
+        let time_node = parse_extended_time_node(&pair[1])?;
         if levels
             .last()
             .is_some_and(|previous: &ParagraphBuildLevel| previous.level >= level)
@@ -248,10 +309,7 @@ fn parse_paragraph_build(record: &PptRecord) -> Result<ParagraphBuild> {
                 "ParaBuild levels must be strictly increasing".to_string(),
             ));
         }
-        levels.push(ParagraphBuildLevel {
-            level,
-            time_node: time_node.clone(),
-        });
+        levels.push(ParagraphBuildLevel { level, time_node });
     }
     if paragraph.build_type == ParagraphBuildType::AsAWhole && levels.len() != 1 {
         return Err(PptError::InvalidFormat(
@@ -385,14 +443,6 @@ fn require_container(
     Ok(())
 }
 
-fn require_ext_time_node(record: &PptRecord) -> Result<()> {
-    require_container(record, PptRecordType::ExtTimeNode, 1, "ExtTimeNode")?;
-    let time_node = record.children.first().ok_or_else(|| {
-        PptError::Corrupted("ExtTimeNode is missing its TimeNodeAtom".to_string())
-    })?;
-    require_atom(time_node, PptRecordType::TimeNode, 0, 32, "TimeNodeAtom")
-}
-
 fn require_atom(
     record: &PptRecord,
     record_type: PptRecordType,
@@ -441,6 +491,25 @@ fn parse_bool1(value: u8, field: &str) -> Result<bool> {
     }
 }
 
+fn parse_optional_time_value<T>(
+    is_set: bool,
+    value: u32,
+    parse: impl FnOnce(u32) -> Option<T>,
+    field: &str,
+) -> Result<Option<T>> {
+    if is_set {
+        parse(value)
+            .map(Some)
+            .ok_or_else(|| PptError::InvalidFormat(format!("{field} has invalid value {value}")))
+    } else if value == 0 {
+        Ok(None)
+    } else {
+        Err(PptError::InvalidFormat(format!(
+            "{field} must be zero when not explicitly set"
+        )))
+    }
+}
+
 fn read_u32(data: &[u8], offset: usize) -> u32 {
     u32::from_le_bytes(data[offset..offset + 4].try_into().expect("length checked"))
 }
@@ -451,7 +520,8 @@ mod tests {
     use crate::ppt::animation::{
         BuildInfo, ChartBuildType, DiagramBuildType, LegacyAnimationAtom, LegacyAnimationBuild,
         LegacyAnimationEffect, LegacyTextBuildSubEffect, ParagraphBuildType, write_animation_info,
-        write_animation_info_atom, write_build_list,
+        write_animation_info_atom, write_build_list, write_extended_time_node,
+        write_time_node_atom,
     };
 
     fn sample_legacy_atom() -> LegacyAnimationAtom {
@@ -478,29 +548,10 @@ mod tests {
         }
     }
 
-    fn empty_time_node() -> PptRecord {
-        let atom = PptRecord {
-            record_type: PptRecordType::TimeNode,
-            record_type_raw: PptRecordType::TimeNode.as_u16(),
-            version: 0,
-            instance: 0,
-            data_length: 32,
-            data: vec![0; 32],
+    fn empty_time_node() -> ExtendedTimeNode {
+        ExtendedTimeNode {
+            atom: TimeNodeAtom::default(),
             children: Vec::new(),
-        };
-        let mut data = Vec::with_capacity(40);
-        data.extend(0u16.to_le_bytes());
-        data.extend(PptRecordType::TimeNode.as_u16().to_le_bytes());
-        data.extend(32u32.to_le_bytes());
-        data.extend([0; 32]);
-        PptRecord {
-            record_type: PptRecordType::ExtTimeNode,
-            record_type_raw: PptRecordType::ExtTimeNode.as_u16(),
-            version: 0x0F,
-            instance: 1,
-            data_length: 40,
-            data,
-            children: vec![atom],
         }
     }
 
@@ -605,6 +656,105 @@ mod tests {
     }
 
     #[test]
+    fn round_trips_exact_time_node_atoms_and_envelopes() {
+        let atom = TimeNodeAtom {
+            fill: Some(TimeNodeFill::ResetWhenInactiveLegacy),
+            restart: Some(TimeNodeRestart::NeverLegacy),
+            node_type: Some(TimeNodeKind::Behavior),
+            duration_ms: Some(-1),
+        };
+        let bytes = write_time_node_atom(&atom);
+        assert_eq!(bytes.len(), 40);
+        let (record, consumed) = PptRecord::parse(&bytes, 0).unwrap();
+        assert_eq!(consumed, bytes.len());
+        assert_eq!(parse_time_node_atom(&record).unwrap(), atom);
+
+        let raw_child = PptRecord {
+            record_type: PptRecordType::Unknown,
+            record_type_raw: 0xF999,
+            version: 0,
+            instance: 7,
+            data_length: 3,
+            data: vec![1, 2, 3],
+            children: Vec::new(),
+        };
+        let node = ExtendedTimeNode {
+            atom,
+            children: vec![raw_child],
+        };
+        let bytes = write_extended_time_node(&node).unwrap();
+        let (record, consumed) = PptRecord::parse(&bytes, 0).unwrap();
+        assert_eq!(consumed, bytes.len());
+        assert_eq!(parse_extended_time_node(&record).unwrap(), node);
+    }
+
+    #[test]
+    fn rejects_malformed_time_node_atoms() {
+        let default = write_time_node_atom(&TimeNodeAtom::default());
+        let mutations: &[(usize, u32)] = &[
+            (12, 1), // restart value without fRestartProperty
+            (16, 1), // type value without fGroupingTypeProperty
+            (20, 1), // fill value without fFillProperty
+            (32, 1), // duration without fDurationProperty
+        ];
+        for &(offset, value) in mutations {
+            let mut bytes = default.clone();
+            bytes[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
+            let (record, _) = PptRecord::parse(&bytes, 0).unwrap();
+            assert!(parse_time_node_atom(&record).is_err());
+        }
+
+        let mut invalid_enum = default;
+        invalid_enum[20..24].copy_from_slice(&5u32.to_le_bytes());
+        invalid_enum[36..40].copy_from_slice(&1u32.to_le_bytes());
+        let (record, _) = PptRecord::parse(&invalid_enum, 0).unwrap();
+        assert!(parse_time_node_atom(&record).is_err());
+    }
+
+    #[test]
+    fn supports_every_time_node_atom_enum_value_and_ignores_reserved_fields() {
+        let fills = [
+            TimeNodeFill::HoldUntilParentEnds,
+            TimeNodeFill::ResetWhenInactive,
+            TimeNodeFill::HoldUntilNext,
+            TimeNodeFill::HoldUntilParentEndsLegacy,
+            TimeNodeFill::ResetWhenInactiveLegacy,
+        ];
+        let restarts = [
+            TimeNodeRestart::Never,
+            TimeNodeRestart::Always,
+            TimeNodeRestart::WhenNotActive,
+            TimeNodeRestart::NeverLegacy,
+        ];
+        let kinds = [
+            TimeNodeKind::Parallel,
+            TimeNodeKind::Sequential,
+            TimeNodeKind::Behavior,
+            TimeNodeKind::Media,
+        ];
+        for fill in fills {
+            for restart in restarts {
+                for node_type in kinds {
+                    let expected = TimeNodeAtom {
+                        fill: Some(fill),
+                        restart: Some(restart),
+                        node_type: Some(node_type),
+                        duration_ms: Some(i32::MIN),
+                    };
+                    let mut bytes = write_time_node_atom(&expected);
+                    bytes[8..12].copy_from_slice(&u32::MAX.to_le_bytes());
+                    bytes[24..28].copy_from_slice(&u32::MAX.to_le_bytes());
+                    bytes[28] = 0xFF;
+                    let flags = u32::from_le_bytes(bytes[36..40].try_into().unwrap()) | 0xFFFF_FFE0;
+                    bytes[36..40].copy_from_slice(&flags.to_le_bytes());
+                    let (record, _) = PptRecord::parse(&bytes, 0).unwrap();
+                    assert_eq!(parse_time_node_atom(&record).unwrap(), expected);
+                }
+            }
+        }
+    }
+
+    #[test]
     fn round_trips_exact_powerpoint_2002_build_lists() {
         assert_eq!(PptRecordType::BuildList.as_u16(), 0x2B02);
         assert_eq!(PptRecordType::LevelInfoAtom.as_u16(), 0x2B0A);
@@ -627,10 +777,7 @@ mod tests {
         assert_eq!(paragraph.paragraph.delay_time_ms, 750);
         assert_eq!(paragraph.levels.len(), 1);
         assert_eq!(paragraph.levels[0].level, 0);
-        assert_eq!(
-            paragraph.levels[0].time_node.record_type,
-            PptRecordType::ExtTimeNode
-        );
+        assert_eq!(paragraph.levels[0].time_node.atom, TimeNodeAtom::default());
 
         let BuildListEntry::Chart(chart) = &parsed.builds[1] else {
             panic!("expected chart build");
