@@ -2215,60 +2215,6 @@ pub(super) fn patch_slide_build_cache(
     })
 }
 
-pub(super) fn patch_show_settings_wire(
-    original: &[u8],
-    show: &kn::ShowArchive,
-    settings: &KeynoteShowSettings,
-) -> Result<Vec<u8>> {
-    let mut data =
-        patch_nested_fixed32_field(original, &[4, 1], true, Some(settings.width.to_bits()))?;
-    data = patch_nested_fixed32_field(&data, &[4, 2], true, Some(settings.height.to_bits()))?;
-    for (field_number, current, replacement) in [
-        (
-            6,
-            show.slide_numbers_visible,
-            settings.slide_numbers_visible,
-        ),
-        (8, show.loop_presentation, settings.loop_presentation),
-        (15, show.idle_timer_active, settings.idle_timer_active),
-        (
-            18,
-            show.automatically_plays_upon_open,
-            settings.automatically_plays_upon_open,
-        ),
-    ] {
-        data = patch_varint_field(
-            &data,
-            field_number,
-            current.is_some(),
-            replacement.map(u64::from),
-        )?;
-    }
-    data = patch_varint_field(
-        &data,
-        9,
-        show.mode.is_some(),
-        settings.mode.map(|value| i64::from(value) as u64),
-    )?;
-    for (field_number, current, replacement) in [
-        (
-            10,
-            show.autoplay_transition_delay,
-            settings.autoplay_transition_delay,
-        ),
-        (11, show.autoplay_build_delay, settings.autoplay_build_delay),
-        (16, show.idle_timer_delay, settings.idle_timer_delay),
-    ] {
-        data = patch_fixed64_field(
-            &data,
-            field_number,
-            current.is_some(),
-            replacement.map(f64::to_bits),
-        )?;
-    }
-    Ok(data)
-}
-
 pub(super) fn patch_transition_settings_wire(
     original: &[u8],
     attributes: &kn::TransitionAttributesArchive,
@@ -2478,33 +2424,6 @@ pub(super) fn validate_transition_wire(
         return Err(Error::InvalidFormat(
             "Keynote transition no-op wire validation changed its payload".to_owned(),
         ));
-    }
-    Ok(())
-}
-
-pub(super) fn validate_show_settings(settings: &KeynoteShowSettings) -> Result<()> {
-    if !settings.width.is_finite()
-        || settings.width <= 0.0
-        || !settings.height.is_finite()
-        || settings.height <= 0.0
-    {
-        return Err(Error::ParseError(
-            "Keynote show dimensions must be finite and greater than zero".to_owned(),
-        ));
-    }
-    for (name, value) in [
-        (
-            "autoplay transition delay",
-            settings.autoplay_transition_delay,
-        ),
-        ("autoplay build delay", settings.autoplay_build_delay),
-        ("idle timer delay", settings.idle_timer_delay),
-    ] {
-        if value.is_some_and(|value| !value.is_finite() || value < 0.0) {
-            return Err(Error::ParseError(format!(
-                "Keynote {name} must be finite and non-negative"
-            )));
-        }
     }
     Ok(())
 }

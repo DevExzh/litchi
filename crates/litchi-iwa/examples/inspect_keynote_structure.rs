@@ -3,6 +3,7 @@ use std::env;
 
 use litchi_iwa::IWorkPackage;
 use litchi_iwa::archive::ArchiveObject;
+use litchi_iwa::keynote::KeynoteShowMode;
 use litchi_iwa::protobuf::kn::{
     BuildArchive, BuildChunkArchive, DocumentArchive, PlaceholderArchive, ShowArchive,
     SlideArchive, SlideNodeArchive,
@@ -43,7 +44,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         show.size.height,
         show.slide_numbers_visible,
         show.loop_presentation,
-        show.mode,
+        show.mode.map(KeynoteShowMode::from_raw),
         show.autoplay_transition_delay,
         show.autoplay_build_delay,
         show.automatically_plays_upon_open,

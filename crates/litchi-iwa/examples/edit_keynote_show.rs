@@ -2,14 +2,24 @@
 
 use std::env;
 
-use litchi_iwa::keynote::KeynoteEditor;
+use litchi_iwa::keynote::{KeynoteEditor, KeynoteShowMode};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
     let input = arguments.next().ok_or(
-        "usage: edit_keynote_show <input.key> <output.key> <width> <height> <loop> <autoplay>",
+        "usage: edit_keynote_show <input.key> <output.key> <normal|self-playing|links-only> <width> <height> <loop> <autoplay>",
     )?;
     let output = arguments.next().ok_or("missing output path")?;
+    let mode = match arguments
+        .next()
+        .ok_or("missing presentation mode")?
+        .as_str()
+    {
+        "normal" => KeynoteShowMode::Normal,
+        "self-playing" => KeynoteShowMode::SelfPlaying,
+        "links-only" => KeynoteShowMode::LinksOnly,
+        _ => return Err("presentation mode must be normal, self-playing, or links-only".into()),
+    };
     let width = arguments.next().ok_or("missing width")?.parse::<f32>()?;
     let height = arguments.next().ok_or("missing height")?.parse::<f32>()?;
     let loop_presentation = arguments
@@ -25,6 +35,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut settings = editor.show_settings()?;
     settings.width = width;
     settings.height = height;
+    settings.mode = Some(mode);
     settings.loop_presentation = Some(loop_presentation);
     settings.automatically_plays_upon_open = Some(autoplay);
     editor.set_show_settings(settings)?;

@@ -12,6 +12,7 @@ const TEST_SLIDE_NUMBER_PLACEHOLDER_FIELD: u32 = 20;
 const TEST_SLIDE_OWNED_DRAWABLES_FIELD: u32 = 7;
 const TEST_SLIDE_DRAWABLES_Z_ORDER_FIELD: u32 = 42;
 const TEST_SLIDE_NUMBER_PLACEHOLDER_ID: u64 = 70;
+const TEST_SHOW_MODE_FIELD: u32 = 9;
 
 #[test]
 fn slide_background_crud_inherits_and_culls_native_variations() {
@@ -2874,6 +2875,7 @@ fn show_settings_and_skip_state_are_transactional() {
     settings.height = 1_080.0;
     settings.slide_numbers_visible = Some(true);
     settings.loop_presentation = Some(true);
+    settings.mode = Some(KeynoteShowMode::SelfPlaying);
     settings.autoplay_transition_delay = Some(3.5);
     settings.autoplay_build_delay = Some(1.25);
     settings.idle_timer_active = Some(true);
@@ -2884,8 +2886,22 @@ fn show_settings_and_skip_state_are_transactional() {
     invalid.width = f32::NAN;
     assert!(editor.set_show_settings(invalid).is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
+    let mut invalid = settings.clone();
+    invalid.mode = Some(KeynoteShowMode::Unknown(1));
+    assert!(editor.set_show_settings(invalid).is_err());
+    assert_eq!(editor.to_bytes().unwrap(), before);
     editor.set_show_settings(settings.clone()).unwrap();
     assert_eq!(editor.show_settings().unwrap(), settings);
+    for mode in [
+        KeynoteShowMode::Normal,
+        KeynoteShowMode::LinksOnly,
+        KeynoteShowMode::Unknown(19),
+    ] {
+        settings.mode = Some(mode);
+        editor.set_show_settings(settings.clone()).unwrap();
+        let reparsed = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(reparsed.show_settings().unwrap(), settings);
+    }
 
     let mut transition = editor.slides().unwrap()[0].transition.clone().unwrap();
     transition.duration = Some(2.5);
@@ -3587,7 +3603,7 @@ fn scalar_updates_preserve_unknown_wire_and_restore_exact_components() {
     changed_show.height = 1_080.0;
     changed_show.slide_numbers_visible = Some(true);
     changed_show.loop_presentation = Some(true);
-    changed_show.mode = Some(1);
+    changed_show.mode = Some(KeynoteShowMode::SelfPlaying);
     changed_show.autoplay_transition_delay = Some(3.5);
     changed_show.autoplay_build_delay = Some(1.25);
     changed_show.idle_timer_active = Some(true);
@@ -3646,6 +3662,26 @@ fn show_update_rejects_duplicate_scalar_fields_transactionally() {
     let before = editor.to_bytes().unwrap();
     let mut settings = editor.show_settings().unwrap();
     settings.loop_presentation = Some(false);
+    assert!(editor.set_show_settings(settings).is_err());
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
+fn show_update_rejects_duplicate_mode_fields_transactionally() {
+    let mut package = test_package();
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            let object = archive.object_mut(2).unwrap();
+            let mut message = object.messages[0].clone();
+            append_unknown_varint(&mut message.data, TEST_SHOW_MODE_FIELD, 0);
+            append_unknown_varint(&mut message.data, TEST_SHOW_MODE_FIELD, 1);
+            object.replace_message(0, message).map(|_| ())
+        })
+        .unwrap();
+    let mut editor = KeynoteEditor::from_package(package).unwrap();
+    let before = editor.to_bytes().unwrap();
+    let mut settings = editor.show_settings().unwrap();
+    settings.mode = Some(KeynoteShowMode::LinksOnly);
     assert!(editor.set_show_settings(settings).is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
 }

@@ -889,39 +889,6 @@ pub struct KeynoteBuildInfo {
     pub chunks: Vec<KeynoteBuildChunkInfo>,
 }
 
-/// Writable presentation-level behavior stored in `KN.ShowArchive`.
-#[derive(Debug, Clone, PartialEq)]
-pub struct KeynoteShowSettings {
-    pub width: f32,
-    pub height: f32,
-    pub slide_numbers_visible: Option<bool>,
-    pub loop_presentation: Option<bool>,
-    /// Raw `KNShowMode` value for forward compatibility.
-    pub mode: Option<i32>,
-    pub autoplay_transition_delay: Option<f64>,
-    pub autoplay_build_delay: Option<f64>,
-    pub idle_timer_active: Option<bool>,
-    pub idle_timer_delay: Option<f64>,
-    pub automatically_plays_upon_open: Option<bool>,
-}
-
-impl From<&kn::ShowArchive> for KeynoteShowSettings {
-    fn from(show: &kn::ShowArchive) -> Self {
-        Self {
-            width: show.size.width,
-            height: show.size.height,
-            slide_numbers_visible: show.slide_numbers_visible,
-            loop_presentation: show.loop_presentation,
-            mode: show.mode,
-            autoplay_transition_delay: show.autoplay_transition_delay,
-            autoplay_build_delay: show.autoplay_build_delay,
-            idle_timer_active: show.idle_timer_active,
-            idle_timer_delay: show.idle_timer_delay,
-            automatically_plays_upon_open: show.automatically_plays_upon_open,
-        }
-    }
-}
-
 /// Transactional editor for title and body placeholders in an existing Keynote package.
 #[derive(Debug, Clone)]
 pub struct KeynoteEditor {
@@ -1481,64 +1448,6 @@ impl KeynoteEditor {
         comments.remove_reply(drawable_object_id, reply_storage_object_id)?;
         let staged = comments.into_package();
         Self::from_package(staged.clone())?;
-        self.text = IWorkTextEditor::from_package(staged);
-        Ok(())
-    }
-
-    pub fn show_settings(&self) -> Result<KeynoteShowSettings> {
-        let graph = ObjectGraph::read(self.text.package())?;
-        let document: kn::DocumentArchive = graph.decode(1, "KN.DocumentArchive")?;
-        let show: kn::ShowArchive = graph.decode(document.show.identifier, "KN.ShowArchive")?;
-        Ok(KeynoteShowSettings::from(&show))
-    }
-
-    pub fn set_show_settings(&mut self, settings: KeynoteShowSettings) -> Result<()> {
-        validate_show_settings(&settings)?;
-        let graph = ObjectGraph::read(self.text.package())?;
-        let document: kn::DocumentArchive = graph.decode(1, "KN.DocumentArchive")?;
-        let show_id = document.show.identifier;
-        let archive_name = graph.archive_name(show_id)?.to_owned();
-        let mut staged = self.text.package().clone();
-        staged.update_archive(&archive_name, |archive| {
-            let object = archive.object_mut(show_id).ok_or_else(|| {
-                Error::InvalidFormat(format!("Keynote show object {show_id} is missing"))
-            })?;
-            let message_index = object
-                .messages
-                .iter()
-                .position(|message| {
-                    message.type_ == 2 && kn::ShowArchive::decode(message.data.as_slice()).is_ok()
-                })
-                .ok_or_else(|| {
-                    Error::InvalidFormat(format!(
-                        "Keynote show object {show_id} has no ShowArchive payload"
-                    ))
-                })?;
-            let message_type = object.messages[message_index].type_;
-            let original = object.messages[message_index].data.as_slice();
-            let show = kn::ShowArchive::decode(original)?;
-            let data = patch_show_settings_wire(original, &show, &settings)?;
-            let verified = kn::ShowArchive::decode(data.as_slice())?;
-            if KeynoteShowSettings::from(&verified) != settings {
-                return Err(Error::InvalidFormat(
-                    "Keynote show-settings wire patch failed validation".to_owned(),
-                ));
-            }
-            object.replace_message(
-                message_index,
-                RawMessage {
-                    type_: message_type,
-                    data,
-                },
-            )?;
-            Ok(())
-        })?;
-        let verified = Self::from_bytes(&staged.to_bytes()?)?;
-        if verified.show_settings()? != settings {
-            return Err(Error::InvalidFormat(
-                "Keynote show settings failed round-trip validation".to_owned(),
-            ));
-        }
         self.text = IWorkTextEditor::from_package(staged);
         Ok(())
     }
@@ -3179,6 +3088,7 @@ impl KeynoteEditor {
 mod builds;
 mod placeholder_ownership;
 mod placeholder_visibility;
+mod show_settings;
 mod slide_background;
 mod slide_background_color;
 mod slide_background_gradient;
@@ -3193,6 +3103,7 @@ mod slide_style_metadata;
 mod slide_style_registry;
 
 use builds::*;
+pub use show_settings::{KeynoteShowMode, KeynoteShowSettings};
 pub use slide_background::KeynoteSlideBackground;
 pub use slide_background_color::{KeynoteRgbColorSpace, KeynoteRgbaColor};
 pub use slide_background_gradient::{

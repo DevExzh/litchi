@@ -262,6 +262,7 @@ transition.duration = Some(1.5);
 keynote.set_slide_transition(0, transition)?;
 let mut show = keynote.show_settings()?;
 show.loop_presentation = Some(true);
+show.mode = Some(litchi_iwa::keynote::KeynoteShowMode::SelfPlaying);
 keynote.set_show_settings(show)?;
 if let Some(drawable) = keynote.slide_drawables(0)?.first() {
     keynote.set_slide_drawable_comment(0, drawable.object_id, "Review this slide object")?;
