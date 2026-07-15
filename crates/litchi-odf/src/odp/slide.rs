@@ -1,6 +1,6 @@
 //! Slide and shape structures for ODP presentations.
 
-use super::SlideTransition;
+use super::{AnimationNode, SlideTransition};
 use litchi_core::Result;
 
 /// A slide in an ODP presentation.
@@ -18,6 +18,8 @@ pub struct Slide {
     pub notes: Option<String>,
     /// Optional slide transition and automatic-advance properties.
     pub transition: Option<SlideTransition>,
+    /// Inert ODF animation and timing trees attached to the slide.
+    pub animations: Vec<AnimationNode>,
     /// Shapes on the slide
     pub shapes: Vec<Shape>,
 }
@@ -92,6 +94,32 @@ impl Slide {
     /// Remove the slide transition configuration.
     pub fn clear_transition(&mut self) {
         self.transition = None;
+    }
+
+    /// Return the slide's inert animation and timing trees.
+    pub fn animations(&self) -> &[AnimationNode] {
+        &self.animations
+    }
+
+    /// Return mutable animation and timing trees.
+    pub fn animations_mut(&mut self) -> &mut Vec<AnimationNode> {
+        &mut self.animations
+    }
+
+    /// Add a schema-defined animation root to the slide.
+    pub fn add_animation(&mut self, animation: AnimationNode) -> Result<()> {
+        if !animation.kind().allowed_at_page_root() {
+            return Err(litchi_core::Error::InvalidFormat(
+                "anim:param is only valid below anim:command".to_string(),
+            ));
+        }
+        self.animations.push(animation);
+        Ok(())
+    }
+
+    /// Remove all animation and timing trees from the slide.
+    pub fn clear_animations(&mut self) {
+        self.animations.clear();
     }
 }
 
@@ -197,6 +225,7 @@ mod tests {
             index: 0,
             notes: None,
             transition: None,
+            animations: vec![],
             shapes: vec![],
         };
         assert!(slide.title.is_none());
@@ -211,6 +240,7 @@ mod tests {
             index: 5,
             notes: Some("Speaker notes".to_string()),
             transition: None,
+            animations: vec![],
             shapes: vec![],
         };
         assert_eq!(slide.title().unwrap(), Some("Test Slide"));
@@ -227,6 +257,7 @@ mod tests {
             index: 0,
             notes: None,
             transition: None,
+            animations: vec![],
             shapes: vec![],
         };
         assert_eq!(slide.title().unwrap(), Some("Title"));
@@ -240,6 +271,7 @@ mod tests {
             index: 0,
             notes: None,
             transition: None,
+            animations: vec![],
             shapes: vec![],
         };
         assert_eq!(slide.title().unwrap(), None);
@@ -253,6 +285,7 @@ mod tests {
             index: 0,
             notes: None,
             transition: None,
+            animations: vec![],
             shapes: vec![],
         };
         assert_eq!(slide.text().unwrap(), "Hello World");
@@ -277,6 +310,7 @@ mod tests {
             index: 0,
             notes: None,
             transition: None,
+            animations: vec![],
             shapes,
         };
         assert_eq!(slide.shapes().unwrap().len(), 1);
@@ -290,6 +324,7 @@ mod tests {
             index: 42,
             notes: None,
             transition: None,
+            animations: vec![],
             shapes: vec![],
         };
         assert_eq!(slide.index(), 42);
@@ -303,6 +338,7 @@ mod tests {
             index: 0,
             notes: Some("Notes".to_string()),
             transition: None,
+            animations: vec![],
             shapes: vec![],
         };
         assert_eq!(slide.notes().unwrap(), Some("Notes"));
@@ -316,6 +352,7 @@ mod tests {
             index: 0,
             notes: None,
             transition: None,
+            animations: vec![],
             shapes: vec![],
         };
         assert_eq!(slide.notes().unwrap(), None);
@@ -329,6 +366,7 @@ mod tests {
             index: 1,
             notes: Some("Notes".to_string()),
             transition: None,
+            animations: vec![],
             shapes: vec![],
         };
         let cloned = slide.clone();

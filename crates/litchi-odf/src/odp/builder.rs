@@ -4,7 +4,9 @@
 
 use crate::core::{OdfStructure, PackageWriter};
 use crate::odp::Slide;
+use crate::odp::animation::validate_animation_roots;
 use litchi_core::{Metadata, Result, xml::escape_xml};
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 /// Builder for creating new ODP presentations.
@@ -246,6 +248,7 @@ impl PresentationBuilder {
             index: self.slides.len(),
             notes: None,
             transition: None,
+            animations: Vec::new(),
             shapes: Vec::new(),
         };
         self.slides.push(slide);
@@ -276,6 +279,7 @@ impl PresentationBuilder {
             index: self.slides.len(),
             notes: None,
             transition: None,
+            animations: Vec::new(),
             shapes: Vec::new(),
         };
         self.slides.push(slide);
@@ -301,6 +305,7 @@ impl PresentationBuilder {
     ///     index: 0,
     ///     notes: Some("Speaker notes".to_string()),
     ///     transition: None,
+    ///     animations: vec![],
     ///     shapes: vec![],
     /// };
     /// builder.add_slide_element(slide)?;
@@ -459,7 +464,10 @@ impl PresentationBuilder {
     }
 
     /// Generate the content.xml body for presentation
-    fn generate_content_body(&self) -> Result<String> {
+    fn generate_content_body(
+        &self,
+        extension_namespaces: &BTreeMap<String, String>,
+    ) -> Result<String> {
         let shape_count = self.slides.iter().map(|s| s.shapes.len()).sum::<usize>();
         let mut estimated = 256usize;
         estimated += self.slides.len() * 128;
@@ -513,6 +521,10 @@ impl PresentationBuilder {
                 body.push_str(&Self::generate_shape_xml(shape, shape_idx)?);
             }
 
+            for animation in &slide.animations {
+                animation.write_xml(&mut body, extension_namespaces)?;
+            }
+
             body.push_str(&Self::generate_notes_xml(slide.notes.as_deref()));
 
             body.push_str("</draw:page>");
@@ -523,12 +535,37 @@ impl PresentationBuilder {
 
     /// Generate the complete content.xml for presentation
     fn generate_content_xml(&self) -> Result<String> {
-        let body = self.generate_content_body()?;
+        let mut extension_uris = BTreeSet::new();
+        for slide in &self.slides {
+            validate_animation_roots(&slide.animations)?;
+            for animation in &slide.animations {
+                animation.collect_extension_namespaces(&mut extension_uris);
+            }
+        }
+        let extension_namespaces = extension_uris
+            .into_iter()
+            .enumerate()
+            .map(|(index, uri)| (uri, format!("anim-ext{}", index + 1)))
+            .collect::<BTreeMap<_, _>>();
+        let mut extension_declarations = String::new();
+        for (uri, prefix) in &extension_namespaces {
+            if uri.is_empty() {
+                return Err(litchi_core::Error::InvalidFormat(
+                    "animation extension namespace URI cannot be empty".to_string(),
+                ));
+            }
+            extension_declarations.push_str(" xmlns:");
+            extension_declarations.push_str(prefix);
+            extension_declarations.push_str("=\"");
+            extension_declarations.push_str(&escape_xml(uri));
+            extension_declarations.push('"');
+        }
+        let body = self.generate_content_body(&extension_namespaces)?;
         let transition_styles = generate_transition_styles(&self.slides);
 
         Ok(format!(
-            r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" xmlns:number="urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:smil="urn:oasis:names:tc:opendocument:xmlns:smil-compatible:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:chart="urn:oasis:names:tc:opendocument:xmlns:chart:1.0" xmlns:dr3d="urn:oasis:names:tc:opendocument:xmlns:dr3d:1.0" xmlns:math="http://www.w3.org/1998/Math/MathML" xmlns:form="urn:oasis:names:tc:opendocument:xmlns:form:1.0" xmlns:script="urn:oasis:names:tc:opendocument:xmlns:script:1.0" xmlns:ooo="http://openoffice.org/2004/office" office:version="1.3"><office:scripts/><office:font-face-decls/><office:automatic-styles>{}</office:automatic-styles><office:body><office:presentation>{}</office:presentation></office:body></office:document-content>"#,
-            transition_styles, body
+            r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" xmlns:number="urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:anim="urn:oasis:names:tc:opendocument:xmlns:animation:1.0" xmlns:smil="urn:oasis:names:tc:opendocument:xmlns:smil-compatible:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:chart="urn:oasis:names:tc:opendocument:xmlns:chart:1.0" xmlns:dr3d="urn:oasis:names:tc:opendocument:xmlns:dr3d:1.0" xmlns:math="http://www.w3.org/1998/Math/MathML" xmlns:form="urn:oasis:names:tc:opendocument:xmlns:form:1.0" xmlns:script="urn:oasis:names:tc:opendocument:xmlns:script:1.0" xmlns:ooo="http://openoffice.org/2004/office"{} office:version="1.3"><office:scripts/><office:font-face-decls/><office:automatic-styles>{}</office:automatic-styles><office:body><office:presentation>{}</office:presentation></office:body></office:document-content>"#,
+            extension_declarations, transition_styles, body
         ))
     }
 

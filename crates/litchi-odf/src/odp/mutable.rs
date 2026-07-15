@@ -4,8 +4,10 @@
 //! for in-place modification of slides, shapes, and content.
 
 use crate::core::{OdfStructure, OwnedPackage, PackageWriter};
+use crate::odp::animation::validate_animation_roots;
 use crate::odp::{Presentation, Shape, Slide};
 use litchi_core::{Metadata, Result, xml::escape_xml};
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 /// A mutable ODP presentation that supports in-place modifications.
@@ -147,6 +149,7 @@ impl MutablePresentation {
             index: self.slides.len(),
             notes: None,
             transition: None,
+            animations: Vec::new(),
             shapes: Vec::new(),
         };
         self.slides.push(slide);
@@ -182,6 +185,7 @@ impl MutablePresentation {
                 index,
                 notes: None,
                 transition: None,
+                animations: Vec::new(),
                 shapes: Vec::new(),
             };
             self.slides.insert(index, slide);
@@ -394,6 +398,32 @@ impl MutablePresentation {
 
     /// Generate content.xml from the current mutable state.
     fn generate_content_xml(&self) -> Result<String> {
+        let mut extension_uris = BTreeSet::new();
+        for slide in &self.slides {
+            validate_animation_roots(&slide.animations)?;
+            for animation in &slide.animations {
+                animation.collect_extension_namespaces(&mut extension_uris);
+            }
+        }
+        let extension_namespaces = extension_uris
+            .into_iter()
+            .enumerate()
+            .map(|(index, uri)| (uri, format!("anim-ext{}", index + 1)))
+            .collect::<BTreeMap<_, _>>();
+        let mut extension_declarations = String::new();
+        for (uri, prefix) in &extension_namespaces {
+            if uri.is_empty() {
+                return Err(litchi_core::Error::InvalidFormat(
+                    "animation extension namespace URI cannot be empty".to_string(),
+                ));
+            }
+            extension_declarations.push_str(" xmlns:");
+            extension_declarations.push_str(prefix);
+            extension_declarations.push_str("=\"");
+            extension_declarations.push_str(&escape_xml(uri));
+            extension_declarations.push('"');
+        }
+
         let shape_count = self.slides.iter().map(|s| s.shapes.len()).sum::<usize>();
         let mut estimated = 256usize;
         estimated += self.slides.len() * 128;
@@ -453,6 +483,10 @@ impl MutablePresentation {
                 )?);
             }
 
+            for animation in &slide.animations {
+                animation.write_xml(&mut body, &extension_namespaces)?;
+            }
+
             body.push_str(&super::builder::PresentationBuilder::generate_notes_xml(
                 slide.notes.as_deref(),
             ));
@@ -461,10 +495,9 @@ impl MutablePresentation {
         }
 
         let transition_styles = super::builder::generate_transition_styles(&self.slides);
-        Ok(xml_minifier::minified_xml_format!(
-            r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:smil="urn:oasis:names:tc:opendocument:xmlns:smil-compatible:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" office:version="1.3"><office:scripts/><office:font-face-decls/><office:automatic-styles>{}</office:automatic-styles><office:body><office:presentation>{}</office:presentation></office:body></office:document-content>"#,
-            transition_styles,
-            body
+        Ok(format!(
+            r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:anim="urn:oasis:names:tc:opendocument:xmlns:animation:1.0" xmlns:smil="urn:oasis:names:tc:opendocument:xmlns:smil-compatible:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink"{} office:version="1.3"><office:scripts/><office:font-face-decls/><office:automatic-styles>{}</office:automatic-styles><office:body><office:presentation>{}</office:presentation></office:body></office:document-content>"#,
+            extension_declarations, transition_styles, body
         ))
     }
 
@@ -587,6 +620,10 @@ impl Default for MutablePresentation {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::odp::{
+        AnimationAttribute, AnimationAttributeNamespace, AnimationKind, AnimationNode,
+        PresentationBuilder,
+    };
 
     const STYLES: &str = r#"<?xml version="1.0"?><office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><office:styles><office:marker>preserve-me</office:marker></office:styles></office:document-styles>"#;
     const SETTINGS: &[u8] = b"<settings>presentation-settings</settings>";
@@ -665,5 +702,97 @@ mod tests {
             .find(|shape| shape.shape_type == litchi_core::ShapeType::Picture)
             .unwrap();
         assert_eq!(picture.image_href(), Some("Pictures/a&b.png"));
+    }
+
+    #[test]
+    fn builder_and_mutable_presentation_round_trip_animation_trees() {
+        let mut parameter = AnimationNode::new(AnimationKind::Parameter);
+        parameter.set_attribute(
+            AnimationAttribute::new(
+                AnimationAttributeNamespace::Animation,
+                "name",
+                "destination",
+            )
+            .unwrap(),
+        );
+        parameter.set_attribute(
+            AnimationAttribute::new(AnimationAttributeNamespace::Animation, "value", "2 & next")
+                .unwrap(),
+        );
+        let mut command = AnimationNode::new(AnimationKind::Command);
+        command.set_attribute(
+            AnimationAttribute::new(AnimationAttributeNamespace::Animation, "command", "show")
+                .unwrap(),
+        );
+        command.add_child(parameter).unwrap();
+
+        let mut root = AnimationNode::new(AnimationKind::Sequence);
+        root.set_attribute(
+            AnimationAttribute::new(AnimationAttributeNamespace::Smil, "begin", "slide.begin")
+                .unwrap(),
+        );
+        root.set_attribute(
+            AnimationAttribute::new(
+                AnimationAttributeNamespace::Other("urn:example:timing".to_string()),
+                "mode",
+                "author-defined",
+            )
+            .unwrap(),
+        );
+        root.add_child(command).unwrap();
+        root.add_child(AnimationNode::new(AnimationKind::TransitionFilter))
+            .unwrap();
+
+        let slide = Slide {
+            title: Some("Animated".to_string()),
+            text: String::new(),
+            index: 0,
+            notes: None,
+            transition: None,
+            animations: vec![root.clone()],
+            shapes: Vec::new(),
+        };
+        let mut builder = PresentationBuilder::new();
+        builder.add_slide_element(slide).unwrap();
+        let built = builder.build().unwrap();
+        let presentation = Presentation::from_bytes(built).unwrap();
+        assert_eq!(presentation.slides().unwrap()[0].animations, [root.clone()]);
+
+        let mutable = MutablePresentation::from_presentation(presentation).unwrap();
+        let bytes = mutable.to_bytes().unwrap();
+        let package = OwnedPackage::from_bytes(bytes.clone()).unwrap();
+        let content = String::from_utf8(package.get_file("content.xml").unwrap()).unwrap();
+        assert!(content.contains(r#"xmlns:anim-ext1="urn:example:timing""#));
+        assert!(content.contains(r#"anim-ext1:mode="author-defined""#));
+        assert!(content.contains(r#"anim:value="2 &amp; next""#));
+
+        let reparsed = Presentation::from_bytes(bytes).unwrap();
+        assert_eq!(reparsed.slides().unwrap()[0].animations, [root]);
+    }
+
+    #[test]
+    fn rejects_invalid_mutated_animation_trees_and_xml_characters() {
+        let mut leaf = AnimationNode::new(AnimationKind::Animate);
+        leaf.children_mut()
+            .push(AnimationNode::new(AnimationKind::Set));
+        let mut presentation = MutablePresentation::new();
+        presentation.add_slide("Invalid", "").unwrap();
+        presentation.slides_mut()[0].animations.push(leaf);
+        assert!(presentation.to_bytes().is_err());
+
+        assert!(
+            AnimationAttribute::new(AnimationAttributeNamespace::Smil, "begin", "bad\0value")
+                .is_err()
+        );
+        assert!(
+            AnimationAttribute::new(
+                AnimationAttributeNamespace::Other(
+                    "http://www.w3.org/XML/1998/namespace".to_string()
+                ),
+                "id",
+                "bad namespace variant"
+            )
+            .is_err()
+        );
     }
 }

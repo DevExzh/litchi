@@ -20,6 +20,7 @@
 //! - ✅ Style parsing
 //! - ✅ Speaker notes
 //! - ✅ Slide transition and automatic-timing style resolution
+//! - ✅ Inert ODF/SMIL animation and timing trees
 //!
 //! ## ✅ Writing (`builder.rs`, `mutable.rs`) - COMPLETE
 //! - ✅ `PresentationBuilder::new()` - Create new presentations
@@ -30,9 +31,9 @@
 //! - ✅ `save()` / `to_bytes()` - Write to file or bytes
 //! - ✅ `MutablePresentation` - Modify existing presentations
 //! - ✅ Slide transitions, timings, and transition sounds
+//! - ✅ Animation tree creation and namespace-preserving round trips
 //!
 //! ## 🚧 TODO - Advanced Features
-//! - ⚠️ Animations (entrance, emphasis, exit, motion paths)
 //! - ⚠️ Multimedia embedding (audio, video)
 //! - ⚠️ Custom slide layouts
 //! - ⚠️ Advanced shape properties (gradients, shadows, 3D effects)
@@ -47,6 +48,7 @@
 //! - odfpy: `odf/draw.py`, `odf/presentation.py`
 //! - ODF Toolkit: Simple API - Presentation class
 
+mod animation;
 mod builder;
 mod mutable;
 mod parser;
@@ -54,6 +56,9 @@ mod presentation;
 mod slide;
 mod transition;
 
+pub use animation::{
+    AnimationAttribute, AnimationAttributeNamespace, AnimationKind, AnimationNode,
+};
 pub use builder::PresentationBuilder;
 pub use mutable::MutablePresentation;
 pub use presentation::Presentation;

@@ -132,6 +132,7 @@
 //! - ✅ Metadata extraction
 //! - ✅ Speaker notes extraction
 //! - ✅ Slide transition and automatic-timing style resolution
+//! - ✅ Inert ODF/SMIL animation and timing-tree parsing
 //!
 //! ### Writing (`odp/builder.rs`, `odp/mutable.rs`)
 //! - ✅ PresentationBuilder for creating new ODP files
@@ -142,10 +143,10 @@
 //! - ✅ Set metadata
 //! - ✅ Speaker notes
 //! - ✅ Slide transitions, timings, and transition sounds
+//! - ✅ Animation tree creation and namespace-preserving round trips
 //! - ✅ Save to file or bytes
 //!
 //! ### TODO - Advanced Features
-//! - ⚠️ Animations
 //! - ⚠️ Multimedia embedding (audio, video)
 //! - ⚠️ Custom slide layouts
 //! - ⚠️ Advanced shape properties
@@ -240,6 +241,7 @@ pub use litchi_core::unit::{Length, LengthUnit};
 
 // Re-export main types for convenience
 pub use odp::{
+    AnimationAttribute, AnimationAttributeNamespace, AnimationKind, AnimationNode,
     MutablePresentation, Presentation, PresentationBuilder, SlideTransition, TransitionDirection,
     TransitionSound, TransitionSoundShow, TransitionSpeed, TransitionStyle, TransitionType,
 };

@@ -1,8 +1,10 @@
 //! ODP-specific parsing utilities.
 
+use super::animation::ANIMATION_NAMESPACE;
 use super::{
-    Shape, Slide, SlideTransition, TransitionDirection, TransitionSound, TransitionSoundShow,
-    TransitionSpeed, TransitionStyle, TransitionType,
+    AnimationAttribute, AnimationAttributeNamespace, AnimationKind, AnimationNode, Shape, Slide,
+    SlideTransition, TransitionDirection, TransitionSound, TransitionSoundShow, TransitionSpeed,
+    TransitionStyle, TransitionType,
 };
 use litchi_core::{Error, Result, ShapeType};
 use quick_xml::XmlVersion;
@@ -20,6 +22,7 @@ const TABLE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:table:1.0
 const TEXT_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:text:1.0";
 const XLINK_NAMESPACE: &[u8] = b"http://www.w3.org/1999/xlink";
 const XML_NAMESPACE: &[u8] = b"http://www.w3.org/XML/1998/namespace";
+const ANIMATION_NAMESPACE_BYTES: &[u8] = ANIMATION_NAMESPACE.as_bytes();
 
 #[derive(Clone, Default)]
 struct TransitionStyleDefinition {
@@ -60,6 +63,8 @@ enum OdpElement {
     TextSpace,
     TextTab,
     TextLineBreak,
+    Animation(AnimationKind),
+    UnknownAnimation,
     Other,
 }
 
@@ -172,7 +177,11 @@ impl OdpParser {
     }
 
     fn classify(namespace: &ResolveResult<'_>, local_name: &[u8]) -> OdpElement {
-        if Self::is_namespace(namespace, DRAW_NAMESPACE) {
+        if Self::is_namespace(namespace, ANIMATION_NAMESPACE_BYTES) {
+            AnimationKind::from_local_name(local_name)
+                .map(OdpElement::Animation)
+                .unwrap_or(OdpElement::UnknownAnimation)
+        } else if Self::is_namespace(namespace, DRAW_NAMESPACE) {
             match local_name {
                 b"page" => OdpElement::Page,
                 b"frame" => OdpElement::Shape(ShapeElement::Frame),
@@ -204,6 +213,192 @@ impl OdpParser {
             }
         } else {
             OdpElement::Other
+        }
+    }
+
+    fn animation_attributes(
+        reader: &NsReader<&[u8]>,
+        element: &BytesStart<'_>,
+    ) -> Result<Vec<AnimationAttribute>> {
+        if element.attributes().count() > 256 {
+            return Err(Error::InvalidFormat(
+                "ODP animation node exceeds 256 attributes".to_string(),
+            ));
+        }
+        let mut attributes = Vec::with_capacity(element.attributes().count());
+        let mut expanded_names = HashSet::new();
+        for attribute in element.attributes() {
+            let attribute = attribute
+                .map_err(|error| Error::InvalidFormat(format!("invalid XML attribute: {error}")))?;
+            let qualified_name = attribute.key.as_ref();
+            if qualified_name == b"xmlns" || qualified_name.starts_with(b"xmlns:") {
+                continue;
+            }
+            let (namespace, local_name) = reader.resolver().resolve_attribute(attribute.key);
+            let namespace_uri = match namespace {
+                ResolveResult::Unbound => None,
+                ResolveResult::Bound(Namespace(uri)) => {
+                    Some(std::str::from_utf8(uri).map_err(|_| {
+                        Error::InvalidFormat("non-UTF-8 animation namespace URI".to_string())
+                    })?)
+                },
+                ResolveResult::Unknown(prefix) => {
+                    return Err(Error::InvalidFormat(format!(
+                        "unknown animation attribute namespace prefix '{}'",
+                        String::from_utf8_lossy(&prefix)
+                    )));
+                },
+            };
+            let local_name = std::str::from_utf8(local_name.as_ref())
+                .map_err(|_| {
+                    Error::InvalidFormat("non-UTF-8 animation attribute name".to_string())
+                })?
+                .to_string();
+            let namespace = AnimationAttributeNamespace::from_uri(namespace_uri);
+            if !expanded_names.insert((namespace.clone(), local_name.clone())) {
+                return Err(Error::InvalidFormat(format!(
+                    "duplicate animation attribute '{local_name}'"
+                )));
+            }
+            let value = attribute
+                .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                .map_err(|error| {
+                    Error::InvalidFormat(format!("invalid XML attribute value: {error}"))
+                })?
+                .into_owned();
+            if value.len() > 1_048_576 {
+                return Err(Error::InvalidFormat(
+                    "ODP animation attribute exceeds 1 MiB".to_string(),
+                ));
+            }
+            attributes.push(AnimationAttribute::from_parsed(
+                namespace, local_name, value,
+            )?);
+        }
+        Ok(attributes)
+    }
+
+    fn parse_animation_node(
+        reader: &mut NsReader<&[u8]>,
+        start: &BytesStart<'_>,
+        kind: AnimationKind,
+        depth: usize,
+        node_count: &mut usize,
+    ) -> Result<AnimationNode> {
+        if depth > 128 {
+            return Err(Error::InvalidFormat(
+                "ODP animation nesting exceeds 128 levels".to_string(),
+            ));
+        }
+        *node_count = node_count
+            .checked_add(1)
+            .ok_or_else(|| Error::InvalidFormat("ODP animation node count overflow".to_string()))?;
+        if *node_count > 65_536 {
+            return Err(Error::InvalidFormat(
+                "ODP animation tree exceeds 65536 nodes".to_string(),
+            ));
+        }
+        let attributes = Self::animation_attributes(reader, start)?;
+        let mut children = Vec::new();
+        let mut buffer = Vec::new();
+        loop {
+            let (namespace, event) = reader
+                .read_resolved_event_into(&mut buffer)
+                .map_err(|error| Error::InvalidFormat(format!("XML parsing error: {error}")))?;
+            match event {
+                Event::Start(ref child) | Event::Empty(ref child) => {
+                    if !Self::is_namespace(&namespace, ANIMATION_NAMESPACE_BYTES) {
+                        return Err(Error::InvalidFormat(format!(
+                            "anim:{} contains a non-animation element",
+                            kind.local_name()
+                        )));
+                    }
+                    let Some(child_kind) =
+                        AnimationKind::from_local_name(child.local_name().as_ref())
+                    else {
+                        return Err(Error::InvalidFormat(format!(
+                            "unknown ODF animation element '{}'",
+                            String::from_utf8_lossy(child.local_name().as_ref())
+                        )));
+                    };
+                    if !kind.allows_child(child_kind) {
+                        return Err(Error::InvalidFormat(format!(
+                            "anim:{} cannot contain anim:{}",
+                            kind.local_name(),
+                            child_kind.local_name()
+                        )));
+                    }
+                    let node = if matches!(event, Event::Empty(_)) {
+                        *node_count = node_count.checked_add(1).ok_or_else(|| {
+                            Error::InvalidFormat("ODP animation node count overflow".to_string())
+                        })?;
+                        if *node_count > 65_536 {
+                            return Err(Error::InvalidFormat(
+                                "ODP animation tree exceeds 65536 nodes".to_string(),
+                            ));
+                        }
+                        AnimationNode::from_parsed(
+                            child_kind,
+                            Self::animation_attributes(reader, child)?,
+                            Vec::new(),
+                        )
+                    } else {
+                        Self::parse_animation_node(
+                            reader,
+                            child,
+                            child_kind,
+                            depth + 1,
+                            node_count,
+                        )?
+                    };
+                    children.push(node);
+                },
+                Event::End(ref end) => {
+                    if !Self::is_namespace(&namespace, ANIMATION_NAMESPACE_BYTES)
+                        || end.local_name().as_ref() != kind.local_name().as_bytes()
+                    {
+                        return Err(Error::InvalidFormat(format!(
+                            "unexpected closing element in anim:{}",
+                            kind.local_name()
+                        )));
+                    }
+                    return Ok(AnimationNode::from_parsed(kind, attributes, children));
+                },
+                Event::Text(ref text) => {
+                    let text = Self::decode_text(text)?;
+                    if !text.trim().is_empty() {
+                        return Err(Error::InvalidFormat(format!(
+                            "anim:{} cannot contain text",
+                            kind.local_name()
+                        )));
+                    }
+                },
+                Event::CData(ref text) => {
+                    let text = text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
+                        Error::InvalidFormat(format!("invalid animation CDATA: {error}"))
+                    })?;
+                    if !text.trim().is_empty() {
+                        return Err(Error::InvalidFormat(format!(
+                            "anim:{} cannot contain text",
+                            kind.local_name()
+                        )));
+                    }
+                },
+                Event::Eof => {
+                    return Err(Error::InvalidFormat(format!(
+                        "unterminated anim:{} element",
+                        kind.local_name()
+                    )));
+                },
+                Event::GeneralRef(_) => {
+                    return Err(Error::InvalidFormat(format!(
+                        "anim:{} cannot contain character references",
+                        kind.local_name()
+                    )));
+                },
+                _ => {},
+            }
+            buffer.clear();
         }
     }
 
@@ -625,6 +820,8 @@ impl OdpParser {
         let mut in_notes = false;
         let mut current_slide_has_segment = false;
         let mut current_transition: Option<SlideTransition> = None;
+        let mut current_animations = Vec::new();
+        let mut animation_node_count = 0;
 
         // Shape parsing state
         let mut current_shape: Option<ShapeBuilder> = None;
@@ -648,6 +845,7 @@ impl OdpParser {
                                     notes: (!current_notes_text.is_empty())
                                         .then(|| std::mem::take(&mut current_notes_text)),
                                     transition: current_transition.take(),
+                                    animations: std::mem::take(&mut current_animations),
                                     shapes: std::mem::take(&mut current_shapes),
                                 });
                                 slide_index += 1;
@@ -685,6 +883,30 @@ impl OdpParser {
                             )?;
                         },
                         _ if in_notes => {},
+                        OdpElement::UnknownAnimation if in_slide => {
+                            return Err(Error::InvalidFormat(format!(
+                                "unknown ODF animation element '{}'",
+                                String::from_utf8_lossy(element.local_name().as_ref())
+                            )));
+                        },
+                        OdpElement::Animation(kind)
+                            if in_slide
+                                && current_shape.is_none()
+                                && current_paragraph.is_none() =>
+                        {
+                            if !kind.allowed_at_page_root() {
+                                return Err(Error::InvalidFormat(
+                                    "anim:param is only valid below anim:command".to_string(),
+                                ));
+                            }
+                            current_animations.push(Self::parse_animation_node(
+                                &mut reader,
+                                element,
+                                kind,
+                                1,
+                                &mut animation_node_count,
+                            )?);
+                        },
                         OdpElement::Shape(shape_element) => {
                             if in_slide && current_shape.is_none() {
                                 current_shape =
@@ -755,6 +977,7 @@ impl OdpParser {
                                 index: slide_index,
                                 notes: None,
                                 transition: (!transition.is_empty()).then_some(transition),
+                                animations: Vec::new(),
                                 shapes: Vec::new(),
                             });
                             slide_index += 1;
@@ -781,6 +1004,39 @@ impl OdpParser {
                             )?;
                         },
                         _ if in_notes => {},
+                        OdpElement::UnknownAnimation if in_slide => {
+                            return Err(Error::InvalidFormat(format!(
+                                "unknown ODF animation element '{}'",
+                                String::from_utf8_lossy(element.local_name().as_ref())
+                            )));
+                        },
+                        OdpElement::Animation(kind)
+                            if in_slide
+                                && current_shape.is_none()
+                                && current_paragraph.is_none() =>
+                        {
+                            if !kind.allowed_at_page_root() {
+                                return Err(Error::InvalidFormat(
+                                    "anim:param is only valid below anim:command".to_string(),
+                                ));
+                            }
+                            animation_node_count =
+                                animation_node_count.checked_add(1).ok_or_else(|| {
+                                    Error::InvalidFormat(
+                                        "ODP animation node count overflow".to_string(),
+                                    )
+                                })?;
+                            if animation_node_count > 65_536 {
+                                return Err(Error::InvalidFormat(
+                                    "ODP animation tree exceeds 65536 nodes".to_string(),
+                                ));
+                            }
+                            current_animations.push(AnimationNode::from_parsed(
+                                kind,
+                                Self::animation_attributes(&reader, element)?,
+                                Vec::new(),
+                            ));
+                        },
                         OdpElement::Image => {
                             if let Some(builder) = current_shape.as_mut() {
                                 builder.shape_type = ShapeType::Picture;
@@ -850,6 +1106,7 @@ impl OdpParser {
                                     notes: (!current_notes_text.is_empty())
                                         .then(|| std::mem::take(&mut current_notes_text)),
                                     transition: current_transition.take(),
+                                    animations: std::mem::take(&mut current_animations),
                                     shapes: std::mem::take(&mut current_shapes),
                                 });
                                 slide_index += 1;
@@ -1026,6 +1283,7 @@ mod tests {
             index: 0,
             notes: None,
             transition: None,
+            animations: vec![],
             shapes: vec![],
         };
         let debug_str = format!("{:?}", slide);
@@ -1041,6 +1299,7 @@ mod tests {
             index: 0,
             notes: None,
             transition: None,
+            animations: vec![],
             shapes: vec![],
         };
         let cloned = slide.clone();
@@ -1263,5 +1522,72 @@ mod tests {
         let content = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"><o:automatic-styles><s:style s:name="A" s:family="drawing-page" s:parent-style-name="B"/><s:style s:name="B" s:family="drawing-page" s:parent-style-name="A"/></o:automatic-styles><o:body><o:presentation><d:page d:style-name="A"/></o:presentation></o:body></o:document-content>"#;
         let error = OdpParser::parse_slides_with_styles(content, None).unwrap_err();
         assert!(error.to_string().contains("cyclic"));
+    }
+
+    #[test]
+    fn parses_complete_namespace_aware_animation_trees() {
+        let xml = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:a="urn:oasis:names:tc:opendocument:xmlns:animation:1.0" xmlns:m="urn:oasis:names:tc:opendocument:xmlns:smil-compatible:1.0" xmlns:p="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:l="http://www.w3.org/1999/xlink" xmlns:e="urn:example:animation-extension" xmlns:f="urn:example:not-animation"><o:body><o:presentation><d:page><f:par/><a:par m:begin="slide.begin+1s" p:node-type="timing-root" e:flag="keep &amp; roundtrip"><a:animate a:formula="x+1" m:targetElement="shape1"/><a:animateColor a:color-interpolation="rgb"/><a:animateMotion s:path="M 0 0 L 1 1"/><a:animateTransform s:type="rotate"/><a:audio l:href="Sounds/chime.ogg" xml:id="audio1"/><a:command a:command="show"><a:param a:name="page" a:value="2"/></a:command><a:iterate a:iterate-type="by-paragraph"><a:set m:to="visible"/></a:iterate><a:par/><a:seq><a:transitionFilter m:type="fade"/></a:seq><a:set m:attributeName="visibility"/><a:transitionFilter m:subtype="crossfade"/></a:par></d:page></o:presentation></o:body></o:document-content>"#;
+
+        let slides = OdpParser::parse_slides(xml).unwrap();
+        assert_eq!(slides.len(), 1);
+        assert_eq!(slides[0].animations.len(), 1);
+        let root = &slides[0].animations[0];
+        assert_eq!(root.kind(), AnimationKind::Parallel);
+        assert_eq!(root.children().len(), 11);
+        assert_eq!(
+            root.attribute(&AnimationAttributeNamespace::Smil, "begin"),
+            Some("slide.begin+1s")
+        );
+        assert_eq!(
+            root.attribute(
+                &AnimationAttributeNamespace::Other("urn:example:animation-extension".to_string()),
+                "flag"
+            ),
+            Some("keep & roundtrip")
+        );
+        assert_eq!(root.children()[0].kind(), AnimationKind::Animate);
+        assert_eq!(root.children()[4].kind(), AnimationKind::Audio);
+        let command = &root.children()[5];
+        assert_eq!(command.kind(), AnimationKind::Command);
+        assert_eq!(command.children()[0].kind(), AnimationKind::Parameter);
+        assert_eq!(
+            command.children()[0].attribute(&AnimationAttributeNamespace::Animation, "value"),
+            Some("2")
+        );
+        assert_eq!(root.children()[6].children()[0].kind(), AnimationKind::Set);
+        assert_eq!(
+            root.children()[8].children()[0].kind(),
+            AnimationKind::TransitionFilter
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_animation_structure() {
+        let invalid_trees = [
+            "<a:animate><a:set/></a:animate>",
+            "<a:command><a:animate/></a:command>",
+            "<a:param a:name=\"orphan\"/>",
+            "<a:notInOdf/>",
+            "<a:par>not whitespace</a:par>",
+        ];
+        for tree in invalid_trees {
+            let xml = format!(
+                r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:a="urn:oasis:names:tc:opendocument:xmlns:animation:1.0"><o:body><o:presentation><d:page>{tree}</d:page></o:presentation></o:body></o:document-content>"#
+            );
+            assert!(OdpParser::parse_slides(&xml).is_err(), "accepted {tree}");
+        }
+    }
+
+    #[test]
+    fn bounds_animation_nesting() {
+        let mut tree = "<a:par>".repeat(129);
+        tree.push_str("<a:set/>");
+        tree.push_str(&"</a:par>".repeat(129));
+        let xml = format!(
+            r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:a="urn:oasis:names:tc:opendocument:xmlns:animation:1.0"><o:body><o:presentation><d:page>{tree}</d:page></o:presentation></o:body></o:document-content>"#
+        );
+
+        let error = OdpParser::parse_slides(&xml).unwrap_err();
+        assert!(error.to_string().contains("128 levels"));
     }
 }
