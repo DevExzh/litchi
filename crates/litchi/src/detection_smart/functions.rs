@@ -88,6 +88,11 @@ pub fn detect_file_format_from_bytes(bytes: &[u8]) -> Option<FileFormat> {
         return None;
     }
 
+    #[cfg(feature = "odf")]
+    if let Some(result) = odf::detect_flat_odf_format(bytes) {
+        return Some(result);
+    }
+
     // Use parallel signature checking to test OLE2, ZIP, and RTF simultaneously
     // This is 3-6x faster than checking each signature individually
     let mask = check_office_signatures(bytes);
@@ -215,6 +220,20 @@ pub fn detect_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<FileF
         return None;
     }
 
+    #[cfg(feature = "odf")]
+    if header
+        .iter()
+        .copied()
+        .find(|byte| !byte.is_ascii_whitespace())
+        == Some(b'<')
+        || header.starts_with(&[0xef, 0xbb, 0xbf])
+    {
+        let _ = reader.seek(std::io::SeekFrom::Start(0));
+        if let Some(result) = odf::detect_odf_format_from_reader(reader) {
+            return Some(result);
+        }
+    }
+
     // Check for RTF format (plain text with {\rtf signature)
     if let Some(result) = rtf::detect_rtf_format_from_reader(reader) {
         return Some(result);
@@ -234,6 +253,18 @@ pub fn detect_iwork_format_from_path<P: AsRef<Path>>(path: P) -> Option<FileForm
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    #[cfg(feature = "odf")]
+    fn detects_flat_odf_bytes_and_reader() {
+        let xml = br#"<?xml version="1.0"?><o:document xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" o:mimetype="application/vnd.oasis.opendocument.chart"><o:body><o:chart/></o:body></o:document>"#;
+        assert_eq!(detect_file_format_from_bytes(xml), Some(FileFormat::Odc));
+        let mut reader = std::io::Cursor::new(xml);
+        assert_eq!(
+            detect_format_from_reader(&mut reader),
+            Some(FileFormat::Odc)
+        );
+    }
 
     #[test]
     #[cfg(feature = "ooxml")]

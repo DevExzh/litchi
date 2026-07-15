@@ -3,6 +3,9 @@
 use crate::constants;
 use crate::core::{Meta, OwnedPackage};
 use litchi_core::{Error, Metadata, Result};
+use quick_xml::events::Event;
+use quick_xml::name::{Namespace, ResolveResult};
+use quick_xml::reader::NsReader;
 use std::io::Read;
 use std::path::Path;
 
@@ -40,6 +43,213 @@ pub struct OpenDocumentPackage {
     family: OpenDocumentFamily,
     template: bool,
     mimetype: String,
+}
+
+/// Validated flat OpenDocument XML file.
+///
+/// Flat documents combine content, styles, settings, and metadata under one
+/// `office:document` root and are conventionally stored as `.fodt`, `.fods`,
+/// `.fodp`, `.fodg`, `.fodc`, `.fodi`, or `.fodf`.
+pub struct FlatOpenDocument {
+    xml: String,
+    family: OpenDocumentFamily,
+    mimetype: String,
+}
+
+impl FlatOpenDocument {
+    /// Open and validate a flat OpenDocument XML file.
+    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
+        let file = std::fs::File::open(path)?;
+        Self::from_reader(file)
+    }
+
+    /// Read and validate a flat OpenDocument XML stream.
+    pub fn from_reader(mut reader: impl Read) -> Result<Self> {
+        let mut bytes = Vec::new();
+        reader.read_to_end(&mut bytes)?;
+        Self::from_bytes(bytes)
+    }
+
+    /// Validate flat OpenDocument XML from owned bytes.
+    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
+        let mimetype = litchi_core::detection::odf::detect_flat_odf_mimetype(&bytes)
+            .ok_or_else(|| Error::InvalidFormat("invalid flat OpenDocument root".to_string()))?;
+        let (family, template) = classify_mimetype(&mimetype).ok_or_else(|| {
+            Error::InvalidFormat(format!("unsupported OpenDocument mimetype '{mimetype}'"))
+        })?;
+        if template || matches!(family, OpenDocumentFamily::Master | OpenDocumentFamily::Web) {
+            return Err(Error::InvalidFormat(format!(
+                "mimetype '{mimetype}' has no standard flat OpenDocument form"
+            )));
+        }
+        let xml = String::from_utf8(bytes)
+            .map_err(|_| Error::InvalidFormat("invalid UTF-8 in flat OpenDocument".to_string()))?;
+        validate_flat_document(&xml, family)?;
+        Ok(Self {
+            xml,
+            family,
+            mimetype,
+        })
+    }
+
+    /// Return the document family.
+    pub fn family(&self) -> OpenDocumentFamily {
+        self.family
+    }
+
+    /// Return the root `office:mimetype` value.
+    pub fn mimetype(&self) -> &str {
+        &self.mimetype
+    }
+
+    /// Return the conventional flat OpenDocument extension.
+    pub fn extension(&self) -> &'static str {
+        match self.family {
+            OpenDocumentFamily::Text => "fodt",
+            OpenDocumentFamily::Spreadsheet => "fods",
+            OpenDocumentFamily::Presentation => "fodp",
+            OpenDocumentFamily::Drawing => "fodg",
+            OpenDocumentFamily::Chart => "fodc",
+            OpenDocumentFamily::Formula => "fodf",
+            OpenDocumentFamily::Image => "fodi",
+            OpenDocumentFamily::Master | OpenDocumentFamily::Web => {
+                unreachable!("master and web flat documents are rejected")
+            },
+        }
+    }
+
+    /// Return the complete flat XML document.
+    pub fn xml(&self) -> &str {
+        &self.xml
+    }
+
+    /// Extract common document metadata from the combined XML document.
+    pub fn metadata(&self) -> Result<Metadata> {
+        Ok(Meta::from_bytes(self.xml.as_bytes())?.extract_metadata())
+    }
+
+    /// Return the exact original bytes.
+    pub fn as_bytes(&self) -> &[u8] {
+        self.xml.as_bytes()
+    }
+
+    /// Clone the exact original bytes.
+    pub fn to_bytes(&self) -> Vec<u8> {
+        self.as_bytes().to_vec()
+    }
+
+    /// Consume this wrapper and return the exact original bytes.
+    pub fn into_bytes(self) -> Vec<u8> {
+        self.xml.into_bytes()
+    }
+
+    /// Save the flat document without reconstructing its XML.
+    pub fn save(&self, path: impl AsRef<Path>) -> Result<()> {
+        std::fs::write(path, self.as_bytes())?;
+        Ok(())
+    }
+}
+
+fn validate_flat_document(xml: &str, family: OpenDocumentFamily) -> Result<()> {
+    const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
+
+    let mut reader = NsReader::from_str(xml);
+    let mut buffer = Vec::new();
+    let mut depth = 0usize;
+    let mut root_seen = false;
+    let mut root_closed = false;
+    let mut body_seen = false;
+    let mut family_body_seen = false;
+    let expected_body = match family {
+        OpenDocumentFamily::Text => b"text".as_slice(),
+        OpenDocumentFamily::Spreadsheet => b"spreadsheet".as_slice(),
+        OpenDocumentFamily::Presentation => b"presentation".as_slice(),
+        OpenDocumentFamily::Drawing => b"drawing".as_slice(),
+        OpenDocumentFamily::Chart => b"chart".as_slice(),
+        OpenDocumentFamily::Formula => b"formula".as_slice(),
+        OpenDocumentFamily::Image => b"image".as_slice(),
+        OpenDocumentFamily::Master | OpenDocumentFamily::Web => unreachable!(),
+    };
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| {
+                Error::InvalidFormat(format!("invalid flat OpenDocument XML: {error}"))
+            })?;
+        match event {
+            Event::Start(element) => {
+                if depth == 0 {
+                    if root_seen
+                        || !matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == OFFICE_NAMESPACE)
+                        || element.local_name().as_ref() != b"document"
+                    {
+                        return Err(Error::InvalidFormat(
+                            "flat OpenDocument must contain one office:document root".to_string(),
+                        ));
+                    }
+                    root_seen = true;
+                } else if depth == 1
+                    && matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == OFFICE_NAMESPACE)
+                    && element.local_name().as_ref() == b"body"
+                {
+                    body_seen = true;
+                } else if depth == 2
+                    && matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == OFFICE_NAMESPACE)
+                    && element.local_name().as_ref() == expected_body
+                {
+                    family_body_seen = true;
+                }
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    Error::InvalidFormat("flat OpenDocument nesting overflow".to_string())
+                })?;
+            },
+            Event::Empty(element) => {
+                if depth == 0 {
+                    return Err(Error::InvalidFormat(
+                        "flat OpenDocument root cannot be empty".to_string(),
+                    ));
+                }
+                if depth == 1
+                    && matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == OFFICE_NAMESPACE)
+                    && element.local_name().as_ref() == b"body"
+                {
+                    body_seen = true;
+                } else if depth == 2
+                    && matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == OFFICE_NAMESPACE)
+                    && element.local_name().as_ref() == expected_body
+                {
+                    family_body_seen = true;
+                }
+            },
+            Event::End(_) => {
+                depth = depth.checked_sub(1).ok_or_else(|| {
+                    Error::InvalidFormat("unexpected flat OpenDocument closing tag".to_string())
+                })?;
+                if depth == 0 {
+                    root_closed = true;
+                }
+            },
+            Event::Text(text) if depth == 0 && !text.iter().all(u8::is_ascii_whitespace) => {
+                return Err(Error::InvalidFormat(
+                    "text is not allowed outside the flat OpenDocument root".to_string(),
+                ));
+            },
+            Event::CData(_) | Event::GeneralRef(_) if depth == 0 => {
+                return Err(Error::InvalidFormat(
+                    "content is not allowed outside the flat OpenDocument root".to_string(),
+                ));
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+        buffer.clear();
+    }
+    if !root_seen || !root_closed || depth != 0 || !body_seen || !family_body_seen {
+        return Err(Error::InvalidFormat(
+            "flat OpenDocument is missing its complete family-specific body".to_string(),
+        ));
+    }
+    Ok(())
 }
 
 impl OpenDocumentPackage {
@@ -305,5 +515,79 @@ mod tests {
         writer.set_mimetype(constants::ODF_CHART).unwrap();
         writer.add_file(constants::ODF_CONTENT, &[0xff]).unwrap();
         assert!(OpenDocumentPackage::from_bytes(writer.finish_to_bytes().unwrap()).is_err());
+    }
+
+    #[test]
+    fn opens_every_standard_flat_document_losslessly() {
+        for (mimetype, body, family, extension) in [
+            (
+                constants::ODF_TEXT,
+                "text",
+                OpenDocumentFamily::Text,
+                "fodt",
+            ),
+            (
+                constants::ODF_SPREADSHEET,
+                "spreadsheet",
+                OpenDocumentFamily::Spreadsheet,
+                "fods",
+            ),
+            (
+                constants::ODF_PRESENTATION,
+                "presentation",
+                OpenDocumentFamily::Presentation,
+                "fodp",
+            ),
+            (
+                constants::ODF_DRAWING,
+                "drawing",
+                OpenDocumentFamily::Drawing,
+                "fodg",
+            ),
+            (
+                constants::ODF_CHART,
+                "chart",
+                OpenDocumentFamily::Chart,
+                "fodc",
+            ),
+            (
+                constants::ODF_FORMULA,
+                "formula",
+                OpenDocumentFamily::Formula,
+                "fodf",
+            ),
+            (
+                constants::ODF_IMAGE,
+                "image",
+                OpenDocumentFamily::Image,
+                "fodi",
+            ),
+        ] {
+            let xml = format!(
+                r#"<?xml version="1.0"?><!-- keep --><o:document xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" o:mimetype="{mimetype}" o:version="1.3"><o:body><o:{body}/></o:body></o:document>"#
+            );
+            let document = FlatOpenDocument::from_bytes(xml.clone().into_bytes()).unwrap();
+            assert_eq!(document.family(), family);
+            assert_eq!(document.mimetype(), mimetype);
+            assert_eq!(document.extension(), extension);
+            assert_eq!(document.xml(), xml);
+            assert_eq!(document.to_bytes(), xml.as_bytes());
+            assert_eq!(document.into_bytes(), xml.into_bytes());
+        }
+    }
+
+    #[test]
+    fn rejects_flat_mimetype_body_mismatch_and_incomplete_xml() {
+        for xml in [
+            r#"<o:document xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" o:mimetype="application/vnd.oasis.opendocument.text"><o:body><o:spreadsheet/></o:body></o:document>"#,
+            r#"<o:document xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" o:mimetype="application/vnd.oasis.opendocument.text"><o:body><o:text/></o:body>"#,
+            r#"<o:document xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" o:mimetype="application/vnd.oasis.opendocument.text-template"><o:body><o:text/></o:body></o:document>"#,
+            r#"<o:document xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" o:mimetype="application/vnd.oasis.opendocument.text"><o:body><o:text/></o:body></o:document><o:document/>"#,
+        ] {
+            assert!(
+                FlatOpenDocument::from_bytes(xml.as_bytes().to_vec()).is_err(),
+                "accepted invalid flat document {xml}"
+            );
+        }
     }
 }

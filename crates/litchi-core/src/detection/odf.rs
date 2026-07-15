@@ -9,6 +9,10 @@
 //! Uses SIMD-accelerated signature matching for improved performance.
 
 use crate::detection::FileFormat;
+use quick_xml::XmlVersion;
+use quick_xml::events::Event;
+use quick_xml::name::{Namespace, ResolveResult};
+use quick_xml::reader::NsReader;
 use std::io::{Read, Seek};
 
 #[cfg(feature = "odf")]
@@ -31,6 +35,7 @@ const ODI_MIME: &str = "application/vnd.oasis.opendocument.image";
 const ODI_TEMPLATE_MIME: &str = "application/vnd.oasis.opendocument.image-template";
 const ODM_MIME: &str = "application/vnd.oasis.opendocument.text-master";
 const OTH_MIME: &str = "application/vnd.oasis.opendocument.text-web";
+const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 
 /// Detect ODF format from mimetype content.
 ///
@@ -75,10 +80,57 @@ pub fn detect_odf_format_from_mimetype(mimetype: &[u8]) -> Option<FileFormat> {
     }
 }
 
+/// Read the MIME type from a flat OpenDocument XML root.
+///
+/// The root must be `office:document` in the ODF office namespace and carry a
+/// recognized `office:mimetype` attribute. Namespace prefixes are ignored.
+pub fn detect_flat_odf_mimetype(bytes: &[u8]) -> Option<String> {
+    let mut reader = NsReader::from_reader(bytes);
+    let mut buffer = Vec::new();
+    loop {
+        let (namespace, event) = reader.read_resolved_event_into(&mut buffer).ok()?;
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                if !matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == OFFICE_NAMESPACE)
+                    || element.local_name().as_ref() != b"document"
+                {
+                    return None;
+                }
+                for attribute in element.attributes() {
+                    let attribute = attribute.ok()?;
+                    let (namespace, local_name) =
+                        reader.resolver().resolve_attribute(attribute.key);
+                    if matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == OFFICE_NAMESPACE)
+                        && local_name.as_ref() == b"mimetype"
+                    {
+                        let mimetype = attribute
+                            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                            .ok()?
+                            .into_owned();
+                        return detect_odf_format_from_mimetype(mimetype.as_bytes())
+                            .map(|_| mimetype);
+                    }
+                }
+                return None;
+            },
+            Event::Decl(_) | Event::Comment(_) | Event::DocType(_) | Event::PI(_) => {},
+            Event::Text(text) if text.iter().all(u8::is_ascii_whitespace) => {},
+            Event::Eof => return None,
+            _ => return None,
+        }
+        buffer.clear();
+    }
+}
+
+/// Detect a flat OpenDocument XML document.
+pub fn detect_flat_odf_format(bytes: &[u8]) -> Option<FileFormat> {
+    let mimetype = detect_flat_odf_mimetype(bytes)?;
+    detect_odf_format_from_mimetype(mimetype.as_bytes())
+}
+
 /// Detect ODF format from byte content.
 ///
-/// Reads the mimetype file directly from the ZIP archive to determine
-/// the specific ODF document type.
+/// Reads either a packaged ODF mimetype part or a flat XML root attribute.
 ///
 /// # Arguments
 ///
@@ -91,12 +143,13 @@ pub fn detect_odf_format_from_mimetype(mimetype: &[u8]) -> Option<FileFormat> {
 ///
 /// # Performance
 ///
-/// This function performs minimal work:
-/// 1. Validates ZIP signature (4 bytes) using SIMD acceleration
-/// 2. Opens ZIP archive in-memory
-/// 3. Reads only the mimetype file (typically < 100 bytes)
+/// Packaged files use a SIMD ZIP signature check and read only the small
+/// `mimetype` member. Flat files read only through the root start tag.
 #[cfg(feature = "odf")]
 pub fn detect_odf_format(bytes: &[u8]) -> Option<FileFormat> {
+    if let Some(format) = detect_flat_odf_format(bytes) {
+        return Some(format);
+    }
     // Quick validation: check ZIP signature using SIMD
     if bytes.len() < 4 || !signature_matches(bytes, crate::detection::utils::ZIP_SIGNATURE) {
         return None;
@@ -121,8 +174,7 @@ pub fn detect_odf_format(_bytes: &[u8]) -> Option<FileFormat> {
 
 /// Detect ODF format from a reader.
 ///
-/// Reads the mimetype file directly from the ZIP archive to determine
-/// the specific ODF document type.
+/// Reads a packaged or flat OpenDocument stream.
 ///
 /// # Arguments
 ///
@@ -145,16 +197,14 @@ pub fn detect_odf_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<F
 
     // Read all data for ArchiveReader
     let mut data = Vec::new();
-    reader.read_to_end(&mut data).ok()?;
+    if reader.read_to_end(&mut data).is_err() {
+        let _ = reader.seek(SeekFrom::Start(0));
+        return None;
+    }
 
-    // Try to open as ZIP archive
-    let archive = soapberry_zip::office::ArchiveReader::new(&data).ok()?;
-
-    // ODF files must have a mimetype file
-    // Read it to determine the specific format
-    let mimetype = archive.read_string("mimetype").ok()?;
-
-    detect_odf_format_from_mimetype(mimetype.as_bytes())
+    let format = detect_odf_format(&data);
+    let _ = reader.seek(SeekFrom::Start(0));
+    format
 }
 
 /// Stub implementation when `odf` feature is disabled.
@@ -232,6 +282,41 @@ mod tests {
                 Some(expected),
                 "failed to detect {mimetype}"
             );
+        }
+    }
+
+    #[test]
+    fn detects_flat_odf_with_arbitrary_namespace_prefixes() {
+        for (body, mimetype, expected) in [
+            ("text", ODT_MIME, FileFormat::Odt),
+            ("spreadsheet", ODS_MIME, FileFormat::Ods),
+            ("presentation", ODP_MIME, FileFormat::Odp),
+            ("drawing", ODG_MIME, FileFormat::Odg),
+            ("chart", ODC_MIME, FileFormat::Odc),
+            ("formula", ODF_MIME, FileFormat::Odf),
+            ("image", ODI_MIME, FileFormat::Odi),
+        ] {
+            let xml = format!(
+                r#"<?xml version="1.0"?><!-- flat --><o:document xmlns:o="{namespace}" o:mimetype="{mimetype}"><o:body><o:{body}/></o:body></o:document>"#,
+                namespace = String::from_utf8_lossy(OFFICE_NAMESPACE),
+            );
+            assert_eq!(detect_flat_odf_format(xml.as_bytes()), Some(expected));
+            assert_eq!(detect_odf_format(xml.as_bytes()), Some(expected));
+            let mut reader = std::io::Cursor::new(xml.as_bytes());
+            assert_eq!(detect_odf_format_from_reader(&mut reader), Some(expected));
+            assert_eq!(reader.position(), 0);
+        }
+    }
+
+    #[test]
+    fn rejects_non_flat_xml_roots_and_unknown_mimetypes() {
+        for xml in [
+            r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" office:mimetype="application/vnd.oasis.opendocument.text"/>"#,
+            r#"<office:document xmlns:office="urn:wrong" office:mimetype="application/vnd.oasis.opendocument.text"/>"#,
+            r#"<office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" office:mimetype="application/xml"/>"#,
+            r#"<office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"/>"#,
+        ] {
+            assert_eq!(detect_flat_odf_format(xml.as_bytes()), None);
         }
     }
 }

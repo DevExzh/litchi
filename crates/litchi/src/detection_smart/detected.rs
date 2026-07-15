@@ -70,6 +70,9 @@ pub enum DetectedFormat {
     Odm(Vec<u8>),
     #[cfg(feature = "odf")]
     Oth(Vec<u8>),
+    /// Flat OpenDocument XML with its detected family.
+    #[cfg(feature = "odf")]
+    FlatOdf(litchi_core::detection::FileFormat, Vec<u8>),
 
     // RTF format (plain text, no parsing structure needed)
     #[cfg(feature = "rtf")]
@@ -111,6 +114,11 @@ pub fn detect_format_smart(bytes: Vec<u8>) -> Option<DetectedFormat> {
     // Quick signature checks (first 4-8 bytes)
     if bytes.len() < 8 {
         return None;
+    }
+
+    #[cfg(feature = "odf")]
+    if let Some(format) = litchi_core::detection::odf::detect_flat_odf_format(&bytes) {
+        return Some(DetectedFormat::FlatOdf(format, bytes));
     }
 
     // Use parallel signature checking to test OLE2, ZIP, and RTF simultaneously
@@ -270,6 +278,17 @@ mod tests {
             };
             assert_eq!(format, expected);
             assert_eq!(retained, bytes);
+        }
+    }
+
+    #[test]
+    fn smart_detection_keeps_flat_odf_distinct_from_packages() {
+        let xml = br#"<?xml version="1.0"?><o:document xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" o:mimetype="application/vnd.oasis.opendocument.graphics"><o:body><o:drawing/></o:body></o:document>"#;
+        match detect_format_smart(xml.to_vec()).unwrap() {
+            DetectedFormat::FlatOdf(FileFormat::Odg, retained) => {
+                assert_eq!(retained, xml);
+            },
+            _ => panic!("flat ODG was not retained as flat OpenDocument XML"),
         }
     }
 }

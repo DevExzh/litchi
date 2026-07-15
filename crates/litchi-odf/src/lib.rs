@@ -167,6 +167,9 @@
 //! - ODM - OpenDocument Master (.odm)
 //! - OTH - OpenDocument Web (.oth)
 //!
+//! Flat XML documents (`.fodt`, `.fods`, `.fodp`, `.fodg`, `.fodc`, `.fodi`,
+//! and `.fodf`) are validated and saved losslessly through [`FlatOpenDocument`].
+//!
 //! ## 🚧 Advanced Features (PLANNED)
 //!
 //! ### Embedded Objects
@@ -243,7 +246,7 @@ mod odt;
 
 // Re-export common utilities for convenience
 // These are used across all Office formats, not ODF-specific
-pub use generic::{OpenDocumentFamily, OpenDocumentPackage};
+pub use generic::{FlatOpenDocument, OpenDocumentFamily, OpenDocumentPackage};
 pub use litchi_core::RGBColor as Color;
 pub use litchi_core::unit::{Length, LengthUnit};
 

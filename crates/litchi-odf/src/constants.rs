@@ -100,6 +100,13 @@ pub static ODF_EXTENSIONS: Map<&'static str, &'static str> = phf_map! {
     "otf" => ODF_FORMULA_TEMPLATE,
     "odm" => ODF_MASTER,
     "oth" => ODF_WEB,
+    "fodt" => ODF_TEXT,
+    "fods" => ODF_SPREADSHEET,
+    "fodp" => ODF_PRESENTATION,
+    "fodg" => ODF_DRAWING,
+    "fodc" => ODF_CHART,
+    "fodi" => ODF_IMAGE,
+    "fodf" => ODF_FORMULA,
 };
 
 /// MIME type to file extension mapping (compile-time perfect hash map)
@@ -120,6 +127,17 @@ pub static ODF_MIMETYPES: Map<&'static str, &'static str> = phf_map! {
     "application/vnd.oasis.opendocument.formula-template" => "otf",
     "application/vnd.oasis.opendocument.text-master" => "odm",
     "application/vnd.oasis.opendocument.text-web" => "oth",
+};
+
+/// MIME type to conventional flat OpenDocument extension mapping.
+pub static ODF_FLAT_MIMETYPES: Map<&'static str, &'static str> = phf_map! {
+    "application/vnd.oasis.opendocument.text" => "fodt",
+    "application/vnd.oasis.opendocument.spreadsheet" => "fods",
+    "application/vnd.oasis.opendocument.presentation" => "fodp",
+    "application/vnd.oasis.opendocument.graphics" => "fodg",
+    "application/vnd.oasis.opendocument.chart" => "fodc",
+    "application/vnd.oasis.opendocument.image" => "fodi",
+    "application/vnd.oasis.opendocument.formula" => "fodf",
 };
 
 // ============================================================================
@@ -215,6 +233,12 @@ pub fn get_extension_from_mime_type(mime_type: &str) -> Option<&'static str> {
     ODF_MIMETYPES.get(mime_type).copied()
 }
 
+/// Get the flat OpenDocument extension for a MIME type.
+#[inline]
+pub fn get_flat_extension_from_mime_type(mime_type: &str) -> Option<&'static str> {
+    ODF_FLAT_MIMETYPES.get(mime_type).copied()
+}
+
 /// Check if a given extension is a valid ODF extension
 ///
 /// # Arguments
@@ -272,6 +296,7 @@ mod tests {
         assert_eq!(get_mime_type_from_extension("ods"), Some(ODF_SPREADSHEET));
         assert_eq!(get_mime_type_from_extension("odp"), Some(ODF_PRESENTATION));
         assert_eq!(get_mime_type_from_extension("unknown"), None);
+        assert_eq!(get_mime_type_from_extension("fodg"), Some(ODF_DRAWING));
     }
 
     #[test]
@@ -280,6 +305,9 @@ mod tests {
         assert_eq!(get_extension_from_mime_type(ODF_SPREADSHEET), Some("ods"));
         assert_eq!(get_extension_from_mime_type(ODF_PRESENTATION), Some("odp"));
         assert_eq!(get_extension_from_mime_type("unknown"), None);
+        assert_eq!(get_flat_extension_from_mime_type(ODF_TEXT), Some("fodt"));
+        assert_eq!(get_flat_extension_from_mime_type(ODF_CHART), Some("fodc"));
+        assert_eq!(get_flat_extension_from_mime_type(ODF_MASTER), None);
     }
 
     #[test]
@@ -287,6 +315,10 @@ mod tests {
         assert!(is_odf_extension("odt"));
         assert!(is_odf_extension("ods"));
         assert!(is_odf_extension("odp"));
+        assert!(is_odf_extension("fodt"));
+        assert!(is_odf_extension("fods"));
+        assert!(is_odf_extension("fodp"));
+        assert!(is_odf_extension("fodg"));
         assert!(!is_odf_extension("txt"));
         assert!(!is_odf_extension("docx"));
     }
