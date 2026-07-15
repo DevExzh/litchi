@@ -4,11 +4,12 @@
 /// including the offset to the current user edit record. This follows Apache POI's
 /// CurrentUserAtom implementation.
 use super::package::{PptError, Result};
-use zerocopy::FromBytes;
-use zerocopy_derive::FromBytes as DeriveFromBytes;
 
 /// Minimum size of CurrentUser stream in bytes
 const CURRENT_USER_MIN_SIZE: usize = 28;
+const CURRENT_USER_RECORD_TYPE: u16 = 0x0FF6;
+const UNENCRYPTED_HEADER_TOKEN: u32 = 0xE391_C05F;
+const ENCRYPTED_HEADER_TOKEN: u32 = 0xF3D1_C4DF;
 
 /// Current User information.
 ///
@@ -20,28 +21,12 @@ pub struct CurrentUser {
     current_edit_offset: u32,
     /// Release version
     release_version: u16,
+    /// Document file version
+    document_version: u16,
+    /// Whether the encrypted header token is present
+    encrypted: bool,
     /// Username (UTF-16LE encoded)
     username: String,
-    /// Relative path to the presentation
-    rel_path: String,
-}
-
-/// CurrentUser header structure (first 16 bytes after size field)
-#[derive(Debug, Clone, DeriveFromBytes)]
-#[repr(C)]
-struct CurrentUserHeader {
-    /// Header token (must be 0xF3D1C4DF)
-    header_token: u32,
-    /// Offset to the current UserEditAtom record
-    current_edit_offset: u32,
-    /// Username length in characters (Unicode)
-    username_len: u16,
-    /// Release version
-    release_version: u16,
-    /// ANSI username length in characters
-    ansi_username_len: u16,
-    /// Padding to align to 16 bytes
-    _padding: u16,
 }
 
 impl CurrentUser {
@@ -57,13 +42,9 @@ impl CurrentUser {
     ///
     /// # Format (based on Apache POI's CurrentUserAtom)
     ///
-    /// - Bytes 0-3: Size (little-endian u32)
-    /// - Bytes 4-7: Header token (0xF3D1C4DF)
-    /// - Bytes 8-11: Current edit offset (u32)
-    /// - Bytes 12-13: Username length (u16)
-    /// - Bytes 14-15: Release version (u16)
-    /// - Bytes 16-19: Major/minor version
-    /// - Bytes 20+: Username (UTF-16LE) and relative path
+    /// - Bytes 0-7: PowerPoint record header
+    /// - Bytes 8-27: Fixed CurrentUserAtom fields
+    /// - Bytes 28+: ANSI username, release version, and optional UTF-16LE username
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < CURRENT_USER_MIN_SIZE {
             return Err(PptError::Corrupted(
@@ -71,51 +52,80 @@ impl CurrentUser {
             ));
         }
 
-        // Parse header using zerocopy (bytes 4-19)
-        let header = CurrentUserHeader::read_from_bytes(&data[4..20])
-            .map_err(|_| PptError::Corrupted("Invalid CurrentUser header format".to_string()))?;
-
-        // Validate header token (magic number)
-        if header.header_token != 0xF3D1C4DF {
+        let ver_instance = u16::from_le_bytes([data[0], data[1]]);
+        let record_type = u16::from_le_bytes([data[2], data[3]]);
+        if ver_instance != 0 || record_type != CURRENT_USER_RECORD_TYPE {
             return Err(PptError::InvalidFormat(format!(
-                "Invalid CurrentUser header token: 0x{:08X}",
-                header.header_token
+                "Invalid CurrentUser record header: ver/instance=0x{ver_instance:04X}, type=0x{record_type:04X}"
             )));
         }
 
-        let current_edit_offset = header.current_edit_offset;
-        let username_len = header.username_len;
-        let release_version = header.release_version;
+        let fixed_size = u32::from_le_bytes([data[8], data[9], data[10], data[11]]);
+        if fixed_size != 20 {
+            return Err(PptError::InvalidFormat(format!(
+                "Invalid CurrentUser fixed size: {fixed_size}"
+            )));
+        }
 
-        // Parse username (UTF-16LE encoded)
-        let username = if username_len > 0 && data.len() >= 20 {
-            let username_byte_len = (username_len as usize) * 2; // UTF-16LE = 2 bytes per char
-            let username_start = 20;
-            let username_end = username_start + username_byte_len;
-
-            if username_end <= data.len() {
-                Self::parse_utf16le_string(&data[username_start..username_end])
-            } else {
-                String::new()
-            }
-        } else {
-            String::new()
+        let header_token = u32::from_le_bytes([data[12], data[13], data[14], data[15]]);
+        let encrypted = match header_token {
+            UNENCRYPTED_HEADER_TOKEN => false,
+            ENCRYPTED_HEADER_TOKEN => true,
+            _ => {
+                return Err(PptError::InvalidFormat(format!(
+                    "Invalid CurrentUser header token: 0x{header_token:08X}"
+                )));
+            },
         };
+        let current_edit_offset = u32::from_le_bytes([data[16], data[17], data[18], data[19]]);
+        let username_len = u16::from_le_bytes([data[20], data[21]]) as usize;
+        if username_len > 255 {
+            return Err(PptError::InvalidFormat(format!(
+                "Invalid CurrentUser username length: {username_len}"
+            )));
+        }
+        let document_version = u16::from_le_bytes([data[22], data[23]]);
 
-        // Parse relative path (if present, after username)
-        let rel_path_start = 20 + (username_len as usize) * 2;
-        let rel_path = if rel_path_start < data.len() {
-            // Relative path is typically null-terminated ASCII
-            Self::parse_ascii_string(&data[rel_path_start..])
+        let ansi_start = CURRENT_USER_MIN_SIZE;
+        let Some(release_start) = ansi_start.checked_add(username_len) else {
+            return Err(PptError::Corrupted(
+                "CurrentUser username length overflow".to_string(),
+            ));
+        };
+        let Some(unicode_start) = release_start.checked_add(4) else {
+            return Err(PptError::Corrupted(
+                "CurrentUser release offset overflow".to_string(),
+            ));
+        };
+        if unicode_start > data.len() {
+            return Err(PptError::Corrupted(
+                "CurrentUser stream truncates the ANSI username or release version".to_string(),
+            ));
+        }
+
+        let release_version_raw = u32::from_le_bytes([
+            data[release_start],
+            data[release_start + 1],
+            data[release_start + 2],
+            data[release_start + 3],
+        ]);
+        let release_version = u16::try_from(release_version_raw).unwrap_or(0);
+        let unicode_len = username_len.saturating_mul(2);
+        let username = if unicode_start
+            .checked_add(unicode_len)
+            .is_some_and(|end| end <= data.len())
+        {
+            Self::parse_utf16le_string(&data[unicode_start..unicode_start + unicode_len])
         } else {
-            String::new()
+            Self::parse_ansi_string(&data[ansi_start..release_start])
         };
 
         Ok(Self {
             current_edit_offset,
             release_version,
+            document_version,
+            encrypted,
             username,
-            rel_path,
         })
     }
 
@@ -134,10 +144,12 @@ impl CurrentUser {
         &self.username
     }
 
-    /// Get the relative path to the presentation.
+    /// Legacy compatibility accessor.
+    ///
+    /// `CurrentUserAtom` has no relative-path field, so this always returns an empty string.
     #[inline]
     pub fn relative_path(&self) -> &str {
-        &self.rel_path
+        ""
     }
 
     /// Get the release version.
@@ -146,54 +158,57 @@ impl CurrentUser {
         self.release_version
     }
 
+    /// Return the document file version stored in the fixed atom fields.
+    #[inline]
+    pub fn document_version(&self) -> u16 {
+        self.document_version
+    }
+
+    /// Return whether the stream identifies an encrypted presentation.
+    #[inline]
+    pub fn is_encrypted(&self) -> bool {
+        self.encrypted
+    }
+
     /// Parse a UTF-16LE encoded string from binary data.
     /// Optimized for performance with minimal allocations.
     fn parse_utf16le_string(data: &[u8]) -> String {
-        if data.is_empty() || data.len() < 2 {
-            return String::new();
-        }
-
-        // Pre-allocate capacity for the result
-        let estimated_chars = data.len() / 2;
-        let mut result = String::with_capacity(estimated_chars);
-
-        // Process in chunks of 2 bytes
-        for chunk in data.chunks_exact(2) {
-            let code_unit = u16::from_le_bytes([chunk[0], chunk[1]]);
-
-            // Stop at null terminator
-            if code_unit == 0 {
-                break;
-            }
-
-            // Convert to char and add to result
-            if let Some(ch) = char::from_u32(code_unit as u32) {
-                result.push(ch);
-            }
-        }
-
-        result.shrink_to_fit();
-        result
+        crate::ppt::text::extractor::from_utf16le_lossy(data)
     }
 
-    /// Parse a null-terminated ASCII string from binary data.
-    /// Optimized for performance with minimal allocations.
-    fn parse_ascii_string(data: &[u8]) -> String {
-        if data.is_empty() {
-            return String::new();
-        }
-
-        // Find null terminator position
+    /// Parse the low-byte Unicode fallback stored in `ansiUserName`.
+    fn parse_ansi_string(data: &[u8]) -> String {
         let null_pos = data.iter().position(|&b| b == 0).unwrap_or(data.len());
-
-        // Convert bytes to string (ASCII-compatible)
-        String::from_utf8_lossy(&data[..null_pos]).to_string()
+        crate::ppt::text::extractor::decode_text_bytes(&data[..null_pos])
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn current_user_stream(ansi_name: &[u8], unicode_name: Option<&str>, token: u32) -> Vec<u8> {
+        let mut data = Vec::new();
+        data.extend_from_slice(&0u16.to_le_bytes());
+        data.extend_from_slice(&CURRENT_USER_RECORD_TYPE.to_le_bytes());
+        data.extend_from_slice(&0u32.to_le_bytes());
+        data.extend_from_slice(&20u32.to_le_bytes());
+        data.extend_from_slice(&token.to_le_bytes());
+        data.extend_from_slice(&0x1000u32.to_le_bytes());
+        data.extend_from_slice(&(ansi_name.len() as u16).to_le_bytes());
+        data.extend_from_slice(&0x03F4u16.to_le_bytes());
+        data.extend_from_slice(&[3, 0, 0, 0]);
+        data.extend_from_slice(ansi_name);
+        data.extend_from_slice(&8u32.to_le_bytes());
+        if let Some(name) = unicode_name {
+            for code_unit in name.encode_utf16() {
+                data.extend_from_slice(&code_unit.to_le_bytes());
+            }
+        }
+        let record_len = (data.len() - 8) as u32;
+        data[4..8].copy_from_slice(&record_len.to_le_bytes());
+        data
+    }
 
     #[test]
     fn test_current_user_min_size() {
@@ -204,12 +219,7 @@ mod tests {
 
     #[test]
     fn test_current_user_header_validation() {
-        let mut data = vec![0u8; 32];
-        // Set invalid header token
-        data[4] = 0xFF;
-        data[5] = 0xFF;
-        data[6] = 0xFF;
-        data[7] = 0xFF;
+        let data = current_user_stream(b"A", Some("A"), 0xFFFF_FFFF);
 
         let result = CurrentUser::parse(&data);
         assert!(result.is_err());
@@ -217,62 +227,35 @@ mod tests {
 
     #[test]
     fn test_current_user_valid() {
-        let mut data = vec![0u8; 32];
-        // Set size (first 4 bytes before header)
-        data[0] = 0x1C;
-        data[1] = 0x00;
-        data[2] = 0x00;
-        data[3] = 0x00;
-        // CurrentUserHeader starts at byte 4 (16 bytes total)
-        // Set valid header token (0xF3D1C4DF)
-        data[4] = 0xDF;
-        data[5] = 0xC4;
-        data[6] = 0xD1;
-        data[7] = 0xF3;
-        // Set current edit offset (offset 4-7 in header, bytes 8-11 in data)
-        data[8] = 0x00;
-        data[9] = 0x10;
-        data[10] = 0x00;
-        data[11] = 0x00;
-        // Set username length (offset 8-9 in header, bytes 12-13 in data)
-        data[12] = 0x00;
-        data[13] = 0x00;
-        // Set release version (offset 10-13 in header, bytes 14-17 in data)
-        data[14] = 0x03;
-        data[15] = 0x00;
-        data[16] = 0x00;
-        data[17] = 0x00;
-        // Set ANSI username length (offset 14-15 in header, bytes 18-19 in data)
-        data[18] = 0x00;
-        data[19] = 0x00;
+        let data = current_user_stream(b"??", Some("😀"), UNENCRYPTED_HEADER_TOKEN);
+        let current_user = CurrentUser::parse(&data).unwrap();
 
-        let result = CurrentUser::parse(&data);
-        if let Err(ref e) = result {
-            eprintln!("Parse error: {:?}", e);
-        }
-        assert!(result.is_ok());
-
-        let current_user = result.unwrap();
         assert_eq!(current_user.current_edit_offset(), 0x1000);
+        assert_eq!(current_user.username(), "😀");
+        assert_eq!(current_user.release_version(), 8);
+        assert_eq!(current_user.document_version(), 0x03F4);
+        assert!(!current_user.is_encrypted());
+        assert_eq!(current_user.relative_path(), "");
     }
 
     #[test]
     fn test_utf16le_parsing() {
         let data = vec![
-            0x41, 0x00, // 'A'
-            0x42, 0x00, // 'B'
-            0x43, 0x00, // 'C'
+            0x3D, 0xD8, // high surrogate
+            0x00, 0xDE, // low surrogate
             0x00, 0x00, // null terminator
         ];
 
         let result = CurrentUser::parse_utf16le_string(&data);
-        assert_eq!(result, "ABC");
+        assert_eq!(result, "😀");
     }
 
     #[test]
-    fn test_ascii_parsing() {
-        let data = b"Hello\0World";
-        let result = CurrentUser::parse_ascii_string(data);
-        assert_eq!(result, "Hello");
+    fn falls_back_to_low_byte_username_when_unicode_is_omitted() {
+        let data = current_user_stream(&[0x80, 0xE9], None, ENCRYPTED_HEADER_TOKEN);
+        let current_user = CurrentUser::parse(&data).unwrap();
+
+        assert_eq!(current_user.username(), "\u{80}é");
+        assert!(current_user.is_encrypted());
     }
 }
