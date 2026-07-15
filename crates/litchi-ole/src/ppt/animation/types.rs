@@ -765,6 +765,187 @@ pub enum TimeEffectNodeType {
     TimingRoot,
 }
 
+/// Shared information used by all PowerPoint 2002 animation behaviors.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TimeBehavior {
+    pub atom: TimeBehaviorAtom,
+    /// Optional property names retained even when the atom marks them as ignored.
+    pub attribute_names: Option<Vec<String>>,
+    pub properties: Option<TimeBehaviorPropertyList>,
+    pub target: TimeVisualElement,
+}
+
+/// Flags and composition mode from a `TimeBehaviorAtom`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TimeBehaviorAtom {
+    /// Explicit additive mode, or `None` when the file uses the default override mode.
+    pub additive: Option<TimeBehaviorAdditive>,
+    /// Whether the optional attribute-name list is meaningful.
+    pub attribute_names_used: bool,
+}
+
+/// Composition mode for an animated value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TimeBehaviorAdditive {
+    Override,
+    Add,
+}
+
+/// Typed properties stored in `TimePropertyList4TimeBehavior`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TimeBehaviorPropertyList {
+    pub properties: Vec<TimeBehaviorProperty>,
+}
+
+/// One shared behavior property, identified by its record instance.
+#[derive(Debug, Clone, PartialEq)]
+pub enum TimeBehaviorProperty {
+    UnknownPropertyList(String),
+    RuntimeContext(String),
+    MotionPathEditRelative(bool),
+    ColorModel(TimeColorModel),
+    ColorDirection(TimeColorDirection),
+    Override,
+    PathEditRotationAngle(f32),
+    PathEditRotationX(f32),
+    PathEditRotationY(f32),
+    PointsTypes(String),
+}
+
+/// Color space used by a color behavior.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TimeColorModel {
+    Rgb,
+    Hsl,
+    Scheme,
+}
+
+/// Hue interpolation direction in HSL color space.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TimeColorDirection {
+    Clockwise,
+    CounterClockwise,
+}
+
+/// Animation target stored in a `ClientVisualElementContainer`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TimeVisualElement {
+    Page,
+    Sound {
+        kind: TimeVisualElementKind,
+        sound_id_ref: u32,
+    },
+    Shape {
+        kind: TimeVisualElementKind,
+        shape_id_ref: u32,
+        data1: i32,
+        data2: i32,
+    },
+    Chart {
+        shape_id_ref: u32,
+        build_type: ChartBuildType,
+        element_index: i32,
+    },
+}
+
+/// Portion of a visual object targeted by a behavior.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TimeVisualElementKind {
+    Shape,
+    Page,
+    TextRange,
+    Audio,
+    Video,
+    ChartElement,
+    ShapeOnly,
+    AllTextRange,
+}
+
+impl TimeVisualElementKind {
+    pub(crate) const fn as_u32(self) -> u32 {
+        match self {
+            Self::Shape => 0,
+            Self::Page => 1,
+            Self::TextRange => 2,
+            Self::Audio => 3,
+            Self::Video => 4,
+            Self::ChartElement => 5,
+            Self::ShapeOnly => 6,
+            Self::AllTextRange => 8,
+        }
+    }
+
+    pub(crate) const fn parse(value: u32) -> Option<Self> {
+        match value {
+            0 => Some(Self::Shape),
+            1 => Some(Self::Page),
+            2 => Some(Self::TextRange),
+            3 => Some(Self::Audio),
+            4 => Some(Self::Video),
+            5 => Some(Self::ChartElement),
+            6 => Some(Self::ShapeOnly),
+            8 => Some(Self::AllTextRange),
+            _ => None,
+        }
+    }
+}
+
+pub(crate) fn is_valid_runtime_context(value: &str) -> bool {
+    fn valid_version(value: &str) -> bool {
+        let mut components = value.split('.');
+        let first = components.next().unwrap_or_default();
+        !first.is_empty()
+            && first.bytes().all(|byte| byte.is_ascii_digit())
+            && components.next().is_none_or(|second| {
+                !second.is_empty()
+                    && second.bytes().all(|byte| byte.is_ascii_digit())
+                    && components.next().is_none()
+            })
+    }
+
+    fn valid_atom(atom: &str) -> bool {
+        fn valid_relation(value: &str) -> bool {
+            value == "!"
+                || ["gte", "gt", "lte", "lt"]
+                    .iter()
+                    .any(|relation| value.eq_ignore_ascii_case(relation))
+        }
+
+        if atom.is_empty()
+            || atom.starts_with(' ')
+            || atom.ends_with(' ')
+            || atom
+                .chars()
+                .any(|character| character.is_whitespace() && character != ' ')
+        {
+            return false;
+        }
+        let fields = atom.split_ascii_whitespace().collect::<Vec<_>>();
+        match fields.as_slice() {
+            [app] => app.eq_ignore_ascii_case("ppt"),
+            [first, second] => {
+                (first.eq_ignore_ascii_case("ppt") && valid_version(second))
+                    || (valid_relation(first) && second.eq_ignore_ascii_case("ppt"))
+            },
+            [relation, app, version] => {
+                valid_relation(relation)
+                    && app.eq_ignore_ascii_case("ppt")
+                    && valid_version(version)
+            },
+            _ => false,
+        }
+    }
+
+    let sequence = value.strip_suffix(';').unwrap_or(value);
+    !sequence.is_empty() && sequence.split(';').all(valid_atom)
+}
+
+pub(crate) fn is_valid_time_points_types(value: &str) -> bool {
+    value
+        .bytes()
+        .all(|byte| matches!(byte, b'A' | b'a' | b'F' | b'f' | b'T' | b't' | b'S' | b's'))
+}
+
 pub(crate) fn is_valid_time_filter(value: &str) -> bool {
     fn normalized_time(value: &str) -> bool {
         value == "1.0"

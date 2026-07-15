@@ -6,8 +6,11 @@ use super::types::{
     AfterEffect, AnimationEffect, AnimationInfo, BuildAtom, BuildKind, BuildList, BuildListEntry,
     ChartBuild, DiagramBuild, EffectDirection, ExtendedTimeNode, LegacyAnimationAtom,
     LegacyAnimationBuild, LegacyAnimationEffect, LegacyTextBuildSubEffect, ParagraphBuild,
-    ParagraphBuildLevel, TimeEffectNodeType, TimeEffectType, TimeMasterRelation, TimeNodeAtom,
-    TimeNodeProperty, TimeNodePropertyList, TimePropertyListContext, is_valid_time_filter,
+    ParagraphBuildLevel, TimeBehavior, TimeBehaviorAdditive, TimeBehaviorAtom,
+    TimeBehaviorProperty, TimeBehaviorPropertyList, TimeColorDirection, TimeColorModel,
+    TimeEffectNodeType, TimeEffectType, TimeMasterRelation, TimeNodeAtom, TimeNodeProperty,
+    TimeNodePropertyList, TimePropertyListContext, TimeVisualElement, TimeVisualElementKind,
+    is_valid_runtime_context, is_valid_time_filter, is_valid_time_points_types,
 };
 use crate::consts::PptRecordType;
 use crate::ppt::package::{PptError, Result};
@@ -386,6 +389,218 @@ fn validate_time_property_context(id: u16, context: TimePropertyListContext) -> 
         )));
     }
     Ok(())
+}
+
+/// Serialize the common behavior information shared by extended animation behaviors.
+pub fn write_time_behavior(behavior: &TimeBehavior) -> Result<Vec<u8>> {
+    let mut children = write_time_behavior_atom(&behavior.atom);
+    if let Some(attribute_names) = &behavior.attribute_names {
+        children.extend(write_time_string_list(attribute_names)?);
+    }
+    if let Some(properties) = &behavior.properties {
+        children.extend(write_time_behavior_property_list(properties)?);
+    }
+    children.extend(write_time_visual_element(&behavior.target)?);
+    wrap_record(PptRecordType::TimeBehaviorContainer, 0x0F, 0, children)
+}
+
+/// Serialize an exact 16-byte `TimeBehaviorAtom` payload.
+pub fn write_time_behavior_atom(atom: &TimeBehaviorAtom) -> Vec<u8> {
+    let mut data = Vec::with_capacity(16);
+    let flags = u32::from(atom.additive.is_some()) | (u32::from(atom.attribute_names_used) << 2);
+    data.extend(flags.to_le_bytes());
+    data.extend(
+        atom.additive
+            .map_or(0u32, |value| match value {
+                TimeBehaviorAdditive::Override => 0,
+                TimeBehaviorAdditive::Add => 1,
+            })
+            .to_le_bytes(),
+    );
+    data.extend(0u32.to_le_bytes());
+    data.extend(0u32.to_le_bytes());
+    let mut result = create_record_header(PptRecordType::TimeBehavior, 0, 0, 16);
+    result.extend(data);
+    result
+}
+
+/// Serialize a typed `TimePropertyList4TimeBehavior` record.
+pub fn write_time_behavior_property_list(list: &TimeBehaviorPropertyList) -> Result<Vec<u8>> {
+    let mut seen = std::collections::HashSet::with_capacity(list.properties.len());
+    let mut children = Vec::new();
+    for property in &list.properties {
+        let (id, data) = encode_time_behavior_property(property)?;
+        if !seen.insert(id) {
+            return Err(PptError::InvalidFormat(format!(
+                "duplicate time behavior property {id:#X}"
+            )));
+        }
+        let length = u32::try_from(data.len()).map_err(|_| {
+            PptError::InvalidFormat("time behavior property exceeds 4 GiB".to_string())
+        })?;
+        children.extend(create_record_header(
+            PptRecordType::TimeVariant,
+            0,
+            id,
+            length,
+        ));
+        children.extend(data);
+    }
+    wrap_record(PptRecordType::TimePropertyList, 0x0F, 0, children)
+}
+
+fn encode_time_behavior_property(property: &TimeBehaviorProperty) -> Result<(u16, Vec<u8>)> {
+    let integer = |value: i32| {
+        let mut data = vec![1];
+        data.extend(value.to_le_bytes());
+        data
+    };
+    let float = |value: f32| {
+        let mut data = vec![2];
+        data.extend(value.to_le_bytes());
+        data
+    };
+    let string = |value: &str| encode_time_variant_string(value);
+    Ok(match property {
+        TimeBehaviorProperty::UnknownPropertyList(value) => (0x01, string(value)),
+        TimeBehaviorProperty::RuntimeContext(value) => {
+            if !is_valid_runtime_context(value) {
+                return Err(PptError::InvalidFormat(
+                    "invalid time runtime context".to_string(),
+                ));
+            }
+            (0x02, string(value))
+        },
+        TimeBehaviorProperty::MotionPathEditRelative(value) => (0x03, vec![0, u8::from(*value)]),
+        TimeBehaviorProperty::ColorModel(value) => (
+            0x04,
+            integer(match value {
+                TimeColorModel::Rgb => 0,
+                TimeColorModel::Hsl => 1,
+                TimeColorModel::Scheme => 2,
+            }),
+        ),
+        TimeBehaviorProperty::ColorDirection(value) => (
+            0x05,
+            integer(match value {
+                TimeColorDirection::Clockwise => 0,
+                TimeColorDirection::CounterClockwise => 1,
+            }),
+        ),
+        TimeBehaviorProperty::Override => (0x06, integer(1)),
+        TimeBehaviorProperty::PathEditRotationAngle(value) => (0x07, float(*value)),
+        TimeBehaviorProperty::PathEditRotationX(value) => (0x08, float(*value)),
+        TimeBehaviorProperty::PathEditRotationY(value) => (0x09, float(*value)),
+        TimeBehaviorProperty::PointsTypes(value) => {
+            if !is_valid_time_points_types(value) {
+                return Err(PptError::InvalidFormat(
+                    "invalid time path point types".to_string(),
+                ));
+            }
+            (0x0A, string(value))
+        },
+    })
+}
+
+fn write_time_string_list(names: &[String]) -> Result<Vec<u8>> {
+    let mut children = Vec::new();
+    for name in names {
+        let data = encode_time_variant_string(name);
+        let length = u32::try_from(data.len()).map_err(|_| {
+            PptError::InvalidFormat("time attribute name exceeds 4 GiB".to_string())
+        })?;
+        children.extend(create_record_header(
+            PptRecordType::TimeVariant,
+            0,
+            0,
+            length,
+        ));
+        children.extend(data);
+    }
+    wrap_record(PptRecordType::TimeVariantList, 0x0F, 1, children)
+}
+
+fn encode_time_variant_string(value: &str) -> Vec<u8> {
+    let mut data = Vec::with_capacity(1 + value.len().saturating_mul(2));
+    data.push(3);
+    data.extend(value.encode_utf16().flat_map(u16::to_le_bytes));
+    data
+}
+
+/// Serialize a `ClientVisualElementContainer` animation target.
+pub fn write_time_visual_element(target: &TimeVisualElement) -> Result<Vec<u8>> {
+    let atom = match target {
+        TimeVisualElement::Page => {
+            let mut atom = create_record_header(PptRecordType::VisualPageAtom, 0, 0, 4);
+            atom.extend(TimeVisualElementKind::Page.as_u32().to_le_bytes());
+            atom
+        },
+        TimeVisualElement::Sound { kind, sound_id_ref } => {
+            if *kind == TimeVisualElementKind::Page {
+                return Err(PptError::InvalidFormat(
+                    "sound target cannot use the page element type".to_string(),
+                ));
+            }
+            write_visual_shape_atom(*kind, 2, *sound_id_ref, u32::MAX, u32::MAX)
+        },
+        TimeVisualElement::Shape {
+            kind,
+            shape_id_ref,
+            data1,
+            data2,
+        } => {
+            if matches!(
+                kind,
+                TimeVisualElementKind::Page | TimeVisualElementKind::ChartElement
+            ) {
+                return Err(PptError::InvalidFormat(
+                    "general shape target has an invalid element type".to_string(),
+                ));
+            }
+            write_visual_shape_atom(
+                *kind,
+                1,
+                *shape_id_ref,
+                u32::from_le_bytes(data1.to_le_bytes()),
+                u32::from_le_bytes(data2.to_le_bytes()),
+            )
+        },
+        TimeVisualElement::Chart {
+            shape_id_ref,
+            build_type,
+            element_index,
+        } => {
+            if *element_index < -1 {
+                return Err(PptError::InvalidFormat(
+                    "chart target element index must be at least -1".to_string(),
+                ));
+            }
+            write_visual_shape_atom(
+                TimeVisualElementKind::ChartElement,
+                1,
+                *shape_id_ref,
+                build_type.as_u32(),
+                u32::from_le_bytes(element_index.to_le_bytes()),
+            )
+        },
+    };
+    wrap_record(PptRecordType::TimeClientVisualElement, 0x0F, 0, atom)
+}
+
+fn write_visual_shape_atom(
+    kind: TimeVisualElementKind,
+    reference_type: u32,
+    reference_id: u32,
+    data1: u32,
+    data2: u32,
+) -> Vec<u8> {
+    let mut atom = create_record_header(PptRecordType::VisualShapeAtom, 0, 0, 20);
+    atom.extend(kind.as_u32().to_le_bytes());
+    atom.extend(reference_type.to_le_bytes());
+    atom.extend(reference_id.to_le_bytes());
+    atom.extend(data1.to_le_bytes());
+    atom.extend(data2.to_le_bytes());
+    atom
 }
 
 /// Map a high-level animation effect to PPT97 fly method and direction codes.

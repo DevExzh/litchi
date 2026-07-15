@@ -133,12 +133,22 @@ pub enum PptRecordType {
     SoundData = 2023,
     /// Time node record
     TimeNode = 0xF127,
+    /// Shared animation behavior container
+    TimeBehaviorContainer = 0xF12A,
+    /// Shared animation behavior atom
+    TimeBehavior = 0xF133,
+    /// Animation target container
+    TimeClientVisualElement = 0xF13C,
     /// Time property list record
     TimePropertyList = 0xF13D,
+    /// Time string-list container
+    TimeVariantList = 0xF13E,
     /// Time variant atom record
     TimeVariant = 0xF142,
-    /// Time behavior record
-    TimeBehavior = 4112,
+    /// Shape or sound animation target atom
+    VisualShapeAtom = 0x2AFB,
+    /// Slide animation target atom
+    VisualPageAtom = 0x2B01,
     /// Named shows container (custom slide shows)
     NamedShows = 1040,
     /// Named show container
@@ -211,9 +221,14 @@ impl From<u16> for PptRecordType {
             0x2B0A => PptRecordType::LevelInfoAtom,
             0xF144 => PptRecordType::ExtTimeNode,
             0xF127 => PptRecordType::TimeNode,
+            0xF12A => PptRecordType::TimeBehaviorContainer,
+            0xF133 => PptRecordType::TimeBehavior,
+            0xF13C => PptRecordType::TimeClientVisualElement,
             0xF13D => PptRecordType::TimePropertyList,
+            0xF13E => PptRecordType::TimeVariantList,
             0xF142 => PptRecordType::TimeVariant,
-            4112 => PptRecordType::TimeBehavior,
+            0x2AFB => PptRecordType::VisualShapeAtom,
+            0x2B01 => PptRecordType::VisualPageAtom,
             1040 => PptRecordType::NamedShows,
             1041 => PptRecordType::NamedShow,
             1042 => PptRecordType::NamedShowSlides,

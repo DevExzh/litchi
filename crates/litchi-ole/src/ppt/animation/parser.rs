@@ -8,9 +8,12 @@ use super::types::{
     ChartBuildAtom, ChartBuildType, DiagramBuild, DiagramBuildAtom, DiagramBuildType,
     ExtendedTimeNode, LegacyAnimationAtom, LegacyAnimationBuild, LegacyAnimationEffect,
     LegacyTextBuildSubEffect, ParagraphBuild, ParagraphBuildAtom, ParagraphBuildLevel,
-    ParagraphBuildType, SlideAnimationExtension, TimeEffectNodeType, TimeEffectType,
-    TimeMasterRelation, TimeNodeAtom, TimeNodeFill, TimeNodeKind, TimeNodeProperty,
-    TimeNodePropertyList, TimeNodeRestart, TimePropertyListContext, is_valid_time_filter,
+    ParagraphBuildType, SlideAnimationExtension, TimeBehavior, TimeBehaviorAdditive,
+    TimeBehaviorAtom, TimeBehaviorProperty, TimeBehaviorPropertyList, TimeColorDirection,
+    TimeColorModel, TimeEffectNodeType, TimeEffectType, TimeMasterRelation, TimeNodeAtom,
+    TimeNodeFill, TimeNodeKind, TimeNodeProperty, TimeNodePropertyList, TimeNodeRestart,
+    TimePropertyListContext, TimeVisualElement, TimeVisualElementKind, is_valid_runtime_context,
+    is_valid_time_filter, is_valid_time_points_types,
 };
 use crate::consts::PptRecordType;
 use crate::ppt::package::{PptError, Result};
@@ -349,6 +352,7 @@ pub fn parse_time_node_property_list(
 }
 
 fn parse_time_node_property(record: &PptRecord) -> Result<TimeNodeProperty> {
+    require_time_variant_payload(record)?;
     let data = &record.data;
     let int = || -> Result<i32> {
         if data.len() != 5 || data[0] != 1 {
@@ -465,6 +469,345 @@ fn parse_time_node_property(record: &PptRecord) -> Result<TimeNodeProperty> {
             )));
         },
     })
+}
+
+/// Parse the common behavior information shared by all extended animation behaviors.
+pub fn parse_time_behavior(record: &PptRecord) -> Result<TimeBehavior> {
+    require_container(
+        record,
+        PptRecordType::TimeBehaviorContainer,
+        0,
+        "TimeBehaviorContainer",
+    )?;
+    let atom_record = record
+        .children
+        .first()
+        .ok_or_else(|| PptError::InvalidFormat("TimeBehaviorContainer has no atom".to_string()))?;
+    let atom = parse_time_behavior_atom(atom_record)?;
+    let mut index = 1;
+    let attribute_names = if record
+        .children
+        .get(index)
+        .is_some_and(|child| child.record_type == PptRecordType::TimeVariantList)
+    {
+        let names = parse_time_string_list(&record.children[index])?;
+        index += 1;
+        Some(names)
+    } else {
+        None
+    };
+    let properties = if record
+        .children
+        .get(index)
+        .is_some_and(|child| child.record_type == PptRecordType::TimePropertyList)
+    {
+        let properties = parse_time_behavior_property_list(&record.children[index])?;
+        index += 1;
+        Some(properties)
+    } else {
+        None
+    };
+    let target = record
+        .children
+        .get(index)
+        .ok_or_else(|| PptError::InvalidFormat("TimeBehaviorContainer has no target".to_string()))
+        .and_then(parse_time_visual_element)?;
+    index += 1;
+    if index != record.children.len() {
+        return Err(PptError::InvalidFormat(
+            "TimeBehaviorContainer has invalid child order or extra children".to_string(),
+        ));
+    }
+    Ok(TimeBehavior {
+        atom,
+        attribute_names,
+        properties,
+        target,
+    })
+}
+
+/// Parse an exact 16-byte `TimeBehaviorAtom` payload.
+pub fn parse_time_behavior_atom(record: &PptRecord) -> Result<TimeBehaviorAtom> {
+    require_atom(
+        record,
+        PptRecordType::TimeBehavior,
+        0,
+        16,
+        "TimeBehaviorAtom",
+    )?;
+    let flags = read_u32(&record.data, 0);
+    let additive_value = read_u32(&record.data, 4);
+    let additive = if flags & 0x01 != 0 {
+        Some(match additive_value {
+            0 => TimeBehaviorAdditive::Override,
+            1 => TimeBehaviorAdditive::Add,
+            value => {
+                return Err(PptError::InvalidFormat(format!(
+                    "invalid TimeBehavior additive mode {value}"
+                )));
+            },
+        })
+    } else if additive_value == 0 {
+        None
+    } else {
+        return Err(PptError::InvalidFormat(
+            "TimeBehavior additive mode must be zero when not explicitly set".to_string(),
+        ));
+    };
+    if read_u32(&record.data, 8) != 0 || read_u32(&record.data, 12) != 0 {
+        return Err(PptError::InvalidFormat(
+            "TimeBehavior accumulation and transform modes must be zero".to_string(),
+        ));
+    }
+    Ok(TimeBehaviorAtom {
+        additive,
+        attribute_names_used: flags & 0x04 != 0,
+    })
+}
+
+/// Parse a `TimePropertyList4TimeBehavior` record.
+pub fn parse_time_behavior_property_list(record: &PptRecord) -> Result<TimeBehaviorPropertyList> {
+    require_container(
+        record,
+        PptRecordType::TimePropertyList,
+        0,
+        "TimePropertyList4TimeBehavior",
+    )?;
+    let mut seen = std::collections::HashSet::with_capacity(record.children.len());
+    let mut properties = Vec::with_capacity(record.children.len());
+    for child in &record.children {
+        if child.record_type != PptRecordType::TimeVariant || child.version != 0 {
+            return Err(PptError::InvalidFormat(
+                "invalid TimePropertyList4TimeBehavior child".to_string(),
+            ));
+        }
+        if !seen.insert(child.instance) {
+            return Err(PptError::InvalidFormat(format!(
+                "duplicate time behavior property {:#X}",
+                child.instance
+            )));
+        }
+        properties.push(parse_time_behavior_property(child)?);
+    }
+    Ok(TimeBehaviorPropertyList { properties })
+}
+
+fn parse_time_behavior_property(record: &PptRecord) -> Result<TimeBehaviorProperty> {
+    let property = match record.instance {
+        0x01 => TimeBehaviorProperty::UnknownPropertyList(parse_time_variant_string(record)?),
+        0x02 => {
+            let value = parse_time_variant_string(record)?;
+            if !is_valid_runtime_context(&value) {
+                return Err(PptError::InvalidFormat(
+                    "invalid time runtime context".to_string(),
+                ));
+            }
+            TimeBehaviorProperty::RuntimeContext(value)
+        },
+        0x03 => TimeBehaviorProperty::MotionPathEditRelative(parse_time_variant_bool(record)?),
+        0x04 => TimeBehaviorProperty::ColorModel(match parse_time_variant_i32(record)? {
+            0 => TimeColorModel::Rgb,
+            1 => TimeColorModel::Hsl,
+            2 => TimeColorModel::Scheme,
+            value => {
+                return Err(PptError::InvalidFormat(format!(
+                    "invalid time color model {value}"
+                )));
+            },
+        }),
+        0x05 => TimeBehaviorProperty::ColorDirection(match parse_time_variant_i32(record)? {
+            0 => TimeColorDirection::Clockwise,
+            1 => TimeColorDirection::CounterClockwise,
+            value => {
+                return Err(PptError::InvalidFormat(format!(
+                    "invalid time color direction {value}"
+                )));
+            },
+        }),
+        0x06 => match parse_time_variant_i32(record)? {
+            1 => TimeBehaviorProperty::Override,
+            _ => {
+                return Err(PptError::InvalidFormat(
+                    "invalid time behavior override".to_string(),
+                ));
+            },
+        },
+        0x07 => TimeBehaviorProperty::PathEditRotationAngle(parse_time_variant_f32(record)?),
+        0x08 => TimeBehaviorProperty::PathEditRotationX(parse_time_variant_f32(record)?),
+        0x09 => TimeBehaviorProperty::PathEditRotationY(parse_time_variant_f32(record)?),
+        0x0A => {
+            let value = parse_time_variant_string(record)?;
+            if !is_valid_time_points_types(&value) {
+                return Err(PptError::InvalidFormat(
+                    "invalid time path point types".to_string(),
+                ));
+            }
+            TimeBehaviorProperty::PointsTypes(value)
+        },
+        id => {
+            return Err(PptError::InvalidFormat(format!(
+                "unknown time behavior property {id:#X}"
+            )));
+        },
+    };
+    Ok(property)
+}
+
+fn parse_time_string_list(record: &PptRecord) -> Result<Vec<String>> {
+    require_container(
+        record,
+        PptRecordType::TimeVariantList,
+        1,
+        "TimeStringListContainer",
+    )?;
+    record
+        .children
+        .iter()
+        .map(|child| {
+            if child.record_type != PptRecordType::TimeVariant || child.version != 0 {
+                return Err(PptError::InvalidFormat(
+                    "invalid TimeStringListContainer child".to_string(),
+                ));
+            }
+            parse_time_variant_string(child)
+        })
+        .collect()
+}
+
+/// Parse a `ClientVisualElementContainer` animation target.
+pub fn parse_time_visual_element(record: &PptRecord) -> Result<TimeVisualElement> {
+    require_container(
+        record,
+        PptRecordType::TimeClientVisualElement,
+        0,
+        "ClientVisualElementContainer",
+    )?;
+    if record.children.len() != 1 {
+        return Err(PptError::InvalidFormat(
+            "ClientVisualElementContainer requires exactly one atom".to_string(),
+        ));
+    }
+    let atom = &record.children[0];
+    if atom.record_type == PptRecordType::VisualPageAtom {
+        require_atom(atom, PptRecordType::VisualPageAtom, 0, 4, "VisualPageAtom")?;
+        if read_u32(&atom.data, 0) != TimeVisualElementKind::Page.as_u32() {
+            return Err(PptError::InvalidFormat(
+                "VisualPageAtom has a non-page target type".to_string(),
+            ));
+        }
+        return Ok(TimeVisualElement::Page);
+    }
+    require_atom(
+        atom,
+        PptRecordType::VisualShapeAtom,
+        0,
+        20,
+        "VisualShapeOrSoundAtom",
+    )?;
+    let kind = TimeVisualElementKind::parse(read_u32(&atom.data, 0))
+        .ok_or_else(|| PptError::InvalidFormat("invalid visual element target type".to_string()))?;
+    if kind == TimeVisualElementKind::Page {
+        return Err(PptError::InvalidFormat(
+            "VisualShapeOrSoundAtom cannot target a page".to_string(),
+        ));
+    }
+    match read_u32(&atom.data, 4) {
+        1 if kind == TimeVisualElementKind::ChartElement => {
+            let build_type = ChartBuildType::parse(read_u32(&atom.data, 12)).ok_or_else(|| {
+                PptError::InvalidFormat("invalid chart target build type".to_string())
+            })?;
+            let element_index = read_i32(&atom.data, 16);
+            if element_index < -1 {
+                return Err(PptError::InvalidFormat(
+                    "chart target element index must be at least -1".to_string(),
+                ));
+            }
+            Ok(TimeVisualElement::Chart {
+                shape_id_ref: read_u32(&atom.data, 8),
+                build_type,
+                element_index,
+            })
+        },
+        1 => Ok(TimeVisualElement::Shape {
+            kind,
+            shape_id_ref: read_u32(&atom.data, 8),
+            data1: read_i32(&atom.data, 12),
+            data2: read_i32(&atom.data, 16),
+        }),
+        2 => {
+            if read_u32(&atom.data, 12) != u32::MAX || read_u32(&atom.data, 16) != u32::MAX {
+                return Err(PptError::InvalidFormat(
+                    "VisualSoundAtom reserved data must be -1".to_string(),
+                ));
+            }
+            Ok(TimeVisualElement::Sound {
+                kind,
+                sound_id_ref: read_u32(&atom.data, 8),
+            })
+        },
+        value => Err(PptError::InvalidFormat(format!(
+            "invalid visual element reference type {value}"
+        ))),
+    }
+}
+
+fn parse_time_variant_i32(record: &PptRecord) -> Result<i32> {
+    require_time_variant_payload(record)?;
+    if record.data.len() != 5 || record.data[0] != 1 {
+        return Err(PptError::InvalidFormat(
+            "invalid integer time variant".to_string(),
+        ));
+    }
+    Ok(i32::from_le_bytes(
+        record.data[1..5].try_into().expect("length checked"),
+    ))
+}
+
+fn parse_time_variant_f32(record: &PptRecord) -> Result<f32> {
+    require_time_variant_payload(record)?;
+    if record.data.len() != 5 || record.data[0] != 2 {
+        return Err(PptError::InvalidFormat(
+            "invalid floating-point time variant".to_string(),
+        ));
+    }
+    Ok(f32::from_le_bytes(
+        record.data[1..5].try_into().expect("length checked"),
+    ))
+}
+
+fn parse_time_variant_bool(record: &PptRecord) -> Result<bool> {
+    require_time_variant_payload(record)?;
+    if record.data.len() != 2 || record.data[0] != 0 {
+        return Err(PptError::InvalidFormat(
+            "invalid Boolean time variant".to_string(),
+        ));
+    }
+    parse_bool1(record.data[1], "TimeVariant.boolValue")
+}
+
+fn parse_time_variant_string(record: &PptRecord) -> Result<String> {
+    require_time_variant_payload(record)?;
+    if record.data.len() % 2 != 1 || record.data.first() != Some(&3) {
+        return Err(PptError::InvalidFormat(
+            "invalid string time variant".to_string(),
+        ));
+    }
+    String::from_utf16(
+        &record.data[1..]
+            .chunks_exact(2)
+            .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .map_err(|_| PptError::InvalidFormat("invalid UTF-16 time variant".to_string()))
+}
+
+fn require_time_variant_payload(record: &PptRecord) -> Result<()> {
+    if record.data_length as usize != record.data.len() {
+        return Err(PptError::Corrupted(
+            "truncated TimeVariant payload".to_string(),
+        ));
+    }
+    Ok(())
 }
 
 /// Parse build list from BuildList container record.
@@ -759,14 +1102,19 @@ fn read_u32(data: &[u8], offset: usize) -> u32 {
     u32::from_le_bytes(data[offset..offset + 4].try_into().expect("length checked"))
 }
 
+fn read_i32(data: &[u8], offset: usize) -> i32 {
+    i32::from_le_bytes(data[offset..offset + 4].try_into().expect("length checked"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::ppt::animation::{
         BuildInfo, ChartBuildType, DiagramBuildType, LegacyAnimationAtom, LegacyAnimationBuild,
         LegacyAnimationEffect, LegacyTextBuildSubEffect, ParagraphBuildType, write_animation_info,
-        write_animation_info_atom, write_build_list, write_extended_time_node,
-        write_time_node_atom, write_time_node_property_list,
+        write_animation_info_atom, write_build_list, write_extended_time_node, write_time_behavior,
+        write_time_behavior_atom, write_time_behavior_property_list, write_time_node_atom,
+        write_time_node_property_list, write_time_visual_element,
     };
 
     fn sample_legacy_atom() -> LegacyAnimationAtom {
@@ -1100,6 +1448,153 @@ mod tests {
         let (mut record, _) = PptRecord::parse(&bytes, 0).unwrap();
         record.children[0].data[0] = 1;
         assert!(parse_time_node_property_list(&record, TimePropertyListContext::TimeNode).is_err());
+    }
+
+    #[test]
+    fn round_trips_shared_time_behaviors_and_all_properties() {
+        assert_eq!(PptRecordType::TimeBehaviorContainer.as_u16(), 0xF12A);
+        assert_eq!(PptRecordType::TimeBehavior.as_u16(), 0xF133);
+        assert_eq!(PptRecordType::TimeClientVisualElement.as_u16(), 0xF13C);
+        assert_eq!(PptRecordType::TimeVariantList.as_u16(), 0xF13E);
+        let properties = TimeBehaviorPropertyList {
+            properties: vec![
+                TimeBehaviorProperty::UnknownPropertyList("vendor.extension".to_string()),
+                TimeBehaviorProperty::RuntimeContext("GTE  PPT 12.0;PpT;".to_string()),
+                TimeBehaviorProperty::MotionPathEditRelative(true),
+                TimeBehaviorProperty::ColorModel(TimeColorModel::Hsl),
+                TimeBehaviorProperty::ColorDirection(TimeColorDirection::CounterClockwise),
+                TimeBehaviorProperty::Override,
+                TimeBehaviorProperty::PathEditRotationAngle(90.0),
+                TimeBehaviorProperty::PathEditRotationX(-0.5),
+                TimeBehaviorProperty::PathEditRotationY(1.25),
+                TimeBehaviorProperty::PointsTypes("AaFfTtSs".to_string()),
+            ],
+        };
+        let behavior = TimeBehavior {
+            atom: TimeBehaviorAtom {
+                additive: Some(TimeBehaviorAdditive::Add),
+                attribute_names_used: true,
+            },
+            attribute_names: Some(vec![
+                "style.opacity".to_string(),
+                "style.rotation".to_string(),
+            ]),
+            properties: Some(properties.clone()),
+            target: TimeVisualElement::Shape {
+                kind: TimeVisualElementKind::TextRange,
+                shape_id_ref: 0xC03,
+                data1: 0,
+                data2: 12,
+            },
+        };
+
+        let atom_bytes = write_time_behavior_atom(&behavior.atom);
+        let (atom_record, _) = PptRecord::parse(&atom_bytes, 0).unwrap();
+        assert_eq!(
+            parse_time_behavior_atom(&atom_record).unwrap(),
+            behavior.atom
+        );
+
+        let property_bytes = write_time_behavior_property_list(&properties).unwrap();
+        let (property_record, _) = PptRecord::parse(&property_bytes, 0).unwrap();
+        assert_eq!(
+            parse_time_behavior_property_list(&property_record).unwrap(),
+            properties
+        );
+
+        let bytes = write_time_behavior(&behavior).unwrap();
+        let (record, consumed) = PptRecord::parse(&bytes, 0).unwrap();
+        assert_eq!(consumed, bytes.len());
+        assert_eq!(parse_time_behavior(&record).unwrap(), behavior);
+    }
+
+    #[test]
+    fn round_trips_all_time_visual_element_forms() {
+        let targets = [
+            TimeVisualElement::Page,
+            TimeVisualElement::Sound {
+                kind: TimeVisualElementKind::Audio,
+                sound_id_ref: 42,
+            },
+            TimeVisualElement::Shape {
+                kind: TimeVisualElementKind::ShapeOnly,
+                shape_id_ref: 100,
+                data1: -7,
+                data2: 9,
+            },
+            TimeVisualElement::Chart {
+                shape_id_ref: 101,
+                build_type: ChartBuildType::ByElementInSeries,
+                element_index: -1,
+            },
+        ];
+        for target in targets {
+            let bytes = write_time_visual_element(&target).unwrap();
+            let (record, consumed) = PptRecord::parse(&bytes, 0).unwrap();
+            assert_eq!(consumed, bytes.len());
+            assert_eq!(parse_time_visual_element(&record).unwrap(), target);
+        }
+    }
+
+    #[test]
+    fn rejects_malformed_shared_time_behaviors() {
+        let mut atom = write_time_behavior_atom(&TimeBehaviorAtom {
+            additive: None,
+            attribute_names_used: false,
+        });
+        atom[12..16].copy_from_slice(&1u32.to_le_bytes());
+        let (atom_record, _) = PptRecord::parse(&atom, 0).unwrap();
+        assert!(parse_time_behavior_atom(&atom_record).is_err());
+
+        for property in [
+            TimeBehaviorProperty::RuntimeContext("ppt 1.".to_string()),
+            TimeBehaviorProperty::PointsTypes("A?".to_string()),
+        ] {
+            let list = TimeBehaviorPropertyList {
+                properties: vec![property],
+            };
+            assert!(write_time_behavior_property_list(&list).is_err());
+        }
+        let duplicate = TimeBehaviorPropertyList {
+            properties: vec![
+                TimeBehaviorProperty::Override,
+                TimeBehaviorProperty::Override,
+            ],
+        };
+        assert!(write_time_behavior_property_list(&duplicate).is_err());
+        let valid = TimeBehaviorPropertyList {
+            properties: vec![TimeBehaviorProperty::Override],
+        };
+        let bytes = write_time_behavior_property_list(&valid).unwrap();
+        let (mut record, _) = PptRecord::parse(&bytes, 0).unwrap();
+        record.children[0].data_length += 1;
+        assert!(parse_time_behavior_property_list(&record).is_err());
+        assert!(
+            write_time_visual_element(&TimeVisualElement::Shape {
+                kind: TimeVisualElementKind::ChartElement,
+                shape_id_ref: 1,
+                data1: 0,
+                data2: 0,
+            })
+            .is_err()
+        );
+        assert!(
+            write_time_visual_element(&TimeVisualElement::Chart {
+                shape_id_ref: 1,
+                build_type: ChartBuildType::AsOneObject,
+                element_index: -2,
+            })
+            .is_err()
+        );
+
+        let sound = TimeVisualElement::Sound {
+            kind: TimeVisualElementKind::Audio,
+            sound_id_ref: 42,
+        };
+        let bytes = write_time_visual_element(&sound).unwrap();
+        let (mut record, _) = PptRecord::parse(&bytes, 0).unwrap();
+        record.children[0].data[12..16].copy_from_slice(&0u32.to_le_bytes());
+        assert!(parse_time_visual_element(&record).is_err());
     }
 
     #[test]

@@ -137,7 +137,10 @@ impl PptRecord {
                 | PptRecordType::DiagramBuild
                 | PptRecordType::ParaBuild
                 | PptRecordType::ExtTimeNode
+                | PptRecordType::TimeBehaviorContainer
+                | PptRecordType::TimeClientVisualElement
                 | PptRecordType::TimePropertyList
+                | PptRecordType::TimeVariantList
         )
     }
 
