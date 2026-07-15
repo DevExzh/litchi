@@ -1048,6 +1048,7 @@ impl Document {
             let mut para = Paragraph::new(String::new());
             para.set_runs(run_objects);
             para.set_properties(para_props);
+            para.resolve_revision(&self.revision_authors)?;
             output.push(para);
         }
         Ok(())

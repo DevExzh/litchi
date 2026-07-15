@@ -359,6 +359,8 @@ pub struct ParagraphFormatting {
     pub ilvl: Option<u8>,
     /// List format override index (1-based index into PlfLfo; 0 = no list)
     pub ilfo: Option<u16>,
+    /// Mark the paragraph formatting as a tracked change.
+    pub formatting_revision: Option<FormattingRevision>,
 }
 
 /// Represents a text run with formatting
@@ -1253,15 +1255,20 @@ impl DocWriter {
             }
             Ok(())
         };
-        for run in paragraphs.iter().flat_map(|paragraph| &paragraph.runs) {
-            if let Some(revision) = &run.formatting.insertion_revision {
+        for paragraph in paragraphs {
+            if let Some(revision) = &paragraph.formatting.formatting_revision {
                 index_author(&revision.author)?;
             }
-            if let Some(revision) = &run.formatting.deletion_revision {
-                index_author(&revision.author)?;
-            }
-            if let Some(revision) = &run.formatting.formatting_revision {
-                index_author(&revision.author)?;
+            for run in &paragraph.runs {
+                if let Some(revision) = &run.formatting.insertion_revision {
+                    index_author(&revision.author)?;
+                }
+                if let Some(revision) = &run.formatting.deletion_revision {
+                    index_author(&revision.author)?;
+                }
+                if let Some(revision) = &run.formatting.formatting_revision {
+                    index_author(&revision.author)?;
+                }
             }
         }
         if !has_revisions {
@@ -1710,7 +1717,8 @@ impl DocWriter {
                 chpx_entries[last_idx].1 += 2;
             }
             let fc_para_end = text_fc_start + text_stream.len() as u32;
-            let pap_grpprl = build_papx_grpprl(&paragraph.formatting);
+            let pap_grpprl =
+                build_revision_papx_grpprl(&paragraph.formatting, revision_data.as_ref())?;
             papx_entries.push((fc_para_start, fc_para_end, pap_grpprl));
 
             let fc_offset = fc_para_start;
@@ -2252,7 +2260,8 @@ impl DocWriter {
                 chpx_entries[last_idx].1 += 2;
             }
             let fc_para_end = text_fc_start + text_stream.len() as u32;
-            let pap_grpprl = build_papx_grpprl(&paragraph.formatting);
+            let pap_grpprl =
+                build_revision_papx_grpprl(&paragraph.formatting, revision_data.as_ref())?;
             papx_entries.push((fc_para_start, fc_para_end, pap_grpprl));
 
             let fc_offset = fc_para_start;
@@ -2904,6 +2913,28 @@ fn build_papx_grpprl(fmt: &ParagraphFormatting) -> Vec<u8> {
     }
 
     grp
+}
+
+fn build_revision_papx_grpprl(
+    fmt: &ParagraphFormatting,
+    revisions: Option<&RevisionWriterData>,
+) -> Result<Vec<u8>, DocWriteError> {
+    let mut grp = build_papx_grpprl(fmt);
+    let Some(revision) = &fmt.formatting_revision else {
+        return Ok(grp);
+    };
+    let revisions = revisions.ok_or_else(|| {
+        DocWriteError::InvalidData("DOC paragraph revision author was not indexed".to_string())
+    })?;
+    let author_index = revisions.indexes.get(&revision.author).ok_or_else(|| {
+        DocWriteError::InvalidData("DOC paragraph revision author was not indexed".to_string())
+    })?;
+    grp.extend_from_slice(&SPRM_P_PROP_RMARK_CURRENT.to_le_bytes());
+    grp.push(7);
+    grp.push(1);
+    grp.extend_from_slice(&author_index.to_le_bytes());
+    grp.extend_from_slice(&pack_dttm(revision.timestamp)?.to_le_bytes());
+    Ok(grp)
 }
 
 impl Default for DocWriter {
@@ -3595,7 +3626,13 @@ mod tests {
                         },
                     ),
                 ],
-                ParagraphFormatting::default(),
+                ParagraphFormatting {
+                    alignment: Some(1),
+                    formatting_revision: Some(
+                        FormattingRevision::new("Paragraph Editor").with_timestamp(timestamp),
+                    ),
+                    ..ParagraphFormatting::default()
+                },
             )
             .unwrap();
 
@@ -3606,9 +3643,13 @@ mod tests {
         let document = package.document().unwrap();
         assert_eq!(
             document.revision_authors(),
-            ["Unknown", "Alice 😀", "Bob", "张三"]
+            ["Unknown", "Paragraph Editor", "Alice 😀", "Bob", "张三"]
         );
-        let runs = document.paragraphs().unwrap()[0].runs().unwrap();
+        let paragraphs = document.paragraphs().unwrap();
+        let paragraph_revision = paragraphs[0].formatting_revision().unwrap();
+        assert_eq!(paragraph_revision.author, "Paragraph Editor");
+        assert_eq!(paragraph_revision.timestamp, Some(timestamp));
+        let runs = paragraphs[0].runs().unwrap();
         let insertion = runs
             .iter()
             .find_map(|run| run.insertion_revision())
@@ -3642,7 +3683,12 @@ mod tests {
         let document = package.document().unwrap();
         assert_eq!(
             document.revision_authors(),
-            ["Unknown", "Alice 😀", "Bob", "张三"]
+            ["Unknown", "Paragraph Editor", "Alice 😀", "Bob", "张三"]
+        );
+        assert!(
+            document.paragraphs().unwrap()[0]
+                .formatting_revision()
+                .is_some()
         );
         assert!(
             document.paragraphs().unwrap()[0]

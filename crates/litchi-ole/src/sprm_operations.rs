@@ -586,6 +586,9 @@ pub const SPRM_P_F_CONTEXTUAL_SPACING: u16 = 0x2464;
 /// sprmPPropRMark90 - Property revision mark v90 (operation 0x65)
 pub const SPRM_P_PROP_RMARK90: u16 = 0xC665;
 
+/// Current sprmPPropRMark property revision mark (operation 0x6F)
+pub const SPRM_P_PROP_RMARK_CURRENT: u16 = 0xC66F;
+
 /// sprmPFMirrorIndents - Mirror indents (operation 0x66)
 pub const SPRM_P_F_MIRROR_INDENTS: u16 = 0x2466;
 

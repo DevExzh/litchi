@@ -9,7 +9,7 @@
 /// - Table nesting information
 ///
 /// Based on Apache POI's ParagraphSprmUncompressor and ParagraphProperties.
-use super::super::package::Result;
+use super::super::package::{DocError, Result};
 use crate::sprm::{Sprm, parse_sprms};
 use crate::sprm_operations::*;
 use litchi_core::binary::{read_i16_le, read_u16_le, read_u32_le};
@@ -108,6 +108,12 @@ pub struct ParagraphProperties {
     pub dxa_from_text: Option<i16>,
     /// Vertical distance from text
     pub dya_from_text: Option<i16>,
+    /// Whether this paragraph has a tracked property change.
+    pub has_formatting_revision: Option<bool>,
+    /// Paragraph revision author index in `SttbfRMark`.
+    pub formatting_revision_author_index: Option<u16>,
+    /// Packed paragraph revision DTTM.
+    pub formatting_revision_timestamp: Option<u32>,
 }
 
 /// Paragraph justification/alignment.
@@ -290,7 +296,7 @@ impl ParagraphProperties {
         for sprm in &sprms {
             // Only process PAP SPRMs (type = 1)
             if get_sprm_type(sprm.opcode) == 1 {
-                Self::apply_sprm(&mut pap, sprm);
+                Self::apply_sprm(&mut pap, sprm)?;
             }
         }
 
@@ -305,7 +311,7 @@ impl ParagraphProperties {
     ///
     /// * `pap` - The paragraph properties to modify
     /// * `sprm` - The SPRM operation to apply
-    fn apply_sprm(pap: &mut ParagraphProperties, sprm: &Sprm) {
+    fn apply_sprm(pap: &mut ParagraphProperties, sprm: &Sprm) -> Result<()> {
         let operation = get_sprm_operation(sprm.opcode);
 
         match operation {
@@ -655,10 +661,8 @@ impl ParagraphProperties {
             0x3E => {
                 // Autonumber list data - complex structure
             },
-            // Operation 0x3F: sprmPPropRMark - Property revision mark
-            0x3F => {
-                // Revision mark properties - not commonly used
-            },
+            // Versioned sprmPPropRMark property revision marks.
+            0x3F | 0x65 | 0x6F => Self::apply_property_revision(pap, sprm)?,
             // Operation 0x40: sprmPOutLvl - Outline level
             0x40 => {
                 if let Some(lvl) = sprm.operand_byte() {
@@ -765,6 +769,33 @@ impl ParagraphProperties {
                 // Silently ignore unknown SPRMs
             },
         }
+        Ok(())
+    }
+
+    fn apply_property_revision(pap: &mut ParagraphProperties, sprm: &Sprm) -> Result<()> {
+        let operand = sprm.operand_bytes();
+        if operand.len() != 7 {
+            return Err(DocError::Corrupted(
+                "sprmPPropRMark operand must contain exactly 7 bytes".to_string(),
+            ));
+        }
+        pap.has_formatting_revision = Some(match operand[0] {
+            0 => false,
+            1 => true,
+            _ => {
+                return Err(DocError::Corrupted(
+                    "sprmPPropRMark must begin with a Boolean8 value".to_string(),
+                ));
+            },
+        });
+        let author = i16::from_le_bytes([operand[1], operand[2]]);
+        pap.formatting_revision_author_index = Some(u16::try_from(author).map_err(|_| {
+            DocError::Corrupted("sprmPPropRMark author index is negative".to_string())
+        })?);
+        pap.formatting_revision_timestamp = Some(u32::from_le_bytes([
+            operand[3], operand[4], operand[5], operand[6],
+        ]));
+        Ok(())
     }
 
     /// Handle tab stops (sprmPChgTabsPapx).
@@ -1082,5 +1113,37 @@ mod tests {
         let mut pap = ParagraphProperties::new();
         pap.indent_left = Some(1440); // 1 inch in twips
         assert_eq!(pap.get_indent_left_inches(), 1.0);
+    }
+
+    #[test]
+    fn parses_all_paragraph_formatting_revision_sprms_strictly() {
+        let timestamp =
+            30u32 | (14u32 << 6) | (15u32 << 11) | (7u32 << 16) | (126u32 << 20) | (3u32 << 29);
+        for opcode in [
+            SPRM_P_PROP_RMARK,
+            SPRM_P_PROP_RMARK90,
+            SPRM_P_PROP_RMARK_CURRENT,
+        ] {
+            let mut grpprl = opcode.to_le_bytes().to_vec();
+            grpprl.push(7);
+            grpprl.push(1);
+            grpprl.extend_from_slice(&2i16.to_le_bytes());
+            grpprl.extend_from_slice(&timestamp.to_le_bytes());
+            let properties = ParagraphProperties::from_sprm(&grpprl).unwrap();
+            assert_eq!(properties.has_formatting_revision, Some(true));
+            assert_eq!(properties.formatting_revision_author_index, Some(2));
+            assert_eq!(properties.formatting_revision_timestamp, Some(timestamp));
+        }
+
+        for operand in [
+            vec![2, 0, 0, 0, 0, 0, 0],
+            vec![1, 0xFF, 0xFF, 0, 0, 0, 0],
+            vec![1, 0, 0, 0, 0, 0],
+        ] {
+            let mut grpprl = SPRM_P_PROP_RMARK_CURRENT.to_le_bytes().to_vec();
+            grpprl.push(operand.len() as u8);
+            grpprl.extend_from_slice(&operand);
+            assert!(ParagraphProperties::from_sprm(&grpprl).is_err());
+        }
     }
 }

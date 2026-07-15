@@ -24,6 +24,8 @@ pub struct Paragraph {
     runs: Vec<Run>,
     /// Paragraph formatting properties (PAP)
     properties: super::parts::pap::ParagraphProperties,
+    /// Resolved paragraph-formatting revision metadata.
+    formatting_revision: Option<RevisionMark>,
 }
 
 impl Paragraph {
@@ -49,6 +51,7 @@ impl Paragraph {
             text,
             runs,
             properties: super::parts::pap::ParagraphProperties::default(),
+            formatting_revision: None,
         }
     }
 
@@ -64,6 +67,7 @@ impl Paragraph {
             text,
             runs,
             properties: super::parts::pap::ParagraphProperties::default(),
+            formatting_revision: None,
         }
     }
 
@@ -77,6 +81,7 @@ impl Paragraph {
             text,
             runs: Vec::new(),
             properties,
+            formatting_revision: None,
         }
     }
 
@@ -118,6 +123,38 @@ impl Paragraph {
     /// Get the paragraph properties.
     pub fn properties(&self) -> &super::parts::pap::ParagraphProperties {
         &self.properties
+    }
+
+    /// Tracked paragraph-formatting revision metadata.
+    pub fn formatting_revision(&self) -> Option<&RevisionMark> {
+        self.formatting_revision.as_ref()
+    }
+
+    pub(crate) fn resolve_revision(&mut self, authors: &RevisionAuthorTable) -> Result<()> {
+        if self.properties.has_formatting_revision == Some(true) {
+            let author_index = self
+                .properties
+                .formatting_revision_author_index
+                .unwrap_or(0);
+            let author = authors.get(author_index).ok_or_else(|| {
+                super::package::DocError::Corrupted(
+                    "paragraph revision author index exceeds SttbfRMark".to_string(),
+                )
+            })?;
+            self.formatting_revision = Some(RevisionMark {
+                kind: RevisionKind::Formatting,
+                author_index,
+                author: author.to_string(),
+                timestamp: self
+                    .properties
+                    .formatting_revision_timestamp
+                    .map(decode_dttm)
+                    .transpose()?
+                    .flatten(),
+                revision_id: None,
+            });
+        }
+        Ok(())
     }
 
     /// Extract all MTEF formulas from this paragraph as LaTeX.
