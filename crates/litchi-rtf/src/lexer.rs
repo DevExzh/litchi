@@ -209,8 +209,11 @@ pub enum ControlWord<'a> {
     EndnoteNumber(i32),
 
     // Bookmarks
-    BookmarkStart(&'a str),
+    BookmarkStart,
     BookmarkEnd,
+    BookmarkFirstColumn(i32),
+    BookmarkLastColumn(i32),
+    BookmarkPublic,
 
     // Annotations/comments
     Annotation,
@@ -320,8 +323,6 @@ pub struct Lexer<'a> {
     arena: &'a Bump,
     /// Current character set
     charset: CharacterSet,
-    /// A control symbol does not consume a following space as a delimiter.
-    preserve_next_whitespace: bool,
 }
 
 impl<'a> Lexer<'a> {
@@ -333,7 +334,6 @@ impl<'a> Lexer<'a> {
             pos: 0,
             arena,
             charset: CharacterSet::default(),
-            preserve_next_whitespace: false,
         }
     }
 
@@ -361,12 +361,6 @@ impl<'a> Lexer<'a> {
 
     /// Get the next token.
     fn next_token(&mut self) -> RtfResult<Token<'a>> {
-        if self.preserve_next_whitespace {
-            self.preserve_next_whitespace = false;
-        } else {
-            self.skip_whitespace();
-        }
-
         if self.pos >= self.input.len() {
             return Err(RtfError::UnexpectedEof);
         }
@@ -401,7 +395,6 @@ impl<'a> Lexer<'a> {
             '\\' | '{' | '}' => {
                 let text = self.arena.alloc_str(&ch.to_string());
                 self.advance();
-                self.preserve_next_whitespace = true;
                 return Ok(Token::Text(Cow::Borrowed(text)));
             },
             '\'' => return self.parse_hex_char(),
@@ -416,19 +409,16 @@ impl<'a> Lexer<'a> {
             '~' => {
                 self.advance();
                 let text = self.arena.alloc_str("\u{00A0}"); // Non-breaking space
-                self.preserve_next_whitespace = true;
                 return Ok(Token::Text(Cow::Borrowed(text)));
             },
             '-' => {
                 self.advance();
                 let text = self.arena.alloc_str("\u{00AD}"); // Optional hyphen
-                self.preserve_next_whitespace = true;
                 return Ok(Token::Text(Cow::Borrowed(text)));
             },
             '_' => {
                 self.advance();
                 let text = self.arena.alloc_str("\u{2011}"); // Non-breaking hyphen
-                self.preserve_next_whitespace = true;
                 return Ok(Token::Text(Cow::Borrowed(text)));
             },
             _ => {},
@@ -710,8 +700,11 @@ impl<'a> Lexer<'a> {
             "chftnsepc" => ControlWord::EndnoteNumber(param_value),
 
             // Bookmarks
-            "bkmkstart" => ControlWord::BookmarkStart(word),
+            "bkmkstart" => ControlWord::BookmarkStart,
             "bkmkend" => ControlWord::BookmarkEnd,
+            "bkmkcolf" => ControlWord::BookmarkFirstColumn(param_value),
+            "bkmkcoll" => ControlWord::BookmarkLastColumn(param_value),
+            "bkmkpub" => ControlWord::BookmarkPublic,
 
             // Annotations
             "atn" => ControlWord::Annotation,
@@ -800,7 +793,6 @@ impl<'a> Lexer<'a> {
         // Decode based on character set
         let ch = self.decode_byte(byte);
         let text = self.arena.alloc_str(&ch.to_string());
-        self.preserve_next_whitespace = true;
         Ok(Token::Text(Cow::Borrowed(text)))
     }
 
@@ -915,19 +907,6 @@ impl<'a> Lexer<'a> {
         if self.pos < self.input.len() {
             let ch = self.current_char();
             self.pos += ch.len_utf8();
-        }
-    }
-
-    /// Skip whitespace (but not newlines, they might be significant).
-    #[inline]
-    fn skip_whitespace(&mut self) {
-        while self.pos < self.input.len() {
-            let ch = self.current_char();
-            if ch == ' ' || ch == '\t' {
-                self.advance();
-            } else {
-                break;
-            }
         }
     }
 }

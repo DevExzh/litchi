@@ -113,10 +113,8 @@ impl<W: Write> RtfWriter<W> {
         // Write document properties before body content.
         self.write_document_info(doc.info())?;
 
-        // Write document content
-        for block in doc.blocks() {
-            self.write_style_block(block)?;
-        }
+        // Write document content and reinsert positional bookmark markers.
+        self.write_blocks_with_bookmarks(doc.blocks(), doc.bookmarks())?;
 
         // Write tables
         for table in doc.tables() {
@@ -314,6 +312,172 @@ impl<W: Write> RtfWriter<W> {
         Ok(())
     }
 
+    /// Write a bookmark start destination.
+    pub fn write_bookmark_start(&mut self, bookmark: &Bookmark<'_>) -> io::Result<()> {
+        if bookmark.name.is_empty() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "RTF bookmark name cannot be empty",
+            ));
+        }
+        self.write_str("{\\*")?;
+        self.write_control_word("bkmkstart", None)?;
+        self.write_optional_i32("bkmkcolf", bookmark.first_column)?;
+        self.write_optional_i32("bkmkcoll", bookmark.last_column)?;
+        if bookmark.is_public {
+            self.write_control_word("bkmkpub", None)?;
+        }
+        self.write_str(" ")?;
+        self.write_text(bookmark.name.as_ref())?;
+        self.write_str("}")
+    }
+
+    /// Write a bookmark end destination.
+    pub fn write_bookmark_end(&mut self, name: &str) -> io::Result<()> {
+        if name.is_empty() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "RTF bookmark name cannot be empty",
+            ));
+        }
+        self.write_str("{\\*")?;
+        self.write_control_word("bkmkend", None)?;
+        self.write_str(" ")?;
+        self.write_text(name)?;
+        self.write_str("}")
+    }
+
+    fn write_blocks_with_bookmarks(
+        &mut self,
+        blocks: &[StyleBlock<'_>],
+        bookmarks: &BookmarkTable<'_>,
+    ) -> io::Result<()> {
+        #[derive(Clone, Copy)]
+        enum EventKind {
+            Start,
+            End,
+        }
+        #[derive(Clone, Copy)]
+        struct Event<'b, 'a> {
+            offset: usize,
+            order: u8,
+            kind: EventKind,
+            bookmark: &'b Bookmark<'a>,
+        }
+
+        if bookmarks.bookmarks().is_empty() {
+            for block in blocks {
+                self.write_style_block(block)?;
+            }
+            return Ok(());
+        }
+
+        let body: String = blocks.iter().map(|block| block.text.as_ref()).collect();
+        let mut events = Vec::with_capacity(bookmarks.bookmarks().len().saturating_mul(2));
+        for bookmark in bookmarks.bookmarks() {
+            let end = bookmark
+                .position
+                .checked_add(bookmark.content.len())
+                .ok_or_else(|| {
+                    io::Error::new(io::ErrorKind::InvalidInput, "RTF bookmark range overflow")
+                })?;
+            let content = body.get(bookmark.position..end).ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF bookmark range is outside body text or splits a character",
+                )
+            })?;
+            if content != bookmark.content {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF bookmark content does not match its body range",
+                ));
+            }
+            let empty = bookmark.content.is_empty();
+            events.push(Event {
+                offset: bookmark.position,
+                order: 1,
+                kind: EventKind::Start,
+                bookmark,
+            });
+            events.push(Event {
+                offset: end,
+                order: if empty { 2 } else { 0 },
+                kind: EventKind::End,
+                bookmark,
+            });
+        }
+        events.sort_by_key(|event| (event.offset, event.order));
+
+        let mut event_index = 0usize;
+        let mut body_offset = 0usize;
+        for block in blocks {
+            let block_end = body_offset + block.text.len();
+            let mut local_offset = 0usize;
+            while event_index < events.len() && events[event_index].offset <= block_end {
+                let event_offset = events[event_index].offset;
+                if event_offset < body_offset {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        "RTF bookmark events are not ordered",
+                    ));
+                }
+                let local_end = event_offset - body_offset;
+                if local_end > local_offset {
+                    self.write_style_block_fragment(block, local_offset, local_end)?;
+                    local_offset = local_end;
+                }
+                while event_index < events.len() && events[event_index].offset == event_offset {
+                    let event = events[event_index];
+                    match event.kind {
+                        EventKind::Start => self.write_bookmark_start(event.bookmark)?,
+                        EventKind::End => self.write_bookmark_end(event.bookmark.name.as_ref())?,
+                    }
+                    event_index += 1;
+                }
+            }
+            if local_offset < block.text.len() {
+                self.write_style_block_fragment(block, local_offset, block.text.len())?;
+            }
+            body_offset = block_end;
+        }
+        while event_index < events.len() && events[event_index].offset == body_offset {
+            let event = events[event_index];
+            match event.kind {
+                EventKind::Start => self.write_bookmark_start(event.bookmark)?,
+                EventKind::End => self.write_bookmark_end(event.bookmark.name.as_ref())?,
+            }
+            event_index += 1;
+        }
+        if event_index != events.len() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "RTF bookmark range extends beyond body text",
+            ));
+        }
+        Ok(())
+    }
+
+    fn write_style_block_fragment(
+        &mut self,
+        block: &StyleBlock<'_>,
+        start: usize,
+        end: usize,
+    ) -> io::Result<()> {
+        let text = block.text.get(start..end).ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "RTF bookmark boundary splits a UTF-8 character",
+            )
+        })?;
+        let fragment = StyleBlock::new(
+            std::borrow::Cow::Borrowed(text),
+            block.formatting,
+            block.paragraph,
+        );
+        self.write_style_block(&fragment)
+    }
+
     /// Write a style block
     fn write_style_block(&mut self, block: &StyleBlock) -> io::Result<()> {
         self.write_str("{")?;
@@ -323,6 +487,9 @@ impl<W: Write> RtfWriter<W> {
 
         // Write paragraph properties
         self.write_paragraph_properties(&block.paragraph)?;
+
+        // Delimit the final control word from body text that starts with a letter.
+        self.write_str(" ")?;
 
         // Write text content
         self.write_text(block.text.as_ref())?;
@@ -976,5 +1143,39 @@ mod tests {
         assert_eq!(parsed.info().pages, Some(3));
         assert_eq!(parsed.info().characters_with_spaces, Some(42));
         assert_eq!(parsed.text(), "Body");
+    }
+
+    #[test]
+    fn document_writer_round_trips_bookmark_ranges() {
+        let source = r#"{\rtf1\ansi Start {\*\bkmkstart\bkmkcolf2\bkmkcoll4\bkmkpub Link}R\'e9sum\'e9 \u20320?{\*\bkmkend Link} end}"#;
+        let document = RtfDocument::parse(source).unwrap();
+        let mut output = Vec::new();
+        RtfWriter::new(&mut output)
+            .write_document(&document)
+            .unwrap();
+
+        let reparsed = RtfDocument::from_bytes(&output).unwrap();
+        assert_eq!(reparsed.text(), document.text());
+        let bookmark = reparsed.bookmarks().get("Link").unwrap();
+        assert_eq!(bookmark.content, "Résumé 你");
+        assert_eq!(bookmark.first_column, Some(2));
+        assert_eq!(bookmark.last_column, Some(4));
+        assert!(bookmark.is_public);
+    }
+
+    #[test]
+    fn document_writer_preserves_bookmark_in_empty_body() {
+        let document =
+            RtfDocument::parse(r#"{\rtf1{\*\bkmkstart Empty}{\*\bkmkend Empty}}"#).unwrap();
+        let mut output = Vec::new();
+        RtfWriter::new(&mut output)
+            .write_document(&document)
+            .unwrap();
+
+        let reparsed = RtfDocument::from_bytes(&output).unwrap();
+        let bookmark = reparsed.bookmarks().get("Empty").unwrap();
+        assert_eq!(bookmark.position, 0);
+        assert!(bookmark.content.is_empty());
+        assert!(reparsed.text().is_empty());
     }
 }

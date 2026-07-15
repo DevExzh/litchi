@@ -10,10 +10,16 @@ use std::borrow::Cow;
 pub struct Bookmark<'a> {
     /// Bookmark name (unique identifier)
     pub name: Cow<'a, str>,
-    /// Text position/offset where bookmark is located
+    /// UTF-8 byte offset in the document body text where the bookmark starts.
     pub position: usize,
-    /// Associated text content (if any)
+    /// Body text covered by the bookmark.
     pub content: Cow<'a, str>,
+    /// First table column covered by the bookmark, when specified.
+    pub first_column: Option<i32>,
+    /// Last table column covered by the bookmark, when specified.
+    pub last_column: Option<i32>,
+    /// Whether this is a public bookmark.
+    pub is_public: bool,
 }
 
 impl<'a> Bookmark<'a> {
@@ -24,6 +30,9 @@ impl<'a> Bookmark<'a> {
             name,
             position: 0,
             content: Cow::Borrowed(""),
+            first_column: None,
+            last_column: None,
+            is_public: false,
         }
     }
 
@@ -34,6 +43,9 @@ impl<'a> Bookmark<'a> {
             name,
             position: 0,
             content,
+            first_column: None,
+            last_column: None,
+            is_public: false,
         }
     }
 }

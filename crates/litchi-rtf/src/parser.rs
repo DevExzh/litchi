@@ -9,6 +9,7 @@ use litchi_core::encoding::codepage_to_encoding;
 use smallvec::SmallVec;
 use std::borrow::Cow;
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::num::NonZeroU16;
 
 /// RTF destination type - determines if we're in document body or header
@@ -81,6 +82,22 @@ struct InfoTimestamp {
 }
 
 const MAX_INFO_TEXT_BYTES: usize = 1_048_576;
+const MAX_BOOKMARKS: usize = 65_536;
+const MAX_BOOKMARK_NAME_BYTES: usize = 65_536;
+
+struct OpenBookmark {
+    name: String,
+    position: usize,
+    first_column: Option<i32>,
+    last_column: Option<i32>,
+    is_public: bool,
+    order: usize,
+}
+
+struct BookmarkSpan {
+    bookmark: OpenBookmark,
+    end: usize,
+}
 
 /// Parser state for tracking formatting context.
 #[derive(Debug, Clone)]
@@ -151,6 +168,14 @@ pub struct Parser<'a> {
     sections: Vec<super::section::Section<'a>>,
     /// Bookmarks
     bookmarks: super::bookmark::BookmarkTable<'a>,
+    /// Open bookmark ranges, indexed by name.
+    open_bookmarks: HashMap<String, Vec<OpenBookmark>>,
+    /// Completed bookmark ranges awaiting content reconstruction.
+    bookmark_spans: Vec<BookmarkSpan>,
+    /// UTF-8 byte length of body text emitted into style blocks.
+    body_text_len: usize,
+    /// Stable source order for bookmark ranges.
+    next_bookmark_order: usize,
     /// Shapes
     shapes: Vec<super::shape::Shape<'a>>,
     /// Shape groups
@@ -195,6 +220,10 @@ impl<'a> Parser<'a> {
             list_override_table: super::list::ListOverrideTable::new(),
             sections: Vec::new(),
             bookmarks: super::bookmark::BookmarkTable::new(),
+            open_bookmarks: HashMap::new(),
+            bookmark_spans: Vec::new(),
+            body_text_len: 0,
+            next_bookmark_order: 0,
             shapes: Vec::new(),
             shape_groups: Vec::new(),
             stylesheet: super::stylesheet::StyleSheet::new(),
@@ -229,6 +258,7 @@ impl<'a> Parser<'a> {
 
         // Finalize any remaining table
         self.finalize_table();
+        self.finalize_bookmarks()?;
 
         Ok(ParsedDocument {
             font_table: self.font_table.into_inner(),
@@ -286,6 +316,16 @@ impl<'a> Parser<'a> {
                     return Ok(());
                 },
                 Token::Control(ControlWord::IgnorableDestination) => {
+                    if matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(
+                            ControlWord::BookmarkStart | ControlWord::BookmarkEnd
+                        ))
+                    ) {
+                        self.parse_bookmark_destination()?;
+                        self.states.pop();
+                        return Ok(());
+                    }
                     // Mark as other destination and skip
                     if let Some(state) = self.states.last_mut() {
                         state.destination = Destination::Other;
@@ -582,6 +622,9 @@ impl<'a> Parser<'a> {
             // Allocate in arena and create block
             let text = self.arena.alloc_str(&decoded_str);
             let block = StyleBlock::new(Cow::Borrowed(text), state.formatting, state.paragraph);
+            self.body_text_len = self.body_text_len.checked_add(text.len()).ok_or_else(|| {
+                RtfError::MalformedDocument("RTF body text length overflow".to_string())
+            })?;
             self.blocks.push(block);
         }
 
@@ -953,6 +996,136 @@ impl<'a> Parser<'a> {
         Err(RtfError::UnexpectedEof)
     }
 
+    fn parse_bookmark_destination(&mut self) -> RtfResult<()> {
+        self.pos += 1; // ignorable-destination marker
+        let is_start = match self.tokens.get(self.pos) {
+            Some(Token::Control(ControlWord::BookmarkStart)) => true,
+            Some(Token::Control(ControlWord::BookmarkEnd)) => false,
+            _ => {
+                return Err(RtfError::MalformedDocument(
+                    "invalid bookmark destination".into(),
+                ));
+            },
+        };
+        self.pos += 1;
+
+        let mut name = String::new();
+        let mut first_column = None;
+        let mut last_column = None;
+        let mut is_public = false;
+        let mut depth = 1usize;
+        let mut unicode_skip = self.current_state()?.unicode_skip.max(0) as usize;
+        let mut fallback_skip = 0usize;
+        while self.pos < self.tokens.len() && depth > 0 {
+            match self.tokens.get(self.pos) {
+                Some(Token::OpenBrace) => depth += 1,
+                Some(Token::CloseBrace) => depth -= 1,
+                Some(Token::Text(text)) => {
+                    let skipped = fallback_skip.min(text.chars().count());
+                    fallback_skip -= skipped;
+                    name.extend(text.chars().skip(skipped));
+                },
+                Some(Token::Control(ControlWord::BookmarkFirstColumn(value))) => {
+                    first_column = Some(*value);
+                },
+                Some(Token::Control(ControlWord::BookmarkLastColumn(value))) => {
+                    last_column = Some(*value);
+                },
+                Some(Token::Control(ControlWord::BookmarkPublic)) => is_public = true,
+                Some(Token::Control(ControlWord::Unicode(_))) => {
+                    let mut utf16 = SmallVec::<[u16; 4]>::new();
+                    while let Some(Token::Control(ControlWord::Unicode(code))) =
+                        self.tokens.get(self.pos)
+                    {
+                        utf16.push(*code as u16);
+                        self.pos += 1;
+                    }
+                    name.push_str(&String::from_utf16(&utf16).map_err(|error| {
+                        RtfError::InvalidUnicode(format!("invalid Unicode bookmark name: {error}"))
+                    })?);
+                    fallback_skip = unicode_skip.saturating_mul(utf16.len());
+                    continue;
+                },
+                Some(Token::Control(ControlWord::UnicodeSkip(value))) => {
+                    unicode_skip = (*value).max(0) as usize;
+                },
+                _ => {},
+            }
+            self.pos += 1;
+            if name.len() > MAX_BOOKMARK_NAME_BYTES {
+                return Err(RtfError::MalformedDocument(
+                    "RTF bookmark name exceeds the safety limit".to_string(),
+                ));
+            }
+        }
+        if depth != 0 {
+            return Err(RtfError::UnexpectedEof);
+        }
+        let name = name.trim_end_matches(['\r', '\n']).to_string();
+        if name.is_empty() {
+            return Ok(());
+        }
+
+        if is_start {
+            if self.next_bookmark_order >= MAX_BOOKMARKS {
+                return Err(RtfError::MalformedDocument(
+                    "RTF bookmark count exceeds the safety limit".to_string(),
+                ));
+            }
+            let bookmark = OpenBookmark {
+                name: name.clone(),
+                position: self.body_text_len,
+                first_column,
+                last_column,
+                is_public,
+                order: self.next_bookmark_order,
+            };
+            self.next_bookmark_order += 1;
+            self.open_bookmarks.entry(name).or_default().push(bookmark);
+        } else if let Some(open) = self.open_bookmarks.get_mut(&name).and_then(Vec::pop) {
+            self.bookmark_spans.push(BookmarkSpan {
+                bookmark: open,
+                end: self.body_text_len,
+            });
+        }
+        Ok(())
+    }
+
+    fn finalize_bookmarks(&mut self) -> RtfResult<()> {
+        for bookmarks in self.open_bookmarks.values_mut() {
+            for bookmark in bookmarks.drain(..) {
+                self.bookmark_spans.push(BookmarkSpan {
+                    bookmark,
+                    end: self.body_text_len,
+                });
+            }
+        }
+        self.bookmark_spans
+            .sort_unstable_by_key(|span| span.bookmark.order);
+        if self.bookmark_spans.is_empty() {
+            return Ok(());
+        }
+
+        let mut body = String::with_capacity(self.body_text_len);
+        for block in &self.blocks {
+            body.push_str(block.text.as_ref());
+        }
+        for span in self.bookmark_spans.drain(..) {
+            let content = body.get(span.bookmark.position..span.end).ok_or_else(|| {
+                RtfError::MalformedDocument("bookmark does not align to body text".to_string())
+            })?;
+            self.bookmarks.add(super::bookmark::Bookmark {
+                name: Cow::Owned(span.bookmark.name),
+                position: span.bookmark.position,
+                content: Cow::Owned(content.to_string()),
+                first_column: span.bookmark.first_column,
+                last_column: span.bookmark.last_column,
+                is_public: span.bookmark.is_public,
+            });
+        }
+        Ok(())
+    }
+
     fn parse_info_text(&mut self, field: InfoTextField) -> RtfResult<()> {
         self.pos += 1; // destination control word
         let mut value = String::new();
@@ -1176,17 +1349,19 @@ impl<'a> Parser<'a> {
         // Skip fallback characters based on unicode_skip count
         // Fallback chars are for non-Unicode readers (usually hex escapes or plain ASCII)
         let mut fallback_skip = skip_count * unicode_values.len();
+        let mut fallback_remainder = None;
 
         // Handle fallback: skip the next N characters/tokens
         while fallback_skip > 0 && self.pos < self.tokens.len() {
             match &self.tokens[self.pos] {
                 Token::Text(text) => {
-                    let text_len = text.len();
-                    if text_len <= fallback_skip {
-                        fallback_skip -= text_len;
+                    let character_count = text.chars().count();
+                    if character_count <= fallback_skip {
+                        fallback_skip -= character_count;
                         self.pos += 1;
                     } else {
-                        // Partial text consumption - not ideal but handle it
+                        fallback_remainder =
+                            Some(text.chars().skip(fallback_skip).collect::<String>());
                         fallback_skip = 0;
                         self.pos += 1;
                     }
@@ -1207,11 +1382,34 @@ impl<'a> Parser<'a> {
         let unicode_str = String::from_utf16(&unicode_values)
             .map_err(|e| RtfError::InvalidUnicode(format!("Invalid Unicode sequence: {}", e)))?;
 
-        // Add to document
-        let allocated = self.arena.alloc_str(&unicode_str);
-        let state = self.current_state()?;
-        let block = StyleBlock::new(Cow::Borrowed(allocated), state.formatting, state.paragraph);
-        self.blocks.push(block);
+        let state = self.current_state()?.clone();
+        if state.in_table {
+            self.current_cell_text
+                .extend_from_slice(unicode_str.as_bytes());
+            if let Some(remainder) = fallback_remainder {
+                self.current_cell_text
+                    .extend_from_slice(remainder.as_bytes());
+            }
+        } else {
+            // Add the Unicode sequence to the document as its own formatted block.
+            let allocated = self.arena.alloc_str(&unicode_str);
+            let block =
+                StyleBlock::new(Cow::Borrowed(allocated), state.formatting, state.paragraph);
+            self.body_text_len =
+                self.body_text_len
+                    .checked_add(allocated.len())
+                    .ok_or_else(|| {
+                        RtfError::MalformedDocument("RTF body text length overflow".into())
+                    })?;
+            self.blocks.push(block);
+
+            // A fallback and subsequent text often share one lexer token. Preserve
+            // the portion after the configured fallback character count.
+            if let Some(remainder) = fallback_remainder {
+                let mut buffer = SmallVec::<[u8; 256]>::from_slice(remainder.as_bytes());
+                self.flush_text_buffer(&mut buffer)?;
+            }
+        }
 
         Ok(())
     }

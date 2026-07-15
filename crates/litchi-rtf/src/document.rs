@@ -546,12 +546,21 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Convert bookmarks to owned
-    #[allow(clippy::needless_pass_by_value)]
     fn convert_bookmarks_to_owned(
-        _bookmarks: super::bookmark::BookmarkTable<'_>,
+        bookmarks: super::bookmark::BookmarkTable<'_>,
     ) -> super::bookmark::BookmarkTable<'static> {
-        // TODO: Implement proper conversion when bookmark parsing is fully implemented
-        super::bookmark::BookmarkTable::new()
+        let mut owned = super::bookmark::BookmarkTable::new();
+        for bookmark in bookmarks.bookmarks() {
+            owned.add(super::bookmark::Bookmark {
+                name: Cow::Owned(bookmark.name.clone().into_owned()),
+                position: bookmark.position,
+                content: Cow::Owned(bookmark.content.clone().into_owned()),
+                first_column: bookmark.first_column,
+                last_column: bookmark.last_column,
+                is_public: bookmark.is_public,
+            });
+        }
+        owned
     }
 
     /// Convert shapes to owned
@@ -742,5 +751,23 @@ mod tests {
         let doc = RtfDocument::parse(rtf).unwrap();
         assert_eq!(doc.info().title.as_deref(), Some("Kept"));
         assert_eq!(doc.text(), "Text");
+    }
+
+    #[test]
+    fn parses_nested_bookmarks_with_range_metadata() {
+        let rtf = r#"{\rtf1\ansi Before {\*\bkmkstart\bkmkcolf1\bkmkcoll3\bkmkpub Outer}alpha {\*\bkmkstart Inner}\u20320?{\*\bkmkend Inner} omega{\*\bkmkend Outer} After}"#;
+        let doc = RtfDocument::parse(rtf).unwrap();
+        assert_eq!(doc.text(), "Before alpha 你 omega After");
+
+        let outer = doc.bookmarks().get("Outer").unwrap();
+        assert_eq!(outer.position, "Before ".len());
+        assert_eq!(outer.content, "alpha 你 omega");
+        assert_eq!(outer.first_column, Some(1));
+        assert_eq!(outer.last_column, Some(3));
+        assert!(outer.is_public);
+
+        let inner = doc.bookmarks().get("Inner").unwrap();
+        assert_eq!(inner.position, "Before alpha ".len());
+        assert_eq!(inner.content, "你");
     }
 }
