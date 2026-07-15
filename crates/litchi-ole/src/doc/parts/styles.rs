@@ -271,6 +271,57 @@ impl StyleSheet {
         Ok((effective_index, properties))
     }
 
+    /// Resolve the paragraph and character properties contributed by a table style.
+    ///
+    /// The returned index is the effective table style index, using fixed style
+    /// 11 when the requested slot is empty, missing, or not a table style. Style
+    /// properties are applied parent-first so a derived table style overrides its
+    /// ancestors. Conditional `sprmPCnf` and `sprmCCnf` records remain available
+    /// in the returned properties for the table layout pass to apply by cell.
+    pub fn resolve_table_text_properties(
+        &self,
+        requested_index: u16,
+    ) -> Result<(
+        u16,
+        super::pap::ParagraphProperties,
+        super::chp::CharacterProperties,
+    )> {
+        let effective_index = self.effective_table_style_index(requested_index);
+        let Some(style) = self
+            .get(effective_index)
+            .filter(|style| style.kind == StyleKind::Table)
+        else {
+            return Ok((
+                effective_index,
+                super::pap::ParagraphProperties::default(),
+                super::chp::CharacterProperties::default(),
+            ));
+        };
+
+        let mut paragraph = Vec::new();
+        let mut character = Vec::new();
+        for style in self.style_chain(style) {
+            if style.kind != StyleKind::Table {
+                continue;
+            }
+            if let Some(properties) = style.paragraph_properties() {
+                let properties = strip_paragraph_style_index(properties, style.index)?;
+                validate_style_sprms(properties, 1, "table-style UpxPapx")?;
+                paragraph.extend_from_slice(properties);
+            }
+            if let Some(properties) = style.character_properties() {
+                validate_style_sprms(properties, 2, "table-style UpxChpx")?;
+                character.extend_from_slice(properties);
+            }
+        }
+
+        Ok((
+            effective_index,
+            super::pap::ParagraphProperties::from_sprm(&paragraph)?,
+            super::chp::CharacterProperties::from_sprm(&character)?,
+        ))
+    }
+
     /// Resolve the paragraph and character property differences contributed by
     /// a paragraph style, in parent-first application order.
     ///
@@ -1267,6 +1318,142 @@ mod tests {
             fallback.justification,
             super::super::tap::TableJustification::Center
         );
+    }
+
+    #[test]
+    fn resolves_table_text_style_inheritance_conditions_and_fallback() {
+        use crate::sprm_operations::{
+            SPRM_C_CNF, SPRM_C_F_BOLD, SPRM_C_F_ITALIC, SPRM_P_CNF, SPRM_P_F_KEEP,
+            SPRM_P_F_KEEP_FOLLOW,
+        };
+
+        fn append(grpprl: &mut Vec<u8>, opcode: u16, operand: &[u8]) {
+            grpprl.extend_from_slice(&opcode.to_le_bytes());
+            grpprl.extend_from_slice(operand);
+        }
+
+        fn conditional(opcode: u16, condition: u16, nested: &[u8]) -> Vec<u8> {
+            let mut grpprl = opcode.to_le_bytes().to_vec();
+            grpprl.push((nested.len() + 2) as u8);
+            grpprl.extend_from_slice(&condition.to_le_bytes());
+            grpprl.extend_from_slice(nested);
+            grpprl
+        }
+
+        let mut normal_papx = Vec::new();
+        append(&mut normal_papx, SPRM_P_F_KEEP, &[1]);
+        let normal_conditional = [SPRM_P_F_KEEP_FOLLOW.to_le_bytes().as_slice(), &[1]].concat();
+        normal_papx.extend_from_slice(&conditional(SPRM_P_CNF, 0x0001, &normal_conditional));
+        let mut normal_chpx = Vec::new();
+        append(&mut normal_chpx, SPRM_C_F_BOLD, &[1]);
+        let normal_character_conditional =
+            [SPRM_C_F_ITALIC.to_le_bytes().as_slice(), &[1]].concat();
+        normal_chpx.extend_from_slice(&conditional(
+            SPRM_C_CNF,
+            0x0001,
+            &normal_character_conditional,
+        ));
+
+        let mut derived_papx = 15u16.to_le_bytes().to_vec();
+        append(&mut derived_papx, SPRM_P_F_KEEP, &[0]);
+        let derived_conditional = [SPRM_P_F_KEEP.to_le_bytes().as_slice(), &[1]].concat();
+        derived_papx.extend_from_slice(&conditional(SPRM_P_CNF, 0x0008, &derived_conditional));
+        let mut derived_chpx = Vec::new();
+        append(&mut derived_chpx, SPRM_C_F_BOLD, &[0]);
+        let derived_character_conditional = [SPRM_C_F_BOLD.to_le_bytes().as_slice(), &[1]].concat();
+        derived_chpx.extend_from_slice(&conditional(
+            SPRM_C_CNF,
+            0x0008,
+            &derived_character_conditional,
+        ));
+
+        let mut slots = vec![None; 16];
+        slots[0] = Some(std_record(0, 1, NIL_STYLE, 0, "Normal", &[&[], &[]]));
+        slots[10] = Some(std_record(65, 2, NIL_STYLE, 10, "Font", &[&[]]));
+        slots[11] = Some(std_record(
+            105,
+            3,
+            NIL_STYLE,
+            0,
+            "Normal Table",
+            &[&[], &normal_papx, &normal_chpx],
+        ));
+        slots[15] = Some(std_record(
+            0x0FFE,
+            3,
+            11,
+            0,
+            "Derived Table",
+            &[&[], &derived_papx, &derived_chpx],
+        ));
+        let stylesheet = parse(&stylesheet(slots)).unwrap();
+
+        let (effective, paragraph, character) =
+            stylesheet.resolve_table_text_properties(15).unwrap();
+        assert_eq!(effective, 15);
+        assert!(!paragraph.keep_on_page);
+        assert_eq!(paragraph.conditional_formats.len(), 2);
+        assert_eq!(
+            paragraph.conditional_formats[0].condition,
+            super::super::tap::TableStyleCondition::HeaderRow
+        );
+        assert!(paragraph.conditional_formats[0].properties.keep_with_next);
+        assert_eq!(
+            paragraph.conditional_formats[1].condition,
+            super::super::tap::TableStyleCondition::LastColumn
+        );
+        assert!(paragraph.conditional_formats[1].properties.keep_on_page);
+        assert_eq!(character.is_bold, Some(false));
+        assert_eq!(character.conditional_formats.len(), 2);
+        assert_eq!(
+            character.conditional_formats[0].condition,
+            super::super::tap::TableStyleCondition::HeaderRow
+        );
+        assert_eq!(
+            character.conditional_formats[0].properties.is_italic,
+            Some(true)
+        );
+        assert_eq!(
+            character.conditional_formats[1].condition,
+            super::super::tap::TableStyleCondition::LastColumn
+        );
+        assert_eq!(
+            character.conditional_formats[1].properties.is_bold,
+            Some(true)
+        );
+
+        let (effective, paragraph, character) =
+            stylesheet.resolve_table_text_properties(999).unwrap();
+        assert_eq!(effective, 11);
+        assert!(paragraph.keep_on_page);
+        assert_eq!(paragraph.conditional_formats.len(), 1);
+        assert_eq!(character.is_bold, Some(true));
+        assert_eq!(character.conditional_formats.len(), 1);
+    }
+
+    #[test]
+    fn rejects_malformed_table_text_style_property_sets_when_resolved() {
+        let mut slots = vec![None; 16];
+        slots[0] = Some(std_record(0, 1, NIL_STYLE, 0, "Normal", &[&[], &[]]));
+        slots[10] = Some(std_record(65, 2, NIL_STYLE, 10, "Font", &[&[]]));
+        slots[11] = Some(std_record(
+            105,
+            3,
+            NIL_STYLE,
+            0,
+            "Normal Table",
+            &[&[], &[], &[]],
+        ));
+        slots[15] = Some(std_record(
+            0x0FFE,
+            3,
+            11,
+            0,
+            "Malformed Table",
+            &[&[], &[0x35, 0x08, 1], &[]],
+        ));
+        let stylesheet = parse(&stylesheet(slots)).unwrap();
+        assert!(stylesheet.resolve_table_text_properties(15).is_err());
     }
 
     #[test]
