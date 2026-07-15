@@ -184,3 +184,79 @@ pub fn write_boolerr<W: Write>(
 
     Ok(())
 }
+
+/// Write a BIFF8 FORMULA record with an empty cached result.
+///
+/// The `fAlwaysCalc` flag requests recalculation when Excel opens the file.
+pub fn write_formula<W: Write>(
+    writer: &mut W,
+    row: u32,
+    col: u16,
+    xf_index: u16,
+    tokens: &[u8],
+) -> XlsResult<()> {
+    let row_u16 = u16::try_from(row).map_err(|_| {
+        XlsError::InvalidData(format!(
+            "Row index {row} exceeds BIFF8 limit 65535 for FORMULA record"
+        ))
+    })?;
+    if tokens.is_empty() {
+        return Err(XlsError::InvalidFormula(
+            "Formula token stream cannot be empty".to_string(),
+        ));
+    }
+    // A BIFF record payload is limited to 8,224 bytes. FORMULA contributes
+    // 22 fixed bytes before the token stream.
+    if tokens.len() > 8_202 {
+        return Err(XlsError::InvalidFormula(
+            "Formula token stream exceeds BIFF8 record limit".to_string(),
+        ));
+    }
+    let token_len = u16::try_from(tokens.len())
+        .map_err(|_| XlsError::InvalidFormula("Formula token length exceeds u16".to_string()))?;
+    let data_len = 22u16
+        .checked_add(token_len)
+        .ok_or_else(|| XlsError::InvalidFormula("Formula record length overflow".to_string()))?;
+
+    write_record_header(writer, 0x0006, data_len)?;
+    writer.write_all(&row_u16.to_le_bytes())?;
+    writer.write_all(&col.to_le_bytes())?;
+    writer.write_all(&xf_index.to_le_bytes())?;
+    // FormulaValue special cached EMPTY: type, reserved, data, reserved[3], marker.
+    writer.write_all(&[3, 0, 0, 0, 0, 0, 0xff, 0xff])?;
+    writer.write_all(&0x0001u16.to_le_bytes())?; // fAlwaysCalc
+    writer.write_all(&0u32.to_le_bytes())?; // chn
+    writer.write_all(&token_len.to_le_bytes())?;
+    writer.write_all(tokens)?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::write_formula;
+    use crate::xls::records::{CellRecord, FormulaValue, XlsEncoding};
+
+    #[test]
+    fn writes_formula_record_with_recalculation_and_empty_cache() {
+        let tokens = [0x1e, 2, 0, 0x1e, 3, 0, 0x03];
+        let mut bytes = Vec::new();
+        write_formula(&mut bytes, 4, 5, 15, &tokens).unwrap();
+        assert_eq!(&bytes[..4], &[0x06, 0x00, 29, 0]);
+        assert_eq!(u16::from_le_bytes([bytes[18], bytes[19]]), 1);
+
+        let record = CellRecord::parse(0x0006, &bytes[4..], &XlsEncoding::Utf16Le).unwrap();
+        assert!(
+            matches!(
+                record,
+                CellRecord::Formula {
+                    row: 4,
+                    col: 5,
+                    xf_index: 15,
+                    value: FormulaValue::Empty,
+                    ref formula,
+                } if formula == &tokens
+            ),
+            "{record:?}"
+        );
+    }
+}

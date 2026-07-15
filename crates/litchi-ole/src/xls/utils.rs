@@ -130,7 +130,7 @@ pub fn parse_formula_value(data: &[u8]) -> XlsResult<FormulaValue> {
         0x00 => Ok(FormulaValue::StringPending),
         0x01 => Ok(FormulaValue::Bool(data[2] != 0)),
         0x02 => Ok(FormulaValue::Error(data[2])),
-        0x03 => Ok(FormulaValue::String(String::new())),
+        0x03 => Ok(FormulaValue::Empty),
         value_type => Err(XlsError::InvalidData(format!(
             "Invalid formula cached-value type: {value_type}"
         ))),
@@ -281,7 +281,7 @@ mod tests {
         ));
         assert!(matches!(
             parse_formula_value(&[3, 0, 0, 0, 0, 0, 0xFF, 0xFF]).unwrap(),
-            FormulaValue::String(value) if value.is_empty()
+            FormulaValue::Empty
         ));
 
         let numeric = 3.5f64.to_le_bytes();

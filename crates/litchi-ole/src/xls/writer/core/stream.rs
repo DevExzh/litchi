@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::xls::writer::biff;
 use crate::xls::writer::formatting::FormattingManager;
+use crate::xls::writer::formula::{FormulaTokenizer, encode_ptg_tokens};
 use crate::xls::{XlsError, XlsResult};
 
 use super::named_range::XlsDefinedName as InternalDefinedName;
@@ -599,10 +600,14 @@ pub(crate) fn generate_workbook_stream(
                         .or_insert(stream.len() as u32);
                     biff::write_boolerr(&mut stream, *row, *col, xf_index, *value)?;
                 },
-                XlsCellValue::Formula(_formula) => {
-                    // Formula tokenization not yet implemented
-                    // Write as blank cell for now
-                    // Future enhancement: Parse formula to RPN tokens and write FORMULA record
+                XlsCellValue::Formula(formula) => {
+                    let expression = formula.strip_prefix('=').unwrap_or(formula);
+                    let tokens = FormulaTokenizer::new().tokenize(expression)?;
+                    let encoded = encode_ptg_tokens(&tokens);
+                    row_first_cell_positions
+                        .entry(*row)
+                        .or_insert(stream.len() as u32);
+                    biff::write_formula(&mut stream, *row, *col, xf_index, &encoded)?;
                 },
                 XlsCellValue::Blank => {
                     // Skip blank cells

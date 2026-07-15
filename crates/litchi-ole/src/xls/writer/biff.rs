@@ -30,6 +30,8 @@ mod validation;
 mod workbook;
 mod worksheet;
 
+pub(crate) use cells::write_formula;
+
 pub(crate) use modern_globals::{
     sxdbex_creation_timestamp_bytes, write_compat12, write_compress_pictures,
     write_pivot_cache_sxaddl_block, write_table_styles,

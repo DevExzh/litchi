@@ -66,6 +66,8 @@ pub enum Ptg {
     PtgGT,
     /// Not equal
     PtgNE,
+    /// Range operator
+    PtgRange,
     /// Function call (function index, arg count)
     PtgFunc(u16, u8),
     /// Parentheses
@@ -77,6 +79,7 @@ pub enum Ptg {
 /// Operator precedence
 fn get_precedence(op: &str) -> u8 {
     match op {
+        ":" => 5,
         "^" => 4,
         "*" | "/" => 3,
         "+" | "-" => 2,
@@ -304,7 +307,7 @@ impl FormulaTokenizer {
                         output.push(Ptg::PtgFunc(func_idx, argc));
                     }
                 },
-                "+" | "-" | "*" | "/" | "^" | "&" | "=" | "<" | ">" => {
+                "+" | "-" | "*" | "/" | "^" | "&" | "=" | "<" | ">" | ":" => {
                     self.handle_operator(&mut output, &mut operators, &op_str)?;
                 },
                 "," => {
@@ -380,6 +383,7 @@ impl FormulaTokenizer {
             "<=" => Ptg::PtgLE,
             ">" => Ptg::PtgGT,
             ">=" => Ptg::PtgGE,
+            ":" => Ptg::PtgRange,
             _ => return Err(XlsError::InvalidData(format!("Unknown operator: {}", op))),
         };
         output.push(ptg);
@@ -406,6 +410,7 @@ impl FormulaTokenizer {
             "<=" => "<=",
             ">" => ">",
             ">=" => ">=",
+            ":" => ":",
             _ => return Err(XlsError::InvalidData(format!("Unknown operator: {}", op))),
         };
 
@@ -521,6 +526,7 @@ pub fn encode_ptg_tokens(tokens: &[Ptg]) -> Vec<u8> {
             Ptg::PtgGE => bytes.push(0x0C),
             Ptg::PtgGT => bytes.push(0x0D),
             Ptg::PtgNE => bytes.push(0x0E),
+            Ptg::PtgRange => bytes.push(0x11),
             Ptg::PtgFunc(func_idx, argc) => {
                 bytes.push(0x42); // PtgFuncVar, value operand class
                 bytes.push(*argc);
@@ -750,6 +756,7 @@ mod tests {
         let _ = Ptg::PtgGE;
         let _ = Ptg::PtgGT;
         let _ = Ptg::PtgNE;
+        let _ = Ptg::PtgRange;
         let _ = Ptg::PtgFunc(0, 1);
         let _ = Ptg::PtgParen;
         let _ = Ptg::PtgMissArg;
@@ -864,6 +871,7 @@ mod tests {
             (Ptg::PtgGE, 0x0C),
             (Ptg::PtgGT, 0x0D),
             (Ptg::PtgNE, 0x0E),
+            (Ptg::PtgRange, 0x11),
             (Ptg::PtgParen, 0x15),
             (Ptg::PtgMissArg, 0x16),
         ];
@@ -872,5 +880,15 @@ mod tests {
             let bytes = encode_ptg_tokens(std::slice::from_ref(&ptg));
             assert_eq!(bytes[0], expected_opcode, "Opcode mismatch for {:?}", ptg);
         }
+    }
+
+    #[test]
+    fn test_tokenize_cell_range() {
+        let tokenizer = FormulaTokenizer::new();
+        let tokens = tokenizer.tokenize("SUM(A1:B1)").unwrap();
+        assert!(matches!(tokens[0], Ptg::PtgRef(0, 0, true, true)));
+        assert!(matches!(tokens[1], Ptg::PtgRef(0, 1, true, true)));
+        assert!(matches!(tokens[2], Ptg::PtgRange));
+        assert!(matches!(tokens[3], Ptg::PtgFunc(4, 1)));
     }
 }

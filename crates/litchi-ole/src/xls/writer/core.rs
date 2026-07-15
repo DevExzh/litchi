@@ -377,10 +377,9 @@ impl XlsWriter {
     /// * `col` - Column index (0-based)
     /// * `formula` - Formula string (without leading '=')
     ///
-    /// # Implementation Notes
-    ///
-    /// Formula tokenization is deferred as a future enhancement.
-    /// Formulas are currently written as blank cells.
+    /// The supported BIFF8 formula subset includes constants, cell/range
+    /// references, arithmetic/comparison operators, and built-in functions
+    /// recognized by [`FormulaTokenizer`](crate::xls::writer::FormulaTokenizer).
     pub fn write_formula(
         &mut self,
         sheet: usize,
@@ -1529,7 +1528,7 @@ impl XlsWriter {
     /// ✅ Basic structure generation (BOF, EOF, workbook globals)
     /// ✅ Cell record generation (Number, LabelSST, BoolErr)
     /// ✅ Shared string table (SST)
-    /// ❌ Formula tokenization (formulas stored as values currently)
+    /// ✅ Formula tokenization for the supported BIFF8 writer subset
     /// ❌ Cell formatting (XF records)
     /// ❌ Column widths / row heights
     /// ❌ Merged cells
@@ -1646,13 +1645,13 @@ impl XlsWriter {
 
     // Implementation status notes:
     // ✅ Building shared string table (SST) with deduplication - IMPLEMENTED
-    // ✅ Generating BIFF8 records for all cell types - IMPLEMENTED (Number, LabelSST, BoolErr)
+    // ✅ Generating BIFF8 records for supported cell types - Number, LabelSST, BoolErr, Formula
     // ❌ Worksheet management (rename, delete, reorder) - Future enhancement
     // ❌ Cell formatting (fonts, colors, borders, number formats) - Future enhancement
     // ❌ Column widths and row heights - Future enhancement
     // ❌ Merged cells - Future enhancement
     // ✅ Named ranges (simple A1-style, workbook and sheet scoped) - IMPLEMENTED
-    // ❌ Formulas (parsing and tokenization) - Future enhancement
+    // ✅ Formula parsing and tokenization for the supported writer subset
 }
 
 impl Default for XlsWriter {
@@ -1675,10 +1674,10 @@ impl Default for XlsWriter {
 /// - ✅ write_number() - Floating point cell (0x0203)
 /// - ✅ write_labelsst() - String cell (0x00FD)
 /// - ✅ write_boolerr() - Boolean/error cell (0x0205)
+/// - ✅ write_formula() - Formula cell with RPN tokens (0x0006)
 /// - ✅ write_continue() - Continuation record (0x003C)
 ///
 /// Future enhancements:
-/// - FORMULA record (0x0006) - For formula cells with RPN tokens
 /// - XF records (0x00E0) - For cell formatting
 /// - FONT records (0x0031) - For font definitions
 /// - FORMAT records (0x041E) - For number formats
@@ -1689,6 +1688,7 @@ impl Default for XlsWriter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use litchi_core::sheet::Cell;
     use std::io::Cursor;
 
     #[test]
@@ -1793,6 +1793,25 @@ mod tests {
 
         let cell = writer.worksheets[0].cells.get(&(0, 0)).unwrap();
         assert!(matches!(&cell.value, XlsCellValue::Formula(f) if f == "SUM(A1:B1)"));
+    }
+
+    #[test]
+    fn test_formula_round_trips_through_xls_reader() {
+        let mut writer = XlsWriter::new();
+        let sheet = writer.add_worksheet("Sheet1").unwrap();
+        writer.write_number(sheet, 0, 0, 2.0).unwrap();
+        writer.write_number(sheet, 0, 1, 3.0).unwrap();
+        writer.write_formula(sheet, 0, 2, "SUM(A1:B1)").unwrap();
+
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).unwrap();
+        output.set_position(0);
+        let workbook = crate::xls::XlsWorkbook::new(output).unwrap();
+        let formula_cell = workbook.xls_worksheet(0).unwrap().get_cell(0, 2).unwrap();
+
+        assert!(formula_cell.is_formula());
+        assert_eq!(formula_cell.formula(), Some("=SUM((A1:B1))"));
+        assert!(!formula_cell.formula_bytes().unwrap().is_empty());
     }
 
     #[test]
