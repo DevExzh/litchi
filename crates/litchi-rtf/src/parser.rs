@@ -450,6 +450,18 @@ impl<'a> Parser<'a> {
                     self.states.pop();
                     return Ok(());
                 },
+                Token::Control(ControlWord::Shape) => {
+                    let shape = self.parse_shape_destination()?;
+                    self.shapes.push(shape);
+                    self.states.pop();
+                    return Ok(());
+                },
+                Token::Control(ControlWord::ShapeGroup) => {
+                    let group = self.parse_shape_group_destination()?;
+                    self.shape_groups.push(group);
+                    self.states.pop();
+                    return Ok(());
+                },
                 Token::Control(ControlWord::Picture) => {
                     // Mark as picture destination and extract
                     if let Some(state) = self.states.last_mut() {
@@ -2769,6 +2781,350 @@ impl<'a> Parser<'a> {
             && table.row_count() > 0
         {
             self.tables.push(table);
+        }
+    }
+
+    /// Parse a `shp` destination and its nested shape-property groups.
+    fn parse_shape_destination(&mut self) -> RtfResult<super::shape::Shape<'a>> {
+        use super::shape::{Shape, ShapeType};
+
+        let mut shape = Shape::new(ShapeType::Unknown);
+        let mut text = String::new();
+        let mut depth = 0usize;
+        let mut text_depth = None;
+        let mut right = None;
+        let mut bottom = None;
+        self.pos += 1; // consume \shp
+
+        while self.pos < self.tokens.len() {
+            match &self.tokens[self.pos] {
+                Token::OpenBrace
+                    if self.nested_control_word() == Some(ControlWord::ShapeProperty) =>
+                {
+                    let (name, value) = self.parse_shape_property_group()?;
+                    Self::apply_shape_property(&mut shape, &name, &value);
+                },
+                Token::OpenBrace => {
+                    depth += 1;
+                    self.pos += 1;
+                },
+                Token::CloseBrace if depth == 0 => {
+                    self.pos += 1;
+                    break;
+                },
+                Token::CloseBrace => {
+                    if text_depth == Some(depth) {
+                        text_depth = None;
+                    }
+                    depth -= 1;
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ShapeType(value)) => {
+                    shape.shape_type = Self::shape_type_from_rtf(*value);
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ShapeLeft(value)) => {
+                    shape.geometry.x = *value;
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ShapeTop(value)) => {
+                    shape.geometry.y = *value;
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ShapeRight(value)) => {
+                    right = Some(*value);
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ShapeBottom(value)) => {
+                    bottom = Some(*value);
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ShapeWidth(value)) => {
+                    shape.geometry.width = *value;
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ShapeHeight(value)) => {
+                    shape.geometry.height = *value;
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ShapeRotation(value)) => {
+                    shape.geometry.rotation = *value;
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ShapeZOrder(value)) => {
+                    shape.geometry.z_order = *value;
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ShapeWrap(value)) => {
+                    shape.wrap_mode = match value {
+                        1 => super::shape::WrapMode::None,
+                        2 => super::shape::WrapMode::Square,
+                        4 => super::shape::WrapMode::Tight,
+                        3 | 5 => super::shape::WrapMode::Through,
+                        _ => shape.wrap_mode,
+                    };
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ShapeBelowText(value)) => {
+                    shape.behind_doc = *value;
+                    if *value {
+                        shape.wrap_mode = super::shape::WrapMode::Behind;
+                    }
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ShapeLockAnchor) => {
+                    shape.locked = true;
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ShapeText) => {
+                    text_depth = Some(depth);
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::Unicode(code)) if text_depth.is_some() => {
+                    text.push_str(&self.parse_destination_unicode_sequence(*code)?);
+                },
+                Token::Control(ControlWord::Par | ControlWord::Line) if text_depth.is_some() => {
+                    text.push('\n');
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::Tab) if text_depth.is_some() => {
+                    text.push('\t');
+                    self.pos += 1;
+                },
+                Token::Text(value) if text_depth.is_some() => {
+                    text.push_str(value);
+                    self.pos += 1;
+                },
+                _ => self.pos += 1,
+            }
+        }
+        if !text.is_empty() {
+            shape.text = Cow::Owned(text);
+            shape.text_formatting = self.current_state().ok().map(|state| state.formatting);
+        }
+        if let Some(right) = right {
+            shape.geometry.width = right.saturating_sub(shape.geometry.x);
+        }
+        if let Some(bottom) = bottom {
+            shape.geometry.height = bottom.saturating_sub(shape.geometry.y);
+        }
+        Ok(shape)
+    }
+
+    fn parse_shape_property_group(&mut self) -> RtfResult<(String, String)> {
+        #[derive(Clone, Copy, PartialEq, Eq)]
+        enum PropertyPart {
+            Name,
+            Value,
+        }
+
+        let mut name = String::new();
+        let mut value = String::new();
+        let mut part = None;
+        let mut part_depth = None;
+        let mut depth = 0usize;
+        self.pos += 1; // consume the opening brace
+        while self.pos < self.tokens.len() {
+            match &self.tokens[self.pos] {
+                Token::OpenBrace => {
+                    depth += 1;
+                    self.pos += 1;
+                },
+                Token::CloseBrace if depth == 0 => {
+                    self.pos += 1;
+                    break;
+                },
+                Token::CloseBrace => {
+                    if part_depth == Some(depth) {
+                        part = None;
+                        part_depth = None;
+                    }
+                    depth -= 1;
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ShapePropertyName) => {
+                    part = Some(PropertyPart::Name);
+                    part_depth = Some(depth);
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ShapePropertyValue) => {
+                    part = Some(PropertyPart::Value);
+                    part_depth = Some(depth);
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::Unicode(code)) if part.is_some() => {
+                    let decoded = self.parse_destination_unicode_sequence(*code)?;
+                    match part {
+                        Some(PropertyPart::Name) => name.push_str(&decoded),
+                        Some(PropertyPart::Value) => value.push_str(&decoded),
+                        None => {},
+                    }
+                },
+                Token::Text(text) => {
+                    match part {
+                        Some(PropertyPart::Name) => name.push_str(text),
+                        Some(PropertyPart::Value) => value.push_str(text),
+                        None => {},
+                    }
+                    self.pos += 1;
+                },
+                _ => self.pos += 1,
+            }
+        }
+        Ok((name.trim().to_string(), value.trim().to_string()))
+    }
+
+    fn apply_shape_property(shape: &mut super::shape::Shape<'a>, name: &str, value: &str) {
+        match name {
+            "shapeType" => {
+                if let Ok(value) = value.parse() {
+                    shape.shape_type = Self::shape_type_from_rtf(value);
+                }
+            },
+            "wzName" => shape.name = Cow::Owned(value.to_string()),
+            "fBehindDocument" => shape.behind_doc = value != "0",
+            "fLockPosition" | "fLockAgainstGrouping" => shape.locked = value != "0",
+            "fFilled" => {
+                shape.fill.fill_type = if value == "0" {
+                    super::shape::FillType::None
+                } else {
+                    super::shape::FillType::Solid
+                };
+            },
+            _ => {},
+        }
+    }
+
+    fn parse_shape_group_destination(&mut self) -> RtfResult<super::shape::ShapeGroup<'a>> {
+        let mut group = super::shape::ShapeGroup::new();
+        let mut depth = 0usize;
+        let mut right = None;
+        let mut bottom = None;
+        self.pos += 1; // consume \shpgrp
+
+        while self.pos < self.tokens.len() {
+            match &self.tokens[self.pos] {
+                Token::OpenBrace
+                    if self.nested_control_word() == Some(ControlWord::ShapeProperty) =>
+                {
+                    let (name, value) = self.parse_shape_property_group()?;
+                    if name == "wzName" {
+                        group.name = Cow::Owned(value);
+                    }
+                },
+                Token::OpenBrace if self.nested_shape_control() == Some(ControlWord::Shape) => {
+                    self.pos += 1;
+                    if matches!(
+                        self.tokens.get(self.pos),
+                        Some(Token::Control(ControlWord::IgnorableDestination))
+                    ) {
+                        self.pos += 1;
+                    }
+                    group.add_shape(self.parse_shape_destination()?);
+                },
+                Token::OpenBrace
+                    if self.nested_shape_control() == Some(ControlWord::ShapeGroup) =>
+                {
+                    self.pos += 1;
+                    if matches!(
+                        self.tokens.get(self.pos),
+                        Some(Token::Control(ControlWord::IgnorableDestination))
+                    ) {
+                        self.pos += 1;
+                    }
+                    group
+                        .shapes
+                        .extend(self.parse_shape_group_destination()?.shapes);
+                },
+                Token::OpenBrace => {
+                    depth += 1;
+                    self.pos += 1;
+                },
+                Token::CloseBrace if depth == 0 => {
+                    self.pos += 1;
+                    break;
+                },
+                Token::CloseBrace => {
+                    depth -= 1;
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ShapeLeft(value)) => {
+                    group.geometry.x = *value;
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ShapeTop(value)) => {
+                    group.geometry.y = *value;
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ShapeRight(value)) => {
+                    right = Some(*value);
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ShapeBottom(value)) => {
+                    bottom = Some(*value);
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ShapeWidth(value)) => {
+                    group.geometry.width = *value;
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ShapeHeight(value)) => {
+                    group.geometry.height = *value;
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ShapeRotation(value)) => {
+                    group.geometry.rotation = *value;
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ShapeZOrder(value)) => {
+                    group.geometry.z_order = *value;
+                    self.pos += 1;
+                },
+                _ => self.pos += 1,
+            }
+        }
+        if let Some(right) = right {
+            group.geometry.width = right.saturating_sub(group.geometry.x);
+        }
+        if let Some(bottom) = bottom {
+            group.geometry.height = bottom.saturating_sub(group.geometry.y);
+        }
+        Ok(group)
+    }
+
+    fn nested_shape_control(&self) -> Option<ControlWord<'a>> {
+        match self.nested_control_word()? {
+            control @ (ControlWord::Shape | ControlWord::ShapeGroup) => Some(control),
+            _ => None,
+        }
+    }
+
+    fn nested_control_word(&self) -> Option<ControlWord<'a>> {
+        let mut index = self.pos.checked_add(1)?;
+        if matches!(
+            self.tokens.get(index),
+            Some(Token::Control(ControlWord::IgnorableDestination))
+        ) {
+            index += 1;
+        }
+        match self.tokens.get(index) {
+            Some(Token::Control(control)) => Some(*control),
+            _ => None,
+        }
+    }
+
+    fn shape_type_from_rtf(value: i32) -> super::shape::ShapeType {
+        use super::shape::ShapeType;
+        match value {
+            1 => ShapeType::Rectangle,
+            2 => ShapeType::RoundRectangle,
+            3 => ShapeType::Ellipse,
+            19 => ShapeType::Arc,
+            20 => ShapeType::Line,
+            75 => ShapeType::PictureFrame,
+            202 => ShapeType::TextBox,
+            0 => ShapeType::Polygon,
+            _ => ShapeType::Unknown,
         }
     }
 

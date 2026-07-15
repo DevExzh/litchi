@@ -607,21 +607,46 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Convert shapes to owned
-    #[allow(clippy::needless_pass_by_value)]
     fn convert_shapes_to_owned(
-        _shapes: Vec<super::shape::Shape<'_>>,
+        shapes: Vec<super::shape::Shape<'_>>,
     ) -> Vec<super::shape::Shape<'static>> {
-        // TODO: Implement proper conversion when shape parsing is fully implemented
-        Vec::new()
+        shapes
+            .into_iter()
+            .map(Self::convert_shape_to_owned)
+            .collect()
     }
 
     /// Convert shape groups to owned
-    #[allow(clippy::needless_pass_by_value)]
     fn convert_shape_groups_to_owned(
-        _groups: Vec<super::shape::ShapeGroup<'_>>,
+        groups: Vec<super::shape::ShapeGroup<'_>>,
     ) -> Vec<super::shape::ShapeGroup<'static>> {
-        // TODO: Implement proper conversion when shape group parsing is fully implemented
-        Vec::new()
+        groups
+            .into_iter()
+            .map(|group| super::shape::ShapeGroup {
+                name: Cow::Owned(group.name.into_owned()),
+                shapes: group
+                    .shapes
+                    .into_iter()
+                    .map(Self::convert_shape_to_owned)
+                    .collect(),
+                geometry: group.geometry,
+            })
+            .collect()
+    }
+
+    fn convert_shape_to_owned(shape: super::shape::Shape<'_>) -> super::shape::Shape<'static> {
+        super::shape::Shape {
+            shape_type: shape.shape_type,
+            geometry: shape.geometry,
+            fill: shape.fill,
+            border: shape.border,
+            text: Cow::Owned(shape.text.into_owned()),
+            text_formatting: shape.text_formatting,
+            wrap_mode: shape.wrap_mode,
+            behind_doc: shape.behind_doc,
+            locked: shape.locked,
+            name: Cow::Owned(shape.name.into_owned()),
+        }
     }
 
     /// Convert stylesheet to owned
@@ -787,6 +812,49 @@ mod tests {
         let doc = RtfDocument::parse(rtf).unwrap();
         let runs = doc.runs();
         assert!(!runs.is_empty());
+    }
+
+    #[test]
+    fn parses_and_owns_shapes_and_shape_groups() {
+        let rtf = r#"{\rtf1\ansi
+            {\shp\shpleft10\shptop20\shpright310\shpbottom140
+                \shprotation15\shpz4\shpwr4\shplockanchor{\*\shpinst
+                    {\sp{\sn shapeType}{\sv 202}}
+                    {\sp{\sn wzName}{\sv Owned Text Box}}
+                    {\sp{\sn fBehindDocument}{\sv 1}}
+                    {\sp{\sn fLockPosition}{\sv 1}}}
+                {\shptxt Hello \u20320?}}
+            {\shpgrp\shpleft1\shptop2\shpright801\shpbottom602
+                {\sp{\sn wzName}{\sv Owned Group}}
+                {\shp\shpinst1\shpleft5\shptop6\shpwidth70\shpheight80\shpfblwtxt1}
+                {\shp\shpinst3\shpleft15\shptop16\shpwidth90\shpheight100}}
+        }"#;
+        let doc = RtfDocument::parse(rtf).unwrap();
+
+        let shape = &doc.shapes()[0];
+        assert_eq!(shape.shape_type, crate::ShapeType::TextBox);
+        assert_eq!(shape.geometry.x, 10);
+        assert_eq!(shape.geometry.y, 20);
+        assert_eq!(shape.geometry.width, 300);
+        assert_eq!(shape.geometry.height, 120);
+        assert_eq!(shape.geometry.rotation, 15);
+        assert_eq!(shape.geometry.z_order, 4);
+        assert_eq!(shape.text, "Hello 你");
+        assert_eq!(shape.name, "Owned Text Box");
+        assert!(shape.behind_doc);
+        assert!(shape.locked);
+        assert_eq!(shape.wrap_mode, crate::WrapMode::Tight);
+        assert!(matches!(shape.text, Cow::Owned(_)));
+
+        let group = &doc.shape_groups()[0];
+        assert_eq!(group.geometry, crate::ShapeGeometry::new(1, 2, 800, 600));
+        assert_eq!(group.shapes.len(), 2);
+        assert_eq!(group.shapes[0].shape_type, crate::ShapeType::Rectangle);
+        assert!(group.shapes[0].behind_doc);
+        assert_eq!(group.shapes[0].wrap_mode, crate::WrapMode::Behind);
+        assert_eq!(group.shapes[1].shape_type, crate::ShapeType::Ellipse);
+        assert_eq!(group.name, "Owned Group");
+        assert!(matches!(group.name, Cow::Owned(_)));
     }
 
     #[test]

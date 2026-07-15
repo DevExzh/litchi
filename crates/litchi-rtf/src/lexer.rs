@@ -289,14 +289,24 @@ pub enum ControlWord<'a> {
 
     // Shapes
     Shape,
+    ShapeInstance,
     ShapeType(i32),
     ShapeLeft(i32),
     ShapeTop(i32),
+    ShapeRight(i32),
+    ShapeBottom(i32),
     ShapeWidth(i32),
     ShapeHeight(i32),
     ShapeRotation(i32),
     ShapeZOrder(i32),
+    ShapeWrap(i32),
+    ShapeBelowText(bool),
+    ShapeLockAnchor,
     ShapeGroup,
+    ShapeProperty,
+    ShapePropertyName,
+    ShapePropertyValue,
+    ShapeText,
 
     // Document info
     Title,
@@ -849,13 +859,22 @@ impl<'a> Lexer<'a> {
             // Shapes
             "shp" => ControlWord::Shape,
             "shpgrp" => ControlWord::ShapeGroup,
-            "shpinst" => ControlWord::ShapeType(param_value),
+            "shpinst" => param.map_or(ControlWord::ShapeInstance, ControlWord::ShapeType),
             "shpleft" => ControlWord::ShapeLeft(param_value),
             "shptop" => ControlWord::ShapeTop(param_value),
+            "shpright" => ControlWord::ShapeRight(param_value),
+            "shpbottom" => ControlWord::ShapeBottom(param_value),
             "shpwidth" => ControlWord::ShapeWidth(param_value),
             "shpheight" => ControlWord::ShapeHeight(param_value),
             "shprotation" => ControlWord::ShapeRotation(param_value),
             "shpz" => ControlWord::ShapeZOrder(param_value),
+            "shpwr" => ControlWord::ShapeWrap(param_value),
+            "shpfblwtxt" => ControlWord::ShapeBelowText(param_bool),
+            "shplockanchor" => ControlWord::ShapeLockAnchor,
+            "sp" => ControlWord::ShapeProperty,
+            "sn" => ControlWord::ShapePropertyName,
+            "sv" => ControlWord::ShapePropertyValue,
+            "shptxt" => ControlWord::ShapeText,
 
             // Document info
             "title" => ControlWord::Title,
