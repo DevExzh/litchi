@@ -413,6 +413,15 @@ impl<'a> Parser<'a> {
                             self.states.pop();
                             return Ok(());
                         },
+                        Some(Token::Control(ControlWord::BackgroundDestination)) => {
+                            self.pos += 2;
+                            if let Some(state) = self.states.last_mut() {
+                                state.destination = Destination::Other;
+                            }
+                            self.parse_content()?;
+                            self.states.pop();
+                            return Ok(());
+                        },
                         _ => {},
                     }
                     // Mark as other destination and skip
@@ -3025,6 +3034,11 @@ impl<'a> Parser<'a> {
             "fBehindDocument" => {
                 if let Some(value) = Self::parse_shape_bool(value) {
                     shape.behind_doc = value;
+                }
+            },
+            "fBackground" => {
+                if let Some(value) = Self::parse_shape_bool(value) {
+                    shape.is_background = value;
                 }
             },
             "fLockPosition" | "fLockAgainstGrouping" => {

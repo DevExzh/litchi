@@ -329,6 +329,8 @@ pub struct Shape<'a> {
     pub wrap_mode: WrapMode,
     /// Whether shape is behind text
     pub behind_doc: bool,
+    /// Whether the shape is a document/page background (`fBackground`)
+    pub is_background: bool,
     /// Whether shape is locked (cannot be moved/resized)
     pub locked: bool,
     /// Shape name/identifier
@@ -351,6 +353,7 @@ impl<'a> Shape<'a> {
             text_formatting: None,
             wrap_mode: WrapMode::default(),
             behind_doc: false,
+            is_background: false,
             locked: false,
             name: Cow::Borrowed(""),
             properties: Vec::new(),

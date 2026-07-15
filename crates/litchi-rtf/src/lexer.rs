@@ -307,6 +307,7 @@ pub enum ControlWord<'a> {
     ShapePropertyName,
     ShapePropertyValue,
     ShapeText,
+    BackgroundDestination,
 
     // Document info
     Title,
@@ -875,6 +876,7 @@ impl<'a> Lexer<'a> {
             "sn" => ControlWord::ShapePropertyName,
             "sv" => ControlWord::ShapePropertyValue,
             "shptxt" => ControlWord::ShapeText,
+            "background" => ControlWord::BackgroundDestination,
 
             // Document info
             "title" => ControlWord::Title,

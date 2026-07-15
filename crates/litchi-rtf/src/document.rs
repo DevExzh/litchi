@@ -650,6 +650,7 @@ impl<'a> RtfDocument<'a> {
             text_formatting: shape.text_formatting,
             wrap_mode: shape.wrap_mode,
             behind_doc: shape.behind_doc,
+            is_background: shape.is_background,
             locked: shape.locked,
             name: Cow::Owned(shape.name.into_owned()),
             properties: shape
@@ -946,6 +947,22 @@ mod tests {
         assert_eq!(shape.name, "PowerPlusWaterMarkObject142907");
         assert!(shape.behind_doc);
         assert_eq!(shape.property("gtextUNICODE"), Some("ASAP"));
+    }
+
+    #[test]
+    fn parses_shape_from_ignorable_page_background_destination() {
+        let rtf = include_str!("../../../test-data/rtf/page-background.rtf");
+        let doc = RtfDocument::parse(rtf).unwrap();
+
+        assert_eq!(doc.shapes().len(), 1);
+        let shape = &doc.shapes()[0];
+        assert_eq!(shape.shape_type, crate::ShapeType::Rectangle);
+        assert_eq!(shape.fill.color.raw(), 5_296_274);
+        assert!(shape.is_background);
+        assert!(shape.behind_doc);
+        assert_eq!(shape.property("bWMode"), Some("9"));
+        assert!(!doc.text().contains("shapeType"));
+        assert!(!doc.text().contains("fillColor"));
     }
 
     #[test]
