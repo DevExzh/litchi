@@ -115,6 +115,21 @@ impl std::fmt::Display for DocWriteError {
 
 impl std::error::Error for DocWriteError {}
 
+fn utf16_code_unit_len(text: &str) -> Result<u32, DocWriteError> {
+    let length = u32::try_from(text.encode_utf16().count()).map_err(|_| {
+        DocWriteError::InvalidData("DOC text exceeds the 32-bit CP range".to_string())
+    })?;
+    if length >= 0x7FFF_FFFF {
+        return Err(DocWriteError::InvalidData(
+            "DOC text exceeds the MS-DOC CP limit".to_string(),
+        ));
+    }
+    Ok(length)
+}
+
+type NoteStoryData = (Vec<u8>, Vec<u8>, u32);
+type HeaderStoryData = (Vec<u8>, u32);
+
 /// Character formatting properties
 #[derive(Debug, Clone, Default)]
 pub struct CharacterFormatting {
@@ -582,9 +597,9 @@ impl DocWriter {
         pieces: &mut Vec<Piece>,
         current_cp_total: &mut u32,
         font_builder: &mut FontTableBuilder,
-    ) -> Option<(Vec<u8>, Vec<u8>, u32)> {
+    ) -> Result<Option<NoteStoryData>, DocWriteError> {
         if entries.is_empty() {
-            return None;
+            return Ok(None);
         }
 
         let mut note_cp: u32 = 0;
@@ -610,7 +625,7 @@ impl DocWriter {
 
             // 2) Note body text
             let text = &entry.text;
-            let text_chars = text.chars().count() as u32;
+            let text_chars = utf16_code_unit_len(text)?;
             let fc_text_start = text_fc_start + text_stream.len() as u32;
             for u in text.encode_utf16() {
                 text_stream.extend_from_slice(&u.to_le_bytes());
@@ -693,7 +708,7 @@ impl DocWriter {
             plcf_txt.extend_from_slice(&cp.to_le_bytes());
         }
 
-        Some((plcf_ref, plcf_txt, note_cp))
+        Ok(Some((plcf_ref, plcf_txt, note_cp)))
     }
 
     /// Build header/footer story text and PlcfHdd
@@ -710,7 +725,7 @@ impl DocWriter {
         pieces: &mut Vec<Piece>,
         current_cp_total: &mut u32,
         font_builder: &mut FontTableBuilder,
-    ) -> Option<(Vec<u8>, u32)> {
+    ) -> Result<Option<HeaderStoryData>, DocWriteError> {
         // TODO(stage:headers_footers): support complex content (multiple paragraphs, fields)
         // For now, each defined header/footer is one paragraph, terminated by chEop (0x0D)
 
@@ -722,7 +737,7 @@ impl DocWriter {
             && self.footer_odd.is_none()
             && self.footer_first.is_none()
         {
-            return None;
+            return Ok(None);
         }
 
         // Build index->text mapping for 12 slots per MS-DOC PlcfHdd / Apache POI:
@@ -774,7 +789,7 @@ impl DocWriter {
                 for u in text.encode_utf16() {
                     text_stream.extend_from_slice(&u.to_le_bytes());
                 }
-                para_chars += text.chars().count() as u32;
+                para_chars += utf16_code_unit_len(text)?;
                 let run_fc_end = run_fc_start + para_chars * 2;
                 chpx_entries.push((run_fc_start, run_fc_end, grpprl));
                 let current_chpx_idx = chpx_entries.len() - 1;
@@ -843,7 +858,7 @@ impl DocWriter {
         }
         plcfhdd.extend_from_slice(&header_cp.to_le_bytes());
 
-        Some((plcfhdd, header_cp))
+        Ok(Some((plcfhdd, header_cp)))
     }
 
     /// Create a new table with the specified dimensions
@@ -1019,19 +1034,22 @@ impl DocWriter {
             for run in &paragraph.runs {
                 let run_fc_start = text_fc_start + text_stream.len() as u32;
                 let run_text = &run.text;
-                let run_len_chars = run_text.chars().count() as u32;
+                let run_len_chars = utf16_code_unit_len(run_text)?;
                 let grpprl = build_chpx_grpprl(&run.formatting, &mut font_builder);
 
                 // Track field characters in this run
-                for (char_offset, ch) in run_text.chars().enumerate() {
-                    let cp = current_cp + para_chars + char_offset as u32;
+                let mut utf16_offset = 0u32;
+                for ch in run_text.chars() {
+                    let cp = current_cp + para_chars + utf16_offset;
                     match ch as u32 {
                         0x0013 => field_char_cps.push((cp, 0x13)),
                         0x0014 => field_char_cps.push((cp, 0x14)),
                         0x0015 => field_char_cps.push((cp, 0x15)),
                         _ => {},
                     }
+                    utf16_offset += ch.len_utf16() as u32;
                 }
+                debug_assert_eq!(utf16_offset, run_len_chars);
 
                 for u in run_text.encode_utf16() {
                     text_stream.extend_from_slice(&u.to_le_bytes());
@@ -1112,7 +1130,7 @@ impl DocWriter {
             &mut pieces,
             &mut current_cp,
             &mut font_builder,
-        );
+        )?;
 
         // Build header/footer story
         let mut header_plcfhdd: Option<(Vec<u8>, u32)> = None;
@@ -1124,7 +1142,7 @@ impl DocWriter {
             &mut pieces,
             &mut current_cp,
             &mut font_builder,
-        ) {
+        )? {
             header_plcfhdd = Some((plcf_bytes, header_cp));
         }
 
@@ -1140,7 +1158,7 @@ impl DocWriter {
             &mut pieces,
             &mut current_cp,
             &mut font_builder,
-        );
+        )?;
 
         // Mandatory trailing paragraph mark when ANY subdocument exists.
         // Per MS-DOC spec: "The total number of character positions is
@@ -1509,18 +1527,21 @@ impl DocWriter {
             for run in &paragraph.runs {
                 let run_fc_start = text_fc_start + text_stream.len() as u32;
                 let run_text = &run.text;
-                let run_len_chars = run_text.chars().count() as u32;
+                let run_len_chars = utf16_code_unit_len(run_text)?;
                 let grpprl = build_chpx_grpprl(&run.formatting, &mut font_builder);
 
-                for (char_offset, ch) in run_text.chars().enumerate() {
-                    let cp = current_cp + para_chars + char_offset as u32;
+                let mut utf16_offset = 0u32;
+                for ch in run_text.chars() {
+                    let cp = current_cp + para_chars + utf16_offset;
                     match ch as u32 {
                         0x0013 => field_char_cps.push((cp, 0x13)),
                         0x0014 => field_char_cps.push((cp, 0x14)),
                         0x0015 => field_char_cps.push((cp, 0x15)),
                         _ => {},
                     }
+                    utf16_offset += ch.len_utf16() as u32;
                 }
+                debug_assert_eq!(utf16_offset, run_len_chars);
 
                 for u in run_text.encode_utf16() {
                     text_stream.extend_from_slice(&u.to_le_bytes());
@@ -1595,7 +1616,7 @@ impl DocWriter {
             &mut pieces,
             &mut current_cp,
             &mut font_builder,
-        );
+        )?;
 
         let mut header_plcfhdd: Option<(Vec<u8>, u32)> = None;
         if let Some((plcf_bytes, header_cp)) = self.build_header_story(
@@ -1606,7 +1627,7 @@ impl DocWriter {
             &mut pieces,
             &mut current_cp,
             &mut font_builder,
-        ) {
+        )? {
             header_plcfhdd = Some((plcf_bytes, header_cp));
         }
 
@@ -1621,7 +1642,7 @@ impl DocWriter {
             &mut pieces,
             &mut current_cp,
             &mut font_builder,
-        );
+        )?;
 
         // Mandatory trailing paragraph mark when ANY subdocument exists (same as save()).
         let has_subdocs =
@@ -2460,6 +2481,83 @@ mod tests {
         assert_eq!(
             paragraphs[1].properties().line_spacing_type,
             crate::doc::parts::pap::LineSpacingType::Double
+        );
+    }
+
+    #[test]
+    fn supplementary_unicode_uses_utf16_code_unit_character_positions() {
+        assert_eq!(utf16_code_unit_len("A😀𝄞").unwrap(), 5);
+
+        let mut writer = DocWriter::new();
+        writer
+            .add_paragraph_runs(
+                vec![
+                    (
+                        "A😀".to_string(),
+                        CharacterFormatting {
+                            bold: Some(true),
+                            ..CharacterFormatting::default()
+                        },
+                    ),
+                    (
+                        "B𝄞C".to_string(),
+                        CharacterFormatting {
+                            italic: Some(true),
+                            ..CharacterFormatting::default()
+                        },
+                    ),
+                ],
+                ParagraphFormatting::default(),
+            )
+            .unwrap();
+        writer.add_paragraph("After 🦀").unwrap();
+        writer
+            .add_paragraph("😀\u{13} HYPERLINK \"https://example.test\" \u{14}link\u{15}")
+            .unwrap();
+        writer.set_odd_header("Header 😀");
+        writer.set_odd_footer("Footer 𝄞");
+        writer.add_footnote(FootnoteEntry::new(1, "Footnote 🦀", 1));
+        writer.add_endnote(FootnoteEntry::new(2, "Endnote 😀", 1));
+
+        let mut cursor = Cursor::new(Vec::new());
+        writer.write_to(&mut cursor).unwrap();
+        let mut package =
+            super::super::super::Package::from_reader(Cursor::new(cursor.into_inner())).unwrap();
+        let document = package.document().unwrap();
+
+        let paragraphs = document.paragraphs().unwrap();
+        assert_eq!(paragraphs[0].text().unwrap(), "A😀B𝄞C\u{2}\u{2}");
+        assert_eq!(paragraphs[1].text().unwrap(), "After 🦀");
+        let fields = document.fields_table().unwrap().main_document_fields();
+        assert_eq!(fields.len(), 1);
+        assert_eq!(fields[0].start_cp, 21);
+        assert_eq!(
+            fields[0].field_type,
+            crate::doc::parts::fields::FieldType::Hyperlink
+        );
+        let headers = document.headers().unwrap();
+        assert!(
+            headers
+                .iter()
+                .any(|header| header.text().contains("Header 😀")),
+            "{headers:?}"
+        );
+        let footers = document.footers().unwrap();
+        assert!(
+            footers
+                .iter()
+                .any(|footer| footer.text().contains("Footer 𝄞")),
+            "{footers:?}"
+        );
+        assert!(
+            document.footnotes().unwrap()[0]
+                .text()
+                .contains("Footnote 🦀")
+        );
+        assert!(
+            document.endnotes().unwrap()[0]
+                .text()
+                .contains("Endnote 😀")
         );
     }
 

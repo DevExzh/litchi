@@ -85,8 +85,8 @@ impl FootnotesTable {
         // Check if footnotes exist in the document
         if let Some((subdoc_start, _subdoc_end)) = fib.get_footnote_range() {
             // Parse footnote reference PLCF (plcfFndRef)
-            // FIB index 5: fcPlcfFndRef and lcbPlcfFndRef
-            if let Some((offset, length)) = fib.get_table_pointer(5)
+            // FIB index 2: fcPlcfFndRef and lcbPlcfFndRef
+            if let Some((offset, length)) = fib.get_table_pointer(2)
                 && length > 0
                 && (offset as usize) < table_stream.len()
             {
@@ -97,8 +97,8 @@ impl FootnotesTable {
                     // Parse reference PLCF with 2-byte FRD descriptors
                     if let Some(ref_plcf) = PlcfParser::parse(&plcf_data[..plcf_len], 2) {
                         // Parse footnote text PLCF (plcfFndTxt)
-                        // FIB index 6: fcPlcfFndTxt and lcbPlcfFndTxt
-                        if let Some((txt_offset, txt_length)) = fib.get_table_pointer(6)
+                        // FIB index 3: fcPlcfFndTxt and lcbPlcfFndTxt
+                        if let Some((txt_offset, txt_length)) = fib.get_table_pointer(3)
                             && txt_length > 0
                             && (txt_offset as usize) < table_stream.len()
                         {
@@ -209,8 +209,8 @@ impl EndnotesTable {
         // Check if endnotes exist in the document
         if let Some((subdoc_start, _subdoc_end)) = fib.get_endnote_range() {
             // Parse endnote reference PLCF (plcfEndRef)
-            // FIB index 7: fcPlcfEndRef and lcbPlcfEndRef
-            if let Some((offset, length)) = fib.get_table_pointer(7)
+            // FIB index 46: fcPlcfEndRef and lcbPlcfEndRef
+            if let Some((offset, length)) = fib.get_table_pointer(46)
                 && length > 0
                 && (offset as usize) < table_stream.len()
             {
@@ -221,8 +221,8 @@ impl EndnotesTable {
                     // Parse reference PLCF with 2-byte FRD descriptors
                     if let Some(ref_plcf) = PlcfParser::parse(&plcf_data[..plcf_len], 2) {
                         // Parse endnote text PLCF (plcfEndTxt)
-                        // FIB index 8: fcPlcfEndTxt and lcbPlcfEndTxt
-                        if let Some((txt_offset, txt_length)) = fib.get_table_pointer(8)
+                        // FIB index 47: fcPlcfEndTxt and lcbPlcfEndTxt
+                        if let Some((txt_offset, txt_length)) = fib.get_table_pointer(47)
                             && txt_length > 0
                             && (txt_offset as usize) < table_stream.len()
                         {

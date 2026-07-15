@@ -26,6 +26,8 @@ pub const PIECE_DESCRIPTOR_SIZE: usize = 8;
 pub struct TextExtractor {
     /// The extracted text
     text: String,
+    /// UTF-16 CP boundary to UTF-8 byte-offset mapping.
+    cp_to_byte: Vec<usize>,
 }
 
 impl TextExtractor {
@@ -42,9 +44,11 @@ impl TextExtractor {
         table_stream: &[u8],
     ) -> Result<Self> {
         // Extract text using the piece table
-        let text = Self::extract_text_from_pieces(fib, word_document, table_stream)?;
+        let utf16 = Self::extract_text_from_pieces(fib, word_document, table_stream)?;
+        let text = String::from_utf16_lossy(&utf16);
+        let cp_to_byte = Self::build_cp_to_byte_map(&text);
 
-        Ok(Self { text })
+        Ok(Self { text, cp_to_byte })
     }
 
     /// Extract all text from the document.
@@ -70,21 +74,35 @@ impl TextExtractor {
     ///
     /// # Returns
     ///
-    /// The text slice for the given CP range, or an empty string if out of bounds.
+    /// Text for the given UTF-16 CP range, or an empty string if out of bounds.
+    ///
+    /// MS-DOC ranges must not split a UTF-16 surrogate pair. Such malformed ranges return an
+    /// empty slice because Rust strings cannot represent an isolated surrogate code unit.
     pub fn text_at_range(&self, start_cp: u32, end_cp: u32) -> &str {
-        let chars: Vec<char> = self.text.chars().collect();
-        let start = start_cp as usize;
-        let end = (end_cp as usize).min(chars.len());
-
-        if start >= end || start >= chars.len() {
+        let start = usize::try_from(start_cp)
+            .unwrap_or(usize::MAX)
+            .min(self.cp_to_byte.len().saturating_sub(1));
+        let end = usize::try_from(end_cp)
+            .unwrap_or(usize::MAX)
+            .min(self.cp_to_byte.len().saturating_sub(1));
+        if start >= end
+            || (start > 0 && self.cp_to_byte[start] == self.cp_to_byte[start - 1])
+            || (end > 0 && self.cp_to_byte[end] == self.cp_to_byte[end - 1])
+        {
             return "";
         }
+        &self.text[self.cp_to_byte[start]..self.cp_to_byte[end]]
+    }
 
-        // Convert character indices to byte offsets
-        let byte_start: usize = chars[..start].iter().map(|c| c.len_utf8()).sum();
-        let byte_end: usize = chars[..end].iter().map(|c| c.len_utf8()).sum();
-
-        &self.text[byte_start..byte_end]
+    fn build_cp_to_byte_map(text: &str) -> Vec<usize> {
+        let mut cp_to_byte = Vec::with_capacity(text.encode_utf16().count() + 1);
+        for (offset, ch) in text.char_indices() {
+            for _ in 0..ch.len_utf16() {
+                cp_to_byte.push(offset);
+            }
+        }
+        cp_to_byte.push(text.len());
+        cp_to_byte
     }
 
     /// Extract text using the piece table (CLX structure).
@@ -96,7 +114,7 @@ impl TextExtractor {
         fib: &FileInformationBlock,
         word_document: &[u8],
         table_stream: &[u8],
-    ) -> Result<String> {
+    ) -> Result<Vec<u16>> {
         // Get the CLX (piece table) location from FIB
         // CLX is at FibRgFcLcb index 33 (fcClx, lcbClx) according to Apache POI's FIBFieldHandler
         let (clx_offset, clx_length) = fib
@@ -149,7 +167,7 @@ impl TextExtractor {
     /// - TEXT_PIECE_TABLE_TYPE marker (0x02)
     /// - 4-byte size of the piece table data
     /// - The piece table data itself (PlexOfCps structure)
-    fn parse_piece_table(clx_data: &[u8], word_document: &[u8]) -> Result<String> {
+    fn parse_piece_table(clx_data: &[u8], word_document: &[u8]) -> Result<Vec<u16>> {
         let mut offset = 0;
 
         // Skip GRPPR L sections (type 0x01) until we find the piece table
@@ -226,7 +244,7 @@ impl TextExtractor {
 
         // If we reach here, no piece table was found in the CLX
         // Return empty string to trigger fallback
-        Ok(String::new())
+        Ok(Vec::new())
     }
 
     /// Parse a PlexOfCps structure (Property List with Character Positions).
@@ -316,8 +334,8 @@ impl TextExtractor {
     fn extract_text_from_piece_descriptors(
         pieces: &[PieceDescriptor],
         word_document: &[u8],
-    ) -> Result<String> {
-        let mut text = String::new();
+    ) -> Result<Vec<u16>> {
+        let mut text = Vec::new();
 
         for piece in pieces {
             // Calculate text length in characters from CP range
@@ -367,7 +385,9 @@ impl TextExtractor {
             if piece.is_ansi {
                 // 8-bit ANSI text (Windows-1252)
                 for &byte in text_data {
-                    text.push(windows_1252_to_char(byte));
+                    let mut encoded = [0u16; 2];
+                    let units = windows_1252_to_char(byte).encode_utf16(&mut encoded);
+                    text.extend_from_slice(units);
                 }
             } else {
                 // 16-bit Unicode (UTF-16LE)
@@ -380,9 +400,7 @@ impl TextExtractor {
 
                 for chunk in utf16_data.chunks_exact(2) {
                     let code_unit = read_u16_le(chunk, 0).unwrap_or(0);
-                    if let Some(ch) = char::from_u32(code_unit as u32) {
-                        text.push(ch);
-                    }
+                    text.push(code_unit);
                 }
             }
         }
@@ -394,22 +412,24 @@ impl TextExtractor {
     ///
     /// In older or simplified DOC files, text may start at a fixed offset
     /// without a piece table.
-    fn extract_text_simple(word_document: &[u8]) -> Result<String> {
+    fn extract_text_simple(word_document: &[u8]) -> Result<Vec<u16>> {
         // Text typically starts at 0x200 (512) or 0x800 (2048)
         let start_offset = 0x200;
 
         if word_document.len() <= start_offset {
-            return Ok(String::new());
+            return Ok(Vec::new());
         }
 
         // Try to extract as Windows-1252
-        let mut text = String::new();
+        let mut text = Vec::new();
         for &byte in &word_document[start_offset..] {
             // Stop at null terminator or control characters
             if byte == 0 {
                 break;
             }
-            text.push(windows_1252_to_char(byte));
+            let mut encoded = [0u16; 2];
+            let units = windows_1252_to_char(byte).encode_utf16(&mut encoded);
+            text.extend_from_slice(units);
         }
 
         Ok(text)
@@ -507,5 +527,42 @@ mod tests {
         assert_eq!(pieces[0].cp_end, 16);
         assert_eq!(pieces[0].file_pos, 0);
         assert!(!pieces[0].is_ansi); // Bit 30 not set = Unicode
+    }
+
+    #[test]
+    fn unicode_piece_preserves_surrogate_pairs_in_cp_domain() {
+        let utf16 = "A😀B".encode_utf16().collect::<Vec<_>>();
+        let word_document = utf16
+            .iter()
+            .flat_map(|unit| unit.to_le_bytes())
+            .collect::<Vec<_>>();
+        let pieces = [PieceDescriptor {
+            cp_start: 0,
+            cp_end: 4,
+            file_pos: 0,
+            is_ansi: false,
+        }];
+
+        let extracted =
+            TextExtractor::extract_text_from_piece_descriptors(&pieces, &word_document).unwrap();
+        assert_eq!(extracted, utf16);
+        assert_eq!(String::from_utf16(&extracted).unwrap(), "A😀B");
+    }
+
+    #[test]
+    fn text_ranges_are_utf16_code_unit_positions() {
+        let utf16 = "A😀B".encode_utf16().collect::<Vec<_>>();
+        let extractor = TextExtractor {
+            text: String::from_utf16(&utf16).unwrap(),
+            cp_to_byte: TextExtractor::build_cp_to_byte_map("A😀B"),
+        };
+
+        assert_eq!(extractor.text(), "A😀B");
+        assert_eq!(extractor.text_at_range(0, 1), "A");
+        assert_eq!(extractor.text_at_range(1, 3), "😀");
+        assert_eq!(extractor.text_at_range(3, 4), "B");
+        assert_eq!(extractor.text_at_range(1, 2), "");
+        assert_eq!(extractor.text_at_range(2, 3), "");
+        assert_eq!(extractor.text_at_range(99, 100), "");
     }
 }

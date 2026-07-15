@@ -28,7 +28,7 @@ pub struct ParagraphExtractor<'a> {
     /// The extracted text (shared via Arc to avoid cloning, thread-safe)
     text: Arc<String>,
     /// Text piece character positions
-    text_ranges: Vec<(u32, u32, usize)>, // (cp_start, cp_end, text_offset)
+    text_ranges: Vec<usize>, // UTF-16 CP boundary -> UTF-8 byte offset
     /// Character position range to extract (for subdocuments)
     cp_range: Option<(u32, u32)>,
 }
@@ -80,17 +80,14 @@ impl<'a> ParagraphExtractor<'a> {
     }
 
     /// Build mapping from character positions to text offsets.
-    fn build_text_ranges(text: &str) -> Vec<(u32, u32, usize)> {
-        let mut ranges = Vec::new();
-        let mut offset = 0usize;
-
-        for (cp, ch) in text.chars().enumerate() {
-            let char_len = ch.len_utf8();
-            let cp_u32 = cp as u32;
-            ranges.push((cp_u32, cp_u32 + 1, offset));
-            offset += char_len;
+    fn build_text_ranges(text: &str) -> Vec<usize> {
+        let mut ranges = Vec::with_capacity(text.encode_utf16().count() + 1);
+        for (offset, ch) in text.char_indices() {
+            for _ in 0..ch.len_utf16() {
+                ranges.push(offset);
+            }
         }
-
+        ranges.push(text.len());
         ranges
     }
 
@@ -109,21 +106,26 @@ impl<'a> ParagraphExtractor<'a> {
         let doc_end_cp = self
             .cp_range
             .map(|(_, end)| end)
-            .unwrap_or(self.text.chars().count() as u32);
+            .unwrap_or_else(|| self.text_ranges.len().saturating_sub(1) as u32);
 
         // Find all paragraph breaks (CR characters) in the text
         // CR (0x000D / '\r') marks the end of each paragraph in Word documents
         let mut para_boundaries = vec![doc_start_cp];
-        let mut current_cp = doc_start_cp;
+        let mut current_cp = 0u32;
 
-        for c in self.text.chars().skip(doc_start_cp as usize) {
-            if c == '\r' {
-                para_boundaries.push(current_cp + 1); // Position after CR
+        for c in self.text.chars() {
+            let next_cp = current_cp + c.len_utf16() as u32;
+            if next_cp <= doc_start_cp {
+                current_cp = next_cp;
+                continue;
             }
-            current_cp += 1;
             if current_cp >= doc_end_cp {
                 break;
             }
+            if c == '\r' && next_cp <= doc_end_cp {
+                para_boundaries.push(next_cp); // Position after CR
+            }
+            current_cp = next_cp;
         }
 
         // Ensure we have an end boundary
@@ -156,7 +158,7 @@ impl<'a> ParagraphExtractor<'a> {
 
             // Extract character runs within this paragraph (excluding the CR)
             let para_text_end = if para_end > para_start
-                && self.text.chars().nth((para_end - 1) as usize) == Some('\r')
+                && self.extract_text_range(para_end - 1, para_end) == "\r"
             {
                 para_end - 1
             } else {
@@ -183,7 +185,7 @@ impl<'a> ParagraphExtractor<'a> {
     /// Extract text for a character position range.
     fn extract_text_range(&self, cp_start: u32, cp_end: u32) -> String {
         // Clamp CPs to valid range
-        let max_cp = self.text_ranges.len() as u32;
+        let max_cp = self.text_ranges.len().saturating_sub(1) as u32;
         let cp_start_clamped = cp_start.min(max_cp);
         let cp_end_clamped = cp_end.min(max_cp);
 
@@ -195,12 +197,8 @@ impl<'a> ParagraphExtractor<'a> {
         let end_idx = cp_end_clamped as usize;
 
         if start_idx < self.text_ranges.len() {
-            let start_offset = self.text_ranges[start_idx].2;
-            let end_offset = if end_idx < self.text_ranges.len() {
-                self.text_ranges[end_idx].2
-            } else {
-                self.text.len()
-            };
+            let start_offset = self.text_ranges[start_idx];
+            let end_offset = self.text_ranges[end_idx];
 
             if start_offset <= end_offset {
                 self.text[start_offset..end_offset].to_string()

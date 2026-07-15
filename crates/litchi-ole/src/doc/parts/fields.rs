@@ -137,8 +137,8 @@ impl FieldsTable {
     /// Fields are stored in PLCF (Plex of Character Positions and Properties) structures.
     pub fn parse(fib: &FileInformationBlock, table_stream: &[u8]) -> Result<Self> {
         // Get the PLCF for main document fields (PLCFFLDMOM)
-        // FIB offset 266 (fcPlcffldMom) and 270 (lcbPlcffldMom)
-        let main_fields = if let Some((offset, length)) = fib.get_table_pointer(11) {
+        // FibRgFcLcb97 index 16: fcPlcffldMom and lcbPlcffldMom.
+        let main_fields = if let Some((offset, length)) = fib.get_table_pointer(16) {
             if length > 0 && (offset as usize) < table_stream.len() {
                 let fields_data = &table_stream[offset as usize..];
                 let fields_len = length.min((table_stream.len() - offset as usize) as u32) as usize;

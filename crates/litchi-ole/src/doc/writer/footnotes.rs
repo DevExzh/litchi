@@ -81,7 +81,7 @@ impl FootnotesWriter {
 
         // Each footnote contributes its character length + terminating chEop (0x0D)
         for footnote in &self.footnotes {
-            let footnote_cp = footnote.text.chars().count() as u32 + 1; // include paragraph mark
+            let footnote_cp = footnote.text.encode_utf16().count() as u32 + 1; // include paragraph mark
             current_cp += footnote_cp;
             plcf.write_all(&current_cp.to_le_bytes()).unwrap();
         }
@@ -102,7 +102,7 @@ impl FootnotesWriter {
     pub fn char_count(&self) -> u32 {
         self.footnotes
             .iter()
-            .map(|f| f.text.chars().count() as u32 + 1)
+            .map(|f| f.text.encode_utf16().count() as u32 + 1)
             .sum()
     }
 
@@ -125,3 +125,18 @@ impl Default for FootnotesWriter {
 
 /// Endnotes writer (same structure as footnotes)
 pub type EndnotesWriter = FootnotesWriter;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn counts_supplementary_characters_as_two_utf16_code_units() {
+        let mut writer = FootnotesWriter::new();
+        writer.add_footnote(FootnoteEntry::new(0, "A😀", 1));
+
+        assert_eq!(writer.char_count(), 4);
+        let text_plcf = writer.build_plcf_fnd_txt();
+        assert_eq!(u32::from_le_bytes(text_plcf[4..8].try_into().unwrap()), 4);
+    }
+}

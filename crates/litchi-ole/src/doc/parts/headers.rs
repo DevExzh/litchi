@@ -3,7 +3,7 @@
 /// Based on Apache POI's HeaderStories and LibreOffice's implementation.
 /// Headers and footers in DOC files are stored as a subdocument with character positions
 /// defined in the FIB, and their mapping to sections is defined in a PLCF structure.
-use super::super::package::Result;
+use super::super::package::{DocError, Result};
 use super::fib::FileInformationBlock;
 
 /// Header/Footer types based on section properties
@@ -24,7 +24,9 @@ pub enum HeaderFooterType {
 }
 
 impl HeaderFooterType {
-    /// Get all header/footer types in the order they appear in the subdocument
+    /// Get all header/footer types in stable semantic order.
+    ///
+    /// This differs from the interleaved storage order used by `PlcfHdd`.
     pub fn all_types() -> &'static [HeaderFooterType] {
         &[
             HeaderFooterType::FirstPageHeader,
@@ -110,8 +112,8 @@ impl HeadersTable {
         // Check if headers/footers exist
         if let Some((start_cp, end_cp)) = fib.get_header_range() {
             // Get the PLCF for headers/footers (plcfHdd)
-            // FIB index 9: fcPlcfHdd and lcbPlcfHdd
-            if let Some((offset, length)) = fib.get_table_pointer(9)
+            // FIB index 11: fcPlcfHdd and lcbPlcfHdd
+            if let Some((offset, length)) = fib.get_table_pointer(11)
                 && length > 0
                 && (offset as usize) < table_stream.len()
             {
@@ -119,7 +121,7 @@ impl HeadersTable {
                 let plcf_len = length.min((table_stream.len() - offset as usize) as u32) as usize;
 
                 if plcf_len >= 4 {
-                    stories = Self::parse_header_plcf(&plcf_data[..plcf_len], start_cp, end_cp);
+                    stories = Self::parse_header_plcf(&plcf_data[..plcf_len], start_cp, end_cp)?;
                 }
             }
         }
@@ -131,22 +133,28 @@ impl HeadersTable {
     ///
     /// The plcfHdd PLCF has element_size = 0 (just character positions).
     /// It contains character positions that divide the header subdocument into stories.
-    /// Each section can have up to 6 stories (first page header/footer, even page, odd page).
+    /// The first six stories are footnote/endnote separators. Each section then contributes
+    /// six stories in even-header, odd-header, even-footer, odd-footer, first-header,
+    /// first-footer order.
     fn parse_header_plcf(
         data: &[u8],
         subdoc_start: u32,
-        _subdoc_end: u32,
-    ) -> Vec<HeaderFooterStory> {
+        subdoc_end: u32,
+    ) -> Result<Vec<HeaderFooterStory>> {
         // Parse as PLCF with element_size = 0 (only CPs, no properties)
         // We need to manually parse this since PlcfParser expects element_size > 0
-        if data.len() < 8 {
-            return Vec::new();
+        if data.len() < 8 || data.len() % 4 != 0 {
+            return Err(DocError::Corrupted(
+                "PlcfHdd must contain at least two complete CP entries".to_string(),
+            ));
         }
 
         // Count of CPs = data.len() / 4
         let cp_count = data.len() / 4;
         if cp_count < 2 {
-            return Vec::new();
+            return Err(DocError::Corrupted(
+                "PlcfHdd does not contain a story range".to_string(),
+            ));
         }
 
         let mut cps = Vec::with_capacity(cp_count);
@@ -158,28 +166,51 @@ impl HeadersTable {
             }
         }
 
-        // Build stories from consecutive CP pairs
-        // Each pair of CPs defines one header/footer story
-        let mut stories = Vec::new();
-        let header_types = HeaderFooterType::all_types();
+        let subdoc_len = subdoc_end.checked_sub(subdoc_start).ok_or_else(|| {
+            DocError::Corrupted("header subdocument range is reversed".to_string())
+        })?;
+        for pair in cps.windows(2) {
+            if pair[0] > pair[1] {
+                return Err(DocError::Corrupted(
+                    "PlcfHdd character positions are not monotonic".to_string(),
+                ));
+            }
+        }
+        if cps.iter().any(|&cp| cp > subdoc_len) {
+            return Err(DocError::Corrupted(
+                "PlcfHdd character position exceeds the header subdocument".to_string(),
+            ));
+        }
 
-        for i in 0..(cps.len() - 1) {
+        // Build stories from consecutive CP pairs. Slots 0-5 are separator stories,
+        // not document headers or footers, so the public table begins at slot 6.
+        let mut stories = Vec::new();
+        for i in 6..(cps.len() - 1) {
             let start = cps[i];
             let end = cps[i + 1];
 
             // Convert relative CPs to absolute CPs in the text stream
-            let abs_start = subdoc_start + start;
-            let abs_end = subdoc_start + end;
+            let abs_start = subdoc_start.checked_add(start).ok_or_else(|| {
+                DocError::Corrupted("PlcfHdd start character position overflows".to_string())
+            })?;
+            let abs_end = subdoc_start.checked_add(end).ok_or_else(|| {
+                DocError::Corrupted("PlcfHdd end character position overflows".to_string())
+            })?;
 
-            // Determine story type based on position
-            // Each section contributes up to 6 stories in order
-            let type_index = i % header_types.len();
-            let story_type = header_types[type_index];
+            let story_type = match (i - 6) % 6 {
+                0 => HeaderFooterType::EvenPageHeader,
+                1 => HeaderFooterType::OddPageHeader,
+                2 => HeaderFooterType::EvenPageFooter,
+                3 => HeaderFooterType::OddPageFooter,
+                4 => HeaderFooterType::FirstPageHeader,
+                5 => HeaderFooterType::FirstPageFooter,
+                _ => unreachable!(),
+            };
 
             stories.push(HeaderFooterStory::new(story_type, abs_start, abs_end));
         }
 
-        stories
+        Ok(stories)
     }
 
     /// Get all header/footer stories
@@ -220,6 +251,10 @@ impl HeadersTable {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn encode_cps(cps: &[u32]) -> Vec<u8> {
+        cps.iter().flat_map(|cp| cp.to_le_bytes()).collect()
+    }
 
     #[test]
     fn test_header_footer_type() {
@@ -396,5 +431,29 @@ mod tests {
         // After copy, original should still be valid
         assert_eq!(header, HeaderFooterType::OddPageHeader);
         assert_eq!(copied, HeaderFooterType::OddPageHeader);
+    }
+
+    #[test]
+    fn parses_section_slots_after_separator_stories() {
+        let data = encode_cps(&[0, 1, 2, 3, 4, 5, 6, 7, 10, 11, 12, 13, 14]);
+        let stories = HeadersTable::parse_header_plcf(&data, 100, 114).unwrap();
+
+        assert_eq!(stories.len(), 6);
+        assert_eq!(stories[0].story_type, HeaderFooterType::EvenPageHeader);
+        assert_eq!((stories[0].start_cp, stories[0].end_cp), (106, 107));
+        assert_eq!(stories[1].story_type, HeaderFooterType::OddPageHeader);
+        assert_eq!((stories[1].start_cp, stories[1].end_cp), (107, 110));
+        assert_eq!(stories[2].story_type, HeaderFooterType::EvenPageFooter);
+        assert_eq!(stories[3].story_type, HeaderFooterType::OddPageFooter);
+        assert_eq!(stories[4].story_type, HeaderFooterType::FirstPageHeader);
+        assert_eq!(stories[5].story_type, HeaderFooterType::FirstPageFooter);
+    }
+
+    #[test]
+    fn rejects_malformed_header_character_positions() {
+        assert!(HeadersTable::parse_header_plcf(&[0; 7], 0, 10).is_err());
+        assert!(HeadersTable::parse_header_plcf(&encode_cps(&[0, 2, 1]), 0, 10).is_err());
+        assert!(HeadersTable::parse_header_plcf(&encode_cps(&[0, 11]), 0, 10).is_err());
+        assert!(HeadersTable::parse_header_plcf(&encode_cps(&[0, 1]), 10, 9).is_err());
     }
 }
