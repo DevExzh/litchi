@@ -56,6 +56,18 @@ pub enum FileFormat {
     Ods,
     /// OpenDocument Presentation (.odp)
     Odp,
+    /// OpenDocument Drawing (.odg, .otg)
+    Odg,
+    /// OpenDocument Chart (.odc, .otc)
+    Odc,
+    /// OpenDocument Formula (.odf, .otf)
+    Odf,
+    /// OpenDocument Image (.odi, .oti)
+    Odi,
+    /// OpenDocument Master Document (.odm)
+    Odm,
+    /// OpenDocument Web Document (.oth)
+    Oth,
     /// Apple Pages (.pages)
     Pages,
     /// Apple Keynote (.key)
@@ -79,6 +91,12 @@ impl From<litchi::FileFormat> for FileFormat {
             litchi::FileFormat::Odt => FileFormat::Odt,
             litchi::FileFormat::Ods => FileFormat::Ods,
             litchi::FileFormat::Odp => FileFormat::Odp,
+            litchi::FileFormat::Odg => FileFormat::Odg,
+            litchi::FileFormat::Odc => FileFormat::Odc,
+            litchi::FileFormat::Odf => FileFormat::Odf,
+            litchi::FileFormat::Odi => FileFormat::Odi,
+            litchi::FileFormat::Odm => FileFormat::Odm,
+            litchi::FileFormat::Oth => FileFormat::Oth,
             litchi::FileFormat::Pages => FileFormat::Pages,
             litchi::FileFormat::Keynote => FileFormat::Keynote,
             litchi::FileFormat::Numbers => FileFormat::Numbers,
@@ -108,6 +126,12 @@ impl FileFormat {
             FileFormat::Odt => "Odt",
             FileFormat::Ods => "Ods",
             FileFormat::Odp => "Odp",
+            FileFormat::Odg => "Odg",
+            FileFormat::Odc => "Odc",
+            FileFormat::Odf => "Odf",
+            FileFormat::Odi => "Odi",
+            FileFormat::Odm => "Odm",
+            FileFormat::Oth => "Oth",
             FileFormat::Pages => "Pages",
             FileFormat::Keynote => "Keynote",
             FileFormat::Numbers => "Numbers",

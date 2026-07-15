@@ -13,7 +13,7 @@
 /// - OOXML formats (DOCX, PPTX, XLSX, XLSB): include parsed OPC package
 /// - OLE2 formats (DOC, PPT, XLS): include parsed OleFile
 /// - iWork formats (Pages, Keynote, Numbers): include raw bytes (lazy parsing)
-/// - ODF formats (ODT, ODP, ODS): include raw bytes (lazy parsing)
+/// - ODF formats: include raw bytes (lazy parsing)
 /// - RTF: just bytes (no parsing needed)
 ///
 /// # Performance
@@ -58,6 +58,18 @@ pub enum DetectedFormat {
     Odp(Vec<u8>),
     #[cfg(feature = "odf")]
     Ods(Vec<u8>),
+    #[cfg(feature = "odf")]
+    Odg(Vec<u8>),
+    #[cfg(feature = "odf")]
+    Odc(Vec<u8>),
+    #[cfg(feature = "odf")]
+    Odf(Vec<u8>),
+    #[cfg(feature = "odf")]
+    Odi(Vec<u8>),
+    #[cfg(feature = "odf")]
+    Odm(Vec<u8>),
+    #[cfg(feature = "odf")]
+    Oth(Vec<u8>),
 
     // RTF format (plain text, no parsing structure needed)
     #[cfg(feature = "rtf")]
@@ -186,6 +198,12 @@ pub fn detect_format_smart(bytes: Vec<u8>) -> Option<DetectedFormat> {
                                 FileFormat::Odt => Some(DetectedFormat::Odt(bytes)),
                                 FileFormat::Odp => Some(DetectedFormat::Odp(bytes)),
                                 FileFormat::Ods => Some(DetectedFormat::Ods(bytes)),
+                                FileFormat::Odg => Some(DetectedFormat::Odg(bytes)),
+                                FileFormat::Odc => Some(DetectedFormat::Odc(bytes)),
+                                FileFormat::Odf => Some(DetectedFormat::Odf(bytes)),
+                                FileFormat::Odi => Some(DetectedFormat::Odi(bytes)),
+                                FileFormat::Odm => Some(DetectedFormat::Odm(bytes)),
+                                FileFormat::Oth => Some(DetectedFormat::Oth(bytes)),
                                 _ => None,
                             };
                         }
@@ -196,4 +214,62 @@ pub fn detect_format_smart(bytes: Vec<u8>) -> Option<DetectedFormat> {
     }
 
     None
+}
+
+#[cfg(all(test, feature = "odf"))]
+mod tests {
+    use super::*;
+    use litchi_core::detection::FileFormat;
+    use std::io::{Cursor, Write};
+
+    fn package_with_mimetype(mimetype: &str) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        {
+            let mut writer = zip::ZipWriter::new(Cursor::new(&mut bytes));
+            let options = zip::write::SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Stored);
+            writer.start_file("mimetype", options).unwrap();
+            writer.write_all(mimetype.as_bytes()).unwrap();
+            writer.finish().unwrap();
+        }
+        bytes
+    }
+
+    #[test]
+    fn smart_detection_retains_all_additional_odf_families() {
+        for (mimetype, expected) in [
+            (
+                "application/vnd.oasis.opendocument.graphics",
+                FileFormat::Odg,
+            ),
+            ("application/vnd.oasis.opendocument.chart", FileFormat::Odc),
+            (
+                "application/vnd.oasis.opendocument.formula",
+                FileFormat::Odf,
+            ),
+            ("application/vnd.oasis.opendocument.image", FileFormat::Odi),
+            (
+                "application/vnd.oasis.opendocument.text-master",
+                FileFormat::Odm,
+            ),
+            (
+                "application/vnd.oasis.opendocument.text-web",
+                FileFormat::Oth,
+            ),
+        ] {
+            let bytes = package_with_mimetype(mimetype);
+            let detected = detect_format_smart(bytes.clone()).unwrap();
+            let (format, retained) = match detected {
+                DetectedFormat::Odg(retained) => (FileFormat::Odg, retained),
+                DetectedFormat::Odc(retained) => (FileFormat::Odc, retained),
+                DetectedFormat::Odf(retained) => (FileFormat::Odf, retained),
+                DetectedFormat::Odi(retained) => (FileFormat::Odi, retained),
+                DetectedFormat::Odm(retained) => (FileFormat::Odm, retained),
+                DetectedFormat::Oth(retained) => (FileFormat::Oth, retained),
+                _ => panic!("wrong smart-detection result for {mimetype}"),
+            };
+            assert_eq!(format, expected);
+            assert_eq!(retained, bytes);
+        }
+    }
 }

@@ -1,7 +1,7 @@
 //! ODF (OpenDocument Format) detection.
 //!
 //! This module provides fast, safe detection of OpenDocument Format files
-//! (.odt, .ods, .odp) by reading the mimetype file from the ZIP archive.
+//! by reading the mimetype file from the ZIP archive.
 //!
 //! ODF files are ZIP archives containing a special "mimetype" file that
 //! must be stored uncompressed as the first file in the archive.
@@ -21,6 +21,16 @@ const ODS_MIME: &str = "application/vnd.oasis.opendocument.spreadsheet";
 const ODS_TEMPLATE_MIME: &str = "application/vnd.oasis.opendocument.spreadsheet-template";
 const ODP_MIME: &str = "application/vnd.oasis.opendocument.presentation";
 const ODP_TEMPLATE_MIME: &str = "application/vnd.oasis.opendocument.presentation-template";
+const ODG_MIME: &str = "application/vnd.oasis.opendocument.graphics";
+const ODG_TEMPLATE_MIME: &str = "application/vnd.oasis.opendocument.graphics-template";
+const ODC_MIME: &str = "application/vnd.oasis.opendocument.chart";
+const ODC_TEMPLATE_MIME: &str = "application/vnd.oasis.opendocument.chart-template";
+const ODF_MIME: &str = "application/vnd.oasis.opendocument.formula";
+const ODF_TEMPLATE_MIME: &str = "application/vnd.oasis.opendocument.formula-template";
+const ODI_MIME: &str = "application/vnd.oasis.opendocument.image";
+const ODI_TEMPLATE_MIME: &str = "application/vnd.oasis.opendocument.image-template";
+const ODM_MIME: &str = "application/vnd.oasis.opendocument.text-master";
+const OTH_MIME: &str = "application/vnd.oasis.opendocument.text-web";
 
 /// Detect ODF format from mimetype content.
 ///
@@ -55,6 +65,12 @@ pub fn detect_odf_format_from_mimetype(mimetype: &[u8]) -> Option<FileFormat> {
         ODT_MIME | ODT_TEMPLATE_MIME => Some(FileFormat::Odt),
         ODS_MIME | ODS_TEMPLATE_MIME => Some(FileFormat::Ods),
         ODP_MIME | ODP_TEMPLATE_MIME => Some(FileFormat::Odp),
+        ODG_MIME | ODG_TEMPLATE_MIME => Some(FileFormat::Odg),
+        ODC_MIME | ODC_TEMPLATE_MIME => Some(FileFormat::Odc),
+        ODF_MIME | ODF_TEMPLATE_MIME => Some(FileFormat::Odf),
+        ODI_MIME | ODI_TEMPLATE_MIME => Some(FileFormat::Odi),
+        ODM_MIME => Some(FileFormat::Odm),
+        OTH_MIME => Some(FileFormat::Oth),
         _ => None,
     }
 }
@@ -195,5 +211,27 @@ mod tests {
             detect_odf_format_from_mimetype(odt_mime_ws),
             Some(FileFormat::Odt)
         );
+    }
+
+    #[test]
+    fn detects_all_standard_odf_document_families_and_templates() {
+        for (mimetype, expected) in [
+            (ODG_MIME, FileFormat::Odg),
+            (ODG_TEMPLATE_MIME, FileFormat::Odg),
+            (ODC_MIME, FileFormat::Odc),
+            (ODC_TEMPLATE_MIME, FileFormat::Odc),
+            (ODF_MIME, FileFormat::Odf),
+            (ODF_TEMPLATE_MIME, FileFormat::Odf),
+            (ODI_MIME, FileFormat::Odi),
+            (ODI_TEMPLATE_MIME, FileFormat::Odi),
+            (ODM_MIME, FileFormat::Odm),
+            (OTH_MIME, FileFormat::Oth),
+        ] {
+            assert_eq!(
+                detect_odf_format_from_mimetype(mimetype.as_bytes()),
+                Some(expected),
+                "failed to detect {mimetype}"
+            );
+        }
     }
 }

@@ -32,4 +32,16 @@ pub enum FileFormat {
     Ods,
     /// OpenDocument Presentation (.odp)
     Odp,
+    /// OpenDocument Drawing (.odg, .otg)
+    Odg,
+    /// OpenDocument Chart (.odc, .otc)
+    Odc,
+    /// OpenDocument Formula (.odf, .otf)
+    Odf,
+    /// OpenDocument Image (.odi, .oti)
+    Odi,
+    /// OpenDocument Master Document (.odm)
+    Odm,
+    /// OpenDocument Web Document (.oth)
+    Oth,
 }
