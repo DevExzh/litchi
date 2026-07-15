@@ -622,21 +622,32 @@ impl<'a> RtfDocument<'a> {
     ) -> Vec<super::shape::ShapeGroup<'static>> {
         groups
             .into_iter()
-            .map(|group| super::shape::ShapeGroup {
-                name: Cow::Owned(group.name.into_owned()),
-                shapes: group
-                    .shapes
-                    .into_iter()
-                    .map(Self::convert_shape_to_owned)
-                    .collect(),
-                geometry: group.geometry,
-                properties: group
-                    .properties
-                    .into_iter()
-                    .map(Self::convert_shape_property_to_owned)
-                    .collect(),
-            })
+            .map(Self::convert_shape_group_to_owned)
             .collect()
+    }
+
+    fn convert_shape_group_to_owned(
+        group: super::shape::ShapeGroup<'_>,
+    ) -> super::shape::ShapeGroup<'static> {
+        super::shape::ShapeGroup {
+            name: Cow::Owned(group.name.into_owned()),
+            shapes: group
+                .shapes
+                .into_iter()
+                .map(Self::convert_shape_to_owned)
+                .collect(),
+            groups: group
+                .groups
+                .into_iter()
+                .map(Self::convert_shape_group_to_owned)
+                .collect(),
+            geometry: group.geometry,
+            properties: group
+                .properties
+                .into_iter()
+                .map(Self::convert_shape_property_to_owned)
+                .collect(),
+        }
     }
 
     fn convert_shape_to_owned(shape: super::shape::Shape<'_>) -> super::shape::Shape<'static> {
@@ -856,7 +867,10 @@ mod tests {
             {\shpgrp\shpleft1\shptop2\shpright801\shpbottom602
                 {\sp{\sn wzName}{\sv Owned Group}}
                 {\shp\shpinst1\shpleft5\shptop6\shpwidth70\shpheight80\shpfblwtxt1}
-                {\shp\shpinst3\shpleft15\shptop16\shpwidth90\shpheight100}}
+                {\shp\shpinst3\shpleft15\shptop16\shpwidth90\shpheight100}
+                {\shpgrp\shpleft100\shptop110\shpright400\shpbottom510
+                    {\sp{\sn wzName}{\sv Owned Nested Group}}
+                    {\shp\shpinst20\shpleft1\shptop2\shpwidth3\shpheight4}}}
         }"#;
         let doc = RtfDocument::parse(rtf).unwrap();
 
@@ -909,6 +923,36 @@ mod tests {
                 .properties
                 .iter()
                 .all(|property| matches!(property.value, Cow::Owned(_)))
+        );
+        assert_eq!(group.groups().len(), 1);
+        let nested = &group.groups()[0];
+        assert_eq!(nested.name, "Owned Nested Group");
+        assert_eq!(
+            nested.geometry,
+            crate::ShapeGeometry::new(100, 110, 300, 400)
+        );
+        assert_eq!(nested.shapes().len(), 1);
+        assert_eq!(nested.shapes()[0].shape_type, crate::ShapeType::Line);
+        assert!(matches!(nested.name, Cow::Owned(_)));
+    }
+
+    #[test]
+    fn rejects_excessively_nested_shape_groups() {
+        let mut rtf = String::from("{\\rtf1");
+        for _ in 0..=64 {
+            rtf.push_str("{\\shpgrp");
+        }
+        for _ in 0..=64 {
+            rtf.push('}');
+        }
+        rtf.push('}');
+
+        let error = match RtfDocument::parse(&rtf) {
+            Ok(_) => panic!("excessive shape-group nesting should fail"),
+            Err(error) => error,
+        };
+        assert!(
+            matches!(error, RtfError::MalformedDocument(message) if message.contains("shape group nesting"))
         );
     }
 

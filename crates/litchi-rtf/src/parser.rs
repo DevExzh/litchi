@@ -98,6 +98,8 @@ const MAX_REVISIONS: usize = 65_536;
 const MAX_SHAPES: usize = 65_536;
 const MAX_SHAPE_GROUPS: usize = 16_384;
 const MAX_SHAPES_PER_GROUP: usize = 65_536;
+const MAX_GROUPS_PER_GROUP: usize = 16_384;
+const MAX_SHAPE_GROUP_DEPTH: usize = 64;
 const MAX_SHAPE_PROPERTIES: usize = 65_536;
 const MAX_SHAPE_PROPERTY_BYTES: usize = 1_048_576;
 const MAX_SHAPE_TEXT_BYTES: usize = 16 * 1_048_576;
@@ -3140,6 +3142,18 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_shape_group_destination(&mut self) -> RtfResult<super::shape::ShapeGroup<'a>> {
+        self.parse_shape_group_destination_at_depth(0)
+    }
+
+    fn parse_shape_group_destination_at_depth(
+        &mut self,
+        nesting_depth: usize,
+    ) -> RtfResult<super::shape::ShapeGroup<'a>> {
+        if nesting_depth >= MAX_SHAPE_GROUP_DEPTH {
+            return Err(RtfError::MalformedDocument(
+                "RTF shape group nesting exceeds the safety limit".to_string(),
+            ));
+        }
         let mut group = super::shape::ShapeGroup::new();
         let mut depth = 0usize;
         let mut right = None;
@@ -3183,6 +3197,11 @@ impl<'a> Parser<'a> {
                 Token::OpenBrace
                     if self.nested_shape_control() == Some(ControlWord::ShapeGroup) =>
                 {
+                    if group.groups.len() >= MAX_GROUPS_PER_GROUP {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF nested shape group count exceeds the safety limit".to_string(),
+                        ));
+                    }
                     self.pos += 1;
                     if matches!(
                         self.tokens.get(self.pos),
@@ -3190,14 +3209,9 @@ impl<'a> Parser<'a> {
                     ) {
                         self.pos += 1;
                     }
-                    let nested = self.parse_shape_group_destination()?;
-                    if group.shapes.len().saturating_add(nested.shapes.len()) > MAX_SHAPES_PER_GROUP
-                    {
-                        return Err(RtfError::MalformedDocument(
-                            "RTF shape group child count exceeds the safety limit".to_string(),
-                        ));
-                    }
-                    group.shapes.extend(nested.shapes);
+                    let nested = self
+                        .parse_shape_group_destination_at_depth(nesting_depth.saturating_add(1))?;
+                    group.add_group(nested);
                 },
                 Token::OpenBrace => {
                     depth += 1;

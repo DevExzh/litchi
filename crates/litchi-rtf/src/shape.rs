@@ -394,6 +394,8 @@ pub struct ShapeGroup<'a> {
     pub name: Cow<'a, str>,
     /// Shapes in the group
     pub shapes: Vec<Shape<'a>>,
+    /// Nested shape groups in document order
+    pub groups: Vec<ShapeGroup<'a>>,
     /// Group geometry (bounding box)
     pub geometry: ShapeGeometry,
     /// All scalar OfficeArt properties attached to the group
@@ -407,6 +409,7 @@ impl<'a> ShapeGroup<'a> {
         Self {
             name: Cow::Borrowed(""),
             shapes: Vec::new(),
+            groups: Vec::new(),
             geometry: ShapeGeometry::default(),
             properties: Vec::new(),
         }
@@ -418,10 +421,22 @@ impl<'a> ShapeGroup<'a> {
         self.shapes.push(shape);
     }
 
+    /// Add a nested shape group.
+    #[inline]
+    pub fn add_group(&mut self, group: ShapeGroup<'a>) {
+        self.groups.push(group);
+    }
+
     /// Get all shapes in the group
     #[inline]
     pub fn shapes(&self) -> &[Shape<'a>] {
         &self.shapes
+    }
+
+    /// Get directly nested shape groups.
+    #[inline]
+    pub fn groups(&self) -> &[ShapeGroup<'a>] {
+        &self.groups
     }
 
     /// Return the last scalar OfficeArt property with the requested name.
