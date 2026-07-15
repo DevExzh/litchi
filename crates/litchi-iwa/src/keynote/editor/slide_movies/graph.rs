@@ -33,14 +33,14 @@ enum TextWrapFit {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub(super) struct MovieObjectIds {
-    pub(super) drawable: u64,
+pub(in crate::keynote::editor) struct MovieObjectIds {
+    pub(in crate::keynote::editor) drawable: u64,
     title: u64,
     caption: u64,
 }
 
 impl MovieObjectIds {
-    pub(super) fn allocate(first: u64) -> Result<Self> {
+    pub(in crate::keynote::editor) fn allocate(first: u64) -> Result<Self> {
         let identifier = |offset: u64| {
             first
                 .checked_add(offset)
@@ -53,24 +53,24 @@ impl MovieObjectIds {
         })
     }
 
-    pub(super) const fn last(self) -> u64 {
+    pub(in crate::keynote::editor) const fn last(self) -> u64 {
         self.caption
     }
 
-    pub(super) const fn all(self) -> [u64; 3] {
+    pub(in crate::keynote::editor) const fn all(self) -> [u64; 3] {
         [self.drawable, self.title, self.caption]
     }
 }
 
-pub(super) struct MovieCreationContext {
-    pub(super) slide_id: u64,
-    pub(super) component_id: u64,
-    pub(super) archive_name: String,
-    pub(super) style_id: u64,
-    pub(super) stylesheet_component_id: u64,
+pub(in crate::keynote::editor) struct MovieCreationContext {
+    pub(in crate::keynote::editor) slide_id: u64,
+    pub(in crate::keynote::editor) component_id: u64,
+    pub(in crate::keynote::editor) archive_name: String,
+    pub(in crate::keynote::editor) style_id: u64,
+    pub(in crate::keynote::editor) stylesheet_component_id: u64,
 }
 
-pub(super) fn movie_creation_values(
+pub(in crate::keynote::editor) fn movie_creation_values(
     options: KeynoteSlideMovieOptions,
 ) -> Result<(DrawableGeometry, f32)> {
     if options.size.width <= 0.0 || options.size.height <= 0.0 {
@@ -87,12 +87,7 @@ pub(super) fn movie_creation_values(
             "Keynote movie natural size must be finite and greater than zero".to_owned(),
         ));
     }
-    let duration_seconds = options.duration.as_secs_f64();
-    if duration_seconds == 0.0 || duration_seconds > f64::from(f32::MAX) {
-        return Err(Error::ParseError(
-            "Keynote movie duration must be greater than zero and fit in f32 seconds".to_owned(),
-        ));
-    }
+    let duration_seconds = media_duration_seconds(options.duration, "movie")?;
     let geometry = DrawableGeometry {
         position: Some(options.position),
         size: Some(options.size),
@@ -100,10 +95,37 @@ pub(super) fn movie_creation_values(
         angle: Some(DEFAULT_MOVIE_ROTATION_DEGREES),
     }
     .validate()?;
-    Ok((geometry, duration_seconds as f32))
+    Ok((geometry, duration_seconds))
 }
 
-pub(super) fn movie_creation_context(
+pub(in crate::keynote::editor) fn audio_creation_values(
+    position: DrawablePoint,
+    duration: Duration,
+) -> Result<(DrawableGeometry, f32)> {
+    let geometry = DrawableGeometry {
+        position: Some(position),
+        size: Some(DrawableSize {
+            width: 0.0,
+            height: 0.0,
+        }),
+        flags: Some(DEFAULT_DRAWABLE_FLAGS),
+        angle: Some(DEFAULT_MOVIE_ROTATION_DEGREES),
+    }
+    .validate()?;
+    Ok((geometry, media_duration_seconds(duration, "audio")?))
+}
+
+fn media_duration_seconds(duration: Duration, kind: &str) -> Result<f32> {
+    let duration_seconds = duration.as_secs_f64();
+    if duration_seconds == 0.0 || duration_seconds > f64::from(f32::MAX) {
+        return Err(Error::ParseError(format!(
+            "Keynote {kind} duration must be greater than zero and fit in f32 seconds"
+        )));
+    }
+    Ok(duration_seconds as f32)
+}
+
+pub(in crate::keynote::editor) fn movie_creation_context(
     editor: &KeynoteEditor,
     slide_index: usize,
 ) -> Result<MovieCreationContext> {
@@ -162,8 +184,7 @@ pub(super) fn movie_creation_context(
     })
 }
 
-#[allow(deprecated)]
-pub(super) fn movie_objects(
+pub(in crate::keynote::editor) fn movie_objects(
     ids: MovieObjectIds,
     slide_id: u64,
     style_id: u64,
@@ -173,12 +194,89 @@ pub(super) fn movie_objects(
     natural_size: DrawableSize,
     duration_seconds: f32,
 ) -> Result<[ArchiveObject; 3]> {
+    media_objects(
+        ids,
+        slide_id,
+        style_id,
+        movie_data_identifier,
+        geometry,
+        duration_seconds,
+        MediaPayload::Movie {
+            poster_data_identifier,
+            natural_size,
+        },
+    )
+}
+
+pub(in crate::keynote::editor) fn audio_objects(
+    ids: MovieObjectIds,
+    slide_id: u64,
+    style_id: u64,
+    audio_data_identifier: u64,
+    geometry: DrawableGeometry,
+    duration_seconds: f32,
+) -> Result<[ArchiveObject; 3]> {
+    media_objects(
+        ids,
+        slide_id,
+        style_id,
+        audio_data_identifier,
+        geometry,
+        duration_seconds,
+        MediaPayload::Audio,
+    )
+}
+
+#[derive(Debug, Clone, Copy)]
+enum MediaPayload {
+    Movie {
+        poster_data_identifier: u64,
+        natural_size: DrawableSize,
+    },
+    Audio,
+}
+
+#[allow(deprecated)]
+fn media_objects(
+    ids: MovieObjectIds,
+    slide_id: u64,
+    style_id: u64,
+    data_identifier: u64,
+    geometry: DrawableGeometry,
+    duration_seconds: f32,
+    payload: MediaPayload,
+) -> Result<[ArchiveObject; 3]> {
     let position = geometry.position.ok_or_else(|| {
         Error::InvalidFormat("validated Keynote movie geometry has no position".to_owned())
     })?;
     let size = geometry.size.ok_or_else(|| {
         Error::InvalidFormat("validated Keynote movie geometry has no size".to_owned())
     })?;
+    let (poster_image_data, audio_only, alpha_support, natural_size, data_references) =
+        match payload {
+            MediaPayload::Movie {
+                poster_data_identifier,
+                natural_size,
+            } => (
+                Some(tsp::DataReference {
+                    identifier: poster_data_identifier,
+                }),
+                false,
+                true,
+                natural_size,
+                vec![poster_data_identifier, data_identifier],
+            ),
+            MediaPayload::Audio => (
+                None,
+                true,
+                false,
+                DrawableSize {
+                    width: 0.0,
+                    height: 0.0,
+                },
+                vec![data_identifier],
+            ),
+        };
     let movie = tsd::MovieArchive {
         super_: tsd::DrawableArchive {
             geometry: Some(tsd::GeometryArchive {
@@ -211,20 +309,18 @@ pub(super) fn movie_objects(
             ..Default::default()
         },
         movie_data: Some(tsp::DataReference {
-            identifier: movie_data_identifier,
+            identifier: data_identifier,
         }),
         start_time: Some(0.0),
         end_time: Some(duration_seconds),
         poster_time: Some(0.0),
         loop_option: Some(tsd::movie_archive::MovieLoopOption::None as i32),
         volume: Some(DEFAULT_MOVIE_VOLUME),
-        audio_only: Some(false),
+        audio_only: Some(audio_only),
         streaming: Some(false),
         plays_across_slides: Some(true),
-        poster_image_data: Some(tsp::DataReference {
-            identifier: poster_data_identifier,
-        }),
-        poster_image_generated_with_alpha_support: Some(true),
+        poster_image_data,
+        poster_image_generated_with_alpha_support: Some(alpha_support),
         flags: Some(DEFAULT_MOVIE_FLAGS),
         style: Some(reference(style_id)),
         original_size: Some(tsp::Size {
@@ -244,7 +340,7 @@ pub(super) fn movie_objects(
             movie,
             &STANDARD_MESSAGE_VERSION,
             &[ids.caption, ids.title, style_id],
-            &[poster_data_identifier, movie_data_identifier],
+            &data_references,
         )?,
         keynote_object(
             ids.title,

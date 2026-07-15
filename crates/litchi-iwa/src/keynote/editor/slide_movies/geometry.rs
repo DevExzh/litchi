@@ -3,7 +3,7 @@
 use super::*;
 use crate::shapes::patch_drawable_geometry;
 
-pub(super) fn set_movie_geometry(
+pub(in crate::keynote::editor) fn set_movie_geometry(
     package: &mut IWorkPackage,
     archive_name: &str,
     movie_id: u64,

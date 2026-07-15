@@ -483,6 +483,17 @@ pub struct KeynoteBuildSettings {
 }
 
 impl KeynoteBuildSettings {
+    /// Native playback trigger attached to a newly inserted audio clip.
+    pub(crate) fn audio_start() -> Self {
+        Self {
+            effect: "apple:audio-start".to_owned(),
+            duration: 0.5,
+            text_delivery: None,
+            delivery_option: None,
+            ..Self::appear_in()
+        }
+    }
+
     /// Native playback trigger attached to a newly inserted movie.
     pub(crate) fn movie_start() -> Self {
         Self {
@@ -2943,6 +2954,7 @@ mod builds;
 mod placeholder_ownership;
 mod placeholder_visibility;
 mod show_settings;
+mod slide_audio;
 mod slide_background;
 mod slide_background_color;
 mod slide_background_gradient;
@@ -2972,6 +2984,7 @@ mod transition_wire;
 
 use builds::*;
 pub use show_settings::{KeynoteShowMode, KeynoteShowSettings};
+pub use slide_audio::{KeynoteSlideAudioInfo, KeynoteSlideAudioOptions, RemovedKeynoteSlideAudio};
 pub use slide_background::KeynoteSlideBackground;
 pub use slide_background_color::{KeynoteRgbColorSpace, KeynoteRgbaColor};
 pub use slide_background_gradient::{

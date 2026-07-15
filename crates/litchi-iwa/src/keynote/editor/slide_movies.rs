@@ -8,8 +8,8 @@ use crate::shapes::{DrawableGeometry, DrawablePoint, DrawableSize, geometry_from
 use std::time::Duration;
 
 mod builds;
-mod geometry;
-mod graph;
+pub(in crate::keynote::editor) mod geometry;
+pub(in crate::keynote::editor) mod graph;
 
 use builds::*;
 use geometry::*;
@@ -28,6 +28,8 @@ const MOVIE_MEDIA_PLACEHOLDER_FLAG: u32 = 1;
 pub enum KeynoteSlideMovieKind {
     /// Ordinary file-backed movie inserted by the user.
     File,
+    /// Independently positioned audio clip stored in a movie archive.
+    Audio,
     /// File-backed replacement target materialized from a slide layout.
     MediaPlaceholder,
     /// Camera-backed live-video drawable.
@@ -87,12 +89,12 @@ pub struct RemovedKeynoteSlideMovie {
     pub removed_data_identifiers: Vec<u64>,
 }
 
-struct SlideMovieGraph {
-    slide_id: u64,
+pub(in crate::keynote::editor) struct SlideMovieGraph {
+    pub(in crate::keynote::editor) slide_id: u64,
     node_id: u64,
-    archive_name: String,
-    info: KeynoteSlideMovieInfo,
-    object_ids: Vec<u64>,
+    pub(in crate::keynote::editor) archive_name: String,
+    pub(in crate::keynote::editor) info: KeynoteSlideMovieInfo,
+    pub(in crate::keynote::editor) object_ids: Vec<u64>,
     build_ids: Vec<u64>,
     uuid_object_ids: Vec<u64>,
     data_references: Vec<(u64, u64)>,
@@ -101,6 +103,17 @@ struct SlideMovieGraph {
 impl KeynoteEditor {
     /// List movie drawables directly owned by one slide in drawable order.
     pub fn slide_movies(&self, slide_index: usize) -> Result<Vec<KeynoteSlideMovieInfo>> {
+        Ok(self
+            .slide_media_infos(slide_index)?
+            .into_iter()
+            .filter(|movie| movie.kind != KeynoteSlideMovieKind::Audio)
+            .collect())
+    }
+
+    pub(in crate::keynote::editor) fn slide_media_infos(
+        &self,
+        slide_index: usize,
+    ) -> Result<Vec<KeynoteSlideMovieInfo>> {
         let slides = self.slides()?;
         let slide = slides.get(slide_index).ok_or_else(|| {
             Error::ParseError(format!(
@@ -519,12 +532,23 @@ impl KeynoteEditor {
         slide_index: usize,
         drawable_object_id: u64,
     ) -> Result<RemovedKeynoteSlideMovie> {
-        let source = self.require_file_movie(slide_index, drawable_object_id)?;
+        self.remove_slide_media(slide_index, drawable_object_id, KeynoteSlideMovieKind::File)
+    }
+
+    pub(in crate::keynote::editor) fn remove_slide_media(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        expected_kind: KeynoteSlideMovieKind,
+    ) -> Result<RemovedKeynoteSlideMovie> {
+        let source =
+            self.require_slide_media_kind(slide_index, drawable_object_id, expected_kind)?;
         let mut working = self.clone();
         for build_id in &source.build_ids {
             working.remove_slide_build(slide_index, *build_id)?;
         }
-        let source = working.require_file_movie(slide_index, drawable_object_id)?;
+        let source =
+            working.require_slide_media_kind(slide_index, drawable_object_id, expected_kind)?;
 
         let mut comments = IWorkDrawableCommentEditor::from_package(working.package().clone())?;
         comments.clear_comment(drawable_object_id)?;
@@ -585,7 +609,7 @@ impl KeynoteEditor {
         let verified = Self::from_bytes(&staged.to_bytes()?)?;
         let remaining_media = verified.media_assets()?;
         if verified
-            .slide_movies(slide_index)?
+            .slide_media_infos(slide_index)?
             .iter()
             .any(|movie| movie.drawable_object_id == drawable_object_id)
             || verified
@@ -624,7 +648,23 @@ impl KeynoteEditor {
         Ok(source)
     }
 
-    fn slide_movie_graph(
+    fn require_slide_media_kind(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        expected_kind: KeynoteSlideMovieKind,
+    ) -> Result<SlideMovieGraph> {
+        let source = self.slide_movie_graph(slide_index, drawable_object_id)?;
+        if source.info.kind != expected_kind {
+            return Err(Error::ParseError(format!(
+                "Keynote media {drawable_object_id} is {:?}, not {expected_kind:?}",
+                source.info.kind
+            )));
+        }
+        Ok(source)
+    }
+
+    pub(in crate::keynote::editor) fn slide_movie_graph(
         &self,
         slide_index: usize,
         drawable_object_id: u64,
@@ -731,6 +771,8 @@ fn movie_info(
         graph.decode_type(identifier, MOVIE_MESSAGE_TYPE, "TSD.MovieArchive")?;
     let kind = if movie.is_live_video == Some(true) {
         KeynoteSlideMovieKind::LiveVideo
+    } else if movie.audio_only == Some(true) {
+        KeynoteSlideMovieKind::Audio
     } else if movie
         .flags
         .is_some_and(|flags| flags & MOVIE_MEDIA_PLACEHOLDER_FLAG != 0)

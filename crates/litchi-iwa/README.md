@@ -309,6 +309,32 @@ keynote.save("created-with-movie.key")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
 
+Independently positioned audio uses a distinct typed API even though Keynote
+stores it in the movie-archive family. Its zero-size control, media style,
+stand-ins, component registrations, and native Start Audio build are created
+without copying a package or drawable:
+
+```rust
+use std::fs;
+use std::time::Duration;
+use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteSlideAudioOptions};
+use litchi_iwa::shapes::DrawablePoint;
+
+let audio = fs::read("narration.aiff")?;
+let mut keynote = KeynoteDocumentBuilder::new().build()?;
+keynote.add_slide_audio(
+    0,
+    "narration.aiff",
+    &audio,
+    KeynoteSlideAudioOptions::new(
+        DrawablePoint { x: 960.0, y: 540.0 },
+        Duration::from_secs(12),
+    ),
+)?;
+keynote.save("created-with-audio.key")?;
+# Ok::<(), litchi_iwa::Error>(())
+```
+
 ### Edit existing documents
 
 ```rust
