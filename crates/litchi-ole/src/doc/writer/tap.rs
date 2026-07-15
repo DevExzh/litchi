@@ -21,8 +21,6 @@ pub enum TapBuildError {
     CellWidthsOverflow,
     /// A merge continuation cannot occur in the first cell.
     MergeWithoutPrecedingCell,
-    /// Brc80 supports only the legacy 16-color palette.
-    UnsupportedBorderColor((u8, u8, u8)),
     /// Brc80 spacing is a five-bit value.
     InvalidBorderSpacing(u8),
     /// DOC cell padding cannot exceed 22 inches.
@@ -47,9 +45,6 @@ impl std::fmt::Display for TapBuildError {
             },
             Self::MergeWithoutPrecedingCell => {
                 write!(f, "the first DOC table cell cannot be a merge continuation")
-            },
-            Self::UnsupportedBorderColor(color) => {
-                write!(f, "DOC Brc80 cannot represent RGB color {color:?}")
             },
             Self::InvalidBorderSpacing(spacing) => {
                 write!(f, "DOC Brc80 spacing {spacing} exceeds 31 points")
@@ -94,6 +89,17 @@ pub struct TableCell {
     pub padding_right: Option<u16>,
 }
 
+/// Default borders for a DOC table row.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct TableBorders {
+    pub top: Option<BorderStyle>,
+    pub left: Option<BorderStyle>,
+    pub bottom: Option<BorderStyle>,
+    pub right: Option<BorderStyle>,
+    pub horizontal: Option<BorderStyle>,
+    pub vertical: Option<BorderStyle>,
+}
+
 /// Table row properties
 #[derive(Debug, Clone)]
 pub struct TableRow {
@@ -105,6 +111,8 @@ pub struct TableRow {
     pub is_header: bool,
     /// Whether the row may split across page breaks
     pub allow_break: bool,
+    /// Default outer and inside borders for this row
+    pub borders: TableBorders,
 }
 
 impl Default for TableRow {
@@ -114,6 +122,7 @@ impl Default for TableRow {
             height: 0,
             is_header: false,
             allow_break: true,
+            borders: TableBorders::default(),
         }
     }
 }
@@ -254,10 +263,10 @@ pub(crate) fn generate_row_sprms(row: &TableRow) -> Result<Vec<u8>, TapBuildErro
         }
         operand.extend_from_slice(&flags.to_le_bytes());
         operand.extend_from_slice(&width.to_le_bytes());
-        operand.extend_from_slice(&encode_border(row.cells[index].borders.top)?);
-        operand.extend_from_slice(&encode_border(row.cells[index].borders.left)?);
-        operand.extend_from_slice(&encode_border(row.cells[index].borders.bottom)?);
-        operand.extend_from_slice(&encode_border(row.cells[index].borders.right)?);
+        operand.extend_from_slice(&encode_border80_fallback(row.cells[index].borders.top)?);
+        operand.extend_from_slice(&encode_border80_fallback(row.cells[index].borders.left)?);
+        operand.extend_from_slice(&encode_border80_fallback(row.cells[index].borders.bottom)?);
+        operand.extend_from_slice(&encode_border80_fallback(row.cells[index].borders.right)?);
     }
 
     let encoded_size =
@@ -266,6 +275,8 @@ pub(crate) fn generate_row_sprms(row: &TableRow) -> Result<Vec<u8>, TapBuildErro
     sprms.extend_from_slice(&encoded_size.to_le_bytes());
     sprms.extend_from_slice(&operand);
 
+    append_table_borders(&mut sprms, row.borders)?;
+    append_cell_borders(&mut sprms, &row.cells)?;
     append_cell_shading(&mut sprms, &row.cells)?;
     append_cell_padding(&mut sprms, &row.cells)?;
     Ok(sprms)
@@ -408,7 +419,7 @@ fn append_cell_padding(sprms: &mut Vec<u8>, cells: &[TableCell]) -> Result<(), T
     Ok(())
 }
 
-fn encode_border(border: Option<BorderStyle>) -> Result<[u8; 4], TapBuildError> {
+fn encode_border80_fallback(border: Option<BorderStyle>) -> Result<[u8; 4], TapBuildError> {
     let Some(border) = border else {
         return Ok([0; 4]);
     };
@@ -418,7 +429,17 @@ fn encode_border(border: Option<BorderStyle>) -> Result<[u8; 4], TapBuildError> 
     if border.spacing > 31 {
         return Err(TapBuildError::InvalidBorderSpacing(border.spacing));
     }
-    let border_type = match border.border_type {
+    let border_type = border_type_code(border.border_type);
+    if matches!(border.border_type, BorderType::Outset | BorderType::Inset) {
+        return Ok([0; 4]);
+    }
+    let ico = rgb_to_ico(border.color).unwrap_or(0);
+    let effects = border.spacing | (u8::from(border.shadow) << 5) | (u8::from(border.frame) << 6);
+    Ok([border.width, border_type, ico, effects])
+}
+
+fn border_type_code(border_type: BorderType) -> u8 {
+    match border_type {
         BorderType::None => 0,
         BorderType::Single => 1,
         BorderType::Thick => 5,
@@ -445,10 +466,146 @@ fn encode_border(border: Option<BorderStyle>) -> Result<[u8; 4], TapBuildError> 
         BorderType::Engrave => 25,
         BorderType::Outset => 26,
         BorderType::Inset => 27,
+    }
+}
+
+fn append_full_border(
+    output: &mut Vec<u8>,
+    border: Option<BorderStyle>,
+    nil: bool,
+) -> Result<(), TapBuildError> {
+    let Some(border) = border else {
+        if nil {
+            output.extend_from_slice(&[0; 4]);
+            output.extend_from_slice(&[0xFF; 4]);
+        } else {
+            output.extend_from_slice(&[0; 8]);
+        }
+        return Ok(());
     };
-    let ico = rgb_to_ico(border.color).map_err(TapBuildError::UnsupportedBorderColor)?;
-    let effects = border.spacing | (u8::from(border.shadow) << 5) | (u8::from(border.frame) << 6);
-    Ok([border.width, border_type, ico, effects])
+    if border.border_type == BorderType::None {
+        if nil {
+            output.extend_from_slice(&[0; 4]);
+            output.extend_from_slice(&[0xFF; 4]);
+        } else {
+            output.extend_from_slice(&[0; 8]);
+        }
+        return Ok(());
+    }
+    if border.spacing > 31 {
+        return Err(TapBuildError::InvalidBorderSpacing(border.spacing));
+    }
+    append_colorref(output, border.color);
+    output.push(border.width);
+    output.push(border_type_code(border.border_type));
+    output.push(border.spacing | (u8::from(border.shadow) << 5) | (u8::from(border.frame) << 6));
+    output.push(0);
+    Ok(())
+}
+
+fn append_table_borders(output: &mut Vec<u8>, borders: TableBorders) -> Result<(), TapBuildError> {
+    let values = [
+        borders.top,
+        borders.left,
+        borders.bottom,
+        borders.right,
+        borders.horizontal,
+        borders.vertical,
+    ];
+    if values.iter().all(Option::is_none) {
+        return Ok(());
+    }
+    if let Some(legacy) = values
+        .iter()
+        .map(|border| encode_border80_exact(*border))
+        .collect::<Option<Vec<_>>>()
+    {
+        output.extend_from_slice(&0xD605u16.to_le_bytes());
+        output.push(24);
+        for border in legacy {
+            output.extend_from_slice(&border);
+        }
+    }
+    output.extend_from_slice(&0xD613u16.to_le_bytes());
+    output.push(48);
+    for border in values {
+        append_full_border(output, border, false)?;
+    }
+    Ok(())
+}
+
+fn encode_border80_exact(border: Option<BorderStyle>) -> Option<[u8; 4]> {
+    let Some(border) = border else {
+        return Some([0; 4]);
+    };
+    if border.border_type == BorderType::None {
+        return Some([0; 4]);
+    }
+    if border.spacing > 31 || matches!(border.border_type, BorderType::Outset | BorderType::Inset) {
+        return None;
+    }
+    let ico = rgb_to_ico(border.color).ok()?;
+    Some([
+        border.width,
+        border_type_code(border.border_type),
+        ico,
+        border.spacing | (u8::from(border.shadow) << 5) | (u8::from(border.frame) << 6),
+    ])
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct BorderRun {
+    first: u8,
+    limit: u8,
+    sides: u8,
+    border: BorderStyle,
+}
+
+type BorderGetter = fn(&TableCell) -> Option<BorderStyle>;
+
+fn append_cell_borders(output: &mut Vec<u8>, cells: &[TableCell]) -> Result<(), TapBuildError> {
+    let sides: [(u8, BorderGetter); 6] = [
+        (0x01, |cell| cell.borders.top),
+        (0x02, |cell| cell.borders.left),
+        (0x04, |cell| cell.borders.bottom),
+        (0x08, |cell| cell.borders.right),
+        (0x10, |cell| cell.borders.diagonal_down),
+        (0x20, |cell| cell.borders.diagonal_up),
+    ];
+    let mut runs = Vec::<BorderRun>::new();
+    for (side, get_border) in sides {
+        let mut first = 0;
+        while first < cells.len() {
+            let Some(border) = get_border(&cells[first]) else {
+                first += 1;
+                continue;
+            };
+            let mut limit = first + 1;
+            while limit < cells.len() && get_border(&cells[limit]) == Some(border) {
+                limit += 1;
+            }
+            if let Some(run) = runs.iter_mut().find(|run| {
+                run.first == first as u8 && run.limit == limit as u8 && run.border == border
+            }) {
+                run.sides |= side;
+            } else {
+                runs.push(BorderRun {
+                    first: first as u8,
+                    limit: limit as u8,
+                    sides: side,
+                    border,
+                });
+            }
+            first = limit;
+        }
+    }
+    for run in runs {
+        output.extend_from_slice(&0xD62Fu16.to_le_bytes());
+        output.push(11);
+        output.extend_from_slice(&[run.first, run.limit, run.sides]);
+        append_full_border(output, Some(run.border), true)?;
+    }
+    Ok(())
 }
 
 fn rgb_to_ico(color: Option<(u8, u8, u8)>) -> Result<u8, (u8, u8, u8)> {
@@ -498,6 +655,7 @@ pub fn create_simple_table(rows: usize, cols: usize, cell_width: u16) -> TapBuil
             height: 0, // Auto height
             is_header: false,
             allow_break: true,
+            borders: TableBorders::default(),
         });
     }
 
@@ -526,11 +684,19 @@ mod tests {
                     borders: CellBorders {
                         top: Some(BorderStyle {
                             width: 8,
-                            color: Some((255, 0, 0)),
+                            color: Some((1, 2, 3)),
                             border_type: BorderType::Single,
                             spacing: 2,
                             shadow: true,
                             frame: false,
+                        }),
+                        diagonal_down: Some(BorderStyle {
+                            width: 4,
+                            color: Some((10, 20, 30)),
+                            border_type: BorderType::Outset,
+                            spacing: 1,
+                            shadow: false,
+                            frame: true,
                         }),
                         ..CellBorders::default()
                     },
@@ -553,6 +719,17 @@ mod tests {
             height: -200,
             is_header: true,
             allow_break: false,
+            borders: TableBorders {
+                vertical: Some(BorderStyle {
+                    width: 6,
+                    color: Some((40, 50, 60)),
+                    border_type: BorderType::Double,
+                    spacing: 0,
+                    shadow: false,
+                    frame: false,
+                }),
+                ..TableBorders::default()
+            },
         });
 
         let sprms = builder.try_generate_row_sprms(0).unwrap();
@@ -574,9 +751,14 @@ mod tests {
         assert!(tap.cell_properties[0].no_wrap);
         assert!(tap.cell_properties[0].hide_mark);
         let border = tap.cell_properties[0].borders.top.unwrap();
-        assert_eq!(border.color, Some((255, 0, 0)));
+        assert_eq!(border.color, Some((1, 2, 3)));
         assert_eq!(border.spacing, 2);
         assert!(border.shadow);
+        let diagonal = tap.cell_properties[0].borders.diagonal_down.unwrap();
+        assert_eq!(diagonal.color, Some((10, 20, 30)));
+        assert_eq!(diagonal.border_type, BorderType::Outset);
+        assert!(diagonal.frame);
+        assert_eq!(tap.border_vertical.unwrap().color, Some((40, 50, 60)));
         assert_eq!(
             tap.cell_properties[0].shading,
             Some(CellShading {
@@ -666,6 +848,7 @@ mod tests {
                 height: 200 + (i as i16 * 50),
                 is_header: i == 0,
                 allow_break: true,
+                borders: TableBorders::default(),
             });
         }
 
@@ -712,6 +895,7 @@ mod tests {
             height: 0,
             is_header: false,
             allow_break: true,
+            borders: TableBorders::default(),
         });
         assert_eq!(
             builder.try_generate_row_sprms(0),
@@ -728,6 +912,7 @@ mod tests {
             height: 0,
             is_header: false,
             allow_break: true,
+            borders: TableBorders::default(),
         });
         assert_eq!(
             builder.try_generate_row_sprms(0),
@@ -753,10 +938,7 @@ mod tests {
             }],
             ..TableRow::default()
         });
-        assert_eq!(
-            builder.try_generate_row_sprms(0),
-            Err(TapBuildError::UnsupportedBorderColor((1, 2, 3)))
-        );
+        assert!(builder.try_generate_row_sprms(0).is_ok());
 
         let mut builder = TapBuilder::new();
         builder.add_row(TableRow {

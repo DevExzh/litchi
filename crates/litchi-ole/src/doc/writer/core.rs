@@ -1791,6 +1791,7 @@ impl DocWriter {
                     height: 0,
                     is_header: false,
                     allow_break: true,
+                    borders: super::tap::TableBorders::default(),
                 },
             };
             for _ in 0..cols {
@@ -3738,11 +3739,19 @@ mod tests {
                             borders: crate::doc::parts::tap::CellBorders {
                                 top: Some(crate::doc::parts::tap::BorderStyle {
                                     width: 8,
-                                    color: Some((255, 0, 0)),
+                                    color: Some((1, 2, 3)),
                                     border_type: crate::doc::parts::tap::BorderType::Single,
                                     spacing: 2,
                                     shadow: true,
                                     frame: false,
+                                }),
+                                diagonal_down: Some(crate::doc::parts::tap::BorderStyle {
+                                    width: 4,
+                                    color: Some((10, 20, 30)),
+                                    border_type: crate::doc::parts::tap::BorderType::Outset,
+                                    spacing: 1,
+                                    shadow: false,
+                                    frame: true,
                                 }),
                                 ..crate::doc::parts::tap::CellBorders::default()
                             },
@@ -3765,6 +3774,17 @@ mod tests {
                     height: 360,
                     is_header: true,
                     allow_break: true,
+                    borders: crate::doc::writer::TableBorders {
+                        vertical: Some(crate::doc::parts::tap::BorderStyle {
+                            width: 6,
+                            color: Some((40, 50, 60)),
+                            border_type: crate::doc::parts::tap::BorderType::Double,
+                            spacing: 0,
+                            shadow: false,
+                            frame: false,
+                        }),
+                        ..crate::doc::writer::TableBorders::default()
+                    },
                 },
             )
             .unwrap();
@@ -3790,6 +3810,7 @@ mod tests {
                     height: -480,
                     is_header: false,
                     allow_break: false,
+                    borders: crate::doc::writer::TableBorders::default(),
                 },
             )
             .unwrap();
@@ -3844,7 +3865,7 @@ mod tests {
             assert!(first_cell_properties.hide_mark);
             let top_border = first_cell_properties.borders.top.unwrap();
             assert_eq!(top_border.width, 8);
-            assert_eq!(top_border.color, Some((255, 0, 0)));
+            assert_eq!(top_border.color, Some((1, 2, 3)));
             assert_eq!(
                 top_border.border_type,
                 crate::doc::parts::tap::BorderType::Single
@@ -3852,6 +3873,17 @@ mod tests {
             assert_eq!(top_border.spacing, 2);
             assert!(top_border.shadow);
             assert!(!top_border.frame);
+            let diagonal = first_cell_properties.borders.diagonal_down.unwrap();
+            assert_eq!(diagonal.color, Some((10, 20, 30)));
+            assert_eq!(
+                diagonal.border_type,
+                crate::doc::parts::tap::BorderType::Outset
+            );
+            assert!(diagonal.frame);
+            assert_eq!(
+                rows[0].properties().unwrap().border_vertical.unwrap().color,
+                Some((40, 50, 60))
+            );
             assert_eq!(
                 first_cell_properties.shading,
                 Some(crate::doc::parts::tap::CellShading {
@@ -4846,6 +4878,7 @@ mod tests {
             height: 0,
             is_header: false,
             allow_break: true,
+            borders: crate::doc::writer::TableBorders::default(),
         };
         assert!(writer.set_table_row_formatting(table, 0, one_cell).is_err());
 
@@ -4865,6 +4898,7 @@ mod tests {
             height: 0,
             is_header: false,
             allow_break: true,
+            borders: crate::doc::writer::TableBorders::default(),
         };
         assert!(
             writer
@@ -4888,6 +4922,7 @@ mod tests {
             height: 0,
             is_header: true,
             allow_break: true,
+            borders: crate::doc::writer::TableBorders::default(),
         };
         writer
             .set_table_row_formatting(table, 1, late_header)
@@ -4909,6 +4944,7 @@ mod tests {
                     height: 0,
                     is_header: false,
                     allow_break: true,
+                    borders: crate::doc::writer::TableBorders::default(),
                 },
             )
             .unwrap();

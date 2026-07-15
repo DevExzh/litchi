@@ -298,16 +298,20 @@ pub enum WidthType {
 }
 
 /// Cell borders.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct CellBorders {
     pub top: Option<BorderStyle>,
     pub left: Option<BorderStyle>,
     pub bottom: Option<BorderStyle>,
     pub right: Option<BorderStyle>,
+    /// Diagonal from the top-left to the bottom-right
+    pub diagonal_down: Option<BorderStyle>,
+    /// Diagonal from the top-right to the bottom-left
+    pub diagonal_up: Option<BorderStyle>,
 }
 
 /// Border style.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BorderStyle {
     /// Line width in 1/8 points
     pub width: u8,

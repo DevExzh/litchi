@@ -215,7 +215,13 @@ impl<'arena> TapParser<'arena> {
                 }
             },
             0x12 => self.parse_full_cell_shading(tap, sprm, 0, false)?,
+            // Full-color row border defaults.
+            0x13 => self.parse_full_table_borders(tap, sprm)?,
             0x16 => self.parse_full_cell_shading(tap, sprm, 22, false)?,
+            // Per-cell colors for top, left, bottom, and right borders.
+            0x1A..=0x1D => self.parse_cell_border_colors(tap, sprm, operation)?,
+            // Legacy range border override.
+            0x20 => self.parse_cell_border_range(tap, sprm, false)?,
             // sprmTInsert (0x7621) - Insert cells
             0x21 => {
                 self.handle_insert_cells(tap, sprm)?;
@@ -223,6 +229,8 @@ impl<'arena> TapParser<'arena> {
             // Full-color shading over every or every other cell in a range.
             0x2D => self.parse_full_cell_shading_range(tap, sprm, false)?,
             0x2E => self.parse_full_cell_shading_range(tap, sprm, true)?,
+            // Full-color range border override.
+            0x2F => self.parse_cell_border_range(tap, sprm, true)?,
             // Full-color shading applied to every cell in the table row.
             0x60 => self.parse_full_table_shading(tap, sprm)?,
             // sprmTCellPadding / sprmTCellPaddingDefault
@@ -491,7 +499,30 @@ impl<'arena> TapParser<'arena> {
             return Ok(None);
         }
 
-        let btype = match border_type {
+        let btype = Self::parse_border_type(border_type, false)?;
+
+        let color = if ico == 0 {
+            None
+        } else if ico <= 16 {
+            Self::ico_to_rgb(ico)
+        } else {
+            return Err(DocError::Corrupted(format!(
+                "Brc80 contains invalid color index {ico}"
+            )));
+        };
+
+        Ok(Some(BorderStyle {
+            width,
+            color,
+            border_type: btype,
+            spacing: effects & 0x1F,
+            shadow: effects & 0x20 != 0,
+            frame: effects & 0x40 != 0,
+        }))
+    }
+
+    fn parse_border_type(border_type: u8, full: bool) -> Result<BorderType> {
+        Ok(match border_type {
             0 => BorderType::None,
             1 => BorderType::Single,
             3 => BorderType::Double,
@@ -516,33 +547,14 @@ impl<'arena> TapParser<'arena> {
             23 => BorderType::DashDotStroked,
             24 => BorderType::Emboss,
             25 => BorderType::Engrave,
-            26 => BorderType::Outset,
-            27 => BorderType::Inset,
+            26 if full => BorderType::Outset,
+            27 if full => BorderType::Inset,
             value => {
                 return Err(DocError::Corrupted(format!(
-                    "Brc80 contains invalid border type {value:#04x}"
+                    "DOC border contains invalid border type {value:#04x}"
                 )));
             },
-        };
-
-        let color = if ico == 0 {
-            None
-        } else if ico <= 16 {
-            Self::ico_to_rgb(ico)
-        } else {
-            return Err(DocError::Corrupted(format!(
-                "Brc80 contains invalid color index {ico}"
-            )));
-        };
-
-        Ok(Some(BorderStyle {
-            width,
-            color,
-            border_type: btype,
-            spacing: effects & 0x1F,
-            shadow: effects & 0x20 != 0,
-            frame: effects & 0x40 != 0,
-        }))
+        })
     }
 
     /// Parse table borders (sprmTTableBorders - 0xD605).
@@ -553,21 +565,152 @@ impl<'arena> TapParser<'arena> {
         &self,
         tap: &mut TableProperties,
         sprm: &Sprm,
-        grpprl: &[u8],
+        _grpprl: &[u8],
     ) -> Result<()> {
-        let offset = sprm.offset + 3; // Skip SPRM header
-        if offset + 24 > grpprl.len() {
-            return Ok(());
+        let operand = sprm.operand_bytes();
+        if operand.len() != 24 {
+            return Err(DocError::Corrupted(
+                "DOC TableBordersOperand80 must contain 24 bytes".to_string(),
+            ));
         }
 
         // Parse 6 border codes (each 4 bytes)
-        tap.border_top = Self::parse_border_code(grpprl, offset)?;
-        tap.border_left = Self::parse_border_code(grpprl, offset + 4)?;
-        tap.border_bottom = Self::parse_border_code(grpprl, offset + 8)?;
-        tap.border_right = Self::parse_border_code(grpprl, offset + 12)?;
-        tap.border_horizontal = Self::parse_border_code(grpprl, offset + 16)?;
-        tap.border_vertical = Self::parse_border_code(grpprl, offset + 20)?;
+        tap.border_top = Self::parse_border_code(operand, 0)?;
+        tap.border_left = Self::parse_border_code(operand, 4)?;
+        tap.border_bottom = Self::parse_border_code(operand, 8)?;
+        tap.border_right = Self::parse_border_code(operand, 12)?;
+        tap.border_horizontal = Self::parse_border_code(operand, 16)?;
+        tap.border_vertical = Self::parse_border_code(operand, 20)?;
 
+        Ok(())
+    }
+
+    fn parse_full_table_borders(&self, tap: &mut TableProperties, sprm: &Sprm) -> Result<()> {
+        let operand = sprm.operand_bytes();
+        if operand.len() != 48 {
+            return Err(DocError::Corrupted(
+                "DOC TableBordersOperand must contain 48 bytes".to_string(),
+            ));
+        }
+        tap.border_top = Self::parse_full_border(&operand[0..8])?;
+        tap.border_left = Self::parse_full_border(&operand[8..16])?;
+        tap.border_bottom = Self::parse_full_border(&operand[16..24])?;
+        tap.border_right = Self::parse_full_border(&operand[24..32])?;
+        tap.border_horizontal = Self::parse_full_border(&operand[32..40])?;
+        tap.border_vertical = Self::parse_full_border(&operand[40..48])?;
+        Ok(())
+    }
+
+    fn parse_full_border(bytes: &[u8]) -> Result<Option<BorderStyle>> {
+        if bytes.len() != 8 {
+            return Err(DocError::Corrupted(
+                "DOC Brc must contain exactly 8 bytes".to_string(),
+            ));
+        }
+        if bytes[4..] == [0xFF; 4] {
+            return Ok(None);
+        }
+        let width = bytes[4];
+        let border_type = bytes[5];
+        if width == 0 && border_type == 0 {
+            return Ok(None);
+        }
+        let effects = bytes[6];
+        Ok(Some(BorderStyle {
+            width,
+            color: Self::parse_colorref(&bytes[..4])?,
+            border_type: Self::parse_border_type(border_type, true)?,
+            spacing: effects & 0x1F,
+            shadow: effects & 0x20 != 0,
+            frame: effects & 0x40 != 0,
+        }))
+    }
+
+    fn parse_cell_border_colors(
+        &self,
+        tap: &mut TableProperties,
+        sprm: &Sprm,
+        operation: u16,
+    ) -> Result<()> {
+        let operand = sprm.operand_bytes();
+        if operand.len() != tap.cell_properties.len() * 4 {
+            return Err(DocError::Corrupted(
+                "DOC cell border color array does not match the row".to_string(),
+            ));
+        }
+        for (cell, colorref) in tap.cell_properties.iter_mut().zip(operand.chunks_exact(4)) {
+            let border = match operation {
+                0x1A => &mut cell.borders.top,
+                0x1B => &mut cell.borders.left,
+                0x1C => &mut cell.borders.bottom,
+                0x1D => &mut cell.borders.right,
+                _ => unreachable!(),
+            };
+            if colorref == [0xFF; 4] {
+                *border = None;
+            } else {
+                let color = Self::parse_colorref(colorref)?;
+                if let Some(border) = border {
+                    border.color = color;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn parse_cell_border_range(
+        &self,
+        tap: &mut TableProperties,
+        sprm: &Sprm,
+        full: bool,
+    ) -> Result<()> {
+        let operand = sprm.operand_bytes();
+        let expected_len = if full { 11 } else { 7 };
+        if operand.len() != expected_len {
+            return Err(DocError::Corrupted(format!(
+                "DOC cell border range operand must contain {expected_len} bytes"
+            )));
+        }
+        let first = operand[0] as usize;
+        let limit = operand[1] as usize;
+        if first >= tap.cell_properties.len() || limit < first || limit > tap.cell_properties.len()
+        {
+            return Err(DocError::Corrupted(
+                "DOC cell border range exceeds the row".to_string(),
+            ));
+        }
+        let sides = operand[2];
+        let allowed_sides = if full { 0x3F } else { 0x0F };
+        if sides & !allowed_sides != 0 {
+            return Err(DocError::Corrupted(
+                "DOC cell border range contains invalid side flags".to_string(),
+            ));
+        }
+        let border = if full {
+            Self::parse_full_border(&operand[3..])?
+        } else {
+            Self::parse_border_code(&operand[3..], 0)?
+        };
+        for cell in &mut tap.cell_properties[first..limit] {
+            if sides & 0x01 != 0 {
+                cell.borders.top = border;
+            }
+            if sides & 0x02 != 0 {
+                cell.borders.left = border;
+            }
+            if sides & 0x04 != 0 {
+                cell.borders.bottom = border;
+            }
+            if sides & 0x08 != 0 {
+                cell.borders.right = border;
+            }
+            if sides & 0x10 != 0 {
+                cell.borders.diagonal_down = border;
+            }
+            if sides & 0x20 != 0 {
+                cell.borders.diagonal_up = border;
+            }
+        }
         Ok(())
     }
 
@@ -933,6 +1076,12 @@ mod tests {
         shading
     }
 
+    fn full_border(color: [u8; 4], width: u8, border_type: u8, effects: u8) -> Vec<u8> {
+        let mut border = color.to_vec();
+        border.extend_from_slice(&[width, border_type, effects, 0]);
+        border
+    }
+
     #[test]
     fn test_tap_parser_creation() {
         let arena = Bump::new();
@@ -1132,6 +1281,55 @@ mod tests {
         assert!(parse_with(0xD62D, &[2, 2, 0, 0, 0, 0xFF, 0, 0, 0, 0xFF, 0, 0]).is_err());
         assert!(parse_with(0xD62D, &[0, 2, 0, 0, 0, 1, 0, 0, 0, 0xFF, 0, 0]).is_err());
         assert!(parse_with(0xD62D, &[0, 2, 0, 0, 0, 0xFF, 0, 0, 0, 0xFF, 0x1A, 0]).is_err());
+    }
+
+    #[test]
+    fn parses_row_range_diagonal_and_color_borders() {
+        let arena = Bump::new();
+        let parser = TapParser::new(&arena);
+        let mut grpprl = table_definition_grpprl(&[2, 0, 0, 100, 0, 200, 0]);
+
+        append_variable_sprm(&mut grpprl, 0xD620, &[0, 2, 0x01, 8, 1, 1, 0]);
+        append_variable_sprm(&mut grpprl, 0xD61A, &[1, 2, 3, 0, 0xFF, 0xFF, 0xFF, 0xFF]);
+        let diagonal = full_border([10, 20, 30, 0], 4, 0x1A, 0x41);
+        let mut range = vec![0, 2, 0x30];
+        range.extend_from_slice(&diagonal);
+        append_variable_sprm(&mut grpprl, 0xD62F, &range);
+        let mut row_borders = full_border([40, 50, 60, 0], 6, 3, 0);
+        row_borders.resize(48, 0);
+        append_variable_sprm(&mut grpprl, 0xD613, &row_borders);
+
+        let tap = parser.parse_tap(&grpprl).unwrap();
+        assert_eq!(
+            tap.cell_properties[0].borders.top.unwrap().color,
+            Some((1, 2, 3))
+        );
+        assert!(tap.cell_properties[1].borders.top.is_none());
+        let diagonal = tap.cell_properties[0].borders.diagonal_down.unwrap();
+        assert_eq!(diagonal.border_type, BorderType::Outset);
+        assert_eq!(diagonal.color, Some((10, 20, 30)));
+        assert_eq!(tap.cell_properties[1].borders.diagonal_up, Some(diagonal));
+        assert_eq!(tap.border_top.unwrap().color, Some((40, 50, 60)));
+    }
+
+    #[test]
+    fn rejects_malformed_modern_table_borders() {
+        let arena = Bump::new();
+        let parser = TapParser::new(&arena);
+        let parse_with = |opcode, operand: &[u8]| {
+            let mut grpprl = table_definition_grpprl(&[2, 0, 0, 100, 0, 200, 0]);
+            append_variable_sprm(&mut grpprl, opcode, operand);
+            parser.parse_tap(&grpprl)
+        };
+        assert!(parse_with(0xD605, &[0; 23]).is_err());
+        assert!(parse_with(0xD613, &[0; 47]).is_err());
+        assert!(parse_with(0xD61A, &[0; 4]).is_err());
+        assert!(parse_with(0xD620, &[0; 6]).is_err());
+        assert!(parse_with(0xD62F, &[2, 2, 1, 0, 0, 0, 0xFF, 8, 1, 0, 0]).is_err());
+        assert!(parse_with(0xD62F, &[0, 2, 0x40, 0, 0, 0, 0xFF, 8, 1, 0, 0]).is_err());
+        assert!(parse_with(0xD62F, &[0, 2, 1, 0, 0, 0, 1, 8, 1, 0, 0]).is_err());
+        assert!(parse_with(0xD62F, &[0, 2, 1, 0, 0, 0, 0xFF, 8, 2, 0, 0]).is_err());
+        assert!(TapParser::parse_border_code(&[8, 0x1A, 1, 0], 0).is_err());
     }
 
     #[test]
