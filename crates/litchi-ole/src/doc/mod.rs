@@ -49,6 +49,7 @@
 /// }
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
+pub mod bookmark;
 pub mod comment;
 pub mod document;
 pub mod footnote;
@@ -64,6 +65,7 @@ pub mod table;
 /// DOC file writing
 pub mod writer;
 
+pub use bookmark::Bookmark;
 pub use comment::{Comment, CommentDateTime, CommentExtendedMetadata};
 pub use document::Document;
 pub use footnote::{Endnote, Footnote};

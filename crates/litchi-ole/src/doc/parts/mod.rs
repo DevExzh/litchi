@@ -1,3 +1,4 @@
+pub mod bookmarks;
 /// Internal parts for parsing DOC file structures.
 ///
 /// This module contains parsers for the binary structures used in

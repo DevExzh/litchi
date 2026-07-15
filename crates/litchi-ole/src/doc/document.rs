@@ -1,4 +1,5 @@
 use super::super::OleFile;
+use super::bookmark::Bookmark;
 /// Document - the main API for working with Word document content.
 use super::comment::Comment;
 use super::footnote::Footnote;
@@ -6,6 +7,7 @@ use super::header_footer::HeaderFooter;
 use super::hyperlink::Hyperlink;
 use super::package::{DocError, Result};
 use super::paragraph::{Paragraph, Run};
+use super::parts::bookmarks::BookmarksTable;
 use super::parts::chp_bin_table::ChpBinTable;
 use super::parts::comments::CommentsTable;
 use super::parts::fib::FileInformationBlock;
@@ -82,6 +84,8 @@ pub struct Document {
     endnotes_table: Option<EndnotesTable>,
     /// Comments table
     comments_table: CommentsTable,
+    /// Standard bookmark tables
+    bookmarks_table: BookmarksTable,
     /// Hyperlinks table
     hyperlinks_table: Option<HyperlinksTable>,
     /// List/numbering tables
@@ -150,6 +154,7 @@ impl Document {
         let footnotes_table = FootnotesTable::parse(&fib, &table_stream).ok();
         let endnotes_table = EndnotesTable::parse(&fib, &table_stream).ok();
         let comments_table = CommentsTable::parse(&fib, &table_stream)?;
+        let bookmarks_table = BookmarksTable::parse(&fib, &table_stream)?;
 
         // Parse hyperlinks from fields table
         let hyperlinks_table = fields_table.as_ref().and_then(|ft| {
@@ -195,6 +200,7 @@ impl Document {
             footnotes_table,
             endnotes_table,
             comments_table,
+            bookmarks_table,
             hyperlinks_table,
             list_tables,
             mtef_data,
@@ -619,6 +625,15 @@ impl Document {
         }
 
         Ok(result)
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // Bookmarks
+    // ──────────────────────────────────────────────────────────────────
+
+    /// Get all standard bookmarks in start-CP order.
+    pub fn bookmarks(&self) -> Result<Vec<Bookmark>> {
+        Ok(self.bookmarks_table.bookmarks().to_vec())
     }
 
     // ──────────────────────────────────────────────────────────────────

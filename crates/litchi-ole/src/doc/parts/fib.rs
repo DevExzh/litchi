@@ -224,6 +224,13 @@ impl FileInformationBlock {
             .unwrap_or(0)
     }
 
+    /// End CP of the concatenated set of all document parts.
+    pub fn get_document_parts_end(&self) -> Option<u32> {
+        (0..8).try_fold(0u32, |total, index| {
+            total.checked_add(self.get_character_count(index))
+        })
+    }
+
     /// Get the main document character position range.
     ///
     /// Returns (start_cp, end_cp) for the main document text.
