@@ -782,13 +782,21 @@ pub struct KeynoteBuildInfo {
     pub chunks: Vec<KeynoteBuildChunkInfo>,
 }
 
-/// Transactional editor for title and body placeholders in an existing Keynote package.
+/// Transactional editor for a Keynote package.
 #[derive(Debug, Clone)]
 pub struct KeynoteEditor {
     text: IWorkTextEditor,
 }
 
 impl KeynoteEditor {
+    /// Create an independent native Basic White Keynote presentation from scratch.
+    ///
+    /// The presentation starts with one title slide and the complete Basic
+    /// White slide-layout catalog, ready for slide and object CRUD.
+    pub fn create() -> Result<Self> {
+        Self::from_package(crate::templates::basic_white_keynote_package()?)
+    }
+
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         Self::from_package(IWorkPackage::open(path)?)
     }

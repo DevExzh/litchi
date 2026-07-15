@@ -29,6 +29,7 @@ println!("{}", structured.summary());
 ## Features
 
 - Parse Pages, Numbers, and Keynote bundles from a path or in-memory bytes
+- Create independent native Pages, Numbers, and Keynote documents from scratch
 - Snappy decompression and protobuf decoding of `.iwa` streams
 - Text extraction across all iWork applications
 - Structured-data extraction: tables (with CSV export), slides, sections
@@ -65,6 +66,35 @@ println!("{}", structured.summary());
   copy-on-write threads, annotation authors, dates, and UUIDs
 
 ## Semantic editing
+
+### Create from scratch
+
+```rust
+use litchi_iwa::keynote::KeynoteEditor;
+use litchi_iwa::numbers::{CellValue, NumbersEditor};
+use litchi_iwa::pages::PagesEditor;
+
+let mut pages = PagesEditor::create()?;
+pages.set_body_text("Quarterly report")?;
+pages.save("report.pages")?;
+
+let mut numbers = NumbersEditor::create()?;
+let table_id = numbers.tables()?.remove(0).object_id;
+numbers.set_cell(table_id, 0, 0, CellValue::Text("Revenue".into()))?;
+numbers.set_cell(table_id, 0, 1, CellValue::Number(42.0))?;
+numbers.save("model.numbers")?;
+
+let mut keynote = KeynoteEditor::create()?;
+keynote.set_slide_title(0, "Launch")?;
+keynote.set_slide_body(0, "Built with litchi-iwa")?;
+keynote.save("launch.key")?;
+# Ok::<(), litchi_iwa::Error>(())
+```
+
+Each constructor assigns fresh document, version, private, and package-revision
+UUIDs. The returned editor supports the same CRUD API as an opened document.
+
+### Edit existing documents
 
 ```rust
 use litchi_iwa::numbers::{

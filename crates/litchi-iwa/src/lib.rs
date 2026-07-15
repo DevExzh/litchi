@@ -130,6 +130,7 @@
 // Core parsing modules
 pub mod archive;
 pub mod bundle;
+pub mod identity;
 pub mod media;
 pub mod object_index;
 pub mod package;
@@ -139,6 +140,7 @@ pub mod ref_graph;
 pub mod registry;
 pub mod snappy;
 pub mod structured;
+mod templates;
 pub mod varint;
 pub(crate) mod wire;
 pub mod zip_utils;
@@ -169,6 +171,7 @@ pub use comments::{
     IWorkDrawableCommentEditor, IWorkDrawableInfo,
 };
 pub use document::Document;
+pub use identity::IWorkDocumentIdentity;
 pub use media::{
     EmbeddedMediaAsset, IWorkMediaEditor, MediaAsset, MediaManager, MediaStats, MediaType,
 };

@@ -71,7 +71,7 @@ struct HeaderFooterLocation {
     storage_id: u64,
 }
 
-/// Transactional editor for the body text of an existing Pages package.
+/// Transactional editor for a Pages package.
 #[derive(Debug, Clone)]
 pub struct PagesEditor {
     text: IWorkTextEditor,
@@ -81,6 +81,11 @@ pub struct PagesEditor {
 }
 
 impl PagesEditor {
+    /// Create an independent native blank Pages document from scratch.
+    pub fn create() -> Result<Self> {
+        Self::from_package(crate::templates::blank_pages_package()?)
+    }
+
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         Self::from_package(IWorkPackage::open(path)?)
     }
