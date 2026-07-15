@@ -23,6 +23,7 @@
 //! - ✅ `sections()` - Parse document sections
 //! - ✅ `text_indexes()` - Parse all generated index sources and cached bodies
 //! - ✅ `text_index_marks()` - Parse TOC, user, alphabetical, and bibliography marks
+//! - ✅ `reference_marks()` - Parse point/range cross-reference targets
 //! - ✅ Style parsing and resolution with registry
 //!
 //! ## ✅ Writing (`builder.rs`, `mutable.rs`) - COMPLETE
@@ -59,6 +60,7 @@ mod index_mark;
 mod mutable;
 mod page_layout;
 mod parser;
+mod reference_mark;
 
 pub use builder::DocumentBuilder;
 pub use document::Document;
@@ -67,6 +69,7 @@ pub use index::{TextIndex, TextIndexAttribute, TextIndexContent, TextIndexElemen
 pub use index_mark::{TextIndexMark, TextIndexMarkKind};
 pub use mutable::MutableDocument;
 pub use page_layout::{PageLayout, PageLayoutAttribute, PageLayoutProperties, PageUsage};
+pub use reference_mark::ReferenceMark;
 
 // Re-export ODT-specific types for external use
 #[allow(unused_imports)] // Library public API

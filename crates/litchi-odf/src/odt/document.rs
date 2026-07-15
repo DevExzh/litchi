@@ -542,6 +542,11 @@ impl Document {
         super::index_mark::parse_text_index_marks(self.content.xml_content())
     }
 
+    /// Get point and range targets used by `text:reference-ref` fields.
+    pub fn reference_marks(&self) -> Result<Vec<super::ReferenceMark>> {
+        super::reference_mark::parse_reference_marks(self.content.xml_content())
+    }
+
     /// Get all bookmarks in the document.
     ///
     /// # Examples

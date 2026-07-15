@@ -59,6 +59,7 @@
 //! - ✅ Section parsing
 //! - ✅ Generated indexes, source templates, and cached index bodies
 //! - ✅ Point/range index source marks and inert bibliography records
+//! - ✅ Point/range cross-reference targets with exact positions and text
 //!
 //! ### Writing (`odt/builder.rs`, `odt/mutable.rs`)
 //! - ✅ DocumentBuilder for creating new ODT files
@@ -367,7 +368,7 @@ pub use ods::{
 };
 pub use odt::{
     Document, DocumentBuilder, HeaderFooter, HeaderFooterKind, MasterPage, MutableDocument,
-    PageLayout, PageLayoutAttribute, PageLayoutProperties, PageUsage, TextIndex,
+    PageLayout, PageLayoutAttribute, PageLayoutProperties, PageUsage, ReferenceMark, TextIndex,
     TextIndexAttribute, TextIndexContent, TextIndexElement, TextIndexKind, TextIndexMark,
     TextIndexMarkKind,
 };
