@@ -7,6 +7,7 @@ use crate::docx::enums::WdHeaderFooter;
 use crate::docx::namespace::scan_word_element_ranges;
 use crate::docx::paragraph::{Paragraph, extract_word_text};
 use crate::docx::table::Table;
+use crate::docx::writer::Watermark;
 use crate::error::Result;
 use litchi_opc::part::Part;
 use std::sync::Arc;
@@ -206,6 +207,15 @@ impl HeaderFooter {
             },
         )?;
         Ok(count)
+    }
+
+    /// Return standard VML text watermarks embedded in this header.
+    ///
+    /// Ordinary VML header shapes and WordArt are ignored unless they use the
+    /// canonical Word watermark identifier or centered background-watermark
+    /// shape contract.
+    pub fn watermarks(&self) -> Result<Vec<Watermark>> {
+        Watermark::from_header_xml(self.xml_bytes.as_slice())
     }
 }
 
@@ -505,5 +515,23 @@ mod tests {
         assert!(primary.text().unwrap().contains("Primary"));
         assert!(first.text().unwrap().contains("First Page"));
         assert!(even.text().unwrap().contains("Even Page"));
+    }
+
+    #[test]
+    fn extracts_standard_vml_watermarks() {
+        let xml =
+            br##"<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            xmlns:v="urn:schemas-microsoft-com:vml">
+            <w:p><w:r><w:pict><v:shape id="PowerPlusWaterMarkObject1" fillcolor="#808080">
+                <v:textpath style="font-family:'Cambria';font-size:1pt" string="CONFIDENTIAL"/>
+            </v:shape></w:pict></w:r></w:p>
+        </w:hdr>"##;
+        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), WdHeaderFooter::Primary);
+
+        let watermarks = header.watermarks().unwrap();
+
+        assert_eq!(watermarks.len(), 1);
+        assert_eq!(watermarks[0].get_text(), "CONFIDENTIAL");
+        assert_eq!(watermarks[0].color(), "#808080");
     }
 }

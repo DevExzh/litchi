@@ -1482,6 +1482,25 @@ mod tests {
     }
 
     #[test]
+    fn writes_and_rediscovers_distinct_watermarks() {
+        let file = NamedTempFile::with_suffix(".docx").unwrap();
+        let mut package = Package::new().unwrap();
+        let mut watermark = crate::docx::Watermark::text("INTERNAL");
+        watermark.set_font("Aptos");
+        watermark.set_color("808080");
+        package.document_mut().unwrap().set_watermark(watermark);
+        package.save(file.path()).unwrap();
+
+        let reopened = Package::open(file.path()).unwrap();
+        let watermarks = reopened.document().unwrap().watermarks().unwrap();
+
+        assert_eq!(watermarks.len(), 1);
+        assert_eq!(watermarks[0].get_text(), "INTERNAL");
+        assert_eq!(watermarks[0].font(), "Aptos");
+        assert_eq!(watermarks[0].color(), "#808080");
+    }
+
+    #[test]
     fn body_edits_preserve_settings_part_byte_for_byte() {
         let mut package = Package::new().unwrap();
         let settings_uri = PackURI::new("/word/settings.xml").unwrap();

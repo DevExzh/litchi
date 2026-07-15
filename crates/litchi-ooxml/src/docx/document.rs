@@ -23,6 +23,7 @@ use crate::docx::table::Table;
 use crate::docx::theme::Theme;
 use crate::docx::variables::DocumentVariables;
 use crate::docx::web_settings::{WebSettings, is_web_settings_relationship};
+use crate::docx::writer::Watermark;
 use crate::error::{OoxmlError, Result};
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::relationship_type;
@@ -630,6 +631,23 @@ impl<'a> Document<'a> {
         }
 
         Ok(headers)
+    }
+
+    /// Return distinct standard VML text watermarks from document headers.
+    ///
+    /// Word commonly repeats the same watermark in default, first-page, and
+    /// even-page headers; equivalent copies are returned once in relationship
+    /// order.
+    pub fn watermarks(&self) -> Result<Vec<Watermark>> {
+        let mut watermarks = Vec::new();
+        for (_, header) in self.headers()? {
+            for watermark in header.watermarks()? {
+                if !watermarks.contains(&watermark) {
+                    watermarks.push(watermark);
+                }
+            }
+        }
+        Ok(watermarks)
     }
 
     /// Get all footers in the document.
@@ -1431,9 +1449,7 @@ impl<'a> Document<'a> {
     // TODO: Section-break insertion and mutation
     // - insert_section_break()
     //
-    // TODO: Watermarks (MS-DOCX Section 17.10.2)
-    // - Requires parsing VML shapes in headers with watermark styling
-    // - add_watermark(), remove_watermark()
+    // ✅ Watermarks: typed VML header discovery plus mutable add/remove support
     //
     // ✅ COMPLETED: Images reading (November 2024)
     // - See image.rs module and Paragraph::images() method
@@ -1444,9 +1460,7 @@ impl<'a> Document<'a> {
     // - Full support for shapes, text boxes, inline/anchored positions
     // - 20+ standard shape types (rectangle, ellipse, arrows, etc.)
     //
-    // TODO: Smart tags (MS-DOCX Section 17.5.1)
-    // - Requires parsing w:smartTag elements with namespace URIs
-    // - get_smart_tags(), add_smart_tag(), remove_smart_tag()
+    // ✅ Smart tags: namespace-aware reading and mutable nested-tag writing
 }
 
 // Note: Paragraph, Run, Table, Row, Cell, Section, Styles are now in separate modules:
