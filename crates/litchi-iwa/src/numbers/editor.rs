@@ -1792,6 +1792,7 @@ mod model;
 mod row_insert;
 mod sheet_duplicate;
 mod storage;
+mod table_dimension;
 mod table_duplicate;
 mod table_move;
 mod table_topology;
@@ -1799,6 +1800,7 @@ mod text_box_duplicate;
 
 use model::*;
 use storage::*;
+pub use table_dimension::{NumbersTableDimension, NumbersTableDimensionSize, NumbersTablePoints};
 use table_duplicate::*;
 #[cfg(test)]
 mod tests;
