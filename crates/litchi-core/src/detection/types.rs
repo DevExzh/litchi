@@ -40,7 +40,7 @@ pub enum FileFormat {
     Odf,
     /// OpenDocument Image (.odi, .oti)
     Odi,
-    /// OpenDocument Master Document (.odm)
+    /// OpenDocument Master Document (.odm, .otm)
     Odm,
     /// OpenDocument Web Document (.oth)
     Oth,

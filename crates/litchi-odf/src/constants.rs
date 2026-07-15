@@ -73,6 +73,9 @@ pub const ODF_FORMULA_TEMPLATE: &str = "application/vnd.oasis.opendocument.formu
 /// MIME type for OpenDocument Master (.odm)
 pub const ODF_MASTER: &str = "application/vnd.oasis.opendocument.text-master";
 
+/// MIME type for OpenDocument Master Template (.otm)
+pub const ODF_MASTER_TEMPLATE: &str = "application/vnd.oasis.opendocument.text-master-template";
+
 /// MIME type for OpenDocument Web (.oth)
 pub const ODF_WEB: &str = "application/vnd.oasis.opendocument.text-web";
 
@@ -99,6 +102,7 @@ pub static ODF_EXTENSIONS: Map<&'static str, &'static str> = phf_map! {
     "odf" => ODF_FORMULA,
     "otf" => ODF_FORMULA_TEMPLATE,
     "odm" => ODF_MASTER,
+    "otm" => ODF_MASTER_TEMPLATE,
     "oth" => ODF_WEB,
     "fodt" => ODF_TEXT,
     "fods" => ODF_SPREADSHEET,
@@ -126,6 +130,7 @@ pub static ODF_MIMETYPES: Map<&'static str, &'static str> = phf_map! {
     "application/vnd.oasis.opendocument.formula" => "odf",
     "application/vnd.oasis.opendocument.formula-template" => "otf",
     "application/vnd.oasis.opendocument.text-master" => "odm",
+    "application/vnd.oasis.opendocument.text-master-template" => "otm",
     "application/vnd.oasis.opendocument.text-web" => "oth",
 };
 
@@ -301,6 +306,10 @@ mod tests {
         assert_eq!(get_mime_type_from_extension("odp"), Some(ODF_PRESENTATION));
         assert_eq!(get_mime_type_from_extension("unknown"), None);
         assert_eq!(get_mime_type_from_extension("fodg"), Some(ODF_DRAWING));
+        assert_eq!(
+            get_mime_type_from_extension("otm"),
+            Some(ODF_MASTER_TEMPLATE)
+        );
     }
 
     #[test]
@@ -312,6 +321,10 @@ mod tests {
         assert_eq!(get_flat_extension_from_mime_type(ODF_TEXT), Some("fodt"));
         assert_eq!(get_flat_extension_from_mime_type(ODF_CHART), Some("fodc"));
         assert_eq!(get_flat_extension_from_mime_type(ODF_MASTER), None);
+        assert_eq!(
+            get_extension_from_mime_type(ODF_MASTER_TEMPLATE),
+            Some("otm")
+        );
     }
 
     #[test]
@@ -323,6 +336,7 @@ mod tests {
         assert!(is_odf_extension("fods"));
         assert!(is_odf_extension("fodp"));
         assert!(is_odf_extension("fodg"));
+        assert!(is_odf_extension("otm"));
         assert!(!is_odf_extension("txt"));
         assert!(!is_odf_extension("docx"));
     }

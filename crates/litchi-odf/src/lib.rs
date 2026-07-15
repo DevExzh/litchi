@@ -189,12 +189,19 @@
 //! - ✅ External references remain inert and are never fetched
 //! - ✅ Metadata and lossless exact original-byte saving
 //!
+//! ## ✅ ODM - Master Documents (READ-ONLY SEMANTIC MODEL)
+//!
+//! - ✅ Open master documents and master templates (`.odm`/`.otm`)
+//! - ✅ Reuse the complete text-document semantic reader for cached content
+//! - ✅ Namespace-aware linked sections, display/protection metadata, and XLink behavior
+//! - ✅ Linked external documents remain inert and are never refreshed automatically
+//! - ✅ Metadata and lossless exact original-byte saving
+//!
 //! ## 🚧 Additional ODF Formats (PACKAGE SUPPORT)
 //!
 //! All standard families and templates can be validated, inspected, extracted,
 //! and saved losslessly through [`OpenDocumentPackage`]. Specialized semantic
 //! object models remain in progress for:
-//! - ODM - OpenDocument Master (.odm)
 //! - OTH - OpenDocument Web (.oth)
 //!
 //! Standard flat XML documents (`.fodt`, `.fods`, `.fodp`, `.fodg`, `.fodc`,
@@ -277,6 +284,8 @@ mod odc;
 mod odg;
 /// OpenDocument image (.odi/.oti) support.
 mod odi;
+/// OpenDocument master (.odm/.otm) support.
+mod odm;
 /// ODF presentation (.odp) support
 mod odp;
 /// ODF spreadsheet (.ods) support
@@ -299,6 +308,7 @@ pub use odg::{
     DrawingDocument, DrawingLayer, DrawingLayerDisplay, DrawingPage, DrawingPageProperties,
 };
 pub use odi::{ImageAttribute, ImageContent, ImageDocument, ImageElement, ImageElementKind};
+pub use odm::{MasterDocument, MasterSubdocument};
 
 // Re-export main types for convenience
 pub use odp::{

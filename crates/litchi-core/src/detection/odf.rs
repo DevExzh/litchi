@@ -34,6 +34,7 @@ const ODF_TEMPLATE_MIME: &str = "application/vnd.oasis.opendocument.formula-temp
 const ODI_MIME: &str = "application/vnd.oasis.opendocument.image";
 const ODI_TEMPLATE_MIME: &str = "application/vnd.oasis.opendocument.image-template";
 const ODM_MIME: &str = "application/vnd.oasis.opendocument.text-master";
+const ODM_TEMPLATE_MIME: &str = "application/vnd.oasis.opendocument.text-master-template";
 const OTH_MIME: &str = "application/vnd.oasis.opendocument.text-web";
 const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 
@@ -74,7 +75,7 @@ pub fn detect_odf_format_from_mimetype(mimetype: &[u8]) -> Option<FileFormat> {
         ODC_MIME | ODC_TEMPLATE_MIME => Some(FileFormat::Odc),
         ODF_MIME | ODF_TEMPLATE_MIME => Some(FileFormat::Odf),
         ODI_MIME | ODI_TEMPLATE_MIME => Some(FileFormat::Odi),
-        ODM_MIME => Some(FileFormat::Odm),
+        ODM_MIME | ODM_TEMPLATE_MIME => Some(FileFormat::Odm),
         OTH_MIME => Some(FileFormat::Oth),
         _ => None,
     }
@@ -275,6 +276,7 @@ mod tests {
             (ODI_MIME, FileFormat::Odi),
             (ODI_TEMPLATE_MIME, FileFormat::Odi),
             (ODM_MIME, FileFormat::Odm),
+            (ODM_TEMPLATE_MIME, FileFormat::Odm),
             (OTH_MIME, FileFormat::Oth),
         ] {
             assert_eq!(

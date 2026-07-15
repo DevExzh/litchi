@@ -120,6 +120,10 @@ impl Document {
     /// ```
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         let owned_package = OwnedPackage::from_bytes(bytes)?;
+        Self::from_owned_package(owned_package)
+    }
+
+    pub(crate) fn from_owned_package(owned_package: OwnedPackage) -> Result<Self> {
         let package = owned_package.package()?;
 
         // Verify this is a text document
@@ -174,6 +178,10 @@ impl Document {
             meta,
             style_registry,
         })
+    }
+
+    pub(crate) fn original_bytes(&self) -> &[u8] {
+        self.package.as_bytes()
     }
 
     /// Create an ODT document from raw bytes (ZIP archive data).
