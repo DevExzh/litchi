@@ -2,19 +2,9 @@
 //!
 //! Generates list structures (LST, LVL) and format overrides (LFO, LFOLVL).
 
+use super::core::DocWriteError;
+pub use crate::doc::parts::numbering::NumberFormat;
 use std::io::Write;
-
-/// Number format type
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum NumberFormat {
-    Decimal = 0,
-    UpperRoman = 1,
-    LowerRoman = 2,
-    UpperLetter = 3,
-    LowerLetter = 4,
-    Ordinal = 5,
-    Bullet = 23,
-}
 
 /// List level definition
 #[derive(Debug, Clone)]
@@ -53,7 +43,28 @@ impl ListLevel {
     ///
     /// The number text uses placeholder characters 0x0000–0x0008 for levels 0–8.
     /// For example, `"%1."` becomes `[0x0000, u'.']` (level 0 counter + period).
-    pub fn to_bytes(&self) -> Vec<u8> {
+    pub fn to_bytes(&self) -> Result<Vec<u8>, DocWriteError> {
+        if matches!(
+            self.number_format,
+            NumberFormat::Hex
+                | NumberFormat::Chicago
+                | NumberFormat::DecimalHalfWidth
+                | NumberFormat::DecimalFullWidth2
+        ) {
+            return Err(DocWriteError::InvalidData(format!(
+                "MSONFC {:#04x} is forbidden in a DOC list level",
+                self.number_format as u8
+            )));
+        }
+        if self.number_format != NumberFormat::Bullet
+            && self.number_format != NumberFormat::None
+            && self.start_at > 0x7FFF
+        {
+            return Err(DocWriteError::InvalidData(format!(
+                "DOC list start value {} exceeds 32767",
+                self.start_at
+            )));
+        }
         // Convert user-facing number_text to internal xst format.
         // "%1" → char 0x0000 (level 0 placeholder), "%2" → 0x0001, etc.
         let mut xst_chars: Vec<u16> = Vec::new();
@@ -124,7 +135,7 @@ impl ListLevel {
             buf.write_all(&ch.to_le_bytes()).unwrap();
         }
 
-        buf
+        Ok(buf)
     }
 }
 
@@ -194,19 +205,19 @@ impl ListStructure {
     ///
     /// Per MS-DOC spec, LVLs are appended after all LSTFs in the PlfLst
     /// and are NOT counted in `lcbPlfLst`.
-    pub fn levels_to_bytes(&self) -> Vec<u8> {
+    pub fn levels_to_bytes(&self) -> Result<Vec<u8>, DocWriteError> {
         let mut buf = Vec::new();
         let level_count = if self.levels.len() <= 1 { 1 } else { 9 };
         for level_index in 0..level_count {
             if let Some(level) = self.levels.get(level_index) {
-                buf.extend_from_slice(&level.to_bytes());
+                buf.extend_from_slice(&level.to_bytes()?);
             } else {
                 let mut level = ListLevel::new(1, NumberFormat::Decimal);
                 level.number_text = format!("%{}.", level_index + 1);
-                buf.extend_from_slice(&level.to_bytes());
+                buf.extend_from_slice(&level.to_bytes()?);
             }
         }
-        buf
+        Ok(buf)
     }
 }
 
@@ -283,7 +294,7 @@ impl NumberingWriter {
     ///   `lcbPlfLst` should cover.
     /// - `lvl_data` = LVL array for all lists — appended immediately after but
     ///   NOT counted in `lcbPlfLst` per MS-DOC spec / Apache POI.
-    pub fn build_plflst(&self) -> (Vec<u8>, Vec<u8>) {
+    pub fn build_plflst(&self) -> Result<(Vec<u8>, Vec<u8>), DocWriteError> {
         let mut header_buf = Vec::new();
         let mut lvl_buf = Vec::new();
 
@@ -299,10 +310,10 @@ impl NumberingWriter {
 
         // LVL data for all lists
         for list in &self.list_structures {
-            lvl_buf.extend_from_slice(&list.levels_to_bytes());
+            lvl_buf.extend_from_slice(&list.levels_to_bytes()?);
         }
 
-        (header_buf, lvl_buf)
+        Ok((header_buf, lvl_buf))
     }
 
     /// Generate PlfLfo (List Format Override Table)
@@ -366,7 +377,7 @@ mod tests {
     #[test]
     fn test_list_level_to_bytes_basic() {
         let level = ListLevel::new(1, NumberFormat::Decimal);
-        let bytes = level.to_bytes();
+        let bytes = level.to_bytes().unwrap();
 
         // LVLF is 28 bytes + xst length
         assert!(bytes.len() >= 30); // 28 + at least 2 for cch
@@ -385,7 +396,7 @@ mod tests {
     fn test_list_level_bullet_format() {
         let mut level = ListLevel::new(1, NumberFormat::Bullet);
         level.number_text = "•".to_string();
-        let bytes = level.to_bytes();
+        let bytes = level.to_bytes().unwrap();
 
         // Bullet format should have bullet character 0x2022
         assert_eq!(bytes[4], 23); // Bullet = 23
@@ -395,7 +406,7 @@ mod tests {
     fn test_list_level_with_level_placeholder() {
         let mut level = ListLevel::new(1, NumberFormat::Decimal);
         level.number_text = "%1.".to_string();
-        let bytes = level.to_bytes();
+        let bytes = level.to_bytes().unwrap();
 
         // Should generate valid LVL structure
         assert!(bytes.len() > 28);
@@ -405,7 +416,7 @@ mod tests {
     fn test_list_level_multi_level_placeholder() {
         let mut level = ListLevel::new(1, NumberFormat::Decimal);
         level.number_text = "%1.%2.%3.".to_string();
-        let bytes = level.to_bytes();
+        let bytes = level.to_bytes().unwrap();
 
         // Should handle multiple level placeholders
         assert!(bytes.len() >= 28);
@@ -476,7 +487,7 @@ mod tests {
         list.add_level(ListLevel::new(1, NumberFormat::Decimal));
         list.add_level(ListLevel::new(1, NumberFormat::Bullet));
 
-        let bytes = list.levels_to_bytes();
+        let bytes = list.levels_to_bytes().unwrap();
         // Should contain bytes from both levels
         assert!(!bytes.is_empty());
         assert!(bytes.len() >= 56); // At least 28 bytes per level
@@ -537,7 +548,7 @@ mod tests {
     #[test]
     fn test_build_plflst_empty() {
         let writer = NumberingWriter::new();
-        let (header, lvl_data) = writer.build_plflst();
+        let (header, lvl_data) = writer.build_plflst().unwrap();
 
         // Should have just count (0)
         assert_eq!(header.len(), 2);
@@ -552,7 +563,7 @@ mod tests {
         list.add_level(ListLevel::new(1, NumberFormat::Decimal));
         writer.add_list(list);
 
-        let (header, lvl_data) = writer.build_plflst();
+        let (header, lvl_data) = writer.build_plflst().unwrap();
 
         // Header: 2 bytes count + 28 bytes LSTF
         assert_eq!(header.len(), 30);
@@ -636,22 +647,24 @@ mod tests {
 
     #[test]
     fn test_all_number_formats_to_bytes() {
-        let formats = vec![
-            NumberFormat::Decimal,
-            NumberFormat::UpperRoman,
-            NumberFormat::LowerRoman,
-            NumberFormat::UpperLetter,
-            NumberFormat::LowerLetter,
-            NumberFormat::Ordinal,
-            NumberFormat::Bullet,
-        ];
-
-        for format in formats {
+        for value in 0..=59 {
+            let format = NumberFormat::try_from(value).unwrap();
             let level = ListLevel::new(1, format);
-            let bytes = level.to_bytes();
-            assert!(!bytes.is_empty(), "Failed for format {:?}", format);
-            assert_eq!(bytes[4], format as u8);
+            if matches!(value, 8 | 9 | 15 | 19) {
+                assert!(level.to_bytes().is_err());
+            } else {
+                let bytes = level.to_bytes().unwrap();
+                assert!(!bytes.is_empty(), "Failed for format {:?}", format);
+                assert_eq!(bytes[4], value);
+            }
         }
+        let none = ListLevel::new(1, NumberFormat::None).to_bytes().unwrap();
+        assert_eq!(none[4], 0xFF);
+        assert!(
+            ListLevel::new(32_768, NumberFormat::Decimal)
+                .to_bytes()
+                .is_err()
+        );
     }
 
     #[test]
@@ -679,7 +692,7 @@ mod tests {
 
         assert_eq!(writer.list_count(), 2);
 
-        let (header, _) = writer.build_plflst();
+        let (header, _) = writer.build_plflst().unwrap();
         assert_eq!(header.len(), 2 + 2 * 28); // count + 2 LSTFs
     }
 }

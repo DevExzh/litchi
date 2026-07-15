@@ -2436,7 +2436,7 @@ impl DocWriter {
             // PlfLst: lcbPlfLst covers only cLst + LSTF array.
             // LVL data is appended immediately after but NOT counted in lcbPlfLst
             // per MS-DOC spec and Apache POI ListTables.writeListDataTo().
-            let (plflst_header, lvl_data) = self.numbering.build_plflst();
+            let (plflst_header, lvl_data) = self.numbering.build_plflst()?;
             fib.set_plflst(table_offset, plflst_header.len() as u32);
             table_stream.extend_from_slice(&plflst_header);
             table_stream.extend_from_slice(&lvl_data);
@@ -2996,7 +2996,7 @@ impl DocWriter {
 
         // Write numbering tables if present
         if !self.numbering.is_empty() {
-            let (plflst_header, lvl_data) = self.numbering.build_plflst();
+            let (plflst_header, lvl_data) = self.numbering.build_plflst()?;
             fib.set_plflst(table_offset, plflst_header.len() as u32);
             table_stream.extend_from_slice(&plflst_header);
             table_stream.extend_from_slice(&lvl_data);

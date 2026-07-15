@@ -29,27 +29,139 @@ pub enum NumberFormat {
     CardinalText = 6,
     /// Ordinal text (First, Second, Third...)
     OrdinalText = 7,
+    Hex = 8,
+    Chicago = 9,
+    IdeographDigital = 10,
+    JapaneseCounting = 11,
+    Aiueo = 12,
+    Iroha = 13,
+    DecimalFullWidth = 14,
+    DecimalHalfWidth = 15,
+    JapaneseLegal = 16,
+    JapaneseDigitalTenThousand = 17,
+    DecimalEnclosedCircle = 18,
+    DecimalFullWidth2 = 19,
+    AiueoFullWidth = 20,
+    IrohaFullWidth = 21,
+    DecimalZero = 22,
     /// Bullet
     Bullet = 23,
+    Ganada = 24,
+    Chosung = 25,
+    DecimalEnclosedFullstop = 26,
+    DecimalEnclosedParen = 27,
+    DecimalEnclosedCircleChinese = 28,
+    IdeographEnclosedCircle = 29,
+    IdeographTraditional = 30,
+    IdeographZodiac = 31,
+    IdeographZodiacTraditional = 32,
+    TaiwaneseCounting = 33,
+    IdeographLegalTraditional = 34,
+    TaiwaneseCountingThousand = 35,
+    TaiwaneseDigital = 36,
+    ChineseCounting = 37,
+    ChineseLegalSimplified = 38,
+    ChineseCountingThousand = 39,
+    DecimalChinese = 40,
+    KoreanDigital = 41,
+    KoreanCounting = 42,
+    KoreanLegal = 43,
+    KoreanDigital2 = 44,
+    Hebrew1 = 45,
+    ArabicAlpha = 46,
+    Hebrew2 = 47,
+    ArabicAbjad = 48,
+    HindiVowels = 49,
+    HindiConsonants = 50,
+    HindiNumbers = 51,
+    HindiCounting = 52,
+    ThaiLetters = 53,
+    ThaiNumbers = 54,
+    ThaiCounting = 55,
+    VietnameseCounting = 56,
+    NumberInDash = 57,
+    RussianLower = 58,
+    RussianUpper = 59,
     /// No numbering
     None = 255,
 }
 
 impl NumberFormat {
-    /// Convert from u8 value
-    pub fn from_u8(value: u8) -> Self {
+    /// Writer-compatible name for decimal numbering.
+    #[allow(non_upper_case_globals)]
+    pub const Decimal: Self = Self::Arabic;
+}
+
+impl TryFrom<u8> for NumberFormat {
+    type Error = u8;
+
+    fn try_from(value: u8) -> std::result::Result<Self, Self::Error> {
+        const VALUES: [NumberFormat; 60] = [
+            NumberFormat::Arabic,
+            NumberFormat::UpperRoman,
+            NumberFormat::LowerRoman,
+            NumberFormat::UpperLetter,
+            NumberFormat::LowerLetter,
+            NumberFormat::Ordinal,
+            NumberFormat::CardinalText,
+            NumberFormat::OrdinalText,
+            NumberFormat::Hex,
+            NumberFormat::Chicago,
+            NumberFormat::IdeographDigital,
+            NumberFormat::JapaneseCounting,
+            NumberFormat::Aiueo,
+            NumberFormat::Iroha,
+            NumberFormat::DecimalFullWidth,
+            NumberFormat::DecimalHalfWidth,
+            NumberFormat::JapaneseLegal,
+            NumberFormat::JapaneseDigitalTenThousand,
+            NumberFormat::DecimalEnclosedCircle,
+            NumberFormat::DecimalFullWidth2,
+            NumberFormat::AiueoFullWidth,
+            NumberFormat::IrohaFullWidth,
+            NumberFormat::DecimalZero,
+            NumberFormat::Bullet,
+            NumberFormat::Ganada,
+            NumberFormat::Chosung,
+            NumberFormat::DecimalEnclosedFullstop,
+            NumberFormat::DecimalEnclosedParen,
+            NumberFormat::DecimalEnclosedCircleChinese,
+            NumberFormat::IdeographEnclosedCircle,
+            NumberFormat::IdeographTraditional,
+            NumberFormat::IdeographZodiac,
+            NumberFormat::IdeographZodiacTraditional,
+            NumberFormat::TaiwaneseCounting,
+            NumberFormat::IdeographLegalTraditional,
+            NumberFormat::TaiwaneseCountingThousand,
+            NumberFormat::TaiwaneseDigital,
+            NumberFormat::ChineseCounting,
+            NumberFormat::ChineseLegalSimplified,
+            NumberFormat::ChineseCountingThousand,
+            NumberFormat::DecimalChinese,
+            NumberFormat::KoreanDigital,
+            NumberFormat::KoreanCounting,
+            NumberFormat::KoreanLegal,
+            NumberFormat::KoreanDigital2,
+            NumberFormat::Hebrew1,
+            NumberFormat::ArabicAlpha,
+            NumberFormat::Hebrew2,
+            NumberFormat::ArabicAbjad,
+            NumberFormat::HindiVowels,
+            NumberFormat::HindiConsonants,
+            NumberFormat::HindiNumbers,
+            NumberFormat::HindiCounting,
+            NumberFormat::ThaiLetters,
+            NumberFormat::ThaiNumbers,
+            NumberFormat::ThaiCounting,
+            NumberFormat::VietnameseCounting,
+            NumberFormat::NumberInDash,
+            NumberFormat::RussianLower,
+            NumberFormat::RussianUpper,
+        ];
         match value {
-            0 => NumberFormat::Arabic,
-            1 => NumberFormat::UpperRoman,
-            2 => NumberFormat::LowerRoman,
-            3 => NumberFormat::UpperLetter,
-            4 => NumberFormat::LowerLetter,
-            5 => NumberFormat::Ordinal,
-            6 => NumberFormat::CardinalText,
-            7 => NumberFormat::OrdinalText,
-            23 => NumberFormat::Bullet,
-            255 => NumberFormat::None,
-            _ => NumberFormat::Arabic, // Default to Arabic for unknown values
+            0..=59 => Ok(VALUES[usize::from(value)]),
+            255 => Ok(NumberFormat::None),
+            invalid => Err(invalid),
         }
     }
 }
@@ -62,13 +174,15 @@ pub enum ListAlignment {
     Right = 2,
 }
 
-impl ListAlignment {
-    pub fn from_u8(value: u8) -> Self {
+impl TryFrom<u8> for ListAlignment {
+    type Error = u8;
+
+    fn try_from(value: u8) -> std::result::Result<Self, Self::Error> {
         match value {
-            0 => ListAlignment::Left,
-            1 => ListAlignment::Center,
-            2 => ListAlignment::Right,
-            _ => ListAlignment::Left,
+            0 => Ok(ListAlignment::Left),
+            1 => Ok(ListAlignment::Center),
+            2 => Ok(ListAlignment::Right),
+            invalid => Err(invalid),
         }
     }
 }
@@ -112,9 +226,38 @@ impl ListLevel {
 
         let start_at = binary::read_u32_le(data, 0)
             .map_err(|e| DocError::InvalidFormat(format!("Failed to read start_at: {}", e)))?;
-        let number_format = NumberFormat::from_u8(data[4]);
-        let alignment = ListAlignment::from_u8(data[5] & 0x03);
+        let number_format = NumberFormat::try_from(data[4]).map_err(|invalid| {
+            DocError::InvalidFormat(format!("LVLF has invalid MSONFC value {invalid:#04x}"))
+        })?;
+        if matches!(
+            number_format,
+            NumberFormat::Hex
+                | NumberFormat::Chicago
+                | NumberFormat::DecimalHalfWidth
+                | NumberFormat::DecimalFullWidth2
+        ) {
+            return Err(DocError::InvalidFormat(format!(
+                "LVLF forbids MSONFC value {:#04x}",
+                number_format as u8
+            )));
+        }
+        if number_format != NumberFormat::Bullet
+            && number_format != NumberFormat::None
+            && start_at > 0x7FFF
+        {
+            return Err(DocError::InvalidFormat(format!(
+                "LVLF start value {start_at} exceeds 32767"
+            )));
+        }
+        let alignment = ListAlignment::try_from(data[5] & 0x03).map_err(|invalid| {
+            DocError::InvalidFormat(format!("LVLF has invalid alignment {invalid}"))
+        })?;
         let follow_char = data[15];
+        if follow_char > 2 {
+            return Err(DocError::InvalidFormat(format!(
+                "LVLF has invalid follow character {follow_char}"
+            )));
+        }
         let indent_left = binary::read_i32_le(data, 16)
             .map_err(|e| DocError::InvalidFormat(format!("Failed to read indent_left: {}", e)))?;
         let cb_chpx = data[24] as usize;
@@ -493,38 +636,32 @@ mod tests {
 
     #[test]
     fn test_number_format() {
-        assert_eq!(NumberFormat::from_u8(0), NumberFormat::Arabic);
-        assert_eq!(NumberFormat::from_u8(23), NumberFormat::Bullet);
-        assert_eq!(NumberFormat::from_u8(255), NumberFormat::None);
+        assert_eq!(NumberFormat::try_from(0), Ok(NumberFormat::Arabic));
+        assert_eq!(NumberFormat::try_from(23), Ok(NumberFormat::Bullet));
+        assert_eq!(NumberFormat::try_from(255), Ok(NumberFormat::None));
     }
 
     #[test]
     fn test_list_alignment() {
-        assert_eq!(ListAlignment::from_u8(0), ListAlignment::Left);
-        assert_eq!(ListAlignment::from_u8(1), ListAlignment::Center);
-        assert_eq!(ListAlignment::from_u8(2), ListAlignment::Right);
+        assert_eq!(ListAlignment::try_from(0), Ok(ListAlignment::Left));
+        assert_eq!(ListAlignment::try_from(1), Ok(ListAlignment::Center));
+        assert_eq!(ListAlignment::try_from(2), Ok(ListAlignment::Right));
+        assert_eq!(ListAlignment::try_from(3), Err(3));
     }
 
     #[test]
     fn test_number_format_all_variants() {
-        assert_eq!(NumberFormat::from_u8(0), NumberFormat::Arabic);
-        assert_eq!(NumberFormat::from_u8(1), NumberFormat::UpperRoman);
-        assert_eq!(NumberFormat::from_u8(2), NumberFormat::LowerRoman);
-        assert_eq!(NumberFormat::from_u8(3), NumberFormat::UpperLetter);
-        assert_eq!(NumberFormat::from_u8(4), NumberFormat::LowerLetter);
-        assert_eq!(NumberFormat::from_u8(5), NumberFormat::Ordinal);
-        assert_eq!(NumberFormat::from_u8(6), NumberFormat::CardinalText);
-        assert_eq!(NumberFormat::from_u8(7), NumberFormat::OrdinalText);
-        assert_eq!(NumberFormat::from_u8(23), NumberFormat::Bullet);
-        assert_eq!(NumberFormat::from_u8(255), NumberFormat::None);
+        for value in 0..=59 {
+            assert_eq!(NumberFormat::try_from(value).unwrap() as u8, value);
+        }
+        assert_eq!(NumberFormat::try_from(255), Ok(NumberFormat::None));
     }
 
     #[test]
-    fn test_number_format_default_for_unknown() {
-        // Unknown values default to Arabic
-        assert_eq!(NumberFormat::from_u8(8), NumberFormat::Arabic);
-        assert_eq!(NumberFormat::from_u8(100), NumberFormat::Arabic);
-        assert_eq!(NumberFormat::from_u8(254), NumberFormat::Arabic);
+    fn test_number_format_rejects_unknown() {
+        for value in 60..=254 {
+            assert_eq!(NumberFormat::try_from(value), Err(value));
+        }
     }
 
     #[test]
@@ -555,9 +692,9 @@ mod tests {
     }
 
     #[test]
-    fn test_list_alignment_default_for_unknown() {
-        assert_eq!(ListAlignment::from_u8(3), ListAlignment::Left);
-        assert_eq!(ListAlignment::from_u8(100), ListAlignment::Left);
+    fn test_list_alignment_rejects_unknown() {
+        assert_eq!(ListAlignment::try_from(3), Err(3));
+        assert_eq!(ListAlignment::try_from(100), Err(100));
     }
 
     #[test]
@@ -971,6 +1108,28 @@ mod tests {
     }
 
     #[test]
+    fn list_level_preserves_exotic_msonfc_and_rejects_reserved_values() {
+        let mut data = vec![0u8; 30];
+        data[4] = NumberFormat::RussianUpper as u8;
+        let level = ListLevel::from_bytes(&data, 0).unwrap();
+        assert_eq!(level.number_format, NumberFormat::RussianUpper);
+
+        data[4] = 0x3C;
+        assert!(ListLevel::from_bytes(&data, 0).is_err());
+        data[4] = NumberFormat::Hex as u8;
+        assert!(ListLevel::from_bytes(&data, 0).is_err());
+        data[4] = NumberFormat::Arabic as u8;
+        data[5] = 3;
+        assert!(ListLevel::from_bytes(&data, 0).is_err());
+        data[5] = 0;
+        data[15] = 3;
+        assert!(ListLevel::from_bytes(&data, 0).is_err());
+        data[15] = 0;
+        data[..4].copy_from_slice(&32_768u32.to_le_bytes());
+        assert!(ListLevel::from_bytes(&data, 0).is_err());
+    }
+
+    #[test]
     fn test_list_level_from_bytes_bullet() {
         let mut data = vec![0u8; 32];
         data[4] = 23; // Bullet format
@@ -1099,7 +1258,7 @@ mod tests {
             crate::doc::writer::numbering::NumberFormat::LowerLetter,
         ));
         writer.add_list(list);
-        let (header, levels) = writer.build_plflst();
+        let (header, levels) = writer.build_plflst().unwrap();
 
         let parsed = ListTables::parse_plflst(&header, &levels).unwrap();
         assert_eq!(parsed.len(), 1);
