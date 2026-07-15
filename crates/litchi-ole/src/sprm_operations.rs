@@ -361,6 +361,27 @@ pub const SPRM_P_DXA_LEFT_2000: u16 = 0x845E;
 /// sprmPDxaLeft1 (Word 2000+) - modern encoding used by newer nFib
 pub const SPRM_P_DXA_LEFT1_2000: u16 = 0x8460;
 
+/// sprmPDxcRight - Logical right indent in hundredths of a character (operation 0x55)
+pub const SPRM_P_DXC_RIGHT: u16 = 0x4455;
+
+/// sprmPDxcLeft - Logical left indent in hundredths of a character (operation 0x56)
+pub const SPRM_P_DXC_LEFT: u16 = 0x4456;
+
+/// sprmPDxcLeft1 - First-line indent in hundredths of a character (operation 0x57)
+pub const SPRM_P_DXC_LEFT1: u16 = 0x4457;
+
+/// sprmPDylBefore - Space before in hundredths of a line (operation 0x58)
+pub const SPRM_P_DYL_BEFORE: u16 = 0x4458;
+
+/// sprmPDylAfter - Space after in hundredths of a line (operation 0x59)
+pub const SPRM_P_DYL_AFTER: u16 = 0x4459;
+
+/// sprmPFOpenTch - Table cell mark displayed after a nested table (operation 0x5A)
+pub const SPRM_P_F_OPEN_TCH: u16 = 0x245A;
+
+/// sprmPNest - Current nested-indent delta (operation 0x5F)
+pub const SPRM_P_NEST_2000: u16 = 0x465F;
+
 /// sprmPDyaLine - Line spacing (operation 0x12)
 pub const SPRM_P_DYA_LINE: u16 = 0x6412;
 
@@ -922,6 +943,19 @@ mod tests {
 
     #[test]
     fn current_high_paragraph_sprms_match_ms_doc() {
+        assert_eq!(SPRM_P_DXC_RIGHT, 0x4455);
+        assert_eq!(SPRM_P_DXC_LEFT, 0x4456);
+        assert_eq!(SPRM_P_DXC_LEFT1, 0x4457);
+        assert_eq!(SPRM_P_DYL_BEFORE, 0x4458);
+        assert_eq!(SPRM_P_DYL_AFTER, 0x4459);
+        assert_eq!(SPRM_P_F_OPEN_TCH, 0x245A);
+        assert_eq!(SPRM_P_F_DYA_BEFORE_AUTO, 0x245B);
+        assert_eq!(SPRM_P_F_DYA_AFTER_AUTO, 0x245C);
+        assert_eq!(SPRM_P_DXA_RIGHT_2000, 0x845D);
+        assert_eq!(SPRM_P_DXA_LEFT_2000, 0x845E);
+        assert_eq!(SPRM_P_NEST_2000, 0x465F);
+        assert_eq!(SPRM_P_DXA_LEFT1_2000, 0x8460);
+        assert_eq!(SPRM_P_JC_LOGICAL, 0x2461);
         assert_eq!(SPRM_P_F_NO_ALLOW_OVERLAP, 0x2462);
         assert_eq!(SPRM_P_WALL, 0x2664);
         assert_eq!(SPRM_P_IPGP, 0x6465);

@@ -1111,6 +1111,7 @@ mod tests {
         let mut ordered_papx = vec![
             0x03, 0x24, 0, // direct left alignment before style switch
             0x16, 0x24, 1, // table membership is preserved
+            0x5A, 0x24, 1, // open cell-mark display state is preserved
             0x64, 0x26, 1, // paragraph revision wall is preserved
             0x65, 0x64, 7, 0, 0, 0, // PGPInfo identity is preserved
             0x67, 0x64, 0x78, 0x56, 0x34, 0x12, // paragraph RSID is preserved
@@ -1128,6 +1129,7 @@ mod tests {
             super::super::pap::Justification::Right
         );
         assert!(switched.in_table);
+        assert!(switched.open_table_cell_mark);
         assert!(switched.properties_preserved_for_revision);
         assert_eq!(switched.paragraph_group_id, Some(7));
         assert_eq!(switched.revision_save_id, Some(0x1234_5678));

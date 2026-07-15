@@ -30,10 +30,24 @@ pub struct ParagraphProperties {
     pub indent_right: Option<i32>,
     /// First line indent in twips
     pub indent_first_line: Option<i32>,
+    /// Logical left indent in hundredths of a character
+    pub indent_left_chars: Option<i16>,
+    /// Logical right indent in hundredths of a character
+    pub indent_right_chars: Option<i16>,
+    /// First-line indent in hundredths of a character
+    pub indent_first_line_chars: Option<i16>,
     /// Space before paragraph in twips
     pub space_before: Option<u16>,
     /// Space after paragraph in twips
     pub space_after: Option<u16>,
+    /// Space before paragraph in hundredths of a line
+    pub space_before_lines: Option<i16>,
+    /// Space after paragraph in hundredths of a line
+    pub space_after_lines: Option<i16>,
+    /// Whether automatic space-before is enabled
+    pub space_before_auto: bool,
+    /// Whether automatic space-after is enabled
+    pub space_after_auto: bool,
     /// Line spacing value
     pub line_spacing: Option<i16>,
     /// Line spacing type
@@ -78,6 +92,8 @@ pub struct ParagraphProperties {
     pub inner_table_row_end: bool,
     /// This paragraph is terminated by a top-level table cell mark.
     pub is_table_cell_end: bool,
+    /// The table cell mark remained displayed immediately after a nested table
+    pub open_table_cell_mark: bool,
     /// Parsed row-level TAP properties when table SPRMs are present.
     pub table_properties: Option<TableProperties>,
     /// Outline level (0-9, where 0-8 are heading levels)
@@ -181,6 +197,36 @@ pub enum Justification {
     Justified,
     /// Distributed (Asian typography)
     Distributed,
+    /// Medium Kashida or medium character compression.
+    MediumKashida,
+    /// Indented justification.
+    Indented,
+    /// High Kashida or high character compression.
+    HighKashida,
+    /// Low Kashida or high character compression.
+    LowKashida,
+    /// Thai distributed or low character compression.
+    ThaiDistributed,
+}
+
+impl TryFrom<u8> for Justification {
+    type Error = u8;
+
+    fn try_from(value: u8) -> std::result::Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Self::Left),
+            1 => Ok(Self::Center),
+            2 => Ok(Self::Right),
+            3 => Ok(Self::Justified),
+            4 => Ok(Self::Distributed),
+            5 => Ok(Self::MediumKashida),
+            6 => Ok(Self::Indented),
+            7 => Ok(Self::HighKashida),
+            8 => Ok(Self::LowKashida),
+            9 => Ok(Self::ThaiDistributed),
+            invalid => Err(invalid),
+        }
+    }
 }
 
 /// Line spacing type.
@@ -476,6 +522,7 @@ impl ParagraphProperties {
         styled.inner_table_cell = previous.inner_table_cell;
         styled.inner_table_row_end = previous.inner_table_row_end;
         styled.is_table_cell_end = previous.is_table_cell_end;
+        styled.open_table_cell_mark = previous.open_table_cell_mark;
         styled.table_properties = previous.table_properties.clone();
         styled.paragraph_group_id = previous.paragraph_group_id;
         styled.properties_preserved_for_revision = previous.properties_preserved_for_revision;
@@ -547,6 +594,66 @@ impl ParagraphProperties {
     /// * `sprm` - The SPRM operation to apply
     fn apply_sprm(pap: &mut ParagraphProperties, sprm: &Sprm) -> Result<()> {
         match sprm.opcode {
+            SPRM_P_DXC_RIGHT => {
+                pap.indent_right_chars = Some(Self::required_i16(sprm, "sprmPDxcRight")?);
+                return Ok(());
+            },
+            SPRM_P_DXC_LEFT => {
+                pap.indent_left_chars = Some(Self::required_i16(sprm, "sprmPDxcLeft")?);
+                return Ok(());
+            },
+            SPRM_P_DXC_LEFT1 => {
+                pap.indent_first_line_chars = Some(Self::required_i16(sprm, "sprmPDxcLeft1")?);
+                return Ok(());
+            },
+            SPRM_P_DYL_BEFORE => {
+                pap.space_before_lines = Some(Self::line_hundredths(sprm, "sprmPDylBefore")?);
+                return Ok(());
+            },
+            SPRM_P_DYL_AFTER => {
+                pap.space_after_lines = Some(Self::line_hundredths(sprm, "sprmPDylAfter")?);
+                return Ok(());
+            },
+            SPRM_P_F_OPEN_TCH => {
+                pap.open_table_cell_mark = Self::strict_bool8(sprm, "sprmPFOpenTch")?;
+                return Ok(());
+            },
+            SPRM_P_F_DYA_BEFORE_AUTO => {
+                pap.space_before_auto = Self::strict_bool8(sprm, "sprmPFDyaBeforeAuto")?;
+                return Ok(());
+            },
+            SPRM_P_F_DYA_AFTER_AUTO => {
+                pap.space_after_auto = Self::strict_bool8(sprm, "sprmPFDyaAfterAuto")?;
+                return Ok(());
+            },
+            SPRM_P_DXA_RIGHT_2000 => {
+                pap.indent_right = Some(i32::from(Self::required_i16(sprm, "sprmPDxaRight")?));
+                return Ok(());
+            },
+            SPRM_P_DXA_LEFT_2000 => {
+                pap.indent_left = Some(i32::from(Self::required_i16(sprm, "sprmPDxaLeft")?));
+                return Ok(());
+            },
+            SPRM_P_NEST_2000 => {
+                let delta = i32::from(Self::required_i16(sprm, "sprmPNest")?);
+                pap.indent_left = Some(pap.indent_left.unwrap_or(0) + delta);
+                return Ok(());
+            },
+            SPRM_P_DXA_LEFT1_2000 => {
+                pap.indent_first_line = Some(i32::from(Self::required_i16(sprm, "sprmPDxaLeft1")?));
+                return Ok(());
+            },
+            SPRM_P_JC_LOGICAL => {
+                let code = sprm.operand_byte().ok_or_else(|| {
+                    DocError::Corrupted("sprmPJc is missing its justification".to_string())
+                })?;
+                pap.justification = Justification::try_from(code).map_err(|invalid| {
+                    DocError::Corrupted(format!(
+                        "sprmPJc has invalid logical justification {invalid}"
+                    ))
+                })?;
+                return Ok(());
+            },
             SPRM_P_F_NO_ALLOW_OVERLAP => {
                 pap.no_allow_overlap = Self::strict_bool8(sprm, "sprmPFNoAllowOverlap")?;
                 return Ok(());
@@ -628,16 +735,15 @@ impl ParagraphProperties {
             },
             // Operation 0x03: sprmPJc - Paragraph justification
             0x03 => {
-                if let Some(jc) = sprm.operand_byte() {
-                    pap.justification = match jc {
-                        0 => Justification::Left,
-                        1 => Justification::Center,
-                        2 => Justification::Right,
-                        3 => Justification::Justified,
-                        4 => Justification::Distributed,
-                        _ => Justification::Left,
-                    };
+                let jc = sprm.operand_byte().ok_or_else(|| {
+                    DocError::Corrupted("sprmPJc80 is missing its justification".to_string())
+                })?;
+                if jc > 4 {
+                    return Err(DocError::Corrupted(format!(
+                        "sprmPJc80 has invalid justification {jc}"
+                    )));
                 }
+                pap.justification = Justification::try_from(jc).expect("values 0 through 4 map");
             },
             // Operation 0x04: sprmPFSideBySide - Side-by-side
             0x04 => {
@@ -1013,37 +1119,6 @@ impl ParagraphProperties {
             0x4E..=0x53 => {
                 // BrcXXX80 - Word 97-2000 borders
             },
-            // Operation 0x5D: sprmPDxaRight (alternative)
-            0x5D => {
-                if let Some(val) = sprm.operand_i16() {
-                    pap.indent_right = Some(val as i32);
-                }
-            },
-            // Operation 0x5E: sprmPDxaLeft (alternative)
-            0x5E => {
-                if let Some(val) = sprm.operand_i16() {
-                    pap.indent_left = Some(val as i32);
-                }
-            },
-            // Operation 0x60: sprmPDxaLeft1 (alternative)
-            0x60 => {
-                if let Some(val) = sprm.operand_i16() {
-                    pap.indent_first_line = Some(val as i32);
-                }
-            },
-            // Operation 0x61: sprmPJc (logical justification for bi-di)
-            0x61 => {
-                if let Some(jc) = sprm.operand_byte() {
-                    pap.justification = match jc {
-                        0 => Justification::Left,
-                        1 => Justification::Center,
-                        2 => Justification::Right,
-                        3 => Justification::Justified,
-                        4 => Justification::Distributed,
-                        _ => Justification::Left,
-                    };
-                }
-            },
             // Operation 0x67: sprmPRsid - Revision save ID
             0x67 => {
                 // Revision save ID - not commonly used
@@ -1090,6 +1165,21 @@ impl ParagraphProperties {
                 "{name} must contain a Boolean8 value"
             ))),
         }
+    }
+
+    fn required_i16(sprm: &Sprm, name: &str) -> Result<i16> {
+        sprm.operand_i16()
+            .ok_or_else(|| DocError::Corrupted(format!("{name} is missing its 16-bit operand")))
+    }
+
+    fn line_hundredths(sprm: &Sprm, name: &str) -> Result<i16> {
+        let value = Self::required_i16(sprm, name)?;
+        if !(-20..=31_680).contains(&value) {
+            return Err(DocError::Corrupted(format!(
+                "{name} value {value} is outside -20..=31680"
+            )));
+        }
+        Ok(value)
     }
 
     fn parse_numbering_revision(sprm: &Sprm) -> Result<NumberingRevisionProperties> {
@@ -1637,5 +1727,58 @@ mod tests {
 
         let invalid_tight_wrap = [SPRM_P_TTWO.to_le_bytes().as_slice(), &[5]].concat();
         assert!(ParagraphProperties::from_sprm(&invalid_tight_wrap).is_err());
+    }
+
+    #[test]
+    fn parses_current_character_relative_paragraph_layout_strictly() {
+        let mut grpprl = Vec::new();
+        for (opcode, value) in [
+            (SPRM_P_DXC_RIGHT, -125i16),
+            (SPRM_P_DXC_LEFT, 250),
+            (SPRM_P_DXC_LEFT1, -50),
+            (SPRM_P_DYL_BEFORE, -20),
+            (SPRM_P_DYL_AFTER, 31_680),
+            (SPRM_P_DXA_LEFT_2000, 100),
+            (SPRM_P_NEST_2000, -20),
+        ] {
+            grpprl.extend_from_slice(&opcode.to_le_bytes());
+            grpprl.extend_from_slice(&value.to_le_bytes());
+        }
+        for opcode in [
+            SPRM_P_F_OPEN_TCH,
+            SPRM_P_F_DYA_BEFORE_AUTO,
+            SPRM_P_F_DYA_AFTER_AUTO,
+        ] {
+            grpprl.extend_from_slice(&opcode.to_le_bytes());
+            grpprl.push(1);
+        }
+        grpprl.extend_from_slice(&SPRM_P_JC_LOGICAL.to_le_bytes());
+        grpprl.push(9);
+
+        let properties = ParagraphProperties::from_sprm(&grpprl).unwrap();
+        assert_eq!(properties.indent_right_chars, Some(-125));
+        assert_eq!(properties.indent_left_chars, Some(250));
+        assert_eq!(properties.indent_first_line_chars, Some(-50));
+        assert_eq!(properties.space_before_lines, Some(-20));
+        assert_eq!(properties.space_after_lines, Some(31_680));
+        assert_eq!(properties.indent_left, Some(80));
+        assert!(properties.open_table_cell_mark);
+        assert!(properties.space_before_auto);
+        assert!(properties.space_after_auto);
+        assert_eq!(properties.justification, Justification::ThaiDistributed);
+
+        for (opcode, value) in [(SPRM_P_DYL_BEFORE, -21i16), (SPRM_P_DYL_AFTER, 31_681)] {
+            let invalid = [opcode.to_le_bytes(), value.to_le_bytes()].concat();
+            assert!(ParagraphProperties::from_sprm(&invalid).is_err());
+        }
+
+        let invalid_bool = [SPRM_P_F_OPEN_TCH.to_le_bytes().as_slice(), &[2]].concat();
+        assert!(ParagraphProperties::from_sprm(&invalid_bool).is_err());
+
+        let invalid_logical_jc = [SPRM_P_JC_LOGICAL.to_le_bytes().as_slice(), &[10]].concat();
+        assert!(ParagraphProperties::from_sprm(&invalid_logical_jc).is_err());
+
+        let invalid_legacy_jc = [SPRM_P_JC.to_le_bytes().as_slice(), &[5]].concat();
+        assert!(ParagraphProperties::from_sprm(&invalid_legacy_jc).is_err());
     }
 }

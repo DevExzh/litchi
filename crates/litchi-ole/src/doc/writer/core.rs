@@ -332,14 +332,26 @@ pub struct ParagraphFormatting {
     pub right_indent: Option<i32>,
     /// First line indent (in twips)
     pub first_line_indent: Option<i32>,
+    /// Logical left indent in hundredths of a character
+    pub left_indent_chars: Option<i16>,
+    /// Logical right indent in hundredths of a character
+    pub right_indent_chars: Option<i16>,
+    /// First-line indent in hundredths of a character
+    pub first_line_indent_chars: Option<i16>,
     /// Space before paragraph (in twips)
     pub space_before: Option<u16>,
     /// Space after paragraph (in twips)
     pub space_after: Option<u16>,
+    /// Space before paragraph in hundredths of a line (`-20..=31680`)
+    pub space_before_lines: Option<i16>,
+    /// Space after paragraph in hundredths of a line (`-20..=31680`)
+    pub space_after_lines: Option<i16>,
     /// Use auto spacing for space before
     pub space_before_auto: Option<bool>,
     /// Use auto spacing for space after
     pub space_after_auto: Option<bool>,
+    /// Keep a cell mark visible immediately after a nested table
+    pub open_table_cell_mark: Option<bool>,
     /// Widow/orphan control
     pub widow_control: Option<bool>,
     /// Keep the paragraph on one page
@@ -3352,9 +3364,11 @@ fn build_papx_grpprl(fmt: &ParagraphFormatting) -> Vec<u8> {
         grp.push(if val { 1 } else { 0 });
     }
 
-    // Alignment (emit both legacy and modern; modern last to take precedence)
+    // Alignment. The legacy encoding only permits values 0 through 4.
     if let Some(jc) = fmt.alignment {
-        push_byte(&mut grp, SPRM_P_JC, jc);
+        if jc <= 4 {
+            push_byte(&mut grp, SPRM_P_JC, jc);
+        }
         push_byte(&mut grp, SPRM_P_JC_LOGICAL, jc);
     }
     // Indents (twips). Emit legacy and modern variants. Values are signed twips.
@@ -3373,12 +3387,27 @@ fn build_papx_grpprl(fmt: &ParagraphFormatting) -> Vec<u8> {
         push_i16(&mut grp, SPRM_P_DXA_LEFT1, v);
         push_i16(&mut grp, SPRM_P_DXA_LEFT1_2000, v);
     }
+    if let Some(dxc_left) = fmt.left_indent_chars {
+        push_i16(&mut grp, SPRM_P_DXC_LEFT, dxc_left);
+    }
+    if let Some(dxc_right) = fmt.right_indent_chars {
+        push_i16(&mut grp, SPRM_P_DXC_RIGHT, dxc_right);
+    }
+    if let Some(dxc_first) = fmt.first_line_indent_chars {
+        push_i16(&mut grp, SPRM_P_DXC_LEFT1, dxc_first);
+    }
     // Spacing (twips)
     if let Some(dya_before) = fmt.space_before {
         push_u16(&mut grp, SPRM_P_DYA_BEFORE, dya_before);
     }
     if let Some(dya_after) = fmt.space_after {
         push_u16(&mut grp, SPRM_P_DYA_AFTER, dya_after);
+    }
+    if let Some(dyl_before) = fmt.space_before_lines {
+        push_i16(&mut grp, SPRM_P_DYL_BEFORE, dyl_before);
+    }
+    if let Some(dyl_after) = fmt.space_after_lines {
+        push_i16(&mut grp, SPRM_P_DYL_AFTER, dyl_after);
     }
 
     // Auto spacing flags
@@ -3387,6 +3416,9 @@ fn build_papx_grpprl(fmt: &ParagraphFormatting) -> Vec<u8> {
     }
     if let Some(auto) = fmt.space_after_auto {
         push_bool(&mut grp, SPRM_P_F_DYA_AFTER_AUTO, auto);
+    }
+    if let Some(open) = fmt.open_table_cell_mark {
+        push_bool(&mut grp, SPRM_P_F_OPEN_TCH, open);
     }
 
     // Keep, keep-with-next, page break before
@@ -3458,6 +3490,26 @@ fn build_revision_papx_grpprl(
     fmt: &ParagraphFormatting,
     revisions: Option<&RevisionWriterData>,
 ) -> Result<Vec<u8>, DocWriteError> {
+    if let Some(alignment) = fmt.alignment
+        && alignment > 9
+    {
+        return Err(DocWriteError::InvalidData(format!(
+            "DOC paragraph alignment {alignment} is outside 0..=9"
+        )));
+    }
+    for (name, value) in [
+        ("space_before_lines", fmt.space_before_lines),
+        ("space_after_lines", fmt.space_after_lines),
+    ] {
+        if let Some(value) = value
+            && !(-20..=31_680).contains(&value)
+        {
+            return Err(DocWriteError::InvalidData(format!(
+                "DOC paragraph {name} value {value} is outside -20..=31680"
+            )));
+        }
+    }
+
     let mut grp = build_papx_grpprl(fmt);
     if let Some(revision) = &fmt.formatting_revision {
         let revisions = revisions.ok_or_else(|| {
@@ -4128,7 +4180,15 @@ mod tests {
                 "Exactly spaced",
                 ParagraphFormatting {
                     alignment: Some(1),
+                    left_indent_chars: Some(250),
+                    right_indent_chars: Some(-125),
+                    first_line_indent_chars: Some(-50),
                     space_before: Some(120),
+                    space_before_lines: Some(-20),
+                    space_after_lines: Some(31_680),
+                    space_before_auto: Some(true),
+                    space_after_auto: Some(true),
+                    open_table_cell_mark: Some(true),
                     no_allow_overlap: Some(true),
                     contextual_spacing: Some(true),
                     mirror_indents: Some(true),
@@ -4147,6 +4207,15 @@ mod tests {
                 },
             )
             .unwrap();
+        writer
+            .add_formatted_paragraph(
+                "Thai distributed",
+                ParagraphFormatting {
+                    alignment: Some(9),
+                    ..ParagraphFormatting::default()
+                },
+            )
+            .unwrap();
 
         let mut cursor = Cursor::new(Vec::new());
         writer.write_to(&mut cursor).unwrap();
@@ -4155,13 +4224,24 @@ mod tests {
         let document = package.document().unwrap();
         let paragraphs = document.paragraphs().unwrap();
 
-        assert_eq!(paragraphs.len(), 2);
+        assert_eq!(paragraphs.len(), 3);
         assert_eq!(paragraphs[0].text().unwrap(), "Exactly spaced");
         assert_eq!(
             paragraphs[0].properties().justification,
             crate::doc::parts::pap::Justification::Center
         );
         assert_eq!(paragraphs[0].properties().space_before, Some(120));
+        assert_eq!(paragraphs[0].properties().indent_left_chars, Some(250));
+        assert_eq!(paragraphs[0].properties().indent_right_chars, Some(-125));
+        assert_eq!(
+            paragraphs[0].properties().indent_first_line_chars,
+            Some(-50)
+        );
+        assert_eq!(paragraphs[0].properties().space_before_lines, Some(-20));
+        assert_eq!(paragraphs[0].properties().space_after_lines, Some(31_680));
+        assert!(paragraphs[0].properties().space_before_auto);
+        assert!(paragraphs[0].properties().space_after_auto);
+        assert!(paragraphs[0].properties().open_table_cell_mark);
         assert!(paragraphs[0].properties().no_allow_overlap);
         assert!(paragraphs[0].properties().contextual_spacing);
         assert!(paragraphs[0].properties().mirror_indents);
@@ -4180,6 +4260,30 @@ mod tests {
             paragraphs[1].properties().line_spacing_type,
             crate::doc::parts::pap::LineSpacingType::Double
         );
+        assert_eq!(
+            paragraphs[2].properties().justification,
+            crate::doc::parts::pap::Justification::ThaiDistributed
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_current_paragraph_layout_values() {
+        for formatting in [
+            ParagraphFormatting {
+                alignment: Some(10),
+                ..ParagraphFormatting::default()
+            },
+            ParagraphFormatting {
+                space_before_lines: Some(-21),
+                ..ParagraphFormatting::default()
+            },
+            ParagraphFormatting {
+                space_after_lines: Some(31_681),
+                ..ParagraphFormatting::default()
+            },
+        ] {
+            assert!(build_revision_papx_grpprl(&formatting, None).is_err());
+        }
     }
 
     #[test]
