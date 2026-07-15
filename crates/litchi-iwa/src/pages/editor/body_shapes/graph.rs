@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::IWorkThemeArchive;
-use crate::shapes::shape_path_kind;
+use crate::shapes::{shape_path_kind, shape_preset};
 
 const THEME_MESSAGE_TYPE: u32 = 10_001;
 const DRAWABLE_Z_ORDER_MESSAGE_TYPE: u32 = 10_015;
@@ -16,7 +16,7 @@ pub(super) struct BodyShapeGraph {
     pub(super) uuid_object_ids: Vec<u64>,
 }
 
-pub(super) fn rectangle_geometry(
+pub(super) fn new_shape_geometry(
     position: DrawablePoint,
     size: DrawableSize,
 ) -> Result<DrawableGeometry> {
@@ -28,8 +28,7 @@ pub(super) fn rectangle_geometry(
         || size.height <= 0.0
     {
         return Err(Error::ParseError(
-            "Pages rectangle position must be finite and size must be finite and positive"
-                .to_owned(),
+            "Pages shape position must be finite and size must be finite and positive".to_owned(),
         ));
     }
     DrawableGeometry {
@@ -318,6 +317,7 @@ fn body_shape_graph_from_text(
         )));
     }
     let kind = shape_path_kind(&shape)?;
+    let preset = shape_preset(&shape)?;
     let geometry = shape_geometry(editor.package(), &archive_name, drawable_object_id)?;
     let properties = shape_properties(editor.package(), &archive_name, drawable_object_id)?;
     Ok(BodyShapeGraph {
@@ -326,6 +326,7 @@ fn body_shape_graph_from_text(
             drawable_object_id,
             anchor_character_index: *anchor_character_index,
             kind,
+            preset,
             storage: text.storage,
             geometry,
             properties,

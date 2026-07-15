@@ -8,7 +8,8 @@ use crate::package_metadata::{
     remove_component_external_references_to_object,
 };
 use crate::shapes::{
-    DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, ShapePathKind,
+    DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, ShapePathKind, ShapePreset,
+    set_shape_preset,
 };
 
 use super::text_box_create::{
@@ -29,6 +30,8 @@ pub struct PagesBodyShapeInfo {
     /// UTF-16 index of the object-replacement character in the body text.
     pub anchor_character_index: u32,
     pub kind: PagesBodyShapeKind,
+    /// Source-buildable preset and its native controls, when recognized.
+    pub preset: Option<ShapePreset>,
     pub storage: TextStorageInfo,
     pub geometry: DrawableGeometry,
     pub properties: DrawableProperties,
@@ -58,7 +61,29 @@ impl PagesEditor {
         position: DrawablePoint,
         size: DrawableSize,
     ) -> Result<PagesBodyShapeInfo> {
-        let geometry = rectangle_geometry(position, size)?;
+        self.add_body_shape(
+            anchor_character_index,
+            text,
+            position,
+            size,
+            ShapePreset::Rectangle,
+        )
+    }
+
+    /// Add a typed preset shape at one UTF-16 position in the body.
+    ///
+    /// The path, writable storage, stand-ins, body attachment, z-order, UUIDs,
+    /// and style relationship are constructed directly from typed values. No
+    /// source drawable or package template is copied.
+    pub fn add_body_shape(
+        &mut self,
+        anchor_character_index: usize,
+        text: &str,
+        position: DrawablePoint,
+        size: DrawableSize,
+        preset: ShapePreset,
+    ) -> Result<PagesBodyShapeInfo> {
+        let geometry = new_shape_geometry(position, size)?;
         let root = root_document(self.package())?;
         let body: StorageArchive = decode_typed_package_object(
             self.package(),
@@ -86,6 +111,7 @@ impl PagesEditor {
             geometry,
             storage,
             root.left_margin.unwrap_or_default(),
+            preset,
             BodyTextShapeRole::Shape,
         )?;
 
@@ -133,24 +159,53 @@ impl PagesEditor {
             .into_iter()
             .find(|shape| shape.drawable_object_id == ids.drawable)
             .ok_or_else(|| {
-                Error::InvalidFormat("Pages rectangle creation failed validation".to_owned())
+                Error::InvalidFormat("Pages shape creation failed validation".to_owned())
             })?;
         let created_graph = body_shape_graph(&verified, ids.drawable)?;
         let expected_anchor = u32::try_from(anchor_character_index)
             .map_err(|_| Error::ParseError("Pages body attachment index exceeds u32".to_owned()))?;
         if created.anchor_character_index != expected_anchor
-            || created.kind != PagesBodyShapeKind::Rectangle
+            || created.preset != Some(preset)
             || created.storage.object_id != ids.storage
             || created.storage.text != text
             || created.geometry != geometry
             || created_graph.object_ids != ids.all()
         {
             return Err(Error::InvalidFormat(
-                "Pages rectangle creation produced an inconsistent graph".to_owned(),
+                "Pages shape creation produced an inconsistent graph".to_owned(),
             ));
         }
         *self = verified;
         Ok(created)
+    }
+
+    /// Read the recognized preset and native controls for one body shape.
+    pub fn body_shape_preset(&self, drawable_object_id: u64) -> Result<Option<ShapePreset>> {
+        Ok(body_shape_graph(self, drawable_object_id)?.info.preset)
+    }
+
+    /// Replace a body shape's preset path while retaining its text and style.
+    pub fn set_body_shape_preset(
+        &mut self,
+        drawable_object_id: u64,
+        preset: ShapePreset,
+    ) -> Result<()> {
+        let source = body_shape_graph(self, drawable_object_id)?;
+        let mut staged = self.package().clone();
+        set_shape_preset(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            preset,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.body_shape_preset(drawable_object_id)? != Some(preset) {
+            return Err(Error::InvalidFormat(
+                "Pages shape preset update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
     }
 
     /// Read typed geometry for one ordinary body shape.
@@ -305,6 +360,7 @@ impl PagesEditor {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::shapes::ShapeCornerRadius;
 
     const POSITION: DrawablePoint = DrawablePoint { x: 180.0, y: 240.0 };
     const SIZE: DrawableSize = DrawableSize {
@@ -322,6 +378,7 @@ mod tests {
             .add_body_rectangle(4, "Built from typed objects", POSITION, SIZE)
             .unwrap();
         assert_eq!(created.kind, PagesBodyShapeKind::Rectangle);
+        assert_eq!(created.preset, Some(ShapePreset::Rectangle));
         assert_eq!(created.storage.text, "Built from typed objects");
         editor
             .replace_body_shape_text(created.drawable_object_id, 0..5, "Made")
@@ -379,6 +436,46 @@ mod tests {
     }
 
     #[test]
+    fn scratch_document_supports_typed_preset_shape_crud() {
+        let mut editor = PagesEditor::create_with_text("Body").unwrap();
+        let baseline_body = editor.body_text().unwrap();
+        let created = editor
+            .add_body_shape(4, "Rounded", POSITION, SIZE, ShapePreset::ROUNDED_RECTANGLE)
+            .unwrap();
+        assert_eq!(created.kind, PagesBodyShapeKind::RoundedRectangle);
+        assert_eq!(created.preset, Some(ShapePreset::ROUNDED_RECTANGLE));
+
+        let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .body_shape_preset(created.drawable_object_id)
+                .unwrap(),
+            Some(ShapePreset::ROUNDED_RECTANGLE)
+        );
+
+        for (preset, kind) in [
+            (ShapePreset::Ellipse, PagesBodyShapeKind::Ellipse),
+            (ShapePreset::PENTAGON, PagesBodyShapeKind::RegularPolygon),
+            (ShapePreset::STAR, PagesBodyShapeKind::Star),
+        ] {
+            editor
+                .set_body_shape_preset(created.drawable_object_id, preset)
+                .unwrap();
+            let shape = &editor.body_shapes().unwrap()[0];
+            assert_eq!(shape.kind, kind);
+            assert_eq!(shape.preset, Some(preset));
+            assert_eq!(shape.storage.text, "Rounded");
+            assert_eq!(shape.anchor_character_index, 4);
+        }
+
+        editor
+            .remove_body_shape(created.drawable_object_id)
+            .unwrap();
+        assert_eq!(editor.body_text().unwrap(), baseline_body);
+        assert!(editor.body_shapes().unwrap().is_empty());
+    }
+
+    #[test]
     fn invalid_creation_and_cross_type_updates_are_transactional() {
         let mut editor = PagesEditor::create_with_text("Body").unwrap();
         let baseline = editor.to_bytes().unwrap();
@@ -396,6 +493,20 @@ mod tests {
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), baseline);
+        assert!(
+            editor
+                .add_body_shape(
+                    4,
+                    "invalid radius",
+                    POSITION,
+                    SIZE,
+                    ShapePreset::RoundedRectangle {
+                        corner_radius: ShapeCornerRadius::new(SIZE.height).unwrap(),
+                    },
+                )
+                .is_err()
+        );
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
 
         let text_box = editor
             .add_text_box(4, "not a shape", POSITION, SIZE)
@@ -404,6 +515,12 @@ mod tests {
         assert!(
             editor
                 .set_body_shape_text(text_box.drawable_object_id, "wrong type")
+                .is_err()
+        );
+        assert_eq!(editor.to_bytes().unwrap(), before);
+        assert!(
+            editor
+                .set_body_shape_preset(text_box.drawable_object_id, ShapePreset::Ellipse)
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), before);

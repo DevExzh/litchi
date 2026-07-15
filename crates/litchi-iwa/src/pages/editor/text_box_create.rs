@@ -2,14 +2,15 @@
 
 use super::*;
 use crate::IWorkThemeArchive;
-use crate::shapes::{DrawableGeometry, DrawablePoint, DrawableSize};
+use crate::shapes::{
+    DrawableGeometry, DrawablePoint, DrawableSize, ShapePreset, shape_path_source,
+};
 
 const DRAWABLE_Z_ORDER_MESSAGE_TYPE: u32 = 10_015;
 const DEFAULT_DRAWABLE_FLAGS: u32 = 3;
 const DEFAULT_TEXT_BOX_ROTATION_DEGREES: f32 = 0.0;
 const DEFAULT_TEXT_WRAP_MARGIN_POINTS: f32 = 12.0;
 const DEFAULT_TEXT_WRAP_ALPHA_THRESHOLD: f32 = 0.5;
-const NORMALIZED_RECTANGLE_EXTENT: f32 = 100.0;
 const STANDARD_MESSAGE_VERSION: [u32; 3] = [1, 0, 5];
 const STANDIN_CAPTION_MESSAGE_VERSION: [u32; 3] = [10, 1, 0];
 
@@ -145,6 +146,7 @@ impl PagesEditor {
             geometry,
             storage,
             root.left_margin.unwrap_or_default(),
+            ShapePreset::Rectangle,
             BodyTextShapeRole::TextBox,
         )?;
         staged.update_archive(&archive_name, |archive| {
@@ -317,6 +319,7 @@ pub(super) fn body_text_shape_objects(
     geometry: DrawableGeometry,
     storage: StorageArchive,
     left_margin: f32,
+    preset: ShapePreset,
     role: BodyTextShapeRole,
 ) -> Result<[ArchiveObject; 5]> {
     let position = geometry.position.ok_or_else(|| {
@@ -359,7 +362,7 @@ pub(super) fn body_text_shape_objects(
                 ..Default::default()
             },
             style: Some(reference(style_id)),
-            pathsource: Some(rectangle_path_source(size)),
+            pathsource: Some(shape_path_source(preset, size)?),
             stroke_pattern_offset_distance: Some(0.0),
             ..Default::default()
         },
@@ -412,50 +415,6 @@ pub(super) fn body_text_shape_objects(
             &[ids.drawable],
         )?,
     ])
-}
-
-fn rectangle_path_source(size: DrawableSize) -> tsd::PathSourceArchive {
-    use tsp::path::{Element, ElementType};
-
-    let point = |x, y| tsp::Point { x, y };
-    let element = |r#type: ElementType, points| Element {
-        r#type: r#type as i32,
-        points,
-    };
-    tsd::PathSourceArchive {
-        horizontal_flip: Some(false),
-        vertical_flip: Some(false),
-        bezier_path_source: Some(tsd::BezierPathSourceArchive {
-            natural_size: Some(tsp::Size {
-                width: size.width,
-                height: size.height,
-            }),
-            path: Some(tsp::Path {
-                elements: vec![
-                    element(ElementType::MoveTo, vec![point(0.0, 0.0)]),
-                    element(
-                        ElementType::LineTo,
-                        vec![point(NORMALIZED_RECTANGLE_EXTENT, 0.0)],
-                    ),
-                    element(
-                        ElementType::LineTo,
-                        vec![point(
-                            NORMALIZED_RECTANGLE_EXTENT,
-                            NORMALIZED_RECTANGLE_EXTENT,
-                        )],
-                    ),
-                    element(
-                        ElementType::LineTo,
-                        vec![point(0.0, NORMALIZED_RECTANGLE_EXTENT)],
-                    ),
-                    element(ElementType::CloseSubpath, Vec::new()),
-                    element(ElementType::MoveTo, vec![point(0.0, 0.0)]),
-                ],
-            }),
-            ..Default::default()
-        }),
-        ..Default::default()
-    }
 }
 
 fn storage_references(storage: &StorageArchive) -> Vec<u64> {

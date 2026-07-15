@@ -11,11 +11,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let editor = PagesEditor::open(input)?;
     for (index, shape) in editor.body_shapes()?.iter().enumerate() {
         println!(
-            "shape[{index}] drawable={} storage={} anchor={} kind={:?} text={:?} geometry={:?} properties={:?}",
+            "shape[{index}] drawable={} storage={} anchor={} kind={:?} preset={:?} text={:?} geometry={:?} properties={:?}",
             shape.drawable_object_id,
             shape.storage.object_id,
             shape.anchor_character_index,
             shape.kind,
+            shape.preset,
             shape.storage.text,
             shape.geometry,
             shape.properties

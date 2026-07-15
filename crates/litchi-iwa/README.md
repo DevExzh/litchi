@@ -101,23 +101,27 @@ pages.save("created-with-text-box.pages")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
 
-Ordinary text-bearing rectangles have independent shape CRUD. Their path,
-storage, stand-ins, body attachment, z-order, style relationship, and UUIDs
-are likewise built directly from typed values:
+Ordinary text-bearing shapes have independent CRUD. Rectangle, rounded
+rectangle, ellipse, regular-polygon, and star paths are constructed from typed,
+validated presets together with their storage, stand-ins, body attachment,
+z-order, style relationship, and UUIDs. No source drawable or package is
+copied:
 
 ```rust
 use litchi_iwa::pages::PagesEditor;
-use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_iwa::shapes::{DrawablePoint, DrawableSize, ShapePreset};
 
 let body = "Quarterly report";
 let mut pages = PagesEditor::create_with_text(body)?;
-let rectangle = pages.add_body_rectangle(
+let shape = pages.add_body_shape(
     body.encode_utf16().count(),
     "A fully editable shape",
     DrawablePoint { x: 180.0, y: 240.0 },
     DrawableSize { width: 300.0, height: 150.0 },
+    ShapePreset::ROUNDED_RECTANGLE,
 )?;
-pages.set_body_shape_text(rectangle.drawable_object_id, "Updated")?;
+pages.set_body_shape_text(shape.drawable_object_id, "Updated")?;
+pages.set_body_shape_preset(shape.drawable_object_id, ShapePreset::STAR)?;
 pages.save("created-with-shape.pages")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
