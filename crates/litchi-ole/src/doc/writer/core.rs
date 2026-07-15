@@ -1342,6 +1342,11 @@ impl DocWriter {
     ) -> Result<(), DocWriteError> {
         for table in &self.tables {
             let mut encountered_body_row = false;
+            let mut vertical_merges = table
+                .rows
+                .first()
+                .map(|row| vec![false; row.cells.len()])
+                .unwrap_or_default();
             for row in &table.rows {
                 let column_count = row.cells.len();
                 if !(1..=63).contains(&column_count) {
@@ -1360,6 +1365,23 @@ impl DocWriter {
                     ));
                 }
                 encountered_body_row |= !row.formatting.is_header;
+                for (index, cell) in row.formatting.cells.iter().enumerate() {
+                    match cell.vertical_merge {
+                        crate::doc::parts::tap::VerticalMergeStatus::None => {
+                            vertical_merges[index] = false;
+                        },
+                        crate::doc::parts::tap::VerticalMergeStatus::First => {
+                            vertical_merges[index] = true;
+                        },
+                        crate::doc::parts::tap::VerticalMergeStatus::Merged => {
+                            if !vertical_merges[index] {
+                                return Err(DocWriteError::InvalidData(format!(
+                                    "DOC cell {index} continues a vertical merge that was not started"
+                                )));
+                            }
+                        },
+                    }
+                }
                 for cell in &row.cells {
                     if cell.paragraphs.is_empty() {
                         return Err(DocWriteError::InvalidData(
@@ -1772,6 +1794,7 @@ impl DocWriter {
                 row.formatting.cells.push(super::tap::TableCell {
                     width: (right - left) as u16,
                     merged: false,
+                    ..super::tap::TableCell::default()
                 });
             }
             table.rows.push(row);
@@ -3633,10 +3656,17 @@ mod tests {
                         crate::doc::writer::TableCell {
                             width: 2880,
                             merged: false,
+                            vertical_merge: crate::doc::parts::tap::VerticalMergeStatus::First,
+                            vertical_alignment: crate::doc::parts::tap::VerticalAlignment::Center,
+                            text_direction: crate::doc::parts::tap::TextDirection::TbRl,
+                            fit_text: true,
+                            no_wrap: true,
+                            hide_mark: true,
                         },
                         crate::doc::writer::TableCell {
                             width: 5760,
                             merged: true,
+                            ..crate::doc::writer::TableCell::default()
                         },
                     ],
                     height: 360,
@@ -3655,10 +3685,13 @@ mod tests {
                         crate::doc::writer::TableCell {
                             width: 4320,
                             merged: false,
+                            vertical_merge: crate::doc::parts::tap::VerticalMergeStatus::Merged,
+                            ..crate::doc::writer::TableCell::default()
                         },
                         crate::doc::writer::TableCell {
                             width: 4320,
                             merged: false,
+                            ..crate::doc::writer::TableCell::default()
                         },
                     ],
                     height: -480,
@@ -3699,6 +3732,21 @@ mod tests {
             );
             assert_eq!(first_cell_properties.preferred_width.unwrap().value, 2880);
             assert_eq!(
+                first_cell_properties.vertical_merge_status,
+                crate::doc::parts::tap::VerticalMergeStatus::First
+            );
+            assert_eq!(
+                first_cell_properties.vertical_alignment,
+                crate::doc::parts::tap::VerticalAlignment::Center
+            );
+            assert_eq!(
+                first_cell_properties.text_direction,
+                crate::doc::parts::tap::TextDirection::TbRl
+            );
+            assert!(first_cell_properties.fit_text);
+            assert!(first_cell_properties.no_wrap);
+            assert!(first_cell_properties.hide_mark);
+            assert_eq!(
                 rows[0].cells().unwrap()[1]
                     .properties()
                     .unwrap()
@@ -3709,6 +3757,13 @@ mod tests {
             assert_eq!(rows[1].cells().unwrap()[1].text().unwrap(), "");
             assert_eq!(rows[1].properties().unwrap().row_height, Some(-480));
             assert!(!rows[1].properties().unwrap().allow_row_break);
+            assert_eq!(
+                rows[1].cells().unwrap()[0]
+                    .properties()
+                    .unwrap()
+                    .vertical_merge_status,
+                crate::doc::parts::tap::VerticalMergeStatus::Merged
+            );
             assert_eq!(
                 tables[1].rows().unwrap()[0].cells().unwrap()[0]
                     .text()
@@ -4656,6 +4711,7 @@ mod tests {
             cells: vec![crate::doc::writer::TableCell {
                 width: 1000,
                 merged: false,
+                ..crate::doc::writer::TableCell::default()
             }],
             height: 0,
             is_header: false,
@@ -4668,10 +4724,12 @@ mod tests {
                 crate::doc::writer::TableCell {
                     width: 1000,
                     merged: true,
+                    ..crate::doc::writer::TableCell::default()
                 },
                 crate::doc::writer::TableCell {
                     width: 1000,
                     merged: false,
+                    ..crate::doc::writer::TableCell::default()
                 },
             ],
             height: 0,
@@ -4689,10 +4747,12 @@ mod tests {
                 crate::doc::writer::TableCell {
                     width: 1000,
                     merged: false,
+                    ..crate::doc::writer::TableCell::default()
                 },
                 crate::doc::writer::TableCell {
                     width: 1000,
                     merged: false,
+                    ..crate::doc::writer::TableCell::default()
                 },
             ],
             height: 0,
@@ -4701,6 +4761,26 @@ mod tests {
         };
         writer
             .set_table_row_formatting(table, 1, late_header)
+            .unwrap();
+        assert!(writer.write_to(&mut Cursor::new(Vec::new())).is_err());
+
+        let mut writer = DocWriter::new();
+        let table = writer.add_table(1, 1).unwrap();
+        writer
+            .set_table_row_formatting(
+                table,
+                0,
+                crate::doc::writer::TableRow {
+                    cells: vec![crate::doc::writer::TableCell {
+                        width: 1000,
+                        vertical_merge: crate::doc::parts::tap::VerticalMergeStatus::Merged,
+                        ..crate::doc::writer::TableCell::default()
+                    }],
+                    height: 0,
+                    is_header: false,
+                    allow_break: true,
+                },
+            )
             .unwrap();
         assert!(writer.write_to(&mut Cursor::new(Vec::new())).is_err());
     }

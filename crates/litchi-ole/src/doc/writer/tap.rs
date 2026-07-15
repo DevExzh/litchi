@@ -5,6 +5,7 @@
 //! Based on Microsoft's "[MS-DOC]" specification and Apache POI's TableProperties.
 
 use super::sprm::SprmBuilder;
+use crate::doc::parts::tap::{TextDirection, VerticalAlignment, VerticalMergeStatus};
 
 /// Error returned when table row properties cannot be represented in DOC TAP.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -52,6 +53,18 @@ pub struct TableCell {
     /// This cell is merged into the preceding cell. The preceding cell is
     /// automatically encoded as the start of the horizontal merge.
     pub merged: bool,
+    /// Vertical merge state for this cell
+    pub vertical_merge: VerticalMergeStatus,
+    /// Vertical alignment of cell contents
+    pub vertical_alignment: VerticalAlignment,
+    /// Cell text flow and rotation
+    pub text_direction: TextDirection,
+    /// Stretch contents to use the full cell width
+    pub fit_text: bool,
+    /// Prefer cell contents on a single unwrapped line
+    pub no_wrap: bool,
+    /// Hide the cell mark when every cell in the row is empty
+    pub hide_mark: bool,
 }
 
 /// Table row properties
@@ -152,7 +165,12 @@ pub(crate) fn generate_row_sprms(row: &TableRow) -> Result<Vec<u8>, TapBuildErro
     }
 
     let mut builder = SprmBuilder::new();
-    if !row.allow_break || row.cells.iter().any(|cell| cell.merged) {
+    if !row.allow_break
+        || row
+            .cells
+            .iter()
+            .any(|cell| cell.merged || cell.vertical_merge != VerticalMergeStatus::None)
+    {
         builder.add_bool(0x3403, true);
     }
     if row.is_header {
@@ -176,7 +194,37 @@ pub(crate) fn generate_row_sprms(row: &TableRow) -> Result<Vec<u8>, TapBuildErro
         } else {
             0
         };
-        let flags = horizontal_merge | (3u16 << 9); // horzMerge + ftsDxa
+        let text_flow = match row.cells[index].text_direction {
+            TextDirection::LrTb => 0,
+            TextDirection::TbRl => 1,
+            TextDirection::BtLr => 3,
+            TextDirection::LrBt => 4,
+            TextDirection::TbLr => 5,
+        };
+        let vertical_merge = match row.cells[index].vertical_merge {
+            VerticalMergeStatus::None => 0,
+            VerticalMergeStatus::Merged => 1,
+            VerticalMergeStatus::First => 3,
+        };
+        let vertical_alignment = match row.cells[index].vertical_alignment {
+            VerticalAlignment::Top => 0,
+            VerticalAlignment::Center => 1,
+            VerticalAlignment::Bottom => 2,
+        };
+        let mut flags = horizontal_merge
+            | (text_flow << 2)
+            | (vertical_merge << 5)
+            | (vertical_alignment << 7)
+            | (3u16 << 9); // ftsDxa
+        if row.cells[index].fit_text {
+            flags |= 0x1000;
+        }
+        if row.cells[index].no_wrap {
+            flags |= 0x2000;
+        }
+        if row.cells[index].hide_mark {
+            flags |= 0x4000;
+        }
         operand.extend_from_slice(&flags.to_le_bytes());
         operand.extend_from_slice(&width.to_le_bytes());
         operand.extend_from_slice(&[0; 16]); // Four default Brc80MayBeNil values.
@@ -204,7 +252,8 @@ pub fn create_simple_table(rows: usize, cols: usize, cell_width: u16) -> TapBuil
         let cells = vec![
             TableCell {
                 width: cell_width,
-                merged: false
+                merged: false,
+                ..TableCell::default()
             };
             cols
         ];
@@ -231,10 +280,17 @@ mod tests {
                 TableCell {
                     width: 1000,
                     merged: false,
+                    vertical_merge: VerticalMergeStatus::First,
+                    vertical_alignment: VerticalAlignment::Center,
+                    text_direction: TextDirection::TbRl,
+                    fit_text: true,
+                    no_wrap: true,
+                    hide_mark: true,
                 },
                 TableCell {
                     width: 1000,
                     merged: false,
+                    ..TableCell::default()
                 },
             ],
             height: -200,
@@ -248,6 +304,18 @@ mod tests {
         assert_eq!(tap.row_height, Some(-200));
         assert!(tap.is_header_row);
         assert!(!tap.allow_row_break);
+        assert_eq!(
+            tap.cell_properties[0].vertical_merge_status,
+            VerticalMergeStatus::First
+        );
+        assert_eq!(
+            tap.cell_properties[0].vertical_alignment,
+            VerticalAlignment::Center
+        );
+        assert_eq!(tap.cell_properties[0].text_direction, TextDirection::TbRl);
+        assert!(tap.cell_properties[0].fit_text);
+        assert!(tap.cell_properties[0].no_wrap);
+        assert!(tap.cell_properties[0].hide_mark);
         assert_eq!(
             tap.cell_properties[0].preferred_width.unwrap().width_type,
             crate::doc::parts::tap::WidthType::Twips
@@ -273,14 +341,17 @@ mod tests {
                     TableCell {
                         width: 1000,
                         merged: false,
+                        ..TableCell::default()
                     },
                     TableCell {
                         width: 1000,
                         merged: false,
+                        ..TableCell::default()
                     },
                     TableCell {
                         width: 1000,
                         merged: false,
+                        ..TableCell::default()
                     },
                 ],
                 height: 200 + (i as i16 * 50),
@@ -327,6 +398,7 @@ mod tests {
             cells: vec![TableCell {
                 width: 1000,
                 merged: true,
+                ..TableCell::default()
             }],
             height: 0,
             is_header: false,
@@ -342,6 +414,7 @@ mod tests {
             cells: vec![TableCell {
                 width: u16::MAX,
                 merged: false,
+                ..TableCell::default()
             }],
             height: 0,
             is_header: false,
