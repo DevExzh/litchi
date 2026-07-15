@@ -701,12 +701,14 @@ impl<'data> EscherProperties<'data> {
             let is_complex = (desc.id_raw & IS_COMPLEX) != 0;
 
             let prop_value = if is_complex {
-                let complex_len = desc.value as usize;
-                let complex_end = complex_data_offset + complex_len;
-
+                let Ok(complex_len) = usize::try_from(desc.value) else {
+                    break;
+                };
+                let Some(complex_end) = complex_data_offset.checked_add(complex_len) else {
+                    break;
+                };
                 if complex_end > opt.data.len() {
-                    complex_data_offset = complex_end;
-                    continue;
+                    break;
                 }
 
                 let complex_data = &opt.data[complex_data_offset..complex_end];
@@ -779,7 +781,18 @@ impl<'data> EscherProperties<'data> {
 
     #[inline]
     pub fn get_bool(&self, id: EscherPropertyId) -> Option<bool> {
-        self.get_int(id).map(|v| v != 0)
+        let raw_id = id as u16;
+        if let Some(terminal_id) = boolean_group_terminal(raw_id) {
+            let terminal = EscherPropertyId::from(terminal_id);
+            if let Some(value) = self.get_int(terminal) {
+                let bit = u32::from(terminal_id - raw_id);
+                let value_mask = 1u32 << bit;
+                let use_mask = value_mask << 16;
+                let value = value as u32;
+                return (value & use_mask != 0).then_some(value & value_mask != 0);
+            }
+        }
+        self.get_int(id).map(|value| value != 0)
     }
 
     #[inline]
@@ -905,6 +918,23 @@ impl<'data> EscherProperties<'data> {
     }
 }
 
+fn boolean_group_terminal(id: u16) -> Option<u16> {
+    match id {
+        0x0077..=0x007F => Some(0x007F),
+        0x00BB..=0x00BF => Some(0x00BF),
+        0x00FA..=0x00FF => Some(0x00FF),
+        0x013C..=0x013F => Some(0x013F),
+        0x017A..=0x017F => Some(0x017F),
+        0x01BB..=0x01BF => Some(0x01BF),
+        0x01FB..=0x01FF => Some(0x01FF),
+        0x023E..=0x023F => Some(0x023F),
+        0x027F => Some(0x027F),
+        0x02BC..=0x02BF => Some(0x02BF),
+        0x033A..=0x033F => Some(0x033F),
+        _ => None,
+    }
+}
+
 impl<'data> Default for EscherProperties<'data> {
     fn default() -> Self {
         Self::new()
@@ -976,5 +1006,92 @@ impl ShapeAnchor {
 
     pub fn from_client_anchor(anchor: &EscherRecord) -> Option<Self> {
         Self::from_child_anchor(anchor)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn opt_record(data: &[u8], instance: u16) -> EscherRecord<'_> {
+        EscherRecord {
+            record_type: EscherRecordType::Opt,
+            record_type_raw: EscherRecordType::Opt as u16,
+            version: 3,
+            instance,
+            length: data.len() as u32,
+            data,
+        }
+    }
+
+    fn push_property(data: &mut Vec<u8>, id: u16, value: i32) {
+        data.extend_from_slice(&id.to_le_bytes());
+        data.extend_from_slice(&value.to_le_bytes());
+    }
+
+    #[test]
+    fn decodes_packed_boolean_property_groups() {
+        let mut data = Vec::new();
+        push_property(&mut data, 0x01BF, 0x0014_0010);
+        push_property(&mut data, 0x01FF, 0x0008_0008);
+        push_property(&mut data, 0x023F, 0x0002_0002);
+        push_property(&mut data, 0x00FF, 0x0020_0020);
+
+        let properties = EscherProperties::from_opt_record(&opt_record(&data, 4));
+
+        assert_eq!(properties.get_bool(EscherPropertyId::Filled), Some(true));
+        assert_eq!(
+            properties.get_bool(EscherPropertyId::FillShape),
+            Some(false)
+        );
+        assert_eq!(properties.get_bool(EscherPropertyId::HitTestFill), None);
+        assert!(properties.is_filled());
+        assert_eq!(properties.get_bool(EscherPropertyId::AnyLine), Some(true));
+        assert!(properties.has_line());
+        assert_eq!(properties.get_bool(EscherPropertyId::Shadow), Some(true));
+        assert!(properties.has_shadow());
+        assert_eq!(
+            properties.get_bool(EscherPropertyId::GeoTextBoldFont),
+            Some(true)
+        );
+        assert_eq!(
+            properties.get_bool(EscherPropertyId::GeoTextUnderlineFont),
+            None
+        );
+    }
+
+    #[test]
+    fn decodes_explicit_false_boolean_group_bits() {
+        let mut data = Vec::new();
+        push_property(&mut data, 0x01FF, 0x0008_0000);
+
+        let properties = EscherProperties::from_opt_record(&opt_record(&data, 1));
+
+        assert_eq!(properties.get_bool(EscherPropertyId::AnyLine), Some(false));
+        assert!(!properties.has_line());
+    }
+
+    #[test]
+    fn accepts_direct_boolean_properties_from_lenient_producers() {
+        let mut data = Vec::new();
+        push_property(&mut data, EscherPropertyId::Filled as u16, 1);
+
+        let properties = EscherProperties::from_opt_record(&opt_record(&data, 1));
+
+        assert_eq!(properties.get_bool(EscherPropertyId::Filled), Some(true));
+    }
+
+    #[test]
+    fn rejects_negative_complex_property_lengths_without_panicking() {
+        let mut data = Vec::new();
+        push_property(
+            &mut data,
+            IS_COMPLEX | EscherPropertyId::Vertices as u16,
+            -1,
+        );
+
+        let properties = EscherProperties::from_opt_record(&opt_record(&data, 1));
+
+        assert!(properties.is_empty());
     }
 }
