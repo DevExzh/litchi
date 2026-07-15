@@ -25,6 +25,8 @@ use litchi_core::binary::{read_i16_le, read_u16_le};
 pub struct ParagraphProperties {
     /// Justification/alignment
     pub justification: Justification,
+    /// Legacy physical justification, when set by `sprmPJc80`
+    pub physical_justification: Option<PhysicalJustification>,
     /// Left indent in twips (1/1440 inch)
     pub indent_left: Option<i32>,
     /// Right indent in twips
@@ -234,6 +236,46 @@ impl TryFrom<u8> for Justification {
             8 => Ok(Self::LowKashida),
             9 => Ok(Self::ThaiDistributed),
             invalid => Err(invalid),
+        }
+    }
+}
+
+/// Physical paragraph justification used by Word 97-compatible `sprmPJc80` records.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PhysicalJustification {
+    Left,
+    Center,
+    Right,
+    LowCompression,
+    MediumCompression,
+    HighCompression,
+}
+
+impl TryFrom<u8> for PhysicalJustification {
+    type Error = u8;
+
+    fn try_from(value: u8) -> std::result::Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Self::Left),
+            1 => Ok(Self::Center),
+            2 => Ok(Self::Right),
+            3 => Ok(Self::LowCompression),
+            4 => Ok(Self::MediumCompression),
+            5 => Ok(Self::HighCompression),
+            invalid => Err(invalid),
+        }
+    }
+}
+
+impl PhysicalJustification {
+    fn normalized(self) -> Justification {
+        match self {
+            Self::Left => Justification::Left,
+            Self::Center => Justification::Center,
+            Self::Right => Justification::Right,
+            Self::LowCompression => Justification::Justified,
+            Self::MediumCompression => Justification::MediumKashida,
+            Self::HighCompression => Justification::HighKashida,
         }
     }
 }
@@ -780,6 +822,7 @@ impl ParagraphProperties {
                         "sprmPJc has invalid logical justification {invalid}"
                     ))
                 })?;
+                pap.physical_justification = None;
                 return Ok(());
             },
             SPRM_P_BRC_TOP => {
@@ -869,20 +912,15 @@ impl ParagraphProperties {
             },
             // Operation 0x02: sprmPIncLvl - Increment outline level
             0x02 => {
-                if let Some(param) = sprm.operand_byte()
-                    && pap.style_index.unwrap_or(0) <= 9
-                    && pap.style_index.unwrap_or(0) >= 1
-                {
-                    let param_signed = param as i8;
-                    let istd = pap.style_index.unwrap_or(0) as i16 + param_signed as i16;
-                    let lvl = pap.outline_level.unwrap_or(0) as i16 + param_signed as i16;
-
-                    pap.style_index = if (param_signed >> 7) & 0x01 == 1 {
-                        Some(istd.max(1) as u16)
-                    } else {
-                        Some(istd.min(9) as u16)
-                    };
-                    pap.outline_level = Some(lvl as u8);
+                let delta = sprm.operand_byte().ok_or_else(|| {
+                    DocError::Corrupted("sprmPIncLvl is missing its signed offset".to_string())
+                })? as i8 as i16;
+                if let Some(style @ 1..=9) = pap.style_index {
+                    let style = (style as i16 + delta).clamp(1, 9) as u16;
+                    pap.style_index = Some(style);
+                    pap.outline_level = Some((style - 1) as u8);
+                } else if let Some(level @ 0..=8) = pap.outline_level {
+                    pap.outline_level = Some((i16::from(level) + delta).clamp(0, 9) as u8);
                 }
             },
             // Operation 0x03: sprmPJc - Paragraph justification
@@ -890,12 +928,13 @@ impl ParagraphProperties {
                 let jc = sprm.operand_byte().ok_or_else(|| {
                     DocError::Corrupted("sprmPJc80 is missing its justification".to_string())
                 })?;
-                if jc > 4 {
-                    return Err(DocError::Corrupted(format!(
-                        "sprmPJc80 has invalid justification {jc}"
-                    )));
-                }
-                pap.justification = Justification::try_from(jc).expect("values 0 through 4 map");
+                let physical = PhysicalJustification::try_from(jc).map_err(|invalid| {
+                    DocError::Corrupted(format!(
+                        "sprmPJc80 has invalid physical justification {invalid}"
+                    ))
+                })?;
+                pap.physical_justification = Some(physical);
+                pap.justification = physical.normalized();
             },
             // Operation 0x04: sprmPFSideBySide - Side-by-side
             0x04 => {
@@ -2292,7 +2331,7 @@ mod tests {
         let invalid_logical_jc = [SPRM_P_JC_LOGICAL.to_le_bytes().as_slice(), &[10]].concat();
         assert!(ParagraphProperties::from_sprm(&invalid_logical_jc).is_err());
 
-        let invalid_legacy_jc = [SPRM_P_JC.to_le_bytes().as_slice(), &[5]].concat();
+        let invalid_legacy_jc = [SPRM_P_JC.to_le_bytes().as_slice(), &[6]].concat();
         assert!(ParagraphProperties::from_sprm(&invalid_legacy_jc).is_err());
     }
 
@@ -2523,6 +2562,67 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn applies_style_level_increments_and_physical_justification_in_order() {
+        let heading = [
+            SPRM_P_ISTD.to_le_bytes().as_slice(),
+            3u16.to_le_bytes().as_slice(),
+            SPRM_P_INC_LVL.to_le_bytes().as_slice(),
+            &[(-5i8) as u8],
+        ]
+        .concat();
+        let properties = ParagraphProperties::from_sprm(&heading).unwrap();
+        assert_eq!(properties.style_index, Some(1));
+        assert_eq!(properties.outline_level, Some(0));
+
+        let body = [
+            SPRM_P_ISTD.to_le_bytes().as_slice(),
+            10u16.to_le_bytes().as_slice(),
+            SPRM_P_OUT_LVL.to_le_bytes().as_slice(),
+            &[5],
+            SPRM_P_INC_LVL.to_le_bytes().as_slice(),
+            &[(-10i8) as u8],
+        ]
+        .concat();
+        let properties = ParagraphProperties::from_sprm(&body).unwrap();
+        assert_eq!(properties.style_index, Some(10));
+        assert_eq!(properties.outline_level, Some(0));
+
+        for (code, physical, normalized) in [
+            (
+                3,
+                PhysicalJustification::LowCompression,
+                Justification::Justified,
+            ),
+            (
+                4,
+                PhysicalJustification::MediumCompression,
+                Justification::MediumKashida,
+            ),
+            (
+                5,
+                PhysicalJustification::HighCompression,
+                Justification::HighKashida,
+            ),
+        ] {
+            let grpprl = [SPRM_P_JC.to_le_bytes().as_slice(), &[code]].concat();
+            let properties = ParagraphProperties::from_sprm(&grpprl).unwrap();
+            assert_eq!(properties.physical_justification, Some(physical));
+            assert_eq!(properties.justification, normalized);
+        }
+
+        let logical_supersedes_physical = [
+            SPRM_P_JC.to_le_bytes().as_slice(),
+            &[5],
+            SPRM_P_JC_LOGICAL.to_le_bytes().as_slice(),
+            &[4],
+        ]
+        .concat();
+        let properties = ParagraphProperties::from_sprm(&logical_supersedes_physical).unwrap();
+        assert_eq!(properties.justification, Justification::Distributed);
+        assert_eq!(properties.physical_justification, None);
     }
 
     #[test]

@@ -84,8 +84,8 @@ use crate::doc::parts::pap::{
     Border as ParagraphBorder, BorderStyle as ParagraphBorderStyle, Borders as ParagraphBorders,
     DropCap, FontAlignment, FrameAnchor, FrameHeight, FrameHorizontalAnchor,
     FrameHorizontalPosition, FrameTextFlow, FrameTextWrap, FrameVerticalAnchor,
-    FrameVerticalPosition, Shading as ParagraphShading, TabAlignment, TabLeader, TabStop,
-    TextBoxTightWrap,
+    FrameVerticalPosition, PhysicalJustification, Shading as ParagraphShading, TabAlignment,
+    TabLeader, TabStop, TextBoxTightWrap,
 };
 use crate::sprm_operations::*;
 use litchi_cfb::writer::OleWriter;
@@ -322,6 +322,8 @@ impl Default for LineSpacing {
 pub struct ParagraphFormatting {
     /// Alignment (0=left, 1=center, 2=right, 3=justify)
     pub alignment: Option<u8>,
+    /// Explicit Word 97 physical justification for compatibility readers
+    pub physical_justification: Option<PhysicalJustification>,
     /// Left indent (in twips, 1440 twips = 1 inch)
     pub left_indent: Option<i32>,
     /// Right indent (in twips)
@@ -3418,12 +3420,29 @@ fn build_papx_grpprl(fmt: &ParagraphFormatting) -> Vec<u8> {
         grp.push(if val { 1 } else { 0 });
     }
 
-    // Alignment. The legacy encoding only permits values 0 through 4.
+    // Alignment. Emit a compatible physical value before the authoritative logical value.
     if let Some(jc) = fmt.alignment {
-        if jc <= 4 {
-            push_byte(&mut grp, SPRM_P_JC, jc);
+        let physical = match jc {
+            0..=3 => Some(jc),
+            4 | 5 => Some(4),
+            7 | 8 => Some(5),
+            9 => Some(3),
+            _ => None,
+        };
+        if let Some(physical) = physical {
+            push_byte(&mut grp, SPRM_P_JC, physical);
         }
         push_byte(&mut grp, SPRM_P_JC_LOGICAL, jc);
+    } else if let Some(physical) = fmt.physical_justification {
+        let code = match physical {
+            PhysicalJustification::Left => 0,
+            PhysicalJustification::Center => 1,
+            PhysicalJustification::Right => 2,
+            PhysicalJustification::LowCompression => 3,
+            PhysicalJustification::MediumCompression => 4,
+            PhysicalJustification::HighCompression => 5,
+        };
+        push_byte(&mut grp, SPRM_P_JC, code);
     }
     // Indents (twips). Emit legacy and modern variants. Values are signed twips.
     if let Some(dxa_left) = fmt.left_indent {
@@ -4601,6 +4620,33 @@ mod tests {
         assert_eq!(ls, LineSpacing::single());
         assert_eq!(ls.dya_line, 240);
         assert!(ls.is_multiple);
+    }
+
+    #[test]
+    fn encodes_physical_and_logical_paragraph_justification_compatibly() {
+        let physical = build_papx_grpprl(&ParagraphFormatting {
+            physical_justification: Some(PhysicalJustification::HighCompression),
+            ..ParagraphFormatting::default()
+        });
+        assert_eq!(
+            physical,
+            [SPRM_P_JC.to_le_bytes().as_slice(), &[5]].concat()
+        );
+
+        let logical = build_papx_grpprl(&ParagraphFormatting {
+            alignment: Some(7),
+            ..ParagraphFormatting::default()
+        });
+        assert_eq!(
+            logical,
+            [
+                SPRM_P_JC.to_le_bytes().as_slice(),
+                &[5],
+                SPRM_P_JC_LOGICAL.to_le_bytes().as_slice(),
+                &[7],
+            ]
+            .concat()
+        );
     }
 
     #[test]

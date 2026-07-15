@@ -63,8 +63,8 @@ pub use crate::doc::parts::pap::{
     Border as ParagraphBorder, BorderStyle as ParagraphBorderStyle, Borders as ParagraphBorders,
     DropCap, DropCapType, FontAlignment, FrameAnchor, FrameHeight, FrameHorizontalAnchor,
     FrameHorizontalPosition, FrameTextFlow, FrameTextWrap, FrameVerticalAnchor,
-    FrameVerticalPosition, Shading as ParagraphShading, TabAlignment, TabLeader, TabStop,
-    TextBoxTightWrap,
+    FrameVerticalPosition, PhysicalJustification, Shading as ParagraphShading, TabAlignment,
+    TabLeader, TabStop, TextBoxTightWrap,
 };
 pub use crate::doc::parts::tap::{
     CellBorderTypes, CellShading, CellSpacing, CellSpacingSource, ShadingPattern,
