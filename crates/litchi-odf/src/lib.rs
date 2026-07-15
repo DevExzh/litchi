@@ -276,7 +276,9 @@ pub use ods::{
     ValidationMessage, ValidationMessageType, ValidationPresentationEventListener,
     ValidationPresentationSound, ValidationScriptEventListener,
 };
-pub use odt::{Document, DocumentBuilder, MutableDocument};
+pub use odt::{
+    Document, DocumentBuilder, HeaderFooter, HeaderFooterKind, MasterPage, MutableDocument,
+};
 
 // Re-export shapes for presentations
 pub use odp::{Shape, Slide};

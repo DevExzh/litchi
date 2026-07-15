@@ -7,6 +7,8 @@ use crate::elements::text::{Paragraph as ElementParagraph, TextElements};
 use litchi_core::{Error, Metadata, Result};
 use std::path::Path;
 
+use super::header_footer::{MasterPage, parse_master_pages};
+
 /// An OpenDocument text document (.odt).
 ///
 /// This struct represents a complete ODT document and provides methods to access
@@ -379,6 +381,14 @@ impl Document {
     /// ```
     pub fn styles(&self) -> &StyleRegistry {
         &self.style_registry
+    }
+
+    /// Parse master pages and their losslessly retained headers and footers.
+    pub fn master_pages(&self) -> Result<Vec<MasterPage>> {
+        self.styles.as_ref().map_or_else(
+            || Ok(Vec::new()),
+            |styles| parse_master_pages(styles.xml_content()),
+        )
     }
 
     /// Get resolved style properties for a given style name.

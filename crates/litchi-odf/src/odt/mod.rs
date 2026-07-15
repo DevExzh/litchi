@@ -51,11 +51,13 @@
 
 mod builder;
 mod document;
+mod header_footer;
 mod mutable;
 mod parser;
 
 pub use builder::DocumentBuilder;
 pub use document::Document;
+pub use header_footer::{HeaderFooter, HeaderFooterKind, MasterPage};
 pub use mutable::MutableDocument;
 
 // Re-export ODT-specific types for external use
