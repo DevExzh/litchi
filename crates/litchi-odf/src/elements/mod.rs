@@ -33,3 +33,4 @@ pub mod table_expansion;
 pub mod tag_matcher;
 /// Text-related elements (paragraphs, spans, headings)
 pub mod text;
+pub(crate) mod xml;

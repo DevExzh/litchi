@@ -4,11 +4,22 @@ use crate::core::{Content, Meta, OwnedPackage, Styles};
 use crate::elements::style::{StyleElements, StyleRegistry};
 use crate::elements::table::Table as ElementTable;
 use crate::elements::text::{Paragraph as ElementParagraph, TextElements};
+use crate::elements::xml::{
+    DRAW_NAMESPACE, TEXT_NAMESPACE, XLINK_NAMESPACE, append_checked, append_text_control,
+    decode_reference, is_bound, namespaced_attribute,
+};
 use litchi_core::{Error, Metadata, Result};
+use quick_xml::XmlVersion;
+use quick_xml::events::Event;
+use quick_xml::reader::NsReader;
+use std::collections::HashSet;
 use std::path::Path;
 
 use super::header_footer::{MasterPage, parse_master_pages};
 use super::page_layout::{PageLayout, parse_page_layouts};
+
+const MAX_REFERENCE_DEPTH: usize = 4_096;
+const MAX_REFERENCES: usize = 1_000_000;
 
 /// An OpenDocument text document (.odt).
 ///
@@ -570,6 +581,8 @@ impl Document {
     /// Get all fields in the document.
     ///
     /// Fields are dynamic content elements like page numbers, dates, and references.
+    /// Returned values are the document's cached display text; expressions, database
+    /// fields, and other dynamic sources are never evaluated or executed.
     ///
     /// # Examples
     ///
@@ -693,60 +706,7 @@ impl Document {
     /// # }
     /// ```
     pub fn hyperlinks(&self) -> Result<Vec<(String, String)>> {
-        use quick_xml::Reader;
-        use quick_xml::events::Event;
-
-        let content_xml = self.content.xml_content();
-        let mut reader = Reader::from_str(content_xml);
-        let mut buf = Vec::new();
-        let mut links = Vec::new();
-
-        loop {
-            match reader.read_event_into(&mut buf) {
-                Ok(Event::Start(ref e)) if e.name().as_ref() == b"text:a" => {
-                    // Extract href attribute
-                    let href = e
-                        .attributes()
-                        .filter_map(|a| a.ok())
-                        .find(|attr| attr.key.as_ref() == b"xlink:href")
-                        .and_then(|attr| String::from_utf8(attr.value.to_vec()).ok());
-
-                    // Extract link text
-                    let mut text = String::new();
-                    let mut depth = 1;
-                    buf.clear();
-                    loop {
-                        match reader.read_event_into(&mut buf) {
-                            Ok(Event::Text(ref e)) => {
-                                if let Ok(t) = String::from_utf8(e.to_vec()) {
-                                    text.push_str(&t);
-                                }
-                            },
-                            Ok(Event::Start(_)) => depth += 1,
-                            Ok(Event::End(_)) => {
-                                depth -= 1;
-                                if depth == 0 {
-                                    break;
-                                }
-                            },
-                            Ok(Event::Eof) => break,
-                            _ => {},
-                        }
-                        buf.clear();
-                    }
-
-                    if let Some(url) = href {
-                        links.push((text, url));
-                    }
-                },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(Error::Other(format!("XML parse error: {}", e))),
-                _ => {},
-            }
-            buf.clear();
-        }
-
-        Ok(links)
+        parse_hyperlinks(self.content.xml_content())
     }
 
     /// Extract all bookmark names from the document
@@ -768,46 +728,13 @@ impl Document {
     /// # }
     /// ```
     pub fn bookmark_names(&self) -> Result<Vec<String>> {
-        use quick_xml::Reader;
-        use quick_xml::events::Event;
-
-        let content_xml = self.content.xml_content();
-        let mut reader = Reader::from_str(content_xml);
-        let mut buf = Vec::new();
-        let mut bookmarks = Vec::new();
-
-        loop {
-            match reader.read_event_into(&mut buf) {
-                Ok(Event::Empty(ref e)) | Ok(Event::Start(ref e))
-                    if (e.name().as_ref() == b"text:bookmark"
-                        || e.name().as_ref() == b"text:bookmark-start"
-                        || e.name().as_ref() == b"text:bookmark-end") =>
-                {
-                    // Extract name attribute
-                    for attr in e.attributes().filter_map(|a| a.ok()) {
-                        if attr.key.as_ref() == b"text:name" {
-                            if let Ok(name) = String::from_utf8(attr.value.to_vec())
-                                && !bookmarks.contains(&name)
-                            {
-                                bookmarks.push(name);
-                            }
-                            break;
-                        }
-                    }
-                },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(Error::Other(format!("XML parse error: {}", e))),
-                _ => {},
-            }
-            buf.clear();
-        }
-
-        Ok(bookmarks)
+        parse_bookmark_names(self.content.xml_content())
     }
 
-    /// Extract all image paths from the document
+    /// Extract all linked image references from the document
     ///
-    /// Returns a vector of image file paths within the ODF package.
+    /// Returns package-local and external `xlink:href` values in document order.
+    /// Images stored inline as `office:binary-data` have no path and are omitted.
     ///
     /// # Examples
     ///
@@ -826,37 +753,7 @@ impl Document {
     /// # }
     /// ```
     pub fn image_paths(&self) -> Result<Vec<String>> {
-        use quick_xml::Reader;
-        use quick_xml::events::Event;
-
-        let content_xml = self.content.xml_content();
-        let mut reader = Reader::from_str(content_xml);
-        let mut buf = Vec::new();
-        let mut images = Vec::new();
-
-        loop {
-            match reader.read_event_into(&mut buf) {
-                Ok(Event::Empty(ref e)) | Ok(Event::Start(ref e))
-                    if e.name().as_ref() == b"draw:image" =>
-                {
-                    // Extract href attribute
-                    if let Some(href) = e
-                        .attributes()
-                        .filter_map(|a| a.ok())
-                        .find(|attr| attr.key.as_ref() == b"xlink:href")
-                        .and_then(|attr| String::from_utf8(attr.value.to_vec()).ok())
-                    {
-                        images.push(href);
-                    }
-                },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(Error::Other(format!("XML parse error: {}", e))),
-                _ => {},
-            }
-            buf.clear();
-        }
-
-        Ok(images)
+        parse_image_references(self.content.xml_content())
     }
 
     /// Get a file from the ODF package (useful for extracting images)
@@ -891,6 +788,277 @@ impl Document {
     // Available methods: remove_paragraph, remove_table, update_paragraph, clear_content, etc.
 }
 
+struct ActiveHyperlink {
+    href: Option<String>,
+    text: String,
+    depth: usize,
+}
+
+fn parse_hyperlinks(xml: &str) -> Result<Vec<(String, String)>> {
+    let mut reader = NsReader::from_str(xml);
+    let mut buffer = Vec::new();
+    let mut document_depth = 0usize;
+    let mut active: Option<ActiveHyperlink> = None;
+    let mut links = Vec::new();
+
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| Error::InvalidFormat(format!("invalid hyperlink XML: {error}")))?;
+        let text_element = is_bound(&namespace, TEXT_NAMESPACE);
+        match event {
+            Event::Start(ref element) => {
+                document_depth = checked_reference_depth(document_depth)?;
+                if let Some(link) = active.as_mut() {
+                    if text_element && element.local_name().as_ref() == b"a" {
+                        return Err(Error::InvalidFormat(
+                            "nested text:a hyperlinks are not allowed".to_string(),
+                        ));
+                    }
+                    link.depth += 1;
+                    if text_element {
+                        append_text_control(&reader, element, &mut link.text)?;
+                    }
+                } else if text_element && element.local_name().as_ref() == b"a" {
+                    active = Some(ActiveHyperlink {
+                        href: namespaced_attribute(
+                            &reader,
+                            element,
+                            XLINK_NAMESPACE,
+                            b"href",
+                            "text:a",
+                        )?,
+                        text: String::new(),
+                        depth: 1,
+                    });
+                }
+            },
+            Event::Empty(ref element) => {
+                if let Some(link) = active.as_mut() {
+                    if text_element && element.local_name().as_ref() == b"a" {
+                        return Err(Error::InvalidFormat(
+                            "nested text:a hyperlinks are not allowed".to_string(),
+                        ));
+                    }
+                    if text_element {
+                        append_text_control(&reader, element, &mut link.text)?;
+                    }
+                } else if text_element
+                    && element.local_name().as_ref() == b"a"
+                    && let Some(href) =
+                        namespaced_attribute(&reader, element, XLINK_NAMESPACE, b"href", "text:a")?
+                {
+                    ensure_reference_capacity(links.len(), "hyperlinks")?;
+                    links.push((String::new(), href));
+                }
+            },
+            Event::Text(ref value) if active.is_some() => {
+                let value = value
+                    .xml_content(XmlVersion::Explicit1_0)
+                    .map_err(|error| {
+                        Error::InvalidFormat(format!("invalid hyperlink text: {error}"))
+                    })?;
+                append_checked(
+                    &mut active.as_mut().expect("checked hyperlink").text,
+                    &value,
+                )?;
+            },
+            Event::CData(ref value) if active.is_some() => {
+                let value = value
+                    .xml_content(XmlVersion::Explicit1_0)
+                    .map_err(|error| {
+                        Error::InvalidFormat(format!("invalid hyperlink CDATA: {error}"))
+                    })?;
+                append_checked(
+                    &mut active.as_mut().expect("checked hyperlink").text,
+                    &value,
+                )?;
+            },
+            Event::GeneralRef(ref reference) if active.is_some() => {
+                let value = decode_reference(reference, "hyperlink")?;
+                append_checked(
+                    &mut active.as_mut().expect("checked hyperlink").text,
+                    &value,
+                )?;
+            },
+            Event::End(_) => {
+                document_depth = document_depth.checked_sub(1).ok_or_else(|| {
+                    Error::InvalidFormat("hyperlink XML stack underflow".to_string())
+                })?;
+                if let Some(link) = active.as_mut() {
+                    link.depth = link.depth.checked_sub(1).ok_or_else(|| {
+                        Error::InvalidFormat("hyperlink element stack underflow".to_string())
+                    })?;
+                    if link.depth == 0 {
+                        let link = active.take().expect("checked hyperlink");
+                        if let Some(href) = link.href {
+                            ensure_reference_capacity(links.len(), "hyperlinks")?;
+                            links.push((link.text, href));
+                        }
+                    }
+                }
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+        buffer.clear();
+    }
+
+    if document_depth != 0 || active.is_some() {
+        return Err(Error::InvalidFormat(
+            "incomplete hyperlink XML structure".to_string(),
+        ));
+    }
+    Ok(links)
+}
+
+fn parse_bookmark_names(xml: &str) -> Result<Vec<String>> {
+    let mut reader = NsReader::from_str(xml);
+    let mut buffer = Vec::new();
+    let mut depth = 0usize;
+    let mut names = Vec::new();
+    let mut unique_names = HashSet::new();
+
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| Error::InvalidFormat(format!("invalid bookmark XML: {error}")))?;
+        let text_element = is_bound(&namespace, TEXT_NAMESPACE);
+        match event {
+            Event::Start(ref element) => {
+                depth = checked_reference_depth(depth)?;
+                collect_bookmark_name(
+                    &reader,
+                    text_element,
+                    element,
+                    &mut names,
+                    &mut unique_names,
+                )?;
+            },
+            Event::Empty(ref element) => {
+                collect_bookmark_name(
+                    &reader,
+                    text_element,
+                    element,
+                    &mut names,
+                    &mut unique_names,
+                )?;
+            },
+            Event::End(_) => {
+                depth = depth.checked_sub(1).ok_or_else(|| {
+                    Error::InvalidFormat("bookmark XML stack underflow".to_string())
+                })?;
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+        buffer.clear();
+    }
+    if depth != 0 {
+        return Err(Error::InvalidFormat(
+            "incomplete bookmark XML structure".to_string(),
+        ));
+    }
+    Ok(names)
+}
+
+fn collect_bookmark_name(
+    reader: &NsReader<&[u8]>,
+    text_element: bool,
+    element: &quick_xml::events::BytesStart<'_>,
+    names: &mut Vec<String>,
+    unique_names: &mut HashSet<String>,
+) -> Result<()> {
+    if text_element
+        && matches!(
+            element.local_name().as_ref(),
+            b"bookmark" | b"bookmark-start" | b"bookmark-end"
+        )
+        && let Some(name) =
+            namespaced_attribute(reader, element, TEXT_NAMESPACE, b"name", "bookmark")?
+        && unique_names.insert(name.clone())
+    {
+        ensure_reference_capacity(names.len(), "bookmark names")?;
+        names.push(name);
+    }
+    Ok(())
+}
+
+fn parse_image_references(xml: &str) -> Result<Vec<String>> {
+    let mut reader = NsReader::from_str(xml);
+    let mut buffer = Vec::new();
+    let mut depth = 0usize;
+    let mut references = Vec::new();
+
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| Error::InvalidFormat(format!("invalid image XML: {error}")))?;
+        let draw_element = is_bound(&namespace, DRAW_NAMESPACE);
+        match event {
+            Event::Start(ref element) => {
+                depth = checked_reference_depth(depth)?;
+                collect_image_reference(&reader, draw_element, element, &mut references)?;
+            },
+            Event::Empty(ref element) => {
+                collect_image_reference(&reader, draw_element, element, &mut references)?;
+            },
+            Event::End(_) => {
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| Error::InvalidFormat("image XML stack underflow".to_string()))?;
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+        buffer.clear();
+    }
+    if depth != 0 {
+        return Err(Error::InvalidFormat(
+            "incomplete image XML structure".to_string(),
+        ));
+    }
+    Ok(references)
+}
+
+fn collect_image_reference(
+    reader: &NsReader<&[u8]>,
+    draw_element: bool,
+    element: &quick_xml::events::BytesStart<'_>,
+    references: &mut Vec<String>,
+) -> Result<()> {
+    if draw_element
+        && element.local_name().as_ref() == b"image"
+        && let Some(href) =
+            namespaced_attribute(reader, element, XLINK_NAMESPACE, b"href", "draw:image")?
+    {
+        ensure_reference_capacity(references.len(), "image references")?;
+        references.push(href);
+    }
+    Ok(())
+}
+
+fn checked_reference_depth(depth: usize) -> Result<usize> {
+    let depth = depth
+        .checked_add(1)
+        .ok_or_else(|| Error::InvalidFormat("ODF reference nesting depth overflow".to_string()))?;
+    if depth > MAX_REFERENCE_DEPTH {
+        return Err(Error::InvalidFormat(format!(
+            "ODF reference nesting exceeds {MAX_REFERENCE_DEPTH} levels"
+        )));
+    }
+    Ok(depth)
+}
+
+fn ensure_reference_capacity(length: usize, kind: &str) -> Result<()> {
+    if length >= MAX_REFERENCES {
+        return Err(Error::InvalidFormat(format!(
+            "document exceeds {MAX_REFERENCES} {kind}"
+        )));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod text_model_tests {
     use super::*;
@@ -898,15 +1066,19 @@ mod text_model_tests {
     use crate::core::PackageWriter;
     use crate::elements::parser::DocumentOrderElement;
 
-    #[test]
-    fn text_model_accepts_arbitrary_prefixes_and_decodes_mixed_text() {
-        let content = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><o:body><o:text><t:h t:outline-level="2">Title &amp; More</t:h><t:p t:style-name="Body">A<t:span>B</t:span>C<t:s t:c="2"/>D<![CDATA[!]]></t:p></o:text></o:body></o:document-content>"#;
+    fn document(content: &str) -> Document {
         let mut writer = PackageWriter::new();
         writer.set_mimetype(constants::ODF_TEXT).unwrap();
         writer
             .add_file(constants::ODF_CONTENT, content.as_bytes())
             .unwrap();
-        let document = Document::from_bytes(writer.finish_to_bytes().unwrap()).unwrap();
+        Document::from_bytes(writer.finish_to_bytes().unwrap()).unwrap()
+    }
+
+    #[test]
+    fn text_model_accepts_arbitrary_prefixes_and_decodes_mixed_text() {
+        let content = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><o:body><o:text><t:h t:outline-level="2">Title &amp; More</t:h><t:p t:style-name="Body">A<t:span>B</t:span>C<t:s t:c="2"/>D<![CDATA[!]]></t:p></o:text></o:body></o:document-content>"#;
+        let document = document(content);
 
         assert_eq!(document.text().unwrap(), "Title & More\nABC  D!");
         assert_eq!(document.paragraph_count().unwrap(), 1);
@@ -925,5 +1097,60 @@ mod text_model_tests {
             panic!("second document element is not a paragraph");
         };
         assert_eq!(paragraph.text().unwrap(), "ABC  D!");
+    }
+
+    #[test]
+    fn references_fields_and_images_are_namespace_aware_and_decoded() {
+        let content = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:x="http://www.w3.org/1999/xlink" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0"><o:body><o:text><t:p><t:bookmark t:name="point &amp; one"/><t:bookmark-start t:name="range"/>ab<t:s t:c="2"/>c<t:bookmark-end t:name="range"/></t:p><t:p><t:a x:type="simple" x:href="https://example.invalid/?a=1&amp;b=2">A<t:span>B &amp; C</t:span><t:s t:c="2"/>D<![CDATA[!]]></t:a><t:date s:data-style-name="N1" t:fixed="true" t:date-value="2026-07-16">July &amp; 16</t:date><t:word-count>42</t:word-count><d:frame><d:image x:href="Pictures/a&amp;b.png"/><d:image x:href="https://example.invalid/image.png"/><d:image><o:binary-data>AA==</o:binary-data></d:image></d:frame></t:p></o:text></o:body></o:document-content>"#;
+        let document = document(content);
+
+        assert_eq!(
+            document.hyperlinks().unwrap(),
+            vec![(
+                "AB & C  D!".to_string(),
+                "https://example.invalid/?a=1&b=2".to_string()
+            )]
+        );
+        assert_eq!(
+            document.bookmark_names().unwrap(),
+            vec!["point & one".to_string(), "range".to_string()]
+        );
+        let bookmarks = document.bookmarks().unwrap();
+        assert_eq!(bookmarks.len(), 1);
+        assert_eq!(bookmarks[0].name(), Some("point & one"));
+        let ranges = document.bookmark_ranges().unwrap();
+        assert_eq!(ranges.len(), 1);
+        assert_eq!(ranges[0].name, "range");
+        assert_eq!(ranges[0].start, Some((0, 0)));
+        assert_eq!(ranges[0].end, Some((0, 5)));
+        assert!(ranges[0].is_complete());
+
+        let fields = document.fields().unwrap();
+        assert_eq!(fields.len(), 2);
+        assert_eq!(fields[0].field_type(), "text:date");
+        assert_eq!(fields[0].value(), "July & 16");
+        assert_eq!(fields[0].format(), Some("N1"));
+        assert_eq!(fields[1].field_type(), "text:word-count");
+        assert_eq!(fields[1].value(), "42");
+        assert_eq!(
+            document.image_paths().unwrap(),
+            vec![
+                "Pictures/a&b.png".to_string(),
+                "https://example.invalid/image.png".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn reference_readers_reject_malformed_xml_and_duplicate_expanded_attributes() {
+        let duplicate = r#"<t:p xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:x="http://www.w3.org/1999/xlink" xmlns:y="http://www.w3.org/1999/xlink"><t:a x:href="a" y:href="b">bad</t:a></t:p>"#;
+        assert!(parse_hyperlinks(duplicate).is_err());
+        let missing_name =
+            r#"<t:p xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><t:bookmark/></t:p>"#;
+        assert!(crate::elements::bookmark::BookmarkParser::parse_bookmarks(missing_name).is_err());
+        let nonempty = r#"<t:p xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><t:bookmark t:name="bad">content</t:bookmark></t:p>"#;
+        assert!(crate::elements::bookmark::BookmarkParser::parse_bookmarks(nonempty).is_err());
+        assert!(parse_image_references("<d:image").is_err());
+        assert!(crate::elements::field::FieldParser::parse_fields("<t:date>").is_err());
     }
 }
