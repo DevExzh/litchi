@@ -9,6 +9,7 @@ use std::collections::HashSet;
 
 use litchi_core::binary::{read_u16_le, read_u32_le};
 
+use super::super::package::{DocError, Result};
 use super::fkp::{PapxFkp, ParagraphHeight};
 use super::pap::ParagraphProperties;
 use super::piece_table::PieceTable;
@@ -49,36 +50,44 @@ impl PapBinTable {
         data_stream: Option<&[u8]>,
         piece_table: &PieceTable,
         stylesheet: Option<&StyleSheet>,
-    ) -> Option<Self> {
+    ) -> Result<Option<Self>> {
         // PlcBtePapx = (n + 1) FCs followed by n four-byte PnFkpPapx values.
         if plcf_bte_papx_data.len() < 12 || (plcf_bte_papx_data.len() - 4) % 8 != 0 {
-            return None;
+            return Ok(None);
         }
         let page_count = (plcf_bte_papx_data.len() - 4) / 8;
         if page_count == 0 {
-            return None;
+            return Ok(None);
         }
 
         let mut runs = Vec::with_capacity(page_count.saturating_mul(10));
         let pn_array_offset = (page_count + 1) * 4;
 
         for index in 0..page_count {
-            let pn_raw = read_u32_le(plcf_bte_papx_data, pn_array_offset + index * 4).ok()?;
+            let pn_raw =
+                read_u32_le(plcf_bte_papx_data, pn_array_offset + index * 4).map_err(|error| {
+                    DocError::Corrupted(format!("invalid PAP bin-table page: {error}"))
+                })?;
             let page_number = pn_raw & 0x003f_ffff;
             if page_number == 0 {
                 continue;
             }
-            let page_offset = (page_number as usize).checked_mul(FKP_PAGE_SIZE)?;
-            let page_end = page_offset.checked_add(FKP_PAGE_SIZE)?;
-            let page = word_document.get(page_offset..page_end)?;
-            let Some(fkp) = PapxFkp::parse(page, data_stream.unwrap_or_default()) else {
-                continue;
-            };
+            let page_offset = (page_number as usize)
+                .checked_mul(FKP_PAGE_SIZE)
+                .ok_or_else(|| DocError::Corrupted("PAP FKP page offset overflowed".to_string()))?;
+            let page_end = page_offset
+                .checked_add(FKP_PAGE_SIZE)
+                .ok_or_else(|| DocError::Corrupted("PAP FKP page range overflowed".to_string()))?;
+            let page = word_document.get(page_offset..page_end).ok_or_else(|| {
+                DocError::Corrupted("PAP FKP page extends beyond WordDocument".to_string())
+            })?;
+            let fkp = PapxFkp::parse(page, data_stream.unwrap_or_default())
+                .ok_or_else(|| DocError::Corrupted("PAP FKP page is malformed".to_string()))?;
 
             for entry_index in 0..fkp.count() {
-                let Some(entry) = fkp.entry(entry_index) else {
-                    continue;
-                };
+                let entry = fkp
+                    .entry(entry_index)
+                    .ok_or_else(|| DocError::Corrupted("PAP FKP entry is malformed".to_string()))?;
                 for (start_cp, end_cp) in piece_table.fc_range_to_cp_ranges(entry.fc, entry.end_fc)
                 {
                     let piece_modifier = piece_table
@@ -90,7 +99,7 @@ impl PapBinTable {
                         piece_modifier,
                         data_stream,
                         stylesheet,
-                    );
+                    )?;
                     runs.push(ParagraphRun {
                         start_cp,
                         end_cp,
@@ -117,7 +126,7 @@ impl PapBinTable {
             true
         });
 
-        Some(Self { runs })
+        Ok(Some(Self { runs }))
     }
 
     fn parse_properties(
@@ -125,14 +134,12 @@ impl PapBinTable {
         piece_modifier: &[u8],
         data_stream: Option<&[u8]>,
         stylesheet: Option<&StyleSheet>,
-    ) -> ParagraphProperties {
+    ) -> Result<ParagraphProperties> {
         if grpprl_and_istd.is_empty() {
-            return stylesheet
-                .map_or_else(
-                    || ParagraphProperties::from_sprm(piece_modifier),
-                    |styles| ParagraphProperties::from_sprm_with_stylesheet(piece_modifier, styles),
-                )
-                .unwrap_or_default();
+            return stylesheet.map_or_else(
+                || ParagraphProperties::from_sprm(piece_modifier),
+                |styles| ParagraphProperties::from_sprm_with_stylesheet(piece_modifier, styles),
+            );
         }
 
         let (style_index, direct_sprms) = if grpprl_and_istd.len() >= 2 {
@@ -144,11 +151,19 @@ impl PapBinTable {
         let expanded;
         let sprms = if let Some(data) = data_stream {
             let mut visited = HashSet::new();
-            expanded = Self::expand_data_indirections(direct_sprms, data, &mut visited, 0)
-                .ok()
-                .flatten();
+            expanded = Self::expand_data_indirections(direct_sprms, data, &mut visited, 0)?;
             expanded.as_deref().unwrap_or(direct_sprms)
         } else {
+            if parse_sprms(direct_sprms).iter().any(|sprm| {
+                matches!(
+                    sprm.opcode,
+                    SPRM_P_HUGE_PAPX | SPRM_P_TABLE_PROPS | SPRM_P_TABLE_PROPS_LEGACY
+                )
+            }) {
+                return Err(DocError::Corrupted(
+                    "PAPX data indirection requires a Data Stream".to_string(),
+                ));
+            }
             direct_sprms
         };
 
@@ -159,30 +174,29 @@ impl PapBinTable {
             combined = [sprms, piece_modifier].concat();
             &combined
         };
-        let mut properties = stylesheet
-            .map_or_else(
-                || ParagraphProperties::from_sprm(sprms),
-                |styles| ParagraphProperties::cascade_styles(style_index, sprms, styles),
-            )
-            .unwrap_or_default();
+        let mut properties = stylesheet.map_or_else(
+            || ParagraphProperties::from_sprm(sprms),
+            |styles| ParagraphProperties::cascade_styles(style_index, sprms, styles),
+        )?;
         if properties.style_index.is_none() {
             properties.style_index = style_index;
         }
-        properties
+        Ok(properties)
     }
 
     /// Expand `sprmPHugePapx`/`sprmPTableProps` PrcData references.
     ///
-    /// Malformed, cyclic, or excessively deep chains are ignored and leave the
-    /// already available direct properties intact.
+    /// Malformed, cyclic, or excessively deep chains are reported as corruption.
     fn expand_data_indirections(
         grpprl: &[u8],
         data_stream: &[u8],
         visited: &mut HashSet<u32>,
         depth: usize,
-    ) -> Result<Option<Vec<u8>>, ()> {
+    ) -> Result<Option<Vec<u8>>> {
         if depth >= MAX_DATA_INDIRECTION_DEPTH {
-            return Err(());
+            return Err(DocError::Corrupted(
+                "PAPX data indirection exceeds the depth limit".to_string(),
+            ));
         }
 
         for sprm in parse_sprms(grpprl) {
@@ -197,18 +211,34 @@ impl PapBinTable {
                 continue;
             }
 
-            let data_offset = sprm.operand_dword().ok_or(())?;
+            let data_offset = sprm.operand_dword().ok_or_else(|| {
+                DocError::Corrupted("PAPX data indirection lacks an offset".to_string())
+            })?;
             if !visited.insert(data_offset) {
-                return Err(());
+                return Err(DocError::Corrupted(
+                    "PAPX data indirection contains a cycle".to_string(),
+                ));
             }
-            let offset = usize::try_from(data_offset).map_err(|_| ())?;
-            let size = usize::from(read_u16_le(data_stream, offset).map_err(|_| ())?);
+            let offset = usize::try_from(data_offset).map_err(|_| {
+                DocError::Corrupted("PAPX data offset does not fit in memory".to_string())
+            })?;
+            let size = usize::from(read_u16_le(data_stream, offset).map_err(|error| {
+                DocError::Corrupted(format!("invalid PAPX PrcData length: {error}"))
+            })?);
             if size < 10 {
-                return Err(());
+                return Err(DocError::Corrupted(
+                    "PAPX PrcData is shorter than 10 bytes".to_string(),
+                ));
             }
-            let content_start = offset.checked_add(2).ok_or(())?;
-            let content_end = content_start.checked_add(size).ok_or(())?;
-            let referenced = data_stream.get(content_start..content_end).ok_or(())?;
+            let content_start = offset
+                .checked_add(2)
+                .ok_or_else(|| DocError::Corrupted("PAPX PrcData start overflowed".to_string()))?;
+            let content_end = content_start
+                .checked_add(size)
+                .ok_or_else(|| DocError::Corrupted("PAPX PrcData range overflowed".to_string()))?;
+            let referenced = data_stream.get(content_start..content_end).ok_or_else(|| {
+                DocError::Corrupted("PAPX PrcData extends beyond the Data Stream".to_string())
+            })?;
 
             let nested =
                 Self::expand_data_indirections(referenced, data_stream, visited, depth + 1)?;
@@ -253,7 +283,7 @@ mod tests {
         papx.extend_from_slice(&SPRM_P_HUGE_PAPX.to_le_bytes());
         papx.extend_from_slice(&20u32.to_le_bytes());
 
-        let properties = PapBinTable::parse_properties(&papx, &[], Some(&data), None);
+        let properties = PapBinTable::parse_properties(&papx, &[], Some(&data), None).unwrap();
         assert_eq!(properties.style_index, Some(7));
         assert_eq!(properties.line_spacing, Some(240));
     }
@@ -273,10 +303,22 @@ mod tests {
     }
 
     #[test]
+    fn rejects_missing_or_truncated_papx_data_indirections() {
+        let mut papx = 7u16.to_le_bytes().to_vec();
+        papx.extend_from_slice(&SPRM_P_HUGE_PAPX.to_le_bytes());
+        papx.extend_from_slice(&20u32.to_le_bytes());
+        assert!(PapBinTable::parse_properties(&papx, &[], None, None).is_err());
+
+        let mut truncated_data = vec![0; 24];
+        truncated_data[20..22].copy_from_slice(&10u16.to_le_bytes());
+        assert!(PapBinTable::parse_properties(&papx, &[], Some(&truncated_data), None).is_err());
+    }
+
+    #[test]
     fn applies_piece_modifiers_after_fkp_properties() {
         let papx = [0x00, 0x00, 0x03, 0x24, 0x00];
         let piece_modifier = [0x03, 0x24, 0x02];
-        let properties = PapBinTable::parse_properties(&papx, &piece_modifier, None, None);
+        let properties = PapBinTable::parse_properties(&papx, &piece_modifier, None, None).unwrap();
         assert_eq!(
             properties.justification,
             super::super::pap::Justification::Right
