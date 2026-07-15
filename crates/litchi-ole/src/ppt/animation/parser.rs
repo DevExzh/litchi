@@ -11,13 +11,14 @@ use super::types::{
     ParagraphBuildType, SlideAnimationExtension, TimeBehavior, TimeBehaviorAdditive,
     TimeBehaviorAtom, TimeBehaviorProperty, TimeBehaviorPropertyList, TimeColorDirection,
     TimeColorModel, TimeCommandBehavior, TimeCommandBehaviorAtom, TimeCommandBehaviorType,
-    TimeEffectNodeType, TimeEffectType, TimeIterateData, TimeIterateDirection,
-    TimeIterateIntervalType, TimeIterateType, TimeMasterRelation, TimeNodeAtom, TimeNodeFill,
-    TimeNodeKind, TimeNodeProperty, TimeNodePropertyList, TimeNodeRestart, TimePropertyListContext,
-    TimeRotationBehavior, TimeRotationBehaviorAtom, TimeRotationDirection, TimeScaleBehavior,
-    TimeScaleBehaviorAtom, TimeSequenceData, TimeSequenceNextAction, TimeSequencePreviousAction,
-    TimeVisualElement, TimeVisualElementKind, is_valid_runtime_context, is_valid_time_filter,
-    is_valid_time_points_types,
+    TimeCondition, TimeConditionAtom, TimeConditionType, TimeEffectNodeType, TimeEffectType,
+    TimeIterateData, TimeIterateDirection, TimeIterateIntervalType, TimeIterateType,
+    TimeMasterRelation, TimeModifier, TimeNodeAtom, TimeNodeFill, TimeNodeKind, TimeNodeProperty,
+    TimeNodePropertyList, TimeNodeRestart, TimePropertyListContext, TimeRotationBehavior,
+    TimeRotationBehaviorAtom, TimeRotationDirection, TimeScaleBehavior, TimeScaleBehaviorAtom,
+    TimeSequenceData, TimeSequenceNextAction, TimeSequencePreviousAction, TimeTriggerEvent,
+    TimeTriggerObject, TimeVisualElement, TimeVisualElementKind, is_valid_runtime_context,
+    is_valid_time_filter, is_valid_time_points_types,
 };
 use crate::consts::PptRecordType;
 use crate::ppt::package::{PptError, Result};
@@ -1200,6 +1201,132 @@ fn optional_u32<T>(
     }
 }
 
+/// Parse an exact `TimeConditionContainer` and its optional visual target.
+pub fn parse_time_condition(record: &PptRecord) -> Result<TimeCondition> {
+    require_container(
+        record,
+        PptRecordType::TimeConditionContainer,
+        record.instance,
+        "TimeConditionContainer",
+    )?;
+    let condition_type = match record.instance {
+        1 => TimeConditionType::None,
+        2 => TimeConditionType::Begin,
+        3 => TimeConditionType::End,
+        4 => TimeConditionType::Next,
+        5 => TimeConditionType::Previous,
+        6 => TimeConditionType::EndSync,
+        value => {
+            return Err(PptError::InvalidFormat(format!(
+                "invalid time condition type {value}"
+            )));
+        },
+    };
+    let atom = record
+        .children
+        .first()
+        .ok_or_else(|| PptError::InvalidFormat("time condition has no atom".to_string()))
+        .and_then(parse_time_condition_atom)?;
+    let expects_visual = atom.trigger_object == TimeTriggerObject::VisualElement;
+    let visual_target = match record.children.get(1) {
+        Some(target) if expects_visual => Some(parse_time_visual_element(target)?),
+        Some(_) => {
+            return Err(PptError::InvalidFormat(
+                "only visual-element conditions can contain a visual target".to_string(),
+            ));
+        },
+        None if expects_visual => {
+            return Err(PptError::InvalidFormat(
+                "visual-element condition is missing its target".to_string(),
+            ));
+        },
+        None => None,
+    };
+    if record.children.len() > 2 {
+        return Err(PptError::InvalidFormat(
+            "time condition has extra children".to_string(),
+        ));
+    }
+    Ok(TimeCondition {
+        condition_type,
+        atom,
+        visual_target,
+    })
+}
+
+/// Parse an exact 16-byte `TimeConditionAtom` payload.
+pub fn parse_time_condition_atom(record: &PptRecord) -> Result<TimeConditionAtom> {
+    require_atom(
+        record,
+        PptRecordType::TimeCondition,
+        0,
+        16,
+        "TimeConditionAtom",
+    )?;
+    let trigger_object = match read_u32(&record.data, 0) {
+        0 => TimeTriggerObject::None,
+        1 => TimeTriggerObject::VisualElement,
+        2 => TimeTriggerObject::TimeNode,
+        3 => TimeTriggerObject::RuntimeNodeReference,
+        value => {
+            return Err(PptError::InvalidFormat(format!(
+                "invalid condition trigger object {value}"
+            )));
+        },
+    };
+    let trigger_event = match read_u32(&record.data, 4) {
+        0 => TimeTriggerEvent::None,
+        1 => TimeTriggerEvent::OnBegin,
+        3 => TimeTriggerEvent::TimeNodeStart,
+        4 => TimeTriggerEvent::TimeNodeEnd,
+        5 => TimeTriggerEvent::MouseClick,
+        7 => TimeTriggerEvent::MouseOver,
+        9 => TimeTriggerEvent::OnNext,
+        10 => TimeTriggerEvent::OnPrevious,
+        11 => TimeTriggerEvent::StopAudio,
+        value => {
+            return Err(PptError::InvalidFormat(format!(
+                "invalid condition trigger event {value}"
+            )));
+        },
+    };
+    let target_id = read_u32(&record.data, 8);
+    if trigger_object == TimeTriggerObject::RuntimeNodeReference && target_id != 2 {
+        return Err(PptError::InvalidFormat(
+            "runtime-node condition target must be 2".to_string(),
+        ));
+    }
+    Ok(TimeConditionAtom {
+        trigger_object,
+        trigger_event,
+        target_id,
+        delay_ms: read_i32(&record.data, 12),
+    })
+}
+
+/// Parse an exact `TimeModifierAtom`.
+pub fn parse_time_modifier(record: &PptRecord) -> Result<TimeModifier> {
+    if record.record_type != PptRecordType::TimeModifier {
+        return Err(PptError::InvalidFormat(format!(
+            "Expected TimeModifierAtom, got {:?}",
+            record.record_type
+        )));
+    }
+    require_header(record, 0, record.instance, Some(8), "TimeModifierAtom")?;
+    let value = read_u32(&record.data, 4);
+    match read_u32(&record.data, 0) {
+        0 => Ok(TimeModifier::RepeatCount(value)),
+        1 => Ok(TimeModifier::RepeatDuration(value)),
+        2 => Ok(TimeModifier::Speed(value)),
+        3 => Ok(TimeModifier::Accelerate(value)),
+        4 => Ok(TimeModifier::Decelerate(value)),
+        5 => Ok(TimeModifier::AutomaticReverse(value)),
+        kind => Err(PptError::InvalidFormat(format!(
+            "invalid time modifier type {kind}"
+        ))),
+    }
+}
+
 /// Parse build list from BuildList container record.
 pub fn parse_build_list(record: &PptRecord) -> Result<BuildList> {
     if record.record_type != PptRecordType::BuildList {
@@ -1508,7 +1635,8 @@ mod tests {
         LegacyAnimationEffect, LegacyTextBuildSubEffect, ParagraphBuildType, write_animation_info,
         write_animation_info_atom, write_build_list, write_extended_time_node, write_time_behavior,
         write_time_behavior_atom, write_time_behavior_property_list, write_time_command_behavior,
-        write_time_command_behavior_atom, write_time_iterate_data, write_time_node_atom,
+        write_time_command_behavior_atom, write_time_condition, write_time_condition_atom,
+        write_time_iterate_data, write_time_modifier, write_time_node_atom,
         write_time_node_property_list, write_time_rotation_behavior,
         write_time_rotation_behavior_atom, write_time_scale_behavior,
         write_time_scale_behavior_atom, write_time_sequence_data, write_time_visual_element,
@@ -2220,6 +2348,111 @@ mod tests {
         bytes[8] = 2;
         let (record, _) = PptRecord::parse(&bytes, 0).unwrap();
         assert!(parse_time_sequence_data(&record).is_err());
+    }
+
+    #[test]
+    fn round_trips_time_conditions_and_modifiers() {
+        assert_eq!(PptRecordType::TimeConditionContainer.as_u16(), 0xF125);
+        assert_eq!(PptRecordType::TimeCondition.as_u16(), 0xF128);
+        assert_eq!(PptRecordType::TimeModifier.as_u16(), 0xF129);
+        let condition_types = [
+            TimeConditionType::None,
+            TimeConditionType::Begin,
+            TimeConditionType::End,
+            TimeConditionType::Next,
+            TimeConditionType::Previous,
+            TimeConditionType::EndSync,
+        ];
+        for condition_type in condition_types {
+            let expected = TimeCondition {
+                condition_type,
+                atom: TimeConditionAtom {
+                    trigger_object: TimeTriggerObject::VisualElement,
+                    trigger_event: TimeTriggerEvent::MouseClick,
+                    target_id: 0,
+                    delay_ms: -1,
+                },
+                visual_target: Some(TimeVisualElement::Page),
+            };
+            let bytes = write_time_condition(&expected).unwrap();
+            let (record, consumed) = PptRecord::parse(&bytes, 0).unwrap();
+            assert_eq!(consumed, bytes.len());
+            assert_eq!(parse_time_condition(&record).unwrap(), expected);
+        }
+
+        for trigger_event in [
+            TimeTriggerEvent::None,
+            TimeTriggerEvent::OnBegin,
+            TimeTriggerEvent::TimeNodeStart,
+            TimeTriggerEvent::TimeNodeEnd,
+            TimeTriggerEvent::MouseClick,
+            TimeTriggerEvent::MouseOver,
+            TimeTriggerEvent::OnNext,
+            TimeTriggerEvent::OnPrevious,
+            TimeTriggerEvent::StopAudio,
+        ] {
+            let atom = TimeConditionAtom {
+                trigger_object: TimeTriggerObject::RuntimeNodeReference,
+                trigger_event,
+                target_id: 2,
+                delay_ms: i32::MIN,
+            };
+            let bytes = write_time_condition_atom(&atom).unwrap();
+            let (record, _) = PptRecord::parse(&bytes, 0).unwrap();
+            assert_eq!(parse_time_condition_atom(&record).unwrap(), atom);
+        }
+
+        let modifiers = [
+            TimeModifier::RepeatCount(1),
+            TimeModifier::RepeatDuration(2),
+            TimeModifier::Speed(3),
+            TimeModifier::Accelerate(4),
+            TimeModifier::Decelerate(5),
+            TimeModifier::AutomaticReverse(u32::MAX),
+        ];
+        for modifier in modifiers {
+            let bytes = write_time_modifier(&modifier);
+            let (record, _) = PptRecord::parse(&bytes, 0).unwrap();
+            assert_eq!(parse_time_modifier(&record).unwrap(), modifier);
+        }
+    }
+
+    #[test]
+    fn rejects_malformed_time_conditions_and_modifiers() {
+        let missing_target = TimeCondition {
+            condition_type: TimeConditionType::Begin,
+            atom: TimeConditionAtom {
+                trigger_object: TimeTriggerObject::VisualElement,
+                trigger_event: TimeTriggerEvent::OnBegin,
+                target_id: 0,
+                delay_ms: 0,
+            },
+            visual_target: None,
+        };
+        assert!(write_time_condition(&missing_target).is_err());
+        let bad_runtime = TimeConditionAtom {
+            trigger_object: TimeTriggerObject::RuntimeNodeReference,
+            trigger_event: TimeTriggerEvent::TimeNodeStart,
+            target_id: 1,
+            delay_ms: 0,
+        };
+        assert!(write_time_condition_atom(&bad_runtime).is_err());
+
+        let mut bytes = write_time_condition_atom(&TimeConditionAtom {
+            trigger_object: TimeTriggerObject::None,
+            trigger_event: TimeTriggerEvent::None,
+            target_id: 0,
+            delay_ms: 0,
+        })
+        .unwrap();
+        bytes[12..16].copy_from_slice(&2u32.to_le_bytes());
+        let (record, _) = PptRecord::parse(&bytes, 0).unwrap();
+        assert!(parse_time_condition_atom(&record).is_err());
+
+        let mut bytes = write_time_modifier(&TimeModifier::Speed(100));
+        bytes[8..12].copy_from_slice(&6u32.to_le_bytes());
+        let (record, _) = PptRecord::parse(&bytes, 0).unwrap();
+        assert!(parse_time_modifier(&record).is_err());
     }
 
     #[test]

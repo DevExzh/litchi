@@ -8,13 +8,14 @@ use super::types::{
     LegacyAnimationBuild, LegacyAnimationEffect, LegacyTextBuildSubEffect, ParagraphBuild,
     ParagraphBuildLevel, TimeBehavior, TimeBehaviorAdditive, TimeBehaviorAtom,
     TimeBehaviorProperty, TimeBehaviorPropertyList, TimeColorDirection, TimeColorModel,
-    TimeCommandBehavior, TimeCommandBehaviorAtom, TimeCommandBehaviorType, TimeEffectNodeType,
-    TimeEffectType, TimeIterateData, TimeIterateDirection, TimeIterateIntervalType,
-    TimeIterateType, TimeMasterRelation, TimeNodeAtom, TimeNodeProperty, TimeNodePropertyList,
-    TimePropertyListContext, TimeRotationBehavior, TimeRotationBehaviorAtom, TimeRotationDirection,
-    TimeScaleBehavior, TimeScaleBehaviorAtom, TimeSequenceData, TimeSequenceNextAction,
-    TimeSequencePreviousAction, TimeVisualElement, TimeVisualElementKind, is_valid_runtime_context,
-    is_valid_time_filter, is_valid_time_points_types,
+    TimeCommandBehavior, TimeCommandBehaviorAtom, TimeCommandBehaviorType, TimeCondition,
+    TimeConditionAtom, TimeConditionType, TimeEffectNodeType, TimeEffectType, TimeIterateData,
+    TimeIterateDirection, TimeIterateIntervalType, TimeIterateType, TimeMasterRelation,
+    TimeModifier, TimeNodeAtom, TimeNodeProperty, TimeNodePropertyList, TimePropertyListContext,
+    TimeRotationBehavior, TimeRotationBehaviorAtom, TimeRotationDirection, TimeScaleBehavior,
+    TimeScaleBehaviorAtom, TimeSequenceData, TimeSequenceNextAction, TimeSequencePreviousAction,
+    TimeTriggerEvent, TimeTriggerObject, TimeVisualElement, TimeVisualElementKind,
+    is_valid_runtime_context, is_valid_time_filter, is_valid_time_points_types,
 };
 use crate::consts::PptRecordType;
 use crate::ppt::package::{PptError, Result};
@@ -855,6 +856,82 @@ pub fn write_time_sequence_data(data: &TimeSequenceData) -> Vec<u8> {
     payload.extend(flags.to_le_bytes());
     let mut result = create_record_header(PptRecordType::TimeSequenceData, 0, 0, 20);
     result.extend(payload);
+    result
+}
+
+/// Serialize an exact `TimeConditionContainer`.
+pub fn write_time_condition(condition: &TimeCondition) -> Result<Vec<u8>> {
+    let expects_visual = condition.atom.trigger_object == TimeTriggerObject::VisualElement;
+    if expects_visual != condition.visual_target.is_some() {
+        return Err(PptError::InvalidFormat(
+            "visual target must exist exactly for visual-element conditions".to_string(),
+        ));
+    }
+    let mut children = write_time_condition_atom(&condition.atom)?;
+    if let Some(target) = &condition.visual_target {
+        children.extend(write_time_visual_element(target)?);
+    }
+    let instance = match condition.condition_type {
+        TimeConditionType::None => 1,
+        TimeConditionType::Begin => 2,
+        TimeConditionType::End => 3,
+        TimeConditionType::Next => 4,
+        TimeConditionType::Previous => 5,
+        TimeConditionType::EndSync => 6,
+    };
+    wrap_record(
+        PptRecordType::TimeConditionContainer,
+        0x0F,
+        instance,
+        children,
+    )
+}
+
+/// Serialize an exact `TimeConditionAtom`.
+pub fn write_time_condition_atom(atom: &TimeConditionAtom) -> Result<Vec<u8>> {
+    if atom.trigger_object == TimeTriggerObject::RuntimeNodeReference && atom.target_id != 2 {
+        return Err(PptError::InvalidFormat(
+            "runtime-node condition target must be 2".to_string(),
+        ));
+    }
+    let trigger_object = match atom.trigger_object {
+        TimeTriggerObject::None => 0u32,
+        TimeTriggerObject::VisualElement => 1,
+        TimeTriggerObject::TimeNode => 2,
+        TimeTriggerObject::RuntimeNodeReference => 3,
+    };
+    let trigger_event = match atom.trigger_event {
+        TimeTriggerEvent::None => 0u32,
+        TimeTriggerEvent::OnBegin => 1,
+        TimeTriggerEvent::TimeNodeStart => 3,
+        TimeTriggerEvent::TimeNodeEnd => 4,
+        TimeTriggerEvent::MouseClick => 5,
+        TimeTriggerEvent::MouseOver => 7,
+        TimeTriggerEvent::OnNext => 9,
+        TimeTriggerEvent::OnPrevious => 10,
+        TimeTriggerEvent::StopAudio => 11,
+    };
+    let mut result = create_record_header(PptRecordType::TimeCondition, 0, 0, 16);
+    result.extend(trigger_object.to_le_bytes());
+    result.extend(trigger_event.to_le_bytes());
+    result.extend(atom.target_id.to_le_bytes());
+    result.extend(atom.delay_ms.to_le_bytes());
+    Ok(result)
+}
+
+/// Serialize an exact `TimeModifierAtom`.
+pub fn write_time_modifier(modifier: &TimeModifier) -> Vec<u8> {
+    let (kind, value) = match modifier {
+        TimeModifier::RepeatCount(value) => (0u32, *value),
+        TimeModifier::RepeatDuration(value) => (1, *value),
+        TimeModifier::Speed(value) => (2, *value),
+        TimeModifier::Accelerate(value) => (3, *value),
+        TimeModifier::Decelerate(value) => (4, *value),
+        TimeModifier::AutomaticReverse(value) => (5, *value),
+    };
+    let mut result = create_record_header(PptRecordType::TimeModifier, 0, 0, 8);
+    result.extend(kind.to_le_bytes());
+    result.extend(value.to_le_bytes());
     result
 }
 

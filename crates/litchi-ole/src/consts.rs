@@ -133,6 +133,12 @@ pub enum PptRecordType {
     SoundData = 2023,
     /// Time node record
     TimeNode = 0xF127,
+    /// Time condition container
+    TimeConditionContainer = 0xF125,
+    /// Time condition atom
+    TimeCondition = 0xF128,
+    /// Time modifier atom
+    TimeModifier = 0xF129,
     /// Shared animation behavior container
     TimeBehaviorContainer = 0xF12A,
     /// Rotation behavior container
@@ -236,7 +242,10 @@ impl From<u16> for PptRecordType {
             0x2B09 => PptRecordType::ParaBuildAtom,
             0x2B0A => PptRecordType::LevelInfoAtom,
             0xF144 => PptRecordType::ExtTimeNode,
+            0xF125 => PptRecordType::TimeConditionContainer,
             0xF127 => PptRecordType::TimeNode,
+            0xF128 => PptRecordType::TimeCondition,
+            0xF129 => PptRecordType::TimeModifier,
             0xF12A => PptRecordType::TimeBehaviorContainer,
             0xF12F => PptRecordType::TimeRotationBehaviorContainer,
             0xF130 => PptRecordType::TimeScaleBehaviorContainer,

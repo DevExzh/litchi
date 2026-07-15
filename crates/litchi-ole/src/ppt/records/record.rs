@@ -137,6 +137,7 @@ impl PptRecord {
                 | PptRecordType::DiagramBuild
                 | PptRecordType::ParaBuild
                 | PptRecordType::ExtTimeNode
+                | PptRecordType::TimeConditionContainer
                 | PptRecordType::TimeBehaviorContainer
                 | PptRecordType::TimeRotationBehaviorContainer
                 | PptRecordType::TimeScaleBehaviorContainer

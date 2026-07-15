@@ -902,6 +902,69 @@ pub enum TimeSequencePreviousAction {
     SkipTimedChildren,
 }
 
+/// A condition that controls activation or deactivation of a time node.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TimeCondition {
+    pub condition_type: TimeConditionType,
+    pub atom: TimeConditionAtom,
+    /// Present if and only if `trigger_object` is `VisualElement`.
+    pub visual_target: Option<TimeVisualElement>,
+}
+
+/// Fixed fields stored in a `TimeConditionAtom`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TimeConditionAtom {
+    pub trigger_object: TimeTriggerObject,
+    pub trigger_event: TimeTriggerEvent,
+    pub target_id: u32,
+    pub delay_ms: i32,
+}
+
+/// Role of a condition within its containing time node.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TimeConditionType {
+    None,
+    Begin,
+    End,
+    Next,
+    Previous,
+    EndSync,
+}
+
+/// Kind of target participating in condition evaluation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TimeTriggerObject {
+    None,
+    VisualElement,
+    TimeNode,
+    RuntimeNodeReference,
+}
+
+/// Event that makes a time condition true.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TimeTriggerEvent {
+    None,
+    OnBegin,
+    TimeNodeStart,
+    TimeNodeEnd,
+    MouseClick,
+    MouseOver,
+    OnNext,
+    OnPrevious,
+    StopAudio,
+}
+
+/// One `TimeModifierAtom`; values remain unsigned as required by MS-PPT.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TimeModifier {
+    RepeatCount(u32),
+    RepeatDuration(u32),
+    Speed(u32),
+    Accelerate(u32),
+    Decelerate(u32),
+    AutomaticReverse(u32),
+}
+
 /// Typed properties stored in `TimePropertyList4TimeBehavior`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TimeBehaviorPropertyList {
