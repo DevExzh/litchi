@@ -47,10 +47,11 @@ pub use editor::{
     KeynoteRgbaColor, KeynoteRotationAction, KeynoteRotationDirection, KeynoteScaleAction,
     KeynoteShowMode, KeynoteShowSettings, KeynoteSlideBackground, KeynoteSlideInfo,
     KeynoteSlideLayoutId, KeynoteSlideLayoutInfo, KeynoteSlideTextInfo,
-    KeynoteSlideTextPlaceholder, KeynoteSlideTextRole, KeynoteSwooshDirection,
-    KeynoteTransitionAcceleration, KeynoteTransitionAnimationParameters,
-    KeynoteTransitionCustomParameters, KeynoteTransitionDirection, KeynoteTransitionMosaicType,
-    KeynoteTransitionSettings, KeynoteTransitionTextDelivery, RemovedKeynoteTextBox,
+    KeynoteSlideTextPlaceholder, KeynoteSlideTextRole, KeynoteSoundtrackMode,
+    KeynoteSoundtrackSettings, KeynoteSwooshDirection, KeynoteTransitionAcceleration,
+    KeynoteTransitionAnimationParameters, KeynoteTransitionCustomParameters,
+    KeynoteTransitionDirection, KeynoteTransitionMosaicType, KeynoteTransitionSettings,
+    KeynoteTransitionTextDelivery, RemovedKeynoteTextBox,
 };
 pub use show::KeynoteShow;
 pub use slide::{BuildAnimation, KeynoteSlide, SlideTransition};

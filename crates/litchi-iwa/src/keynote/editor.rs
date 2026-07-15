@@ -2929,6 +2929,8 @@ mod slide_number;
 mod slide_style_graph;
 mod slide_style_metadata;
 mod slide_style_registry;
+mod soundtrack;
+mod soundtrack_wire;
 mod transition;
 mod transition_wire;
 
@@ -2940,6 +2942,7 @@ pub use slide_background_gradient::{
     KeynoteGradient, KeynoteGradientAngle, KeynoteGradientKind, KeynoteGradientStop,
 };
 use slide_graph::*;
+pub use soundtrack::{KeynoteSoundtrackMode, KeynoteSoundtrackSettings};
 pub use transition::{
     KeynoteTransitionAcceleration, KeynoteTransitionAnimationParameters,
     KeynoteTransitionCustomParameters, KeynoteTransitionDirection, KeynoteTransitionMosaicType,

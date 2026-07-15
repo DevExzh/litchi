@@ -15,6 +15,13 @@ const TEST_SLIDE_OWNED_DRAWABLES_FIELD: u32 = 7;
 const TEST_SLIDE_DRAWABLES_Z_ORDER_FIELD: u32 = 42;
 const TEST_SLIDE_NUMBER_PLACEHOLDER_ID: u64 = 70;
 const TEST_SHOW_MODE_FIELD: u32 = 9;
+const TEST_SHOW_SOUNDTRACK_FIELD: u32 = 17;
+const TEST_SOUNDTRACK_ID: u64 = 80;
+const TEST_SOUNDTRACK_MESSAGE_TYPE: u32 = 21;
+const TEST_SOUNDTRACK_MODE_FIELD: u32 = 2;
+const TEST_SOUNDTRACK_PLAY_ONCE_MODE: i32 = 0;
+const TEST_SOUNDTRACK_LOOP_MODE: i32 = 1;
+const TEST_SOUNDTRACK_MEDIA_IDS: [u64; 2] = [91, 92];
 
 #[test]
 fn slide_background_crud_inherits_and_culls_native_variations() {
@@ -2930,6 +2937,147 @@ fn show_settings_and_skip_state_are_transactional() {
 }
 
 #[test]
+fn soundtrack_settings_are_typed_transactional_and_wire_exact() {
+    let mut editor = KeynoteEditor::from_package(test_package_with_soundtrack()).unwrap();
+    let original = KeynoteSoundtrackSettings {
+        volume: Some(1.0),
+        mode: Some(KeynoteSoundtrackMode::PlayOnce),
+        media_item_count: TEST_SOUNDTRACK_MEDIA_IDS.len(),
+    };
+    assert_eq!(editor.soundtrack_settings().unwrap(), Some(original));
+    let original_bytes = editor.to_bytes().unwrap();
+
+    for invalid in [
+        KeynoteSoundtrackSettings {
+            volume: Some(f64::NAN),
+            ..original
+        },
+        KeynoteSoundtrackSettings {
+            volume: Some(1.01),
+            ..original
+        },
+        KeynoteSoundtrackSettings {
+            mode: Some(KeynoteSoundtrackMode::Unknown(TEST_SOUNDTRACK_LOOP_MODE)),
+            ..original
+        },
+        KeynoteSoundtrackSettings {
+            media_item_count: 1,
+            ..original
+        },
+    ] {
+        assert!(editor.set_soundtrack_settings(invalid).is_err());
+        assert_eq!(editor.to_bytes().unwrap(), original_bytes);
+    }
+
+    let changed = KeynoteSoundtrackSettings {
+        volume: Some(0.35),
+        mode: Some(KeynoteSoundtrackMode::Loop),
+        ..original
+    };
+    editor.set_soundtrack_settings(changed).unwrap();
+    assert_eq!(editor.soundtrack_settings().unwrap(), Some(changed));
+    let changed_bytes = editor.to_bytes().unwrap();
+    editor.set_soundtrack_settings(changed).unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), changed_bytes);
+    let graph = ObjectGraph::read(editor.package()).unwrap();
+    let native: kn::Soundtrack = graph
+        .decode_type(
+            TEST_SOUNDTRACK_ID,
+            TEST_SOUNDTRACK_MESSAGE_TYPE,
+            "KN.Soundtrack",
+        )
+        .unwrap();
+    assert_eq!(
+        native
+            .movie_media
+            .iter()
+            .map(|reference| reference.identifier)
+            .collect::<Vec<_>>(),
+        TEST_SOUNDTRACK_MEDIA_IDS
+    );
+
+    let future = KeynoteSoundtrackSettings {
+        mode: Some(KeynoteSoundtrackMode::Unknown(19)),
+        ..changed
+    };
+    editor.set_soundtrack_settings(future).unwrap();
+    assert_eq!(editor.soundtrack_settings().unwrap(), Some(future));
+    editor.set_soundtrack_settings(original).unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), original_bytes);
+}
+
+#[test]
+fn soundtrack_settings_handle_absent_and_malformed_objects_transactionally() {
+    let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
+    assert_eq!(editor.soundtrack_settings().unwrap(), None);
+    let before = editor.to_bytes().unwrap();
+    assert!(
+        editor
+            .set_soundtrack_settings(KeynoteSoundtrackSettings {
+                volume: Some(1.0),
+                mode: Some(KeynoteSoundtrackMode::PlayOnce),
+                media_item_count: 0,
+            })
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), before);
+
+    let mut package = test_package_with_soundtrack();
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            let object = archive.object_mut(TEST_SOUNDTRACK_ID).unwrap();
+            let mut message = object.messages[0].clone();
+            append_unknown_varint(
+                &mut message.data,
+                TEST_SOUNDTRACK_MODE_FIELD,
+                TEST_SOUNDTRACK_LOOP_MODE as u64,
+            );
+            object.replace_message(0, message).map(|_| ())
+        })
+        .unwrap();
+    let mut editor = KeynoteEditor::from_package(package).unwrap();
+    let before = editor.to_bytes().unwrap();
+    assert!(editor.soundtrack_settings().is_err());
+    assert!(
+        editor
+            .set_soundtrack_settings(KeynoteSoundtrackSettings {
+                volume: Some(0.5),
+                mode: Some(KeynoteSoundtrackMode::Loop),
+                media_item_count: TEST_SOUNDTRACK_MEDIA_IDS.len(),
+            })
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), before);
+
+    let mut package = test_package_with_soundtrack();
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            let object = archive.object_mut(2).unwrap();
+            let mut message = object.messages[0].clone();
+            message.data = append_repeated_length_delimited_field(
+                &message.data,
+                TEST_SHOW_SOUNDTRACK_FIELD,
+                &reference(TEST_SOUNDTRACK_ID).encode_to_vec(),
+            )?;
+            object.replace_message(0, message).map(|_| ())
+        })
+        .unwrap();
+    let mut editor = KeynoteEditor::from_package(package).unwrap();
+    let before = editor.to_bytes().unwrap();
+    assert!(editor.soundtrack_settings().is_err());
+    assert!(
+        editor
+            .set_soundtrack_settings(KeynoteSoundtrackSettings {
+                volume: Some(0.5),
+                mode: Some(KeynoteSoundtrackMode::Loop),
+                media_item_count: TEST_SOUNDTRACK_MEDIA_IDS.len(),
+            })
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
 fn slide_number_visibility_matches_native_ownership_and_round_trips_exactly() {
     let mut editor = KeynoteEditor::from_package(test_package_with_slide_number()).unwrap();
     assert_eq!(
@@ -4544,6 +4692,45 @@ fn test_package() -> IWorkPackage {
                 ],
             },
         )
+        .unwrap();
+    package
+}
+
+fn test_package_with_soundtrack() -> IWorkPackage {
+    let mut package = test_package();
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            let show = archive.object_mut(2).unwrap();
+            let mut decoded = kn::ShowArchive::decode(show.messages[0].data.as_slice())?;
+            decoded.soundtrack = Some(reference(TEST_SOUNDTRACK_ID));
+            show.replace_message(
+                0,
+                RawMessage {
+                    type_: 2,
+                    data: decoded.encode_to_vec(),
+                },
+            )?;
+            show.archive_info.message_infos[0]
+                .object_references
+                .push(TEST_SOUNDTRACK_ID);
+            let mut soundtrack = object(
+                TEST_SOUNDTRACK_ID,
+                TEST_SOUNDTRACK_MESSAGE_TYPE,
+                kn::Soundtrack {
+                    volume: Some(1.0),
+                    mode: Some(TEST_SOUNDTRACK_PLAY_ONCE_MODE),
+                    movie_media: TEST_SOUNDTRACK_MEDIA_IDS
+                        .into_iter()
+                        .map(|identifier| tsp::DataReference { identifier })
+                        .collect(),
+                },
+            );
+            append_unknown_varint(&mut soundtrack.messages[0].data, 99, 990);
+            soundtrack.archive_info.message_infos[0]
+                .data_references
+                .extend(TEST_SOUNDTRACK_MEDIA_IDS);
+            archive.insert_object(soundtrack)
+        })
         .unwrap();
     package
 }

@@ -8,7 +8,7 @@ use litchi_iwa::keynote::{
 };
 use litchi_iwa::protobuf::kn::{
     BuildArchive, BuildChunkArchive, DocumentArchive, PlaceholderArchive, ShowArchive,
-    SlideArchive, SlideNodeArchive,
+    SlideArchive, SlideNodeArchive, Soundtrack,
 };
 use litchi_iwa::protobuf::tswp::{ShapeInfoArchive, StorageArchive};
 use prost::Message;
@@ -18,13 +18,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let path = env::args()
         .nth(1)
         .ok_or("usage: inspect_keynote_structure <file>")?;
-    for slide in KeynoteEditor::open(&path)?.slides()? {
+    let editor = KeynoteEditor::open(&path)?;
+    for slide in editor.slides()? {
         println!(
             "slide {} current layout: {:?}",
             slide.index + 1,
             slide.layout
         );
     }
+    println!("soundtrack settings: {:?}", editor.soundtrack_settings()?);
     let package = IWorkPackage::open(path)?;
     let mut objects: HashMap<u64, (String, ArchiveObject)> = HashMap::new();
     for name in package.entry_names().filter(|name| name.ends_with(".iwa")) {
@@ -43,7 +45,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .ok_or("show object is missing")?;
     let show = decode::<ShowArchive>(show_object).ok_or("no show payload")?;
     println!(
-        "slide tree refs: {:?} size={}x{} slide_numbers={:?} loop={:?} mode={:?} autoplay=({:?},{:?},{:?}) idle=({:?},{:?}) slide_list={:?} recording={:?}",
+        "slide tree refs: {:?} size={}x{} slide_numbers={:?} loop={:?} mode={:?} autoplay=({:?},{:?},{:?}) idle=({:?},{:?}) slide_list={:?} recording={:?} soundtrack={:?}",
         show.slide_tree
             .slides
             .iter()
@@ -60,8 +62,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         show.idle_timer_active,
         show.idle_timer_delay,
         show.slide_list.as_ref().map(|r| r.identifier),
-        show.recording.as_ref().map(|r| r.identifier)
+        show.recording.as_ref().map(|r| r.identifier),
+        show.soundtrack.as_ref().map(|r| r.identifier),
     );
+    if let Some(reference) = &show.soundtrack {
+        let (archive_name, object) = objects
+            .get(&reference.identifier)
+            .ok_or("soundtrack object is missing")?;
+        let soundtrack = decode::<Soundtrack>(object).ok_or("no soundtrack payload")?;
+        println!(
+            "soundtrack {} archive={} info={:?}: {soundtrack:?}",
+            reference.identifier, archive_name, object.archive_info.message_infos
+        );
+    }
     for reference in show.slide_tree.slides {
         let (name, object) = objects
             .get(&reference.identifier)
