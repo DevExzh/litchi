@@ -9,10 +9,12 @@ use super::types::{
     ParagraphBuildLevel, TimeBehavior, TimeBehaviorAdditive, TimeBehaviorAtom,
     TimeBehaviorProperty, TimeBehaviorPropertyList, TimeColorDirection, TimeColorModel,
     TimeCommandBehavior, TimeCommandBehaviorAtom, TimeCommandBehaviorType, TimeEffectNodeType,
-    TimeEffectType, TimeMasterRelation, TimeNodeAtom, TimeNodeProperty, TimeNodePropertyList,
+    TimeEffectType, TimeIterateData, TimeIterateDirection, TimeIterateIntervalType,
+    TimeIterateType, TimeMasterRelation, TimeNodeAtom, TimeNodeProperty, TimeNodePropertyList,
     TimePropertyListContext, TimeRotationBehavior, TimeRotationBehaviorAtom, TimeRotationDirection,
-    TimeScaleBehavior, TimeScaleBehaviorAtom, TimeVisualElement, TimeVisualElementKind,
-    is_valid_runtime_context, is_valid_time_filter, is_valid_time_points_types,
+    TimeScaleBehavior, TimeScaleBehaviorAtom, TimeSequenceData, TimeSequenceNextAction,
+    TimeSequencePreviousAction, TimeVisualElement, TimeVisualElementKind, is_valid_runtime_context,
+    is_valid_time_filter, is_valid_time_points_types,
 };
 use crate::consts::PptRecordType;
 use crate::ppt::package::{PptError, Result};
@@ -785,6 +787,75 @@ fn validate_time_command(
         ));
     }
     Ok(())
+}
+
+/// Serialize an exact `TimeIterateDataAtom`.
+pub fn write_time_iterate_data(data: &TimeIterateData) -> Vec<u8> {
+    let flags = (u32::from(data.direction.is_some()))
+        | (u32::from(data.iterate_type.is_some()) << 1)
+        | (u32::from(data.interval.is_some()) << 2)
+        | (u32::from(data.interval_type.is_some()) << 3);
+    let mut payload = Vec::with_capacity(20);
+    payload.extend(data.interval.unwrap_or(0).to_le_bytes());
+    payload.extend(
+        data.iterate_type
+            .map_or(0u32, |v| match v {
+                TimeIterateType::AllAtOnce => 0,
+                TimeIterateType::ByWord => 1,
+                TimeIterateType::ByLetter => 2,
+            })
+            .to_le_bytes(),
+    );
+    payload.extend(
+        data.direction
+            .map_or(1u32, |v| match v {
+                TimeIterateDirection::Backward => 0,
+                TimeIterateDirection::Forward => 1,
+            })
+            .to_le_bytes(),
+    );
+    payload.extend(
+        data.interval_type
+            .map_or(0u32, |v| match v {
+                TimeIterateIntervalType::Milliseconds => 0,
+                TimeIterateIntervalType::TenthsOfAPercent => 1,
+            })
+            .to_le_bytes(),
+    );
+    payload.extend(flags.to_le_bytes());
+    let mut result = create_record_header(PptRecordType::TimeIterateData, 0, 0, 20);
+    result.extend(payload);
+    result
+}
+
+/// Serialize an exact `TimeSequenceDataAtom`.
+pub fn write_time_sequence_data(data: &TimeSequenceData) -> Vec<u8> {
+    let flags = u32::from(data.concurrent.is_some())
+        | (u32::from(data.next_action.is_some()) << 1)
+        | (u32::from(data.previous_action.is_some()) << 2);
+    let mut payload = Vec::with_capacity(20);
+    payload.extend(data.concurrent.map_or(0u32, u32::from).to_le_bytes());
+    payload.extend(
+        data.next_action
+            .map_or(0u32, |v| match v {
+                TimeSequenceNextAction::None => 0,
+                TimeSequenceNextAction::SeekToNaturalEnd => 1,
+            })
+            .to_le_bytes(),
+    );
+    payload.extend(
+        data.previous_action
+            .map_or(0u32, |v| match v {
+                TimeSequencePreviousAction::None => 0,
+                TimeSequencePreviousAction::SkipTimedChildren => 1,
+            })
+            .to_le_bytes(),
+    );
+    payload.extend(0u32.to_le_bytes());
+    payload.extend(flags.to_le_bytes());
+    let mut result = create_record_header(PptRecordType::TimeSequenceData, 0, 0, 20);
+    result.extend(payload);
+    result
 }
 
 /// Map a high-level animation effect to PPT97 fly method and direction codes.

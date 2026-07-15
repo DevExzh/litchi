@@ -854,6 +854,54 @@ pub enum TimeCommandBehaviorType {
     OleVerb,
 }
 
+/// Optional iteration controls for repeated sub-element effects.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TimeIterateData {
+    pub interval: Option<u32>,
+    pub iterate_type: Option<TimeIterateType>,
+    pub direction: Option<TimeIterateDirection>,
+    pub interval_type: Option<TimeIterateIntervalType>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TimeIterateType {
+    AllAtOnce,
+    ByWord,
+    ByLetter,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TimeIterateDirection {
+    Backward,
+    Forward,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TimeIterateIntervalType {
+    Milliseconds,
+    TenthsOfAPercent,
+}
+
+/// Optional sequencing controls for a sequential time node.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TimeSequenceData {
+    pub concurrent: Option<bool>,
+    pub next_action: Option<TimeSequenceNextAction>,
+    pub previous_action: Option<TimeSequencePreviousAction>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TimeSequenceNextAction {
+    None,
+    SeekToNaturalEnd,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TimeSequencePreviousAction {
+    None,
+    SkipTimedChildren,
+}
+
 /// Typed properties stored in `TimePropertyList4TimeBehavior`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TimeBehaviorPropertyList {

@@ -155,6 +155,10 @@ pub enum PptRecordType {
     TimePropertyList = 0xF13D,
     /// Time string-list container
     TimeVariantList = 0xF13E,
+    /// Time iterate-data atom
+    TimeIterateData = 0xF140,
+    /// Time sequence-data atom
+    TimeSequenceData = 0xF141,
     /// Time variant atom record
     TimeVariant = 0xF142,
     /// Shape or sound animation target atom
@@ -244,6 +248,8 @@ impl From<u16> for PptRecordType {
             0xF13C => PptRecordType::TimeClientVisualElement,
             0xF13D => PptRecordType::TimePropertyList,
             0xF13E => PptRecordType::TimeVariantList,
+            0xF140 => PptRecordType::TimeIterateData,
+            0xF141 => PptRecordType::TimeSequenceData,
             0xF142 => PptRecordType::TimeVariant,
             0x2AFB => PptRecordType::VisualShapeAtom,
             0x2B01 => PptRecordType::VisualPageAtom,

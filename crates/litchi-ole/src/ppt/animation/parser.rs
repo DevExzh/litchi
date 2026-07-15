@@ -11,11 +11,13 @@ use super::types::{
     ParagraphBuildType, SlideAnimationExtension, TimeBehavior, TimeBehaviorAdditive,
     TimeBehaviorAtom, TimeBehaviorProperty, TimeBehaviorPropertyList, TimeColorDirection,
     TimeColorModel, TimeCommandBehavior, TimeCommandBehaviorAtom, TimeCommandBehaviorType,
-    TimeEffectNodeType, TimeEffectType, TimeMasterRelation, TimeNodeAtom, TimeNodeFill,
+    TimeEffectNodeType, TimeEffectType, TimeIterateData, TimeIterateDirection,
+    TimeIterateIntervalType, TimeIterateType, TimeMasterRelation, TimeNodeAtom, TimeNodeFill,
     TimeNodeKind, TimeNodeProperty, TimeNodePropertyList, TimeNodeRestart, TimePropertyListContext,
     TimeRotationBehavior, TimeRotationBehaviorAtom, TimeRotationDirection, TimeScaleBehavior,
-    TimeScaleBehaviorAtom, TimeVisualElement, TimeVisualElementKind, is_valid_runtime_context,
-    is_valid_time_filter, is_valid_time_points_types,
+    TimeScaleBehaviorAtom, TimeSequenceData, TimeSequenceNextAction, TimeSequencePreviousAction,
+    TimeVisualElement, TimeVisualElementKind, is_valid_runtime_context, is_valid_time_filter,
+    is_valid_time_points_types,
 };
 use crate::consts::PptRecordType;
 use crate::ppt::package::{PptError, Result};
@@ -1103,6 +1105,101 @@ fn validate_time_command(
     Ok(())
 }
 
+/// Parse an exact `TimeIterateDataAtom`.
+pub fn parse_time_iterate_data(record: &PptRecord) -> Result<TimeIterateData> {
+    require_atom(
+        record,
+        PptRecordType::TimeIterateData,
+        0,
+        20,
+        "TimeIterateDataAtom",
+    )?;
+    let flags = read_u32(&record.data, 16);
+    let interval = optional_u32(flags & 4 != 0, read_u32(&record.data, 0), 0, Ok)?;
+    let iterate_type = optional_u32(flags & 2 != 0, read_u32(&record.data, 4), 0, |v| match v {
+        0 => Ok(TimeIterateType::AllAtOnce),
+        1 => Ok(TimeIterateType::ByWord),
+        2 => Ok(TimeIterateType::ByLetter),
+        _ => Err(PptError::InvalidFormat("invalid iteration type".into())),
+    })?;
+    let direction = optional_u32(flags & 1 != 0, read_u32(&record.data, 8), 1, |v| match v {
+        0 => Ok(TimeIterateDirection::Backward),
+        1 => Ok(TimeIterateDirection::Forward),
+        _ => Err(PptError::InvalidFormat(
+            "invalid iteration direction".into(),
+        )),
+    })?;
+    let interval_type = optional_u32(flags & 8 != 0, read_u32(&record.data, 12), 0, |v| match v {
+        0 => Ok(TimeIterateIntervalType::Milliseconds),
+        1 => Ok(TimeIterateIntervalType::TenthsOfAPercent),
+        _ => Err(PptError::InvalidFormat(
+            "invalid iteration interval type".into(),
+        )),
+    })?;
+    Ok(TimeIterateData {
+        interval,
+        iterate_type,
+        direction,
+        interval_type,
+    })
+}
+
+/// Parse an exact `TimeSequenceDataAtom`.
+pub fn parse_time_sequence_data(record: &PptRecord) -> Result<TimeSequenceData> {
+    require_atom(
+        record,
+        PptRecordType::TimeSequenceData,
+        0,
+        20,
+        "TimeSequenceDataAtom",
+    )?;
+    let flags = read_u32(&record.data, 16);
+    let concurrent = optional_u32(flags & 1 != 0, read_u32(&record.data, 0), 0, |v| match v {
+        0 => Ok(false),
+        1 => Ok(true),
+        _ => Err(PptError::InvalidFormat(
+            "invalid sequence concurrency".into(),
+        )),
+    })?;
+    let next_action = optional_u32(flags & 2 != 0, read_u32(&record.data, 4), 0, |v| match v {
+        0 => Ok(TimeSequenceNextAction::None),
+        1 => Ok(TimeSequenceNextAction::SeekToNaturalEnd),
+        _ => Err(PptError::InvalidFormat(
+            "invalid next sequence action".into(),
+        )),
+    })?;
+    let previous_action =
+        optional_u32(flags & 4 != 0, read_u32(&record.data, 8), 0, |v| match v {
+            0 => Ok(TimeSequencePreviousAction::None),
+            1 => Ok(TimeSequencePreviousAction::SkipTimedChildren),
+            _ => Err(PptError::InvalidFormat(
+                "invalid previous sequence action".into(),
+            )),
+        })?;
+    Ok(TimeSequenceData {
+        concurrent,
+        next_action,
+        previous_action,
+    })
+}
+
+fn optional_u32<T>(
+    used: bool,
+    value: u32,
+    default: u32,
+    parse: impl FnOnce(u32) -> Result<T>,
+) -> Result<Option<T>> {
+    if used {
+        parse(value).map(Some)
+    } else if value == default {
+        Ok(None)
+    } else {
+        Err(PptError::InvalidFormat(
+            "unused time property has a non-default value".into(),
+        ))
+    }
+}
+
 /// Parse build list from BuildList container record.
 pub fn parse_build_list(record: &PptRecord) -> Result<BuildList> {
     if record.record_type != PptRecordType::BuildList {
@@ -1411,9 +1508,10 @@ mod tests {
         LegacyAnimationEffect, LegacyTextBuildSubEffect, ParagraphBuildType, write_animation_info,
         write_animation_info_atom, write_build_list, write_extended_time_node, write_time_behavior,
         write_time_behavior_atom, write_time_behavior_property_list, write_time_command_behavior,
-        write_time_command_behavior_atom, write_time_node_atom, write_time_node_property_list,
-        write_time_rotation_behavior, write_time_rotation_behavior_atom, write_time_scale_behavior,
-        write_time_scale_behavior_atom, write_time_visual_element,
+        write_time_command_behavior_atom, write_time_iterate_data, write_time_node_atom,
+        write_time_node_property_list, write_time_rotation_behavior,
+        write_time_rotation_behavior_atom, write_time_scale_behavior,
+        write_time_scale_behavior_atom, write_time_sequence_data, write_time_visual_element,
     };
 
     fn sample_legacy_atom() -> LegacyAnimationAtom {
@@ -2064,6 +2162,64 @@ mod tests {
         atom[12..16].copy_from_slice(&0u32.to_le_bytes());
         let (record, _) = PptRecord::parse(&atom, 0).unwrap();
         assert!(parse_time_command_behavior_atom(&record).is_err());
+    }
+
+    #[test]
+    fn round_trips_iterate_and_sequence_data_atoms() {
+        assert_eq!(PptRecordType::TimeIterateData.as_u16(), 0xF140);
+        assert_eq!(PptRecordType::TimeSequenceData.as_u16(), 0xF141);
+        for iterate_type in [
+            TimeIterateType::AllAtOnce,
+            TimeIterateType::ByWord,
+            TimeIterateType::ByLetter,
+        ] {
+            for direction in [
+                TimeIterateDirection::Backward,
+                TimeIterateDirection::Forward,
+            ] {
+                for interval_type in [
+                    TimeIterateIntervalType::Milliseconds,
+                    TimeIterateIntervalType::TenthsOfAPercent,
+                ] {
+                    let expected = TimeIterateData {
+                        interval: Some(250),
+                        iterate_type: Some(iterate_type),
+                        direction: Some(direction),
+                        interval_type: Some(interval_type),
+                    };
+                    let bytes = write_time_iterate_data(&expected);
+                    let (record, _) = PptRecord::parse(&bytes, 0).unwrap();
+                    assert_eq!(parse_time_iterate_data(&record).unwrap(), expected);
+                }
+            }
+        }
+        let expected = TimeSequenceData {
+            concurrent: Some(true),
+            next_action: Some(TimeSequenceNextAction::SeekToNaturalEnd),
+            previous_action: Some(TimeSequencePreviousAction::SkipTimedChildren),
+        };
+        let bytes = write_time_sequence_data(&expected);
+        let (record, _) = PptRecord::parse(&bytes, 0).unwrap();
+        assert_eq!(parse_time_sequence_data(&record).unwrap(), expected);
+
+        let mut bytes = write_time_iterate_data(&TimeIterateData {
+            interval: None,
+            iterate_type: None,
+            direction: None,
+            interval_type: None,
+        });
+        bytes[8] = 1;
+        let (record, _) = PptRecord::parse(&bytes, 0).unwrap();
+        assert!(parse_time_iterate_data(&record).is_err());
+
+        let mut bytes = write_time_sequence_data(&TimeSequenceData {
+            concurrent: Some(false),
+            next_action: None,
+            previous_action: None,
+        });
+        bytes[8] = 2;
+        let (record, _) = PptRecord::parse(&bytes, 0).unwrap();
+        assert!(parse_time_sequence_data(&record).is_err());
     }
 
     #[test]
