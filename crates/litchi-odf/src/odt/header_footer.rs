@@ -263,6 +263,54 @@ pub(crate) fn set_region_text(
     kind: HeaderFooterKind,
     text: Option<&str>,
 ) -> Result<String> {
+    let replacement = text.map(|text| {
+        format!(
+            "<style:{name} xmlns:style=\"{style}\" xmlns:text=\"{text_ns}\"><text:p>{value}</text:p></style:{name}>",
+            name = kind.element_name(),
+            style = String::from_utf8_lossy(STYLE_NAMESPACE),
+            text_ns = String::from_utf8_lossy(TEXT_NAMESPACE),
+            value = litchi_core::xml::escape_xml(text),
+        )
+    });
+    replace_region(xml, master_page_name, kind, replacement.as_deref())
+}
+
+pub(crate) fn set_region_xml(
+    xml: &str,
+    master_page_name: &str,
+    kind: HeaderFooterKind,
+    region_xml: &str,
+) -> Result<String> {
+    validate_region_xml(region_xml, kind)?;
+    replace_region(xml, master_page_name, kind, Some(region_xml))
+}
+
+fn validate_region_xml(region_xml: &str, kind: HeaderFooterKind) -> Result<()> {
+    let wrapper = format!(
+        "<office:document-styles xmlns:office=\"{}\" xmlns:style=\"{}\"><office:master-styles><style:master-page style:name=\"validation\">{region_xml}</style:master-page></office:master-styles></office:document-styles>",
+        String::from_utf8_lossy(OFFICE_NAMESPACE),
+        String::from_utf8_lossy(STYLE_NAMESPACE),
+    );
+    let pages = parse_master_pages(&wrapper)?;
+    let valid = pages.len() == 1
+        && pages[0].regions.len() == 1
+        && pages[0].regions[0].kind == kind
+        && pages[0].regions[0].xml == region_xml;
+    if !valid {
+        return Err(Error::InvalidFormat(format!(
+            "header/footer XML must be exactly one style:{} element",
+            kind.element_name()
+        )));
+    }
+    Ok(())
+}
+
+fn replace_region(
+    xml: &str,
+    master_page_name: &str,
+    kind: HeaderFooterKind,
+    replacement: Option<&str>,
+) -> Result<String> {
     let pages = parse_master_pages(xml)?;
     let page = pages
         .iter()
@@ -273,15 +321,6 @@ pub(crate) fn set_region_text(
     let location = find_master_page(xml, master_page_name)?.ok_or_else(|| {
         Error::InvalidFormat(format!("master page '{master_page_name}' does not exist"))
     })?;
-    let replacement = text.map(|text| {
-        format!(
-            "<style:{name} xmlns:style=\"{style}\" xmlns:text=\"{text_ns}\"><text:p>{value}</text:p></style:{name}>",
-            name = kind.element_name(),
-            style = String::from_utf8_lossy(STYLE_NAMESPACE),
-            text_ns = String::from_utf8_lossy(TEXT_NAMESPACE),
-            value = litchi_core::xml::escape_xml(text),
-        )
-    });
 
     if location.empty {
         let Some(replacement) = replacement else {
@@ -294,7 +333,7 @@ pub(crate) fn set_region_text(
         let mut expanded = String::with_capacity(empty.len() + replacement.len() + 32);
         expanded.push_str(&empty[..marker]);
         expanded.push('>');
-        expanded.push_str(&replacement);
+        expanded.push_str(replacement);
         expanded.push_str("</");
         expanded.push_str(&location.qualified_name);
         expanded.push('>');
@@ -308,12 +347,7 @@ pub(crate) fn set_region_text(
         })?;
         let start = location.content_start + relative;
         let end = start + region.xml.len();
-        return Ok(replace_range(
-            xml,
-            start,
-            end,
-            replacement.as_deref().unwrap_or(""),
-        ));
+        return Ok(replace_range(xml, start, end, replacement.unwrap_or("")));
     }
     let Some(replacement) = replacement else {
         return Ok(xml.to_string());
@@ -331,7 +365,7 @@ pub(crate) fn set_region_text(
         }
         insertion = start + existing.xml.len();
     }
-    Ok(replace_range(xml, insertion, insertion, &replacement))
+    Ok(replace_range(xml, insertion, insertion, replacement))
 }
 
 pub(crate) fn add_master_page(xml: &str, name: &str, page_layout_name: &str) -> Result<String> {
@@ -786,5 +820,28 @@ mod tests {
         assert!(add_master_page(&second, "Second", "pm2").is_err());
         assert!(add_master_page(&second, "", "pm2").is_err());
         assert!(add_master_page(&second, "Third", "").is_err());
+    }
+
+    #[test]
+    fn validates_and_sets_complete_rich_region_fragments() {
+        let styles = r#"<o:document-styles xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0"><o:master-styles><s:master-page s:name="A" s:page-layout-name="pm1"/></o:master-styles></o:document-styles>"#;
+        let rich = r#"<x:header xmlns:x="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><t:p>Page <t:page-number/> of <t:page-count/></t:p></x:header>"#;
+        let updated = set_region_xml(styles, "A", HeaderFooterKind::Header, rich).unwrap();
+        let pages = parse_master_pages(&updated).unwrap();
+        let header = pages[0].region(HeaderFooterKind::Header).unwrap();
+        assert_eq!(header.xml, rich);
+        assert_eq!(header.text, "Page  of ");
+
+        assert!(set_region_xml(styles, "A", HeaderFooterKind::Footer, rich).is_err());
+        assert!(set_region_xml(styles, "A", HeaderFooterKind::Header, " malformed ").is_err());
+        assert!(
+            set_region_xml(
+                styles,
+                "A",
+                HeaderFooterKind::Header,
+                &format!("{rich}{rich}"),
+            )
+            .is_err()
+        );
     }
 }

@@ -10,6 +10,7 @@ use crate::elements::text::{Heading, List, Paragraph};
 use crate::odt::Document;
 use crate::odt::header_footer::{
     HeaderFooterKind, MasterPage, add_master_page, parse_master_pages, set_region_text,
+    set_region_xml,
 };
 use litchi_core::{Metadata, Result, xml::escape_xml};
 use std::path::Path;
@@ -170,6 +171,26 @@ impl MutableDocument {
             )
         })?;
         self.styles_xml = Some(set_region_text(styles, master_page_name, kind, Some(text))?);
+        Ok(())
+    }
+
+    /// Replace one header/footer region with a complete XML fragment.
+    ///
+    /// The fragment must be exactly one self-contained `style:header`,
+    /// `style:footer`, or corresponding first/left variant matching `kind`.
+    /// This preserves rich text, fields, tables, drawings, and extension content.
+    pub fn set_header_footer_xml(
+        &mut self,
+        master_page_name: &str,
+        kind: HeaderFooterKind,
+        xml: &str,
+    ) -> Result<()> {
+        let styles = self.styles_xml.as_deref().ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(
+                "document has no styles.xml master page to modify".to_string(),
+            )
+        })?;
+        self.styles_xml = Some(set_region_xml(styles, master_page_name, kind, xml)?);
         Ok(())
     }
 
@@ -974,6 +995,10 @@ mod tests {
         mutable
             .set_header_footer_text("Standard", HeaderFooterKind::Header, "Created header")
             .unwrap();
+        let rich = r#"<s:header xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><t:p>Page <t:page-number/></t:p></s:header>"#;
+        mutable
+            .set_header_footer_xml("Standard", HeaderFooterKind::Header, rich)
+            .unwrap();
 
         let round_trip = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();
         let pages = round_trip.master_pages().unwrap();
@@ -982,8 +1007,9 @@ mod tests {
         assert_eq!(pages[0].page_layout_name.as_deref(), Some("pm1"));
         assert_eq!(
             pages[0].region(HeaderFooterKind::Header).unwrap().text,
-            "Created header"
+            "Page "
         );
+        assert_eq!(pages[0].region(HeaderFooterKind::Header).unwrap().xml, rich);
         let styles = String::from_utf8(round_trip.get_file("styles.xml").unwrap()).unwrap();
         assert!(styles.contains("<style:page-layout"));
     }
