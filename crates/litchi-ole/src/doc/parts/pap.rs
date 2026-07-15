@@ -10,6 +10,7 @@
 ///
 /// Based on Apache POI's ParagraphSprmUncompressor and ParagraphProperties.
 use super::super::package::{DocError, Result};
+use super::styles::StyleSheet;
 use super::tap::TableProperties;
 use crate::sprm::{Sprm, parse_sprms};
 use crate::sprm_operations::*;
@@ -326,6 +327,17 @@ impl ParagraphProperties {
     ///
     /// * `grpprl` - Group of SPRMs (property modifications)
     pub fn from_sprm(grpprl: &[u8]) -> Result<Self> {
+        Self::from_sprm_context(grpprl, None)
+    }
+
+    pub(crate) fn from_sprm_with_stylesheet(
+        grpprl: &[u8],
+        stylesheet: &StyleSheet,
+    ) -> Result<Self> {
+        Self::from_sprm_context(grpprl, Some(stylesheet))
+    }
+
+    fn from_sprm_context(grpprl: &[u8], stylesheet: Option<&StyleSheet>) -> Result<Self> {
         let mut pap = Self::default();
         let sprms = parse_sprms(grpprl);
 
@@ -340,8 +352,12 @@ impl ParagraphProperties {
 
         if sprms.iter().any(|sprm| get_sprm_type(sprm.opcode) == 5) {
             let arena = bumpalo::Bump::new();
-            pap.table_properties =
-                Some(super::tap_parser::TapParser::new(&arena).parse_tap(grpprl)?);
+            let parser = super::tap_parser::TapParser::new(&arena);
+            pap.table_properties = Some(if let Some(stylesheet) = stylesheet {
+                parser.parse_tap_with_stylesheet(grpprl, stylesheet)?
+            } else {
+                parser.parse_tap(grpprl)?
+            });
         }
 
         Ok(pap)

@@ -12,6 +12,7 @@ use litchi_core::binary::{read_u16_le, read_u32_le};
 use super::fkp::{PapxFkp, ParagraphHeight};
 use super::pap::ParagraphProperties;
 use super::piece_table::PieceTable;
+use super::styles::StyleSheet;
 use crate::sprm::parse_sprms;
 use crate::sprm_operations::{SPRM_P_HUGE_PAPX, SPRM_P_TABLE_PROPS};
 
@@ -47,6 +48,7 @@ impl PapBinTable {
         word_document: &[u8],
         data_stream: Option<&[u8]>,
         piece_table: &PieceTable,
+        stylesheet: Option<&StyleSheet>,
     ) -> Option<Self> {
         // PlcBtePapx = (n + 1) FCs followed by n four-byte PnFkpPapx values.
         if plcf_bte_papx_data.len() < 12 || (plcf_bte_papx_data.len() - 4) % 8 != 0 {
@@ -83,8 +85,12 @@ impl PapBinTable {
                         .piece_for_cp(start_cp)
                         .map(|piece| piece.property_modifier())
                         .unwrap_or_default();
-                    let properties =
-                        Self::parse_properties(&entry.grpprl, piece_modifier, data_stream);
+                    let properties = Self::parse_properties(
+                        &entry.grpprl,
+                        piece_modifier,
+                        data_stream,
+                        stylesheet,
+                    );
                     runs.push(ParagraphRun {
                         start_cp,
                         end_cp,
@@ -118,9 +124,15 @@ impl PapBinTable {
         grpprl_and_istd: &[u8],
         piece_modifier: &[u8],
         data_stream: Option<&[u8]>,
+        stylesheet: Option<&StyleSheet>,
     ) -> ParagraphProperties {
         if grpprl_and_istd.is_empty() {
-            return ParagraphProperties::from_sprm(piece_modifier).unwrap_or_default();
+            return stylesheet
+                .map_or_else(
+                    || ParagraphProperties::from_sprm(piece_modifier),
+                    |styles| ParagraphProperties::from_sprm_with_stylesheet(piece_modifier, styles),
+                )
+                .unwrap_or_default();
         }
 
         let (style_index, direct_sprms) = if grpprl_and_istd.len() >= 2 {
@@ -147,7 +159,12 @@ impl PapBinTable {
             combined = [sprms, piece_modifier].concat();
             &combined
         };
-        let mut properties = ParagraphProperties::from_sprm(sprms).unwrap_or_default();
+        let mut properties = stylesheet
+            .map_or_else(
+                || ParagraphProperties::from_sprm(sprms),
+                |styles| ParagraphProperties::from_sprm_with_stylesheet(sprms, styles),
+            )
+            .unwrap_or_default();
         if properties.style_index.is_none() {
             properties.style_index = style_index;
         }
@@ -236,7 +253,7 @@ mod tests {
         papx.extend_from_slice(&SPRM_P_HUGE_PAPX.to_le_bytes());
         papx.extend_from_slice(&20u32.to_le_bytes());
 
-        let properties = PapBinTable::parse_properties(&papx, &[], Some(&data));
+        let properties = PapBinTable::parse_properties(&papx, &[], Some(&data), None);
         assert_eq!(properties.style_index, Some(7));
         assert_eq!(properties.line_spacing, Some(240));
     }
@@ -259,7 +276,7 @@ mod tests {
     fn applies_piece_modifiers_after_fkp_properties() {
         let papx = [0x00, 0x00, 0x03, 0x24, 0x00];
         let piece_modifier = [0x03, 0x24, 0x02];
-        let properties = PapBinTable::parse_properties(&papx, &piece_modifier, None);
+        let properties = PapBinTable::parse_properties(&papx, &piece_modifier, None, None);
         assert_eq!(
             properties.justification,
             super::super::pap::Justification::Right

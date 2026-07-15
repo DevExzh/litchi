@@ -24,6 +24,7 @@ fn read_byte(data: &[u8], offset: usize) -> BinaryResult<u8> {
 fn binary_to_doc_result<T>(result: BinaryResult<T>) -> Result<T> {
     result.map_err(|e| DocError::InvalidFormat(format!("Binary read error: {}", e)))
 }
+use super::styles::StyleSheet;
 use super::tap::{
     BorderStyle, BorderType, CellBorderTypes, CellMergeStatus, CellProperties, CellShading,
     CellSpacing, CellSpacingSource, ShadingPattern, TableConditionalFormatting,
@@ -84,17 +85,27 @@ impl<'arena> TapParser<'arena> {
     ///
     /// Parsed TableProperties structure
     pub fn parse_tap(&self, grpprl: &[u8]) -> Result<TableProperties> {
-        self.parse_tap_context(grpprl, false)
+        self.parse_tap_context(grpprl, false, None)
+    }
+
+    /// Parse direct table properties while resolving `sprmTIstd` against a stylesheet.
+    pub(crate) fn parse_tap_with_stylesheet(
+        &self,
+        grpprl: &[u8],
+        stylesheet: &StyleSheet,
+    ) -> Result<TableProperties> {
+        self.parse_tap_context(grpprl, false, Some(stylesheet))
     }
 
     pub(crate) fn parse_conditional_tap(&self, grpprl: &[u8]) -> Result<TableProperties> {
-        self.parse_tap_context(grpprl, true)
+        self.parse_tap_context(grpprl, true, None)
     }
 
     fn parse_tap_context(
         &self,
         grpprl: &[u8],
         inside_conditional: bool,
+        stylesheet: Option<&StyleSheet>,
     ) -> Result<TableProperties> {
         // Parse all SPRMs using arena for temporary storage
         let sprms = parse_sprms(grpprl);
@@ -111,7 +122,7 @@ impl<'arena> TapParser<'arena> {
         // Apply each TAP-type SPRM to the table properties
         for sprm in sprms {
             if Self::is_tap_sprm(sprm.opcode) {
-                self.apply_sprm_to_tap(&mut tap, &sprm, grpprl, inside_conditional)?;
+                self.apply_sprm_to_tap(&mut tap, &sprm, grpprl, inside_conditional, stylesheet)?;
             }
         }
 
@@ -328,6 +339,7 @@ impl<'arena> TapParser<'arena> {
         sprm: &Sprm,
         grpprl: &[u8],
         inside_conditional: bool,
+        stylesheet: Option<&StyleSheet>,
     ) -> Result<()> {
         // Use shared SPRM operation extraction
         let operation = get_sprm_operation(sprm.opcode);
@@ -562,7 +574,13 @@ impl<'arena> TapParser<'arena> {
                         "sprmTIstd operand must contain 2 bytes".to_string(),
                     ));
                 }
-                tap.table_style_index = Some(binary_to_doc_result(read_u16_le(operand, 0))?);
+                let requested = binary_to_doc_result(read_u16_le(operand, 0))?;
+                if let Some(stylesheet) = stylesheet {
+                    let (effective, style) = stylesheet.resolve_table_properties(requested)?;
+                    Self::apply_table_style(tap, style, effective);
+                } else {
+                    tap.table_style_index = Some(requested);
+                }
             },
             0x3E => self.parse_style_cell_padding(tap, sprm)?,
             0x42 => self.parse_cell_range_bool(tap, sprm, CellBoolProperty::HideMark)?,
@@ -704,6 +722,29 @@ impl<'arena> TapParser<'arena> {
         }
 
         Ok(())
+    }
+
+    /// Apply the properties controlled by an UpxTapx while retaining the
+    /// structural, positioning, sizing, and revision state that MS-DOC says a
+    /// `sprmTIstd` must preserve.
+    fn apply_table_style(tap: &mut TableProperties, style: TableProperties, effective: u16) {
+        tap.legacy_physical_justification = style.legacy_physical_justification;
+        tap.modern_logical_justification = style.modern_logical_justification;
+        tap.style_defaults = style.style_defaults;
+        tap.conditional_formats = style.conditional_formats;
+        tap.width_before = style.width_before;
+        tap.preferred_indent = style.preferred_indent;
+        tap.cell_spacing = style.cell_spacing;
+        tap.is_header_row = style.is_header_row;
+        tap.allow_row_break = style.allow_row_break;
+        tap.border_top = style.border_top;
+        tap.border_left = style.border_left;
+        tap.border_bottom = style.border_bottom;
+        tap.border_right = style.border_right;
+        tap.border_horizontal = style.border_horizontal;
+        tap.border_vertical = style.border_vertical;
+        tap.table_style_index = Some(effective);
+        Self::resolve_justification(tap);
     }
 
     fn parse_justification(sprm: &Sprm, name: &str) -> Result<TableJustification> {

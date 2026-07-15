@@ -202,7 +202,13 @@ impl Document {
         });
         let pap_bin_table = piece_table.as_ref().and_then(|piece_table| {
             Self::table_slice(&fib, &table_stream, 13).and_then(|data| {
-                PapBinTable::parse(data, &word_document, data_stream.as_deref(), piece_table)
+                PapBinTable::parse(
+                    data,
+                    &word_document,
+                    data_stream.as_deref(),
+                    piece_table,
+                    stylesheet.as_ref(),
+                )
             })
         });
 

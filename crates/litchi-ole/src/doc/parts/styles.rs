@@ -827,4 +827,86 @@ mod tests {
             super::super::tap::TableJustification::Center
         );
     }
+
+    #[test]
+    fn applies_table_styles_in_direct_sprm_order_and_preserves_sizing() {
+        fn append(grpprl: &mut Vec<u8>, opcode: u16, operand: &[u8]) {
+            grpprl.extend_from_slice(&opcode.to_le_bytes());
+            grpprl.extend_from_slice(operand);
+        }
+
+        let mut slots = vec![None; 16];
+        slots[0] = Some(std_record(0, 1, NIL_STYLE, 0, "Normal", &[&[], &[]]));
+        slots[10] = Some(std_record(65, 2, NIL_STYLE, 10, "Font", &[&[]]));
+        slots[11] = Some(std_record(
+            105,
+            3,
+            NIL_STYLE,
+            0,
+            "Normal Table",
+            &[&[], &[], &[]],
+        ));
+        let mut style_tapx = Vec::new();
+        append(&mut style_tapx, 0x548A, &[2, 0]);
+        append(&mut style_tapx, 0x3404, &[1]);
+        append(&mut style_tapx, 0x3403, &[1]);
+        append(&mut style_tapx, 0x347D, &[1]);
+        slots[15] = Some(std_record(
+            0x0FFE,
+            3,
+            11,
+            0,
+            "Applied Table",
+            &[&style_tapx, &[], &[]],
+        ));
+        let stylesheet = parse(&stylesheet(slots)).unwrap();
+
+        let mut direct = Vec::new();
+        append(&mut direct, 0x548A, &[1, 0]);
+        append(&mut direct, 0x3404, &[0]);
+        append(&mut direct, 0x3403, &[0]);
+        append(&mut direct, 0x9407, &[0x20, 0x03]);
+        append(&mut direct, 0xF614, &[3, 0xE8, 0x03]);
+        append(&mut direct, 0x3615, &[1]);
+        append(&mut direct, 0x5664, &[1, 0]);
+        append(&mut direct, 0x7479, &[0x78, 0x56, 0x34, 0x12]);
+        append(&mut direct, 0x563A, &[15, 0]);
+
+        let arena = bumpalo::Bump::new();
+        let parser = super::super::tap_parser::TapParser::new(&arena);
+        let styled = parser
+            .parse_tap_with_stylesheet(&direct, &stylesheet)
+            .unwrap();
+        assert_eq!(styled.table_style_index, Some(15));
+        assert_eq!(
+            styled.justification,
+            super::super::tap::TableJustification::Right
+        );
+        assert!(styled.is_header_row);
+        assert!(!styled.allow_row_break);
+        assert_eq!(styled.style_defaults.no_wrap, Some(true));
+        assert_eq!(styled.row_height, Some(800));
+        assert_eq!(styled.preferred_width.unwrap().value, 1000);
+        assert!(styled.auto_fit);
+        assert!(styled.right_to_left);
+        assert_eq!(styled.revision_save_id, Some(0x1234_5678));
+
+        append(&mut direct, 0x548A, &[0, 0]);
+        append(&mut direct, 0x3404, &[0]);
+        append(&mut direct, 0x3403, &[0]);
+        let overridden = parser
+            .parse_tap_with_stylesheet(&direct, &stylesheet)
+            .unwrap();
+        assert_eq!(
+            overridden.justification,
+            super::super::tap::TableJustification::Left
+        );
+        assert!(!overridden.is_header_row);
+        assert!(overridden.allow_row_break);
+        assert_eq!(overridden.row_height, Some(800));
+        assert_eq!(overridden.preferred_width.unwrap().value, 1000);
+        assert!(overridden.auto_fit);
+        assert!(overridden.right_to_left);
+        assert_eq!(overridden.revision_save_id, Some(0x1234_5678));
+    }
 }
