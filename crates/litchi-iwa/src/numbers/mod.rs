@@ -44,8 +44,9 @@ pub use cell::{APPLE_EPOCH_UNIX_OFFSET_SECONDS, CellType, CellValue};
 pub use document::NumbersDocument;
 pub use editor::{
     NumbersCellCommentInfo, NumbersCellCommentReplyInfo, NumbersEditor, NumbersPivotCategoryInfo,
-    NumbersSheetInfo, NumbersTableDimension, NumbersTableDimensionSize, NumbersTableInfo,
-    NumbersTablePoints, NumbersTextBoxInfo, RemovedNumbersTextBox,
+    NumbersSheetInfo, NumbersTableDimension, NumbersTableDimensionSize, NumbersTableHeaderCount,
+    NumbersTableHeaderSettings, NumbersTableInfo, NumbersTablePoints, NumbersTextBoxInfo,
+    RemovedNumbersTextBox,
 };
 pub use formula::{
     FormulaAxisReference, FormulaBinaryOperator, FormulaCellReference, FormulaExpression,

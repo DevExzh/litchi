@@ -40,6 +40,8 @@ println!("{}", structured.summary());
   explicit password-protected document rejection
 - Semantic editors for Numbers sheets/tables/cells/formulas, Pages
   body/header/footer/text-box text, and Keynote slides/placeholders/text boxes/speaker notes
+- Typed Numbers table header/footer counts, freeze state, and repeating-header
+  settings with lossless optional-field presence
 - Typed Keynote theme-layout discovery and fresh empty-slide creation with native
   component registration, speaker notes, slide numbers, and transactional insertion
 - Wire-preserving Keynote per-slide number visibility with native placeholder
@@ -63,6 +65,7 @@ println!("{}", structured.summary());
 ```rust
 use litchi_iwa::numbers::{
     CellValue, FormulaAxisReference, FormulaCellReference, FormulaExpression, NumbersEditor,
+    NumbersTableHeaderCount,
 };
 use litchi_iwa::pages::PagesEditor;
 use litchi_iwa::keynote::{
@@ -73,6 +76,11 @@ use litchi_iwa::keynote::{
 
 let mut numbers = NumbersEditor::open("input.numbers")?;
 let table = numbers.tables()?.remove(0);
+let mut headers = numbers.table_header_settings(table.object_id)?;
+headers.header_rows = Some(NumbersTableHeaderCount::TWO);
+headers.footer_rows = Some(NumbersTableHeaderCount::ONE);
+headers.header_rows_frozen = Some(true);
+numbers.set_table_header_settings(table.object_id, headers)?;
 numbers.set_cell(table.object_id, 1, 2, CellValue::Number(42.0))?;
 // Existing rich-text cells use the same call. Their TSWP formatting storage is
 // retained, and shared payloads are isolated with copy-on-write.
@@ -402,7 +410,11 @@ removing the stale legacy row payloads.
 Numbers sheet names (including nested form-based sheets), table names, and
 required table-model dimensions are patched at the protobuf wire level.
 Unrecognized Apple fields retain their bytes and position, while duplicate
-singular fields fail transactionally. Table resizing still updates tiles,
+singular fields fail transactionally. Header rows, header columns, footer rows,
+freeze toggles, and print-time repeating-header toggles expose their native
+optional presence through typed settings; the validated count type matches
+Numbers' native 1–5 choices, with `None` representing zero. See
+`edit_numbers_table_headers`. Table resizing still updates tiles,
 header buckets, stable UID maps, and stroke sidecars as one checked operation;
 each existing object is now mutated through bounded wire paths, including the
 unpacked UID index arrays and nested UUID records. Grow/shrink restoration is

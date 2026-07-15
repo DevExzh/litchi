@@ -3303,6 +3303,115 @@ fn column_insert_preserves_unknown_tile_header_and_dependency_record_fields() {
 }
 
 #[test]
+fn table_header_settings_are_typed_transactional_and_wire_exact() {
+    let mut package = test_package();
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            let object = archive.object_mut(10).unwrap();
+            let message = object.messages[0].clone();
+            let mut data = message.data;
+            append_unknown_varint(&mut data, 99, 990);
+            object.replace_message(
+                0,
+                RawMessage {
+                    type_: message.type_,
+                    data,
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    let mut editor = NumbersEditor::from_package(package).unwrap();
+    let baseline = editor.to_bytes().unwrap();
+    assert_eq!(
+        editor.table_header_settings(10).unwrap(),
+        NumbersTableHeaderSettings::default()
+    );
+
+    let settings = NumbersTableHeaderSettings {
+        header_rows: Some(NumbersTableHeaderCount::TWO),
+        header_columns: Some(NumbersTableHeaderCount::ONE),
+        footer_rows: Some(NumbersTableHeaderCount::ONE),
+        header_rows_frozen: Some(true),
+        header_columns_frozen: Some(false),
+        repeating_header_rows_enabled: Some(true),
+        repeating_header_columns_enabled: Some(false),
+    };
+    editor.set_table_header_settings(10, settings).unwrap();
+    assert_eq!(editor.table_header_settings(10).unwrap(), settings);
+    assert_eq!(settings.header_row_count(), 2);
+    assert_eq!(settings.header_column_count(), 1);
+    assert_eq!(settings.footer_row_count(), 1);
+    assert!(settings.header_rows_are_frozen());
+    assert!(!settings.header_columns_are_frozen());
+    assert!(settings.repeats_header_rows());
+    assert!(!settings.repeats_header_columns());
+    let changed = editor.to_bytes().unwrap();
+    let reparsed = NumbersEditor::from_bytes(&changed).unwrap();
+    assert_eq!(reparsed.table_header_settings(10).unwrap(), settings);
+
+    editor.set_table_header_settings(10, settings).unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), changed);
+    editor
+        .set_table_header_settings(10, NumbersTableHeaderSettings::default())
+        .unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+    let before = editor.to_bytes().unwrap();
+    let too_many_rows = NumbersTableHeaderSettings {
+        header_rows: Some(NumbersTableHeaderCount::THREE),
+        footer_rows: Some(NumbersTableHeaderCount::TWO),
+        ..Default::default()
+    };
+    assert!(editor.set_table_header_settings(10, too_many_rows).is_err());
+    let too_many_columns = NumbersTableHeaderSettings {
+        header_columns: Some(NumbersTableHeaderCount::FIVE),
+        ..Default::default()
+    };
+    assert!(
+        editor
+            .set_table_header_settings(10, too_many_columns)
+            .is_err()
+    );
+    assert!(editor.table_header_settings(u64::MAX).is_err());
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
+fn table_header_settings_reject_malformed_wire_transactionally() {
+    for malformed in [vec![(9, 1), (9, 2)], vec![(12, 2)], vec![(29, 0), (29, 1)]] {
+        let mut package = test_package();
+        package
+            .update_archive("Index/Document.iwa", |archive| {
+                let object = archive.object_mut(10).unwrap();
+                let message = object.messages[0].clone();
+                let mut data = message.data;
+                for (field, value) in &malformed {
+                    append_unknown_varint(&mut data, *field, *value);
+                }
+                object.replace_message(
+                    0,
+                    RawMessage {
+                        type_: message.type_,
+                        data,
+                    },
+                )?;
+                Ok(())
+            })
+            .unwrap();
+        let mut editor = NumbersEditor::from_package(package).unwrap();
+        let before = editor.to_bytes().unwrap();
+        assert!(editor.table_header_settings(10).is_err());
+        assert!(
+            editor
+                .set_table_header_settings(10, NumbersTableHeaderSettings::default())
+                .is_err()
+        );
+        assert_eq!(editor.to_bytes().unwrap(), before);
+    }
+}
+
+#[test]
 fn table_dimension_sizes_are_typed_transactional_and_wire_exact() {
     assert!(NumbersTablePoints::new(0.0).is_err());
     assert!(NumbersTablePoints::new(-1.0).is_err());
