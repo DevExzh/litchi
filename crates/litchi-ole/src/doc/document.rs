@@ -1,11 +1,13 @@
 use super::super::OleFile;
 /// Document - the main API for working with Word document content.
+use super::comment::Comment;
 use super::footnote::Footnote;
 use super::header_footer::HeaderFooter;
 use super::hyperlink::Hyperlink;
 use super::package::{DocError, Result};
 use super::paragraph::{Paragraph, Run};
 use super::parts::chp_bin_table::ChpBinTable;
+use super::parts::comments::CommentsTable;
 use super::parts::fib::FileInformationBlock;
 use super::parts::fields::FieldsTable;
 use super::parts::footnotes::{EndnotesTable, FootnotesTable};
@@ -78,6 +80,8 @@ pub struct Document {
     footnotes_table: Option<FootnotesTable>,
     /// Endnotes table
     endnotes_table: Option<EndnotesTable>,
+    /// Comments table
+    comments_table: CommentsTable,
     /// Hyperlinks table
     hyperlinks_table: Option<HyperlinksTable>,
     /// List/numbering tables
@@ -145,6 +149,7 @@ impl Document {
         // Parse footnotes and endnotes tables
         let footnotes_table = FootnotesTable::parse(&fib, &table_stream).ok();
         let endnotes_table = EndnotesTable::parse(&fib, &table_stream).ok();
+        let comments_table = CommentsTable::parse(&fib, &table_stream)?;
 
         // Parse hyperlinks from fields table
         let hyperlinks_table = fields_table.as_ref().and_then(|ft| {
@@ -189,6 +194,7 @@ impl Document {
             headers_table,
             footnotes_table,
             endnotes_table,
+            comments_table,
             hyperlinks_table,
             list_tables,
             mtef_data,
@@ -612,6 +618,83 @@ impl Document {
             result.push(note);
         }
 
+        Ok(result)
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // Comments
+    // ──────────────────────────────────────────────────────────────────
+
+    /// Get all comments in main-document reference order.
+    pub fn comments(&self) -> Result<Vec<Comment>> {
+        let mut result = Vec::with_capacity(self.comments_table.count());
+        for reference in self.comments_table.references() {
+            let reference_end = reference
+                .reference_cp
+                .checked_add(1)
+                .ok_or_else(|| DocError::Corrupted("comment reference CP overflows".to_string()))?;
+            let marker_end = reference
+                .marker_cp
+                .checked_add(1)
+                .ok_or_else(|| DocError::Corrupted("comment marker CP overflows".to_string()))?;
+            if self
+                .text_extractor
+                .text_at_range(reference.reference_cp, reference_end)
+                != "\u{5}"
+                || self
+                    .text_extractor
+                    .text_at_range(reference.marker_cp, marker_end)
+                    != "\u{5}"
+            {
+                return Err(DocError::Corrupted(
+                    "comment reference or story does not begin with U+0005".to_string(),
+                ));
+            }
+            if let Some(chp_table) = &self.chp_bin_table
+                && (!chp_table
+                    .runs_in_range(reference.reference_cp, reference_end)
+                    .any(|run| run.properties.is_spec)
+                    || !chp_table
+                        .runs_in_range(reference.marker_cp, marker_end)
+                        .any(|run| run.properties.is_spec))
+            {
+                return Err(DocError::Corrupted(
+                    "comment reference or story marker is missing sprmCFSpec".to_string(),
+                ));
+            }
+
+            let body_start = reference.marker_cp.checked_add(1).ok_or_else(|| {
+                DocError::Corrupted("comment body start CP overflows".to_string())
+            })?;
+            let paragraph_mark_cp = reference
+                .text_end_cp
+                .checked_sub(1)
+                .ok_or_else(|| DocError::Corrupted("comment story range is empty".to_string()))?;
+            if self
+                .text_extractor
+                .text_at_range(paragraph_mark_cp, reference.text_end_cp)
+                != "\r"
+            {
+                return Err(DocError::Corrupted(
+                    "comment story does not end with a paragraph mark".to_string(),
+                ));
+            }
+            let text = self
+                .text_extractor
+                .text_at_range(body_start, reference.text_end_cp)
+                .to_string();
+            let paragraphs =
+                self.extract_paragraphs_for_range(body_start, reference.text_end_cp)?;
+            let mut comment = Comment::new(
+                reference.reference_cp,
+                reference.author.clone(),
+                reference.descriptor.initials.clone(),
+                reference.descriptor.bookmark_tag,
+                text,
+            );
+            comment.paragraphs = paragraphs;
+            result.push(comment);
+        }
         Ok(result)
     }
 

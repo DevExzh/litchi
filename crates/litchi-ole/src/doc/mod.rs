@@ -11,6 +11,7 @@
 /// - `Paragraph`: A paragraph with runs (formatted text)
 /// - `Run`: A text run with formatting
 /// - `Table`: A table with rows and cells
+/// - `Comment`: A comment with author metadata and body paragraphs
 ///
 /// # DOC File Structure
 ///
@@ -48,6 +49,7 @@
 /// }
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
+pub mod comment;
 pub mod document;
 pub mod footnote;
 pub mod header_footer;
@@ -62,6 +64,7 @@ pub mod table;
 /// DOC file writing
 pub mod writer;
 
+pub use comment::Comment;
 pub use document::Document;
 pub use footnote::{Endnote, Footnote};
 pub use header_footer::HeaderFooter;
