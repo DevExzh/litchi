@@ -827,11 +827,41 @@ mod tests {
 
     #[test]
     fn preserves_parsed_headers_and_footers_in_owned_document() {
-        let rtf = r#"{\rtf1\ansi{\header Main \u20320? header\par Second line}{\footer Page footer}Body}"#;
+        let rtf = r#"{\rtf1\ansi\sectd\sbkeven\pgwsxn10000\pghsxn14000\marglsxn900\margrsxn800\margtsxn700\margbsxn600\guttersxn120\headery300\footery400\lndscpsxn\cols2\colsx360\pgnstarts5\pgnucrm\vertalc\linemod1\lineppage{\header Main \u20320? header\par Second line}{\footer Page footer}Body}"#;
         let doc = RtfDocument::parse(rtf).unwrap();
         assert_eq!(doc.text(), "Body");
         assert_eq!(doc.sections().len(), 1);
         let section = &doc.sections()[0];
+        assert_eq!(
+            section.properties.break_type,
+            crate::SectionBreakType::EvenPage
+        );
+        assert_eq!(section.properties.page_width, 10000);
+        assert_eq!(section.properties.page_height, 14000);
+        assert_eq!(section.properties.margin_left, 900);
+        assert_eq!(section.properties.margin_right, 800);
+        assert_eq!(section.properties.margin_top, 700);
+        assert_eq!(section.properties.margin_bottom, 600);
+        assert_eq!(section.properties.margin_gutter, 120);
+        assert_eq!(section.properties.header_distance, 300);
+        assert_eq!(section.properties.footer_distance, 400);
+        assert_eq!(
+            section.properties.orientation,
+            crate::PageOrientation::Landscape
+        );
+        assert_eq!(section.properties.columns, 2);
+        assert_eq!(section.properties.column_space, 360);
+        assert_eq!(section.properties.page_number_start, 5);
+        assert_eq!(
+            section.properties.page_number_format,
+            crate::PageNumberFormat::UpperRoman
+        );
+        assert_eq!(
+            section.properties.vertical_alignment,
+            crate::VerticalAlignment::Center
+        );
+        assert!(section.properties.line_numbering);
+        assert!(section.properties.line_number_restart);
         assert_eq!(
             section
                 .get_header(super::super::section::HeaderFooterType::Header)

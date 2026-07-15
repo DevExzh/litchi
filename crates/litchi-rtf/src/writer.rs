@@ -97,6 +97,12 @@ impl<W: Write> RtfWriter<W> {
 
     /// Write a complete RTF document
     pub fn write_document<'a>(&mut self, doc: &RtfDocument<'a>) -> io::Result<()> {
+        if doc.sections().len() > 1 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "RTF document model does not retain body boundaries for multiple sections",
+            ));
+        }
         // Collect font and color tables from document by cloning them
         // We need to convert the lifetime to 'static for storage
         let font_table: FontTable<'static> = FontTable {
@@ -1145,6 +1151,14 @@ impl<W: Write> RtfWriter<W> {
         // Write section properties
         self.write_control_word("sectd", None)?;
 
+        match section.properties.break_type {
+            SectionBreakType::Continuous => self.write_control_word("sbknone", None)?,
+            SectionBreakType::Column => self.write_control_word("sbkcol", None)?,
+            SectionBreakType::Page => self.write_control_word("sbkpage", None)?,
+            SectionBreakType::EvenPage => self.write_control_word("sbkeven", None)?,
+            SectionBreakType::OddPage => self.write_control_word("sbkodd", None)?,
+        }
+
         // Page size
         self.write_control_word("pgwsxn", Some(section.properties.page_width))?;
         self.write_control_word("pghsxn", Some(section.properties.page_height))?;
@@ -1154,10 +1168,48 @@ impl<W: Write> RtfWriter<W> {
         self.write_control_word("margrsxn", Some(section.properties.margin_right))?;
         self.write_control_word("margtsxn", Some(section.properties.margin_top))?;
         self.write_control_word("margbsxn", Some(section.properties.margin_bottom))?;
+        self.write_control_word("guttersxn", Some(section.properties.margin_gutter))?;
 
         // Header/footer distance
         self.write_control_word("headery", Some(section.properties.header_distance))?;
         self.write_control_word("footery", Some(section.properties.footer_distance))?;
+
+        if section.properties.orientation == PageOrientation::Landscape {
+            self.write_control_word("lndscpsxn", None)?;
+        }
+        self.write_control_word("cols", Some(i32::from(section.properties.columns)))?;
+        self.write_control_word("colsx", Some(section.properties.column_space))?;
+        self.write_control_word("pgnstarts", Some(section.properties.page_number_start))?;
+        self.write_control_word(
+            match section.properties.page_number_format {
+                PageNumberFormat::Decimal => "pgndec",
+                PageNumberFormat::UpperRoman => "pgnucrm",
+                PageNumberFormat::LowerRoman => "pgnlcrm",
+                PageNumberFormat::UpperLetter => "pgnucltr",
+                PageNumberFormat::LowerLetter => "pgnlcltr",
+            },
+            None,
+        )?;
+        self.write_control_word(
+            match section.properties.vertical_alignment {
+                VerticalAlignment::Top => "vertalt",
+                VerticalAlignment::Center => "vertalc",
+                VerticalAlignment::Justify => "vertalj",
+                VerticalAlignment::Bottom => "vertalb",
+            },
+            None,
+        )?;
+        if section.properties.line_numbering {
+            self.write_control_word("linemod", Some(1))?;
+            self.write_control_word(
+                if section.properties.line_number_restart {
+                    "lineppage"
+                } else {
+                    "linecont"
+                },
+                None,
+            )?;
+        }
 
         // Write all headers and footers for this section
         for hf in &section.headers_footers {
@@ -1288,7 +1340,7 @@ mod tests {
     #[test]
     fn document_writer_round_trips_headers_and_footers() {
         let document = RtfDocument::parse(
-            r#"{\rtf1\ansi{\header Header \u20320? one\par Header two}{\footer Footer}Body}"#,
+            r#"{\rtf1\ansi\sectd\sbkodd\pgwsxn11000\pghsxn15000\marglsxn910\margrsxn810\margtsxn710\margbsxn610\guttersxn130\headery310\footery410\lndscpsxn\cols3\colsx370\pgnstarts6\pgnlcltr\vertalb\linemod1\lineppage{\header Header \u20320? one\par Header two}{\footer Footer}Body}"#,
         )
         .unwrap();
         let mut output = Vec::new();
@@ -1300,6 +1352,7 @@ mod tests {
         assert_eq!(reparsed.text(), "Body");
         assert_eq!(reparsed.sections().len(), 1);
         let section = &reparsed.sections()[0];
+        assert_eq!(section.properties, document.sections()[0].properties);
         assert_eq!(
             section.get_header(HeaderFooterType::Header).unwrap().text(),
             "Header 你 one\nHeader two"
@@ -1308,5 +1361,17 @@ mod tests {
             section.get_header(HeaderFooterType::Footer).unwrap().text(),
             "Footer"
         );
+    }
+
+    #[test]
+    fn document_writer_rejects_ambiguous_multiple_sections() {
+        let document =
+            RtfDocument::parse(r#"{\rtf1\sectd{\header First}One\sect\sectd{\header Second}Two}"#)
+                .unwrap();
+        assert_eq!(document.sections().len(), 2);
+        let error = RtfWriter::new(Vec::new())
+            .write_document(&document)
+            .unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
     }
 }

@@ -86,6 +86,7 @@ const MAX_BOOKMARKS: usize = 65_536;
 const MAX_BOOKMARK_NAME_BYTES: usize = 65_536;
 const MAX_ANNOTATIONS: usize = 65_536;
 const MAX_ANNOTATION_TEXT_BYTES: usize = 4 * 1_048_576;
+const MAX_SECTIONS: usize = 4_096;
 
 struct OpenBookmark {
     name: String,
@@ -168,6 +169,8 @@ pub struct Parser<'a> {
     list_override_table: super::list::ListOverrideTable,
     /// Sections
     sections: Vec<super::section::Section<'a>>,
+    /// Whether section-specific properties are currently active.
+    section_properties_active: bool,
     /// Bookmarks
     bookmarks: super::bookmark::BookmarkTable<'a>,
     /// Open bookmark ranges, indexed by name.
@@ -227,6 +230,7 @@ impl<'a> Parser<'a> {
             list_table: super::list::ListTable::new(),
             list_override_table: super::list::ListOverrideTable::new(),
             sections: Vec::new(),
+            section_properties_active: false,
             bookmarks: super::bookmark::BookmarkTable::new(),
             open_bookmarks: HashMap::new(),
             bookmark_spans: Vec::new(),
@@ -675,6 +679,9 @@ impl<'a> Parser<'a> {
 
     /// Apply a control word to the current state.
     fn apply_control_word(&mut self, control: &ControlWord) -> RtfResult<()> {
+        if self.apply_section_control(control)? {
+            return Ok(());
+        }
         let state = self.current_state_mut()?;
 
         match control {
@@ -820,6 +827,130 @@ impl<'a> Parser<'a> {
         }
 
         Ok(())
+    }
+
+    fn apply_section_control(&mut self, control: &ControlWord<'_>) -> RtfResult<bool> {
+        use super::section::{
+            PageNumberFormat, PageOrientation, SectionBreakType, VerticalAlignment,
+        };
+
+        if matches!(control, ControlWord::Section) {
+            self.section_properties_active = false;
+            return Ok(true);
+        }
+        let is_section_control = matches!(
+            control,
+            ControlWord::SectionDefault
+                | ControlWord::SectionBreak
+                | ControlWord::SectionContinuous
+                | ControlWord::SectionColumn
+                | ControlWord::SectionPage
+                | ControlWord::SectionEvenPage
+                | ControlWord::SectionOddPage
+                | ControlWord::PageWidth(_)
+                | ControlWord::PageHeight(_)
+                | ControlWord::MarginLeft(_)
+                | ControlWord::MarginRight(_)
+                | ControlWord::MarginTop(_)
+                | ControlWord::MarginBottom(_)
+                | ControlWord::MarginGutter(_)
+                | ControlWord::HeaderDistance(_)
+                | ControlWord::FooterDistance(_)
+                | ControlWord::Landscape
+                | ControlWord::Columns(_)
+                | ControlWord::ColumnSpace(_)
+                | ControlWord::PageNumberStart(_)
+                | ControlWord::PageNumberDecimal
+                | ControlWord::PageNumberUpperRoman
+                | ControlWord::PageNumberLowerRoman
+                | ControlWord::PageNumberUpperLetter
+                | ControlWord::PageNumberLowerLetter
+                | ControlWord::VerticalAlignTop
+                | ControlWord::VerticalAlignCenter
+                | ControlWord::VerticalAlignJustify
+                | ControlWord::VerticalAlignBottom
+                | ControlWord::LineNumbering(_)
+                | ControlWord::LineNumberRestartPage
+                | ControlWord::LineNumberContinuous
+        );
+        if !is_section_control {
+            return Ok(false);
+        }
+
+        if !self.section_properties_active {
+            if self.sections.len() >= MAX_SECTIONS {
+                return Err(RtfError::MalformedDocument(
+                    "RTF section count exceeds the safety limit".to_string(),
+                ));
+            }
+            self.sections.push(super::section::Section::new());
+            self.section_properties_active = true;
+        }
+        let section = self.sections.last_mut().ok_or_else(|| {
+            RtfError::ParserError("failed to create RTF section state".to_string())
+        })?;
+        let properties = &mut section.properties;
+        match control {
+            ControlWord::SectionDefault => {
+                *properties = super::section::SectionProperties::default();
+            },
+            ControlWord::SectionBreak | ControlWord::SectionPage => {
+                properties.break_type = SectionBreakType::Page;
+            },
+            ControlWord::SectionContinuous => {
+                properties.break_type = SectionBreakType::Continuous;
+            },
+            ControlWord::SectionColumn => properties.break_type = SectionBreakType::Column,
+            ControlWord::SectionEvenPage => properties.break_type = SectionBreakType::EvenPage,
+            ControlWord::SectionOddPage => properties.break_type = SectionBreakType::OddPage,
+            ControlWord::PageWidth(value) => properties.page_width = *value,
+            ControlWord::PageHeight(value) => properties.page_height = *value,
+            ControlWord::MarginLeft(value) => properties.margin_left = *value,
+            ControlWord::MarginRight(value) => properties.margin_right = *value,
+            ControlWord::MarginTop(value) => properties.margin_top = *value,
+            ControlWord::MarginBottom(value) => properties.margin_bottom = *value,
+            ControlWord::MarginGutter(value) => properties.margin_gutter = *value,
+            ControlWord::HeaderDistance(value) => properties.header_distance = *value,
+            ControlWord::FooterDistance(value) => properties.footer_distance = *value,
+            ControlWord::Landscape => properties.orientation = PageOrientation::Landscape,
+            ControlWord::Columns(value) => {
+                properties.columns = (*value).clamp(1, i32::from(u16::MAX)) as u16;
+            },
+            ControlWord::ColumnSpace(value) => properties.column_space = *value,
+            ControlWord::PageNumberStart(value) => properties.page_number_start = *value,
+            ControlWord::PageNumberDecimal => {
+                properties.page_number_format = PageNumberFormat::Decimal;
+            },
+            ControlWord::PageNumberUpperRoman => {
+                properties.page_number_format = PageNumberFormat::UpperRoman;
+            },
+            ControlWord::PageNumberLowerRoman => {
+                properties.page_number_format = PageNumberFormat::LowerRoman;
+            },
+            ControlWord::PageNumberUpperLetter => {
+                properties.page_number_format = PageNumberFormat::UpperLetter;
+            },
+            ControlWord::PageNumberLowerLetter => {
+                properties.page_number_format = PageNumberFormat::LowerLetter;
+            },
+            ControlWord::VerticalAlignTop => {
+                properties.vertical_alignment = VerticalAlignment::Top;
+            },
+            ControlWord::VerticalAlignCenter => {
+                properties.vertical_alignment = VerticalAlignment::Center;
+            },
+            ControlWord::VerticalAlignJustify => {
+                properties.vertical_alignment = VerticalAlignment::Justify;
+            },
+            ControlWord::VerticalAlignBottom => {
+                properties.vertical_alignment = VerticalAlignment::Bottom;
+            },
+            ControlWord::LineNumbering(value) => properties.line_numbering = *value > 0,
+            ControlWord::LineNumberRestartPage => properties.line_number_restart = true,
+            ControlWord::LineNumberContinuous => properties.line_number_restart = false,
+            _ => {},
+        }
+        Ok(true)
     }
 
     /// Parse font table.
