@@ -52,8 +52,9 @@ const TEXT_BOX_DUPLICATE_OFFSET: f32 = 12.0;
 
 pub use document_options::PagesDocumentOptions;
 pub use types::{
-    PagesDrawableTextInfo, PagesHeaderFooterInfo, PagesHeaderFooterKind, PagesPageLayout,
-    PagesPageNumber, PagesPageOrientation, PagesRgbColorSpace, PagesRgbaColor,
+    PagesDrawableTextInfo, PagesFootnoteFormat, PagesFootnoteGap, PagesFootnoteKind,
+    PagesFootnoteNumbering, PagesFootnoteSettings, PagesHeaderFooterInfo, PagesHeaderFooterKind,
+    PagesPageLayout, PagesPageNumber, PagesPageOrientation, PagesRgbColorSpace, PagesRgbaColor,
     PagesSectionBackground, PagesSectionInfo, PagesSectionPageNumbering, PagesSectionSettings,
     PagesSectionStart, PagesTemplateKind, RemovedPagesTextBox,
 };
@@ -2598,6 +2599,7 @@ fn insert_unique<T>(
 }
 
 mod document_options;
+mod footnote_settings;
 mod page_layout;
 mod section_background;
 mod section_content;

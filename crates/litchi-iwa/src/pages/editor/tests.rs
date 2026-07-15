@@ -35,8 +35,40 @@ fn pages_native_discriminants_are_typed_and_lossless() {
         assert_eq!(PagesPageOrientation::from_raw(raw), value);
         assert_eq!(value.as_raw(), raw);
     }
+    for (raw, value) in [
+        (0, PagesFootnoteKind::Footnotes),
+        (1, PagesFootnoteKind::DocumentEndnotes),
+        (2, PagesFootnoteKind::SectionEndnotes),
+        (7, PagesFootnoteKind::Unknown(7)),
+    ] {
+        assert_eq!(PagesFootnoteKind::from_raw(raw), value);
+        assert_eq!(value.as_raw(), raw);
+    }
+    for (raw, value) in [
+        (0, PagesFootnoteFormat::Numeric),
+        (1, PagesFootnoteFormat::Roman),
+        (2, PagesFootnoteFormat::Symbolic),
+        (3, PagesFootnoteFormat::JapaneseNumeric),
+        (4, PagesFootnoteFormat::JapaneseIdeographic),
+        (5, PagesFootnoteFormat::ArabicNumeric),
+        (8, PagesFootnoteFormat::Unknown(8)),
+    ] {
+        assert_eq!(PagesFootnoteFormat::from_raw(raw), value);
+        assert_eq!(value.as_raw(), raw);
+    }
+    for (raw, value) in [
+        (0, PagesFootnoteNumbering::Continuous),
+        (1, PagesFootnoteNumbering::RestartEachPage),
+        (2, PagesFootnoteNumbering::RestartEachSection),
+        (9, PagesFootnoteNumbering::Unknown(9)),
+    ] {
+        assert_eq!(PagesFootnoteNumbering::from_raw(raw), value);
+        assert_eq!(value.as_raw(), raw);
+    }
     assert!(PagesPageNumber::new(0).is_err());
     assert_eq!(PagesPageNumber::new(42).unwrap().get(), 42);
+    assert_eq!(PagesFootnoteGap::new(14).unwrap().points(), 14);
+    assert!(PagesFootnoteGap::new(u32::MAX).is_err());
 }
 
 #[test]
@@ -250,6 +282,107 @@ fn document_options_update_and_restore_native_presence_exactly() {
     assert_eq!(editor.document_options().unwrap(), changed);
     editor.set_document_options(native).unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
+}
+
+#[test]
+fn footnote_settings_crud_is_lossless_transactional_and_wire_exact() {
+    let baseline_settings = PagesFootnoteSettings {
+        kind: Some(PagesFootnoteKind::Footnotes),
+        format: Some(PagesFootnoteFormat::Numeric),
+        numbering: Some(PagesFootnoteNumbering::Continuous),
+        gap: Some(PagesFootnoteGap::new(10).unwrap()),
+    };
+    let mut data = tp::SettingsArchive {
+        language: Some("en".to_owned()),
+        footnote_kind: Some(0),
+        footnote_format: Some(0),
+        footnote_numbering: Some(0),
+        footnote_gap: Some(10),
+        ..Default::default()
+    }
+    .encode_to_vec();
+    let unknown = append_unknown_varint(&mut data, 99, 990);
+    let mut editor = PagesEditor::from_package(test_package_with_settings(data)).unwrap();
+    let baseline = editor.to_bytes().unwrap();
+    assert_eq!(editor.footnote_settings().unwrap(), baseline_settings);
+
+    let changed = PagesFootnoteSettings {
+        kind: Some(PagesFootnoteKind::DocumentEndnotes),
+        format: Some(PagesFootnoteFormat::Symbolic),
+        numbering: Some(PagesFootnoteNumbering::RestartEachSection),
+        gap: Some(PagesFootnoteGap::new(14).unwrap()),
+    };
+    editor.set_footnote_settings(changed).unwrap();
+    assert_eq!(editor.footnote_settings().unwrap(), changed);
+
+    let archive = editor.package().archive("Index/Document.iwa").unwrap();
+    let payload = &archive.object(43).unwrap().messages[0].data;
+    let native = tp::SettingsArchive::decode(payload.as_slice()).unwrap();
+    assert_eq!(native.language.as_deref(), Some("en"));
+    assert_eq!(native.footnote_kind, Some(1));
+    assert_eq!(native.footnote_format, Some(2));
+    assert_eq!(native.footnote_numbering, Some(2));
+    assert_eq!(native.footnote_gap, Some(14));
+    assert_eq!(
+        payload
+            .windows(unknown.len())
+            .filter(|window| *window == unknown)
+            .count(),
+        1
+    );
+
+    let changed_bytes = editor.to_bytes().unwrap();
+    let reparsed = PagesEditor::from_bytes(&changed_bytes).unwrap();
+    assert_eq!(reparsed.footnote_settings().unwrap(), changed);
+    editor.set_footnote_settings(changed).unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), changed_bytes);
+
+    editor.set_footnote_settings(baseline_settings).unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+}
+
+#[test]
+fn footnote_settings_reject_invalid_input_and_malformed_wire_transactionally() {
+    let mut duplicated_data = tp::SettingsArchive::default().encode_to_vec();
+    append_unknown_varint(&mut duplicated_data, 30, 0);
+    append_unknown_varint(&mut duplicated_data, 30, 1);
+    let mut duplicated =
+        PagesEditor::from_package(test_package_with_settings(duplicated_data)).unwrap();
+    let duplicated_before = duplicated.to_bytes().unwrap();
+    assert!(duplicated.footnote_settings().is_err());
+    assert!(
+        duplicated
+            .set_footnote_settings(PagesFootnoteSettings::default())
+            .is_err()
+    );
+    assert_eq!(duplicated.to_bytes().unwrap(), duplicated_before);
+
+    let negative_gap_data = tp::SettingsArchive {
+        footnote_gap: Some(-1),
+        ..Default::default()
+    }
+    .encode_to_vec();
+    let mut negative_gap =
+        PagesEditor::from_package(test_package_with_settings(negative_gap_data)).unwrap();
+    let negative_before = negative_gap.to_bytes().unwrap();
+    assert!(negative_gap.footnote_settings().is_err());
+    assert!(
+        negative_gap
+            .set_footnote_settings(PagesFootnoteSettings::default())
+            .is_err()
+    );
+    assert_eq!(negative_gap.to_bytes().unwrap(), negative_before);
+
+    let mut editor = PagesEditor::from_package(test_package("Body")).unwrap();
+    let before = editor.to_bytes().unwrap();
+    let invalid = PagesFootnoteSettings {
+        kind: Some(PagesFootnoteKind::Unknown(0)),
+        format: Some(PagesFootnoteFormat::Unknown(2)),
+        numbering: Some(PagesFootnoteNumbering::Unknown(1)),
+        gap: None,
+    };
+    assert!(editor.set_footnote_settings(invalid).is_err());
+    assert_eq!(editor.to_bytes().unwrap(), before);
 }
 
 #[test]

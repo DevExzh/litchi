@@ -9,7 +9,7 @@ mod wire;
 use wire::{read_document_options_wire, write_document_options_wire};
 
 const SETTINGS_REFERENCE_FIELD: u32 = 7;
-const SETTINGS_MESSAGE_TYPE: u32 = 10_012;
+pub(super) const SETTINGS_MESSAGE_TYPE: u32 = 10_012;
 
 /// Lossless options exposed by Pages' Document formatter.
 ///
@@ -115,13 +115,15 @@ impl PagesEditor {
     }
 }
 
-struct SettingsLocation {
-    identifier: u64,
-    archive_name: String,
+pub(super) struct SettingsLocation {
+    pub(super) identifier: u64,
+    pub(super) archive_name: String,
+    pub(super) data: Vec<u8>,
+    pub(super) settings: SettingsArchive,
     options: PagesDocumentOptions,
 }
 
-fn locate_settings(package: &IWorkPackage) -> Result<SettingsLocation> {
+pub(super) fn locate_settings(package: &IWorkPackage) -> Result<SettingsLocation> {
     let identifier = settings_identifier(package)?;
     let mut found = None;
     for archive_name in package.iwa_entry_names() {
@@ -141,6 +143,8 @@ fn locate_settings(package: &IWorkPackage) -> Result<SettingsLocation> {
         found = Some(SettingsLocation {
             identifier,
             archive_name: archive_name.to_owned(),
+            data: original.to_vec(),
+            settings,
             options,
         });
     }
@@ -185,7 +189,7 @@ fn settings_identifier(package: &IWorkPackage) -> Result<u64> {
     Ok(reference.identifier)
 }
 
-fn settings_message_index(object: &ArchiveObject, identifier: u64) -> Result<usize> {
+pub(super) fn settings_message_index(object: &ArchiveObject, identifier: u64) -> Result<usize> {
     let matches = object
         .messages
         .iter()

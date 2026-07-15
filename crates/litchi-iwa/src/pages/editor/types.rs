@@ -13,6 +13,18 @@ const RAW_PAGE_NUMBERING_CONTINUE: u32 = 0;
 const RAW_PAGE_NUMBERING_RESTART: u32 = 1;
 const RAW_PAGE_ORIENTATION_PORTRAIT: u32 = 0;
 const RAW_PAGE_ORIENTATION_LANDSCAPE: u32 = 1;
+const RAW_FOOTNOTE_KIND_FOOTNOTES: i32 = 0;
+const RAW_FOOTNOTE_KIND_DOCUMENT_ENDNOTES: i32 = 1;
+const RAW_FOOTNOTE_KIND_SECTION_ENDNOTES: i32 = 2;
+const RAW_FOOTNOTE_FORMAT_NUMERIC: i32 = 0;
+const RAW_FOOTNOTE_FORMAT_ROMAN: i32 = 1;
+const RAW_FOOTNOTE_FORMAT_SYMBOLIC: i32 = 2;
+const RAW_FOOTNOTE_FORMAT_JAPANESE_NUMERIC: i32 = 3;
+const RAW_FOOTNOTE_FORMAT_JAPANESE_IDEOGRAPHIC: i32 = 4;
+const RAW_FOOTNOTE_FORMAT_ARABIC_NUMERIC: i32 = 5;
+const RAW_FOOTNOTE_NUMBERING_CONTINUOUS: i32 = 0;
+const RAW_FOOTNOTE_NUMBERING_RESTART_EACH_PAGE: i32 = 1;
+const RAW_FOOTNOTE_NUMBERING_RESTART_EACH_SECTION: i32 = 2;
 
 /// Which page variant owns a Pages header/footer storage.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -176,6 +188,175 @@ impl From<PagesPageNumber> for u32 {
     fn from(value: PagesPageNumber) -> Self {
         value.get()
     }
+}
+
+/// Where Pages places notes belonging to the document body.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PagesFootnoteKind {
+    Footnotes,
+    DocumentEndnotes,
+    SectionEndnotes,
+    /// A value written by a newer Pages version.
+    Unknown(i32),
+}
+
+impl PagesFootnoteKind {
+    /// Decode the lossless protobuf representation.
+    pub const fn from_raw(raw: i32) -> Self {
+        match raw {
+            RAW_FOOTNOTE_KIND_FOOTNOTES => Self::Footnotes,
+            RAW_FOOTNOTE_KIND_DOCUMENT_ENDNOTES => Self::DocumentEndnotes,
+            RAW_FOOTNOTE_KIND_SECTION_ENDNOTES => Self::SectionEndnotes,
+            unknown => Self::Unknown(unknown),
+        }
+    }
+
+    /// Return the lossless protobuf representation.
+    pub const fn as_raw(self) -> i32 {
+        match self {
+            Self::Footnotes => RAW_FOOTNOTE_KIND_FOOTNOTES,
+            Self::DocumentEndnotes => RAW_FOOTNOTE_KIND_DOCUMENT_ENDNOTES,
+            Self::SectionEndnotes => RAW_FOOTNOTE_KIND_SECTION_ENDNOTES,
+            Self::Unknown(raw) => raw,
+        }
+    }
+
+    pub(super) const fn is_canonical(self) -> bool {
+        match self {
+            Self::Unknown(raw) => matches!(Self::from_raw(raw), Self::Unknown(_)),
+            _ => true,
+        }
+    }
+}
+
+/// Marker sequence used for Pages footnotes and endnotes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PagesFootnoteFormat {
+    Numeric,
+    Roman,
+    Symbolic,
+    JapaneseNumeric,
+    JapaneseIdeographic,
+    ArabicNumeric,
+    /// A value written by a newer Pages version.
+    Unknown(i32),
+}
+
+impl PagesFootnoteFormat {
+    /// Decode the lossless protobuf representation.
+    pub const fn from_raw(raw: i32) -> Self {
+        match raw {
+            RAW_FOOTNOTE_FORMAT_NUMERIC => Self::Numeric,
+            RAW_FOOTNOTE_FORMAT_ROMAN => Self::Roman,
+            RAW_FOOTNOTE_FORMAT_SYMBOLIC => Self::Symbolic,
+            RAW_FOOTNOTE_FORMAT_JAPANESE_NUMERIC => Self::JapaneseNumeric,
+            RAW_FOOTNOTE_FORMAT_JAPANESE_IDEOGRAPHIC => Self::JapaneseIdeographic,
+            RAW_FOOTNOTE_FORMAT_ARABIC_NUMERIC => Self::ArabicNumeric,
+            unknown => Self::Unknown(unknown),
+        }
+    }
+
+    /// Return the lossless protobuf representation.
+    pub const fn as_raw(self) -> i32 {
+        match self {
+            Self::Numeric => RAW_FOOTNOTE_FORMAT_NUMERIC,
+            Self::Roman => RAW_FOOTNOTE_FORMAT_ROMAN,
+            Self::Symbolic => RAW_FOOTNOTE_FORMAT_SYMBOLIC,
+            Self::JapaneseNumeric => RAW_FOOTNOTE_FORMAT_JAPANESE_NUMERIC,
+            Self::JapaneseIdeographic => RAW_FOOTNOTE_FORMAT_JAPANESE_IDEOGRAPHIC,
+            Self::ArabicNumeric => RAW_FOOTNOTE_FORMAT_ARABIC_NUMERIC,
+            Self::Unknown(raw) => raw,
+        }
+    }
+
+    pub(super) const fn is_canonical(self) -> bool {
+        match self {
+            Self::Unknown(raw) => matches!(Self::from_raw(raw), Self::Unknown(_)),
+            _ => true,
+        }
+    }
+}
+
+/// How Pages restarts footnote or endnote numbering.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PagesFootnoteNumbering {
+    Continuous,
+    RestartEachPage,
+    RestartEachSection,
+    /// A value written by a newer Pages version.
+    Unknown(i32),
+}
+
+impl PagesFootnoteNumbering {
+    /// Decode the lossless protobuf representation.
+    pub const fn from_raw(raw: i32) -> Self {
+        match raw {
+            RAW_FOOTNOTE_NUMBERING_CONTINUOUS => Self::Continuous,
+            RAW_FOOTNOTE_NUMBERING_RESTART_EACH_PAGE => Self::RestartEachPage,
+            RAW_FOOTNOTE_NUMBERING_RESTART_EACH_SECTION => Self::RestartEachSection,
+            unknown => Self::Unknown(unknown),
+        }
+    }
+
+    /// Return the lossless protobuf representation.
+    pub const fn as_raw(self) -> i32 {
+        match self {
+            Self::Continuous => RAW_FOOTNOTE_NUMBERING_CONTINUOUS,
+            Self::RestartEachPage => RAW_FOOTNOTE_NUMBERING_RESTART_EACH_PAGE,
+            Self::RestartEachSection => RAW_FOOTNOTE_NUMBERING_RESTART_EACH_SECTION,
+            Self::Unknown(raw) => raw,
+        }
+    }
+
+    pub(super) const fn is_canonical(self) -> bool {
+        match self {
+            Self::Unknown(raw) => matches!(Self::from_raw(raw), Self::Unknown(_)),
+            _ => true,
+        }
+    }
+}
+
+/// Validated spacing between Pages footnotes or endnotes, in whole points.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct PagesFootnoteGap(u32);
+
+impl PagesFootnoteGap {
+    /// Validate and construct a note gap.
+    pub fn new(points: u32) -> Result<Self> {
+        i32::try_from(points).map(|_| Self(points)).map_err(|_| {
+            Error::ParseError(
+                "Pages footnote gap exceeds the native signed integer range".to_owned(),
+            )
+        })
+    }
+
+    /// Return the gap in whole points.
+    pub const fn points(self) -> u32 {
+        self.0
+    }
+}
+
+impl TryFrom<u32> for PagesFootnoteGap {
+    type Error = Error;
+
+    fn try_from(value: u32) -> Result<Self> {
+        Self::new(value)
+    }
+}
+
+impl From<PagesFootnoteGap> for u32 {
+    fn from(value: PagesFootnoteGap) -> Self {
+        value.points()
+    }
+}
+
+/// Lossless settings shown by Pages' Footnotes formatter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct PagesFootnoteSettings {
+    pub kind: Option<PagesFootnoteKind>,
+    pub format: Option<PagesFootnoteFormat>,
+    pub numbering: Option<PagesFootnoteNumbering>,
+    pub gap: Option<PagesFootnoteGap>,
 }
 
 /// Writable settings stored directly on a Pages section.
