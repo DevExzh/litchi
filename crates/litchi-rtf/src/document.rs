@@ -858,6 +858,22 @@ mod tests {
     }
 
     #[test]
+    fn parses_real_background_shape_fixture_with_trailing_newline() {
+        let rtf = include_str!("../../../test-data/rtf/background.rtf");
+        let doc = RtfDocument::parse(rtf).unwrap();
+
+        assert_eq!(doc.shapes().len(), 2);
+        assert_eq!(doc.shapes()[0].geometry.x, 2633);
+        assert_eq!(doc.shapes()[0].geometry.width, 2220);
+        assert_eq!(doc.shapes()[1].geometry.x, 488);
+        assert_eq!(doc.shapes()[1].geometry.width, 1515);
+        assert_eq!(
+            doc.text(),
+            "First should be foreground, the second should be background.\n"
+        );
+    }
+
+    #[test]
     fn parses_complete_document_info_without_leaking_into_body() {
         let rtf = r#"{\rtf1\ansi\ansicpg1252
             {\info

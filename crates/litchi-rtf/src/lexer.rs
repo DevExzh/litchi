@@ -1034,7 +1034,11 @@ impl<'a> Lexer<'a> {
             // If we hit only whitespace/newlines, try to consume at least one whitespace
             // and return a space token, or skip to next token
             if self.pos >= self.input.len() {
-                return Err(RtfError::UnexpectedEof);
+                // Trailing physical line breaks are insignificant in RTF. Reaching EOF
+                // after consuming only those line breaks is a successful final token,
+                // not a truncated control word or escape.
+                let allocated = self.arena.alloc_str("");
+                return Ok(Token::Text(Cow::Borrowed(allocated)));
             }
             // Return empty text for now - parser will handle it
             let allocated = self.arena.alloc_str("");
@@ -1540,5 +1544,18 @@ mod tests {
         let mut lexer = Lexer::new(input, &arena);
         let tokens = lexer.tokenize().unwrap();
         assert!(matches!(tokens[0], Token::Binary(4)));
+    }
+
+    #[test]
+    fn test_tokenize_document_with_trailing_line_breaks() {
+        let arena = Bump::new();
+        let mut lexer = Lexer::new("{\\rtf1 body}\r\n", &arena);
+        let tokens = lexer.tokenize().unwrap();
+
+        assert!(matches!(tokens.last(), Some(Token::Text(text)) if text.is_empty()));
+        assert!(matches!(
+            tokens.get(tokens.len().saturating_sub(2)),
+            Some(Token::CloseBrace)
+        ));
     }
 }
