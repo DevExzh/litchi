@@ -784,7 +784,37 @@ impl ParagraphProperties {
         direct_sprms: &[u8],
         stylesheet: &StyleSheet,
     ) -> Result<Self> {
-        let mut current = Self::paragraph_style_baseline(initial_style_index, stylesheet)?;
+        Self::cascade_styles_on_baseline(
+            &Self::default(),
+            initial_style_index,
+            direct_sprms,
+            stylesheet,
+        )
+    }
+
+    pub(crate) fn cascade_table_style(
+        table_style_sprms: &[u8],
+        initial_style_index: Option<u16>,
+        direct_sprms: &[u8],
+        stylesheet: &StyleSheet,
+    ) -> Result<Self> {
+        let table_baseline = Self::from_sprm(table_style_sprms)?;
+        Self::cascade_styles_on_baseline(
+            &table_baseline,
+            initial_style_index,
+            direct_sprms,
+            stylesheet,
+        )
+    }
+
+    fn cascade_styles_on_baseline(
+        baseline: &Self,
+        initial_style_index: Option<u16>,
+        direct_sprms: &[u8],
+        stylesheet: &StyleSheet,
+    ) -> Result<Self> {
+        let mut current =
+            Self::paragraph_style_on_baseline(baseline, initial_style_index, stylesheet)?;
         let sprms = parse_sprms(direct_sprms);
         let consumed = sprms.last().map_or(0, |sprm| sprm.offset + sprm.size);
         if consumed != direct_sprms.len() {
@@ -806,7 +836,8 @@ impl ParagraphProperties {
                 None
             };
             if let Some(requested) = requested_style {
-                let mut styled = Self::paragraph_style_baseline(Some(requested), stylesheet)?;
+                let mut styled =
+                    Self::paragraph_style_on_baseline(baseline, Some(requested), stylesheet)?;
                 styled.style_index = Some(requested);
                 Self::preserve_style_state(&current, &mut styled);
                 current = styled;
@@ -827,17 +858,24 @@ impl ParagraphProperties {
         Ok(current)
     }
 
-    fn paragraph_style_baseline(style_index: Option<u16>, stylesheet: &StyleSheet) -> Result<Self> {
+    fn paragraph_style_on_baseline(
+        baseline: &Self,
+        style_index: Option<u16>,
+        stylesheet: &StyleSheet,
+    ) -> Result<Self> {
         let Some(requested) = style_index else {
-            return Ok(Self::default());
+            return Ok(baseline.clone());
         };
         let (effective, paragraph, _) = stylesheet.resolve_paragraph_style_sprms(requested)?;
-        let mut baseline = Self::from_sprm(&paragraph)?;
-        baseline.style_index = Some(requested);
-        if effective.is_some() && (1..=9).contains(&requested) {
-            baseline.outline_level = Some((requested - 1) as u8);
+        let mut styled = baseline.clone();
+        for sprm in parse_sprms(&paragraph) {
+            Self::apply_sprm(&mut styled, &sprm)?;
         }
-        Ok(baseline)
+        styled.style_index = Some(requested);
+        if effective.is_some() && (1..=9).contains(&requested) {
+            styled.outline_level = Some((requested - 1) as u8);
+        }
+        Ok(styled)
     }
 
     fn preserve_style_state(previous: &Self, styled: &mut Self) {

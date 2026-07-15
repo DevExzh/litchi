@@ -8,6 +8,7 @@ use super::chp_bin_table::ChpBinTable;
 use super::pap::ParagraphProperties;
 use super::pap_bin_table::PapBinTable;
 use super::styles::StyleSheet;
+use super::tap::{TableLookFlags, TableStyleCondition};
 use crate::sprm::parse_sprms;
 use crate::sprm_operations::{SPRM_C_ISTD, get_sprm_type};
 use std::sync::Arc;
@@ -18,6 +19,12 @@ pub(crate) type ExtractedParagraph = (
     ParagraphProperties,
     Vec<(String, CharacterProperties)>,
 );
+
+#[derive(Debug)]
+struct TableTextContext {
+    style_index: u16,
+    conditions: Vec<TableStyleCondition>,
+}
 
 /// Paragraph extractor using binary structures.
 ///
@@ -175,6 +182,32 @@ impl<'a> ParagraphExtractor<'a> {
                 .and_then(|table| table.properties_at(para_start))
                 .cloned()
                 .unwrap_or_default();
+            let table_context = self.table_text_context(para_start, &para_props);
+            let (table_papx, table_chpx) = if let (Some(stylesheet), Some(context)) =
+                (self.stylesheet, table_context.as_ref())
+            {
+                let (_, paragraph, character) = stylesheet
+                    .resolve_table_text_style_sprms_for_conditions(
+                        context.style_index,
+                        &context.conditions,
+                    )?;
+                (paragraph, character)
+            } else {
+                (Vec::new(), Vec::new())
+            };
+            if let (Some(stylesheet), Some(paragraph_run)) = (
+                self.stylesheet,
+                self.pap_bin_table
+                    .and_then(|table| table.run_at(para_start)),
+            ) && !table_papx.is_empty()
+            {
+                para_props = ParagraphProperties::cascade_table_style(
+                    &table_papx,
+                    paragraph_run.initial_style_index,
+                    &paragraph_run.direct_grpprl,
+                    stylesheet,
+                )?;
+            }
             para_props.is_table_cell_end = terminator == "\u{7}";
 
             // Extract character runs within this paragraph (excluding the CR)
@@ -183,14 +216,19 @@ impl<'a> ParagraphExtractor<'a> {
             } else {
                 para_end
             };
-            let runs = self.extract_runs(para_start, para_text_end, para_props.style_index)?;
+            let runs = self.extract_runs(
+                para_start,
+                para_text_end,
+                para_props.style_index,
+                &table_chpx,
+            )?;
 
             paragraphs.push((para_text, para_props, runs));
         }
 
         // Fallback if no paragraphs were found
         if paragraphs.is_empty() && !self.text.is_empty() {
-            let runs = self.extract_runs(doc_start_cp, doc_end_cp, None)?;
+            let runs = self.extract_runs(doc_start_cp, doc_end_cp, None, &[])?;
             paragraphs.push((
                 self.text.as_ref().clone(),
                 ParagraphProperties::default(),
@@ -229,12 +267,177 @@ impl<'a> ParagraphExtractor<'a> {
         }
     }
 
+    fn table_text_context(
+        &self,
+        cp: u32,
+        properties: &ParagraphProperties,
+    ) -> Option<TableTextContext> {
+        if !properties.in_table {
+            return None;
+        }
+        let level = properties.table_nesting_level;
+        let table = self.pap_bin_table?;
+        let runs = table.runs();
+        let current = runs
+            .partition_point(|run| run.start_cp <= cp)
+            .checked_sub(1)?;
+        if cp >= runs.get(current)?.end_cp {
+            return None;
+        }
+
+        let mut table_start = current;
+        while table_start > 0 {
+            let candidate = &runs[table_start - 1].properties;
+            if !candidate.in_table || candidate.table_nesting_level < level {
+                break;
+            }
+            table_start -= 1;
+        }
+        let mut table_end = current + 1;
+        while let Some(run) = runs.get(table_end) {
+            if !run.properties.in_table || run.properties.table_nesting_level < level {
+                break;
+            }
+            table_end += 1;
+        }
+
+        let row_ends = (table_start..table_end)
+            .filter(|&index| {
+                let properties = &runs[index].properties;
+                properties.table_nesting_level == level && properties.is_table_row_end
+            })
+            .collect::<Vec<_>>();
+        let row_position = row_ends.iter().position(|&index| index >= current)?;
+        let row_end_index = row_ends[row_position];
+        let row_properties = runs[row_end_index].properties.table_properties.as_ref()?;
+        let style_index = row_properties.table_style_index?;
+        let Some(table_look) = row_properties.table_look else {
+            return Some(TableTextContext {
+                style_index,
+                conditions: Vec::new(),
+            });
+        };
+        let flags = table_look.flags;
+        let last_row = row_position + 1 == row_ends.len();
+        let header_row = row_position == 0 || row_properties.is_header_row;
+        let matches_header = flags.contains(TableLookFlags::HEADER_ROW) && header_row;
+        let matches_footer =
+            flags.contains(TableLookFlags::LAST_ROW) && last_row && !matches_header;
+
+        let row_start_cp = row_position
+            .checked_sub(1)
+            .map(|previous| runs[row_ends[previous]].end_cp)
+            .unwrap_or(runs[table_start].start_cp);
+        let mut cell_index = 0usize;
+        for marker_cp in row_start_cp..cp {
+            if self.extract_text_range(marker_cp, marker_cp + 1) != "\u{7}" {
+                continue;
+            }
+            if table
+                .properties_at(marker_cp)
+                .is_some_and(|marker| marker.table_nesting_level == level)
+            {
+                cell_index += 1;
+            }
+        }
+        let cell_count = row_properties.cell_count;
+        if cell_count == 0 || cell_index >= cell_count {
+            return Some(TableTextContext {
+                style_index,
+                conditions: Vec::new(),
+            });
+        }
+        let left_index = if row_properties.right_to_left {
+            cell_count - 1
+        } else {
+            0
+        };
+        let right_index = if row_properties.right_to_left {
+            0
+        } else {
+            cell_count - 1
+        };
+        let matches_left =
+            flags.contains(TableLookFlags::HEADER_COLUMN) && cell_index == left_index;
+        let matches_right = flags.contains(TableLookFlags::LAST_COLUMN)
+            && cell_index == right_index
+            && !matches_left;
+
+        let mut conditions = Vec::with_capacity(5);
+        if !matches_header && !matches_footer && !flags.contains(TableLookFlags::NO_ROW_BANDING) {
+            if let Some(size) = row_properties.style_defaults.horizontal_band_size {
+                let preceding = row_ends[..row_position]
+                    .iter()
+                    .filter(|&&index| {
+                        !flags.contains(TableLookFlags::HEADER_ROW)
+                            || !(index == row_ends[0]
+                                || runs[index]
+                                    .properties
+                                    .table_properties
+                                    .as_ref()
+                                    .is_some_and(|properties| properties.is_header_row))
+                    })
+                    .count();
+                conditions.push(if (preceding / usize::from(size)) % 2 == 0 {
+                    TableStyleCondition::OddRowBand
+                } else {
+                    TableStyleCondition::EvenRowBand
+                });
+            }
+        }
+        if !matches_left && !matches_right && !flags.contains(TableLookFlags::NO_COLUMN_BANDING) {
+            if let Some(size) = row_properties.style_defaults.vertical_band_size {
+                let logical_index = if row_properties.right_to_left {
+                    cell_count - 1 - cell_index
+                } else {
+                    cell_index
+                };
+                let preceding =
+                    if flags.contains(TableLookFlags::HEADER_COLUMN) && logical_index > 0 {
+                        logical_index - 1
+                    } else {
+                        logical_index
+                    };
+                conditions.push(if (preceding / usize::from(size)) % 2 == 0 {
+                    TableStyleCondition::OddColumnBand
+                } else {
+                    TableStyleCondition::EvenColumnBand
+                });
+            }
+        }
+        if matches_left {
+            conditions.push(TableStyleCondition::FirstColumn);
+        } else if matches_right {
+            conditions.push(TableStyleCondition::LastColumn);
+        }
+        if matches_header {
+            conditions.push(TableStyleCondition::HeaderRow);
+        } else if matches_footer {
+            conditions.push(TableStyleCondition::FooterRow);
+        }
+        if matches_header && matches_left {
+            conditions.push(TableStyleCondition::TopLeftCell);
+        } else if matches_header && matches_right {
+            conditions.push(TableStyleCondition::TopRightCell);
+        } else if matches_footer && matches_left {
+            conditions.push(TableStyleCondition::BottomLeftCell);
+        } else if matches_footer && matches_right {
+            conditions.push(TableStyleCondition::BottomRightCell);
+        }
+
+        Some(TableTextContext {
+            style_index,
+            conditions,
+        })
+    }
+
     /// Extract character runs (formatted text segments) within a paragraph.
     fn extract_runs(
         &self,
         para_start: u32,
         para_end: u32,
         paragraph_style_index: Option<u16>,
+        table_style_chpx: &[u8],
     ) -> Result<Vec<(String, CharacterProperties)>> {
         let mut runs = Vec::new();
         let paragraph_style_chpx = self
@@ -266,8 +469,9 @@ impl<'a> ParagraphExtractor<'a> {
                     continue;
                 }
 
-                let properties = cascade_character_properties(
+                let properties = cascade_character_properties_with_table(
                     self.stylesheet,
+                    table_style_chpx,
                     &paragraph_style_chpx,
                     &run.properties,
                     &run.direct_grpprl,
@@ -280,7 +484,13 @@ impl<'a> ParagraphExtractor<'a> {
         if runs.is_empty() {
             let para_text = self.extract_text_range(para_start, para_end);
             if !para_text.is_empty() {
-                let properties = CharacterProperties::from_sprm(&paragraph_style_chpx)?;
+                let properties = cascade_character_properties_with_table(
+                    self.stylesheet,
+                    table_style_chpx,
+                    &paragraph_style_chpx,
+                    &CharacterProperties::default(),
+                    &[],
+                )?;
                 runs.push((para_text, properties));
             }
         } else {
@@ -348,16 +558,36 @@ impl<'a> ParagraphExtractor<'a> {
     }
 }
 
+#[cfg(test)]
 pub(crate) fn cascade_character_properties(
     stylesheet: Option<&StyleSheet>,
     paragraph_style_chpx: &[u8],
     direct_properties: &CharacterProperties,
     direct_grpprl: &[u8],
 ) -> Result<CharacterProperties> {
-    if stylesheet.is_none() && paragraph_style_chpx.is_empty() {
+    cascade_character_properties_with_table(
+        stylesheet,
+        &[],
+        paragraph_style_chpx,
+        direct_properties,
+        direct_grpprl,
+    )
+}
+
+pub(crate) fn cascade_character_properties_with_table(
+    stylesheet: Option<&StyleSheet>,
+    table_style_chpx: &[u8],
+    paragraph_style_chpx: &[u8],
+    direct_properties: &CharacterProperties,
+    direct_grpprl: &[u8],
+) -> Result<CharacterProperties> {
+    if stylesheet.is_none() && table_style_chpx.is_empty() && paragraph_style_chpx.is_empty() {
         return Ok(direct_properties.clone());
     }
-    let paragraph_baseline = CharacterProperties::from_sprm(paragraph_style_chpx)?;
+    let mut paragraph_baseline = CharacterProperties::from_sprm(table_style_chpx)?;
+    for sprm in parse_sprms(paragraph_style_chpx) {
+        CharacterProperties::apply_sprm(&mut paragraph_baseline, &sprm)?;
+    }
     let mut current = paragraph_baseline.clone();
     let sprms = parse_sprms(direct_grpprl);
     let consumed = sprms.last().map_or(0, |sprm| sprm.offset + sprm.size);
@@ -428,7 +658,10 @@ fn preserve_character_style_state(
 
 #[cfg(test)]
 mod tests {
+    use super::super::pap_bin_table::ParagraphRun;
+    use super::super::tap::{TableLook, TableProperties, TableStyleDefaults};
     use super::*;
+    use crate::sprm_operations::{SPRM_C_F_BOLD, SPRM_C_F_ITALIC};
 
     #[test]
     fn consolidation_preserves_non_visual_character_metadata_boundaries() {
@@ -463,5 +696,141 @@ mod tests {
         assert!(paragraphs[0].1.is_table_cell_end);
         assert_eq!(paragraphs[1].0, "");
         assert!(paragraphs[1].1.is_table_cell_end);
+    }
+
+    #[test]
+    fn cascades_table_character_defaults_before_paragraph_and_direct_properties() {
+        let table = [SPRM_C_F_BOLD.to_le_bytes().as_slice(), &[1]].concat();
+        let paragraph = [SPRM_C_F_ITALIC.to_le_bytes().as_slice(), &[1]].concat();
+        let direct_grpprl = [SPRM_C_F_BOLD.to_le_bytes().as_slice(), &[0]].concat();
+        let direct = CharacterProperties::from_sprm(&direct_grpprl).unwrap();
+
+        let properties = cascade_character_properties_with_table(
+            None,
+            &table,
+            &paragraph,
+            &direct,
+            &direct_grpprl,
+        )
+        .unwrap();
+        assert_eq!(properties.is_bold, Some(false));
+        assert_eq!(properties.is_italic, Some(true));
+    }
+
+    #[test]
+    fn selects_table_text_conditions_in_specified_precedence() {
+        fn cell_properties() -> ParagraphProperties {
+            ParagraphProperties {
+                in_table: true,
+                table_nesting_level: 1,
+                ..ParagraphProperties::default()
+            }
+        }
+
+        fn row_end_properties() -> ParagraphProperties {
+            let table = TableProperties {
+                cell_count: 2,
+                style_defaults: TableStyleDefaults {
+                    horizontal_band_size: Some(1),
+                    vertical_band_size: Some(1),
+                    ..TableStyleDefaults::default()
+                },
+                table_style_index: Some(15),
+                table_look: Some(TableLook {
+                    autoformat_index: -1,
+                    flags: TableLookFlags::HEADER_ROW
+                        | TableLookFlags::LAST_ROW
+                        | TableLookFlags::HEADER_COLUMN
+                        | TableLookFlags::LAST_COLUMN,
+                }),
+                ..TableProperties::default()
+            };
+            ParagraphProperties {
+                in_table: true,
+                is_table_row_end: true,
+                table_nesting_level: 1,
+                table_properties: Some(table),
+                ..ParagraphProperties::default()
+            }
+        }
+
+        fn run(start_cp: u32, end_cp: u32, properties: ParagraphProperties) -> ParagraphRun {
+            ParagraphRun {
+                start_cp,
+                end_cp,
+                properties,
+                direct_grpprl: Vec::new(),
+                initial_style_index: None,
+                paragraph_height: None,
+            }
+        }
+
+        let table = PapBinTable::from_runs_for_test(vec![
+            run(0, 2, cell_properties()),
+            run(2, 4, cell_properties()),
+            run(4, 5, row_end_properties()),
+            run(5, 7, cell_properties()),
+            run(7, 9, cell_properties()),
+            run(9, 10, row_end_properties()),
+        ]);
+        let extractor = ParagraphExtractor::new(
+            Arc::new("a\u{7}b\u{7}\u{7}c\u{7}d\u{7}\u{7}".to_string()),
+            Some(&table),
+            None,
+        )
+        .unwrap();
+
+        let top_left = extractor
+            .table_text_context(0, table.properties_at(0).unwrap())
+            .unwrap();
+        assert_eq!(top_left.style_index, 15);
+        assert_eq!(
+            top_left.conditions,
+            [
+                TableStyleCondition::FirstColumn,
+                TableStyleCondition::HeaderRow,
+                TableStyleCondition::TopLeftCell,
+            ]
+        );
+        let top_right = extractor
+            .table_text_context(2, table.properties_at(2).unwrap())
+            .unwrap();
+        assert_eq!(
+            top_right.conditions,
+            [
+                TableStyleCondition::LastColumn,
+                TableStyleCondition::HeaderRow,
+                TableStyleCondition::TopRightCell,
+            ]
+        );
+        let bottom_left = extractor
+            .table_text_context(5, table.properties_at(5).unwrap())
+            .unwrap();
+        assert_eq!(
+            bottom_left.conditions,
+            [
+                TableStyleCondition::FirstColumn,
+                TableStyleCondition::FooterRow,
+                TableStyleCondition::BottomLeftCell,
+            ]
+        );
+
+        let mut no_look_end = row_end_properties();
+        no_look_end.table_properties.as_mut().unwrap().table_look = None;
+        let no_look_table = PapBinTable::from_runs_for_test(vec![
+            run(0, 2, cell_properties()),
+            run(2, 3, no_look_end),
+        ]);
+        let no_look_extractor = ParagraphExtractor::new(
+            Arc::new("a\u{7}\u{7}".to_string()),
+            Some(&no_look_table),
+            None,
+        )
+        .unwrap();
+        let context = no_look_extractor
+            .table_text_context(0, no_look_table.properties_at(0).unwrap())
+            .unwrap();
+        assert_eq!(context.style_index, 15);
+        assert!(context.conditions.is_empty());
     }
 }

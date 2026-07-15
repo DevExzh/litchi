@@ -286,16 +286,25 @@ impl StyleSheet {
         super::pap::ParagraphProperties,
         super::chp::CharacterProperties,
     )> {
+        let (effective_index, paragraph, character) =
+            self.resolve_table_text_style_sprms(requested_index)?;
+        Ok((
+            effective_index,
+            super::pap::ParagraphProperties::from_sprm(&paragraph)?,
+            super::chp::CharacterProperties::from_sprm(&character)?,
+        ))
+    }
+
+    pub(crate) fn resolve_table_text_style_sprms(
+        &self,
+        requested_index: u16,
+    ) -> Result<(u16, Vec<u8>, Vec<u8>)> {
         let effective_index = self.effective_table_style_index(requested_index);
         let Some(style) = self
             .get(effective_index)
             .filter(|style| style.kind == StyleKind::Table)
         else {
-            return Ok((
-                effective_index,
-                super::pap::ParagraphProperties::default(),
-                super::chp::CharacterProperties::default(),
-            ));
+            return Ok((effective_index, Vec::new(), Vec::new()));
         };
 
         let mut paragraph = Vec::new();
@@ -315,10 +324,33 @@ impl StyleSheet {
             }
         }
 
+        // Validate nested conditional payloads even when a particular table
+        // position will not select them later.
+        super::pap::ParagraphProperties::from_sprm(&paragraph)?;
+        super::chp::CharacterProperties::from_sprm(&character)?;
+
+        Ok((effective_index, paragraph, character))
+    }
+
+    pub(crate) fn resolve_table_text_style_sprms_for_conditions(
+        &self,
+        requested_index: u16,
+        conditions: &[super::tap::TableStyleCondition],
+    ) -> Result<(u16, Vec<u8>, Vec<u8>)> {
+        let (effective, paragraph, character) =
+            self.resolve_table_text_style_sprms(requested_index)?;
         Ok((
-            effective_index,
-            super::pap::ParagraphProperties::from_sprm(&paragraph)?,
-            super::chp::CharacterProperties::from_sprm(&character)?,
+            effective,
+            flatten_conditional_style_sprms(
+                &paragraph,
+                crate::sprm_operations::SPRM_P_CNF,
+                conditions,
+            )?,
+            flatten_conditional_style_sprms(
+                &character,
+                crate::sprm_operations::SPRM_C_CNF,
+                conditions,
+            )?,
         ))
     }
 
@@ -734,6 +766,37 @@ fn strip_paragraph_style_index(properties: &[u8], style_index: u16) -> Result<&[
         }
     }
     Ok(properties)
+}
+
+fn flatten_conditional_style_sprms(
+    properties: &[u8],
+    conditional_opcode: u16,
+    conditions: &[super::tap::TableStyleCondition],
+) -> Result<Vec<u8>> {
+    let sprms = validate_style_sprms(
+        properties,
+        crate::sprm_operations::get_sprm_type(conditional_opcode),
+        "conditional table-style property set",
+    )?;
+    let mut flattened = Vec::with_capacity(properties.len());
+    for sprm in &sprms {
+        if sprm.opcode != conditional_opcode {
+            flattened.extend_from_slice(&properties[sprm.offset..sprm.offset + sprm.size]);
+        }
+    }
+    for condition in conditions {
+        for sprm in &sprms {
+            if sprm.opcode != conditional_opcode {
+                continue;
+            }
+            let operand = sprm.operand_bytes();
+            let code = read_u16(operand, 0, "CNFOperand.cnfc")?;
+            if code == condition.code() {
+                flattened.extend_from_slice(&operand[2..]);
+            }
+        }
+    }
+    Ok(flattened)
 }
 
 fn validate_style_sprms(
@@ -1422,6 +1485,19 @@ mod tests {
             Some(true)
         );
 
+        let (_, table_papx, _) = stylesheet.resolve_table_text_style_sprms(15).unwrap();
+        let direct_papx = [SPRM_P_F_KEEP.to_le_bytes().as_slice(), &[1]].concat();
+        let cascaded = super::super::pap::ParagraphProperties::cascade_table_style(
+            &table_papx,
+            Some(0),
+            &direct_papx,
+            &stylesheet,
+        )
+        .unwrap();
+        assert!(cascaded.keep_on_page);
+        assert_eq!(cascaded.style_index, Some(0));
+        assert_eq!(cascaded.conditional_formats.len(), 2);
+
         let (effective, paragraph, character) =
             stylesheet.resolve_table_text_properties(999).unwrap();
         assert_eq!(effective, 11);
@@ -1454,6 +1530,35 @@ mod tests {
         ));
         let stylesheet = parse(&stylesheet(slots)).unwrap();
         assert!(stylesheet.resolve_table_text_properties(15).is_err());
+    }
+
+    #[test]
+    fn flattens_table_text_conditions_in_position_precedence_order() {
+        use crate::sprm_operations::{SPRM_C_CNF, SPRM_C_F_BOLD};
+
+        fn conditional(condition: u16, value: u8) -> Vec<u8> {
+            let nested = [SPRM_C_F_BOLD.to_le_bytes().as_slice(), &[value]].concat();
+            let mut grpprl = SPRM_C_CNF.to_le_bytes().to_vec();
+            grpprl.push((nested.len() + 2) as u8);
+            grpprl.extend_from_slice(&condition.to_le_bytes());
+            grpprl.extend_from_slice(&nested);
+            grpprl
+        }
+
+        // Source order is deliberately the reverse of positional precedence.
+        let source = [conditional(0x0001, 0), conditional(0x0040, 1)].concat();
+        let flattened = flatten_conditional_style_sprms(
+            &source,
+            SPRM_C_CNF,
+            &[
+                super::super::tap::TableStyleCondition::OddRowBand,
+                super::super::tap::TableStyleCondition::HeaderRow,
+            ],
+        )
+        .unwrap();
+        let properties = super::super::chp::CharacterProperties::from_sprm(&flattened).unwrap();
+        assert_eq!(properties.is_bold, Some(false));
+        assert!(properties.conditional_formats.is_empty());
     }
 
     #[test]

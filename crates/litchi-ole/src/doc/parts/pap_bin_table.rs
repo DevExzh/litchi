@@ -32,6 +32,11 @@ pub struct ParagraphRun {
     pub end_cp: u32,
     /// Direct paragraph properties stored in the PAPX.
     pub properties: ParagraphProperties,
+    /// Expanded direct PAPX followed by piece modifiers, retained for later
+    /// table-style cascading once row and cell context is known.
+    pub(crate) direct_grpprl: Vec<u8>,
+    /// Paragraph style selected by the PAPX header before direct SPRMs run.
+    pub(crate) initial_style_index: Option<u16>,
     /// Version-specific paragraph-height metadata from `BxPap`.
     pub paragraph_height: Option<ParagraphHeight>,
 }
@@ -43,6 +48,11 @@ pub struct PapBinTable {
 }
 
 impl PapBinTable {
+    #[cfg(test)]
+    pub(crate) fn from_runs_for_test(runs: Vec<ParagraphRun>) -> Self {
+        Self { runs }
+    }
+
     /// Reconstruct a paragraph bin table from its page index.
     pub fn parse(
         plcf_bte_papx_data: &[u8],
@@ -94,16 +104,19 @@ impl PapBinTable {
                         .piece_for_cp(start_cp)
                         .map(|piece| piece.property_modifier())
                         .unwrap_or_default();
-                    let properties = Self::parse_properties(
-                        &entry.grpprl,
-                        piece_modifier,
-                        data_stream,
-                        stylesheet,
-                    )?;
+                    let (properties, direct_grpprl, initial_style_index) =
+                        Self::parse_properties_with_direct(
+                            &entry.grpprl,
+                            piece_modifier,
+                            data_stream,
+                            stylesheet,
+                        )?;
                     runs.push(ParagraphRun {
                         start_cp,
                         end_cp,
                         properties,
+                        direct_grpprl,
+                        initial_style_index,
                         paragraph_height: entry.paragraph_height,
                     });
                 }
@@ -129,17 +142,29 @@ impl PapBinTable {
         Ok(Some(Self { runs }))
     }
 
+    #[cfg(test)]
     fn parse_properties(
         grpprl_and_istd: &[u8],
         piece_modifier: &[u8],
         data_stream: Option<&[u8]>,
         stylesheet: Option<&StyleSheet>,
     ) -> Result<ParagraphProperties> {
+        Self::parse_properties_with_direct(grpprl_and_istd, piece_modifier, data_stream, stylesheet)
+            .map(|(properties, _, _)| properties)
+    }
+
+    fn parse_properties_with_direct(
+        grpprl_and_istd: &[u8],
+        piece_modifier: &[u8],
+        data_stream: Option<&[u8]>,
+        stylesheet: Option<&StyleSheet>,
+    ) -> Result<(ParagraphProperties, Vec<u8>, Option<u16>)> {
         if grpprl_and_istd.is_empty() {
-            return stylesheet.map_or_else(
+            let properties = stylesheet.map_or_else(
                 || ParagraphProperties::from_sprm(piece_modifier),
                 |styles| ParagraphProperties::from_sprm_with_stylesheet(piece_modifier, styles),
-            );
+            )?;
+            return Ok((properties, piece_modifier.to_vec(), None));
         }
 
         let (style_index, direct_sprms) = if grpprl_and_istd.len() >= 2 {
@@ -167,21 +192,15 @@ impl PapBinTable {
             direct_sprms
         };
 
-        let combined;
-        let sprms = if piece_modifier.is_empty() {
-            sprms
-        } else {
-            combined = [sprms, piece_modifier].concat();
-            &combined
-        };
+        let direct_grpprl = [sprms, piece_modifier].concat();
         let mut properties = stylesheet.map_or_else(
-            || ParagraphProperties::from_sprm(sprms),
-            |styles| ParagraphProperties::cascade_styles(style_index, sprms, styles),
+            || ParagraphProperties::from_sprm(&direct_grpprl),
+            |styles| ParagraphProperties::cascade_styles(style_index, &direct_grpprl, styles),
         )?;
         if properties.style_index.is_none() {
             properties.style_index = style_index;
         }
-        Ok(properties)
+        Ok((properties, direct_grpprl, style_index))
     }
 
     /// Expand `sprmPHugePapx`/`sprmPTableProps` PrcData references.
@@ -260,9 +279,14 @@ impl PapBinTable {
 
     /// Properties covering a logical character position.
     pub fn properties_at(&self, cp: u32) -> Option<&ParagraphProperties> {
+        self.run_at(cp).map(|run| &run.properties)
+    }
+
+    /// Property run covering a logical character position.
+    pub(crate) fn run_at(&self, cp: u32) -> Option<&ParagraphRun> {
         let index = self.runs.partition_point(|run| run.start_cp <= cp);
         let run = self.runs.get(index.checked_sub(1)?)?;
-        (cp < run.end_cp).then_some(&run.properties)
+        (cp < run.end_cp).then_some(run)
     }
 }
 
@@ -283,9 +307,12 @@ mod tests {
         papx.extend_from_slice(&SPRM_P_HUGE_PAPX.to_le_bytes());
         papx.extend_from_slice(&20u32.to_le_bytes());
 
-        let properties = PapBinTable::parse_properties(&papx, &[], Some(&data), None).unwrap();
+        let (properties, direct_grpprl, initial_style_index) =
+            PapBinTable::parse_properties_with_direct(&papx, &[], Some(&data), None).unwrap();
         assert_eq!(properties.style_index, Some(7));
         assert_eq!(properties.line_spacing, Some(240));
+        assert_eq!(direct_grpprl, direct);
+        assert_eq!(initial_style_index, Some(7));
     }
 
     #[test]
