@@ -34,7 +34,7 @@ use super::tap::{
 use crate::sprm::{Sprm, parse_sprms};
 use crate::sprm_operations::get_sprm_operation;
 use bumpalo::Bump;
-use litchi_core::binary::{BinaryResult, read_i16_le, read_u16_le};
+use litchi_core::binary::{BinaryResult, read_i16_le, read_u16_le, read_u32_le};
 
 /// TAP parser with arena allocation for temporary structures.
 ///
@@ -621,6 +621,30 @@ impl<'arena> TapParser<'arena> {
                         ));
                     },
                 };
+            },
+            0x69 => {
+                let operand = sprm.operand_bytes();
+                if operand.len() != 4 {
+                    return Err(DocError::Corrupted(
+                        "sprmTIpgp operand must contain exactly 4 bytes".to_string(),
+                    ));
+                }
+                let identifier = binary_to_doc_result(read_u32_le(operand, 0))?;
+                if identifier == 0 {
+                    return Err(DocError::Corrupted(
+                        "sprmTIpgp cannot reference PGPInfo identifier zero".to_string(),
+                    ));
+                }
+                tap.paragraph_group_id = Some(identifier);
+            },
+            0x79 => {
+                let operand = sprm.operand_bytes();
+                if operand.len() != 4 {
+                    return Err(DocError::Corrupted(
+                        "sprmTRsid operand must contain exactly 4 bytes".to_string(),
+                    ));
+                }
+                tap.revision_save_id = Some(binary_to_doc_result(read_u32_le(operand, 0))?);
             },
             // Other table SPRMs.
             _ => {
@@ -2534,13 +2558,21 @@ mod tests {
         grpprl.extend_from_slice(&timestamp.to_le_bytes());
         grpprl.extend_from_slice(&0x3668u16.to_le_bytes());
         grpprl.push(1);
+        append_fixed_sprm(&mut grpprl, 0x7469, &0x1020_3040u32.to_le_bytes());
+        append_fixed_sprm(&mut grpprl, 0x7479, &0xA1B2_C3D4u32.to_le_bytes());
         let tap = parser.parse_tap(&grpprl).unwrap();
         assert_eq!(tap.has_formatting_revision, Some(true));
         assert_eq!(tap.formatting_revision_author_index, Some(1));
         assert_eq!(tap.formatting_revision_timestamp, Some(timestamp));
         assert!(tap.properties_preserved_for_revision);
+        assert_eq!(tap.paragraph_group_id, Some(0x1020_3040));
+        assert_eq!(tap.revision_save_id, Some(0xA1B2_C3D4));
 
         let invalid_wall = [0x68, 0x36, 2];
         assert!(parser.parse_tap(&invalid_wall).is_err());
+        let zero_ipgp = [0x69, 0x74, 0, 0, 0, 0];
+        assert!(parser.parse_tap(&zero_ipgp).is_err());
+        let truncated_rsid = [0x79, 0x74, 1, 2, 3];
+        assert!(parser.parse_tap(&truncated_rsid).is_err());
     }
 }

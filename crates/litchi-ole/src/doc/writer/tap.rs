@@ -31,6 +31,8 @@ pub enum TapBuildError {
     InvalidCellPadding(u16),
     /// DOC uniform cell spacing cannot exceed 11 inches.
     InvalidCellSpacing(u16),
+    /// `PGPInfo.ipgpSelf` identifiers are nonzero.
+    InvalidParagraphGroupId,
     /// A TCellBrcType prefix requires four explicit types for every included cell.
     IncompleteCellBorderTypes(usize),
     /// A preferred-width property uses unsupported units or a value outside its context's range.
@@ -73,6 +75,9 @@ impl std::fmt::Display for TapBuildError {
             },
             Self::InvalidCellSpacing(spacing) => {
                 write!(f, "DOC cell spacing {spacing} exceeds 15840 twips")
+            },
+            Self::InvalidParagraphGroupId => {
+                write!(f, "DOC paragraph-group identifier cannot be zero")
             },
             Self::IncompleteCellBorderTypes(index) => {
                 write!(f, "DOC cell {index} has an incomplete border-type override")
@@ -186,6 +191,10 @@ pub struct TableRow {
     pub distance_from_text_bottom: u16,
     /// Uniform spacing around every cell in this row
     pub cell_spacing: Option<CellSpacing>,
+    /// Nonzero `PGPInfo.ipgpSelf` associated with this row
+    pub paragraph_group_id: Option<u32>,
+    /// Revision save ID associated with this table formatting
+    pub revision_save_id: Option<u32>,
     /// Default outer and inside borders for this row
     pub borders: TableBorders,
 }
@@ -215,6 +224,8 @@ impl Default for TableRow {
             distance_from_text_right: 0,
             distance_from_text_bottom: 0,
             cell_spacing: None,
+            paragraph_group_id: None,
+            revision_save_id: None,
             borders: TableBorders::default(),
         }
     }
@@ -457,6 +468,9 @@ pub(crate) fn generate_row_sprms(row: &TableRow) -> Result<Vec<u8>, TapBuildErro
     }
     let horizontal_position = encode_horizontal_position(row.horizontal_position)?;
     let vertical_position = encode_vertical_position(row.vertical_position)?;
+    if row.paragraph_group_id == Some(0) {
+        return Err(TapBuildError::InvalidParagraphGroupId);
+    }
 
     let mut builder = SprmBuilder::new();
     // Apply the style first so later SPRMs remain direct row formatting.
@@ -540,6 +554,12 @@ pub(crate) fn generate_row_sprms(row: &TableRow) -> Result<Vec<u8>, TapBuildErro
     }
     if !row.allow_overlap {
         builder.add_bool(0x3465, true);
+    }
+    if let Some(identifier) = row.paragraph_group_id {
+        builder.add_dword(0x7469, identifier);
+    }
+    if let Some(identifier) = row.revision_save_id {
+        builder.add_dword(0x7479, identifier);
     }
     let mut sprms = builder.build();
 
@@ -1282,6 +1302,25 @@ mod tests {
     }
 
     #[test]
+    fn round_trips_row_identity_metadata() {
+        let mut builder = TapBuilder::new();
+        builder.add_row(TableRow {
+            cells: vec![TableCell {
+                width: 1000,
+                ..TableCell::default()
+            }],
+            paragraph_group_id: Some(0x1020_3040),
+            revision_save_id: Some(0xA1B2_C3D4),
+            ..TableRow::default()
+        });
+
+        let sprms = builder.try_generate_row_sprms(0).unwrap();
+        let tap = crate::doc::parts::tap::TableProperties::from_sprm(&sprms).unwrap();
+        assert_eq!(tap.paragraph_group_id, Some(0x1020_3040));
+        assert_eq!(tap.revision_save_id, Some(0xA1B2_C3D4));
+    }
+
+    #[test]
     fn round_trips_table_sizing_and_fit_properties() {
         let mut builder = TapBuilder::new();
         builder.add_row(TableRow {
@@ -1569,6 +1608,20 @@ mod tests {
         assert_eq!(
             builder.try_generate_row_sprms(0),
             Err(TapBuildError::InvalidCellSpacing(15_841))
+        );
+
+        let mut builder = TapBuilder::new();
+        builder.add_row(TableRow {
+            cells: vec![TableCell {
+                width: 1000,
+                ..TableCell::default()
+            }],
+            paragraph_group_id: Some(0),
+            ..TableRow::default()
+        });
+        assert_eq!(
+            builder.try_generate_row_sprms(0),
+            Err(TapBuildError::InvalidParagraphGroupId)
         );
 
         let mut builder = TapBuilder::new();

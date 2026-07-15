@@ -171,6 +171,10 @@ pub struct TableProperties {
     pub formatting_revision_timestamp: Option<u32>,
     /// Whether pre-revision table properties are preserved
     pub properties_preserved_for_revision: bool,
+    /// Nonzero `PGPInfo.ipgpSelf` associated with this row
+    pub paragraph_group_id: Option<u32>,
+    /// Revision save ID associated with this table formatting
+    pub revision_save_id: Option<u32>,
     /// Table borders
     pub border_top: Option<BorderStyle>,
     pub border_left: Option<BorderStyle>,
@@ -535,6 +539,8 @@ impl Default for TableProperties {
             formatting_revision_author_index: None,
             formatting_revision_timestamp: None,
             properties_preserved_for_revision: false,
+            paragraph_group_id: None,
+            revision_save_id: None,
             border_top: None,
             border_left: None,
             border_bottom: None,
