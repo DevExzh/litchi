@@ -5,8 +5,8 @@ use std::ops::Range;
 
 use super::*;
 use crate::shapes::{
-    DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, ShapePathKind,
-    shape_path_kind,
+    DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, ShapePathKind, ShapePreset,
+    set_shape_preset, shape_path_kind, shape_preset,
 };
 use crate::text::TextStorageInfo;
 
@@ -30,6 +30,8 @@ pub struct KeynoteSlideShapeInfo {
     pub slide_index: usize,
     pub drawable_object_id: u64,
     pub kind: KeynoteSlideShapeKind,
+    /// Source-buildable preset and its native controls, when recognized.
+    pub preset: Option<ShapePreset>,
     pub storage: TextStorageInfo,
     pub geometry: DrawableGeometry,
     pub properties: DrawableProperties,
@@ -68,7 +70,23 @@ impl KeynoteEditor {
         position: DrawablePoint,
         size: DrawableSize,
     ) -> Result<KeynoteSlideShapeInfo> {
-        let geometry = rectangle_geometry(position, size)?;
+        self.add_slide_shape(slide_index, text, position, size, ShapePreset::Rectangle)
+    }
+
+    /// Add a typed preset shape with independent writable text to one slide.
+    ///
+    /// The path, storage, title/caption stand-ins, ownership, z-order, UUID
+    /// metadata, and style relationship are built directly from typed values.
+    /// No source drawable or package template is copied.
+    pub fn add_slide_shape(
+        &mut self,
+        slide_index: usize,
+        text: &str,
+        position: DrawablePoint,
+        size: DrawableSize,
+        preset: ShapePreset,
+    ) -> Result<KeynoteSlideShapeInfo> {
+        let geometry = new_shape_geometry(position, size)?;
         let graph = ObjectGraph::read(self.package())?;
         let context = text_box_context(&graph, slide_index)?;
         let styles = text_box_theme_styles(&graph, context.theme_id, context.stylesheet_id)?;
@@ -97,6 +115,7 @@ impl KeynoteEditor {
             styles.shape,
             geometry,
             storage,
+            preset,
             false,
         )?;
 
@@ -129,21 +148,57 @@ impl KeynoteEditor {
             .into_iter()
             .find(|shape| shape.drawable_object_id == ids.drawable)
             .ok_or_else(|| {
-                Error::InvalidFormat("Keynote rectangle creation failed validation".to_owned())
+                Error::InvalidFormat("Keynote shape creation failed validation".to_owned())
             })?;
         let created_graph = shape_graph(&verified, slide_index, ids.drawable)?;
-        if created.kind != KeynoteSlideShapeKind::Rectangle
+        if created.preset != Some(preset)
             || created.storage.object_id != ids.storage
             || created.storage.text != text
             || created.geometry != geometry
             || created_graph.object_ids != ids.all()
         {
             return Err(Error::InvalidFormat(
-                "Keynote rectangle creation produced an inconsistent graph".to_owned(),
+                "Keynote shape creation produced an inconsistent graph".to_owned(),
             ));
         }
         *self = verified;
         Ok(created)
+    }
+
+    /// Read the recognized preset and native controls for one slide shape.
+    pub fn slide_shape_preset(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<Option<ShapePreset>> {
+        Ok(shape_graph(self, slide_index, drawable_object_id)?
+            .info
+            .preset)
+    }
+
+    /// Replace a slide shape's preset path while retaining its text and style.
+    pub fn set_slide_shape_preset(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        preset: ShapePreset,
+    ) -> Result<()> {
+        let source = shape_graph(self, slide_index, drawable_object_id)?;
+        let mut staged = self.package().clone();
+        set_shape_preset(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            preset,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.slide_shape_preset(slide_index, drawable_object_id)? != Some(preset) {
+            return Err(Error::InvalidFormat(
+                "Keynote shape preset update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
     }
 
     /// Read typed geometry for one ordinary slide shape.
@@ -299,7 +354,7 @@ impl KeynoteEditor {
     }
 }
 
-fn rectangle_geometry(position: DrawablePoint, size: DrawableSize) -> Result<DrawableGeometry> {
+fn new_shape_geometry(position: DrawablePoint, size: DrawableSize) -> Result<DrawableGeometry> {
     if !position.x.is_finite()
         || !position.y.is_finite()
         || !size.width.is_finite()
@@ -308,8 +363,7 @@ fn rectangle_geometry(position: DrawablePoint, size: DrawableSize) -> Result<Dra
         || size.height <= 0.0
     {
         return Err(Error::ParseError(
-            "Keynote rectangle position must be finite and size must be finite and positive"
-                .to_owned(),
+            "Keynote shape position must be finite and size must be finite and positive".to_owned(),
         ));
     }
     DrawableGeometry {
@@ -482,6 +536,7 @@ fn shape_info(
         slide_index,
         drawable_object_id,
         kind: shape_path_kind(shape)?,
+        preset: shape_preset(shape)?,
         storage: editor.text.storage(storage_id)?,
         geometry: shape_geometry(
             editor.package(),
@@ -589,6 +644,9 @@ fn validate_shape_private_objects(
 mod tests {
     use super::*;
     use crate::keynote::KeynoteDocumentBuilder;
+    use crate::shapes::{
+        ShapeCornerRadius, ShapePolygonSides, ShapeStarInnerRatio, ShapeStarPoints,
+    };
 
     const POSITION: DrawablePoint = DrawablePoint { x: 320.0, y: 240.0 };
     const SIZE: DrawableSize = DrawableSize {
@@ -610,6 +668,7 @@ mod tests {
             .add_slide_rectangle(0, "Built from typed objects", POSITION, SIZE)
             .unwrap();
         assert_eq!(created.kind, KeynoteSlideShapeKind::Rectangle);
+        assert_eq!(created.preset, Some(ShapePreset::Rectangle));
         assert_eq!(created.storage.text, "Built from typed objects");
         assert_eq!(
             editor
@@ -661,6 +720,48 @@ mod tests {
     }
 
     #[test]
+    fn scratch_presentation_supports_typed_preset_shape_crud() {
+        let mut editor = KeynoteDocumentBuilder::new()
+            .title("Preset shapes")
+            .subtitle("Built from typed paths")
+            .build()
+            .unwrap();
+        let baseline = editor.to_bytes().unwrap();
+        let created = editor
+            .add_slide_shape(0, "Rounded", POSITION, SIZE, ShapePreset::ROUNDED_RECTANGLE)
+            .unwrap();
+        assert_eq!(created.kind, KeynoteSlideShapeKind::RoundedRectangle);
+        assert_eq!(created.preset, Some(ShapePreset::ROUNDED_RECTANGLE));
+
+        let reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .slide_shape_preset(0, created.drawable_object_id)
+                .unwrap(),
+            Some(ShapePreset::ROUNDED_RECTANGLE)
+        );
+
+        for (preset, kind) in [
+            (ShapePreset::Ellipse, KeynoteSlideShapeKind::Ellipse),
+            (ShapePreset::PENTAGON, KeynoteSlideShapeKind::RegularPolygon),
+            (ShapePreset::STAR, KeynoteSlideShapeKind::Star),
+        ] {
+            editor
+                .set_slide_shape_preset(0, created.drawable_object_id, preset)
+                .unwrap();
+            let shape = &editor.slide_shapes(0).unwrap()[0];
+            assert_eq!(shape.kind, kind);
+            assert_eq!(shape.preset, Some(preset));
+            assert_eq!(shape.storage.text, "Rounded");
+        }
+
+        editor
+            .remove_slide_shape(0, created.drawable_object_id)
+            .unwrap();
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
+    }
+
+    #[test]
     fn invalid_rectangle_creation_and_cross_type_updates_are_transactional() {
         let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
         let baseline = editor.to_bytes().unwrap();
@@ -678,6 +779,24 @@ mod tests {
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), baseline);
+        assert!(ShapeCornerRadius::new(f32::NAN).is_err());
+        assert!(ShapePolygonSides::new(2).is_err());
+        assert!(ShapeStarPoints::new(2).is_err());
+        assert!(ShapeStarInnerRatio::new(1.0).is_err());
+        assert!(
+            editor
+                .add_slide_shape(
+                    0,
+                    "invalid radius",
+                    POSITION,
+                    SIZE,
+                    ShapePreset::RoundedRectangle {
+                        corner_radius: ShapeCornerRadius::new(SIZE.height).unwrap(),
+                    },
+                )
+                .is_err()
+        );
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
         let text_box = editor
             .add_slide_text_box(0, "not a shape", POSITION, SIZE)
             .unwrap();
@@ -685,6 +804,12 @@ mod tests {
         assert!(
             editor
                 .set_slide_shape_text(0, text_box.drawable_object_id, "wrong type")
+                .is_err()
+        );
+        assert_eq!(editor.to_bytes().unwrap(), before);
+        assert!(
+            editor
+                .set_slide_shape_preset(0, text_box.drawable_object_id, ShapePreset::Ellipse)
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), before);

@@ -238,22 +238,25 @@ keynote.save("created-with-text-box.key")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
 
-Ordinary text-bearing rectangles have independent shape CRUD. Their Bézier
-path, storage, stand-ins, style relationship, ownership, z-order, and UUIDs are
-also constructed directly from typed values:
+Ordinary text-bearing shapes have independent CRUD. Rectangle, rounded
+rectangle, ellipse, regular-polygon, and star paths are constructed from typed,
+validated presets together with their storage, stand-ins, style relationship,
+ownership, z-order, and UUIDs. No source drawable or package is copied:
 
 ```rust
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
-use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_iwa::shapes::{DrawablePoint, DrawableSize, ShapePreset};
 
 let mut keynote = KeynoteDocumentBuilder::new().build()?;
-let rectangle = keynote.add_slide_rectangle(
+let shape = keynote.add_slide_shape(
     0,
     "A fully editable shape",
     DrawablePoint { x: 720.0, y: 660.0 },
     DrawableSize { width: 480.0, height: 240.0 },
+    ShapePreset::ROUNDED_RECTANGLE,
 )?;
-keynote.set_slide_shape_text(0, rectangle.drawable_object_id, "Updated")?;
+keynote.set_slide_shape_text(0, shape.drawable_object_id, "Updated")?;
+keynote.set_slide_shape_preset(0, shape.drawable_object_id, ShapePreset::STAR)?;
 keynote.save("created-with-shape.key")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```

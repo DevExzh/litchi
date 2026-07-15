@@ -16,8 +16,11 @@ pub use geometry::{DrawableGeometry, DrawablePoint, DrawableSize};
 pub(crate) use geometry::{
     geometry_from_drawable, patch_drawable_geometry, set_shape_geometry, shape_geometry,
 };
-pub use path::ShapePathKind;
-pub(crate) use path::shape_path_kind;
+pub use path::{
+    ShapeCornerRadius, ShapePathKind, ShapePolygonSides, ShapePreset, ShapeStarInnerRatio,
+    ShapeStarPoints,
+};
+pub(crate) use path::{set_shape_preset, shape_path_kind, shape_path_source, shape_preset};
 pub use properties::DrawableProperties;
 pub(crate) use properties::{set_shape_properties, shape_properties};
 pub use text_extractor::ShapeTextExtractor;

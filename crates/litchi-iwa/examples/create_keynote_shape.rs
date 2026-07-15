@@ -1,9 +1,9 @@
-//! Create a Keynote presentation and editable rectangle without an input package.
+//! Create a Keynote presentation and editable preset shape without an input package.
 
 use std::env;
 
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
-use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_iwa::shapes::{DrawablePoint, DrawableSize, ShapePreset};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -21,7 +21,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .title("Created from scratch")
         .subtitle("Shape built from typed IWA objects")
         .build()?;
-    let created = editor.add_slide_rectangle(
+    let created = editor.add_slide_shape(
         0,
         &text,
         DrawablePoint { x: 720.0, y: 660.0 },
@@ -29,11 +29,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             width: 480.0,
             height: 240.0,
         },
+        ShapePreset::ROUNDED_RECTANGLE,
     )?;
     editor.save(output)?;
     println!(
-        "created Keynote {:?} {} with storage {}",
-        created.kind, created.drawable_object_id, created.storage.object_id
+        "created Keynote {:?} {:?} {} with storage {}",
+        created.kind, created.preset, created.drawable_object_id, created.storage.object_id
     );
     Ok(())
 }

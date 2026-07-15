@@ -12,10 +12,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for slide in editor.slides()? {
         for (shape_index, shape) in editor.slide_shapes(slide.index)?.into_iter().enumerate() {
             println!(
-                "slide={} shape_index={shape_index} drawable={} kind={:?} storage={} text={:?} geometry={:?} properties={:?}",
+                "slide={} shape_index={shape_index} drawable={} kind={:?} preset={:?} storage={} text={:?} geometry={:?} properties={:?}",
                 slide.index,
                 shape.drawable_object_id,
                 shape.kind,
+                shape.preset,
                 shape.storage.object_id,
                 shape.storage.text,
                 shape.geometry,
