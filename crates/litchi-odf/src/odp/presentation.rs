@@ -207,10 +207,15 @@ impl Presentation {
     /// Extracts metadata from the meta.xml file.
     pub fn metadata(&self) -> Result<Metadata> {
         if let Some(meta) = &self.meta {
-            Ok(meta.extract_metadata())
+            meta.try_extract_metadata()
         } else {
             Ok(Metadata::default())
         }
+    }
+
+    /// Get the complete format-specific OpenDocument metadata model.
+    pub fn odf_metadata(&self) -> Result<Option<crate::OdfMetadata>> {
+        self.meta.as_ref().map(Meta::odf_metadata).transpose()
     }
 
     pub(crate) fn styles_xml(&self) -> Option<&str> {

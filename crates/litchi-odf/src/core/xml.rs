@@ -161,13 +161,14 @@ impl Meta {
         self.xml.content()
     }
 
-    /// Extract basic metadata
-    pub fn extract_metadata(&self) -> litchi_core::Metadata {
-        // Parse ODF metadata from meta.xml content
-        match crate::core::metadata::OdfMetadata::from_xml(self.xml.content()) {
-            Ok(odf_meta) => odf_meta.into(),
-            Err(_) => litchi_core::Metadata::default(), // Fall back to default on parse error
-        }
+    /// Parse the complete format-specific OpenDocument metadata model.
+    pub fn odf_metadata(&self) -> Result<crate::core::OdfMetadata> {
+        crate::core::OdfMetadata::from_xml(self.xml.content())
+    }
+
+    /// Extract common metadata while preserving parse failures.
+    pub fn try_extract_metadata(&self) -> Result<litchi_core::Metadata> {
+        Ok(self.odf_metadata()?.into())
     }
 }
 
@@ -264,7 +265,7 @@ mod tests {
                               xmlns:dc="http://purl.org/dc/elements/1.1/">
         </office:document-meta>"#;
         let meta = Meta::from_bytes(xml.as_bytes()).unwrap();
-        let metadata = meta.extract_metadata();
+        let metadata = meta.try_extract_metadata().unwrap();
         // Default metadata should be returned
         assert!(metadata.title.is_none());
     }

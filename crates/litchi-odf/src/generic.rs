@@ -125,7 +125,12 @@ impl FlatOpenDocument {
 
     /// Extract common document metadata from the combined XML document.
     pub fn metadata(&self) -> Result<Metadata> {
-        Ok(Meta::from_bytes(self.xml.as_bytes())?.extract_metadata())
+        Meta::from_bytes(self.xml.as_bytes())?.try_extract_metadata()
+    }
+
+    /// Extract the complete format-specific metadata model.
+    pub fn odf_metadata(&self) -> Result<crate::OdfMetadata> {
+        Meta::from_bytes(self.xml.as_bytes())?.odf_metadata()
     }
 
     /// Return the exact original bytes.
@@ -335,7 +340,15 @@ impl OpenDocumentPackage {
         let Some(xml) = self.optional_xml_part(constants::ODF_META)? else {
             return Ok(Metadata::default());
         };
-        Ok(Meta::from_bytes(xml.as_bytes())?.extract_metadata())
+        Meta::from_bytes(xml.as_bytes())?.try_extract_metadata()
+    }
+
+    /// Extract the complete format-specific metadata model, if `meta.xml` exists.
+    pub fn odf_metadata(&self) -> Result<Option<crate::OdfMetadata>> {
+        let Some(xml) = self.optional_xml_part(constants::ODF_META)? else {
+            return Ok(None);
+        };
+        Ok(Some(Meta::from_bytes(xml.as_bytes())?.odf_metadata()?))
     }
 
     fn optional_xml_part(&self, path: &str) -> Result<Option<String>> {
@@ -494,6 +507,7 @@ mod tests {
             assert_eq!(document.is_template(), template);
             assert_eq!(document.mimetype(), mimetype);
             assert!(document.content_xml().unwrap().contains("office:body"));
+            assert!(document.odf_metadata().unwrap().is_none());
             assert_eq!(document.media_files().unwrap(), ["Pictures/pixel.png"]);
             assert_eq!(document.to_bytes(), bytes);
             assert_eq!(document.into_bytes(), bytes);
@@ -589,5 +603,21 @@ mod tests {
                 "accepted invalid flat document {xml}"
             );
         }
+    }
+
+    #[test]
+    fn flat_document_exposes_namespace_aware_metadata() {
+        let xml = br#"<o:document xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+            xmlns:d="http://purl.org/dc/elements/1.1/"
+            o:mimetype="application/vnd.oasis.opendocument.text">
+            <o:meta><d:title>A &amp; B</d:title></o:meta>
+            <o:body><o:text/></o:body>
+        </o:document>"#;
+        let document = FlatOpenDocument::from_bytes(xml.to_vec()).unwrap();
+        assert_eq!(
+            document.odf_metadata().unwrap().title.as_deref(),
+            Some("A & B")
+        );
+        assert_eq!(document.metadata().unwrap().title.as_deref(), Some("A & B"));
     }
 }

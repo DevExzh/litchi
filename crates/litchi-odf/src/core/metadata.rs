@@ -3,10 +3,19 @@
 //! This module provides comprehensive parsing of ODF metadata from meta.xml,
 //! including document properties, statistics, and user information.
 
+use crate::datatype::DateTimeOdf;
 use chrono::{DateTime, Utc};
 use litchi_core::{Error, Metadata, Result};
-use quick_xml::events::Event;
+use quick_xml::XmlVersion;
+use quick_xml::events::{BytesStart, Event};
+use quick_xml::name::{Namespace, ResolveResult};
+use quick_xml::reader::NsReader;
 use std::collections::HashMap;
+
+const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
+const META_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:meta:1.0";
+const DC_NAMESPACE: &[u8] = b"http://purl.org/dc/elements/1.1/";
+const XLINK_NAMESPACE: &[u8] = b"http://www.w3.org/1999/xlink";
 
 /// Comprehensive ODF metadata
 #[derive(Debug, Clone, Default)]
@@ -21,121 +30,224 @@ pub struct OdfMetadata {
     pub keywords: Vec<String>,
     /// Document creator/author
     pub creator: Option<String>,
+    /// Original document creator
+    pub initial_creator: Option<String>,
+    /// Person who last printed the document
+    pub printed_by: Option<String>,
     /// Document language
     pub language: Option<String>,
     /// Creation date
     pub creation_date: Option<String>,
     /// Last modification date
     pub modification_date: Option<String>,
+    /// Last print date
+    pub print_date: Option<String>,
     /// Generator application
     pub generator: Option<String>,
+    /// Exact non-negative editing-cycle count
+    pub editing_cycles: Option<String>,
+    /// Exact XML Schema duration spent editing
+    pub editing_duration: Option<String>,
+    /// Template reference, if present
+    pub template: Option<TemplateMetadata>,
+    /// Automatic reload behavior, if present
+    pub auto_reload: Option<AutoReloadMetadata>,
+    /// Default hyperlink behavior, if present
+    pub hyperlink_behaviour: Option<HyperlinkBehaviourMetadata>,
     /// Document statistics
     pub statistics: DocumentStatistics,
     /// Custom properties
     pub custom_properties: HashMap<String, String>,
+    /// Ordered, typed user-defined metadata, including duplicate names
+    pub user_defined: Vec<UserDefinedMetadata>,
+}
+
+/// A `meta:user-defined` property with its exact lexical value.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UserDefinedMetadata {
+    /// Property name.
+    pub name: String,
+    /// Declared ODF value type. Missing declarations default to `string`.
+    pub value_type: UserDefinedValueType,
+    /// Exact decoded element text.
+    pub value: String,
+}
+
+/// Standard ODF user-defined metadata value types.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UserDefinedValueType {
+    /// XML Schema double.
+    Float,
+    /// XML Schema date or dateTime.
+    Date,
+    /// XML Schema duration.
+    Time,
+    /// XML Schema boolean.
+    Boolean,
+    /// String value.
+    String,
+}
+
+/// Metadata describing the template used to create a document.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct TemplateMetadata {
+    /// Template URI.
+    pub href: Option<String>,
+    /// Human-readable template title.
+    pub title: Option<String>,
+    /// Template dateTime lexical value.
+    pub date: Option<String>,
+    /// XLink activation behavior.
+    pub actuate: Option<String>,
+}
+
+/// Metadata describing automatic document reload behavior.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct AutoReloadMetadata {
+    /// Reload URI.
+    pub href: Option<String>,
+    /// Exact XML Schema duration delay.
+    pub delay: Option<String>,
+    /// XLink show behavior.
+    pub show: Option<String>,
+    /// XLink activation behavior.
+    pub actuate: Option<String>,
+}
+
+/// Metadata describing default hyperlink behavior.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct HyperlinkBehaviourMetadata {
+    /// Target frame name.
+    pub target_frame_name: Option<String>,
+    /// XLink show behavior.
+    pub show: Option<String>,
 }
 
 /// Document statistics from metadata
 #[derive(Debug, Clone, Default)]
 pub struct DocumentStatistics {
     /// Number of pages
-    pub page_count: Option<u32>,
+    pub page_count: Option<String>,
     /// Number of paragraphs
-    pub paragraph_count: Option<u32>,
+    pub paragraph_count: Option<String>,
     /// Number of words
-    pub word_count: Option<u32>,
+    pub word_count: Option<String>,
     /// Number of characters
-    pub character_count: Option<u32>,
+    pub character_count: Option<String>,
     /// Number of tables
-    pub table_count: Option<u32>,
+    pub table_count: Option<String>,
+    /// Number of drawing objects
+    pub draw_count: Option<String>,
     /// Number of images
-    pub image_count: Option<u32>,
+    pub image_count: Option<String>,
+    /// Number of embedded OLE objects
+    pub ole_object_count: Option<String>,
     /// Number of objects
-    pub object_count: Option<u32>,
+    pub object_count: Option<String>,
+    /// Number of frames
+    pub frame_count: Option<String>,
+    /// Number of sentences
+    pub sentence_count: Option<String>,
+    /// Number of syllables
+    pub syllable_count: Option<String>,
+    /// Number of non-whitespace characters
+    pub non_whitespace_character_count: Option<String>,
+    /// Number of spreadsheet rows
+    pub row_count: Option<String>,
+    /// Number of spreadsheet cells
+    pub cell_count: Option<String>,
 }
 
 impl OdfMetadata {
     /// Parse metadata from meta.xml content
     pub fn from_xml(xml_content: &str) -> Result<Self> {
-        use quick_xml::Reader;
-        use quick_xml::events::Event;
-
-        let mut reader = Reader::from_str(xml_content);
+        let mut reader = NsReader::from_str(xml_content);
         let mut buf = Vec::new();
         let mut metadata = OdfMetadata::default();
-        let mut current_element = Vec::new();
+        let mut depth = 0usize;
+        let mut meta_depth = None;
 
         loop {
-            match reader.read_event_into(&mut buf) {
-                Ok(Event::Start(ref e)) => {
-                    let name = e.name();
-                    let name_str = String::from_utf8(name.as_ref().to_vec()).unwrap_or_default();
-
-                    current_element.push(name_str);
-
-                    match name.as_ref() {
-                        b"dc:title" => {
-                            metadata.title = Self::extract_text_content(&mut reader, &mut buf)?;
-                        },
-                        b"dc:description" => {
-                            metadata.description =
-                                Self::extract_text_content(&mut reader, &mut buf)?;
-                        },
-                        b"dc:subject" => {
-                            metadata.subject = Self::extract_text_content(&mut reader, &mut buf)?;
-                        },
-                        b"meta:keyword" => {
-                            if let Some(keyword) =
-                                Self::extract_text_content(&mut reader, &mut buf)?
-                            {
-                                metadata.keywords.push(keyword);
-                            }
-                        },
-                        b"dc:creator" => {
-                            metadata.creator = Self::extract_text_content(&mut reader, &mut buf)?;
-                        },
-                        b"dc:language" => {
-                            metadata.language = Self::extract_text_content(&mut reader, &mut buf)?;
-                        },
-                        b"meta:creation-date" => {
-                            metadata.creation_date =
-                                Self::extract_text_content(&mut reader, &mut buf)?;
-                        },
-                        b"dc:date" => {
-                            metadata.modification_date =
-                                Self::extract_text_content(&mut reader, &mut buf)?;
-                        },
-                        b"meta:generator" => {
-                            metadata.generator = Self::extract_text_content(&mut reader, &mut buf)?;
-                        },
-                        b"meta:document-statistic" => {
-                            metadata.statistics = Self::parse_document_statistics(e)?;
-                        },
-                        b"meta:user-defined" => {
-                            let mut temp_buf = Vec::new();
-                            if let Some((key, value)) =
-                                Self::parse_user_defined_property(e, &mut reader, &mut temp_buf)?
-                            {
-                                metadata.custom_properties.insert(key, value);
-                            }
-                        },
-                        _ => {},
-                    }
-                },
-                Ok(Event::End(ref e)) => {
-                    if let Some(last) = current_element.last()
-                        && last.as_bytes() == e.name().as_ref()
+            let (namespace, event) = reader
+                .read_resolved_event_into(&mut buf)
+                .map_err(metadata_xml_error)?;
+            let namespace = known_namespace(&namespace);
+            match event {
+                Event::Start(ref element) => {
+                    let local_name = element.local_name();
+                    if meta_depth.is_none()
+                        && namespace == KnownNamespace::Office
+                        && local_name.as_ref() == b"meta"
                     {
-                        current_element.pop();
+                        depth = checked_depth_add(depth)?;
+                        meta_depth = Some(depth);
+                    } else if meta_depth == Some(depth) {
+                        if let Some(field) = text_field(&namespace, local_name.as_ref()) {
+                            let value = extract_text_content(&mut reader)?;
+                            assign_text_field(&mut metadata, field, value);
+                        } else if namespace == KnownNamespace::Meta
+                            && local_name.as_ref() == b"user-defined"
+                        {
+                            let mut property =
+                                parse_user_defined_property(element, &reader, String::new())?;
+                            property.value = extract_text_content(&mut reader)?;
+                            metadata
+                                .custom_properties
+                                .insert(property.name.clone(), property.value.clone());
+                            metadata.user_defined.push(property);
+                        } else {
+                            parse_metadata_attributes(
+                                &mut metadata,
+                                &namespace,
+                                local_name.as_ref(),
+                                element,
+                                &reader,
+                            )?;
+                            depth = checked_depth_add(depth)?;
+                        }
+                    } else {
+                        depth = checked_depth_add(depth)?;
                     }
                 },
-                Ok(Event::Eof) => break,
-                Err(e) => {
-                    return Err(Error::InvalidFormat(format!(
-                        "XML parsing error in metadata: {}",
-                        e
-                    )));
+                Event::Empty(ref element) => {
+                    let local_name = element.local_name();
+                    if meta_depth == Some(depth) {
+                        if let Some(field) = text_field(&namespace, local_name.as_ref()) {
+                            assign_text_field(&mut metadata, field, String::new());
+                        } else if namespace == KnownNamespace::Meta
+                            && local_name.as_ref() == b"user-defined"
+                        {
+                            let property =
+                                parse_user_defined_property(element, &reader, String::new())?;
+                            metadata
+                                .custom_properties
+                                .insert(property.name.clone(), property.value.clone());
+                            metadata.user_defined.push(property);
+                        } else {
+                            parse_metadata_attributes(
+                                &mut metadata,
+                                &namespace,
+                                local_name.as_ref(),
+                                element,
+                                &reader,
+                            )?;
+                        }
+                    }
                 },
+                Event::End(ref element) => {
+                    depth = depth.checked_sub(1).ok_or_else(|| {
+                        Error::InvalidFormat(
+                            "unexpected closing tag in OpenDocument metadata".to_string(),
+                        )
+                    })?;
+                    if meta_depth == Some(depth + 1)
+                        && namespace == KnownNamespace::Office
+                        && element.local_name().as_ref() == b"meta"
+                    {
+                        meta_depth = None;
+                    }
+                },
+                Event::Eof => break,
                 _ => {},
             }
             buf.clear();
@@ -144,130 +256,316 @@ impl OdfMetadata {
         Ok(metadata)
     }
 
-    /// Extract text content from current element
-    fn extract_text_content(
-        reader: &mut quick_xml::Reader<&[u8]>,
-        buf: &mut Vec<u8>,
-    ) -> Result<Option<String>> {
-        let mut content = String::new();
-        let mut depth = 0;
-
-        loop {
-            match reader.read_event_into(buf) {
-                Ok(Event::Start(_)) => {
-                    depth += 1;
-                },
-                Ok(Event::Text(ref t)) if depth == 0 => {
-                    content.push_str(&String::from_utf8(t.to_vec()).unwrap_or_default());
-                },
-                Ok(Event::End(_)) => {
-                    if depth == 0 {
-                        break;
-                    }
-                    depth -= 1;
-                },
-                Ok(Event::Eof) => break,
-                _ => {},
-            }
-        }
-
-        let trimmed = content.trim();
-        if trimmed.is_empty() {
-            Ok(None)
-        } else {
-            Ok(Some(trimmed.to_string()))
-        }
-    }
-
-    /// Parse document statistics
-    fn parse_document_statistics(e: &quick_xml::events::BytesStart) -> Result<DocumentStatistics> {
-        let mut stats = DocumentStatistics::default();
-
-        for attr_result in e.attributes() {
-            let attr = attr_result.map_err(|_| {
-                Error::InvalidFormat("Invalid attribute in document statistics".to_string())
-            })?;
-            let value_str = String::from_utf8(attr.value.to_vec()).map_err(|_| {
-                Error::InvalidFormat("Invalid UTF-8 in document statistics".to_string())
-            })?;
-
-            if let Ok(value) = value_str.parse::<u32>() {
-                match attr.key.as_ref() {
-                    b"meta:page-count" => stats.page_count = Some(value),
-                    b"meta:paragraph-count" => stats.paragraph_count = Some(value),
-                    b"meta:word-count" => stats.word_count = Some(value),
-                    b"meta:character-count" => stats.character_count = Some(value),
-                    b"meta:table-count" => stats.table_count = Some(value),
-                    b"meta:image-count" => stats.image_count = Some(value),
-                    b"meta:object-count" => stats.object_count = Some(value),
-                    _ => {},
-                }
-            }
-        }
-
-        Ok(stats)
-    }
-
-    /// Parse user-defined property
-    fn parse_user_defined_property(
-        e: &quick_xml::events::BytesStart,
-        reader: &mut quick_xml::Reader<&[u8]>,
-        buf: &mut Vec<u8>,
-    ) -> Result<Option<(String, String)>> {
-        let mut name = None;
-
-        // Get property name from attributes
-        for attr_result in e.attributes() {
-            let attr = attr_result.map_err(|_| {
-                Error::InvalidFormat("Invalid attribute in user-defined property".to_string())
-            })?;
-            if attr.key.as_ref() == b"meta:name" {
-                name = Some(String::from_utf8(attr.value.to_vec()).map_err(|_| {
-                    Error::InvalidFormat("Invalid UTF-8 in property name".to_string())
-                })?);
-                break;
-            }
-        }
-
-        if let Some(name) = name {
-            if let Some(value) = Self::extract_text_content(reader, buf)? {
-                Ok(Some((name, value)))
-            } else {
-                Ok(None)
-            }
-        } else {
-            Ok(None)
-        }
-    }
-}
-
-impl OdfMetadata {
     /// Parse a date string into DateTime<Utc>
     fn parse_date(date_str: Option<String>) -> Option<DateTime<Utc>> {
-        date_str.and_then(|s| {
-            // Try different date formats that ODF might use
-            // ISO 8601 format: 2023-10-15T14:30:00Z or 2023-10-15T14:30:00.000Z
-            if let Ok(dt) = DateTime::parse_from_rfc3339(&s) {
-                Some(dt.into())
-            } else if let Ok(dt) = DateTime::parse_from_str(&s, "%Y-%m-%dT%H:%M:%S%.fZ") {
-                Some(dt.into())
-            } else if let Ok(dt) = DateTime::parse_from_str(&s, "%Y-%m-%dT%H:%M:%SZ") {
-                Some(dt.into())
-            } else {
-                // Try simpler date format
-                DateTime::parse_from_str(&s, "%Y-%m-%d")
-                    .ok()
-                    .map(|dt| dt.into())
-            }
+        date_str.and_then(|value| {
+            DateTimeOdf::decode(&value)
+                .ok()
+                .map(|date| date.with_timezone(&Utc))
         })
     }
 }
 
+#[derive(Clone, Copy)]
+enum TextField {
+    Title,
+    Description,
+    Subject,
+    Keyword,
+    Creator,
+    Language,
+    Date,
+    InitialCreator,
+    PrintedBy,
+    CreationDate,
+    PrintDate,
+    Generator,
+    EditingCycles,
+    EditingDuration,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum KnownNamespace {
+    Office,
+    Meta,
+    Dc,
+    Other,
+}
+
+fn known_namespace(namespace: &ResolveResult<'_>) -> KnownNamespace {
+    if namespace_is(namespace, OFFICE_NAMESPACE) {
+        KnownNamespace::Office
+    } else if namespace_is(namespace, META_NAMESPACE) {
+        KnownNamespace::Meta
+    } else if namespace_is(namespace, DC_NAMESPACE) {
+        KnownNamespace::Dc
+    } else {
+        KnownNamespace::Other
+    }
+}
+
+fn namespace_is(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool {
+    matches!(namespace, ResolveResult::Bound(Namespace(uri)) if *uri == expected)
+}
+
+fn text_field(namespace: &KnownNamespace, local_name: &[u8]) -> Option<TextField> {
+    if *namespace == KnownNamespace::Dc {
+        return match local_name {
+            b"title" => Some(TextField::Title),
+            b"description" => Some(TextField::Description),
+            b"subject" => Some(TextField::Subject),
+            b"creator" => Some(TextField::Creator),
+            b"language" => Some(TextField::Language),
+            b"date" => Some(TextField::Date),
+            _ => None,
+        };
+    }
+    if *namespace == KnownNamespace::Meta {
+        return match local_name {
+            b"keyword" => Some(TextField::Keyword),
+            b"initial-creator" => Some(TextField::InitialCreator),
+            b"printed-by" => Some(TextField::PrintedBy),
+            b"creation-date" => Some(TextField::CreationDate),
+            b"print-date" => Some(TextField::PrintDate),
+            b"generator" => Some(TextField::Generator),
+            b"editing-cycles" => Some(TextField::EditingCycles),
+            b"editing-duration" => Some(TextField::EditingDuration),
+            _ => None,
+        };
+    }
+    None
+}
+
+fn assign_text_field(metadata: &mut OdfMetadata, field: TextField, value: String) {
+    match field {
+        TextField::Title => metadata.title = Some(value),
+        TextField::Description => metadata.description = Some(value),
+        TextField::Subject => metadata.subject = Some(value),
+        TextField::Keyword => metadata.keywords.push(value),
+        TextField::Creator => metadata.creator = Some(value),
+        TextField::Language => metadata.language = Some(value),
+        TextField::Date => metadata.modification_date = Some(value),
+        TextField::InitialCreator => metadata.initial_creator = Some(value),
+        TextField::PrintedBy => metadata.printed_by = Some(value),
+        TextField::CreationDate => metadata.creation_date = Some(value),
+        TextField::PrintDate => metadata.print_date = Some(value),
+        TextField::Generator => metadata.generator = Some(value),
+        TextField::EditingCycles => metadata.editing_cycles = Some(value),
+        TextField::EditingDuration => metadata.editing_duration = Some(value),
+    }
+}
+
+fn extract_text_content(reader: &mut NsReader<&[u8]>) -> Result<String> {
+    let mut buffer = Vec::new();
+    let mut content = String::new();
+    loop {
+        let event = reader
+            .read_event_into(&mut buffer)
+            .map_err(metadata_xml_error)?;
+        match event {
+            Event::Text(text) => content.push_str(
+                &text
+                    .xml_content(XmlVersion::Implicit1_0)
+                    .map_err(metadata_xml_error)?,
+            ),
+            Event::CData(text) => content.push_str(
+                &text
+                    .xml_content(XmlVersion::Implicit1_0)
+                    .map_err(metadata_xml_error)?,
+            ),
+            Event::GeneralRef(reference) => {
+                if let Some(character) = reference.resolve_char_ref().map_err(metadata_xml_error)? {
+                    content.push(character);
+                } else {
+                    let name = reference.decode().map_err(metadata_xml_error)?;
+                    let replacement = quick_xml::escape::resolve_predefined_entity(&name)
+                        .ok_or_else(|| {
+                            Error::InvalidFormat(format!(
+                                "unresolved entity '&{name};' in OpenDocument metadata"
+                            ))
+                        })?;
+                    content.push_str(replacement);
+                }
+            },
+            Event::End(_) => return Ok(content),
+            Event::Comment(_) | Event::PI(_) => {},
+            Event::Eof => {
+                return Err(Error::InvalidFormat(
+                    "unexpected end of OpenDocument metadata text".to_string(),
+                ));
+            },
+            _ => {
+                return Err(Error::InvalidFormat(
+                    "nested markup is not allowed in OpenDocument metadata values".to_string(),
+                ));
+            },
+        }
+        buffer.clear();
+    }
+}
+
+fn parse_metadata_attributes(
+    metadata: &mut OdfMetadata,
+    namespace: &KnownNamespace,
+    local_name: &[u8],
+    element: &BytesStart<'_>,
+    reader: &NsReader<&[u8]>,
+) -> Result<()> {
+    if *namespace != KnownNamespace::Meta {
+        return Ok(());
+    }
+    match local_name {
+        b"document-statistic" => {
+            metadata.statistics = parse_document_statistics(element, reader)?;
+        },
+        b"template" => {
+            metadata.template = Some(TemplateMetadata {
+                href: attribute_value(element, reader, XLINK_NAMESPACE, b"href")?,
+                title: attribute_value(element, reader, XLINK_NAMESPACE, b"title")?,
+                date: attribute_value(element, reader, META_NAMESPACE, b"date")?,
+                actuate: attribute_value(element, reader, XLINK_NAMESPACE, b"actuate")?,
+            });
+        },
+        b"auto-reload" => {
+            metadata.auto_reload = Some(AutoReloadMetadata {
+                href: attribute_value(element, reader, XLINK_NAMESPACE, b"href")?,
+                delay: attribute_value(element, reader, META_NAMESPACE, b"delay")?,
+                show: attribute_value(element, reader, XLINK_NAMESPACE, b"show")?,
+                actuate: attribute_value(element, reader, XLINK_NAMESPACE, b"actuate")?,
+            });
+        },
+        b"hyperlink-behaviour" => {
+            metadata.hyperlink_behaviour = Some(HyperlinkBehaviourMetadata {
+                target_frame_name: attribute_value(
+                    element,
+                    reader,
+                    OFFICE_NAMESPACE,
+                    b"target-frame-name",
+                )?,
+                show: attribute_value(element, reader, XLINK_NAMESPACE, b"show")?,
+            });
+        },
+        _ => {},
+    }
+    Ok(())
+}
+
+fn parse_document_statistics(
+    element: &BytesStart<'_>,
+    reader: &NsReader<&[u8]>,
+) -> Result<DocumentStatistics> {
+    let mut statistics = DocumentStatistics::default();
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(metadata_xml_error)?;
+        let (namespace, local_name) = reader.resolver().resolve_attribute(attribute.key);
+        if !namespace_is(&namespace, META_NAMESPACE) {
+            continue;
+        }
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+            .map_err(metadata_xml_error)?
+            .into_owned();
+        if value.is_empty() || !value.bytes().all(|byte| byte.is_ascii_digit()) {
+            return Err(Error::InvalidFormat(format!(
+                "invalid non-negative ODF statistic '{value}'"
+            )));
+        }
+        match local_name.as_ref() {
+            b"page-count" => statistics.page_count = Some(value),
+            b"paragraph-count" => statistics.paragraph_count = Some(value),
+            b"word-count" => statistics.word_count = Some(value),
+            b"character-count" => statistics.character_count = Some(value),
+            b"table-count" => statistics.table_count = Some(value),
+            b"draw-count" => statistics.draw_count = Some(value),
+            b"image-count" => statistics.image_count = Some(value),
+            b"ole-object-count" => statistics.ole_object_count = Some(value),
+            b"object-count" => statistics.object_count = Some(value),
+            b"frame-count" => statistics.frame_count = Some(value),
+            b"sentence-count" => statistics.sentence_count = Some(value),
+            b"syllable-count" => statistics.syllable_count = Some(value),
+            b"non-whitespace-character-count" => {
+                statistics.non_whitespace_character_count = Some(value);
+            },
+            b"row-count" => statistics.row_count = Some(value),
+            b"cell-count" => statistics.cell_count = Some(value),
+            _ => {},
+        }
+    }
+    Ok(statistics)
+}
+
+fn parse_user_defined_property(
+    element: &BytesStart<'_>,
+    reader: &NsReader<&[u8]>,
+    value: String,
+) -> Result<UserDefinedMetadata> {
+    let name = attribute_value(element, reader, META_NAMESPACE, b"name")?.ok_or_else(|| {
+        Error::InvalidFormat("meta:user-defined is missing meta:name".to_string())
+    })?;
+    let value_type = match attribute_value(element, reader, META_NAMESPACE, b"value-type")?
+        .as_deref()
+        .unwrap_or("string")
+    {
+        "float" => UserDefinedValueType::Float,
+        "date" => UserDefinedValueType::Date,
+        "time" => UserDefinedValueType::Time,
+        "boolean" => UserDefinedValueType::Boolean,
+        "string" => UserDefinedValueType::String,
+        value_type => {
+            return Err(Error::InvalidFormat(format!(
+                "unsupported ODF metadata value type '{value_type}'"
+            )));
+        },
+    };
+    Ok(UserDefinedMetadata {
+        name,
+        value_type,
+        value,
+    })
+}
+
+fn attribute_value(
+    element: &BytesStart<'_>,
+    reader: &NsReader<&[u8]>,
+    expected_namespace: &[u8],
+    expected_local_name: &[u8],
+) -> Result<Option<String>> {
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(metadata_xml_error)?;
+        let (namespace, local_name) = reader.resolver().resolve_attribute(attribute.key);
+        if namespace_is(&namespace, expected_namespace)
+            && local_name.as_ref() == expected_local_name
+        {
+            return Ok(Some(
+                attribute
+                    .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                    .map_err(metadata_xml_error)?
+                    .into_owned(),
+            ));
+        }
+    }
+    Ok(None)
+}
+
+fn checked_depth_add(depth: usize) -> Result<usize> {
+    depth.checked_add(1).ok_or_else(|| {
+        Error::InvalidFormat("OpenDocument metadata nesting depth overflow".to_string())
+    })
+}
+
+fn metadata_xml_error(error: impl std::fmt::Display) -> Error {
+    Error::InvalidFormat(format!("XML parsing error in metadata: {error}"))
+}
+
 impl From<OdfMetadata> for Metadata {
     fn from(odf_meta: OdfMetadata) -> Self {
+        let author = odf_meta
+            .initial_creator
+            .clone()
+            .or_else(|| odf_meta.creator.clone());
         Metadata {
             title: odf_meta.title,
-            author: odf_meta.creator,
+            author,
             subject: odf_meta.subject,
             keywords: if odf_meta.keywords.is_empty() {
                 None
@@ -275,15 +573,23 @@ impl From<OdfMetadata> for Metadata {
                 Some(odf_meta.keywords.join(", "))
             },
             description: odf_meta.description,
+            template: odf_meta.template.and_then(|template| template.href),
+            last_modified_by: odf_meta.creator,
+            revision: odf_meta.editing_cycles,
             created: OdfMetadata::parse_date(odf_meta.creation_date),
             modified: OdfMetadata::parse_date(odf_meta.modification_date),
-            page_count: odf_meta.statistics.page_count,
-            word_count: odf_meta.statistics.word_count,
-            character_count: odf_meta.statistics.character_count,
+            page_count: parse_u32_count(odf_meta.statistics.page_count),
+            word_count: parse_u32_count(odf_meta.statistics.word_count),
+            character_count: parse_u32_count(odf_meta.statistics.character_count),
             application: odf_meta.generator,
+            last_printed_time: OdfMetadata::parse_date(odf_meta.print_date),
             ..Default::default()
         }
     }
+}
+
+fn parse_u32_count(value: Option<String>) -> Option<u32> {
+    value.and_then(|value| value.parse().ok())
 }
 
 #[cfg(test)]
@@ -323,7 +629,8 @@ mod tests {
     #[test]
     fn test_odf_metadata_from_xml_title() {
         let xml = r#"<?xml version="1.0"?>
-<office:document-meta xmlns:dc="http://purl.org/dc/elements/1.1/">
+<office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+                      xmlns:dc="http://purl.org/dc/elements/1.1/">
     <office:meta>
         <dc:title>Test Document</dc:title>
     </office:meta>
@@ -336,7 +643,8 @@ mod tests {
     #[test]
     fn test_odf_metadata_from_xml_creator() {
         let xml = r#"<?xml version="1.0"?>
-<office:document-meta xmlns:dc="http://purl.org/dc/elements/1.1/">
+<office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+                      xmlns:dc="http://purl.org/dc/elements/1.1/">
     <office:meta>
         <dc:creator>John Doe</dc:creator>
     </office:meta>
@@ -349,7 +657,8 @@ mod tests {
     #[test]
     fn test_odf_metadata_from_xml_description() {
         let xml = r#"<?xml version="1.0"?>
-<office:document-meta xmlns:dc="http://purl.org/dc/elements/1.1/">
+<office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+                      xmlns:dc="http://purl.org/dc/elements/1.1/">
     <office:meta>
         <dc:description>This is a test document</dc:description>
     </office:meta>
@@ -365,7 +674,8 @@ mod tests {
     #[test]
     fn test_odf_metadata_from_xml_subject() {
         let xml = r#"<?xml version="1.0"?>
-<office:document-meta xmlns:dc="http://purl.org/dc/elements/1.1/">
+<office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+                      xmlns:dc="http://purl.org/dc/elements/1.1/">
     <office:meta>
         <dc:subject>Testing</dc:subject>
     </office:meta>
@@ -378,7 +688,8 @@ mod tests {
     #[test]
     fn test_odf_metadata_from_xml_keywords() {
         let xml = r#"<?xml version="1.0"?>
-<office:document-meta xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0">
+<office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+                      xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0">
     <office:meta>
         <meta:keyword>rust</meta:keyword>
         <meta:keyword>odf</meta:keyword>
@@ -393,7 +704,8 @@ mod tests {
     #[test]
     fn test_odf_metadata_from_xml_language() {
         let xml = r#"<?xml version="1.0"?>
-<office:document-meta xmlns:dc="http://purl.org/dc/elements/1.1/">
+<office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+                      xmlns:dc="http://purl.org/dc/elements/1.1/">
     <office:meta>
         <dc:language>en-US</dc:language>
     </office:meta>
@@ -406,7 +718,8 @@ mod tests {
     #[test]
     fn test_odf_metadata_from_xml_dates() {
         let xml = r#"<?xml version="1.0"?>
-<office:document-meta xmlns:dc="http://purl.org/dc/elements/1.1/"
+<office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+                      xmlns:dc="http://purl.org/dc/elements/1.1/"
                       xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0">
     <office:meta>
         <meta:creation-date>2024-01-15T10:30:00Z</meta:creation-date>
@@ -425,7 +738,8 @@ mod tests {
     #[test]
     fn test_odf_metadata_from_xml_generator() {
         let xml = r#"<?xml version="1.0"?>
-<office:document-meta xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0">
+<office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+                      xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0">
     <office:meta>
         <meta:generator>LibreOffice/7.0</meta:generator>
     </office:meta>
@@ -440,7 +754,8 @@ mod tests {
         // Note: The parser handles empty document-statistic elements
         // Statistics are parsed from attributes on the Start event
         let xml = r#"<?xml version="1.0"?>
-<office:document-meta xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0">
+<office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+                      xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0">
     <office:meta>
         <meta:document-statistic meta:page-count="5"
                                  meta:paragraph-count="42"
@@ -454,19 +769,20 @@ mod tests {
 
         let meta = OdfMetadata::from_xml(xml).unwrap();
         // The statistics parsing happens on Start event with attributes
-        assert_eq!(meta.statistics.page_count, Some(5));
-        assert_eq!(meta.statistics.paragraph_count, Some(42));
-        assert_eq!(meta.statistics.word_count, Some(350));
-        assert_eq!(meta.statistics.character_count, Some(2100));
-        assert_eq!(meta.statistics.table_count, Some(3));
-        assert_eq!(meta.statistics.image_count, Some(2));
-        assert_eq!(meta.statistics.object_count, Some(1));
+        assert_eq!(meta.statistics.page_count.as_deref(), Some("5"));
+        assert_eq!(meta.statistics.paragraph_count.as_deref(), Some("42"));
+        assert_eq!(meta.statistics.word_count.as_deref(), Some("350"));
+        assert_eq!(meta.statistics.character_count.as_deref(), Some("2100"));
+        assert_eq!(meta.statistics.table_count.as_deref(), Some("3"));
+        assert_eq!(meta.statistics.image_count.as_deref(), Some("2"));
+        assert_eq!(meta.statistics.object_count.as_deref(), Some("1"));
     }
 
     #[test]
     fn test_odf_metadata_from_xml_user_defined() {
         let xml = r#"<?xml version="1.0"?>
-<office:document-meta xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0">
+<office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+                      xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0">
     <office:meta>
         <meta:user-defined meta:name="Department">Engineering</meta:user-defined>
         <meta:user-defined meta:name="Project">Alpha</meta:user-defined>
@@ -487,7 +803,8 @@ mod tests {
     #[test]
     fn test_odf_metadata_from_xml_full() {
         let xml = r#"<?xml version="1.0"?>
-<office:document-meta xmlns:dc="http://purl.org/dc/elements/1.1/"
+<office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+                      xmlns:dc="http://purl.org/dc/elements/1.1/"
                       xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0">
     <office:meta>
         <dc:title>Full Test Document</dc:title>
@@ -516,7 +833,120 @@ mod tests {
         );
         assert_eq!(meta.generator, Some("Test Generator".to_string()));
         assert_eq!(meta.keywords, vec!["test"]);
-        assert_eq!(meta.statistics.page_count, Some(10));
+        assert_eq!(meta.statistics.page_count.as_deref(), Some("10"));
+    }
+
+    #[test]
+    fn parses_namespaces_entities_and_complete_metadata_without_annotation_leakage() {
+        let xml = r#"<?xml version="1.0"?>
+<o:document xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+            xmlns:m="urn:oasis:names:tc:opendocument:xmlns:meta:1.0"
+            xmlns:d="http://purl.org/dc/elements/1.1/"
+            xmlns:x="http://www.w3.org/1999/xlink">
+  <o:meta>
+    <d:title>R&amp;D &#x1F34B;</d:title>
+    <d:creator>Last Editor</d:creator>
+    <m:initial-creator>Original Author</m:initial-creator>
+    <m:printed-by>Print Operator</m:printed-by>
+    <m:print-date>2025-04-03T02:01:00</m:print-date>
+    <m:editing-cycles>0000000000000000000000007</m:editing-cycles>
+    <m:editing-duration>PT1H2M3.0000000001S</m:editing-duration>
+    <m:template x:href="Templates/A&amp;B.ott" x:title="A &amp; B" m:date="2024-01-02T03:04:05" x:actuate="onRequest"/>
+    <m:auto-reload x:href="next.fodt" m:delay="PT5M" x:show="replace" x:actuate="onLoad"/>
+    <m:hyperlink-behaviour o:target-frame-name="_blank" x:show="new"/>
+    <m:document-statistic m:page-count="184467440737095516160"
+      m:table-count="1" m:draw-count="2" m:image-count="3"
+      m:ole-object-count="4" m:object-count="5" m:paragraph-count="6"
+      m:word-count="7" m:character-count="8" m:frame-count="9"
+      m:sentence-count="10" m:syllable-count="11"
+      m:non-whitespace-character-count="12" m:row-count="13" m:cell-count="14"/>
+    <m:user-defined m:name="Flag" m:value-type="boolean">true</m:user-defined>
+    <m:user-defined m:name="Flag" m:value-type="string"><![CDATA[A&B]]></m:user-defined>
+  </o:meta>
+  <o:body><o:text><o:annotation><d:creator>Annotation Author</d:creator></o:annotation></o:text></o:body>
+</o:document>"#;
+
+        let metadata = OdfMetadata::from_xml(xml).unwrap();
+        assert_eq!(metadata.title.as_deref(), Some("R&D 🍋"));
+        assert_eq!(metadata.creator.as_deref(), Some("Last Editor"));
+        assert_eq!(metadata.initial_creator.as_deref(), Some("Original Author"));
+        assert_eq!(metadata.printed_by.as_deref(), Some("Print Operator"));
+        assert_eq!(
+            metadata.editing_cycles.as_deref(),
+            Some("0000000000000000000000007")
+        );
+        assert_eq!(
+            metadata.editing_duration.as_deref(),
+            Some("PT1H2M3.0000000001S")
+        );
+
+        let template = metadata.template.as_ref().unwrap();
+        assert_eq!(template.href.as_deref(), Some("Templates/A&B.ott"));
+        assert_eq!(template.title.as_deref(), Some("A & B"));
+        assert_eq!(template.actuate.as_deref(), Some("onRequest"));
+        let auto_reload = metadata.auto_reload.as_ref().unwrap();
+        assert_eq!(auto_reload.href.as_deref(), Some("next.fodt"));
+        assert_eq!(auto_reload.delay.as_deref(), Some("PT5M"));
+        let hyperlink = metadata.hyperlink_behaviour.as_ref().unwrap();
+        assert_eq!(hyperlink.target_frame_name.as_deref(), Some("_blank"));
+        assert_eq!(hyperlink.show.as_deref(), Some("new"));
+
+        assert_eq!(
+            metadata.statistics.page_count.as_deref(),
+            Some("184467440737095516160")
+        );
+        assert_eq!(metadata.statistics.draw_count.as_deref(), Some("2"));
+        assert_eq!(metadata.statistics.ole_object_count.as_deref(), Some("4"));
+        assert_eq!(metadata.statistics.frame_count.as_deref(), Some("9"));
+        assert_eq!(metadata.statistics.sentence_count.as_deref(), Some("10"));
+        assert_eq!(metadata.statistics.syllable_count.as_deref(), Some("11"));
+        assert_eq!(
+            metadata
+                .statistics
+                .non_whitespace_character_count
+                .as_deref(),
+            Some("12")
+        );
+        assert_eq!(metadata.statistics.row_count.as_deref(), Some("13"));
+        assert_eq!(metadata.statistics.cell_count.as_deref(), Some("14"));
+
+        assert_eq!(metadata.user_defined.len(), 2);
+        assert_eq!(
+            metadata.user_defined[0].value_type,
+            UserDefinedValueType::Boolean
+        );
+        assert_eq!(metadata.user_defined[0].value, "true");
+        assert_eq!(
+            metadata.user_defined[1].value_type,
+            UserDefinedValueType::String
+        );
+        assert_eq!(metadata.user_defined[1].value, "A&B");
+        assert_eq!(
+            metadata.custom_properties.get("Flag").map(String::as_str),
+            Some("A&B")
+        );
+
+        let common: Metadata = metadata.into();
+        assert_eq!(common.author.as_deref(), Some("Original Author"));
+        assert_eq!(common.last_modified_by.as_deref(), Some("Last Editor"));
+        assert_eq!(common.template.as_deref(), Some("Templates/A&B.ott"));
+        assert_eq!(
+            common.revision.as_deref(),
+            Some("0000000000000000000000007")
+        );
+        assert_eq!(common.page_count, None);
+        assert!(common.last_printed_time.is_some());
+    }
+
+    #[test]
+    fn rejects_invalid_statistic_and_nested_simple_metadata() {
+        for xml in [
+            r#"<o:document-meta xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:m="urn:oasis:names:tc:opendocument:xmlns:meta:1.0"><o:meta><m:document-statistic m:page-count="-1"/></o:meta></o:document-meta>"#,
+            r#"<o:document-meta xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:d="http://purl.org/dc/elements/1.1/"><o:meta><d:title>bad<d:subject>nested</d:subject></d:title></o:meta></o:document-meta>"#,
+            r#"<o:document-meta xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:m="urn:oasis:names:tc:opendocument:xmlns:meta:1.0"><o:meta><m:user-defined>missing name</m:user-defined></o:meta></o:document-meta>"#,
+        ] {
+            assert!(OdfMetadata::from_xml(xml).is_err(), "accepted {xml}");
+        }
     }
 
     #[test]
@@ -576,9 +1006,9 @@ mod tests {
             modification_date: Some("2024-06-01T00:00:00Z".to_string()),
             generator: Some("App".to_string()),
             statistics: DocumentStatistics {
-                page_count: Some(5),
-                word_count: Some(100),
-                character_count: Some(500),
+                page_count: Some("5".to_string()),
+                word_count: Some("100".to_string()),
+                character_count: Some("500".to_string()),
                 ..Default::default()
             },
             ..Default::default()

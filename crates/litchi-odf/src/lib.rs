@@ -246,6 +246,10 @@ mod odt;
 
 // Re-export common utilities for convenience
 // These are used across all Office formats, not ODF-specific
+pub use core::{
+    AutoReloadMetadata, DocumentStatistics, HyperlinkBehaviourMetadata, OdfMetadata,
+    TemplateMetadata, UserDefinedMetadata, UserDefinedValueType,
+};
 pub use generic::{FlatOpenDocument, OpenDocumentFamily, OpenDocumentPackage};
 pub use litchi_core::RGBColor as Color;
 pub use litchi_core::unit::{Length, LengthUnit};
