@@ -1,5 +1,6 @@
 //! Cell representation for XLS files
 
+use crate::xls::formula::render_formula;
 use crate::xls::records::{BoolErrValue, CellRecord, FormulaValue};
 use crate::xls::utils;
 use litchi_core::sheet::{Cell, CellValue};
@@ -11,6 +12,7 @@ pub struct XlsCell {
     col: u32,
     value: CellValue,
     formula: Option<String>,
+    formula_bytes: Option<Vec<u8>>,
     shared_string_index: Option<u32>,
 }
 
@@ -22,6 +24,7 @@ impl XlsCell {
             col,
             value,
             formula: None,
+            formula_bytes: None,
             shared_string_index: None,
         }
     }
@@ -33,6 +36,7 @@ impl XlsCell {
             col,
             value,
             formula: Some(formula),
+            formula_bytes: None,
             shared_string_index: None,
         }
     }
@@ -43,19 +47,26 @@ impl XlsCell {
             CellRecord::LabelSst { sst_index, .. } => Some(*sst_index),
             _ => None,
         };
-        let (row, col, value, formula) = match record {
+        let (row, col, value, formula, formula_bytes) = match record {
             CellRecord::Blank { row, col, .. } => {
-                (*row as u32, *col as u32, CellValue::Empty, None)
+                (*row as u32, *col as u32, CellValue::Empty, None, None)
             },
             CellRecord::Number {
                 row, col, value, ..
-            } => (*row as u32, *col as u32, CellValue::Float(*value), None),
+            } => (
+                *row as u32,
+                *col as u32,
+                CellValue::Float(*value),
+                None,
+                None,
+            ),
             CellRecord::Label {
                 row, col, value, ..
             } => (
                 *row as u32,
                 *col as u32,
                 CellValue::String(value.clone()),
+                None,
                 None,
             ),
             CellRecord::BoolErr {
@@ -65,11 +76,17 @@ impl XlsCell {
                     BoolErrValue::Bool(b) => CellValue::Bool(*b),
                     BoolErrValue::Error(e) => CellValue::Error(format!("Error {}", e)),
                 };
-                (*row as u32, *col as u32, cell_value, None)
+                (*row as u32, *col as u32, cell_value, None, None)
             },
             CellRecord::Rk {
                 row, col, value, ..
-            } => (*row as u32, *col as u32, CellValue::Float(*value), None),
+            } => (
+                *row as u32,
+                *col as u32,
+                CellValue::Float(*value),
+                None,
+                None,
+            ),
             CellRecord::LabelSst {
                 row,
                 col,
@@ -89,7 +106,7 @@ impl XlsCell {
                 } else {
                     CellValue::Error("SST not available".to_string())
                 };
-                (*row as u32, *col as u32, cell_value, None)
+                (*row as u32, *col as u32, cell_value, None, None)
             },
             CellRecord::Formula {
                 row,
@@ -107,11 +124,14 @@ impl XlsCell {
                     FormulaValue::Empty => CellValue::Empty,
                 };
 
-                // For now, just store the raw formula bytes as a placeholder
-                // A full implementation would parse the formula
-                let formula_str = format!("Formula({} bytes)", formula.len());
-
-                (*row as u32, *col as u32, cell_value, Some(formula_str))
+                let formula_text = render_formula(formula);
+                (
+                    *row as u32,
+                    *col as u32,
+                    cell_value,
+                    formula_text,
+                    Some(formula.clone()),
+                )
             },
         };
 
@@ -120,6 +140,7 @@ impl XlsCell {
             col,
             value,
             formula,
+            formula_bytes,
             shared_string_index,
         })
     }
@@ -127,6 +148,20 @@ impl XlsCell {
     /// Original SST index for a BIFF `LabelSst` cell.
     pub fn shared_string_index(&self) -> Option<u32> {
         self.shared_string_index
+    }
+
+    /// Formula text rendered from BIFF tokens, or supplied when constructed.
+    ///
+    /// Workbook-dependent formulas that require name or external-sheet tables
+    /// return `None`; their original token stream remains available through
+    /// [`Self::formula_bytes`].
+    pub fn formula(&self) -> Option<&str> {
+        self.formula.as_deref()
+    }
+
+    /// Original BIFF formula token stream for cells read from a workbook.
+    pub fn formula_bytes(&self) -> Option<&[u8]> {
+        self.formula_bytes.as_deref()
     }
 }
 
@@ -148,7 +183,7 @@ impl Cell for XlsCell {
     }
 
     fn is_formula(&self) -> bool {
-        self.formula.is_some()
+        self.formula.is_some() || self.formula_bytes.is_some()
     }
 }
 
@@ -196,6 +231,8 @@ mod tests {
         assert_eq!(cell.column(), 2);
         assert_eq!(cell.coordinate(), "C2");
         assert!(cell.is_formula());
+        assert_eq!(cell.formula(), Some("=A1+B1"));
+        assert_eq!(cell.formula_bytes(), None);
     }
 
     #[test]
@@ -343,15 +380,18 @@ mod tests {
 
     #[test]
     fn test_from_record_formula_number() {
+        let formula = vec![0x1e, 0x02, 0x00, 0x1e, 0x03, 0x00, 0x03];
         let record = CellRecord::Formula {
             row: 0,
             col: 0,
             xf_index: 0,
             value: FormulaValue::Number(std::f64::consts::PI),
-            formula: vec![0x01, 0x02, 0x03],
+            formula: formula.clone(),
         };
         let cell = XlsCell::from_record(&record, None).unwrap();
         assert!(cell.is_formula());
+        assert_eq!(cell.formula(), Some("=(2+3)"));
+        assert_eq!(cell.formula_bytes(), Some(formula.as_slice()));
         if let CellValue::Float(v) = cell.value() {
             assert!((v - std::f64::consts::PI).abs() < 0.001);
         } else {
@@ -409,6 +449,25 @@ mod tests {
         };
         let cell = XlsCell::from_record(&record, None).unwrap();
         assert!(matches!(cell.value(), CellValue::Empty));
+        assert!(cell.is_formula());
+        assert_eq!(cell.formula(), None);
+        assert_eq!(cell.formula_bytes(), Some([].as_slice()));
+    }
+
+    #[test]
+    fn test_unsupported_formula_retains_original_tokens() {
+        let formula = vec![0x3a, 0, 0, 0, 0, 0, 0];
+        let record = CellRecord::Formula {
+            row: 0,
+            col: 0,
+            xf_index: 0,
+            value: FormulaValue::Number(1.0),
+            formula: formula.clone(),
+        };
+        let cell = XlsCell::from_record(&record, None).unwrap();
+        assert!(cell.is_formula());
+        assert_eq!(cell.formula(), None);
+        assert_eq!(cell.formula_bytes(), Some(formula.as_slice()));
     }
 
     #[test]

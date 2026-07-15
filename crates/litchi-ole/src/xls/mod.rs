@@ -20,6 +20,9 @@ mod worksheet;
 /// Cell value parsing and representation
 mod cell;
 
+/// BIFF formula token rendering
+mod formula;
+
 /// Shape extraction
 pub mod shapes;
 

@@ -251,10 +251,15 @@ impl FormulaTokenizer {
                 // Check if it's a function call
                 if i < chars.len() && chars[i] == '(' {
                     let func_name = token.to_uppercase();
-                    if let Some(&func_idx) = self.functions.get(&func_name) {
-                        // For simplicity, assume 1 argument (full implementation would parse args)
-                        operators.push(("FUNC", func_idx, 1));
+                    let func_idx = self.functions.get(&func_name).copied().ok_or_else(|| {
+                        XlsError::InvalidData(format!("Unknown function: {func_name}"))
+                    })?;
+                    let mut next = i + 1;
+                    while next < chars.len() && chars[next].is_whitespace() {
+                        next += 1;
                     }
+                    let argc = u8::from(next >= chars.len() || chars[next] != ')');
+                    operators.push(("FUNC", func_idx, argc));
                     operators.push(("(", 0, 0));
                     i += 1; // Skip '('
                 } else {
@@ -294,6 +299,10 @@ impl FormulaTokenizer {
                             self.push_operator(&mut output, op)?;
                         }
                     }
+                    if operators.last().is_some_and(|(op, _, _)| *op == "FUNC") {
+                        let (_, func_idx, argc) = operators.pop().unwrap();
+                        output.push(Ptg::PtgFunc(func_idx, argc));
+                    }
                 },
                 "+" | "-" | "*" | "/" | "^" | "&" | "=" | "<" | ">" => {
                     self.handle_operator(&mut output, &mut operators, &op_str)?;
@@ -311,6 +320,24 @@ impl FormulaTokenizer {
                             self.push_operator(&mut output, op)?;
                         }
                     }
+                    let open_paren = operators
+                        .iter()
+                        .rposition(|(op, _, _)| *op == "(")
+                        .ok_or_else(|| {
+                            XlsError::InvalidData("Argument separator outside function".to_string())
+                        })?;
+                    let function = open_paren.checked_sub(1).ok_or_else(|| {
+                        XlsError::InvalidData("Argument separator outside function".to_string())
+                    })?;
+                    let (op, _, argc) = &mut operators[function];
+                    if *op != "FUNC" {
+                        return Err(XlsError::InvalidData(
+                            "Argument separator outside function".to_string(),
+                        ));
+                    }
+                    *argc = argc.checked_add(1).ok_or_else(|| {
+                        XlsError::InvalidData("Too many function arguments".to_string())
+                    })?;
                 },
                 _ => {
                     return Err(XlsError::InvalidData(format!(
@@ -425,11 +452,23 @@ pub fn encode_ptg_tokens(tokens: &[Ptg]) -> Vec<u8> {
             },
             Ptg::PtgStr(s) => {
                 bytes.push(0x17); // PtgStr
-                let s_bytes = s.as_bytes();
-                let len = s_bytes.len().min(255) as u8;
-                bytes.push(len);
-                bytes.push(0); // String flags (uncompressed)
-                bytes.extend_from_slice(&s_bytes[..len as usize]);
+                let mut utf16: Vec<u16> = s.encode_utf16().take(255).collect();
+                if utf16
+                    .last()
+                    .is_some_and(|unit| (0xd800..=0xdbff).contains(unit))
+                {
+                    utf16.pop();
+                }
+                bytes.push(utf16.len() as u8);
+                if utf16.iter().all(|unit| *unit <= 0xff) {
+                    bytes.push(0); // Compressed Unicode
+                    bytes.extend(utf16.iter().map(|unit| *unit as u8));
+                } else {
+                    bytes.push(1); // UTF-16LE
+                    for unit in utf16 {
+                        bytes.extend_from_slice(&unit.to_le_bytes());
+                    }
+                }
             },
             Ptg::PtgRef(row, col, row_rel, col_rel) => {
                 bytes.push(0x24); // PtgRef
@@ -483,7 +522,7 @@ pub fn encode_ptg_tokens(tokens: &[Ptg]) -> Vec<u8> {
             Ptg::PtgGT => bytes.push(0x0D),
             Ptg::PtgNE => bytes.push(0x0E),
             Ptg::PtgFunc(func_idx, argc) => {
-                bytes.push(0x41); // PtgFuncVar
+                bytes.push(0x42); // PtgFuncVar, value operand class
                 bytes.push(*argc);
                 bytes.extend_from_slice(&func_idx.to_le_bytes());
             },
@@ -665,6 +704,21 @@ mod tests {
     }
 
     #[test]
+    fn test_tokenize_function_arguments_and_following_operator() {
+        let tokenizer = FormulaTokenizer::new();
+        let tokens = tokenizer.tokenize("ROUND(A1,2)+SUM()").unwrap();
+        assert!(matches!(tokens[2], Ptg::PtgFunc(27, 2)));
+        assert!(matches!(tokens[3], Ptg::PtgFunc(4, 0)));
+        assert!(matches!(tokens[4], Ptg::PtgAdd));
+    }
+
+    #[test]
+    fn test_tokenize_unknown_function_is_rejected() {
+        let tokenizer = FormulaTokenizer::new();
+        assert!(tokenizer.tokenize("MADEUP(A1)").is_err());
+    }
+
+    #[test]
     fn test_tokenize_precedence() {
         let tokenizer = FormulaTokenizer::new();
         // Multiplication has higher precedence than addition
@@ -758,6 +812,20 @@ mod tests {
     }
 
     #[test]
+    fn test_encode_ptg_str_as_utf16_when_required() {
+        let bytes = encode_ptg_tokens(&[Ptg::PtgStr("你好".to_string())]);
+        assert_eq!(bytes, [0x17, 2, 1, 0x60, 0x4f, 0x7d, 0x59]);
+    }
+
+    #[test]
+    fn test_encode_ptg_str_does_not_split_surrogate_pair_at_limit() {
+        let value = format!("{}😀", "a".repeat(254));
+        let bytes = encode_ptg_tokens(&[Ptg::PtgStr(value)]);
+        assert_eq!(bytes[1], 254);
+        assert_eq!(bytes.len(), 257);
+    }
+
+    #[test]
     fn test_encode_ptg_area() {
         let tokens = vec![Ptg::PtgArea(0, 5, 0, 3)];
         let bytes = encode_ptg_tokens(&tokens);
@@ -777,7 +845,7 @@ mod tests {
     fn test_encode_ptg_func() {
         let tokens = vec![Ptg::PtgFunc(4, 1)]; // SUM with 1 arg
         let bytes = encode_ptg_tokens(&tokens);
-        assert_eq!(bytes[0], 0x41); // PtgFuncVar opcode
+        assert_eq!(bytes[0], 0x42); // PtgFuncVar opcode, value operand class
         assert_eq!(bytes[1], 1); // Arg count
     }
 
