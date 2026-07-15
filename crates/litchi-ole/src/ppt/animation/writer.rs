@@ -10,7 +10,8 @@ use super::types::{
     TimeBehaviorAtom, TimeBehaviorProperty, TimeBehaviorPropertyList, TimeColorBehavior,
     TimeColorBehaviorAtom, TimeColorDirection, TimeColorModel, TimeCommandBehavior,
     TimeCommandBehaviorAtom, TimeCommandBehaviorType, TimeCondition, TimeConditionAtom,
-    TimeConditionType, TimeEffectNodeType, TimeEffectType, TimeIterateData, TimeIterateDirection,
+    TimeConditionType, TimeEffectBehavior, TimeEffectBehaviorAtom, TimeEffectNodeType,
+    TimeEffectTransition, TimeEffectType, TimeIterateData, TimeIterateDirection,
     TimeIterateIntervalType, TimeIterateType, TimeMasterRelation, TimeModifier, TimeNodeAtom,
     TimeNodeProperty, TimeNodePropertyList, TimePropertyListContext, TimeRotationBehavior,
     TimeRotationBehaviorAtom, TimeRotationDirection, TimeScaleBehavior, TimeScaleBehaviorAtom,
@@ -579,6 +580,103 @@ fn validate_color_behavior(atom: &TimeColorBehaviorAtom, behavior: &TimeBehavior
             "direction-used flag requires a color direction property".to_string(),
         ));
     }
+    Ok(())
+}
+
+/// Serialize an exact image-effect behavior container.
+pub fn write_time_effect_behavior(effect: &TimeEffectBehavior) -> Result<Vec<u8>> {
+    validate_effect_behavior(effect)?;
+    let mut children = write_time_effect_behavior_atom(&effect.atom);
+    if let Some(filter) = effect.filter {
+        append_time_variant(
+            &mut children,
+            1,
+            encode_time_variant_string(filter.as_str()),
+        )?;
+    }
+    if let Some(progress) = effect.progress {
+        let mut data = vec![2];
+        data.extend(progress.to_le_bytes());
+        append_time_variant(&mut children, 2, data)?;
+    }
+    if let Some(runtime_context) = &effect.runtime_context {
+        append_time_variant(
+            &mut children,
+            3,
+            encode_time_variant_string(runtime_context),
+        )?;
+    }
+    children.extend(write_time_behavior(&effect.behavior)?);
+    wrap_record(
+        PptRecordType::TimeEffectBehaviorContainer,
+        0x0F,
+        0,
+        children,
+    )
+}
+
+/// Serialize an exact `TimeEffectBehaviorAtom`.
+pub fn write_time_effect_behavior_atom(atom: &TimeEffectBehaviorAtom) -> Vec<u8> {
+    let flags = u32::from(atom.transition.is_some())
+        | (u32::from(atom.filter_used) << 1)
+        | (u32::from(atom.progress_used) << 2)
+        | (u32::from(atom.runtime_context_used) << 3);
+    let transition = atom.transition.map_or(0u32, |value| match value {
+        TimeEffectTransition::In => 0,
+        TimeEffectTransition::Out => 1,
+    });
+    let mut result = create_record_header(PptRecordType::TimeEffectBehavior, 0, 0, 8);
+    result.extend(flags.to_le_bytes());
+    result.extend(transition.to_le_bytes());
+    result
+}
+
+fn validate_effect_behavior(effect: &TimeEffectBehavior) -> Result<()> {
+    if effect.atom.filter_used && effect.filter.is_none() {
+        return Err(PptError::InvalidFormat(
+            "image-effect filter-use flag requires a filter".to_string(),
+        ));
+    }
+    if effect.atom.progress_used && effect.progress.is_none() {
+        return Err(PptError::InvalidFormat(
+            "image-effect progress-use flag requires progress".to_string(),
+        ));
+    }
+    if effect.atom.runtime_context_used && effect.runtime_context.is_none() {
+        return Err(PptError::InvalidFormat(
+            "image-effect runtime-context-use flag requires a runtime context".to_string(),
+        ));
+    }
+    if effect
+        .progress
+        .is_some_and(|value| !(0.0..=1.0).contains(&value))
+    {
+        return Err(PptError::InvalidFormat(
+            "image-effect progress must be between zero and one".to_string(),
+        ));
+    }
+    if effect
+        .runtime_context
+        .as_deref()
+        .is_some_and(|value| !is_valid_runtime_context(value))
+    {
+        return Err(PptError::InvalidFormat(
+            "invalid image-effect runtime context".to_string(),
+        ));
+    }
+    validate_basic_behavior_properties(&effect.behavior)
+}
+
+fn append_time_variant(children: &mut Vec<u8>, instance: u16, data: Vec<u8>) -> Result<()> {
+    let length = u32::try_from(data.len())
+        .map_err(|_| PptError::InvalidFormat("time variant exceeds 4 GiB".to_string()))?;
+    children.extend(create_record_header(
+        PptRecordType::TimeVariant,
+        0,
+        instance,
+        length,
+    ));
+    children.extend(data);
     Ok(())
 }
 

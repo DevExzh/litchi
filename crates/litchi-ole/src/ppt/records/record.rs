@@ -140,6 +140,7 @@ impl PptRecord {
                 | PptRecordType::TimeConditionContainer
                 | PptRecordType::TimeBehaviorContainer
                 | PptRecordType::TimeColorBehaviorContainer
+                | PptRecordType::TimeEffectBehaviorContainer
                 | PptRecordType::TimeRotationBehaviorContainer
                 | PptRecordType::TimeScaleBehaviorContainer
                 | PptRecordType::TimeCommandBehaviorContainer

@@ -12,14 +12,15 @@ use super::types::{
     TimeBehavior, TimeBehaviorAdditive, TimeBehaviorAtom, TimeBehaviorProperty,
     TimeBehaviorPropertyList, TimeColorBehavior, TimeColorBehaviorAtom, TimeColorDirection,
     TimeColorModel, TimeCommandBehavior, TimeCommandBehaviorAtom, TimeCommandBehaviorType,
-    TimeCondition, TimeConditionAtom, TimeConditionType, TimeEffectNodeType, TimeEffectType,
-    TimeIterateData, TimeIterateDirection, TimeIterateIntervalType, TimeIterateType,
-    TimeMasterRelation, TimeModifier, TimeNodeAtom, TimeNodeFill, TimeNodeKind, TimeNodeProperty,
-    TimeNodePropertyList, TimeNodeRestart, TimePropertyListContext, TimeRotationBehavior,
-    TimeRotationBehaviorAtom, TimeRotationDirection, TimeScaleBehavior, TimeScaleBehaviorAtom,
-    TimeSequenceData, TimeSequenceNextAction, TimeSequencePreviousAction, TimeTriggerEvent,
-    TimeTriggerObject, TimeVisualElement, TimeVisualElementKind, is_valid_runtime_context,
-    is_valid_time_filter, is_valid_time_points_types,
+    TimeCondition, TimeConditionAtom, TimeConditionType, TimeEffectBehavior,
+    TimeEffectBehaviorAtom, TimeEffectFilter, TimeEffectNodeType, TimeEffectTransition,
+    TimeEffectType, TimeIterateData, TimeIterateDirection, TimeIterateIntervalType,
+    TimeIterateType, TimeMasterRelation, TimeModifier, TimeNodeAtom, TimeNodeFill, TimeNodeKind,
+    TimeNodeProperty, TimeNodePropertyList, TimeNodeRestart, TimePropertyListContext,
+    TimeRotationBehavior, TimeRotationBehaviorAtom, TimeRotationDirection, TimeScaleBehavior,
+    TimeScaleBehaviorAtom, TimeSequenceData, TimeSequenceNextAction, TimeSequencePreviousAction,
+    TimeTriggerEvent, TimeTriggerObject, TimeVisualElement, TimeVisualElementKind,
+    is_valid_runtime_context, is_valid_time_filter, is_valid_time_points_types,
 };
 use crate::consts::PptRecordType;
 use crate::ppt::package::{PptError, Result};
@@ -742,6 +743,146 @@ fn validate_color_behavior(atom: &TimeColorBehaviorAtom, behavior: &TimeBehavior
         ));
     }
     Ok(())
+}
+
+/// Parse an exact image-effect behavior container.
+pub fn parse_time_effect_behavior(record: &PptRecord) -> Result<TimeEffectBehavior> {
+    require_container(
+        record,
+        PptRecordType::TimeEffectBehaviorContainer,
+        0,
+        "TimeEffectBehaviorContainer",
+    )?;
+    let atom = record
+        .children
+        .first()
+        .ok_or_else(|| PptError::InvalidFormat("effect behavior has no atom".to_string()))
+        .and_then(parse_time_effect_behavior_atom)?;
+    let mut index = 1;
+    let filter =
+        if record.children.get(index).is_some_and(|child| {
+            child.record_type == PptRecordType::TimeVariant && child.instance == 1
+        }) {
+            let value = parse_time_variant_string(&record.children[index])?;
+            index += 1;
+            Some(TimeEffectFilter::parse(&value).ok_or_else(|| {
+                PptError::InvalidFormat(format!("invalid image-effect filter {value}"))
+            })?)
+        } else {
+            None
+        };
+    let progress =
+        if record.children.get(index).is_some_and(|child| {
+            child.record_type == PptRecordType::TimeVariant && child.instance == 2
+        }) {
+            let value = parse_time_variant_f32(&record.children[index])?;
+            index += 1;
+            Some(value)
+        } else {
+            None
+        };
+    let runtime_context =
+        if record.children.get(index).is_some_and(|child| {
+            child.record_type == PptRecordType::TimeVariant && child.instance == 3
+        }) {
+            let value = parse_time_variant_string(&record.children[index])?;
+            index += 1;
+            Some(value)
+        } else {
+            None
+        };
+    let behavior = record
+        .children
+        .get(index)
+        .ok_or_else(|| PptError::InvalidFormat("effect behavior has no target".to_string()))
+        .and_then(parse_time_behavior)?;
+    index += 1;
+    if index != record.children.len() {
+        return Err(PptError::InvalidFormat(
+            "effect behavior has invalid child order or extra children".to_string(),
+        ));
+    }
+    let effect = TimeEffectBehavior {
+        atom,
+        filter,
+        progress,
+        runtime_context,
+        behavior,
+    };
+    validate_effect_behavior(&effect)?;
+    Ok(effect)
+}
+
+/// Parse an exact 8-byte `TimeEffectBehaviorAtom` payload.
+pub fn parse_time_effect_behavior_atom(record: &PptRecord) -> Result<TimeEffectBehaviorAtom> {
+    require_atom(
+        record,
+        PptRecordType::TimeEffectBehavior,
+        0,
+        8,
+        "TimeEffectBehaviorAtom",
+    )?;
+    let flags = read_u32(&record.data, 0);
+    let value = read_u32(&record.data, 4);
+    let transition = if flags & 0x01 != 0 {
+        Some(match value {
+            0 => TimeEffectTransition::In,
+            1 => TimeEffectTransition::Out,
+            value => {
+                return Err(PptError::InvalidFormat(format!(
+                    "invalid image-effect transition {value}"
+                )));
+            },
+        })
+    } else if value == 0 {
+        None
+    } else {
+        return Err(PptError::InvalidFormat(
+            "image-effect transition must be transition-in when unused".to_string(),
+        ));
+    };
+    Ok(TimeEffectBehaviorAtom {
+        transition,
+        filter_used: flags & 0x02 != 0,
+        progress_used: flags & 0x04 != 0,
+        runtime_context_used: flags & 0x08 != 0,
+    })
+}
+
+fn validate_effect_behavior(effect: &TimeEffectBehavior) -> Result<()> {
+    if effect.atom.filter_used && effect.filter.is_none() {
+        return Err(PptError::InvalidFormat(
+            "image-effect filter-use flag requires a filter".to_string(),
+        ));
+    }
+    if effect.atom.progress_used && effect.progress.is_none() {
+        return Err(PptError::InvalidFormat(
+            "image-effect progress-use flag requires progress".to_string(),
+        ));
+    }
+    if effect.atom.runtime_context_used && effect.runtime_context.is_none() {
+        return Err(PptError::InvalidFormat(
+            "image-effect runtime-context-use flag requires a runtime context".to_string(),
+        ));
+    }
+    if effect
+        .progress
+        .is_some_and(|value| !(0.0..=1.0).contains(&value))
+    {
+        return Err(PptError::InvalidFormat(
+            "image-effect progress must be between zero and one".to_string(),
+        ));
+    }
+    if effect
+        .runtime_context
+        .as_deref()
+        .is_some_and(|value| !is_valid_runtime_context(value))
+    {
+        return Err(PptError::InvalidFormat(
+            "invalid image-effect runtime context".to_string(),
+        ));
+    }
+    validate_basic_behavior_properties(&effect.behavior)
 }
 
 /// Parse a `TimePropertyList4TimeBehavior` record.
@@ -1811,9 +1952,9 @@ mod tests {
         write_time_behavior_atom, write_time_behavior_property_list, write_time_color_behavior,
         write_time_color_behavior_atom, write_time_command_behavior,
         write_time_command_behavior_atom, write_time_condition, write_time_condition_atom,
-        write_time_iterate_data, write_time_modifier, write_time_node_atom,
-        write_time_node_property_list, write_time_rotation_behavior,
-        write_time_rotation_behavior_atom, write_time_scale_behavior,
+        write_time_effect_behavior, write_time_effect_behavior_atom, write_time_iterate_data,
+        write_time_modifier, write_time_node_atom, write_time_node_property_list,
+        write_time_rotation_behavior, write_time_rotation_behavior_atom, write_time_scale_behavior,
         write_time_scale_behavior_atom, write_time_sequence_data, write_time_visual_element,
     };
 
@@ -2469,6 +2610,181 @@ mod tests {
         ] {
             assert!(write_time_color_behavior(&invalid).is_err());
         }
+    }
+
+    #[test]
+    fn round_trips_all_image_effect_filters() {
+        assert_eq!(PptRecordType::TimeEffectBehaviorContainer.as_u16(), 0xF12D);
+        assert_eq!(PptRecordType::TimeEffectBehavior.as_u16(), 0xF136);
+        let filters = [
+            TimeEffectFilter::BlindsHorizontal,
+            TimeEffectFilter::BlindsVertical,
+            TimeEffectFilter::BoxIn,
+            TimeEffectFilter::BoxOut,
+            TimeEffectFilter::CheckerboardAcross,
+            TimeEffectFilter::CheckerboardDown,
+            TimeEffectFilter::CircleIn,
+            TimeEffectFilter::CircleOut,
+            TimeEffectFilter::DiamondIn,
+            TimeEffectFilter::DiamondOut,
+            TimeEffectFilter::Dissolve,
+            TimeEffectFilter::Fade,
+            TimeEffectFilter::PlusIn,
+            TimeEffectFilter::PlusOut,
+            TimeEffectFilter::BarnInVertical,
+            TimeEffectFilter::BarnInHorizontal,
+            TimeEffectFilter::BarnOutVertical,
+            TimeEffectFilter::BarnOutHorizontal,
+            TimeEffectFilter::RandomBarHorizontal,
+            TimeEffectFilter::RandomBarVertical,
+            TimeEffectFilter::StripsDownLeft,
+            TimeEffectFilter::StripsUpLeft,
+            TimeEffectFilter::StripsDownRight,
+            TimeEffectFilter::StripsUpRight,
+            TimeEffectFilter::Wedge,
+            TimeEffectFilter::Wheel1,
+            TimeEffectFilter::Wheel2,
+            TimeEffectFilter::Wheel3,
+            TimeEffectFilter::Wheel4,
+            TimeEffectFilter::Wheel8,
+            TimeEffectFilter::WipeRight,
+            TimeEffectFilter::WipeLeft,
+            TimeEffectFilter::WipeUp,
+            TimeEffectFilter::WipeDown,
+        ];
+        let common = || TimeBehavior {
+            atom: TimeBehaviorAtom {
+                additive: Some(TimeBehaviorAdditive::Override),
+                attribute_names_used: false,
+            },
+            attribute_names: Some(vec!["ignored".to_string()]),
+            properties: Some(TimeBehaviorPropertyList {
+                properties: vec![TimeBehaviorProperty::RuntimeContext("ppt".to_string())],
+            }),
+            target: TimeVisualElement::Shape {
+                kind: TimeVisualElementKind::Shape,
+                shape_id_ref: 21,
+                data1: 0,
+                data2: 0,
+            },
+        };
+        for filter in filters {
+            assert_eq!(TimeEffectFilter::parse(filter.as_str()), Some(filter));
+            let expected = TimeEffectBehavior {
+                atom: TimeEffectBehaviorAtom {
+                    transition: Some(TimeEffectTransition::Out),
+                    filter_used: true,
+                    progress_used: true,
+                    runtime_context_used: true,
+                },
+                filter: Some(filter),
+                progress: Some(0.625),
+                runtime_context: Some("GTE PPT 10.0;PpT;".to_string()),
+                behavior: common(),
+            };
+            let bytes = write_time_effect_behavior(&expected).unwrap();
+            let (record, consumed) = PptRecord::parse(&bytes, 0).unwrap();
+            assert_eq!(consumed, bytes.len());
+            assert_eq!(parse_time_effect_behavior(&record).unwrap(), expected);
+        }
+
+        for transition in [
+            None,
+            Some(TimeEffectTransition::In),
+            Some(TimeEffectTransition::Out),
+        ] {
+            let expected = TimeEffectBehaviorAtom {
+                transition,
+                filter_used: false,
+                progress_used: false,
+                runtime_context_used: false,
+            };
+            let bytes = write_time_effect_behavior_atom(&expected);
+            let (record, _) = PptRecord::parse(&bytes, 0).unwrap();
+            assert_eq!(parse_time_effect_behavior_atom(&record).unwrap(), expected);
+        }
+    }
+
+    #[test]
+    fn rejects_malformed_image_effect_behaviors() {
+        let common = || TimeBehavior {
+            atom: TimeBehaviorAtom {
+                additive: None,
+                attribute_names_used: false,
+            },
+            attribute_names: None,
+            properties: None,
+            target: TimeVisualElement::Page,
+        };
+        let valid = TimeEffectBehavior {
+            atom: TimeEffectBehaviorAtom {
+                transition: None,
+                filter_used: true,
+                progress_used: true,
+                runtime_context_used: true,
+            },
+            filter: Some(TimeEffectFilter::Fade),
+            progress: Some(0.5),
+            runtime_context: Some("ppt".to_string()),
+            behavior: common(),
+        };
+        for invalid in [
+            TimeEffectBehavior {
+                filter: None,
+                ..valid.clone()
+            },
+            TimeEffectBehavior {
+                progress: None,
+                ..valid.clone()
+            },
+            TimeEffectBehavior {
+                runtime_context: None,
+                ..valid.clone()
+            },
+            TimeEffectBehavior {
+                progress: Some(-0.01),
+                ..valid.clone()
+            },
+            TimeEffectBehavior {
+                progress: Some(f32::NAN),
+                ..valid.clone()
+            },
+            TimeEffectBehavior {
+                runtime_context: Some("ppt 1.".to_string()),
+                ..valid.clone()
+            },
+            TimeEffectBehavior {
+                behavior: TimeBehavior {
+                    properties: Some(TimeBehaviorPropertyList {
+                        properties: vec![TimeBehaviorProperty::ColorModel(TimeColorModel::Rgb)],
+                    }),
+                    ..common()
+                },
+                ..valid.clone()
+            },
+        ] {
+            assert!(write_time_effect_behavior(&invalid).is_err());
+        }
+
+        let mut bytes = write_time_effect_behavior_atom(&TimeEffectBehaviorAtom {
+            transition: None,
+            filter_used: false,
+            progress_used: false,
+            runtime_context_used: false,
+        });
+        bytes[12..16].copy_from_slice(&1u32.to_le_bytes());
+        let (record, _) = PptRecord::parse(&bytes, 0).unwrap();
+        assert!(parse_time_effect_behavior_atom(&record).is_err());
+
+        let bytes = write_time_effect_behavior(&valid).unwrap();
+        let (mut record, _) = PptRecord::parse(&bytes, 0).unwrap();
+        record.children[1].data = vec![3, b'n', 0, b'o', 0, b'p', 0, b'e', 0];
+        record.children[1].data_length = 9;
+        assert!(parse_time_effect_behavior(&record).is_err());
+
+        let (mut record, _) = PptRecord::parse(&bytes, 0).unwrap();
+        record.children.swap(1, 2);
+        assert!(parse_time_effect_behavior(&record).is_err());
     }
 
     #[test]

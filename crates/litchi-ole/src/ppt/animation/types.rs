@@ -1041,6 +1041,156 @@ pub enum TimeAnimateColor {
     Scheme(u32),
 }
 
+/// A PowerPoint 2002 image-transition behavior.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TimeEffectBehavior {
+    pub atom: TimeEffectBehaviorAtom,
+    /// Optional transition filter retained even when its use flag is clear.
+    pub filter: Option<TimeEffectFilter>,
+    /// Optional normalized progress retained even when its use flag is clear.
+    pub progress: Option<f32>,
+    /// Optional obsolete runtime context retained even when its use flag is clear.
+    pub runtime_context: Option<String>,
+    pub behavior: TimeBehavior,
+}
+
+/// Flags and transition direction from a `TimeEffectBehaviorAtom`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TimeEffectBehaviorAtom {
+    /// Explicit transition direction, or `None` for the default transition-in value.
+    pub transition: Option<TimeEffectTransition>,
+    pub filter_used: bool,
+    pub progress_used: bool,
+    pub runtime_context_used: bool,
+}
+
+/// Visibility direction of an image transition.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TimeEffectTransition {
+    In,
+    Out,
+}
+
+/// Transition filter supported by `TimeEffectBehaviorContainer`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TimeEffectFilter {
+    BlindsHorizontal,
+    BlindsVertical,
+    BoxIn,
+    BoxOut,
+    CheckerboardAcross,
+    CheckerboardDown,
+    CircleIn,
+    CircleOut,
+    DiamondIn,
+    DiamondOut,
+    Dissolve,
+    Fade,
+    PlusIn,
+    PlusOut,
+    BarnInVertical,
+    BarnInHorizontal,
+    BarnOutVertical,
+    BarnOutHorizontal,
+    RandomBarHorizontal,
+    RandomBarVertical,
+    StripsDownLeft,
+    StripsUpLeft,
+    StripsDownRight,
+    StripsUpRight,
+    Wedge,
+    Wheel1,
+    Wheel2,
+    Wheel3,
+    Wheel4,
+    Wheel8,
+    WipeRight,
+    WipeLeft,
+    WipeUp,
+    WipeDown,
+}
+
+impl TimeEffectFilter {
+    pub(crate) fn parse(value: &str) -> Option<Self> {
+        Some(match value {
+            "blinds(horizontal)" => Self::BlindsHorizontal,
+            "blinds(vertical)" => Self::BlindsVertical,
+            "box(in)" => Self::BoxIn,
+            "box(out)" => Self::BoxOut,
+            "checkerboard(across)" => Self::CheckerboardAcross,
+            "checkerboard(down)" => Self::CheckerboardDown,
+            "circle(in)" => Self::CircleIn,
+            "circle(out)" => Self::CircleOut,
+            "diamond(in)" => Self::DiamondIn,
+            "diamond(out)" => Self::DiamondOut,
+            "dissolve" => Self::Dissolve,
+            "fade" => Self::Fade,
+            "plus(in)" => Self::PlusIn,
+            "plus(out)" => Self::PlusOut,
+            "barn(inVertical)" => Self::BarnInVertical,
+            "barn(inHorizontal)" => Self::BarnInHorizontal,
+            "barn(outVertical)" => Self::BarnOutVertical,
+            "barn(outHorizontal)" => Self::BarnOutHorizontal,
+            "randombar(horizontal)" => Self::RandomBarHorizontal,
+            "randombar(vertical)" => Self::RandomBarVertical,
+            "strips(downLeft)" => Self::StripsDownLeft,
+            "strips(upLeft)" => Self::StripsUpLeft,
+            "strips(downRight)" => Self::StripsDownRight,
+            "strips(upRight)" => Self::StripsUpRight,
+            "wedge" => Self::Wedge,
+            "wheel(1)" => Self::Wheel1,
+            "wheel(2)" => Self::Wheel2,
+            "wheel(3)" => Self::Wheel3,
+            "wheel(4)" => Self::Wheel4,
+            "wheel(8)" => Self::Wheel8,
+            "wipe(right)" => Self::WipeRight,
+            "wipe(left)" => Self::WipeLeft,
+            "wipe(up)" => Self::WipeUp,
+            "wipe(down)" => Self::WipeDown,
+            _ => return None,
+        })
+    }
+
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::BlindsHorizontal => "blinds(horizontal)",
+            Self::BlindsVertical => "blinds(vertical)",
+            Self::BoxIn => "box(in)",
+            Self::BoxOut => "box(out)",
+            Self::CheckerboardAcross => "checkerboard(across)",
+            Self::CheckerboardDown => "checkerboard(down)",
+            Self::CircleIn => "circle(in)",
+            Self::CircleOut => "circle(out)",
+            Self::DiamondIn => "diamond(in)",
+            Self::DiamondOut => "diamond(out)",
+            Self::Dissolve => "dissolve",
+            Self::Fade => "fade",
+            Self::PlusIn => "plus(in)",
+            Self::PlusOut => "plus(out)",
+            Self::BarnInVertical => "barn(inVertical)",
+            Self::BarnInHorizontal => "barn(inHorizontal)",
+            Self::BarnOutVertical => "barn(outVertical)",
+            Self::BarnOutHorizontal => "barn(outHorizontal)",
+            Self::RandomBarHorizontal => "randombar(horizontal)",
+            Self::RandomBarVertical => "randombar(vertical)",
+            Self::StripsDownLeft => "strips(downLeft)",
+            Self::StripsUpLeft => "strips(upLeft)",
+            Self::StripsDownRight => "strips(downRight)",
+            Self::StripsUpRight => "strips(upRight)",
+            Self::Wedge => "wedge",
+            Self::Wheel1 => "wheel(1)",
+            Self::Wheel2 => "wheel(2)",
+            Self::Wheel3 => "wheel(3)",
+            Self::Wheel4 => "wheel(4)",
+            Self::Wheel8 => "wheel(8)",
+            Self::WipeRight => "wipe(right)",
+            Self::WipeLeft => "wipe(left)",
+            Self::WipeUp => "wipe(up)",
+            Self::WipeDown => "wipe(down)",
+        }
+    }
+}
+
 /// Animation target stored in a `ClientVisualElementContainer`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TimeVisualElement {
