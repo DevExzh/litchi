@@ -33,6 +33,10 @@ pub enum TapBuildError {
     InvalidCellSpacing(u16),
     /// `PGPInfo.ipgpSelf` identifiers are nonzero.
     InvalidParagraphGroupId,
+    /// PropRMark stores its revision-author index as a signed 16-bit value.
+    InvalidRevisionAuthorIndex(u16),
+    /// PropRMark contains an invalid packed DTTM.
+    InvalidRevisionTimestamp(u32),
     /// A TCellBrcType prefix requires four explicit types for every included cell.
     IncompleteCellBorderTypes(usize),
     /// A preferred-width property uses unsupported units or a value outside its context's range.
@@ -78,6 +82,12 @@ impl std::fmt::Display for TapBuildError {
             },
             Self::InvalidParagraphGroupId => {
                 write!(f, "DOC paragraph-group identifier cannot be zero")
+            },
+            Self::InvalidRevisionAuthorIndex(index) => {
+                write!(f, "DOC table revision author index {index} exceeds 32767")
+            },
+            Self::InvalidRevisionTimestamp(timestamp) => {
+                write!(f, "DOC table revision DTTM {timestamp:#010x} is invalid")
             },
             Self::IncompleteCellBorderTypes(index) => {
                 write!(f, "DOC cell {index} has an incomplete border-type override")
@@ -147,6 +157,17 @@ pub struct TableBorders {
     pub vertical: Option<BorderStyle>,
 }
 
+/// Raw property revision metadata for a DOC table row.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TableRevisionMark {
+    /// Whether this operand represents an active property revision.
+    pub active: bool,
+    /// Index into the document's `SttbfRMark` author table.
+    pub author_index: u16,
+    /// Packed MS-DOC `DTTM` value.
+    pub timestamp: u32,
+}
+
 /// Table row properties
 #[derive(Debug, Clone)]
 pub struct TableRow {
@@ -197,6 +218,10 @@ pub struct TableRow {
     pub paragraph_group_id: Option<u32>,
     /// Revision save ID associated with this table formatting
     pub revision_save_id: Option<u32>,
+    /// Tracked row-property revision metadata
+    pub formatting_revision: Option<TableRevisionMark>,
+    /// Preserve pre-revision properties before the `sprmTWall` boundary
+    pub properties_preserved_for_revision: bool,
     /// Default outer and inside borders for this row
     pub borders: TableBorders,
 }
@@ -229,6 +254,8 @@ impl Default for TableRow {
             cell_spacing: None,
             paragraph_group_id: None,
             revision_save_id: None,
+            formatting_revision: None,
+            properties_preserved_for_revision: false,
             borders: TableBorders::default(),
         }
     }
@@ -494,6 +521,16 @@ pub(crate) fn generate_row_sprms(row: &TableRow) -> Result<Vec<u8>, TapBuildErro
     if row.paragraph_group_id == Some(0) {
         return Err(TapBuildError::InvalidParagraphGroupId);
     }
+    if let Some(revision) = row.formatting_revision {
+        if revision.author_index > i16::MAX as u16 {
+            return Err(TapBuildError::InvalidRevisionAuthorIndex(
+                revision.author_index,
+            ));
+        }
+        if crate::doc::revision::decode_dttm(revision.timestamp).is_err() {
+            return Err(TapBuildError::InvalidRevisionTimestamp(revision.timestamp));
+        }
+    }
 
     let mut builder = SprmBuilder::new();
     // Apply the style first so later SPRMs remain direct row formatting.
@@ -591,7 +628,19 @@ pub(crate) fn generate_row_sprms(row: &TableRow) -> Result<Vec<u8>, TapBuildErro
     if let Some(identifier) = row.revision_save_id {
         builder.add_dword(0x7479, identifier);
     }
-    let mut sprms = builder.build();
+    let mut sprms = Vec::new();
+    if let Some(revision) = row.formatting_revision {
+        sprms.extend_from_slice(&0xD667u16.to_le_bytes());
+        sprms.push(7);
+        sprms.push(u8::from(revision.active));
+        sprms.extend_from_slice(&revision.author_index.to_le_bytes());
+        sprms.extend_from_slice(&revision.timestamp.to_le_bytes());
+    }
+    if row.properties_preserved_for_revision {
+        sprms.extend_from_slice(&0x3668u16.to_le_bytes());
+        sprms.push(1);
+    }
+    sprms.extend_from_slice(&builder.build());
 
     let mut operand = Vec::with_capacity(1 + (cell_count + 1) * 2 + cell_count * 20);
     operand.push(cell_count as u8);
@@ -1383,6 +1432,46 @@ mod tests {
     }
 
     #[test]
+    fn round_trips_table_row_revision_state() {
+        let timestamp =
+            30u32 | (14u32 << 6) | (15u32 << 11) | (7u32 << 16) | (126u32 << 20) | (3u32 << 29);
+        let mut builder = TapBuilder::new();
+        builder.add_row(TableRow {
+            cells: vec![TableCell {
+                width: 1000,
+                ..TableCell::default()
+            }],
+            justification: TableJustification::Center,
+            formatting_revision: Some(TableRevisionMark {
+                active: true,
+                author_index: 12,
+                timestamp,
+            }),
+            properties_preserved_for_revision: true,
+            ..TableRow::default()
+        });
+
+        let sprms = builder.try_generate_row_sprms(0).unwrap();
+        let parsed = crate::sprm::parse_sprms(&sprms);
+        let position = |opcode| {
+            parsed
+                .iter()
+                .position(|sprm| sprm.opcode == opcode)
+                .unwrap()
+        };
+        assert!(position(0xD667) < position(0x3668));
+        assert!(position(0x3668) < position(0x5400));
+        assert!(position(0x3668) < position(0x548A));
+
+        let tap = crate::doc::parts::tap::TableProperties::from_sprm(&sprms).unwrap();
+        assert_eq!(tap.has_formatting_revision, Some(true));
+        assert_eq!(tap.formatting_revision_author_index, Some(12));
+        assert_eq!(tap.formatting_revision_timestamp, Some(timestamp));
+        assert!(tap.properties_preserved_for_revision);
+        assert_eq!(tap.justification, TableJustification::Center);
+    }
+
+    #[test]
     fn round_trips_table_sizing_and_fit_properties() {
         let mut builder = TapBuilder::new();
         builder.add_row(TableRow {
@@ -1684,6 +1773,42 @@ mod tests {
         assert_eq!(
             builder.try_generate_row_sprms(0),
             Err(TapBuildError::InvalidParagraphGroupId)
+        );
+
+        let mut builder = TapBuilder::new();
+        builder.add_row(TableRow {
+            cells: vec![TableCell {
+                width: 1000,
+                ..TableCell::default()
+            }],
+            formatting_revision: Some(TableRevisionMark {
+                active: true,
+                author_index: 0x8000,
+                timestamp: 0,
+            }),
+            ..TableRow::default()
+        });
+        assert_eq!(
+            builder.try_generate_row_sprms(0),
+            Err(TapBuildError::InvalidRevisionAuthorIndex(0x8000))
+        );
+
+        let mut builder = TapBuilder::new();
+        builder.add_row(TableRow {
+            cells: vec![TableCell {
+                width: 1000,
+                ..TableCell::default()
+            }],
+            formatting_revision: Some(TableRevisionMark {
+                active: true,
+                author_index: 0,
+                timestamp: 0x3F,
+            }),
+            ..TableRow::default()
+        });
+        assert_eq!(
+            builder.try_generate_row_sprms(0),
+            Err(TapBuildError::InvalidRevisionTimestamp(0x3F))
         );
 
         let mut builder = TapBuilder::new();

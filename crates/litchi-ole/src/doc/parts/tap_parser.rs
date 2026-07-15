@@ -585,9 +585,10 @@ impl<'arena> TapParser<'arena> {
                     Some(u16::try_from(author).map_err(|_| {
                         DocError::Corrupted("sprmTPropRMark author index is negative".to_string())
                     })?);
-                tap.formatting_revision_timestamp = Some(u32::from_le_bytes([
-                    operand[3], operand[4], operand[5], operand[6],
-                ]));
+                let timestamp =
+                    u32::from_le_bytes([operand[3], operand[4], operand[5], operand[6]]);
+                crate::doc::revision::decode_dttm(timestamp)?;
+                tap.formatting_revision_timestamp = Some(timestamp);
             },
             // Raw defaults preserve ShdNil as table-style inheritance.
             0x70 => self.parse_full_cell_shading(tap, sprm, 0, true)?,
@@ -2635,5 +2636,7 @@ mod tests {
         assert!(parser.parse_tap(&zero_ipgp).is_err());
         let truncated_rsid = [0x79, 0x74, 1, 2, 3];
         assert!(parser.parse_tap(&truncated_rsid).is_err());
+        let invalid_dttm = [0x67, 0xD6, 7, 1, 0, 0, 0x3F, 0, 0, 0];
+        assert!(parser.parse_tap(&invalid_dttm).is_err());
     }
 }

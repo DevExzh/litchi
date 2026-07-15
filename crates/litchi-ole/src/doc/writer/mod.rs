@@ -76,4 +76,4 @@ pub use numbering::{ListFormatOverride, ListLevel, ListStructure, NumberFormat, 
 pub use piece_table::{Piece, PieceTableBuilder};
 pub use revisions::{DisplayFieldRevision, FormattingRevision, NumberingRevision, TextRevision};
 pub use sprm::SprmBuilder;
-pub use tap::{TableBorders, TableCell, TableRow, TapBuildError, TapBuilder};
+pub use tap::{TableBorders, TableCell, TableRevisionMark, TableRow, TapBuildError, TapBuilder};

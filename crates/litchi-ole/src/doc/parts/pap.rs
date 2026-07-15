@@ -370,9 +370,10 @@ impl ParagraphProperties {
                     Some(u16::try_from(author).map_err(|_| {
                         DocError::Corrupted("sprmTPropRMark author index is negative".to_string())
                     })?);
-                pap.table_formatting_revision_timestamp = Some(u32::from_le_bytes([
-                    operand[3], operand[4], operand[5], operand[6],
-                ]));
+                let timestamp =
+                    u32::from_le_bytes([operand[3], operand[4], operand[5], operand[6]]);
+                crate::doc::revision::decode_dttm(timestamp)?;
+                pap.table_formatting_revision_timestamp = Some(timestamp);
             },
             0x3668 => {
                 let operand = sprm.operand_bytes();
@@ -886,9 +887,9 @@ impl ParagraphProperties {
         pap.formatting_revision_author_index = Some(u16::try_from(author).map_err(|_| {
             DocError::Corrupted("sprmPPropRMark author index is negative".to_string())
         })?);
-        pap.formatting_revision_timestamp = Some(u32::from_le_bytes([
-            operand[3], operand[4], operand[5], operand[6],
-        ]));
+        let timestamp = u32::from_le_bytes([operand[3], operand[4], operand[5], operand[6]]);
+        crate::doc::revision::decode_dttm(timestamp)?;
+        pap.formatting_revision_timestamp = Some(timestamp);
         Ok(())
     }
 
@@ -1307,6 +1308,7 @@ mod tests {
             vec![2, 0, 0, 0, 0, 0, 0],
             vec![1, 0xFF, 0xFF, 0, 0, 0, 0],
             vec![1, 0, 0, 0, 0, 0],
+            vec![1, 0, 0, 0x3F, 0, 0, 0],
         ] {
             let mut grpprl = SPRM_P_PROP_RMARK_CURRENT.to_le_bytes().to_vec();
             grpprl.push(operand.len() as u8);
@@ -1339,6 +1341,7 @@ mod tests {
             vec![2, 0, 0, 0, 0, 0, 0],
             vec![1, 0xFF, 0xFF, 0, 0, 0, 0],
             vec![1, 0, 0, 0, 0, 0],
+            vec![1, 0, 0, 0x3F, 0, 0, 0],
         ] {
             let mut invalid = 0xD667u16.to_le_bytes().to_vec();
             invalid.push(operand.len() as u8);
