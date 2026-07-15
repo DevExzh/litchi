@@ -86,12 +86,13 @@ pub use revision::{
 pub use shapes::DocShape;
 pub use table::{Cell, Row, Table};
 pub use writer::{
-    BookmarkEntry, CharacterFormatting, CommentEntry, DisplayFieldRevision, DocWriteError,
-    DocWriter, DropCap, DropCapType, FontAlignment, FormattingRevision, FrameAnchor, FrameHeight,
-    FrameHorizontalAnchor, FrameHorizontalPosition, FrameTextFlow, FrameTextWrap,
-    FrameVerticalAnchor, FrameVerticalPosition, LineSpacing, NumberingRevision, ParagraphBorder,
-    ParagraphBorderStyle, ParagraphBorders, ParagraphFormatting, ParagraphShading,
-    PhysicalJustification, TabAlignment, TabLeader, TabStop, TextBoxTightWrap, TextRevision,
+    AutoNumberAlignment, BookmarkEntry, CharacterFormatting, CommentEntry, DisplayFieldRevision,
+    DocWriteError, DocWriter, DropCap, DropCapType, FontAlignment, FormattingRevision, FrameAnchor,
+    FrameHeight, FrameHorizontalAnchor, FrameHorizontalPosition, FrameTextFlow, FrameTextWrap,
+    FrameVerticalAnchor, FrameVerticalPosition, LegacyAutoNumbering, LineSpacing,
+    NumberingRevision, ParagraphBorder, ParagraphBorderStyle, ParagraphBorders,
+    ParagraphFormatting, ParagraphShading, PhysicalJustification, TabAlignment, TabLeader, TabStop,
+    TextBoxTightWrap, TextRevision,
 };
 
 /// Crate-native ordered document element returned by [`Document::elements`].

@@ -60,11 +60,11 @@ pub mod numbering;
 
 // Re-export public types
 pub use crate::doc::parts::pap::{
-    Border as ParagraphBorder, BorderStyle as ParagraphBorderStyle, Borders as ParagraphBorders,
-    DropCap, DropCapType, FontAlignment, FrameAnchor, FrameHeight, FrameHorizontalAnchor,
-    FrameHorizontalPosition, FrameTextFlow, FrameTextWrap, FrameVerticalAnchor,
-    FrameVerticalPosition, PhysicalJustification, Shading as ParagraphShading, TabAlignment,
-    TabLeader, TabStop, TextBoxTightWrap,
+    AutoNumberAlignment, Border as ParagraphBorder, BorderStyle as ParagraphBorderStyle,
+    Borders as ParagraphBorders, DropCap, DropCapType, FontAlignment, FrameAnchor, FrameHeight,
+    FrameHorizontalAnchor, FrameHorizontalPosition, FrameTextFlow, FrameTextWrap,
+    FrameVerticalAnchor, FrameVerticalPosition, LegacyAutoNumbering, PhysicalJustification,
+    Shading as ParagraphShading, TabAlignment, TabLeader, TabStop, TextBoxTightWrap,
 };
 pub use crate::doc::parts::tap::{
     CellBorderTypes, CellShading, CellSpacing, CellSpacingSource, ShadingPattern,

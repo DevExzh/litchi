@@ -81,11 +81,11 @@ use super::piece_table::{Piece, PieceTableBuilder};
 use super::revisions::{DisplayFieldRevision, FormattingRevision, NumberingRevision, TextRevision};
 use crate::doc::CommentDateTime;
 use crate::doc::parts::pap::{
-    Border as ParagraphBorder, BorderStyle as ParagraphBorderStyle, Borders as ParagraphBorders,
-    DropCap, FontAlignment, FrameAnchor, FrameHeight, FrameHorizontalAnchor,
-    FrameHorizontalPosition, FrameTextFlow, FrameTextWrap, FrameVerticalAnchor,
-    FrameVerticalPosition, PhysicalJustification, Shading as ParagraphShading, TabAlignment,
-    TabLeader, TabStop, TextBoxTightWrap,
+    AutoNumberAlignment, Border as ParagraphBorder, BorderStyle as ParagraphBorderStyle,
+    Borders as ParagraphBorders, DropCap, FontAlignment, FrameAnchor, FrameHeight,
+    FrameHorizontalAnchor, FrameHorizontalPosition, FrameTextFlow, FrameTextWrap,
+    FrameVerticalAnchor, FrameVerticalPosition, LegacyAutoNumbering, PhysicalJustification,
+    Shading as ParagraphShading, TabAlignment, TabLeader, TabStop, TextBoxTightWrap,
 };
 use crate::sprm_operations::*;
 use litchi_cfb::writer::OleWriter;
@@ -434,6 +434,8 @@ pub struct ParagraphFormatting {
     pub ilvl: Option<u8>,
     /// Raw list override encoding (positive values are 1-based; negative encodings preserve indents)
     pub ilfo: Option<u16>,
+    /// Legacy autonumber descriptor for compatibility with pre-list-table documents
+    pub legacy_autonumbering: Option<LegacyAutoNumbering>,
     /// Mark the paragraph formatting as a tracked change.
     pub formatting_revision: Option<FormattingRevision>,
     /// Whether a numbered list was applied after the previous revision.
@@ -3679,6 +3681,9 @@ fn build_papx_grpprl(fmt: &ParagraphFormatting) -> Vec<u8> {
     if let Some(ilfo) = fmt.ilfo {
         push_u16(&mut grp, SPRM_P_ILFO, ilfo);
     }
+    if let Some(autonumbering) = &fmt.legacy_autonumbering {
+        append_legacy_autonumbering(&mut grp, autonumbering);
+    }
 
     // Line spacing (LSPD: 4 bytes = dyaLine (i16 LE), fMulti (i16 LE))
     if let Some(ls) = fmt.line_spacing {
@@ -3742,6 +3747,50 @@ fn append_tab_changes(output: &mut Vec<u8>, deletes: &[i32], additions: &[TabSto
             output.push(alignment | (leader << 3));
         }
     }
+}
+
+fn append_legacy_autonumbering(output: &mut Vec<u8>, value: &LegacyAutoNumbering) {
+    let mut operand = [0u8; 84];
+    operand[0] = value.number_format as u8;
+    let prefix = value.prefix.encode_utf16().collect::<Vec<_>>();
+    let suffix = value.suffix.encode_utf16().collect::<Vec<_>>();
+    operand[1] = prefix.len() as u8;
+    operand[2] = suffix.len() as u8;
+    operand[3] = match value.alignment {
+        AutoNumberAlignment::Left => 0,
+        AutoNumberAlignment::Center => 1,
+        AutoNumberAlignment::Right => 2,
+        AutoNumberAlignment::Justified => 3,
+    } | (u8::from(value.include_previous_levels) << 2)
+        | (u8::from(value.hanging_indent) << 3)
+        | (u8::from(value.set_bold) << 4)
+        | (u8::from(value.set_italic) << 5)
+        | (u8::from(value.set_small_caps) << 6)
+        | (u8::from(value.set_caps) << 7);
+    operand[4] = u8::from(value.set_strike)
+        | (u8::from(value.set_underline) << 1)
+        | (u8::from(value.prefix_space) << 2)
+        | (u8::from(value.bold) << 3)
+        | (u8::from(value.italic) << 4)
+        | (u8::from(value.small_caps) << 5)
+        | (u8::from(value.caps) << 6)
+        | (u8::from(value.strike) << 7);
+    operand[5] = value.underline | (value.color_index << 3);
+    operand[6..8].copy_from_slice(&value.font_index.to_le_bytes());
+    operand[8..10].copy_from_slice(&value.font_size_half_points.to_le_bytes());
+    operand[10..12].copy_from_slice(&value.start_at.to_le_bytes());
+    operand[12..14].copy_from_slice(&value.indent_twips.to_le_bytes());
+    operand[14..16].copy_from_slice(&value.space_twips.to_le_bytes());
+    operand[16] = u8::from(value.number_once_per_cell);
+    operand[17] = u8::from(value.number_across_cells);
+    operand[18] = u8::from(value.restart_each_section);
+    for (index, unit) in prefix.into_iter().chain(suffix).enumerate() {
+        let offset = 20 + index * 2;
+        operand[offset..offset + 2].copy_from_slice(&unit.to_le_bytes());
+    }
+    output.extend_from_slice(&SPRM_P_ANLD.to_le_bytes());
+    output.push(operand.len() as u8);
+    output.extend_from_slice(&operand);
 }
 
 fn append_paragraph_border(output: &mut Vec<u8>, opcode: u16, border: ParagraphBorder) {
@@ -3816,6 +3865,40 @@ fn build_revision_papx_grpprl(
         return Err(DocWriteError::InvalidData(format!(
             "DOC paragraph list override {ilfo:#06x} is reserved"
         )));
+    }
+    if let Some(value) = &fmt.legacy_autonumbering {
+        let prefix_units = value.prefix.encode_utf16().count();
+        let suffix_units = value.suffix.encode_utf16().count();
+        if prefix_units + suffix_units > 32 {
+            return Err(DocWriteError::InvalidData(format!(
+                "DOC legacy autonumber label uses {} UTF-16 units; maximum is 32",
+                prefix_units + suffix_units
+            )));
+        }
+        if value.underline > 7 {
+            return Err(DocWriteError::InvalidData(format!(
+                "DOC legacy autonumber underline {} exceeds 7",
+                value.underline
+            )));
+        }
+        if value.color_index > 16 {
+            return Err(DocWriteError::InvalidData(format!(
+                "DOC legacy autonumber color index {} exceeds 16",
+                value.color_index
+            )));
+        }
+        if !(-31_680..=31_680).contains(&value.indent_twips) {
+            return Err(DocWriteError::InvalidData(format!(
+                "DOC legacy autonumber indent {} is outside -31680..=31680",
+                value.indent_twips
+            )));
+        }
+        if value.space_twips > 31_680 {
+            return Err(DocWriteError::InvalidData(format!(
+                "DOC legacy autonumber spacing {} exceeds 31680",
+                value.space_twips
+            )));
+        }
     }
     for (name, value) in [
         ("left_indent", fmt.left_indent),
@@ -4094,6 +4177,7 @@ impl Default for DocWriter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::doc::parts::numbering::NumberFormat;
     use std::io::Cursor;
 
     #[test]
@@ -4689,6 +4773,36 @@ mod tests {
 
     #[test]
     fn test_paragraph_formatting_writer_reader_round_trip() {
+        let legacy_autonumbering = LegacyAutoNumbering {
+            number_format: NumberFormat::RussianUpper,
+            alignment: AutoNumberAlignment::Justified,
+            include_previous_levels: true,
+            hanging_indent: true,
+            set_bold: true,
+            set_italic: true,
+            set_small_caps: true,
+            set_caps: true,
+            set_strike: true,
+            set_underline: true,
+            prefix_space: true,
+            bold: true,
+            italic: true,
+            small_caps: true,
+            caps: true,
+            strike: true,
+            underline: 3,
+            color_index: 6,
+            font_index: 4,
+            font_size_half_points: 24,
+            start_at: 3,
+            indent_twips: -360,
+            space_twips: 180,
+            number_once_per_cell: true,
+            number_across_cells: false,
+            restart_each_section: true,
+            prefix: "§(".to_string(),
+            suffix: ")".to_string(),
+        };
         let mut writer = DocWriter::new();
         writer
             .add_formatted_paragraph(
@@ -4787,6 +4901,7 @@ mod tests {
                     ],
                     ilvl: Some(8),
                     ilfo: Some(1),
+                    legacy_autonumbering: Some(legacy_autonumbering.clone()),
                     ..ParagraphFormatting::default()
                 },
             )
@@ -4828,6 +4943,10 @@ mod tests {
         assert!(paragraphs[0].properties().no_line_numbering);
         assert_eq!(paragraphs[0].properties().list_level, Some(8));
         assert_eq!(paragraphs[0].properties().list_format_override, Some(1));
+        assert_eq!(
+            paragraphs[0].properties().legacy_autonumbering,
+            Some(legacy_autonumbering)
+        );
         assert_eq!(
             paragraphs[0].properties().tab_stops,
             vec![
@@ -4989,6 +5108,41 @@ mod tests {
             },
             ParagraphFormatting {
                 ilfo: Some(0x07FF),
+                ..ParagraphFormatting::default()
+            },
+            ParagraphFormatting {
+                legacy_autonumbering: Some(LegacyAutoNumbering {
+                    prefix: "x".repeat(33),
+                    ..LegacyAutoNumbering::default()
+                }),
+                ..ParagraphFormatting::default()
+            },
+            ParagraphFormatting {
+                legacy_autonumbering: Some(LegacyAutoNumbering {
+                    underline: 8,
+                    ..LegacyAutoNumbering::default()
+                }),
+                ..ParagraphFormatting::default()
+            },
+            ParagraphFormatting {
+                legacy_autonumbering: Some(LegacyAutoNumbering {
+                    color_index: 17,
+                    ..LegacyAutoNumbering::default()
+                }),
+                ..ParagraphFormatting::default()
+            },
+            ParagraphFormatting {
+                legacy_autonumbering: Some(LegacyAutoNumbering {
+                    indent_twips: i16::MIN,
+                    ..LegacyAutoNumbering::default()
+                }),
+                ..ParagraphFormatting::default()
+            },
+            ParagraphFormatting {
+                legacy_autonumbering: Some(LegacyAutoNumbering {
+                    space_twips: 31_681,
+                    ..LegacyAutoNumbering::default()
+                }),
                 ..ParagraphFormatting::default()
             },
             ParagraphFormatting {

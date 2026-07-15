@@ -10,6 +10,7 @@
 ///
 /// Based on Apache POI's ParagraphSprmUncompressor and ParagraphProperties.
 use super::super::package::{DocError, Result};
+use super::numbering::NumberFormat;
 use super::styles::StyleSheet;
 use super::tap::TableProperties;
 pub use super::tap::{CellShading as Shading, ShadingPattern};
@@ -107,6 +108,8 @@ pub struct ParagraphProperties {
     pub list_level: Option<u8>,
     /// Signed list format override encoding (negative values preserve paragraph indents)
     pub list_format_override: Option<i16>,
+    /// Legacy Word autonumber descriptor (`sprmPAnld`)
+    pub legacy_autonumbering: Option<LegacyAutoNumbering>,
     /// Bi-directional paragraph
     pub bi_directional: bool,
     /// Whether the paragraph follows vertical document-grid settings
@@ -276,6 +279,83 @@ impl PhysicalJustification {
             Self::LowCompression => Justification::Justified,
             Self::MediumCompression => Justification::MediumKashida,
             Self::HighCompression => Justification::HighKashida,
+        }
+    }
+}
+
+/// Alignment of a legacy Word autonumber label.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AutoNumberAlignment {
+    Left,
+    Center,
+    Right,
+    Justified,
+}
+
+/// Legacy ANLD autonumbering descriptor used by pre-list-table documents.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LegacyAutoNumbering {
+    pub number_format: NumberFormat,
+    pub alignment: AutoNumberAlignment,
+    pub include_previous_levels: bool,
+    pub hanging_indent: bool,
+    pub set_bold: bool,
+    pub set_italic: bool,
+    pub set_small_caps: bool,
+    pub set_caps: bool,
+    pub set_strike: bool,
+    pub set_underline: bool,
+    pub prefix_space: bool,
+    pub bold: bool,
+    pub italic: bool,
+    pub small_caps: bool,
+    pub caps: bool,
+    pub strike: bool,
+    pub underline: u8,
+    pub color_index: u8,
+    pub font_index: u16,
+    pub font_size_half_points: u16,
+    pub start_at: u16,
+    pub indent_twips: i16,
+    pub space_twips: u16,
+    pub number_once_per_cell: bool,
+    pub number_across_cells: bool,
+    pub restart_each_section: bool,
+    pub prefix: String,
+    pub suffix: String,
+}
+
+impl Default for LegacyAutoNumbering {
+    fn default() -> Self {
+        Self {
+            number_format: NumberFormat::Arabic,
+            alignment: AutoNumberAlignment::Left,
+            include_previous_levels: false,
+            hanging_indent: false,
+            set_bold: false,
+            set_italic: false,
+            set_small_caps: false,
+            set_caps: false,
+            set_strike: false,
+            set_underline: false,
+            prefix_space: false,
+            bold: false,
+            italic: false,
+            small_caps: false,
+            caps: false,
+            strike: false,
+            underline: 0,
+            color_index: 0,
+            font_index: 0,
+            font_size_half_points: 0,
+            start_at: 1,
+            indent_twips: 0,
+            space_twips: 0,
+            number_once_per_cell: false,
+            number_across_cells: false,
+            restart_each_section: false,
+            prefix: String::new(),
+            suffix: String::new(),
         }
     }
 }
@@ -1313,7 +1393,7 @@ impl ParagraphProperties {
             },
             // Operation 0x3E: sprmPAnld - Autonumber list data
             0x3E => {
-                // Autonumber list data - complex structure
+                pap.legacy_autonumbering = Some(Self::parse_legacy_autonumbering(sprm)?);
             },
             // Versioned sprmPPropRMark property revision marks.
             0x3F | 0x65 | 0x6F => Self::apply_property_revision(pap, sprm)?,
@@ -1408,6 +1488,115 @@ impl ParagraphProperties {
             },
         }
         Ok(())
+    }
+
+    fn parse_legacy_autonumbering(sprm: &Sprm) -> Result<LegacyAutoNumbering> {
+        let data = sprm.operand_bytes();
+        if !matches!(data.len(), 52 | 84) {
+            return Err(DocError::Corrupted(format!(
+                "sprmPAnld has {} bytes; expected 52 or 84",
+                data.len()
+            )));
+        }
+        let number_format = NumberFormat::try_from(data[0]).map_err(|invalid| {
+            DocError::Corrupted(format!("sprmPAnld has invalid MSONFC {invalid:#04x}"))
+        })?;
+        let alignment = match data[3] & 0x03 {
+            0 => AutoNumberAlignment::Left,
+            1 => AutoNumberAlignment::Center,
+            2 => AutoNumberAlignment::Right,
+            _ => AutoNumberAlignment::Justified,
+        };
+        let bool8 = |value, name| match value {
+            0 => Ok(false),
+            1 => Ok(true),
+            invalid => Err(DocError::Corrupted(format!(
+                "sprmPAnld {name} has invalid Boolean8 value {invalid}"
+            ))),
+        };
+        let color_index = data[5] >> 3;
+        if color_index > 16 {
+            return Err(DocError::Corrupted(format!(
+                "sprmPAnld has invalid color index {color_index}"
+            )));
+        }
+        let indent_twips = read_i16_le(data, 12).map_err(|error| {
+            DocError::Corrupted(format!("sprmPAnld has invalid indent: {error}"))
+        })?;
+        if !(-31_680..=31_680).contains(&indent_twips) {
+            return Err(DocError::Corrupted(format!(
+                "sprmPAnld indent {indent_twips} is outside -31680..=31680"
+            )));
+        }
+        let space_twips = read_u16_le(data, 14).map_err(|error| {
+            DocError::Corrupted(format!("sprmPAnld has invalid spacing: {error}"))
+        })?;
+        if space_twips > 31_680 {
+            return Err(DocError::Corrupted(format!(
+                "sprmPAnld spacing {space_twips} exceeds 31680"
+            )));
+        }
+        if data[19] != 0 {
+            return Err(DocError::Corrupted(
+                "sprmPAnld reserved flag byte must be zero".to_string(),
+            ));
+        }
+        let before = usize::from(data[1]);
+        let after = usize::from(data[2]);
+        let text_count = before + after;
+        let capacity = (data.len() - 20) / 2;
+        if text_count > capacity {
+            return Err(DocError::Corrupted(format!(
+                "sprmPAnld requests {text_count} label characters; capacity is {capacity}"
+            )));
+        }
+        let mut text = Vec::with_capacity(text_count);
+        for index in 0..text_count {
+            text.push(read_u16_le(data, 20 + index * 2).map_err(|error| {
+                DocError::Corrupted(format!("sprmPAnld has invalid label text: {error}"))
+            })?);
+        }
+        let prefix = String::from_utf16(&text[..before])
+            .map_err(|_| DocError::Corrupted("sprmPAnld prefix is not valid UTF-16".to_string()))?;
+        let suffix = String::from_utf16(&text[before..])
+            .map_err(|_| DocError::Corrupted("sprmPAnld suffix is not valid UTF-16".to_string()))?;
+
+        Ok(LegacyAutoNumbering {
+            number_format,
+            alignment,
+            include_previous_levels: data[3] & 0x04 != 0,
+            hanging_indent: data[3] & 0x08 != 0,
+            set_bold: data[3] & 0x10 != 0,
+            set_italic: data[3] & 0x20 != 0,
+            set_small_caps: data[3] & 0x40 != 0,
+            set_caps: data[3] & 0x80 != 0,
+            set_strike: data[4] & 0x01 != 0,
+            set_underline: data[4] & 0x02 != 0,
+            prefix_space: data[4] & 0x04 != 0,
+            bold: data[4] & 0x08 != 0,
+            italic: data[4] & 0x10 != 0,
+            small_caps: data[4] & 0x20 != 0,
+            caps: data[4] & 0x40 != 0,
+            strike: data[4] & 0x80 != 0,
+            underline: data[5] & 0x07,
+            color_index,
+            font_index: read_u16_le(data, 6).map_err(|error| {
+                DocError::Corrupted(format!("sprmPAnld has invalid font index: {error}"))
+            })?,
+            font_size_half_points: read_u16_le(data, 8).map_err(|error| {
+                DocError::Corrupted(format!("sprmPAnld has invalid font size: {error}"))
+            })?,
+            start_at: read_u16_le(data, 10).map_err(|error| {
+                DocError::Corrupted(format!("sprmPAnld has invalid start value: {error}"))
+            })?,
+            indent_twips,
+            space_twips,
+            number_once_per_cell: bool8(data[16], "fNumber1")?,
+            number_across_cells: bool8(data[17], "fNumberAcross")?,
+            restart_each_section: bool8(data[18], "fRestartHdn")?,
+            prefix,
+            suffix,
+        })
     }
 
     fn apply_property_revision(pap: &mut ParagraphProperties, sprm: &Sprm) -> Result<()> {
@@ -2003,6 +2192,7 @@ impl ParagraphProperties {
             || self.borders != Borders::default()
             || self.shading.is_some()
             || !self.tab_stops.is_empty()
+            || self.legacy_autonumbering.is_some()
     }
 
     /// Get indent in inches.
@@ -2033,6 +2223,106 @@ mod tests {
         assert_eq!(pap.justification, Justification::Left);
         assert!(!pap.keep_on_page);
         assert!(!pap.has_formatting());
+    }
+
+    #[test]
+    fn parses_legacy_autonumber_descriptors_and_text_widths() {
+        let grpprl = |operand: &[u8]| {
+            let mut bytes = SPRM_P_ANLD.to_le_bytes().to_vec();
+            bytes.push(operand.len() as u8);
+            bytes.extend_from_slice(operand);
+            bytes
+        };
+        let mut operand = [0u8; 84];
+        operand[0] = NumberFormat::RussianUpper as u8;
+        operand[1] = 1;
+        operand[2] = 1;
+        operand[3] = 0xFE;
+        operand[4] = 0xFF;
+        operand[5] = 3 | (6 << 3);
+        operand[6..8].copy_from_slice(&4u16.to_le_bytes());
+        operand[8..10].copy_from_slice(&24u16.to_le_bytes());
+        operand[10..12].copy_from_slice(&3u16.to_le_bytes());
+        operand[12..14].copy_from_slice(&(-360i16).to_le_bytes());
+        operand[14..16].copy_from_slice(&180u16.to_le_bytes());
+        operand[16..19].copy_from_slice(&[1, 0, 1]);
+        operand[20..22].copy_from_slice(&('(' as u16).to_le_bytes());
+        operand[22..24].copy_from_slice(&(')' as u16).to_le_bytes());
+
+        let expected = LegacyAutoNumbering {
+            number_format: NumberFormat::RussianUpper,
+            alignment: AutoNumberAlignment::Right,
+            include_previous_levels: true,
+            hanging_indent: true,
+            set_bold: true,
+            set_italic: true,
+            set_small_caps: true,
+            set_caps: true,
+            set_strike: true,
+            set_underline: true,
+            prefix_space: true,
+            bold: true,
+            italic: true,
+            small_caps: true,
+            caps: true,
+            strike: true,
+            underline: 3,
+            color_index: 6,
+            font_index: 4,
+            font_size_half_points: 24,
+            start_at: 3,
+            indent_twips: -360,
+            space_twips: 180,
+            number_once_per_cell: true,
+            number_across_cells: false,
+            restart_each_section: true,
+            prefix: "(".to_string(),
+            suffix: ")".to_string(),
+        };
+
+        for width in [52, 84] {
+            let properties = ParagraphProperties::from_sprm(&grpprl(&operand[..width])).unwrap();
+            assert_eq!(properties.legacy_autonumbering, Some(expected.clone()));
+            assert!(properties.has_formatting());
+        }
+    }
+
+    #[test]
+    fn rejects_malformed_legacy_autonumber_descriptors() {
+        let grpprl = |operand: &[u8]| {
+            let mut bytes = SPRM_P_ANLD.to_le_bytes().to_vec();
+            bytes.push(operand.len() as u8);
+            bytes.extend_from_slice(operand);
+            bytes
+        };
+        let valid = [0u8; 84];
+        let mut cases = vec![valid[..51].to_vec(), valid[..53].to_vec()];
+        for mutation in [
+            |value: &mut [u8; 84]| value[0] = 60,
+            |value: &mut [u8; 84]| value[5] = 17 << 3,
+            |value: &mut [u8; 84]| value[16] = 2,
+            |value: &mut [u8; 84]| value[17] = 2,
+            |value: &mut [u8; 84]| value[18] = 2,
+            |value: &mut [u8; 84]| value[19] = 1,
+            |value: &mut [u8; 84]| {
+                value[12..14].copy_from_slice(&i16::MIN.to_le_bytes());
+            },
+            |value: &mut [u8; 84]| {
+                value[14..16].copy_from_slice(&31_681u16.to_le_bytes());
+            },
+            |value: &mut [u8; 84]| value[1] = 33,
+            |value: &mut [u8; 84]| {
+                value[1] = 1;
+                value[20..22].copy_from_slice(&0xD800u16.to_le_bytes());
+            },
+        ] {
+            let mut operand = valid;
+            mutation(&mut operand);
+            cases.push(operand.to_vec());
+        }
+        for operand in cases {
+            assert!(ParagraphProperties::from_sprm(&grpprl(&operand)).is_err());
+        }
     }
 
     #[test]
