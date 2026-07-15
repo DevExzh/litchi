@@ -791,6 +791,45 @@ pub enum TimeBehaviorAdditive {
     Add,
 }
 
+/// A PowerPoint 2002 rotation behavior and its common target information.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TimeRotationBehavior {
+    pub atom: TimeRotationBehaviorAtom,
+    pub behavior: TimeBehavior,
+}
+
+/// Values controlled by a `TimeRotationBehaviorAtom`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TimeRotationBehaviorAtom {
+    pub by_degrees: Option<f32>,
+    pub from_degrees: Option<f32>,
+    pub to_degrees: Option<f32>,
+    pub direction: Option<TimeRotationDirection>,
+}
+
+/// Direction used by a rotation behavior.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TimeRotationDirection {
+    Clockwise,
+    CounterClockwise,
+}
+
+/// A PowerPoint 2002 scale behavior and its common target information.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TimeScaleBehavior {
+    pub atom: TimeScaleBehaviorAtom,
+    pub behavior: TimeBehavior,
+}
+
+/// Values controlled by a `TimeScaleBehaviorAtom`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TimeScaleBehaviorAtom {
+    pub by_percent: Option<(f32, f32)>,
+    pub from_percent: Option<(f32, f32)>,
+    pub to_percent: Option<(f32, f32)>,
+    pub zoom_contents: Option<bool>,
+}
+
 /// Typed properties stored in `TimePropertyList4TimeBehavior`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TimeBehaviorPropertyList {

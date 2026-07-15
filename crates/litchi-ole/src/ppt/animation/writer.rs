@@ -9,8 +9,10 @@ use super::types::{
     ParagraphBuildLevel, TimeBehavior, TimeBehaviorAdditive, TimeBehaviorAtom,
     TimeBehaviorProperty, TimeBehaviorPropertyList, TimeColorDirection, TimeColorModel,
     TimeEffectNodeType, TimeEffectType, TimeMasterRelation, TimeNodeAtom, TimeNodeProperty,
-    TimeNodePropertyList, TimePropertyListContext, TimeVisualElement, TimeVisualElementKind,
-    is_valid_runtime_context, is_valid_time_filter, is_valid_time_points_types,
+    TimeNodePropertyList, TimePropertyListContext, TimeRotationBehavior, TimeRotationBehaviorAtom,
+    TimeRotationDirection, TimeScaleBehavior, TimeScaleBehaviorAtom, TimeVisualElement,
+    TimeVisualElementKind, is_valid_runtime_context, is_valid_time_filter,
+    is_valid_time_points_types,
 };
 use crate::consts::PptRecordType;
 use crate::ppt::package::{PptError, Result};
@@ -601,6 +603,120 @@ fn write_visual_shape_atom(
     atom.extend(data1.to_le_bytes());
     atom.extend(data2.to_le_bytes());
     atom
+}
+
+/// Serialize an exact rotation behavior container.
+pub fn write_time_rotation_behavior(behavior: &TimeRotationBehavior) -> Result<Vec<u8>> {
+    validate_rotation_behavior(&behavior.behavior)?;
+    let mut children = write_time_rotation_behavior_atom(&behavior.atom)?;
+    children.extend(write_time_behavior(&behavior.behavior)?);
+    wrap_record(
+        PptRecordType::TimeRotationBehaviorContainer,
+        0x0F,
+        0,
+        children,
+    )
+}
+
+/// Serialize an exact `TimeRotationBehaviorAtom`.
+pub fn write_time_rotation_behavior_atom(atom: &TimeRotationBehaviorAtom) -> Result<Vec<u8>> {
+    if atom.from_degrees.is_some() && atom.by_degrees.is_none() && atom.to_degrees.is_none() {
+        return Err(PptError::InvalidFormat(
+            "rotation from value requires a by or to value".to_string(),
+        ));
+    }
+    let flags = u32::from(atom.by_degrees.is_some())
+        | (u32::from(atom.from_degrees.is_some()) << 1)
+        | (u32::from(atom.to_degrees.is_some()) << 2)
+        | (u32::from(atom.direction.is_some()) << 3);
+    let mut data = Vec::with_capacity(20);
+    data.extend(flags.to_le_bytes());
+    data.extend(atom.by_degrees.unwrap_or(0.0).to_le_bytes());
+    data.extend(atom.from_degrees.unwrap_or(0.0).to_le_bytes());
+    data.extend(atom.to_degrees.unwrap_or(360.0).to_le_bytes());
+    data.extend(
+        atom.direction
+            .map_or(0u32, |direction| match direction {
+                TimeRotationDirection::Clockwise => 0,
+                TimeRotationDirection::CounterClockwise => 1,
+            })
+            .to_le_bytes(),
+    );
+    let mut result = create_record_header(PptRecordType::TimeRotationBehavior, 0, 0, 20);
+    result.extend(data);
+    Ok(result)
+}
+
+/// Serialize an exact scale behavior container.
+pub fn write_time_scale_behavior(behavior: &TimeScaleBehavior) -> Result<Vec<u8>> {
+    validate_basic_behavior_properties(&behavior.behavior)?;
+    let mut children = write_time_scale_behavior_atom(&behavior.atom)?;
+    children.extend(write_time_behavior(&behavior.behavior)?);
+    wrap_record(PptRecordType::TimeScaleBehaviorContainer, 0x0F, 0, children)
+}
+
+/// Serialize an exact `TimeScaleBehaviorAtom`.
+pub fn write_time_scale_behavior_atom(atom: &TimeScaleBehaviorAtom) -> Result<Vec<u8>> {
+    if atom.from_percent.is_some() && atom.by_percent.is_none() && atom.to_percent.is_none() {
+        return Err(PptError::InvalidFormat(
+            "scale from values require by or to values".to_string(),
+        ));
+    }
+    let flags = u32::from(atom.by_percent.is_some())
+        | (u32::from(atom.from_percent.is_some()) << 1)
+        | (u32::from(atom.to_percent.is_some()) << 2)
+        | (u32::from(atom.zoom_contents.is_some()) << 3);
+    let mut data = Vec::with_capacity(32);
+    data.extend(flags.to_le_bytes());
+    for value in [
+        atom.by_percent.unwrap_or((0.0, 0.0)),
+        atom.from_percent.unwrap_or((0.0, 0.0)),
+        atom.to_percent.unwrap_or((100.0, 100.0)),
+    ] {
+        data.extend(value.0.to_le_bytes());
+        data.extend(value.1.to_le_bytes());
+    }
+    data.push(atom.zoom_contents.map_or(1, u8::from));
+    data.extend([0, 0, 0]);
+    let mut result = create_record_header(PptRecordType::TimeScaleBehavior, 0, 0, 32);
+    result.extend(data);
+    Ok(result)
+}
+
+fn validate_rotation_behavior(behavior: &TimeBehavior) -> Result<()> {
+    if !behavior.atom.attribute_names_used
+        || !matches!(
+            behavior.attribute_names.as_deref(),
+            Some([name]) if matches!(name.as_str(), "r" | "ppt_r")
+        )
+    {
+        return Err(PptError::InvalidFormat(
+            "rotation behavior requires exactly one r or ppt_r attribute".to_string(),
+        ));
+    }
+    validate_basic_behavior_properties(behavior)
+}
+
+fn validate_basic_behavior_properties(behavior: &TimeBehavior) -> Result<()> {
+    if behavior.properties.as_ref().is_some_and(|list| {
+        list.properties.iter().any(|property| {
+            matches!(
+                property,
+                TimeBehaviorProperty::MotionPathEditRelative(_)
+                    | TimeBehaviorProperty::ColorModel(_)
+                    | TimeBehaviorProperty::ColorDirection(_)
+                    | TimeBehaviorProperty::PathEditRotationAngle(_)
+                    | TimeBehaviorProperty::PathEditRotationX(_)
+                    | TimeBehaviorProperty::PathEditRotationY(_)
+                    | TimeBehaviorProperty::PointsTypes(_)
+            )
+        })
+    }) {
+        return Err(PptError::InvalidFormat(
+            "behavior contains properties reserved for color or motion behaviors".to_string(),
+        ));
+    }
+    Ok(())
 }
 
 /// Map a high-level animation effect to PPT97 fly method and direction codes.

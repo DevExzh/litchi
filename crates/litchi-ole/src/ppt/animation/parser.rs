@@ -12,8 +12,9 @@ use super::types::{
     TimeBehaviorAtom, TimeBehaviorProperty, TimeBehaviorPropertyList, TimeColorDirection,
     TimeColorModel, TimeEffectNodeType, TimeEffectType, TimeMasterRelation, TimeNodeAtom,
     TimeNodeFill, TimeNodeKind, TimeNodeProperty, TimeNodePropertyList, TimeNodeRestart,
-    TimePropertyListContext, TimeVisualElement, TimeVisualElementKind, is_valid_runtime_context,
-    is_valid_time_filter, is_valid_time_points_types,
+    TimePropertyListContext, TimeRotationBehavior, TimeRotationBehaviorAtom, TimeRotationDirection,
+    TimeScaleBehavior, TimeScaleBehaviorAtom, TimeVisualElement, TimeVisualElementKind,
+    is_valid_runtime_context, is_valid_time_filter, is_valid_time_points_types,
 };
 use crate::consts::PptRecordType;
 use crate::ppt::package::{PptError, Result};
@@ -810,6 +811,190 @@ fn require_time_variant_payload(record: &PptRecord) -> Result<()> {
     Ok(())
 }
 
+/// Parse an exact rotation behavior container.
+pub fn parse_time_rotation_behavior(record: &PptRecord) -> Result<TimeRotationBehavior> {
+    require_container(
+        record,
+        PptRecordType::TimeRotationBehaviorContainer,
+        0,
+        "TimeRotationBehaviorContainer",
+    )?;
+    if record.children.len() != 2 {
+        return Err(PptError::InvalidFormat(
+            "TimeRotationBehaviorContainer requires an atom and common behavior".to_string(),
+        ));
+    }
+    let atom = parse_time_rotation_behavior_atom(&record.children[0])?;
+    let behavior = parse_time_behavior(&record.children[1])?;
+    if !behavior.atom.attribute_names_used
+        || !matches!(
+            behavior.attribute_names.as_deref(),
+            Some([name]) if matches!(name.as_str(), "r" | "ppt_r")
+        )
+    {
+        return Err(PptError::InvalidFormat(
+            "rotation behavior requires exactly one r or ppt_r attribute".to_string(),
+        ));
+    }
+    validate_basic_behavior_properties(&behavior)?;
+    Ok(TimeRotationBehavior { atom, behavior })
+}
+
+/// Parse an exact 20-byte `TimeRotationBehaviorAtom` payload.
+pub fn parse_time_rotation_behavior_atom(record: &PptRecord) -> Result<TimeRotationBehaviorAtom> {
+    require_atom(
+        record,
+        PptRecordType::TimeRotationBehavior,
+        0,
+        20,
+        "TimeRotationBehaviorAtom",
+    )?;
+    let flags = read_u32(&record.data, 0);
+    let by_degrees = (flags & 0x01 != 0).then(|| read_f32(&record.data, 4));
+    let from_degrees = if flags & 0x02 != 0 {
+        Some(read_f32(&record.data, 8))
+    } else if read_f32(&record.data, 8) == 0.0 {
+        None
+    } else {
+        return Err(PptError::InvalidFormat(
+            "rotation from value must be zero when unused".to_string(),
+        ));
+    };
+    let to_degrees = if flags & 0x04 != 0 {
+        Some(read_f32(&record.data, 12))
+    } else if read_f32(&record.data, 12) == 360.0 {
+        None
+    } else {
+        return Err(PptError::InvalidFormat(
+            "rotation to value must be 360 when unused".to_string(),
+        ));
+    };
+    let direction = if flags & 0x08 != 0 {
+        Some(match read_u32(&record.data, 16) {
+            0 => TimeRotationDirection::Clockwise,
+            1 => TimeRotationDirection::CounterClockwise,
+            value => {
+                return Err(PptError::InvalidFormat(format!(
+                    "invalid rotation direction {value}"
+                )));
+            },
+        })
+    } else if read_u32(&record.data, 16) == 0 {
+        None
+    } else {
+        return Err(PptError::InvalidFormat(
+            "rotation direction must be zero when unused".to_string(),
+        ));
+    };
+    if from_degrees.is_some() && by_degrees.is_none() && to_degrees.is_none() {
+        return Err(PptError::InvalidFormat(
+            "rotation from value requires a by or to value".to_string(),
+        ));
+    }
+    Ok(TimeRotationBehaviorAtom {
+        by_degrees,
+        from_degrees,
+        to_degrees,
+        direction,
+    })
+}
+
+/// Parse an exact scale behavior container.
+pub fn parse_time_scale_behavior(record: &PptRecord) -> Result<TimeScaleBehavior> {
+    require_container(
+        record,
+        PptRecordType::TimeScaleBehaviorContainer,
+        0,
+        "TimeScaleBehaviorContainer",
+    )?;
+    if record.children.len() != 2 {
+        return Err(PptError::InvalidFormat(
+            "TimeScaleBehaviorContainer requires an atom and common behavior".to_string(),
+        ));
+    }
+    let atom = parse_time_scale_behavior_atom(&record.children[0])?;
+    let behavior = parse_time_behavior(&record.children[1])?;
+    validate_basic_behavior_properties(&behavior)?;
+    Ok(TimeScaleBehavior { atom, behavior })
+}
+
+/// Parse an exact 32-byte `TimeScaleBehaviorAtom` payload.
+pub fn parse_time_scale_behavior_atom(record: &PptRecord) -> Result<TimeScaleBehaviorAtom> {
+    require_atom(
+        record,
+        PptRecordType::TimeScaleBehavior,
+        0,
+        32,
+        "TimeScaleBehaviorAtom",
+    )?;
+    let flags = read_u32(&record.data, 0);
+    let by_percent =
+        (flags & 0x01 != 0).then(|| (read_f32(&record.data, 4), read_f32(&record.data, 8)));
+    let from_percent = if flags & 0x02 != 0 {
+        Some((read_f32(&record.data, 12), read_f32(&record.data, 16)))
+    } else if read_f32(&record.data, 12) == 0.0 && read_f32(&record.data, 16) == 0.0 {
+        None
+    } else {
+        return Err(PptError::InvalidFormat(
+            "scale from values must be zero when unused".to_string(),
+        ));
+    };
+    let to_percent = if flags & 0x04 != 0 {
+        Some((read_f32(&record.data, 20), read_f32(&record.data, 24)))
+    } else if read_f32(&record.data, 20) == 100.0 && read_f32(&record.data, 24) == 100.0 {
+        None
+    } else {
+        return Err(PptError::InvalidFormat(
+            "scale to values must be 100 when unused".to_string(),
+        ));
+    };
+    let zoom_contents = if flags & 0x08 != 0 {
+        Some(parse_bool1(
+            record.data[28],
+            "TimeScaleBehaviorAtom.fZoomContents",
+        )?)
+    } else if record.data[28] == 1 {
+        None
+    } else {
+        return Err(PptError::InvalidFormat(
+            "scale zoom-contents value must be true when unused".to_string(),
+        ));
+    };
+    if from_percent.is_some() && by_percent.is_none() && to_percent.is_none() {
+        return Err(PptError::InvalidFormat(
+            "scale from values require by or to values".to_string(),
+        ));
+    }
+    Ok(TimeScaleBehaviorAtom {
+        by_percent,
+        from_percent,
+        to_percent,
+        zoom_contents,
+    })
+}
+
+fn validate_basic_behavior_properties(behavior: &TimeBehavior) -> Result<()> {
+    if behavior.properties.as_ref().is_some_and(|list| {
+        list.properties.iter().any(|property| {
+            matches!(
+                property,
+                TimeBehaviorProperty::MotionPathEditRelative(_)
+                    | TimeBehaviorProperty::ColorModel(_)
+                    | TimeBehaviorProperty::ColorDirection(_)
+                    | TimeBehaviorProperty::PathEditRotationAngle(_)
+                    | TimeBehaviorProperty::PathEditRotationX(_)
+                    | TimeBehaviorProperty::PathEditRotationY(_)
+                    | TimeBehaviorProperty::PointsTypes(_)
+            )
+        })
+    }) {
+        return Err(PptError::InvalidFormat(
+            "behavior contains properties reserved for color or motion behaviors".to_string(),
+        ));
+    }
+    Ok(())
+}
+
 /// Parse build list from BuildList container record.
 pub fn parse_build_list(record: &PptRecord) -> Result<BuildList> {
     if record.record_type != PptRecordType::BuildList {
@@ -1106,6 +1291,10 @@ fn read_i32(data: &[u8], offset: usize) -> i32 {
     i32::from_le_bytes(data[offset..offset + 4].try_into().expect("length checked"))
 }
 
+fn read_f32(data: &[u8], offset: usize) -> f32 {
+    f32::from_le_bytes(data[offset..offset + 4].try_into().expect("length checked"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1114,7 +1303,9 @@ mod tests {
         LegacyAnimationEffect, LegacyTextBuildSubEffect, ParagraphBuildType, write_animation_info,
         write_animation_info_atom, write_build_list, write_extended_time_node, write_time_behavior,
         write_time_behavior_atom, write_time_behavior_property_list, write_time_node_atom,
-        write_time_node_property_list, write_time_visual_element,
+        write_time_node_property_list, write_time_rotation_behavior,
+        write_time_rotation_behavior_atom, write_time_scale_behavior,
+        write_time_scale_behavior_atom, write_time_visual_element,
     };
 
     fn sample_legacy_atom() -> LegacyAnimationAtom {
@@ -1595,6 +1786,110 @@ mod tests {
         let (mut record, _) = PptRecord::parse(&bytes, 0).unwrap();
         record.children[0].data[12..16].copy_from_slice(&0u32.to_le_bytes());
         assert!(parse_time_visual_element(&record).is_err());
+    }
+
+    #[test]
+    fn round_trips_rotation_and_scale_behaviors() {
+        assert_eq!(
+            PptRecordType::TimeRotationBehaviorContainer.as_u16(),
+            0xF12F
+        );
+        assert_eq!(PptRecordType::TimeScaleBehaviorContainer.as_u16(), 0xF130);
+        assert_eq!(PptRecordType::TimeRotationBehavior.as_u16(), 0xF138);
+        assert_eq!(PptRecordType::TimeScaleBehavior.as_u16(), 0xF139);
+        let common = |attribute_names: Option<Vec<String>>, used| TimeBehavior {
+            atom: TimeBehaviorAtom {
+                additive: Some(TimeBehaviorAdditive::Override),
+                attribute_names_used: used,
+            },
+            attribute_names,
+            properties: Some(TimeBehaviorPropertyList {
+                properties: vec![TimeBehaviorProperty::RuntimeContext("ppt 12".to_string())],
+            }),
+            target: TimeVisualElement::Shape {
+                kind: TimeVisualElementKind::Shape,
+                shape_id_ref: 7,
+                data1: 0,
+                data2: 0,
+            },
+        };
+        let rotation = TimeRotationBehavior {
+            atom: TimeRotationBehaviorAtom {
+                by_degrees: Some(45.0),
+                from_degrees: Some(-15.0),
+                to_degrees: Some(180.0),
+                direction: Some(TimeRotationDirection::CounterClockwise),
+            },
+            behavior: common(Some(vec!["ppt_r".to_string()]), true),
+        };
+        let atom_bytes = write_time_rotation_behavior_atom(&rotation.atom).unwrap();
+        let (atom_record, _) = PptRecord::parse(&atom_bytes, 0).unwrap();
+        assert_eq!(
+            parse_time_rotation_behavior_atom(&atom_record).unwrap(),
+            rotation.atom
+        );
+        let bytes = write_time_rotation_behavior(&rotation).unwrap();
+        let (record, _) = PptRecord::parse(&bytes, 0).unwrap();
+        assert_eq!(parse_time_rotation_behavior(&record).unwrap(), rotation);
+
+        let scale = TimeScaleBehavior {
+            atom: TimeScaleBehaviorAtom {
+                by_percent: Some((10.0, 20.0)),
+                from_percent: Some((80.0, 90.0)),
+                to_percent: Some((120.0, 130.0)),
+                zoom_contents: Some(false),
+            },
+            behavior: common(Some(vec!["ignored".to_string()]), false),
+        };
+        let atom_bytes = write_time_scale_behavior_atom(&scale.atom).unwrap();
+        let (atom_record, _) = PptRecord::parse(&atom_bytes, 0).unwrap();
+        assert_eq!(
+            parse_time_scale_behavior_atom(&atom_record).unwrap(),
+            scale.atom
+        );
+        let bytes = write_time_scale_behavior(&scale).unwrap();
+        let (record, _) = PptRecord::parse(&bytes, 0).unwrap();
+        assert_eq!(parse_time_scale_behavior(&record).unwrap(), scale);
+    }
+
+    #[test]
+    fn rejects_malformed_rotation_and_scale_behaviors() {
+        let invalid_rotation = TimeRotationBehaviorAtom {
+            by_degrees: None,
+            from_degrees: Some(1.0),
+            to_degrees: None,
+            direction: None,
+        };
+        assert!(write_time_rotation_behavior_atom(&invalid_rotation).is_err());
+        let invalid_scale = TimeScaleBehaviorAtom {
+            by_percent: None,
+            from_percent: Some((1.0, 1.0)),
+            to_percent: None,
+            zoom_contents: None,
+        };
+        assert!(write_time_scale_behavior_atom(&invalid_scale).is_err());
+
+        let mut bytes = write_time_rotation_behavior_atom(&TimeRotationBehaviorAtom {
+            by_degrees: None,
+            from_degrees: None,
+            to_degrees: None,
+            direction: None,
+        })
+        .unwrap();
+        bytes[20..24].copy_from_slice(&0f32.to_le_bytes());
+        let (record, _) = PptRecord::parse(&bytes, 0).unwrap();
+        assert!(parse_time_rotation_behavior_atom(&record).is_err());
+
+        let mut bytes = write_time_scale_behavior_atom(&TimeScaleBehaviorAtom {
+            by_percent: None,
+            from_percent: None,
+            to_percent: None,
+            zoom_contents: None,
+        })
+        .unwrap();
+        bytes[36] = 0;
+        let (record, _) = PptRecord::parse(&bytes, 0).unwrap();
+        assert!(parse_time_scale_behavior_atom(&record).is_err());
     }
 
     #[test]

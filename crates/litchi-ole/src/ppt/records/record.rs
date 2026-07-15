@@ -138,6 +138,8 @@ impl PptRecord {
                 | PptRecordType::ParaBuild
                 | PptRecordType::ExtTimeNode
                 | PptRecordType::TimeBehaviorContainer
+                | PptRecordType::TimeRotationBehaviorContainer
+                | PptRecordType::TimeScaleBehaviorContainer
                 | PptRecordType::TimeClientVisualElement
                 | PptRecordType::TimePropertyList
                 | PptRecordType::TimeVariantList
