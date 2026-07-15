@@ -17,7 +17,13 @@ use crate::sprm_operations::{
     SPRM_T_CELL_BRC_INSIDE_H_STYLE, SPRM_T_CELL_BRC_INSIDE_V_STYLE, SPRM_T_CELL_BRC_LEFT_STYLE,
     SPRM_T_CELL_BRC_RIGHT_STYLE, SPRM_T_CELL_BRC_TL2BR_STYLE, SPRM_T_CELL_BRC_TOP_STYLE,
     SPRM_T_CELL_BRC_TR2BL_STYLE, SPRM_T_CELL_NO_WRAP_STYLE, SPRM_T_CELL_PADDING_STYLE,
-    SPRM_T_CELL_SHD_STYLE, SPRM_T_CELL_VERT_ALIGN_STYLE, SPRM_T_CNF, SPRM_T_ISTD, SPRM_T_JC,
+    SPRM_T_CELL_SHD_STYLE, SPRM_T_CELL_VERT_ALIGN_STYLE, SPRM_T_CNF, SPRM_T_DXA_ABS,
+    SPRM_T_DXA_FROM_TEXT, SPRM_T_DXA_FROM_TEXT_RIGHT, SPRM_T_DYA_ABS, SPRM_T_DYA_FROM_TEXT,
+    SPRM_T_DYA_FROM_TEXT_BOTTOM, SPRM_T_F_AUTOFIT, SPRM_T_F_BI_DI, SPRM_T_F_BI_DI90,
+    SPRM_T_F_CANT_SPLIT, SPRM_T_F_CANT_SPLIT90, SPRM_T_F_KEEP_FOLLOW, SPRM_T_F_NO_ALLOW_OVERLAP,
+    SPRM_T_IPGP, SPRM_T_ISTD, SPRM_T_JC, SPRM_T_JC90, SPRM_T_PC, SPRM_T_PROP_RMARK, SPRM_T_RSID,
+    SPRM_T_TABLE_HEADER, SPRM_T_TABLE_WIDTH, SPRM_T_TLP, SPRM_T_WALL, SPRM_T_WIDTH_AFTER,
+    SPRM_T_WIDTH_BEFORE, SPRM_T_WIDTH_INDENT,
 };
 
 /// Error returned when table row properties cannot be represented in DOC TAP.
@@ -767,31 +773,31 @@ fn generate_current_row_sprms(row: &TableRow) -> Result<Vec<u8>, TapBuildError> 
     }
     if row.justification != TableJustification::Left || row.right_to_left {
         builder.add_word(
-            0x5400,
+            SPRM_T_JC90,
             justification_code(physical_justification(row.justification, row.right_to_left)),
         );
         builder.add_word(SPRM_T_JC, justification_code(row.justification));
     }
     if let Some(positioning) = row.positioning {
-        builder.add_byte(0x360D, encode_positioning(positioning));
+        builder.add_byte(SPRM_T_PC, encode_positioning(positioning));
     }
     if row.horizontal_position != TableHorizontalPosition::Left {
-        builder.add_signed_word(0x940E, horizontal_position);
+        builder.add_signed_word(SPRM_T_DXA_ABS, horizontal_position);
     }
     if row.vertical_position != TableVerticalPosition::Inline {
-        builder.add_signed_word(0x940F, vertical_position);
+        builder.add_signed_word(SPRM_T_DYA_ABS, vertical_position);
     }
     if row.distance_from_text_left != 0 {
-        builder.add_word(0x9410, row.distance_from_text_left);
+        builder.add_word(SPRM_T_DXA_FROM_TEXT, row.distance_from_text_left);
     }
     if row.distance_from_text_top != 0 {
-        builder.add_word(0x9411, row.distance_from_text_top);
+        builder.add_word(SPRM_T_DYA_FROM_TEXT, row.distance_from_text_top);
     }
     if row.distance_from_text_right != 0 {
-        builder.add_word(0x941E, row.distance_from_text_right);
+        builder.add_word(SPRM_T_DXA_FROM_TEXT_RIGHT, row.distance_from_text_right);
     }
     if row.distance_from_text_bottom != 0 {
-        builder.add_word(0x941F, row.distance_from_text_bottom);
+        builder.add_word(SPRM_T_DYA_FROM_TEXT_BOTTOM, row.distance_from_text_bottom);
     }
     if !row.allow_break
         || row
@@ -801,32 +807,32 @@ fn generate_current_row_sprms(row: &TableRow) -> Result<Vec<u8>, TapBuildError> 
     {
         // Emit the legacy form first for older readers, followed by the
         // authoritative modern form as required for equivalent SPRMs.
-        builder.add_bool(0x3403, true);
-        builder.add_bool(0x3466, true);
+        builder.add_bool(SPRM_T_F_CANT_SPLIT90, true);
+        builder.add_bool(SPRM_T_F_CANT_SPLIT, true);
     }
     if row.is_header {
-        builder.add_bool(0x3404, true);
+        builder.add_bool(SPRM_T_TABLE_HEADER, true);
     }
     if row.height != 0 {
         builder.add_signed_word(0x9407, row.height);
     }
     if let Some(width) = preferred_width {
-        builder.add_three_byte(0xF614, width);
+        builder.add_three_byte(SPRM_T_TABLE_WIDTH, width);
     }
     if row.auto_fit {
-        builder.add_bool(0x3615, true);
+        builder.add_bool(SPRM_T_F_AUTOFIT, true);
     }
     if let Some(width) = width_before {
-        builder.add_three_byte(0xF617, width);
+        builder.add_three_byte(SPRM_T_WIDTH_BEFORE, width);
     }
     if let Some(width) = width_after {
-        builder.add_three_byte(0xF618, width);
+        builder.add_three_byte(SPRM_T_WIDTH_AFTER, width);
     }
     if row.keep_with_next {
-        builder.add_bool(0x3619, true);
+        builder.add_bool(SPRM_T_F_KEEP_FOLLOW, true);
     }
     if let Some(width) = preferred_indent {
-        builder.add_three_byte(0xF661, width);
+        builder.add_three_byte(SPRM_T_WIDTH_INDENT, width);
     }
     if let Some(look) = row.table_look {
         let flags = look.flags.bits();
@@ -834,7 +840,7 @@ fn generate_current_row_sprms(row: &TableRow) -> Result<Vec<u8>, TapBuildError> 
             return Err(TapBuildError::InvalidTableLookFlags(flags));
         }
         builder.add_dword(
-            0x740A,
+            SPRM_T_TLP,
             u32::from_le_bytes([
                 look.autoformat_index.to_le_bytes()[0],
                 look.autoformat_index.to_le_bytes()[1],
@@ -844,28 +850,28 @@ fn generate_current_row_sprms(row: &TableRow) -> Result<Vec<u8>, TapBuildError> 
         );
     }
     if row.right_to_left {
-        builder.add_word(0x560B, 1);
-        builder.add_word(0x5664, 1);
+        builder.add_word(SPRM_T_F_BI_DI, 1);
+        builder.add_word(SPRM_T_F_BI_DI90, 1);
     }
     if !row.allow_overlap {
-        builder.add_bool(0x3465, true);
+        builder.add_bool(SPRM_T_F_NO_ALLOW_OVERLAP, true);
     }
     if let Some(identifier) = row.paragraph_group_id {
-        builder.add_dword(0x7469, identifier);
+        builder.add_dword(SPRM_T_IPGP, identifier);
     }
     if let Some(identifier) = row.revision_save_id {
-        builder.add_dword(0x7479, identifier);
+        builder.add_dword(SPRM_T_RSID, identifier);
     }
     let mut sprms = Vec::new();
     if let Some(revision) = row.formatting_revision {
-        sprms.extend_from_slice(&0xD667u16.to_le_bytes());
+        sprms.extend_from_slice(&SPRM_T_PROP_RMARK.to_le_bytes());
         sprms.push(7);
         sprms.push(u8::from(revision.active));
         sprms.extend_from_slice(&revision.author_index.to_le_bytes());
         sprms.extend_from_slice(&revision.timestamp.to_le_bytes());
     }
     if row.properties_preserved_for_revision {
-        sprms.extend_from_slice(&0x3668u16.to_le_bytes());
+        sprms.extend_from_slice(&SPRM_T_WALL.to_le_bytes());
         sprms.push(1);
     }
     sprms.extend_from_slice(&builder.build());

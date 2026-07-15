@@ -637,8 +637,11 @@ pub const SPRM_T_DXA_LEFT: u16 = 0x9601;
 /// sprmTDxaGapHalf - Half gap between cells (operation 0x03)
 pub const SPRM_T_DXA_GAP_HALF: u16 = 0x9602;
 
+/// sprmTFCantSplit90 - Legacy row cannot split (operation 0x03)
+pub const SPRM_T_F_CANT_SPLIT90: u16 = 0x3403;
+
 /// sprmTFCantSplit - Table row cannot split (operation 0x04)
-pub const SPRM_T_F_CANT_SPLIT: u16 = 0x3666;
+pub const SPRM_T_F_CANT_SPLIT: u16 = 0x3466;
 
 /// sprmTTableHeader - Table header row (operation 0x05)
 pub const SPRM_T_TABLE_HEADER: u16 = 0x3404;
@@ -663,6 +666,19 @@ pub const SPRM_T_TLP: u16 = 0x740A;
 
 /// sprmTFBiDi - Bi-directional table (operation 0x0C)
 pub const SPRM_T_F_BI_DI: u16 = 0x560B;
+
+/// sprmTPc - Floating table anchor origins (operation 0x0D)
+pub const SPRM_T_PC: u16 = 0x360D;
+/// sprmTDxaAbs - Floating table horizontal position (operation 0x0E)
+pub const SPRM_T_DXA_ABS: u16 = 0x940E;
+/// sprmTDyaAbs - Floating table vertical position (operation 0x0F)
+pub const SPRM_T_DYA_ABS: u16 = 0x940F;
+/// sprmTDxaFromText - Left text-wrapping distance (operation 0x10)
+pub const SPRM_T_DXA_FROM_TEXT: u16 = 0x9410;
+/// sprmTDyaFromText - Top text-wrapping distance (operation 0x11)
+pub const SPRM_T_DYA_FROM_TEXT: u16 = 0x9411;
+/// sprmTTableWidth - Preferred total table width (operation 0x14)
+pub const SPRM_T_TABLE_WIDTH: u16 = 0xF614;
 
 /// sprmTHTMLProps - HTML properties (operation 0x0D)
 pub const SPRM_T_HTML_PROPS: u16 = 0x740D;
@@ -736,17 +752,32 @@ pub const SPRM_T_CELL_F_HIDE_MARK: u16 = 0xD642;
 /// sprmTSetShdTable - Set table shading (operation 0x24)
 pub const SPRM_T_SET_SHD_TABLE: u16 = 0xD660;
 
+/// sprmTWidthIndent - Preferred leading table indent (operation 0x61)
+pub const SPRM_T_WIDTH_INDENT: u16 = 0xF661;
+
 /// sprmTWidthBefore - Width before table (operation 0x25)
 pub const SPRM_T_WIDTH_BEFORE: u16 = 0xF617;
 
 /// sprmTWidthAfter - Width after table (operation 0x26)
 pub const SPRM_T_WIDTH_AFTER: u16 = 0xF618;
 
+/// sprmTFKeepFollow - Avoid page breaks between adjacent rows (operation 0x19)
+pub const SPRM_T_F_KEEP_FOLLOW: u16 = 0x3619;
+/// sprmTDxaFromTextRight - Right text-wrapping distance (operation 0x1E)
+pub const SPRM_T_DXA_FROM_TEXT_RIGHT: u16 = 0x941E;
+/// sprmTDyaFromTextBottom - Bottom text-wrapping distance (operation 0x1F)
+pub const SPRM_T_DYA_FROM_TEXT_BOTTOM: u16 = 0x941F;
+
 /// sprmTFBiDi90 - Bi-directional v90 (operation 0x27)
 pub const SPRM_T_F_BI_DI90: u16 = 0x5664;
 
 /// sprmTFNoAllowOverlap - No allow overlap (operation 0x28)
 pub const SPRM_T_F_NO_ALLOW_OVERLAP: u16 = 0x3465;
+
+/// sprmTPropRMark - Tracked table-row property change (operation 0x67)
+pub const SPRM_T_PROP_RMARK: u16 = 0xD667;
+/// sprmTWall - Preserve pre-revision table properties (operation 0x68)
+pub const SPRM_T_WALL: u16 = 0x3668;
 
 /// sprmTFCantOverlap - Cannot overlap (operation 0x29)
 pub const SPRM_T_F_CANT_OVERLAP: u16 = 0x3429;
@@ -913,6 +944,7 @@ mod tests {
         assert_eq!(SPRM_T_DEF_TABLE, 0xD608);
         assert_eq!(SPRM_T_TABLE_BORDERS, 0xD613);
         assert_eq!(SPRM_T_WIDTH_BEFORE, 0xF617);
+        assert_eq!(SPRM_T_F_CANT_SPLIT, 0x3466);
         assert_eq!(SPRM_T_ISTD, 0x563A);
         assert_eq!(SPRM_T_CNF, 0xD66A);
         assert_eq!(SPRM_T_CELL_PADDING_STYLE, 0xD63E);
