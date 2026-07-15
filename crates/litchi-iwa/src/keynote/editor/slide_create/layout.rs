@@ -136,10 +136,9 @@ pub(in crate::keynote::editor) fn resolve_layout(
         .ok_or_else(|| Error::InvalidFormat(format!("Keynote layout node {node_id} has no slide")))?
         .identifier;
     let archive_name = graph.archive_name(slide_id)?.to_owned();
-    let expected = format!("Index/TemplateSlide-{slide_id}.iwa");
-    if archive_name != expected {
+    if !is_template_slide_archive(&archive_name) {
         return Err(Error::InvalidFormat(format!(
-            "Keynote layout slide {slide_id} is not stored in {expected}"
+            "Keynote layout slide {slide_id} is not stored in a TemplateSlide component"
         )));
     }
     Ok(ResolvedLayout {
@@ -148,4 +147,32 @@ pub(in crate::keynote::editor) fn resolve_layout(
         archive_name,
         slide: graph.decode_type(slide_id, SLIDE_MESSAGE_TYPE, "KN.SlideArchive")?,
     })
+}
+
+fn is_template_slide_archive(archive_name: &str) -> bool {
+    let Some(suffix) = archive_name
+        .strip_prefix("Index/TemplateSlide")
+        .and_then(|name| name.strip_suffix(".iwa"))
+    else {
+        return false;
+    };
+    suffix.is_empty()
+        || suffix.strip_prefix('-').is_some_and(|identifier| {
+            !identifier.is_empty() && identifier.bytes().all(|byte| byte.is_ascii_digit())
+        })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_template_slide_archive;
+
+    #[test]
+    fn accepts_generated_and_keynote_normalized_template_component_names() {
+        assert!(is_template_slide_archive("Index/TemplateSlide-8.iwa"));
+        assert!(is_template_slide_archive("Index/TemplateSlide.iwa"));
+        assert!(!is_template_slide_archive("Index/TemplateSlide-.iwa"));
+        assert!(!is_template_slide_archive("Index/TemplateSlide-copy.iwa"));
+        assert!(!is_template_slide_archive("Index/Slide-8.iwa"));
+        assert!(!is_template_slide_archive("Data/TemplateSlide-8.iwa"));
+    }
 }

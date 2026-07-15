@@ -2936,6 +2936,7 @@ mod slide_style_registry;
 mod soundtrack;
 mod soundtrack_items;
 mod soundtrack_wire;
+mod text_box_create;
 mod transition;
 mod transition_effect;
 mod transition_lifecycle;

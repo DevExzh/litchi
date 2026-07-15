@@ -29,7 +29,8 @@ println!("{}", structured.summary());
 ## Features
 
 - Parse Pages, Numbers, and Keynote bundles from a path or in-memory bytes
-- Build independent Pages packages from typed IWA objects with no bundled template
+- Build independent Pages, Numbers, and Keynote packages from typed IWA objects
+  with no bundled template
 - Snappy decompression and protobuf decoding of `.iwa` streams
 - Text extraction across all iWork applications
 - Structured-data extraction: tables (with CSV export), slides, sections
@@ -97,6 +98,30 @@ pages.add_text_box(
     DrawableSize { width: 240.0, height: 72.0 },
 )?;
 pages.save("created-with-text-box.pages")?;
+# Ok::<(), litchi_iwa::Error>(())
+```
+
+### Create Keynote presentations from scratch
+
+Scratch-created presentations can add ordinary text boxes directly to any
+slide. The shape, text storage, stand-ins, ownership, z-order, and metadata are
+encoded from typed values; no existing drawable or blank package is required:
+
+```rust
+use litchi_iwa::keynote::KeynoteDocumentBuilder;
+use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+
+let mut keynote = KeynoteDocumentBuilder::new()
+    .title("Quarterly review")
+    .subtitle("Created entirely by litchi-iwa")
+    .build()?;
+keynote.add_slide_text_box(
+    0,
+    "Revenue grew 24% year over year",
+    DrawablePoint { x: 144.0, y: 720.0 },
+    DrawableSize { width: 1_200.0, height: 120.0 },
+)?;
+keynote.save("created-with-text-box.key")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
 
