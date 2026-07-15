@@ -7,6 +7,33 @@
 /// - Cell margins and spacing
 use super::super::package::Result;
 
+bitflags::bitflags! {
+    /// Optional formats enabled by a DOC table style or auto-format (`Fatl`).
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+    pub struct TableLookFlags: u16 {
+        const BORDERS = 0x0001;
+        const SHADING = 0x0002;
+        const FONT = 0x0004;
+        const COLOR = 0x0008;
+        const BEST_FIT = 0x0010;
+        const HEADER_ROW = 0x0020;
+        const LAST_ROW = 0x0040;
+        const HEADER_COLUMN = 0x0080;
+        const LAST_COLUMN = 0x0100;
+        const NO_ROW_BANDING = 0x0200;
+        const NO_COLUMN_BANDING = 0x0400;
+    }
+}
+
+/// Table auto-format identity and optional look flags (`TLP`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TableLook {
+    /// Application-specific predefined auto-format index; -1 means none.
+    pub autoformat_index: i16,
+    /// Optional formats enabled by the table style or auto-format.
+    pub flags: TableLookFlags,
+}
+
 /// Table Properties structure.
 ///
 /// Contains formatting and structural information for a table.
@@ -37,6 +64,18 @@ pub struct TableProperties {
     pub preferred_indent: Option<TableWidth>,
     /// Avoid a page break between this row and the following row
     pub keep_with_next: bool,
+    /// Table auto-format identity and enabled optional formatting
+    pub table_look: Option<TableLook>,
+    /// Style-sheet index of the applied table style
+    pub table_style_index: Option<u16>,
+    /// Final right-to-left layout state
+    pub right_to_left: bool,
+    /// Legacy right-to-left source retained for correct Bool16 OR semantics
+    pub legacy_right_to_left: bool,
+    /// Modern right-to-left source retained for correct Bool16 OR semantics
+    pub modern_right_to_left: bool,
+    /// Whether this floating table may overlap other tables
+    pub allow_overlap: bool,
     /// Row height in twips (positive = at least, negative = exact)
     pub row_height: Option<i16>,
     /// Row is header row
@@ -383,6 +422,12 @@ impl Default for TableProperties {
             width_after: None,
             preferred_indent: None,
             keep_with_next: false,
+            table_look: None,
+            table_style_index: None,
+            right_to_left: false,
+            legacy_right_to_left: false,
+            modern_right_to_left: false,
+            allow_overlap: true,
             row_height: None,
             is_header_row: false,
             allow_row_break: true,

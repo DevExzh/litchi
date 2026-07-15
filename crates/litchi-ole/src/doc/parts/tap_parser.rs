@@ -26,8 +26,8 @@ fn binary_to_doc_result<T>(result: BinaryResult<T>) -> Result<T> {
 }
 use super::tap::{
     BorderStyle, BorderType, CellMergeStatus, CellProperties, CellShading, ShadingPattern,
-    TableJustification, TableProperties, TableWidth, TextDirection, VerticalAlignment,
-    VerticalMergeStatus, WidthType,
+    TableJustification, TableLook, TableLookFlags, TableProperties, TableWidth, TextDirection,
+    VerticalAlignment, VerticalMergeStatus, WidthType,
 };
 use crate::sprm::{Sprm, parse_sprms};
 use crate::sprm_operations::get_sprm_operation;
@@ -146,6 +146,22 @@ impl<'arena> TapParser<'arena> {
             )));
         }
         Ok(operand[0] != 0)
+    }
+
+    fn parse_bool16(sprm: &Sprm, name: &str) -> Result<bool> {
+        let operand = sprm.operand_bytes();
+        if operand.len() != 2 {
+            return Err(DocError::Corrupted(format!(
+                "{name} must contain one Bool16 value"
+            )));
+        }
+        match binary_to_doc_result(read_u16_le(operand, 0))? {
+            0 => Ok(false),
+            1 => Ok(true),
+            _ => Err(DocError::Corrupted(format!(
+                "{name} contains an invalid Bool16 value"
+            ))),
+        }
     }
 
     fn parse_fts_width(sprm: &Sprm, usage: WidthUsage) -> Result<Option<TableWidth>> {
@@ -364,16 +380,26 @@ impl<'arena> TapParser<'arena> {
             },
             // Full-color default shading chunks for cells 45..63, 1..22, and 23..44.
             0x0C => self.parse_full_cell_shading(tap, sprm, 44, false)?,
-            // sprmTTlp (0x740A) - Table look specifier
+            // sprmTTlp (0x740A) - Table auto-format look specifier
             0x0A => {
-                // Table look specifier for table styles
-                // This is a complex structure that defines table style properties
-                // For basic parsing, we can skip this as it's mainly for styling
-                if let Some(tlp) = sprm.operand_dword() {
-                    // TLP structure contains bit flags for various table style options
-                    // Not critical for basic text extraction
-                    let _ = tlp;
+                let operand = sprm.operand_bytes();
+                if operand.len() != 4 {
+                    return Err(DocError::Corrupted(
+                        "sprmTTlp operand must contain 4 bytes".to_string(),
+                    ));
                 }
+                let bits = binary_to_doc_result(read_u16_le(operand, 2))?;
+                let flags = TableLookFlags::from_bits(bits).ok_or_else(|| {
+                    DocError::Corrupted("sprmTTlp Fatl padding bits are nonzero".to_string())
+                })?;
+                tap.table_look = Some(TableLook {
+                    autoformat_index: binary_to_doc_result(read_i16_le(operand, 0))?,
+                    flags,
+                });
+            },
+            0x0B => {
+                tap.legacy_right_to_left = Self::parse_bool16(sprm, "sprmTFBiDi")?;
+                tap.right_to_left = tap.legacy_right_to_left || tap.modern_right_to_left;
             },
             0x12 => self.parse_full_cell_shading(tap, sprm, 0, false)?,
             // Full-color row border defaults.
@@ -414,7 +440,23 @@ impl<'arena> TapParser<'arena> {
             0x35 => self.parse_cell_width(tap, sprm)?,
             0x36 => self.parse_cell_range_bool(tap, sprm, CellBoolProperty::FitText)?,
             0x39 => self.parse_cell_range_bool(tap, sprm, CellBoolProperty::NoWrap)?,
+            0x3A => {
+                let operand = sprm.operand_bytes();
+                if operand.len() != 2 {
+                    return Err(DocError::Corrupted(
+                        "sprmTIstd operand must contain 2 bytes".to_string(),
+                    ));
+                }
+                tap.table_style_index = Some(binary_to_doc_result(read_u16_le(operand, 0))?);
+            },
             0x42 => self.parse_cell_range_bool(tap, sprm, CellBoolProperty::HideMark)?,
+            0x64 => {
+                tap.modern_right_to_left = Self::parse_bool16(sprm, "sprmTFBiDi90")?;
+                tap.right_to_left = tap.legacy_right_to_left || tap.modern_right_to_left;
+            },
+            0x65 => {
+                tap.allow_overlap = !Self::parse_bool8(sprm, "sprmTFNoAllowOverlap")?;
+            },
             // Modern row can't-split property supersedes sprmTFCantSplit90.
             0x66 => {
                 tap.allow_row_break = !Self::parse_bool8(sprm, "sprmTFCantSplit")?;
@@ -2088,6 +2130,54 @@ mod tests {
         append_fixed_sprm(&mut beyond_right_edge, 0xF661, &[3, 0xF8, 0x77]);
         append_fixed_sprm(&mut beyond_right_edge, 0xF614, &[3, 0xE8, 0x03]);
         assert!(parser.parse_tap(&beyond_right_edge).is_err());
+    }
+
+    #[test]
+    fn parses_table_look_style_direction_and_overlap() {
+        let arena = Bump::new();
+        let parser = TapParser::new(&arena);
+        let mut grpprl = table_definition_grpprl(&[1, 0, 0, 232, 3]);
+        append_fixed_sprm(&mut grpprl, 0x740A, &[0xFF, 0xFF, 0xFF, 0x07]);
+        append_fixed_sprm(&mut grpprl, 0x560B, &[1, 0]);
+        append_fixed_sprm(&mut grpprl, 0x5664, &[0, 0]);
+        append_fixed_sprm(&mut grpprl, 0x563A, &[0x34, 0x12]);
+        append_fixed_sprm(&mut grpprl, 0x3465, &[1]);
+
+        let tap = parser.parse_tap(&grpprl).unwrap();
+        assert_eq!(
+            tap.table_look,
+            Some(TableLook {
+                autoformat_index: -1,
+                flags: TableLookFlags::all(),
+            })
+        );
+        assert_eq!(tap.table_style_index, Some(0x1234));
+        assert!(tap.legacy_right_to_left);
+        assert!(!tap.modern_right_to_left);
+        assert!(tap.right_to_left);
+        assert!(!tap.allow_overlap);
+
+        append_fixed_sprm(&mut grpprl, 0x560B, &[0, 0]);
+        append_fixed_sprm(&mut grpprl, 0x3465, &[0]);
+        let tap = parser.parse_tap(&grpprl).unwrap();
+        assert!(!tap.right_to_left);
+        assert!(tap.allow_overlap);
+    }
+
+    #[test]
+    fn rejects_malformed_table_look_and_direction() {
+        let arena = Bump::new();
+        let parser = TapParser::new(&arena);
+        let parse_with = |opcode, operand: &[u8]| {
+            let mut grpprl = table_definition_grpprl(&[1, 0, 0, 232, 3]);
+            append_fixed_sprm(&mut grpprl, opcode, operand);
+            parser.parse_tap(&grpprl)
+        };
+
+        assert!(parse_with(0x740A, &[0, 0, 0, 0x08]).is_err());
+        assert!(parse_with(0x560B, &[2, 0]).is_err());
+        assert!(parse_with(0x5664, &[2, 0]).is_err());
+        assert!(parse_with(0x3465, &[2]).is_err());
     }
 
     #[test]

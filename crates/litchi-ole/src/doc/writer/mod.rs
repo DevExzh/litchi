@@ -59,7 +59,9 @@ pub mod hyperlinks;
 pub mod numbering;
 
 // Re-export public types
-pub use crate::doc::parts::tap::{CellShading, ShadingPattern, TableWidth, WidthType};
+pub use crate::doc::parts::tap::{
+    CellShading, ShadingPattern, TableLook, TableLookFlags, TableWidth, WidthType,
+};
 pub use bookmarks::BookmarkEntry;
 pub use comments::CommentEntry;
 pub use core::{CharacterFormatting, DocWriteError, DocWriter, LineSpacing, ParagraphFormatting};

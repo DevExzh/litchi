@@ -6,7 +6,7 @@
 
 use super::sprm::SprmBuilder;
 use crate::doc::parts::tap::{
-    BorderStyle, BorderType, CellBorders, CellShading, TableWidth, TextDirection,
+    BorderStyle, BorderType, CellBorders, CellShading, TableLook, TableWidth, TextDirection,
     VerticalAlignment, VerticalMergeStatus, WidthType,
 };
 
@@ -29,6 +29,8 @@ pub enum TapBuildError {
     InvalidCellPadding(u16),
     /// A preferred-width property uses unsupported units or a value outside its context's range.
     InvalidPreferredWidth(&'static str, TableWidth),
+    /// TLP contains bits outside the eleven-bit Fatl field.
+    InvalidTableLookFlags(u16),
 }
 
 impl std::fmt::Display for TapBuildError {
@@ -61,6 +63,9 @@ impl std::fmt::Display for TapBuildError {
             },
             Self::InvalidPreferredWidth(property, width) => {
                 write!(f, "DOC {property} has an invalid preferred width {width:?}")
+            },
+            Self::InvalidTableLookFlags(flags) => {
+                write!(f, "DOC table look contains reserved flags {flags:#06x}")
             },
         }
     }
@@ -133,6 +138,14 @@ pub struct TableRow {
     pub preferred_indent: Option<TableWidth>,
     /// Avoid a page break between this row and the next row
     pub keep_with_next: bool,
+    /// Table auto-format identity and optional look flags
+    pub table_look: Option<TableLook>,
+    /// Style-sheet index of the applied table style
+    pub table_style_index: Option<u16>,
+    /// Lay out the table from right to left
+    pub right_to_left: bool,
+    /// Whether this floating table may overlap other tables
+    pub allow_overlap: bool,
     /// Default outer and inside borders for this row
     pub borders: TableBorders,
 }
@@ -150,6 +163,10 @@ impl Default for TableRow {
             width_after: None,
             preferred_indent: None,
             keep_with_next: false,
+            table_look: None,
+            table_style_index: None,
+            right_to_left: false,
+            allow_overlap: true,
             borders: TableBorders::default(),
         }
     }
@@ -327,6 +344,10 @@ pub(crate) fn generate_row_sprms(row: &TableRow) -> Result<Vec<u8>, TapBuildErro
     }
 
     let mut builder = SprmBuilder::new();
+    // Apply the style first so later SPRMs remain direct row formatting.
+    if let Some(style_index) = row.table_style_index {
+        builder.add_word(0x563A, style_index);
+    }
     if !row.allow_break
         || row
             .cells
@@ -361,6 +382,28 @@ pub(crate) fn generate_row_sprms(row: &TableRow) -> Result<Vec<u8>, TapBuildErro
     }
     if let Some(width) = preferred_indent {
         builder.add_three_byte(0xF661, width);
+    }
+    if let Some(look) = row.table_look {
+        let flags = look.flags.bits();
+        if flags & !0x07FF != 0 {
+            return Err(TapBuildError::InvalidTableLookFlags(flags));
+        }
+        builder.add_dword(
+            0x740A,
+            u32::from_le_bytes([
+                look.autoformat_index.to_le_bytes()[0],
+                look.autoformat_index.to_le_bytes()[1],
+                flags.to_le_bytes()[0],
+                flags.to_le_bytes()[1],
+            ]),
+        );
+    }
+    if row.right_to_left {
+        builder.add_word(0x560B, 1);
+        builder.add_word(0x5664, 1);
+    }
+    if !row.allow_overlap {
+        builder.add_bool(0x3465, true);
     }
     let mut sprms = builder.build();
 
@@ -809,7 +852,7 @@ pub fn create_simple_table(rows: usize, cols: usize, cell_width: u16) -> TapBuil
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::doc::parts::tap::ShadingPattern;
+    use crate::doc::parts::tap::{ShadingPattern, TableLookFlags};
 
     #[test]
     fn test_tap_builder() {
@@ -1040,10 +1083,28 @@ mod tests {
                 width_type: WidthType::Twips,
             }),
             keep_with_next: true,
+            table_look: Some(TableLook {
+                autoformat_index: -1,
+                flags: TableLookFlags::BORDERS
+                    | TableLookFlags::HEADER_COLUMN
+                    | TableLookFlags::NO_COLUMN_BANDING,
+            }),
+            table_style_index: Some(0x1234),
+            right_to_left: true,
+            allow_overlap: false,
             ..TableRow::default()
         });
 
         let sprms = builder.try_generate_row_sprms(0).unwrap();
+        let opcodes = crate::sprm::parse_sprms(&sprms)
+            .into_iter()
+            .map(|sprm| sprm.opcode)
+            .collect::<Vec<_>>();
+        assert_eq!(opcodes[0], 0x563A);
+        assert!(
+            opcodes.iter().position(|opcode| *opcode == 0x560B)
+                < opcodes.iter().position(|opcode| *opcode == 0x5664)
+        );
         let tap = crate::doc::parts::tap::TableProperties::from_sprm(&sprms).unwrap();
         assert_eq!(tap.preferred_width, builder.rows()[0].preferred_width);
         assert!(tap.auto_fit);
@@ -1051,6 +1112,10 @@ mod tests {
         assert_eq!(tap.width_after, builder.rows()[0].width_after);
         assert_eq!(tap.preferred_indent, builder.rows()[0].preferred_indent);
         assert!(tap.keep_with_next);
+        assert_eq!(tap.table_look, builder.rows()[0].table_look);
+        assert_eq!(tap.table_style_index, Some(0x1234));
+        assert!(tap.right_to_left);
+        assert!(!tap.allow_overlap);
     }
 
     #[test]
@@ -1167,6 +1232,24 @@ mod tests {
                 "table indent",
                 invalid_indent
             ))
+        );
+
+        let invalid_flags = 0x8000;
+        let mut builder = TapBuilder::new();
+        builder.add_row(TableRow {
+            cells: vec![TableCell {
+                width: 1000,
+                ..TableCell::default()
+            }],
+            table_look: Some(TableLook {
+                autoformat_index: 0,
+                flags: TableLookFlags::from_bits_retain(invalid_flags),
+            }),
+            ..TableRow::default()
+        });
+        assert_eq!(
+            builder.try_generate_row_sprms(0),
+            Err(TapBuildError::InvalidTableLookFlags(invalid_flags))
         );
 
         let mut builder = TapBuilder::new();
