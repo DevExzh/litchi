@@ -1,4 +1,4 @@
-//! Discovery and unambiguous matching of layout-owned image graphs.
+//! Discovery and unambiguous matching of layout-owned media graphs.
 
 use super::*;
 use slide_create::graph::private_clone_object_ids;
@@ -6,119 +6,195 @@ use slide_create::graph::private_clone_object_ids;
 const SLIDE_MESSAGE_TYPE: u32 = 5;
 const IMAGE_MESSAGE_TYPE: u32 = 3_005;
 const MOVIE_MESSAGE_TYPE: u32 = 3_007;
+const LIVE_VIDEO_INFO_FIELD: u32 = 100;
 
-pub(in crate::keynote::editor) fn template_image_roots(
-    archive: &Archive,
-    slide: &kn::SlideArchive,
-) -> Vec<u64> {
-    slide
-        .owned_drawables
-        .iter()
-        .filter(|reference| {
-            archive.object(reference.identifier).is_some_and(|object| {
-                object
-                    .messages
-                    .iter()
-                    .any(|message| message.type_ == IMAGE_MESSAGE_TYPE)
-            })
-        })
-        .map(|reference| reference.identifier)
-        .collect()
+#[derive(Debug, Default)]
+pub(in crate::keynote::editor) struct LayoutMediaRoots {
+    pub(super) images: Vec<u64>,
+    pub(super) live_videos: Vec<u64>,
 }
 
-pub(super) fn layout_image_roots(graph: &ObjectGraph, slide: &kn::SlideArchive) -> Vec<u64> {
-    slide
-        .owned_drawables
-        .iter()
-        .filter(|reference| {
-            graph
-                .objects
-                .get(&reference.identifier)
-                .is_some_and(|messages| {
-                    messages
-                        .iter()
-                        .any(|message| message.type_ == IMAGE_MESSAGE_TYPE)
-                })
-        })
-        .map(|reference| reference.identifier)
-        .collect()
+impl LayoutMediaRoots {
+    pub(super) fn is_empty(&self) -> bool {
+        self.images.is_empty() && self.live_videos.is_empty()
+    }
+
+    pub(super) fn identifiers(&self) -> impl Iterator<Item = u64> + '_ {
+        self.images.iter().chain(&self.live_videos).copied()
+    }
 }
 
-pub(super) fn reject_layout_movies(
+pub(in crate::keynote::editor) fn layout_media_roots(
     graph: &ObjectGraph,
     slide: &kn::SlideArchive,
     context: &str,
-) -> Result<()> {
-    if slide.owned_drawables.iter().any(|reference| {
-        graph
-            .objects
-            .get(&reference.identifier)
-            .is_some_and(|messages| {
-                messages
-                    .iter()
-                    .any(|message| message.type_ == MOVIE_MESSAGE_TYPE)
-            })
-    }) {
-        return Err(Error::InvalidFormat(format!(
-            "Keynote {context} contains a movie that cannot yet be materialized safely"
-        )));
-    }
-    Ok(())
+) -> Result<LayoutMediaRoots> {
+    media_roots(graph, slide, MoviePolicy::RequireLiveVideo, context)
 }
 
-pub(super) fn current_layout_image_roots(
+fn live_slide_media_candidates(
+    graph: &ObjectGraph,
+    slide: &kn::SlideArchive,
+) -> Result<LayoutMediaRoots> {
+    media_roots(graph, slide, MoviePolicy::IgnoreNonLiveVideo, "live slide")
+}
+
+#[derive(Clone, Copy)]
+enum MoviePolicy {
+    RequireLiveVideo,
+    IgnoreNonLiveVideo,
+}
+
+fn media_roots(
+    graph: &ObjectGraph,
+    slide: &kn::SlideArchive,
+    movie_policy: MoviePolicy,
+    context: &str,
+) -> Result<LayoutMediaRoots> {
+    let mut roots = LayoutMediaRoots::default();
+    for reference in &slide.owned_drawables {
+        let Some(messages) = graph.objects.get(&reference.identifier) else {
+            return Err(Error::InvalidFormat(format!(
+                "Keynote {context} drawable {} is missing",
+                reference.identifier
+            )));
+        };
+        let is_image = messages
+            .iter()
+            .any(|message| message.type_ == IMAGE_MESSAGE_TYPE);
+        let is_movie = messages
+            .iter()
+            .any(|message| message.type_ == MOVIE_MESSAGE_TYPE);
+        if is_image && is_movie {
+            return Err(Error::InvalidFormat(format!(
+                "Keynote {context} drawable {} is both an image and a movie",
+                reference.identifier
+            )));
+        }
+        if is_image {
+            roots.images.push(reference.identifier);
+        } else if is_movie {
+            let movie: tsd::MovieArchive =
+                graph.decode_type(reference.identifier, MOVIE_MESSAGE_TYPE, "TSD.MovieArchive")?;
+            if movie.is_live_video == Some(true) {
+                roots.live_videos.push(reference.identifier);
+            } else if matches!(movie_policy, MoviePolicy::RequireLiveVideo) {
+                return Err(Error::InvalidFormat(format!(
+                    "Keynote {context} contains a non-live movie that cannot yet be materialized safely"
+                )));
+            }
+        }
+    }
+    Ok(roots)
+}
+
+pub(super) fn current_layout_media_roots(
     graph: &ObjectGraph,
     current: &kn::SlideArchive,
-) -> Result<Vec<u64>> {
+) -> Result<LayoutMediaRoots> {
     let Some(template) = current.template_slide.as_ref() else {
-        return Ok(Vec::new());
+        return Ok(LayoutMediaRoots::default());
     };
     let slide: kn::SlideArchive =
         graph.decode_type(template.identifier, SLIDE_MESSAGE_TYPE, "KN.SlideArchive")?;
-    reject_layout_movies(graph, &slide, "current layout")?;
-    Ok(layout_image_roots(graph, &slide))
+    layout_media_roots(graph, &slide, "current layout")
 }
 
-pub(super) fn match_live_image_roots(
+pub(super) fn match_live_media_roots(
     graph: &ObjectGraph,
     current: &kn::SlideArchive,
+    templates: &LayoutMediaRoots,
+) -> Result<LayoutMediaRoots> {
+    let candidates = live_slide_media_candidates(graph, current)?;
+    Ok(LayoutMediaRoots {
+        images: match_roots(
+            &templates.images,
+            &candidates.images,
+            |identifier| image_signature(graph, identifier),
+            "image",
+        )?,
+        live_videos: match_roots(
+            &templates.live_videos,
+            &candidates.live_videos,
+            |identifier| live_video_signature(graph, identifier),
+            "live video",
+        )?,
+    })
+}
+
+fn match_roots<T: PartialEq>(
     templates: &[u64],
+    candidates: &[u64],
+    signature: impl Fn(u64) -> Result<T>,
+    kind: &str,
 ) -> Result<Vec<u64>> {
-    let candidates = layout_image_roots(graph, current);
-    let mut used = HashSet::new();
-    templates
+    let mut available = candidates
         .iter()
-        .map(|template| {
-            let signature = image_signature(graph, *template)?;
-            let mut matches = Vec::new();
-            for candidate in candidates.iter().copied() {
-                if !used.contains(&candidate)
-                    && image_signature(graph, candidate)? == signature
-                {
-                    matches.push(candidate);
-                }
+        .copied()
+        .map(|identifier| Ok((identifier, signature(identifier)?)))
+        .collect::<Result<Vec<_>>>()?;
+    let mut matched = Vec::with_capacity(templates.len());
+    for template in templates {
+        let expected = signature(*template)?;
+        let mut position = None;
+        let mut match_count = 0usize;
+        for (index, (_, candidate)) in available.iter().enumerate() {
+            if candidate == &expected {
+                match_count += 1;
+                position = Some(index);
             }
-            let [identifier] = matches.as_slice() else {
-                return Err(Error::InvalidFormat(format!(
-                    "Keynote layout image {template} matched {} live slide images; expected exactly one",
-                    matches.len()
-                )));
-            };
-            used.insert(*identifier);
-            Ok(*identifier)
-        })
-        .collect()
+        }
+        if match_count != 1 {
+            return Err(Error::InvalidFormat(format!(
+                "Keynote layout {kind} {template} matched {} live slide objects; expected exactly one",
+                match_count
+            )));
+        }
+        let position = position.ok_or_else(|| {
+            Error::InvalidFormat("Keynote media match count lost its position".to_owned())
+        })?;
+        matched.push(available.remove(position).0);
+    }
+    Ok(matched)
 }
 
 fn image_signature(graph: &ObjectGraph, identifier: u64) -> Result<tsd::ImageArchive> {
     let mut image: tsd::ImageArchive =
         graph.decode_type(identifier, IMAGE_MESSAGE_TYPE, "TSD.ImageArchive")?;
-    image.super_.parent = None;
-    image.super_.title = None;
-    image.super_.caption = None;
+    clear_instance_references(&mut image.super_);
     image.mask = None;
     image.flags = None;
     Ok(image)
+}
+
+#[derive(PartialEq)]
+struct LiveVideoSignature {
+    movie: tsd::MovieArchive,
+    extension_payloads: Vec<Vec<u8>>,
+}
+
+fn live_video_signature(graph: &ObjectGraph, identifier: u64) -> Result<LiveVideoSignature> {
+    let data = graph.message_data_type(identifier, MOVIE_MESSAGE_TYPE, "TSD.MovieArchive")?;
+    let mut movie = tsd::MovieArchive::decode(data)?;
+    if movie.is_live_video != Some(true) {
+        return Err(Error::InvalidFormat(format!(
+            "Keynote layout movie {identifier} is not a live video"
+        )));
+    }
+    clear_instance_references(&mut movie.super_);
+    Ok(LiveVideoSignature {
+        movie,
+        extension_payloads: repeated_length_delimited_payloads(data, LIVE_VIDEO_INFO_FIELD)?
+            .into_iter()
+            .map(ToOwned::to_owned)
+            .collect(),
+    })
+}
+
+fn clear_instance_references(drawable: &mut tsd::DrawableArchive) {
+    drawable.parent = None;
+    drawable.title = None;
+    drawable.caption = None;
 }
 
 pub(super) fn private_graph_union(

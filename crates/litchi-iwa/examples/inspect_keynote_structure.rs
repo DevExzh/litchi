@@ -10,7 +10,7 @@ use litchi_iwa::protobuf::kn::{
     BuildArchive, BuildChunkArchive, DocumentArchive, PlaceholderArchive, ShowArchive,
     SlideArchive, SlideNodeArchive, Soundtrack, ThemeArchive,
 };
-use litchi_iwa::protobuf::tsd::ImageArchive;
+use litchi_iwa::protobuf::tsd::{ImageArchive, MovieArchive};
 use litchi_iwa::protobuf::tsp::PackageMetadata;
 use litchi_iwa::protobuf::tswp::{ShapeInfoArchive, StorageArchive};
 use prost::Message;
@@ -154,6 +154,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     image.thumbnail_data.map(|reference| reference.identifier),
                     image.flags,
                     object.archive_info.message_infos,
+                );
+            }
+            if let Some(movie) = decode::<MovieArchive>(object) {
+                print_movie(
+                    " layout movie",
+                    drawable.identifier,
+                    archive_name,
+                    object,
+                    movie,
                 );
             }
         }
@@ -369,6 +378,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             object.archive_info.message_infos,
                         );
                     }
+                    if let Some(movie) = decode::<MovieArchive>(object) {
+                        print_movie("   movie", drawable.identifier, name, object, movie);
+                    }
                     if let Some(storage_id) = storage {
                         let (name, object) = objects
                             .get(&storage_id)
@@ -425,4 +437,33 @@ fn decode<T: Message + Default>(object: &ArchiveObject) -> Option<T> {
         .messages
         .iter()
         .find_map(|message| T::decode(message.data.as_slice()).ok())
+}
+
+fn print_movie(
+    prefix: &str,
+    identifier: u64,
+    archive_name: &str,
+    object: &ArchiveObject,
+    movie: MovieArchive,
+) {
+    println!(
+        "{prefix}={identifier} archive={archive_name} parent={:?} style={:?} data={:?} poster={:?} database={:?}/{:?} flags={:?} live={:?} size={:?}/{:?} metadata={:?}",
+        movie.super_.parent.map(|reference| reference.identifier),
+        movie.style.map(|reference| reference.identifier),
+        movie.movie_data.map(|reference| reference.identifier),
+        movie
+            .poster_image_data
+            .map(|reference| reference.identifier),
+        movie
+            .database_movie_data
+            .map(|reference| reference.identifier),
+        movie
+            .database_poster_image_data
+            .map(|reference| reference.identifier),
+        movie.flags,
+        movie.is_live_video,
+        movie.original_size,
+        movie.natural_size,
+        object.archive_info.message_infos,
+    );
 }

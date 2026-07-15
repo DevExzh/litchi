@@ -10,6 +10,9 @@ const TEST_SLIDE_NODE_MESSAGE_TYPE: u32 = 4;
 const TEST_THEME_MESSAGE_TYPE: u32 = 10;
 const TEST_PLACEHOLDER_MESSAGE_TYPE: u32 = 7;
 const TEST_IMAGE_MESSAGE_TYPE: u32 = 3_005;
+const TEST_MOVIE_MESSAGE_TYPE: u32 = 3_007;
+const TEST_LIVE_VIDEO_INFO_FIELD: u32 = 100;
+const TEST_LIVE_VIDEO_INFO_PAYLOAD: &[u8] = &[0x08, 0x01];
 const TEST_TITLE_PLACEHOLDER_FIELD: u32 = 5;
 const TEST_SLIDE_NUMBER_PLACEHOLDER_FIELD: u32 = 20;
 const TEST_SLIDE_OWNED_DRAWABLES_FIELD: u32 = 7;
@@ -4209,6 +4212,164 @@ fn creates_slide_with_materialized_layout_image_graph() {
 }
 
 #[test]
+fn slide_layout_update_materializes_and_removes_live_video_graphs() {
+    let mut editor = KeynoteEditor::from_package(test_package_with_live_video_layout()).unwrap();
+    let layouts = editor.slide_layouts().unwrap();
+    let live_video = layouts
+        .iter()
+        .find(|layout| layout.name == "Title & Live Video")
+        .unwrap()
+        .id;
+    let bullets = layouts
+        .iter()
+        .find(|layout| layout.name == "Title & Bullets")
+        .unwrap()
+        .id;
+
+    editor.set_slide_layout(0, live_video).unwrap();
+    let graph = ObjectGraph::read(editor.package()).unwrap();
+    let slide: kn::SlideArchive = graph.decode_type(4, 5, "KN.SlideArchive").unwrap();
+    assert_eq!(
+        slide
+            .owned_drawables
+            .iter()
+            .map(|reference| reference.identifier)
+            .collect::<Vec<_>>(),
+        [73, 5, 6]
+    );
+    let movie: tsd::MovieArchive = graph
+        .decode_type(73, TEST_MOVIE_MESSAGE_TYPE, "TSD.MovieArchive")
+        .unwrap();
+    assert_eq!(movie.super_.parent, Some(reference(4)));
+    assert_eq!(movie.super_.title, Some(reference(74)));
+    assert_eq!(movie.super_.caption, Some(reference(75)));
+    assert_eq!(movie.style, Some(reference(60)));
+    assert_eq!(
+        movie.poster_image_data,
+        Some(tsp::DataReference { identifier: 2_001 })
+    );
+    assert_eq!(movie.is_live_video, Some(true));
+    let movie_data = graph
+        .message_data_type(73, TEST_MOVIE_MESSAGE_TYPE, "TSD.MovieArchive")
+        .unwrap();
+    assert_eq!(
+        repeated_length_delimited_payloads(movie_data, TEST_LIVE_VIDEO_INFO_FIELD).unwrap(),
+        [TEST_LIVE_VIDEO_INFO_PAYLOAD]
+    );
+
+    editor.set_slide_layout(0, bullets).unwrap();
+    let graph = ObjectGraph::read(editor.package()).unwrap();
+    let slide: kn::SlideArchive = graph.decode_type(4, 5, "KN.SlideArchive").unwrap();
+    assert_eq!(slide.owned_drawables, [reference(5), reference(6)]);
+    for identifier in 73..=75 {
+        assert!(!graph.objects.contains_key(&identifier));
+    }
+}
+
+#[test]
+fn creates_slide_with_materialized_layout_live_video_graph() {
+    let mut editor = KeynoteEditor::from_package(test_package_with_live_video_layout()).unwrap();
+    let live_video = editor
+        .slide_layouts()
+        .unwrap()
+        .into_iter()
+        .find(|layout| layout.name == "Title & Live Video")
+        .unwrap()
+        .id;
+    let created = editor.insert_slide(1, live_video).unwrap();
+    let graph = ObjectGraph::read(editor.package()).unwrap();
+    let slide: kn::SlideArchive = graph
+        .decode_type(created.slide_id, TEST_SLIDE_MESSAGE_TYPE, "KN.SlideArchive")
+        .unwrap();
+    let movie_id = slide.owned_drawables[0].identifier;
+    let movie: tsd::MovieArchive = graph
+        .decode_type(movie_id, TEST_MOVIE_MESSAGE_TYPE, "TSD.MovieArchive")
+        .unwrap();
+    assert_eq!(movie.super_.parent, Some(reference(created.slide_id)));
+    assert_ne!(movie.super_.title, Some(reference(71)));
+    assert_ne!(movie.super_.caption, Some(reference(72)));
+    assert_eq!(movie.is_live_video, Some(true));
+    assert_eq!(created.title, None);
+    assert_eq!(created.body, None);
+}
+
+#[test]
+fn slide_layout_update_rejects_non_live_layout_movies_transactionally() {
+    let mut package = test_package_with_live_video_layout();
+    package
+        .update_archive("Index/TemplateSlide-38.iwa", |archive| {
+            let movie = archive.object_mut(70).unwrap();
+            let mut decoded = tsd::MovieArchive::decode(movie.messages[0].data.as_slice())?;
+            decoded.is_live_video = Some(false);
+            movie.replace_message(
+                0,
+                RawMessage {
+                    type_: TEST_MOVIE_MESSAGE_TYPE,
+                    data: decoded.encode_to_vec(),
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    let mut editor = KeynoteEditor::from_package(package).unwrap();
+    let live_video = editor
+        .slide_layouts()
+        .unwrap()
+        .into_iter()
+        .find(|layout| layout.name == "Title & Live Video")
+        .unwrap()
+        .id;
+    let before = editor.to_bytes().unwrap();
+    assert!(editor.set_slide_layout(0, live_video).is_err());
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
+fn slide_layout_update_rejects_ambiguous_live_videos_transactionally() {
+    let mut editor = KeynoteEditor::from_package(test_package_with_live_video_layout()).unwrap();
+    let layouts = editor.slide_layouts().unwrap();
+    let live_video = layouts
+        .iter()
+        .find(|layout| layout.name == "Title & Live Video")
+        .unwrap()
+        .id;
+    let bullets = layouts
+        .iter()
+        .find(|layout| layout.name == "Title & Bullets")
+        .unwrap()
+        .id;
+    editor.set_slide_layout(0, live_video).unwrap();
+    let mut package = editor.into_package();
+    package
+        .update_archive("Index/Slide-4.iwa", |archive| {
+            let source = archive.object(73).unwrap();
+            let duplicate =
+                clone_object_metadata(source, 76, source.messages.clone(), &HashMap::new(), false)?;
+            archive.insert_object(duplicate)?;
+            let slide = archive.object_mut(4).unwrap();
+            let mut decoded = kn::SlideArchive::decode(slide.messages[0].data.as_slice())?;
+            decoded.owned_drawables.push(reference(76));
+            decoded.drawables_z_order.push(reference(76));
+            slide.replace_message(
+                0,
+                RawMessage {
+                    type_: TEST_SLIDE_MESSAGE_TYPE,
+                    data: decoded.encode_to_vec(),
+                },
+            )?;
+            slide.archive_info.message_infos[0]
+                .object_references
+                .push(76);
+            Ok(())
+        })
+        .unwrap();
+    let mut editor = KeynoteEditor::from_package(package).unwrap();
+    let before = editor.to_bytes().unwrap();
+    assert!(editor.set_slide_layout(0, bullets).is_err());
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
 fn slide_layout_update_rejects_ambiguous_materialized_images_transactionally() {
     let mut editor = KeynoteEditor::from_package(test_package_with_image_layout()).unwrap();
     let layouts = editor.slide_layouts().unwrap();
@@ -5645,6 +5806,79 @@ fn test_package_with_image_layout() -> IWorkPackage {
                     },
                     ..Default::default()
                 },
+            ))?;
+            Ok(())
+        })
+        .unwrap();
+    package
+}
+
+fn test_package_with_live_video_layout() -> IWorkPackage {
+    let mut package = test_package_with_two_layouts();
+    package
+        .update_archive("Index/TemplateSlide-38.iwa", |archive| {
+            let slide = archive.object_mut(38).unwrap();
+            let mut decoded = kn::SlideArchive::decode(slide.messages[0].data.as_slice())?;
+            decoded.name = Some("Title & Live Video".to_owned());
+            decoded.owned_drawables = vec![reference(70), reference(39), reference(40)];
+            decoded.drawables_z_order = decoded.owned_drawables.clone();
+            slide.replace_message(
+                0,
+                RawMessage {
+                    type_: TEST_SLIDE_MESSAGE_TYPE,
+                    data: decoded.encode_to_vec(),
+                },
+            )?;
+
+            let mut movie = object(
+                70,
+                TEST_MOVIE_MESSAGE_TYPE,
+                tsd::MovieArchive {
+                    super_: tsd::DrawableArchive {
+                        geometry: Some(tsd::GeometryArchive {
+                            position: Some(tsp::Point { x: 500.0, y: 100.0 }),
+                            size: Some(tsp::Size {
+                                width: 400.0,
+                                height: 400.0,
+                            }),
+                            ..Default::default()
+                        }),
+                        parent: Some(reference(38)),
+                        title: Some(reference(71)),
+                        caption: Some(reference(72)),
+                        accessibility_description: Some("Default Camera".to_owned()),
+                        ..Default::default()
+                    },
+                    poster_image_data: Some(tsp::DataReference { identifier: 2_001 }),
+                    style: Some(reference(60)),
+                    is_live_video: Some(true),
+                    ..Default::default()
+                },
+            );
+            let data = append_repeated_length_delimited_field(
+                &movie.messages[0].data,
+                TEST_LIVE_VIDEO_INFO_FIELD,
+                TEST_LIVE_VIDEO_INFO_PAYLOAD,
+            )?;
+            movie.replace_message(
+                0,
+                RawMessage {
+                    type_: TEST_MOVIE_MESSAGE_TYPE,
+                    data,
+                },
+            )?;
+            movie.archive_info.message_infos[0].object_references = vec![72, 71, 60];
+            movie.archive_info.message_infos[0].data_references = vec![2_001];
+            archive.insert_object(movie)?;
+            archive.insert_object(object(
+                71,
+                STANDIN_CAPTION_MESSAGE_TYPE,
+                tsd::StandinCaptionArchive::default(),
+            ))?;
+            archive.insert_object(object(
+                72,
+                STANDIN_CAPTION_MESSAGE_TYPE,
+                tsd::StandinCaptionArchive::default(),
             ))?;
             Ok(())
         })

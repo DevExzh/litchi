@@ -25,7 +25,8 @@ impl KeynoteEditor {
     /// Keynote retains the slide's text, notes, builds, transition, and ordinary
     /// drawables during this operation. The selected layout supplies the slide
     /// style, title/body placeholder presentation and visibility, and cloned
-    /// layout-owned images. Replaced layout image graphs are removed safely.
+    /// layout-owned images or live-video objects. Replaced layout media graphs
+    /// are removed safely.
     pub fn set_slide_layout(
         &mut self,
         slide_index: usize,

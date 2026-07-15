@@ -1,76 +1,10 @@
-//! Wire-preserving image materialization and slide z-order updates.
+//! Wire-preserving slide ordering for layout-owned media.
 
 use super::*;
 
 const SLIDE_MESSAGE_TYPE: u32 = 5;
-const IMAGE_MESSAGE_TYPE: u32 = 3_005;
-const IMAGE_FLAGS_FIELD: u32 = 7;
 const SLIDE_OWNED_DRAWABLES_FIELD: u32 = 7;
 const SLIDE_DRAWABLES_Z_ORDER_FIELD: u32 = 42;
-const TEMPLATE_MEDIA_FLAG: u32 = 1 << 1;
-
-pub(in crate::keynote::editor) fn materialize_cloned_images(
-    archive: &mut Archive,
-    source_roots: &[u64],
-    remap: &HashMap<u64, u64>,
-    slide_id: u64,
-) -> Result<()> {
-    for source in source_roots {
-        let identifier = remap[source];
-        let object = archive.object_mut(identifier).ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "Cloned Keynote layout image {identifier} is missing"
-            ))
-        })?;
-        materialize_image_object(object, slide_id)?;
-    }
-    Ok(())
-}
-
-pub(super) fn materialize_image_object(object: &mut ArchiveObject, slide_id: u64) -> Result<()> {
-    let indexes = object
-        .messages
-        .iter()
-        .enumerate()
-        .filter(|(_, message)| message.type_ == IMAGE_MESSAGE_TYPE)
-        .map(|(index, _)| index)
-        .collect::<Vec<_>>();
-    let [index] = indexes.as_slice() else {
-        return Err(Error::InvalidFormat(
-            "Keynote layout image must contain exactly one ImageArchive payload".to_owned(),
-        ));
-    };
-    let index = *index;
-    let original = object.messages[index].data.as_slice();
-    let image = tsd::ImageArchive::decode(original)?;
-    if image.super_.parent.as_ref().map(|parent| parent.identifier) != Some(slide_id) {
-        return Err(Error::InvalidFormat(
-            "Keynote materialized image has the wrong slide parent".to_owned(),
-        ));
-    }
-    let flags = image.flags.map(|flags| flags & !TEMPLATE_MEDIA_FLAG);
-    let data = patch_varint_field(
-        original,
-        IMAGE_FLAGS_FIELD,
-        image.flags.is_some(),
-        flags.map(u64::from),
-    )?;
-    let mut expected = image;
-    expected.flags = flags;
-    if tsd::ImageArchive::decode(data.as_slice())? != expected {
-        return Err(Error::InvalidFormat(
-            "Keynote layout image materialization failed validation".to_owned(),
-        ));
-    }
-    object.replace_message(
-        index,
-        RawMessage {
-            type_: IMAGE_MESSAGE_TYPE,
-            data,
-        },
-    )?;
-    Ok(())
-}
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn rewrite_slide_media_roots(
@@ -143,12 +77,12 @@ pub(super) fn rewrite_slide_media_roots(
                     != 1
                 {
                     return Err(Error::InvalidFormat(format!(
-                        "Keynote slide field {field} must contain layout image {identifier} exactly once"
+                        "Keynote slide field {field} must contain layout media object {identifier} exactly once"
                     )));
                 }
                 identifiers.retain(|candidate| candidate != identifier);
             }
-            insert_target_images(&mut identifiers, target, current, &replacements)?;
+            insert_target_media(&mut identifiers, target, current, &replacements)?;
             let payloads = identifiers
                 .iter()
                 .map(|identifier| {
@@ -175,7 +109,7 @@ pub(super) fn rewrite_slide_media_roots(
         }
         if kn::SlideArchive::decode(data.as_slice())? != expected {
             return Err(Error::InvalidFormat(
-                "Keynote slide layout-image ordering failed validation".to_owned(),
+                "Keynote slide layout-media ordering failed validation".to_owned(),
             ));
         }
         object.replace_message(
@@ -202,7 +136,7 @@ pub(super) fn rewrite_slide_media_roots(
     })
 }
 
-fn insert_target_images(
+fn insert_target_media(
     identifiers: &mut Vec<u64>,
     target: &kn::SlideArchive,
     current: &kn::SlideArchive,
@@ -239,7 +173,7 @@ fn insert_target_images(
         };
         if identifiers.contains(&new_identifier) {
             return Err(Error::InvalidFormat(format!(
-                "Keynote slide already owns materialized image {new_identifier}"
+                "Keynote slide already owns materialized media object {new_identifier}"
             )));
         }
         let next_anchor = target.owned_drawables[index + 1..]
@@ -251,7 +185,7 @@ fn insert_target_images(
                 .iter()
                 .position(|identifier| *identifier == next_anchor)
                 .ok_or_else(|| {
-                    Error::InvalidFormat("Keynote layout image anchor disappeared".to_owned())
+                    Error::InvalidFormat("Keynote layout media anchor disappeared".to_owned())
                 })?;
             identifiers.insert(position, new_identifier);
         } else if has_anchor {

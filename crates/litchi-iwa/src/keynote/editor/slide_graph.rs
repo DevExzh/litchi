@@ -1,6 +1,11 @@
 //! Slide object-graph traversal, cloning, remapping, and deletion.
 
 use super::*;
+
+const IMAGE_MESSAGE_TYPE: u32 = 3_005;
+const MASK_MESSAGE_TYPE: u32 = 3_006;
+const MOVIE_MESSAGE_TYPE: u32 = 3_007;
+
 pub(super) struct ObjectGraph {
     pub(super) objects: HashMap<u64, Vec<RawMessage>>,
     pub(super) archives: HashMap<u64, String>,
@@ -568,6 +573,33 @@ pub(super) fn remap_mask_archive_wire(data: &[u8], remap: &HashMap<u64, u64>) ->
     Ok(data)
 }
 
+pub(super) fn remap_movie_archive_wire(data: &[u8], remap: &HashMap<u64, u64>) -> Result<Vec<u8>> {
+    const REFERENCE_PATHS: &[&[u32]] = &[
+        &[1, 2],
+        &[1, 6],
+        &[1, 9],
+        &[1, 10],
+        &[1, 11],
+        &[2],
+        &[10],
+        &[11],
+        &[19],
+    ];
+    let mut expected = tsd::MovieArchive::decode(data)?;
+    remap_drawable_archive(&mut expected.super_, remap);
+    remap_optional_reference(&mut expected.database_movie_data, remap);
+    remap_optional_reference(&mut expected.database_poster_image_data, remap);
+    remap_optional_reference(&mut expected.database_audio_only_image_data, remap);
+    remap_optional_reference(&mut expected.style, remap);
+    let data = remap_reference_paths(data, REFERENCE_PATHS, remap)?;
+    if tsd::MovieArchive::decode(data.as_slice())? != expected {
+        return Err(Error::InvalidFormat(
+            "Keynote MovieArchive wire remap failed validation".to_owned(),
+        ));
+    }
+    Ok(data)
+}
+
 pub(super) fn remap_note_archive_wire(data: &[u8], remap: &HashMap<u64, u64>) -> Result<Vec<u8>> {
     let mut expected = kn::NoteArchive::decode(data)?;
     remap_reference(&mut expected.contained_storage, remap);
@@ -625,8 +657,9 @@ pub(super) fn clone_slide_object(
             5 => remap_slide_archive_wire(&message.data, remap)?,
             7 => remap_placeholder_archive_wire(&message.data, remap)?,
             15 => remap_note_archive_wire(&message.data, remap)?,
-            3005 => remap_image_archive_wire(&message.data, remap)?,
-            3006 => remap_mask_archive_wire(&message.data, remap)?,
+            IMAGE_MESSAGE_TYPE => remap_image_archive_wire(&message.data, remap)?,
+            MASK_MESSAGE_TYPE => remap_mask_archive_wire(&message.data, remap)?,
+            MOVIE_MESSAGE_TYPE => remap_movie_archive_wire(&message.data, remap)?,
             2001 | 2022 => remap_storage_archive_wire(&message.data, remap)?,
             2011 => remap_shape_info_wire(&message.data, remap)?,
             _ => {

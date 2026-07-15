@@ -1,23 +1,24 @@
-//! Materialization lifecycle for layout-owned Keynote images.
+//! Materialization lifecycle for layout-owned Keynote media.
 
 use super::*;
 use graph::{
-    current_layout_image_roots, layout_image_roots, match_live_image_roots, private_graph_union,
-    reject_layout_movies,
+    current_layout_media_roots, layout_media_roots, match_live_media_roots, private_graph_union,
 };
+use materialize::materialize_media_object;
 use metadata::{
     object_data_references, registered_subset, remapped_registered_subset,
     update_component_metadata,
 };
 use slide_create::graph::take_identifier;
-use wire::{materialize_image_object, rewrite_slide_media_roots};
+use wire::rewrite_slide_media_roots;
 
 mod graph;
+mod materialize;
 mod metadata;
 mod wire;
 
-pub(super) use graph::template_image_roots;
-pub(super) use wire::materialize_cloned_images;
+pub(super) use graph::layout_media_roots as template_media_roots;
+pub(super) use materialize::materialize_cloned_media;
 
 pub(super) fn materialize(
     package: &mut IWorkPackage,
@@ -29,25 +30,26 @@ pub(super) fn materialize(
     let slide_archive_name = graph.archive_name(slide_id)?.to_owned();
     let slide_archive = package.archive(&slide_archive_name)?;
     let target_archive = package.archive(&target.archive_name)?;
-    let target_roots = layout_image_roots(graph, &target.slide);
-    let old_roots = current_layout_image_roots(graph, current)?;
-    let live_roots = match_live_image_roots(graph, current, &old_roots)?;
+    let target_roots = layout_media_roots(graph, &target.slide, "target layout")?;
+    let old_roots = current_layout_media_roots(graph, current)?;
+    let live_roots = match_live_media_roots(graph, current, &old_roots)?;
 
     if target_roots.is_empty() && live_roots.is_empty() {
-        reject_layout_movies(graph, &target.slide, "target layout")?;
         return Ok(());
     }
-    reject_layout_movies(graph, &target.slide, "target layout")?;
+
+    let target_root_ids = target_roots.identifiers().collect::<Vec<_>>();
+    let live_root_ids = live_roots.identifiers().collect::<Vec<_>>();
 
     let old_graph_ids =
-        private_graph_union(&slide_archive, &live_roots, "materialized layout image")?;
+        private_graph_union(&slide_archive, &live_root_ids, "materialized layout media")?;
     if old_graph_ids.contains(&slide_id) {
         return Err(Error::InvalidFormat(
-            "Keynote layout image graph reaches its owning slide".to_owned(),
+            "Keynote layout media graph reaches its owning slide".to_owned(),
         ));
     }
     let source_graph_ids =
-        private_graph_union(&target_archive, &target_roots, "layout image template")?;
+        private_graph_union(&target_archive, &target_root_ids, "layout media template")?;
 
     let mut next_identifier = next_object_identifier(package)?;
     let mut remap = HashMap::with_capacity(source_graph_ids.len() + 1);
@@ -55,7 +57,7 @@ pub(super) fn materialize(
     for identifier in &source_graph_ids {
         remap.insert(*identifier, take_identifier(&mut next_identifier)?);
     }
-    let new_roots = target_roots
+    let new_roots = target_root_ids
         .iter()
         .map(|identifier| remap[identifier])
         .collect::<Vec<_>>();
@@ -64,12 +66,12 @@ pub(super) fn materialize(
         .map(|identifier| {
             let source = target_archive.object(*identifier).ok_or_else(|| {
                 Error::InvalidFormat(format!(
-                    "Keynote layout image object {identifier} disappeared"
+                    "Keynote layout media object {identifier} disappeared"
                 ))
             })?;
             let mut object = clone_slide_object(source, &remap)?;
-            if target_roots.contains(identifier) {
-                materialize_image_object(&mut object, slide_id)?;
+            if target_root_ids.contains(identifier) {
+                materialize_media_object(&mut object, slide_id)?;
             }
             Ok(object)
         })
@@ -95,8 +97,8 @@ pub(super) fn materialize(
         package,
         &slide_archive_name,
         slide_id,
-        &live_roots,
-        &target_roots,
+        &live_root_ids,
+        &target_root_ids,
         &new_roots,
         current,
         &target.slide,
@@ -105,7 +107,7 @@ pub(super) fn materialize(
         for identifier in &old_graph_ids {
             archive.remove_object(*identifier).ok_or_else(|| {
                 Error::InvalidFormat(format!(
-                    "Keynote layout image object {identifier} is missing"
+                    "Keynote layout media object {identifier} is missing"
                 ))
             })?;
         }
@@ -126,7 +128,7 @@ pub(super) fn materialize(
     for identifier in old_graph_ids {
         if package_references_object(package, identifier)? {
             return Err(Error::InvalidFormat(format!(
-                "Removed Keynote layout image object {identifier} is still referenced"
+                "Removed Keynote layout media object {identifier} is still referenced"
             )));
         }
     }

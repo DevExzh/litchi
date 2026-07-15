@@ -72,8 +72,11 @@ impl KeynoteEditor {
         }
         let resolved = resolve_layout(&graph, layout.0)?;
         let template_archive = self.package().archive(&resolved.archive_name)?;
-        let layout_image_roots =
-            slide_layout_media::template_image_roots(&template_archive, &resolved.slide);
+        let layout_media_roots = slide_layout_media::template_media_roots(
+            &graph,
+            &resolved.slide,
+            "slide-creation layout",
+        )?;
         let template_ids =
             template_clone_object_ids(&template_archive, resolved.slide_id, &resolved.slide)?;
         let note_source = find_note_source(self, &graph, &slides)?;
@@ -125,9 +128,9 @@ impl KeynoteEditor {
             resolved.slide_id,
             new_note_id,
         )?;
-        slide_layout_media::materialize_cloned_images(
+        slide_layout_media::materialize_cloned_media(
             &mut new_archive,
-            &layout_image_roots,
+            &layout_media_roots,
             &remap,
             new_slide_id,
         )?;

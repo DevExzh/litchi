@@ -1,4 +1,4 @@
-//! PackageMetadata accounting for materialized layout image graphs.
+//! PackageMetadata accounting for materialized layout media graphs.
 
 use super::*;
 use crate::data_reference_registry::{
@@ -11,7 +11,7 @@ pub(super) fn object_data_references<'a>(
     let mut references = Vec::new();
     for object in objects {
         let identifier = object.archive_info.identifier.ok_or_else(|| {
-            Error::InvalidFormat("Keynote layout image object has no identifier".to_owned())
+            Error::InvalidFormat("Keynote layout media object has no identifier".to_owned())
         })?;
         references.extend(object.archive_info.message_infos.iter().flat_map(|info| {
             info.data_references
