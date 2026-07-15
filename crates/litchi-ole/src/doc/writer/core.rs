@@ -3747,8 +3747,8 @@ mod tests {
                                 ..crate::doc::parts::tap::CellBorders::default()
                             },
                             shading: Some(crate::doc::parts::tap::CellShading {
-                                foreground_color: Some((0, 0, 255)),
-                                background_color: Some((255, 255, 0)),
+                                foreground_color: Some((1, 2, 3)),
+                                background_color: Some((250, 240, 230)),
                                 pattern: crate::doc::parts::tap::ShadingPattern::DarkCross,
                             }),
                             padding_top: Some(120),
@@ -3855,19 +3855,23 @@ mod tests {
             assert_eq!(
                 first_cell_properties.shading,
                 Some(crate::doc::parts::tap::CellShading {
-                    foreground_color: Some((0, 0, 255)),
-                    background_color: Some((255, 255, 0)),
+                    foreground_color: Some((1, 2, 3)),
+                    background_color: Some((250, 240, 230)),
                     pattern: crate::doc::parts::tap::ShadingPattern::DarkCross,
                 })
             );
-            assert_eq!(first_cell_properties.background_color, Some((255, 255, 0)));
+            assert_eq!(
+                first_cell_properties.background_color,
+                Some((250, 240, 230))
+            );
             assert_eq!(first_cell_properties.padding_top, Some(120));
             assert_eq!(first_cell_properties.padding_left, Some(240));
             assert_eq!(first_cell_properties.padding_bottom, Some(120));
             assert_eq!(first_cell_properties.padding_right, Some(240));
             let first_cell = &rows[0].cells().unwrap()[0];
             assert_eq!(first_cell.shading(), first_cell_properties.shading);
-            assert_eq!(first_cell.background_color(), Some((255, 255, 0)));
+            assert_eq!(first_cell.shading_inherits_from_style(), Some(false));
+            assert_eq!(first_cell.background_color(), Some((250, 240, 230)));
             assert_eq!(first_cell.padding_top(), Some(120));
             assert_eq!(first_cell.padding_left(), Some(240));
             assert_eq!(first_cell.padding_bottom(), Some(120));

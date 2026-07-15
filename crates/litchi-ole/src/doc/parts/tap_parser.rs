@@ -201,6 +201,8 @@ impl<'arena> TapParser<'arena> {
                 // Based on Apache POI's handling of sprmTDefTableShd
                 self.parse_cell_shading(tap, sprm, grpprl)?;
             },
+            // Full-color default shading chunks for cells 45..63, 1..22, and 23..44.
+            0x0C => self.parse_full_cell_shading(tap, sprm, 44, false)?,
             // sprmTTlp (0x740A) - Table look specifier
             0x0A => {
                 // Table look specifier for table styles
@@ -212,10 +214,17 @@ impl<'arena> TapParser<'arena> {
                     let _ = tlp;
                 }
             },
+            0x12 => self.parse_full_cell_shading(tap, sprm, 0, false)?,
+            0x16 => self.parse_full_cell_shading(tap, sprm, 22, false)?,
             // sprmTInsert (0x7621) - Insert cells
             0x21 => {
                 self.handle_insert_cells(tap, sprm)?;
             },
+            // Full-color shading over every or every other cell in a range.
+            0x2D => self.parse_full_cell_shading_range(tap, sprm, false)?,
+            0x2E => self.parse_full_cell_shading_range(tap, sprm, true)?,
+            // Full-color shading applied to every cell in the table row.
+            0x60 => self.parse_full_table_shading(tap, sprm)?,
             // sprmTCellPadding / sprmTCellPaddingDefault
             0x32 | 0x34 => {
                 self.parse_cell_padding(tap, sprm, grpprl)?;
@@ -246,6 +255,10 @@ impl<'arena> TapParser<'arena> {
                     operand[3], operand[4], operand[5], operand[6],
                 ]));
             },
+            // Raw defaults preserve ShdNil as table-style inheritance.
+            0x70 => self.parse_full_cell_shading(tap, sprm, 0, true)?,
+            0x71 => self.parse_full_cell_shading(tap, sprm, 22, true)?,
+            0x72 => self.parse_full_cell_shading(tap, sprm, 44, true)?,
             // sprmTWall (0x3668) - Preserve properties before tracked changes
             0x68 => {
                 let operand = sprm.operand_bytes();
@@ -743,6 +756,7 @@ impl<'arena> TapParser<'arena> {
             let shd = binary_to_doc_result(read_u16_le(descriptor, 0))?;
             if shd == u16::MAX {
                 tap.cell_properties[i].shading = None;
+                tap.cell_properties[i].shading_inherits_from_style = false;
                 tap.cell_properties[i].background_color = None;
                 continue;
             }
@@ -764,9 +778,125 @@ impl<'arena> TapParser<'arena> {
             };
             tap.cell_properties[i].background_color = shading.background_color;
             tap.cell_properties[i].shading = Some(shading);
+            tap.cell_properties[i].shading_inherits_from_style = false;
         }
 
         Ok(())
+    }
+
+    fn parse_full_cell_shading(
+        &self,
+        tap: &mut TableProperties,
+        sprm: &Sprm,
+        first_cell: usize,
+        raw: bool,
+    ) -> Result<()> {
+        let operand = sprm.operand_bytes();
+        if operand.len() % 10 != 0 || operand.len() > 220 {
+            return Err(DocError::Corrupted(
+                "DOC table Shd array has an invalid byte count".to_string(),
+            ));
+        }
+        let count = operand.len() / 10;
+        let chunk_limit = if first_cell == 44 { 19 } else { 22 };
+        if count > chunk_limit || first_cell.saturating_add(count) > tap.cell_properties.len() {
+            return Err(DocError::Corrupted(
+                "DOC table Shd array exceeds its cell chunk".to_string(),
+            ));
+        }
+        for (offset, bytes) in operand.chunks_exact(10).enumerate() {
+            Self::apply_full_shading(&mut tap.cell_properties[first_cell + offset], bytes, raw)?;
+        }
+        Ok(())
+    }
+
+    fn parse_full_cell_shading_range(
+        &self,
+        tap: &mut TableProperties,
+        sprm: &Sprm,
+        odd_only: bool,
+    ) -> Result<()> {
+        let operand = sprm.operand_bytes();
+        if operand.len() != 12 {
+            return Err(DocError::Corrupted(
+                "DOC table range shading operand must contain exactly 12 bytes".to_string(),
+            ));
+        }
+        let first = operand[0] as usize;
+        let limit = operand[1] as usize;
+        if first >= tap.cell_properties.len() || limit < first || limit > tap.cell_properties.len()
+        {
+            return Err(DocError::Corrupted(
+                "DOC table range shading exceeds the row".to_string(),
+            ));
+        }
+        let step = if odd_only { 2 } else { 1 };
+        for index in (first..limit).step_by(step) {
+            Self::apply_full_shading(&mut tap.cell_properties[index], &operand[2..], false)?;
+        }
+        Ok(())
+    }
+
+    fn parse_full_table_shading(&self, tap: &mut TableProperties, sprm: &Sprm) -> Result<()> {
+        let operand = sprm.operand_bytes();
+        if operand.len() != 10 {
+            return Err(DocError::Corrupted(
+                "DOC whole-table shading operand must contain exactly 10 bytes".to_string(),
+            ));
+        }
+        for cell in &mut tap.cell_properties {
+            Self::apply_full_shading(cell, operand, false)?;
+        }
+        Ok(())
+    }
+
+    fn apply_full_shading(cell: &mut CellProperties, bytes: &[u8], raw: bool) -> Result<()> {
+        if bytes.len() != 10 {
+            return Err(DocError::Corrupted(
+                "DOC Shd must contain exactly 10 bytes".to_string(),
+            ));
+        }
+        let is_nil = bytes[..8].iter().all(|byte| *byte == 0xFF) && bytes[8..] == [0, 0];
+        if is_nil {
+            cell.shading = None;
+            cell.background_color = None;
+            cell.shading_inherits_from_style = raw;
+            return Ok(());
+        }
+        let is_auto =
+            bytes[..4] == [0, 0, 0, 0xFF] && bytes[4..8] == [0, 0, 0, 0xFF] && bytes[8..] == [0, 0];
+        if is_auto {
+            cell.shading = None;
+            cell.background_color = None;
+            cell.shading_inherits_from_style = false;
+            return Ok(());
+        }
+        let foreground_color = Self::parse_colorref(&bytes[..4])?;
+        let background_color = Self::parse_colorref(&bytes[4..8])?;
+        let pattern_value = binary_to_doc_result(read_u16_le(bytes, 8))?;
+        let pattern = u8::try_from(pattern_value)
+            .ok()
+            .and_then(ShadingPattern::from_u8)
+            .ok_or_else(|| {
+                DocError::Corrupted("DOC Shd contains an invalid pattern index".to_string())
+            })?;
+        cell.shading = Some(CellShading {
+            foreground_color,
+            background_color,
+            pattern,
+        });
+        cell.background_color = background_color;
+        cell.shading_inherits_from_style = false;
+        Ok(())
+    }
+
+    fn parse_colorref(bytes: &[u8]) -> Result<Option<(u8, u8, u8)>> {
+        if bytes.len() != 4 || !matches!(bytes[3], 0x00 | 0xFF) {
+            return Err(DocError::Corrupted(
+                "DOC COLORREF has an invalid automatic-color flag".to_string(),
+            ));
+        }
+        Ok((bytes[3] == 0).then_some((bytes[0], bytes[1], bytes[2])))
     }
 }
 
@@ -794,6 +924,13 @@ mod tests {
         grpprl.extend_from_slice(&opcode.to_le_bytes());
         grpprl.push(u8::try_from(operand.len()).unwrap());
         grpprl.extend_from_slice(operand);
+    }
+
+    fn full_shading(foreground: [u8; 4], background: [u8; 4], pattern: u16) -> Vec<u8> {
+        let mut shading = foreground.to_vec();
+        shading.extend_from_slice(&background);
+        shading.extend_from_slice(&pattern.to_le_bytes());
+        shading
     }
 
     #[test]
@@ -941,6 +1078,60 @@ mod tests {
         grpprl.extend_from_slice(&0x740Au16.to_le_bytes());
         grpprl.extend_from_slice(&0u32.to_le_bytes());
         assert!(parser.parse_tap(&grpprl).is_ok());
+    }
+
+    #[test]
+    fn parses_full_color_range_and_raw_shading() {
+        let arena = Bump::new();
+        let parser = TapParser::new(&arena);
+        let mut grpprl = table_definition_grpprl(&[4, 0, 0, 100, 0, 200, 0, 44, 1, 144, 1]);
+        let blue_on_red = full_shading([0, 0, 255, 0], [255, 0, 0, 0], 0x12);
+        let green = full_shading([0, 0, 0, 0xFF], [0, 255, 0, 0], 0);
+        let nil = full_shading([0xFF; 4], [0xFF; 4], 0);
+        let mut range_shading = vec![1, 3];
+        range_shading.extend_from_slice(&blue_on_red);
+        append_variable_sprm(&mut grpprl, 0xD62D, &range_shading);
+        let mut odd_shading = vec![0, 4];
+        odd_shading.extend_from_slice(&green);
+        append_variable_sprm(&mut grpprl, 0xD62E, &odd_shading);
+        append_variable_sprm(&mut grpprl, 0xD670, &nil);
+
+        let tap = parser.parse_tap(&grpprl).unwrap();
+        assert!(tap.cell_properties[0].shading_inherits_from_style);
+        assert_eq!(tap.cell_properties[1].background_color, Some((255, 0, 0)));
+        assert_eq!(
+            tap.cell_properties[1].shading.unwrap().pattern,
+            ShadingPattern::DarkCross
+        );
+        assert_eq!(tap.cell_properties[2].background_color, Some((0, 255, 0)));
+        assert!(tap.cell_properties[3].shading.is_none());
+
+        let mut whole_table = table_definition_grpprl(&[2, 0, 0, 100, 0, 200, 0]);
+        append_variable_sprm(&mut whole_table, 0xD660, &blue_on_red);
+        let tap = parser.parse_tap(&whole_table).unwrap();
+        assert_eq!(
+            tap.cell_properties[0].shading,
+            tap.cell_properties[1].shading
+        );
+        assert_eq!(tap.cell_properties[0].background_color, Some((255, 0, 0)));
+    }
+
+    #[test]
+    fn rejects_malformed_full_color_shading() {
+        let arena = Bump::new();
+        let parser = TapParser::new(&arena);
+        let parse_with = |opcode, operand: &[u8]| {
+            let mut grpprl = table_definition_grpprl(&[2, 0, 0, 100, 0, 200, 0]);
+            append_variable_sprm(&mut grpprl, opcode, operand);
+            parser.parse_tap(&grpprl)
+        };
+        assert!(parse_with(0xD612, &[0]).is_err());
+        assert!(parse_with(0xD612, &[0; 30]).is_err());
+        assert!(parse_with(0xD62D, &[0; 11]).is_err());
+        assert!(parse_with(0xD660, &[0; 9]).is_err());
+        assert!(parse_with(0xD62D, &[2, 2, 0, 0, 0, 0xFF, 0, 0, 0, 0xFF, 0, 0]).is_err());
+        assert!(parse_with(0xD62D, &[0, 2, 0, 0, 0, 1, 0, 0, 0, 0xFF, 0, 0]).is_err());
+        assert!(parse_with(0xD62D, &[0, 2, 0, 0, 0, 0xFF, 0, 0, 0, 0xFF, 0x1A, 0]).is_err());
     }
 
     #[test]

@@ -307,6 +307,13 @@ impl Cell {
         self.properties.as_ref().and_then(|p| p.shading)
     }
 
+    /// Whether the cell's raw `ShdNil` value defers shading to its table style.
+    pub fn shading_inherits_from_style(&self) -> Option<bool> {
+        self.properties
+            .as_ref()
+            .map(|p| p.shading_inherits_from_style)
+    }
+
     /// Get the cell's top padding in twips.
     pub fn padding_top(&self) -> Option<i16> {
         self.properties.as_ref().and_then(|p| p.padding_top)

@@ -66,6 +66,8 @@ pub struct CellProperties {
     pub background_color: Option<(u8, u8, u8)>,
     /// Complete legacy cell shading descriptor
     pub shading: Option<CellShading>,
+    /// `ShdNil` from a raw shading operand defers to the table style
+    pub shading_inherits_from_style: bool,
     /// Cell borders
     pub borders: CellBorders,
     /// Text direction

@@ -23,8 +23,6 @@ pub enum TapBuildError {
     MergeWithoutPrecedingCell,
     /// Brc80 supports only the legacy 16-color palette.
     UnsupportedBorderColor((u8, u8, u8)),
-    /// Shd80 supports only the legacy 16-color palette.
-    UnsupportedShadingColor((u8, u8, u8)),
     /// Brc80 spacing is a five-bit value.
     InvalidBorderSpacing(u8),
     /// DOC cell padding cannot exceed 22 inches.
@@ -52,9 +50,6 @@ impl std::fmt::Display for TapBuildError {
             },
             Self::UnsupportedBorderColor(color) => {
                 write!(f, "DOC Brc80 cannot represent RGB color {color:?}")
-            },
-            Self::UnsupportedShadingColor(color) => {
-                write!(f, "DOC Shd80 cannot represent RGB color {color:?}")
             },
             Self::InvalidBorderSpacing(spacing) => {
                 write!(f, "DOC Brc80 spacing {spacing} exceeds 31 points")
@@ -280,24 +275,80 @@ fn append_cell_shading(sprms: &mut Vec<u8>, cells: &[TableCell]) -> Result<(), T
     if !cells.iter().any(|cell| cell.shading.is_some()) {
         return Ok(());
     }
-    sprms.extend_from_slice(&0xD609u16.to_le_bytes());
-    sprms.push((cells.len() * 2) as u8);
-    for cell in cells {
-        let descriptor = match cell.shading {
-            None => u16::MAX,
-            Some(shading) => {
-                let foreground = rgb_to_ico(shading.foreground_color)
-                    .map_err(TapBuildError::UnsupportedShadingColor)?;
-                let background = rgb_to_ico(shading.background_color)
-                    .map_err(TapBuildError::UnsupportedShadingColor)?;
-                u16::from(foreground)
-                    | (u16::from(background) << 5)
-                    | ((shading.pattern as u16) << 10)
-            },
-        };
-        sprms.extend_from_slice(&descriptor.to_le_bytes());
+    let last_shaded = cells
+        .iter()
+        .rposition(|cell| cell.shading.is_some())
+        .expect("at least one shaded cell was checked above");
+    let legacy_cells = &cells[..=last_shaded];
+    let legacy = legacy_cells
+        .iter()
+        .map(|cell| encode_shading80(cell.shading))
+        .collect::<Option<Vec<_>>>();
+    if let Some(descriptors) = legacy {
+        sprms.extend_from_slice(&0xD609u16.to_le_bytes());
+        sprms.push((legacy_cells.len() * 2) as u8);
+        for descriptor in descriptors {
+            sprms.extend_from_slice(&descriptor.to_le_bytes());
+        }
     }
+
+    append_full_shading_chunks(sprms, cells, false);
+    append_full_shading_chunks(sprms, cells, true);
     Ok(())
+}
+
+fn append_full_shading_chunks(sprms: &mut Vec<u8>, cells: &[TableCell], raw: bool) {
+    for (chunk_index, chunk) in cells.chunks(22).enumerate() {
+        let Some(last_shaded) = chunk.iter().rposition(|cell| cell.shading.is_some()) else {
+            continue;
+        };
+        let chunk = &chunk[..=last_shaded];
+        let opcode = match chunk_index {
+            0 if raw => 0xD670u16,
+            1 if raw => 0xD671u16,
+            2 if raw => 0xD672u16,
+            0 => 0xD612u16,
+            1 => 0xD616u16,
+            2 => 0xD60Cu16,
+            _ => unreachable!("DOC rows contain at most 63 cells"),
+        };
+        sprms.extend_from_slice(&opcode.to_le_bytes());
+        sprms.push((chunk.len() * 10) as u8);
+        for cell in chunk {
+            append_shading(sprms, cell.shading, raw);
+        }
+    }
+}
+
+fn encode_shading80(shading: Option<CellShading>) -> Option<u16> {
+    let Some(shading) = shading else {
+        return Some(u16::MAX);
+    };
+    let foreground = rgb_to_ico(shading.foreground_color).ok()?;
+    let background = rgb_to_ico(shading.background_color).ok()?;
+    Some(u16::from(foreground) | (u16::from(background) << 5) | ((shading.pattern as u16) << 10))
+}
+
+fn append_shading(output: &mut Vec<u8>, shading: Option<CellShading>, raw: bool) {
+    let Some(shading) = shading else {
+        if raw {
+            output.extend_from_slice(&[0, 0, 0, 0xFF, 0, 0, 0, 0xFF]);
+        } else {
+            output.extend_from_slice(&[0xFF; 8]);
+        }
+        output.extend_from_slice(&0u16.to_le_bytes());
+        return;
+    };
+    append_colorref(output, shading.foreground_color);
+    append_colorref(output, shading.background_color);
+    output.extend_from_slice(&(shading.pattern as u16).to_le_bytes());
+}
+
+fn append_colorref(output: &mut Vec<u8>, color: Option<(u8, u8, u8)>) {
+    match color {
+        Some((red, green, blue)) => output.extend_from_slice(&[red, green, blue, 0]),
+        None => output.extend_from_slice(&[0, 0, 0, 0xFF]),
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -555,6 +606,42 @@ mod tests {
     }
 
     #[test]
+    fn writes_full_color_shading_across_all_cell_chunks() {
+        let shading = CellShading {
+            foreground_color: Some((1, 2, 3)),
+            background_color: Some((250, 240, 230)),
+            pattern: ShadingPattern::Percent42Point5,
+        };
+        let mut cells = vec![TableCell::default(); 45];
+        cells[0].shading = Some(shading);
+        cells[22].shading = Some(shading);
+        cells[44].shading = Some(shading);
+        let row = TableRow {
+            cells,
+            ..TableRow::default()
+        };
+
+        let sprms = generate_row_sprms(&row).unwrap();
+        let opcodes = crate::sprm::parse_sprms(&sprms)
+            .into_iter()
+            .map(|sprm| sprm.opcode)
+            .collect::<Vec<_>>();
+        assert!(!opcodes.contains(&0xD609));
+        assert!(opcodes.contains(&0xD612));
+        assert!(opcodes.contains(&0xD616));
+        assert!(opcodes.contains(&0xD60C));
+        assert!(opcodes.contains(&0xD670));
+        assert!(opcodes.contains(&0xD671));
+        assert!(opcodes.contains(&0xD672));
+
+        let tap = crate::doc::parts::tap::TableProperties::from_sprm(&sprms).unwrap();
+        assert_eq!(tap.cell_properties[0].shading, Some(shading));
+        assert_eq!(tap.cell_properties[22].shading, Some(shading));
+        assert_eq!(tap.cell_properties[44].shading, Some(shading));
+        assert!(tap.cell_properties[43].shading.is_none());
+    }
+
+    #[test]
     fn test_tap_builder_multiple_rows() {
         let mut builder = TapBuilder::new();
         for i in 0..5 {
@@ -669,23 +756,6 @@ mod tests {
         assert_eq!(
             builder.try_generate_row_sprms(0),
             Err(TapBuildError::UnsupportedBorderColor((1, 2, 3)))
-        );
-
-        let mut builder = TapBuilder::new();
-        builder.add_row(TableRow {
-            cells: vec![TableCell {
-                width: 1000,
-                shading: Some(CellShading {
-                    foreground_color: Some((1, 2, 3)),
-                    ..CellShading::default()
-                }),
-                ..TableCell::default()
-            }],
-            ..TableRow::default()
-        });
-        assert_eq!(
-            builder.try_generate_row_sprms(0),
-            Err(TapBuildError::UnsupportedShadingColor((1, 2, 3)))
         );
 
         let mut builder = TapBuilder::new();
