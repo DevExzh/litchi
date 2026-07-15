@@ -55,6 +55,7 @@
 //! - ✅ Hyperlink extraction
 //! - ✅ Footnote and endnote support
 //! - ✅ Exact note citations, fixed labels, nested bodies, and note classes
+//! - ✅ Ruby base/pronunciation annotations without visible-text duplication
 //! - ✅ Bookmark and reference tracking
 //! - ✅ Comment and change tracking parsing
 //! - ✅ Section parsing
@@ -371,7 +372,7 @@ pub use ods::{
 pub use odt::{
     Document, DocumentBuilder, HeaderFooter, HeaderFooterKind, MasterPage, MutableDocument, Note,
     NoteClass, PageLayout, PageLayoutAttribute, PageLayoutProperties, PageUsage, ReferenceMark,
-    SectionDdeSource, SectionDisplay, SectionSource, TextIndex, TextIndexAttribute,
+    Ruby, SectionDdeSource, SectionDisplay, SectionSource, TextIndex, TextIndexAttribute,
     TextIndexContent, TextIndexElement, TextIndexKind, TextIndexMark, TextIndexMarkKind,
 };
 

@@ -25,6 +25,7 @@
 //! - ✅ `text_indexes()` - Parse all generated index sources and cached bodies
 //! - ✅ `text_index_marks()` - Parse TOC, user, alphabetical, and bibliography marks
 //! - ✅ `reference_marks()` - Parse point/range cross-reference targets
+//! - ✅ `rubies()` - Parse ruby base/pronunciation pairs and styles
 //! - ✅ Style parsing and resolution with registry
 //!
 //! ## ✅ Writing (`builder.rs`, `mutable.rs`) - COMPLETE
@@ -63,6 +64,7 @@ mod note;
 mod page_layout;
 mod parser;
 mod reference_mark;
+mod ruby;
 
 pub use builder::DocumentBuilder;
 pub use document::Document;
@@ -73,6 +75,7 @@ pub use mutable::MutableDocument;
 pub use note::{Note, NoteClass};
 pub use page_layout::{PageLayout, PageLayoutAttribute, PageLayoutProperties, PageUsage};
 pub use reference_mark::ReferenceMark;
+pub use ruby::Ruby;
 
 // Re-export ODT-specific types for external use
 #[allow(unused_imports)] // Library public API

@@ -629,6 +629,7 @@ pub(crate) fn parse_text_blocks(xml_content: &str) -> Result<Vec<TextBlock>> {
     let mut document_depth = 0usize;
     let mut tracked_changes_depth = 0usize;
     let mut note_body_depth = 0usize;
+    let mut ruby_text_depth = 0usize;
     let mut total_text_bytes = 0usize;
 
     loop {
@@ -656,8 +657,12 @@ pub(crate) fn parse_text_blocks(xml_content: &str) -> Result<Vec<TextBlock>> {
                     current.depth += 1;
                     if note_body_depth > 0 {
                         note_body_depth += 1;
+                    } else if ruby_text_depth > 0 {
+                        ruby_text_depth += 1;
                     } else if is_text_element(text_namespace, element, b"note-body") {
                         note_body_depth = 1;
+                    } else if is_text_element(text_namespace, element, b"ruby-text") {
+                        ruby_text_depth = 1;
                     } else if is_text_block(text_namespace, element) {
                         return Err(Error::InvalidFormat(
                             "nested ODF paragraphs or headings are not allowed".to_string(),
@@ -676,7 +681,9 @@ pub(crate) fn parse_text_blocks(xml_content: &str) -> Result<Vec<TextBlock>> {
             Event::Empty(ref element) if tracked_changes_depth == 0 => {
                 if let Some(current) = active.as_mut() {
                     if note_body_depth == 0
+                        && ruby_text_depth == 0
                         && !is_text_element(text_namespace, element, b"note-body")
+                        && !is_text_element(text_namespace, element, b"ruby-text")
                     {
                         if is_text_block(text_namespace, element) {
                             return Err(Error::InvalidFormat(
@@ -695,7 +702,10 @@ pub(crate) fn parse_text_blocks(xml_content: &str) -> Result<Vec<TextBlock>> {
                 }
             },
             Event::Text(ref value)
-                if tracked_changes_depth == 0 && note_body_depth == 0 && active.is_some() =>
+                if tracked_changes_depth == 0
+                    && note_body_depth == 0
+                    && ruby_text_depth == 0
+                    && active.is_some() =>
             {
                 let decoded = value
                     .xml_content(XmlVersion::Explicit1_0)
@@ -708,7 +718,10 @@ pub(crate) fn parse_text_blocks(xml_content: &str) -> Result<Vec<TextBlock>> {
                 )?;
             },
             Event::CData(ref value)
-                if tracked_changes_depth == 0 && note_body_depth == 0 && active.is_some() =>
+                if tracked_changes_depth == 0
+                    && note_body_depth == 0
+                    && ruby_text_depth == 0
+                    && active.is_some() =>
             {
                 let decoded = value
                     .xml_content(XmlVersion::Explicit1_0)
@@ -721,7 +734,10 @@ pub(crate) fn parse_text_blocks(xml_content: &str) -> Result<Vec<TextBlock>> {
                 )?;
             },
             Event::GeneralRef(ref reference)
-                if tracked_changes_depth == 0 && note_body_depth == 0 && active.is_some() =>
+                if tracked_changes_depth == 0
+                    && note_body_depth == 0
+                    && ruby_text_depth == 0
+                    && active.is_some() =>
             {
                 let decoded = decode_reference(reference)?;
                 append_checked(
@@ -737,6 +753,7 @@ pub(crate) fn parse_text_blocks(xml_content: &str) -> Result<Vec<TextBlock>> {
                     tracked_changes_depth -= 1;
                 } else if let Some(current) = active.as_mut() {
                     note_body_depth = note_body_depth.saturating_sub(1);
+                    ruby_text_depth = ruby_text_depth.saturating_sub(1);
                     current.depth = current.depth.checked_sub(1).ok_or_else(|| {
                         Error::InvalidFormat("ODF text block stack underflow".to_string())
                     })?;
@@ -757,7 +774,11 @@ pub(crate) fn parse_text_blocks(xml_content: &str) -> Result<Vec<TextBlock>> {
         buffer.clear();
     }
 
-    if active.is_some() || tracked_changes_depth != 0 || note_body_depth != 0 || document_depth != 0
+    if active.is_some()
+        || tracked_changes_depth != 0
+        || note_body_depth != 0
+        || ruby_text_depth != 0
+        || document_depth != 0
     {
         return Err(Error::InvalidFormat(
             "incomplete ODF text XML structure".to_string(),
@@ -1268,5 +1289,11 @@ mod tests {
         let paragraphs = TextElements::parse_paragraphs(xml).unwrap();
         assert_eq!(paragraphs.len(), 1);
         assert_eq!(paragraphs[0].text().unwrap(), "Before1After");
+    }
+
+    #[test]
+    fn keeps_ruby_base_but_excludes_pronunciation_from_visible_text() {
+        let xml = r#"<o:text xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><t:p>Before<t:ruby><t:ruby-base>漢字</t:ruby-base><t:ruby-text>かんじ</t:ruby-text></t:ruby>After</t:p></o:text>"#;
+        assert_eq!(TextElements::extract_text(xml).unwrap(), "Before漢字After");
     }
 }

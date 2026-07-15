@@ -568,6 +568,11 @@ impl Document {
             .collect())
     }
 
+    /// Get all ruby base/pronunciation pairs in document order.
+    pub fn rubies(&self) -> Result<Vec<super::Ruby>> {
+        super::ruby::parse_rubies(self.content.xml_content())
+    }
+
     /// Get all bookmarks in the document.
     ///
     /// # Examples
