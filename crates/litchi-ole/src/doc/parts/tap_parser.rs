@@ -68,6 +68,12 @@ impl<'arena> TapParser<'arena> {
     pub fn parse_tap(&self, grpprl: &[u8]) -> Result<TableProperties> {
         // Parse all SPRMs using arena for temporary storage
         let sprms = parse_sprms(grpprl);
+        let consumed = sprms.last().map_or(0, |sprm| sprm.offset + sprm.size);
+        if consumed != grpprl.len() {
+            return Err(DocError::Corrupted(
+                "TAP grpprl does not contain a whole number of SPRMs".to_string(),
+            ));
+        }
 
         // Find sprmTDefTable (0xD608 / operation 0x08) to initialize TAP
         let mut tap = self.find_and_init_tap(&sprms)?;
@@ -94,13 +100,17 @@ impl<'arena> TapParser<'arena> {
                 // first operand byte is itcMac.
                 if let Some(cell_count) = sprm.operand_byte() {
                     let cell_count = cell_count as usize;
+                    if cell_count > 63 {
+                        return Err(DocError::Corrupted(
+                            "sprmTDefTable contains more than 63 columns".to_string(),
+                        ));
+                    }
                     return Ok(TableProperties::with_cell_count(cell_count));
                 }
             }
         }
 
         // No table definition found - use default with 1 cell
-        eprintln!("WARNING: Table row didn't specify number of columns in SPRMs");
         Ok(TableProperties::with_cell_count(1))
     }
 
@@ -276,11 +286,24 @@ impl<'arena> TapParser<'arena> {
     ) -> Result<()> {
         let data = sprm.operand_bytes();
         if data.is_empty() {
-            return Ok(());
+            return Err(DocError::Corrupted(
+                "sprmTDefTable does not contain a column count".to_string(),
+            ));
         }
 
         // Read cell count
         let itc_mac = binary_to_doc_result(read_byte(data, 0))? as usize;
+        if itc_mac > 63 {
+            return Err(DocError::Corrupted(
+                "sprmTDefTable contains more than 63 columns".to_string(),
+            ));
+        }
+        let start_of_tcs = 1 + ((itc_mac + 1) * 2);
+        if data.len() < start_of_tcs || (data.len() - start_of_tcs) % 20 != 0 {
+            return Err(DocError::Corrupted(
+                "sprmTDefTable contains incomplete boundaries or cell descriptors".to_string(),
+            ));
+        }
         tap.cell_count = itc_mac;
 
         // Read cell boundaries (rgdxaCenter)
@@ -291,10 +314,14 @@ impl<'arena> TapParser<'arena> {
                 boundaries.push(binary_to_doc_result(read_i16_le(data, boundary_offset))?);
             }
         }
+        if boundaries.windows(2).any(|pair| pair[0] > pair[1]) {
+            return Err(DocError::Corrupted(
+                "sprmTDefTable cell boundaries are not non-decreasing".to_string(),
+            ));
+        }
         tap.cell_boundaries = boundaries;
 
         // Calculate where cell descriptors start
-        let start_of_tcs = 1 + ((itc_mac + 1) * 2);
         let has_tcs = start_of_tcs < data.len();
 
         // Read cell descriptors (TableCellDescriptor - TC)
@@ -634,6 +661,13 @@ impl<'arena> TapParser<'arena> {
 mod tests {
     use super::*;
 
+    fn table_definition_grpprl(operand: &[u8]) -> Vec<u8> {
+        let mut grpprl = 0xD608u16.to_le_bytes().to_vec();
+        grpprl.extend_from_slice(&u16::try_from(operand.len() + 1).unwrap().to_le_bytes());
+        grpprl.extend_from_slice(operand);
+        grpprl
+    }
+
     #[test]
     fn test_tap_parser_creation() {
         let arena = Bump::new();
@@ -655,6 +689,46 @@ mod tests {
         // For 2 cells, we should have 3 boundaries (start, middle, end)
         // But if initialization adds more, we just check the count is correct
         assert_eq!(tap.cell_boundaries.len(), 3);
+    }
+
+    #[test]
+    fn rejects_malformed_table_definitions() {
+        let arena = Bump::new();
+        let parser = TapParser::new(&arena);
+
+        assert!(parser.parse_tap(&table_definition_grpprl(&[])).is_err());
+        assert!(parser.parse_tap(&table_definition_grpprl(&[0])).is_err());
+        assert!(parser.parse_tap(&table_definition_grpprl(&[64])).is_err());
+        assert!(
+            parser
+                .parse_tap(&table_definition_grpprl(&[2, 0, 0, 100, 0]))
+                .is_err()
+        );
+        assert!(
+            parser
+                .parse_tap(&table_definition_grpprl(&[2, 0, 0, 200, 0, 100, 0]))
+                .is_err()
+        );
+
+        let empty = parser
+            .parse_tap(&table_definition_grpprl(&[0, 0, 0]))
+            .unwrap();
+        assert_eq!(empty.cell_count, 0);
+        assert_eq!(empty.cell_boundaries, [0]);
+
+        let mut excess_descriptors = vec![1, 0, 0, 100, 0];
+        excess_descriptors.extend_from_slice(&[0; 40]);
+        let tap = parser
+            .parse_tap(&table_definition_grpprl(&excess_descriptors))
+            .unwrap();
+        assert_eq!(tap.cell_properties.len(), 1);
+
+        let mut partial_descriptors = vec![2, 0, 0, 100, 0, 200, 0];
+        partial_descriptors.extend_from_slice(&[0; 20]);
+        let tap = parser
+            .parse_tap(&table_definition_grpprl(&partial_descriptors))
+            .unwrap();
+        assert_eq!(tap.cell_properties.len(), 2);
     }
 
     #[test]

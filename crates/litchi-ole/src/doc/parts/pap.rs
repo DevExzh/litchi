@@ -10,6 +10,7 @@
 ///
 /// Based on Apache POI's ParagraphSprmUncompressor and ParagraphProperties.
 use super::super::package::{DocError, Result};
+use super::tap::TableProperties;
 use crate::sprm::{Sprm, parse_sprms};
 use crate::sprm_operations::*;
 use litchi_core::binary::{read_i16_le, read_u16_le, read_u32_le};
@@ -66,6 +67,10 @@ pub struct ParagraphProperties {
     pub inner_table_cell: bool,
     /// Inner table row end flag
     pub inner_table_row_end: bool,
+    /// This paragraph is terminated by a top-level table cell mark.
+    pub is_table_cell_end: bool,
+    /// Parsed row-level TAP properties when table SPRMs are present.
+    pub table_properties: Option<TableProperties>,
     /// Outline level (0-9, where 0-8 are heading levels)
     pub outline_level: Option<u8>,
     /// Style index (istd)
@@ -331,6 +336,12 @@ impl ParagraphProperties {
             } else if get_sprm_type(sprm.opcode) == 5 {
                 Self::apply_table_revision_sprm(&mut pap, sprm)?;
             }
+        }
+
+        if sprms.iter().any(|sprm| get_sprm_type(sprm.opcode) == 5) {
+            let arena = bumpalo::Bump::new();
+            pap.table_properties =
+                Some(super::tap_parser::TapParser::new(&arena).parse_tap(grpprl)?);
         }
 
         Ok(pap)

@@ -150,14 +150,15 @@ impl Row {
         }
     }
 
-    pub(crate) fn with_revision(
+    pub(crate) fn with_metadata(
         cells: Vec<Cell>,
+        row_properties: Option<TableProperties>,
         formatting_revision: Option<RevisionMark>,
         properties_preserved_for_revision: bool,
     ) -> Self {
         Self {
             cells: Arc::new(cells),
-            row_properties: None,
+            row_properties,
             formatting_revision,
             properties_preserved_for_revision,
         }
@@ -324,7 +325,7 @@ mod tests {
             revision_id: None,
             revision_save_id: None,
         };
-        let row = Row::with_revision(vec![Cell::new("A".to_string())], Some(revision), true);
+        let row = Row::with_metadata(vec![Cell::new("A".to_string())], None, Some(revision), true);
         assert_eq!(row.formatting_revision().unwrap().author, "Editor");
         assert!(row.properties_preserved_for_revision());
     }

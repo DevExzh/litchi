@@ -122,8 +122,8 @@ impl<'a> ParagraphExtractor<'a> {
             if current_cp >= doc_end_cp {
                 break;
             }
-            if c == '\r' && next_cp <= doc_end_cp {
-                para_boundaries.push(next_cp); // Position after CR
+            if matches!(c, '\r' | '\u{7}') && next_cp <= doc_end_cp {
+                para_boundaries.push(next_cp); // Position after paragraph/cell marker
             }
             current_cp = next_cp;
         }
@@ -143,23 +143,23 @@ impl<'a> ParagraphExtractor<'a> {
             }
 
             // Extract paragraph text (excluding the CR marker itself)
+            let terminator = self.extract_text_range(para_end - 1, para_end);
             let mut para_text = self.extract_text_range(para_start, para_end);
-            // Remove trailing CR if present
-            if para_text.ends_with('\r') {
+            // Structural terminators are not paragraph content.
+            if matches!(terminator.as_str(), "\r" | "\u{7}") {
                 para_text.pop();
             }
 
             // Find matching PAP properties for this paragraph
-            let para_props = self
+            let mut para_props = self
                 .pap_bin_table
                 .and_then(|table| table.properties_at(para_start))
                 .cloned()
                 .unwrap_or_default();
+            para_props.is_table_cell_end = terminator == "\u{7}";
 
             // Extract character runs within this paragraph (excluding the CR)
-            let para_text_end = if para_end > para_start
-                && self.extract_text_range(para_end - 1, para_end) == "\r"
-            {
+            let para_text_end = if matches!(terminator.as_str(), "\r" | "\u{7}") {
                 para_end - 1
             } else {
                 para_end
@@ -339,5 +339,17 @@ mod tests {
         assert_eq!(runs.len(), 2);
         assert_eq!(runs[0], ("inserted ".to_string(), inserted));
         assert_eq!(runs[1], ("deleted".to_string(), deleted));
+    }
+
+    #[test]
+    fn cell_and_row_marks_form_structural_paragraph_boundaries() {
+        let extractor =
+            ParagraphExtractor::new(Arc::new("Cell\u{7}\u{7}".to_string()), None, None).unwrap();
+        let paragraphs = extractor.extract_paragraphs().unwrap();
+        assert_eq!(paragraphs.len(), 2);
+        assert_eq!(paragraphs[0].0, "Cell");
+        assert!(paragraphs[0].1.is_table_cell_end);
+        assert_eq!(paragraphs[1].0, "");
+        assert!(paragraphs[1].1.is_table_cell_end);
     }
 }

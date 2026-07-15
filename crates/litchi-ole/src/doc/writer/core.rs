@@ -1265,7 +1265,14 @@ impl DocWriter {
         if let Some(revision) = &self.section_formatting_revision {
             index_author(&revision.author)?;
         }
-        for paragraph in &self.paragraphs {
+        let table_paragraphs = self.tables.iter().flat_map(|table| {
+            table
+                .rows
+                .iter()
+                .flat_map(|row| row.cells.iter())
+                .flat_map(|cell| cell.paragraphs.iter())
+        });
+        for paragraph in self.paragraphs.iter().chain(table_paragraphs) {
             if let Some(revision) = &paragraph.formatting.formatting_revision {
                 index_author(&revision.author)?;
             }
@@ -1316,6 +1323,219 @@ impl DocWriter {
         let offset = table_stream.len() as u32;
         fib.set_sttbf_rmark(offset, revisions.table.len() as u32);
         table_stream.extend_from_slice(&revisions.table);
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn append_tables_to_main_story(
+        &self,
+        text_fc_start: u32,
+        text_stream: &mut Vec<u8>,
+        current_cp: &mut u32,
+        pieces: &mut Vec<Piece>,
+        chpx_entries: &mut Vec<(u32, u32, Vec<u8>)>,
+        papx_entries: &mut Vec<(u32, u32, Vec<u8>)>,
+        field_char_cps: &mut Vec<(u32, u16)>,
+        font_builder: &mut FontTableBuilder,
+        revision_data: Option<&RevisionWriterData>,
+    ) -> Result<(), DocWriteError> {
+        for table in &self.tables {
+            for row in &table.rows {
+                let column_count = row.cells.len();
+                if !(1..=63).contains(&column_count) {
+                    return Err(DocWriteError::InvalidData(
+                        "DOC table rows must contain between 1 and 63 cells".to_string(),
+                    ));
+                }
+                for cell in &row.cells {
+                    if cell.paragraphs.is_empty() {
+                        return Err(DocWriteError::InvalidData(
+                            "DOC table cells must contain at least one paragraph".to_string(),
+                        ));
+                    }
+                    let last_paragraph = cell.paragraphs.len() - 1;
+                    for (index, paragraph) in cell.paragraphs.iter().enumerate() {
+                        let terminator = if index == last_paragraph {
+                            0x0007
+                        } else {
+                            0x000D
+                        };
+                        Self::append_table_paragraph(
+                            paragraph,
+                            terminator,
+                            text_fc_start,
+                            text_stream,
+                            current_cp,
+                            pieces,
+                            chpx_entries,
+                            papx_entries,
+                            field_char_cps,
+                            font_builder,
+                            revision_data,
+                        )?;
+                    }
+                }
+
+                let fc_start = text_fc_start
+                    .checked_add(u32::try_from(text_stream.len()).map_err(|_| {
+                        DocWriteError::InvalidData(
+                            "DOC text stream exceeds 32-bit FC space".to_string(),
+                        )
+                    })?)
+                    .ok_or_else(|| {
+                        DocWriteError::InvalidData("DOC table row FC overflows".to_string())
+                    })?;
+                text_stream.extend_from_slice(&0x0007u16.to_le_bytes());
+                let fc_end = fc_start.checked_add(2).ok_or_else(|| {
+                    DocWriteError::InvalidData("DOC table row FC overflows".to_string())
+                })?;
+                chpx_entries.push((fc_start, fc_end, Vec::new()));
+                papx_entries.push((fc_start, fc_end, build_table_row_papx_grpprl(column_count)?));
+                let cp_end = current_cp.checked_add(1).ok_or_else(|| {
+                    DocWriteError::InvalidData("DOC table CP range overflows".to_string())
+                })?;
+                pieces.push(Piece::new(*current_cp, cp_end, fc_start, true));
+                *current_cp = cp_end;
+            }
+
+            // The main document must end in U+000D. A non-table paragraph also
+            // separates adjacent writer table objects into distinct tables.
+            Self::append_empty_main_paragraph(
+                text_fc_start,
+                text_stream,
+                current_cp,
+                pieces,
+                chpx_entries,
+                papx_entries,
+            )?;
+        }
+        Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn append_table_paragraph(
+        paragraph: &WritableParagraph,
+        terminator: u16,
+        text_fc_start: u32,
+        text_stream: &mut Vec<u8>,
+        current_cp: &mut u32,
+        pieces: &mut Vec<Piece>,
+        chpx_entries: &mut Vec<(u32, u32, Vec<u8>)>,
+        papx_entries: &mut Vec<(u32, u32, Vec<u8>)>,
+        field_char_cps: &mut Vec<(u32, u16)>,
+        font_builder: &mut FontTableBuilder,
+        revision_data: Option<&RevisionWriterData>,
+    ) -> Result<(), DocWriteError> {
+        let fc_start = text_fc_start
+            .checked_add(u32::try_from(text_stream.len()).map_err(|_| {
+                DocWriteError::InvalidData("DOC text stream exceeds 32-bit FC space".to_string())
+            })?)
+            .ok_or_else(|| {
+                DocWriteError::InvalidData("DOC table paragraph FC overflows".to_string())
+            })?;
+        let mut paragraph_cps = 0u32;
+        let mut last_chpx = None;
+        for run in &paragraph.runs {
+            let run_fc_start = text_fc_start
+                .checked_add(u32::try_from(text_stream.len()).map_err(|_| {
+                    DocWriteError::InvalidData(
+                        "DOC text stream exceeds 32-bit FC space".to_string(),
+                    )
+                })?)
+                .ok_or_else(|| {
+                    DocWriteError::InvalidData("DOC table run FC overflows".to_string())
+                })?;
+            let run_cps = utf16_code_unit_len(&run.text)?;
+            let mut offset = 0u32;
+            for ch in run.text.chars() {
+                let cp = current_cp
+                    .checked_add(paragraph_cps)
+                    .and_then(|value| value.checked_add(offset))
+                    .ok_or_else(|| {
+                        DocWriteError::InvalidData(
+                            "DOC table field character CP overflows".to_string(),
+                        )
+                    })?;
+                if matches!(ch as u32, 0x0013..=0x0015) {
+                    field_char_cps.push((cp, ch as u16));
+                }
+                offset = offset.checked_add(ch.len_utf16() as u32).ok_or_else(|| {
+                    DocWriteError::InvalidData("DOC table run CP range overflows".to_string())
+                })?;
+            }
+            for unit in run.text.encode_utf16() {
+                text_stream.extend_from_slice(&unit.to_le_bytes());
+            }
+            let run_fc_end = run_fc_start
+                .checked_add(run_cps.checked_mul(2).ok_or_else(|| {
+                    DocWriteError::InvalidData("DOC table run FC overflows".to_string())
+                })?)
+                .ok_or_else(|| {
+                    DocWriteError::InvalidData("DOC table run FC overflows".to_string())
+                })?;
+            chpx_entries.push((
+                run_fc_start,
+                run_fc_end,
+                build_revision_chpx_grpprl(&run.formatting, font_builder, revision_data)?,
+            ));
+            last_chpx = Some(chpx_entries.len() - 1);
+            paragraph_cps = paragraph_cps.checked_add(run_cps).ok_or_else(|| {
+                DocWriteError::InvalidData("DOC table paragraph CP range overflows".to_string())
+            })?;
+        }
+        text_stream.extend_from_slice(&terminator.to_le_bytes());
+        let fc_end = text_fc_start
+            .checked_add(u32::try_from(text_stream.len()).map_err(|_| {
+                DocWriteError::InvalidData("DOC text stream exceeds 32-bit FC space".to_string())
+            })?)
+            .ok_or_else(|| {
+                DocWriteError::InvalidData("DOC table paragraph FC overflows".to_string())
+            })?;
+        if let Some(index) = last_chpx {
+            chpx_entries[index].1 = fc_end;
+        } else {
+            chpx_entries.push((fc_start, fc_end, Vec::new()));
+        }
+        let mut papx = build_revision_papx_grpprl(&paragraph.formatting, revision_data)?;
+        append_table_depth_sprms(&mut papx);
+        papx_entries.push((fc_start, fc_end, papx));
+        let cp_end = current_cp
+            .checked_add(paragraph_cps)
+            .and_then(|value| value.checked_add(1))
+            .ok_or_else(|| {
+                DocWriteError::InvalidData("DOC table paragraph CP range overflows".to_string())
+            })?;
+        pieces.push(Piece::new(*current_cp, cp_end, fc_start, true));
+        *current_cp = cp_end;
+        Ok(())
+    }
+
+    fn append_empty_main_paragraph(
+        text_fc_start: u32,
+        text_stream: &mut Vec<u8>,
+        current_cp: &mut u32,
+        pieces: &mut Vec<Piece>,
+        chpx_entries: &mut Vec<(u32, u32, Vec<u8>)>,
+        papx_entries: &mut Vec<(u32, u32, Vec<u8>)>,
+    ) -> Result<(), DocWriteError> {
+        let fc_start = text_fc_start
+            .checked_add(u32::try_from(text_stream.len()).map_err(|_| {
+                DocWriteError::InvalidData("DOC text stream exceeds 32-bit FC space".to_string())
+            })?)
+            .ok_or_else(|| {
+                DocWriteError::InvalidData("DOC final paragraph FC overflows".to_string())
+            })?;
+        text_stream.extend_from_slice(&0x000Du16.to_le_bytes());
+        let fc_end = fc_start.checked_add(2).ok_or_else(|| {
+            DocWriteError::InvalidData("DOC final paragraph FC overflows".to_string())
+        })?;
+        chpx_entries.push((fc_start, fc_end, Vec::new()));
+        papx_entries.push((fc_start, fc_end, Vec::new()));
+        let cp_end = current_cp.checked_add(1).ok_or_else(|| {
+            DocWriteError::InvalidData("DOC final paragraph CP overflows".to_string())
+        })?;
+        pieces.push(Piece::new(*current_cp, cp_end, fc_start, true));
+        *current_cp = cp_end;
+        Ok(())
     }
 
     fn append_bookmark_tables(
@@ -1492,14 +1712,15 @@ impl DocWriter {
     ///
     /// * `Result<usize, DocWriteError>` - Table index or error
     ///
-    /// # Implementation Status
-    ///
-    /// Table creation with TAP (Table Properties) structures is deferred.
-    /// Use the DOCX writer for production table support.
     pub fn add_table(&mut self, rows: usize, cols: usize) -> Result<usize, DocWriteError> {
         if rows == 0 || cols == 0 {
             return Err(DocWriteError::InvalidData(
                 "Table must have at least 1 row and 1 column".to_string(),
+            ));
+        }
+        if cols > 63 {
+            return Err(DocWriteError::InvalidData(
+                "DOC table rows cannot exceed 63 cells".to_string(),
             ));
         }
 
@@ -1753,6 +1974,28 @@ impl DocWriter {
                 true,
             ));
             current_cp += para_chars + 1;
+        }
+
+        self.append_tables_to_main_story(
+            text_fc_start,
+            &mut text_stream,
+            &mut current_cp,
+            &mut pieces,
+            &mut chpx_entries,
+            &mut papx_entries,
+            &mut field_char_cps,
+            &mut font_builder,
+            revision_data.as_ref(),
+        )?;
+        if current_cp == 0 {
+            Self::append_empty_main_paragraph(
+                text_fc_start,
+                &mut text_stream,
+                &mut current_cp,
+                &mut pieces,
+                &mut chpx_entries,
+                &mut papx_entries,
+            )?;
         }
 
         let text_length = current_cp;
@@ -2313,6 +2556,28 @@ impl DocWriter {
                 true,
             ));
             current_cp += para_chars + 1;
+        }
+
+        self.append_tables_to_main_story(
+            text_fc_start,
+            &mut text_stream,
+            &mut current_cp,
+            &mut pieces,
+            &mut chpx_entries,
+            &mut papx_entries,
+            &mut field_char_cps,
+            &mut font_builder,
+            revision_data.as_ref(),
+        )?;
+        if current_cp == 0 {
+            Self::append_empty_main_paragraph(
+                text_fc_start,
+                &mut text_stream,
+                &mut current_cp,
+                &mut pieces,
+                &mut chpx_entries,
+                &mut papx_entries,
+            )?;
         }
 
         let text_length = current_cp;
@@ -3099,6 +3364,43 @@ fn build_revision_papx_grpprl(
     Ok(grp)
 }
 
+fn append_table_depth_sprms(grp: &mut Vec<u8>) {
+    grp.extend_from_slice(&SPRM_P_F_IN_TABLE.to_le_bytes());
+    grp.push(1);
+    grp.extend_from_slice(&SPRM_P_ITAP.to_le_bytes());
+    grp.extend_from_slice(&1u32.to_le_bytes());
+}
+
+fn build_table_row_papx_grpprl(column_count: usize) -> Result<Vec<u8>, DocWriteError> {
+    if !(1..=63).contains(&column_count) {
+        return Err(DocWriteError::InvalidData(
+            "DOC table rows must contain between 1 and 63 cells".to_string(),
+        ));
+    }
+    let mut grp = Vec::new();
+    append_table_depth_sprms(&mut grp);
+    grp.extend_from_slice(&SPRM_P_F_TTP.to_le_bytes());
+    grp.push(1);
+
+    // TDefTableOperand: itcMac followed by one signed XAS boundary per
+    // column plus the initial left edge. Default descriptors are omitted,
+    // which the format explicitly permits.
+    let mut operand = Vec::with_capacity(1 + (column_count + 1) * 2);
+    operand.push(column_count as u8);
+    const TABLE_WIDTH_TWIPS: i32 = 8640;
+    for index in 0..=column_count {
+        let boundary = (TABLE_WIDTH_TWIPS * index as i32 / column_count as i32) as i16;
+        operand.extend_from_slice(&boundary.to_le_bytes());
+    }
+    let encoded_size = u16::try_from(operand.len() + 1).map_err(|_| {
+        DocWriteError::InvalidData("DOC TDefTable operand exceeds its size field".to_string())
+    })?;
+    grp.extend_from_slice(&SPRM_T_DEF_TABLE.to_le_bytes());
+    grp.extend_from_slice(&encoded_size.to_le_bytes());
+    grp.extend_from_slice(&operand);
+    Ok(grp)
+}
+
 impl Default for DocWriter {
     fn default() -> Self {
         Self::new()
@@ -3260,6 +3562,89 @@ mod tests {
     }
 
     #[test]
+    fn tables_round_trip_through_both_output_paths() {
+        let mut writer = DocWriter::new();
+        writer.add_paragraph("Before table").unwrap();
+        let table = writer.add_table(2, 2).unwrap();
+        writer.set_table_cell_text(table, 0, 0, "A😀").unwrap();
+        writer.tables[table].rows[0].cells[0]
+            .paragraphs
+            .push(WritableParagraph {
+                runs: vec![TextRun {
+                    text: "continued".to_string(),
+                    formatting: CharacterFormatting::default(),
+                }],
+                formatting: ParagraphFormatting::default(),
+            });
+        writer.set_table_cell_text(table, 0, 1, "B").unwrap();
+        writer.set_table_cell_text(table, 1, 0, "C").unwrap();
+        let second_table = writer.add_table(1, 1).unwrap();
+        writer
+            .set_table_cell_text(second_table, 0, 0, "Separate")
+            .unwrap();
+
+        let assert_document = |document: crate::doc::Document| {
+            let tables = document.tables().unwrap();
+            assert_eq!(tables.len(), 2);
+            assert_eq!(tables[0].row_count().unwrap(), 2);
+            assert_eq!(tables[0].column_count().unwrap(), 2);
+            let rows = tables[0].rows().unwrap();
+            assert_eq!(rows[0].properties().unwrap().cell_count, 2);
+            assert_eq!(
+                rows[0].properties().unwrap().cell_boundaries,
+                [0, 4320, 8640]
+            );
+            assert_eq!(
+                rows[0].cells().unwrap()[0].text().unwrap(),
+                "A😀\ncontinued"
+            );
+            assert_eq!(rows[0].cells().unwrap()[0].paragraphs().unwrap().len(), 2);
+            assert_eq!(rows[0].cells().unwrap()[1].text().unwrap(), "B");
+            assert_eq!(rows[1].cells().unwrap()[0].text().unwrap(), "C");
+            assert_eq!(rows[1].cells().unwrap()[1].text().unwrap(), "");
+            assert_eq!(
+                tables[1].rows().unwrap()[0].cells().unwrap()[0]
+                    .text()
+                    .unwrap(),
+                "Separate"
+            );
+            assert!(document.text().unwrap().ends_with('\r'));
+            let element_table = document
+                .elements()
+                .unwrap()
+                .into_iter()
+                .find_map(|element| match element {
+                    crate::doc::DocElement::Table(table) => Some(table),
+                    crate::doc::DocElement::Paragraph(_) => None,
+                })
+                .unwrap();
+            assert_eq!(
+                element_table.properties().unwrap().cell_boundaries,
+                [0, 4320, 8640]
+            );
+        };
+
+        let mut cursor = Cursor::new(Vec::new());
+        writer.write_to(&mut cursor).unwrap();
+        let mut package =
+            crate::doc::Package::from_reader(Cursor::new(cursor.into_inner())).unwrap();
+        assert_document(package.document().unwrap());
+
+        let path = std::env::temp_dir().join(format!(
+            "litchi-doc-table-{}-{}.doc",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        writer.save(&path).unwrap();
+        let mut package = crate::doc::Package::open(&path).unwrap();
+        assert_document(package.document().unwrap());
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
     fn test_set_property() {
         let mut writer = DocWriter::new();
         writer.set_property("Title", "Test Document");
@@ -3327,6 +3712,8 @@ mod tests {
         assert!(result.is_ok());
         let data = cursor.into_inner();
         assert!(!data.is_empty());
+        let mut package = crate::doc::Package::from_reader(Cursor::new(data)).unwrap();
+        assert_eq!(package.document().unwrap().text().unwrap(), "\r");
     }
 
     #[test]
@@ -4142,6 +4529,7 @@ mod tests {
         assert!(writer.add_table(0, 3).is_err());
         assert!(writer.add_table(2, 0).is_err());
         assert!(writer.add_table(0, 0).is_err());
+        assert!(writer.add_table(1, 64).is_err());
     }
 
     #[test]
