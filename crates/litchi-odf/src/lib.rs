@@ -180,12 +180,20 @@
 //! - ✅ Metadata and lossless exact original-byte saving
 //! - ✅ Formula markup remains inert and is never evaluated
 //!
+//! ## ✅ ODI - Image Documents (READ-ONLY SEMANTIC MODEL)
+//!
+//! - ✅ Open images and image templates from paths, readers, or bytes
+//! - ✅ Namespace-aware required frame and complete mixed-content subtree
+//! - ✅ Linked, package-local, and embedded base64 image payloads
+//! - ✅ Text boxes, objects, tables, events, image maps, contours, and vendor elements
+//! - ✅ External references remain inert and are never fetched
+//! - ✅ Metadata and lossless exact original-byte saving
+//!
 //! ## 🚧 Additional ODF Formats (PACKAGE SUPPORT)
 //!
 //! All standard families and templates can be validated, inspected, extracted,
 //! and saved losslessly through [`OpenDocumentPackage`]. Specialized semantic
 //! object models remain in progress for:
-//! - ODI - OpenDocument Image (.odi/.oti)
 //! - ODM - OpenDocument Master (.odm)
 //! - OTH - OpenDocument Web (.oth)
 //!
@@ -267,6 +275,8 @@ mod generic;
 mod odc;
 /// OpenDocument drawing (.odg/.otg) support.
 mod odg;
+/// OpenDocument image (.odi/.oti) support.
+mod odi;
 /// ODF presentation (.odp) support
 mod odp;
 /// ODF spreadsheet (.ods) support
@@ -288,6 +298,7 @@ pub use odc::{ChartAttribute, ChartDocument, ChartElement, ChartElementKind};
 pub use odg::{
     DrawingDocument, DrawingLayer, DrawingLayerDisplay, DrawingPage, DrawingPageProperties,
 };
+pub use odi::{ImageAttribute, ImageContent, ImageDocument, ImageElement, ImageElementKind};
 
 // Re-export main types for convenience
 pub use odp::{
