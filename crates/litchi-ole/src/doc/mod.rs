@@ -90,8 +90,8 @@ pub use writer::{
     DocWriter, DropCap, DropCapType, FontAlignment, FormattingRevision, FrameAnchor, FrameHeight,
     FrameHorizontalAnchor, FrameHorizontalPosition, FrameTextFlow, FrameTextWrap,
     FrameVerticalAnchor, FrameVerticalPosition, LineSpacing, NumberingRevision, ParagraphBorder,
-    ParagraphBorderStyle, ParagraphBorders, ParagraphFormatting, ParagraphShading,
-    TextBoxTightWrap, TextRevision,
+    ParagraphBorderStyle, ParagraphBorders, ParagraphFormatting, ParagraphShading, TabAlignment,
+    TabLeader, TabStop, TextBoxTightWrap, TextRevision,
 };
 
 /// Crate-native ordered document element returned by [`Document::elements`].

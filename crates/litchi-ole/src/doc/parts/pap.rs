@@ -101,9 +101,9 @@ pub struct ParagraphProperties {
     pub outline_level: Option<u8>,
     /// Style index (istd)
     pub style_index: Option<u16>,
-    /// List level (ilvl)
+    /// List level (0 through 8, or 12 when list numbering skips this paragraph)
     pub list_level: Option<u8>,
-    /// List format override index (ilfo)
+    /// Signed list format override encoding (negative values preserve paragraph indents)
     pub list_format_override: Option<i16>,
     /// Bi-directional paragraph
     pub bi_directional: bool,
@@ -419,7 +419,7 @@ impl TryFrom<u8> for TextBoxTightWrap {
 }
 
 /// Tab stop definition.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TabStop {
     /// Position in twips
     pub position: i32,
@@ -442,6 +442,8 @@ pub enum TabAlignment {
     Decimal,
     /// Bar (vertical line)
     Bar,
+    /// List tab
+    List,
 }
 
 /// Tab leader characters.
@@ -459,6 +461,8 @@ pub enum TabLeader {
     Heavy,
     /// Middle dot
     MiddleDot,
+    /// Default leader behavior (equivalent to no leader)
+    DefaultLeader,
 }
 
 /// Paragraph borders.
@@ -751,20 +755,20 @@ impl ParagraphProperties {
                 return Ok(());
             },
             SPRM_P_DXA_RIGHT_2000 => {
-                pap.indent_right = Some(i32::from(Self::required_i16(sprm, "sprmPDxaRight")?));
+                pap.indent_right = Some(i32::from(Self::xas(sprm, "sprmPDxaRight")?));
                 return Ok(());
             },
             SPRM_P_DXA_LEFT_2000 => {
-                pap.indent_left = Some(i32::from(Self::required_i16(sprm, "sprmPDxaLeft")?));
+                pap.indent_left = Some(i32::from(Self::xas(sprm, "sprmPDxaLeft")?));
                 return Ok(());
             },
             SPRM_P_NEST_2000 => {
-                let delta = i32::from(Self::required_i16(sprm, "sprmPNest")?);
+                let delta = i32::from(Self::xas(sprm, "sprmPNest")?);
                 pap.indent_left = Some(pap.indent_left.unwrap_or(0) + delta);
                 return Ok(());
             },
             SPRM_P_DXA_LEFT1_2000 => {
-                pap.indent_first_line = Some(i32::from(Self::required_i16(sprm, "sprmPDxaLeft1")?));
+                pap.indent_first_line = Some(i32::from(Self::xas(sprm, "sprmPDxaLeft1")?));
                 return Ok(());
             },
             SPRM_P_JC_LOGICAL => {
@@ -927,88 +931,103 @@ impl ParagraphProperties {
             },
             // Operation 0x0A: sprmPIlvl - List level
             0x0A => {
-                if let Some(ilvl) = sprm.operand_byte() {
-                    pap.list_level = Some(ilvl);
+                let ilvl = sprm.operand_byte().ok_or_else(|| {
+                    DocError::Corrupted("sprmPIlvl is missing its list level".to_string())
+                })?;
+                if ilvl > 8 && ilvl != 0x0C {
+                    return Err(DocError::Corrupted(format!(
+                        "sprmPIlvl has invalid list level {ilvl}"
+                    )));
                 }
+                pap.list_level = Some(ilvl);
             },
             // Operation 0x0B: sprmPIlfo - List format override
             0x0B => {
-                if let Some(ilfo) = sprm.operand_i16() {
-                    pap.list_format_override = Some(ilfo);
+                let raw = sprm.operand_word().ok_or_else(|| {
+                    DocError::Corrupted("sprmPIlfo is missing its list override".to_string())
+                })?;
+                if (0x07FF..=0xF800).contains(&raw) {
+                    return Err(DocError::Corrupted(format!(
+                        "sprmPIlfo has reserved list override {raw:#06x}"
+                    )));
                 }
+                pap.list_format_override = Some(i16::from_le_bytes(raw.to_le_bytes()));
             },
             // Operation 0x0C: sprmPFNoLineNumb - No line numbering
             0x0C => {
-                if let Some(val) = sprm.operand_byte() {
-                    pap.no_line_numbering = val != 0;
-                }
+                pap.no_line_numbering = Self::strict_bool8(sprm, "sprmPFNoLineNumb")?;
             },
             // Operation 0x0D: sprmPChgTabsPapx - Tab stops
             0x0D => {
-                Self::handle_tabs(pap, sprm);
+                Self::handle_tabs(pap, sprm, false)?;
             },
             // Operation 0x0E: sprmPDxaRight - Right indent
             0x0E => {
-                if let Some(val) = sprm.operand_i16() {
-                    pap.indent_right = Some(val as i32);
-                }
+                pap.indent_right = Some(i32::from(Self::xas(sprm, "sprmPDxaRight")?));
             },
             // Operation 0x0F: sprmPDxaLeft - Left indent
             0x0F => {
-                if let Some(val) = sprm.operand_i16() {
-                    pap.indent_left = Some(val as i32);
-                }
+                pap.indent_left = Some(i32::from(Self::xas(sprm, "sprmPDxaLeft")?));
             },
             // Operation 0x10: sprmPNest - Nested indent
             0x10 => {
-                if let Some(val) = sprm.operand_i16() {
-                    let current = pap.indent_left.unwrap_or(0);
-                    pap.indent_left = Some((current + val as i32).max(0));
-                }
+                let delta = i32::from(Self::xas(sprm, "sprmPNest")?);
+                pap.indent_left = Some(pap.indent_left.unwrap_or(0) + delta);
             },
             // Operation 0x11: sprmPDxaLeft1 - First line indent
             0x11 => {
-                if let Some(val) = sprm.operand_i16() {
-                    pap.indent_first_line = Some(val as i32);
-                }
+                pap.indent_first_line = Some(i32::from(Self::xas(sprm, "sprmPDxaLeft1")?));
             },
             // Operation 0x12: sprmPDyaLine - Line spacing
             0x12 => {
-                if sprm.operand.len() >= 4
-                    && let Ok(dya_line) = read_i16_le(&sprm.operand, 0)
-                    && let Ok(f_mult) = read_u16_le(&sprm.operand, 2)
-                {
-                    pap.line_spacing = Some(dya_line);
-                    if f_mult != 0 {
-                        // Multiple line spacing
-                        pap.line_spacing_type = match dya_line {
-                            240 => LineSpacingType::Single,
-                            360 => LineSpacingType::OnePointFive,
-                            480 => LineSpacingType::Double,
-                            _ => LineSpacingType::Multiple,
-                        };
-                    } else if dya_line > 0 {
-                        pap.line_spacing_type = LineSpacingType::AtLeast;
-                    } else {
-                        pap.line_spacing_type = LineSpacingType::Exactly;
-                    }
+                let bytes = sprm.operand_bytes();
+                if bytes.len() != 4 {
+                    return Err(DocError::Corrupted(
+                        "sprmPDyaLine must contain exactly 4 bytes".to_string(),
+                    ));
                 }
+                let raw_dya = read_u16_le(bytes, 0).map_err(|error| {
+                    DocError::Corrupted(format!("invalid sprmPDyaLine spacing: {error}"))
+                })?;
+                if raw_dya > 0x7BC0 && raw_dya < 0x8440 {
+                    return Err(DocError::Corrupted(format!(
+                        "sprmPDyaLine value {raw_dya:#06x} is outside the LSPD range"
+                    )));
+                }
+                let dya_line = i16::from_le_bytes(raw_dya.to_le_bytes());
+                let f_mult = read_u16_le(bytes, 2).map_err(|error| {
+                    DocError::Corrupted(format!("invalid sprmPDyaLine mode: {error}"))
+                })?;
+                if f_mult > 1 {
+                    return Err(DocError::Corrupted(format!(
+                        "sprmPDyaLine has invalid multiple-line flag {f_mult}"
+                    )));
+                }
+                pap.line_spacing = Some(dya_line);
+                pap.line_spacing_type = if f_mult == 1 {
+                    match dya_line {
+                        240 => LineSpacingType::Single,
+                        360 => LineSpacingType::OnePointFive,
+                        480 => LineSpacingType::Double,
+                        _ => LineSpacingType::Multiple,
+                    }
+                } else if dya_line > 0 {
+                    LineSpacingType::AtLeast
+                } else {
+                    LineSpacingType::Exactly
+                };
             },
             // Operation 0x13: sprmPDyaBefore - Space before
             0x13 => {
-                if let Some(val) = sprm.operand_word() {
-                    pap.space_before = Some(val);
-                }
+                pap.space_before = Some(Self::unsigned_twips(sprm, "sprmPDyaBefore")?);
             },
             // Operation 0x14: sprmPDyaAfter - Space after
             0x14 => {
-                if let Some(val) = sprm.operand_word() {
-                    pap.space_after = Some(val);
-                }
+                pap.space_after = Some(Self::unsigned_twips(sprm, "sprmPDyaAfter")?);
             },
             // Operation 0x15: sprmPChgTabs - Change tabs (fast saved)
             0x15 => {
-                // Fast saved only - not commonly used
+                Self::handle_tabs(pap, sprm, true)?;
             },
             // Operation 0x16: sprmPFInTable - In table flag
             0x16 => {
@@ -1389,6 +1408,28 @@ impl ParagraphProperties {
             .ok_or_else(|| DocError::Corrupted(format!("{name} is missing its 16-bit operand")))
     }
 
+    fn xas(sprm: &Sprm, name: &str) -> Result<i16> {
+        let value = Self::required_i16(sprm, name)?;
+        if !(-31_680..=31_680).contains(&value) {
+            return Err(DocError::Corrupted(format!(
+                "{name} value {value} is outside -31680..=31680"
+            )));
+        }
+        Ok(value)
+    }
+
+    fn unsigned_twips(sprm: &Sprm, name: &str) -> Result<u16> {
+        let value = sprm
+            .operand_word()
+            .ok_or_else(|| DocError::Corrupted(format!("{name} is missing its 16-bit operand")))?;
+        if value > 31_680 {
+            return Err(DocError::Corrupted(format!(
+                "{name} value {value} exceeds 31680"
+            )));
+        }
+        Ok(value)
+    }
+
     fn required_i32(sprm: &Sprm, name: &str) -> Result<i32> {
         let bytes: [u8; 4] = sprm
             .operand_bytes()
@@ -1489,89 +1530,127 @@ impl ParagraphProperties {
     /// - 1 byte: number of tabs to add (addSize)
     /// - addSize * 2 bytes: positions to add
     /// - addSize bytes: tab descriptors (jc + tlc)
-    fn handle_tabs(pap: &mut ParagraphProperties, sprm: &Sprm) {
+    fn handle_tabs(pap: &mut ParagraphProperties, sprm: &Sprm, delete_close: bool) -> Result<()> {
         let bytes = sprm.operand_bytes();
-        if bytes.is_empty() {
-            return;
+        if bytes.len() < 2 {
+            return Err(DocError::Corrupted(
+                "DOC tab-change operand must contain delete and add counts".to_string(),
+            ));
+        }
+        let delete_count = usize::from(bytes[0]);
+        if delete_count > 64 {
+            return Err(DocError::Corrupted(
+                "DOC tab-change delete count exceeds 64".to_string(),
+            ));
+        }
+        let delete_bytes = if delete_close { 4 } else { 2 };
+        let add_count_offset = 1 + delete_count * delete_bytes;
+        if add_count_offset >= bytes.len() {
+            return Err(DocError::Corrupted(
+                "DOC tab-change delete arrays are truncated".to_string(),
+            ));
+        }
+        let add_count = usize::from(bytes[add_count_offset]);
+        if add_count > 64 {
+            return Err(DocError::Corrupted(
+                "DOC tab-change add count exceeds 64".to_string(),
+            ));
+        }
+        let expected = add_count_offset + 1 + add_count * 3;
+        if bytes.len() != expected {
+            return Err(DocError::Corrupted(format!(
+                "DOC tab-change operand has {} bytes; expected {expected}",
+                bytes.len()
+            )));
         }
 
-        let mut offset = 0;
-
-        // Read delete count
-        let del_size = bytes[offset] as usize;
-        offset += 1;
-
-        // Create a map of existing tabs
-        let mut tab_map: std::collections::HashMap<i32, TabStop> =
+        let mut tab_map: std::collections::BTreeMap<i32, TabStop> =
             pap.tab_stops.iter().map(|t| (t.position, *t)).collect();
-
-        // Delete tabs
-        for _ in 0..del_size {
-            if offset + 1 < bytes.len() {
-                if let Ok(pos) = read_i16_le(bytes, offset) {
-                    tab_map.remove(&(pos as i32));
-                }
-                offset += 2;
+        let mut previous_delete = None;
+        for index in 0..delete_count {
+            let position = read_i16_le(bytes, 1 + index * 2)
+                .map_err(|error| DocError::Corrupted(format!("invalid tab deletion: {error}")))?;
+            if position > 31_680 || previous_delete.is_some_and(|previous| position <= previous) {
+                return Err(DocError::Corrupted(
+                    "DOC tab deletion positions must be ascending and at most 31680".to_string(),
+                ));
             }
+            previous_delete = Some(position);
+            let radius = if delete_close {
+                let close_offset = 1 + delete_count * 2 + index * 2;
+                let stored = read_i16_le(bytes, close_offset).map_err(|error| {
+                    DocError::Corrupted(format!("invalid close-tab distance: {error}"))
+                })?;
+                if !(-31_678..=31_682).contains(&stored) {
+                    return Err(DocError::Corrupted(format!(
+                        "DOC close-tab distance {stored} is outside the XAS_plusOne range"
+                    )));
+                }
+                i32::from(stored).saturating_sub(1).max(25)
+            } else {
+                25
+            };
+            let center = i32::from(position);
+            tab_map.retain(|tab, _| (*tab - center).abs() > radius);
         }
-
-        // Read add count
-        if offset >= bytes.len() {
-            return;
-        }
-        let add_size = bytes[offset] as usize;
-        offset += 1;
-
-        // Read new tab positions
-        let positions_start = offset;
-        offset += add_size * 2;
-
-        // Read tab descriptors and add tabs
-        for i in 0..add_size {
-            if positions_start + i * 2 + 1 < bytes.len()
-                && offset < bytes.len()
-                && let Ok(pos) = read_i16_le(bytes, positions_start + i * 2)
+        let positions_start = add_count_offset + 1;
+        let descriptors_start = positions_start + add_count * 2;
+        let mut previous_add = None;
+        for index in 0..add_count {
+            let position = read_i16_le(bytes, positions_start + index * 2)
+                .map_err(|error| DocError::Corrupted(format!("invalid tab addition: {error}")))?;
+            if !(-31_680..=31_680).contains(&position)
+                || previous_add.is_some_and(|previous| position <= previous)
             {
-                let tbd = bytes[offset];
-                let jc = tbd & 0x07;
-                let tlc = (tbd >> 3) & 0x07;
-
-                let alignment = match jc {
-                    0 => TabAlignment::Left,
-                    1 => TabAlignment::Center,
-                    2 => TabAlignment::Right,
-                    3 => TabAlignment::Decimal,
-                    4 => TabAlignment::Bar,
-                    _ => TabAlignment::Left,
-                };
-
-                let leader = match tlc {
+                return Err(DocError::Corrupted(
+                    "DOC tab addition positions must be ascending XAS values".to_string(),
+                ));
+            }
+            previous_add = Some(position);
+            let descriptor = bytes[descriptors_start + index];
+            let alignment = match descriptor & 0x07 {
+                0 => TabAlignment::Left,
+                1 => TabAlignment::Center,
+                2 => TabAlignment::Right,
+                3 => TabAlignment::Decimal,
+                4 => TabAlignment::Bar,
+                6 => TabAlignment::List,
+                invalid => {
+                    return Err(DocError::Corrupted(format!(
+                        "DOC tab has invalid alignment {invalid}"
+                    )));
+                },
+            };
+            let leader = if alignment == TabAlignment::Bar {
+                // The leader field is explicitly ignored for bar tabs.
+                TabLeader::None
+            } else {
+                match (descriptor >> 3) & 0x07 {
                     0 => TabLeader::None,
                     1 => TabLeader::Dots,
                     2 => TabLeader::Hyphens,
                     3 => TabLeader::Underline,
                     4 => TabLeader::Heavy,
                     5 => TabLeader::MiddleDot,
-                    _ => TabLeader::None,
-                };
-
-                tab_map.insert(
-                    pos as i32,
-                    TabStop {
-                        position: pos as i32,
-                        alignment,
-                        leader,
+                    7 => TabLeader::DefaultLeader,
+                    invalid => {
+                        return Err(DocError::Corrupted(format!(
+                            "DOC tab has invalid leader {invalid}"
+                        )));
                     },
-                );
-
-                offset += 1;
-            }
+                }
+            };
+            tab_map.insert(
+                i32::from(position),
+                TabStop {
+                    position: i32::from(position),
+                    alignment,
+                    leader,
+                },
+            );
         }
-
-        // Convert map back to sorted vector
-        let mut tabs: Vec<TabStop> = tab_map.into_values().collect();
-        tabs.sort_by_key(|t| t.position);
-        pap.tab_stops = tabs;
+        pap.tab_stops = tab_map.into_values().collect();
+        Ok(())
     }
 
     /// Parse a Word 97 `Brc80` paragraph border.
@@ -1840,6 +1919,116 @@ mod tests {
         let single = LineSpacingType::Single;
         let double = LineSpacingType::Double;
         assert_ne!(single, double);
+    }
+
+    #[test]
+    fn parses_lists_indents_spacing_and_ordered_tab_changes_strictly() {
+        let mut grpprl = Vec::new();
+        grpprl.extend_from_slice(&SPRM_P_ILVL.to_le_bytes());
+        grpprl.push(8);
+        grpprl.extend_from_slice(&SPRM_P_ILFO.to_le_bytes());
+        grpprl.extend_from_slice(&1u16.to_le_bytes());
+        grpprl.extend_from_slice(&SPRM_P_F_NO_LINE_NUMB.to_le_bytes());
+        grpprl.push(1);
+        grpprl.extend_from_slice(&SPRM_P_DXA_RIGHT.to_le_bytes());
+        grpprl.extend_from_slice(&(-720i16).to_le_bytes());
+        grpprl.extend_from_slice(&SPRM_P_DXA_LEFT.to_le_bytes());
+        grpprl.extend_from_slice(&1_440i16.to_le_bytes());
+        grpprl.extend_from_slice(&SPRM_P_NEST.to_le_bytes());
+        grpprl.extend_from_slice(&(-240i16).to_le_bytes());
+        grpprl.extend_from_slice(&SPRM_P_DXA_LEFT1.to_le_bytes());
+        grpprl.extend_from_slice(&360i16.to_le_bytes());
+        grpprl.extend_from_slice(&SPRM_P_DYA_LINE.to_le_bytes());
+        grpprl.extend_from_slice(&(-360i16).to_le_bytes());
+        grpprl.extend_from_slice(&0u16.to_le_bytes());
+        grpprl.extend_from_slice(&SPRM_P_DYA_BEFORE.to_le_bytes());
+        grpprl.extend_from_slice(&120u16.to_le_bytes());
+        grpprl.extend_from_slice(&SPRM_P_DYA_AFTER.to_le_bytes());
+        grpprl.extend_from_slice(&240u16.to_le_bytes());
+
+        // Add a dotted right tab and a bar tab whose ignored leader bits are reserved.
+        grpprl.extend_from_slice(&SPRM_P_CHG_TABS_PAPX.to_le_bytes());
+        grpprl.extend_from_slice(&[8, 0, 2]);
+        grpprl.extend_from_slice(&100i16.to_le_bytes());
+        grpprl.extend_from_slice(&200i16.to_le_bytes());
+        grpprl.extend_from_slice(&[0x0A, 0x34]);
+        // Delete within 25 twips of 100 and add a list tab with the default leader.
+        grpprl.extend_from_slice(&SPRM_P_CHG_TABS_PAPX.to_le_bytes());
+        grpprl.extend_from_slice(&[7, 1]);
+        grpprl.extend_from_slice(&110i16.to_le_bytes());
+        grpprl.push(1);
+        grpprl.extend_from_slice(&300i16.to_le_bytes());
+        grpprl.push(0x3E);
+
+        let properties = ParagraphProperties::from_sprm(&grpprl).unwrap();
+        assert_eq!(properties.list_level, Some(8));
+        assert_eq!(properties.list_format_override, Some(1));
+        assert!(properties.no_line_numbering);
+        assert_eq!(properties.indent_right, Some(-720));
+        assert_eq!(properties.indent_left, Some(1_200));
+        assert_eq!(properties.indent_first_line, Some(360));
+        assert_eq!(properties.line_spacing, Some(-360));
+        assert_eq!(properties.line_spacing_type, LineSpacingType::Exactly);
+        assert_eq!(properties.space_before, Some(120));
+        assert_eq!(properties.space_after, Some(240));
+        assert_eq!(
+            properties.tab_stops,
+            vec![
+                TabStop {
+                    position: 200,
+                    alignment: TabAlignment::Bar,
+                    leader: TabLeader::None,
+                },
+                TabStop {
+                    position: 300,
+                    alignment: TabAlignment::List,
+                    leader: TabLeader::DefaultLeader,
+                },
+            ]
+        );
+
+        // Fast-save deletion operands carry a parallel close-distance array.
+        let mut fast_save = SPRM_P_CHG_TABS.to_le_bytes().to_vec();
+        fast_save.extend_from_slice(&[6, 1]);
+        fast_save.extend_from_slice(&300i16.to_le_bytes());
+        fast_save.extend_from_slice(&26i16.to_le_bytes());
+        fast_save.push(0);
+        let mut properties = properties;
+        for sprm in parse_sprms(&fast_save) {
+            ParagraphProperties::apply_sprm(&mut properties, &sprm).unwrap();
+        }
+        assert_eq!(properties.tab_stops.len(), 1);
+        assert_eq!(properties.tab_stops[0].position, 200);
+    }
+
+    #[test]
+    fn rejects_invalid_list_indent_spacing_and_tab_operands() {
+        let fixed = |opcode: u16, operand: &[u8]| {
+            let mut grpprl = opcode.to_le_bytes().to_vec();
+            grpprl.extend_from_slice(operand);
+            grpprl
+        };
+        let variable = |opcode: u16, operand: &[u8]| {
+            let mut grpprl = opcode.to_le_bytes().to_vec();
+            grpprl.push(operand.len() as u8);
+            grpprl.extend_from_slice(operand);
+            grpprl
+        };
+        for grpprl in [
+            fixed(SPRM_P_ILVL, &[9]),
+            fixed(SPRM_P_ILFO, &0x07FFu16.to_le_bytes()),
+            fixed(SPRM_P_F_NO_LINE_NUMB, &[2]),
+            fixed(SPRM_P_DXA_LEFT, &31_681i16.to_le_bytes()),
+            fixed(SPRM_P_DYA_LINE, &[0xC1, 0x7B, 0, 0]),
+            fixed(SPRM_P_DYA_LINE, &[240, 0, 2, 0]),
+            fixed(SPRM_P_DYA_BEFORE, &31_681u16.to_le_bytes()),
+            variable(SPRM_P_CHG_TABS_PAPX, &[0, 1, 100, 0, 5]),
+            variable(SPRM_P_CHG_TABS_PAPX, &[0, 1, 100, 0, 0x30]),
+            variable(SPRM_P_CHG_TABS_PAPX, &[0, 2, 200, 0, 100, 0, 0, 0]),
+            variable(SPRM_P_CHG_TABS, &[1, 100, 0, 0, 0x80, 0]),
+        ] {
+            assert!(ParagraphProperties::from_sprm(&grpprl).is_err());
+        }
     }
 
     #[test]

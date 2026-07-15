@@ -84,7 +84,8 @@ use crate::doc::parts::pap::{
     Border as ParagraphBorder, BorderStyle as ParagraphBorderStyle, Borders as ParagraphBorders,
     DropCap, FontAlignment, FrameAnchor, FrameHeight, FrameHorizontalAnchor,
     FrameHorizontalPosition, FrameTextFlow, FrameTextWrap, FrameVerticalAnchor,
-    FrameVerticalPosition, Shading as ParagraphShading, TextBoxTightWrap,
+    FrameVerticalPosition, Shading as ParagraphShading, TabAlignment, TabLeader, TabStop,
+    TextBoxTightWrap,
 };
 use crate::sprm_operations::*;
 use litchi_cfb::writer::OleWriter;
@@ -272,45 +273,35 @@ impl LineSpacing {
 
     /// Create proportional line spacing expressed in 240ths of one line.
     pub fn multiple_240ths(value: u16) -> Result<Self, DocWriteError> {
-        let dya_line = i16::try_from(value).map_err(|_| {
-            DocWriteError::InvalidData(format!(
-                "line-spacing multiple {value} exceeds the signed LSPD range"
-            ))
-        })?;
-        if dya_line == 0 {
-            return Err(DocWriteError::InvalidData(
-                "line-spacing multiple must be greater than zero".into(),
-            ));
+        if !(1..=31_680).contains(&value) {
+            return Err(DocWriteError::InvalidData(format!(
+                "line-spacing multiple {value} is outside the LSPD range 1..=31680"
+            )));
         }
         Ok(Self {
-            dya_line,
+            dya_line: value as i16,
             is_multiple: true,
         })
     }
 
     /// Create minimum line spacing in twips.
     pub fn at_least_twips(value: u16) -> Result<Self, DocWriteError> {
-        let dya_line = i16::try_from(value).map_err(|_| {
-            DocWriteError::InvalidData(format!(
-                "minimum line spacing {value} twips exceeds the signed LSPD range"
-            ))
-        })?;
-        if dya_line == 0 {
-            return Err(DocWriteError::InvalidData(
-                "minimum line spacing must be greater than zero".into(),
-            ));
+        if !(1..=31_680).contains(&value) {
+            return Err(DocWriteError::InvalidData(format!(
+                "minimum line spacing {value} twips is outside the LSPD range 1..=31680"
+            )));
         }
         Ok(Self {
-            dya_line,
+            dya_line: value as i16,
             is_multiple: false,
         })
     }
 
     /// Create exact line spacing in twips.
     pub fn exact_twips(value: u16) -> Result<Self, DocWriteError> {
-        if value == 0 || value > 32_768 {
+        if !(1..=31_680).contains(&value) {
             return Err(DocWriteError::InvalidData(format!(
-                "exact line spacing {value} twips is outside the LSPD range 1..=32768"
+                "exact line spacing {value} twips is outside the LSPD range 1..=31680"
             )));
         }
         Ok(Self {
@@ -347,6 +338,8 @@ pub struct ParagraphFormatting {
     pub space_before: Option<u16>,
     /// Space after paragraph (in twips)
     pub space_after: Option<u16>,
+    /// Exclude this paragraph from line numbering
+    pub no_line_numbering: Option<bool>,
     /// Space before paragraph in hundredths of a line (`-20..=31680`)
     pub space_before_lines: Option<i16>,
     /// Space after paragraph in hundredths of a line (`-20..=31680`)
@@ -429,9 +422,13 @@ pub struct ParagraphFormatting {
     pub shading: Option<ParagraphShading>,
     /// Line spacing descriptor
     pub line_spacing: Option<LineSpacing>,
-    /// List level index (0-based, used with `ilfo` to associate paragraph with a list)
+    /// Existing tab-stop positions to delete, in twips
+    pub tab_stops_to_delete: Vec<i32>,
+    /// Tab stops to add or replace
+    pub tab_stops_to_add: Vec<TabStop>,
+    /// List level index (0 through 8), or 12 to skip this paragraph in list numbering
     pub ilvl: Option<u8>,
-    /// List format override index (1-based index into PlfLfo; 0 = no list)
+    /// Raw list override encoding (positive values are 1-based; negative encodings preserve indents)
     pub ilfo: Option<u16>,
     /// Mark the paragraph formatting as a tracked change.
     pub formatting_revision: Option<FormattingRevision>,
@@ -3458,6 +3455,9 @@ fn build_papx_grpprl(fmt: &ParagraphFormatting) -> Vec<u8> {
     if let Some(dya_after) = fmt.space_after {
         push_u16(&mut grp, SPRM_P_DYA_AFTER, dya_after);
     }
+    if let Some(disabled) = fmt.no_line_numbering {
+        push_bool(&mut grp, SPRM_P_F_NO_LINE_NUMB, disabled);
+    }
     if let Some(dyl_before) = fmt.space_before_lines {
         push_i16(&mut grp, SPRM_P_DYL_BEFORE, dyl_before);
     }
@@ -3665,8 +3665,59 @@ fn build_papx_grpprl(fmt: &ParagraphFormatting) -> Vec<u8> {
         grp.extend_from_slice(&SPRM_P_DYA_LINE.to_le_bytes());
         grp.extend_from_slice(&bytes);
     }
+    append_tab_changes(&mut grp, &fmt.tab_stops_to_delete, &fmt.tab_stops_to_add);
 
     grp
+}
+
+fn append_tab_changes(output: &mut Vec<u8>, deletes: &[i32], additions: &[TabStop]) {
+    let mut deletes = deletes.to_vec();
+    deletes.sort_unstable();
+    for chunk in deletes.chunks(64) {
+        output.extend_from_slice(&SPRM_P_CHG_TABS_PAPX.to_le_bytes());
+        output.push((2 + chunk.len() * 2) as u8);
+        output.push(chunk.len() as u8);
+        for position in chunk {
+            output.extend_from_slice(&(*position as i16).to_le_bytes());
+        }
+        output.push(0);
+    }
+
+    let mut additions = additions.to_vec();
+    additions.sort_unstable_by_key(|tab| tab.position);
+    for chunk in additions.chunks(64) {
+        output.extend_from_slice(&SPRM_P_CHG_TABS_PAPX.to_le_bytes());
+        output.push((2 + chunk.len() * 3) as u8);
+        output.push(0);
+        output.push(chunk.len() as u8);
+        for tab in chunk {
+            output.extend_from_slice(&(tab.position as i16).to_le_bytes());
+        }
+        for tab in chunk {
+            let alignment = match tab.alignment {
+                TabAlignment::Left => 0,
+                TabAlignment::Center => 1,
+                TabAlignment::Right => 2,
+                TabAlignment::Decimal => 3,
+                TabAlignment::Bar => 4,
+                TabAlignment::List => 6,
+            };
+            let leader = if tab.alignment == TabAlignment::Bar {
+                0
+            } else {
+                match tab.leader {
+                    TabLeader::None => 0,
+                    TabLeader::Dots => 1,
+                    TabLeader::Hyphens => 2,
+                    TabLeader::Underline => 3,
+                    TabLeader::Heavy => 4,
+                    TabLeader::MiddleDot => 5,
+                    TabLeader::DefaultLeader => 7,
+                }
+            };
+            output.push(alignment | (leader << 3));
+        }
+    }
 }
 
 fn append_paragraph_border(output: &mut Vec<u8>, opcode: u16, border: ParagraphBorder) {
@@ -3726,6 +3777,79 @@ fn build_revision_papx_grpprl(
         return Err(DocWriteError::InvalidData(format!(
             "DOC paragraph outline level {outline_level} is outside 0..=9"
         )));
+    }
+    if let Some(level) = fmt.ilvl
+        && level > 8
+        && level != 0x0C
+    {
+        return Err(DocWriteError::InvalidData(format!(
+            "DOC paragraph list level {level} is neither 0..=8 nor the skip value 12"
+        )));
+    }
+    if let Some(ilfo) = fmt.ilfo
+        && (0x07FF..=0xF800).contains(&ilfo)
+    {
+        return Err(DocWriteError::InvalidData(format!(
+            "DOC paragraph list override {ilfo:#06x} is reserved"
+        )));
+    }
+    for (name, value) in [
+        ("left_indent", fmt.left_indent),
+        ("right_indent", fmt.right_indent),
+        ("first_line_indent", fmt.first_line_indent),
+    ] {
+        if let Some(value) = value
+            && !(-31_680..=31_680).contains(&value)
+        {
+            return Err(DocWriteError::InvalidData(format!(
+                "DOC paragraph {name} value {value} is outside -31680..=31680"
+            )));
+        }
+    }
+    for (name, value) in [
+        ("space_before", fmt.space_before),
+        ("space_after", fmt.space_after),
+    ] {
+        if let Some(value) = value
+            && value > 31_680
+        {
+            return Err(DocWriteError::InvalidData(format!(
+                "DOC paragraph {name} value {value} exceeds 31680"
+            )));
+        }
+    }
+    if let Some(spacing) = fmt.line_spacing
+        && !(-31_680..=31_680).contains(&spacing.dya_line)
+    {
+        return Err(DocWriteError::InvalidData(format!(
+            "DOC paragraph line spacing {} is outside the LSPD range",
+            spacing.dya_line
+        )));
+    }
+    let added_tab_positions = fmt
+        .tab_stops_to_add
+        .iter()
+        .map(|tab| tab.position)
+        .collect::<Vec<_>>();
+    for (kind, positions) in [
+        ("deleted", fmt.tab_stops_to_delete.as_slice()),
+        ("added", added_tab_positions.as_slice()),
+    ] {
+        let mut sorted = positions.to_vec();
+        sorted.sort_unstable();
+        if sorted
+            .iter()
+            .any(|position| !(-31_680..=31_680).contains(position))
+        {
+            return Err(DocWriteError::InvalidData(format!(
+                "DOC {kind} tab position is outside -31680..=31680"
+            )));
+        }
+        if sorted.windows(2).any(|pair| pair[0] == pair[1]) {
+            return Err(DocWriteError::InvalidData(format!(
+                "DOC {kind} tab positions contain a duplicate"
+            )));
+        }
     }
     if let Some(flow) = fmt.frame_text_flow
         && flow.backwards
@@ -4504,13 +4628,12 @@ mod tests {
             assert_eq!(build_papx_grpprl(&formatting), expected);
         }
 
-        assert_eq!(LineSpacing::exact_twips(32_768).unwrap().dya_line, i16::MIN);
         assert!(LineSpacing::multiple_240ths(0).is_err());
-        assert!(LineSpacing::multiple_240ths(32_768).is_err());
+        assert!(LineSpacing::multiple_240ths(31_681).is_err());
         assert!(LineSpacing::at_least_twips(0).is_err());
-        assert!(LineSpacing::at_least_twips(32_768).is_err());
+        assert!(LineSpacing::at_least_twips(31_681).is_err());
         assert!(LineSpacing::exact_twips(0).is_err());
-        assert!(LineSpacing::exact_twips(32_769).is_err());
+        assert!(LineSpacing::exact_twips(31_681).is_err());
     }
 
     #[test]
@@ -4525,6 +4648,8 @@ mod tests {
                     right_indent_chars: Some(-125),
                     first_line_indent_chars: Some(-50),
                     space_before: Some(120),
+                    space_after: Some(240),
+                    no_line_numbering: Some(true),
                     space_before_lines: Some(-20),
                     space_after_lines: Some(31_680),
                     space_before_auto: Some(true),
@@ -4595,6 +4720,21 @@ mod tests {
                         pattern: crate::doc::parts::tap::ShadingPattern::DiagonalCross,
                     }),
                     line_spacing: Some(LineSpacing::exact_twips(360).unwrap()),
+                    tab_stops_to_delete: vec![720],
+                    tab_stops_to_add: vec![
+                        TabStop {
+                            position: 1_440,
+                            alignment: TabAlignment::List,
+                            leader: TabLeader::DefaultLeader,
+                        },
+                        TabStop {
+                            position: 720,
+                            alignment: TabAlignment::Decimal,
+                            leader: TabLeader::Dots,
+                        },
+                    ],
+                    ilvl: Some(8),
+                    ilfo: Some(1),
                     ..ParagraphFormatting::default()
                 },
             )
@@ -4632,6 +4772,25 @@ mod tests {
             crate::doc::parts::pap::Justification::Center
         );
         assert_eq!(paragraphs[0].properties().space_before, Some(120));
+        assert_eq!(paragraphs[0].properties().space_after, Some(240));
+        assert!(paragraphs[0].properties().no_line_numbering);
+        assert_eq!(paragraphs[0].properties().list_level, Some(8));
+        assert_eq!(paragraphs[0].properties().list_format_override, Some(1));
+        assert_eq!(
+            paragraphs[0].properties().tab_stops,
+            vec![
+                TabStop {
+                    position: 720,
+                    alignment: TabAlignment::Decimal,
+                    leader: TabLeader::Dots,
+                },
+                TabStop {
+                    position: 1_440,
+                    alignment: TabAlignment::List,
+                    leader: TabLeader::DefaultLeader,
+                },
+            ]
+        );
         assert_eq!(paragraphs[0].properties().indent_left_chars, Some(250));
         assert_eq!(paragraphs[0].properties().indent_right_chars, Some(-125));
         assert_eq!(
@@ -4769,6 +4928,41 @@ mod tests {
             },
             ParagraphFormatting {
                 outline_level: Some(10),
+                ..ParagraphFormatting::default()
+            },
+            ParagraphFormatting {
+                ilvl: Some(9),
+                ..ParagraphFormatting::default()
+            },
+            ParagraphFormatting {
+                ilfo: Some(0x07FF),
+                ..ParagraphFormatting::default()
+            },
+            ParagraphFormatting {
+                left_indent: Some(31_681),
+                ..ParagraphFormatting::default()
+            },
+            ParagraphFormatting {
+                space_after: Some(31_681),
+                ..ParagraphFormatting::default()
+            },
+            ParagraphFormatting {
+                line_spacing: Some(LineSpacing {
+                    dya_line: i16::MIN,
+                    is_multiple: false,
+                }),
+                ..ParagraphFormatting::default()
+            },
+            ParagraphFormatting {
+                tab_stops_to_add: vec![TabStop {
+                    position: 31_681,
+                    alignment: TabAlignment::Left,
+                    leader: TabLeader::None,
+                }],
+                ..ParagraphFormatting::default()
+            },
+            ParagraphFormatting {
+                tab_stops_to_delete: vec![720, 720],
                 ..ParagraphFormatting::default()
             },
             ParagraphFormatting {

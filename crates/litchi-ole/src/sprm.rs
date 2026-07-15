@@ -155,7 +155,31 @@ fn parse_sprms_two_byte(grpprl: &[u8]) -> Vec<Sprm> {
             6 => {
                 // Variable operands have a length prefix that is not part of
                 // the operand exposed to property decoders.
-                if opcode == 0xc615 || opcode == 0xd608 {
+                if opcode == 0xc615 {
+                    if offset >= grpprl.len() {
+                        break;
+                    }
+                    let encoded_size = grpprl[offset] as usize;
+                    if encoded_size == 0 {
+                        break;
+                    }
+                    let size = if encoded_size == 255 {
+                        if offset + 2 > grpprl.len() {
+                            break;
+                        }
+                        let delete_count = grpprl[offset + 1] as usize;
+                        let add_count_offset = offset + 2 + 4 * delete_count;
+                        if add_count_offset >= grpprl.len() {
+                            break;
+                        }
+                        let add_count = grpprl[add_count_offset] as usize;
+                        2 + 4 * delete_count + 3 * add_count
+                    } else {
+                        encoded_size
+                    };
+                    offset += 1;
+                    size
+                } else if opcode == 0xd608 {
                     if offset + 2 > grpprl.len() {
                         break;
                     }
@@ -301,6 +325,27 @@ mod tests {
         assert_eq!(sprms[0].operand.as_slice(), &[0x02, 0x10, 0x20]);
         assert_eq!(sprms[0].size, 7);
         assert_eq!(sprms[1].offset, 7);
+    }
+
+    #[test]
+    fn tab_change_sprm_handles_byte_and_extended_lengths() {
+        let normal = [0x15, 0xC6, 2, 0, 0, 0x35, 0x08, 1];
+        let sprms = parse_sprms(&normal);
+        assert_eq!(sprms.len(), 2);
+        assert_eq!(sprms[0].operand.as_slice(), &[0, 0]);
+        assert_eq!(sprms[1].opcode, 0x0835);
+
+        let extended = [
+            0x15, 0xC6, 255, // special computed length
+            1, 100, 0, 25, 0, // one delete center and close distance
+            1, 200, 0, 0, // one added left tab
+            0x35, 0x08, 1,
+        ];
+        let sprms = parse_sprms(&extended);
+        assert_eq!(sprms.len(), 2);
+        assert_eq!(sprms[0].operand.as_slice(), &extended[3..12]);
+        assert_eq!(sprms[1].opcode, 0x0835);
+        assert_eq!(sprms[1].offset, 12);
     }
 
     #[test]
