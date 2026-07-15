@@ -63,9 +63,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 continue;
             };
             println!(
-                "model={model_id} table_id={:?} name={:?} rows={} cols={} tile_size={:?} string_table={} formula_table={} formula_error_table={:?} rich_text_table={:?} row_buckets={:?} column_headers={} next_strips=({}, {}) uid_map={:?} stroke_sidecar={:?}",
+                "model={model_id} table_id={:?} name={:?} title=(visible={:?}, height={:?}, outlined={:?}) rows={} cols={} tile_size={:?} string_table={} formula_table={} formula_error_table={:?} rich_text_table={:?} row_buckets={:?} column_headers={} next_strips=({}, {}) uid_map={:?} stroke_sidecar={:?}",
                 model.table_id,
                 model.table_name,
+                model.table_name_enabled,
+                model.table_name_height,
+                model.table_name_border_enabled,
                 model.number_of_rows,
                 model.number_of_columns,
                 model.base_data_store.tiles.tile_size,

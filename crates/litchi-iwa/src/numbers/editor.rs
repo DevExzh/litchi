@@ -1796,6 +1796,7 @@ mod table_dimension;
 mod table_duplicate;
 mod table_headers;
 mod table_move;
+mod table_title;
 mod table_topology;
 mod text_box_duplicate;
 
@@ -1804,5 +1805,6 @@ use storage::*;
 pub use table_dimension::{NumbersTableDimension, NumbersTableDimensionSize, NumbersTablePoints};
 use table_duplicate::*;
 pub use table_headers::{NumbersTableHeaderCount, NumbersTableHeaderSettings};
+pub use table_title::NumbersTableTitleSettings;
 #[cfg(test)]
 mod tests;

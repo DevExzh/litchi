@@ -44,6 +44,7 @@ println!("{}", structured.summary());
   automatic hyphenation, and ligature options
 - Typed Numbers table header/footer counts, freeze state, and repeating-header
   settings with lossless optional-field presence
+- Lossless Numbers table-title visibility and title-outline settings
 - Typed Keynote theme-layout discovery and fresh empty-slide creation with native
   component registration, speaker notes, slide numbers, and transactional insertion
 - Wire-preserving Keynote per-slide number visibility with native placeholder
@@ -68,6 +69,7 @@ println!("{}", structured.summary());
 use litchi_iwa::numbers::{
     CellValue, FormulaAxisReference, FormulaCellReference, FormulaExpression, NumbersEditor,
     NumbersTableHeaderCount,
+    NumbersTableTitleSettings,
 };
 use litchi_iwa::pages::{PagesDocumentOptions, PagesEditor};
 use litchi_iwa::keynote::{
@@ -83,6 +85,13 @@ headers.header_rows = Some(NumbersTableHeaderCount::TWO);
 headers.footer_rows = Some(NumbersTableHeaderCount::ONE);
 headers.header_rows_frozen = Some(true);
 numbers.set_table_header_settings(table.object_id, headers)?;
+numbers.set_table_title_settings(
+    table.object_id,
+    NumbersTableTitleSettings {
+        visible: Some(true),
+        outlined: Some(false),
+    },
+)?;
 numbers.set_cell(table.object_id, 1, 2, CellValue::Number(42.0))?;
 // Existing rich-text cells use the same call. Their TSWP formatting storage is
 // retained, and shared payloads are isolated with copy-on-write.

@@ -3412,6 +3412,195 @@ fn table_header_settings_reject_malformed_wire_transactionally() {
 }
 
 #[test]
+fn table_title_settings_are_lossless_transactional_and_wire_exact() {
+    let mut package = test_package();
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            let object = archive.object_mut(10).unwrap();
+            let message = object.messages[0].clone();
+            let mut data = message.data;
+            append_unknown_varint(&mut data, 99, 990);
+            object.replace_message(
+                0,
+                RawMessage {
+                    type_: message.type_,
+                    data,
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    let mut editor = NumbersEditor::from_package(package).unwrap();
+    let baseline = editor.to_bytes().unwrap();
+    let defaults = NumbersTableTitleSettings::default();
+    assert_eq!(editor.table_title_settings(10).unwrap(), defaults);
+    assert!(!defaults.is_visible());
+    assert!(!defaults.is_outlined());
+
+    let settings = NumbersTableTitleSettings {
+        visible: Some(true),
+        outlined: Some(false),
+    };
+    editor.set_table_title_settings(10, settings).unwrap();
+    assert_eq!(editor.table_title_settings(10).unwrap(), settings);
+    assert!(settings.is_visible());
+    assert!(!settings.is_outlined());
+    let changed = editor.to_bytes().unwrap();
+    let reparsed = NumbersEditor::from_bytes(&changed).unwrap();
+    assert_eq!(reparsed.table_title_settings(10).unwrap(), settings);
+    let document = reparsed.package().archive("Index/Document.iwa").unwrap();
+    let data = &document.object(10).unwrap().messages[0].data;
+    let mut unknown = Vec::new();
+    append_unknown_varint(&mut unknown, 99, 990);
+    assert!(data.windows(unknown.len()).any(|window| window == unknown));
+
+    editor.set_table_title_settings(10, settings).unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), changed);
+    editor.set_table_title_settings(10, defaults).unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+    assert!(editor.table_title_settings(u64::MAX).is_err());
+}
+
+#[test]
+fn table_title_settings_restore_native_presence_exactly() {
+    let mut package = test_package();
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            let object = archive.object_mut(10).unwrap();
+            let message = object.messages[0].clone();
+            let mut model = TableModelArchive::decode(message.data.as_slice())?;
+            model.table_name_enabled = Some(true);
+            model.table_name_height = Some(28.0);
+            model.table_name_border_enabled = Some(true);
+            object.replace_message(
+                0,
+                RawMessage {
+                    type_: message.type_,
+                    data: model.encode_to_vec(),
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    let mut editor = NumbersEditor::from_package(package).unwrap();
+    let baseline = editor.to_bytes().unwrap();
+    let native = NumbersTableTitleSettings {
+        visible: Some(true),
+        outlined: Some(true),
+    };
+    assert_eq!(editor.table_title_settings(10).unwrap(), native);
+
+    editor
+        .set_table_title_settings(
+            10,
+            NumbersTableTitleSettings {
+                visible: Some(false),
+                outlined: Some(false),
+            },
+        )
+        .unwrap();
+    let changed_model = TableModelArchive::decode(
+        editor
+            .package()
+            .archive("Index/Document.iwa")
+            .unwrap()
+            .object(10)
+            .unwrap()
+            .messages[0]
+            .data
+            .as_slice(),
+    )
+    .unwrap();
+    assert_eq!(changed_model.table_name_height, Some(28.0));
+    editor.set_table_title_settings(10, native).unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+}
+
+#[test]
+fn table_title_settings_reject_malformed_wire_transactionally() {
+    for malformed in [
+        vec![(22, 1), (22, 0)],
+        vec![(37, 2)],
+        vec![(37, 0), (37, 1)],
+    ] {
+        let mut package = test_package();
+        package
+            .update_archive("Index/Document.iwa", |archive| {
+                let object = archive.object_mut(10).unwrap();
+                let message = object.messages[0].clone();
+                let mut data = message.data;
+                for (field, value) in &malformed {
+                    append_unknown_varint(&mut data, *field, *value);
+                }
+                object.replace_message(
+                    0,
+                    RawMessage {
+                        type_: message.type_,
+                        data,
+                    },
+                )?;
+                Ok(())
+            })
+            .unwrap();
+        let mut editor = NumbersEditor::from_package(package).unwrap();
+        let before = editor.to_bytes().unwrap();
+        assert!(editor.table_title_settings(10).is_err());
+        assert!(
+            editor
+                .set_table_title_settings(10, NumbersTableTitleSettings::default())
+                .is_err()
+        );
+        assert_eq!(editor.to_bytes().unwrap(), before);
+    }
+
+    let mut wrong_wire = test_package();
+    wrong_wire
+        .update_archive("Index/Document.iwa", |archive| {
+            let object = archive.object_mut(10).unwrap();
+            let message = object.messages[0].clone();
+            let mut data = message.data;
+            data.extend(crate::varint::encode_varint((u64::from(22_u32) << 3) | 2));
+            data.push(0);
+            object.replace_message(
+                0,
+                RawMessage {
+                    type_: message.type_,
+                    data,
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    let mut editor = NumbersEditor::from_package(wrong_wire).unwrap();
+    let before = editor.to_bytes().unwrap();
+    assert!(editor.table_title_settings(10).is_err());
+    assert!(
+        editor
+            .set_table_title_settings(10, NumbersTableTitleSettings::default())
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), before);
+
+    let mut duplicate_payload = test_package();
+    duplicate_payload
+        .update_archive("Index/Document.iwa", |archive| {
+            let object = archive.object_mut(10).unwrap();
+            object.push_message(object.messages[0].clone())?;
+            Ok(())
+        })
+        .unwrap();
+    let mut editor = NumbersEditor::from_package(duplicate_payload).unwrap();
+    let before = editor.to_bytes().unwrap();
+    assert!(editor.table_title_settings(10).is_err());
+    assert!(
+        editor
+            .set_table_title_settings(10, NumbersTableTitleSettings::default())
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
 fn table_dimension_sizes_are_typed_transactional_and_wire_exact() {
     assert!(NumbersTablePoints::new(0.0).is_err());
     assert!(NumbersTablePoints::new(-1.0).is_err());
