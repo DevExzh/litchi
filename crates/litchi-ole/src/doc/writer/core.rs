@@ -78,7 +78,7 @@ use super::font_table::FontTableBuilder;
 use super::footnotes::FootnoteEntry;
 use super::numbering::{ListFormatOverride, ListStructure, NumberingWriter};
 use super::piece_table::{Piece, PieceTableBuilder};
-use super::revisions::{FormattingRevision, TextRevision};
+use super::revisions::{FormattingRevision, NumberingRevision, TextRevision};
 use crate::doc::CommentDateTime;
 use crate::sprm_operations::*;
 use litchi_cfb::writer::OleWriter;
@@ -361,6 +361,10 @@ pub struct ParagraphFormatting {
     pub ilfo: Option<u16>,
     /// Mark the paragraph formatting as a tracked change.
     pub formatting_revision: Option<FormattingRevision>,
+    /// Whether a numbered list was applied after the previous revision.
+    pub numbering_revision_list_applied: Option<bool>,
+    /// Retained numbering state for a tracked numbering change.
+    pub numbering_revision: Option<NumberingRevision>,
 }
 
 /// Represents a text run with formatting
@@ -1257,6 +1261,9 @@ impl DocWriter {
         };
         for paragraph in paragraphs {
             if let Some(revision) = &paragraph.formatting.formatting_revision {
+                index_author(&revision.author)?;
+            }
+            if let Some(revision) = &paragraph.formatting.numbering_revision {
                 index_author(&revision.author)?;
             }
             for run in &paragraph.runs {
@@ -2893,6 +2900,9 @@ fn build_papx_grpprl(fmt: &ParagraphFormatting) -> Vec<u8> {
     if let Some(mi) = fmt.mirror_indents {
         push_bool(&mut grp, SPRM_P_F_MIRROR_INDENTS, mi);
     }
+    if let Some(applied) = fmt.numbering_revision_list_applied {
+        push_bool(&mut grp, SPRM_P_F_NUM_RM_INS, applied);
+    }
 
     // List numbering: ilvl (list level) and ilfo (list format override)
     if let Some(ilvl) = fmt.ilvl {
@@ -2920,20 +2930,56 @@ fn build_revision_papx_grpprl(
     revisions: Option<&RevisionWriterData>,
 ) -> Result<Vec<u8>, DocWriteError> {
     let mut grp = build_papx_grpprl(fmt);
-    let Some(revision) = &fmt.formatting_revision else {
-        return Ok(grp);
-    };
-    let revisions = revisions.ok_or_else(|| {
-        DocWriteError::InvalidData("DOC paragraph revision author was not indexed".to_string())
-    })?;
-    let author_index = revisions.indexes.get(&revision.author).ok_or_else(|| {
-        DocWriteError::InvalidData("DOC paragraph revision author was not indexed".to_string())
-    })?;
-    grp.extend_from_slice(&SPRM_P_PROP_RMARK_CURRENT.to_le_bytes());
-    grp.push(7);
-    grp.push(1);
-    grp.extend_from_slice(&author_index.to_le_bytes());
-    grp.extend_from_slice(&pack_dttm(revision.timestamp)?.to_le_bytes());
+    if let Some(revision) = &fmt.formatting_revision {
+        let revisions = revisions.ok_or_else(|| {
+            DocWriteError::InvalidData("DOC paragraph revision author was not indexed".to_string())
+        })?;
+        let author_index = revisions.indexes.get(&revision.author).ok_or_else(|| {
+            DocWriteError::InvalidData("DOC paragraph revision author was not indexed".to_string())
+        })?;
+        grp.extend_from_slice(&SPRM_P_PROP_RMARK_CURRENT.to_le_bytes());
+        grp.push(7);
+        grp.push(1);
+        grp.extend_from_slice(&author_index.to_le_bytes());
+        grp.extend_from_slice(&pack_dttm(revision.timestamp)?.to_le_bytes());
+    }
+    if let Some(revision) = &fmt.numbering_revision {
+        let revisions = revisions.ok_or_else(|| {
+            DocWriteError::InvalidData("DOC numbering revision author was not indexed".to_string())
+        })?;
+        let author_index = revisions.indexes.get(&revision.author).ok_or_else(|| {
+            DocWriteError::InvalidData("DOC numbering revision author was not indexed".to_string())
+        })?;
+        let units = revision.format_string.encode_utf16().collect::<Vec<_>>();
+        if units.len() > 31
+            || revision
+                .placeholder_positions
+                .iter()
+                .any(|position| usize::from(*position) > units.len())
+        {
+            return Err(DocWriteError::InvalidData(
+                "DOC numbering revision format or placeholder exceeds NumRM limits".to_string(),
+            ));
+        }
+        let mut numrm = [0u8; 128];
+        numrm[0] = u8::from(revision.was_numbered);
+        numrm[2..4].copy_from_slice(&author_index.to_le_bytes());
+        numrm[4..8].copy_from_slice(&pack_dttm(revision.timestamp)?.to_le_bytes());
+        numrm[8..17].copy_from_slice(&revision.placeholder_positions);
+        numrm[17..26].copy_from_slice(&revision.number_formats);
+        for (index, number) in revision.numbers.iter().enumerate() {
+            let offset = 28 + index * 4;
+            numrm[offset..offset + 4].copy_from_slice(&number.to_le_bytes());
+        }
+        numrm[64..66].copy_from_slice(&(units.len() as u16).to_le_bytes());
+        for (index, unit) in units.into_iter().enumerate() {
+            let offset = 66 + index * 2;
+            numrm[offset..offset + 2].copy_from_slice(&unit.to_le_bytes());
+        }
+        grp.extend_from_slice(&SPRM_P_NUM_RM.to_le_bytes());
+        grp.push(128);
+        grp.extend_from_slice(&numrm);
+    }
     Ok(grp)
 }
 
@@ -3631,6 +3677,13 @@ mod tests {
                     formatting_revision: Some(
                         FormattingRevision::new("Paragraph Editor").with_timestamp(timestamp),
                     ),
+                    numbering_revision_list_applied: Some(true),
+                    numbering_revision: Some(NumberingRevision {
+                        was_numbered: true,
+                        placeholder_positions: [1, 0, 0, 0, 0, 0, 0, 0, 0],
+                        numbers: [12, 0, 0, 0, 0, 0, 0, 0, 0],
+                        ..NumberingRevision::new("Numbering Editor", "%.").with_timestamp(timestamp)
+                    }),
                     ..ParagraphFormatting::default()
                 },
             )
@@ -3643,12 +3696,27 @@ mod tests {
         let document = package.document().unwrap();
         assert_eq!(
             document.revision_authors(),
-            ["Unknown", "Paragraph Editor", "Alice 😀", "Bob", "张三"]
+            [
+                "Unknown",
+                "Paragraph Editor",
+                "Numbering Editor",
+                "Alice 😀",
+                "Bob",
+                "张三"
+            ]
         );
         let paragraphs = document.paragraphs().unwrap();
         let paragraph_revision = paragraphs[0].formatting_revision().unwrap();
         assert_eq!(paragraph_revision.author, "Paragraph Editor");
         assert_eq!(paragraph_revision.timestamp, Some(timestamp));
+        assert_eq!(paragraphs[0].numbering_revision_list_applied(), Some(true));
+        let numbering_revision = paragraphs[0].numbering_revision().unwrap();
+        assert_eq!(numbering_revision.author, "Numbering Editor");
+        assert_eq!(numbering_revision.timestamp, Some(timestamp));
+        assert!(numbering_revision.was_numbered);
+        assert_eq!(numbering_revision.placeholder_positions[0], 1);
+        assert_eq!(numbering_revision.numbers[0], 12);
+        assert_eq!(numbering_revision.format_string, "%.");
         let runs = paragraphs[0].runs().unwrap();
         let insertion = runs
             .iter()
@@ -3683,11 +3751,23 @@ mod tests {
         let document = package.document().unwrap();
         assert_eq!(
             document.revision_authors(),
-            ["Unknown", "Paragraph Editor", "Alice 😀", "Bob", "张三"]
+            [
+                "Unknown",
+                "Paragraph Editor",
+                "Numbering Editor",
+                "Alice 😀",
+                "Bob",
+                "张三"
+            ]
         );
         assert!(
             document.paragraphs().unwrap()[0]
                 .formatting_revision()
+                .is_some()
+        );
+        assert!(
+            document.paragraphs().unwrap()[0]
+                .numbering_revision()
                 .is_some()
         );
         assert!(
@@ -3743,6 +3823,24 @@ mod tests {
             ..CharacterFormatting::default()
         };
         assert!(error_for(invalid_time).contains("timestamp"));
+
+        let mut writer = DocWriter::new();
+        writer
+            .add_paragraph_runs(
+                vec![("text".to_string(), CharacterFormatting::default())],
+                ParagraphFormatting {
+                    numbering_revision: Some(NumberingRevision::new("Alice", "x".repeat(32))),
+                    ..ParagraphFormatting::default()
+                },
+            )
+            .unwrap();
+        assert!(
+            writer
+                .write_to(&mut Cursor::new(Vec::new()))
+                .unwrap_err()
+                .to_string()
+                .contains("NumRM")
+        );
     }
 
     #[test]

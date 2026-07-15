@@ -76,12 +76,12 @@ pub use image::{Image, ImageError};
 pub use package::Package;
 pub use paragraph::{Paragraph, Run};
 pub use parts::numbering::{ListLevel, ListTables, NumberFormat};
-pub use revision::{RevisionKind, RevisionMark};
+pub use revision::{NumberingRevisionMark, RevisionKind, RevisionMark};
 pub use shapes::DocShape;
 pub use table::{Cell, Row, Table};
 pub use writer::{
     BookmarkEntry, CharacterFormatting, CommentEntry, DocWriteError, DocWriter, FormattingRevision,
-    LineSpacing, ParagraphFormatting, TextRevision,
+    LineSpacing, NumberingRevision, ParagraphFormatting, TextRevision,
 };
 
 /// Crate-native ordered document element returned by [`Document::elements`].

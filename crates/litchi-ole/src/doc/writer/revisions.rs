@@ -60,3 +60,43 @@ impl FormattingRevision {
         self
     }
 }
+
+/// Numbering state retained for a tracked paragraph numbering change.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NumberingRevision {
+    /// Revision author name.
+    pub author: String,
+    /// Revision timestamp.
+    pub timestamp: Option<CommentDateTime>,
+    /// Whether the paragraph was already numbered when tracking began.
+    pub was_numbered: bool,
+    /// Placeholder positions for the nine numbering levels.
+    pub placeholder_positions: [u8; 9],
+    /// MSONFC values for the nine numbering levels.
+    pub number_formats: [u8; 9],
+    /// Numeric values for the nine numbering levels.
+    pub numbers: [u32; 9],
+    /// Numbering format string.
+    pub format_string: String,
+}
+
+impl NumberingRevision {
+    /// Create numbering revision metadata for an author and format string.
+    pub fn new(author: impl Into<String>, format_string: impl Into<String>) -> Self {
+        Self {
+            author: author.into(),
+            timestamp: None,
+            was_numbered: false,
+            placeholder_positions: [0; 9],
+            number_formats: [0; 9],
+            numbers: [0; 9],
+            format_string: format_string.into(),
+        }
+    }
+
+    /// Set the revision timestamp.
+    pub fn with_timestamp(mut self, timestamp: CommentDateTime) -> Self {
+        self.timestamp = Some(timestamp);
+        self
+    }
+}

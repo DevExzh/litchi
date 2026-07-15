@@ -114,6 +114,29 @@ pub struct ParagraphProperties {
     pub formatting_revision_author_index: Option<u16>,
     /// Packed paragraph revision DTTM.
     pub formatting_revision_timestamp: Option<u32>,
+    /// Whether a numbered list was applied after the previous revision.
+    pub numbering_revision_list_applied: Option<bool>,
+    /// Numbering state retained by a numbering revision mark.
+    pub numbering_revision: Option<NumberingRevisionProperties>,
+}
+
+/// Parsed `NumRM` numbering revision state.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NumberingRevisionProperties {
+    /// Whether the paragraph was already numbered when tracking began.
+    pub was_numbered: bool,
+    /// Revision author index in `SttbfRMark`.
+    pub author_index: u16,
+    /// Packed revision DTTM.
+    pub timestamp: u32,
+    /// Placeholder positions for the nine numbering levels.
+    pub placeholder_positions: [u8; 9],
+    /// MSONFC values for the nine numbering levels.
+    pub number_formats: [u8; 9],
+    /// Numeric values for the nine numbering levels.
+    pub numbers: [u32; 9],
+    /// Numbering format string.
+    pub format_string: String,
 }
 
 /// Paragraph justification/alignment.
@@ -677,16 +700,17 @@ impl ParagraphProperties {
             },
             // Operation 0x43: sprmPFNumRMIns - Numbering revision insert
             0x43 => {
-                // Numbering revision - not commonly used
+                pap.numbering_revision_list_applied = Some(Self::strict_bool8(
+                    sprm,
+                    "sprmPFNumRMIns",
+                )?);
             },
             // Operation 0x44: sprmPCrLf - CR/LF
             0x44 => {
                 // Not commonly used
             },
             // Operation 0x45: sprmPNumRM - Numbering revision mark
-            0x45 => {
-                // Numbering revision mark - complex structure
-            },
+            0x45 => pap.numbering_revision = Some(Self::parse_numbering_revision(sprm)?),
             // Operation 0x47: sprmPFUsePgsuSettings - Use page setup settings
             0x47 => {
                 // Use page setup settings - not commonly used
@@ -796,6 +820,80 @@ impl ParagraphProperties {
             operand[3], operand[4], operand[5], operand[6],
         ]));
         Ok(())
+    }
+
+    fn strict_bool8(sprm: &Sprm, name: &str) -> Result<bool> {
+        match sprm.operand_byte() {
+            Some(0) => Ok(false),
+            Some(1) => Ok(true),
+            _ => Err(DocError::Corrupted(format!(
+                "{name} must contain a Boolean8 value"
+            ))),
+        }
+    }
+
+    fn parse_numbering_revision(sprm: &Sprm) -> Result<NumberingRevisionProperties> {
+        let operand = sprm.operand_bytes();
+        if operand.len() != 128 {
+            return Err(DocError::Corrupted(
+                "sprmPNumRM operand must contain exactly 128 bytes".to_string(),
+            ));
+        }
+        let was_numbered = match operand[0] {
+            0 => false,
+            1 => true,
+            _ => {
+                return Err(DocError::Corrupted(
+                    "NumRM.fNumRM must be a Boolean8 value".to_string(),
+                ));
+            },
+        };
+        let author = i16::from_le_bytes([operand[2], operand[3]]);
+        let author_index = u16::try_from(author)
+            .map_err(|_| DocError::Corrupted("NumRM author index is negative".to_string()))?;
+        let timestamp = u32::from_le_bytes([operand[4], operand[5], operand[6], operand[7]]);
+        let placeholder_positions: [u8; 9] = operand[8..17].try_into().expect("fixed NumRM slice");
+        let number_formats: [u8; 9] = operand[17..26].try_into().expect("fixed NumRM slice");
+        let numbers = std::array::from_fn(|index| {
+            let offset = 28 + index * 4;
+            u32::from_le_bytes(
+                operand[offset..offset + 4]
+                    .try_into()
+                    .expect("fixed NumRM integer"),
+            )
+        });
+        let string_length = usize::from(u16::from_le_bytes([operand[64], operand[65]]));
+        if string_length > 31 {
+            return Err(DocError::Corrupted(
+                "NumRM format string exceeds its 31-code-unit field".to_string(),
+            ));
+        }
+        let units = (0..string_length)
+            .map(|index| {
+                let offset = 66 + index * 2;
+                u16::from_le_bytes([operand[offset], operand[offset + 1]])
+            })
+            .collect::<Vec<_>>();
+        let format_string = String::from_utf16(&units).map_err(|_| {
+            DocError::Corrupted("NumRM format string is invalid UTF-16".to_string())
+        })?;
+        if placeholder_positions
+            .iter()
+            .any(|position| usize::from(*position) > string_length)
+        {
+            return Err(DocError::Corrupted(
+                "NumRM placeholder position exceeds its format string".to_string(),
+            ));
+        }
+        Ok(NumberingRevisionProperties {
+            was_numbered,
+            author_index,
+            timestamp,
+            placeholder_positions,
+            number_formats,
+            numbers,
+            format_string,
+        })
     }
 
     /// Handle tab stops (sprmPChgTabsPapx).
@@ -1143,6 +1241,56 @@ mod tests {
             let mut grpprl = SPRM_P_PROP_RMARK_CURRENT.to_le_bytes().to_vec();
             grpprl.push(operand.len() as u8);
             grpprl.extend_from_slice(&operand);
+            assert!(ParagraphProperties::from_sprm(&grpprl).is_err());
+        }
+    }
+
+    #[test]
+    fn parses_numbering_revision_state_strictly() {
+        let timestamp =
+            30u32 | (14u32 << 6) | (15u32 << 11) | (7u32 << 16) | (126u32 << 20) | (3u32 << 29);
+        let mut numrm = [0u8; 128];
+        numrm[0] = 1;
+        numrm[2..4].copy_from_slice(&1i16.to_le_bytes());
+        numrm[4..8].copy_from_slice(&timestamp.to_le_bytes());
+        numrm[8] = 1;
+        numrm[17] = 0;
+        numrm[28..32].copy_from_slice(&12u32.to_le_bytes());
+        numrm[64..66].copy_from_slice(&2u16.to_le_bytes());
+        numrm[66..68].copy_from_slice(&('%' as u16).to_le_bytes());
+        numrm[68..70].copy_from_slice(&('.' as u16).to_le_bytes());
+
+        let mut grpprl = SPRM_P_F_NUM_RM_INS.to_le_bytes().to_vec();
+        grpprl.push(1);
+        grpprl.extend_from_slice(&SPRM_P_NUM_RM.to_le_bytes());
+        grpprl.push(128);
+        grpprl.extend_from_slice(&numrm);
+        let properties = ParagraphProperties::from_sprm(&grpprl).unwrap();
+        assert_eq!(properties.numbering_revision_list_applied, Some(true));
+        let revision = properties.numbering_revision.unwrap();
+        assert!(revision.was_numbered);
+        assert_eq!(revision.author_index, 1);
+        assert_eq!(revision.timestamp, timestamp);
+        assert_eq!(revision.placeholder_positions[0], 1);
+        assert_eq!(revision.numbers[0], 12);
+        assert_eq!(revision.format_string, "%.");
+
+        let mut invalid_bool = SPRM_P_F_NUM_RM_INS.to_le_bytes().to_vec();
+        invalid_bool.push(2);
+        assert!(ParagraphProperties::from_sprm(&invalid_bool).is_err());
+
+        for mutate in [0usize, 2, 8, 64] {
+            let mut invalid = numrm;
+            match mutate {
+                0 => invalid[0] = 2,
+                2 => invalid[2..4].copy_from_slice(&(-1i16).to_le_bytes()),
+                8 => invalid[8] = 3,
+                64 => invalid[64..66].copy_from_slice(&32u16.to_le_bytes()),
+                _ => unreachable!(),
+            }
+            let mut grpprl = SPRM_P_NUM_RM.to_le_bytes().to_vec();
+            grpprl.push(128);
+            grpprl.extend_from_slice(&invalid);
             assert!(ParagraphProperties::from_sprm(&grpprl).is_err());
         }
     }

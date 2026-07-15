@@ -27,6 +27,27 @@ pub struct RevisionMark {
     pub revision_id: Option<u16>,
 }
 
+/// Resolved numbering revision metadata for a paragraph.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NumberingRevisionMark {
+    /// Whether the paragraph was already numbered when tracking began.
+    pub was_numbered: bool,
+    /// Index into the document revision-author table.
+    pub author_index: u16,
+    /// Resolved revision author name.
+    pub author: String,
+    /// Revision date and time, when the packed DTTM is not an ignored zero date.
+    pub timestamp: Option<CommentDateTime>,
+    /// Placeholder positions for the nine numbering levels.
+    pub placeholder_positions: [u8; 9],
+    /// MSONFC values for the nine numbering levels.
+    pub number_formats: [u8; 9],
+    /// Numeric values for the nine numbering levels.
+    pub numbers: [u32; 9],
+    /// Numbering format string.
+    pub format_string: String,
+}
+
 pub(crate) fn decode_dttm(value: u32) -> Result<Option<CommentDateTime>> {
     let minute = (value & 0x3F) as u8;
     let hour = ((value >> 6) & 0x1F) as u8;

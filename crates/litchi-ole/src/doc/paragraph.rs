@@ -2,7 +2,7 @@
 use super::package::Result;
 use super::parts::chp::{CharacterProperties, UnderlineStyle, VerticalPosition};
 use super::parts::revisions::RevisionAuthorTable;
-use super::revision::{RevisionKind, RevisionMark, decode_dttm};
+use super::revision::{NumberingRevisionMark, RevisionKind, RevisionMark, decode_dttm};
 use std::sync::Arc;
 
 /// A paragraph in a Word document.
@@ -26,6 +26,8 @@ pub struct Paragraph {
     properties: super::parts::pap::ParagraphProperties,
     /// Resolved paragraph-formatting revision metadata.
     formatting_revision: Option<RevisionMark>,
+    /// Resolved paragraph numbering revision metadata.
+    numbering_revision: Option<NumberingRevisionMark>,
 }
 
 impl Paragraph {
@@ -52,6 +54,7 @@ impl Paragraph {
             runs,
             properties: super::parts::pap::ParagraphProperties::default(),
             formatting_revision: None,
+            numbering_revision: None,
         }
     }
 
@@ -68,6 +71,7 @@ impl Paragraph {
             runs,
             properties: super::parts::pap::ParagraphProperties::default(),
             formatting_revision: None,
+            numbering_revision: None,
         }
     }
 
@@ -82,6 +86,7 @@ impl Paragraph {
             runs: Vec::new(),
             properties,
             formatting_revision: None,
+            numbering_revision: None,
         }
     }
 
@@ -130,6 +135,16 @@ impl Paragraph {
         self.formatting_revision.as_ref()
     }
 
+    /// Numbering revision metadata for this paragraph.
+    pub fn numbering_revision(&self) -> Option<&NumberingRevisionMark> {
+        self.numbering_revision.as_ref()
+    }
+
+    /// Whether a numbered list was applied after the previous revision.
+    pub fn numbering_revision_list_applied(&self) -> Option<bool> {
+        self.properties.numbering_revision_list_applied
+    }
+
     pub(crate) fn resolve_revision(&mut self, authors: &RevisionAuthorTable) -> Result<()> {
         if self.properties.has_formatting_revision == Some(true) {
             let author_index = self
@@ -152,6 +167,23 @@ impl Paragraph {
                     .transpose()?
                     .flatten(),
                 revision_id: None,
+            });
+        }
+        if let Some(revision) = &self.properties.numbering_revision {
+            let author = authors.get(revision.author_index).ok_or_else(|| {
+                super::package::DocError::Corrupted(
+                    "numbering revision author index exceeds SttbfRMark".to_string(),
+                )
+            })?;
+            self.numbering_revision = Some(NumberingRevisionMark {
+                was_numbered: revision.was_numbered,
+                author_index: revision.author_index,
+                author: author.to_string(),
+                timestamp: decode_dttm(revision.timestamp)?,
+                placeholder_positions: revision.placeholder_positions,
+                number_formats: revision.number_formats,
+                numbers: revision.numbers,
+                format_string: revision.format_string.clone(),
             });
         }
         Ok(())
