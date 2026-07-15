@@ -132,6 +132,12 @@ pub struct ParagraphProperties {
     pub table_formatting_revision_timestamp: Option<u32>,
     /// Whether table properties before the tracked change are preserved.
     pub table_properties_preserved_for_revision: bool,
+    /// Whether paragraph properties before a tracked change are preserved.
+    pub properties_preserved_for_revision: bool,
+    /// Nonzero `PGPInfo.ipgpSelf` associated with this paragraph.
+    pub paragraph_group_id: Option<u32>,
+    /// Revision save ID associated with paragraph formatting.
+    pub revision_save_id: Option<u32>,
 }
 
 /// Parsed `NumRM` numbering revision state.
@@ -340,6 +346,12 @@ impl ParagraphProperties {
     fn from_sprm_context(grpprl: &[u8], stylesheet: Option<&StyleSheet>) -> Result<Self> {
         let mut pap = Self::default();
         let sprms = parse_sprms(grpprl);
+        let consumed = sprms.last().map_or(0, |sprm| sprm.offset + sprm.size);
+        if consumed != grpprl.len() {
+            return Err(DocError::Corrupted(
+                "PAP grpprl does not contain a whole number of SPRMs".to_string(),
+            ));
+        }
 
         for sprm in &sprms {
             // Only process PAP SPRMs (type = 1)
@@ -361,6 +373,79 @@ impl ParagraphProperties {
         }
 
         Ok(pap)
+    }
+
+    pub(crate) fn cascade_styles(
+        initial_style_index: Option<u16>,
+        direct_sprms: &[u8],
+        stylesheet: &StyleSheet,
+    ) -> Result<Self> {
+        let mut current = Self::paragraph_style_baseline(initial_style_index, stylesheet)?;
+        let sprms = parse_sprms(direct_sprms);
+        let consumed = sprms.last().map_or(0, |sprm| sprm.offset + sprm.size);
+        if consumed != direct_sprms.len() {
+            return Err(DocError::Corrupted(
+                "PAPX grpprl does not contain a whole number of SPRMs".to_string(),
+            ));
+        }
+        for sprm in &sprms {
+            if get_sprm_type(sprm.opcode) != 1 {
+                continue;
+            }
+            if sprm.opcode == 0x4600 {
+                let requested = sprm.operand_word().ok_or_else(|| {
+                    DocError::Corrupted("sprmPIstd is missing its style index".to_string())
+                })?;
+                let mut styled = Self::paragraph_style_baseline(Some(requested), stylesheet)?;
+                styled.style_index = Some(requested);
+                Self::preserve_style_state(&current, &mut styled);
+                current = styled;
+            } else {
+                Self::apply_sprm(&mut current, sprm)?;
+            }
+        }
+
+        let table_state = Self::from_sprm_with_stylesheet(direct_sprms, stylesheet)?;
+        current.table_properties = table_state.table_properties;
+        current.has_table_formatting_revision = table_state.has_table_formatting_revision;
+        current.table_formatting_revision_author_index =
+            table_state.table_formatting_revision_author_index;
+        current.table_formatting_revision_timestamp =
+            table_state.table_formatting_revision_timestamp;
+        current.table_properties_preserved_for_revision =
+            table_state.table_properties_preserved_for_revision;
+        Ok(current)
+    }
+
+    fn paragraph_style_baseline(style_index: Option<u16>, stylesheet: &StyleSheet) -> Result<Self> {
+        let Some(requested) = style_index else {
+            return Ok(Self::default());
+        };
+        let (effective, paragraph, _) = stylesheet.resolve_paragraph_style_sprms(requested)?;
+        let mut baseline = Self::from_sprm(&paragraph)?;
+        baseline.style_index = Some(requested);
+        if effective.is_some() && (1..=9).contains(&requested) {
+            baseline.outline_level = Some((requested - 1) as u8);
+        }
+        Ok(baseline)
+    }
+
+    fn preserve_style_state(previous: &Self, styled: &mut Self) {
+        styled.in_table = previous.in_table;
+        styled.is_table_row_end = previous.is_table_row_end;
+        styled.table_nesting_level = previous.table_nesting_level;
+        styled.inner_table_cell = previous.inner_table_cell;
+        styled.inner_table_row_end = previous.inner_table_row_end;
+        styled.is_table_cell_end = previous.is_table_cell_end;
+        styled.table_properties = previous.table_properties.clone();
+        styled.paragraph_group_id = previous.paragraph_group_id;
+        styled.properties_preserved_for_revision = previous.properties_preserved_for_revision;
+        styled.revision_save_id = previous.revision_save_id;
+        styled.has_formatting_revision = previous.has_formatting_revision;
+        styled.formatting_revision_author_index = previous.formatting_revision_author_index;
+        styled.formatting_revision_timestamp = previous.formatting_revision_timestamp;
+        styled.numbering_revision_list_applied = previous.numbering_revision_list_applied;
+        styled.numbering_revision = previous.numbering_revision.clone();
     }
 
     fn apply_table_revision_sprm(pap: &mut ParagraphProperties, sprm: &Sprm) -> Result<()> {
@@ -422,6 +507,31 @@ impl ParagraphProperties {
     /// * `pap` - The paragraph properties to modify
     /// * `sprm` - The SPRM operation to apply
     fn apply_sprm(pap: &mut ParagraphProperties, sprm: &Sprm) -> Result<()> {
+        match sprm.opcode {
+            0x2664 => {
+                pap.properties_preserved_for_revision = Self::strict_bool8(sprm, "sprmPWall")?;
+                return Ok(());
+            },
+            0x6465 => {
+                let group_id = sprm.operand_dword().ok_or_else(|| {
+                    DocError::Corrupted("sprmPIpgp is missing its PGPInfo index".to_string())
+                })?;
+                if group_id == 0 {
+                    return Err(DocError::Corrupted(
+                        "sprmPIpgp must contain a nonzero PGPInfo index".to_string(),
+                    ));
+                }
+                pap.paragraph_group_id = Some(group_id);
+                return Ok(());
+            },
+            0x6467 => {
+                pap.revision_save_id = Some(sprm.operand_dword().ok_or_else(|| {
+                    DocError::Corrupted("sprmPRsid is missing its revision save ID".to_string())
+                })?);
+                return Ok(());
+            },
+            _ => {},
+        }
         let operation = get_sprm_operation(sprm.opcode);
 
         match operation {
@@ -1417,5 +1527,22 @@ mod tests {
             grpprl.extend_from_slice(&invalid);
             assert!(ParagraphProperties::from_sprm(&grpprl).is_err());
         }
+    }
+
+    #[test]
+    fn parses_current_paragraph_identity_and_revision_state_strictly() {
+        let grpprl = [
+            0x64, 0x26, 1, // sprmPWall
+            0x65, 0x64, 9, 0, 0, 0, // sprmPIpgp
+            0x67, 0x64, 0x44, 0x33, 0x22, 0x11, // sprmPRsid
+        ];
+        let properties = ParagraphProperties::from_sprm(&grpprl).unwrap();
+        assert!(properties.properties_preserved_for_revision);
+        assert_eq!(properties.paragraph_group_id, Some(9));
+        assert_eq!(properties.revision_save_id, Some(0x1122_3344));
+
+        assert!(ParagraphProperties::from_sprm(&[0x64, 0x26, 2]).is_err());
+        assert!(ParagraphProperties::from_sprm(&[0x65, 0x64, 0, 0, 0, 0]).is_err());
+        assert!(ParagraphProperties::from_sprm(&[0x67, 0x64, 1, 2]).is_err());
     }
 }

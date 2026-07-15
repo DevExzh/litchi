@@ -1107,5 +1107,41 @@ mod tests {
             stylesheet.resolve_character_style_sprms(16).unwrap(),
             (None, Vec::new())
         );
+
+        let mut ordered_papx = vec![
+            0x03, 0x24, 0, // direct left alignment before style switch
+            0x16, 0x24, 1, // table membership is preserved
+            0x64, 0x26, 1, // paragraph revision wall is preserved
+            0x65, 0x64, 7, 0, 0, 0, // PGPInfo identity is preserved
+            0x67, 0x64, 0x78, 0x56, 0x34, 0x12, // paragraph RSID is preserved
+            0x00, 0x46, 15, 0, // switch back to Base Paragraph (right)
+        ];
+        let switched = super::super::pap::ParagraphProperties::cascade_styles(
+            Some(16),
+            &ordered_papx,
+            &stylesheet,
+        )
+        .unwrap();
+        assert_eq!(switched.style_index, Some(15));
+        assert_eq!(
+            switched.justification,
+            super::super::pap::Justification::Right
+        );
+        assert!(switched.in_table);
+        assert!(switched.properties_preserved_for_revision);
+        assert_eq!(switched.paragraph_group_id, Some(7));
+        assert_eq!(switched.revision_save_id, Some(0x1234_5678));
+
+        ordered_papx.extend_from_slice(&[0x03, 0x24, 1]);
+        let overridden = super::super::pap::ParagraphProperties::cascade_styles(
+            Some(16),
+            &ordered_papx,
+            &stylesheet,
+        )
+        .unwrap();
+        assert_eq!(
+            overridden.justification,
+            super::super::pap::Justification::Center
+        );
     }
 }

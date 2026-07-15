@@ -152,22 +152,17 @@ impl PapBinTable {
             direct_sprms
         };
 
-        let style_sprms = stylesheet
-            .zip(style_index)
-            .and_then(|(styles, index)| styles.resolve_paragraph_style_sprms(index).ok())
-            .map(|(_, paragraph, _)| paragraph)
-            .unwrap_or_default();
         let combined;
-        let sprms = if style_sprms.is_empty() && piece_modifier.is_empty() {
+        let sprms = if piece_modifier.is_empty() {
             sprms
         } else {
-            combined = [style_sprms.as_slice(), sprms, piece_modifier].concat();
+            combined = [sprms, piece_modifier].concat();
             &combined
         };
         let mut properties = stylesheet
             .map_or_else(
                 || ParagraphProperties::from_sprm(sprms),
-                |styles| ParagraphProperties::from_sprm_with_stylesheet(sprms, styles),
+                |styles| ParagraphProperties::cascade_styles(style_index, sprms, styles),
             )
             .unwrap_or_default();
         if properties.style_index.is_none() {
