@@ -39,29 +39,105 @@ impl ParagraphAlignment {
 }
 
 /// Underline styles for text.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UnderlineStyle {
+    None,
     Single,
+    Words,
     Double,
     Thick,
     Dotted,
+    DottedHeavy,
     Dashed,
+    DashedHeavy,
+    DashLong,
+    DashLongHeavy,
     DotDash,
+    DashDotHeavy,
     DotDotDash,
+    DashDotDotHeavy,
     Wave,
+    WavyHeavy,
+    WavyDouble,
 }
 
 impl UnderlineStyle {
-    pub(crate) fn as_str(&self) -> &'static str {
+    pub(crate) fn from_xml(value: &str) -> Option<Self> {
+        match value {
+            "none" => Some(Self::None),
+            "single" => Some(Self::Single),
+            "words" => Some(Self::Words),
+            "double" => Some(Self::Double),
+            "thick" => Some(Self::Thick),
+            "dotted" => Some(Self::Dotted),
+            "dottedHeavy" => Some(Self::DottedHeavy),
+            "dash" => Some(Self::Dashed),
+            "dashedHeavy" => Some(Self::DashedHeavy),
+            "dashLong" => Some(Self::DashLong),
+            "dashLongHeavy" => Some(Self::DashLongHeavy),
+            "dotDash" => Some(Self::DotDash),
+            "dashDotHeavy" => Some(Self::DashDotHeavy),
+            "dotDotDash" => Some(Self::DotDotDash),
+            "dashDotDotHeavy" => Some(Self::DashDotDotHeavy),
+            "wave" => Some(Self::Wave),
+            "wavyHeavy" => Some(Self::WavyHeavy),
+            "wavyDouble" => Some(Self::WavyDouble),
+            _ => None,
+        }
+    }
+
+    pub(crate) const fn as_str(&self) -> &'static str {
         match self {
+            Self::None => "none",
             Self::Single => "single",
+            Self::Words => "words",
             Self::Double => "double",
             Self::Thick => "thick",
             Self::Dotted => "dotted",
+            Self::DottedHeavy => "dottedHeavy",
             Self::Dashed => "dash",
+            Self::DashedHeavy => "dashedHeavy",
+            Self::DashLong => "dashLong",
+            Self::DashLongHeavy => "dashLongHeavy",
             Self::DotDash => "dotDash",
+            Self::DashDotHeavy => "dashDotHeavy",
             Self::DotDotDash => "dotDotDash",
+            Self::DashDotDotHeavy => "dashDotDotHeavy",
             Self::Wave => "wave",
+            Self::WavyHeavy => "wavyHeavy",
+            Self::WavyDouble => "wavyDouble",
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::UnderlineStyle;
+
+    #[test]
+    fn underline_style_xml_tokens_round_trip() {
+        let styles = [
+            UnderlineStyle::None,
+            UnderlineStyle::Single,
+            UnderlineStyle::Words,
+            UnderlineStyle::Double,
+            UnderlineStyle::Thick,
+            UnderlineStyle::Dotted,
+            UnderlineStyle::DottedHeavy,
+            UnderlineStyle::Dashed,
+            UnderlineStyle::DashedHeavy,
+            UnderlineStyle::DashLong,
+            UnderlineStyle::DashLongHeavy,
+            UnderlineStyle::DotDash,
+            UnderlineStyle::DashDotHeavy,
+            UnderlineStyle::DotDotDash,
+            UnderlineStyle::DashDotDotHeavy,
+            UnderlineStyle::Wave,
+            UnderlineStyle::WavyHeavy,
+            UnderlineStyle::WavyDouble,
+        ];
+        for style in styles {
+            assert_eq!(UnderlineStyle::from_xml(style.as_str()), Some(style));
         }
     }
 }

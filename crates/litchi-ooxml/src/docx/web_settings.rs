@@ -255,7 +255,7 @@ impl FrameScrollbarVisibility {
 }
 
 impl ThemeColor {
-    fn from_xml(value: &str) -> Option<Self> {
+    pub(crate) fn from_xml(value: &str) -> Option<Self> {
         match value {
             "dark1" => Some(Self::Dark1),
             "light1" => Some(Self::Light1),

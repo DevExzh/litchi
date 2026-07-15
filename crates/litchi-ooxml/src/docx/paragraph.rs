@@ -10,15 +10,16 @@ use crate::docx::namespace::{
 };
 use crate::docx::revision::{Revision, parse_revisions};
 use crate::docx::smart_tag::SmartTag;
+use crate::docx::{ThemeColor, UnderlineStyle};
 use crate::error::{OoxmlError, Result};
 /// Paragraph and Run structures for Word documents.
 use litchi_core::VerticalPosition;
 use litchi_core::XmlSlice;
 use litchi_opc::rel::Relationships;
 use quick_xml::events::{BytesStart, Event};
-use quick_xml::name::{QName, ResolveResult};
+use quick_xml::name::{NamespaceResolver, QName, ResolveResult};
 use quick_xml::reader::NsReader;
-use quick_xml::{Reader, XmlVersion};
+use quick_xml::{Reader, XmlVersion, encoding::Decoder};
 use smallvec::SmallVec;
 use std::borrow::Cow;
 use std::sync::Arc;
@@ -743,13 +744,18 @@ pub struct RunProperties {
     pub italic: Option<bool>,
     /// Whether the run is strikethrough
     pub strikethrough: Option<bool>,
+    /// Explicit underline pattern, including [`UnderlineStyle::None`]
+    pub underline: Option<UnderlineStyle>,
     /// Vertical position (superscript/subscript)
     pub vertical_position: Option<VerticalPosition>,
 }
 
 fn update_run_properties(props: &mut RunProperties, element: &BytesStart<'_>) -> Result<()> {
     let property = element.local_name();
-    if !matches!(property.as_ref(), b"b" | b"i" | b"strike" | b"vertAlign") {
+    if !matches!(
+        property.as_ref(),
+        b"b" | b"i" | b"strike" | b"u" | b"vertAlign"
+    ) {
         return Ok(());
     }
 
@@ -766,6 +772,21 @@ fn update_run_properties(props: &mut RunProperties, element: &BytesStart<'_>) ->
         b"b" => props.bold = Some(value.as_deref().is_none_or(is_on)),
         b"i" => props.italic = Some(value.as_deref().is_none_or(is_on)),
         b"strike" => props.strikethrough = Some(value.as_deref().is_none_or(is_on)),
+        b"u" => {
+            props.underline = Some(match value.as_deref() {
+                None => UnderlineStyle::Single,
+                Some(value) => UnderlineStyle::from_xml(
+                    std::str::from_utf8(value)
+                        .map_err(|error| OoxmlError::InvalidFormat(error.to_string()))?,
+                )
+                .ok_or_else(|| {
+                    OoxmlError::InvalidFormat(format!(
+                        "invalid Word underline style '{}'",
+                        String::from_utf8_lossy(value)
+                    ))
+                })?,
+            });
+        },
         b"vertAlign" => {
             props.vertical_position = match value.as_deref() {
                 Some(b"superscript") => Some(VerticalPosition::Superscript),
@@ -776,6 +797,276 @@ fn update_run_properties(props: &mut RunProperties, element: &BytesStart<'_>) ->
         _ => {},
     }
     Ok(())
+}
+
+/// A direct color applied to a WordprocessingML underline.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RunUnderlineColor {
+    /// Automatic color selected by the consumer.
+    Auto,
+    /// Explicit red, green, and blue components.
+    Rgb([u8; 3]),
+}
+
+/// Complete direct underline formatting for a run.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RunUnderline {
+    /// Underline pattern, including the explicit `none` value.
+    pub style: UnderlineStyle,
+    /// Direct automatic or RGB color.
+    pub color: Option<RunUnderlineColor>,
+    /// Theme color used instead of, or to transform, the direct color.
+    pub theme_color: Option<ThemeColor>,
+    /// Theme tint transform byte.
+    pub theme_tint: Option<u8>,
+    /// Theme shade transform byte.
+    pub theme_shade: Option<u8>,
+}
+
+fn parse_run_underline(xml_bytes: &[u8]) -> Result<Option<RunUnderline>> {
+    let mut reader = NsReader::from_reader(xml_bytes);
+    let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
+    let mut depth = 0usize;
+    let mut properties_depth = None;
+    let mut saw_root = false;
+    let mut saw_properties = false;
+    let mut underline = None;
+
+    loop {
+        let decoder = reader.decoder();
+        let event = reader
+            .read_event()
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?
+            .into_owned();
+        let resolver = reader.resolver().clone();
+        let (namespace, event) = resolver.resolve_event(event);
+
+        if fragment_prefix.is_none()
+            && depth == 0
+            && let Event::Start(element) | Event::Empty(element) = &event
+            && !matches!(namespace, ResolveResult::Bound(_))
+        {
+            fragment_prefix = Some(
+                element
+                    .name()
+                    .prefix()
+                    .map(|prefix| prefix.into_inner().to_vec()),
+            );
+        }
+
+        match event {
+            Event::Start(element) => {
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("Word run XML nesting is too deep".into())
+                })?;
+                let is_word = is_fragment_word_name(
+                    &namespace,
+                    element.name(),
+                    element.local_name().as_ref(),
+                    &fragment_prefix,
+                );
+                if depth == 1 {
+                    if saw_root || !is_word || element.local_name().as_ref() != b"r" {
+                        return Err(OoxmlError::InvalidFormat(
+                            "Word underline XML has an invalid run root".into(),
+                        ));
+                    }
+                    saw_root = true;
+                } else if depth == 2 && is_word && element.local_name().as_ref() == b"rPr" {
+                    if saw_properties {
+                        return Err(OoxmlError::InvalidFormat(
+                            "duplicate Word run property container".into(),
+                        ));
+                    }
+                    saw_properties = true;
+                    properties_depth = Some(depth);
+                } else if depth == 3
+                    && properties_depth == Some(2)
+                    && is_word
+                    && element.local_name().as_ref() == b"u"
+                {
+                    set_run_underline(
+                        &mut underline,
+                        &element,
+                        decoder,
+                        &resolver,
+                        &fragment_prefix,
+                    )?;
+                }
+            },
+            Event::Empty(element) => {
+                let child_depth = depth.checked_add(1).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("Word run XML nesting is too deep".into())
+                })?;
+                let is_word = is_fragment_word_name(
+                    &namespace,
+                    element.name(),
+                    element.local_name().as_ref(),
+                    &fragment_prefix,
+                );
+                if child_depth == 1 {
+                    if saw_root || !is_word || element.local_name().as_ref() != b"r" {
+                        return Err(OoxmlError::InvalidFormat(
+                            "Word underline XML has an invalid run root".into(),
+                        ));
+                    }
+                    saw_root = true;
+                } else if child_depth == 2 && is_word && element.local_name().as_ref() == b"rPr" {
+                    if saw_properties {
+                        return Err(OoxmlError::InvalidFormat(
+                            "duplicate Word run property container".into(),
+                        ));
+                    }
+                    saw_properties = true;
+                } else if child_depth == 3
+                    && properties_depth == Some(2)
+                    && is_word
+                    && element.local_name().as_ref() == b"u"
+                {
+                    set_run_underline(
+                        &mut underline,
+                        &element,
+                        decoder,
+                        &resolver,
+                        &fragment_prefix,
+                    )?;
+                }
+            },
+            Event::End(_) => {
+                if properties_depth == Some(depth) {
+                    properties_depth = None;
+                }
+                depth = depth.checked_sub(1).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("invalid Word run XML nesting".into())
+                })?;
+            },
+            Event::Eof if depth != 0 => {
+                return Err(OoxmlError::InvalidFormat(
+                    "unterminated Word run XML".into(),
+                ));
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+
+    if !saw_root {
+        return Err(OoxmlError::InvalidFormat(
+            "Word underline XML has no run root".into(),
+        ));
+    }
+    Ok(underline)
+}
+
+fn set_run_underline(
+    slot: &mut Option<RunUnderline>,
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    resolver: &NamespaceResolver,
+    fragment_prefix: &Option<Option<Vec<u8>>>,
+) -> Result<()> {
+    if slot.is_some() {
+        return Err(OoxmlError::InvalidFormat(
+            "duplicate Word underline property".into(),
+        ));
+    }
+    let style = run_underline_attribute(element, b"val", decoder, resolver, fragment_prefix)?
+        .map(|value| {
+            UnderlineStyle::from_xml(&value).ok_or_else(|| {
+                OoxmlError::InvalidFormat(format!("invalid Word underline style '{value}'"))
+            })
+        })
+        .transpose()?
+        .unwrap_or(UnderlineStyle::Single);
+    let color = run_underline_attribute(element, b"color", decoder, resolver, fragment_prefix)?
+        .map(|value| parse_run_underline_color(&value))
+        .transpose()?;
+    let theme_color =
+        run_underline_attribute(element, b"themeColor", decoder, resolver, fragment_prefix)?
+            .map(|value| {
+                ThemeColor::from_xml(&value).ok_or_else(|| {
+                    OoxmlError::InvalidFormat(format!(
+                        "invalid Word underline theme color '{value}'"
+                    ))
+                })
+            })
+            .transpose()?;
+    let theme_tint =
+        run_underline_attribute(element, b"themeTint", decoder, resolver, fragment_prefix)?
+            .map(|value| parse_run_underline_hex_byte(&value, "theme tint"))
+            .transpose()?;
+    let theme_shade =
+        run_underline_attribute(element, b"themeShade", decoder, resolver, fragment_prefix)?
+            .map(|value| parse_run_underline_hex_byte(&value, "theme shade"))
+            .transpose()?;
+
+    *slot = Some(RunUnderline {
+        style,
+        color,
+        theme_color,
+        theme_tint,
+        theme_shade,
+    });
+    Ok(())
+}
+
+fn run_underline_attribute(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+    resolver: &NamespaceResolver,
+    fragment_prefix: &Option<Option<Vec<u8>>>,
+) -> Result<Option<String>> {
+    let mut value = None;
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| OoxmlError::Xml(error.to_string()))?;
+        let (namespace, _) = resolver.resolve_attribute(attribute.key);
+        if !is_fragment_word_name(&namespace, attribute.key, name, fragment_prefix) {
+            continue;
+        }
+        if value.is_some() {
+            return Err(OoxmlError::InvalidFormat(format!(
+                "duplicate Word underline attribute '{}'",
+                String::from_utf8_lossy(name)
+            )));
+        }
+        value = Some(
+            attribute
+                .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+                .map_err(|error| OoxmlError::Xml(error.to_string()))?
+                .into_owned(),
+        );
+    }
+    Ok(value)
+}
+
+fn parse_run_underline_color(value: &str) -> Result<RunUnderlineColor> {
+    if value == "auto" {
+        return Ok(RunUnderlineColor::Auto);
+    }
+    if value.len() != 6 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(OoxmlError::InvalidFormat(format!(
+            "invalid Word underline color '{value}'"
+        )));
+    }
+    let mut rgb = [0u8; 3];
+    for (index, component) in rgb.iter_mut().enumerate() {
+        *component = u8::from_str_radix(&value[index * 2..index * 2 + 2], 16).map_err(|_| {
+            OoxmlError::InvalidFormat(format!("invalid Word underline color '{value}'"))
+        })?;
+    }
+    Ok(RunUnderlineColor::Rgb(rgb))
+}
+
+fn parse_run_underline_hex_byte(value: &str, description: &str) -> Result<u8> {
+    if value.len() != 2 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(OoxmlError::InvalidFormat(format!(
+            "invalid Word underline {description} '{value}'"
+        )));
+    }
+    u8::from_str_radix(value, 16).map_err(|_| {
+        OoxmlError::InvalidFormat(format!("invalid Word underline {description} '{value}'"))
+    })
 }
 
 #[inline]
@@ -971,39 +1262,31 @@ impl Run {
         self.get_bool_property(b"i")
     }
 
-    /// Check if this run is underlined.
+    /// Check whether this run has a direct underline enabled.
     ///
-    /// Returns `Some(true)` if underline is present,
-    /// `None` if not specified.
-    ///
-    /// Note: This is simplified. Full implementation would return
-    /// the underline style (single, double, wavy, etc.).
+    /// Returns `Some(false)` for an explicit `w:val="none"` and `None` when the
+    /// run has no direct underline property and therefore inherits from styles.
     pub fn underline(&self) -> Result<Option<bool>> {
-        let mut reader = Reader::from_reader(self.xml_bytes());
-        reader.config_mut().trim_text(true);
+        Ok(self
+            .underline_style()?
+            .map(|style| style != UnderlineStyle::None))
+    }
 
-        let mut in_r_pr = false;
+    /// Return the direct underline pattern, including an explicit
+    /// [`UnderlineStyle::None`].
+    pub fn underline_style(&self) -> Result<Option<UnderlineStyle>> {
+        Ok(self
+            .underline_formatting()?
+            .map(|underline| underline.style))
+    }
 
-        loop {
-            match reader.read_event() {
-                Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
-                    let name = e.local_name();
-                    if name.as_ref() == b"rPr" {
-                        in_r_pr = true;
-                    } else if in_r_pr && name.as_ref() == b"u" {
-                        return Ok(Some(true));
-                    }
-                },
-                Ok(Event::End(e)) if e.local_name().as_ref() == b"rPr" => {
-                    in_r_pr = false;
-                },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(OoxmlError::Xml(e.to_string())),
-                _ => {},
-            }
-        }
-
-        Ok(None)
+    /// Return the complete direct underline formatting for this run.
+    ///
+    /// This preserves all `CT_Underline` fields without resolving style or
+    /// theme inheritance. A present `<w:u/>` is interpreted as a single
+    /// underline for compatibility with documents emitted by Word processors.
+    pub fn underline_formatting(&self) -> Result<Option<RunUnderline>> {
+        parse_run_underline(self.xml_bytes())
     }
 
     /// Check if this run is strikethrough.
@@ -1482,7 +1765,7 @@ mod tests {
     fn optimized_run_extraction_matches_text_and_reads_qualified_properties() {
         let run = Run::new(
             br#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-                <w:rPr><w:b w:val="0"/><w:i w:val="on"/><w:strike/><w:vertAlign w:val="superscript"/></w:rPr>
+                <w:rPr><w:b w:val="0"/><w:i w:val="on"/><w:strike/><w:u w:val="dashLongHeavy"/><w:vertAlign w:val="superscript"/></w:rPr>
                 <w:t xml:space="preserve"> A &amp; <![CDATA[B < C]]> &#x1F600; </w:t><w:t/>
                 <w:tab/><w:br/><w:cr/><w:noBreakHyphen/><w:softHyphen/><w:t>tail</w:t>
             </w:r>"#
@@ -1496,6 +1779,7 @@ mod tests {
         assert_eq!(properties.bold, Some(false));
         assert_eq!(properties.italic, Some(true));
         assert_eq!(properties.strikethrough, Some(true));
+        assert_eq!(properties.underline, Some(UnderlineStyle::DashLongHeavy));
         assert_eq!(
             properties.vertical_position,
             Some(VerticalPosition::Superscript)
@@ -1505,6 +1789,7 @@ mod tests {
         assert_eq!(properties_only.bold, properties.bold);
         assert_eq!(properties_only.italic, properties.italic);
         assert_eq!(properties_only.strikethrough, properties.strikethrough);
+        assert_eq!(properties_only.underline, properties.underline);
         assert_eq!(
             properties_only.vertical_position,
             properties.vertical_position
@@ -1512,9 +1797,110 @@ mod tests {
         assert_eq!(run.bold().unwrap(), Some(false));
         assert_eq!(run.italic().unwrap(), Some(true));
         assert_eq!(
+            run.underline_style().unwrap(),
+            Some(UnderlineStyle::DashLongHeavy)
+        );
+        assert_eq!(
             run.vertical_position().unwrap(),
             properties.vertical_position
         );
+    }
+
+    #[test]
+    fn reads_every_wordprocessingml_underline_pattern() {
+        let patterns = [
+            ("none", UnderlineStyle::None),
+            ("single", UnderlineStyle::Single),
+            ("words", UnderlineStyle::Words),
+            ("double", UnderlineStyle::Double),
+            ("thick", UnderlineStyle::Thick),
+            ("dotted", UnderlineStyle::Dotted),
+            ("dottedHeavy", UnderlineStyle::DottedHeavy),
+            ("dash", UnderlineStyle::Dashed),
+            ("dashedHeavy", UnderlineStyle::DashedHeavy),
+            ("dashLong", UnderlineStyle::DashLong),
+            ("dashLongHeavy", UnderlineStyle::DashLongHeavy),
+            ("dotDash", UnderlineStyle::DotDash),
+            ("dashDotHeavy", UnderlineStyle::DashDotHeavy),
+            ("dotDotDash", UnderlineStyle::DotDotDash),
+            ("dashDotDotHeavy", UnderlineStyle::DashDotDotHeavy),
+            ("wave", UnderlineStyle::Wave),
+            ("wavyHeavy", UnderlineStyle::WavyHeavy),
+            ("wavyDouble", UnderlineStyle::WavyDouble),
+        ];
+
+        for (value, expected) in patterns {
+            let run = Run::new(
+                format!(
+                    r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:rPr><w:u w:val="{value}"/></w:rPr></w:r>"#
+                )
+                .into_bytes(),
+            );
+            assert_eq!(run.underline_style().unwrap(), Some(expected));
+            assert_eq!(run.get_properties().unwrap().underline, Some(expected));
+            assert_eq!(
+                run.underline().unwrap(),
+                Some(expected != UnderlineStyle::None)
+            );
+        }
+
+        let implicit_single = Run::new(
+            br#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:rPr><w:u/></w:rPr></w:r>"#
+                .to_vec(),
+        );
+        assert_eq!(
+            implicit_single.underline_style().unwrap(),
+            Some(UnderlineStyle::Single)
+        );
+        let inherited = Run::new(
+            br#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:rPr/></w:r>"#
+                .to_vec(),
+        );
+        assert_eq!(inherited.underline().unwrap(), None);
+    }
+
+    #[test]
+    fn reads_complete_underline_metadata_namespace_aware() {
+        let strict = Run::new(
+            br#"<s:r xmlns:s="http://purl.oclc.org/ooxml/wordprocessingml/main" xmlns:false="urn:not-wordprocessingml"><s:rPr><false:u false:val="double"/><s:u s:val="wavyDouble" s:color="A0b1C2" s:themeColor="accent4" s:themeTint="0a" s:themeShade="FF"/></s:rPr></s:r>"#
+                .to_vec(),
+        );
+        assert_eq!(
+            strict.underline_formatting().unwrap(),
+            Some(RunUnderline {
+                style: UnderlineStyle::WavyDouble,
+                color: Some(RunUnderlineColor::Rgb([0xA0, 0xB1, 0xC2])),
+                theme_color: Some(ThemeColor::Accent4),
+                theme_tint: Some(0x0A),
+                theme_shade: Some(0xFF),
+            })
+        );
+
+        let inherited =
+            Run::new(br#"<q:r><q:rPr><q:u q:val="words" q:color="auto"/></q:rPr></q:r>"#.to_vec());
+        assert_eq!(
+            inherited.underline_formatting().unwrap(),
+            Some(RunUnderline {
+                style: UnderlineStyle::Words,
+                color: Some(RunUnderlineColor::Auto),
+                theme_color: None,
+                theme_tint: None,
+                theme_shade: None,
+            })
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_or_duplicate_underline_properties() {
+        for xml in [
+            br#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:rPr><w:u w:val="triple"/></w:rPr></w:r>"#.as_slice(),
+            br#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:rPr><w:u w:color="12345"/></w:rPr></w:r>"#.as_slice(),
+            br#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:rPr><w:u w:themeColor="accent7"/></w:rPr></w:r>"#.as_slice(),
+            br#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:rPr><w:u w:themeTint="000"/></w:rPr></w:r>"#.as_slice(),
+            br#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:rPr><w:u/><w:u/></w:rPr></w:r>"#.as_slice(),
+        ] {
+            assert!(Run::new(xml.to_vec()).underline_formatting().is_err());
+        }
     }
 
     #[test]
