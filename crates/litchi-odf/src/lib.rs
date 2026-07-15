@@ -155,15 +155,17 @@
 //! - ⚠️ Advanced shape properties
 //! - ⚠️ Slide master manipulation
 //!
-//! ## 🚧 Additional ODF Formats (NOT IMPLEMENTED)
+//! ## 🚧 Additional ODF Formats (PACKAGE SUPPORT)
 //!
-//! These formats are recognized but not fully supported yet:
-//! - 🔲 ODG - OpenDocument Drawing (.odg)
-//! - 🔲 ODC - OpenDocument Chart (.odc) - standalone charts
-//! - 🔲 ODF - OpenDocument Formula (.odf) - mathematical formulas
-//! - 🔲 ODI - OpenDocument Image (.odi)
-//! - 🔲 ODM - OpenDocument Master (.odm) - master documents
-//! - 🔲 Template variants (.ott, .ots, .otp, .otg, etc.)
+//! All standard families and templates can be validated, inspected, extracted,
+//! and saved losslessly through [`OpenDocumentPackage`]. Specialized semantic
+//! object models remain in progress for:
+//! - ODG - OpenDocument Drawing (.odg/.otg)
+//! - ODC - OpenDocument Chart (.odc/.otc)
+//! - ODF - OpenDocument Formula (.odf/.otf)
+//! - ODI - OpenDocument Image (.odi/.oti)
+//! - ODM - OpenDocument Master (.odm)
+//! - OTH - OpenDocument Web (.oth)
 //!
 //! ## 🚧 Advanced Features (PLANNED)
 //!
@@ -230,6 +232,8 @@ mod core;
 pub mod datatype;
 /// ODF XML element classes
 pub mod elements;
+/// Format-neutral package access for every OpenDocument family.
+mod generic;
 /// ODF presentation (.odp) support
 mod odp;
 /// ODF spreadsheet (.ods) support
@@ -239,6 +243,7 @@ mod odt;
 
 // Re-export common utilities for convenience
 // These are used across all Office formats, not ODF-specific
+pub use generic::{OpenDocumentFamily, OpenDocumentPackage};
 pub use litchi_core::RGBColor as Color;
 pub use litchi_core::unit::{Length, LengthUnit};
 
