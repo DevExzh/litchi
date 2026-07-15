@@ -2,8 +2,6 @@
 //!
 //! Generates footnote/endnote reference PLCFs and subdocument content.
 
-use std::io::Write;
-
 /// A footnote entry
 #[derive(Debug, Clone)]
 pub struct FootnoteEntry {
@@ -33,6 +31,12 @@ pub struct FootnotesWriter {
 }
 
 impl FootnotesWriter {
+    fn ordered_footnotes(&self) -> Vec<&FootnoteEntry> {
+        let mut ordered = self.footnotes.iter().collect::<Vec<_>>();
+        ordered.sort_by_key(|footnote| footnote.ref_position);
+        ordered
+    }
+
     /// Create a new footnotes writer
     pub fn new() -> Self {
         Self {
@@ -50,20 +54,27 @@ impl FootnotesWriter {
     /// Format: CP array followed by FRD (Footnote Reference Descriptor) array
     /// FRD is 2 bytes: footnote number
     pub fn build_plcf_fnd_ref(&self) -> Vec<u8> {
+        let final_cp = self
+            .footnotes
+            .iter()
+            .map(|footnote| footnote.ref_position)
+            .max()
+            .and_then(|cp| cp.checked_add(1))
+            .unwrap_or(0);
+        self.build_plcf_fnd_ref_with_text_length(final_cp)
+    }
+
+    /// Generate `PlcfFndRef` with the main-document character count as its ignored final CP.
+    pub fn build_plcf_fnd_ref_with_text_length(&self, ccp_text: u32) -> Vec<u8> {
         let mut plcf = Vec::new();
 
-        // Write character positions
-        for footnote in &self.footnotes {
-            plcf.write_all(&footnote.ref_position.to_le_bytes())
-                .unwrap();
+        for footnote in self.ordered_footnotes() {
+            plcf.extend_from_slice(&footnote.ref_position.to_le_bytes());
         }
-        // Write final CP
-        let last_cp = self.footnotes.last().map_or(0, |f| f.ref_position + 1);
-        plcf.write_all(&last_cp.to_le_bytes()).unwrap();
+        plcf.extend_from_slice(&ccp_text.to_le_bytes());
 
-        // Write FRD descriptors (2 bytes each)
-        for footnote in &self.footnotes {
-            plcf.write_all(&footnote.number.to_le_bytes()).unwrap();
+        for footnote in self.ordered_footnotes() {
+            plcf.extend_from_slice(&footnote.number.max(1).to_le_bytes());
         }
 
         plcf
@@ -77,13 +88,25 @@ impl FootnotesWriter {
         let mut current_cp = 0u32;
 
         // Initial CP (start of first footnote)
-        plcf.write_all(&current_cp.to_le_bytes()).unwrap();
+        plcf.extend_from_slice(&current_cp.to_le_bytes());
 
-        // Each footnote contributes its character length + terminating chEop (0x0D)
-        for footnote in &self.footnotes {
-            let footnote_cp = footnote.text.encode_utf16().count() as u32 + 1; // include paragraph mark
-            current_cp += footnote_cp;
-            plcf.write_all(&current_cp.to_le_bytes()).unwrap();
+        // Each range contains its automatic reference, body, and terminating paragraph mark.
+        for footnote in self.ordered_footnotes() {
+            let footnote_cp = u32::try_from(footnote.text.encode_utf16().count())
+                .expect("DOC footnote exceeds the 32-bit CP range")
+                .checked_add(2)
+                .expect("DOC footnote exceeds the 32-bit CP range");
+            current_cp = current_cp
+                .checked_add(footnote_cp)
+                .expect("DOC footnote story exceeds the 32-bit CP range");
+            plcf.extend_from_slice(&current_cp.to_le_bytes());
+        }
+
+        if !self.footnotes.is_empty() {
+            current_cp = current_cp
+                .checked_add(1)
+                .expect("DOC footnote story exceeds the 32-bit CP range");
+            plcf.extend_from_slice(&current_cp.to_le_bytes());
         }
 
         plcf
@@ -92,18 +115,39 @@ impl FootnotesWriter {
     /// Get the subdocument text content
     pub fn build_subdocument_text(&self) -> Vec<u8> {
         let mut text_bytes = Vec::new();
-        for footnote in &self.footnotes {
-            text_bytes.extend_from_slice(footnote.text.as_bytes());
+        for footnote in self.ordered_footnotes() {
+            text_bytes.extend_from_slice(&0x0002u16.to_le_bytes());
+            for unit in footnote.text.encode_utf16() {
+                text_bytes.extend_from_slice(&unit.to_le_bytes());
+            }
+            text_bytes.extend_from_slice(&0x000Du16.to_le_bytes());
+        }
+        if !self.footnotes.is_empty() {
+            text_bytes.extend_from_slice(&0x000Du16.to_le_bytes());
         }
         text_bytes
     }
 
     /// Get total character count in footnote text
     pub fn char_count(&self) -> u32 {
-        self.footnotes
+        let stories = self
+            .footnotes
             .iter()
-            .map(|f| f.text.encode_utf16().count() as u32 + 1)
-            .sum()
+            .map(|footnote| {
+                u32::try_from(footnote.text.encode_utf16().count())
+                    .expect("DOC footnote exceeds the 32-bit CP range")
+                    .checked_add(2)
+                    .expect("DOC footnote exceeds the 32-bit CP range")
+            })
+            .try_fold(0u32, |total, length| total.checked_add(length))
+            .expect("DOC footnote story exceeds the 32-bit CP range");
+        if self.footnotes.is_empty() {
+            0
+        } else {
+            stories
+                .checked_add(1)
+                .expect("DOC footnote story exceeds the 32-bit CP range")
+        }
     }
 
     /// Get footnote entries
@@ -135,8 +179,49 @@ mod tests {
         let mut writer = FootnotesWriter::new();
         writer.add_footnote(FootnoteEntry::new(0, "A😀", 1));
 
-        assert_eq!(writer.char_count(), 4);
+        assert_eq!(writer.char_count(), 6);
         let text_plcf = writer.build_plcf_fnd_txt();
-        assert_eq!(u32::from_le_bytes(text_plcf[4..8].try_into().unwrap()), 4);
+        assert_eq!(u32::from_le_bytes(text_plcf[4..8].try_into().unwrap()), 5);
+        assert_eq!(u32::from_le_bytes(text_plcf[8..12].try_into().unwrap()), 6);
+
+        let text = writer.build_subdocument_text();
+        let units = text
+            .chunks_exact(2)
+            .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
+            .collect::<Vec<_>>();
+        assert_eq!(String::from_utf16(&units).unwrap(), "\u{2}A😀\r\r");
+
+        let references = writer.build_plcf_fnd_ref_with_text_length(20);
+        assert_eq!(u32::from_le_bytes(references[4..8].try_into().unwrap()), 20);
+        assert_eq!(u16::from_le_bytes(references[8..10].try_into().unwrap()), 1);
+    }
+
+    #[test]
+    fn orders_references_and_text_stories_together() {
+        let mut writer = FootnotesWriter::new();
+        writer.add_footnote(FootnoteEntry::new(8, "second", 2));
+        writer.add_footnote(FootnoteEntry::new(2, "first", 1));
+
+        let references = writer.build_plcf_fnd_ref_with_text_length(20);
+        assert_eq!(u32::from_le_bytes(references[0..4].try_into().unwrap()), 2);
+        assert_eq!(u32::from_le_bytes(references[4..8].try_into().unwrap()), 8);
+        assert_eq!(
+            u16::from_le_bytes(references[12..14].try_into().unwrap()),
+            1
+        );
+        assert_eq!(
+            u16::from_le_bytes(references[14..16].try_into().unwrap()),
+            2
+        );
+
+        let text = writer.build_subdocument_text();
+        let units = text
+            .chunks_exact(2)
+            .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            String::from_utf16(&units).unwrap(),
+            "\u{2}first\r\u{2}second\r\r"
+        );
     }
 }

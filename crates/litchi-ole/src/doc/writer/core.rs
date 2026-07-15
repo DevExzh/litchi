@@ -601,12 +601,33 @@ impl DocWriter {
         if entries.is_empty() {
             return Ok(None);
         }
+        if entries.len() != actual_ref_cps.len() {
+            return Err(DocWriteError::InvalidData(
+                "every DOC note must have a reference in the main document".to_string(),
+            ));
+        }
+
+        let mut ordered = entries
+            .iter()
+            .zip(actual_ref_cps.iter().copied())
+            .collect::<Vec<_>>();
+        ordered.sort_by_key(|(_, cp)| *cp);
+        if ordered.windows(2).any(|pair| pair[0].1 == pair[1].1) {
+            return Err(DocWriteError::InvalidData(
+                "DOC note references must have unique character positions".to_string(),
+            ));
+        }
+        if ordered.iter().any(|(_, cp)| *cp >= ccp_text) {
+            return Err(DocWriteError::InvalidData(
+                "DOC note reference lies outside the main document".to_string(),
+            ));
+        }
 
         let mut note_cp: u32 = 0;
-        // PlcffndTxt: (n+1) CPs relative to note subdocument start
+        // PlcffndTxt: n story starts, one story terminator, and one ignored final CP.
         let mut txt_cps: Vec<u32> = vec![0];
 
-        for entry in entries {
+        for (entry, _) in &ordered {
             let fc_para_start = text_fc_start + text_stream.len() as u32;
 
             // 1) Auto-numbered reference mark U+0002 with fSpec=1 CHPX
@@ -688,7 +709,7 @@ impl DocWriter {
         }
 
         // PlcffndRef: actual reference CPs + mandatory final CP = ccpText
-        let mut ref_cps: Vec<u32> = actual_ref_cps.to_vec();
+        let mut ref_cps = ordered.iter().map(|(_, cp)| *cp).collect::<Vec<_>>();
         ref_cps.push(ccp_text);
 
         // Serialize PlcffndRef: (n+1) CPs then n FRDs (2 bytes each)
@@ -696,10 +717,9 @@ impl DocWriter {
         for cp in &ref_cps {
             plcf_ref.extend_from_slice(&cp.to_le_bytes());
         }
-        // FRD (Footnote Reference Descriptor): nAuto MUST be 0x0000 for
-        // auto-numbered references (MS-DOC 2.9.73). Non-zero = custom mark codepoint.
-        for _entry in entries {
-            plcf_ref.extend_from_slice(&0u16.to_le_bytes());
+        // FRD nAuto is nonzero for an automatically numbered note.
+        for (entry, _) in &ordered {
+            plcf_ref.extend_from_slice(&entry.number.max(1).to_le_bytes());
         }
 
         // Serialize PlcffndTxt: (n+2) CPs for n footnotes (n stories + 1 guard + 1 final)
@@ -748,7 +768,7 @@ impl DocWriter {
         //   Slot 9:     odd page footer (section 0) — "default" when no facing pages
         //   Slot 10:    first page header (section 0)
         //   Slot 11:    first page footer (section 0)
-        // PlcfHdd has 13 CPs (12 slot starts + 1 final).
+        // PlcfHdd has 14 CPs (12 slot starts + story end + ignored final CP).
         // Verified against LibreOffice DOC writer output.
         let mut idx_text: [Option<&str>; 12] = [None; 12];
         if let Some(ref s) = self.header_even {
@@ -771,8 +791,8 @@ impl DocWriter {
         }
 
         // Local CP within header story (counts only header subdocument)
-        // Every slot (0-11) must have at least one paragraph mark.
-        // Word uses the CP ranges to locate header/footer stories.
+        // Empty slots consume no CPs. Non-empty header/footer stories contain a content paragraph
+        // mark and a separate guard paragraph mark.
         let mut header_cp: u32 = 0;
         let mut cp_starts: [u32; 12] = [0; 12];
 
@@ -824,38 +844,35 @@ impl DocWriter {
                 ));
                 *current_cp_total += para_chars + 2;
                 header_cp += para_chars + 2;
-            } else {
-                // Empty slot: write a single paragraph mark as guard (MS-DOC requires it)
-                let fc_guard = text_fc_start + text_stream.len() as u32;
-                text_stream.extend_from_slice(&0x000Du16.to_le_bytes());
-                let fc_guard_end = fc_guard + 2;
-
-                // CHPX for the guard mark
-                chpx_entries.push((fc_guard, fc_guard_end, Vec::new()));
-                // PAPX for the guard mark
-                papx_entries.push((
-                    fc_guard,
-                    fc_guard_end,
-                    build_papx_grpprl(&ParagraphFormatting::default()),
-                ));
-
-                // Piece for guard
-                pieces.push(Piece::new(
-                    *current_cp_total,
-                    *current_cp_total + 1,
-                    fc_guard,
-                    true,
-                ));
-                *current_cp_total += 1;
-                header_cp += 1;
             }
         }
 
-        // Build PlcfHdd: 13 CPs (12 slot starts + 1 final end CP)
-        let mut plcfhdd = Vec::with_capacity((12 + 1) * 4);
+        // The header subdocument ends with an extra paragraph mark. The second-to-last PlcfHdd
+        // CP terminates the final story at ccpHdd - 1; the last CP is ignored.
+        let stories_end = header_cp;
+        let fc_trailing = text_fc_start + text_stream.len() as u32;
+        text_stream.extend_from_slice(&0x000Du16.to_le_bytes());
+        let fc_trailing_end = fc_trailing + 2;
+        chpx_entries.push((fc_trailing, fc_trailing_end, Vec::new()));
+        papx_entries.push((
+            fc_trailing,
+            fc_trailing_end,
+            build_papx_grpprl(&ParagraphFormatting::default()),
+        ));
+        pieces.push(Piece::new(
+            *current_cp_total,
+            *current_cp_total + 1,
+            fc_trailing,
+            true,
+        ));
+        *current_cp_total += 1;
+        header_cp += 1;
+
+        let mut plcfhdd = Vec::with_capacity((12 + 2) * 4);
         for cp_start in &cp_starts {
             plcfhdd.extend_from_slice(&cp_start.to_le_bytes());
         }
+        plcfhdd.extend_from_slice(&stories_end.to_le_bytes());
         plcfhdd.extend_from_slice(&header_cp.to_le_bytes());
 
         Ok(Some((plcfhdd, header_cp)))
@@ -2536,6 +2553,7 @@ mod tests {
             crate::doc::parts::fields::FieldType::Hyperlink
         );
         let headers = document.headers().unwrap();
+        assert_eq!(headers.len(), 1, "{headers:?}");
         assert!(
             headers
                 .iter()
@@ -2543,22 +2561,19 @@ mod tests {
             "{headers:?}"
         );
         let footers = document.footers().unwrap();
+        assert_eq!(footers.len(), 1, "{footers:?}");
         assert!(
             footers
                 .iter()
                 .any(|footer| footer.text().contains("Footer 𝄞")),
             "{footers:?}"
         );
-        assert!(
-            document.footnotes().unwrap()[0]
-                .text()
-                .contains("Footnote 🦀")
-        );
-        assert!(
-            document.endnotes().unwrap()[0]
-                .text()
-                .contains("Endnote 😀")
-        );
+        let footnotes = document.footnotes().unwrap();
+        assert_eq!(footnotes[0].number, 1);
+        assert!(footnotes[0].text().contains("Footnote 🦀"));
+        let endnotes = document.endnotes().unwrap();
+        assert_eq!(endnotes[0].number, 1);
+        assert!(endnotes[0].text().contains("Endnote 😀"));
     }
 
     #[test]

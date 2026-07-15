@@ -143,17 +143,17 @@ impl HeadersTable {
     ) -> Result<Vec<HeaderFooterStory>> {
         // Parse as PLCF with element_size = 0 (only CPs, no properties)
         // We need to manually parse this since PlcfParser expects element_size > 0
-        if data.len() < 8 || data.len() % 4 != 0 {
+        if data.len() < 56 || data.len() % 4 != 0 {
             return Err(DocError::Corrupted(
-                "PlcfHdd must contain at least two complete CP entries".to_string(),
+                "PlcfHdd must contain the six separator and six section story ranges".to_string(),
             ));
         }
 
         // Count of CPs = data.len() / 4
         let cp_count = data.len() / 4;
-        if cp_count < 2 {
+        if cp_count < 14 || (cp_count - 8) % 6 != 0 {
             return Err(DocError::Corrupted(
-                "PlcfHdd does not contain a story range".to_string(),
+                "PlcfHdd story count is inconsistent with its section groups".to_string(),
             ));
         }
 
@@ -169,23 +169,28 @@ impl HeadersTable {
         let subdoc_len = subdoc_end.checked_sub(subdoc_start).ok_or_else(|| {
             DocError::Corrupted("header subdocument range is reversed".to_string())
         })?;
-        for pair in cps.windows(2) {
+        for pair in cps[..cps.len() - 1].windows(2) {
             if pair[0] > pair[1] {
                 return Err(DocError::Corrupted(
                     "PlcfHdd character positions are not monotonic".to_string(),
                 ));
             }
         }
-        if cps.iter().any(|&cp| cp > subdoc_len) {
+        if subdoc_len == 0 || cps[..cps.len() - 1].iter().any(|&cp| cp >= subdoc_len) {
             return Err(DocError::Corrupted(
                 "PlcfHdd character position exceeds the header subdocument".to_string(),
+            ));
+        }
+        if cps[cps.len() - 2] != subdoc_len - 1 {
+            return Err(DocError::Corrupted(
+                "PlcfHdd story terminator must equal ccpHdd - 1".to_string(),
             ));
         }
 
         // Build stories from consecutive CP pairs. Slots 0-5 are separator stories,
         // not document headers or footers, so the public table begins at slot 6.
         let mut stories = Vec::new();
-        for i in 6..(cps.len() - 1) {
+        for i in 6..(cps.len() - 2) {
             let start = cps[i];
             let end = cps[i + 1];
 
@@ -435,8 +440,8 @@ mod tests {
 
     #[test]
     fn parses_section_slots_after_separator_stories() {
-        let data = encode_cps(&[0, 1, 2, 3, 4, 5, 6, 7, 10, 11, 12, 13, 14]);
-        let stories = HeadersTable::parse_header_plcf(&data, 100, 114).unwrap();
+        let data = encode_cps(&[0, 1, 2, 3, 4, 5, 6, 7, 10, 11, 12, 13, 14, 15]);
+        let stories = HeadersTable::parse_header_plcf(&data, 100, 115).unwrap();
 
         assert_eq!(stories.len(), 6);
         assert_eq!(stories[0].story_type, HeaderFooterType::EvenPageHeader);
@@ -454,6 +459,7 @@ mod tests {
         assert!(HeadersTable::parse_header_plcf(&[0; 7], 0, 10).is_err());
         assert!(HeadersTable::parse_header_plcf(&encode_cps(&[0, 2, 1]), 0, 10).is_err());
         assert!(HeadersTable::parse_header_plcf(&encode_cps(&[0, 11]), 0, 10).is_err());
-        assert!(HeadersTable::parse_header_plcf(&encode_cps(&[0, 1]), 10, 9).is_err());
+        assert!(HeadersTable::parse_header_plcf(&encode_cps(&[0, 0, 0]), 10, 9).is_err());
+        assert!(HeadersTable::parse_header_plcf(&encode_cps(&[0, 8, 10]), 0, 10).is_err());
     }
 }

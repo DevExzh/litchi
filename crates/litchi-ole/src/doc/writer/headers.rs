@@ -2,8 +2,6 @@
 //!
 //! Generates the PlcfHdd structure and header/footer subdocument content.
 
-use std::io::Write;
-
 /// Header/footer type
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HeaderFooterType {
@@ -66,19 +64,49 @@ impl HeadersWriter {
 
     /// Get the subdocument text content
     ///
-    /// Returns the concatenated text of all headers/footers and the character positions
+    /// Returns UTF-16LE story bytes and all 14 `PlcfHdd` CPs for one section.
     pub fn build_subdocument_text(&self) -> (Vec<u8>, Vec<u32>) {
+        if self.entries.is_empty() {
+            return (Vec::new(), vec![0]);
+        }
+
+        let mut slots: [Option<&str>; 12] = [None; 12];
+        for entry in &self.entries {
+            let index = match entry.hf_type {
+                HeaderFooterType::EvenPageHeader => 6,
+                HeaderFooterType::OddPageHeader => 7,
+                HeaderFooterType::EvenPageFooter => 8,
+                HeaderFooterType::OddPageFooter => 9,
+                HeaderFooterType::FirstPageHeader => 10,
+                HeaderFooterType::FirstPageFooter => 11,
+            };
+            slots[index] = Some(&entry.text);
+        }
+
         let mut text_bytes = Vec::new();
-        let mut char_positions = vec![0u32];
+        let mut char_positions = Vec::with_capacity(14);
         let mut current_pos = 0u32;
 
-        for entry in &self.entries {
-            // Convert text to CP1252 bytes
-            let text = entry.text.as_bytes();
-            text_bytes.extend_from_slice(text);
-            current_pos += text.len() as u32;
+        for text in slots {
             char_positions.push(current_pos);
+            if let Some(text) = text {
+                for unit in text.encode_utf16().chain([0x000D, 0x000D]) {
+                    text_bytes.extend_from_slice(&unit.to_le_bytes());
+                    current_pos = current_pos
+                        .checked_add(1)
+                        .expect("DOC header story exceeds the 32-bit CP range");
+                }
+            }
         }
+
+        // The second-to-last CP terminates the last story at ccpHdd - 1. The header document has
+        // one final paragraph mark whose position is recorded by the ignored last CP.
+        char_positions.push(current_pos);
+        text_bytes.extend_from_slice(&0x000Du16.to_le_bytes());
+        current_pos = current_pos
+            .checked_add(1)
+            .expect("DOC header story exceeds the 32-bit CP range");
+        char_positions.push(current_pos);
 
         (text_bytes, char_positions)
     }
@@ -92,9 +120,8 @@ impl HeadersWriter {
 
         let mut plcf = Vec::new();
 
-        // Write character positions
         for &cp in &char_positions {
-            plcf.write_all(&cp.to_le_bytes()).unwrap();
+            plcf.extend_from_slice(&cp.to_le_bytes());
         }
 
         plcf
@@ -102,7 +129,7 @@ impl HeadersWriter {
 
     /// Get character count for the header subdocument
     pub fn char_count(&self) -> u32 {
-        self.entries.iter().map(|e| e.text.len() as u32).sum()
+        self.build_subdocument_text().1.last().copied().unwrap_or(0)
     }
 
     /// Check if there are any headers/footers
@@ -170,7 +197,7 @@ mod tests {
         let entry = HeaderFooterEntry::new(HeaderFooterType::OddPageHeader, "Test");
         writer.add_entry(entry);
         assert!(!writer.is_empty());
-        assert_eq!(writer.char_count(), 4);
+        assert_eq!(writer.char_count(), 7);
     }
 
     #[test]
@@ -194,8 +221,18 @@ mod tests {
         let mut writer = HeadersWriter::new();
         writer.add_header(HeaderFooterType::OddPageHeader, "Hello");
         let (text_bytes, char_positions) = writer.build_subdocument_text();
-        assert_eq!(text_bytes, b"Hello");
-        assert_eq!(char_positions, vec![0u32, 5u32]);
+        let text = String::from_utf16(
+            &text_bytes
+                .chunks_exact(2)
+                .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
+                .collect::<Vec<_>>(),
+        )
+        .unwrap();
+        assert_eq!(text, "Hello\r\r\r");
+        assert_eq!(char_positions.len(), 14);
+        assert_eq!(&char_positions[..8], &[0; 8]);
+        assert_eq!(&char_positions[8..13], &[7; 5]);
+        assert_eq!(char_positions[13], 8);
     }
 
     #[test]
@@ -204,8 +241,16 @@ mod tests {
         writer.add_header(HeaderFooterType::OddPageHeader, "First");
         writer.add_header(HeaderFooterType::EvenPageHeader, "Second");
         let (text_bytes, char_positions) = writer.build_subdocument_text();
-        assert_eq!(text_bytes, b"FirstSecond");
-        assert_eq!(char_positions, vec![0u32, 5u32, 11u32]);
+        let units = text_bytes
+            .chunks_exact(2)
+            .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
+            .collect::<Vec<_>>();
+        assert_eq!(String::from_utf16(&units).unwrap(), "Second\r\rFirst\r\r\r");
+        assert_eq!(char_positions.len(), 14);
+        assert_eq!(char_positions[6], 0);
+        assert_eq!(char_positions[7], 8);
+        assert_eq!(char_positions[12], 15);
+        assert_eq!(char_positions[13], 16);
     }
 
     #[test]
@@ -226,16 +271,17 @@ mod tests {
         writer.add_header(HeaderFooterType::OddPageHeader, "Header");
         writer.add_header(HeaderFooterType::OddPageFooter, "Footer");
         let plcf = writer.build_plcfhdd();
-        // Should contain 3 character positions (0, 6, 12)
-        assert_eq!(plcf.len(), 12); // 3 * 4 bytes
-
-        let cp0 = u32::from_le_bytes([plcf[0], plcf[1], plcf[2], plcf[3]]);
-        let cp1 = u32::from_le_bytes([plcf[4], plcf[5], plcf[6], plcf[7]]);
-        let cp2 = u32::from_le_bytes([plcf[8], plcf[9], plcf[10], plcf[11]]);
-
-        assert_eq!(cp0, 0u32);
-        assert_eq!(cp1, 6u32);
-        assert_eq!(cp2, 12u32);
+        assert_eq!(plcf.len(), 56); // 14 CPs
+        let cps = plcf
+            .chunks_exact(4)
+            .map(|chunk| u32::from_le_bytes(chunk.try_into().unwrap()))
+            .collect::<Vec<_>>();
+        assert_eq!(&cps[..8], &[0; 8]);
+        assert_eq!(cps[8], 8);
+        assert_eq!(cps[9], 8);
+        assert_eq!(cps[10], 16);
+        assert_eq!(cps[12], 16);
+        assert_eq!(cps[13], 17);
     }
 
     #[test]
@@ -243,7 +289,19 @@ mod tests {
         let mut writer = HeadersWriter::new();
         writer.add_header(HeaderFooterType::OddPageHeader, "Hello");
         writer.add_header(HeaderFooterType::EvenPageHeader, "World");
-        assert_eq!(writer.char_count(), 10);
+        assert_eq!(writer.char_count(), 15);
+    }
+
+    #[test]
+    fn supplementary_text_uses_utf16_cps_and_duplicate_empty_story_cps() {
+        let mut writer = HeadersWriter::new();
+        writer.add_header(HeaderFooterType::OddPageHeader, "😀");
+
+        let (bytes, cps) = writer.build_subdocument_text();
+        assert_eq!(bytes.len(), 10); // surrogate pair + two story EOPs + document EOP
+        assert_eq!(&cps[..8], &[0; 8]);
+        assert_eq!(&cps[8..13], &[4; 5]);
+        assert_eq!(cps[13], 5);
     }
 
     #[test]

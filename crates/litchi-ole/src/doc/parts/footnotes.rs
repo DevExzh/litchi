@@ -2,7 +2,7 @@
 ///
 /// Based on Apache POI's FootnotesTables and LibreOffice's implementation.
 /// Footnotes and endnotes are stored in separate subdocuments with references in the main text.
-use super::super::package::Result;
+use super::super::package::{DocError, Result};
 use super::fib::FileInformationBlock;
 use crate::plcf::PlcfParser;
 
@@ -83,7 +83,7 @@ impl FootnotesTable {
         let mut references = Vec::new();
 
         // Check if footnotes exist in the document
-        if let Some((subdoc_start, _subdoc_end)) = fib.get_footnote_range() {
+        if let Some((subdoc_start, subdoc_end)) = fib.get_footnote_range() {
             // Parse footnote reference PLCF (plcfFndRef)
             // FIB index 2: fcPlcfFndRef and lcbPlcfFndRef
             if let Some((offset, length)) = fib.get_table_pointer(2)
@@ -111,7 +111,8 @@ impl FootnotesTable {
                                 &ref_plcf,
                                 &txt_plcf_data[..txt_plcf_len],
                                 subdoc_start,
-                            );
+                                subdoc_end,
+                            )?;
                         }
                     }
                 }
@@ -126,12 +127,20 @@ impl FootnotesTable {
         ref_plcf: &PlcfParser,
         txt_plcf_data: &[u8],
         subdoc_start: u32,
-    ) -> Vec<FootnoteReference> {
+        subdoc_end: u32,
+    ) -> Result<Vec<FootnoteReference>> {
         // Parse text PLCF with element_size = 0 (just CPs)
         // Manually parse since PlcfParser expects element_size > 0
+        if txt_plcf_data.len() % 4 != 0 {
+            return Err(DocError::Corrupted(
+                "note text PLCF contains a partial CP".to_string(),
+            ));
+        }
         let cp_count = txt_plcf_data.len() / 4;
-        if cp_count < 2 {
-            return Vec::new();
+        if cp_count != ref_plcf.count() + 2 {
+            return Err(DocError::Corrupted(
+                "note text PLCF count does not match its reference PLCF".to_string(),
+            ));
         }
 
         let mut text_cps = Vec::with_capacity(cp_count);
@@ -141,15 +150,39 @@ impl FootnotesTable {
             }
         }
 
-        let mut references = Vec::new();
+        let subdoc_len = subdoc_end
+            .checked_sub(subdoc_start)
+            .ok_or_else(|| DocError::Corrupted("note subdocument range is reversed".to_string()))?;
+        if subdoc_len == 0
+            || text_cps[..text_cps.len() - 1]
+                .iter()
+                .any(|&cp| cp >= subdoc_len)
+            || text_cps[..text_cps.len() - 1]
+                .windows(2)
+                .any(|pair| pair[0] >= pair[1])
+        {
+            return Err(DocError::Corrupted(
+                "note text PLCF has invalid character positions".to_string(),
+            ));
+        }
+        if text_cps[text_cps.len() - 2] != subdoc_len - 1 {
+            return Err(DocError::Corrupted(
+                "note text PLCF terminator must equal subdocument length minus one".to_string(),
+            ));
+        }
+
+        let mut references = Vec::with_capacity(ref_plcf.count());
         for i in 0..ref_plcf.count() {
             if let Some((ref_cp, _)) = ref_plcf.range(i)
                 && let Some(desc_data) = ref_plcf.property(i)
                 && let Some(descriptor) = FootnoteDescriptor::from_bytes(desc_data)
-                && i < text_cps.len() - 1
             {
-                let text_start = subdoc_start + text_cps[i];
-                let text_end = subdoc_start + text_cps[i + 1];
+                let text_start = subdoc_start.checked_add(text_cps[i]).ok_or_else(|| {
+                    DocError::Corrupted("note text start CP overflows".to_string())
+                })?;
+                let text_end = subdoc_start
+                    .checked_add(text_cps[i + 1])
+                    .ok_or_else(|| DocError::Corrupted("note text end CP overflows".to_string()))?;
 
                 references.push(FootnoteReference::new(
                     ref_cp, text_start, text_end, descriptor,
@@ -157,7 +190,21 @@ impl FootnotesTable {
             }
         }
 
-        references
+        if references.len() != ref_plcf.count() {
+            return Err(DocError::Corrupted(
+                "note reference PLCF contains an invalid descriptor".to_string(),
+            ));
+        }
+        if references
+            .windows(2)
+            .any(|pair| pair[0].ref_cp >= pair[1].ref_cp)
+        {
+            return Err(DocError::Corrupted(
+                "note reference PLCF character positions are not unique and increasing".to_string(),
+            ));
+        }
+
+        Ok(references)
     }
 
     /// Get all footnote references
@@ -207,7 +254,7 @@ impl EndnotesTable {
         let mut references = Vec::new();
 
         // Check if endnotes exist in the document
-        if let Some((subdoc_start, _subdoc_end)) = fib.get_endnote_range() {
+        if let Some((subdoc_start, subdoc_end)) = fib.get_endnote_range() {
             // Parse endnote reference PLCF (plcfEndRef)
             // FIB index 46: fcPlcfEndRef and lcbPlcfEndRef
             if let Some((offset, length)) = fib.get_table_pointer(46)
@@ -235,7 +282,8 @@ impl EndnotesTable {
                                 &ref_plcf,
                                 &txt_plcf_data[..txt_plcf_len],
                                 subdoc_start,
-                            );
+                                subdoc_end,
+                            )?;
                         }
                     }
                 }
@@ -265,6 +313,17 @@ impl EndnotesTable {
 mod tests {
     use super::*;
 
+    fn reference_plcf(cps: &[u32], descriptors: &[u16]) -> PlcfParser {
+        let mut bytes = Vec::new();
+        for cp in cps {
+            bytes.extend_from_slice(&cp.to_le_bytes());
+        }
+        for descriptor in descriptors {
+            bytes.extend_from_slice(&descriptor.to_le_bytes());
+        }
+        PlcfParser::parse(&bytes, 2).unwrap()
+    }
+
     #[test]
     fn test_footnote_descriptor_parsing() {
         let data = [0x01, 0x00]; // number = 1
@@ -278,5 +337,40 @@ mod tests {
         let reference = FootnoteReference::new(100, 5000, 5100, desc);
         assert_eq!(reference.ref_cp, 100);
         assert_eq!(reference.text_length(), 100);
+    }
+
+    #[test]
+    fn parses_spec_terminal_note_character_positions() {
+        let references = reference_plcf(&[1, 10], &[1]);
+        let text_cps = [0u32, 5, 6]
+            .into_iter()
+            .flat_map(u32::to_le_bytes)
+            .collect::<Vec<_>>();
+
+        let parsed =
+            FootnotesTable::parse_footnote_plcfs(&references, &text_cps, 100, 106).unwrap();
+        assert_eq!(parsed.len(), 1);
+        assert_eq!((parsed[0].text_start_cp, parsed[0].text_end_cp), (100, 105));
+        assert_eq!(parsed[0].descriptor.number, 1);
+    }
+
+    #[test]
+    fn rejects_malformed_note_character_positions() {
+        let references = reference_plcf(&[1, 10], &[1]);
+        let encode = |cps: &[u32]| {
+            cps.iter()
+                .flat_map(|cp| cp.to_le_bytes())
+                .collect::<Vec<_>>()
+        };
+
+        assert!(
+            FootnotesTable::parse_footnote_plcfs(&references, &encode(&[0, 0, 5]), 100, 106)
+                .is_err()
+        );
+        assert!(
+            FootnotesTable::parse_footnote_plcfs(&references, &encode(&[0, 3, 5]), 100, 106)
+                .is_err()
+        );
+        assert!(FootnotesTable::parse_footnote_plcfs(&references, &[0; 11], 100, 106).is_err());
     }
 }
