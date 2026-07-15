@@ -150,6 +150,28 @@ keynote.save("created-with-text-box.key")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
 
+Images can be embedded into the same source-free presentation. The image,
+stand-ins, ownership, style link, UUIDs, component data reference, and `Data/*`
+asset are all created directly; no blank Keynote package is embedded:
+
+```rust
+use std::fs;
+use litchi_iwa::keynote::KeynoteDocumentBuilder;
+use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+
+let image = fs::read("chart.png")?;
+let mut keynote = KeynoteDocumentBuilder::new().build()?;
+keynote.add_slide_image(
+    0,
+    "chart.png",
+    &image,
+    DrawablePoint { x: 704.0, y: 284.0 },
+    DrawableSize { width: 512.0, height: 512.0 },
+)?;
+keynote.save("created-with-image.key")?;
+# Ok::<(), litchi_iwa::Error>(())
+```
+
 ### Edit existing documents
 
 ```rust

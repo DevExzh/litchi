@@ -2925,6 +2925,7 @@ mod slide_background_reset;
 mod slide_background_wire;
 mod slide_create;
 mod slide_graph;
+mod slide_images;
 mod slide_layout_media;
 mod slide_layout_update;
 mod slide_movies;
@@ -2950,6 +2951,7 @@ pub use slide_background_gradient::{
     KeynoteGradient, KeynoteGradientAngle, KeynoteGradientKind, KeynoteGradientStop,
 };
 use slide_graph::*;
+pub use slide_images::{KeynoteSlideImageInfo, KeynoteSlideImageKind, RemovedKeynoteSlideImage};
 pub use slide_movies::{KeynoteSlideMovieInfo, KeynoteSlideMovieKind, RemovedKeynoteSlideMovie};
 pub use soundtrack::{KeynoteSoundtrackMode, KeynoteSoundtrackSettings};
 pub use soundtrack_items::KeynoteSoundtrackItemInfo;
