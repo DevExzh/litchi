@@ -12,8 +12,8 @@
 use super::super::package::{DocError, Result};
 use super::numbering::NumberFormat;
 use super::styles::StyleSheet;
-use super::tap::TableProperties;
 pub use super::tap::{CellShading as Shading, ShadingPattern};
+use super::tap::{TableProperties, TableStyleCondition};
 use crate::sprm::{Sprm, parse_sprms};
 use crate::sprm_operations::*;
 use litchi_core::binary::{read_i16_le, read_u16_le};
@@ -108,6 +108,8 @@ pub struct ParagraphProperties {
     pub outline_level: Option<u8>,
     /// Style index (istd)
     pub style_index: Option<u16>,
+    /// Conditional paragraph formatting definitions carried by a table style
+    pub conditional_formats: Vec<ParagraphConditionalFormatting>,
     /// List level (0 through 8, or 12 when list numbering skips this paragraph)
     pub list_level: Option<u8>,
     /// Signed list format override encoding (negative values preserve paragraph indents)
@@ -201,6 +203,17 @@ pub struct NumberingRevisionProperties {
     pub numbers: [u32; 9],
     /// Numbering format string.
     pub format_string: String,
+}
+
+/// Conditional paragraph formatting carried by `sprmPCnf` in a table style.
+#[derive(Debug, Clone)]
+pub struct ParagraphConditionalFormatting {
+    /// Table location or band for which the nested properties apply.
+    pub condition: TableStyleCondition,
+    /// Typed paragraph properties decoded from the nested grpprl.
+    pub properties: Box<ParagraphProperties>,
+    /// Exact nested grpprl retained for lossless preservation.
+    pub raw_grpprl: Vec<u8>,
 }
 
 /// Paragraph justification/alignment.
@@ -1022,6 +1035,11 @@ impl ParagraphProperties {
                 pap.paragraph_group_id = Some(group_id);
                 return Ok(());
             },
+            SPRM_P_CNF => {
+                pap.conditional_formats
+                    .push(Self::parse_conditional_formatting(sprm)?);
+                return Ok(());
+            },
             SPRM_P_RSID => {
                 pap.revision_save_id = Some(sprm.operand_dword().ok_or_else(|| {
                     DocError::Corrupted("sprmPRsid is missing its revision save ID".to_string())
@@ -1682,6 +1700,50 @@ impl ParagraphProperties {
         })
     }
 
+    fn parse_conditional_formatting(sprm: &Sprm) -> Result<ParagraphConditionalFormatting> {
+        let operand = sprm.operand_bytes();
+        if operand.len() < 2 {
+            return Err(DocError::Corrupted(
+                "sprmPCnf must contain a 2-byte condition".to_string(),
+            ));
+        }
+        let code = read_u16_le(operand, 0).map_err(|error| {
+            DocError::Corrupted(format!("sprmPCnf has an invalid condition: {error}"))
+        })?;
+        let condition = TableStyleCondition::from_code(code).ok_or_else(|| {
+            DocError::Corrupted(format!("sprmPCnf contains invalid condition {code:#06x}"))
+        })?;
+        let raw_grpprl = operand[2..].to_vec();
+        let nested = parse_sprms(&raw_grpprl);
+        let consumed = nested
+            .last()
+            .map_or(0, |nested| nested.offset + nested.size);
+        if consumed != raw_grpprl.len() {
+            return Err(DocError::Corrupted(
+                "sprmPCnf nested grpprl is truncated".to_string(),
+            ));
+        }
+        if nested.iter().any(|nested| nested.opcode == SPRM_P_CNF) {
+            return Err(DocError::Corrupted(
+                "sprmPCnf cannot be nested inside another sprmPCnf".to_string(),
+            ));
+        }
+        if nested
+            .iter()
+            .any(|nested| get_sprm_type(nested.opcode) != 1)
+        {
+            return Err(DocError::Corrupted(
+                "sprmPCnf can contain only paragraph SPRMs".to_string(),
+            ));
+        }
+        let properties = Box::new(Self::from_sprm(&raw_grpprl)?);
+        Ok(ParagraphConditionalFormatting {
+            condition,
+            properties,
+            raw_grpprl,
+        })
+    }
+
     fn apply_property_revision(pap: &mut ParagraphProperties, sprm: &Sprm) -> Result<()> {
         let operand = sprm.operand_bytes();
         if operand.len() != 7 {
@@ -2278,6 +2340,7 @@ impl ParagraphProperties {
             || self.shading.is_some()
             || !self.tab_stops.is_empty()
             || self.legacy_autonumbering.is_some()
+            || !self.conditional_formats.is_empty()
     }
 
     /// Get indent in inches.
@@ -2357,6 +2420,42 @@ mod tests {
                     .is_err()
                 );
             }
+        }
+    }
+
+    #[test]
+    fn parses_conditional_table_style_paragraph_formatting_strictly() {
+        let wrap = |condition: u16, nested: &[u8]| {
+            let mut grpprl = SPRM_P_CNF.to_le_bytes().to_vec();
+            grpprl.push((nested.len() + 2) as u8);
+            grpprl.extend_from_slice(&condition.to_le_bytes());
+            grpprl.extend_from_slice(nested);
+            grpprl
+        };
+        let mut nested = SPRM_P_DYA_BEFORE.to_le_bytes().to_vec();
+        nested.extend_from_slice(&120u16.to_le_bytes());
+        nested.extend_from_slice(&SPRM_P_F_KEEP.to_le_bytes());
+        nested.push(1);
+
+        let properties = ParagraphProperties::from_sprm(&wrap(0x0001, &nested)).unwrap();
+        assert_eq!(properties.conditional_formats.len(), 1);
+        let conditional = &properties.conditional_formats[0];
+        assert_eq!(conditional.condition, TableStyleCondition::HeaderRow);
+        assert_eq!(conditional.raw_grpprl, nested);
+        assert_eq!(conditional.properties.space_before, Some(120));
+        assert!(conditional.properties.keep_on_page);
+
+        let recursive = wrap(0x0002, &[]);
+        let character = [SPRM_C_F_BOLD.to_le_bytes().as_slice(), &[1]].concat();
+        let truncated = SPRM_P_DYA_BEFORE.to_le_bytes();
+        for invalid in [
+            [SPRM_P_CNF.to_le_bytes().as_slice(), &[0]].concat(),
+            wrap(0x0003, &[]),
+            wrap(0x0001, &recursive),
+            wrap(0x0001, &character),
+            wrap(0x0001, &truncated),
+        ] {
+            assert!(ParagraphProperties::from_sprm(&invalid).is_err());
         }
     }
 
