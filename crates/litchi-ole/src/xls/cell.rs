@@ -11,6 +11,7 @@ pub struct XlsCell {
     col: u32,
     value: CellValue,
     formula: Option<String>,
+    shared_string_index: Option<u32>,
 }
 
 impl XlsCell {
@@ -21,6 +22,7 @@ impl XlsCell {
             col,
             value,
             formula: None,
+            shared_string_index: None,
         }
     }
 
@@ -31,11 +33,16 @@ impl XlsCell {
             col,
             value,
             formula: Some(formula),
+            shared_string_index: None,
         }
     }
 
     /// Create cell from BIFF record
     pub fn from_record(record: &CellRecord, sst: Option<&[String]>) -> Option<Self> {
+        let shared_string_index = match record {
+            CellRecord::LabelSst { sst_index, .. } => Some(*sst_index),
+            _ => None,
+        };
         let (row, col, value, formula) = match record {
             CellRecord::Blank { row, col, .. } => {
                 (*row as u32, *col as u32, CellValue::Empty, None)
@@ -112,7 +119,13 @@ impl XlsCell {
             col,
             value,
             formula,
+            shared_string_index,
         })
+    }
+
+    /// Original SST index for a BIFF `LabelSst` cell.
+    pub fn shared_string_index(&self) -> Option<u32> {
+        self.shared_string_index
     }
 }
 
@@ -299,6 +312,7 @@ mod tests {
         };
         let cell = XlsCell::from_record(&record, Some(&sst)).unwrap();
         assert!(matches!(cell.value(), CellValue::String(s) if s == "Second"));
+        assert_eq!(cell.shared_string_index(), Some(1));
     }
 
     #[test]

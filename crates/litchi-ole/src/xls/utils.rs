@@ -51,8 +51,8 @@ pub fn parse_short_string(data: &[u8], _encoding: &XlsEncoding) -> XlsResult<Str
     }
 }
 
-/// Parse a string record with length prefix
-pub fn parse_string_record(data: &[u8], encoding: &XlsEncoding) -> XlsResult<String> {
+/// Parse a BIFF8 `XLUnicodeString` with a 16-bit character count.
+pub fn parse_string_record(data: &[u8], _encoding: &XlsEncoding) -> XlsResult<String> {
     if data.len() < 3 {
         return Err(XlsError::InvalidLength {
             expected: 3,
@@ -65,97 +65,20 @@ pub fn parse_string_record(data: &[u8], encoding: &XlsEncoding) -> XlsResult<Str
 
     let high_byte = (flags & 0x01) != 0;
     let offset = 3;
+    let byte_len = len
+        .checked_mul(if high_byte { 2 } else { 1 })
+        .ok_or_else(|| XlsError::InvalidData("XLUnicodeString length overflow".to_string()))?;
 
-    if data.len() < offset + len {
+    if data.len() < offset + byte_len {
         return Err(XlsError::InvalidLength {
-            expected: offset + len,
+            expected: offset + byte_len,
             found: data.len(),
         });
     }
 
-    let string_data = &data[offset..offset + len];
+    let string_data = &data[offset..offset + byte_len];
 
-    // For BIFF8, handle UTF-16
-    if matches!(encoding, XlsEncoding::Utf16Le) && high_byte {
-        if len % 2 != 0 {
-            return Err(XlsError::Encoding(
-                "Invalid UTF-16 string length".to_string(),
-            ));
-        }
-        let utf16_data: Vec<u16> = string_data
-            .chunks_exact(2)
-            .map(|chunk| {
-                U16::<LE>::read_from_bytes(chunk)
-                    .map(|v| v.get())
-                    .unwrap_or(0)
-            })
-            .collect();
-        Ok(String::from_utf16(&utf16_data)
-            .map_err(|e| XlsError::Encoding(format!("UTF-16 decoding error: {}", e)))?)
-    } else {
-        // Assume Latin-1 or compatible encoding
-        Ok(String::from_utf8(string_data.to_vec())
-            .unwrap_or_else(|_| String::from_utf8_lossy(string_data).into_owned()))
-    }
-}
-
-/// Parse a Unicode string from SST or other records
-#[allow(dead_code)]
-pub fn parse_unicode_string(data: &[u8], encoding: &XlsEncoding) -> XlsResult<(String, usize)> {
-    if data.len() < 3 {
-        return Err(XlsError::InvalidLength {
-            expected: 3,
-            found: data.len(),
-        });
-    }
-
-    let cch = binary::read_u16_le_at(data, 0)? as usize;
-    let flags = data[2];
-
-    let mut offset = 3;
-    let high_byte = (flags & 0x01) != 0;
-
-    // Handle rich text formatting (skip for now)
-    if (flags & 0x08) != 0 {
-        if data.len() < offset + 2 {
-            return Err(XlsError::InvalidLength {
-                expected: offset + 2,
-                found: data.len(),
-            });
-        }
-        let c_run = binary::read_u16_le_at(data, offset)?;
-        offset += 2 + 4 * c_run as usize; // Skip formatting runs
-    }
-
-    // Handle extended text (skip for now)
-    if (flags & 0x04) != 0 {
-        if data.len() < offset + 4 {
-            return Err(XlsError::InvalidLength {
-                expected: offset + 4,
-                found: data.len(),
-            });
-        }
-        let cb_ext_rst = binary::read_u32_le_at(data, offset)?;
-        offset += 4 + cb_ext_rst as usize; // Skip extended data
-    }
-
-    if data.len() < offset + cch {
-        return Err(XlsError::InvalidLength {
-            expected: offset + cch,
-            found: data.len(),
-        });
-    }
-
-    let string_data = &data[offset..offset + cch];
-    let consumed = offset + cch;
-
-    let string = if matches!(encoding, XlsEncoding::Utf16Le) && high_byte {
-        // UTF-16 LE
-        if cch % 2 != 0 {
-            return Err(XlsError::Encoding(
-                "Invalid UTF-16 string length".to_string(),
-            ));
-        }
+    if high_byte {
         let utf16_data: Vec<u16> = string_data
             .chunks_exact(2)
             .map(|chunk| {
@@ -165,14 +88,12 @@ pub fn parse_unicode_string(data: &[u8], encoding: &XlsEncoding) -> XlsResult<(S
             })
             .collect();
         String::from_utf16(&utf16_data)
-            .map_err(|e| XlsError::Encoding(format!("UTF-16 decoding error: {}", e)))?
+            .map_err(|error| XlsError::Encoding(format!("UTF-16 decoding error: {error}")))
     } else {
-        // Assume compatible encoding
-        String::from_utf8(string_data.to_vec())
-            .unwrap_or_else(|_| String::from_utf8_lossy(string_data).into_owned())
-    };
-
-    Ok((string, consumed))
+        // Compressed Unicode supplies an implicit zero high byte; CODEPAGE
+        // does not apply to this BIFF8 structure.
+        Ok(string_data.iter().map(|&byte| byte as char).collect())
+    }
 }
 
 /// Convert RK value to f64
@@ -339,6 +260,27 @@ pub fn excel_date_to_datetime(serial: f64, is_1904: bool) -> Option<chrono::Naiv
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parses_xl_unicode_string_character_counts() {
+        let utf16 = [2, 0, 1, 0x22, 0x6F, 0x57, 0x5B];
+        assert_eq!(
+            parse_string_record(&utf16, &XlsEncoding::Utf16Le).unwrap(),
+            "漢字"
+        );
+
+        let compressed = [1, 0, 0, 0xC0];
+        assert_eq!(
+            parse_string_record(&compressed, &XlsEncoding::Codepage(1251)).unwrap(),
+            "À"
+        );
+    }
+
+    #[test]
+    fn rejects_truncated_xl_unicode_string() {
+        let truncated = [2, 0, 1, 0x22, 0x6F];
+        assert!(parse_string_record(&truncated, &XlsEncoding::Utf16Le).is_err());
+    }
 
     #[test]
     fn test_column_index_to_name() {

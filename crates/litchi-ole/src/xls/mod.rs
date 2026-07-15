@@ -49,6 +49,10 @@ pub mod writer;
 
 pub use cell::XlsCell;
 pub use error::{XlsError, XlsResult};
+pub use records::{
+    PhoneticAlignment, PhoneticRun, PhoneticString, PhoneticType, SharedStringFormatRun,
+    SharedStringProperties,
+};
 pub use shapes::XlsShape;
 pub use workbook::XlsWorkbook;
 pub use worksheet::XlsWorksheet;

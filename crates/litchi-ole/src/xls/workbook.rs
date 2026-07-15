@@ -5,7 +5,7 @@ use crate::xls::error::{XlsError, XlsResult};
 use crate::xls::pivot_table::PivotTable;
 use crate::xls::records::{
     BiffVersion, BofRecord, BoundSheetRecord, CellRecord, DimensionsRecord, RecordIter,
-    SharedStringTable, XlsEncoding,
+    SharedStringProperties, SharedStringTable, XlsEncoding,
 };
 use crate::xls::worksheet::XlsWorksheet;
 use crate::xls::{autofilter, comments, hyperlinks, merged_cells, pivot_table, protection};
@@ -22,6 +22,9 @@ pub struct XlsWorkbook<R: Read + Seek> {
     worksheet_names: Vec<String>,
     /// Shared string table (Arc for zero-copy sharing across worksheets)
     shared_strings: Option<Arc<Vec<String>>>,
+    /// Sparse rich-text and phonetic properties parallel to `shared_strings`.
+    shared_string_properties: Option<Arc<Vec<Option<Box<SharedStringProperties>>>>>,
+    shared_string_reference_count: u32,
     biff_version: BiffVersion,
     is_1904_date_system: bool,
 }
@@ -36,6 +39,8 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             worksheets: Vec::new(),
             worksheet_names: Vec::new(),
             shared_strings: None,
+            shared_string_properties: None,
+            shared_string_reference_count: 0,
             biff_version: BiffVersion::Biff8,
             is_1904_date_system: false,
         };
@@ -58,6 +63,8 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             worksheets: Vec::new(),
             worksheet_names: Vec::new(),
             shared_strings: None,
+            shared_string_properties: None,
+            shared_string_reference_count: 0,
             biff_version: BiffVersion::Biff8,
             is_1904_date_system: false,
         };
@@ -78,6 +85,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         let mut encoding = XlsEncoding::from_codepage(1252)?; // Default codepage
         let mut bound_sheets = Vec::new();
         let mut strings = Vec::new();
+        let mut string_properties = Vec::new();
 
         // Parse workbook globals
         self.parse_workbook_globals(
@@ -85,10 +93,12 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             &mut encoding,
             &mut bound_sheets,
             &mut strings,
+            &mut string_properties,
         )?;
 
         // Use Arc for zero-copy sharing across worksheets
         self.shared_strings = Some(Arc::new(strings));
+        self.shared_string_properties = Some(Arc::new(string_properties));
         self.worksheet_names = bound_sheets.iter().map(|s| s.name.clone()).collect();
 
         // Parse worksheets from positions in the workbook stream
@@ -113,6 +123,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         encoding: &mut XlsEncoding,
         bound_sheets: &mut Vec<BoundSheetRecord>,
         strings: &mut Vec<String>,
+        string_properties: &mut Vec<Option<Box<SharedStringProperties>>>,
     ) -> XlsResult<()> {
         // Collect all records first for easier processing
         let mut records = Vec::new();
@@ -161,7 +172,9 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                     }
 
                     let sst = SharedStringTable::parse_from_records(&sst_records, encoding)?;
+                    self.shared_string_reference_count = sst.total_count;
                     strings.extend(sst.strings);
+                    string_properties.extend(sst.properties);
 
                     // Skip the CONTINUE records we consumed
                     i = sst_idx - 1;
@@ -411,6 +424,30 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         self.worksheets
             .get(index)
             .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet index {}", index)))
+    }
+
+    /// Total number of cell references represented by the workbook SST.
+    pub fn shared_string_reference_count(&self) -> u32 {
+        self.shared_string_reference_count
+    }
+
+    /// Rich-text and phonetic properties for a shared-string index.
+    ///
+    /// Returns `None` for an out-of-range index and for an ordinary string
+    /// without either optional BIFF8 payload.
+    pub fn shared_string_properties(&self, index: u32) -> Option<&SharedStringProperties> {
+        self.shared_string_properties
+            .as_ref()?
+            .get(index as usize)?
+            .as_deref()
+    }
+
+    /// Rich-text and phonetic properties for a cell backed by `LabelSst`.
+    pub fn shared_string_properties_for_cell(
+        &self,
+        cell: &XlsCell,
+    ) -> Option<&SharedStringProperties> {
+        self.shared_string_properties(cell.shared_string_index()?)
     }
 }
 

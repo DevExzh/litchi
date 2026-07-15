@@ -332,7 +332,68 @@ impl XlsEncoding {
 /// SST (Shared String Table) record
 #[derive(Debug, Clone)]
 pub struct SharedStringTable {
+    /// Plain text for each shared string, indexed by `LabelSst.isst`.
     pub strings: Vec<String>,
+    /// Optional rich-text or phonetic properties, parallel to [`Self::strings`].
+    ///
+    /// Boxed sparse entries keep the common plain-string case compact.
+    pub properties: Vec<Option<Box<SharedStringProperties>>>,
+    /// Total number of references to shared strings in the workbook.
+    pub total_count: u32,
+}
+
+/// Optional BIFF8 properties attached to a shared string.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SharedStringProperties {
+    /// Font changes in strictly increasing UTF-16 character positions.
+    pub formatting_runs: Vec<SharedStringFormatRun>,
+    /// East Asian phonetic (ruby) text and mappings, when present.
+    pub phonetic: Option<PhoneticString>,
+}
+
+/// A BIFF8 `FormatRun` entry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SharedStringFormatRun {
+    pub character_index: u16,
+    pub font_index: u16,
+}
+
+/// The character repertoire used for BIFF8 phonetic text.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PhoneticType {
+    NarrowKatakana,
+    WideKatakana,
+    Hiragana,
+    Any,
+}
+
+/// Horizontal alignment of BIFF8 phonetic text.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PhoneticAlignment {
+    General,
+    Left,
+    Center,
+    Distributed,
+}
+
+/// East Asian phonetic text stored in an SST `ExtRst` structure.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PhoneticString {
+    pub font_index: u16,
+    pub phonetic_type: PhoneticType,
+    pub alignment: PhoneticAlignment,
+    pub text: String,
+    pub runs: Vec<PhoneticRun>,
+    /// Producer-specific trailing bytes covered by `cbExtRst`.
+    pub extra_data: Vec<u8>,
+}
+
+/// A BIFF8 `PhRuns` mapping from phonetic text to the base string.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PhoneticRun {
+    pub phonetic_text_index: u16,
+    pub base_text_index: u16,
+    pub base_text_length: u16,
 }
 
 impl SharedStringTable {
@@ -341,221 +402,626 @@ impl SharedStringTable {
         if records.is_empty() {
             return Ok(SharedStringTable {
                 strings: Vec::new(),
+                properties: Vec::new(),
+                total_count: 0,
             });
         }
 
-        // Combine all SST and CONTINUE record data
-        let mut combined_data = Vec::new();
-        let mut found_sst = false;
-
-        for record in records {
-            match record.header.record_type {
-                0x00FC => {
-                    // SST
-                    if found_sst {
-                        // Multiple SST records? Shouldn't happen
-                        break;
-                    }
-                    found_sst = true;
-                    // Skip the SST record header (4 bytes record type + 4 bytes length = 8 bytes total)
-                    // But we need to include the SST data header (cstTotal + cstUnique = 8 bytes)
-                    combined_data.extend_from_slice(&record.data);
-                },
-                0x003C => {
-                    // CONTINUE
-                    if found_sst {
-                        combined_data.extend_from_slice(&record.data);
-                    }
-                },
-                _ => {
-                    if found_sst {
-                        // Stop when we hit a non-CONTINUE record after SST
-                        break;
-                    }
-                },
-            }
+        if records[0].header.record_type != 0x00FC {
+            return Err(XlsError::UnexpectedRecordType {
+                expected: 0x00FC,
+                found: records[0].header.record_type,
+            });
         }
-
-        if combined_data.is_empty() {
-            return Ok(SharedStringTable {
-                strings: Vec::new(),
+        if let Some(record) = records
+            .iter()
+            .skip(1)
+            .find(|record| record.header.record_type != 0x003C)
+        {
+            return Err(XlsError::UnexpectedRecordType {
+                expected: 0x003C,
+                found: record.header.record_type,
             });
         }
 
-        Self::parse(&combined_data, encoding)
+        let segments: Vec<&[u8]> = records
+            .iter()
+            .map(|record| record.data.as_slice())
+            .collect();
+        Self::parse_segments(&segments, encoding)
     }
 
     pub fn parse(data: &[u8], encoding: &XlsEncoding) -> XlsResult<Self> {
-        if data.len() < 8 {
-            return Err(XlsError::InvalidLength {
-                expected: 8,
-                found: data.len(),
-            });
-        }
-
-        // Read SST header: cstTotal (4 bytes) and cstUnique (4 bytes)
-        let _cst_total = binary::read_u32_le(data, 0)? as usize; // Total number of strings - kept for future validation
-        let cst_unique = binary::read_u32_le(data, 4)? as usize;
-
-        let mut strings = Vec::with_capacity(cst_unique.min(10000)); // Cap for safety
-        let mut offset = 8;
-
-        // Parse each string entry in SST format
-        for _ in 0..cst_unique {
-            if offset + 3 > data.len() {
-                break;
-            }
-
-            // Parse SST string format: cch (2 bytes) + flags (1 byte) + optional data
-            let cch = binary::read_u16_le(data, offset)? as usize;
-            let flags = data[offset + 2];
-
-            let mut consumed = 3; // cch + flags
-
-            // Rich text formatting (optional)
-            if (flags & 0x08) != 0 {
-                if offset + consumed + 2 > data.len() {
-                    break;
-                }
-                let c_run = binary::read_u16_le(data, offset + consumed)?;
-                consumed += 2;
-                // Skip the formatting runs (4 bytes each)
-                consumed += c_run as usize * 4;
-            }
-
-            // Phonetic information (optional)
-            if (flags & 0x04) != 0 {
-                if offset + consumed + 4 > data.len() {
-                    break;
-                }
-                let cb_phonetic = binary::read_u32_le(data, offset + consumed)?;
-                consumed += 4;
-                // Skip the phonetic data
-                consumed += cb_phonetic as usize;
-            }
-
-            // String data
-            let is_unicode = (flags & 0x01) != 0;
-            let string_len = if is_unicode { cch * 2 } else { cch };
-
-            if offset + consumed + string_len > data.len() {
-                break;
-            }
-
-            let string_data = &data[offset + consumed..offset + consumed + string_len];
-
-            let string = if is_unicode {
-                // UTF-16 LE
-                String::from_utf16(
-                    &string_data
-                        .chunks_exact(2)
-                        .map(|chunk| {
-                            U16::<LE>::read_from_bytes(chunk)
-                                .map(|v| v.get())
-                                .unwrap_or(0)
-                        })
-                        .collect::<Vec<_>>(),
-                )
-                .unwrap_or_default()
-            } else {
-                // 8-bit characters
-                encoding.decode(string_data).unwrap_or_default()
-            };
-
-            strings.push(string);
-            offset += consumed + string_len;
-        }
-
-        Ok(SharedStringTable { strings })
+        Self::parse_segments(&[data], encoding)
     }
 
-    /// Parse a single string entry from SST data
-    #[allow(dead_code)]
-    fn parse_string_entry(data: &[u8], encoding: &XlsEncoding) -> XlsResult<(String, usize)> {
-        if data.len() < 3 {
-            return Err(XlsError::InvalidLength {
-                expected: 3,
-                found: data.len(),
-            });
+    fn parse_segments(segments: &[&[u8]], _encoding: &XlsEncoding) -> XlsResult<Self> {
+        let mut cursor = SstCursor::new(segments);
+        cursor.ensure_current(8, "SST header")?;
+        let total_count = cursor.read_u32_continued("SST total count")?;
+        let unique_count = cursor.read_u32_continued("SST unique count")?;
+        if total_count > i32::MAX as u32 || unique_count > i32::MAX as u32 {
+            return Err(XlsError::InvalidData(
+                "SST counts must be non-negative signed integers".to_string(),
+            ));
+        }
+        if total_count < unique_count {
+            return Err(XlsError::InvalidData(
+                "SST total count is smaller than its unique count".to_string(),
+            ));
         }
 
-        // Read string header: cch (2 bytes) and flags (1 byte)
-        let cch = binary::read_u16_le(data, 0)? as usize;
-        let flags = data[2];
-
-        let mut offset = 3;
-        let mut consumed = 3;
-
-        // Rich text formatting (optional)
-        if (flags & 0x08) != 0 {
-            if offset + 2 > data.len() {
-                return Err(XlsError::InvalidData(
-                    "Incomplete rich text header".to_string(),
-                ));
-            }
-            let _c_run = binary::read_u16_le(data, offset)?;
-            offset += 2;
-            consumed += 2;
+        let unique_count = unique_count as usize;
+        let available = segments.iter().map(|segment| segment.len()).sum::<usize>();
+        if unique_count > available.saturating_sub(8) / 3 {
+            return Err(XlsError::InvalidData(format!(
+                "SST declares {unique_count} strings but its records are too short"
+            )));
         }
 
-        // Phonetic information (optional)
-        if (flags & 0x04) != 0 {
-            if offset + 4 > data.len() {
-                return Err(XlsError::InvalidData(
-                    "Incomplete phonetic header".to_string(),
-                ));
-            }
-            let _cch_phonetic = binary::read_u32_le(data, offset)?;
-            offset += 4;
-            consumed += 4;
+        let mut strings = Vec::new();
+        let mut properties = Vec::new();
+        strings.try_reserve_exact(unique_count).map_err(|error| {
+            XlsError::InvalidData(format!("cannot allocate SST string index: {error}"))
+        })?;
+        properties
+            .try_reserve_exact(unique_count)
+            .map_err(|error| {
+                XlsError::InvalidData(format!("cannot allocate SST property index: {error}"))
+            })?;
+
+        for string_index in 0..unique_count {
+            cursor.ensure_current(3, "shared string header")?;
+            let character_count = cursor.read_u16_continued("shared string character count")?;
+            let flags = cursor.read_u8_continued("shared string flags")?;
+
+            let run_count = if flags & 0x08 != 0 {
+                cursor.ensure_current(2, "shared string rich-text count")?;
+                cursor.read_u16_continued("shared string rich-text count")?
+            } else {
+                0
+            };
+            let extension_length = if flags & 0x04 != 0 {
+                cursor.ensure_current(4, "shared string extension length")?;
+                let length = cursor.read_u32_continued("shared string extension length")?;
+                if length > i32::MAX as u32 {
+                    return Err(XlsError::InvalidData(format!(
+                        "shared string {string_index} has a negative extension length"
+                    )));
+                }
+                length as usize
+            } else {
+                0
+            };
+
+            let text = cursor.read_characters(character_count, flags & 0x01 != 0)?;
+            let formatting_runs =
+                cursor.read_formatting_runs(run_count, character_count, string_index)?;
+            let phonetic = if flags & 0x04 != 0 {
+                let extension = cursor.read_bytes(extension_length, "shared string ExtRst")?;
+                Some(parse_phonetic_string(
+                    &extension,
+                    character_count,
+                    string_index,
+                )?)
+            } else {
+                None
+            };
+            let property = if formatting_runs.is_empty() && phonetic.is_none() {
+                None
+            } else {
+                Some(Box::new(SharedStringProperties {
+                    formatting_runs,
+                    phonetic,
+                }))
+            };
+            strings.push(text);
+            properties.push(property);
         }
 
-        // String data
-        let is_unicode = (flags & 0x01) != 0;
-        let string_data;
-        let string_consumed;
+        Ok(SharedStringTable {
+            strings,
+            properties,
+            total_count,
+        })
+    }
+}
 
-        if is_unicode {
-            // UTF-16 LE
-            let expected_bytes = cch * 2;
-            if offset + expected_bytes > data.len() {
+struct SstCursor<'a> {
+    segments: &'a [&'a [u8]],
+    segment_index: usize,
+    offset: usize,
+}
+
+impl<'a> SstCursor<'a> {
+    fn new(segments: &'a [&'a [u8]]) -> Self {
+        Self {
+            segments,
+            segment_index: 0,
+            offset: 0,
+        }
+    }
+
+    fn current(&self) -> &'a [u8] {
+        self.segments
+            .get(self.segment_index)
+            .copied()
+            .unwrap_or_default()
+    }
+
+    fn remaining(&self) -> usize {
+        self.current().len().saturating_sub(self.offset)
+    }
+
+    fn ensure_current(&mut self, required: usize, context: &str) -> XlsResult<()> {
+        while self.remaining() == 0 && self.segment_index + 1 < self.segments.len() {
+            self.advance_segment(context)?;
+        }
+        if self.remaining() < required {
+            return Err(XlsError::UnexpectedEndOfStream(format!(
+                "{context} must fit in one BIFF record"
+            )));
+        }
+        Ok(())
+    }
+
+    fn remaining_total(&self) -> usize {
+        self.remaining()
+            + self
+                .segments
+                .iter()
+                .skip(self.segment_index + 1)
+                .map(|segment| segment.len())
+                .sum::<usize>()
+    }
+
+    fn advance_segment(&mut self, context: &str) -> XlsResult<()> {
+        self.segment_index += 1;
+        self.offset = 0;
+        if self.segment_index >= self.segments.len() {
+            return Err(XlsError::UnexpectedEndOfStream(context.to_string()));
+        }
+        Ok(())
+    }
+
+    fn read_u8_continued(&mut self, context: &str) -> XlsResult<u8> {
+        if self.remaining() == 0 {
+            self.advance_segment(context)?;
+        }
+        let value = self.current()[self.offset];
+        self.offset += 1;
+        Ok(value)
+    }
+
+    fn read_u16_continued(&mut self, context: &str) -> XlsResult<u16> {
+        let mut bytes = [0; 2];
+        self.read_exact(&mut bytes, context)?;
+        Ok(u16::from_le_bytes(bytes))
+    }
+
+    fn read_u32_continued(&mut self, context: &str) -> XlsResult<u32> {
+        let mut bytes = [0; 4];
+        self.read_exact(&mut bytes, context)?;
+        Ok(u32::from_le_bytes(bytes))
+    }
+
+    fn read_exact(&mut self, output: &mut [u8], context: &str) -> XlsResult<()> {
+        let mut written = 0;
+        while written < output.len() {
+            if self.remaining() == 0 {
+                self.advance_segment(context)?;
+            }
+            let count = self.remaining().min(output.len() - written);
+            output[written..written + count]
+                .copy_from_slice(&self.current()[self.offset..self.offset + count]);
+            self.offset += count;
+            written += count;
+        }
+        Ok(())
+    }
+
+    fn read_bytes(&mut self, length: usize, context: &str) -> XlsResult<Vec<u8>> {
+        if length > self.remaining_total() {
+            return Err(XlsError::UnexpectedEndOfStream(context.to_string()));
+        }
+        let mut bytes = Vec::new();
+        bytes.try_reserve_exact(length).map_err(|error| {
+            XlsError::InvalidData(format!("cannot allocate {context}: {error}"))
+        })?;
+        bytes.resize(length, 0);
+        self.read_exact(&mut bytes, context)?;
+        Ok(bytes)
+    }
+
+    fn read_characters(&mut self, count: u16, mut high_byte: bool) -> XlsResult<String> {
+        let mut characters = Vec::with_capacity(count as usize);
+        while characters.len() < count as usize {
+            let bytes_per_character = if high_byte { 2 } else { 1 };
+            let available_characters = self.remaining() / bytes_per_character;
+            let wanted = count as usize - characters.len();
+            let chunk_characters = available_characters.min(wanted);
+
+            if high_byte && self.remaining() % 2 != 0 && chunk_characters < wanted {
                 return Err(XlsError::InvalidData(
-                    "Incomplete Unicode string".to_string(),
+                    "a UTF-16 shared string is split inside a code unit".to_string(),
                 ));
             }
-            string_data = &data[offset..offset + expected_bytes];
-            string_consumed = expected_bytes;
-
-            // Convert UTF-16 LE to String
-            let utf16_words: Vec<u16> = string_data
-                .chunks_exact(2)
-                .map(|chunk| {
-                    U16::<LE>::read_from_bytes(chunk)
-                        .map(|v| v.get())
-                        .unwrap_or(0)
-                })
-                .collect();
-
-            match String::from_utf16(&utf16_words) {
-                Ok(s) => Ok((s, consumed + string_consumed)),
-                Err(e) => Err(XlsError::InvalidData(format!("Invalid UTF-16: {}", e))),
+            for _ in 0..chunk_characters {
+                let character = if high_byte {
+                    let low = self.current()[self.offset];
+                    let high = self.current()[self.offset + 1];
+                    self.offset += 2;
+                    u16::from_le_bytes([low, high])
+                } else {
+                    let character = self.current()[self.offset] as u16;
+                    self.offset += 1;
+                    character
+                };
+                characters.push(character);
             }
-        } else {
-            // Compressed (8-bit characters)
-            if offset + cch > data.len() {
+
+            if characters.len() == count as usize {
+                break;
+            }
+            if self.remaining() != 0 {
                 return Err(XlsError::InvalidData(
-                    "Incomplete compressed string".to_string(),
+                    "shared string character data does not end at a record boundary".to_string(),
                 ));
             }
-            string_data = &data[offset..offset + cch];
-            string_consumed = cch;
+            self.advance_segment("continued shared string character data")?;
+            let continuation_flags = self.read_u8_continued("shared string continuation flags")?;
+            if continuation_flags > 1 {
+                return Err(XlsError::InvalidData(format!(
+                    "invalid shared string continuation flags 0x{continuation_flags:02X}"
+                )));
+            }
+            high_byte = continuation_flags == 1;
+        }
 
-            // Convert using the specified encoding
-            match encoding.decode(string_data) {
-                Ok(s) => Ok((s, consumed + string_consumed)),
-                Err(e) => Err(XlsError::InvalidData(format!("Encoding error: {}", e))),
+        String::from_utf16(&characters)
+            .map_err(|error| XlsError::Encoding(format!("UTF-16 decoding error: {error}")))
+    }
+
+    fn read_formatting_runs(
+        &mut self,
+        count: u16,
+        character_count: u16,
+        string_index: usize,
+    ) -> XlsResult<Vec<SharedStringFormatRun>> {
+        let mut runs = Vec::with_capacity(count as usize);
+        let mut previous = None;
+        for _ in 0..count {
+            let character_index = self.read_u16_continued("shared string formatting run")?;
+            let font_index = self.read_u16_continued("shared string formatting run")?;
+            if character_index > character_count {
+                return Err(XlsError::InvalidData(format!(
+                    "shared string {string_index} has a formatting run past its text"
+                )));
+            }
+            if previous.is_some_and(|value| character_index <= value) {
+                return Err(XlsError::InvalidData(format!(
+                    "shared string {string_index} formatting runs are not strictly increasing"
+                )));
+            }
+            previous = Some(character_index);
+            if character_index < character_count {
+                runs.push(SharedStringFormatRun {
+                    character_index,
+                    font_index,
+                });
             }
         }
+        Ok(runs)
+    }
+}
+
+fn parse_phonetic_string(
+    data: &[u8],
+    base_character_count: u16,
+    string_index: usize,
+) -> XlsResult<PhoneticString> {
+    if data.len() < 14 {
+        return Err(XlsError::InvalidLength {
+            expected: 14,
+            found: data.len(),
+        });
+    }
+    // Both the marker and inner byte count are producer-controlled reserved
+    // compatibility fields. MS-XLS requires readers to ignore the marker, and
+    // Excel/POI accept stale inner counts while honoring outer cbExtRst.
+    let _reserved = binary::read_u16_le(data, 0)?;
+    let _payload_length = binary::read_u16_le(data, 2)?;
+
+    let font_index = binary::read_u16_le(data, 4)?;
+    let options = binary::read_u16_le(data, 6)?;
+    let phonetic_type = match options & 0x0003 {
+        0 => PhoneticType::NarrowKatakana,
+        1 => PhoneticType::WideKatakana,
+        2 => PhoneticType::Hiragana,
+        _ => PhoneticType::Any,
+    };
+    let alignment = match (options >> 2) & 0x0003 {
+        0 => PhoneticAlignment::General,
+        1 => PhoneticAlignment::Left,
+        2 => PhoneticAlignment::Center,
+        _ => PhoneticAlignment::Distributed,
+    };
+
+    let run_count = binary::read_u16_le(data, 8)?;
+    let character_count = binary::read_u16_le(data, 10)?;
+    let repeated_character_count = binary::read_u16_le(data, 12)?;
+    if run_count > 32767 || character_count > 32767 || character_count != repeated_character_count {
+        return Err(XlsError::InvalidData(format!(
+            "shared string {string_index} has invalid ExtRst string counts"
+        )));
+    }
+    let text_byte_length = usize::from(character_count)
+        .checked_mul(2)
+        .ok_or_else(|| XlsError::InvalidData("ExtRst text length overflow".to_string()))?;
+    let run_byte_length = usize::from(run_count)
+        .checked_mul(6)
+        .ok_or_else(|| XlsError::InvalidData("ExtRst run length overflow".to_string()))?;
+    let required = 14usize
+        .checked_add(text_byte_length)
+        .and_then(|length| length.checked_add(run_byte_length))
+        .ok_or_else(|| XlsError::InvalidData("ExtRst length overflow".to_string()))?;
+    if required > data.len() {
+        return Err(XlsError::InvalidLength {
+            expected: required,
+            found: data.len(),
+        });
+    }
+
+    let text_bytes = &data[14..14 + text_byte_length];
+    let text_words: Vec<u16> = text_bytes
+        .chunks_exact(2)
+        .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
+        .collect();
+    let text = String::from_utf16(&text_words)
+        .map_err(|error| XlsError::Encoding(format!("ExtRst UTF-16 decoding error: {error}")))?;
+
+    let mut runs = Vec::with_capacity(run_count as usize);
+    let mut offset = 14 + text_byte_length;
+    let mut previous_phonetic = None;
+    let mut previous_base = None;
+    let mut total_base_length = 0usize;
+    for _ in 0..run_count {
+        let phonetic_text_index = binary::read_u16_le(data, offset)?;
+        let base_text_index = binary::read_u16_le(data, offset + 2)?;
+        let base_text_length = binary::read_u16_le(data, offset + 4)?;
+        if phonetic_text_index > 32767
+            || base_text_index > 32767
+            || base_text_length > 32767
+            || phonetic_text_index >= character_count
+            || base_text_index >= base_character_count
+            || previous_phonetic.is_some_and(|value| phonetic_text_index <= value)
+            || previous_base.is_some_and(|value| base_text_index <= value)
+        {
+            return Err(XlsError::InvalidData(format!(
+                "shared string {string_index} has an invalid ExtRst phonetic run"
+            )));
+        }
+        total_base_length = total_base_length.saturating_add(base_text_length as usize);
+        previous_phonetic = Some(phonetic_text_index);
+        previous_base = Some(base_text_index);
+        runs.push(PhoneticRun {
+            phonetic_text_index,
+            base_text_index,
+            base_text_length,
+        });
+        offset += 6;
+    }
+    if total_base_length > base_character_count as usize {
+        return Err(XlsError::InvalidData(format!(
+            "shared string {string_index} ExtRst runs exceed the base string"
+        )));
+    }
+
+    Ok(PhoneticString {
+        font_index,
+        phonetic_type,
+        alignment,
+        text,
+        runs,
+        extra_data: data[required..].to_vec(),
+    })
+}
+
+#[cfg(test)]
+mod shared_string_tests {
+    use super::*;
+
+    fn record(record_type: u16, data: Vec<u8>) -> Record {
+        Record {
+            header: RecordHeader {
+                record_type,
+                data_len: data.len() as u16,
+            },
+            data,
+        }
+    }
+
+    fn sst_header(total: u32, unique: u32) -> Vec<u8> {
+        let mut data = Vec::new();
+        data.extend_from_slice(&total.to_le_bytes());
+        data.extend_from_slice(&unique.to_le_bytes());
+        data
+    }
+
+    #[test]
+    fn parses_plain_compressed_and_utf16_strings() {
+        let mut data = sst_header(3, 2);
+        data.extend_from_slice(&[2, 0, 0, b'A', 0xC0]);
+        data.extend_from_slice(&[1, 0, 1, 0x22, 0x6F]);
+
+        let table = SharedStringTable::parse(&data, &XlsEncoding::Codepage(1251)).unwrap();
+
+        assert_eq!(table.total_count, 3);
+        // BIFF8 compressed Unicode supplies an implicit zero high byte; it is
+        // not encoded in the workbook CODEPAGE.
+        assert_eq!(table.strings, ["AÀ", "漢"]);
+        assert_eq!(table.properties, [None, None]);
+    }
+
+    #[test]
+    fn ignores_reserved_shared_string_flags() {
+        let mut data = sst_header(1, 1);
+        data.extend_from_slice(&[1, 0, 0xF2, b'A']);
+
+        let table = SharedStringTable::parse(&data, &XlsEncoding::Utf16Le).unwrap();
+
+        assert_eq!(table.strings, ["A"]);
+    }
+
+    #[test]
+    fn parses_rich_text_after_the_character_data() {
+        let mut data = sst_header(1, 1);
+        data.extend_from_slice(&5u16.to_le_bytes());
+        data.push(0x08);
+        data.extend_from_slice(&2u16.to_le_bytes());
+        data.extend_from_slice(b"Hello");
+        data.extend_from_slice(&0u16.to_le_bytes());
+        data.extend_from_slice(&1u16.to_le_bytes());
+        data.extend_from_slice(&2u16.to_le_bytes());
+        data.extend_from_slice(&3u16.to_le_bytes());
+
+        let table = SharedStringTable::parse(&data, &XlsEncoding::Utf16Le).unwrap();
+        let properties = table.properties[0].as_deref().unwrap();
+
+        assert_eq!(table.strings[0], "Hello");
+        assert_eq!(
+            properties.formatting_runs,
+            [
+                SharedStringFormatRun {
+                    character_index: 0,
+                    font_index: 1,
+                },
+                SharedStringFormatRun {
+                    character_index: 2,
+                    font_index: 3,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn parses_phonetic_text_and_mappings() {
+        let mut extension = Vec::new();
+        extension.extend_from_slice(&1u16.to_le_bytes());
+        extension.extend_from_slice(&20u16.to_le_bytes());
+        extension.extend_from_slice(&7u16.to_le_bytes());
+        extension.extend_from_slice(&10u16.to_le_bytes()); // Hiragana + centered
+        extension.extend_from_slice(&1u16.to_le_bytes());
+        extension.extend_from_slice(&2u16.to_le_bytes());
+        extension.extend_from_slice(&2u16.to_le_bytes());
+        for character in "とう".encode_utf16() {
+            extension.extend_from_slice(&character.to_le_bytes());
+        }
+        extension.extend_from_slice(&0u16.to_le_bytes());
+        extension.extend_from_slice(&0u16.to_le_bytes());
+        extension.extend_from_slice(&2u16.to_le_bytes());
+        assert_eq!(extension.len(), 24);
+
+        let mut data = sst_header(1, 1);
+        data.extend_from_slice(&2u16.to_le_bytes());
+        data.push(0x05);
+        data.extend_from_slice(&(extension.len() as u32).to_le_bytes());
+        for character in "東京".encode_utf16() {
+            data.extend_from_slice(&character.to_le_bytes());
+        }
+        data.extend_from_slice(&extension);
+
+        let table = SharedStringTable::parse(&data, &XlsEncoding::Utf16Le).unwrap();
+        let phonetic = table.properties[0]
+            .as_deref()
+            .unwrap()
+            .phonetic
+            .as_ref()
+            .unwrap();
+
+        assert_eq!(phonetic.font_index, 7);
+        assert_eq!(phonetic.phonetic_type, PhoneticType::Hiragana);
+        assert_eq!(phonetic.alignment, PhoneticAlignment::Center);
+        assert_eq!(phonetic.text, "とう");
+        assert_eq!(
+            phonetic.runs,
+            [PhoneticRun {
+                phonetic_text_index: 0,
+                base_text_index: 0,
+                base_text_length: 2,
+            }]
+        );
+    }
+
+    #[test]
+    fn changes_character_width_at_continue_boundaries() {
+        let mut first = sst_header(1, 1);
+        first.extend_from_slice(&4u16.to_le_bytes());
+        first.push(0);
+        first.extend_from_slice(b"AB");
+        let mut second = vec![1];
+        for character in "漢字".encode_utf16() {
+            second.extend_from_slice(&character.to_le_bytes());
+        }
+
+        let records = [record(0x00FC, first), record(0x003C, second)];
+        let table = SharedStringTable::parse_from_records(&records, &XlsEncoding::Utf16Le).unwrap();
+
+        assert_eq!(table.strings, ["AB漢字"]);
+    }
+
+    #[test]
+    fn reads_formatting_runs_split_across_continue_records() {
+        let mut first = sst_header(1, 1);
+        first.extend_from_slice(&2u16.to_le_bytes());
+        first.push(0x08);
+        first.extend_from_slice(&1u16.to_le_bytes());
+        first.extend_from_slice(b"AB");
+        first.push(1); // first byte of character_index
+        let second = vec![0, 9, 0];
+
+        let records = [record(0x00FC, first), record(0x003C, second)];
+        let table = SharedStringTable::parse_from_records(&records, &XlsEncoding::Utf16Le).unwrap();
+
+        assert_eq!(
+            table.properties[0].as_deref().unwrap().formatting_runs,
+            [SharedStringFormatRun {
+                character_index: 1,
+                font_index: 9,
+            }]
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_continue_flags_and_truncated_extensions() {
+        let mut first = sst_header(1, 1);
+        first.extend_from_slice(&2u16.to_le_bytes());
+        first.push(0);
+        first.push(b'A');
+        let bad_flags = [record(0x00FC, first), record(0x003C, vec![2, b'B'])];
+        assert!(SharedStringTable::parse_from_records(&bad_flags, &XlsEncoding::Utf16Le).is_err());
+
+        let mut truncated = sst_header(1, 1);
+        truncated.extend_from_slice(&1u16.to_le_bytes());
+        truncated.push(0x04);
+        truncated.extend_from_slice(&100u32.to_le_bytes());
+        truncated.push(b'A');
+        assert!(SharedStringTable::parse(&truncated, &XlsEncoding::Utf16Le).is_err());
+    }
+
+    #[test]
+    fn reads_writer_generated_multirecord_sst() {
+        let expected = vec!["a".repeat(9000), "漢".repeat(5000)];
+        let mut bytes = Vec::new();
+        crate::xls::writer::biff::write_sst(&mut bytes, &expected, 2).unwrap();
+        let records: Vec<Record> = RecordIter::new(std::io::Cursor::new(bytes))
+            .unwrap()
+            .collect::<XlsResult<_>>()
+            .unwrap();
+
+        let table = SharedStringTable::parse_from_records(&records, &XlsEncoding::Utf16Le).unwrap();
+
+        assert_eq!(table.strings, expected);
     }
 }
 
