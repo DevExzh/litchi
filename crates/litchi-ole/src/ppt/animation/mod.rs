@@ -23,9 +23,11 @@ pub use triggers::{
     NextCondition, PreviousCondition, RepeatBehavior,
 };
 pub use types::{
-    AfterEffect, AnimationEffect, AnimationInfo, AnimationTrigger, BuildInfo, BuildLevel,
-    BuildType, EffectDirection, EffectSpeed, FillMode, LegacyAnimationAtom, LegacyAnimationBuild,
-    LegacyAnimationEffect, LegacyTextBuildSubEffect, RestartMode, ShapeAnimation,
-    TimeNodeContainer, TimeNodeType,
+    AfterEffect, AnimationEffect, AnimationInfo, AnimationTrigger, BuildAtom, BuildInfo,
+    BuildLevel, BuildList, BuildListEntry, BuildType, ChartBuild, ChartBuildAtom, ChartBuildType,
+    DiagramBuild, DiagramBuildAtom, DiagramBuildType, EffectDirection, EffectSpeed, FillMode,
+    LegacyAnimationAtom, LegacyAnimationBuild, LegacyAnimationEffect, LegacyTextBuildSubEffect,
+    ParagraphBuild, ParagraphBuildAtom, ParagraphBuildLevel, ParagraphBuildType, RestartMode,
+    ShapeAnimation, TimeNodeContainer, TimeNodeType,
 };
 pub use writer::{write_animation_info, write_animation_info_atom, write_build_list};

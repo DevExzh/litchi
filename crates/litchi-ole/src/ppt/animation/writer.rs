@@ -3,9 +3,9 @@
 //! Writes PowerPoint binary animation records from structured types.
 
 use super::types::{
-    AfterEffect, AnimationEffect, AnimationInfo, AnimationTrigger, BuildInfo, BuildLevel,
-    BuildType, EffectDirection, EffectSpeed, LegacyAnimationAtom, LegacyAnimationBuild,
-    LegacyAnimationEffect, LegacyTextBuildSubEffect,
+    AfterEffect, AnimationEffect, AnimationInfo, BuildAtom, BuildKind, BuildList, BuildListEntry,
+    ChartBuild, DiagramBuild, EffectDirection, LegacyAnimationAtom, LegacyAnimationBuild,
+    LegacyAnimationEffect, LegacyTextBuildSubEffect, ParagraphBuild, ParagraphBuildLevel,
 };
 use crate::consts::PptRecordType;
 use crate::ppt::package::{PptError, Result};
@@ -193,7 +193,7 @@ pub fn write_animation_info_atom(atom: &LegacyAnimationAtom) -> Result<Vec<u8>> 
     Ok(result)
 }
 
-/// Map animation effect to PPT97 fly method and direction.
+/// Map a high-level animation effect to PPT97 fly method and direction codes.
 /// Based on LibreOffice ppt97animations.cxx mapping.
 fn map_effect_to_ppt97(effect: AnimationEffect, direction: EffectDirection) -> (u8, u8) {
     use AnimationEffect::*;
@@ -326,188 +326,162 @@ fn map_effect_to_ppt97(effect: AnimationEffect, direction: EffectDirection) -> (
 }
 
 /// Write BuildList container record.
-pub fn write_build_list(build_info: &BuildInfo) -> Vec<u8> {
-    let mut data = Vec::new();
-
-    let mut children: Vec<u8> = Vec::new();
-
+pub fn write_build_list(build_info: &BuildList) -> Result<Vec<u8>> {
+    let mut identities = std::collections::HashSet::with_capacity(build_info.builds.len());
+    let mut children = Vec::new();
     for build in &build_info.builds {
-        children.extend(write_build_atom(build));
+        let atom = match build {
+            BuildListEntry::Paragraph(build) => &build.atom,
+            BuildListEntry::Chart(build) => &build.atom,
+            BuildListEntry::Diagram(build) => &build.atom,
+        };
+        if !identities.insert((atom.build_id, atom.shape_id_ref)) {
+            return Err(PptError::InvalidFormat(format!(
+                "duplicate build identity ({}, {})",
+                atom.build_id, atom.shape_id_ref
+            )));
+        }
+        children.extend(match build {
+            BuildListEntry::Paragraph(build) => write_paragraph_build(build)?,
+            BuildListEntry::Chart(build) => write_chart_build(build)?,
+            BuildListEntry::Diagram(build) => write_diagram_build(build)?,
+        });
     }
-
-    let header = create_record_header(PptRecordType::BuildList, 0x0F, 0, children.len() as u32);
-    data.extend(header);
-    data.extend(children);
-
-    data
+    wrap_record(PptRecordType::BuildList, 0x0F, children)
 }
 
-/// Write BuildAtom record.
-fn write_build_atom(build: &BuildLevel) -> Vec<u8> {
-    let mut data = Vec::new();
-
-    let mut atom_data: Vec<u8> = Vec::new();
-    atom_data.extend(&build.shape_id.to_le_bytes());
-    atom_data.extend(&build.build_order.to_le_bytes());
-
-    let flags = encode_build_flags(build);
-    atom_data.extend(&flags.to_le_bytes());
-
-    let effect_type = encode_effect_type(build.effect);
-    atom_data.extend(&effect_type.to_le_bytes());
-
-    let header = create_record_header(PptRecordType::BuildAtom, 0x01, 0, atom_data.len() as u32);
-    data.extend(header);
-    data.extend(atom_data);
-
-    data
+fn write_build_atom(atom: &BuildAtom, kind: BuildKind) -> Vec<u8> {
+    let mut data = Vec::with_capacity(16);
+    data.extend(kind.as_u32().to_le_bytes());
+    data.extend(atom.build_id.to_le_bytes());
+    data.extend(atom.shape_id_ref.to_le_bytes());
+    data.push(u8::from(atom.expanded));
+    data.push(u8::from(atom.ui_expanded));
+    data.extend([0, 0]);
+    let mut result = create_record_header(PptRecordType::BuildAtom, 0, 0, 16);
+    result.extend(data);
+    result
 }
 
-/// Encode build flags.
-fn encode_build_flags(build: &BuildLevel) -> u32 {
-    let mut flags = 0u32;
-
-    flags |= encode_animation_trigger(build.trigger);
-
-    flags |= (encode_build_type(build.build_type) as u32) << 4;
-
-    flags |= (encode_effect_speed(build.speed) as u32) << 16;
-
-    flags |= (encode_effect_direction(build.direction) as u32) << 20;
-
-    flags |= (encode_after_effect(build.after_effect) as u32) << 24;
-
-    flags |= (encode_iteration_type(&build.iteration) as u32) << 26;
-
-    flags
-}
-
-/// Encode build type.
-fn encode_build_type(build_type: BuildType) -> u8 {
-    match build_type {
-        BuildType::Entrance => 0,
-        BuildType::Emphasis => 1,
-        BuildType::Exit => 2,
-        BuildType::MotionPath => 3,
+fn write_paragraph_build(build: &ParagraphBuild) -> Result<Vec<u8>> {
+    validate_paragraph_levels(&build.paragraph.build_type, &build.levels)?;
+    let mut children = write_build_atom(&build.atom, BuildKind::Paragraph);
+    let mut atom = Vec::with_capacity(16);
+    atom.extend(build.paragraph.build_type.as_u32().to_le_bytes());
+    atom.extend(build.paragraph.build_level.to_le_bytes());
+    atom.push(u8::from(build.paragraph.animate_background));
+    atom.push(u8::from(build.paragraph.reverse));
+    atom.push(u8::from(build.paragraph.user_set_animate_background));
+    atom.push(u8::from(build.paragraph.automatic));
+    atom.extend(build.paragraph.delay_time_ms.to_le_bytes());
+    children.extend(create_record_header(PptRecordType::ParaBuildAtom, 1, 0, 16));
+    children.extend(atom);
+    for level in &build.levels {
+        children.extend(create_record_header(PptRecordType::LevelInfoAtom, 0, 0, 4));
+        children.extend(level.level.to_le_bytes());
+        validate_time_node(&level.time_node)?;
+        children.extend(serialize_raw_record(&level.time_node));
     }
+    wrap_record(PptRecordType::ParaBuild, 0x0F, children)
 }
 
-/// Encode animation effect type.
-fn encode_effect_type(effect: AnimationEffect) -> u32 {
-    use AnimationEffect::*;
-    match effect {
-        // Map core effects to their codes
-        Appear => 0,
-        FlyIn | FloatIn | Ascend | CrawlIn | RiseUp => 1,
-        Blinds | BlindsOut => 2,
-        Box | BoxOut => 3,
-        Checkerboard | CheckerboardOut => 4,
-        Dissolve => 5,
-        Split | SplitOut => 6,
-        Wipe | WipeOut => 7,
-        RandomBars | RandomBarsOut => 8,
-        FadeIn | FadeOut => 9,
-        Zoom => 10,
-        Swivel => 11,
-        Bounce => 12,
-        Pulse | ColorPulse => 13,
-        Spin => 14,
-        GrowAndTurn => 15,
-        Teeter => 16,
-        Wave => 17,
-        // New entrance effects map to closest equivalents
-        Descend | DescendOut | SinkDown => 1,
-        Expand | Stretch | GrowShrink => 10,
-        Compress | Collapse => 10,
-        Wheel | Strips | StripsOut | PeekIn | PeekOut => 0,
-        Plus | PlusOut | Diamond | DiamondOut | Wedge => 0,
-        Random | Disappear => 0,
-        SpiralIn | SpiralOut => 0,
-        // Emphasis effects
-        Lighten | Darken | ChangeFillColor | ChangeLineColor => 0,
-        ChangeFontColor | ChangeFontSize | BoldFlash | Underline => 0,
-        ComplementaryColor | ComplementaryColor2 | ContrastingColor => 0,
-        Transparency | ObjectColor | VerticalHighlight | Flicker => 0,
-        // Exit effects
-        FlyOut | CrawlOut => 1,
-        // Motion paths (not supported, map to 0)
-        MotionPath | MotionPathLines | MotionPathCurves | MotionPathShapes => 0,
-        MotionPathLeft | MotionPathRight | MotionPathUp | MotionPathDown => 0,
-        MotionPathDiagonalUpRight | MotionPathDiagonalDownRight => 0,
-        MotionPathArcDown | MotionPathArcUp | MotionPathCircle => 0,
-        MotionPathDiamond | MotionPathHeart | MotionPathHexagon => 0,
-        MotionPathOctagon | MotionPathPentagon | MotionPathSquare => 0,
-        MotionPathStar4 | MotionPathStar5 | MotionPathStar6 | MotionPathStar8 => 0,
-        MotionPathTriangle | MotionPathLoopDeLoop | MotionPathCurvedX => 0,
-        MotionPathSCurve1 | MotionPathSCurve2 | MotionPathSineWave => 0,
-        MotionPathSpiralLeft | MotionPathSpiralRight | MotionPathSpring => 0,
-        MotionPathZigzag => 0,
-        Custom => 255,
-    }
+fn write_chart_build(build: &ChartBuild) -> Result<Vec<u8>> {
+    let mut children = write_build_atom(&build.atom, BuildKind::Chart);
+    let mut atom = Vec::with_capacity(8);
+    atom.extend(build.chart.build_type.as_u32().to_le_bytes());
+    atom.push(u8::from(build.chart.animate_background));
+    atom.extend([0, 0, 0]);
+    children.extend(create_record_header(PptRecordType::ChartBuildAtom, 0, 0, 8));
+    children.extend(atom);
+    wrap_record(PptRecordType::ChartBuild, 0x0F, children)
 }
 
-/// Encode effect speed.
-fn encode_effect_speed(speed: EffectSpeed) -> u8 {
-    match speed {
-        EffectSpeed::VerySlow => 0,
-        EffectSpeed::Slow => 1,
-        EffectSpeed::Medium => 2,
-        EffectSpeed::Fast => 3,
-        EffectSpeed::VeryFast => 4,
-    }
+fn write_diagram_build(build: &DiagramBuild) -> Result<Vec<u8>> {
+    let mut children = write_build_atom(&build.atom, BuildKind::Diagram);
+    children.extend(create_record_header(
+        PptRecordType::DiagramBuildAtom,
+        0,
+        0,
+        4,
+    ));
+    children.extend(build.diagram.build_type.as_u32().to_le_bytes());
+    wrap_record(PptRecordType::DiagramBuild, 0x0F, children)
 }
 
-/// Encode effect direction.
-fn encode_effect_direction(direction: EffectDirection) -> u8 {
-    use EffectDirection::*;
-    match direction {
-        None => 0,
-        FromTop => 1,
-        FromBottom => 2,
-        FromLeft => 3,
-        FromRight => 4,
-        FromTopLeft => 5,
-        FromTopRight => 6,
-        FromBottomLeft => 7,
-        FromBottomRight => 8,
-        Horizontal => 0,
-        Vertical => 1,
-        In => 0,
-        Out => 1,
-        Across => 0,
-        Clockwise => 0,
-        CounterClockwise => 1,
+fn validate_paragraph_levels(
+    build_type: &super::types::ParagraphBuildType,
+    levels: &[ParagraphBuildLevel],
+) -> Result<()> {
+    if levels.is_empty() {
+        return Err(PptError::InvalidFormat(
+            "ParaBuild requires at least one level".to_string(),
+        ));
     }
+    if *build_type == super::types::ParagraphBuildType::AsAWhole && levels.len() != 1 {
+        return Err(PptError::InvalidFormat(
+            "AsAWhole ParaBuild requires exactly one level".to_string(),
+        ));
+    }
+    for (index, level) in levels.iter().enumerate() {
+        if level.level > 9 {
+            return Err(PptError::InvalidFormat(format!(
+                "paragraph build level {} exceeds 9",
+                level.level
+            )));
+        }
+        if index > 0 && levels[index - 1].level >= level.level {
+            return Err(PptError::InvalidFormat(
+                "ParaBuild levels must be strictly increasing".to_string(),
+            ));
+        }
+    }
+    Ok(())
 }
 
-/// Encode animation trigger.
-fn encode_animation_trigger(trigger: AnimationTrigger) -> u32 {
-    match trigger {
-        AnimationTrigger::OnClick => 0,
-        AnimationTrigger::WithPrevious => 1,
-        AnimationTrigger::AfterPrevious => 2,
+fn validate_time_node(record: &crate::ppt::records::PptRecord) -> Result<()> {
+    if record.record_type != PptRecordType::ExtTimeNode
+        || record.version != 0x0F
+        || record.instance != 1
+        || record.data_length as usize != record.data.len()
+    {
+        return Err(PptError::InvalidFormat(
+            "paragraph level requires an ExtTimeNode container".to_string(),
+        ));
     }
+    let encoded_children_length = record.children.iter().try_fold(0usize, |length, child| {
+        length.checked_add(8 + child.data.len())
+    });
+    if encoded_children_length != Some(record.data.len()) {
+        return Err(PptError::InvalidFormat(
+            "ExtTimeNode child records do not cover its complete payload".to_string(),
+        ));
+    }
+    let time_node = record.children.first().ok_or_else(|| {
+        PptError::InvalidFormat("ExtTimeNode is missing its TimeNodeAtom".to_string())
+    })?;
+    if time_node.record_type != PptRecordType::TimeNode
+        || time_node.version != 0
+        || time_node.instance != 0
+        || time_node.data.len() != 32
+        || time_node.data_length != 32
+    {
+        return Err(PptError::InvalidFormat(
+            "ExtTimeNode must begin with a 32-byte TimeNodeAtom payload".to_string(),
+        ));
+    }
+    u32::try_from(record.data.len()).map_err(|_| {
+        PptError::InvalidFormat("ExtTimeNode data exceeds 4 GiB record limit".to_string())
+    })?;
+    Ok(())
 }
 
-/// Encode after-effect.
-fn encode_after_effect(after_effect: AfterEffect) -> u8 {
-    match after_effect {
-        AfterEffect::None => 0,
-        AfterEffect::DimToColor => 1,
-        AfterEffect::HideOnNextClick => 2,
-        AfterEffect::Hide => 3,
-    }
-}
-
-/// Encode iteration type.
-fn encode_iteration_type(iteration: &super::triggers::IterationType) -> u8 {
-    use super::triggers::IterationType;
-    match iteration {
-        IterationType::All => 0,
-        IterationType::ByElement => 1,
-        IterationType::ByWord => 2,
-        IterationType::ByLetter => 3,
-    }
+fn wrap_record(record_type: PptRecordType, version: u16, data: Vec<u8>) -> Result<Vec<u8>> {
+    let length = u32::try_from(data.len()).map_err(|_| {
+        PptError::InvalidFormat(format!("{record_type:?} data exceeds 4 GiB record limit"))
+    })?;
+    let mut result = create_record_header(record_type, version, 0, length);
+    result.extend(data);
+    Ok(result)
 }
 
 /// Create a PPT record header.
@@ -557,45 +531,64 @@ fn serialize_raw_record(record: &crate::ppt::records::PptRecord) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_encode_build_type() {
-        assert_eq!(encode_build_type(BuildType::Entrance), 0);
-        assert_eq!(encode_build_type(BuildType::Emphasis), 1);
-        assert_eq!(encode_build_type(BuildType::Exit), 2);
-        assert_eq!(encode_build_type(BuildType::MotionPath), 3);
-    }
-
-    #[test]
-    fn test_encode_effect_speed() {
-        assert_eq!(encode_effect_speed(EffectSpeed::VerySlow), 0);
-        assert_eq!(encode_effect_speed(EffectSpeed::Slow), 1);
-        assert_eq!(encode_effect_speed(EffectSpeed::Medium), 2);
-        assert_eq!(encode_effect_speed(EffectSpeed::Fast), 3);
-        assert_eq!(encode_effect_speed(EffectSpeed::VeryFast), 4);
-    }
-
-    #[test]
-    fn test_encode_animation_trigger() {
-        assert_eq!(encode_animation_trigger(AnimationTrigger::OnClick), 0);
-        assert_eq!(encode_animation_trigger(AnimationTrigger::WithPrevious), 1);
-        assert_eq!(encode_animation_trigger(AnimationTrigger::AfterPrevious), 2);
-    }
-
-    #[test]
-    fn test_write_build_atom_header() {
-        let build = BuildLevel::default();
-        let data = write_build_atom(&build);
-
-        assert!(data.len() >= 8);
-    }
+    use crate::ppt::animation::{ChartBuildAtom, ChartBuildType};
 
     #[test]
     fn test_write_build_list_empty() {
-        let build_info = BuildInfo::new();
-        let data = write_build_list(&build_info);
+        let build_info = BuildList::new();
+        let data = write_build_list(&build_info).unwrap();
 
         assert_eq!(data.len(), 8);
+    }
+
+    #[test]
+    fn rejects_invalid_paragraph_builds() {
+        let time_node = crate::ppt::records::PptRecord {
+            record_type: PptRecordType::ExtTimeNode,
+            record_type_raw: PptRecordType::ExtTimeNode.as_u16(),
+            version: 0x0F,
+            instance: 0,
+            data_length: 0,
+            data: Vec::new(),
+            children: Vec::new(),
+        };
+        let level = ParagraphBuildLevel {
+            level: 10,
+            time_node,
+        };
+        assert!(
+            validate_paragraph_levels(
+                &super::super::types::ParagraphBuildType::AllAtOnce,
+                &[level]
+            )
+            .is_err()
+        );
+        assert!(
+            validate_paragraph_levels(&super::super::types::ParagraphBuildType::AsAWhole, &[])
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn rejects_duplicate_build_id_shape_pairs() {
+        let entry = || {
+            BuildListEntry::Chart(ChartBuild {
+                atom: BuildAtom {
+                    build_id: 5,
+                    shape_id_ref: 9,
+                    expanded: false,
+                    ui_expanded: false,
+                },
+                chart: ChartBuildAtom {
+                    build_type: ChartBuildType::AsOneObject,
+                    animate_background: false,
+                },
+            })
+        };
+        let list = BuildList {
+            builds: vec![entry(), entry()],
+        };
+        assert!(write_build_list(&list).is_err());
     }
 
     #[test]

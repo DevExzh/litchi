@@ -96,15 +96,25 @@ pub enum PptRecordType {
     /// Animation info atom record
     AnimationInfoAtom = 4081,
     /// Build list record
-    BuildList = 2000,
+    BuildList = 0x2B02,
     /// Build atom record
-    BuildAtom = 2001,
+    BuildAtom = 0x2B03,
     /// Chart build record
-    ChartBuild = 2010,
+    ChartBuild = 0x2B04,
+    /// Chart build atom record
+    ChartBuildAtom = 0x2B05,
     /// Diagram build record
-    DiagramBuild = 2011,
+    DiagramBuild = 0x2B06,
+    /// Diagram build atom record
+    DiagramBuildAtom = 0x2B07,
     /// Paragraph build record
-    ParaBuild = 2012,
+    ParaBuild = 0x2B08,
+    /// Paragraph build atom record
+    ParaBuildAtom = 0x2B09,
+    /// Paragraph build level atom record
+    LevelInfoAtom = 0x2B0A,
+    /// Extended time node container record
+    ExtTimeNode = 0xF144,
     /// Sound collection container
     SoundCollection = 2020,
     /// Sound collection atom
@@ -114,7 +124,7 @@ pub enum PptRecordType {
     /// Sound data record
     SoundData = 2023,
     /// Time node record
-    TimeNode = 4114,
+    TimeNode = 0xF127,
     /// Time property list record
     TimePropertyList = 4115,
     /// Time behavior record
@@ -176,12 +186,17 @@ impl From<u16> for PptRecordType {
             4087 => PptRecordType::DateTimeMCAtom,
             4116 => PptRecordType::AnimationInfo,
             4081 => PptRecordType::AnimationInfoAtom,
-            2000 => PptRecordType::BuildList,
-            2001 => PptRecordType::BuildAtom,
-            2010 => PptRecordType::ChartBuild,
-            2011 => PptRecordType::DiagramBuild,
-            2012 => PptRecordType::ParaBuild,
-            4114 => PptRecordType::TimeNode,
+            0x2B02 => PptRecordType::BuildList,
+            0x2B03 => PptRecordType::BuildAtom,
+            0x2B04 => PptRecordType::ChartBuild,
+            0x2B05 => PptRecordType::ChartBuildAtom,
+            0x2B06 => PptRecordType::DiagramBuild,
+            0x2B07 => PptRecordType::DiagramBuildAtom,
+            0x2B08 => PptRecordType::ParaBuild,
+            0x2B09 => PptRecordType::ParaBuildAtom,
+            0x2B0A => PptRecordType::LevelInfoAtom,
+            0xF144 => PptRecordType::ExtTimeNode,
+            0xF127 => PptRecordType::TimeNode,
             4115 => PptRecordType::TimePropertyList,
             4112 => PptRecordType::TimeBehavior,
             1040 => PptRecordType::NamedShows,

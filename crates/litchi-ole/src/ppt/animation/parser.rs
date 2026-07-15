@@ -4,14 +4,14 @@
 
 use super::triggers::IterationType;
 use super::types::{
-    AfterEffect, AnimationEffect, AnimationInfo, AnimationTrigger, BuildInfo, BuildLevel,
-    BuildType, EffectDirection, EffectSpeed, LegacyAnimationAtom, LegacyAnimationBuild,
-    LegacyAnimationEffect, LegacyTextBuildSubEffect,
+    AfterEffect, AnimationInfo, BuildAtom, BuildKind, BuildList, BuildListEntry, ChartBuild,
+    ChartBuildAtom, ChartBuildType, DiagramBuild, DiagramBuildAtom, DiagramBuildType,
+    LegacyAnimationAtom, LegacyAnimationBuild, LegacyAnimationEffect, LegacyTextBuildSubEffect,
+    ParagraphBuild, ParagraphBuildAtom, ParagraphBuildLevel, ParagraphBuildType,
 };
 use crate::consts::PptRecordType;
 use crate::ppt::package::{PptError, Result};
 use crate::ppt::records::PptRecord;
-use zerocopy::{FromBytes, byteorder::LittleEndian, byteorder::U32};
 
 /// Parse animation info from AnimationInfo container record.
 pub fn parse_animation_info(record: &PptRecord) -> Result<AnimationInfo> {
@@ -161,7 +161,7 @@ pub fn parse_animation_info_atom(record: &PptRecord) -> Result<LegacyAnimationAt
 }
 
 /// Parse build list from BuildList container record.
-pub fn parse_build_list(record: &PptRecord) -> Result<BuildInfo> {
+pub fn parse_build_list(record: &PptRecord) -> Result<BuildList> {
     if record.record_type != PptRecordType::BuildList {
         return Err(PptError::InvalidFormat(format!(
             "Expected BuildList record, got {:?}",
@@ -169,203 +169,289 @@ pub fn parse_build_list(record: &PptRecord) -> Result<BuildInfo> {
         )));
     }
 
-    let mut build_info = BuildInfo::new();
-
+    require_container(record, PptRecordType::BuildList, 0, "BuildList")?;
+    let mut build_info = BuildList::new();
+    let mut identities = std::collections::HashSet::with_capacity(record.children.len());
     for child in &record.children {
-        match child.record_type {
-            PptRecordType::BuildAtom => {
-                if let Ok(build) = parse_build_atom(child) {
-                    build_info.add_build(build);
-                }
+        let build = match child.record_type {
+            PptRecordType::ParaBuild => BuildListEntry::Paragraph(parse_paragraph_build(child)?),
+            PptRecordType::ChartBuild => BuildListEntry::Chart(parse_chart_build(child)?),
+            PptRecordType::DiagramBuild => BuildListEntry::Diagram(parse_diagram_build(child)?),
+            other => {
+                return Err(PptError::InvalidFormat(format!(
+                    "BuildList contains invalid child {other:?}"
+                )));
             },
-            PptRecordType::ChartBuild | PptRecordType::DiagramBuild | PptRecordType::ParaBuild => {
-                if let Ok(build) = parse_complex_build(child) {
-                    build_info.add_build(build);
-                }
-            },
-            _ => {},
+        };
+        let atom = match &build {
+            BuildListEntry::Paragraph(build) => &build.atom,
+            BuildListEntry::Chart(build) => &build.atom,
+            BuildListEntry::Diagram(build) => &build.atom,
+        };
+        if !identities.insert((atom.build_id, atom.shape_id_ref)) {
+            return Err(PptError::InvalidFormat(format!(
+                "duplicate build identity ({}, {})",
+                atom.build_id, atom.shape_id_ref
+            )));
         }
+        build_info.add_build(build);
     }
-
     Ok(build_info)
 }
 
-/// Parse a single BuildAtom record.
-fn parse_build_atom(record: &PptRecord) -> Result<BuildLevel> {
-    if record.data.len() < 16 {
-        return Err(PptError::Corrupted(
-            "BuildAtom record too small".to_string(),
-        ));
+fn parse_build_atom(record: &PptRecord, expected: BuildKind) -> Result<BuildAtom> {
+    if record.record_type != PptRecordType::BuildAtom {
+        return Err(PptError::InvalidFormat(format!(
+            "Expected BuildAtom, got {:?}",
+            record.record_type
+        )));
     }
-
-    let shape_id = U32::<LittleEndian>::read_from_bytes(&record.data[0..4])
-        .map(|v| v.get())
-        .unwrap_or(0);
-
-    let build_order = U32::<LittleEndian>::read_from_bytes(&record.data[4..8])
-        .map(|v| v.get())
-        .unwrap_or(0);
-
-    let flags = U32::<LittleEndian>::read_from_bytes(&record.data[8..12])
-        .map(|v| v.get())
-        .unwrap_or(0);
-
-    let effect_type = U32::<LittleEndian>::read_from_bytes(&record.data[12..16])
-        .map(|v| v.get())
-        .unwrap_or(0);
-
-    let build_type = parse_build_type(flags);
-    let effect = parse_effect_type(effect_type);
-    let speed = parse_effect_speed(flags);
-    let direction = parse_effect_direction(flags);
-    let trigger = parse_animation_trigger(flags);
-    let after_effect = parse_after_effect(flags);
-    let iteration = parse_iteration_type(flags);
-
-    Ok(BuildLevel {
-        build_type,
-        shape_id,
-        build_order,
-        effect,
-        speed,
-        direction,
-        trigger,
-        motion_path: None,
-        sound: None,
-        iteration,
-        after_effect,
-        duration_ms: None,
+    require_header(record, 0, 0, Some(16), "BuildAtom")?;
+    let kind = BuildKind::parse(read_u32(&record.data, 0)).ok_or_else(|| {
+        PptError::InvalidFormat(format!(
+            "invalid BuildAtom build type {}",
+            read_u32(&record.data, 0)
+        ))
+    })?;
+    if kind != expected {
+        return Err(PptError::InvalidFormat(format!(
+            "BuildAtom type {kind:?} does not match {expected:?} container"
+        )));
+    }
+    Ok(BuildAtom {
+        build_id: read_u32(&record.data, 4),
+        shape_id_ref: read_u32(&record.data, 8),
+        expanded: parse_bool1(record.data[12], "BuildAtom.fExpanded")?,
+        ui_expanded: parse_bool1(record.data[13], "BuildAtom.fUIExpanded")?,
     })
 }
 
-/// Parse complex build types (chart, diagram, paragraph).
-fn parse_complex_build(record: &PptRecord) -> Result<BuildLevel> {
-    let mut build = BuildLevel::default();
-
-    if record.data.len() >= 4 {
-        build.shape_id = U32::<LittleEndian>::read_from_bytes(&record.data[0..4])
-            .map(|v| v.get())
-            .unwrap_or(0);
+fn parse_paragraph_build(record: &PptRecord) -> Result<ParagraphBuild> {
+    require_container(record, PptRecordType::ParaBuild, 0, "ParaBuild")?;
+    if record.children.len() < 4 || (record.children.len() - 2) % 2 != 0 {
+        return Err(PptError::Corrupted(
+            "ParaBuild requires two atoms followed by level/time-node pairs".to_string(),
+        ));
     }
-
-    build.build_type = match record.record_type {
-        PptRecordType::ChartBuild => BuildType::Entrance,
-        PptRecordType::DiagramBuild => BuildType::Entrance,
-        PptRecordType::ParaBuild => BuildType::Entrance,
-        _ => BuildType::Entrance,
-    };
-
-    Ok(build)
+    let atom = parse_build_atom(&record.children[0], BuildKind::Paragraph)?;
+    let paragraph = parse_paragraph_build_atom(&record.children[1])?;
+    let mut levels = Vec::with_capacity((record.children.len() - 2) / 2);
+    for pair in record.children[2..].chunks_exact(2) {
+        let level = parse_level_info_atom(&pair[0])?;
+        let time_node = &pair[1];
+        require_ext_time_node(time_node)?;
+        if levels
+            .last()
+            .is_some_and(|previous: &ParagraphBuildLevel| previous.level >= level)
+        {
+            return Err(PptError::InvalidFormat(
+                "ParaBuild levels must be strictly increasing".to_string(),
+            ));
+        }
+        levels.push(ParagraphBuildLevel {
+            level,
+            time_node: time_node.clone(),
+        });
+    }
+    if paragraph.build_type == ParagraphBuildType::AsAWhole && levels.len() != 1 {
+        return Err(PptError::InvalidFormat(
+            "AsAWhole ParaBuild requires exactly one level".to_string(),
+        ));
+    }
+    Ok(ParagraphBuild {
+        atom,
+        paragraph,
+        levels,
+    })
 }
 
-/// Parse build type from flags.
-fn parse_build_type(flags: u32) -> BuildType {
-    let build_type_bits = (flags >> 4) & 0x03;
-    match build_type_bits {
-        0 => BuildType::Entrance,
-        1 => BuildType::Emphasis,
-        2 => BuildType::Exit,
-        3 => BuildType::MotionPath,
-        _ => BuildType::Entrance,
+fn parse_paragraph_build_atom(record: &PptRecord) -> Result<ParagraphBuildAtom> {
+    require_atom(record, PptRecordType::ParaBuildAtom, 1, 16, "ParaBuildAtom")?;
+    let build_type = ParagraphBuildType::parse(read_u32(&record.data, 0)).ok_or_else(|| {
+        PptError::InvalidFormat(format!(
+            "invalid ParaBuildAtom type {}",
+            read_u32(&record.data, 0)
+        ))
+    })?;
+    Ok(ParagraphBuildAtom {
+        build_type,
+        build_level: read_u32(&record.data, 4),
+        animate_background: parse_bool1(record.data[8], "ParaBuildAtom.fAnimBackground")?,
+        reverse: parse_bool1(record.data[9], "ParaBuildAtom.fReverse")?,
+        user_set_animate_background: parse_bool1(
+            record.data[10],
+            "ParaBuildAtom.fUserSetAnimBackground",
+        )?,
+        automatic: parse_bool1(record.data[11], "ParaBuildAtom.fAutomatic")?,
+        delay_time_ms: read_u32(&record.data, 12),
+    })
+}
+
+fn parse_level_info_atom(record: &PptRecord) -> Result<u32> {
+    require_atom(record, PptRecordType::LevelInfoAtom, 0, 4, "LevelInfoAtom")?;
+    let level = read_u32(&record.data, 0);
+    if level > 9 {
+        return Err(PptError::InvalidFormat(format!(
+            "LevelInfoAtom level {level} exceeds 9"
+        )));
+    }
+    Ok(level)
+}
+
+fn parse_chart_build(record: &PptRecord) -> Result<ChartBuild> {
+    require_container(record, PptRecordType::ChartBuild, 0, "ChartBuild")?;
+    if record.children.len() != 2 {
+        return Err(PptError::Corrupted(
+            "ChartBuild requires exactly BuildAtom and ChartBuildAtom".to_string(),
+        ));
+    }
+    let atom = parse_build_atom(&record.children[0], BuildKind::Chart)?;
+    let chart_record = &record.children[1];
+    require_atom(
+        chart_record,
+        PptRecordType::ChartBuildAtom,
+        0,
+        8,
+        "ChartBuildAtom",
+    )?;
+    let build_type = ChartBuildType::parse(read_u32(&chart_record.data, 0)).ok_or_else(|| {
+        PptError::InvalidFormat(format!(
+            "invalid ChartBuildAtom type {}",
+            read_u32(&chart_record.data, 0)
+        ))
+    })?;
+    Ok(ChartBuild {
+        atom,
+        chart: ChartBuildAtom {
+            build_type,
+            animate_background: parse_bool1(
+                chart_record.data[4],
+                "ChartBuildAtom.fAnimBackground",
+            )?,
+        },
+    })
+}
+
+fn parse_diagram_build(record: &PptRecord) -> Result<DiagramBuild> {
+    require_container(record, PptRecordType::DiagramBuild, 0, "DiagramBuild")?;
+    if record.children.len() != 2 {
+        return Err(PptError::Corrupted(
+            "DiagramBuild requires exactly BuildAtom and DiagramBuildAtom".to_string(),
+        ));
+    }
+    let atom = parse_build_atom(&record.children[0], BuildKind::Diagram)?;
+    let diagram_record = &record.children[1];
+    require_atom(
+        diagram_record,
+        PptRecordType::DiagramBuildAtom,
+        0,
+        4,
+        "DiagramBuildAtom",
+    )?;
+    let build_type =
+        DiagramBuildType::parse(read_u32(&diagram_record.data, 0)).ok_or_else(|| {
+            PptError::InvalidFormat(format!(
+                "invalid DiagramBuildAtom type {}",
+                read_u32(&diagram_record.data, 0)
+            ))
+        })?;
+    Ok(DiagramBuild {
+        atom,
+        diagram: DiagramBuildAtom { build_type },
+    })
+}
+
+fn require_container(
+    record: &PptRecord,
+    record_type: PptRecordType,
+    instance: u16,
+    name: &str,
+) -> Result<()> {
+    if record.record_type != record_type {
+        return Err(PptError::InvalidFormat(format!(
+            "Expected {name}, got {:?}",
+            record.record_type
+        )));
+    }
+    require_header(record, 0x0F, instance, None, name)?;
+    let encoded_children_length = record.children.iter().try_fold(0usize, |length, child| {
+        length.checked_add(8 + child.data.len())
+    });
+    if encoded_children_length != Some(record.data.len()) {
+        return Err(PptError::Corrupted(format!(
+            "{name} child records do not cover its complete payload"
+        )));
+    }
+    Ok(())
+}
+
+fn require_ext_time_node(record: &PptRecord) -> Result<()> {
+    require_container(record, PptRecordType::ExtTimeNode, 1, "ExtTimeNode")?;
+    let time_node = record.children.first().ok_or_else(|| {
+        PptError::Corrupted("ExtTimeNode is missing its TimeNodeAtom".to_string())
+    })?;
+    require_atom(time_node, PptRecordType::TimeNode, 0, 32, "TimeNodeAtom")
+}
+
+fn require_atom(
+    record: &PptRecord,
+    record_type: PptRecordType,
+    version: u16,
+    length: usize,
+    name: &str,
+) -> Result<()> {
+    if record.record_type != record_type {
+        return Err(PptError::InvalidFormat(format!(
+            "Expected {name}, got {:?}",
+            record.record_type
+        )));
+    }
+    require_header(record, version, 0, Some(length), name)
+}
+
+fn require_header(
+    record: &PptRecord,
+    version: u16,
+    instance: u16,
+    length: Option<usize>,
+    name: &str,
+) -> Result<()> {
+    if record.version != version
+        || record.instance != instance
+        || record.data_length as usize != record.data.len()
+        || length.is_some_and(|length| record.data.len() != length)
+    {
+        return Err(PptError::Corrupted(format!(
+            "invalid {name} header: version {}, instance {}, length {}",
+            record.version,
+            record.instance,
+            record.data.len()
+        )));
+    }
+    Ok(())
+}
+
+fn parse_bool1(value: u8, field: &str) -> Result<bool> {
+    match value {
+        0 => Ok(false),
+        1 => Ok(true),
+        _ => Err(PptError::InvalidFormat(format!(
+            "{field} has invalid bool1 value {value}"
+        ))),
     }
 }
 
-/// Parse animation effect type.
-fn parse_effect_type(effect_type: u32) -> AnimationEffect {
-    match effect_type {
-        0 => AnimationEffect::Appear,
-        1 => AnimationEffect::FlyIn,
-        2 => AnimationEffect::Blinds,
-        3 => AnimationEffect::Box,
-        4 => AnimationEffect::Checkerboard,
-        5 => AnimationEffect::Dissolve,
-        6 => AnimationEffect::Split,
-        7 => AnimationEffect::Wipe,
-        8 => AnimationEffect::RandomBars,
-        9 => AnimationEffect::FadeIn,
-        10 => AnimationEffect::Zoom,
-        11 => AnimationEffect::Swivel,
-        12 => AnimationEffect::Bounce,
-        13 => AnimationEffect::Pulse,
-        14 => AnimationEffect::Spin,
-        15 => AnimationEffect::GrowAndTurn,
-        16 => AnimationEffect::Teeter,
-        17 => AnimationEffect::Wave,
-        _ => AnimationEffect::Custom,
-    }
-}
-
-/// Parse effect speed from flags.
-fn parse_effect_speed(flags: u32) -> EffectSpeed {
-    let speed_bits = (flags >> 16) & 0x07;
-    match speed_bits {
-        0 => EffectSpeed::VerySlow,
-        1 => EffectSpeed::Slow,
-        2 => EffectSpeed::Medium,
-        3 => EffectSpeed::Fast,
-        4 => EffectSpeed::VeryFast,
-        _ => EffectSpeed::Medium,
-    }
-}
-
-/// Parse effect direction from flags.
-fn parse_effect_direction(flags: u32) -> EffectDirection {
-    let direction_bits = (flags >> 20) & 0x0F;
-    match direction_bits {
-        0 => EffectDirection::None,
-        1 => EffectDirection::FromTop,
-        2 => EffectDirection::FromBottom,
-        3 => EffectDirection::FromLeft,
-        4 => EffectDirection::FromRight,
-        5 => EffectDirection::FromTopLeft,
-        6 => EffectDirection::FromTopRight,
-        7 => EffectDirection::FromBottomLeft,
-        8 => EffectDirection::FromBottomRight,
-        _ => EffectDirection::None,
-    }
-}
-
-/// Parse animation trigger from flags.
-fn parse_animation_trigger(flags: u32) -> AnimationTrigger {
-    let trigger_bits = flags & 0x03;
-    match trigger_bits {
-        0 => AnimationTrigger::OnClick,
-        1 => AnimationTrigger::WithPrevious,
-        2 => AnimationTrigger::AfterPrevious,
-        _ => AnimationTrigger::OnClick,
-    }
-}
-
-/// Parse after-effect from flags.
-fn parse_after_effect(flags: u32) -> AfterEffect {
-    let after_bits = (flags >> 24) & 0x03;
-    match after_bits {
-        0 => AfterEffect::None,
-        1 => AfterEffect::DimToColor,
-        2 => AfterEffect::HideOnNextClick,
-        3 => AfterEffect::Hide,
-        _ => AfterEffect::None,
-    }
-}
-
-/// Parse iteration type from flags.
-fn parse_iteration_type(flags: u32) -> IterationType {
-    let iter_bits = (flags >> 26) & 0x03;
-    match iter_bits {
-        0 => IterationType::All,
-        1 => IterationType::ByElement,
-        2 => IterationType::ByWord,
-        3 => IterationType::ByLetter,
-        _ => IterationType::All,
-    }
+fn read_u32(data: &[u8], offset: usize) -> u32 {
+    u32::from_le_bytes(data[offset..offset + 4].try_into().expect("length checked"))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::ppt::animation::{
-        LegacyAnimationAtom, LegacyAnimationBuild, LegacyAnimationEffect, LegacyTextBuildSubEffect,
-        write_animation_info, write_animation_info_atom,
+        BuildInfo, ChartBuildType, DiagramBuildType, LegacyAnimationAtom, LegacyAnimationBuild,
+        LegacyAnimationEffect, LegacyTextBuildSubEffect, ParagraphBuildType, write_animation_info,
+        write_animation_info_atom, write_build_list,
     };
 
     fn sample_legacy_atom() -> LegacyAnimationAtom {
@@ -389,6 +475,83 @@ mod tests {
             after_effect: AfterEffect::HideOnNextClick,
             text_build_sub_effect: LegacyTextBuildSubEffect::ByCharacter,
             ole_verb: 2,
+        }
+    }
+
+    fn empty_time_node() -> PptRecord {
+        let atom = PptRecord {
+            record_type: PptRecordType::TimeNode,
+            record_type_raw: PptRecordType::TimeNode.as_u16(),
+            version: 0,
+            instance: 0,
+            data_length: 32,
+            data: vec![0; 32],
+            children: Vec::new(),
+        };
+        let mut data = Vec::with_capacity(40);
+        data.extend(0u16.to_le_bytes());
+        data.extend(PptRecordType::TimeNode.as_u16().to_le_bytes());
+        data.extend(32u32.to_le_bytes());
+        data.extend([0; 32]);
+        PptRecord {
+            record_type: PptRecordType::ExtTimeNode,
+            record_type_raw: PptRecordType::ExtTimeNode.as_u16(),
+            version: 0x0F,
+            instance: 1,
+            data_length: 40,
+            data,
+            children: vec![atom],
+        }
+    }
+
+    fn sample_build_list() -> BuildList {
+        BuildList {
+            builds: vec![
+                BuildListEntry::Paragraph(ParagraphBuild {
+                    atom: BuildAtom {
+                        build_id: 10,
+                        shape_id_ref: 100,
+                        expanded: true,
+                        ui_expanded: false,
+                    },
+                    paragraph: ParagraphBuildAtom {
+                        build_type: ParagraphBuildType::AsAWhole,
+                        build_level: 4,
+                        animate_background: true,
+                        reverse: true,
+                        user_set_animate_background: true,
+                        automatic: true,
+                        delay_time_ms: 750,
+                    },
+                    levels: vec![ParagraphBuildLevel {
+                        level: 0,
+                        time_node: empty_time_node(),
+                    }],
+                }),
+                BuildListEntry::Chart(ChartBuild {
+                    atom: BuildAtom {
+                        build_id: 11,
+                        shape_id_ref: 101,
+                        expanded: false,
+                        ui_expanded: true,
+                    },
+                    chart: ChartBuildAtom {
+                        build_type: ChartBuildType::ByElementInCategory,
+                        animate_background: true,
+                    },
+                }),
+                BuildListEntry::Diagram(DiagramBuild {
+                    atom: BuildAtom {
+                        build_id: 12,
+                        shape_id_ref: 102,
+                        expanded: true,
+                        ui_expanded: true,
+                    },
+                    diagram: DiagramBuildAtom {
+                        build_type: DiagramBuildType::CounterClockwiseOut,
+                    },
+                }),
+            ],
         }
     }
 
@@ -442,33 +605,89 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_build_type() {
-        assert_eq!(parse_build_type(0x00), BuildType::Entrance);
-        assert_eq!(parse_build_type(0x10), BuildType::Emphasis);
-        assert_eq!(parse_build_type(0x20), BuildType::Exit);
-        assert_eq!(parse_build_type(0x30), BuildType::MotionPath);
+    fn round_trips_exact_powerpoint_2002_build_lists() {
+        assert_eq!(PptRecordType::BuildList.as_u16(), 0x2B02);
+        assert_eq!(PptRecordType::LevelInfoAtom.as_u16(), 0x2B0A);
+        let bytes = write_build_list(&sample_build_list()).unwrap();
+        assert_eq!(PptRecordType::TimeNode.as_u16(), 0xF127);
+        assert_eq!(bytes.len(), 216);
+        let (record, consumed) = PptRecord::parse(&bytes, 0).unwrap();
+        assert_eq!(consumed, bytes.len());
+        assert_eq!(record.record_type, PptRecordType::BuildList);
+        assert_eq!(record.children.len(), 3);
+
+        let parsed = parse_build_list(&record).unwrap();
+        assert_eq!(parsed.builds.len(), 3);
+        let BuildListEntry::Paragraph(paragraph) = &parsed.builds[0] else {
+            panic!("expected paragraph build");
+        };
+        assert_eq!(paragraph.atom.build_id, 10);
+        assert_eq!(paragraph.atom.shape_id_ref, 100);
+        assert_eq!(paragraph.paragraph.build_type, ParagraphBuildType::AsAWhole);
+        assert_eq!(paragraph.paragraph.delay_time_ms, 750);
+        assert_eq!(paragraph.levels.len(), 1);
+        assert_eq!(paragraph.levels[0].level, 0);
+        assert_eq!(
+            paragraph.levels[0].time_node.record_type,
+            PptRecordType::ExtTimeNode
+        );
+
+        let BuildListEntry::Chart(chart) = &parsed.builds[1] else {
+            panic!("expected chart build");
+        };
+        assert_eq!(chart.chart.build_type, ChartBuildType::ByElementInCategory);
+        assert!(chart.chart.animate_background);
+
+        let BuildListEntry::Diagram(diagram) = &parsed.builds[2] else {
+            panic!("expected diagram build");
+        };
+        assert_eq!(
+            diagram.diagram.build_type,
+            DiagramBuildType::CounterClockwiseOut
+        );
     }
 
     #[test]
-    fn test_parse_effect_speed() {
-        assert_eq!(parse_effect_speed(0x000000), EffectSpeed::VerySlow);
-        assert_eq!(parse_effect_speed(0x010000), EffectSpeed::Slow);
-        assert_eq!(parse_effect_speed(0x020000), EffectSpeed::Medium);
-        assert_eq!(parse_effect_speed(0x030000), EffectSpeed::Fast);
-        assert_eq!(parse_effect_speed(0x040000), EffectSpeed::VeryFast);
-    }
+    fn rejects_malformed_powerpoint_2002_build_lists() {
+        let bytes = write_build_list(&sample_build_list()).unwrap();
+        let (valid, _) = PptRecord::parse(&bytes, 0).unwrap();
 
-    #[test]
-    fn test_parse_animation_trigger() {
-        assert_eq!(parse_animation_trigger(0x00), AnimationTrigger::OnClick);
-        assert_eq!(
-            parse_animation_trigger(0x01),
-            AnimationTrigger::WithPrevious
-        );
-        assert_eq!(
-            parse_animation_trigger(0x02),
-            AnimationTrigger::AfterPrevious
-        );
+        let mut truncated = bytes.clone();
+        let claimed_length = u32::from_le_bytes(truncated[4..8].try_into().unwrap()) + 1;
+        truncated[4..8].copy_from_slice(&claimed_length.to_le_bytes());
+        let (truncated, _) = PptRecord::parse(&truncated, 0).unwrap();
+        assert_eq!(truncated.data_length, claimed_length);
+        assert!(parse_build_list(&truncated).is_err());
+
+        let mut malformed = Vec::new();
+        let mut wrong_header = valid.clone();
+        wrong_header.version = 0;
+        malformed.push(wrong_header);
+
+        let mut wrong_bool = valid.clone();
+        wrong_bool.children[1].children[1].data[4] = 2;
+        malformed.push(wrong_bool);
+
+        let mut wrong_kind = valid.clone();
+        wrong_kind.children[2].children[0].data[0..4].copy_from_slice(&1u32.to_le_bytes());
+        malformed.push(wrong_kind);
+
+        let mut wrong_level = valid.clone();
+        wrong_level.children[0].children[2].data[0..4].copy_from_slice(&10u32.to_le_bytes());
+        malformed.push(wrong_level);
+
+        let mut duplicate = valid.clone();
+        duplicate.children[2].children[0].data[4..8].copy_from_slice(&11u32.to_le_bytes());
+        duplicate.children[2].children[0].data[8..12].copy_from_slice(&101u32.to_le_bytes());
+        malformed.push(duplicate);
+
+        let mut wrong_order = valid.clone();
+        wrong_order.children[1].children.swap(0, 1);
+        malformed.push(wrong_order);
+
+        for record in malformed {
+            assert!(parse_build_list(&record).is_err());
+        }
     }
 
     #[test]

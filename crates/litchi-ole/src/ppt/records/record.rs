@@ -13,7 +13,7 @@ use zerocopy::{
 };
 
 /// A PPT record containing binary data and metadata.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PptRecord {
     /// Record type
     pub record_type: PptRecordType,
@@ -99,7 +99,7 @@ impl PptRecord {
             record_type_raw: record_type,
             version,
             instance,
-            data_length: actual_data_size as u32,
+            data_length,
             data: record_data,
             children: Vec::new(),
         };
@@ -128,6 +128,11 @@ impl PptRecord {
                 | PptRecordType::Environment
                 | PptRecordType::InteractiveInfo
                 | PptRecordType::AnimationInfo
+                | PptRecordType::BuildList
+                | PptRecordType::ChartBuild
+                | PptRecordType::DiagramBuild
+                | PptRecordType::ParaBuild
+                | PptRecordType::ExtTimeNode
         )
     }
 
