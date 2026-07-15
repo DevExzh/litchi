@@ -605,14 +605,43 @@ pub enum BuildListEntry {
 }
 
 /// Exact PowerPoint 2002 extended time-node container envelope.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct ExtendedTimeNode {
     /// Required first atom containing time-node attributes.
     pub atom: TimeNodeAtom,
     /// Optional typed properties immediately following the atom.
     pub properties: Option<TimeNodePropertyList>,
-    /// Remaining property, behavior, condition, modifier, and child records.
-    pub children: Vec<PptRecord>,
+    /// The single animation behavior attached to a behavior node.
+    pub behavior: Option<TimeNodeBehavior>,
+    /// Media target attached to a media node.
+    pub visual_target: Option<TimeVisualElement>,
+    /// Optional repeated-subelement controls.
+    pub iterate_data: Option<TimeIterateData>,
+    /// Optional controls for a sequential node's children.
+    pub sequence_data: Option<TimeSequenceData>,
+    /// Begin or, for sequential nodes, next-child conditions.
+    pub begin_conditions: Vec<TimeCondition>,
+    /// End or, for sequential nodes, previous-child conditions.
+    pub end_conditions: Vec<TimeCondition>,
+    /// Optional child-stop synchronization condition.
+    pub end_sync_condition: Option<TimeCondition>,
+    /// Timing transformations applied to this node.
+    pub modifiers: Vec<TimeModifier>,
+    /// Recursively nested time nodes.
+    pub children: Vec<ExtendedTimeNode>,
+}
+
+/// The mutually exclusive behavior slots in an extended time node.
+#[derive(Debug, Clone, PartialEq)]
+pub enum TimeNodeBehavior {
+    Animate(TimeAnimateBehavior),
+    Color(TimeColorBehavior),
+    Effect(TimeEffectBehavior),
+    Motion(TimeMotionBehavior),
+    Rotation(TimeRotationBehavior),
+    Scale(TimeScaleBehavior),
+    Set(TimeSetBehavior),
+    Command(TimeCommandBehavior),
 }
 
 /// Exact fields controlled by a PowerPoint 2002 `TimeNodeAtom`.

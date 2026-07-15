@@ -18,15 +18,15 @@ use super::types::{
     TimeEffectNodeType, TimeEffectTransition, TimeEffectType, TimeIterateData,
     TimeIterateDirection, TimeIterateIntervalType, TimeIterateType, TimeMasterRelation,
     TimeModifier, TimeMotionBehavior, TimeMotionBehaviorAtom, TimeMotionOrigin, TimeNodeAtom,
-    TimeNodeFill, TimeNodeKind, TimeNodeProperty, TimeNodePropertyList, TimeNodeRestart,
-    TimePropertyListContext, TimeRotationBehavior, TimeRotationBehaviorAtom, TimeRotationDirection,
-    TimeScaleBehavior, TimeScaleBehaviorAtom, TimeSequenceData, TimeSequenceNextAction,
-    TimeSequencePreviousAction, TimeSetBehavior, TimeSetBehaviorAtom, TimeTriggerEvent,
-    TimeTriggerObject, TimeVariantValue, TimeVisualElement, TimeVisualElementKind,
-    is_valid_animation_attribute_name, is_valid_motion_path, is_valid_runtime_context,
-    is_valid_time_animate_value, is_valid_time_filter, is_valid_time_formula,
-    is_valid_time_points_types, is_valid_time_set_value, time_animation_attribute_value_type,
-    time_set_attribute_value_type,
+    TimeNodeBehavior, TimeNodeFill, TimeNodeKind, TimeNodeProperty, TimeNodePropertyList,
+    TimeNodeRestart, TimePropertyListContext, TimeRotationBehavior, TimeRotationBehaviorAtom,
+    TimeRotationDirection, TimeScaleBehavior, TimeScaleBehaviorAtom, TimeSequenceData,
+    TimeSequenceNextAction, TimeSequencePreviousAction, TimeSetBehavior, TimeSetBehaviorAtom,
+    TimeTriggerEvent, TimeTriggerObject, TimeVariantValue, TimeVisualElement,
+    TimeVisualElementKind, is_valid_animation_attribute_name, is_valid_motion_path,
+    is_valid_runtime_context, is_valid_time_animate_value, is_valid_time_filter,
+    is_valid_time_formula, is_valid_time_points_types, is_valid_time_set_value,
+    time_animation_attribute_value_type, time_set_attribute_value_type,
 };
 use crate::consts::PptRecordType;
 use crate::ppt::package::{PptError, Result};
@@ -179,7 +179,7 @@ pub fn parse_animation_info_atom(record: &PptRecord) -> Result<LegacyAnimationAt
     })
 }
 
-/// Parse the exact envelope and atom of an extended PowerPoint 2002 time node.
+/// Parse an exact, canonically ordered PowerPoint 2002 extended time node.
 pub fn parse_extended_time_node(record: &PptRecord) -> Result<ExtendedTimeNode> {
     require_container(record, PptRecordType::ExtTimeNode, 1, "ExtTimeNode")?;
     let atom_record = record.children.first().ok_or_else(|| {
@@ -209,19 +209,204 @@ pub fn parse_extended_time_node(record: &PptRecord) -> Result<ExtendedTimeNode> 
     } else {
         (None, 1)
     };
-    if record.children[child_start..]
-        .iter()
-        .any(|child| child.record_type == PptRecordType::TimePropertyList)
-    {
+    let effective_kind = atom.node_type.unwrap_or(TimeNodeKind::Parallel);
+    let mut behavior = None;
+    let mut visual_target = None;
+    let mut iterate_data = None;
+    let mut sequence_data = None;
+    let mut begin_conditions = Vec::new();
+    let mut end_conditions = Vec::new();
+    let mut end_sync_condition = None;
+    let mut modifiers = Vec::new();
+    let mut children = Vec::new();
+    let mut last_rank = 1u8;
+    for child in &record.children[child_start..] {
+        let rank = match child.record_type {
+            PptRecordType::TimeAnimateBehaviorContainer => {
+                set_time_node_behavior(
+                    &mut behavior,
+                    TimeNodeBehavior::Animate(parse_time_animate_behavior(child)?),
+                )?;
+                2
+            },
+            PptRecordType::TimeColorBehaviorContainer => {
+                set_time_node_behavior(
+                    &mut behavior,
+                    TimeNodeBehavior::Color(parse_time_color_behavior(child)?),
+                )?;
+                3
+            },
+            PptRecordType::TimeEffectBehaviorContainer => {
+                set_time_node_behavior(
+                    &mut behavior,
+                    TimeNodeBehavior::Effect(parse_time_effect_behavior(child)?),
+                )?;
+                4
+            },
+            PptRecordType::TimeMotionBehaviorContainer => {
+                set_time_node_behavior(
+                    &mut behavior,
+                    TimeNodeBehavior::Motion(parse_time_motion_behavior(child)?),
+                )?;
+                5
+            },
+            PptRecordType::TimeRotationBehaviorContainer => {
+                set_time_node_behavior(
+                    &mut behavior,
+                    TimeNodeBehavior::Rotation(parse_time_rotation_behavior(child)?),
+                )?;
+                6
+            },
+            PptRecordType::TimeScaleBehaviorContainer => {
+                set_time_node_behavior(
+                    &mut behavior,
+                    TimeNodeBehavior::Scale(parse_time_scale_behavior(child)?),
+                )?;
+                7
+            },
+            PptRecordType::TimeSetBehaviorContainer => {
+                set_time_node_behavior(
+                    &mut behavior,
+                    TimeNodeBehavior::Set(parse_time_set_behavior(child)?),
+                )?;
+                8
+            },
+            PptRecordType::TimeCommandBehaviorContainer => {
+                set_time_node_behavior(
+                    &mut behavior,
+                    TimeNodeBehavior::Command(parse_time_command_behavior(child)?),
+                )?;
+                9
+            },
+            PptRecordType::TimeClientVisualElement => {
+                set_once(
+                    &mut visual_target,
+                    parse_time_visual_element(child)?,
+                    "client visual element",
+                )?;
+                10
+            },
+            PptRecordType::TimeIterateData => {
+                set_once(
+                    &mut iterate_data,
+                    parse_time_iterate_data(child)?,
+                    "iterate data",
+                )?;
+                11
+            },
+            PptRecordType::TimeSequenceData => {
+                set_once(
+                    &mut sequence_data,
+                    parse_time_sequence_data(child)?,
+                    "sequence data",
+                )?;
+                12
+            },
+            PptRecordType::TimeConditionContainer => {
+                let condition = parse_time_condition(child)?;
+                match condition.condition_type {
+                    TimeConditionType::Begin => {
+                        begin_conditions.push(condition);
+                        13
+                    },
+                    TimeConditionType::Next if effective_kind == TimeNodeKind::Sequential => {
+                        begin_conditions.push(condition);
+                        13
+                    },
+                    TimeConditionType::End => {
+                        end_conditions.push(condition);
+                        14
+                    },
+                    TimeConditionType::Previous if effective_kind == TimeNodeKind::Sequential => {
+                        end_conditions.push(condition);
+                        14
+                    },
+                    TimeConditionType::EndSync => {
+                        set_once(&mut end_sync_condition, condition, "end-sync condition")?;
+                        15
+                    },
+                    TimeConditionType::Next | TimeConditionType::Previous => {
+                        return Err(PptError::InvalidFormat(
+                            "next/previous conditions require a sequential time node".to_string(),
+                        ));
+                    },
+                    TimeConditionType::None => {
+                        return Err(PptError::InvalidFormat(
+                            "condition type None is not valid in an extended time node".to_string(),
+                        ));
+                    },
+                }
+            },
+            PptRecordType::TimeModifier => {
+                modifiers.push(parse_time_modifier(child)?);
+                16
+            },
+            PptRecordType::ExtTimeNode => {
+                children.push(parse_extended_time_node(child)?);
+                18
+            },
+            _ if child.record_type_raw == 0xF145 => {
+                return Err(PptError::InvalidFormat(
+                    "SubEffectContainer is not yet supported".to_string(),
+                ));
+            },
+            other => {
+                return Err(PptError::InvalidFormat(format!(
+                    "unexpected {other:?} child in ExtTimeNode"
+                )));
+            },
+        };
+        if rank < last_rank {
+            return Err(PptError::InvalidFormat(
+                "ExtTimeNode children are not in canonical order".to_string(),
+            ));
+        }
+        last_rank = rank;
+    }
+    if behavior.is_some() && effective_kind != TimeNodeKind::Behavior {
         return Err(PptError::InvalidFormat(
-            "TimePropertyList must immediately follow TimeNodeAtom".to_string(),
+            "animation behaviors require a behavior time node".to_string(),
+        ));
+    }
+    if visual_target.is_some() && effective_kind != TimeNodeKind::Media {
+        return Err(PptError::InvalidFormat(
+            "standalone visual targets require a media time node".to_string(),
+        ));
+    }
+    if sequence_data.is_some() && effective_kind != TimeNodeKind::Sequential {
+        return Err(PptError::InvalidFormat(
+            "sequence data requires a sequential time node".to_string(),
         ));
     }
     Ok(ExtendedTimeNode {
         atom,
         properties,
-        children: record.children[child_start..].to_vec(),
+        behavior,
+        visual_target,
+        iterate_data,
+        sequence_data,
+        begin_conditions,
+        end_conditions,
+        end_sync_condition,
+        modifiers,
+        children,
     })
+}
+
+fn set_time_node_behavior(
+    slot: &mut Option<TimeNodeBehavior>,
+    behavior: TimeNodeBehavior,
+) -> Result<()> {
+    set_once(slot, behavior, "animation behavior")
+}
+
+fn set_once<T>(slot: &mut Option<T>, value: T, field: &str) -> Result<()> {
+    if slot.replace(value).is_some() {
+        return Err(PptError::InvalidFormat(format!(
+            "ExtTimeNode contains multiple {field} records"
+        )));
+    }
+    Ok(())
 }
 
 /// Parse the exact 32-byte payload of a `TimeNodeAtom`.
@@ -2550,11 +2735,44 @@ mod tests {
     }
 
     fn empty_time_node() -> ExtendedTimeNode {
-        ExtendedTimeNode {
-            atom: TimeNodeAtom::default(),
-            properties: None,
-            children: Vec::new(),
+        ExtendedTimeNode::default()
+    }
+
+    fn simple_condition(condition_type: TimeConditionType) -> TimeCondition {
+        TimeCondition {
+            condition_type,
+            atom: TimeConditionAtom {
+                trigger_object: TimeTriggerObject::None,
+                trigger_event: TimeTriggerEvent::None,
+                target_id: 0,
+                delay_ms: 0,
+            },
+            visual_target: None,
         }
+    }
+
+    fn sample_set_node_behavior() -> TimeNodeBehavior {
+        TimeNodeBehavior::Set(TimeSetBehavior {
+            atom: TimeSetBehaviorAtom {
+                to_used: true,
+                value_type: Some(TimeAnimateValueType::Number),
+            },
+            to: Some("hidden".to_string()),
+            behavior: TimeBehavior {
+                atom: TimeBehaviorAtom {
+                    additive: None,
+                    attribute_names_used: true,
+                },
+                attribute_names: Some(vec!["style.visibility".to_string()]),
+                properties: None,
+                target: TimeVisualElement::Shape {
+                    kind: TimeVisualElementKind::Shape,
+                    shape_id_ref: 23,
+                    data1: 0,
+                    data2: 0,
+                },
+            },
+        })
     }
 
     fn sample_build_list() -> BuildList {
@@ -2671,28 +2889,81 @@ mod tests {
         assert_eq!(consumed, bytes.len());
         assert_eq!(parse_time_node_atom(&record).unwrap(), atom);
 
-        let raw_child = PptRecord {
-            record_type: PptRecordType::Unknown,
-            record_type_raw: 0xF999,
-            version: 0,
-            instance: 7,
-            data_length: 3,
-            data: vec![1, 2, 3],
-            children: Vec::new(),
+        let behavior_child = ExtendedTimeNode {
+            atom: atom.clone(),
+            behavior: Some(sample_set_node_behavior()),
+            iterate_data: Some(TimeIterateData {
+                interval: Some(100),
+                iterate_type: Some(TimeIterateType::ByWord),
+                direction: Some(TimeIterateDirection::Forward),
+                interval_type: Some(TimeIterateIntervalType::Milliseconds),
+            }),
+            ..ExtendedTimeNode::default()
+        };
+        let media_child = ExtendedTimeNode {
+            atom: TimeNodeAtom {
+                node_type: Some(TimeNodeKind::Media),
+                ..TimeNodeAtom::default()
+            },
+            visual_target: Some(TimeVisualElement::Sound {
+                kind: TimeVisualElementKind::Audio,
+                sound_id_ref: 7,
+            }),
+            ..ExtendedTimeNode::default()
         };
         let node = ExtendedTimeNode {
-            atom,
+            atom: TimeNodeAtom {
+                node_type: Some(TimeNodeKind::Sequential),
+                ..atom
+            },
             properties: Some(TimeNodePropertyList {
                 properties: vec![
                     TimeNodeProperty::EffectType(TimeEffectType::Entrance),
                     TimeNodeProperty::EffectNodeType(TimeEffectNodeType::ClickEffect),
                 ],
             }),
-            children: vec![raw_child],
+            sequence_data: Some(TimeSequenceData {
+                concurrent: Some(true),
+                next_action: Some(TimeSequenceNextAction::SeekToNaturalEnd),
+                previous_action: Some(TimeSequencePreviousAction::SkipTimedChildren),
+            }),
+            begin_conditions: vec![
+                simple_condition(TimeConditionType::Begin),
+                simple_condition(TimeConditionType::Next),
+            ],
+            end_conditions: vec![
+                simple_condition(TimeConditionType::End),
+                simple_condition(TimeConditionType::Previous),
+            ],
+            end_sync_condition: Some(simple_condition(TimeConditionType::EndSync)),
+            modifiers: vec![TimeModifier::Speed(100), TimeModifier::AutomaticReverse(1)],
+            children: vec![behavior_child, media_child],
+            ..ExtendedTimeNode::default()
         };
         let bytes = write_extended_time_node(&node).unwrap();
         let (record, consumed) = PptRecord::parse(&bytes, 0).unwrap();
         assert_eq!(consumed, bytes.len());
+        assert_eq!(
+            record
+                .children
+                .iter()
+                .map(|child| child.record_type)
+                .collect::<Vec<_>>(),
+            vec![
+                PptRecordType::TimeNode,
+                PptRecordType::TimePropertyList,
+                PptRecordType::TimeSequenceData,
+                PptRecordType::TimeConditionContainer,
+                PptRecordType::TimeConditionContainer,
+                PptRecordType::TimeConditionContainer,
+                PptRecordType::TimeConditionContainer,
+                PptRecordType::TimeConditionContainer,
+                PptRecordType::TimeModifier,
+                PptRecordType::TimeModifier,
+                PptRecordType::ExtTimeNode,
+                PptRecordType::ExtTimeNode,
+            ]
+        );
         assert_eq!(parse_extended_time_node(&record).unwrap(), node);
     }
 
@@ -2717,6 +2988,87 @@ mod tests {
         invalid_enum[36..40].copy_from_slice(&1u32.to_le_bytes());
         let (record, _) = PptRecord::parse(&invalid_enum, 0).unwrap();
         assert!(parse_time_node_atom(&record).is_err());
+    }
+
+    #[test]
+    fn rejects_invalid_extended_time_node_structure() {
+        let behavior_node = ExtendedTimeNode {
+            atom: TimeNodeAtom {
+                node_type: Some(TimeNodeKind::Behavior),
+                ..TimeNodeAtom::default()
+            },
+            behavior: Some(sample_set_node_behavior()),
+            ..ExtendedTimeNode::default()
+        };
+        let mut invalid = behavior_node.clone();
+        invalid.atom.node_type = Some(TimeNodeKind::Parallel);
+        assert!(write_extended_time_node(&invalid).is_err());
+
+        invalid = ExtendedTimeNode {
+            atom: TimeNodeAtom {
+                node_type: Some(TimeNodeKind::Behavior),
+                ..TimeNodeAtom::default()
+            },
+            visual_target: Some(TimeVisualElement::Page),
+            ..ExtendedTimeNode::default()
+        };
+        assert!(write_extended_time_node(&invalid).is_err());
+
+        invalid = ExtendedTimeNode {
+            sequence_data: Some(TimeSequenceData {
+                concurrent: None,
+                next_action: None,
+                previous_action: None,
+            }),
+            ..ExtendedTimeNode::default()
+        };
+        assert!(write_extended_time_node(&invalid).is_err());
+
+        invalid = ExtendedTimeNode {
+            begin_conditions: vec![simple_condition(TimeConditionType::Next)],
+            ..ExtendedTimeNode::default()
+        };
+        assert!(write_extended_time_node(&invalid).is_err());
+
+        invalid = ExtendedTimeNode {
+            end_sync_condition: Some(simple_condition(TimeConditionType::End)),
+            ..ExtendedTimeNode::default()
+        };
+        assert!(write_extended_time_node(&invalid).is_err());
+
+        let bytes = write_extended_time_node(&behavior_node).unwrap();
+        let (mut record, _) = PptRecord::parse(&bytes, 0).unwrap();
+        record.children[0].data[8..12].copy_from_slice(&0u32.to_le_bytes());
+        assert!(parse_extended_time_node(&record).is_err());
+
+        let behavior_record = record.children[1].clone();
+        record.children[0].data[8..12].copy_from_slice(&3u32.to_le_bytes());
+        let TimeNodeBehavior::Set(set) = behavior_node.behavior.as_ref().unwrap() else {
+            unreachable!();
+        };
+        let behavior_bytes = write_time_set_behavior(set).unwrap();
+        record.data.extend(&behavior_bytes);
+        record.data_length += behavior_bytes.len() as u32;
+        record.children.push(behavior_record);
+        assert!(parse_extended_time_node(&record).is_err());
+
+        let ordered = ExtendedTimeNode {
+            atom: TimeNodeAtom {
+                node_type: Some(TimeNodeKind::Sequential),
+                ..TimeNodeAtom::default()
+            },
+            sequence_data: Some(TimeSequenceData {
+                concurrent: None,
+                next_action: None,
+                previous_action: None,
+            }),
+            begin_conditions: vec![simple_condition(TimeConditionType::Begin)],
+            ..ExtendedTimeNode::default()
+        };
+        let bytes = write_extended_time_node(&ordered).unwrap();
+        let (mut record, _) = PptRecord::parse(&bytes, 0).unwrap();
+        record.children.swap(1, 2);
+        assert!(parse_extended_time_node(&record).is_err());
     }
 
     #[test]
@@ -4325,8 +4677,7 @@ mod tests {
                 node_type: Some(TimeNodeKind::Sequential),
                 ..TimeNodeAtom::default()
             },
-            properties: None,
-            children: Vec::new(),
+            ..ExtendedTimeNode::default()
         };
         let build_list = BuildList::new();
         let mut data = Vec::new();

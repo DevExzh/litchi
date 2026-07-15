@@ -50,12 +50,12 @@ pub use types::{
     TimeEffectFilter, TimeEffectNodeType, TimeEffectTransition, TimeEffectType, TimeIterateData,
     TimeIterateDirection, TimeIterateIntervalType, TimeIterateType, TimeMasterRelation,
     TimeModifier, TimeMotionBehavior, TimeMotionBehaviorAtom, TimeMotionOrigin, TimeNodeAtom,
-    TimeNodeContainer, TimeNodeFill, TimeNodeKind, TimeNodeProperty, TimeNodePropertyList,
-    TimeNodeRestart, TimeNodeType, TimePropertyListContext, TimeRotationBehavior,
-    TimeRotationBehaviorAtom, TimeRotationDirection, TimeScaleBehavior, TimeScaleBehaviorAtom,
-    TimeSequenceData, TimeSequenceNextAction, TimeSequencePreviousAction, TimeSetBehavior,
-    TimeSetBehaviorAtom, TimeTriggerEvent, TimeTriggerObject, TimeVariantValue, TimeVisualElement,
-    TimeVisualElementKind,
+    TimeNodeBehavior, TimeNodeContainer, TimeNodeFill, TimeNodeKind, TimeNodeProperty,
+    TimeNodePropertyList, TimeNodeRestart, TimeNodeType, TimePropertyListContext,
+    TimeRotationBehavior, TimeRotationBehaviorAtom, TimeRotationDirection, TimeScaleBehavior,
+    TimeScaleBehaviorAtom, TimeSequenceData, TimeSequenceNextAction, TimeSequencePreviousAction,
+    TimeSetBehavior, TimeSetBehaviorAtom, TimeTriggerEvent, TimeTriggerObject, TimeVariantValue,
+    TimeVisualElement, TimeVisualElementKind,
 };
 pub use writer::{
     write_animation_info, write_animation_info_atom, write_build_list, write_extended_time_node,

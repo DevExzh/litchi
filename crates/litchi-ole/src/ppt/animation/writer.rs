@@ -15,14 +15,15 @@ use super::types::{
     TimeEffectBehaviorAtom, TimeEffectNodeType, TimeEffectTransition, TimeEffectType,
     TimeIterateData, TimeIterateDirection, TimeIterateIntervalType, TimeIterateType,
     TimeMasterRelation, TimeModifier, TimeMotionBehavior, TimeMotionBehaviorAtom, TimeMotionOrigin,
-    TimeNodeAtom, TimeNodeProperty, TimeNodePropertyList, TimePropertyListContext,
-    TimeRotationBehavior, TimeRotationBehaviorAtom, TimeRotationDirection, TimeScaleBehavior,
-    TimeScaleBehaviorAtom, TimeSequenceData, TimeSequenceNextAction, TimeSequencePreviousAction,
-    TimeSetBehavior, TimeSetBehaviorAtom, TimeTriggerEvent, TimeTriggerObject, TimeVariantValue,
-    TimeVisualElement, TimeVisualElementKind, is_valid_animation_attribute_name,
-    is_valid_motion_path, is_valid_runtime_context, is_valid_time_animate_value,
-    is_valid_time_filter, is_valid_time_formula, is_valid_time_points_types,
-    is_valid_time_set_value, time_animation_attribute_value_type, time_set_attribute_value_type,
+    TimeNodeAtom, TimeNodeBehavior, TimeNodeKind, TimeNodeProperty, TimeNodePropertyList,
+    TimePropertyListContext, TimeRotationBehavior, TimeRotationBehaviorAtom, TimeRotationDirection,
+    TimeScaleBehavior, TimeScaleBehaviorAtom, TimeSequenceData, TimeSequenceNextAction,
+    TimeSequencePreviousAction, TimeSetBehavior, TimeSetBehaviorAtom, TimeTriggerEvent,
+    TimeTriggerObject, TimeVariantValue, TimeVisualElement, TimeVisualElementKind,
+    is_valid_animation_attribute_name, is_valid_motion_path, is_valid_runtime_context,
+    is_valid_time_animate_value, is_valid_time_filter, is_valid_time_formula,
+    is_valid_time_points_types, is_valid_time_set_value, time_animation_attribute_value_type,
+    time_set_attribute_value_type,
 };
 use crate::consts::PptRecordType;
 use crate::ppt::package::{PptError, Result};
@@ -210,8 +211,9 @@ pub fn write_animation_info_atom(atom: &LegacyAnimationAtom) -> Result<Vec<u8>> 
     Ok(result)
 }
 
-/// Serialize an exact PowerPoint 2002 extended time-node envelope.
+/// Serialize a canonically ordered PowerPoint 2002 extended time node.
 pub fn write_extended_time_node(node: &ExtendedTimeNode) -> Result<Vec<u8>> {
+    validate_extended_time_node(node)?;
     let mut children = write_time_node_atom(&node.atom);
     if let Some(properties) = &node.properties {
         children.extend(write_time_node_property_list(
@@ -219,25 +221,94 @@ pub fn write_extended_time_node(node: &ExtendedTimeNode) -> Result<Vec<u8>> {
             TimePropertyListContext::TimeNode,
         )?);
     }
+    if let Some(behavior) = &node.behavior {
+        children.extend(match behavior {
+            TimeNodeBehavior::Animate(value) => write_time_animate_behavior(value)?,
+            TimeNodeBehavior::Color(value) => write_time_color_behavior(value)?,
+            TimeNodeBehavior::Effect(value) => write_time_effect_behavior(value)?,
+            TimeNodeBehavior::Motion(value) => write_time_motion_behavior(value)?,
+            TimeNodeBehavior::Rotation(value) => write_time_rotation_behavior(value)?,
+            TimeNodeBehavior::Scale(value) => write_time_scale_behavior(value)?,
+            TimeNodeBehavior::Set(value) => write_time_set_behavior(value)?,
+            TimeNodeBehavior::Command(value) => write_time_command_behavior(value)?,
+        });
+    }
+    if let Some(target) = &node.visual_target {
+        children.extend(write_time_visual_element(target)?);
+    }
+    if let Some(data) = &node.iterate_data {
+        children.extend(write_time_iterate_data(data));
+    }
+    if let Some(data) = &node.sequence_data {
+        children.extend(write_time_sequence_data(data));
+    }
+    for condition in &node.begin_conditions {
+        children.extend(write_time_condition(condition)?);
+    }
+    for condition in &node.end_conditions {
+        children.extend(write_time_condition(condition)?);
+    }
+    if let Some(condition) = &node.end_sync_condition {
+        children.extend(write_time_condition(condition)?);
+    }
+    for modifier in &node.modifiers {
+        children.extend(write_time_modifier(modifier));
+    }
     for child in &node.children {
-        if matches!(
-            child.record_type,
-            PptRecordType::TimeNode | PptRecordType::TimePropertyList
-        ) {
+        children.extend(write_extended_time_node(child)?);
+    }
+    wrap_record(PptRecordType::ExtTimeNode, 0x0F, 1, children)
+}
+
+fn validate_extended_time_node(node: &ExtendedTimeNode) -> Result<()> {
+    let kind = node.atom.node_type.unwrap_or(TimeNodeKind::Parallel);
+    if node.behavior.is_some() && kind != TimeNodeKind::Behavior {
+        return Err(PptError::InvalidFormat(
+            "animation behaviors require a behavior time node".to_string(),
+        ));
+    }
+    if node.visual_target.is_some() && kind != TimeNodeKind::Media {
+        return Err(PptError::InvalidFormat(
+            "standalone visual targets require a media time node".to_string(),
+        ));
+    }
+    if node.sequence_data.is_some() && kind != TimeNodeKind::Sequential {
+        return Err(PptError::InvalidFormat(
+            "sequence data requires a sequential time node".to_string(),
+        ));
+    }
+    for condition in &node.begin_conditions {
+        let valid = condition.condition_type == TimeConditionType::Begin
+            || (kind == TimeNodeKind::Sequential
+                && condition.condition_type == TimeConditionType::Next);
+        if !valid {
             return Err(PptError::InvalidFormat(
-                "extended time-node raw children cannot contain atom/property-list records"
+                "begin-condition arrays may contain only begin conditions, or next conditions on sequential nodes"
                     .to_string(),
             ));
         }
-        if child.data_length as usize != child.data.len() {
-            return Err(PptError::InvalidFormat(format!(
-                "extended time-node child {:?} has a truncated payload",
-                child.record_type
-            )));
-        }
-        children.extend(serialize_raw_record(child));
     }
-    wrap_record(PptRecordType::ExtTimeNode, 0x0F, 1, children)
+    for condition in &node.end_conditions {
+        let valid = condition.condition_type == TimeConditionType::End
+            || (kind == TimeNodeKind::Sequential
+                && condition.condition_type == TimeConditionType::Previous);
+        if !valid {
+            return Err(PptError::InvalidFormat(
+                "end-condition arrays may contain only end conditions, or previous conditions on sequential nodes"
+                    .to_string(),
+            ));
+        }
+    }
+    if node
+        .end_sync_condition
+        .as_ref()
+        .is_some_and(|condition| condition.condition_type != TimeConditionType::EndSync)
+    {
+        return Err(PptError::InvalidFormat(
+            "end-sync condition must use the EndSync condition type".to_string(),
+        ));
+    }
+    Ok(())
 }
 
 /// Serialize an exact 32-byte `TimeNodeAtom` payload.
@@ -1872,8 +1943,7 @@ mod tests {
     fn rejects_invalid_paragraph_builds() {
         let time_node = ExtendedTimeNode {
             atom: TimeNodeAtom::default(),
-            properties: None,
-            children: Vec::new(),
+            ..ExtendedTimeNode::default()
         };
         let level = ParagraphBuildLevel {
             level: 10,
