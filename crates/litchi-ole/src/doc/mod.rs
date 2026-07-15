@@ -88,7 +88,7 @@ pub use table::{Cell, Row, Table};
 pub use writer::{
     BookmarkEntry, CharacterFormatting, CommentEntry, DisplayFieldRevision, DocWriteError,
     DocWriter, FormattingRevision, LineSpacing, NumberingRevision, ParagraphFormatting,
-    TextRevision,
+    TextBoxTightWrap, TextRevision,
 };
 
 /// Crate-native ordered document element returned by [`Document::elements`].

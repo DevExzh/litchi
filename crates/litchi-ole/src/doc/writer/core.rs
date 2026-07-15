@@ -80,6 +80,7 @@ use super::numbering::{ListFormatOverride, ListStructure, NumberingWriter};
 use super::piece_table::{Piece, PieceTableBuilder};
 use super::revisions::{DisplayFieldRevision, FormattingRevision, NumberingRevision, TextRevision};
 use crate::doc::CommentDateTime;
+use crate::doc::parts::pap::TextBoxTightWrap;
 use crate::sprm_operations::*;
 use litchi_cfb::writer::OleWriter;
 use std::collections::HashMap;
@@ -351,10 +352,14 @@ pub struct ParagraphFormatting {
     pub bidi: Option<bool>,
     /// Outline level (0..9)
     pub outline_level: Option<u8>,
+    /// Prevent overlapping floating objects anchored to the paragraph
+    pub no_allow_overlap: Option<bool>,
     /// Contextual spacing (ignore spacing between same style)
     pub contextual_spacing: Option<bool>,
     /// Mirror indents (for facing pages)
     pub mirror_indents: Option<bool>,
+    /// Lines in a text box whose edges permit tight wrapping
+    pub text_box_tight_wrap: Option<TextBoxTightWrap>,
     /// Line spacing descriptor
     pub line_spacing: Option<LineSpacing>,
     /// List level index (0-based, used with `ilfo` to associate paragraph with a list)
@@ -3411,12 +3416,18 @@ fn build_papx_grpprl(fmt: &ParagraphFormatting) -> Vec<u8> {
         grp.push(lvl);
     }
 
-    // Contextual spacing and mirror indents
+    // Floating-object overlap and text-box wrapping behavior
+    if let Some(no_overlap) = fmt.no_allow_overlap {
+        push_bool(&mut grp, SPRM_P_F_NO_ALLOW_OVERLAP, no_overlap);
+    }
     if let Some(cs) = fmt.contextual_spacing {
         push_bool(&mut grp, SPRM_P_F_CONTEXTUAL_SPACING, cs);
     }
     if let Some(mi) = fmt.mirror_indents {
         push_bool(&mut grp, SPRM_P_F_MIRROR_INDENTS, mi);
+    }
+    if let Some(tight_wrap) = fmt.text_box_tight_wrap {
+        push_byte(&mut grp, SPRM_P_TTWO, tight_wrap as u8);
     }
     if let Some(applied) = fmt.numbering_revision_list_applied {
         push_bool(&mut grp, SPRM_P_F_NUM_RM_INS, applied);
@@ -4118,6 +4129,10 @@ mod tests {
                 ParagraphFormatting {
                     alignment: Some(1),
                     space_before: Some(120),
+                    no_allow_overlap: Some(true),
+                    contextual_spacing: Some(true),
+                    mirror_indents: Some(true),
+                    text_box_tight_wrap: Some(TextBoxTightWrap::FirstAndLastLine),
                     line_spacing: Some(LineSpacing::exact_twips(360).unwrap()),
                     ..ParagraphFormatting::default()
                 },
@@ -4147,6 +4162,13 @@ mod tests {
             crate::doc::parts::pap::Justification::Center
         );
         assert_eq!(paragraphs[0].properties().space_before, Some(120));
+        assert!(paragraphs[0].properties().no_allow_overlap);
+        assert!(paragraphs[0].properties().contextual_spacing);
+        assert!(paragraphs[0].properties().mirror_indents);
+        assert_eq!(
+            paragraphs[0].properties().text_box_tight_wrap,
+            Some(TextBoxTightWrap::FirstAndLastLine)
+        );
         assert_eq!(paragraphs[0].properties().line_spacing, Some(-360));
         assert_eq!(
             paragraphs[0].properties().line_spacing_type,

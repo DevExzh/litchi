@@ -556,32 +556,32 @@ pub const SPRM_P_BRC_BETWEEN80: u16 = 0x6652;
 /// sprmPBrcBar80 - Bar border v80 (operation 0x53)
 pub const SPRM_P_BRC_BAR80: u16 = 0x6653;
 
-/// sprmPFNoAllowOverlap - No allow overlap (operation 0x54)
-pub const SPRM_P_F_NO_ALLOW_OVERLAP: u16 = 0x2454;
+/// sprmPFNoAllowOverlap - No allow overlap (operation 0x62)
+pub const SPRM_P_F_NO_ALLOW_OVERLAP: u16 = 0x2462;
 
-/// sprmPWall - Wall (operation 0x55)
-pub const SPRM_P_WALL: u16 = 0x6455;
+/// sprmPWall - Paragraph revision wall (operation 0x64)
+pub const SPRM_P_WALL: u16 = 0x2664;
 
-/// sprmPIpgp - Page number (operation 0x56)
-pub const SPRM_P_IPGP: u16 = 0x6456;
+/// sprmPIpgp - Paragraph group identity (operation 0x65)
+pub const SPRM_P_IPGP: u16 = 0x6465;
 
-/// sprmPCnf - Conditional formatting (operation 0x57)
-pub const SPRM_P_CNF: u16 = 0x6457;
+/// sprmPCnf - Conditional table-style paragraph formatting (operation 0x66)
+pub const SPRM_P_CNF: u16 = 0xC666;
 
-/// sprmPRsid - Revision save ID (operation 0x60)
-pub const SPRM_P_RSID: u16 = 0x6460;
+/// sprmPRsid - Revision save ID (operation 0x67)
+pub const SPRM_P_RSID: u16 = 0x6467;
 
-/// sprmPIstdListPermute - List style permutation (operation 0x61)
-pub const SPRM_P_ISTD_LIST_PERMUTE: u16 = 0xC661;
+/// sprmPIstdListPermute - List style permutation (operation 0x69)
+pub const SPRM_P_ISTD_LIST_PERMUTE: u16 = 0xC669;
 
 /// sprmPTableProps - Table properties (operation 0x6B)
 pub const SPRM_P_TABLE_PROPS: u16 = 0x646B;
 
-/// sprmPTIstdInfo - Table style info (operation 0x63)
-pub const SPRM_P_T_ISTD_INFO: u16 = 0xC663;
+/// sprmPTIstdInfo - Table style info (operation 0x6C)
+pub const SPRM_P_T_ISTD_INFO: u16 = 0xC66C;
 
-/// sprmPFContextualSpacing - Contextual spacing (operation 0x64)
-pub const SPRM_P_F_CONTEXTUAL_SPACING: u16 = 0x2464;
+/// sprmPFContextualSpacing - Contextual spacing (operation 0x6D)
+pub const SPRM_P_F_CONTEXTUAL_SPACING: u16 = 0x246D;
 
 /// sprmPPropRMark90 - Property revision mark v90 (operation 0x65)
 pub const SPRM_P_PROP_RMARK90: u16 = 0xC665;
@@ -589,11 +589,11 @@ pub const SPRM_P_PROP_RMARK90: u16 = 0xC665;
 /// Current sprmPPropRMark property revision mark (operation 0x6F)
 pub const SPRM_P_PROP_RMARK_CURRENT: u16 = 0xC66F;
 
-/// sprmPFMirrorIndents - Mirror indents (operation 0x66)
-pub const SPRM_P_F_MIRROR_INDENTS: u16 = 0x2466;
+/// sprmPFMirrorIndents - Mirror indents (operation 0x70)
+pub const SPRM_P_F_MIRROR_INDENTS: u16 = 0x2470;
 
-/// sprmPTtwo - Table two (operation 0x67)
-pub const SPRM_P_TTWO: u16 = 0x2467;
+/// sprmPTtwo - Text-box tight wrapping (operation 0x71)
+pub const SPRM_P_TTWO: u16 = 0x2471;
 
 // TAP (Table Properties) SPRM opcodes
 // Based on Apache POI's TableProperties and TableSprmUncompressor
@@ -918,5 +918,21 @@ mod tests {
         // sprmCFBold = 0x0835
         // Bit 9 = 0 (not special)
         assert!(!is_sprm_special(SPRM_C_F_BOLD));
+    }
+
+    #[test]
+    fn current_high_paragraph_sprms_match_ms_doc() {
+        assert_eq!(SPRM_P_F_NO_ALLOW_OVERLAP, 0x2462);
+        assert_eq!(SPRM_P_WALL, 0x2664);
+        assert_eq!(SPRM_P_IPGP, 0x6465);
+        assert_eq!(SPRM_P_CNF, 0xC666);
+        assert_eq!(SPRM_P_RSID, 0x6467);
+        assert_eq!(SPRM_P_ISTD_LIST_PERMUTE, 0xC669);
+        assert_eq!(SPRM_P_TABLE_PROPS, 0x646B);
+        assert_eq!(SPRM_P_T_ISTD_INFO, 0xC66C);
+        assert_eq!(SPRM_P_F_CONTEXTUAL_SPACING, 0x246D);
+        assert_eq!(SPRM_P_PROP_RMARK_CURRENT, 0xC66F);
+        assert_eq!(SPRM_P_F_MIRROR_INDENTS, 0x2470);
+        assert_eq!(SPRM_P_TTWO, 0x2471);
     }
 }

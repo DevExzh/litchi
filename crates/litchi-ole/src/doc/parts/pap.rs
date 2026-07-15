@@ -52,6 +52,14 @@ pub struct ParagraphProperties {
     pub no_line_numbering: bool,
     /// No auto hyphenation
     pub no_auto_hyph: bool,
+    /// Prevent overlapping floating objects anchored to this paragraph
+    pub no_allow_overlap: bool,
+    /// Suppress spacing between paragraphs with the same style
+    pub contextual_spacing: bool,
+    /// Mirror left and right indents on facing pages
+    pub mirror_indents: bool,
+    /// Tight-wrap mode for text boxes
+    pub text_box_tight_wrap: Option<TextBoxTightWrap>,
     /// Tab stops
     pub tab_stops: Vec<TabStop>,
     /// Borders
@@ -191,6 +199,37 @@ pub enum LineSpacingType {
     Exactly,
     /// Multiple (value in 240ths of a line) (lspd.fMultLineSp = 1)
     Multiple,
+}
+
+/// Lines in a text box whose edges permit tight wrapping by surrounding text.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum TextBoxTightWrap {
+    /// No lines permit tight wrapping.
+    None = 0,
+    /// All lines permit tight wrapping.
+    AllLines = 1,
+    /// Only the first and last lines permit tight wrapping.
+    FirstAndLastLine = 2,
+    /// Only the first line permits tight wrapping.
+    FirstLineOnly = 3,
+    /// Only the last line permits tight wrapping.
+    LastLineOnly = 4,
+}
+
+impl TryFrom<u8> for TextBoxTightWrap {
+    type Error = u8;
+
+    fn try_from(value: u8) -> std::result::Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Self::None),
+            1 => Ok(Self::AllLines),
+            2 => Ok(Self::FirstAndLastLine),
+            3 => Ok(Self::FirstLineOnly),
+            4 => Ok(Self::LastLineOnly),
+            invalid => Err(invalid),
+        }
+    }
 }
 
 /// Tab stop definition.
@@ -508,11 +547,15 @@ impl ParagraphProperties {
     /// * `sprm` - The SPRM operation to apply
     fn apply_sprm(pap: &mut ParagraphProperties, sprm: &Sprm) -> Result<()> {
         match sprm.opcode {
-            0x2664 => {
+            SPRM_P_F_NO_ALLOW_OVERLAP => {
+                pap.no_allow_overlap = Self::strict_bool8(sprm, "sprmPFNoAllowOverlap")?;
+                return Ok(());
+            },
+            SPRM_P_WALL => {
                 pap.properties_preserved_for_revision = Self::strict_bool8(sprm, "sprmPWall")?;
                 return Ok(());
             },
-            0x6465 => {
+            SPRM_P_IPGP => {
                 let group_id = sprm.operand_dword().ok_or_else(|| {
                     DocError::Corrupted("sprmPIpgp is missing its PGPInfo index".to_string())
                 })?;
@@ -524,10 +567,30 @@ impl ParagraphProperties {
                 pap.paragraph_group_id = Some(group_id);
                 return Ok(());
             },
-            0x6467 => {
+            SPRM_P_RSID => {
                 pap.revision_save_id = Some(sprm.operand_dword().ok_or_else(|| {
                     DocError::Corrupted("sprmPRsid is missing its revision save ID".to_string())
                 })?);
+                return Ok(());
+            },
+            SPRM_P_F_CONTEXTUAL_SPACING => {
+                pap.contextual_spacing = Self::strict_bool8(sprm, "sprmPFContextualSpacing")?;
+                return Ok(());
+            },
+            SPRM_P_F_MIRROR_INDENTS => {
+                pap.mirror_indents = Self::strict_bool8(sprm, "sprmPFMirrorIndents")?;
+                return Ok(());
+            },
+            SPRM_P_TTWO => {
+                let tight_wrap = sprm.operand_byte().ok_or_else(|| {
+                    DocError::Corrupted("sprmPTtwo is missing its tight-wrap mode".to_string())
+                })?;
+                pap.text_box_tight_wrap =
+                    Some(TextBoxTightWrap::try_from(tight_wrap).map_err(|invalid| {
+                        DocError::Corrupted(format!(
+                            "sprmPTtwo has invalid tight-wrap mode {invalid}"
+                        ))
+                    })?);
                 return Ok(());
             },
             _ => {},
@@ -1531,18 +1594,48 @@ mod tests {
 
     #[test]
     fn parses_current_paragraph_identity_and_revision_state_strictly() {
-        let grpprl = [
-            0x64, 0x26, 1, // sprmPWall
-            0x65, 0x64, 9, 0, 0, 0, // sprmPIpgp
-            0x67, 0x64, 0x44, 0x33, 0x22, 0x11, // sprmPRsid
-        ];
+        let mut grpprl = Vec::new();
+        grpprl.extend_from_slice(&SPRM_P_WALL.to_le_bytes());
+        grpprl.push(1);
+        grpprl.extend_from_slice(&SPRM_P_IPGP.to_le_bytes());
+        grpprl.extend_from_slice(&9u32.to_le_bytes());
+        grpprl.extend_from_slice(&SPRM_P_RSID.to_le_bytes());
+        grpprl.extend_from_slice(&0x1122_3344u32.to_le_bytes());
+        grpprl.extend_from_slice(&SPRM_P_F_NO_ALLOW_OVERLAP.to_le_bytes());
+        grpprl.push(1);
+        grpprl.extend_from_slice(&SPRM_P_F_CONTEXTUAL_SPACING.to_le_bytes());
+        grpprl.push(1);
+        grpprl.extend_from_slice(&SPRM_P_F_MIRROR_INDENTS.to_le_bytes());
+        grpprl.push(1);
+        grpprl.extend_from_slice(&SPRM_P_TTWO.to_le_bytes());
+        grpprl.push(4);
+
         let properties = ParagraphProperties::from_sprm(&grpprl).unwrap();
         assert!(properties.properties_preserved_for_revision);
         assert_eq!(properties.paragraph_group_id, Some(9));
         assert_eq!(properties.revision_save_id, Some(0x1122_3344));
+        assert!(properties.no_allow_overlap);
+        assert!(properties.contextual_spacing);
+        assert!(properties.mirror_indents);
+        assert_eq!(
+            properties.text_box_tight_wrap,
+            Some(TextBoxTightWrap::LastLineOnly)
+        );
 
-        assert!(ParagraphProperties::from_sprm(&[0x64, 0x26, 2]).is_err());
-        assert!(ParagraphProperties::from_sprm(&[0x65, 0x64, 0, 0, 0, 0]).is_err());
-        assert!(ParagraphProperties::from_sprm(&[0x67, 0x64, 1, 2]).is_err());
+        let invalid_bool = [SPRM_P_WALL.to_le_bytes().as_slice(), &[2]].concat();
+        assert!(ParagraphProperties::from_sprm(&invalid_bool).is_err());
+
+        let invalid_group = [
+            SPRM_P_IPGP.to_le_bytes().as_slice(),
+            0u32.to_le_bytes().as_slice(),
+        ]
+        .concat();
+        assert!(ParagraphProperties::from_sprm(&invalid_group).is_err());
+
+        let truncated_rsid = [SPRM_P_RSID.to_le_bytes().as_slice(), &[1, 2]].concat();
+        assert!(ParagraphProperties::from_sprm(&truncated_rsid).is_err());
+
+        let invalid_tight_wrap = [SPRM_P_TTWO.to_le_bytes().as_slice(), &[5]].concat();
+        assert!(ParagraphProperties::from_sprm(&invalid_tight_wrap).is_err());
     }
 }

@@ -59,6 +59,7 @@ pub mod hyperlinks;
 pub mod numbering;
 
 // Re-export public types
+pub use crate::doc::parts::pap::TextBoxTightWrap;
 pub use crate::doc::parts::tap::{
     CellBorderTypes, CellShading, CellSpacing, CellSpacingSource, ShadingPattern,
     TableConditionalFormatting, TableHorizontalAnchor, TableHorizontalPosition, TableJustification,
