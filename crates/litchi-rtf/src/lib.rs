@@ -36,6 +36,7 @@ mod field;
 mod info;
 mod lexer;
 mod list;
+mod object;
 mod parser;
 mod picture;
 mod section;
@@ -61,6 +62,7 @@ pub use list::{
     List, ListFollow, ListJustification, ListLevel, ListLevelType, ListOverride, ListOverrideTable,
     ListTable,
 };
+pub use object::{EmbeddedObject, ObjectKind, OleObjectHeader};
 pub use picture::{ImageType, Picture, detect_image_type};
 pub use section::{
     HeaderFooter, HeaderFooterParagraph, HeaderFooterType, Note, PageNumberFormat, PageOrientation,

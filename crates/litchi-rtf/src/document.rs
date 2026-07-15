@@ -25,6 +25,8 @@ pub struct RtfDocument<'a> {
     pictures: Vec<super::picture::Picture<'a>>,
     /// Extracted fields
     fields: Vec<super::field::Field<'a>>,
+    /// Embedded and linked objects
+    objects: Vec<super::object::EmbeddedObject<'a>>,
     /// List table
     list_table: super::list::ListTable<'a>,
     /// List override table
@@ -177,6 +179,22 @@ impl<'a> RtfDocument<'a> {
             })
             .collect();
 
+        let owned_objects = parsed
+            .objects
+            .into_iter()
+            .map(|object| super::object::EmbeddedObject {
+                kind: object.kind,
+                class_name: Cow::Owned(object.class_name.into_owned()),
+                name: Cow::Owned(object.name.into_owned()),
+                width: object.width,
+                height: object.height,
+                locked: object.locked,
+                update_requested: object.update_requested,
+                set_size: object.set_size,
+                data: object.data,
+            })
+            .collect();
+
         // Convert all borrowed data to owned
         Ok(RtfDocument {
             font_table: owned_font_table,
@@ -185,6 +203,7 @@ impl<'a> RtfDocument<'a> {
             tables: owned_tables,
             pictures: owned_pictures,
             fields: owned_fields,
+            objects: owned_objects,
             list_table: Self::convert_list_table_to_owned(parsed.list_table),
             list_override_table: parsed.list_override_table,
             sections: Self::convert_sections_to_owned(parsed.sections),
@@ -456,6 +475,11 @@ impl<'a> RtfDocument<'a> {
     /// ```
     pub fn fields(&self) -> &[super::field::Field<'_>] {
         &self.fields
+    }
+
+    /// Return embedded and linked object records without activating their content.
+    pub fn objects(&self) -> &[super::object::EmbeddedObject<'_>] {
+        &self.objects
     }
 
     /// Get the list table.
@@ -1007,6 +1031,47 @@ mod tests {
         assert_eq!(shape.property("bWMode"), Some("9"));
         assert!(!doc.text().contains("shapeType"));
         assert!(!doc.text().contains("fillColor"));
+    }
+
+    #[test]
+    fn extracts_embedded_object_metadata_and_native_bytes_without_activation() {
+        let rtf = r#"{\rtf1\ansi Before {\object\objemb\objw1440\objh720\objlock\objupdate\objsetsize
+            {\*\objclass Package}{\*\objname Owned \u20320? Object}
+            {\*\objdata
+                01050000 02000000 08000000 5061636b61676500
+                00000000 00000000 08000000 d0cf11e0a1b11ae1}
+            {\result fallback}} After}"#;
+        let doc = RtfDocument::parse(rtf).unwrap();
+
+        assert_eq!(doc.text(), "Before  After");
+        assert_eq!(doc.objects().len(), 1);
+        let object = &doc.objects()[0];
+        assert_eq!(object.kind, crate::ObjectKind::Embedded);
+        assert_eq!(object.class_name, "Package");
+        assert_eq!(object.name, "Owned 你 Object");
+        assert_eq!(object.width, 1440);
+        assert_eq!(object.height, 720);
+        assert!(object.locked);
+        assert!(object.update_requested);
+        assert!(object.set_size);
+        assert!(matches!(object.class_name, Cow::Owned(_)));
+
+        let header = object.ole_header().unwrap();
+        assert_eq!(header.ole_version, 0x501);
+        assert_eq!(header.format_id, 2);
+        assert_eq!(header.class_name, b"Package");
+        assert!(header.is_compound_file());
+    }
+
+    #[test]
+    fn rejects_invalid_embedded_object_hex() {
+        let error = match RtfDocument::parse(r#"{\rtf1{\object{\*\objdata 0xz}}}"#) {
+            Ok(_) => panic!("invalid object hex should fail"),
+            Err(error) => error,
+        };
+        assert!(
+            matches!(error, RtfError::MalformedDocument(message) if message.contains("non-hexadecimal"))
+        );
     }
 
     #[test]

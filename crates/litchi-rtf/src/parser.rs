@@ -27,8 +27,6 @@ enum Destination {
     Info,
     /// Picture data - extract and process embedded images
     Picture,
-    /// Embedded object - extract if possible
-    Object,
     /// Result of embedded object rendering - should be skipped
     Result,
     /// Field instruction
@@ -103,6 +101,9 @@ const MAX_SHAPE_GROUP_DEPTH: usize = 64;
 const MAX_SHAPE_PROPERTIES: usize = 65_536;
 const MAX_SHAPE_PROPERTY_BYTES: usize = 1_048_576;
 const MAX_SHAPE_TEXT_BYTES: usize = 16 * 1_048_576;
+const MAX_OBJECTS: usize = 65_536;
+const MAX_OBJECT_TEXT_BYTES: usize = 1_048_576;
+const MAX_OBJECT_DATA_BYTES: usize = 256 * 1_048_576;
 
 struct OpenBookmark {
     name: String,
@@ -188,6 +189,8 @@ pub struct Parser<'a> {
     pictures: Vec<super::picture::Picture<'a>>,
     /// Extracted fields
     fields: Vec<super::field::Field<'a>>,
+    /// Embedded and linked objects
+    objects: Vec<super::object::EmbeddedObject<'a>>,
     /// List table
     list_table: super::list::ListTable<'a>,
     /// List override table
@@ -254,6 +257,7 @@ impl<'a> Parser<'a> {
             current_cell_text: SmallVec::new(),
             pictures: Vec::new(),
             fields: Vec::new(),
+            objects: Vec::new(),
             list_table: super::list::ListTable::new(),
             list_override_table: super::list::ListOverrideTable::new(),
             sections: Vec::new(),
@@ -310,6 +314,7 @@ impl<'a> Parser<'a> {
             tables: self.tables,
             pictures: self.pictures,
             fields: self.fields,
+            objects: self.objects,
             list_table: self.list_table,
             list_override_table: self.list_override_table,
             sections: self.sections,
@@ -500,23 +505,13 @@ impl<'a> Parser<'a> {
                     return Ok(());
                 },
                 Token::Control(ControlWord::Object) => {
-                    // Mark as object destination
-                    // Embedded objects in RTF files include:
-                    // - MathType/Equation Editor equations
-                    // - Excel charts and spreadsheets
-                    // - Visio diagrams
-                    // - Other OLE-embedded content
-                    //
-                    // For basic support, we extract object metadata and skip the binary data.
-                    // Full OLE parsing would require:
-                    // 1. Parse the OLE object structure from hex-encoded binary data
-                    // 2. Identify the object type (CLSID/ProgID)
-                    // 3. Extract and decode the object's native format
-                    // 4. Convert to suitable representation (e.g., LaTeX for equations)
-                    if let Some(state) = self.states.last_mut() {
-                        state.destination = Destination::Object;
+                    if self.objects.len() >= MAX_OBJECTS {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF embedded object count exceeds the safety limit".to_string(),
+                        ));
                     }
-                    self.skip_until_close_brace()?;
+                    let object = self.parse_object_destination()?;
+                    self.objects.push(object);
                     self.states.pop();
                     return Ok(());
                 },
@@ -2811,6 +2806,176 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// Parse an `object` destination without activating or updating its content.
+    fn parse_object_destination(&mut self) -> RtfResult<super::object::EmbeddedObject<'a>> {
+        use super::object::ObjectKind;
+
+        let mut object = super::object::EmbeddedObject::new();
+        let mut depth = 0usize;
+        self.pos += 1; // consume \object
+
+        while self.pos < self.tokens.len() {
+            match &self.tokens[self.pos] {
+                Token::OpenBrace
+                    if self.nested_control_word() == Some(ControlWord::ObjectClass) =>
+                {
+                    object.class_name = Cow::Owned(self.parse_object_text_destination()?);
+                },
+                Token::OpenBrace if self.nested_control_word() == Some(ControlWord::ObjectName) => {
+                    object.name = Cow::Owned(self.parse_object_text_destination()?);
+                },
+                Token::OpenBrace if self.nested_control_word() == Some(ControlWord::ObjectData) => {
+                    object.data = self.parse_object_hex_destination()?;
+                },
+                Token::OpenBrace => {
+                    depth += 1;
+                    self.pos += 1;
+                },
+                Token::CloseBrace if depth == 0 => {
+                    self.pos += 1;
+                    return Ok(object);
+                },
+                Token::CloseBrace => {
+                    depth -= 1;
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ObjectEmbedded) => {
+                    object.kind = ObjectKind::Embedded;
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ObjectLink) => {
+                    object.kind = ObjectKind::Link;
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ObjectAutoLink) => {
+                    object.kind = ObjectKind::AutoLink;
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ObjectHtml) => {
+                    object.kind = ObjectKind::Html;
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ObjectWidth(value)) => {
+                    object.width = *value;
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ObjectHeight(value)) => {
+                    object.height = *value;
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ObjectLocked(value)) => {
+                    object.locked = *value;
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ObjectUpdate(value)) => {
+                    object.update_requested = *value;
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::ObjectSetSize(value)) => {
+                    object.set_size = *value;
+                    self.pos += 1;
+                },
+                _ => self.pos += 1,
+            }
+        }
+        Err(RtfError::UnexpectedEof)
+    }
+
+    fn parse_object_text_destination(&mut self) -> RtfResult<String> {
+        let mut text = String::new();
+        let mut depth = 0usize;
+        self.pos += 1; // opening brace
+        while self.pos < self.tokens.len() {
+            match &self.tokens[self.pos] {
+                Token::OpenBrace => {
+                    depth += 1;
+                    self.pos += 1;
+                },
+                Token::CloseBrace if depth == 0 => {
+                    self.pos += 1;
+                    return Ok(text.trim().to_string());
+                },
+                Token::CloseBrace => {
+                    depth -= 1;
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::Unicode(code)) => {
+                    text.push_str(&self.parse_destination_unicode_sequence(*code)?);
+                },
+                Token::Text(value) => {
+                    text.push_str(value);
+                    self.pos += 1;
+                },
+                _ => self.pos += 1,
+            }
+            if text.len() > MAX_OBJECT_TEXT_BYTES {
+                return Err(RtfError::MalformedDocument(
+                    "RTF embedded object metadata exceeds the safety limit".to_string(),
+                ));
+            }
+        }
+        Err(RtfError::UnexpectedEof)
+    }
+
+    fn parse_object_hex_destination(&mut self) -> RtfResult<Vec<u8>> {
+        let mut data = Vec::new();
+        let mut high_nibble = None;
+        let mut depth = 0usize;
+        self.pos += 1; // opening brace
+        while self.pos < self.tokens.len() {
+            match &self.tokens[self.pos] {
+                Token::OpenBrace => {
+                    depth += 1;
+                    self.pos += 1;
+                },
+                Token::CloseBrace if depth == 0 => {
+                    self.pos += 1;
+                    if high_nibble.is_some() {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF objdata contains an odd number of hexadecimal digits".to_string(),
+                        ));
+                    }
+                    return Ok(data);
+                },
+                Token::CloseBrace => {
+                    depth -= 1;
+                    self.pos += 1;
+                },
+                Token::Text(text) => {
+                    for byte in text.bytes().filter(|byte| !byte.is_ascii_whitespace()) {
+                        let nibble = Self::hex_nibble(byte).ok_or_else(|| {
+                            RtfError::MalformedDocument(
+                                "RTF objdata contains a non-hexadecimal character".to_string(),
+                            )
+                        })?;
+                        if let Some(high) = high_nibble.take() {
+                            data.push((high << 4) | nibble);
+                            if data.len() > MAX_OBJECT_DATA_BYTES {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF embedded object data exceeds the safety limit".to_string(),
+                                ));
+                            }
+                        } else {
+                            high_nibble = Some(nibble);
+                        }
+                    }
+                    self.pos += 1;
+                },
+                _ => self.pos += 1,
+            }
+        }
+        Err(RtfError::UnexpectedEof)
+    }
+
+    fn hex_nibble(byte: u8) -> Option<u8> {
+        match byte {
+            b'0'..=b'9' => Some(byte - b'0'),
+            b'a'..=b'f' => Some(byte - b'a' + 10),
+            b'A'..=b'F' => Some(byte - b'A' + 10),
+            _ => None,
+        }
+    }
+
     /// Parse a `shp` destination and its nested shape-property groups.
     fn parse_shape_destination(&mut self) -> RtfResult<super::shape::Shape<'a>> {
         use super::shape::{Shape, ShapeType};
@@ -3714,6 +3879,8 @@ pub struct ParsedDocument<'a> {
     pub pictures: Vec<super::picture::Picture<'a>>,
     /// Extracted fields
     pub fields: Vec<super::field::Field<'a>>,
+    /// Embedded and linked objects
+    pub objects: Vec<super::object::EmbeddedObject<'a>>,
     /// List table
     pub list_table: super::list::ListTable<'a>,
     /// List override table
