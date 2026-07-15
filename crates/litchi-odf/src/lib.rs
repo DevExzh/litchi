@@ -163,12 +163,19 @@
 //! - ✅ Text extraction, metadata, and package-contained media access
 //! - ✅ Lossless unmodified saving with exact original-byte retention
 //!
+//! ## ✅ ODC - Standalone Charts (READ-ONLY SEMANTIC MODEL)
+//!
+//! - ✅ Open charts and chart templates from paths, readers, or bytes
+//! - ✅ Namespace-aware complete chart subtree and expanded attributes
+//! - ✅ Titles, legends, plot areas, axes, series, domains, data points, and analytics nodes
+//! - ✅ Embedded cached tables and vendor extension elements
+//! - ✅ Metadata and lossless exact original-byte saving
+//!
 //! ## 🚧 Additional ODF Formats (PACKAGE SUPPORT)
 //!
 //! All standard families and templates can be validated, inspected, extracted,
 //! and saved losslessly through [`OpenDocumentPackage`]. Specialized semantic
 //! object models remain in progress for:
-//! - ODC - OpenDocument Chart (.odc/.otc)
 //! - ODF - OpenDocument Formula (.odf/.otf)
 //! - ODI - OpenDocument Image (.odi/.oti)
 //! - ODM - OpenDocument Master (.odm)
@@ -244,6 +251,8 @@ pub mod datatype;
 pub mod elements;
 /// Format-neutral package access for every OpenDocument family.
 mod generic;
+/// OpenDocument standalone chart (.odc/.otc) support.
+mod odc;
 /// OpenDocument drawing (.odg/.otg) support.
 mod odg;
 /// ODF presentation (.odp) support
@@ -262,6 +271,7 @@ pub use core::{
 pub use generic::{FlatOpenDocument, OpenDocumentFamily, OpenDocumentPackage};
 pub use litchi_core::RGBColor as Color;
 pub use litchi_core::unit::{Length, LengthUnit};
+pub use odc::{ChartAttribute, ChartDocument, ChartElement, ChartElementKind};
 pub use odg::{
     DrawingDocument, DrawingLayer, DrawingLayerDisplay, DrawingPage, DrawingPageProperties,
 };
