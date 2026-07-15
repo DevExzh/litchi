@@ -12,7 +12,7 @@ pub enum RevisionKind {
     Formatting,
 }
 
-/// Tracked revision metadata attached to one character run.
+/// Tracked revision metadata attached to text or formatted document properties.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RevisionMark {
     /// Revision kind.

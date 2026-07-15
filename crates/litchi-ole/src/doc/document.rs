@@ -1273,7 +1273,11 @@ impl Document {
                 let cells = self.extract_cells_from_row_paragraphs(&current_row_paras)?;
 
                 if !cells.is_empty() {
-                    rows.push(Row::new(cells));
+                    rows.push(Row::with_revision(
+                        cells,
+                        para.table_formatting_revision().cloned(),
+                        props.table_properties_preserved_for_revision,
+                    ));
                 }
 
                 current_row_paras.clear();
@@ -1284,7 +1288,14 @@ impl Document {
         if !current_row_paras.is_empty() {
             let cells = self.extract_cells_from_row_paragraphs(&current_row_paras)?;
             if !cells.is_empty() {
-                rows.push(Row::new(cells));
+                let last = current_row_paras
+                    .last()
+                    .expect("non-empty row paragraph collection");
+                rows.push(Row::with_revision(
+                    cells,
+                    last.table_formatting_revision().cloned(),
+                    last.properties().table_properties_preserved_for_revision,
+                ));
             }
         }
 

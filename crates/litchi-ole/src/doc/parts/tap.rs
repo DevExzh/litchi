@@ -33,6 +33,14 @@ pub struct TableProperties {
     pub is_header_row: bool,
     /// Allow row to break across pages
     pub allow_row_break: bool,
+    /// Whether the row has a tracked property change
+    pub has_formatting_revision: Option<bool>,
+    /// Row revision author index in `SttbfRMark`
+    pub formatting_revision_author_index: Option<u16>,
+    /// Packed row revision DTTM
+    pub formatting_revision_timestamp: Option<u32>,
+    /// Whether pre-revision table properties are preserved
+    pub properties_preserved_for_revision: bool,
     /// Table borders
     pub border_top: Option<BorderStyle>,
     pub border_left: Option<BorderStyle>,
@@ -183,6 +191,10 @@ impl Default for TableProperties {
             row_height: None,
             is_header_row: false,
             allow_row_break: true,
+            has_formatting_revision: None,
+            formatting_revision_author_index: None,
+            formatting_revision_timestamp: None,
+            properties_preserved_for_revision: false,
             border_top: None,
             border_left: None,
             border_bottom: None,

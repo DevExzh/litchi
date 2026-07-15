@@ -209,6 +209,50 @@ impl<'arena> TapParser<'arena> {
             0x34 => {
                 self.parse_cell_padding(tap, sprm, grpprl)?;
             },
+            // sprmTPropRMark (0xD667) - Row property revision mark
+            0x67 => {
+                let operand = sprm.operand_bytes();
+                if operand.len() != 7 {
+                    return Err(DocError::Corrupted(
+                        "sprmTPropRMark operand must contain exactly 7 bytes".to_string(),
+                    ));
+                }
+                tap.has_formatting_revision = Some(match operand[0] {
+                    0 => false,
+                    1 => true,
+                    _ => {
+                        return Err(DocError::Corrupted(
+                            "sprmTPropRMark must begin with a Boolean8 value".to_string(),
+                        ));
+                    },
+                });
+                let author = i16::from_le_bytes([operand[1], operand[2]]);
+                tap.formatting_revision_author_index =
+                    Some(u16::try_from(author).map_err(|_| {
+                        DocError::Corrupted("sprmTPropRMark author index is negative".to_string())
+                    })?);
+                tap.formatting_revision_timestamp = Some(u32::from_le_bytes([
+                    operand[3], operand[4], operand[5], operand[6],
+                ]));
+            },
+            // sprmTWall (0x3668) - Preserve properties before tracked changes
+            0x68 => {
+                let operand = sprm.operand_bytes();
+                if operand.len() != 1 {
+                    return Err(DocError::Corrupted(
+                        "sprmTWall operand must contain exactly 1 byte".to_string(),
+                    ));
+                }
+                tap.properties_preserved_for_revision = match operand[0] {
+                    0 => false,
+                    1 => true,
+                    _ => {
+                        return Err(DocError::Corrupted(
+                            "sprmTWall must contain a Boolean8 value".to_string(),
+                        ));
+                    },
+                };
+            },
             // Other table SPRMs (0x22-0x2C, etc.)
             _ => {
                 // Unknown or unhandled SPRM - skip
@@ -626,5 +670,28 @@ mod tests {
         let border = border.unwrap();
         assert_eq!(border.width, 8);
         assert_eq!(border.border_type, BorderType::Single);
+    }
+
+    #[test]
+    fn parses_table_row_revision_state_strictly() {
+        let arena = Bump::new();
+        let parser = TapParser::new(&arena);
+        let timestamp =
+            30u32 | (14u32 << 6) | (15u32 << 11) | (7u32 << 16) | (126u32 << 20) | (3u32 << 29);
+        let mut grpprl = 0xD667u16.to_le_bytes().to_vec();
+        grpprl.push(7);
+        grpprl.push(1);
+        grpprl.extend_from_slice(&1i16.to_le_bytes());
+        grpprl.extend_from_slice(&timestamp.to_le_bytes());
+        grpprl.extend_from_slice(&0x3668u16.to_le_bytes());
+        grpprl.push(1);
+        let tap = parser.parse_tap(&grpprl).unwrap();
+        assert_eq!(tap.has_formatting_revision, Some(true));
+        assert_eq!(tap.formatting_revision_author_index, Some(1));
+        assert_eq!(tap.formatting_revision_timestamp, Some(timestamp));
+        assert!(tap.properties_preserved_for_revision);
+
+        let invalid_wall = [0x68, 0x36, 2];
+        assert!(parser.parse_tap(&invalid_wall).is_err());
     }
 }

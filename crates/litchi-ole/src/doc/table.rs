@@ -2,6 +2,7 @@
 use super::package::Result;
 use super::paragraph::Paragraph;
 use super::parts::tap::{CellProperties, TableJustification, TableProperties};
+use super::revision::RevisionMark;
 use std::sync::Arc;
 
 /// A table in a Word document.
@@ -120,6 +121,10 @@ pub struct Row {
     cells: Arc<Vec<Cell>>,
     /// Row-level properties (if available)
     row_properties: Option<TableProperties>,
+    /// Resolved tracked property revision metadata
+    formatting_revision: Option<RevisionMark>,
+    /// Whether properties preceding the revision wall are preserved
+    properties_preserved_for_revision: bool,
 }
 
 impl Row {
@@ -129,6 +134,8 @@ impl Row {
         Self {
             cells: Arc::new(cells),
             row_properties: None,
+            formatting_revision: None,
+            properties_preserved_for_revision: false,
         }
     }
 
@@ -137,7 +144,22 @@ impl Row {
     pub(crate) fn with_properties(cells: Vec<Cell>, properties: TableProperties) -> Self {
         Self {
             cells: Arc::new(cells),
+            formatting_revision: None,
+            properties_preserved_for_revision: properties.properties_preserved_for_revision,
             row_properties: Some(properties),
+        }
+    }
+
+    pub(crate) fn with_revision(
+        cells: Vec<Cell>,
+        formatting_revision: Option<RevisionMark>,
+        properties_preserved_for_revision: bool,
+    ) -> Self {
+        Self {
+            cells: Arc::new(cells),
+            row_properties: None,
+            formatting_revision,
+            properties_preserved_for_revision,
         }
     }
 
@@ -169,6 +191,16 @@ impl Row {
         self.row_properties
             .as_ref()
             .is_some_and(|p| p.is_header_row)
+    }
+
+    /// Tracked table-row property revision metadata.
+    pub fn formatting_revision(&self) -> Option<&RevisionMark> {
+        self.formatting_revision.as_ref()
+    }
+
+    /// Whether table properties preceding the revision wall are preserved.
+    pub fn properties_preserved_for_revision(&self) -> bool {
+        self.properties_preserved_for_revision
     }
 }
 
@@ -279,5 +311,19 @@ mod tests {
 
         assert_eq!(table.row_count().unwrap(), 2);
         assert_eq!(table.column_count().unwrap(), 2);
+    }
+
+    #[test]
+    fn exposes_table_row_revision_metadata() {
+        let revision = RevisionMark {
+            kind: super::super::revision::RevisionKind::Formatting,
+            author_index: 1,
+            author: "Editor".to_string(),
+            timestamp: None,
+            revision_id: None,
+        };
+        let row = Row::with_revision(vec![Cell::new("A".to_string())], Some(revision), true);
+        assert_eq!(row.formatting_revision().unwrap().author, "Editor");
+        assert!(row.properties_preserved_for_revision());
     }
 }

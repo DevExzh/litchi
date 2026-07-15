@@ -30,6 +30,8 @@ pub struct Paragraph {
     formatting_revision: Option<RevisionMark>,
     /// Resolved paragraph numbering revision metadata.
     numbering_revision: Option<NumberingRevisionMark>,
+    /// Resolved property revision metadata for a containing table row.
+    table_formatting_revision: Option<RevisionMark>,
 }
 
 impl Paragraph {
@@ -57,6 +59,7 @@ impl Paragraph {
             properties: super::parts::pap::ParagraphProperties::default(),
             formatting_revision: None,
             numbering_revision: None,
+            table_formatting_revision: None,
         }
     }
 
@@ -74,6 +77,7 @@ impl Paragraph {
             properties: super::parts::pap::ParagraphProperties::default(),
             formatting_revision: None,
             numbering_revision: None,
+            table_formatting_revision: None,
         }
     }
 
@@ -89,6 +93,7 @@ impl Paragraph {
             properties,
             formatting_revision: None,
             numbering_revision: None,
+            table_formatting_revision: None,
         }
     }
 
@@ -147,6 +152,10 @@ impl Paragraph {
         self.properties.numbering_revision_list_applied
     }
 
+    pub(crate) fn table_formatting_revision(&self) -> Option<&RevisionMark> {
+        self.table_formatting_revision.as_ref()
+    }
+
     pub(crate) fn resolve_revision(&mut self, authors: &RevisionAuthorTable) -> Result<()> {
         if self.properties.has_formatting_revision == Some(true) {
             let author_index = self
@@ -186,6 +195,29 @@ impl Paragraph {
                 number_formats: revision.number_formats,
                 numbers: revision.numbers,
                 format_string: revision.format_string.clone(),
+            });
+        }
+        if self.properties.has_table_formatting_revision == Some(true) {
+            let author_index = self
+                .properties
+                .table_formatting_revision_author_index
+                .unwrap_or(0);
+            let author = authors.get(author_index).ok_or_else(|| {
+                super::package::DocError::Corrupted(
+                    "table-row revision author index exceeds SttbfRMark".to_string(),
+                )
+            })?;
+            self.table_formatting_revision = Some(RevisionMark {
+                kind: RevisionKind::Formatting,
+                author_index,
+                author: author.to_string(),
+                timestamp: self
+                    .properties
+                    .table_formatting_revision_timestamp
+                    .map(decode_dttm)
+                    .transpose()?
+                    .flatten(),
+                revision_id: None,
             });
         }
         Ok(())
@@ -684,6 +716,27 @@ mod tests {
             },
         );
         assert!(bad_time.resolve_revisions(&authors).is_err());
+    }
+
+    #[test]
+    fn resolves_table_row_revision_authors_and_timestamps() {
+        let timestamp =
+            30u32 | (14u32 << 6) | (15u32 << 11) | (7u32 << 16) | (126u32 << 20) | (3u32 << 29);
+        let mut paragraph = Paragraph::with_properties(
+            String::new(),
+            super::super::parts::pap::ParagraphProperties {
+                has_table_formatting_revision: Some(true),
+                table_formatting_revision_author_index: Some(1),
+                table_formatting_revision_timestamp: Some(timestamp),
+                ..Default::default()
+            },
+        );
+        let authors = RevisionAuthorTable::from_authors(&["Unknown", "Table Editor"]);
+        paragraph.resolve_revision(&authors).unwrap();
+        let revision = paragraph.table_formatting_revision().unwrap();
+        assert_eq!(revision.kind, RevisionKind::Formatting);
+        assert_eq!(revision.author, "Table Editor");
+        assert_eq!(revision.timestamp.unwrap().year, 2026);
     }
 
     #[test]

@@ -118,6 +118,14 @@ pub struct ParagraphProperties {
     pub numbering_revision_list_applied: Option<bool>,
     /// Numbering state retained by a numbering revision mark.
     pub numbering_revision: Option<NumberingRevisionProperties>,
+    /// Whether the containing table row has a tracked property change.
+    pub has_table_formatting_revision: Option<bool>,
+    /// Table-row revision author index in `SttbfRMark`.
+    pub table_formatting_revision_author_index: Option<u16>,
+    /// Packed table-row revision DTTM.
+    pub table_formatting_revision_timestamp: Option<u32>,
+    /// Whether table properties before the tracked change are preserved.
+    pub table_properties_preserved_for_revision: bool,
 }
 
 /// Parsed `NumRM` numbering revision state.
@@ -320,10 +328,61 @@ impl ParagraphProperties {
             // Only process PAP SPRMs (type = 1)
             if get_sprm_type(sprm.opcode) == 1 {
                 Self::apply_sprm(&mut pap, sprm)?;
+            } else if get_sprm_type(sprm.opcode) == 5 {
+                Self::apply_table_revision_sprm(&mut pap, sprm)?;
             }
         }
 
         Ok(pap)
+    }
+
+    fn apply_table_revision_sprm(pap: &mut ParagraphProperties, sprm: &Sprm) -> Result<()> {
+        match sprm.opcode {
+            0xD667 => {
+                let operand = sprm.operand_bytes();
+                if operand.len() != 7 {
+                    return Err(DocError::Corrupted(
+                        "sprmTPropRMark operand must contain exactly 7 bytes".to_string(),
+                    ));
+                }
+                pap.has_table_formatting_revision = Some(match operand[0] {
+                    0 => false,
+                    1 => true,
+                    _ => {
+                        return Err(DocError::Corrupted(
+                            "sprmTPropRMark must begin with a Boolean8 value".to_string(),
+                        ));
+                    },
+                });
+                let author = i16::from_le_bytes([operand[1], operand[2]]);
+                pap.table_formatting_revision_author_index =
+                    Some(u16::try_from(author).map_err(|_| {
+                        DocError::Corrupted("sprmTPropRMark author index is negative".to_string())
+                    })?);
+                pap.table_formatting_revision_timestamp = Some(u32::from_le_bytes([
+                    operand[3], operand[4], operand[5], operand[6],
+                ]));
+            },
+            0x3668 => {
+                let operand = sprm.operand_bytes();
+                if operand.len() != 1 {
+                    return Err(DocError::Corrupted(
+                        "sprmTWall operand must contain exactly 1 byte".to_string(),
+                    ));
+                }
+                pap.table_properties_preserved_for_revision = match operand[0] {
+                    0 => false,
+                    1 => true,
+                    _ => {
+                        return Err(DocError::Corrupted(
+                            "sprmTWall must contain a Boolean8 value".to_string(),
+                        ));
+                    },
+                };
+            },
+            _ => {},
+        }
+        Ok(())
     }
 
     /// Apply a single SPRM operation to paragraph properties.
@@ -1243,6 +1302,41 @@ mod tests {
             grpprl.extend_from_slice(&operand);
             assert!(ParagraphProperties::from_sprm(&grpprl).is_err());
         }
+    }
+
+    #[test]
+    fn parses_table_row_revision_state_strictly() {
+        let timestamp =
+            30u32 | (14u32 << 6) | (15u32 << 11) | (7u32 << 16) | (126u32 << 20) | (3u32 << 29);
+        let mut grpprl = 0xD667u16.to_le_bytes().to_vec();
+        grpprl.push(7);
+        grpprl.push(1);
+        grpprl.extend_from_slice(&2i16.to_le_bytes());
+        grpprl.extend_from_slice(&timestamp.to_le_bytes());
+        grpprl.extend_from_slice(&0x3668u16.to_le_bytes());
+        grpprl.push(1);
+        let properties = ParagraphProperties::from_sprm(&grpprl).unwrap();
+        assert_eq!(properties.has_table_formatting_revision, Some(true));
+        assert_eq!(properties.table_formatting_revision_author_index, Some(2));
+        assert_eq!(
+            properties.table_formatting_revision_timestamp,
+            Some(timestamp)
+        );
+        assert!(properties.table_properties_preserved_for_revision);
+
+        for operand in [
+            vec![2, 0, 0, 0, 0, 0, 0],
+            vec![1, 0xFF, 0xFF, 0, 0, 0, 0],
+            vec![1, 0, 0, 0, 0, 0],
+        ] {
+            let mut invalid = 0xD667u16.to_le_bytes().to_vec();
+            invalid.push(operand.len() as u8);
+            invalid.extend_from_slice(&operand);
+            assert!(ParagraphProperties::from_sprm(&invalid).is_err());
+        }
+
+        let invalid_wall = [0x68, 0x36, 2];
+        assert!(ParagraphProperties::from_sprm(&invalid_wall).is_err());
     }
 
     #[test]
