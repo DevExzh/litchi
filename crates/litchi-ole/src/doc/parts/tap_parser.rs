@@ -45,6 +45,13 @@ pub struct TapParser<'arena> {
     arena: &'arena Bump,
 }
 
+#[derive(Debug, Clone, Copy)]
+enum CellBoolProperty {
+    FitText,
+    NoWrap,
+    HideMark,
+}
+
 impl<'arena> TapParser<'arena> {
     /// Create a new TAP parser with an arena allocator.
     ///
@@ -226,6 +233,9 @@ impl<'arena> TapParser<'arena> {
             0x21 => {
                 self.handle_insert_cells(tap, sprm)?;
             },
+            0x29 => self.parse_cell_text_flow(tap, sprm)?,
+            0x2B => self.parse_vertical_merge(tap, sprm)?,
+            0x2C => self.parse_vertical_alignment(tap, sprm)?,
             // Full-color shading over every or every other cell in a range.
             0x2D => self.parse_full_cell_shading_range(tap, sprm, false)?,
             0x2E => self.parse_full_cell_shading_range(tap, sprm, true)?,
@@ -237,6 +247,10 @@ impl<'arena> TapParser<'arena> {
             0x32 | 0x34 => {
                 self.parse_cell_padding(tap, sprm, grpprl)?;
             },
+            0x35 => self.parse_cell_width(tap, sprm)?,
+            0x36 => self.parse_cell_range_bool(tap, sprm, CellBoolProperty::FitText)?,
+            0x39 => self.parse_cell_range_bool(tap, sprm, CellBoolProperty::NoWrap)?,
+            0x42 => self.parse_cell_range_bool(tap, sprm, CellBoolProperty::HideMark)?,
             // sprmTPropRMark (0xD667) - Row property revision mark
             0x67 => {
                 let operand = sprm.operand_bytes();
@@ -714,6 +728,153 @@ impl<'arena> TapParser<'arena> {
         Ok(())
     }
 
+    fn cell_range(tap: &TableProperties, operand: &[u8]) -> Result<std::ops::Range<usize>> {
+        if operand.len() < 2 {
+            return Err(DocError::Corrupted(
+                "DOC cell range operand is truncated".to_string(),
+            ));
+        }
+        let first = operand[0] as usize;
+        let limit = operand[1] as usize;
+        if first >= tap.cell_properties.len() || limit < first || limit > tap.cell_properties.len()
+        {
+            return Err(DocError::Corrupted(
+                "DOC cell property range exceeds the row".to_string(),
+            ));
+        }
+        Ok(first..limit)
+    }
+
+    fn parse_cell_text_flow(&self, tap: &mut TableProperties, sprm: &Sprm) -> Result<()> {
+        let operand = sprm.operand_bytes();
+        if operand.len() != 4 {
+            return Err(DocError::Corrupted(
+                "DOC cell text-flow operand must contain 4 bytes".to_string(),
+            ));
+        }
+        let range = Self::cell_range(tap, operand)?;
+        let value = binary_to_doc_result(read_u16_le(operand, 2))?;
+        let direction = match value {
+            0 => TextDirection::LrTb,
+            1 => TextDirection::TbRl,
+            3 => TextDirection::BtLr,
+            4 => TextDirection::LrBt,
+            5 => TextDirection::TbLr,
+            _ => {
+                return Err(DocError::Corrupted(
+                    "DOC cell text-flow value is invalid".to_string(),
+                ));
+            },
+        };
+        for cell in &mut tap.cell_properties[range] {
+            cell.text_direction = direction;
+        }
+        Ok(())
+    }
+
+    fn parse_vertical_merge(&self, tap: &mut TableProperties, sprm: &Sprm) -> Result<()> {
+        let operand = sprm.operand_bytes();
+        if operand.len() != 2 || operand[0] as usize >= tap.cell_properties.len() {
+            return Err(DocError::Corrupted(
+                "DOC vertical-merge operand is invalid for the row".to_string(),
+            ));
+        }
+        tap.cell_properties[operand[0] as usize].vertical_merge_status = match operand[1] {
+            0 => VerticalMergeStatus::None,
+            1 => VerticalMergeStatus::Merged,
+            3 => VerticalMergeStatus::First,
+            _ => {
+                return Err(DocError::Corrupted(
+                    "DOC vertical-merge flag is invalid".to_string(),
+                ));
+            },
+        };
+        Ok(())
+    }
+
+    fn parse_vertical_alignment(&self, tap: &mut TableProperties, sprm: &Sprm) -> Result<()> {
+        let operand = sprm.operand_bytes();
+        if operand.len() != 3 {
+            return Err(DocError::Corrupted(
+                "DOC vertical-alignment operand must contain 3 bytes".to_string(),
+            ));
+        }
+        let range = Self::cell_range(tap, operand)?;
+        let alignment = match operand[2] {
+            0 => VerticalAlignment::Top,
+            1 => VerticalAlignment::Center,
+            2 => VerticalAlignment::Bottom,
+            _ => {
+                return Err(DocError::Corrupted(
+                    "DOC cell vertical-alignment value is invalid".to_string(),
+                ));
+            },
+        };
+        for cell in &mut tap.cell_properties[range] {
+            cell.vertical_alignment = alignment;
+        }
+        Ok(())
+    }
+
+    fn parse_cell_width(&self, tap: &mut TableProperties, sprm: &Sprm) -> Result<()> {
+        let operand = sprm.operand_bytes();
+        if operand.len() != 5 {
+            return Err(DocError::Corrupted(
+                "DOC cell-width operand must contain 5 bytes".to_string(),
+            ));
+        }
+        let range = Self::cell_range(tap, operand)?;
+        let value = binary_to_doc_result(read_i16_le(operand, 3))?;
+        let width = match operand[2] {
+            0 => None,
+            1 if value == 0 => Some(TableWidth {
+                value,
+                width_type: WidthType::Auto,
+            }),
+            2 if (0..=5_000).contains(&value) => Some(TableWidth {
+                value,
+                width_type: WidthType::Percentage,
+            }),
+            3 if (0..=31_680).contains(&value) => Some(TableWidth {
+                value,
+                width_type: WidthType::Twips,
+            }),
+            _ => {
+                return Err(DocError::Corrupted(
+                    "DOC preferred cell width has invalid units or value".to_string(),
+                ));
+            },
+        };
+        for cell in &mut tap.cell_properties[range] {
+            cell.preferred_width = width;
+        }
+        Ok(())
+    }
+
+    fn parse_cell_range_bool(
+        &self,
+        tap: &mut TableProperties,
+        sprm: &Sprm,
+        property: CellBoolProperty,
+    ) -> Result<()> {
+        let operand = sprm.operand_bytes();
+        if operand.len() != 3 || !matches!(operand[2], 0 | 1) {
+            return Err(DocError::Corrupted(
+                "DOC Boolean cell-range operand is invalid".to_string(),
+            ));
+        }
+        let range = Self::cell_range(tap, operand)?;
+        let value = operand[2] != 0;
+        for cell in &mut tap.cell_properties[range] {
+            match property {
+                CellBoolProperty::FitText => cell.fit_text = value,
+                CellBoolProperty::NoWrap => cell.no_wrap = value,
+                CellBoolProperty::HideMark => cell.hide_mark = value,
+            }
+        }
+        Ok(())
+    }
+
     /// Handle cell insertion (sprmTInsert - 0x7621).
     ///
     /// Operand format (4 bytes):
@@ -1069,6 +1230,11 @@ mod tests {
         grpprl.extend_from_slice(operand);
     }
 
+    fn append_fixed_sprm(grpprl: &mut Vec<u8>, opcode: u16, operand: &[u8]) {
+        grpprl.extend_from_slice(&opcode.to_le_bytes());
+        grpprl.extend_from_slice(operand);
+    }
+
     fn full_shading(foreground: [u8; 4], background: [u8; 4], pattern: u16) -> Vec<u8> {
         let mut shading = foreground.to_vec();
         shading.extend_from_slice(&background);
@@ -1330,6 +1496,64 @@ mod tests {
         assert!(parse_with(0xD62F, &[0, 2, 1, 0, 0, 0, 1, 8, 1, 0, 0]).is_err());
         assert!(parse_with(0xD62F, &[0, 2, 1, 0, 0, 0, 0xFF, 8, 2, 0, 0]).is_err());
         assert!(TapParser::parse_border_code(&[8, 0x1A, 1, 0], 0).is_err());
+    }
+
+    #[test]
+    fn parses_cell_range_layout_overrides() {
+        let arena = Bump::new();
+        let parser = TapParser::new(&arena);
+        let mut grpprl = table_definition_grpprl(&[3, 0, 0, 100, 0, 200, 0, 44, 1]);
+        append_fixed_sprm(&mut grpprl, 0x7629, &[0, 2, 5, 0]);
+        append_variable_sprm(&mut grpprl, 0xD62B, &[1, 3]);
+        append_variable_sprm(&mut grpprl, 0xD62C, &[1, 3, 2]);
+        append_variable_sprm(&mut grpprl, 0xD635, &[0, 2, 2, 0xC4, 0x09]);
+        append_fixed_sprm(&mut grpprl, 0xF636, &[0, 3, 1]);
+        append_variable_sprm(&mut grpprl, 0xD639, &[1, 2, 1]);
+        append_variable_sprm(&mut grpprl, 0xD642, &[2, 3, 1]);
+
+        let tap = parser.parse_tap(&grpprl).unwrap();
+        assert_eq!(tap.cell_properties[0].text_direction, TextDirection::TbLr);
+        assert_eq!(tap.cell_properties[1].text_direction, TextDirection::TbLr);
+        assert_eq!(
+            tap.cell_properties[1].vertical_merge_status,
+            VerticalMergeStatus::First
+        );
+        assert_eq!(
+            tap.cell_properties[2].vertical_alignment,
+            VerticalAlignment::Bottom
+        );
+        let width = tap.cell_properties[0].preferred_width.unwrap();
+        assert_eq!(width.width_type, WidthType::Percentage);
+        assert_eq!(width.value, 2500);
+        assert!(tap.cell_properties.iter().all(|cell| cell.fit_text));
+        assert!(tap.cell_properties[1].no_wrap);
+        assert!(tap.cell_properties[2].hide_mark);
+    }
+
+    #[test]
+    fn rejects_malformed_cell_range_layout_overrides() {
+        let arena = Bump::new();
+        let parser = TapParser::new(&arena);
+        let parse_variable = |opcode, operand: &[u8]| {
+            let mut grpprl = table_definition_grpprl(&[2, 0, 0, 100, 0, 200, 0]);
+            append_variable_sprm(&mut grpprl, opcode, operand);
+            parser.parse_tap(&grpprl)
+        };
+        let parse_fixed = |opcode, operand: &[u8]| {
+            let mut grpprl = table_definition_grpprl(&[2, 0, 0, 100, 0, 200, 0]);
+            append_fixed_sprm(&mut grpprl, opcode, operand);
+            parser.parse_tap(&grpprl)
+        };
+        assert!(parse_fixed(0x7629, &[0, 2, 2, 0]).is_err());
+        assert!(parse_fixed(0x7629, &[2, 2, 0, 0]).is_err());
+        assert!(parse_variable(0xD62B, &[2, 0]).is_err());
+        assert!(parse_variable(0xD62B, &[0, 2]).is_err());
+        assert!(parse_variable(0xD62C, &[0, 2, 3]).is_err());
+        assert!(parse_variable(0xD635, &[0, 2, 2, 0x89, 0x13]).is_err());
+        assert!(parse_variable(0xD635, &[0, 2, 3, 0xC1, 0x7B]).is_err());
+        assert!(parse_fixed(0xF636, &[0, 2, 2]).is_err());
+        assert!(parse_variable(0xD639, &[0, 3, 1]).is_err());
+        assert!(parse_variable(0xD642, &[0, 2]).is_err());
     }
 
     #[test]
