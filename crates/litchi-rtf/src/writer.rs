@@ -49,12 +49,6 @@ pub struct RtfWriter<W: Write> {
     font_table: FontTable<'static>,
     /// Color table
     color_table: ColorTable,
-    /// List table (reserved for writing lists)
-    #[allow(dead_code)]
-    list_table: ListTable<'static>,
-    /// List override table (reserved for writing lists)
-    #[allow(dead_code)]
-    list_override_table: ListOverrideTable,
 }
 
 #[derive(Clone, Copy)]
@@ -86,8 +80,6 @@ impl<W: Write> RtfWriter<W> {
             indent_level: 0,
             font_table: FontTable::new(),
             color_table: ColorTable::new(),
-            list_table: ListTable::new(),
-            list_override_table: ListOverrideTable::new(),
         }
     }
 
@@ -129,6 +121,10 @@ impl<W: Write> RtfWriter<W> {
 
         // Write named paragraph, character, section, and table styles.
         self.write_stylesheet(doc.stylesheet())?;
+
+        // Write list definitions before body paragraphs reference them.
+        self.write_list_table(doc.list_table())?;
+        self.write_list_override_table(doc.list_override_table())?;
 
         // Write document properties before body content.
         self.write_document_info(doc.info())?;
@@ -228,6 +224,192 @@ impl<W: Write> RtfWriter<W> {
             self.write_str(";")?;
         }
 
+        self.write_str("}")?;
+        Ok(())
+    }
+
+    /// Write the list-definition table.
+    pub fn write_list_table(&mut self, table: &ListTable<'_>) -> io::Result<()> {
+        if table.lists().is_empty() {
+            return Ok(());
+        }
+        if table.lists().len() > 65_536 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "RTF list table exceeds the supported list count",
+            ));
+        }
+        self.write_str("{\\*\\listtable")?;
+        for list in table.lists() {
+            self.write_list_definition(list)?;
+        }
+        self.write_str("}")?;
+        Ok(())
+    }
+
+    fn write_list_definition(&mut self, list: &List<'_>) -> io::Result<()> {
+        if list.levels.len() > 9 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "RTF lists cannot contain more than nine levels",
+            ));
+        }
+        if list.simple && list.levels.len() > 1 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "a simple RTF list cannot contain more than one level",
+            ));
+        }
+        if list.simple && list.hybrid {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "an RTF list cannot be both simple and hybrid",
+            ));
+        }
+        self.write_str("{")?;
+        self.write_control_word("list", None)?;
+        self.write_control_word("listtemplateid", Some(list.template_id))?;
+        if list.simple {
+            self.write_control_word("listsimple", None)?;
+        }
+        if list.hybrid {
+            self.write_control_word("listhybrid", None)?;
+        }
+        for level in &list.levels {
+            self.write_list_level(level)?;
+        }
+        if !list.name.is_empty() {
+            self.write_str("{")?;
+            self.write_control_word("listname", None)?;
+            self.write_str(" ")?;
+            self.write_text(list.name.as_ref())?;
+            self.write_str(";}")?;
+        }
+        self.write_control_word("listid", Some(list.id))?;
+        self.write_str("}")?;
+        Ok(())
+    }
+
+    fn write_list_level(&mut self, level: &ListLevel<'_>) -> io::Result<()> {
+        self.write_str("{")?;
+        self.write_control_word("listlevel", None)?;
+        self.write_control_word(
+            "levelnfc",
+            Some(Self::list_level_type_value(level.level_type)),
+        )?;
+        self.write_control_word(
+            "leveljc",
+            Some(match level.justification {
+                ListJustification::Left => 0,
+                ListJustification::Center => 1,
+                ListJustification::Right => 2,
+            }),
+        )?;
+        self.write_control_word(
+            "levelfollow",
+            Some(match level.follow {
+                ListFollow::Tab => 0,
+                ListFollow::Space => 1,
+                ListFollow::Nothing => 2,
+            }),
+        )?;
+        self.write_control_word("levelstartat", Some(level.start_at))?;
+        self.write_control_word("levelspace", Some(level.space))?;
+        self.write_control_word("levelindent", Some(level.indent))?;
+        self.write_list_level_text(level.number_text.as_ref())?;
+        if level.font_ref != 0 {
+            self.write_control_word("f", Some(i32::from(level.font_ref)))?;
+        }
+        self.write_str("}")?;
+        Ok(())
+    }
+
+    fn list_level_type_value(level_type: ListLevelType) -> i32 {
+        match level_type {
+            ListLevelType::Decimal => 0,
+            ListLevelType::UpperRoman => 1,
+            ListLevelType::LowerRoman => 2,
+            ListLevelType::UpperLetter => 3,
+            ListLevelType::LowerLetter => 4,
+            ListLevelType::Ordinal => 5,
+            ListLevelType::CardinalText => 6,
+            ListLevelType::OrdinalText => 7,
+            ListLevelType::Bullet => 23,
+            ListLevelType::None => 255,
+            ListLevelType::Other(value) => value,
+        }
+    }
+
+    fn write_list_level_text(&mut self, text: &str) -> io::Result<()> {
+        let count = u8::try_from(text.chars().count()).map_err(|_| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "RTF list level text cannot exceed 255 characters",
+            )
+        })?;
+        self.write_str("{")?;
+        self.write_control_word("leveltext", None)?;
+        self.write_hex_byte(count)?;
+        for ch in text.chars() {
+            if u32::from(ch) <= u8::MAX.into() && (ch.is_control() || !ch.is_ascii()) {
+                self.write_hex_byte(ch as u8)?;
+            } else {
+                let mut buffer = [0; 4];
+                self.write_text(ch.encode_utf8(&mut buffer))?;
+            }
+        }
+        self.write_str(";}")?;
+
+        self.write_str("{")?;
+        self.write_control_word("levelnumbers", None)?;
+        for (index, ch) in text.chars().enumerate() {
+            if u32::from(ch) <= 8 {
+                let position = u8::try_from(index + 1).map_err(|_| {
+                    io::Error::new(io::ErrorKind::InvalidInput, "invalid RTF list placeholder")
+                })?;
+                self.write_hex_byte(position)?;
+            }
+        }
+        self.write_str(";}")?;
+        Ok(())
+    }
+
+    fn write_hex_byte(&mut self, value: u8) -> io::Result<()> {
+        write!(self.writer, "\\'{value:02x}")
+    }
+
+    /// Write the list-override table.
+    pub fn write_list_override_table(&mut self, table: &ListOverrideTable) -> io::Result<()> {
+        if table.overrides().is_empty() {
+            return Ok(());
+        }
+        if table.overrides().len() > 65_536 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "RTF list override table exceeds the supported entry count",
+            ));
+        }
+        self.write_str("{\\*\\listoverridetable")?;
+        for entry in table.overrides() {
+            self.write_str("{")?;
+            self.write_control_word("listoverride", None)?;
+            self.write_control_word("listid", Some(entry.list_id))?;
+            self.write_control_word(
+                "listoverridecount",
+                Some(i32::from(entry.level_count_override.unwrap_or_else(|| {
+                    u8::from(entry.start_at_override.is_some())
+                }))),
+            )?;
+            if let Some(start_at) = entry.start_at_override {
+                self.write_str("{")?;
+                self.write_control_word("lfolevel", None)?;
+                self.write_control_word("listoverridestartat", None)?;
+                self.write_control_word("levelstartat", Some(start_at))?;
+                self.write_str("}")?;
+            }
+            self.write_control_word("ls", Some(entry.index))?;
+            self.write_str("}")?;
+        }
         self.write_str("}")?;
         Ok(())
     }
@@ -1505,6 +1687,35 @@ mod tests {
                 .get_typed(StyleType::Table, 4)
                 .is_some()
         );
+    }
+
+    #[test]
+    fn document_writer_round_trips_list_tables() {
+        let document = RtfDocument::parse(
+            r#"{\rtf1\ansi{\*\listtable{\list\listtemplateid42\listhybrid{\listlevel\levelnfc0\leveljc2\levelfollow1\levelstartat3\levelspace120\levelindent360{\leveltext\'02\'00.;}{\levelnumbers\'01;}\f2}{\listlevel\levelnfc77\leveljc0\levelfollow2\levelstartat1{\leveltext\'01\u8226?;}{\levelnumbers;}}{\listname Outline;}\listid77}}{\*\listoverridetable{\listoverride\listid77\listoverridecount1{\lfolevel\listoverridestartat\levelstartat9}\ls4}}Body}"#,
+        )
+        .unwrap();
+        let mut output = Vec::new();
+        RtfWriter::new(&mut output)
+            .write_document(&document)
+            .unwrap();
+
+        let reparsed = RtfDocument::from_bytes(&output).unwrap();
+        assert_eq!(reparsed.text(), "Body");
+        let list = reparsed.list_table().get(77).unwrap();
+        assert_eq!(list.template_id, 42);
+        assert!(list.hybrid);
+        assert_eq!(list.name, "Outline");
+        assert_eq!(list.levels.len(), 2);
+        assert_eq!(list.levels[0].number_text, "\0.");
+        assert_eq!(list.levels[0].follow, ListFollow::Space);
+        assert_eq!(list.levels[1].level_type, ListLevelType::Other(77));
+        assert_eq!(list.levels[1].number_text, "•");
+        assert_eq!(list.levels[1].follow, ListFollow::Nothing);
+        let list_override = reparsed.list_override_table().get(4).unwrap();
+        assert_eq!(list_override.list_id, 77);
+        assert_eq!(list_override.level_count_override, Some(1));
+        assert_eq!(list_override.start_at_override, Some(9));
     }
 
     #[test]

@@ -187,15 +187,27 @@ pub enum ControlWord<'a> {
 
     // Lists
     ListTable,
-    List(i32),
+    List,
+    ListTemplateId(i32),
+    ListSimple(bool),
+    ListHybrid(bool),
+    ListName,
     ListId(i32),
     ListOverrideTable,
-    ListOverride(i32),
-    ListLevel(i32),
+    ListOverride,
+    ListOverrideCount(i32),
+    ListOverrideIndex(i32),
+    ListOverrideLevel,
+    ListOverrideStartAt(bool),
+    ListLevel,
     ListLevelType(i32),
-    ListNumberText(&'a str),
+    ListLevelJustification(i32),
+    ListLevelFollow(i32),
+    ListLevelSpace(i32),
+    ListLevelIndent(i32),
+    ListNumberText,
     ListLevelStartAt(i32),
-    ListLevelNumber(i32),
+    ListLevelNumbers,
 
     // Sections
     SectionBreak,
@@ -721,15 +733,27 @@ impl<'a> Lexer<'a> {
 
             // Lists
             "listtable" => ControlWord::ListTable,
-            "list" => ControlWord::List(param_value),
+            "list" => ControlWord::List,
+            "listtemplateid" => ControlWord::ListTemplateId(param_value),
+            "listsimple" => ControlWord::ListSimple(param_bool),
+            "listhybrid" => ControlWord::ListHybrid(param_bool),
+            "listname" => ControlWord::ListName,
             "listid" => ControlWord::ListId(param_value),
             "listoverridetable" => ControlWord::ListOverrideTable,
-            "listoverride" => ControlWord::ListOverride(param_value),
-            "listlevel" => ControlWord::ListLevel(param_value),
+            "listoverride" => ControlWord::ListOverride,
+            "listoverridecount" => ControlWord::ListOverrideCount(param_value),
+            "ls" => ControlWord::ListOverrideIndex(param_value),
+            "lfolevel" => ControlWord::ListOverrideLevel,
+            "listoverridestartat" => ControlWord::ListOverrideStartAt(param_bool),
+            "listlevel" => ControlWord::ListLevel,
             "levelnfc" => ControlWord::ListLevelType(param_value),
-            "leveltext" => ControlWord::ListNumberText(word),
+            "leveljc" => ControlWord::ListLevelJustification(param_value),
+            "levelfollow" => ControlWord::ListLevelFollow(param_value),
+            "levelspace" => ControlWord::ListLevelSpace(param_value),
+            "levelindent" => ControlWord::ListLevelIndent(param_value),
+            "leveltext" => ControlWord::ListNumberText,
             "levelstartat" => ControlWord::ListLevelStartAt(param_value),
-            "levelnumbers" => ControlWord::ListLevelNumber(param_value),
+            "levelnumbers" => ControlWord::ListLevelNumbers,
 
             // Sections
             "sectd" => ControlWord::SectionDefault,
@@ -1415,10 +1439,7 @@ mod tests {
         assert_eq!(tokens.len(), 3);
         assert!(matches!(tokens[0], Token::Control(ControlWord::ListTable)));
         assert!(matches!(tokens[1], Token::Control(ControlWord::ListId(1))));
-        assert!(matches!(
-            tokens[2],
-            Token::Control(ControlWord::ListLevel(1))
-        ));
+        assert!(matches!(tokens[2], Token::Control(ControlWord::ListLevel)));
     }
 
     #[test]

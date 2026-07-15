@@ -58,7 +58,8 @@ pub use field::{Field, FieldType};
 pub use info::{DocumentInfo, DocumentProtection, ProtectionType};
 pub use lexer::CharacterSet;
 pub use list::{
-    List, ListJustification, ListLevel, ListLevelType, ListOverride, ListOverrideTable, ListTable,
+    List, ListFollow, ListJustification, ListLevel, ListLevelType, ListOverride, ListOverrideTable,
+    ListTable,
 };
 pub use picture::{ImageType, Picture, detect_image_type};
 pub use section::{

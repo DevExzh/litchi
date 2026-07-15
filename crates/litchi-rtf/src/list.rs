@@ -29,6 +29,20 @@ pub enum ListLevelType {
     Bullet,
     /// No numbering
     None,
+    /// A numbering format not represented by a named variant
+    Other(i32),
+}
+
+/// Text emitted after a list label.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ListFollow {
+    /// Follow the label with a tab.
+    #[default]
+    Tab,
+    /// Follow the label with a space.
+    Space,
+    /// Do not emit a following character.
+    Nothing,
 }
 
 /// List level justification
@@ -58,6 +72,8 @@ pub struct ListLevel<'a> {
     pub justification: ListJustification,
     /// Whether to follow the previous level
     pub follow_previous: bool,
+    /// Character emitted after the generated label
+    pub follow: ListFollow,
     /// Font for the number/bullet
     pub font_ref: super::types::FontRef,
     /// Indentation for this level (in twips)
@@ -77,6 +93,7 @@ impl<'a> ListLevel<'a> {
             start_at: 1,
             justification: ListJustification::default(),
             follow_previous: false,
+            follow: ListFollow::default(),
             font_ref: 0,
             indent: 0,
             space: 0,
@@ -111,6 +128,10 @@ pub struct List<'a> {
     pub template_id: i32,
     /// Whether this is a simple list (single level)
     pub simple: bool,
+    /// Whether this is a hybrid multilevel list
+    pub hybrid: bool,
+    /// Optional list name
+    pub name: Cow<'a, str>,
     /// List levels (up to 9 levels)
     pub levels: Vec<ListLevel<'a>>,
 }
@@ -123,6 +144,8 @@ impl<'a> List<'a> {
             id,
             template_id: id,
             simple: true,
+            hybrid: false,
+            name: Cow::Borrowed(""),
             levels: Vec::new(),
         }
     }

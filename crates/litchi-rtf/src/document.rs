@@ -528,12 +528,36 @@ impl<'a> RtfDocument<'a> {
     // This allows the parsed document to outlive the input string.
 
     /// Convert list table to owned
-    #[allow(clippy::needless_pass_by_value)]
     fn convert_list_table_to_owned(
-        _table: super::list::ListTable<'_>,
+        table: super::list::ListTable<'_>,
     ) -> super::list::ListTable<'static> {
-        // TODO: Implement proper conversion when list parsing is fully implemented
-        super::list::ListTable::new()
+        let mut owned = super::list::ListTable::new();
+        for list in table.lists() {
+            owned.add(super::list::List {
+                id: list.id,
+                template_id: list.template_id,
+                simple: list.simple,
+                hybrid: list.hybrid,
+                name: Cow::Owned(list.name.clone().into_owned()),
+                levels: list
+                    .levels
+                    .iter()
+                    .map(|level| super::list::ListLevel {
+                        level: level.level,
+                        level_type: level.level_type,
+                        number_text: Cow::Owned(level.number_text.clone().into_owned()),
+                        start_at: level.start_at,
+                        justification: level.justification,
+                        follow_previous: level.follow_previous,
+                        follow: level.follow,
+                        font_ref: level.font_ref,
+                        indent: level.indent,
+                        space: level.space,
+                    })
+                    .collect(),
+            });
+        }
+        owned
     }
 
     /// Convert sections to owned
@@ -745,7 +769,7 @@ impl<'a> RtfDocument<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Alignment, StyleType};
+    use crate::{Alignment, ListFollow, ListJustification, ListLevelType, StyleType};
 
     #[test]
     fn test_simple_document() {
@@ -859,6 +883,52 @@ mod tests {
         assert!(emphasis.paragraph.is_none());
         assert!(doc.stylesheet().get_typed(StyleType::Section, 3).is_some());
         assert!(doc.stylesheet().get_typed(StyleType::Table, 4).is_some());
+    }
+
+    #[test]
+    fn parses_list_and_override_tables_without_leaking_labels() {
+        let rtf = r#"{\rtf1\ansi
+            {\*\listtable
+                {\list\listtemplateid42\listhybrid
+                    {\listlevel\levelnfc0\leveljc2\levelfollow1\levelstartat3
+                        \levelspace120\levelindent360
+                        {\leveltext\'02\'00.;}{\levelnumbers\'01;}\f2}
+                    {\listlevel\levelnfc23\leveljc0\levelfollow2\levelstartat1
+                        {\leveltext\'01\u8226?;}{\levelnumbers;}}
+                    {\listname Outline;}\listid77}
+            }
+            {\listoverridetable
+                {\listoverride\listid77\listoverridecount1
+                    {\lfolevel\listoverridestartat\levelstartat9}\ls4}}
+            Body}"#;
+        let doc = RtfDocument::parse(rtf).unwrap();
+        assert_eq!(doc.text().trim(), "Body");
+        assert_eq!(doc.list_table().lists().len(), 1);
+
+        let list = doc.list_table().get(77).unwrap();
+        assert_eq!(list.template_id, 42);
+        assert!(!list.simple);
+        assert!(list.hybrid);
+        assert_eq!(list.name, "Outline");
+        assert_eq!(list.levels.len(), 2);
+        let decimal = &list.levels[0];
+        assert_eq!(decimal.level_type, ListLevelType::Decimal);
+        assert_eq!(decimal.number_text, "\0.");
+        assert_eq!(decimal.start_at, 3);
+        assert_eq!(decimal.justification, ListJustification::Right);
+        assert_eq!(decimal.follow, ListFollow::Space);
+        assert_eq!(decimal.font_ref, 2);
+        assert_eq!(decimal.indent, 360);
+        assert_eq!(decimal.space, 120);
+        let bullet = &list.levels[1];
+        assert_eq!(bullet.level_type, ListLevelType::Bullet);
+        assert_eq!(bullet.number_text, "•");
+        assert_eq!(bullet.follow, ListFollow::Nothing);
+
+        let list_override = doc.list_override_table().get(4).unwrap();
+        assert_eq!(list_override.list_id, 77);
+        assert_eq!(list_override.level_count_override, Some(1));
+        assert_eq!(list_override.start_at_override, Some(9));
     }
 
     #[test]

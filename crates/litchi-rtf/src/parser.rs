@@ -89,6 +89,9 @@ const MAX_ANNOTATION_TEXT_BYTES: usize = 4 * 1_048_576;
 const MAX_SECTIONS: usize = 4_096;
 const MAX_STYLES: usize = 65_536;
 const MAX_STYLE_NAME_BYTES: usize = 65_536;
+const MAX_LISTS: usize = 65_536;
+const MAX_LIST_LEVELS: usize = 9;
+const MAX_LIST_TEXT_BYTES: usize = 65_536;
 
 struct OpenBookmark {
     name: String,
@@ -344,6 +347,18 @@ impl<'a> Parser<'a> {
                         return Ok(());
                     }
                     match self.tokens.get(self.pos + 1) {
+                        Some(Token::Control(ControlWord::ListTable)) => {
+                            self.pos += 1;
+                            self.parse_list_table()?;
+                            self.states.pop();
+                            return Ok(());
+                        },
+                        Some(Token::Control(ControlWord::ListOverrideTable)) => {
+                            self.pos += 1;
+                            self.parse_list_override_table()?;
+                            self.states.pop();
+                            return Ok(());
+                        },
                         Some(Token::Control(ControlWord::AnnotationAuthor)) => {
                             self.pending_annotation_author =
                                 self.parse_ignorable_text_destination()?;
@@ -387,6 +402,16 @@ impl<'a> Parser<'a> {
                         state.destination = Destination::StyleSheet;
                     }
                     self.parse_stylesheet()?;
+                    self.states.pop();
+                    return Ok(());
+                },
+                Token::Control(ControlWord::ListTable) => {
+                    self.parse_list_table()?;
+                    self.states.pop();
+                    return Ok(());
+                },
+                Token::Control(ControlWord::ListOverrideTable) => {
+                    self.parse_list_override_table()?;
                     self.states.pop();
                     return Ok(());
                 },
@@ -953,6 +978,365 @@ impl<'a> Parser<'a> {
             _ => {},
         }
         Ok(true)
+    }
+
+    fn parse_list_table(&mut self) -> RtfResult<()> {
+        self.pos += 1; // `listtable`
+        while self.pos < self.tokens.len() {
+            match self.tokens.get(self.pos) {
+                Some(Token::OpenBrace)
+                    if matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::List))
+                    ) =>
+                {
+                    self.parse_list_definition()?;
+                },
+                Some(Token::OpenBrace) => self.skip_group()?,
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    return Ok(());
+                },
+                Some(_) => self.pos += 1,
+                None => break,
+            }
+        }
+        Err(RtfError::UnexpectedEof)
+    }
+
+    fn parse_list_definition(&mut self) -> RtfResult<()> {
+        self.pos += 2; // opening brace and `list`
+        let mut list = super::list::List::new(0);
+        list.simple = false;
+        let mut has_id = false;
+        let mut has_template_id = false;
+        let mut closed = false;
+        while self.pos < self.tokens.len() {
+            match self.tokens.get(self.pos) {
+                Some(Token::OpenBrace)
+                    if matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::ListLevel))
+                    ) =>
+                {
+                    if list.levels.len() >= MAX_LIST_LEVELS {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF list exceeds the nine-level specification limit".to_string(),
+                        ));
+                    }
+                    let level = self.parse_list_level(list.levels.len() as u8)?;
+                    list.add_level(level);
+                    continue;
+                },
+                Some(Token::OpenBrace)
+                    if matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::ListName))
+                    ) =>
+                {
+                    let name = self.parse_list_text_group(true)?;
+                    list.name = Cow::Borrowed(self.arena.alloc_str(&name));
+                    continue;
+                },
+                Some(Token::OpenBrace) => {
+                    self.skip_group()?;
+                    continue;
+                },
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    closed = true;
+                    break;
+                },
+                Some(Token::Control(control)) => match control {
+                    ControlWord::ListTemplateId(value) => {
+                        list.template_id = *value;
+                        has_template_id = true;
+                    },
+                    ControlWord::ListSimple(value) => list.simple = *value,
+                    ControlWord::ListHybrid(value) => list.hybrid = *value,
+                    ControlWord::ListId(value) => {
+                        list.id = *value;
+                        has_id = true;
+                    },
+                    _ => {},
+                },
+                Some(_) => {},
+                None => return Err(RtfError::UnexpectedEof),
+            }
+            self.pos += 1;
+        }
+        if !closed {
+            return Err(RtfError::UnexpectedEof);
+        }
+        if list.simple && (list.hybrid || list.levels.len() > 1) {
+            return Err(RtfError::MalformedDocument(
+                "invalid simple RTF list definition".to_string(),
+            ));
+        }
+        if !has_template_id {
+            list.template_id = list.id;
+        }
+        if has_id {
+            if self.list_table.lists().len() >= MAX_LISTS {
+                return Err(RtfError::MalformedDocument(
+                    "RTF list count exceeds the safety limit".to_string(),
+                ));
+            }
+            self.list_table.add(list);
+        }
+        Ok(())
+    }
+
+    fn parse_list_level(&mut self, level_index: u8) -> RtfResult<super::list::ListLevel<'a>> {
+        self.pos += 2; // opening brace and `listlevel`
+        let mut level = super::list::ListLevel::new(level_index);
+        let mut explicit_indent = false;
+        while self.pos < self.tokens.len() {
+            match self.tokens.get(self.pos) {
+                Some(Token::OpenBrace)
+                    if matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::ListNumberText))
+                    ) =>
+                {
+                    let text = self.parse_list_text_group(false)?;
+                    level.number_text = Cow::Borrowed(self.arena.alloc_str(&text));
+                    continue;
+                },
+                Some(Token::OpenBrace)
+                    if matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::ListLevelNumbers))
+                    ) =>
+                {
+                    self.skip_group()?;
+                    continue;
+                },
+                Some(Token::OpenBrace) => {
+                    self.skip_group()?;
+                    continue;
+                },
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    return Ok(level);
+                },
+                Some(Token::Control(control)) => match control {
+                    ControlWord::ListLevelType(value) => {
+                        level.level_type = Self::list_level_type(*value);
+                    },
+                    ControlWord::ListLevelJustification(value) => {
+                        level.justification = match value {
+                            1 => super::list::ListJustification::Center,
+                            2 => super::list::ListJustification::Right,
+                            _ => super::list::ListJustification::Left,
+                        };
+                    },
+                    ControlWord::ListLevelFollow(value) => {
+                        level.follow = match value {
+                            1 => super::list::ListFollow::Space,
+                            2 => super::list::ListFollow::Nothing,
+                            _ => super::list::ListFollow::Tab,
+                        };
+                        level.follow_previous = *value != 0;
+                    },
+                    ControlWord::ListLevelStartAt(value) => level.start_at = *value,
+                    ControlWord::ListLevelSpace(value) => level.space = *value,
+                    ControlWord::ListLevelIndent(value) => {
+                        level.indent = *value;
+                        explicit_indent = true;
+                    },
+                    ControlWord::FontNumber(value) => {
+                        level.font_ref = u16::try_from(*value).map_err(|_| {
+                            RtfError::MalformedDocument(
+                                "RTF list font reference is outside the supported range"
+                                    .to_string(),
+                            )
+                        })?;
+                    },
+                    ControlWord::LeftIndent(value) if !explicit_indent => level.indent = *value,
+                    _ => {},
+                },
+                Some(_) => {},
+                None => break,
+            }
+            self.pos += 1;
+        }
+        Err(RtfError::UnexpectedEof)
+    }
+
+    fn parse_list_text_group(&mut self, is_name: bool) -> RtfResult<String> {
+        self.pos += 2; // opening brace and destination control
+        let mut value = String::new();
+        let mut unicode_skip = self.current_state()?.unicode_skip.max(0);
+        while self.pos < self.tokens.len() {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    let trimmed = value.trim_end_matches(['\r', '\n', ' ']);
+                    let trimmed = trimmed.strip_suffix(';').unwrap_or(trimmed);
+                    if is_name {
+                        return Ok(trimmed.trim().to_string());
+                    }
+                    let mut chars = trimmed.chars();
+                    if chars
+                        .next()
+                        .is_some_and(|ch| u32::from(ch) <= u8::MAX.into())
+                    {
+                        return Ok(chars.collect());
+                    }
+                    return Ok(trimmed.to_string());
+                },
+                Some(Token::OpenBrace) => {
+                    self.skip_group()?;
+                    continue;
+                },
+                Some(Token::Text(text)) => value.push_str(text),
+                Some(Token::Control(ControlWord::Unicode(first))) => {
+                    let decoded = self.parse_style_unicode(*first, unicode_skip)?;
+                    value.push_str(&decoded);
+                    if value.len() > MAX_LIST_TEXT_BYTES {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF list text exceeds the safety limit".to_string(),
+                        ));
+                    }
+                    continue;
+                },
+                Some(Token::Control(ControlWord::UnicodeSkip(value))) => {
+                    unicode_skip = (*value).max(0);
+                },
+                Some(_) => {},
+                None => break,
+            }
+            self.pos += 1;
+            if value.len() > MAX_LIST_TEXT_BYTES {
+                return Err(RtfError::MalformedDocument(
+                    "RTF list text exceeds the safety limit".to_string(),
+                ));
+            }
+        }
+        Err(RtfError::UnexpectedEof)
+    }
+
+    fn list_level_type(value: i32) -> super::list::ListLevelType {
+        match value {
+            0 => super::list::ListLevelType::Decimal,
+            1 => super::list::ListLevelType::UpperRoman,
+            2 => super::list::ListLevelType::LowerRoman,
+            3 => super::list::ListLevelType::UpperLetter,
+            4 => super::list::ListLevelType::LowerLetter,
+            5 => super::list::ListLevelType::Ordinal,
+            6 => super::list::ListLevelType::CardinalText,
+            7 => super::list::ListLevelType::OrdinalText,
+            23 => super::list::ListLevelType::Bullet,
+            255 => super::list::ListLevelType::None,
+            other => super::list::ListLevelType::Other(other),
+        }
+    }
+
+    fn parse_list_override_table(&mut self) -> RtfResult<()> {
+        self.pos += 1; // `listoverridetable`
+        while self.pos < self.tokens.len() {
+            match self.tokens.get(self.pos) {
+                Some(Token::OpenBrace)
+                    if matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::ListOverride))
+                    ) =>
+                {
+                    self.parse_list_override()?;
+                },
+                Some(Token::OpenBrace) => self.skip_group()?,
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    return Ok(());
+                },
+                Some(_) => self.pos += 1,
+                None => break,
+            }
+        }
+        Err(RtfError::UnexpectedEof)
+    }
+
+    fn parse_list_override(&mut self) -> RtfResult<()> {
+        self.pos += 2; // opening brace and `listoverride`
+        let mut list_id = None;
+        let mut index = None;
+        let mut level_count = None;
+        let mut start_at = None;
+        let mut closed = false;
+        while self.pos < self.tokens.len() {
+            match self.tokens.get(self.pos) {
+                Some(Token::OpenBrace)
+                    if matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::ListOverrideLevel))
+                    ) =>
+                {
+                    self.pos += 2;
+                    let mut has_start_override = false;
+                    while self.pos < self.tokens.len() {
+                        match self.tokens.get(self.pos) {
+                            Some(Token::CloseBrace) => {
+                                self.pos += 1;
+                                break;
+                            },
+                            Some(Token::Control(ControlWord::ListOverrideStartAt(value))) => {
+                                has_start_override = *value;
+                            },
+                            Some(Token::Control(ControlWord::ListLevelStartAt(value)))
+                                if has_start_override =>
+                            {
+                                start_at = Some(*value);
+                            },
+                            Some(Token::OpenBrace) => {
+                                self.skip_group()?;
+                                continue;
+                            },
+                            Some(_) => {},
+                            None => return Err(RtfError::UnexpectedEof),
+                        }
+                        self.pos += 1;
+                    }
+                    continue;
+                },
+                Some(Token::OpenBrace) => {
+                    self.skip_group()?;
+                    continue;
+                },
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    closed = true;
+                    break;
+                },
+                Some(Token::Control(ControlWord::ListId(value))) => list_id = Some(*value),
+                Some(Token::Control(ControlWord::ListOverrideIndex(value))) => index = Some(*value),
+                Some(Token::Control(ControlWord::ListOverrideCount(value))) => {
+                    level_count = Some(u8::try_from(*value).map_err(|_| {
+                        RtfError::MalformedDocument(
+                            "RTF list override count is outside the supported range".to_string(),
+                        )
+                    })?);
+                },
+                Some(_) => {},
+                None => return Err(RtfError::UnexpectedEof),
+            }
+            self.pos += 1;
+        }
+        if !closed {
+            return Err(RtfError::UnexpectedEof);
+        }
+        if let (Some(index), Some(list_id)) = (index, list_id) {
+            if self.list_override_table.overrides().len() >= MAX_LISTS {
+                return Err(RtfError::MalformedDocument(
+                    "RTF list override count exceeds the safety limit".to_string(),
+                ));
+            }
+            let mut entry = super::list::ListOverride::new(index, list_id);
+            entry.level_count_override = level_count;
+            entry.start_at_override = start_at;
+            self.list_override_table.add(entry);
+        }
+        Ok(())
     }
 
     /// Parse the standard RTF stylesheet destination.
