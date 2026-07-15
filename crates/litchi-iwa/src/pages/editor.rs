@@ -50,6 +50,7 @@ const DRAWABLE_ATTACHMENT_MESSAGE_TYPE: u32 = 2003;
 const STANDIN_CAPTION_MESSAGE_TYPE: u32 = 3097;
 const TEXT_BOX_DUPLICATE_OFFSET: f32 = 12.0;
 
+pub use document_options::PagesDocumentOptions;
 pub use types::{
     PagesDrawableTextInfo, PagesHeaderFooterInfo, PagesHeaderFooterKind, PagesPageLayout,
     PagesPageNumber, PagesPageOrientation, PagesRgbColorSpace, PagesRgbaColor,
@@ -2596,6 +2597,7 @@ fn insert_unique<T>(
     Ok(())
 }
 
+mod document_options;
 mod page_layout;
 mod section_background;
 mod section_content;

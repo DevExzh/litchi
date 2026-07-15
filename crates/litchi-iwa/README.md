@@ -40,6 +40,8 @@ println!("{}", structured.summary());
   explicit password-protected document rejection
 - Semantic editors for Numbers sheets/tables/cells/formulas, Pages
   body/header/footer/text-box text, and Keynote slides/placeholders/text boxes/speaker notes
+- Lossless Pages document body/header/footer visibility, facing-page layout,
+  automatic hyphenation, and ligature options
 - Typed Numbers table header/footer counts, freeze state, and repeating-header
   settings with lossless optional-field presence
 - Typed Keynote theme-layout discovery and fresh empty-slide creation with native
@@ -67,7 +69,7 @@ use litchi_iwa::numbers::{
     CellValue, FormulaAxisReference, FormulaCellReference, FormulaExpression, NumbersEditor,
     NumbersTableHeaderCount,
 };
-use litchi_iwa::pages::PagesEditor;
+use litchi_iwa::pages::{PagesDocumentOptions, PagesEditor};
 use litchi_iwa::keynote::{
     KeynoteBuildSettings, KeynoteBuildStart, KeynoteEditor, KeynoteFlipDirection,
     KeynoteHorizontalBuildDirection, KeynoteKeyboardDirection, KeynoteRotationDirection,
@@ -186,6 +188,11 @@ if let Some(sheet) = numbers.sheets()?.first()
 numbers.save("updated.numbers")?;
 
 let mut pages = PagesEditor::open("input.pages")?;
+let mut document_options = pages.document_options()?;
+document_options.facing_pages = Some(true);
+document_options.automatic_hyphenation = Some(true);
+document_options.ligatures_enabled = Some(false);
+pages.set_document_options(document_options)?;
 let section_id = pages.sections()[0].object_id;
 pages.set_section_text(section_id, "Updated body")?;
 let first_header = pages
@@ -514,7 +521,11 @@ Pages page dimensions, margins, scale, orientation, and vertical-layout flags
 are also patched directly in the protobuf wire stream. Unknown Apple fields
 retain their original bytes and positions; duplicate singular fields, wrong
 wire types, and truncated payloads fail transactionally instead of being
-normalized by a decode/re-encode cycle. Page orientation, facing-page section
+normalized by a decode/re-encode cycle. The Document formatter's body, header,
+footer, facing-page, automatic-hyphenation, and ligature toggles are likewise
+writable through lossless optional settings; absent values retain Pages'
+effective defaults. See `edit_pages_document_options`. Page orientation,
+facing-page section
 starts, and continue/restart numbering behavior use lossless enums; future
 native values remain available as typed `Unknown` variants. Starting page
 numbers use a validated non-zero type. See `edit_pages_layout` and

@@ -152,6 +152,178 @@ fn page_layout_rejects_duplicate_scalar_fields_transactionally() {
 }
 
 #[test]
+fn document_options_crud_is_lossless_transactional_and_wire_exact() {
+    let baseline_settings = tp::SettingsArchive {
+        language: Some("en".to_owned()),
+        hyphenation_language: Some(String::new()),
+        footnote_kind: Some(0),
+        footnote_format: Some(0),
+        footnote_numbering: Some(0),
+        footnote_gap: Some(10),
+        ..Default::default()
+    };
+    let mut baseline_data = baseline_settings.encode_to_vec();
+    let unknown = append_unknown_varint(&mut baseline_data, 99, 990);
+    let mut editor = PagesEditor::from_package(test_package_with_settings(baseline_data)).unwrap();
+    let baseline = editor.to_bytes().unwrap();
+    assert_eq!(
+        editor.document_options().unwrap(),
+        PagesDocumentOptions::default()
+    );
+
+    let options = PagesDocumentOptions {
+        body_enabled: Some(true),
+        headers_enabled: Some(false),
+        footers_enabled: Some(true),
+        facing_pages: Some(true),
+        automatic_hyphenation: Some(true),
+        ligatures_enabled: Some(false),
+    };
+    editor.set_document_options(options).unwrap();
+    assert_eq!(editor.document_options().unwrap(), options);
+    assert!(options.body_is_enabled());
+    assert!(!options.headers_are_enabled());
+    assert!(options.footers_are_enabled());
+    assert!(options.uses_facing_pages());
+    assert!(options.uses_automatic_hyphenation());
+    assert!(!options.uses_ligatures());
+
+    let archive = editor.package().archive("Index/Document.iwa").unwrap();
+    let payload = &archive.object(43).unwrap().messages[0].data;
+    let settings = tp::SettingsArchive::decode(payload.as_slice()).unwrap();
+    assert_eq!(settings.language.as_deref(), Some("en"));
+    assert_eq!(settings.footnote_gap, Some(10));
+    assert_eq!(
+        payload
+            .windows(unknown.len())
+            .filter(|window| *window == unknown)
+            .count(),
+        1
+    );
+    let changed = editor.to_bytes().unwrap();
+    let reparsed = PagesEditor::from_bytes(&changed).unwrap();
+    assert_eq!(reparsed.document_options().unwrap(), options);
+    editor.set_document_options(options).unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), changed);
+
+    editor
+        .set_document_options(PagesDocumentOptions::default())
+        .unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+}
+
+#[test]
+fn document_options_update_and_restore_native_presence_exactly() {
+    let native = PagesDocumentOptions {
+        body_enabled: Some(true),
+        headers_enabled: Some(true),
+        footers_enabled: Some(true),
+        facing_pages: Some(false),
+        automatic_hyphenation: Some(false),
+        ligatures_enabled: Some(true),
+    };
+    let mut data = tp::SettingsArchive {
+        body: native.body_enabled,
+        headers: native.headers_enabled,
+        footers: native.footers_enabled,
+        facing_pages: native.facing_pages,
+        hyphenation: native.automatic_hyphenation,
+        use_ligatures: native.ligatures_enabled,
+        language: Some("en".to_owned()),
+        ..Default::default()
+    }
+    .encode_to_vec();
+    append_unknown_varint(&mut data, 99, 990);
+    let mut editor = PagesEditor::from_package(test_package_with_settings(data)).unwrap();
+    let baseline = editor.to_bytes().unwrap();
+    assert_eq!(editor.document_options().unwrap(), native);
+
+    let changed = PagesDocumentOptions {
+        headers_enabled: Some(false),
+        footers_enabled: Some(false),
+        facing_pages: Some(true),
+        automatic_hyphenation: Some(true),
+        ligatures_enabled: Some(false),
+        ..native
+    };
+    editor.set_document_options(changed).unwrap();
+    assert_eq!(editor.document_options().unwrap(), changed);
+    editor.set_document_options(native).unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+}
+
+#[test]
+fn document_options_reject_malformed_wire_transactionally() {
+    for malformed in [vec![(1, 0), (1, 1)], vec![(9, 2)], vec![(34, 0), (34, 1)]] {
+        let mut data = tp::SettingsArchive::default().encode_to_vec();
+        for (field, value) in malformed {
+            append_unknown_varint(&mut data, field, value);
+        }
+        let mut editor = PagesEditor::from_package(test_package_with_settings(data)).unwrap();
+        let before = editor.to_bytes().unwrap();
+        assert!(editor.document_options().is_err());
+        assert!(
+            editor
+                .set_document_options(PagesDocumentOptions::default())
+                .is_err()
+        );
+        assert_eq!(editor.to_bytes().unwrap(), before);
+    }
+
+    let mut invalid_payload =
+        PagesEditor::from_package(test_package_with_settings(vec![0xff])).unwrap();
+    let before = invalid_payload.to_bytes().unwrap();
+    assert!(invalid_payload.document_options().is_err());
+    assert!(
+        invalid_payload
+            .set_document_options(PagesDocumentOptions::default())
+            .is_err()
+    );
+    assert_eq!(invalid_payload.to_bytes().unwrap(), before);
+
+    let mut duplicate_reference_package =
+        test_package_with_settings(tp::SettingsArchive::default().encode_to_vec());
+    duplicate_reference_package
+        .update_archive(DOCUMENT_ARCHIVE_NAME, |archive| {
+            let object = archive.object_mut(DOCUMENT_OBJECT_ID).unwrap();
+            let message = object.messages[0].clone();
+            let data = append_repeated_length_delimited_field(
+                &message.data,
+                7,
+                &reference(43).encode_to_vec(),
+            )?;
+            object.replace_message(
+                0,
+                RawMessage {
+                    type_: message.type_,
+                    data,
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    let mut duplicate_reference = PagesEditor::from_package(duplicate_reference_package).unwrap();
+    let before = duplicate_reference.to_bytes().unwrap();
+    assert!(duplicate_reference.document_options().is_err());
+    assert!(
+        duplicate_reference
+            .set_document_options(PagesDocumentOptions::default())
+            .is_err()
+    );
+    assert_eq!(duplicate_reference.to_bytes().unwrap(), before);
+
+    let mut editor = PagesEditor::from_package(test_package("Body")).unwrap();
+    let before = editor.to_bytes().unwrap();
+    assert!(editor.document_options().is_err());
+    assert!(
+        editor
+            .set_document_options(PagesDocumentOptions::default())
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
 fn section_settings_crud_is_lossless_validated_and_transactional() {
     let body_id = 42;
     let section_id = 43;
@@ -1581,6 +1753,34 @@ fn test_package(text: &str) -> IWorkPackage {
                 ],
             },
         )
+        .unwrap();
+    package
+}
+
+fn test_package_with_settings(settings_data: Vec<u8>) -> IWorkPackage {
+    let body_id = 42;
+    let settings_id = 43;
+    let root = DocumentArchive {
+        body_storage: Some(reference(body_id)),
+        settings: Some(reference(settings_id)),
+        ..Default::default()
+    };
+    let storage = StorageArchive {
+        text: vec!["Body".to_owned()],
+        ..Default::default()
+    };
+    let mut root_object = object(1, DOCUMENT_MESSAGE_TYPE, root.encode_to_vec());
+    root_object.archive_info.message_infos[0].object_references = vec![body_id, settings_id];
+    let archive = Archive {
+        objects: vec![
+            root_object,
+            object(body_id, 2_001, storage.encode_to_vec()),
+            object(settings_id, 10_012, settings_data),
+        ],
+    };
+    let mut package = IWorkPackage::new();
+    package
+        .replace_archive(DOCUMENT_ARCHIVE_NAME, &archive)
         .unwrap();
     package
 }

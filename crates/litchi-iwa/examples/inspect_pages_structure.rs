@@ -6,7 +6,9 @@ use litchi_iwa::archive::ArchiveObject;
 use litchi_iwa::pages::{
     PagesPageNumber, PagesPageOrientation, PagesSectionPageNumbering, PagesSectionStart,
 };
-use litchi_iwa::protobuf::tp::{DocumentArchive, SectionArchive, SectionTemplateArchive};
+use litchi_iwa::protobuf::tp::{
+    DocumentArchive, SectionArchive, SectionTemplateArchive, SettingsArchive,
+};
 use litchi_iwa::protobuf::tswp::StorageArchive;
 use prost::Message;
 
@@ -46,6 +48,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         document.orientation.map(PagesPageOrientation::from_raw),
         document.uses_single_header_footer,
     );
+    if let Some(reference) = &document.settings {
+        let (_, object) = objects
+            .get(&reference.identifier)
+            .ok_or("settings object is missing")?;
+        let settings = decode::<SettingsArchive>(object).ok_or("settings payload is invalid")?;
+        println!(
+            "settings={} body={:?} headers={:?} footers={:?} facing={:?} hyphenation={:?} ligatures={:?} language={:?} hyphenation_language={:?} footnotes=({:?},{:?},{:?},{:?})",
+            reference.identifier,
+            settings.body,
+            settings.headers,
+            settings.footers,
+            settings.facing_pages,
+            settings.hyphenation,
+            settings.use_ligatures,
+            settings.language,
+            settings.hyphenation_language,
+            settings.footnote_kind,
+            settings.footnote_format,
+            settings.footnote_numbering,
+            settings.footnote_gap,
+        );
+    }
 
     if let Some(reference) = document.body_storage {
         let (name, object) = objects
