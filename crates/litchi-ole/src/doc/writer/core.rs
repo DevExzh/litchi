@@ -82,7 +82,7 @@ use super::revisions::{DisplayFieldRevision, FormattingRevision, NumberingRevisi
 use crate::doc::CommentDateTime;
 use crate::doc::parts::pap::{
     Border as ParagraphBorder, BorderStyle as ParagraphBorderStyle, Borders as ParagraphBorders,
-    TextBoxTightWrap,
+    Shading as ParagraphShading, TextBoxTightWrap,
 };
 use crate::sprm_operations::*;
 use litchi_cfb::writer::OleWriter;
@@ -365,6 +365,10 @@ pub struct ParagraphFormatting {
     pub page_break_before: Option<bool>,
     /// Bi-directional paragraph
     pub bidi: Option<bool>,
+    /// Follow vertical document-grid settings
+    pub use_page_setup_settings: Option<bool>,
+    /// Automatically adjust the right indent to the document grid
+    pub adjust_right_indent: Option<bool>,
     /// Outline level (0..9)
     pub outline_level: Option<u8>,
     /// Prevent overlapping floating objects anchored to the paragraph
@@ -377,6 +381,8 @@ pub struct ParagraphFormatting {
     pub text_box_tight_wrap: Option<TextBoxTightWrap>,
     /// Paragraph borders
     pub borders: ParagraphBorders,
+    /// Paragraph background shading
+    pub shading: Option<ParagraphShading>,
     /// Line spacing descriptor
     pub line_spacing: Option<LineSpacing>,
     /// List level index (0-based, used with `ilfo` to associate paragraph with a list)
@@ -3446,6 +3452,12 @@ fn build_papx_grpprl(fmt: &ParagraphFormatting) -> Vec<u8> {
     if let Some(bidi) = fmt.bidi {
         push_bool(&mut grp, SPRM_P_F_BI_DI, bidi);
     }
+    if let Some(use_grid) = fmt.use_page_setup_settings {
+        push_bool(&mut grp, SPRM_P_F_USE_PGSU_SETTINGS, use_grid);
+    }
+    if let Some(adjust) = fmt.adjust_right_indent {
+        push_bool(&mut grp, SPRM_P_F_ADJUST_RIGHT, adjust);
+    }
 
     // Outline level
     if let Some(lvl) = fmt.outline_level {
@@ -3477,6 +3489,17 @@ fn build_papx_grpprl(fmt: &ParagraphFormatting) -> Vec<u8> {
         if let Some(border) = border {
             append_paragraph_border(&mut grp, opcode, border);
         }
+    }
+    if let Some(shading) = fmt.shading {
+        grp.extend_from_slice(&SPRM_P_SHD.to_le_bytes());
+        grp.push(10);
+        for color in [shading.foreground_color, shading.background_color] {
+            match color {
+                Some((red, green, blue)) => grp.extend_from_slice(&[red, green, blue, 0]),
+                None => grp.extend_from_slice(&[0, 0, 0, 0xFF]),
+            }
+        }
+        grp.extend_from_slice(&(shading.pattern as u16).to_le_bytes());
     }
     if let Some(applied) = fmt.numbering_revision_list_applied {
         push_bool(&mut grp, SPRM_P_F_NUM_RM_INS, applied);
@@ -4264,6 +4287,8 @@ mod tests {
                     space_before_auto: Some(true),
                     space_after_auto: Some(true),
                     open_table_cell_mark: Some(true),
+                    use_page_setup_settings: Some(true),
+                    adjust_right_indent: Some(false),
                     no_allow_overlap: Some(true),
                     contextual_spacing: Some(true),
                     mirror_indents: Some(true),
@@ -4287,6 +4312,11 @@ mod tests {
                         }),
                         ..ParagraphBorders::default()
                     },
+                    shading: Some(ParagraphShading {
+                        foreground_color: Some((1, 2, 3)),
+                        background_color: None,
+                        pattern: crate::doc::parts::tap::ShadingPattern::DiagonalCross,
+                    }),
                     line_spacing: Some(LineSpacing::exact_twips(360).unwrap()),
                     ..ParagraphFormatting::default()
                 },
@@ -4336,6 +4366,11 @@ mod tests {
         assert!(paragraphs[0].properties().space_before_auto);
         assert!(paragraphs[0].properties().space_after_auto);
         assert!(paragraphs[0].properties().open_table_cell_mark);
+        assert_eq!(
+            paragraphs[0].properties().use_page_setup_settings,
+            Some(true)
+        );
+        assert_eq!(paragraphs[0].properties().adjust_right_indent, Some(false));
         assert!(paragraphs[0].properties().no_allow_overlap);
         assert!(paragraphs[0].properties().contextual_spacing);
         assert!(paragraphs[0].properties().mirror_indents);
@@ -4364,6 +4399,14 @@ mod tests {
                 }),
                 ..ParagraphBorders::default()
             }
+        );
+        assert_eq!(
+            paragraphs[0].properties().shading,
+            Some(ParagraphShading {
+                foreground_color: Some((1, 2, 3)),
+                background_color: None,
+                pattern: crate::doc::parts::tap::ShadingPattern::DiagonalCross,
+            })
         );
         assert_eq!(paragraphs[0].properties().line_spacing, Some(-360));
         assert_eq!(

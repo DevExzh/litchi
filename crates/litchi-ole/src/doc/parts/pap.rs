@@ -12,9 +12,10 @@
 use super::super::package::{DocError, Result};
 use super::styles::StyleSheet;
 use super::tap::TableProperties;
+pub use super::tap::{CellShading as Shading, ShadingPattern};
 use crate::sprm::{Sprm, parse_sprms};
 use crate::sprm_operations::*;
-use litchi_core::binary::{read_i16_le, read_u16_le, read_u32_le};
+use litchi_core::binary::{read_i16_le, read_u16_le};
 
 /// Paragraph Properties structure.
 ///
@@ -106,6 +107,10 @@ pub struct ParagraphProperties {
     pub list_format_override: Option<i16>,
     /// Bi-directional paragraph
     pub bi_directional: bool,
+    /// Whether the paragraph follows vertical document-grid settings
+    pub use_page_setup_settings: Option<bool>,
+    /// Whether the right indent adjusts automatically to the document grid
+    pub adjust_right_indent: Option<bool>,
     /// Locked paragraph
     pub locked: bool,
     /// Kinsoku (Asian typography)
@@ -384,42 +389,6 @@ pub enum BorderStyle {
     ThreeDEngrave,
     Outset,
     Inset,
-}
-
-/// Paragraph shading.
-#[derive(Debug, Clone, Copy)]
-pub struct Shading {
-    /// Background color (RGB)
-    pub background_color: (u8, u8, u8),
-    /// Foreground color (RGB) for patterns
-    pub foreground_color: (u8, u8, u8),
-    /// Shading pattern
-    pub pattern: ShadingPattern,
-}
-
-/// Shading patterns.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ShadingPattern {
-    Clear,
-    Solid,
-    Percent5,
-    Percent10,
-    Percent20,
-    Percent25,
-    Percent30,
-    Percent40,
-    Percent50,
-    Percent60,
-    Percent70,
-    Percent75,
-    Percent80,
-    Percent90,
-    DarkHorizontal,
-    DarkVertical,
-    DarkForwardDiagonal,
-    DarkBackwardDiagonal,
-    DarkCross,
-    DarkDiagonalCross,
 }
 
 impl ParagraphProperties {
@@ -986,9 +955,10 @@ impl ParagraphProperties {
             },
             // Operation 0x2D: sprmPShd80 - Shading (Word 97-2000)
             0x2D => {
-                if let Some(shd) = sprm.operand_word() {
-                    pap.shading = Self::parse_shd80(shd);
-                }
+                let shd = sprm.operand_word().ok_or_else(|| {
+                    DocError::Corrupted("sprmPShd80 is missing its Shd80".to_string())
+                })?;
+                pap.shading = Self::parse_shd80(shd)?;
             },
             // Operation 0x2E: sprmPDyaFromText - Vertical distance from text
             0x2E => {
@@ -1086,10 +1056,8 @@ impl ParagraphProperties {
             },
             // Operation 0x43: sprmPFNumRMIns - Numbering revision insert
             0x43 => {
-                pap.numbering_revision_list_applied = Some(Self::strict_bool8(
-                    sprm,
-                    "sprmPFNumRMIns",
-                )?);
+                pap.numbering_revision_list_applied =
+                    Some(Self::strict_bool8(sprm, "sprmPFNumRMIns")?);
             },
             // Operation 0x44: sprmPCrLf - CR/LF
             0x44 => {
@@ -1099,42 +1067,58 @@ impl ParagraphProperties {
             0x45 => pap.numbering_revision = Some(Self::parse_numbering_revision(sprm)?),
             // Operation 0x47: sprmPFUsePgsuSettings - Use page setup settings
             0x47 => {
-                // Use page setup settings - not commonly used
+                pap.use_page_setup_settings =
+                    Some(Self::strict_bool8(sprm, "sprmPFUsePgsuSettings")?);
             },
             // Operation 0x48: sprmPFAdjustRight - Adjust right
             0x48 => {
-                // Adjust right - not commonly used
+                pap.adjust_right_indent = Some(Self::strict_bool8(sprm, "sprmPFAdjustRight")?);
             },
             // Operation 0x49: sprmPItap - Table nesting level
             0x49 => {
-                if let Some(itap) = sprm.operand_dword() {
-                    pap.table_nesting_level = itap as i32;
+                let depth = Self::required_i32(sprm, "sprmPItap")?;
+                if depth < 0 {
+                    return Err(DocError::Corrupted(
+                        "sprmPItap table depth must be non-negative".to_string(),
+                    ));
                 }
+                pap.table_nesting_level = depth;
             },
             // Operation 0x4A: sprmPDtap - Table nesting delta
             0x4A => {
-                if let Some(dtap) = sprm.operand_dword() {
-                    pap.table_nesting_level += dtap as i32;
+                let delta = Self::required_i32(sprm, "sprmPDtap")?;
+                let depth = pap.table_nesting_level.checked_add(delta).ok_or_else(|| {
+                    DocError::Corrupted("sprmPDtap table depth overflowed".to_string())
+                })?;
+                if depth < 0 {
+                    return Err(DocError::Corrupted(
+                        "sprmPDtap produced a negative table depth".to_string(),
+                    ));
                 }
+                pap.table_nesting_level = depth;
             },
             // Operation 0x4B: sprmPFInnerTableCell - Inner table cell
             0x4B => {
-                if let Some(val) = sprm.operand_byte() {
-                    pap.inner_table_cell = val != 0;
+                let value = Self::strict_bool8(sprm, "sprmPFInnerTableCell")?;
+                if value && pap.table_nesting_level <= 1 {
+                    return Err(DocError::Corrupted(
+                        "sprmPFInnerTableCell requires table depth greater than 1".to_string(),
+                    ));
                 }
+                pap.inner_table_cell = value;
             },
             // Operation 0x4C: sprmPFInnerTtp - Inner table row end
             0x4C => {
-                if let Some(val) = sprm.operand_byte() {
-                    pap.inner_table_row_end = val != 0;
+                let value = Self::strict_bool8(sprm, "sprmPFInnerTtp")?;
+                if value && pap.table_nesting_level <= 1 {
+                    return Err(DocError::Corrupted(
+                        "sprmPFInnerTtp requires table depth greater than 1".to_string(),
+                    ));
                 }
+                pap.inner_table_row_end = value;
             },
             // Operation 0x4D: sprmPShd - Shading (Word 2002+)
-            0x4D
-                // Parse ShadingDescriptor structure
-                if sprm.operand.len() >= 10 => {
-                    pap.shading = Self::parse_shading_descriptor(&sprm.operand);
-                },
+            0x4D => pap.shading = Self::parse_shading_descriptor(sprm)?,
             // Operation 0x67: sprmPRsid - Revision save ID
             0x67 => {
                 // Revision save ID - not commonly used
@@ -1186,6 +1170,14 @@ impl ParagraphProperties {
     fn required_i16(sprm: &Sprm, name: &str) -> Result<i16> {
         sprm.operand_i16()
             .ok_or_else(|| DocError::Corrupted(format!("{name} is missing its 16-bit operand")))
+    }
+
+    fn required_i32(sprm: &Sprm, name: &str) -> Result<i32> {
+        let bytes: [u8; 4] = sprm
+            .operand_bytes()
+            .try_into()
+            .map_err(|_| DocError::Corrupted(format!("{name} is missing its 32-bit operand")))?;
+        Ok(i32::from_le_bytes(bytes))
     }
 
     fn line_hundredths(sprm: &Sprm, name: &str) -> Result<i16> {
@@ -1452,89 +1444,65 @@ impl ParagraphProperties {
     }
 
     /// Parse shading from Shd80 (2 bytes).
-    fn parse_shd80(shd: u16) -> Option<Shading> {
-        // Simplified Shd80 parsing
+    fn parse_shd80(shd: u16) -> Result<Option<Shading>> {
+        if shd == u16::MAX {
+            return Ok(None);
+        }
         let ico_fore = (shd & 0x1F) as u8;
         let ico_back = ((shd >> 5) & 0x1F) as u8;
         let ipat = ((shd >> 10) & 0x3F) as u8;
-
-        if ipat == 0 {
-            return None;
+        let pattern = ShadingPattern::from_u8(ipat).ok_or_else(|| {
+            DocError::Corrupted(format!("sprmPShd80 has invalid pattern {ipat:#04x}"))
+        })?;
+        if pattern == ShadingPattern::Auto {
+            return Ok(None);
         }
-
-        let fg_color = Self::get_ico_color(ico_fore);
-        let bg_color = Self::get_ico_color(ico_back);
-
-        let pattern = match ipat {
-            0 => ShadingPattern::Clear,
-            1 => ShadingPattern::Solid,
-            2 => ShadingPattern::Percent5,
-            3 => ShadingPattern::Percent10,
-            4 => ShadingPattern::Percent20,
-            5 => ShadingPattern::Percent25,
-            6 => ShadingPattern::Percent30,
-            7 => ShadingPattern::Percent40,
-            8 => ShadingPattern::Percent50,
-            9 => ShadingPattern::Percent60,
-            10 => ShadingPattern::Percent70,
-            11 => ShadingPattern::Percent75,
-            12 => ShadingPattern::Percent80,
-            13 => ShadingPattern::Percent90,
-            _ => ShadingPattern::Clear,
+        let palette_color = |index| match index {
+            0 => Ok(None),
+            value @ 1..=16 => Ok(Some(Self::get_ico_color(value))),
+            invalid => Err(DocError::Corrupted(format!(
+                "sprmPShd80 has invalid color index {invalid}"
+            ))),
         };
-
-        Some(Shading {
-            foreground_color: fg_color,
-            background_color: bg_color,
+        Ok(Some(Shading {
+            foreground_color: palette_color(ico_fore)?,
+            background_color: palette_color(ico_back)?,
             pattern,
-        })
+        }))
     }
 
     /// Parse shading from ShadingDescriptor (10 bytes).
-    fn parse_shading_descriptor(data: &[u8]) -> Option<Shading> {
-        if data.len() < 10 {
-            return None;
+    fn parse_shading_descriptor(sprm: &Sprm) -> Result<Option<Shading>> {
+        let data = sprm.operand_bytes();
+        if data.len() != 10 {
+            return Err(DocError::Corrupted(
+                "sprmPShd SHDOperand must contain exactly 10 bytes".to_string(),
+            ));
         }
-
-        // ShadingDescriptor structure (simplified)
-        let cv_fore = read_u32_le(data, 0).ok()?;
-        let cv_back = read_u32_le(data, 4).ok()?;
-        let ipat = read_u16_le(data, 8).ok()?;
-
-        let fg_color = (
-            (cv_fore & 0xFF) as u8,
-            ((cv_fore >> 8) & 0xFF) as u8,
-            ((cv_fore >> 16) & 0xFF) as u8,
-        );
-        let bg_color = (
-            (cv_back & 0xFF) as u8,
-            ((cv_back >> 8) & 0xFF) as u8,
-            ((cv_back >> 16) & 0xFF) as u8,
-        );
-
-        let pattern = match ipat {
-            0 => ShadingPattern::Clear,
-            1 => ShadingPattern::Solid,
-            2 => ShadingPattern::Percent5,
-            3 => ShadingPattern::Percent10,
-            4 => ShadingPattern::Percent20,
-            5 => ShadingPattern::Percent25,
-            6 => ShadingPattern::Percent30,
-            7 => ShadingPattern::Percent40,
-            8 => ShadingPattern::Percent50,
-            9 => ShadingPattern::Percent60,
-            10 => ShadingPattern::Percent70,
-            11 => ShadingPattern::Percent75,
-            12 => ShadingPattern::Percent80,
-            13 => ShadingPattern::Percent90,
-            _ => ShadingPattern::Clear,
+        let pattern_code = read_u16_le(data, 8).map_err(|error| {
+            DocError::Corrupted(format!("sprmPShd has invalid pattern: {error}"))
+        })?;
+        let pattern = u8::try_from(pattern_code)
+            .ok()
+            .and_then(ShadingPattern::from_u8)
+            .ok_or_else(|| {
+                DocError::Corrupted(format!("sprmPShd has invalid pattern {pattern_code:#06x}"))
+            })?;
+        if pattern == ShadingPattern::Auto {
+            return Ok(None);
+        }
+        let colorref = |bytes: &[u8]| match bytes[3] {
+            0 => Ok(Some((bytes[0], bytes[1], bytes[2]))),
+            0xFF => Ok(None),
+            invalid => Err(DocError::Corrupted(format!(
+                "sprmPShd has invalid automatic-color flag {invalid:#04x}"
+            ))),
         };
-
-        Some(Shading {
-            foreground_color: fg_color,
-            background_color: bg_color,
+        Ok(Some(Shading {
+            foreground_color: colorref(&data[..4])?,
+            background_color: colorref(&data[4..8])?,
             pattern,
-        })
+        }))
     }
 
     /// Get color from ico index.
@@ -1581,11 +1549,14 @@ impl ParagraphProperties {
             || self.keep_with_next
             || self.page_break_before
             || self.widow_control
+            || self.use_page_setup_settings.is_some()
+            || self.adjust_right_indent.is_some()
             || self.no_allow_overlap
             || self.contextual_spacing
             || self.mirror_indents
             || self.text_box_tight_wrap.is_some()
             || self.borders != Borders::default()
+            || self.shading.is_some()
             || !self.tab_stops.is_empty()
     }
 
@@ -1905,6 +1876,77 @@ mod tests {
 
         for operand in [[8, 1, 17, 0], [8, 26, 1, 0]] {
             let invalid = [SPRM_P_BRC_TOP80.to_le_bytes().as_slice(), &operand].concat();
+            assert!(ParagraphProperties::from_sprm(&invalid).is_err());
+        }
+    }
+
+    #[test]
+    fn parses_current_grid_table_depth_and_shading_strictly() {
+        let mut grpprl = Vec::new();
+        for opcode in [SPRM_P_F_USE_PGSU_SETTINGS, SPRM_P_F_ADJUST_RIGHT] {
+            grpprl.extend_from_slice(&opcode.to_le_bytes());
+            grpprl.push(1);
+        }
+        grpprl.extend_from_slice(&SPRM_P_ITAP.to_le_bytes());
+        grpprl.extend_from_slice(&3i32.to_le_bytes());
+        grpprl.extend_from_slice(&SPRM_P_DTAP.to_le_bytes());
+        grpprl.extend_from_slice(&(-1i32).to_le_bytes());
+        for opcode in [SPRM_P_F_INNER_TABLE_CELL, SPRM_P_F_INNER_TTP] {
+            grpprl.extend_from_slice(&opcode.to_le_bytes());
+            grpprl.push(1);
+        }
+        grpprl.extend_from_slice(&SPRM_P_SHD.to_le_bytes());
+        grpprl.push(10);
+        grpprl.extend_from_slice(&[1, 2, 3, 0, 4, 5, 6, 0, 0x19, 0]);
+
+        let properties = ParagraphProperties::from_sprm(&grpprl).unwrap();
+        assert_eq!(properties.use_page_setup_settings, Some(true));
+        assert_eq!(properties.adjust_right_indent, Some(true));
+        assert_eq!(properties.table_nesting_level, 2);
+        assert!(properties.inner_table_cell);
+        assert!(properties.inner_table_row_end);
+        assert_eq!(
+            properties.shading,
+            Some(Shading {
+                foreground_color: Some((1, 2, 3)),
+                background_color: Some((4, 5, 6)),
+                pattern: ShadingPattern::DiagonalCross,
+            })
+        );
+
+        let invalid_i32 = |opcode: u16, value: i32| {
+            [
+                opcode.to_le_bytes().as_slice(),
+                value.to_le_bytes().as_slice(),
+            ]
+            .concat()
+        };
+        assert!(ParagraphProperties::from_sprm(&invalid_i32(SPRM_P_ITAP, -1)).is_err());
+        assert!(ParagraphProperties::from_sprm(&invalid_i32(SPRM_P_DTAP, -1)).is_err());
+        assert!(
+            ParagraphProperties::from_sprm(
+                &[SPRM_P_F_USE_PGSU_SETTINGS.to_le_bytes().as_slice(), &[2]].concat()
+            )
+            .is_err()
+        );
+
+        let inner_at_depth_one = [
+            SPRM_P_ITAP.to_le_bytes().as_slice(),
+            1i32.to_le_bytes().as_slice(),
+            SPRM_P_F_INNER_TABLE_CELL.to_le_bytes().as_slice(),
+            &[1],
+        ]
+        .concat();
+        assert!(ParagraphProperties::from_sprm(&inner_at_depth_one).is_err());
+
+        for operand in [
+            vec![1, 2, 3, 2, 4, 5, 6, 0, 1, 0],
+            vec![1, 2, 3, 0, 4, 5, 6, 0, 0x1A, 0],
+            vec![0; 9],
+        ] {
+            let mut invalid = SPRM_P_SHD.to_le_bytes().to_vec();
+            invalid.push(operand.len() as u8);
+            invalid.extend_from_slice(&operand);
             assert!(ParagraphProperties::from_sprm(&invalid).is_err());
         }
     }

@@ -61,7 +61,7 @@ pub mod numbering;
 // Re-export public types
 pub use crate::doc::parts::pap::{
     Border as ParagraphBorder, BorderStyle as ParagraphBorderStyle, Borders as ParagraphBorders,
-    TextBoxTightWrap,
+    Shading as ParagraphShading, TextBoxTightWrap,
 };
 pub use crate::doc::parts::tap::{
     CellBorderTypes, CellShading, CellSpacing, CellSpacingSource, ShadingPattern,
