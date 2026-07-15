@@ -72,6 +72,59 @@ pub(super) fn patch_soundtrack_wire(
     )
 }
 
+pub(super) fn soundtrack_media_payloads(data: &[u8]) -> Result<Vec<Vec<u8>>> {
+    repeated_length_delimited_payloads(data, MEDIA_FIELD)?
+        .into_iter()
+        .map(|payload| {
+            decode_media_reference_payload(payload)?;
+            Ok(payload.to_vec())
+        })
+        .collect()
+}
+
+pub(super) fn soundtrack_media_identifiers(data: &[u8]) -> Result<Vec<u64>> {
+    soundtrack_media_payloads(data)?
+        .into_iter()
+        .map(|payload| decode_media_reference_payload(&payload))
+        .collect()
+}
+
+pub(super) fn encoded_media_reference(data_identifier: u64) -> Result<Vec<u8>> {
+    if data_identifier == 0 {
+        return Err(Error::InvalidFormat(
+            "Keynote soundtrack data reference has identifier zero".to_owned(),
+        ));
+    }
+    Ok(tsp::DataReference {
+        identifier: data_identifier,
+    }
+    .encode_to_vec())
+}
+
+pub(super) fn rewrite_soundtrack_media(original: &[u8], payloads: &[Vec<u8>]) -> Result<Vec<u8>> {
+    for payload in payloads {
+        decode_media_reference_payload(payload)?;
+    }
+    let data = rewrite_repeated_length_delimited_fields(original, MEDIA_FIELD, payloads)?;
+    if soundtrack_media_payloads(&data)? != payloads {
+        return Err(Error::InvalidFormat(
+            "Keynote soundtrack media rewrite failed validation".to_owned(),
+        ));
+    }
+    Ok(data)
+}
+
+fn decode_media_reference_payload(payload: &[u8]) -> Result<u64> {
+    let reference = tsp::DataReference::decode(payload)?;
+    let _ = patch_varint_field(payload, 1, true, Some(reference.identifier))?;
+    if reference.identifier == 0 {
+        return Err(Error::InvalidFormat(
+            "Keynote soundtrack data reference has identifier zero".to_owned(),
+        ));
+    }
+    Ok(reference.identifier)
+}
+
 pub(super) fn replace_soundtrack_message(
     archive: &mut Archive,
     soundtrack_id: u64,
@@ -97,6 +150,27 @@ pub(super) fn replace_soundtrack_message(
             "Keynote soundtrack object {soundtrack_id} repeats its Soundtrack payload"
         )));
     }
+    let old_identifiers = soundtrack_media_identifiers(&object.messages[message_index].data)?;
+    let new_identifiers = soundtrack_media_identifiers(&data)?;
+    let info = &mut object.archive_info.message_infos[message_index];
+    if info.data_references != old_identifiers {
+        return Err(Error::InvalidFormat(format!(
+            "Keynote soundtrack MessageInfo data references {:?} do not match payload references {old_identifiers:?}",
+            info.data_references
+        )));
+    }
+    for field_info in &mut info.field_infos {
+        if field_info.r#type != Some(tsp::field_info::Type::DataReference as i32) {
+            continue;
+        }
+        if field_info.path.path != [MEDIA_FIELD] || field_info.data_references != old_identifiers {
+            return Err(Error::InvalidFormat(
+                "Keynote soundtrack has unsupported field-level data-reference metadata".to_owned(),
+            ));
+        }
+        field_info.data_references.clone_from(&new_identifiers);
+    }
+    info.data_references.clone_from(&new_identifiers);
     object.replace_message(
         message_index,
         RawMessage {

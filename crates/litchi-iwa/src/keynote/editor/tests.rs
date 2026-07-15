@@ -3078,6 +3078,123 @@ fn soundtrack_settings_handle_absent_and_malformed_objects_transactionally() {
 }
 
 #[test]
+fn soundtrack_item_crud_is_ordered_transactional_and_wire_exact() {
+    const FIRST: &[u8] = b"FORM\0\0\0\x04AIFFfirst";
+    const SECOND: &[u8] = b"FORM\0\0\0\x05AIFFsecond";
+    const REPLACEMENT: &[u8] = b"FORM\0\0\0\x06AIFCreplacement";
+
+    let mut editor = KeynoteEditor::from_package(test_package_with_empty_soundtrack()).unwrap();
+    let baseline = editor.to_bytes().unwrap();
+    assert!(editor.soundtrack_items().unwrap().is_empty());
+
+    let first = editor.add_soundtrack_item("first.aiff", FIRST).unwrap();
+    assert_eq!(first.index, 0);
+    assert_eq!(first.asset.media_type, crate::MediaType::Audio);
+    let second = editor
+        .insert_soundtrack_item(0, "second.aiff", SECOND)
+        .unwrap();
+    let items = editor.soundtrack_items().unwrap();
+    assert_eq!(second.index, 0);
+    assert_eq!(items.len(), 2);
+    assert_eq!(items[0].asset.preferred_filename, "second.aiff");
+    assert_eq!(items[1].asset.preferred_filename, "first.aiff");
+    assert_eq!(items[0].asset.component_reference_count, 1);
+    assert_eq!(items[0].asset.message_reference_count, 1);
+
+    editor.move_soundtrack_item(0, 1).unwrap();
+    let moved = editor.soundtrack_items().unwrap();
+    assert_eq!(moved[0].asset.data_identifier, first.asset.data_identifier);
+    assert_eq!(moved[1].asset.data_identifier, second.asset.data_identifier);
+    editor.move_soundtrack_item(1, 0).unwrap();
+    assert_eq!(editor.soundtrack_items().unwrap(), items);
+
+    let replaced = editor
+        .replace_soundtrack_item(1, "replacement.aif", REPLACEMENT)
+        .unwrap();
+    assert_eq!(replaced.index, 1);
+    assert_eq!(replaced.asset.preferred_filename, "replacement.aif");
+    assert!(
+        IWorkMediaEditor::from_package(editor.package().clone())
+            .unwrap()
+            .asset(first.asset.data_identifier)
+            .is_none()
+    );
+
+    let before_invalid = editor.to_bytes().unwrap();
+    assert!(editor.add_soundtrack_item("not-audio.png", FIRST).is_err());
+    assert!(
+        editor
+            .insert_soundtrack_item(3, "bad.aiff", SECOND)
+            .is_err()
+    );
+    assert!(editor.move_soundtrack_item(0, 2).is_err());
+    assert_eq!(editor.to_bytes().unwrap(), before_invalid);
+
+    editor.remove_soundtrack_item(1).unwrap();
+    editor.remove_soundtrack_item(0).unwrap();
+    assert!(editor.soundtrack_items().unwrap().is_empty());
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+}
+
+#[test]
+fn soundtrack_item_replacement_isolated_from_duplicate_references() {
+    const ORIGINAL: &[u8] = b"FORM\0\0\0\x04AIFForiginal";
+    const REPLACEMENT: &[u8] = b"FORM\0\0\0\x04AIFFreplacement";
+
+    let mut editor = KeynoteEditor::from_package(test_package_with_empty_soundtrack()).unwrap();
+    let original = editor
+        .add_soundtrack_item("original.aiff", ORIGINAL)
+        .unwrap();
+    let mut package = editor.into_package();
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            let object = archive.object(TEST_SOUNDTRACK_ID).unwrap();
+            let mut payloads =
+                soundtrack_wire::soundtrack_media_payloads(object.messages[0].data.as_slice())?;
+            payloads.push(payloads[0].clone());
+            let data = soundtrack_wire::rewrite_soundtrack_media(
+                object.messages[0].data.as_slice(),
+                &payloads,
+            )?;
+            soundtrack_wire::replace_soundtrack_message(archive, TEST_SOUNDTRACK_ID, data)
+        })
+        .unwrap();
+    crate::data_reference_registry::add_component_data_reference(
+        &mut package,
+        1,
+        original.asset.data_identifier,
+        TEST_SOUNDTRACK_ID,
+    )
+    .unwrap();
+
+    let mut editor = KeynoteEditor::from_package(package).unwrap();
+    let duplicated = editor.soundtrack_items().unwrap();
+    assert_eq!(duplicated.len(), 2);
+    assert_eq!(duplicated[0].asset.component_reference_count, 2);
+    assert_eq!(duplicated[0].asset.message_reference_count, 2);
+
+    let replacement = editor
+        .replace_soundtrack_item(0, "replacement.aiff", REPLACEMENT)
+        .unwrap();
+    let items = editor.soundtrack_items().unwrap();
+    assert_eq!(items[0], replacement);
+    assert_eq!(
+        items[1].asset.data_identifier,
+        original.asset.data_identifier
+    );
+    assert_eq!(items[1].asset.component_reference_count, 1);
+    assert_eq!(items[1].asset.message_reference_count, 1);
+
+    editor.remove_soundtrack_item(1).unwrap();
+    assert!(
+        IWorkMediaEditor::from_package(editor.package().clone())
+            .unwrap()
+            .asset(original.asset.data_identifier)
+            .is_none()
+    );
+}
+
+#[test]
 fn slide_number_visibility_matches_native_ownership_and_round_trips_exactly() {
     let mut editor = KeynoteEditor::from_package(test_package_with_slide_number()).unwrap();
     assert_eq!(
@@ -4731,6 +4848,52 @@ fn test_package_with_soundtrack() -> IWorkPackage {
                 .extend(TEST_SOUNDTRACK_MEDIA_IDS);
             archive.insert_object(soundtrack)
         })
+        .unwrap();
+    package
+}
+
+fn test_package_with_empty_soundtrack() -> IWorkPackage {
+    let mut package = test_package_with_soundtrack();
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            let soundtrack = archive.object_mut(TEST_SOUNDTRACK_ID).unwrap();
+            soundtrack.archive_info.message_infos[0]
+                .data_references
+                .clear();
+            soundtrack.replace_message(
+                0,
+                RawMessage {
+                    type_: TEST_SOUNDTRACK_MESSAGE_TYPE,
+                    data: kn::Soundtrack {
+                        volume: Some(1.0),
+                        mode: Some(TEST_SOUNDTRACK_PLAY_ONCE_MODE),
+                        movie_media: Vec::new(),
+                    }
+                    .encode_to_vec(),
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    package
+        .replace_archive(
+            PACKAGE_METADATA_ENTRY,
+            &Archive {
+                objects: vec![object(
+                    100,
+                    PACKAGE_METADATA_MESSAGE_TYPE,
+                    PackageMetadata {
+                        last_object_identifier: 100,
+                        components: vec![ComponentInfo {
+                            identifier: 1,
+                            preferred_locator: "Document".to_owned(),
+                            ..Default::default()
+                        }],
+                        ..Default::default()
+                    },
+                )],
+            },
+        )
         .unwrap();
     package
 }

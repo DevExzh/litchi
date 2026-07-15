@@ -146,6 +146,7 @@ pub mod zip_utils;
 /// Shared text extraction utilities
 pub mod text;
 
+mod data_reference_registry;
 /// High-level iWork document types
 pub mod document;
 

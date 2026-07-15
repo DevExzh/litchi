@@ -10,8 +10,11 @@ use litchi_iwa::protobuf::kn::{
     BuildArchive, BuildChunkArchive, DocumentArchive, PlaceholderArchive, ShowArchive,
     SlideArchive, SlideNodeArchive, Soundtrack,
 };
+use litchi_iwa::protobuf::tsp::PackageMetadata;
 use litchi_iwa::protobuf::tswp::{ShapeInfoArchive, StorageArchive};
 use prost::Message;
+
+const PACKAGE_METADATA_MESSAGE_TYPE: u32 = 11_006;
 
 #[allow(deprecated)]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -27,6 +30,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
     println!("soundtrack settings: {:?}", editor.soundtrack_settings()?);
+    println!("soundtrack items: {:?}", editor.soundtrack_items()?);
+    let media_assets = editor.media_assets()?;
     let package = IWorkPackage::open(path)?;
     let mut objects: HashMap<u64, (String, ArchiveObject)> = HashMap::new();
     for name in package.entry_names().filter(|name| name.ends_with(".iwa")) {
@@ -74,6 +79,47 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "soundtrack {} archive={} info={:?}: {soundtrack:?}",
             reference.identifier, archive_name, object.archive_info.message_infos
         );
+        for media in &soundtrack.movie_media {
+            println!(
+                " soundtrack media {}: {:?}",
+                media.identifier,
+                media_assets
+                    .iter()
+                    .find(|asset| asset.data_identifier == media.identifier)
+            );
+        }
+        let metadata = objects
+            .values()
+            .find_map(|(_, object)| {
+                object
+                    .messages
+                    .iter()
+                    .find(|message| message.type_ == PACKAGE_METADATA_MESSAGE_TYPE)
+            })
+            .map(|message| PackageMetadata::decode(message.data.as_slice()))
+            .transpose()?
+            .ok_or("package metadata payload is missing")?;
+        for component in metadata
+            .components
+            .iter()
+            .chain(&metadata.versioned_components)
+            .filter(|component| {
+                component.data_references.iter().any(|data| {
+                    soundtrack
+                        .movie_media
+                        .iter()
+                        .any(|media| media.identifier == data.data_identifier)
+                })
+            })
+        {
+            println!(
+                " soundtrack component {} locator={:?}/{:?} data={:?}",
+                component.identifier,
+                component.preferred_locator,
+                component.locator,
+                component.data_references
+            );
+        }
     }
     for reference in show.slide_tree.slides {
         let (name, object) = objects
