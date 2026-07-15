@@ -1,6 +1,6 @@
 //! Cell representation for XLS files
 
-use crate::xls::formula::render_formula;
+use crate::xls::formula::{FormulaContext, render_formula};
 use crate::xls::records::{BoolErrValue, CellRecord, FormulaValue};
 use crate::xls::utils;
 use litchi_core::sheet::{Cell, CellValue};
@@ -43,6 +43,14 @@ impl XlsCell {
 
     /// Create cell from BIFF record
     pub fn from_record(record: &CellRecord, sst: Option<&[String]>) -> Option<Self> {
+        Self::from_record_with_formula_context(record, sst, None)
+    }
+
+    pub(crate) fn from_record_with_formula_context(
+        record: &CellRecord,
+        sst: Option<&[String]>,
+        formula_context: Option<&FormulaContext>,
+    ) -> Option<Self> {
         let shared_string_index = match record {
             CellRecord::LabelSst { sst_index, .. } => Some(*sst_index),
             _ => None,
@@ -124,7 +132,7 @@ impl XlsCell {
                     FormulaValue::Empty => CellValue::Empty,
                 };
 
-                let formula_text = render_formula(formula);
+                let formula_text = render_formula(formula, formula_context);
                 (
                     *row as u32,
                     *col as u32,
@@ -213,6 +221,7 @@ impl Cell for &XlsCell {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::xls::formula::FormulaContext;
     use crate::xls::records::{BoolErrValue, CellRecord, FormulaValue};
 
     #[test]
@@ -468,6 +477,26 @@ mod tests {
         assert!(cell.is_formula());
         assert_eq!(cell.formula(), None);
         assert_eq!(cell.formula_bytes(), Some(formula.as_slice()));
+    }
+
+    #[test]
+    fn test_formula_uses_internal_sheet_context() {
+        let mut context = FormulaContext::default();
+        context.add_sup_book(&[1, 0, 0x01, 0x04]);
+        context.add_extern_sheet(&[1, 0, 0, 0, 0, 0, 0, 0]).unwrap();
+        context.set_sheet_names(vec!["Data 2026".to_string()]);
+        let formula = vec![0x5a, 0, 0, 4, 0, 2, 0xc0];
+        let record = CellRecord::Formula {
+            row: 0,
+            col: 0,
+            xf_index: 0,
+            value: FormulaValue::Number(42.0),
+            formula,
+        };
+
+        let cell =
+            XlsCell::from_record_with_formula_context(&record, None, Some(&context)).unwrap();
+        assert_eq!(cell.formula(), Some("='Data 2026'!C5"));
     }
 
     #[test]

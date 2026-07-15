@@ -2,6 +2,7 @@
 
 use crate::xls::cell::XlsCell;
 use crate::xls::error::{XlsError, XlsResult};
+use crate::xls::formula::FormulaContext;
 use crate::xls::pivot_table::PivotTable;
 use crate::xls::records::{
     BiffVersion, BofRecord, BoundSheetRecord, CellRecord, DimensionsRecord, FormulaValue,
@@ -27,6 +28,7 @@ pub struct XlsWorkbook<R: Read + Seek> {
     shared_string_reference_count: u32,
     biff_version: BiffVersion,
     is_1904_date_system: bool,
+    formula_context: FormulaContext,
 }
 
 impl<R: Read + Seek> XlsWorkbook<R> {
@@ -43,6 +45,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             shared_string_reference_count: 0,
             biff_version: BiffVersion::Biff8,
             is_1904_date_system: false,
+            formula_context: FormulaContext::default(),
         };
 
         workbook.parse_workbook()?;
@@ -67,6 +70,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             shared_string_reference_count: 0,
             biff_version: BiffVersion::Biff8,
             is_1904_date_system: false,
+            formula_context: FormulaContext::default(),
         };
 
         workbook.parse_workbook()?;
@@ -100,6 +104,8 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         self.shared_strings = Some(Arc::new(strings));
         self.shared_string_properties = Some(Arc::new(string_properties));
         self.worksheet_names = bound_sheets.iter().map(|s| s.name.clone()).collect();
+        self.formula_context
+            .set_sheet_names(self.worksheet_names.clone());
 
         // Parse worksheets from positions in the workbook stream
         for bound_sheet in &bound_sheets {
@@ -158,6 +164,20 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                     // BoundSheet8
                     let sheet = BoundSheetRecord::parse(&record.data, encoding)?;
                     bound_sheets.push(sheet);
+                },
+                0x01AE => {
+                    // SUPBOOK: retain its position and whether it references
+                    // this workbook so EXTERNSHEET indices remain stable.
+                    self.formula_context.add_sup_book(&record.data);
+                },
+                0x0017 => {
+                    // EXTERNSHEET: XTI entries used by PtgRef3d/PtgArea3d.
+                    self.formula_context
+                        .add_extern_sheet(&record.data)
+                        .map_err(|message| XlsError::InvalidRecord {
+                            record_type: 0x0017,
+                            message: message.to_string(),
+                        })?;
                 },
                 0x00FC => {
                     // SST
@@ -222,7 +242,13 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             .shared_strings
             .clone()
             .unwrap_or_else(|| Arc::new(Vec::new()));
-        Self::parse_worksheet_records(record_iter, encoding, &bound_sheet.name, shared_strings)
+        Self::parse_worksheet_records(
+            record_iter,
+            encoding,
+            &bound_sheet.name,
+            shared_strings,
+            Some(&self.formula_context),
+        )
     }
 
     /// Parse worksheet records sequentially
@@ -231,6 +257,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         encoding: &XlsEncoding,
         name: &str,
         shared_strings: Arc<Vec<String>>,
+        formula_context: Option<&FormulaContext>,
     ) -> XlsResult<XlsWorksheet> {
         let mut worksheet = XlsWorksheet::with_shared_strings(name.to_string(), shared_strings);
 
@@ -257,7 +284,11 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                 if let CellRecord::Formula { value, .. } = &mut formula {
                     *value = FormulaValue::String(text);
                 }
-                if let Some(cell) = XlsCell::from_record(&formula, worksheet.shared_strings()) {
+                if let Some(cell) = XlsCell::from_record_with_formula_context(
+                    &formula,
+                    worksheet.shared_strings(),
+                    formula_context,
+                ) {
                     worksheet.add_cell(cell);
                 }
                 continue;
@@ -298,9 +329,10 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                         }
                     ) {
                         pending_string_formula = Some(cell_record);
-                    } else if let Some(cell) = XlsCell::from_record(
+                    } else if let Some(cell) = XlsCell::from_record_with_formula_context(
                         &cell_record,
                         worksheet.shared_strings(),
+                        formula_context,
                     ) {
                         worksheet.add_cell(cell);
                     }
@@ -308,9 +340,10 @@ impl<R: Read + Seek> XlsWorkbook<R> {
 
                 0x00BD => { // MulRk
                     for cell_record in CellRecord::parse_mul_rk(&record.data)? {
-                        if let Some(cell) = XlsCell::from_record(
+                        if let Some(cell) = XlsCell::from_record_with_formula_context(
                             &cell_record,
                             worksheet.shared_strings(),
+                            formula_context,
                         ) {
                             worksheet.add_cell(cell);
                         }
@@ -319,9 +352,10 @@ impl<R: Read + Seek> XlsWorkbook<R> {
 
                 0x00BE => { // MulBlank
                     for cell_record in CellRecord::parse_mul_blank(&record.data)? {
-                        if let Some(cell) = XlsCell::from_record(
+                        if let Some(cell) = XlsCell::from_record_with_formula_context(
                             &cell_record,
                             worksheet.shared_strings(),
+                            formula_context,
                         ) {
                             worksheet.add_cell(cell);
                         }
@@ -633,6 +667,7 @@ mod tests {
             &XlsEncoding::Utf16Le,
             "Sheet1",
             Arc::new(Vec::new()),
+            None,
         )
         .unwrap();
 
@@ -668,6 +703,7 @@ mod tests {
             &XlsEncoding::Utf16Le,
             "Sheet1",
             Arc::new(Vec::new()),
+            None,
         )
         .unwrap();
         let cell = worksheet.get_cell(4, 5).unwrap();
@@ -691,6 +727,7 @@ mod tests {
             &XlsEncoding::Utf16Le,
             "Sheet1",
             Arc::new(Vec::new()),
+            None,
         );
 
         assert!(result.is_err());

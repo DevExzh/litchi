@@ -5,9 +5,91 @@
 //! workbook-global tables.  Callers retain the original bytes when rendering
 //! returns `None`, so unsupported names and 3-D references remain lossless.
 
-/// Render a context-free BIFF8 formula token stream in A1 notation.
-pub(crate) fn render_formula(tokens: &[u8]) -> Option<String> {
-    let mut decoder = FormulaDecoder::new(tokens);
+/// Workbook-global context needed to resolve BIFF `ixti` sheet references.
+#[derive(Debug, Default)]
+pub(crate) struct FormulaContext {
+    sup_books: Vec<SupBookKind>,
+    extern_sheets: Vec<ExternSheetRef>,
+    sheet_names: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SupBookKind {
+    Internal,
+    Other,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ExternSheetRef {
+    sup_book: u16,
+    first_sheet: i16,
+    last_sheet: i16,
+}
+
+impl FormulaContext {
+    pub(crate) fn add_sup_book(&mut self, data: &[u8]) {
+        let kind = if data.len() == 4 && data[2..4] == [0x01, 0x04] {
+            SupBookKind::Internal
+        } else {
+            SupBookKind::Other
+        };
+        self.sup_books.push(kind);
+    }
+
+    pub(crate) fn add_extern_sheet(&mut self, data: &[u8]) -> Result<(), &'static str> {
+        let count_bytes = data.get(..2).ok_or("EXTERNSHEET is missing cXTI")?;
+        let count = usize::from(u16::from_le_bytes([count_bytes[0], count_bytes[1]]));
+        let expected = count
+            .checked_mul(6)
+            .and_then(|size| size.checked_add(2))
+            .ok_or("EXTERNSHEET count overflows")?;
+        if data.len() != expected {
+            return Err("EXTERNSHEET length does not match cXTI");
+        }
+
+        for entry in data[2..].chunks_exact(6) {
+            self.extern_sheets.push(ExternSheetRef {
+                sup_book: u16::from_le_bytes([entry[0], entry[1]]),
+                first_sheet: i16::from_le_bytes([entry[2], entry[3]]),
+                last_sheet: i16::from_le_bytes([entry[4], entry[5]]),
+            });
+        }
+        Ok(())
+    }
+
+    pub(crate) fn set_sheet_names(&mut self, sheet_names: Vec<String>) {
+        self.sheet_names = sheet_names;
+    }
+
+    fn sheet_prefix(&self, extern_sheet: u16) -> Option<String> {
+        let reference = self.extern_sheets.get(usize::from(extern_sheet))?;
+        if self.sup_books.get(usize::from(reference.sup_book))? != &SupBookKind::Internal {
+            return None;
+        }
+        let first = usize::try_from(reference.first_sheet).ok()?;
+        let last = usize::try_from(reference.last_sheet).ok()?;
+        let first_name = self.sheet_names.get(first)?;
+        let last_name = self.sheet_names.get(last)?;
+        let name = if first == last {
+            escape_sheet_name(first_name)
+        } else {
+            format!(
+                "{}:{}",
+                escape_sheet_name(first_name),
+                escape_sheet_name(last_name)
+            )
+        };
+        Some(format!("'{name}'!"))
+    }
+}
+
+fn escape_sheet_name(name: &str) -> String {
+    name.replace('\'', "''")
+}
+
+/// Render a BIFF8 formula token stream in A1 notation.
+pub(crate) fn render_formula(tokens: &[u8], context: Option<&FormulaContext>) -> Option<String> {
+    let mut decoder = FormulaDecoder::new(tokens, context);
     decoder.decode().ok().map(|formula| format!("={formula}"))
 }
 
@@ -15,14 +97,16 @@ struct FormulaDecoder<'a> {
     data: &'a [u8],
     pos: usize,
     stack: Vec<String>,
+    context: Option<&'a FormulaContext>,
 }
 
 impl<'a> FormulaDecoder<'a> {
-    fn new(data: &'a [u8]) -> Self {
+    fn new(data: &'a [u8], context: Option<&'a FormulaContext>) -> Self {
         Self {
             data,
             pos: 0,
             stack: Vec::new(),
+            context,
         }
     }
 
@@ -159,6 +243,33 @@ impl<'a> FormulaDecoder<'a> {
             // an expression operand.
             0x26 | 0x27 => self.skip(6),
             0x29 => self.skip(2),
+            0x3a => {
+                let extern_sheet = self.u16()?;
+                let row = self.u16()?;
+                let col = self.u16()?;
+                let prefix = self
+                    .context
+                    .and_then(|context| context.sheet_prefix(extern_sheet))
+                    .ok_or(())?;
+                let reference = cell_reference(row, col)?;
+                self.stack.push(format!("{prefix}{reference}"));
+                Ok(())
+            },
+            0x3b => {
+                let extern_sheet = self.u16()?;
+                let first_row = self.u16()?;
+                let last_row = self.u16()?;
+                let first_col = self.u16()?;
+                let last_col = self.u16()?;
+                let prefix = self
+                    .context
+                    .and_then(|context| context.sheet_prefix(extern_sheet))
+                    .ok_or(())?;
+                let first = cell_reference(first_row, first_col)?;
+                let last = cell_reference(last_row, last_col)?;
+                self.stack.push(format!("{prefix}{first}:{last}"));
+                Ok(())
+            },
             _ => Err(()),
         }
     }
@@ -316,7 +427,7 @@ fn function_metadata(index: u16) -> Option<(&'static str, Option<usize>)> {
 
 #[cfg(test)]
 mod tests {
-    use super::render_formula;
+    use super::{FormulaContext, render_formula};
 
     #[test]
     fn renders_constants_operators_and_references() {
@@ -327,7 +438,10 @@ mod tests {
             0x05, // multiply
             0x03, // add
         ];
-        assert_eq!(render_formula(&tokens).as_deref(), Some("=(A1+(B1*2))"));
+        assert_eq!(
+            render_formula(&tokens, None).as_deref(),
+            Some("=(A1+(B1*2))")
+        );
     }
 
     #[test]
@@ -336,7 +450,10 @@ mod tests {
             0x25, 0x00, 0x00, 0x09, 0x00, 0x00, 0x00, 0x02, 0x00, // $A$1:$C$10
             0x19, 0x10, 0x00, 0x00,
         ];
-        assert_eq!(render_formula(&tokens).as_deref(), Some("=SUM($A$1:$C$10)"));
+        assert_eq!(
+            render_formula(&tokens, None).as_deref(),
+            Some("=SUM($A$1:$C$10)")
+        );
     }
 
     #[test]
@@ -347,15 +464,56 @@ mod tests {
             0x42, 0x02, 0x50, 0x01, // CONCATENATE, two arguments
         ];
         assert_eq!(
-            render_formula(&tokens).as_deref(),
+            render_formula(&tokens, None).as_deref(),
             Some("=CONCATENATE(\"你好\",2)")
         );
     }
 
     #[test]
     fn rejects_workbook_dependent_and_malformed_tokens() {
-        assert_eq!(render_formula(&[0x3a, 0, 0, 0, 0, 0, 0]), None);
-        assert_eq!(render_formula(&[0x1f, 0, 0]), None);
-        assert_eq!(render_formula(&[0x1e, 1, 0, 0x1e, 2, 0]), None);
+        assert_eq!(render_formula(&[0x3a, 0, 0, 0, 0, 0, 0], None), None);
+        assert_eq!(render_formula(&[0x1f, 0, 0], None), None);
+        assert_eq!(render_formula(&[0x1e, 1, 0, 0x1e, 2, 0], None), None);
+    }
+
+    #[test]
+    fn renders_internal_3d_references_from_workbook_context() {
+        let mut context = FormulaContext::default();
+        context.add_sup_book(&[2, 0, 0x01, 0x04]);
+        context
+            .add_extern_sheet(&[
+                2, 0, // cXTI
+                0, 0, 0, 0, 0, 0, // Sheet One
+                0, 0, 0, 0, 1, 0, // Sheet One:O'Brien
+            ])
+            .unwrap();
+        context.set_sheet_names(vec!["Sheet One".to_string(), "O'Brien".to_string()]);
+
+        let reference = [0x5a, 0, 0, 2, 0, 1, 0xc0];
+        assert_eq!(
+            render_formula(&reference, Some(&context)).as_deref(),
+            Some("='Sheet One'!B3")
+        );
+
+        let area = [
+            0x3b, 1, 0, 0, 0, 2, 0, 0, 0, 1, 0, // $A$1:$B$3
+        ];
+        assert_eq!(
+            render_formula(&area, Some(&context)).as_deref(),
+            Some("='Sheet One:O''Brien'!$A$1:$B$3")
+        );
+    }
+
+    #[test]
+    fn rejects_external_or_malformed_sheet_context() {
+        let mut context = FormulaContext::default();
+        context.add_sup_book(&[1, 0, 1, 0, 0]);
+        context.add_extern_sheet(&[1, 0, 0, 0, 0, 0, 0, 0]).unwrap();
+        context.set_sheet_names(vec!["Sheet1".to_string()]);
+        assert_eq!(
+            render_formula(&[0x3a, 0, 0, 0, 0, 0, 0], Some(&context)),
+            None
+        );
+        assert!(context.add_extern_sheet(&[2, 0, 0, 0]).is_err());
     }
 }
