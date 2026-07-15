@@ -5,7 +5,9 @@
 //! Based on Microsoft's "[MS-DOC]" specification and Apache POI's TableProperties.
 
 use super::sprm::SprmBuilder;
-use crate::doc::parts::tap::{TextDirection, VerticalAlignment, VerticalMergeStatus};
+use crate::doc::parts::tap::{
+    BorderStyle, BorderType, CellBorders, TextDirection, VerticalAlignment, VerticalMergeStatus,
+};
 
 /// Error returned when table row properties cannot be represented in DOC TAP.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -18,6 +20,10 @@ pub enum TapBuildError {
     CellWidthsOverflow,
     /// A merge continuation cannot occur in the first cell.
     MergeWithoutPrecedingCell,
+    /// Brc80 supports only the legacy 16-color palette.
+    UnsupportedBorderColor((u8, u8, u8)),
+    /// Brc80 spacing is a five-bit value.
+    InvalidBorderSpacing(u8),
 }
 
 impl std::fmt::Display for TapBuildError {
@@ -38,6 +44,12 @@ impl std::fmt::Display for TapBuildError {
             },
             Self::MergeWithoutPrecedingCell => {
                 write!(f, "the first DOC table cell cannot be a merge continuation")
+            },
+            Self::UnsupportedBorderColor(color) => {
+                write!(f, "DOC Brc80 cannot represent RGB color {color:?}")
+            },
+            Self::InvalidBorderSpacing(spacing) => {
+                write!(f, "DOC Brc80 spacing {spacing} exceeds 31 points")
             },
         }
     }
@@ -65,6 +77,8 @@ pub struct TableCell {
     pub no_wrap: bool,
     /// Hide the cell mark when every cell in the row is empty
     pub hide_mark: bool,
+    /// Cell edge borders
+    pub borders: CellBorders,
 }
 
 /// Table row properties
@@ -227,7 +241,10 @@ pub(crate) fn generate_row_sprms(row: &TableRow) -> Result<Vec<u8>, TapBuildErro
         }
         operand.extend_from_slice(&flags.to_le_bytes());
         operand.extend_from_slice(&width.to_le_bytes());
-        operand.extend_from_slice(&[0; 16]); // Four default Brc80MayBeNil values.
+        operand.extend_from_slice(&encode_border(row.cells[index].borders.top)?);
+        operand.extend_from_slice(&encode_border(row.cells[index].borders.left)?);
+        operand.extend_from_slice(&encode_border(row.cells[index].borders.bottom)?);
+        operand.extend_from_slice(&encode_border(row.cells[index].borders.right)?);
     }
 
     let encoded_size =
@@ -236,6 +253,68 @@ pub(crate) fn generate_row_sprms(row: &TableRow) -> Result<Vec<u8>, TapBuildErro
     sprms.extend_from_slice(&encoded_size.to_le_bytes());
     sprms.extend_from_slice(&operand);
     Ok(sprms)
+}
+
+fn encode_border(border: Option<BorderStyle>) -> Result<[u8; 4], TapBuildError> {
+    let Some(border) = border else {
+        return Ok([0; 4]);
+    };
+    if border.border_type == BorderType::None {
+        return Ok([0; 4]);
+    }
+    if border.spacing > 31 {
+        return Err(TapBuildError::InvalidBorderSpacing(border.spacing));
+    }
+    let border_type = match border.border_type {
+        BorderType::None => 0,
+        BorderType::Single => 1,
+        BorderType::Thick => 5,
+        BorderType::Double => 3,
+        BorderType::Dotted => 6,
+        BorderType::Dashed => 7,
+        BorderType::DotDash => 8,
+        BorderType::DotDotDash => 9,
+        BorderType::Triple => 10,
+        BorderType::ThinThickSmall => 11,
+        BorderType::ThickThinSmall => 12,
+        BorderType::ThinThickThinSmall => 13,
+        BorderType::ThinThickMedium => 14,
+        BorderType::ThickThinMedium => 15,
+        BorderType::ThinThickThinMedium => 16,
+        BorderType::ThinThickLarge => 17,
+        BorderType::ThickThinLarge => 18,
+        BorderType::ThinThickThinLarge => 19,
+        BorderType::Wave => 20,
+        BorderType::DoubleWave => 21,
+        BorderType::DashSmall => 22,
+        BorderType::DashDotStroked => 23,
+        BorderType::Emboss => 24,
+        BorderType::Engrave => 25,
+        BorderType::Outset => 26,
+        BorderType::Inset => 27,
+    };
+    let ico = match border.color {
+        None => 0,
+        Some((0, 0, 0)) => 1,
+        Some((0, 0, 255)) => 2,
+        Some((0, 255, 255)) => 3,
+        Some((0, 255, 0)) => 4,
+        Some((255, 0, 255)) => 5,
+        Some((255, 0, 0)) => 6,
+        Some((255, 255, 0)) => 7,
+        Some((255, 255, 255)) => 8,
+        Some((0, 0, 128)) => 9,
+        Some((0, 128, 128)) => 10,
+        Some((0, 128, 0)) => 11,
+        Some((128, 0, 128)) => 12,
+        Some((128, 0, 0)) => 13,
+        Some((128, 128, 0)) => 14,
+        Some((128, 128, 128)) => 15,
+        Some((192, 192, 192)) => 16,
+        Some(color) => return Err(TapBuildError::UnsupportedBorderColor(color)),
+    };
+    let effects = border.spacing | (u8::from(border.shadow) << 5) | (u8::from(border.frame) << 6);
+    Ok([border.width, border_type, ico, effects])
 }
 
 impl Default for TapBuilder {
@@ -286,6 +365,17 @@ mod tests {
                     fit_text: true,
                     no_wrap: true,
                     hide_mark: true,
+                    borders: CellBorders {
+                        top: Some(BorderStyle {
+                            width: 8,
+                            color: Some((255, 0, 0)),
+                            border_type: BorderType::Single,
+                            spacing: 2,
+                            shadow: true,
+                            frame: false,
+                        }),
+                        ..CellBorders::default()
+                    },
                 },
                 TableCell {
                     width: 1000,
@@ -316,6 +406,10 @@ mod tests {
         assert!(tap.cell_properties[0].fit_text);
         assert!(tap.cell_properties[0].no_wrap);
         assert!(tap.cell_properties[0].hide_mark);
+        let border = tap.cell_properties[0].borders.top.unwrap();
+        assert_eq!(border.color, Some((255, 0, 0)));
+        assert_eq!(border.spacing, 2);
+        assert!(border.shadow);
         assert_eq!(
             tap.cell_properties[0].preferred_width.unwrap().width_type,
             crate::doc::parts::tap::WidthType::Twips
@@ -423,6 +517,30 @@ mod tests {
         assert_eq!(
             builder.try_generate_row_sprms(0),
             Err(TapBuildError::CellWidthsOverflow)
+        );
+
+        let mut builder = TapBuilder::new();
+        builder.add_row(TableRow {
+            cells: vec![TableCell {
+                width: 1000,
+                borders: CellBorders {
+                    top: Some(BorderStyle {
+                        width: 8,
+                        color: Some((1, 2, 3)),
+                        border_type: BorderType::Single,
+                        spacing: 0,
+                        shadow: false,
+                        frame: false,
+                    }),
+                    ..CellBorders::default()
+                },
+                ..TableCell::default()
+            }],
+            ..TableRow::default()
+        });
+        assert_eq!(
+            builder.try_generate_row_sprms(0),
+            Err(TapBuildError::UnsupportedBorderColor((1, 2, 3)))
         );
     }
 }

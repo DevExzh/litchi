@@ -457,7 +457,8 @@ impl<'arena> TapParser<'arena> {
     /// BorderCode format:
     /// - byte 0: dptLineWidth (line width in 1/8 points)
     /// - byte 1: brcType (border type)
-    /// - byte 2-3: ico (color index) or RGB color
+    /// - byte 2: ico (color index)
+    /// - byte 3: spacing and effect flags
     fn parse_border_code(data: &[u8], offset: usize) -> Result<Option<BorderStyle>> {
         if offset + 4 > data.len() {
             return Ok(None);
@@ -465,7 +466,11 @@ impl<'arena> TapParser<'arena> {
 
         let width = binary_to_doc_result(read_byte(data, offset))?;
         let border_type = binary_to_doc_result(read_byte(data, offset + 1))?;
-        let color_word = binary_to_doc_result(read_u16_le(data, offset + 2))?;
+        if data[offset..offset + 4] == [0xFF; 4] {
+            return Ok(None);
+        }
+        let ico = binary_to_doc_result(read_byte(data, offset + 2))?;
+        let effects = binary_to_doc_result(read_byte(data, offset + 3))?;
 
         // If width is 0 and type is 0, no border
         if width == 0 && border_type == 0 {
@@ -475,34 +480,54 @@ impl<'arena> TapParser<'arena> {
         let btype = match border_type {
             0 => BorderType::None,
             1 => BorderType::Single,
-            2 => BorderType::Thick,
             3 => BorderType::Double,
-            5 => BorderType::Dotted,
-            6 => BorderType::Dashed,
-            7 => BorderType::DotDash,
-            8 => BorderType::DotDotDash,
-            9 => BorderType::Triple,
-            10 => BorderType::ThinThickSmall,
-            11 => BorderType::ThickThinSmall,
-            12 => BorderType::ThinThickThinSmall,
-            _ => BorderType::Single,
+            5 => BorderType::Thick,
+            6 => BorderType::Dotted,
+            7 => BorderType::Dashed,
+            8 => BorderType::DotDash,
+            9 => BorderType::DotDotDash,
+            10 => BorderType::Triple,
+            11 => BorderType::ThinThickSmall,
+            12 => BorderType::ThickThinSmall,
+            13 => BorderType::ThinThickThinSmall,
+            14 => BorderType::ThinThickMedium,
+            15 => BorderType::ThickThinMedium,
+            16 => BorderType::ThinThickThinMedium,
+            17 => BorderType::ThinThickLarge,
+            18 => BorderType::ThickThinLarge,
+            19 => BorderType::ThinThickThinLarge,
+            20 => BorderType::Wave,
+            21 => BorderType::DoubleWave,
+            22 => BorderType::DashSmall,
+            23 => BorderType::DashDotStroked,
+            24 => BorderType::Emboss,
+            25 => BorderType::Engrave,
+            26 => BorderType::Outset,
+            27 => BorderType::Inset,
+            value => {
+                return Err(DocError::Corrupted(format!(
+                    "Brc80 contains invalid border type {value:#04x}"
+                )));
+            },
         };
 
-        // Color extraction from Word color format (based on POI)
-        let color = if color_word == 0 || color_word == 0xFFFF {
+        let color = if ico == 0 {
             None
+        } else if ico <= 16 {
+            Some(Self::ico_to_rgb(ico))
         } else {
-            Some((
-                (color_word & 0x1F) as u8 * 8,         // Red (5 bits)
-                ((color_word >> 5) & 0x1F) as u8 * 8,  // Green (5 bits)
-                ((color_word >> 10) & 0x1F) as u8 * 8, // Blue (5 bits)
-            ))
+            return Err(DocError::Corrupted(format!(
+                "Brc80 contains invalid color index {ico}"
+            )));
         };
 
         Ok(Some(BorderStyle {
             width,
             color,
             border_type: btype,
+            spacing: effects & 0x1F,
+            shadow: effects & 0x20 != 0,
+            frame: effects & 0x40 != 0,
         }))
     }
 
@@ -829,15 +854,28 @@ mod tests {
     fn test_border_code_parsing() {
         let data = vec![
             0x08, // width = 8 (1 point)
-            0x01, // type = single
-            0x00, 0x00, // color = black
+            0x06, // type = dotted
+            0x06, // color = red
+            0x62, // 2pt spacing, shadow, and frame
         ];
 
         let border = TapParser::parse_border_code(&data, 0).unwrap();
         assert!(border.is_some());
         let border = border.unwrap();
         assert_eq!(border.width, 8);
-        assert_eq!(border.border_type, BorderType::Single);
+        assert_eq!(border.border_type, BorderType::Dotted);
+        assert_eq!(border.color, Some((255, 0, 0)));
+        assert_eq!(border.spacing, 2);
+        assert!(border.shadow);
+        assert!(border.frame);
+
+        assert!(
+            TapParser::parse_border_code(&[0xFF; 4], 0)
+                .unwrap()
+                .is_none()
+        );
+        assert!(TapParser::parse_border_code(&[8, 2, 1, 0], 0).is_err());
+        assert!(TapParser::parse_border_code(&[8, 1, 17, 0], 0).is_err());
     }
 
     #[test]

@@ -179,6 +179,12 @@ pub struct BorderStyle {
     pub color: Option<(u8, u8, u8)>,
     /// Border type
     pub border_type: BorderType,
+    /// Distance from cell contents in points
+    pub spacing: u8,
+    /// Draw a shadow effect
+    pub shadow: bool,
+    /// Reverse the border for a frame effect
+    pub frame: bool,
 }
 
 /// Border types.
@@ -196,6 +202,20 @@ pub enum BorderType {
     ThinThickSmall,
     ThickThinSmall,
     ThinThickThinSmall,
+    ThinThickMedium,
+    ThickThinMedium,
+    ThinThickThinMedium,
+    ThinThickLarge,
+    ThickThinLarge,
+    ThinThickThinLarge,
+    Wave,
+    DoubleWave,
+    DashSmall,
+    DashDotStroked,
+    Emboss,
+    Engrave,
+    Outset,
+    Inset,
 }
 
 impl Default for TableProperties {

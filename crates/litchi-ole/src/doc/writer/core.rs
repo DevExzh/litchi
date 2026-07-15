@@ -3662,6 +3662,17 @@ mod tests {
                             fit_text: true,
                             no_wrap: true,
                             hide_mark: true,
+                            borders: crate::doc::parts::tap::CellBorders {
+                                top: Some(crate::doc::parts::tap::BorderStyle {
+                                    width: 8,
+                                    color: Some((255, 0, 0)),
+                                    border_type: crate::doc::parts::tap::BorderType::Single,
+                                    spacing: 2,
+                                    shadow: true,
+                                    frame: false,
+                                }),
+                                ..crate::doc::parts::tap::CellBorders::default()
+                            },
                         },
                         crate::doc::writer::TableCell {
                             width: 5760,
@@ -3746,6 +3757,16 @@ mod tests {
             assert!(first_cell_properties.fit_text);
             assert!(first_cell_properties.no_wrap);
             assert!(first_cell_properties.hide_mark);
+            let top_border = first_cell_properties.borders.top.unwrap();
+            assert_eq!(top_border.width, 8);
+            assert_eq!(top_border.color, Some((255, 0, 0)));
+            assert_eq!(
+                top_border.border_type,
+                crate::doc::parts::tap::BorderType::Single
+            );
+            assert_eq!(top_border.spacing, 2);
+            assert!(top_border.shadow);
+            assert!(!top_border.frame);
             assert_eq!(
                 rows[0].cells().unwrap()[1]
                     .properties()
