@@ -22,6 +22,7 @@
 //! - ✅ `track_changes()` - Parse tracked changes
 //! - ✅ `sections()` - Parse document sections
 //! - ✅ `text_indexes()` - Parse all generated index sources and cached bodies
+//! - ✅ `text_index_marks()` - Parse TOC, user, alphabetical, and bibliography marks
 //! - ✅ Style parsing and resolution with registry
 //!
 //! ## ✅ Writing (`builder.rs`, `mutable.rs`) - COMPLETE
@@ -54,6 +55,7 @@ mod builder;
 mod document;
 mod header_footer;
 mod index;
+mod index_mark;
 mod mutable;
 mod page_layout;
 mod parser;
@@ -62,6 +64,7 @@ pub use builder::DocumentBuilder;
 pub use document::Document;
 pub use header_footer::{HeaderFooter, HeaderFooterKind, MasterPage};
 pub use index::{TextIndex, TextIndexAttribute, TextIndexContent, TextIndexElement, TextIndexKind};
+pub use index_mark::{TextIndexMark, TextIndexMarkKind};
 pub use mutable::MutableDocument;
 pub use page_layout::{PageLayout, PageLayoutAttribute, PageLayoutProperties, PageUsage};
 

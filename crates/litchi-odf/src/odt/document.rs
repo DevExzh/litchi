@@ -537,6 +537,11 @@ impl Document {
         super::index::parse_text_indexes(self.content.xml_content())
     }
 
+    /// Get point and resolved range marks that contribute entries to generated text indexes.
+    pub fn text_index_marks(&self) -> Result<Vec<super::TextIndexMark>> {
+        super::index_mark::parse_text_index_marks(self.content.xml_content())
+    }
+
     /// Get all bookmarks in the document.
     ///
     /// # Examples

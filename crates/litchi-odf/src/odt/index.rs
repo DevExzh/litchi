@@ -28,9 +28,9 @@ pub enum TextIndexKind {
 /// A decoded attribute identified by its expanded XML name.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TextIndexAttribute {
-    namespace_uri: Option<String>,
-    local_name: String,
-    value: String,
+    pub(crate) namespace_uri: Option<String>,
+    pub(crate) local_name: String,
+    pub(crate) value: String,
 }
 
 impl TextIndexAttribute {
@@ -301,13 +301,8 @@ fn index_kind(local_name: &[u8]) -> Option<TextIndexKind> {
 }
 
 fn validate_index_root(reader: &NsReader<&[u8]>, source: &BytesStart<'_>) -> Result<()> {
-    let name = namespaced_attribute(reader, source, TEXT_NAMESPACE, b"name", "text index")?
+    namespaced_attribute(reader, source, TEXT_NAMESPACE, b"name", "text index")?
         .ok_or_else(|| Error::InvalidFormat("text index requires text:name".to_string()))?;
-    if name.is_empty() {
-        return Err(Error::InvalidFormat(
-            "text-index name must not be empty".to_string(),
-        ));
-    }
     if let Some(value) =
         namespaced_attribute(reader, source, TEXT_NAMESPACE, b"protected", "text index")?
         && !matches!(value.as_str(), "true" | "false" | "1" | "0")
@@ -327,30 +322,44 @@ fn element_from_start(
     let local_name = std::str::from_utf8(source.local_name().as_ref())
         .map_err(|_| Error::InvalidFormat("non-UTF-8 text-index element name".to_string()))?
         .to_string();
+    let attributes = expanded_attributes(reader, source, "text index")?;
+    Ok(TextIndexElement {
+        namespace_uri,
+        local_name,
+        attributes,
+        content: Vec::new(),
+    })
+}
+
+pub(crate) fn expanded_attributes(
+    reader: &NsReader<&[u8]>,
+    source: &BytesStart<'_>,
+    context: &str,
+) -> Result<Vec<TextIndexAttribute>> {
     let mut attributes = Vec::new();
     for attribute in source.attributes() {
         let attribute = attribute.map_err(|error| {
-            Error::InvalidFormat(format!("invalid text-index attribute: {error}"))
+            Error::InvalidFormat(format!("invalid {context} attribute: {error}"))
         })?;
         if attribute.key.as_ref() == b"xmlns" || attribute.key.as_ref().starts_with(b"xmlns:") {
             continue;
         }
         let (namespace, local_name) = reader.resolver().resolve_attribute(attribute.key);
-        let namespace_uri = resolved_namespace(&namespace, "text-index attribute")?;
+        let namespace_uri = resolved_namespace(&namespace, context)?;
         let local_name = std::str::from_utf8(local_name.as_ref())
-            .map_err(|_| Error::InvalidFormat("non-UTF-8 text-index attribute name".to_string()))?
+            .map_err(|_| Error::InvalidFormat(format!("non-UTF-8 {context} attribute name")))?
             .to_string();
         if attributes.iter().any(|existing: &TextIndexAttribute| {
             existing.namespace_uri == namespace_uri && existing.local_name == local_name
         }) {
             return Err(Error::InvalidFormat(format!(
-                "duplicate expanded text-index attribute '{local_name}'"
+                "duplicate expanded {context} attribute '{local_name}'"
             )));
         }
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
             .map_err(|error| {
-                Error::InvalidFormat(format!("invalid text-index attribute value: {error}"))
+                Error::InvalidFormat(format!("invalid {context} attribute value: {error}"))
             })?
             .into_owned();
         attributes.push(TextIndexAttribute {
@@ -359,12 +368,7 @@ fn element_from_start(
             value,
         });
     }
-    Ok(TextIndexElement {
-        namespace_uri,
-        local_name,
-        attributes,
-        content: Vec::new(),
-    })
+    Ok(attributes)
 }
 
 fn resolved_namespace(namespace: &ResolveResult<'_>, context: &str) -> Result<Option<String>> {
