@@ -108,6 +108,10 @@ impl XlsWorksheet {
         self.cells.get(&(row, col))
     }
 
+    pub(crate) fn get_cell_mut(&mut self, row: u32, col: u32) -> Option<&mut XlsCell> {
+        self.cells.get_mut(&(row, col))
+    }
+
     // -- Merged cells --
 
     /// Add merged cell ranges parsed from a MERGECELLS record.

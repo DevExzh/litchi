@@ -171,6 +171,10 @@ impl XlsCell {
     pub fn formula_bytes(&self) -> Option<&[u8]> {
         self.formula_bytes.as_deref()
     }
+
+    pub(crate) fn set_rendered_formula(&mut self, formula: Option<String>) {
+        self.formula = formula;
+    }
 }
 
 impl Cell for XlsCell {

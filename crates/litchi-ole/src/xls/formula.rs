@@ -89,8 +89,30 @@ fn escape_sheet_name(name: &str) -> String {
 
 /// Render a BIFF8 formula token stream in A1 notation.
 pub(crate) fn render_formula(tokens: &[u8], context: Option<&FormulaContext>) -> Option<String> {
-    let mut decoder = FormulaDecoder::new(tokens, context);
+    let mut decoder = FormulaDecoder::new(tokens, context, None);
     decoder.decode().ok().map(|formula| format!("={formula}"))
+}
+
+/// Render a shared formula template at a particular formula-cell origin.
+pub(crate) fn render_shared_formula(
+    tokens: &[u8],
+    context: Option<&FormulaContext>,
+    row: u16,
+    column: u16,
+) -> Option<String> {
+    let mut decoder = FormulaDecoder::new(tokens, context, Some((row, column)));
+    decoder.decode().ok().map(|formula| format!("={formula}"))
+}
+
+/// Return the shared/array formula anchor encoded by a standalone `PtgExp`.
+pub(crate) fn ptg_exp_anchor(tokens: &[u8]) -> Option<(u16, u16)> {
+    if tokens.len() != 5 || tokens[0] & 0x7f != 0x01 {
+        return None;
+    }
+    Some((
+        u16::from_le_bytes([tokens[1], tokens[2]]),
+        u16::from_le_bytes([tokens[3], tokens[4]]),
+    ))
 }
 
 struct FormulaDecoder<'a> {
@@ -98,15 +120,21 @@ struct FormulaDecoder<'a> {
     pos: usize,
     stack: Vec<String>,
     context: Option<&'a FormulaContext>,
+    shared_origin: Option<(u16, u16)>,
 }
 
 impl<'a> FormulaDecoder<'a> {
-    fn new(data: &'a [u8], context: Option<&'a FormulaContext>) -> Self {
+    fn new(
+        data: &'a [u8],
+        context: Option<&'a FormulaContext>,
+        shared_origin: Option<(u16, u16)>,
+    ) -> Self {
         Self {
             data,
             pos: 0,
             stack: Vec::new(),
             context,
+            shared_origin,
         }
     }
 
@@ -226,6 +254,7 @@ impl<'a> FormulaDecoder<'a> {
             0x24 => {
                 let row = self.u16()?;
                 let col = self.u16()?;
+                let (row, col) = resolve_shared_reference(row, col, self.shared_origin)?;
                 self.stack.push(cell_reference(row, col)?);
                 Ok(())
             },
@@ -234,6 +263,10 @@ impl<'a> FormulaDecoder<'a> {
                 let last_row = self.u16()?;
                 let first_col = self.u16()?;
                 let last_col = self.u16()?;
+                let (first_row, first_col) =
+                    resolve_shared_reference(first_row, first_col, self.shared_origin)?;
+                let (last_row, last_col) =
+                    resolve_shared_reference(last_row, last_col, self.shared_origin)?;
                 let first = cell_reference(first_row, first_col)?;
                 let last = cell_reference(last_row, last_col)?;
                 self.stack.push(format!("{first}:{last}"));
@@ -243,10 +276,34 @@ impl<'a> FormulaDecoder<'a> {
             // an expression operand.
             0x26 | 0x27 => self.skip(6),
             0x29 => self.skip(2),
+            0x2c => {
+                let row = self.u16()?;
+                let col = self.u16()?;
+                let origin = self.shared_origin.ok_or(())?;
+                let (row, col) = resolve_shared_reference(row, col, Some(origin))?;
+                self.stack.push(cell_reference(row, col)?);
+                Ok(())
+            },
+            0x2d => {
+                let first_row = self.u16()?;
+                let last_row = self.u16()?;
+                let first_col = self.u16()?;
+                let last_col = self.u16()?;
+                let origin = self.shared_origin.ok_or(())?;
+                let (first_row, first_col) =
+                    resolve_shared_reference(first_row, first_col, Some(origin))?;
+                let (last_row, last_col) =
+                    resolve_shared_reference(last_row, last_col, Some(origin))?;
+                let first = cell_reference(first_row, first_col)?;
+                let last = cell_reference(last_row, last_col)?;
+                self.stack.push(format!("{first}:{last}"));
+                Ok(())
+            },
             0x3a => {
                 let extern_sheet = self.u16()?;
                 let row = self.u16()?;
                 let col = self.u16()?;
+                let (row, col) = resolve_shared_reference(row, col, self.shared_origin)?;
                 let prefix = self
                     .context
                     .and_then(|context| context.sheet_prefix(extern_sheet))
@@ -261,6 +318,10 @@ impl<'a> FormulaDecoder<'a> {
                 let last_row = self.u16()?;
                 let first_col = self.u16()?;
                 let last_col = self.u16()?;
+                let (first_row, first_col) =
+                    resolve_shared_reference(first_row, first_col, self.shared_origin)?;
+                let (last_row, last_col) =
+                    resolve_shared_reference(last_row, last_col, self.shared_origin)?;
                 let prefix = self
                     .context
                     .and_then(|context| context.sheet_prefix(extern_sheet))
@@ -375,6 +436,31 @@ impl<'a> FormulaDecoder<'a> {
     }
 }
 
+fn resolve_shared_reference(
+    row: u16,
+    column_flags: u16,
+    origin: Option<(u16, u16)>,
+) -> Result<(u16, u16), ()> {
+    let Some((origin_row, origin_column)) = origin else {
+        return Ok((row, column_flags));
+    };
+    let row_relative = column_flags & 0x8000 != 0;
+    let column_relative = column_flags & 0x4000 != 0;
+    let resolved_row = if row_relative {
+        origin_row.wrapping_add_signed(row as i16)
+    } else {
+        row
+    };
+    let raw_column = column_flags & 0x00ff;
+    let resolved_column = if column_relative {
+        let offset = (raw_column as u8) as i8;
+        origin_column.wrapping_add_signed(i16::from(offset)) & 0x00ff
+    } else {
+        raw_column
+    };
+    Ok((resolved_row, resolved_column | (column_flags & 0xc000)))
+}
+
 fn cell_reference(row: u16, column_flags: u16) -> Result<String, ()> {
     let column = usize::from(column_flags & 0x3fff);
     if column > 255 {
@@ -427,7 +513,7 @@ fn function_metadata(index: u16) -> Option<(&'static str, Option<usize>)> {
 
 #[cfg(test)]
 mod tests {
-    use super::{FormulaContext, render_formula};
+    use super::{FormulaContext, ptg_exp_anchor, render_formula, render_shared_formula};
 
     #[test]
     fn renders_constants_operators_and_references() {
@@ -515,5 +601,23 @@ mod tests {
             None
         );
         assert!(context.add_extern_sheet(&[2, 0, 0, 0]).is_err());
+    }
+
+    #[test]
+    fn renders_shared_relative_references_at_each_origin() {
+        let tokens = [
+            0x4c, 0xff, 0xff, 0xff, 0xc0, // previous row/column
+            0x1e, 0x02, 0x00, 0x05, // * 2
+        ];
+        assert_eq!(
+            render_shared_formula(&tokens, None, 5, 3).as_deref(),
+            Some("=(C5*2)")
+        );
+        assert_eq!(
+            render_shared_formula(&tokens, None, 6, 4).as_deref(),
+            Some("=(D6*2)")
+        );
+        assert_eq!(ptg_exp_anchor(&[0x01, 5, 0, 3, 0]), Some((5, 3)));
+        assert_eq!(ptg_exp_anchor(&[0x01, 5, 0]), None);
     }
 }

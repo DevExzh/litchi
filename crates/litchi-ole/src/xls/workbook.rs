@@ -2,7 +2,7 @@
 
 use crate::xls::cell::XlsCell;
 use crate::xls::error::{XlsError, XlsResult};
-use crate::xls::formula::FormulaContext;
+use crate::xls::formula::{FormulaContext, ptg_exp_anchor, render_formula, render_shared_formula};
 use crate::xls::pivot_table::PivotTable;
 use crate::xls::records::{
     BiffVersion, BofRecord, BoundSheetRecord, CellRecord, DimensionsRecord, FormulaValue,
@@ -12,8 +12,100 @@ use crate::xls::worksheet::XlsWorksheet;
 use crate::xls::{autofilter, comments, hyperlinks, merged_cells, pivot_table, protection, utils};
 use litchi_cfb::OleFile;
 use litchi_core::sheet::{Result, Worksheet as SheetTrait, WorksheetIterator};
+use std::collections::HashMap;
 use std::io::{Read, Seek};
 use std::sync::Arc;
+
+#[derive(Debug)]
+struct SharedFormulaTemplate {
+    first_row: u16,
+    last_row: u16,
+    first_col: u16,
+    last_col: u16,
+    tokens: Vec<u8>,
+    relative: bool,
+}
+
+impl SharedFormulaTemplate {
+    fn contains(&self, row: u16, col: u16) -> bool {
+        (self.first_row..=self.last_row).contains(&row)
+            && (self.first_col..=self.last_col).contains(&col)
+    }
+
+    fn render(&self, context: Option<&FormulaContext>, row: u16, col: u16) -> Option<String> {
+        if !self.contains(row, col) {
+            return None;
+        }
+        if self.relative {
+            render_shared_formula(&self.tokens, context, row, col)
+        } else {
+            render_formula(&self.tokens, context)
+        }
+    }
+}
+
+fn parse_shared_formula_template(
+    record_type: u16,
+    data: &[u8],
+) -> XlsResult<SharedFormulaTemplate> {
+    let (fixed_size, length_offset, relative) = match record_type {
+        0x04bc => (10usize, 8usize, true),
+        0x0221 => (14usize, 12usize, false),
+        _ => {
+            return Err(XlsError::UnexpectedRecordType {
+                expected: 0x04bc,
+                found: record_type,
+            });
+        },
+    };
+    if data.len() < fixed_size {
+        return Err(XlsError::InvalidLength {
+            expected: fixed_size,
+            found: data.len(),
+        });
+    }
+    let first_row = u16::from_le_bytes([data[0], data[1]]);
+    let last_row = u16::from_le_bytes([data[2], data[3]]);
+    let first_col = u16::from(data[4]);
+    let last_col = u16::from(data[5]);
+    if first_row > last_row || first_col > last_col {
+        return Err(XlsError::InvalidRecord {
+            record_type,
+            message: "shared formula range is reversed".to_string(),
+        });
+    }
+    let token_len = usize::from(u16::from_le_bytes([
+        data[length_offset],
+        data[length_offset + 1],
+    ]));
+    let end = fixed_size
+        .checked_add(token_len)
+        .ok_or_else(|| XlsError::InvalidRecord {
+            record_type,
+            message: "shared formula token length overflows".to_string(),
+        })?;
+    let tokens = data
+        .get(fixed_size..end)
+        .ok_or(XlsError::InvalidLength {
+            expected: end,
+            found: data.len(),
+        })?
+        .to_vec();
+    if tokens.is_empty() {
+        return Err(XlsError::InvalidRecord {
+            record_type,
+            message: "shared formula token stream is empty".to_string(),
+        });
+    }
+    Ok(SharedFormulaTemplate {
+        first_row,
+        last_row,
+        first_col,
+        last_col,
+        tokens,
+        relative,
+    })
+}
 
 /// XLS workbook implementation
 #[derive(Debug)]
@@ -268,6 +360,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         // Collector for TXO comment text: tracks OBJ→TXO→CONTINUE sequences.
         let mut txo_collector = comments::TxoCollector::new();
         let mut pending_string_formula: Option<CellRecord> = None;
+        let mut shared_formulas = HashMap::<(u16, u16), SharedFormulaTemplate>::new();
 
         for record_result in record_iter.by_ref() {
             let record = record_result?;
@@ -284,11 +377,24 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                 if let CellRecord::Formula { value, .. } = &mut formula {
                     *value = FormulaValue::String(text);
                 }
-                if let Some(cell) = XlsCell::from_record_with_formula_context(
+                if let Some(mut cell) = XlsCell::from_record_with_formula_context(
                     &formula,
                     worksheet.shared_strings(),
                     formula_context,
                 ) {
+                    if let CellRecord::Formula {
+                        row, col, formula, ..
+                    } = &formula
+                    {
+                        if let Some(anchor) = ptg_exp_anchor(formula) {
+                            if let Some(rendered) = shared_formulas
+                                .get(&anchor)
+                                .and_then(|template| template.render(formula_context, *row, *col))
+                            {
+                                cell.set_rendered_formula(Some(rendered));
+                            }
+                        }
+                    }
                     worksheet.add_cell(cell);
                 }
                 continue;
@@ -329,12 +435,43 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                         }
                     ) {
                         pending_string_formula = Some(cell_record);
-                    } else if let Some(cell) = XlsCell::from_record_with_formula_context(
+                    } else if let Some(mut cell) = XlsCell::from_record_with_formula_context(
                         &cell_record,
                         worksheet.shared_strings(),
                         formula_context,
                     ) {
+                        if let CellRecord::Formula {
+                            row, col, formula, ..
+                        } = &cell_record
+                        {
+                            if let Some(anchor) = ptg_exp_anchor(formula) {
+                                if let Some(rendered) = shared_formulas
+                                    .get(&anchor)
+                                    .and_then(|template| {
+                                        template.render(formula_context, *row, *col)
+                                    })
+                                {
+                                    cell.set_rendered_formula(Some(rendered));
+                                }
+                            }
+                        }
                         worksheet.add_cell(cell);
+                    }
+                }
+
+                0x04BC | 0x0221 => { // ShrFmla or Array
+                    let template = parse_shared_formula_template(
+                        record.header.record_type,
+                        &record.data,
+                    )?;
+                    let anchor = (template.first_row, template.first_col);
+                    let rendered = template.render(formula_context, anchor.0, anchor.1);
+                    shared_formulas.insert(anchor, template);
+                    if let Some(cell) = worksheet.get_cell_mut(
+                        u32::from(anchor.0),
+                        u32::from(anchor.1),
+                    ) {
+                        cell.set_rendered_formula(rendered);
                     }
                 }
 
@@ -627,14 +764,21 @@ mod tests {
     }
 
     fn string_formula_data(row: u16, col: u16) -> Vec<u8> {
+        let mut data = formula_data(row, col, &[]);
+        data[6] = 0;
+        data
+    }
+
+    fn formula_data(row: u16, col: u16, tokens: &[u8]) -> Vec<u8> {
         let mut data = Vec::new();
         data.extend_from_slice(&row.to_le_bytes());
         data.extend_from_slice(&col.to_le_bytes());
         data.extend_from_slice(&0u16.to_le_bytes());
-        data.extend_from_slice(&[0, 0, 0, 0, 0, 0, 0xFF, 0xFF]);
+        data.extend_from_slice(&[3, 0, 0, 0, 0, 0, 0xFF, 0xFF]);
         data.extend_from_slice(&0u16.to_le_bytes());
         data.extend_from_slice(&0u32.to_le_bytes());
-        data.extend_from_slice(&0u16.to_le_bytes());
+        data.extend_from_slice(&(tokens.len() as u16).to_le_bytes());
+        data.extend_from_slice(tokens);
         data
     }
 
@@ -731,5 +875,74 @@ mod tests {
         );
 
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn worksheet_expands_shared_formula_relative_references() {
+        let anchor = [0x01, 0, 0, 1, 0];
+        let template = [
+            0x4c, 0, 0, 0xff, 0xc0, // same row, previous column
+            0x1e, 2, 0, 0x05, // * 2
+        ];
+        let mut shared = Vec::new();
+        shared.extend_from_slice(&0u16.to_le_bytes());
+        shared.extend_from_slice(&1u16.to_le_bytes());
+        shared.extend_from_slice(&[1, 1, 0, 2]); // columns, reserved, cUse
+        shared.extend_from_slice(&(template.len() as u16).to_le_bytes());
+        shared.extend_from_slice(&template);
+
+        let mut stream = Vec::new();
+        push_record(&mut stream, 0x0006, &formula_data(0, 1, &anchor));
+        push_record(&mut stream, 0x04bc, &shared);
+        push_record(&mut stream, 0x0006, &formula_data(1, 1, &anchor));
+        push_record(&mut stream, 0x000a, &[]);
+        let mut records = RecordIter::new(Cursor::new(stream)).unwrap();
+        let worksheet = XlsWorkbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+            &mut records,
+            &XlsEncoding::Utf16Le,
+            "Sheet1",
+            Arc::new(Vec::new()),
+            None,
+        )
+        .unwrap();
+
+        let first = worksheet.get_cell(0, 1).unwrap();
+        let second = worksheet.get_cell(1, 1).unwrap();
+        assert_eq!(first.formula(), Some("=(A1*2)"));
+        assert_eq!(second.formula(), Some("=(A2*2)"));
+        assert_eq!(first.formula_bytes(), Some(anchor.as_slice()));
+        assert_eq!(second.formula_bytes(), Some(anchor.as_slice()));
+    }
+
+    #[test]
+    fn worksheet_resolves_array_formula_for_every_cell() {
+        let anchor = [0x01, 0, 0, 2, 0];
+        let template = [0x1e, 7, 0];
+        let mut array = Vec::new();
+        array.extend_from_slice(&0u16.to_le_bytes());
+        array.extend_from_slice(&1u16.to_le_bytes());
+        array.extend_from_slice(&[2, 2]);
+        array.extend_from_slice(&0u16.to_le_bytes());
+        array.extend_from_slice(&0u32.to_le_bytes());
+        array.extend_from_slice(&(template.len() as u16).to_le_bytes());
+        array.extend_from_slice(&template);
+
+        let mut stream = Vec::new();
+        push_record(&mut stream, 0x0006, &formula_data(0, 2, &anchor));
+        push_record(&mut stream, 0x0221, &array);
+        push_record(&mut stream, 0x0006, &formula_data(1, 2, &anchor));
+        push_record(&mut stream, 0x000a, &[]);
+        let mut records = RecordIter::new(Cursor::new(stream)).unwrap();
+        let worksheet = XlsWorkbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+            &mut records,
+            &XlsEncoding::Utf16Le,
+            "Sheet1",
+            Arc::new(Vec::new()),
+            None,
+        )
+        .unwrap();
+
+        assert_eq!(worksheet.get_cell(0, 2).unwrap().formula(), Some("=7"));
+        assert_eq!(worksheet.get_cell(1, 2).unwrap().formula(), Some("=7"));
     }
 }
