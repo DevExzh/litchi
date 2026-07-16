@@ -80,6 +80,7 @@ pub mod hyperlink;
 pub mod kinsoku;
 pub mod master_style;
 pub mod picture_bullets;
+pub mod smart_tags;
 pub mod text_extensions;
 pub mod text_prop;
 pub mod text_ruler;
@@ -123,6 +124,9 @@ pub use kinsoku::{
 };
 pub use master_style::{TextMasterStyle, TextMasterStyleLevel};
 pub use picture_bullets::{PictureBullet, PictureBulletCollection, PictureBulletType};
+pub use smart_tags::{
+    PowerPointSmartTag, PowerPointSmartTagProperty, PowerPointSmartTagStore, PowerPointSmartTagType,
+};
 pub use text_extensions::{
     TextCharacterExtension9, TextCharacterExtension10, TextDefaultsExtension9,
     TextDefaultsExtension10, TextMasterStyleExtension9, TextMasterStyleExtension9Level,

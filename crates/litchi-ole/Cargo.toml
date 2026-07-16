@@ -19,7 +19,7 @@ bumpalo         = { workspace = true }
 bytes           = { workspace = true }
 chrono          = { workspace = true }
 litchi-cfb      = { workspace = true }
-litchi-core     = { workspace = true }
+litchi-core     = { workspace = true, features = ["ole"] }
 litchi-formula  = { workspace = true, optional = true }
 litchi-imgconv  = { workspace = true, optional = true }
 once_cell       = { workspace = true }
