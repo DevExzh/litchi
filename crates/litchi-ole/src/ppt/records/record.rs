@@ -137,6 +137,7 @@ impl PptRecord {
                 | PptRecordType::ProgTags
                 | PptRecordType::ProgStringTag
                 | PptRecordType::ProgBinaryTag
+                | PptRecordType::RoundTripSlideSyncInfo12
                 | PptRecordType::OutlineTextProps9
                 | PptRecordType::OutlineTextProps10
                 | PptRecordType::OutlineTextProps11

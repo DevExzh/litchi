@@ -25,5 +25,6 @@ litchi-imgconv  = { workspace = true, optional = true }
 once_cell       = { workspace = true }
 smallvec        = { workspace = true }
 thiserror       = { workspace = true }
+url             = { workspace = true }
 zerocopy        = { workspace = true }
 zerocopy-derive = { workspace = true }

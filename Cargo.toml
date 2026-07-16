@@ -77,6 +77,7 @@ sxd-xpath     = "0.4"
 tempfile      = "3"
 thiserror     = "2.0"
 tokio         = { version = "1", features = ["full"] }
+url           = "2.5"
 urlencoding   = "2.1"
 xml-minifier     = { path = "crates/xml-minifier" }
 zerocopy      = { version = "0.8", features = ["std"] }

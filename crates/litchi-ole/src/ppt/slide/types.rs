@@ -6,6 +6,7 @@ use super::factory::SlideData;
 use crate::consts::PptRecordType;
 use crate::ppt::animation::{ShapeAnimation, SlideAnimationExtension};
 use crate::ppt::slide_extension::PowerPoint12SlideExtension;
+use crate::ppt::slide_sync::PowerPointSlideSyncInfo;
 use once_cell::unsync::OnceCell;
 
 /// A slide in a PowerPoint presentation with lazy-loaded shapes.
@@ -35,6 +36,8 @@ pub struct Slide<'doc> {
     animation_extension: OnceCell<Option<SlideAnimationExtension>>,
     /// Lazily parsed PowerPoint 12 slide/master round-trip metadata.
     powerpoint12_extension: OnceCell<PowerPoint12SlideExtension>,
+    /// Lazily parsed, inert slide-library synchronization metadata.
+    sync_info: OnceCell<Option<PowerPointSlideSyncInfo>>,
 }
 
 impl<'doc> Slide<'doc> {
@@ -51,6 +54,7 @@ impl<'doc> Slide<'doc> {
             animations: OnceCell::new(),
             animation_extension: OnceCell::new(),
             powerpoint12_extension: OnceCell::new(),
+            sync_info: OnceCell::new(),
         }
     }
 
@@ -166,6 +170,13 @@ impl<'doc> Slide<'doc> {
     pub fn powerpoint12_extension(&self) -> Result<&PowerPoint12SlideExtension> {
         self.powerpoint12_extension
             .get_or_try_init(|| PowerPoint12SlideExtension::parse(&self.record))
+    }
+
+    /// Return inert PowerPoint 12 slide-library synchronization metadata.
+    pub fn sync_info(&self) -> Result<Option<&PowerPointSlideSyncInfo>> {
+        self.sync_info
+            .get_or_try_init(|| PowerPointSlideSyncInfo::parse(&self.record))
+            .map(Option::as_ref)
     }
 
     /// Extract all text from this slide (lazy-loaded).
@@ -1093,6 +1104,40 @@ mod tests {
         let slide = Slide::from_slide_data(slide_data, 5);
 
         assert_eq!(slide.slide_number(), 5);
+    }
+
+    #[test]
+    fn exposes_inert_slide_library_synchronization_metadata() {
+        let server: Vec<u8> = "server-id"
+            .encode_utf16()
+            .flat_map(u16::to_le_bytes)
+            .collect();
+        let url: Vec<u8> = "http://example.com/library"
+            .encode_utf16()
+            .flat_map(u16::to_le_bytes)
+            .collect();
+        let server = record_bytes(0, 0, 4026, &server);
+        let url = record_bytes(0, 1, 4026, &url);
+        let mut times = Vec::new();
+        for fields in [
+            [2026u16, 7, 4, 16, 12, 30, 45, 500],
+            [2025u16, 1, 3, 2, 8, 0, 0, 0],
+        ] {
+            times.extend(fields.into_iter().flat_map(u16::to_le_bytes));
+        }
+        let atom = record_bytes(0, 0, 0x3715, &times);
+        let container = record_bytes(0x0f, 0, 0x3714, &[server, url, atom].concat());
+        let sync = PptRecord::parse(&container, 0).unwrap().0;
+        let slide_record = create_test_record(PptRecordType::Slide, Vec::new(), vec![sync]);
+        let doc_data = vec![0u8; 32];
+        let slide = Slide::from_slide_data(create_slide_data(slide_record, 256, &doc_data), 1);
+
+        let sync = slide.sync_info().unwrap().unwrap();
+        assert_eq!(sync.server_slide_id, "server-id");
+        assert_eq!(sync.slide_library_url, "http://example.com/library");
+        assert_eq!(sync.server_modified.year, 2026);
+        assert_eq!(sync.client_inserted.year, 2025);
+        assert!(std::ptr::eq(sync, slide.sync_info().unwrap().unwrap()));
     }
 
     #[test]

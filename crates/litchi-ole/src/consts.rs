@@ -131,6 +131,10 @@ pub enum PptRecordType {
     PhotoAlbumInfo10Atom = 0x36B2,
     /// PowerPoint 11 smart tag store container
     SmartTagStore11 = 0x36B3,
+    /// PowerPoint 12 slide-library synchronization container
+    RoundTripSlideSyncInfo12 = 0x3714,
+    /// PowerPoint 12 slide-library synchronization timestamps atom
+    RoundTripSlideSyncInfoAtom12 = 0x3715,
     /// CString record
     CString = 4026,
     /// East Asian line-breaking settings container
@@ -350,6 +354,8 @@ impl From<u16> for PptRecordType {
             0x36B0 => PptRecordType::FilterPrivacyFlags10Atom,
             0x36B2 => PptRecordType::PhotoAlbumInfo10Atom,
             0x36B3 => PptRecordType::SmartTagStore11,
+            0x3714 => PptRecordType::RoundTripSlideSyncInfo12,
+            0x3715 => PptRecordType::RoundTripSlideSyncInfoAtom12,
             4026 => PptRecordType::CString,
             4040 => PptRecordType::Kinsoku,
             4050 => PptRecordType::KinsokuAtom,
