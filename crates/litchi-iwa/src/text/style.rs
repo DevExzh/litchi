@@ -293,6 +293,69 @@ impl Default for TextBaselineShift {
     }
 }
 
+/// Uniform extra spacing between text characters, expressed as a percentage.
+///
+/// Pages, Numbers, and Keynote expose this native tracking value as
+/// “Character Spacing” and constrain it to -40% through 400%.
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+pub struct TextCharacterSpacing(f32);
+
+impl TextCharacterSpacing {
+    /// Smallest percentage accepted by the iWork applications.
+    pub const MINIMUM_PERCENT: f32 = -40.0;
+    /// Largest percentage accepted by the iWork applications.
+    pub const MAXIMUM_PERCENT: f32 = 400.0;
+    const PERCENT_SCALE: f32 = 100.0;
+    const MINIMUM_NATIVE_RATIO: f32 = Self::MINIMUM_PERCENT / Self::PERCENT_SCALE;
+    const MAXIMUM_NATIVE_RATIO: f32 = Self::MAXIMUM_PERCENT / Self::PERCENT_SCALE;
+
+    /// No extra spacing between characters.
+    pub const NORMAL: Self = Self(0.0);
+    /// Tightest character spacing accepted by the iWork applications.
+    pub const MINIMUM: Self = Self(Self::MINIMUM_NATIVE_RATIO);
+    /// Widest character spacing accepted by the iWork applications.
+    pub const MAXIMUM: Self = Self(Self::MAXIMUM_NATIVE_RATIO);
+
+    /// Construct character spacing from a percentage in the inclusive
+    /// `-40.0..=400.0` range.
+    pub fn from_percent(percent: f32) -> crate::Result<Self> {
+        if !percent.is_finite()
+            || !(Self::MINIMUM_PERCENT..=Self::MAXIMUM_PERCENT).contains(&percent)
+        {
+            return Err(crate::Error::InvalidFormat(
+                "text character spacing must be finite and between -40% and 400%".to_owned(),
+            ));
+        }
+        Ok(Self(percent / Self::PERCENT_SCALE))
+    }
+
+    /// Return the character spacing percentage.
+    pub const fn percent(self) -> f32 {
+        self.0 * Self::PERCENT_SCALE
+    }
+
+    pub(crate) fn from_native_ratio(ratio: f32) -> crate::Result<Self> {
+        if !ratio.is_finite()
+            || !(Self::MINIMUM_NATIVE_RATIO..=Self::MAXIMUM_NATIVE_RATIO).contains(&ratio)
+        {
+            return Err(crate::Error::InvalidFormat(
+                "native iWork character spacing must be finite and between -0.4 and 4.0".to_owned(),
+            ));
+        }
+        Ok(Self(ratio))
+    }
+
+    pub(crate) const fn native_ratio(self) -> f32 {
+        self.0
+    }
+}
+
+impl Default for TextCharacterSpacing {
+    fn default() -> Self {
+        Self::NORMAL
+    }
+}
+
 /// Uniform paragraph properties currently supported by the shared text editor.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ParagraphStyle {

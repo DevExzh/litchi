@@ -15,8 +15,8 @@ use super::super::paragraph_tabs::ParagraphTabStops;
 use super::super::style::{
     ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingMultiple,
     ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, TextAlignment,
-    TextBaselineShift, TextCapitalization, TextDecorations, TextPointSize, TextScript,
-    TextStrikethrough, TextStyle, TextUnderline,
+    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextDecorations, TextPointSize,
+    TextScript, TextStrikethrough, TextStyle, TextUnderline,
 };
 use super::super::style_registry::object_archive_name;
 
@@ -40,6 +40,7 @@ const CHARACTER_UNDERLINE_FIELD: u32 = 11;
 const CHARACTER_STRIKETHROUGH_FIELD: u32 = 12;
 const CHARACTER_CAPITALIZATION_FIELD: u32 = 13;
 const CHARACTER_BASELINE_SHIFT_FIELD: u32 = 14;
+const CHARACTER_TRACKING_FIELD: u32 = 27;
 const CHARACTER_DRAWING_FILL_FIELD: u32 = 46;
 const CHARACTER_CAPITALIZATION_LINGUISTICS_FIELD: u32 = 41;
 const DRAWING_FILL_COLOR_FIELD: u32 = 1;
@@ -81,6 +82,7 @@ pub(super) struct ParagraphStyleOverrides {
     pub(super) capitalization: Option<TextCapitalization>,
     pub(super) script: Option<TextScript>,
     pub(super) baseline_shift: Option<TextBaselineShift>,
+    pub(super) character_spacing: Option<TextCharacterSpacing>,
     pub(super) underline: Option<TextUnderline>,
     pub(super) strikethrough: Option<TextStrikethrough>,
     pub(super) alignment: Option<TextAlignment>,
@@ -104,6 +106,7 @@ impl ParagraphStyleOverrides {
                 .map_or(0, TextCapitalization::native_override_count)
             + u32::from(self.script.is_some())
             + u32::from(self.baseline_shift.is_some())
+            + u32::from(self.character_spacing.is_some())
             + u32::from(self.underline.is_some())
             + u32::from(self.strikethrough.is_some())
             + u32::from(self.alignment.is_some())
@@ -201,6 +204,13 @@ pub(super) fn inherited_text_baseline_shift(
     inheritance::text_baseline_shift(package, first_style_id)
 }
 
+pub(super) fn inherited_text_character_spacing(
+    package: &IWorkPackage,
+    first_style_id: u64,
+) -> Result<TextCharacterSpacing> {
+    inheritance::text_character_spacing(package, first_style_id)
+}
+
 pub(super) fn inherited_line_spacing(
     package: &IWorkPackage,
     first_style_id: u64,
@@ -255,6 +265,10 @@ pub(super) fn direct_overrides(
         .baseline_shift
         .map(TextBaselineShift::from_points)
         .transpose()?;
+    let character_spacing = character_properties
+        .tracking
+        .map(TextCharacterSpacing::from_native_ratio)
+        .transpose()?;
     let underline = character_properties
         .underline
         .map(TextUnderline::from_native_value)
@@ -305,6 +319,7 @@ pub(super) fn direct_overrides(
         capitalization,
         script,
         baseline_shift,
+        character_spacing,
         underline,
         strikethrough,
         alignment,
@@ -337,6 +352,7 @@ pub(super) fn direct_overrides(
     }
     remaining_character.superscript = None;
     remaining_character.baseline_shift = None;
+    remaining_character.tracking = None;
     remaining_character.underline = None;
     remaining_character.strikethru = None;
     let semantic = !overrides.is_empty()
@@ -363,7 +379,7 @@ pub(super) fn direct_overrides(
         STYLE_PARAGRAPH_PROPERTIES_FIELD,
         "paragraph properties",
     )?;
-    let mut character_fields = Vec::with_capacity(11);
+    let mut character_fields = Vec::with_capacity(12);
     if bold.is_some() {
         character_fields.push(CHARACTER_BOLD_FIELD);
     }
@@ -409,6 +425,9 @@ pub(super) fn direct_overrides(
     }
     if baseline_shift.is_some() {
         character_fields.push(CHARACTER_BASELINE_SHIFT_FIELD);
+    }
+    if character_spacing.is_some() {
+        character_fields.push(CHARACTER_TRACKING_FIELD);
     }
     if underline.is_some() {
         character_fields.push(CHARACTER_UNDERLINE_FIELD);
@@ -507,6 +526,9 @@ pub(super) fn variation_object(
                 .map(TextCapitalization::native_value),
             superscript: overrides.script.map(TextScript::native_value),
             baseline_shift: overrides.baseline_shift.map(TextBaselineShift::points),
+            tracking: overrides
+                .character_spacing
+                .map(TextCharacterSpacing::native_ratio),
             underline: overrides.underline.map(TextUnderline::native_value),
             strikethru: overrides.strikethrough.map(TextStrikethrough::native_value),
             tsd_fill: overrides.font_color.map(|color| tsd::FillArchive {

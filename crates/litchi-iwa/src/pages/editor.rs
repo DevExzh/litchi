@@ -31,8 +31,8 @@ use crate::shapes::{
 use crate::text::{
     IWorkTextEditor, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphIndents,
     ParagraphLineSpacing, ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment,
-    TextBaselineShift, TextCapitalization, TextColumns, TextDecorations, TextScript,
-    TextStorageInfo, TextStyle,
+    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumns, TextDecorations,
+    TextScript, TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     append_repeated_length_delimited_field, patch_fixed32_field, patch_length_delimited_field,
@@ -574,6 +574,48 @@ impl PagesEditor {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
         let changed = staged.reset_text_baseline_shift(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective character spacing of a reachable ordinary text box.
+    pub fn text_box_text_character_spacing(
+        &self,
+        drawable_object_id: u64,
+    ) -> Result<TextCharacterSpacing> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        self.text.text_character_spacing(graph.storage_id)
+    }
+
+    /// Atomically set character spacing across a reachable ordinary text box.
+    pub fn set_text_box_text_character_spacing(
+        &mut self,
+        drawable_object_id: u64,
+        spacing: TextCharacterSpacing,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_text_character_spacing(graph.storage_id, spacing)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified.text_box_text_character_spacing(drawable_object_id)? != spacing {
+            return Err(Error::InvalidFormat(
+                "Pages text-box character-spacing update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore inherited character spacing while preserving sibling overrides.
+    pub fn reset_text_box_text_character_spacing(
+        &mut self,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_text_character_spacing(graph.storage_id)?;
         if changed {
             *self = Self::from_package(staged.into_package())?;
         }

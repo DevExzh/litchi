@@ -12,9 +12,9 @@ use litchi_iwa::text::{
     DropCapWrap, ParagraphDropCap, ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing,
     ParagraphLineSpacingMultiple, ParagraphSpacing, ParagraphSpacingPoints, ParagraphStart,
     ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
-    ParagraphTabStops, TextAlignment, TextBaselineShift, TextCapitalization, TextColumnCount,
-    TextColumnGap, TextColumns, TextDecorations, TextPointSize, TextScript, TextStrikethrough,
-    TextStyle, TextUnderline,
+    ParagraphTabStops, TextAlignment, TextBaselineShift, TextCapitalization, TextCharacterSpacing,
+    TextColumnCount, TextColumnGap, TextColumns, TextDecorations, TextPointSize, TextScript,
+    TextStrikethrough, TextStyle, TextUnderline,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -75,6 +75,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_text_box_text_baseline_shift(
         created.drawable_object_id,
         TextBaselineShift::from_points(4.0)?,
+    )?;
+    editor.set_text_box_text_character_spacing(
+        created.drawable_object_id,
+        TextCharacterSpacing::from_percent(12.0)?,
     )?;
     editor.set_text_box_paragraph_alignment(created.drawable_object_id, TextAlignment::Center)?;
     editor.set_text_box_paragraph_line_spacing(

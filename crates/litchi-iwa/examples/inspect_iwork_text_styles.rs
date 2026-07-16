@@ -22,6 +22,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             editor.text_capitalization(storage.object_id),
             editor.text_script(storage.object_id),
             editor.text_baseline_shift(storage.object_id),
+            editor.text_character_spacing(storage.object_id),
         ) {
             (
                 Ok(style),
@@ -30,8 +31,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Ok(capitalization),
                 Ok(script),
                 Ok(baseline_shift),
+                Ok(character_spacing),
             ) => println!(
-                "storage={} points={} bold={} italic={} underline={:?} strikethrough={:?} rgba=({},{},{},{}) color_space={:?} capitalization={capitalization:?} script={script:?} baseline_shift_points={}",
+                "storage={} points={} bold={} italic={} underline={:?} strikethrough={:?} rgba=({},{},{},{}) color_space={:?} capitalization={capitalization:?} script={script:?} baseline_shift_points={} character_spacing_percent={}",
                 storage.object_id,
                 style.point_size.points(),
                 style.bold,
@@ -43,14 +45,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 color.blue(),
                 color.alpha(),
                 color.color_space(),
-                baseline_shift.points()
+                baseline_shift.points(),
+                character_spacing.percent()
             ),
-            (Err(error), _, _, _, _, _)
-            | (_, Err(error), _, _, _, _)
-            | (_, _, Err(error), _, _, _)
-            | (_, _, _, Err(error), _, _)
-            | (_, _, _, _, Err(error), _)
-            | (_, _, _, _, _, Err(error)) => {
+            (Err(error), _, _, _, _, _, _)
+            | (_, Err(error), _, _, _, _, _)
+            | (_, _, Err(error), _, _, _, _)
+            | (_, _, _, Err(error), _, _, _)
+            | (_, _, _, _, Err(error), _, _)
+            | (_, _, _, _, _, Err(error), _)
+            | (_, _, _, _, _, _, Err(error)) => {
                 println!("storage={} unavailable={error}", storage.object_id)
             },
         }
