@@ -200,6 +200,105 @@ impl PptRecord {
             .collect()
     }
 
+    /// Return records stored in every matching `___PPTn` programmable tag.
+    ///
+    /// `BinaryTagData` is an atom whose payload is itself a strict sequence of
+    /// PPT records, so these records do not appear in the ordinary child tree.
+    pub fn versioned_binary_tag_records(&self, version: u8) -> Result<Vec<PptRecord>> {
+        if !matches!(version, 9..=11) {
+            return Err(PptError::Corrupted(
+                "Unsupported PowerPoint programmable-tag version".to_string(),
+            ));
+        }
+        let expected_name = format!("___PPT{version}");
+        let expected_name: Vec<u16> = expected_name.encode_utf16().collect();
+        let mut prog_tags = Vec::new();
+        collect_prog_tags(self, &mut prog_tags);
+        let mut records = Vec::new();
+
+        for container in prog_tags {
+            for tag in
+                Self::parse_sequence_strict(&container.data, &format!("PPT{version} ProgTags"))?
+            {
+                if tag.record_type != PptRecordType::ProgBinaryTag {
+                    continue;
+                }
+                let children =
+                    Self::parse_sequence_strict(&tag.data, &format!("PPT{version} ProgBinaryTag"))?;
+                let Some(name) = children
+                    .iter()
+                    .find(|child| child.record_type == PptRecordType::CString)
+                else {
+                    continue;
+                };
+                if name.version != 0
+                    || name.instance != 0
+                    || name.data.len() != expected_name.len() * 2
+                    || !name
+                        .data
+                        .chunks_exact(2)
+                        .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
+                        .eq(expected_name.iter().copied())
+                {
+                    continue;
+                }
+                let blob = children
+                    .iter()
+                    .find(|child| child.record_type == PptRecordType::BinaryTagData)
+                    .ok_or_else(|| {
+                        PptError::Corrupted(format!(
+                            "___PPT{version} programmable tag is missing BinaryTagData"
+                        ))
+                    })?;
+                records.extend(Self::parse_sequence_strict(
+                    &blob.data,
+                    &format!("___PPT{version} BinaryTagData"),
+                )?);
+            }
+        }
+        Ok(records)
+    }
+
+    fn parse_sequence_strict(data: &[u8], context: &str) -> Result<Vec<PptRecord>> {
+        let mut records = Vec::new();
+        let mut offset = 0usize;
+        while offset < data.len() {
+            let header_end = offset.checked_add(8).ok_or_else(|| {
+                PptError::Corrupted(format!("{context} record header offset overflow"))
+            })?;
+            if header_end > data.len() {
+                return Err(PptError::Corrupted(format!(
+                    "Truncated record header in {context}"
+                )));
+            }
+            let length = u32::from_le_bytes([
+                data[offset + 4],
+                data[offset + 5],
+                data[offset + 6],
+                data[offset + 7],
+            ]);
+            let length = usize::try_from(length)
+                .map_err(|_| PptError::Corrupted(format!("{context} record size overflow")))?;
+            let record_end = header_end
+                .checked_add(length)
+                .ok_or_else(|| PptError::Corrupted(format!("{context} record size overflow")))?;
+            if record_end > data.len() {
+                return Err(PptError::Corrupted(format!(
+                    "Record extends beyond {context}"
+                )));
+            }
+            let (record, consumed) = Self::parse(&data[offset..record_end], 0)?;
+            if consumed != record_end - offset {
+                return Err(PptError::Corrupted(format!(
+                    "Record in {context} was only partially parsed"
+                )));
+            }
+            records.push(record);
+            offset = record_end;
+        }
+        Ok(records)
+    }
+
     /// Extract slide data from this record.
     pub fn extract_slide_data(&self) -> Option<Vec<u8>> {
         if let Some(ppdrawing) = self.find_child(PptRecordType::PPDrawing) {
@@ -419,6 +518,16 @@ impl PptRecord {
         } else {
             None
         }
+    }
+}
+
+fn collect_prog_tags<'a>(record: &'a PptRecord, output: &mut Vec<&'a PptRecord>) {
+    if record.record_type == PptRecordType::ProgTags {
+        output.push(record);
+        return;
+    }
+    for child in &record.children {
+        collect_prog_tags(child, output);
     }
 }
 

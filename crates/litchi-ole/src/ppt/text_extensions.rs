@@ -3,6 +3,7 @@
 use litchi_core::binary::{read_i16_le, read_u16_le, read_u32_le};
 
 use super::package::{PptError, Result};
+use super::records::PptRecord;
 
 /// PowerPoint 9 paragraph extensions from `TextPFException9`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -410,6 +411,241 @@ impl TextStyleExtension11 {
     }
 }
 
+/// Additional PowerPoint 9 formatting for one master indent level.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TextMasterStyleExtension9Level {
+    /// Additional paragraph formatting.
+    pub paragraph: TextParagraphExtension9,
+    /// Additional character formatting.
+    pub character: TextCharacterExtension9,
+}
+
+/// Parsed payload of a `TextMasterStyle9Atom`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TextMasterStyleExtension9 {
+    /// `TextTypeEnum` value from the record instance.
+    pub text_type: u16,
+    /// Additional formatting for indent levels `0..levels.len()`.
+    pub levels: Vec<TextMasterStyleExtension9Level>,
+}
+
+impl TextMasterStyleExtension9 {
+    /// Parse a complete `TextMasterStyle9Atom` payload.
+    pub fn parse(data: &[u8], text_type: u16) -> Result<Self> {
+        validate_text_type(text_type, "TextMasterStyle9Atom")?;
+        require_bytes(data, 0, 2, "TextMasterStyle9Atom level count")?;
+        let level_count = read_u16_le(data, 0).unwrap_or(0);
+        if level_count > 5 {
+            return Err(PptError::Corrupted(
+                "TextMasterStyle9Atom has more than five levels".to_string(),
+            ));
+        }
+        let mut offset = 2usize;
+        let mut levels = Vec::with_capacity(level_count as usize);
+        for _ in 0..level_count {
+            let (paragraph, consumed) = TextParagraphExtension9::parse_prefix(&data[offset..])?;
+            offset += consumed;
+            let (character, consumed) = TextCharacterExtension9::parse_prefix(&data[offset..])?;
+            offset += consumed;
+            levels.push(TextMasterStyleExtension9Level {
+                paragraph,
+                character,
+            });
+        }
+        if offset != data.len() {
+            return Err(PptError::Corrupted(
+                "TextMasterStyle9Atom has trailing bytes".to_string(),
+            ));
+        }
+        Ok(Self { text_type, levels })
+    }
+}
+
+/// Parsed payload of a `TextMasterStyle10Atom`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TextMasterStyleExtension10 {
+    /// `TextTypeEnum` value from the record instance.
+    pub text_type: u16,
+    /// Additional character formatting for each indent level.
+    pub levels: Vec<TextCharacterExtension10>,
+}
+
+impl TextMasterStyleExtension10 {
+    /// Parse a complete `TextMasterStyle10Atom` payload.
+    pub fn parse(data: &[u8], text_type: u16) -> Result<Self> {
+        validate_text_type(text_type, "TextMasterStyle10Atom")?;
+        require_bytes(data, 0, 2, "TextMasterStyle10Atom level count")?;
+        let level_count = read_u16_le(data, 0).unwrap_or(0);
+        if level_count > 5 {
+            return Err(PptError::Corrupted(
+                "TextMasterStyle10Atom has more than five levels".to_string(),
+            ));
+        }
+        let mut offset = 2usize;
+        let mut levels = Vec::with_capacity(level_count as usize);
+        for _ in 0..level_count {
+            let (level, consumed) = TextCharacterExtension10::parse_prefix(&data[offset..])?;
+            offset += consumed;
+            levels.push(level);
+        }
+        if offset != data.len() {
+            return Err(PptError::Corrupted(
+                "TextMasterStyle10Atom has trailing bytes".to_string(),
+            ));
+        }
+        Ok(Self { text_type, levels })
+    }
+}
+
+/// Parsed payload of a document-level `TextDefaults9Atom`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TextDefaultsExtension9 {
+    /// Default PowerPoint 9 character formatting.
+    pub character: TextCharacterExtension9,
+    /// Default PowerPoint 9 paragraph formatting.
+    pub paragraph: TextParagraphExtension9,
+}
+
+impl TextDefaultsExtension9 {
+    /// Parse a complete `TextDefaults9Atom` payload.
+    pub fn parse(data: &[u8]) -> Result<Self> {
+        let (character, consumed) = TextCharacterExtension9::parse_prefix(data)?;
+        let (paragraph, paragraph_size) = TextParagraphExtension9::parse_prefix(&data[consumed..])?;
+        if consumed + paragraph_size != data.len() {
+            return Err(PptError::Corrupted(
+                "TextDefaults9Atom has trailing bytes".to_string(),
+            ));
+        }
+        Ok(Self {
+            character,
+            paragraph,
+        })
+    }
+}
+
+/// Parsed payload of a document-level `TextDefaults10Atom`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TextDefaultsExtension10 {
+    /// Default PowerPoint 10 character formatting.
+    pub character: TextCharacterExtension10,
+}
+
+impl TextDefaultsExtension10 {
+    /// Parse a complete `TextDefaults10Atom` payload.
+    pub fn parse(data: &[u8]) -> Result<Self> {
+        let (character, consumed) = TextCharacterExtension10::parse_prefix(data)?;
+        if consumed != data.len() {
+            return Err(PptError::Corrupted(
+                "TextDefaults10Atom has trailing bytes".to_string(),
+            ));
+        }
+        Ok(Self { character })
+    }
+}
+
+fn validate_text_type(text_type: u16, record: &str) -> Result<()> {
+    if matches!(text_type, 0 | 1 | 2 | 4 | 5 | 6 | 7 | 8) {
+        Ok(())
+    } else {
+        Err(PptError::Corrupted(format!(
+            "{record} has an invalid TextTypeEnum instance"
+        )))
+    }
+}
+
+/// Versioned text master styles collected from a PPT record tree.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct VersionedTextMasterStyles {
+    /// PowerPoint 9 paragraph and character master extensions.
+    pub powerpoint9: Vec<TextMasterStyleExtension9>,
+    /// PowerPoint 10 character master extensions.
+    pub powerpoint10: Vec<TextMasterStyleExtension10>,
+}
+
+impl VersionedTextMasterStyles {
+    /// Collect and parse all versioned master-style atoms below `root`.
+    pub fn parse(root: &PptRecord) -> Result<Self> {
+        let mut result = Self::default();
+        for record in root.versioned_binary_tag_records(9)? {
+            if record.record_type != crate::consts::PptRecordType::TextMasterStyle9Atom {
+                continue;
+            }
+            validate_atom_header(&record, "TextMasterStyle9Atom", false)?;
+            result.powerpoint9.push(TextMasterStyleExtension9::parse(
+                &record.data,
+                record.instance,
+            )?);
+        }
+        for record in root.versioned_binary_tag_records(10)? {
+            if record.record_type != crate::consts::PptRecordType::TextMasterStyle10Atom {
+                continue;
+            }
+            validate_atom_header(&record, "TextMasterStyle10Atom", false)?;
+            result.powerpoint10.push(TextMasterStyleExtension10::parse(
+                &record.data,
+                record.instance,
+            )?);
+        }
+        Ok(result)
+    }
+}
+
+/// Versioned document-wide text defaults collected from a PPT record tree.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct VersionedTextDefaults {
+    /// PowerPoint 9 default paragraph and character extensions.
+    pub powerpoint9: Option<TextDefaultsExtension9>,
+    /// PowerPoint 10 default character extensions.
+    pub powerpoint10: Option<TextDefaultsExtension10>,
+}
+
+impl VersionedTextDefaults {
+    /// Collect and parse document-level text-default atoms below `root`.
+    pub fn parse(root: &PptRecord) -> Result<Self> {
+        let mut result = Self::default();
+        for record in root.versioned_binary_tag_records(9)? {
+            if record.record_type != crate::consts::PptRecordType::TextDefaults9Atom {
+                continue;
+            }
+            validate_atom_header(&record, "TextDefaults9Atom", true)?;
+            if result
+                .powerpoint9
+                .replace(TextDefaultsExtension9::parse(&record.data)?)
+                .is_some()
+            {
+                return Err(PptError::Corrupted(
+                    "Record tree contains multiple TextDefaults9Atom records".to_string(),
+                ));
+            }
+        }
+        for record in root.versioned_binary_tag_records(10)? {
+            if record.record_type != crate::consts::PptRecordType::TextDefaults10Atom {
+                continue;
+            }
+            validate_atom_header(&record, "TextDefaults10Atom", true)?;
+            if result
+                .powerpoint10
+                .replace(TextDefaultsExtension10::parse(&record.data)?)
+                .is_some()
+            {
+                return Err(PptError::Corrupted(
+                    "Record tree contains multiple TextDefaults10Atom records".to_string(),
+                ));
+            }
+        }
+        Ok(result)
+    }
+}
+
+fn validate_atom_header(record: &PptRecord, name: &str, zero_instance: bool) -> Result<()> {
+    if record.version != 0 || zero_instance && record.instance != 0 {
+        return Err(PptError::Corrupted(format!(
+            "{name} has an invalid record header"
+        )));
+    }
+    Ok(())
+}
+
 fn read_optional_u16(
     data: &[u8],
     offset: &mut usize,
@@ -438,6 +674,36 @@ fn require_bytes(data: &[u8], offset: usize, size: usize, field: &str) -> Result
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn ppt_record_bytes(version: u16, instance: u16, record_type: u16, payload: &[u8]) -> Vec<u8> {
+        let mut data = Vec::with_capacity(8 + payload.len());
+        data.extend_from_slice(&((instance << 4) | version).to_le_bytes());
+        data.extend_from_slice(&record_type.to_le_bytes());
+        data.extend_from_slice(&(payload.len() as u32).to_le_bytes());
+        data.extend_from_slice(payload);
+        data
+    }
+
+    fn prog_tags_record(version: u8, blob_payload: &[u8]) -> PptRecord {
+        let tag_name: Vec<u8> = format!("___PPT{version}")
+            .encode_utf16()
+            .flat_map(u16::to_le_bytes)
+            .collect();
+        let name = ppt_record_bytes(0, 0, 4026, &tag_name);
+        let blob = ppt_record_bytes(0, 0, 0x138b, blob_payload);
+        let mut tag_payload = name;
+        tag_payload.extend_from_slice(&blob);
+        let tag = ppt_record_bytes(0x0f, 0, 0x138a, &tag_payload);
+        PptRecord {
+            record_type: crate::consts::PptRecordType::ProgTags,
+            record_type_raw: 0x1388,
+            version: 0x0f,
+            instance: 0,
+            data_length: tag.len() as u32,
+            data: tag,
+            children: Vec::new(),
+        }
+    }
 
     #[test]
     fn parses_powerpoint_9_auto_numbering() {
@@ -601,5 +867,105 @@ mod tests {
         truncated.extend_from_slice(&2u32.to_le_bytes());
         truncated.extend_from_slice(&1u32.to_le_bytes());
         assert!(TextStyleExtension11::parse(&truncated).is_err());
+    }
+
+    #[test]
+    fn parses_powerpoint_9_and_10_master_style_extensions() {
+        let mut master9 = Vec::new();
+        master9.extend_from_slice(&1u16.to_le_bytes());
+        master9.extend_from_slice(&0x0200_0000u32.to_le_bytes());
+        master9.extend_from_slice(&1i16.to_le_bytes());
+        master9.extend_from_slice(&0x0010_0000u32.to_le_bytes());
+        master9.extend_from_slice(&0x1234_567au32.to_le_bytes());
+        let style9 = TextMasterStyleExtension9::parse(&master9, 1).unwrap();
+        assert_eq!(style9.levels.len(), 1);
+        assert_eq!(style9.levels[0].paragraph.auto_numbered, Some(true));
+        assert_eq!(style9.levels[0].character.pp10_run_id, Some(10));
+
+        let mut master10 = Vec::new();
+        master10.extend_from_slice(&2u16.to_le_bytes());
+        master10.extend_from_slice(&0x0100_0000u32.to_le_bytes());
+        master10.extend_from_slice(&65_535u16.to_le_bytes());
+        master10.extend_from_slice(&0u32.to_le_bytes());
+        let style10 = TextMasterStyleExtension10::parse(&master10, 5).unwrap();
+        assert_eq!(style10.levels.len(), 2);
+        assert_eq!(style10.levels[0].new_east_asian_font_ref, Some(65_535));
+        assert_eq!(style10.levels[1].mask, 0);
+    }
+
+    #[test]
+    fn rejects_malformed_versioned_master_style_extensions() {
+        assert!(TextMasterStyleExtension9::parse(&[], 1).is_err());
+        assert!(TextMasterStyleExtension9::parse(&6u16.to_le_bytes(), 1).is_err());
+        assert!(TextMasterStyleExtension9::parse(&0u16.to_le_bytes(), 3).is_err());
+
+        let mut trailing9 = 0u16.to_le_bytes().to_vec();
+        trailing9.push(0);
+        assert!(TextMasterStyleExtension9::parse(&trailing9, 1).is_err());
+
+        let mut truncated10 = Vec::new();
+        truncated10.extend_from_slice(&1u16.to_le_bytes());
+        truncated10.extend_from_slice(&0x0100_0000u32.to_le_bytes());
+        assert!(TextMasterStyleExtension10::parse(&truncated10, 1).is_err());
+        assert!(TextMasterStyleExtension10::parse(&0u16.to_le_bytes(), 9).is_err());
+    }
+
+    #[test]
+    fn parses_and_validates_document_text_defaults() {
+        let mut defaults9 = Vec::new();
+        defaults9.extend_from_slice(&0u32.to_le_bytes());
+        defaults9.extend_from_slice(&0x0200_0000u32.to_le_bytes());
+        defaults9.extend_from_slice(&1i16.to_le_bytes());
+        let defaults9 = TextDefaultsExtension9::parse(&defaults9).unwrap();
+        assert_eq!(defaults9.character.mask, 0);
+        assert_eq!(defaults9.paragraph.auto_numbered, Some(true));
+
+        let mut defaults10 = Vec::new();
+        defaults10.extend_from_slice(&0x0200_0000u32.to_le_bytes());
+        defaults10.extend_from_slice(&37u16.to_le_bytes());
+        let defaults10 = TextDefaultsExtension10::parse(&defaults10).unwrap();
+        assert_eq!(defaults10.character.complex_script_font_ref, Some(37));
+
+        let mut trailing = defaults10.character.mask.to_le_bytes().to_vec();
+        trailing.extend_from_slice(&37u16.to_le_bytes());
+        trailing.push(0);
+        assert!(TextDefaultsExtension10::parse(&trailing).is_err());
+        assert!(TextDefaultsExtension9::parse(&[0; 7]).is_err());
+    }
+
+    #[test]
+    fn discovers_typed_master_styles_and_defaults_in_versioned_tags() {
+        let mut ppt9_blob = Vec::new();
+        ppt9_blob.extend_from_slice(&ppt_record_bytes(0, 1, 4013, &0u16.to_le_bytes()));
+        ppt9_blob.extend_from_slice(&ppt_record_bytes(0, 0, 4016, &[0; 8]));
+
+        let mut ppt10_blob = Vec::new();
+        ppt10_blob.extend_from_slice(&ppt_record_bytes(0, 5, 4018, &0u16.to_le_bytes()));
+        ppt10_blob.extend_from_slice(&ppt_record_bytes(0, 0, 4020, &[0; 4]));
+
+        let root = PptRecord {
+            record_type: crate::consts::PptRecordType::Document,
+            record_type_raw: 1000,
+            version: 0x0f,
+            instance: 0,
+            data_length: 0,
+            data: Vec::new(),
+            children: vec![
+                prog_tags_record(9, &ppt9_blob),
+                prog_tags_record(10, &ppt10_blob),
+            ],
+        };
+
+        let styles = VersionedTextMasterStyles::parse(&root).unwrap();
+        assert_eq!(styles.powerpoint9.len(), 1);
+        assert_eq!(styles.powerpoint9[0].text_type, 1);
+        assert_eq!(styles.powerpoint10.len(), 1);
+        assert_eq!(styles.powerpoint10[0].text_type, 5);
+
+        let defaults = VersionedTextDefaults::parse(&root).unwrap();
+        assert_eq!(defaults.powerpoint9.unwrap().paragraph.mask, 0);
+        assert_eq!(defaults.powerpoint10.unwrap().character.mask, 0);
+
+        assert!(root.versioned_binary_tag_records(8).is_err());
     }
 }
