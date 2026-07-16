@@ -7,13 +7,14 @@ use super::*;
 use crate::shapes::{
     DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, LineEndpoints, LineSegment,
     LineStyle, RgbaColor, ShapeEffects, ShapeFill, ShapeImageFill, ShapeImageFillTechnique,
-    ShapePathKind, ShapePreset, ShapeShadow, ShapeStroke, line_geometry, line_path_source,
-    line_segments_match, reset_shape_effects, reset_shape_fill, reset_shape_shadow,
-    reset_shape_stroke, set_shape_effects, set_shape_fill, set_shape_geometry,
-    set_shape_image_fill_data, set_shape_line_endpoints, set_shape_line_segment, set_shape_preset,
-    set_shape_shadow, set_shape_stroke, shape_effects, shape_fill, shape_line_endpoints,
-    shape_line_segment, shape_path_kind, shape_path_source, shape_preset, shape_shadow,
-    shape_stroke,
+    ShapePathKind, ShapePreset, ShapeShadow, ShapeStroke, ShapeTextLayout, line_geometry,
+    line_path_source, line_segments_match, reset_shape_effects, reset_shape_fill,
+    reset_shape_shadow, reset_shape_stroke, reset_shape_text_layout, set_shape_effects,
+    set_shape_fill, set_shape_geometry, set_shape_image_fill_data, set_shape_line_endpoints,
+    set_shape_line_segment, set_shape_preset, set_shape_shadow, set_shape_stroke,
+    set_shape_text_layout, shape_effects, shape_fill, shape_line_endpoints, shape_line_segment,
+    shape_path_kind, shape_path_source, shape_preset, shape_shadow, shape_stroke,
+    shape_text_layout,
 };
 use crate::text::TextStorageInfo;
 
@@ -577,6 +578,58 @@ impl KeynoteEditor {
         Ok(changed)
     }
 
+    /// Read effective vertical alignment, edge insets, and autosizing.
+    pub fn slide_shape_text_layout(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<ShapeTextLayout> {
+        let source = shape_graph(self, slide_index, drawable_object_id)?;
+        shape_text_layout(self.package(), &source.archive_name, drawable_object_id)
+    }
+
+    /// Replace frame-level text layout while preserving drawing style and columns.
+    pub fn set_slide_shape_text_layout(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        layout: ShapeTextLayout,
+    ) -> Result<()> {
+        let source = shape_graph(self, slide_index, drawable_object_id)?;
+        let staged = set_shape_text_layout(
+            self.package().clone(),
+            &source.archive_name,
+            drawable_object_id,
+            layout,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.slide_shape_text_layout(slide_index, drawable_object_id)? != layout {
+            return Err(Error::InvalidFormat(
+                "Keynote shape text-layout update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove direct frame-level text-layout overrides and restore inherited values.
+    pub fn reset_slide_shape_text_layout(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let source = shape_graph(self, slide_index, drawable_object_id)?;
+        let (staged, changed) = reset_shape_text_layout(
+            self.package().clone(),
+            &source.archive_name,
+            drawable_object_id,
+        )?;
+        if changed {
+            *self = Self::from_package(staged)?;
+        }
+        Ok(changed)
+    }
+
     /// Move or resize one native straight line by replacing its endpoints.
     pub fn set_slide_line_segment(
         &mut self,
@@ -1104,7 +1157,8 @@ mod tests {
         ShapeGradientStop, ShapeGradientStopMidpoint, ShapeGradientStopPosition, ShapeOpacity,
         ShapePolygonSides, ShapeReflection, ShapeReflectionOpacity, ShapeShadowAngle,
         ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowCurve, ShapeShadowOffset,
-        ShapeShadowOpacity, ShapeStarInnerRatio, ShapeStarPoints, StrokePattern, StrokeWidth,
+        ShapeShadowOpacity, ShapeStarInnerRatio, ShapeStarPoints, ShapeTextAutoSize,
+        ShapeTextInset, ShapeTextInsets, ShapeTextVerticalAlignment, StrokePattern, StrokeWidth,
     };
 
     const POSITION: DrawablePoint = DrawablePoint { x: 320.0, y: 240.0 };
@@ -1511,6 +1565,53 @@ mod tests {
                 .slide_shape_shadow(0, created.drawable_object_id)
                 .unwrap(),
             inherited
+        );
+    }
+
+    #[test]
+    fn scratch_presentation_supports_shape_text_layout_crud() {
+        let mut editor = KeynoteDocumentBuilder::new()
+            .title("Layout")
+            .subtitle("Typed frame layout")
+            .build()
+            .unwrap();
+        let created = editor
+            .add_slide_shape(0, "Layout", POSITION, SIZE, ShapePreset::Rectangle)
+            .unwrap();
+        let inherited = editor
+            .slide_shape_text_layout(0, created.drawable_object_id)
+            .unwrap();
+        let layout = ShapeTextLayout::new(
+            ShapeTextVerticalAlignment::Middle,
+            ShapeTextInsets::uniform(ShapeTextInset::from_points(14.0).unwrap()),
+            ShapeTextAutoSize::ShrinkToFit,
+        );
+        editor
+            .set_slide_shape_text_layout(0, created.drawable_object_id, layout)
+            .unwrap();
+
+        let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .slide_shape_text_layout(0, created.drawable_object_id)
+                .unwrap(),
+            layout
+        );
+        assert!(
+            reopened
+                .reset_slide_shape_text_layout(0, created.drawable_object_id)
+                .unwrap()
+        );
+        assert_eq!(
+            reopened
+                .slide_shape_text_layout(0, created.drawable_object_id)
+                .unwrap(),
+            inherited
+        );
+        assert!(
+            !reopened
+                .reset_slide_shape_text_layout(0, created.drawable_object_id)
+                .unwrap()
         );
     }
 

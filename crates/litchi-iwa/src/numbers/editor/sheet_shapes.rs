@@ -7,13 +7,14 @@ use super::*;
 use crate::shapes::{
     DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, LineEndpoints, LineSegment,
     LineStyle, RgbaColor, ShapeEffects, ShapeFill, ShapeImageFill, ShapeImageFillTechnique,
-    ShapePathKind, ShapePreset, ShapeShadow, ShapeStroke, line_geometry, line_path_source,
-    line_segments_match, reset_shape_effects, reset_shape_fill, reset_shape_shadow,
-    reset_shape_stroke, set_shape_effects, set_shape_fill, set_shape_geometry,
-    set_shape_image_fill_data, set_shape_line_endpoints, set_shape_line_segment, set_shape_preset,
-    set_shape_shadow, set_shape_stroke, shape_effects, shape_fill, shape_line_endpoints,
-    shape_line_segment, shape_path_kind, shape_path_source, shape_preset, shape_shadow,
-    shape_stroke,
+    ShapePathKind, ShapePreset, ShapeShadow, ShapeStroke, ShapeTextLayout, line_geometry,
+    line_path_source, line_segments_match, reset_shape_effects, reset_shape_fill,
+    reset_shape_shadow, reset_shape_stroke, reset_shape_text_layout, set_shape_effects,
+    set_shape_fill, set_shape_geometry, set_shape_image_fill_data, set_shape_line_endpoints,
+    set_shape_line_segment, set_shape_preset, set_shape_shadow, set_shape_stroke,
+    set_shape_text_layout, shape_effects, shape_fill, shape_line_endpoints, shape_line_segment,
+    shape_path_kind, shape_path_source, shape_preset, shape_shadow, shape_stroke,
+    shape_text_layout,
 };
 
 use super::text_box_create::{
@@ -565,6 +566,58 @@ impl NumbersEditor {
     ) -> Result<bool> {
         let source = shape_graph(self, sheet_id, drawable_object_id)?;
         let (staged, changed) = reset_shape_shadow(
+            self.package.clone(),
+            &source.archive_name,
+            drawable_object_id,
+        )?;
+        if changed {
+            *self = Self::from_package(staged)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read effective vertical alignment, edge insets, and autosizing.
+    pub fn sheet_shape_text_layout(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<ShapeTextLayout> {
+        let source = shape_graph(self, sheet_id, drawable_object_id)?;
+        shape_text_layout(&self.package, &source.archive_name, drawable_object_id)
+    }
+
+    /// Replace frame-level text layout while preserving drawing style and columns.
+    pub fn set_sheet_shape_text_layout(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        layout: ShapeTextLayout,
+    ) -> Result<()> {
+        let source = shape_graph(self, sheet_id, drawable_object_id)?;
+        let staged = set_shape_text_layout(
+            self.package.clone(),
+            &source.archive_name,
+            drawable_object_id,
+            layout,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.sheet_shape_text_layout(sheet_id, drawable_object_id)? != layout {
+            return Err(Error::InvalidFormat(
+                "Numbers shape text-layout update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove direct frame-level text-layout overrides and restore inherited values.
+    pub fn reset_sheet_shape_text_layout(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let source = shape_graph(self, sheet_id, drawable_object_id)?;
+        let (staged, changed) = reset_shape_text_layout(
             self.package.clone(),
             &source.archive_name,
             drawable_object_id,
@@ -1157,7 +1210,8 @@ mod tests {
         LineEndpoint, RgbColorSpace, RgbaColor, ShapeContactShadow, ShapeCornerRadius,
         ShapeGradient, ShapeGradientAngle, ShapeOpacity, ShapeReflection, ShapeReflectionOpacity,
         ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowOffset, ShapeShadowOpacity,
-        ShapeShadowPerspective, StrokePattern, StrokeWidth,
+        ShapeShadowPerspective, ShapeTextAutoSize, ShapeTextInset, ShapeTextInsets,
+        ShapeTextVerticalAlignment, StrokePattern, StrokeWidth,
     };
 
     const POSITION: DrawablePoint = DrawablePoint { x: 420.0, y: 300.0 };
@@ -1544,6 +1598,54 @@ mod tests {
                 .sheet_shape_shadow(sheet_id, created.drawable_object_id)
                 .unwrap(),
             inherited
+        );
+    }
+
+    #[test]
+    fn scratch_spreadsheet_supports_shape_text_layout_crud() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .sheet_name("Layout")
+            .table_name("Data")
+            .build()
+            .unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let created = editor
+            .add_sheet_shape(sheet_id, "Layout", POSITION, SIZE, ShapePreset::Rectangle)
+            .unwrap();
+        let inherited = editor
+            .sheet_shape_text_layout(sheet_id, created.drawable_object_id)
+            .unwrap();
+        let layout = ShapeTextLayout::new(
+            ShapeTextVerticalAlignment::Bottom,
+            ShapeTextInsets::uniform(ShapeTextInset::from_points(9.0).unwrap()),
+            ShapeTextAutoSize::Fixed,
+        );
+        editor
+            .set_sheet_shape_text_layout(sheet_id, created.drawable_object_id, layout)
+            .unwrap();
+
+        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .sheet_shape_text_layout(sheet_id, created.drawable_object_id)
+                .unwrap(),
+            layout
+        );
+        assert!(
+            reopened
+                .reset_sheet_shape_text_layout(sheet_id, created.drawable_object_id)
+                .unwrap()
+        );
+        assert_eq!(
+            reopened
+                .sheet_shape_text_layout(sheet_id, created.drawable_object_id)
+                .unwrap(),
+            inherited
+        );
+        assert!(
+            !reopened
+                .reset_sheet_shape_text_layout(sheet_id, created.drawable_object_id)
+                .unwrap()
         );
     }
 

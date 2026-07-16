@@ -36,6 +36,12 @@ const TSD_SHADOW_FIELD: u32 = 4;
 const TSD_REFLECTION_FIELD: u32 = 5;
 const TSD_HEAD_LINE_END_FIELD: u32 = 6;
 const TSD_TAIL_LINE_END_FIELD: u32 = 7;
+const TSWP_SHRINK_TO_FIT_FIELD: u32 = 1;
+const TSWP_VERTICAL_ALIGNMENT_FIELD: u32 = 2;
+const TSWP_COLUMNS_NULL_FIELD: u32 = 3;
+const TSWP_COLUMNS_FIELD: u32 = 4;
+const TSWP_PADDING_NULL_FIELD: u32 = 5;
+const TSWP_PADDING_FIELD: u32 = 6;
 const SHAPE_INFO_SUPER_FIELD: u32 = 1;
 const DRAWABLE_STYLE_FIELD: u32 = 2;
 const REFERENCE_IDENTIFIER_FIELD: u32 = 1;
@@ -52,6 +58,12 @@ pub(crate) struct ShapeStyleOverrides {
     pub(crate) reflection: Option<tsd::ReflectionArchive>,
     pub(crate) head_line_end: Option<tsd::LineEndArchive>,
     pub(crate) tail_line_end: Option<tsd::LineEndArchive>,
+    pub(crate) shrink_to_fit: Option<bool>,
+    pub(crate) vertical_alignment: Option<i32>,
+    pub(crate) columns_null: Option<bool>,
+    pub(crate) columns: Option<tswp::ColumnsArchive>,
+    pub(crate) padding_null: Option<bool>,
+    pub(crate) padding: Option<tswp::PaddingArchive>,
 }
 
 impl ShapeStyleOverrides {
@@ -63,6 +75,12 @@ impl ShapeStyleOverrides {
             + u32::from(self.reflection.is_some())
             + u32::from(self.head_line_end.is_some())
             + u32::from(self.tail_line_end.is_some())
+            + u32::from(self.shrink_to_fit.is_some())
+            + u32::from(self.vertical_alignment.is_some())
+            + u32::from(self.columns_null.is_some())
+            + u32::from(self.columns.is_some())
+            + u32::from(self.padding_null.is_some())
+            + u32::from(self.padding.is_some())
     }
 
     pub(crate) fn is_empty(&self) -> bool {
@@ -82,6 +100,9 @@ pub(crate) fn direct_shape_style_overrides(
     let Some(properties) = style.super_.shape_properties.as_ref() else {
         return Ok(None);
     };
+    let Some(text_properties) = style.shape_properties.as_ref() else {
+        return Ok(None);
+    };
     let overrides = ShapeStyleOverrides {
         fill: properties.fill.clone(),
         stroke: properties.stroke.clone(),
@@ -90,6 +111,12 @@ pub(crate) fn direct_shape_style_overrides(
         reflection: properties.reflection,
         head_line_end: properties.head_line_end.clone(),
         tail_line_end: properties.tail_line_end.clone(),
+        shrink_to_fit: text_properties.shrink_to_fit,
+        vertical_alignment: text_properties.vertical_alignment,
+        columns_null: text_properties.columns_null,
+        columns: text_properties.columns.clone(),
+        padding_null: text_properties.padding_null,
+        padding: text_properties.padding,
     };
     let override_count = overrides.override_count();
     let endpoints_are_paired =
@@ -97,10 +124,11 @@ pub(crate) fn direct_shape_style_overrides(
     let semantic = override_count > 0
         && endpoints_are_paired
         && style.override_count == Some(override_count)
-        && style
-            .shape_properties
-            .as_ref()
-            .is_some_and(|properties| properties == &Default::default())
+        && text_properties.default_text_preset_index.is_none()
+        && text_properties.vertical_text.is_none()
+        && text_properties.paragraph_style_null.is_none()
+        && text_properties.paragraph_style.is_none()
+        && text_properties.vertical_text_40.is_none()
         && style.super_.override_count == Some(override_count)
         && style.super_.super_.name.is_none()
         && style.super_.super_.style_identifier.is_none()
@@ -146,6 +174,25 @@ pub(crate) fn direct_shape_style_overrides(
     if overrides.tail_line_end.is_some() {
         property_fields.push(TSD_TAIL_LINE_END_FIELD);
     }
+    let mut text_property_fields = Vec::with_capacity(6);
+    if overrides.shrink_to_fit.is_some() {
+        text_property_fields.push(TSWP_SHRINK_TO_FIT_FIELD);
+    }
+    if overrides.vertical_alignment.is_some() {
+        text_property_fields.push(TSWP_VERTICAL_ALIGNMENT_FIELD);
+    }
+    if overrides.columns_null.is_some() {
+        text_property_fields.push(TSWP_COLUMNS_NULL_FIELD);
+    }
+    if overrides.columns.is_some() {
+        text_property_fields.push(TSWP_COLUMNS_FIELD);
+    }
+    if overrides.padding_null.is_some() {
+        text_property_fields.push(TSWP_PADDING_NULL_FIELD);
+    }
+    if overrides.padding.is_some() {
+        text_property_fields.push(TSWP_PADDING_FIELD);
+    }
     let exact = has_exact_fields(
         raw,
         &[
@@ -168,7 +215,7 @@ pub(crate) fn direct_shape_style_overrides(
             TSS_STYLE_STYLESHEET_FIELD,
         ],
     )? && has_exact_fields(tsd_properties, &property_fields)?
-        && has_exact_fields(tswp_properties, &[])?;
+        && has_exact_fields(tswp_properties, &text_property_fields)?;
     Ok(exact.then_some(overrides))
 }
 
@@ -297,7 +344,15 @@ pub(crate) fn shape_style_variation_object(
             }),
         },
         override_count: Some(override_count),
-        shape_properties: Some(tswp::ShapeStylePropertiesArchive::default()),
+        shape_properties: Some(tswp::ShapeStylePropertiesArchive {
+            shrink_to_fit: overrides.shrink_to_fit,
+            vertical_alignment: overrides.vertical_alignment,
+            columns_null: overrides.columns_null,
+            columns: overrides.columns,
+            padding_null: overrides.padding_null,
+            padding: overrides.padding,
+            ..Default::default()
+        }),
     }
     .encode_to_vec();
     tswp::ShapeStyleArchive::decode(data.as_slice())?;

@@ -8,6 +8,8 @@ use litchi_iwa::shapes::{
     ShapeFill, ShapeGradient, ShapeGradientAngle, ShapeImageFillTechnique, ShapeOpacity,
     ShapePreset, ShapeReflection, ShapeReflectionOpacity, ShapeShadow, ShapeShadowAngle,
     ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowOffset, ShapeShadowOpacity,
+    ShapeTextAutoSize, ShapeTextInset, ShapeTextInsets, ShapeTextLayout,
+    ShapeTextVerticalAlignment,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -68,6 +70,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ),
             ShapeShadowAngle::from_degrees(135.0)?,
         )),
+    )?;
+    editor.set_body_shape_text_layout(
+        created.drawable_object_id,
+        ShapeTextLayout::new(
+            ShapeTextVerticalAlignment::Middle,
+            ShapeTextInsets::uniform(ShapeTextInset::from_points(12.0)?),
+            ShapeTextAutoSize::Fixed,
+        ),
     )?;
     editor.save(output)?;
     println!(

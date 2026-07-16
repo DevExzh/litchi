@@ -9,7 +9,8 @@ use litchi_iwa::shapes::{
     ShapeGradientStop, ShapeGradientStopMidpoint, ShapeGradientStopPosition,
     ShapeImageFillTechnique, ShapeOpacity, ShapePreset, ShapeReflection, ShapeReflectionOpacity,
     ShapeShadow, ShapeShadowAngle, ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowCurve,
-    ShapeShadowOffset, ShapeShadowOpacity,
+    ShapeShadowOffset, ShapeShadowOpacity, ShapeTextAutoSize, ShapeTextInset, ShapeTextInsets,
+    ShapeTextLayout, ShapeTextVerticalAlignment,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -88,6 +89,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ShapeShadowAngle::from_degrees(310.0)?,
             ShapeShadowCurve::new(0.2)?,
         )),
+    )?;
+    editor.set_slide_shape_text_layout(
+        0,
+        created.drawable_object_id,
+        ShapeTextLayout::new(
+            ShapeTextVerticalAlignment::Middle,
+            ShapeTextInsets::uniform(ShapeTextInset::from_points(14.0)?),
+            ShapeTextAutoSize::ShrinkToFit,
+        ),
     )?;
     editor.save(output)?;
     println!(

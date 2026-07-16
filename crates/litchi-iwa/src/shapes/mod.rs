@@ -18,6 +18,7 @@ mod properties;
 mod shadow;
 mod stroke;
 pub mod text_extractor;
+mod text_layout;
 
 pub use color::{RgbColorSpace, RgbaColor};
 pub use effects::{ShapeEffects, ShapeOpacity, ShapeReflection, ShapeReflectionOpacity};
@@ -57,3 +58,7 @@ pub use stroke::{
 };
 pub(crate) use stroke::{reset_shape_stroke, set_shape_stroke, shape_stroke};
 pub use text_extractor::ShapeTextExtractor;
+pub use text_layout::{
+    ShapeTextAutoSize, ShapeTextInset, ShapeTextInsets, ShapeTextLayout, ShapeTextVerticalAlignment,
+};
+pub(crate) use text_layout::{reset_shape_text_layout, set_shape_text_layout, shape_text_layout};

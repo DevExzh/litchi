@@ -10,12 +10,13 @@ use crate::package_metadata::{
 use crate::shapes::{
     DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, LineEndpoints, LineSegment,
     LineStyle, RgbaColor, ShapeEffects, ShapeFill, ShapeImageFill, ShapeImageFillTechnique,
-    ShapePathKind, ShapePreset, ShapeShadow, ShapeStroke, line_geometry, line_path_source,
-    line_segments_match, reset_shape_effects, reset_shape_fill, reset_shape_shadow,
-    reset_shape_stroke, set_shape_effects, set_shape_fill, set_shape_geometry,
-    set_shape_image_fill_data, set_shape_line_endpoints, set_shape_line_segment, set_shape_preset,
-    set_shape_shadow, set_shape_stroke, shape_effects, shape_fill, shape_line_endpoints,
-    shape_path_source, shape_shadow, shape_stroke,
+    ShapePathKind, ShapePreset, ShapeShadow, ShapeStroke, ShapeTextLayout, line_geometry,
+    line_path_source, line_segments_match, reset_shape_effects, reset_shape_fill,
+    reset_shape_shadow, reset_shape_stroke, reset_shape_text_layout, set_shape_effects,
+    set_shape_fill, set_shape_geometry, set_shape_image_fill_data, set_shape_line_endpoints,
+    set_shape_line_segment, set_shape_preset, set_shape_shadow, set_shape_stroke,
+    set_shape_text_layout, shape_effects, shape_fill, shape_line_endpoints, shape_path_source,
+    shape_shadow, shape_stroke, shape_text_layout,
 };
 
 use super::text_box_create::{
@@ -534,6 +535,49 @@ impl PagesEditor {
         Ok(changed)
     }
 
+    /// Read effective vertical alignment, edge insets, and autosizing.
+    pub fn body_shape_text_layout(&self, drawable_object_id: u64) -> Result<ShapeTextLayout> {
+        let source = body_shape_graph(self, drawable_object_id)?;
+        shape_text_layout(self.package(), &source.archive_name, drawable_object_id)
+    }
+
+    /// Replace frame-level text layout while preserving drawing style and columns.
+    pub fn set_body_shape_text_layout(
+        &mut self,
+        drawable_object_id: u64,
+        layout: ShapeTextLayout,
+    ) -> Result<()> {
+        let source = body_shape_graph(self, drawable_object_id)?;
+        let staged = set_shape_text_layout(
+            self.package().clone(),
+            &source.archive_name,
+            drawable_object_id,
+            layout,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.body_shape_text_layout(drawable_object_id)? != layout {
+            return Err(Error::InvalidFormat(
+                "Pages shape text-layout update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove direct frame-level text-layout overrides and restore inherited values.
+    pub fn reset_body_shape_text_layout(&mut self, drawable_object_id: u64) -> Result<bool> {
+        let source = body_shape_graph(self, drawable_object_id)?;
+        let (staged, changed) = reset_shape_text_layout(
+            self.package().clone(),
+            &source.archive_name,
+            drawable_object_id,
+        )?;
+        if changed {
+            *self = Self::from_package(staged)?;
+        }
+        Ok(changed)
+    }
+
     /// Move or resize one native straight line by replacing its endpoints.
     pub fn set_body_line_segment(
         &mut self,
@@ -753,7 +797,8 @@ mod tests {
         LineEndpoint, RgbColorSpace, RgbaColor, ShapeCornerRadius, ShapeDropShadow, ShapeGradient,
         ShapeGradientAngle, ShapeOpacity, ShapeReflection, ShapeReflectionOpacity,
         ShapeShadowAngle, ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowOffset,
-        ShapeShadowOpacity, StrokePattern, StrokeWidth,
+        ShapeShadowOpacity, ShapeTextAutoSize, ShapeTextInset, ShapeTextInsets,
+        ShapeTextVerticalAlignment, StrokePattern, StrokeWidth,
     };
 
     const POSITION: DrawablePoint = DrawablePoint { x: 180.0, y: 240.0 };
@@ -1304,6 +1349,73 @@ mod tests {
         assert!(
             !reopened
                 .reset_body_shape_shadow(created.drawable_object_id)
+                .unwrap()
+        );
+    }
+
+    #[test]
+    fn scratch_document_supports_shape_text_layout_crud() {
+        let mut editor = PagesEditor::create_with_text("Body").unwrap();
+        let created = editor
+            .add_body_shape(4, "Layout", POSITION, SIZE, ShapePreset::Rectangle)
+            .unwrap();
+        let inherited = editor
+            .body_shape_text_layout(created.drawable_object_id)
+            .unwrap();
+        let shadow = ShapeShadow::Drop(ShapeDropShadow::new(
+            ShapeShadowAppearance::new(
+                RgbaColor::black(),
+                ShapeShadowBlurRadius::from_points(7).unwrap(),
+                ShapeShadowOffset::from_points(11.0).unwrap(),
+                ShapeShadowOpacity::new(0.42).unwrap(),
+            ),
+            ShapeShadowAngle::from_degrees(135.0).unwrap(),
+        ));
+        editor
+            .set_body_shape_shadow(created.drawable_object_id, shadow)
+            .unwrap();
+        let layout = ShapeTextLayout::new(
+            ShapeTextVerticalAlignment::Middle,
+            ShapeTextInsets::uniform(ShapeTextInset::from_points(12.0).unwrap()),
+            ShapeTextAutoSize::Fixed,
+        );
+        editor
+            .set_body_shape_text_layout(created.drawable_object_id, layout)
+            .unwrap();
+
+        let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .body_shape_text_layout(created.drawable_object_id)
+                .unwrap(),
+            layout
+        );
+        assert_eq!(
+            reopened
+                .body_shape_shadow(created.drawable_object_id)
+                .unwrap(),
+            shadow
+        );
+        assert!(
+            reopened
+                .reset_body_shape_text_layout(created.drawable_object_id)
+                .unwrap()
+        );
+        assert_eq!(
+            reopened
+                .body_shape_text_layout(created.drawable_object_id)
+                .unwrap(),
+            inherited
+        );
+        assert_eq!(
+            reopened
+                .body_shape_shadow(created.drawable_object_id)
+                .unwrap(),
+            shadow
+        );
+        assert!(
+            !reopened
+                .reset_body_shape_text_layout(created.drawable_object_id)
                 .unwrap()
         );
     }
