@@ -29,7 +29,7 @@ use crate::text::{
     IWorkTextEditor, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphIndents,
     ParagraphLineSpacing, ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment,
     TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumns, TextDecorations,
-    TextLigatures, TextScript, TextStorageInfo, TextStyle,
+    TextLigatures, TextOutline, TextScript, TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     append_repeated_length_delimited_field, parse_wire_fields, patch_fixed32_field,
@@ -1610,6 +1610,51 @@ impl KeynoteEditor {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();
         let changed = staged.reset_text_ligatures(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective outline of an ordinary slide text box.
+    pub fn slide_text_box_text_outline(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<TextOutline> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text.text_outline(graph.storage_id)
+    }
+
+    /// Atomically set a typed outline across an ordinary slide text box.
+    pub fn set_slide_text_box_text_outline(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        outline: TextOutline,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_text_outline(graph.storage_id, outline)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified.slide_text_box_text_outline(slide_index, drawable_object_id)? != outline {
+            return Err(Error::InvalidFormat(
+                "Keynote text-box outline update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore the inherited outline while preserving sibling overrides.
+    pub fn reset_slide_text_box_text_outline(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_text_outline(graph.storage_id)?;
         if changed {
             *self = Self::from_package(staged.into_package())?;
         }

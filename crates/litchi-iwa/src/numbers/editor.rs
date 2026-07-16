@@ -41,7 +41,7 @@ use crate::text::{
     IWorkTextEditor, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphIndents,
     ParagraphLineSpacing, ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment,
     TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumns, TextDecorations,
-    TextLigatures, TextScript, TextStorageInfo, TextStyle,
+    TextLigatures, TextOutline, TextScript, TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     patch_length_delimited_field, patch_nested_fixed32_field, patch_nested_length_delimited_field,
@@ -941,6 +941,51 @@ impl NumbersEditor {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
         let changed = text.reset_text_ligatures(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(text.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective outline of a sheet-owned text box.
+    pub fn sheet_text_box_text_outline(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<TextOutline> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        IWorkTextEditor::from_package(self.package.clone()).text_outline(graph.storage_id)
+    }
+
+    /// Atomically set a typed outline across a sheet-owned text box.
+    pub fn set_sheet_text_box_text_outline(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        outline: TextOutline,
+    ) -> Result<()> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        text.set_text_outline(graph.storage_id, outline)?;
+        let verified = Self::from_package(text.into_package())?;
+        if verified.sheet_text_box_text_outline(sheet_id, drawable_object_id)? != outline {
+            return Err(Error::InvalidFormat(
+                "Numbers text-box outline update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore the inherited outline while preserving sibling overrides.
+    pub fn reset_sheet_text_box_text_outline(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let changed = text.reset_text_outline(graph.storage_id)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
         }

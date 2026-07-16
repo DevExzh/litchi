@@ -80,6 +80,17 @@ impl RgbaColor {
             color_space: RgbColorSpace::Srgb,
         }
     }
+
+    /// Transparent sRGB black used by iWork's standard text-outline stroke.
+    pub const fn transparent_black() -> Self {
+        Self {
+            red: 0.0,
+            green: 0.0,
+            blue: 0.0,
+            alpha: 0.0,
+            color_space: RgbColorSpace::Srgb,
+        }
+    }
 }
 
 pub(crate) fn color_from_native(color: &tsp::Color) -> Result<RgbaColor> {

@@ -7,7 +7,9 @@ use prost::Message;
 
 use crate::archive::{ArchiveObject, RawMessage};
 use crate::protobuf::{tsd, tsp, tss, tswp};
-use crate::shapes::{RgbaColor, color_from_native, color_to_native};
+use crate::shapes::{
+    RgbaColor, color_from_native, color_to_native, stroke_from_native, stroke_to_native,
+};
 use crate::wire::{parse_wire_fields, repeated_length_delimited_payloads};
 use crate::{Error, IWorkPackage, Result};
 
@@ -16,7 +18,7 @@ use super::super::style::{
     ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingMultiple,
     ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, TextAlignment,
     TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextDecorations, TextLigatures,
-    TextPointSize, TextScript, TextStrikethrough, TextStyle, TextUnderline,
+    TextOutline, TextPointSize, TextScript, TextStrikethrough, TextStyle, TextUnderline,
 };
 use super::super::style_registry::object_archive_name;
 
@@ -42,6 +44,8 @@ const CHARACTER_CAPITALIZATION_FIELD: u32 = 13;
 const CHARACTER_BASELINE_SHIFT_FIELD: u32 = 14;
 const CHARACTER_LIGATURES_FIELD: u32 = 16;
 const CHARACTER_TRACKING_FIELD: u32 = 27;
+const CHARACTER_DRAWING_STROKE_NULL_FIELD: u32 = 43;
+const CHARACTER_DRAWING_STROKE_FIELD: u32 = 44;
 const CHARACTER_DRAWING_FILL_FIELD: u32 = 46;
 const CHARACTER_CAPITALIZATION_LINGUISTICS_FIELD: u32 = 41;
 const DRAWING_FILL_COLOR_FIELD: u32 = 1;
@@ -85,6 +89,7 @@ pub(super) struct ParagraphStyleOverrides {
     pub(super) baseline_shift: Option<TextBaselineShift>,
     pub(super) character_spacing: Option<TextCharacterSpacing>,
     pub(super) ligatures: Option<TextLigatures>,
+    pub(super) outline: Option<TextOutline>,
     pub(super) underline: Option<TextUnderline>,
     pub(super) strikethrough: Option<TextStrikethrough>,
     pub(super) alignment: Option<TextAlignment>,
@@ -110,6 +115,7 @@ impl ParagraphStyleOverrides {
             + u32::from(self.baseline_shift.is_some())
             + u32::from(self.character_spacing.is_some())
             + u32::from(self.ligatures.is_some())
+            + u32::from(self.outline.is_some())
             + u32::from(self.underline.is_some())
             + u32::from(self.strikethrough.is_some())
             + u32::from(self.alignment.is_some())
@@ -221,6 +227,13 @@ pub(super) fn inherited_text_ligatures(
     inheritance::text_ligatures(package, first_style_id)
 }
 
+pub(super) fn inherited_text_outline(
+    package: &IWorkPackage,
+    first_style_id: u64,
+) -> Result<TextOutline> {
+    inheritance::text_outline(package, first_style_id)
+}
+
 pub(super) fn inherited_line_spacing(
     package: &IWorkPackage,
     first_style_id: u64,
@@ -283,6 +296,7 @@ pub(super) fn direct_overrides(
         .ligatures
         .map(TextLigatures::from_native_value)
         .transpose()?;
+    let outline = text_outline_from_character(character_properties)?;
     let underline = character_properties
         .underline
         .map(TextUnderline::from_native_value)
@@ -335,6 +349,7 @@ pub(super) fn direct_overrides(
         baseline_shift,
         character_spacing,
         ligatures,
+        outline,
         underline,
         strikethrough,
         alignment,
@@ -369,6 +384,10 @@ pub(super) fn direct_overrides(
     remaining_character.baseline_shift = None;
     remaining_character.tracking = None;
     remaining_character.ligatures = None;
+    if outline.is_some() {
+        remaining_character.tsd_stroke_null = None;
+        remaining_character.tsd_stroke = None;
+    }
     remaining_character.underline = None;
     remaining_character.strikethru = None;
     let semantic = !overrides.is_empty()
@@ -395,7 +414,7 @@ pub(super) fn direct_overrides(
         STYLE_PARAGRAPH_PROPERTIES_FIELD,
         "paragraph properties",
     )?;
-    let mut character_fields = Vec::with_capacity(13);
+    let mut character_fields = Vec::with_capacity(14);
     if bold.is_some() {
         character_fields.push(CHARACTER_BOLD_FIELD);
     }
@@ -447,6 +466,12 @@ pub(super) fn direct_overrides(
     }
     if ligatures.is_some() {
         character_fields.push(CHARACTER_LIGATURES_FIELD);
+    }
+    if let Some(outline) = outline {
+        character_fields.push(match outline {
+            TextOutline::None => CHARACTER_DRAWING_STROKE_NULL_FIELD,
+            TextOutline::Stroke(_) => CHARACTER_DRAWING_STROKE_FIELD,
+        });
     }
     if underline.is_some() {
         character_fields.push(CHARACTER_UNDERLINE_FIELD);
@@ -549,6 +574,11 @@ pub(super) fn variation_object(
                 .character_spacing
                 .map(TextCharacterSpacing::native_ratio),
             ligatures: overrides.ligatures.map(TextLigatures::native_value),
+            tsd_stroke_null: matches!(overrides.outline, Some(TextOutline::None)).then_some(true),
+            tsd_stroke: overrides.outline.and_then(|outline| match outline {
+                TextOutline::None => None,
+                TextOutline::Stroke(stroke) => Some(stroke_to_native(stroke)),
+            }),
             underline: overrides.underline.map(TextUnderline::native_value),
             strikethru: overrides.strikethrough.map(TextStrikethrough::native_value),
             tsd_fill: overrides.font_color.map(|color| tsd::FillArchive {
@@ -592,6 +622,11 @@ pub(super) fn variation_object(
             .field_infos
             .push(text_fill_field_info());
     }
+    if matches!(overrides.outline, Some(TextOutline::Stroke(_))) {
+        object.archive_info.message_infos[0]
+            .field_infos
+            .push(text_stroke_field_info());
+    }
     Ok(object)
 }
 
@@ -605,6 +640,10 @@ pub(super) fn replace_variation(
         .field_infos
         .iter()
         .any(is_text_fill_field_info);
+    let has_text_stroke_info = replacement.archive_info.message_infos[0]
+        .field_infos
+        .iter()
+        .any(is_text_stroke_field_info);
     let message = replacement.messages.pop().ok_or_else(|| {
         Error::InvalidFormat("replacement paragraph style has no payload".to_owned())
     })?;
@@ -632,9 +671,12 @@ pub(super) fn replace_variation(
         object.replace_message(*index, message)?;
         let info = &mut object.archive_info.message_infos[*index];
         info.field_infos
-            .retain(|field| !is_text_fill_field_info(field));
+            .retain(|field| !is_text_fill_field_info(field) && !is_text_stroke_field_info(field));
         if has_text_fill_info {
             info.field_infos.push(text_fill_field_info());
+        }
+        if has_text_stroke_info {
+            info.field_infos.push(text_stroke_field_info());
         }
         Ok(())
     })
@@ -680,6 +722,32 @@ pub(super) fn text_color_from_character(
     }
 }
 
+pub(super) fn text_outline_from_character(
+    properties: &tswp::CharacterStylePropertiesArchive,
+) -> Result<Option<TextOutline>> {
+    if properties.tsd_stroke_null == Some(true) {
+        if properties.tsd_stroke.is_some() {
+            return Err(Error::InvalidFormat(
+                "native iWork text outline is both null and populated".to_owned(),
+            ));
+        }
+        return Ok(Some(TextOutline::None));
+    }
+    if properties.tsd_stroke_null == Some(false) && properties.tsd_stroke.is_none() {
+        return Err(Error::InvalidFormat(
+            "native iWork text outline has a false null marker without a stroke".to_owned(),
+        ));
+    }
+    properties
+        .tsd_stroke
+        .as_ref()
+        .map(|stroke| {
+            stroke_from_native(stroke)
+                .map(|outline| outline.map_or(TextOutline::None, TextOutline::Stroke))
+        })
+        .transpose()
+}
+
 pub(super) fn capitalization_from_character(
     properties: &tswp::CharacterStylePropertiesArchive,
 ) -> Result<Option<TextCapitalization>> {
@@ -723,11 +791,33 @@ fn text_fill_field_info() -> tsp::FieldInfo {
     }
 }
 
+fn text_stroke_field_info() -> tsp::FieldInfo {
+    tsp::FieldInfo {
+        path: tsp::FieldPath {
+            path: vec![
+                STYLE_CHARACTER_PROPERTIES_FIELD,
+                CHARACTER_DRAWING_STROKE_FIELD,
+            ],
+        },
+        r#type: Some(tsp::field_info::Type::Message as i32),
+        unknown_field_rule: Some(tsp::field_info::UnknownFieldRule::IgnoreAndPreserve as i32),
+        ..Default::default()
+    }
+}
+
 fn is_text_fill_field_info(field: &tsp::FieldInfo) -> bool {
     field.path.path
         == [
             STYLE_CHARACTER_PROPERTIES_FIELD,
             CHARACTER_DRAWING_FILL_FIELD,
+        ]
+}
+
+fn is_text_stroke_field_info(field: &tsp::FieldInfo) -> bool {
+    field.path.path
+        == [
+            STYLE_CHARACTER_PROPERTIES_FIELD,
+            CHARACTER_DRAWING_STROKE_FIELD,
         ]
 }
 

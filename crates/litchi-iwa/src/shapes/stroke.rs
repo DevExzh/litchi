@@ -12,7 +12,8 @@ mod native;
 mod style;
 
 #[cfg(test)]
-use native::{pattern_to_native, stroke_from_native, stroke_to_native};
+use native::pattern_to_native;
+pub(crate) use native::{stroke_from_native, stroke_to_native};
 pub(crate) use style::{reset_shape_stroke, set_shape_stroke, shape_stroke};
 
 /// A finite, positive stroke width measured in points.
@@ -20,6 +21,9 @@ pub(crate) use style::{reset_shape_stroke, set_shape_stroke, shape_stroke};
 pub struct StrokeWidth(f32);
 
 impl StrokeWidth {
+    /// One-point stroke used by standard iWork text outlines.
+    pub const ONE: Self = Self(1.0);
+
     pub fn new(points: f32) -> Result<Self> {
         if !points.is_finite() || points <= 0.0 {
             return Err(Error::ParseError(

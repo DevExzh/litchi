@@ -16,7 +16,7 @@ const ROUNDED_DOT_LENGTH: f32 = 0.001;
 const ROUNDED_DOT_GAP: f32 = 2.0;
 const NATIVE_PATTERN_CAPACITY: usize = 6;
 
-pub(super) fn stroke_from_native(stroke: &tsd::StrokeArchive) -> Result<Option<ShapeStroke>> {
+pub(crate) fn stroke_from_native(stroke: &tsd::StrokeArchive) -> Result<Option<ShapeStroke>> {
     if stroke.smart_stroke.is_some() || stroke.frame.is_some() || stroke.patterned_stroke.is_some()
     {
         return Err(Error::InvalidFormat(
@@ -101,7 +101,7 @@ pub(super) fn stroke_from_native(stroke: &tsd::StrokeArchive) -> Result<Option<S
     }))
 }
 
-pub(super) fn stroke_to_native(stroke: ShapeStroke) -> tsd::StrokeArchive {
+pub(crate) fn stroke_to_native(stroke: ShapeStroke) -> tsd::StrokeArchive {
     tsd::StrokeArchive {
         color: Some(color_to_native(stroke.color)),
         width: Some(stroke.width.points()),

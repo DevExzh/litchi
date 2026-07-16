@@ -15,8 +15,8 @@ use self::native::ParagraphStyleOverrides;
 use super::paragraph_tabs::ParagraphTabStops;
 use super::style::{
     ParagraphIndents, ParagraphLineSpacing, ParagraphSpacing, TextAlignment, TextBaselineShift,
-    TextCapitalization, TextCharacterSpacing, TextDecorations, TextLigatures, TextScript,
-    TextStyle,
+    TextCapitalization, TextCharacterSpacing, TextDecorations, TextLigatures, TextOutline,
+    TextScript, TextStyle,
 };
 use super::style_registry::{
     object_archive_name, register_private_style, unregister_private_style,
@@ -32,6 +32,7 @@ enum ParagraphProperty<'a> {
     TextBaselineShift(TextBaselineShift),
     TextCharacterSpacing(TextCharacterSpacing),
     TextLigatures(TextLigatures),
+    TextOutline(TextOutline),
     Alignment(TextAlignment),
     LineSpacing(ParagraphLineSpacing),
     Spacing(ParagraphSpacing),
@@ -49,6 +50,7 @@ enum ParagraphPropertyKind {
     TextBaselineShift,
     TextCharacterSpacing,
     TextLigatures,
+    TextOutline,
     Alignment,
     LineSpacing,
     Spacing,
@@ -67,6 +69,7 @@ enum InheritedCharacterProperty {
     TextBaselineShift(TextBaselineShift),
     TextCharacterSpacing(TextCharacterSpacing),
     TextLigatures(TextLigatures),
+    TextOutline(TextOutline),
 }
 
 pub(super) fn text_style(package: &IWorkPackage, storage_id: u64) -> Result<TextStyle> {
@@ -277,6 +280,26 @@ pub(super) fn set_text_ligatures(
 
 pub(super) fn reset_text_ligatures(package: &mut IWorkPackage, storage_id: u64) -> Result<bool> {
     reset_property(package, storage_id, ParagraphPropertyKind::TextLigatures)
+}
+
+pub(super) fn text_outline(package: &IWorkPackage, storage_id: u64) -> Result<TextOutline> {
+    let storage = storage::locate(package, storage_id)?;
+    native::inherited_text_outline(package, storage.style_id)
+}
+
+pub(super) fn set_text_outline(
+    package: &mut IWorkPackage,
+    storage_id: u64,
+    outline: TextOutline,
+) -> Result<()> {
+    if text_outline(package, storage_id)? == outline {
+        return Ok(());
+    }
+    set_property(package, storage_id, ParagraphProperty::TextOutline(outline))
+}
+
+pub(super) fn reset_text_outline(package: &mut IWorkPackage, storage_id: u64) -> Result<bool> {
+    reset_property(package, storage_id, ParagraphPropertyKind::TextOutline)
 }
 
 pub(super) fn paragraph_alignment(
@@ -593,6 +616,10 @@ fn inherited_character_property(
             native::inherited_text_ligatures(package, parent_style_id)
                 .map(InheritedCharacterProperty::TextLigatures)
         },
+        ParagraphProperty::TextOutline(_) => {
+            native::inherited_text_outline(package, parent_style_id)
+                .map(InheritedCharacterProperty::TextOutline)
+        },
         _ => Ok(InheritedCharacterProperty::None),
     }
 }
@@ -674,6 +701,14 @@ fn apply_property(
             };
             overrides.ligatures = (*ligatures != inherited).then_some(*ligatures);
         },
+        ParagraphProperty::TextOutline(outline) => {
+            let InheritedCharacterProperty::TextOutline(inherited) = inherited else {
+                return Err(Error::InvalidFormat(
+                    "text outline mutation has no inherited character formatting".to_owned(),
+                ));
+            };
+            overrides.outline = (*outline != inherited).then_some(*outline);
+        },
         ParagraphProperty::Alignment(alignment) => overrides.alignment = Some(*alignment),
         ParagraphProperty::LineSpacing(spacing) => overrides.line_spacing = Some(*spacing),
         ParagraphProperty::Spacing(spacing) => {
@@ -706,6 +741,7 @@ fn has_property(overrides: &ParagraphStyleOverrides, kind: ParagraphPropertyKind
         ParagraphPropertyKind::TextBaselineShift => overrides.baseline_shift.is_some(),
         ParagraphPropertyKind::TextCharacterSpacing => overrides.character_spacing.is_some(),
         ParagraphPropertyKind::TextLigatures => overrides.ligatures.is_some(),
+        ParagraphPropertyKind::TextOutline => overrides.outline.is_some(),
         ParagraphPropertyKind::Alignment => overrides.alignment.is_some(),
         ParagraphPropertyKind::LineSpacing => overrides.line_spacing.is_some(),
         ParagraphPropertyKind::Spacing => {
@@ -737,6 +773,7 @@ fn clear_property(overrides: &mut ParagraphStyleOverrides, kind: ParagraphProper
         ParagraphPropertyKind::TextBaselineShift => overrides.baseline_shift = None,
         ParagraphPropertyKind::TextCharacterSpacing => overrides.character_spacing = None,
         ParagraphPropertyKind::TextLigatures => overrides.ligatures = None,
+        ParagraphPropertyKind::TextOutline => overrides.outline = None,
         ParagraphPropertyKind::Alignment => overrides.alignment = None,
         ParagraphPropertyKind::LineSpacing => overrides.line_spacing = None,
         ParagraphPropertyKind::Spacing => {
@@ -781,6 +818,9 @@ fn inherited_property(
         )),
         ParagraphPropertyKind::TextLigatures => Ok(ParagraphProperty::TextLigatures(
             native::inherited_text_ligatures(package, style_id)?,
+        )),
+        ParagraphPropertyKind::TextOutline => Ok(ParagraphProperty::TextOutline(
+            native::inherited_text_outline(package, style_id)?,
         )),
         ParagraphPropertyKind::Alignment => Ok(ParagraphProperty::Alignment(
             native::inherited_alignment(package, style_id)?,
@@ -834,6 +874,7 @@ fn validate_expected_property(
         ParagraphProperty::TextLigatures(ligatures) => {
             text_ligatures(package, storage_id)? == ligatures
         },
+        ParagraphProperty::TextOutline(outline) => text_outline(package, storage_id)? == outline,
         ParagraphProperty::Alignment(alignment) => {
             paragraph_alignment(package, storage_id)? == alignment
         },

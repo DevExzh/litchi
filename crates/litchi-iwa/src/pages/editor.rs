@@ -32,7 +32,7 @@ use crate::text::{
     IWorkTextEditor, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphIndents,
     ParagraphLineSpacing, ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment,
     TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumns, TextDecorations,
-    TextLigatures, TextScript, TextStorageInfo, TextStyle,
+    TextLigatures, TextOutline, TextScript, TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     append_repeated_length_delimited_field, patch_fixed32_field, patch_length_delimited_field,
@@ -652,6 +652,42 @@ impl PagesEditor {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
         let changed = staged.reset_text_ligatures(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective outline of a reachable ordinary text box.
+    pub fn text_box_text_outline(&self, drawable_object_id: u64) -> Result<TextOutline> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        self.text.text_outline(graph.storage_id)
+    }
+
+    /// Atomically set a typed outline across a reachable ordinary text box.
+    pub fn set_text_box_text_outline(
+        &mut self,
+        drawable_object_id: u64,
+        outline: TextOutline,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_text_outline(graph.storage_id, outline)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified.text_box_text_outline(drawable_object_id)? != outline {
+            return Err(Error::InvalidFormat(
+                "Pages text-box outline update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore the inherited outline while preserving sibling overrides.
+    pub fn reset_text_box_text_outline(&mut self, drawable_object_id: u64) -> Result<bool> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_text_outline(graph.storage_id)?;
         if changed {
             *self = Self::from_package(staged.into_package())?;
         }

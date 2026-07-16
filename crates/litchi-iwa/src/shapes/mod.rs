@@ -60,7 +60,9 @@ pub(crate) use shadow::{reset_shape_shadow, set_shape_shadow, shape_shadow};
 pub use stroke::{
     LineStyle, ShapeStroke, StrokeCap, StrokeJoin, StrokeMiterLimit, StrokePattern, StrokeWidth,
 };
-pub(crate) use stroke::{reset_shape_stroke, set_shape_stroke, shape_stroke};
+pub(crate) use stroke::{
+    reset_shape_stroke, set_shape_stroke, shape_stroke, stroke_from_native, stroke_to_native,
+};
 pub(crate) use text_columns::{
     reset_shape_text_columns, set_shape_text_columns, shape_text_columns,
 };

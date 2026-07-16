@@ -3,6 +3,7 @@
 //! iWork documents support rich text with character-level and paragraph-level styling.
 
 use super::paragraph_tabs::ParagraphTabStops;
+use crate::shapes::{RgbaColor, ShapeStroke, StrokePattern, StrokeWidth};
 
 /// Positive character size in typographic points.
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
@@ -390,6 +391,32 @@ impl TextLigatures {
                 "unsupported native iWork ligature policy {value}"
             ))),
         }
+    }
+}
+
+/// Effective outline applied to uniformly styled text.
+///
+/// Current iWork applications store text outlines as the same typed TSD
+/// strokes used by drawing shapes. [`TextOutline::standard`] reproduces the
+/// one-point outline written by the Outline checkbox in Pages, Numbers, and
+/// Keynote.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub enum TextOutline {
+    /// Render text without an outline.
+    #[default]
+    None,
+    /// Render text using a standard native stroke.
+    Stroke(ShapeStroke),
+}
+
+impl TextOutline {
+    /// Construct the exact outline written by current iWork applications.
+    pub fn standard() -> Self {
+        Self::Stroke(ShapeStroke::new(
+            RgbaColor::transparent_black(),
+            StrokeWidth::ONE,
+            StrokePattern::Solid,
+        ))
     }
 }
 
