@@ -608,7 +608,7 @@ pub(crate) fn collapse_style_variation(
     Ok(())
 }
 
-fn remove_style_variation(
+pub(crate) fn remove_style_variation(
     package: &mut IWorkPackage,
     archive_name: &str,
     stylesheet_id: u64,
@@ -662,7 +662,7 @@ fn remove_style_variation(
                 .retain(|&reference| reference != style_id);
         }
         archive.remove_object(style_id).ok_or_else(|| {
-            Error::InvalidFormat(format!("disposable iWork shape style {style_id} is missing"))
+            Error::InvalidFormat(format!("disposable iWork style {style_id} is missing"))
         })?;
         Ok(())
     })
@@ -746,7 +746,7 @@ fn remove_style_registry_entry(
             .any(|style| style.identifier == style_id)
     {
         return Err(Error::InvalidFormat(
-            "iWork stylesheet retained a removed line style".to_owned(),
+            "iWork stylesheet retained a removed style".to_owned(),
         ));
     }
     Ok(data)

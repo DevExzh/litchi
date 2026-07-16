@@ -25,7 +25,7 @@ use crate::shapes::{
     reset_shape_text_layout, set_shape_geometry, set_shape_properties, set_shape_text_columns,
     set_shape_text_layout, shape_geometry, shape_properties, shape_text_columns, shape_text_layout,
 };
-use crate::text::{IWorkTextEditor, TextColumns, TextStorageInfo};
+use crate::text::{IWorkTextEditor, TextAlignment, TextColumns, TextStorageInfo};
 use crate::wire::{
     append_repeated_length_delimited_field, parse_wire_fields, patch_fixed32_field,
     patch_fixed64_field, patch_length_delimited_field, patch_nested_fixed32_field,
@@ -1242,6 +1242,53 @@ impl KeynoteEditor {
         )?;
         if changed {
             *self = Self::from_package(staged)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective paragraph alignment of an ordinary slide text box.
+    pub fn slide_text_box_paragraph_alignment(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<TextAlignment> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text.paragraph_alignment(graph.storage_id)
+    }
+
+    /// Set one paragraph alignment across an ordinary slide text box.
+    pub fn set_slide_text_box_paragraph_alignment(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        alignment: TextAlignment,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_paragraph_alignment(graph.storage_id, alignment)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified.slide_text_box_paragraph_alignment(slide_index, drawable_object_id)?
+            != alignment
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote text-box paragraph-alignment update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore inherited paragraph alignment after a private minimal override.
+    pub fn reset_slide_text_box_paragraph_alignment(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_paragraph_alignment(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
         }
         Ok(changed)
     }

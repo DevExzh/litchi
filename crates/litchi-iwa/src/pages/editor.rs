@@ -28,7 +28,7 @@ use crate::shapes::{
     set_shape_geometry, set_shape_properties, set_shape_text_columns, set_shape_text_layout,
     shape_geometry, shape_properties, shape_text_columns, shape_text_layout,
 };
-use crate::text::{IWorkTextEditor, TextColumns, TextStorageInfo};
+use crate::text::{IWorkTextEditor, TextAlignment, TextColumns, TextStorageInfo};
 use crate::wire::{
     append_repeated_length_delimited_field, patch_fixed32_field, patch_length_delimited_field,
     patch_nested_fixed32_field, patch_nested_varint_field, patch_varint_field,
@@ -349,6 +349,42 @@ impl PagesEditor {
             reset_shape_text_columns(self.package().clone(), &archive_name, drawable_object_id)?;
         if changed {
             *self = Self::from_package(staged)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective paragraph alignment of a reachable ordinary text box.
+    pub fn text_box_paragraph_alignment(&self, drawable_object_id: u64) -> Result<TextAlignment> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        self.text.paragraph_alignment(graph.storage_id)
+    }
+
+    /// Set one paragraph alignment across a reachable ordinary text box.
+    pub fn set_text_box_paragraph_alignment(
+        &mut self,
+        drawable_object_id: u64,
+        alignment: TextAlignment,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_paragraph_alignment(graph.storage_id, alignment)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified.text_box_paragraph_alignment(drawable_object_id)? != alignment {
+            return Err(Error::InvalidFormat(
+                "Pages text-box paragraph-alignment update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore inherited paragraph alignment after a private minimal override.
+    pub fn reset_text_box_paragraph_alignment(&mut self, drawable_object_id: u64) -> Result<bool> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_paragraph_alignment(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
         }
         Ok(changed)
     }

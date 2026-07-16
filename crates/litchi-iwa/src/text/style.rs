@@ -42,7 +42,7 @@ impl TextStyle {
 /// Paragraph style properties
 #[derive(Debug, Clone, Default)]
 pub struct ParagraphStyle {
-    /// Alignment (left, center, right, justify)
+    /// Native paragraph alignment.
     pub alignment: TextAlignment,
     /// First line indent (in points)
     pub first_line_indent: f32,
@@ -62,7 +62,7 @@ impl ParagraphStyle {
     /// Create a new default paragraph style
     pub fn new() -> Self {
         Self {
-            alignment: TextAlignment::Left,
+            alignment: TextAlignment::Natural,
             first_line_indent: 0.0,
             left_indent: 0.0,
             right_indent: 0.0,
@@ -73,25 +73,41 @@ impl ParagraphStyle {
     }
 }
 
-/// Text alignment options
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+/// Horizontal paragraph alignment used by native iWork paragraph styles.
+///
+/// `Natural` follows the paragraph writing direction. The four explicit
+/// variants correspond to the controls exposed by Pages, Numbers, and Keynote.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum TextAlignment {
     #[default]
+    Natural,
     Left,
     Center,
     Right,
-    Justify,
+    Justified,
 }
 
 impl TextAlignment {
-    /// Parse alignment from integer value
-    pub fn from_i32(value: i32) -> Self {
+    pub(crate) const fn native_value(self) -> i32 {
+        match self {
+            Self::Natural => 0,
+            Self::Right => 1,
+            Self::Center => 2,
+            Self::Justified => 3,
+            Self::Left => 4,
+        }
+    }
+
+    pub(crate) fn from_native_value(value: i32) -> crate::Result<Self> {
         match value {
-            0 => Self::Left,
-            1 => Self::Center,
-            2 => Self::Right,
-            3 => Self::Justify,
-            _ => Self::Left,
+            0 => Ok(Self::Natural),
+            1 => Ok(Self::Right),
+            2 => Ok(Self::Center),
+            3 => Ok(Self::Justified),
+            4 => Ok(Self::Left),
+            _ => Err(crate::Error::InvalidFormat(format!(
+                "unsupported native iWork paragraph alignment {value}"
+            ))),
         }
     }
 }
@@ -114,16 +130,32 @@ mod tests {
     #[test]
     fn test_paragraph_style() {
         let para = ParagraphStyle::new();
-        assert_eq!(para.alignment, TextAlignment::Left);
+        assert_eq!(para.alignment, TextAlignment::Natural);
         assert_eq!(para.line_spacing, 1.0);
     }
 
     #[test]
     fn test_alignment_parsing() {
-        assert_eq!(TextAlignment::from_i32(0), TextAlignment::Left);
-        assert_eq!(TextAlignment::from_i32(1), TextAlignment::Center);
-        assert_eq!(TextAlignment::from_i32(2), TextAlignment::Right);
-        assert_eq!(TextAlignment::from_i32(3), TextAlignment::Justify);
-        assert_eq!(TextAlignment::from_i32(999), TextAlignment::Left); // default
+        assert_eq!(
+            TextAlignment::from_native_value(0).unwrap(),
+            TextAlignment::Natural
+        );
+        assert_eq!(
+            TextAlignment::from_native_value(1).unwrap(),
+            TextAlignment::Right
+        );
+        assert_eq!(
+            TextAlignment::from_native_value(2).unwrap(),
+            TextAlignment::Center
+        );
+        assert_eq!(
+            TextAlignment::from_native_value(3).unwrap(),
+            TextAlignment::Justified
+        );
+        assert_eq!(
+            TextAlignment::from_native_value(4).unwrap(),
+            TextAlignment::Left
+        );
+        assert!(TextAlignment::from_native_value(999).is_err());
     }
 }

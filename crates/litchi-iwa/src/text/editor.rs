@@ -17,6 +17,11 @@ use crate::wire::{
 };
 use crate::{Error, IWorkPackage, Result};
 
+use super::paragraph_alignment::{
+    paragraph_alignment, reset_paragraph_alignment, set_paragraph_alignment,
+};
+use super::style::TextAlignment;
+
 const STORAGE_MESSAGE_TYPES: &[u32] = &[2001, 2022];
 
 /// A discoverable text storage within an iWork package.
@@ -135,6 +140,45 @@ impl IWorkTextEditor {
             0..storage.text.encode_utf16().count(),
             replacement,
         )
+    }
+
+    /// Read the effective uniform paragraph alignment of a text storage.
+    pub fn paragraph_alignment(&self, object_id: u64) -> Result<TextAlignment> {
+        paragraph_alignment(&self.package, object_id)
+    }
+
+    /// Set one alignment for every paragraph in a uniformly styled text storage.
+    ///
+    /// Rich text containing multiple paragraph-style boundaries is rejected so
+    /// this whole-storage operation can never flatten unrelated formatting.
+    pub fn set_paragraph_alignment(
+        &mut self,
+        object_id: u64,
+        alignment: TextAlignment,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        set_paragraph_alignment(&mut staged, object_id, alignment)?;
+        let bytes = staged.to_bytes()?;
+        let verified = IWorkPackage::from_bytes(&bytes)?;
+        if paragraph_alignment(&verified, object_id)? != alignment {
+            return Err(Error::InvalidFormat(
+                "iWork paragraph-alignment update failed round-trip validation".to_owned(),
+            ));
+        }
+        self.package = staged;
+        Ok(())
+    }
+
+    /// Remove a private minimal alignment override and restore its parent style.
+    pub fn reset_paragraph_alignment(&mut self, object_id: u64) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = reset_paragraph_alignment(&mut staged, object_id)?;
+        if changed {
+            let bytes = staged.to_bytes()?;
+            IWorkPackage::from_bytes(&bytes)?;
+            self.package = staged;
+        }
+        Ok(changed)
     }
 
     pub fn package(&self) -> &IWorkPackage {

@@ -40,7 +40,9 @@ pub(crate) use line::{
     shape_line_segment,
 };
 pub use line_end::{LineEndpoint, LineEndpoints};
-pub(crate) use line_end::{set_shape_line_endpoints, shape_line_endpoints};
+pub(crate) use line_end::{
+    insert_style_variation, remove_style_variation, set_shape_line_endpoints, shape_line_endpoints,
+};
 pub use path::{
     ShapeCornerRadius, ShapePathKind, ShapePolygonSides, ShapePreset, ShapeStarInnerRatio,
     ShapeStarPoints,

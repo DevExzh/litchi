@@ -7,7 +7,7 @@ use litchi_iwa::shapes::{
     DrawablePoint, DrawableSize, ShapeTextAutoSize, ShapeTextInset, ShapeTextInsets,
     ShapeTextLayout, ShapeTextVerticalAlignment,
 };
-use litchi_iwa::text::{TextColumnCount, TextColumnGap, TextColumns};
+use litchi_iwa::text::{TextAlignment, TextColumnCount, TextColumnGap, TextColumns};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -51,6 +51,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ShapeTextInsets::uniform(ShapeTextInset::from_points(6.0)?),
             ShapeTextAutoSize::Fixed,
         ),
+    )?;
+    editor.set_sheet_text_box_paragraph_alignment(
+        sheet_id,
+        created.drawable_object_id,
+        TextAlignment::Right,
     )?;
     editor.save(output)?;
     println!(

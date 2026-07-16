@@ -7,7 +7,7 @@ use litchi_iwa::shapes::{
     DrawablePoint, DrawableSize, ShapeTextAutoSize, ShapeTextInset, ShapeTextInsets,
     ShapeTextLayout, ShapeTextVerticalAlignment,
 };
-use litchi_iwa::text::{TextColumnCount, TextColumns};
+use litchi_iwa::text::{TextAlignment, TextColumnCount, TextColumns};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -47,6 +47,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ShapeTextInsets::uniform(ShapeTextInset::from_points(12.0)?),
             ShapeTextAutoSize::ShrinkToFit,
         ),
+    )?;
+    editor.set_slide_text_box_paragraph_alignment(
+        0,
+        created.drawable_object_id,
+        TextAlignment::Justified,
     )?;
     editor.save(output)?;
     println!(

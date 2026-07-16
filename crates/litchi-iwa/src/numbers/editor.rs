@@ -37,7 +37,7 @@ use crate::shapes::{
     reset_shape_text_layout, set_shape_geometry, set_shape_properties, set_shape_text_columns,
     set_shape_text_layout, shape_geometry, shape_properties, shape_text_columns, shape_text_layout,
 };
-use crate::text::{IWorkTextEditor, TextColumns, TextStorageInfo};
+use crate::text::{IWorkTextEditor, TextAlignment, TextColumns, TextStorageInfo};
 use crate::wire::{
     patch_length_delimited_field, patch_nested_fixed32_field, patch_nested_length_delimited_field,
     patch_nested_varint_field, patch_varint_field, repeated_length_delimited_payloads,
@@ -575,6 +575,51 @@ impl NumbersEditor {
         )?;
         if changed {
             *self = Self::from_package(staged)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective paragraph alignment of a sheet-owned text box.
+    pub fn sheet_text_box_paragraph_alignment(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<TextAlignment> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        IWorkTextEditor::from_package(self.package.clone()).paragraph_alignment(graph.storage_id)
+    }
+
+    /// Set one paragraph alignment across a sheet-owned text box.
+    pub fn set_sheet_text_box_paragraph_alignment(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        alignment: TextAlignment,
+    ) -> Result<()> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        text.set_paragraph_alignment(graph.storage_id, alignment)?;
+        let verified = Self::from_package(text.into_package())?;
+        if verified.sheet_text_box_paragraph_alignment(sheet_id, drawable_object_id)? != alignment {
+            return Err(Error::InvalidFormat(
+                "Numbers text-box paragraph-alignment update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore inherited paragraph alignment after a private minimal override.
+    pub fn reset_sheet_text_box_paragraph_alignment(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let changed = text.reset_paragraph_alignment(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(text.into_package())?;
         }
         Ok(changed)
     }

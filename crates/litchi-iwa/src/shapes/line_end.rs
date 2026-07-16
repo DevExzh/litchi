@@ -20,8 +20,8 @@ use native::endpoint_archive;
 pub(crate) use registry::{
     ShapeStyleOverrides, ShapeStyleVariationLocation, collapse_line_end_variation,
     collapse_style_variation, direct_shape_style_overrides, endpoint_from_archive,
-    insert_style_variation, patch_shape_style_reference, replace_style_variation,
-    shape_style_is_exclusive, shape_style_variation_object,
+    insert_style_variation, patch_shape_style_reference, remove_style_variation,
+    replace_style_variation, shape_style_is_exclusive, shape_style_variation_object,
 };
 
 const MAX_STYLE_INHERITANCE_DEPTH: usize = 64;
