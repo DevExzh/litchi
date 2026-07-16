@@ -232,13 +232,13 @@ impl<'doc> Slide<'doc> {
 
         let shape_id = escher_shape.shape_id().unwrap_or(0);
         let anchor = escher_shape.anchor();
-        let powerpoint12_placeholder_metadata = escher_shape.powerpoint12_placeholder_metadata()?;
+        let powerpoint12_shape_metadata = escher_shape.powerpoint12_shape_metadata()?;
 
         if let Some(placeholder_info) = escher_shape.placeholder() {
             let mut properties = shape::ShapeProperties {
                 id: shape_id,
                 shape_type: shape::ShapeType::Placeholder,
-                powerpoint12_placeholder_metadata,
+                powerpoint12_shape_metadata,
                 ..Default::default()
             };
             if let Some(a) = anchor {
@@ -258,7 +258,7 @@ impl<'doc> Slide<'doc> {
         }
 
         if let Some(header_footer) =
-            powerpoint12_placeholder_metadata.and_then(|metadata| metadata.header_footer)
+            powerpoint12_shape_metadata.and_then(|metadata| metadata.header_footer)
         {
             let placeholder_type = match header_footer {
                 PowerPointHeaderFooterPlaceholder::Date => PlaceholderType::DateAndTime,
@@ -269,7 +269,7 @@ impl<'doc> Slide<'doc> {
             let mut properties = shape::ShapeProperties {
                 id: shape_id,
                 shape_type: shape::ShapeType::Placeholder,
-                powerpoint12_placeholder_metadata,
+                powerpoint12_shape_metadata,
                 ..Default::default()
             };
             if let Some(a) = anchor {
@@ -295,7 +295,7 @@ impl<'doc> Slide<'doc> {
                 let mut properties = shape::ShapeProperties {
                     id: shape_id,
                     shape_type: shape::ShapeType::TextBox,
-                    powerpoint12_placeholder_metadata,
+                    powerpoint12_shape_metadata,
                     ..Default::default()
                 };
 
@@ -335,8 +335,7 @@ impl<'doc> Slide<'doc> {
                 if let Some(a) = anchor {
                     picture.set_bounds(a.left, a.top, a.width(), a.height());
                 }
-                picture.properties_mut().powerpoint12_placeholder_metadata =
-                    powerpoint12_placeholder_metadata;
+                picture.properties_mut().powerpoint12_shape_metadata = powerpoint12_shape_metadata;
 
                 // Extract the one-based BLIP store index from the pib property.
                 use super::super::escher::EscherPropertyId;
@@ -372,7 +371,7 @@ impl<'doc> Slide<'doc> {
                     {
                         line.set_color(color);
                     }
-                    line.set_powerpoint12_placeholder_metadata(powerpoint12_placeholder_metadata);
+                    line.set_powerpoint12_shape_metadata(powerpoint12_shape_metadata);
 
                     Ok(Some(ShapeEnum::Line(line)))
                 } else {
@@ -387,7 +386,7 @@ impl<'doc> Slide<'doc> {
                 if let Some(a) = anchor {
                     group.set_bounds(a.left, a.top, a.width(), a.height());
                 }
-                group.set_powerpoint12_placeholder_metadata(powerpoint12_placeholder_metadata);
+                group.set_powerpoint12_shape_metadata(powerpoint12_shape_metadata);
 
                 // Recursively parse child shapes
                 // This follows Apache POI's approach: iterate child shapes and convert them
@@ -431,7 +430,7 @@ impl<'doc> Slide<'doc> {
                 if let Some(a) = anchor {
                     table.set_bounds(a.left, a.top, a.width(), a.height());
                 }
-                table.set_powerpoint12_placeholder_metadata(powerpoint12_placeholder_metadata);
+                table.set_powerpoint12_shape_metadata(powerpoint12_shape_metadata);
 
                 for (cell, cell_anchor) in cells {
                     let Ok(row) = row_positions.binary_search(&cell_anchor.top) else {
@@ -454,7 +453,7 @@ impl<'doc> Slide<'doc> {
                 let mut properties = shape::ShapeProperties {
                     id: shape_id,
                     shape_type: shape::ShapeType::AutoShape,
-                    powerpoint12_placeholder_metadata,
+                    powerpoint12_shape_metadata,
                     ..Default::default()
                 };
 
@@ -1536,6 +1535,7 @@ mod tests {
             Some(&PowerPoint12PlaceholderMetadata {
                 header_footer: Some(PowerPointHeaderFooterPlaceholder::Header),
                 new_placeholder: Some(PowerPointNewPlaceholder::Picture),
+                ..PowerPoint12PlaceholderMetadata::default()
             })
         );
     }
@@ -1670,6 +1670,80 @@ mod tests {
                     .and_then(|metadata| metadata.new_placeholder),
                 Some(expected)
             );
+        }
+    }
+
+    #[test]
+    fn exposes_powerpoint12_shape_id_and_custom_layout_checksums() {
+        use crate::ppt::PowerPointShapeChecksums;
+
+        let mut checksums = Vec::new();
+        checksums.extend_from_slice(&0u32.to_le_bytes());
+        checksums.extend_from_slice(&u32::MAX.to_le_bytes());
+        let records = [
+            record_bytes(0, 0, 0x041f, &u32::MAX.to_le_bytes()),
+            record_bytes(0, 0, 0x0426, &checksums),
+        ]
+        .concat();
+        let doc_data = vec![0u8; 32];
+        let ppdrawing = create_test_record(
+            PptRecordType::PPDrawing,
+            create_round_trip_placeholder_escher_drawing(1, &records),
+            Vec::new(),
+        );
+        let slide_record = create_test_record(PptRecordType::Slide, Vec::new(), vec![ppdrawing]);
+        let slide = Slide::from_slide_data(create_slide_data(slide_record, 256, &doc_data), 1);
+        let metadata = slide.shapes().unwrap()[0]
+            .powerpoint12_shape_metadata()
+            .unwrap();
+
+        assert_eq!(metadata.shape_id, Some(u32::MAX));
+        assert_eq!(
+            metadata.custom_layout_checksums,
+            Some(PowerPointShapeChecksums {
+                shape: 0,
+                text: u32::MAX,
+            })
+        );
+    }
+
+    #[test]
+    fn rejects_malformed_or_duplicate_powerpoint12_shape_round_trip_atoms() {
+        let duplicate_id = [
+            record_bytes(0, 0, 0x041f, &1u32.to_le_bytes()),
+            record_bytes(0, 0, 0x041f, &2u32.to_le_bytes()),
+        ]
+        .concat();
+        let checksum = [0u8; 8];
+        let duplicate_checksums = [
+            record_bytes(0, 0, 0x0426, &checksum),
+            record_bytes(0, 0, 0x0426, &checksum),
+        ]
+        .concat();
+        let mut truncated_id = record_bytes(0, 0, 0x041f, &[0; 3]);
+        truncated_id[4..8].copy_from_slice(&4u32.to_le_bytes());
+        let mut truncated_checksums = record_bytes(0, 0, 0x0426, &[0; 7]);
+        truncated_checksums[4..8].copy_from_slice(&8u32.to_le_bytes());
+
+        for malformed in [
+            record_bytes(1, 0, 0x041f, &0u32.to_le_bytes()),
+            record_bytes(0, 1, 0x041f, &0u32.to_le_bytes()),
+            record_bytes(0, 0, 0x041f, &[0; 3]),
+            record_bytes(0, 0, 0x041f, &[0; 5]),
+            record_bytes(1, 0, 0x0426, &checksum),
+            record_bytes(0, 1, 0x0426, &checksum),
+            record_bytes(0, 0, 0x0426, &[0; 7]),
+            record_bytes(0, 0, 0x0426, &[0; 9]),
+            truncated_id,
+            truncated_checksums,
+            duplicate_id,
+            duplicate_checksums,
+        ] {
+            let drawing = create_round_trip_placeholder_escher_drawing(1, &malformed);
+            let shapes =
+                crate::ppt::escher::EscherShapeFactory::extract_shapes_from_drawing(&drawing)
+                    .unwrap();
+            assert!(shapes[0].powerpoint12_shape_metadata().is_err());
         }
     }
 

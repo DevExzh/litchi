@@ -6,7 +6,7 @@ use super::picture::PictureShape;
 use super::shape::{Shape, ShapeType};
 use super::{AutoShape, Placeholder, TextBox};
 use crate::ppt::package::Result;
-use crate::ppt::slide_extension::PowerPoint12PlaceholderMetadata;
+use crate::ppt::slide_extension::PowerPoint12ShapeMetadata;
 
 /// Represents any shape on a slide using an enum for zero-cost abstraction.
 ///
@@ -182,28 +182,23 @@ where
     }
 
     /// Return inert PowerPoint 12 placeholder metadata retained for round trips.
-    pub fn powerpoint12_placeholder_metadata(&self) -> Option<&PowerPoint12PlaceholderMetadata> {
+    pub fn powerpoint12_shape_metadata(&self) -> Option<&PowerPoint12ShapeMetadata> {
         match self {
-            ShapeEnum::TextBox(shape) => shape
-                .properties()
-                .powerpoint12_placeholder_metadata
-                .as_ref(),
-            ShapeEnum::Placeholder(shape) => shape
-                .properties()
-                .powerpoint12_placeholder_metadata
-                .as_ref(),
-            ShapeEnum::AutoShape(shape) => shape
-                .properties()
-                .powerpoint12_placeholder_metadata
-                .as_ref(),
-            ShapeEnum::Picture(shape) => shape
-                .properties()
-                .powerpoint12_placeholder_metadata
-                .as_ref(),
-            ShapeEnum::Table(shape) => shape.powerpoint12_placeholder_metadata.as_ref(),
-            ShapeEnum::Group(shape) => shape.powerpoint12_placeholder_metadata.as_ref(),
-            ShapeEnum::Line(shape) => shape.powerpoint12_placeholder_metadata.as_ref(),
+            ShapeEnum::TextBox(shape) => shape.properties().powerpoint12_shape_metadata.as_ref(),
+            ShapeEnum::Placeholder(shape) => {
+                shape.properties().powerpoint12_shape_metadata.as_ref()
+            },
+            ShapeEnum::AutoShape(shape) => shape.properties().powerpoint12_shape_metadata.as_ref(),
+            ShapeEnum::Picture(shape) => shape.properties().powerpoint12_shape_metadata.as_ref(),
+            ShapeEnum::Table(shape) => shape.powerpoint12_shape_metadata.as_ref(),
+            ShapeEnum::Group(shape) => shape.powerpoint12_shape_metadata.as_ref(),
+            ShapeEnum::Line(shape) => shape.powerpoint12_shape_metadata.as_ref(),
         }
+    }
+
+    /// Compatibility accessor for [`Self::powerpoint12_shape_metadata`].
+    pub fn powerpoint12_placeholder_metadata(&self) -> Option<&PowerPoint12ShapeMetadata> {
+        self.powerpoint12_shape_metadata()
     }
 }
 
@@ -230,7 +225,7 @@ pub struct TableShape {
     width: i32,
     /// Height
     height: i32,
-    powerpoint12_placeholder_metadata: Option<PowerPoint12PlaceholderMetadata>,
+    powerpoint12_shape_metadata: Option<PowerPoint12ShapeMetadata>,
 }
 
 impl TableShape {
@@ -246,7 +241,7 @@ impl TableShape {
             top: 0,
             width: 0,
             height: 0,
-            powerpoint12_placeholder_metadata: None,
+            powerpoint12_shape_metadata: None,
         }
     }
 
@@ -306,11 +301,11 @@ impl TableShape {
         self.height
     }
 
-    pub(crate) fn set_powerpoint12_placeholder_metadata(
+    pub(crate) fn set_powerpoint12_shape_metadata(
         &mut self,
-        metadata: Option<PowerPoint12PlaceholderMetadata>,
+        metadata: Option<PowerPoint12ShapeMetadata>,
     ) {
-        self.powerpoint12_placeholder_metadata = metadata;
+        self.powerpoint12_shape_metadata = metadata;
     }
 }
 
@@ -331,7 +326,7 @@ pub struct GroupShape<'a> {
     width: i32,
     /// Height
     height: i32,
-    powerpoint12_placeholder_metadata: Option<PowerPoint12PlaceholderMetadata>,
+    powerpoint12_shape_metadata: Option<PowerPoint12ShapeMetadata>,
 }
 
 impl<'a> GroupShape<'a> {
@@ -344,7 +339,7 @@ impl<'a> GroupShape<'a> {
             top: 0,
             width: 0,
             height: 0,
-            powerpoint12_placeholder_metadata: None,
+            powerpoint12_shape_metadata: None,
         }
     }
 
@@ -391,11 +386,11 @@ impl<'a> GroupShape<'a> {
         self.height
     }
 
-    pub(crate) fn set_powerpoint12_placeholder_metadata(
+    pub(crate) fn set_powerpoint12_shape_metadata(
         &mut self,
-        metadata: Option<PowerPoint12PlaceholderMetadata>,
+        metadata: Option<PowerPoint12ShapeMetadata>,
     ) {
-        self.powerpoint12_placeholder_metadata = metadata;
+        self.powerpoint12_shape_metadata = metadata;
     }
 }
 
@@ -418,7 +413,7 @@ pub struct LineShape {
     width: i32,
     /// Line color
     color: Option<u32>,
-    powerpoint12_placeholder_metadata: Option<PowerPoint12PlaceholderMetadata>,
+    powerpoint12_shape_metadata: Option<PowerPoint12ShapeMetadata>,
 }
 
 impl LineShape {
@@ -432,7 +427,7 @@ impl LineShape {
             y2,
             width: 1,
             color: None,
-            powerpoint12_placeholder_metadata: None,
+            powerpoint12_shape_metadata: None,
         }
     }
 
@@ -458,10 +453,10 @@ impl LineShape {
         (dx * dx + dy * dy).sqrt()
     }
 
-    pub(crate) fn set_powerpoint12_placeholder_metadata(
+    pub(crate) fn set_powerpoint12_shape_metadata(
         &mut self,
-        metadata: Option<PowerPoint12PlaceholderMetadata>,
+        metadata: Option<PowerPoint12ShapeMetadata>,
     ) {
-        self.powerpoint12_placeholder_metadata = metadata;
+        self.powerpoint12_shape_metadata = metadata;
     }
 }

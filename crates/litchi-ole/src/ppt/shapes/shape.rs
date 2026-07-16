@@ -158,8 +158,7 @@ pub struct ShapeProperties {
     /// Z-order (drawing order)
     pub z_order: u16,
     /// Inert PowerPoint 12 placeholder compatibility metadata.
-    pub powerpoint12_placeholder_metadata:
-        Option<crate::ppt::slide_extension::PowerPoint12PlaceholderMetadata>,
+    pub powerpoint12_shape_metadata: Option<crate::ppt::slide_extension::PowerPoint12ShapeMetadata>,
 }
 
 impl Default for ShapeProperties {
@@ -177,7 +176,7 @@ impl Default for ShapeProperties {
             line_width: None,
             hidden: false,
             z_order: 0,
-            powerpoint12_placeholder_metadata: None,
+            powerpoint12_shape_metadata: None,
         }
     }
 }

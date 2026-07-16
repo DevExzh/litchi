@@ -126,8 +126,9 @@ pub use kinsoku::{
 pub use master_style::{TextMasterStyle, TextMasterStyleLevel};
 pub use picture_bullets::{PictureBullet, PictureBulletCollection, PictureBulletType};
 pub use slide_extension::{
-    PowerPoint12PlaceholderMetadata, PowerPoint12SlideExtension, PowerPointHeaderFooterDefaults,
-    PowerPointHeaderFooterPlaceholder, PowerPointNewPlaceholder,
+    PowerPoint12PlaceholderMetadata, PowerPoint12ShapeMetadata, PowerPoint12SlideExtension,
+    PowerPointHeaderFooterDefaults, PowerPointHeaderFooterPlaceholder, PowerPointNewPlaceholder,
+    PowerPointShapeChecksums,
 };
 pub use smart_tags::{
     PowerPointSmartTag, PowerPointSmartTagProperty, PowerPointSmartTagStore, PowerPointSmartTagType,

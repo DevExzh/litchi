@@ -42,17 +42,33 @@ pub enum PowerPointNewPlaceholder {
     Picture,
 }
 
-/// Inert PowerPoint 12 placeholder metadata stored in OfficeArt client data.
+/// Application-defined checksums retained for PowerPoint 12 custom-layout round trips.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PowerPointShapeChecksums {
+    /// Checksum used to detect changes to OfficeArt shape properties.
+    pub shape: u32,
+    /// Checksum used to detect changes to the shape's text body.
+    pub text: u32,
+}
+
+/// Inert PowerPoint 12 shape metadata stored in OfficeArt client data.
 ///
 /// MS-PPT recommends ignoring these compatibility atoms while preserving them. The legacy
 /// `PlaceholderAtom`, when present, remains authoritative for the resolved placeholder type.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct PowerPoint12PlaceholderMetadata {
+pub struct PowerPoint12ShapeMetadata {
     /// Header/footer identity from `RoundTripHFPlaceholder12Atom`.
     pub header_footer: Option<PowerPointHeaderFooterPlaceholder>,
     /// New identity from `RoundTripNewPlaceholderId12Atom`.
     pub new_placeholder: Option<PowerPointNewPlaceholder>,
+    /// Shape identifier from `RoundTripShapeId12Atom`.
+    pub shape_id: Option<u32>,
+    /// Application-defined shape and text checksums for custom layouts.
+    pub custom_layout_checksums: Option<PowerPointShapeChecksums>,
 }
+
+/// Compatibility name for [`PowerPoint12ShapeMetadata`].
+pub type PowerPoint12PlaceholderMetadata = PowerPoint12ShapeMetadata;
 
 /// Metadata stored in a `___PPT12` slide programmable-tag extension.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]

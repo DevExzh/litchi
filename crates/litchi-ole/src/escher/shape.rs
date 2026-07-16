@@ -201,13 +201,13 @@ impl<'data> EscherShape<'data> {
     }
 
     /// Parse inert PowerPoint 12 placeholder round-trip metadata from OfficeArt client data.
-    pub fn powerpoint12_placeholder_metadata(
+    pub fn powerpoint12_shape_metadata(
         &self,
-    ) -> crate::ppt::package::Result<Option<crate::ppt::PowerPoint12PlaceholderMetadata>> {
+    ) -> crate::ppt::package::Result<Option<crate::ppt::PowerPoint12ShapeMetadata>> {
         use crate::consts::PptRecordType;
         use crate::ppt::{
-            PowerPoint12PlaceholderMetadata, PowerPointHeaderFooterPlaceholder,
-            PowerPointNewPlaceholder,
+            PowerPoint12ShapeMetadata, PowerPointHeaderFooterPlaceholder, PowerPointNewPlaceholder,
+            PowerPointShapeChecksums,
         };
 
         let group_header = if self.is_group {
@@ -222,7 +222,7 @@ impl<'data> EscherShape<'data> {
             return Ok(None);
         };
 
-        let mut metadata = PowerPoint12PlaceholderMetadata::default();
+        let mut metadata = PowerPoint12ShapeMetadata::default();
         let mut found = false;
         let mut offset = 0usize;
         while offset < client_data.data.len() {
@@ -236,7 +236,7 @@ impl<'data> EscherShape<'data> {
                                 .to_string(),
                         ));
                     }
-                    validate_placeholder_round_trip_atom(&record, "RoundTripHFPlaceholder12Atom")?;
+                    validate_shape_round_trip_atom(&record, "RoundTripHFPlaceholder12Atom", 1)?;
                     metadata.header_footer = Some(match record.data[0] {
                         7 => PowerPointHeaderFooterPlaceholder::Date,
                         8 => PowerPointHeaderFooterPlaceholder::SlideNumber,
@@ -258,10 +258,7 @@ impl<'data> EscherShape<'data> {
                                 .to_string(),
                         ));
                     }
-                    validate_placeholder_round_trip_atom(
-                        &record,
-                        "RoundTripNewPlaceholderId12Atom",
-                    )?;
+                    validate_shape_round_trip_atom(&record, "RoundTripNewPlaceholderId12Atom", 1)?;
                     metadata.new_placeholder = Some(match record.data[0] {
                         25 => PowerPointNewPlaceholder::VerticalObject,
                         26 => PowerPointNewPlaceholder::Picture,
@@ -271,6 +268,49 @@ impl<'data> EscherShape<'data> {
                                     .to_string(),
                             ));
                         },
+                    });
+                    found = true;
+                },
+                PptRecordType::RoundTripShapeId12Atom => {
+                    if metadata.shape_id.is_some() {
+                        return Err(crate::ppt::package::PptError::Corrupted(
+                            "Shape contains duplicate RoundTripShapeId12Atom records".to_string(),
+                        ));
+                    }
+                    validate_shape_round_trip_atom(&record, "RoundTripShapeId12Atom", 4)?;
+                    metadata.shape_id = Some(u32::from_le_bytes([
+                        record.data[0],
+                        record.data[1],
+                        record.data[2],
+                        record.data[3],
+                    ]));
+                    found = true;
+                },
+                PptRecordType::RoundTripShapeCheckSumForCustomLayouts12Atom => {
+                    if metadata.custom_layout_checksums.is_some() {
+                        return Err(crate::ppt::package::PptError::Corrupted(
+                            "Shape contains duplicate RoundTripShapeCheckSumForCustomLayouts12Atom records"
+                                .to_string(),
+                        ));
+                    }
+                    validate_shape_round_trip_atom(
+                        &record,
+                        "RoundTripShapeCheckSumForCustomLayouts12Atom",
+                        8,
+                    )?;
+                    metadata.custom_layout_checksums = Some(PowerPointShapeChecksums {
+                        shape: u32::from_le_bytes([
+                            record.data[0],
+                            record.data[1],
+                            record.data[2],
+                            record.data[3],
+                        ]),
+                        text: u32::from_le_bytes([
+                            record.data[4],
+                            record.data[5],
+                            record.data[6],
+                            record.data[7],
+                        ]),
                     });
                     found = true;
                 },
@@ -289,6 +329,13 @@ impl<'data> EscherShape<'data> {
         }
 
         Ok(found.then_some(metadata))
+    }
+
+    /// Compatibility accessor for [`Self::powerpoint12_shape_metadata`].
+    pub fn powerpoint12_placeholder_metadata(
+        &self,
+    ) -> crate::ppt::package::Result<Option<crate::ppt::PowerPoint12ShapeMetadata>> {
+        self.powerpoint12_shape_metadata()
     }
 
     /// Return the external object reference used by an OLE or media frame.
@@ -525,14 +572,15 @@ struct EscherFrameInfo {
     external_object_id: Option<u32>,
 }
 
-fn validate_placeholder_round_trip_atom(
+fn validate_shape_round_trip_atom(
     record: &crate::ppt::records::PptRecord,
     name: &str,
+    expected_length: usize,
 ) -> crate::ppt::package::Result<()> {
     if record.version != 0
         || record.instance != 0
-        || record.data_length != 1
-        || record.data.len() != 1
+        || record.data_length as usize != expected_length
+        || record.data.len() != expected_length
     {
         return Err(crate::ppt::package::PptError::Corrupted(format!(
             "{name} has an invalid record header or size"
