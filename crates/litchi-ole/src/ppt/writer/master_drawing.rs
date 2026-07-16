@@ -47,7 +47,8 @@ pub mod placeholder_type {
 /// Escher property IDs
 pub mod escher_prop {
     pub const LOCK_AGGR: u16 = 0x007F;
-    pub const ADJUST_VALUE: u16 = 0x0080;
+    pub const TEXT_ID: u16 = 0x0080;
+    pub const ANCHOR_TEXT: u16 = 0x0087;
     pub const FILL_COLOR: u16 = 0x0181;
     pub const FILL_BACK_COLOR: u16 = 0x0183;
     pub const FILL_RECT_RIGHT: u16 = 0x0188;
@@ -366,8 +367,8 @@ impl MasterPPDrawingBuilder {
         // Title placeholder properties
         let title_props = [
             (escher_prop::LOCK_AGGR, 0x00010005),
-            (escher_prop::ADJUST_VALUE, 0x067C94EC),
-            (escher_prop::ADJUST_VALUE | 0x0007, 0x00010000),
+            (escher_prop::TEXT_ID, 0x067C94EC),
+            (escher_prop::ANCHOR_TEXT, 0x00010000),
             (escher_prop::FILL_COLOR, 0x08000004),
             (escher_prop::FILL_BACK_COLOR, 0x08000000),
             (escher_prop::NO_FILL_HIT_TEST, 0x00110001),
@@ -389,7 +390,7 @@ impl MasterPPDrawingBuilder {
         // Body placeholder properties (similar but different lock value)
         let body_props = [
             (escher_prop::LOCK_AGGR, 0x00010005),
-            (escher_prop::ADJUST_VALUE, 0x067C9784),
+            (escher_prop::TEXT_ID, 0x067C9784),
             (escher_prop::FILL_COLOR, 0x08000004),
             (escher_prop::FILL_BACK_COLOR, 0x08000000),
             (escher_prop::NO_FILL_HIT_TEST, 0x00110001),
@@ -411,7 +412,7 @@ impl MasterPPDrawingBuilder {
         // Date/Footer/SlideNumber placeholders (simpler, no text)
         let simple_props = [
             (escher_prop::LOCK_AGGR, 0x00010005),
-            (escher_prop::ADJUST_VALUE, 0x067C9784),
+            (escher_prop::TEXT_ID, 0x067C9784),
             (escher_prop::FILL_COLOR, 0x08000004),
             (escher_prop::FILL_BACK_COLOR, 0x08000000),
             (escher_prop::NO_FILL_HIT_TEST, 0x00110001),

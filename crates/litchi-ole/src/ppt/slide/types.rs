@@ -409,7 +409,11 @@ impl<'doc> Slide<'doc> {
                     properties.height = a.height();
                 }
 
-                let autoshape = AutoShape::new(properties, Vec::new());
+                let autoshape = AutoShape::from_escher(
+                    properties,
+                    escher_shape.native_shape_type(),
+                    escher_shape.properties(),
+                );
                 Some(ShapeEnum::AutoShape(autoshape))
             },
 
@@ -743,6 +747,35 @@ mod tests {
 
     fn create_picture_escher_drawing(blip_id: u32) -> Vec<u8> {
         create_frame_escher_drawing(blip_id, None, None)
+    }
+
+    fn create_autoshape_escher_drawing() -> Vec<u8> {
+        use crate::escher::writer::{
+            PropertyBuilder, ShapeBuilder, record_type, write_client_anchor, write_container,
+        };
+
+        let mut shape_children = Vec::new();
+        ShapeBuilder::new(13, 44)
+            .write(&mut shape_children)
+            .unwrap();
+        let mut properties = PropertyBuilder::new();
+        properties.add_simple(0x0147, 32_768);
+        properties.add_simple(0x0149, -123);
+        properties.write(&mut shape_children).unwrap();
+        write_client_anchor(&mut shape_children, 11, 22, 211, 122).unwrap();
+
+        let mut shape_container = Vec::new();
+        write_container(
+            &mut shape_container,
+            0,
+            record_type::SP_CONTAINER,
+            &shape_children,
+        )
+        .unwrap();
+
+        let mut drawing = Vec::new();
+        write_container(&mut drawing, 0, record_type::DG_CONTAINER, &shape_container).unwrap();
+        drawing
     }
 
     fn create_animated_escher_drawing() -> Vec<u8> {
@@ -1260,6 +1293,28 @@ mod tests {
         assert_eq!(picture.properties.y, 20);
         assert_eq!(picture.properties.width, 200);
         assert_eq!(picture.properties.height, 100);
+    }
+
+    #[test]
+    fn autoshape_preserves_native_type_and_sparse_adjustments() {
+        use crate::ppt::shapes::{Shape, autoshape::AutoShapeType};
+
+        let doc_data = vec![0u8; 32];
+        let ppdrawing = create_test_record(
+            PptRecordType::PPDrawing,
+            create_autoshape_escher_drawing(),
+            Vec::new(),
+        );
+        let record = create_test_record(PptRecordType::Slide, Vec::new(), vec![ppdrawing]);
+        let slide = Slide::from_slide_data(create_slide_data(record, 256, &doc_data), 1);
+
+        let shapes = slide.shapes().unwrap();
+        assert_eq!(shapes.len(), 1);
+        let autoshape = shapes[0].as_autoshape().expect("auto shape");
+        assert_eq!(autoshape.id(), 44);
+        assert_eq!(autoshape.auto_shape_type(), AutoShapeType::Arrow);
+        assert_eq!(autoshape.adjustments(), &[32_768, 0, -123]);
+        assert_eq!(autoshape.bounds(), (11, 22, 200, 100));
     }
 
     #[test]

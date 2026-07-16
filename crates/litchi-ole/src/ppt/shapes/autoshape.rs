@@ -131,6 +131,20 @@ impl<'a> AutoShape<'a> {
         }
     }
 
+    /// Create an auto shape from already-parsed OfficeArt metadata.
+    pub(crate) fn from_escher(
+        properties: ShapeProperties,
+        native_shape_type: Option<u16>,
+        escher_properties: &super::super::escher::EscherProperties<'_>,
+    ) -> Self {
+        let mut shape = Self::new(properties, Vec::new());
+        if let Some(native_shape_type) = native_shape_type {
+            shape.auto_shape_type = AutoShapeType::from(native_shape_type);
+        }
+        shape.adjustments = Self::extract_adjustments_from_properties(escher_properties);
+        shape
+    }
+
     /// Create an auto shape from an existing container.
     pub fn from_container(container: ShapeContainer<'a>) -> Self {
         // Extract auto shape type from raw data
@@ -153,23 +167,12 @@ impl<'a> AutoShape<'a> {
     ///
     /// # Performance
     ///
-    /// - Single-pass scanning
+    /// - Bounded depth-first record scanning
     /// - Early termination on match
     fn extract_shape_type(raw_data: &[u8]) -> AutoShapeType {
-        // Scan for shape type in raw data
-        // The shape type ID would typically be at a known offset in Escher Sp record
-        // For a complete implementation, we'd parse the Escher structure properly
-
-        // If raw_data is too small, return default
-        if raw_data.len() < 4 {
-            return AutoShapeType::Rectangle;
-        }
-
-        // Try to extract shape type ID from first few bytes
-        // In Escher Sp record, bytes 0-1 contain shape flags, bytes 2-3 contain shape type
-        let shape_type_id = u16::from_le_bytes([raw_data[0], raw_data[1]]);
-
-        AutoShapeType::from(shape_type_id)
+        Self::find_escher_record(raw_data, super::super::escher::EscherRecordType::Sp)
+            .map(|sp| AutoShapeType::from(sp.instance))
+            .unwrap_or(AutoShapeType::Rectangle)
     }
 
     /// Extract adjustment values from raw shape data.
@@ -185,30 +188,50 @@ impl<'a> AutoShape<'a> {
     ///
     /// - Returns empty vector for shapes without adjustments
     /// - Pre-allocated capacity for shapes with adjustments (max 10)
-    /// - Single-pass property scanning
+    /// - Bounded depth-first record scanning
     fn extract_adjustments(raw_data: &[u8]) -> Vec<i32> {
-        // For basic shapes, no adjustments needed
-        if raw_data.len() < 8 {
+        let Some(opt) =
+            Self::find_escher_record(raw_data, super::super::escher::EscherRecordType::Opt)
+        else {
             return Vec::new();
+        };
+        let properties = super::super::escher::EscherProperties::from_opt_record(&opt);
+        Self::extract_adjustments_from_properties(&properties)
+    }
+
+    fn find_escher_record<'data>(
+        data: &'data [u8],
+        record_type: super::super::escher::EscherRecordType,
+    ) -> Option<super::super::escher::EscherRecord<'data>> {
+        const MAX_SCANNED_RECORDS: usize = 4_096;
+
+        let mut streams = vec![data];
+        let mut scanned = 0;
+        while let Some(stream) = streams.pop() {
+            let mut offset = 0;
+            while stream.len().saturating_sub(offset) >= 8 {
+                if scanned == MAX_SCANNED_RECORDS {
+                    return None;
+                }
+                let Ok((record, consumed)) =
+                    super::super::escher::EscherRecord::parse(stream, offset)
+                else {
+                    break;
+                };
+                scanned += 1;
+                if record.record_type == record_type {
+                    return Some(record);
+                }
+                if record.is_container() {
+                    streams.push(record.data);
+                }
+                if consumed == 0 {
+                    break;
+                }
+                offset = offset.checked_add(consumed)?;
+            }
         }
-
-        // Try to parse as Escher container to find Opt record
-        // In a real implementation, we would properly parse the Escher structure
-        // For now, we'll use a simplified approach that looks for adjustment patterns
-
-        // Pre-allocate with max capacity (10 adjustments possible)
-        // Scan for adjustment value patterns in the raw data
-        // Adjustment values are typically 32-bit signed integers
-        // They appear in sequence if multiple adjustments exist
-
-        // This is a simplified extraction - in production, we would:
-        // 1. Parse the Escher container structure
-        // 2. Find the Opt record
-        // 3. Use EscherProperties to extract AdjustValue through Adjust10Value
-
-        // For now, return empty vector - proper implementation would use
-        // the EscherProperties system from escher/properties.rs
-        Vec::with_capacity(10)
+        None
     }
 
     /// Extract adjustment values from Escher properties.
@@ -228,16 +251,13 @@ impl<'a> AutoShape<'a> {
     ///
     /// - Pre-allocated Vec with known max capacity (10)
     /// - O(1) property lookups via HashMap
-    /// - Early termination on first missing adjustment
+    /// - Missing positions use the protocol-defined default of zero
+    /// - Trailing absent positions are omitted
     pub fn extract_adjustments_from_properties(
         props: &super::super::escher::EscherProperties,
     ) -> Vec<i32> {
         use super::super::escher::EscherPropertyId;
 
-        let mut adjustments = Vec::with_capacity(10);
-
-        // Extract up to 10 adjustment values
-        // Follow Apache POI's approach: stop at first missing value
         let adjustment_ids = [
             EscherPropertyId::AdjustValue,
             EscherPropertyId::Adjust2Value,
@@ -251,14 +271,15 @@ impl<'a> AutoShape<'a> {
             EscherPropertyId::Adjust10Value,
         ];
 
-        for id in &adjustment_ids {
-            if let Some(value) = props.get_adjust(*id) {
-                adjustments.push(value);
-            } else {
-                // Stop at first missing adjustment (they must be sequential)
-                break;
+        let mut adjustments = vec![0; adjustment_ids.len()];
+        let mut populated_len = 0;
+        for (index, id) in adjustment_ids.into_iter().enumerate() {
+            if let Some(value) = props.get_adjust(id) {
+                adjustments[index] = value;
+                populated_len = index + 1;
             }
         }
+        adjustments.truncate(populated_len);
 
         adjustments
     }
@@ -351,6 +372,21 @@ mod tests {
     use super::super::shape::ShapeType;
     use super::*;
 
+    fn autoshape_container() -> ShapeContainer<'static> {
+        use crate::escher::writer::{PropertyBuilder, ShapeBuilder, record_type, write_container};
+
+        let mut children = Vec::new();
+        ShapeBuilder::new(13, 7).write(&mut children).unwrap();
+        let mut properties = PropertyBuilder::new();
+        properties.add_simple(0x0147, 25);
+        properties.add_simple(0x0149, 75);
+        properties.write(&mut children).unwrap();
+
+        let mut raw_data = Vec::new();
+        write_container(&mut raw_data, 0, record_type::SP_CONTAINER, &children).unwrap();
+        ShapeContainer::new(ShapeProperties::default(), raw_data)
+    }
+
     #[test]
     #[allow(clippy::field_reassign_with_default)]
     fn test_autoshape_creation() {
@@ -411,5 +447,13 @@ mod tests {
         assert_eq!(AutoShapeType::from(3), AutoShapeType::Oval);
         assert_eq!(AutoShapeType::from(12), AutoShapeType::Star);
         assert_eq!(AutoShapeType::from(999), AutoShapeType::Custom(999));
+    }
+
+    #[test]
+    fn test_autoshape_from_container_parses_officeart_metadata() {
+        let autoshape = AutoShape::from_container(autoshape_container());
+
+        assert_eq!(autoshape.auto_shape_type(), AutoShapeType::Arrow);
+        assert_eq!(autoshape.adjustments(), &[25, 0, 75]);
     }
 }

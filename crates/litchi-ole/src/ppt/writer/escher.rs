@@ -32,9 +32,13 @@ pub mod prop_id {
     pub const LOCK_ADJUST_HANDLES: u16 = 0x007E;
     pub const LOCK_AGGR: u16 = 0x007F;
 
-    // Transform group
-    pub const ADJUST_VALUE: u16 = 0x0080;
-    pub const ADJUST2_VALUE: u16 = 0x0081;
+    // Text group
+    pub const TEXT_ID: u16 = 0x0080;
+    pub const TEXT_LEFT: u16 = 0x0081;
+
+    // Geometry group
+    pub const ADJUST_VALUE: u16 = 0x0147;
+    pub const ADJUST2_VALUE: u16 = 0x0148;
 
     // Fill style (MS-ODRAW section 2.3.7)
     pub const FILL_TYPE: u16 = 0x0180;

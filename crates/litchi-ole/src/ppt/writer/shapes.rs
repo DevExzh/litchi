@@ -580,6 +580,10 @@ impl Shape {
 
     /// Set adjust value (shape-specific parameter)
     pub fn with_adjust(mut self, index: usize, value: i32) -> Self {
+        assert!(
+            index < 10,
+            "OfficeArt shapes support at most 10 adjustments"
+        );
         if index >= self.adjust_values.len() {
             self.adjust_values.resize(index + 1, 0);
         }
@@ -600,7 +604,7 @@ impl Shape {
 
         // Add adjust values
         for (i, &value) in self.adjust_values.iter().enumerate() {
-            let prop_id = 0x0080 + i as u16; // adjustValue, adjust2Value, etc.
+            let prop_id = 0x0147 + i as u16; // adjustValue, adjust2Value, etc.
             props.push((prop_id, value as u32));
         }
 
@@ -1002,6 +1006,17 @@ mod tests {
         assert_eq!(shape.adjust_values.len(), 2);
         assert_eq!(shape.adjust_values[0], 50);
         assert_eq!(shape.adjust_values[1], 100);
+
+        let props = shape.build_escher_properties();
+        assert!(props.contains(&(0x0147, 50)));
+        assert!(props.contains(&(0x0148, 100)));
+        assert!(!props.iter().any(|(id, _)| *id == 0x0080));
+    }
+
+    #[test]
+    #[should_panic(expected = "OfficeArt shapes support at most 10 adjustments")]
+    fn test_shape_rejects_an_eleventh_adjustment() {
+        let _ = Shape::rectangle(0, 0, 100, 100).with_adjust(10, 1);
     }
 
     #[test]

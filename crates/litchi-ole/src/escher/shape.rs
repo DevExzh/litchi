@@ -44,6 +44,7 @@ pub struct EscherShape<'data> {
     pub is_group: bool,
     pub children: Vec<EscherShape<'data>>,
     container: EscherContainer<'data>,
+    native_shape_type: Option<u16>,
     anchor: Option<ShapeAnchor>,
     placeholder: Option<EscherPlaceholder>,
     external_object_id: Option<u32>,
@@ -81,6 +82,7 @@ impl<'data> EscherShape<'data> {
         };
         let metadata_container = group_header.as_ref().unwrap_or(&container);
         let shape_id = Self::extract_shape_id(metadata_container);
+        let native_shape_type = Self::extract_native_shape_type(metadata_container);
         let properties = EscherProperties::from_container(metadata_container);
         let anchor = Self::extract_anchor(metadata_container);
 
@@ -128,6 +130,7 @@ impl<'data> EscherShape<'data> {
             is_group,
             children,
             container,
+            native_shape_type,
             anchor,
             placeholder,
             external_object_id: frame_info.external_object_id,
@@ -142,6 +145,12 @@ impl<'data> EscherShape<'data> {
     #[inline]
     pub fn shape_id(&self) -> Option<u32> {
         self.shape_id
+    }
+
+    /// Return the native MSOSPT value stored in the OfficeArt `Sp` atom.
+    #[inline]
+    pub fn native_shape_type(&self) -> Option<u16> {
+        self.native_shape_type
     }
 
     #[inline]
@@ -384,6 +393,12 @@ impl<'data> EscherShape<'data> {
             return Some(id);
         }
         None
+    }
+
+    fn extract_native_shape_type(container: &EscherContainer<'data>) -> Option<u16> {
+        container
+            .find_child(EscherRecordType::Sp)
+            .map(|sp| sp.instance)
     }
 
     fn extract_anchor(container: &EscherContainer<'data>) -> Option<ShapeAnchor> {
