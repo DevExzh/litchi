@@ -45,17 +45,17 @@ pub enum EscherPropertyId {
     TextRight = 0x0083,
     TextBottom = 0x0084,
     WrapText = 0x0085,
-    ScaleText = 0x0086,
+    UnusedText134 = 0x0086,
     AnchorText = 0x0087,
     TextFlow = 0x0088,
     FontRotation = 0x0089,
     IdOfNextShape = 0x008A,
-    TextBidi = 0x008B,
-    SingleClickSelects = 0x00BB,
-    UseHostMargins = 0x00BC,
-    RotateTextWithShape = 0x00BD,
-    SizeShapeToFitText = 0x00BE,
-    SizeTextToFitShape = 0x00BF,
+    TextDirection = 0x008B,
+    SelectText = 0x00BB,
+    AutoTextMargin = 0x00BC,
+    UnusedTextBoolean189 = 0x00BD,
+    FitShapeToText = 0x00BE,
+    TextBooleanProperties = 0x00BF,
     GeoTextUnicode = 0x00C0,
     GeoTextRtf = 0x00C1,
     GeoTextAlignmentOnCurve = 0x00C2,
@@ -304,17 +304,17 @@ impl From<u16> for EscherPropertyId {
             0x0083 => Self::TextRight,
             0x0084 => Self::TextBottom,
             0x0085 => Self::WrapText,
-            0x0086 => Self::ScaleText,
+            0x0086 => Self::UnusedText134,
             0x0087 => Self::AnchorText,
             0x0088 => Self::TextFlow,
             0x0089 => Self::FontRotation,
             0x008A => Self::IdOfNextShape,
-            0x008B => Self::TextBidi,
-            0x00BB => Self::SingleClickSelects,
-            0x00BC => Self::UseHostMargins,
-            0x00BD => Self::RotateTextWithShape,
-            0x00BE => Self::SizeShapeToFitText,
-            0x00BF => Self::SizeTextToFitShape,
+            0x008B => Self::TextDirection,
+            0x00BB => Self::SelectText,
+            0x00BC => Self::AutoTextMargin,
+            0x00BD => Self::UnusedTextBoolean189,
+            0x00BE => Self::FitShapeToText,
+            0x00BF => Self::TextBooleanProperties,
             0x00C0 => Self::GeoTextUnicode,
             0x00C1 => Self::GeoTextRtf,
             0x00C2 => Self::GeoTextAlignmentOnCurve,
@@ -905,10 +905,20 @@ impl<'data> EscherProperties<'data> {
 
     #[inline]
     pub fn get_text_margins(&self) -> Option<(i32, i32, i32, i32)> {
-        let left = self.get_int(EscherPropertyId::TextLeft).unwrap_or(0);
-        let top = self.get_int(EscherPropertyId::TextTop).unwrap_or(0);
-        let right = self.get_int(EscherPropertyId::TextRight).unwrap_or(0);
-        let bottom = self.get_int(EscherPropertyId::TextBottom).unwrap_or(0);
+        const HORIZONTAL_DEFAULT: i32 = 0x0001_6530;
+        const VERTICAL_DEFAULT: i32 = 0x0000_B298;
+        let left = self
+            .get_int(EscherPropertyId::TextLeft)
+            .unwrap_or(HORIZONTAL_DEFAULT);
+        let top = self
+            .get_int(EscherPropertyId::TextTop)
+            .unwrap_or(VERTICAL_DEFAULT);
+        let right = self
+            .get_int(EscherPropertyId::TextRight)
+            .unwrap_or(HORIZONTAL_DEFAULT);
+        let bottom = self
+            .get_int(EscherPropertyId::TextBottom)
+            .unwrap_or(VERTICAL_DEFAULT);
         Some((left, top, right, bottom))
     }
 
@@ -1037,8 +1047,9 @@ mod tests {
         push_property(&mut data, 0x023F, 0x0002_0002);
         push_property(&mut data, 0x00FF, 0x0020_0020);
         push_property(&mut data, 0x033F, 0x0001_0001);
+        push_property(&mut data, 0x00BF, 0x001A_0012);
 
-        let properties = EscherProperties::from_opt_record(&opt_record(&data, 5));
+        let properties = EscherProperties::from_opt_record(&opt_record(&data, 6));
 
         assert_eq!(properties.get_bool(EscherPropertyId::Filled), Some(true));
         assert_eq!(
@@ -1064,6 +1075,18 @@ mod tests {
             properties.get_bool(EscherPropertyId::ShapeBackgroundShape),
             Some(true)
         );
+        assert_eq!(
+            properties.get_bool(EscherPropertyId::SelectText),
+            Some(true)
+        );
+        assert_eq!(
+            properties.get_bool(EscherPropertyId::AutoTextMargin),
+            Some(false)
+        );
+        assert_eq!(
+            properties.get_bool(EscherPropertyId::FitShapeToText),
+            Some(true)
+        );
     }
 
     #[test]
@@ -1078,6 +1101,15 @@ mod tests {
         assert!(!properties.has_line());
         assert_eq!(properties.get_bool(EscherPropertyId::Shadow), Some(false));
         assert!(!properties.has_shadow());
+    }
+
+    #[test]
+    fn text_margins_use_ms_odraw_defaults() {
+        let properties = EscherProperties::new();
+        assert_eq!(
+            properties.get_text_margins(),
+            Some((0x0001_6530, 0x0000_B298, 0x0001_6530, 0x0000_B298))
+        );
     }
 
     #[test]

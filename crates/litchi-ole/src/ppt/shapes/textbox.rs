@@ -117,6 +117,40 @@ impl<'a> TextBox<'a> {
             .find_map(|child| Self::find_descendant(child, record_type))
     }
 
+    fn find_escher_property<'record>(
+        record: &'record super::escher::EscherRecord<'a>,
+        property_number: u32,
+    ) -> Option<&'record super::escher::EscherProperty<'a>> {
+        if matches!(
+            record.record_type,
+            super::escher::EscherRecordType::Opt
+                | super::escher::EscherRecordType::SecondaryOpt
+                | super::escher::EscherRecordType::TertiaryOpt
+        ) && let Some(property) = record.find_property(property_number)
+        {
+            return Some(property);
+        }
+        record
+            .children
+            .iter()
+            .find_map(|child| Self::find_escher_property(child, property_number))
+    }
+
+    fn packed_text_boolean(
+        record: &super::escher::EscherRecord<'a>,
+        individual_property: u32,
+    ) -> Option<bool> {
+        const TEXT_BOOLEAN_PROPERTIES: u32 = 0x00BF;
+        let property = Self::find_escher_property(record, TEXT_BOOLEAN_PROPERTIES)?;
+        let bit = TEXT_BOOLEAN_PROPERTIES.checked_sub(individual_property)?;
+        if bit >= 16 {
+            return None;
+        }
+        let value_mask = 1u32 << bit;
+        let use_mask = value_mask << 16;
+        (property.data & use_mask != 0).then_some(property.data & value_mask != 0)
+    }
+
     fn formatting_from_runs(runs: &[TextRun]) -> TextFormattingResult {
         let formatting = runs
             .first()
@@ -139,21 +173,6 @@ impl<'a> TextBox<'a> {
     /// extracts text-related properties from the Escher Opt record within
     /// the shape's Escher record hierarchy.
     ///
-    /// # Algorithm
-    ///
-    /// 1. Check if the record is a container
-    /// 2. Find the Opt (options/properties) record
-    /// 3. Parse properties using EscherProperties::from_opt_record
-    /// 4. Extract text-specific properties (margins, etc.)
-    /// 5. Store extracted properties in the container for later use
-    ///
-    /// # Performance
-    ///
-    /// - Zero-copy property access via borrowing
-    /// - Early return on missing data (no Opt record)
-    /// - Efficient O(1) property lookup via HashMap
-    /// - No allocations for property access
-    ///
     /// # Note
     ///
     /// This function extracts Escher-level text properties. Text formatting
@@ -166,18 +185,8 @@ impl<'a> TextBox<'a> {
         record: &super::escher::EscherRecord<'a>,
         container: &mut ShapeContainer<'a>,
     ) -> super::super::package::Result<()> {
-        let Some(options) = Self::find_descendant(record, super::escher::EscherRecordType::Opt)
-            .or_else(|| {
-                Self::find_descendant(record, super::escher::EscherRecordType::SecondaryOpt)
-            })
-            .or_else(|| {
-                Self::find_descendant(record, super::escher::EscherRecordType::TertiaryOpt)
-            })
-        else {
-            return Ok(());
-        };
-
         // Property IDs for text-related properties (from MS-ODRAW)
+        const TEXT_ID: u32 = 0x0080;
         const TEXT_LEFT: u32 = 0x0081; // Text left margin
         const TEXT_TOP: u32 = 0x0082; // Text top margin
         const TEXT_RIGHT: u32 = 0x0083; // Text right margin
@@ -185,30 +194,55 @@ impl<'a> TextBox<'a> {
         const WRAP_TEXT: u32 = 0x0085; // MSOWRAPMODE
         const ANCHOR_TEXT: u32 = 0x0087; // Text anchor (vertical alignment)
         const TEXT_FLOW: u32 = 0x0088; // Text flow direction
+        const FONT_ROTATION: u32 = 0x0089;
+        const NEXT_SHAPE_ID: u32 = 0x008A;
+        const TEXT_DIRECTION: u32 = 0x008B;
+        const SELECT_TEXT: u32 = 0x00BB;
+        const AUTO_TEXT_MARGIN: u32 = 0x00BC;
+        const FIT_SHAPE_TO_TEXT: u32 = 0x00BE;
 
-        // Extract text margins in EMUs.
-        if let (Some(left), Some(top), Some(right), Some(bottom)) = (
-            options.find_property(TEXT_LEFT).map(|p| p.data as i32),
-            options.find_property(TEXT_TOP).map(|p| p.data as i32),
-            options.find_property(TEXT_RIGHT).map(|p| p.data as i32),
-            options.find_property(TEXT_BOTTOM).map(|p| p.data as i32),
-        ) {
-            container.set_text_margins(Some((left, top, right, bottom)));
-        }
+        let property = |id| Self::find_escher_property(record, id);
+        container.text_id = property(TEXT_ID).map(|p| p.data as i32);
+        let margin_value = |id, name| -> super::super::package::Result<Option<i32>> {
+            const MAX_TEXT_MARGIN: u32 = 0x0132_F540;
+            property(id)
+                .map(|p| {
+                    if p.data > MAX_TEXT_MARGIN {
+                        Err(super::super::package::PptError::Corrupted(format!(
+                            "OfficeArt {name} margin exceeds the MS-ODRAW limit"
+                        )))
+                    } else {
+                        Ok(p.data as i32)
+                    }
+                })
+                .transpose()
+        };
+        container.text_left = margin_value(TEXT_LEFT, "left")?;
+        container.text_top = margin_value(TEXT_TOP, "top")?;
+        container.text_right = margin_value(TEXT_RIGHT, "right")?;
+        container.text_bottom = margin_value(TEXT_BOTTOM, "bottom")?;
+        container.id_of_next_shape = property(NEXT_SHAPE_ID).map(|p| p.data);
 
-        if let Some(flow_prop) = options.find_property(TEXT_FLOW) {
-            container.set_text_flow(Some(flow_prop.data as u16));
-        }
+        let enum_value = |id, name| -> super::super::package::Result<Option<u16>> {
+            property(id)
+                .map(|p| {
+                    u16::try_from(p.data).map_err(|_| {
+                        super::super::package::PptError::Corrupted(format!(
+                            "OfficeArt {name} value does not fit in 16 bits"
+                        ))
+                    })
+                })
+                .transpose()
+        };
+        container.wrap_text = enum_value(WRAP_TEXT, "WrapText")?;
+        container.anchor_text = enum_value(ANCHOR_TEXT, "anchorText")?;
+        container.text_flow = enum_value(TEXT_FLOW, "txflTextFlow")?;
+        container.font_rotation = enum_value(FONT_ROTATION, "cdirFont")?;
+        container.text_direction = enum_value(TEXT_DIRECTION, "txdir")?;
 
-        // Extract text anchor (vertical alignment)
-        // 0 = top, 1 = middle, 2 = bottom, 3 = top centered, etc.
-        if let Some(anchor_prop) = options.find_property(ANCHOR_TEXT) {
-            container.set_anchor_text(Some(anchor_prop.data as u16));
-        }
-
-        if let Some(wrap_prop) = options.find_property(WRAP_TEXT) {
-            container.set_wrap_text(Some(wrap_prop.data as u16));
-        }
+        container.select_text = Self::packed_text_boolean(record, SELECT_TEXT);
+        container.auto_text_margin = Self::packed_text_boolean(record, AUTO_TEXT_MARGIN);
+        container.size_shape_to_fit_text = Self::packed_text_boolean(record, FIT_SHAPE_TO_TEXT);
 
         Ok(())
     }
@@ -274,7 +308,7 @@ impl<'a> TextBox<'a> {
     ///
     /// # Returns
     ///
-    /// Tuple of (left, top, right, bottom) margins in master units
+    /// Tuple of (left, top, right, bottom) margins in EMUs
     ///
     /// # Performance
     ///
@@ -392,6 +426,11 @@ impl<'a> TextBox<'a> {
         self.container.text_margins()
     }
 
+    /// Get text insets in EMUs with MS-ODRAW defaults applied.
+    pub fn effective_text_margins(&self) -> (i32, i32, i32, i32) {
+        self.container.effective_text_margins()
+    }
+
     /// Get the raw `MSOTXFL` text-flow value.
     pub fn text_flow(&self) -> Option<u16> {
         self.container.text_flow
@@ -410,6 +449,41 @@ impl<'a> TextBox<'a> {
     /// Get the raw `MSOANCHOR` vertical text anchor value.
     pub fn text_anchor(&self) -> Option<u16> {
         self.container.anchor_text
+    }
+
+    /// Get the text identifier stored in the OfficeArt options.
+    pub fn text_id(&self) -> Option<i32> {
+        self.container.text_id
+    }
+
+    /// Get the raw `MSOCDIR` font-rotation value.
+    pub fn font_rotation(&self) -> Option<u16> {
+        self.container.font_rotation
+    }
+
+    /// Get the next shape ID in a linked-textbox sequence.
+    pub fn next_shape_id(&self) -> Option<u32> {
+        self.container.id_of_next_shape
+    }
+
+    /// Get the raw `MSOTXDIR` text-direction value.
+    pub fn text_direction(&self) -> Option<u16> {
+        self.container.text_direction
+    }
+
+    /// Whether one click on the text area enters text editing mode.
+    pub fn single_click_selects_text(&self) -> Option<bool> {
+        self.container.select_text
+    }
+
+    /// Whether the shape uses automatic default text margins.
+    pub fn automatic_text_margins(&self) -> Option<bool> {
+        self.container.auto_text_margin
+    }
+
+    /// Whether the shape dimensions should be adjusted to fit the text.
+    pub fn size_shape_to_fit_text(&self) -> Option<bool> {
+        self.container.size_shape_to_fit_text
     }
 
     fn current_run_formatting(&self) -> TextRunFormatting {
@@ -480,7 +554,7 @@ mod tests {
         target.extend_from_slice(data);
     }
 
-    fn formatted_textbox_record() -> Vec<u8> {
+    fn formatted_textbox_record(wrap_mode: u32, left_margin: u32) -> Vec<u8> {
         let mut ppt_records = Vec::new();
         push_record(&mut ppt_records, 0, 0, 3999, &4u32.to_le_bytes());
         push_record(&mut ppt_records, 0, 0, 4008, b"abcd");
@@ -502,18 +576,27 @@ mod tests {
         push_record(&mut ppt_records, 0, 0, 4001, &style);
 
         let properties = [
-            (0x0081u16, 91_440u32),
+            (0x0080u16, 0xCAFE_BABEu32),
+            (0x0081u16, left_margin),
             (0x0082u16, 45_720u32),
             (0x0083u16, 91_440u32),
             (0x0084u16, 45_720u32),
-            (0x0085u16, 0u32),
+            (0x0085u16, wrap_mode),
             (0x0087u16, 2u32),
             (0x0088u16, 1u32),
+            (0x0089u16, 3u32),
+            (0x008Au16, 2002u32),
         ];
         let mut opt = Vec::new();
         for (id, value) in properties {
             opt.extend_from_slice(&id.to_le_bytes());
             opt.extend_from_slice(&value.to_le_bytes());
+        }
+        let secondary_properties = [(0x008Bu16, 1u32), (0x00BFu16, 0x001A_0012u32)];
+        let mut secondary_opt = Vec::new();
+        for (id, value) in secondary_properties {
+            secondary_opt.extend_from_slice(&id.to_le_bytes());
+            secondary_opt.extend_from_slice(&value.to_le_bytes());
         }
 
         let mut shape = Vec::new();
@@ -522,6 +605,13 @@ mod tests {
         sp.extend_from_slice(&0x0A00u32.to_le_bytes());
         push_record(&mut shape, 2, 24, 0xF00A, &sp);
         push_record(&mut shape, 3, properties.len() as u16, 0xF00B, &opt);
+        push_record(
+            &mut shape,
+            3,
+            secondary_properties.len() as u16,
+            0xF121,
+            &secondary_opt,
+        );
         push_record(&mut shape, 0xF, 0, 0xF00D, &ppt_records);
 
         let mut result = Vec::new();
@@ -582,7 +672,7 @@ mod tests {
 
     #[test]
     fn parses_embedded_style_runs_and_nested_text_options() {
-        let data = formatted_textbox_record();
+        let data = formatted_textbox_record(0, 91_440);
         let (record, consumed) = super::super::escher::EscherRecord::parse(&data, 0).unwrap();
         assert_eq!(consumed, data.len());
 
@@ -606,10 +696,21 @@ mod tests {
             textbox.text_margins(),
             Some((91_440, 45_720, 91_440, 45_720))
         );
+        assert_eq!(
+            textbox.effective_text_margins(),
+            (91_440, 45_720, 91_440, 45_720)
+        );
         assert_eq!(textbox.wrap_mode(), Some(0));
         assert_eq!(textbox.word_wrap_enabled(), Some(true));
         assert_eq!(textbox.text_anchor(), Some(2));
         assert_eq!(textbox.text_flow(), Some(1));
+        assert_eq!(textbox.text_id(), Some(0xCAFE_BABEu32 as i32));
+        assert_eq!(textbox.font_rotation(), Some(3));
+        assert_eq!(textbox.next_shape_id(), Some(2002));
+        assert_eq!(textbox.text_direction(), Some(1));
+        assert_eq!(textbox.single_click_selects_text(), Some(true));
+        assert_eq!(textbox.automatic_text_margins(), Some(false));
+        assert_eq!(textbox.size_shape_to_fit_text(), Some(true));
     }
 
     #[test]
@@ -625,5 +726,23 @@ mod tests {
         assert_eq!(textbox.runs()[0].formatting.font_size, Some(20));
         assert!(textbox.runs()[0].formatting.bold);
         assert!(textbox.runs()[0].formatting.italic);
+    }
+
+    #[test]
+    fn rejects_out_of_range_text_enum_values() {
+        let data = formatted_textbox_record(u32::from(u16::MAX) + 1, 91_440);
+        let (record, _) = super::super::escher::EscherRecord::parse(&data, 0).unwrap();
+
+        let error = TextBox::from_escher_record(&record).unwrap_err();
+        assert!(error.to_string().contains("WrapText value"));
+    }
+
+    #[test]
+    fn rejects_out_of_range_text_margins() {
+        let data = formatted_textbox_record(0, 0x0132_F541);
+        let (record, _) = super::super::escher::EscherRecord::parse(&data, 0).unwrap();
+
+        let error = TextBox::from_escher_record(&record).unwrap_err();
+        assert!(error.to_string().contains("left margin"));
     }
 }

@@ -282,44 +282,32 @@ pub struct ShapeContainer<'a> {
     ///         5=bottom centered, 6=top baseline, 7=bottom baseline, 8=top centered baseline
     pub anchor_text: Option<u16>,
 
-    /// Rotate text with shape
-    /// Property ID: 0x00BF (ROTATE_TEXT)
-    pub rotate_text: Option<bool>,
-
     /// Text ID (identifier for the text)
     /// Property ID: 0x0080 (TEXT_ID)
-    pub text_id: Option<u32>,
-
-    /// Scale text to fit shape
-    /// Property ID: 0x0089 (SCALE_TEXT)
-    pub scale_text: Option<bool>,
-
-    /// Size text to fit shape bounds
-    /// Property ID: 0x008A (SIZE_TEXT_TO_FIT_SHAPE)
-    pub size_text_to_fit_shape: Option<bool>,
+    pub text_id: Option<i32>,
 
     /// Size shape to fit text content
-    /// Property ID: 0x008B (SIZE_SHAPE_TO_FIT_TEXT)
+    /// Packed Boolean property ID: 0x00BE (fFitShapeToText)
     pub size_shape_to_fit_text: Option<bool>,
 
-    /// Font rotation angle (16.16 fixed-point degrees)
-    /// Property ID: 0x008D (FONT_ROTATION)
-    pub font_rotation: Option<u32>,
+    /// Font rotation (`MSOCDIR`)
+    /// Property ID: 0x0089 (cdirFont)
+    pub font_rotation: Option<u16>,
 
-    /// Bidirectional text flag
-    /// Property ID: 0x0088 (BIDI)
-    pub bidi: Option<bool>,
+    /// Text direction (`MSOTXDIR`)
+    /// Property ID: 0x008B (txdir)
+    pub text_direction: Option<u16>,
 
-    /// Use host margins (use container's margins)
-    /// Property ID: 0x008E (USE_HOST_MARGINS)
-    pub use_host_margins: Option<bool>,
+    /// Use automatic default text margins
+    /// Packed Boolean property ID: 0x00BC (fAutoTextMargin)
+    pub auto_text_margin: Option<bool>,
 
-    /// Single click selects text
-    /// Property ID: 0x008F (SINGLE_CLICK_SELECTS)
-    pub single_click_selects: Option<bool>,
+    /// Enter text editing mode when the contained text area is clicked
+    /// Packed Boolean property ID: 0x00BB (fSelectText)
+    pub select_text: Option<bool>,
 
     /// ID of next shape in sequence
-    /// Property ID: 0x0082 (ID_OF_NEXT_SHAPE) - Note: different context than TEXT_TOP
+    /// Property ID: 0x008A (hspNext)
     pub id_of_next_shape: Option<u32>,
 }
 
@@ -385,15 +373,12 @@ impl<'a> ShapeContainer<'a> {
             text_flow: None,
             wrap_text: None,
             anchor_text: None,
-            rotate_text: None,
             text_id: None,
-            scale_text: None,
-            size_text_to_fit_shape: None,
             size_shape_to_fit_text: None,
             font_rotation: None,
-            bidi: None,
-            use_host_margins: None,
-            single_click_selects: None,
+            text_direction: None,
+            auto_text_margin: None,
+            select_text: None,
             id_of_next_shape: None,
         }
     }
@@ -426,15 +411,12 @@ impl<'a> ShapeContainer<'a> {
             text_flow: None,
             wrap_text: None,
             anchor_text: None,
-            rotate_text: None,
             text_id: None,
-            scale_text: None,
-            size_text_to_fit_shape: None,
             size_shape_to_fit_text: None,
             font_rotation: None,
-            bidi: None,
-            use_host_margins: None,
-            single_click_selects: None,
+            text_direction: None,
+            auto_text_margin: None,
+            select_text: None,
             id_of_next_shape: None,
         }
     }
@@ -491,6 +473,18 @@ impl<'a> ShapeContainer<'a> {
         }
     }
 
+    /// Get text margins with the MS-ODRAW defaults applied to absent values.
+    pub fn effective_text_margins(&self) -> (i32, i32, i32, i32) {
+        const HORIZONTAL_DEFAULT: i32 = 0x0001_6530;
+        const VERTICAL_DEFAULT: i32 = 0x0000_B298;
+        (
+            self.text_left.unwrap_or(HORIZONTAL_DEFAULT),
+            self.text_top.unwrap_or(VERTICAL_DEFAULT),
+            self.text_right.unwrap_or(HORIZONTAL_DEFAULT),
+            self.text_bottom.unwrap_or(VERTICAL_DEFAULT),
+        )
+    }
+
     /// Set text flow direction.
     ///
     /// # Values
@@ -532,22 +526,9 @@ impl<'a> ShapeContainer<'a> {
         self.wrap_text.map(|mode| mode != 2)
     }
 
-    /// Set rotate text with shape flag.
-    pub fn set_rotate_text(&mut self, rotate: Option<bool>) {
-        self.rotate_text = rotate;
-    }
-
-    /// Set font rotation angle (16.16 fixed-point degrees).
-    pub fn set_font_rotation(&mut self, rotation: Option<u32>) {
+    /// Set the raw `MSOCDIR` font rotation value.
+    pub fn set_font_rotation(&mut self, rotation: Option<u16>) {
         self.font_rotation = rotation;
-    }
-
-    /// Get font rotation in degrees as a float.
-    ///
-    /// Converts from 16.16 fixed-point to f32.
-    pub fn font_rotation_degrees(&self) -> Option<f32> {
-        self.font_rotation
-            .map(|rot| (rot >> 16) as f32 + ((rot & 0xFFFF) as f32 / 65536.0))
     }
 }
 
