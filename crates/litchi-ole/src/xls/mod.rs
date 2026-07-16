@@ -35,6 +35,9 @@ mod defined_names;
 /// BIFF8 number formats, XF slots, and workbook date system.
 mod number_format;
 
+/// BIFF8 worksheet row heights and column widths/formatting.
+mod layout;
+
 /// Shape extraction
 pub mod shapes;
 
@@ -75,6 +78,7 @@ pub use defined_names::{
 pub use number_format::{
     XlsDateSystem, XlsExtendedFormat, XlsExtendedFormatKind, XlsFormatting, XlsNumberFormat,
 };
+pub use layout::{XlsColumnLayout, XlsRowLayout};
 pub use records::{
     PhoneticAlignment, PhoneticRun, PhoneticString, PhoneticType, SharedStringFormatRun,
     SharedStringProperties,

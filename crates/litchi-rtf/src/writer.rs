@@ -135,6 +135,9 @@ impl<W: Write> RtfWriter<W> {
         // Revision controls reference this author table by numeric index.
         self.write_revision_table(doc.revision_authors(), doc.revisions())?;
 
+        // Producer provenance is inert header metadata.
+        self.write_generator(doc.generator())?;
+
         // Write document properties before body content.
         self.write_document_info(doc.info())?;
 
@@ -503,6 +506,21 @@ impl<W: Write> RtfWriter<W> {
         }
         self.write_str("}")?;
         Ok(())
+    }
+
+    pub fn write_generator(
+        &mut self,
+        generator: Option<&crate::DocumentGenerator<'_>>,
+    ) -> io::Result<()> {
+        let Some(generator) = generator else {
+            return Ok(());
+        };
+        generator
+            .validate()
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+        self.write_str("{\\*\\generator ")?;
+        self.write_destination_text(generator.value.as_ref())?;
+        self.write_str(";}")
     }
 
     /// Write an RTF stylesheet destination.

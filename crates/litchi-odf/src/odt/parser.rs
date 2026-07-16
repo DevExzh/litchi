@@ -29,17 +29,36 @@ const MAX_SEMANTIC_ITEMS: usize = 1_000_000;
 /// from `crate::elements::parser` instead.
 pub(crate) struct OdtParser;
 
-/// Represents a tracked change in the document
-#[derive(Debug, Clone)]
+/// Complete inert tracked-change declarations and their container policy.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct TrackedChanges {
+    /// Whether the producer requested change tracking to remain enabled.
+    pub track_changes: Option<bool>,
+    /// Stored base64 protection-key material. It is never used to unlock changes.
+    pub protection_key: Option<String>,
+    /// Digest algorithm URI associated with the protection key.
+    pub protection_key_digest_algorithm: Option<String>,
+    /// Change declarations in document order.
+    pub changes: Vec<TrackChange>,
+}
+
+/// Represents a tracked change in the document.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TrackChange {
     /// Change ID
     pub id: String,
+    /// Optional XML identifier retained separately from `text:id`.
+    pub xml_id: Option<String>,
     /// Author who made the change
     pub author: Option<String>,
     /// Date/time of the change
     pub date: Option<String>,
     /// Type of change (insertion, deletion, format-change)
     pub change_type: ChangeType,
+    /// Style referenced by a format change. The style is not resolved automatically.
+    pub style_name: Option<String>,
+    /// Deletion paragraph-merge behavior when explicitly stored.
+    pub merge_last_paragraph: Option<bool>,
     /// Changed text content
     pub content: String,
 }
@@ -145,9 +164,14 @@ impl OdtParser {
     ///
     /// Vector of `TrackChange` objects with metadata
     pub fn parse_track_changes(content: &str) -> Result<Vec<TrackChange>> {
-        let mut changes = parse_change_declarations(content)?;
-        correlate_change_ranges(content, &mut changes)?;
-        Ok(changes)
+        Ok(Self::parse_tracked_changes(content)?.changes)
+    }
+
+    /// Parse the full tracked-change container, including inert policy metadata.
+    pub fn parse_tracked_changes(content: &str) -> Result<TrackedChanges> {
+        let mut tracked = parse_change_declarations(content)?;
+        correlate_change_ranges(content, &mut tracked.changes)?;
+        Ok(tracked)
     }
 
     /// Parse comments/annotations
@@ -185,9 +209,12 @@ impl OdtParser {
 
 struct ActiveTrackedChange {
     id: String,
+    xml_id: Option<String>,
     author: Option<String>,
     date: Option<String>,
     change_type: Option<ChangeType>,
+    style_name: Option<String>,
+    merge_last_paragraph: Option<bool>,
     content: String,
     depth: usize,
     kind_depth: Option<usize>,
@@ -199,7 +226,7 @@ struct ActiveTrackedChange {
     seen_paragraph: bool,
 }
 
-fn parse_change_declarations(content: &str) -> Result<Vec<TrackChange>> {
+fn parse_change_declarations(content: &str) -> Result<TrackedChanges> {
     let mut reader = NsReader::from_str(content);
     let mut buffer = Vec::new();
     let mut document_depth = 0usize;
@@ -208,6 +235,7 @@ fn parse_change_declarations(content: &str) -> Result<Vec<TrackChange>> {
     let mut active: Option<ActiveTrackedChange> = None;
     let mut changes = Vec::new();
     let mut ids = HashMap::new();
+    let mut tracked = TrackedChanges::default();
 
     loop {
         let (namespace, event) = reader
@@ -230,6 +258,7 @@ fn parse_change_declarations(content: &str) -> Result<Vec<TrackChange>> {
                             ));
                         }
                         tracked_changes_seen = true;
+                        parse_tracked_changes_attributes(&reader, element, &mut tracked)?;
                         tracked_depth = 1;
                     }
                 } else {
@@ -256,7 +285,7 @@ fn parse_change_declarations(content: &str) -> Result<Vec<TrackChange>> {
                                 "document exceeds {MAX_SEMANTIC_ITEMS} tracked changes"
                             )));
                         }
-                        let id = change_region_id(&reader, element)?;
+                        let (id, xml_id) = change_region_ids(&reader, element)?;
                         if ids.insert(id.clone(), changes.len()).is_some() {
                             return Err(Error::InvalidFormat(format!(
                                 "duplicate tracked-change ID '{id}'"
@@ -264,9 +293,12 @@ fn parse_change_declarations(content: &str) -> Result<Vec<TrackChange>> {
                         }
                         active = Some(ActiveTrackedChange {
                             id,
+                            xml_id,
                             author: None,
                             date: None,
                             change_type: None,
+                            style_name: None,
+                            merge_last_paragraph: None,
                             content: String::new(),
                             depth: 1,
                             kind_depth: None,
@@ -306,6 +338,7 @@ fn parse_change_declarations(content: &str) -> Result<Vec<TrackChange>> {
                     ));
                 }
                 tracked_changes_seen = true;
+                parse_tracked_changes_attributes(&reader, element, &mut tracked)?;
             },
             Event::Text(ref value) if active.is_some() => {
                 let value = value
@@ -367,9 +400,12 @@ fn parse_change_declarations(content: &str) -> Result<Vec<TrackChange>> {
                             }
                             changes.push(TrackChange {
                                 id: change.id,
+                                xml_id: change.xml_id,
                                 author: change.author,
                                 date: change.date,
                                 change_type,
+                                style_name: change.style_name,
+                                merge_last_paragraph: change.merge_last_paragraph,
                                 content: change.content,
                             });
                         }
@@ -389,21 +425,81 @@ fn parse_change_declarations(content: &str) -> Result<Vec<TrackChange>> {
             "incomplete tracked-change XML structure".to_string(),
         ));
     }
-    Ok(changes)
+    tracked.changes = changes;
+    Ok(tracked)
 }
 
-fn change_region_id(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<String> {
+fn change_region_ids(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+) -> Result<(String, Option<String>)> {
     let text_id = namespaced_attribute(reader, element, TEXT_NAMESPACE, b"id", "changed-region")?;
     let xml_id = namespaced_attribute(reader, element, XML_NAMESPACE, b"id", "changed-region")?;
-    let id = text_id.or(xml_id).ok_or_else(|| {
-        Error::InvalidFormat("text:changed-region requires text:id or xml:id".to_string())
-    })?;
-    if id.is_empty() {
+    let (id, xml_id) = match (text_id, xml_id) {
+        (Some(text_id), Some(xml_id)) => {
+            if text_id != xml_id {
+                return Err(Error::InvalidFormat(
+                    "text:changed-region text:id and xml:id must match".to_string(),
+                ));
+            }
+            (text_id, Some(xml_id))
+        },
+        (Some(text_id), None) => (text_id, None),
+        (None, Some(xml_id)) => (xml_id.clone(), Some(xml_id)),
+        (None, None) => {
+            return Err(Error::InvalidFormat(
+                "text:changed-region requires text:id or xml:id".to_string(),
+            ));
+        },
+    };
+    validate_tracked_change_text(&id, "tracked-change ID", false)?;
+    Ok((id, xml_id))
+}
+
+fn parse_tracked_changes_attributes(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    tracked: &mut TrackedChanges,
+) -> Result<()> {
+    if let Some(value) = namespaced_attribute(
+        reader,
+        element,
+        TEXT_NAMESPACE,
+        b"track-changes",
+        "tracked-changes",
+    )? {
+        tracked.track_changes = Some(parse_tracked_change_bool("track-changes", &value)?);
+    }
+    if let Some(value) = namespaced_attribute(
+        reader,
+        element,
+        TEXT_NAMESPACE,
+        b"protection-key",
+        "tracked-changes",
+    )? {
+        validate_protection_key(&value)?;
+        tracked.protection_key = Some(value);
+    }
+    if let Some(value) = namespaced_attribute(
+        reader,
+        element,
+        TEXT_NAMESPACE,
+        b"protection-key-digest-algorithm",
+        "tracked-changes",
+    )? {
+        validate_tracked_change_text(
+            &value,
+            "text:protection-key-digest-algorithm",
+            false,
+        )?;
+        tracked.protection_key_digest_algorithm = Some(value);
+    }
+    if tracked.protection_key_digest_algorithm.is_some() && tracked.protection_key.is_none() {
         return Err(Error::InvalidFormat(
-            "tracked-change ID must not be empty".to_string(),
+            "text:protection-key-digest-algorithm requires text:protection-key".to_string(),
         ));
     }
-    Ok(id)
+    Ok(())
 }
 
 fn process_change_declaration_start(
@@ -432,6 +528,32 @@ fn process_change_declaration_start(
                 return Err(Error::InvalidFormat(
                     "change declaration must be a direct child of text:changed-region".to_string(),
                 ));
+            }
+            match change_type {
+                ChangeType::FormatChange => {
+                    change.style_name = namespaced_attribute(
+                        reader,
+                        element,
+                        TEXT_NAMESPACE,
+                        b"style-name",
+                        "format-change",
+                    )?;
+                    if let Some(style_name) = &change.style_name {
+                        validate_tracked_change_text(style_name, "text:style-name", false)?;
+                    }
+                },
+                ChangeType::Deletion => {
+                    change.merge_last_paragraph = namespaced_attribute(
+                        reader,
+                        element,
+                        TEXT_NAMESPACE,
+                        b"merge-last-paragraph",
+                        "deletion",
+                    )?
+                    .map(|value| parse_tracked_change_bool("merge-last-paragraph", &value))
+                    .transpose()?;
+                },
+                ChangeType::Insertion => {},
             }
             change.change_type = Some(change_type);
             change.kind_depth = Some(change.depth);
@@ -485,6 +607,70 @@ fn process_change_declaration_start(
     }
     if text_element && change.paragraph_depth.is_some() {
         append_text_control(reader, element, &mut change.content)?;
+    }
+    Ok(())
+}
+
+fn parse_tracked_change_bool(name: &str, value: &str) -> Result<bool> {
+    match value {
+        "true" | "1" => Ok(true),
+        "false" | "0" => Ok(false),
+        _ => Err(Error::InvalidFormat(format!(
+            "text:{name} is not an XML Schema boolean"
+        ))),
+    }
+}
+
+fn validate_tracked_change_text(value: &str, description: &str, allow_empty: bool) -> Result<()> {
+    const MAX_TRACKED_CHANGE_TEXT_BYTES: usize = 1024 * 1024;
+    if value.len() > MAX_TRACKED_CHANGE_TEXT_BYTES {
+        return Err(Error::InvalidFormat(format!(
+            "{description} exceeds {MAX_TRACKED_CHANGE_TEXT_BYTES} bytes"
+        )));
+    }
+    if !allow_empty && value.is_empty() {
+        return Err(Error::InvalidFormat(format!("{description} cannot be empty")));
+    }
+    if value.chars().any(|character| {
+        character == '\0'
+            || (character.is_control() && !matches!(character, '\t' | '\n' | '\r'))
+    }) {
+        return Err(Error::InvalidFormat(format!(
+            "{description} contains invalid XML characters"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_protection_key(value: &str) -> Result<()> {
+    validate_tracked_change_text(value, "text:protection-key", false)?;
+    let mut symbols = 0usize;
+    let mut padding = 0usize;
+    let mut saw_padding = false;
+    for byte in value.bytes() {
+        if byte.is_ascii_whitespace() {
+            continue;
+        }
+        symbols += 1;
+        if byte == b'=' {
+            saw_padding = true;
+            padding += 1;
+        } else if byte.is_ascii_alphanumeric() || matches!(byte, b'+' | b'/') {
+            if saw_padding {
+                return Err(Error::InvalidFormat(
+                    "text:protection-key has data after base64 padding".to_string(),
+                ));
+            }
+        } else {
+            return Err(Error::InvalidFormat(
+                "text:protection-key is not base64Binary".to_string(),
+            ));
+        }
+    }
+    if symbols == 0 || !symbols.is_multiple_of(4) || padding > 2 {
+        return Err(Error::InvalidFormat(
+            "text:protection-key is not base64Binary".to_string(),
+        ));
     }
     Ok(())
 }
@@ -1758,6 +1944,37 @@ mod tests {
     }
 
     #[test]
+    fn retains_tracked_change_policy_and_schema_attributes() {
+        let xml = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:d="http://purl.org/dc/elements/1.1/"><o:body><o:text><t:tracked-changes t:track-changes="0" t:protection-key="YWJj" t:protection-key-digest-algorithm="urn:example:sha256"><t:changed-region t:id="d1" xml:id="d1"><t:deletion t:merge-last-paragraph="false"><o:change-info><d:creator>A</d:creator><d:date>2026-07-16</d:date></o:change-info><t:p>gone</t:p></t:deletion></t:changed-region><t:changed-region t:id="f1"><t:format-change t:style-name="Emphasis"><o:change-info><d:creator>B</d:creator><d:date>2026-07-16</d:date></o:change-info></t:format-change></t:changed-region></t:tracked-changes></o:text></o:body></o:document-content>"#;
+        let tracked = OdtParser::parse_tracked_changes(xml).unwrap();
+        assert_eq!(tracked.track_changes, Some(false));
+        assert_eq!(tracked.protection_key.as_deref(), Some("YWJj"));
+        assert_eq!(
+            tracked.protection_key_digest_algorithm.as_deref(),
+            Some("urn:example:sha256")
+        );
+        assert_eq!(tracked.changes[0].xml_id.as_deref(), Some("d1"));
+        assert_eq!(tracked.changes[0].merge_last_paragraph, Some(false));
+        assert_eq!(tracked.changes[1].style_name.as_deref(), Some("Emphasis"));
+    }
+
+    #[test]
+    fn rejects_invalid_tracked_change_policy_and_attributes() {
+        let prefix = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:d="http://purl.org/dc/elements/1.1/"><o:body><o:text>"#;
+        let suffix = "</o:text></o:body></o:document-content>";
+        for body in [
+            r#"<t:tracked-changes t:track-changes="yes"/>"#,
+            r#"<t:tracked-changes t:protection-key="not-base64"/>"#,
+            r#"<t:tracked-changes t:protection-key-digest-algorithm="urn:sha256"/>"#,
+            r#"<t:tracked-changes><t:changed-region t:id="a" xml:id="b"><t:insertion><o:change-info/></t:insertion></t:changed-region></t:tracked-changes>"#,
+            r#"<t:tracked-changes><t:changed-region t:id="a"><t:deletion t:merge-last-paragraph="maybe"><o:change-info/></t:deletion></t:changed-region></t:tracked-changes>"#,
+        ] {
+            let xml = format!("{prefix}{body}{suffix}");
+            assert!(OdtParser::parse_tracked_changes(&xml).is_err(), "accepted {body}");
+        }
+    }
+
+    #[test]
     fn tracked_changes_reject_ambiguous_declarations_and_ranges() {
         let prelude = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:u="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:d="http://purl.org/dc/elements/1.1/"><o:body><o:text>"#;
         let info = r#"<o:change-info><d:creator>A</d:creator><d:date>D</d:date></o:change-info>"#;
@@ -1959,9 +2176,12 @@ mod tests {
     fn test_track_change_debug() {
         let change = TrackChange {
             id: "test1".to_string(),
+            xml_id: None,
             author: Some("Author".to_string()),
             date: Some("2024-03-15".to_string()),
             change_type: ChangeType::Insertion,
+            style_name: None,
+            merge_last_paragraph: None,
             content: "content".to_string(),
         };
         let debug_str = format!("{:?}", change);
@@ -2044,9 +2264,12 @@ mod tests {
     fn test_track_change_clone() {
         let change = TrackChange {
             id: "tc1".to_string(),
+            xml_id: None,
             author: Some("Author".to_string()),
             date: Some("2024-03-15".to_string()),
             change_type: ChangeType::Deletion,
+            style_name: None,
+            merge_last_paragraph: None,
             content: "Deleted text".to_string(),
         };
         let cloned = change.clone();

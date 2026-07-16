@@ -112,6 +112,7 @@ pub enum ControlWord<'a> {
     FormFieldListEntry,
     FormFieldTextType(i32),
     FormFieldHasListBox(bool),
+    Generator,
 
     // Index and table-of-contents source marks
     IndexEntry,
@@ -719,6 +720,7 @@ impl<'a> Lexer<'a> {
             "ffl" => ControlWord::FormFieldListEntry,
             "fftypetxt" => ControlWord::FormFieldTextType(param_value),
             "ffhaslistbox" => ControlWord::FormFieldHasListBox(param_bool),
+            "generator" => ControlWord::Generator,
 
             // Index and table-of-contents source marks
             "xe" => ControlWord::IndexEntry,

@@ -32,6 +32,10 @@ use super::data_validation::{
 use super::sort::SortState;
 use super::sparkline::{SparklineGroup, parse_sparkline_groups_from_worksheet_xml};
 use super::sheet_view::{WorksheetViewCollection, parse_worksheet_views};
+use super::sheet_protection::{
+    WorksheetProtectedRange, WorksheetProtection, WorksheetProtectionMetadata,
+    parse_worksheet_protection,
+};
 use super::named_sheet_view::{NamedSheetViews, discover_named_sheet_views};
 use super::table::{Table, parse_table_xml};
 use super::views::SheetView;
@@ -243,6 +247,8 @@ pub struct Worksheet<'a> {
     sheet_view_collection: Option<WorksheetViewCollection>,
     /// Static Named Sheet Views part associated with this worksheet.
     named_sheet_views: Option<NamedSheetViews>,
+    /// Static worksheet protection and editable-range metadata.
+    protection_metadata: WorksheetProtectionMetadata,
     /// Manual row page breaks
     row_breaks: Vec<PageBreak>,
     /// Manual column page breaks
@@ -278,6 +284,7 @@ impl<'a> Worksheet<'a> {
             sheet_views: Vec::new(),
             sheet_view_collection: None,
             named_sheet_views: None,
+            protection_metadata: WorksheetProtectionMetadata::default(),
             row_breaks: Vec::new(),
             col_breaks: Vec::new(),
             rich_text_cells: HashMap::new(),
@@ -382,6 +389,7 @@ impl<'a> Worksheet<'a> {
         let data_validation_collections = parse_data_validation_collections(sheet_data.as_bytes())?;
         let auto_filter_definition = parse_auto_filter(sheet_data.as_bytes())?;
         let sheet_view_collection = parse_worksheet_views(sheet_data.as_bytes())?;
+        let protection_metadata = parse_worksheet_protection(sheet_data.as_bytes())?;
         self.cells = parsed.cells;
         self.cell_styles = parsed.cell_styles;
         self.rows = parsed.rows;
@@ -402,6 +410,7 @@ impl<'a> Worksheet<'a> {
         self.auto_filter_definition = auto_filter_definition;
         self.sheet_views = parsed.sheet_views;
         self.sheet_view_collection = sheet_view_collection;
+        self.protection_metadata = protection_metadata;
         self.dimensions = parsed.dimensions;
         Ok((
             parsed.hyperlinks,
@@ -1860,6 +1869,23 @@ impl<'a> Worksheet<'a> {
     /// * `row` - Row number (1-based)
     pub fn get_row_info(&self, row: u32) -> Option<&RowInfo> {
         self.rows.get(&row)
+    }
+
+    // ===== Worksheet Protection =====
+
+    /// Complete worksheet protection metadata.
+    pub fn protection_metadata(&self) -> &WorksheetProtectionMetadata {
+        &self.protection_metadata
+    }
+
+    /// Effective core worksheet protection options, when present.
+    pub fn sheet_protection(&self) -> Option<&WorksheetProtection> {
+        self.protection_metadata.sheet_protection()
+    }
+
+    /// Protected ranges from core and Office 2010 collections in document order.
+    pub fn protected_ranges(&self) -> impl Iterator<Item = &WorksheetProtectedRange> {
+        self.protection_metadata.protected_ranges()
     }
 
     // ===== Data Validation =====

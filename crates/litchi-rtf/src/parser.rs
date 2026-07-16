@@ -296,6 +296,7 @@ pub struct Parser<'a> {
     fields: Vec<super::field::Field<'a>>,
     form_fields: Vec<super::form_field::FormField<'a>>,
     form_field_text_bytes: usize,
+    generator: Option<crate::DocumentGenerator<'a>>,
     /// Embedded and linked objects
     objects: Vec<super::object::EmbeddedObject<'a>>,
     /// Ordered inert document variables
@@ -407,6 +408,7 @@ impl<'a> Parser<'a> {
             fields: Vec::new(),
             form_fields: Vec::new(),
             form_field_text_bytes: 0,
+            generator: None,
             objects: Vec::new(),
             document_variables: Vec::new(),
             document_variable_text_bytes: 0,
@@ -479,6 +481,7 @@ impl<'a> Parser<'a> {
             pictures: self.pictures,
             fields: self.fields,
             form_fields: self.form_fields,
+            generator: self.generator,
             objects: self.objects,
             document_variables: self.document_variables,
             user_properties: self.user_properties,
@@ -621,6 +624,16 @@ impl<'a> Parser<'a> {
                                 "orphan RTF formfield/datafield destination".to_string(),
                             ));
                         },
+                        Some(Token::Control(ControlWord::Generator)) => {
+                            if self.generator.is_some() {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF contains multiple generator destinations".to_string(),
+                                ));
+                            }
+                            self.generator = Some(self.parse_generator_destination()?);
+                            self.states.pop();
+                            return Ok(());
+                        },
                         Some(Token::Control(ControlWord::DocumentVariable)) => {
                             self.parse_document_variable_destination()?;
                             self.states.pop();
@@ -716,6 +729,11 @@ impl<'a> Parser<'a> {
                 Token::Control(ControlWord::FormField | ControlWord::DataField) => {
                     return Err(RtfError::MalformedDocument(
                         "orphan RTF formfield/datafield destination".to_string(),
+                    ));
+                },
+                Token::Control(ControlWord::Generator) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF generator destination must be starred".to_string(),
                     ));
                 },
                 Token::Control(ControlWord::Info) => {
@@ -2371,6 +2389,59 @@ impl<'a> Parser<'a> {
             self.push_direct_revision_authors(&mut direct_text)?;
         }
         Err(RtfError::UnexpectedEof)
+    }
+
+    fn parse_generator_destination(&mut self) -> RtfResult<crate::DocumentGenerator<'a>> {
+        self.pos += 1; // ignorable-destination marker
+        if !matches!(
+            self.tokens.get(self.pos),
+            Some(Token::Control(ControlWord::Generator))
+        ) {
+            return Err(RtfError::MalformedDocument(
+                "invalid RTF generator destination".to_string(),
+            ));
+        }
+        self.pos += 1;
+        let mut value = String::new();
+        let mut unicode_skip = self.current_state()?.unicode_skip.max(0);
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    let value = value.trim();
+                    let value = value.strip_suffix(';').unwrap_or(value).trim_end();
+                    let value = self.arena.alloc_str(value);
+                    return crate::DocumentGenerator::new(Cow::Borrowed(value));
+                },
+                Some(Token::Text(text)) => {
+                    value.push_str(&self.decode_transport_text(text)?);
+                    self.pos += 1;
+                },
+                Some(Token::Control(ControlWord::Unicode(first))) => {
+                    value.push_str(&self.parse_style_unicode(*first, unicode_skip)?);
+                },
+                Some(Token::Control(ControlWord::UnicodeSkip(count))) => {
+                    unicode_skip = (*count).max(0);
+                    self.pos += 1;
+                },
+                Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
+                    value.push_str(control_symbol_text(control).unwrap_or_default());
+                    self.pos += 1;
+                },
+                Some(Token::OpenBrace | Token::Binary(_)) | Some(Token::Control(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF generator destination contains active, nested, or binary data"
+                            .to_string(),
+                    ));
+                },
+                None => return Err(RtfError::UnexpectedEof),
+            }
+            if value.len() > crate::generator::MAX_GENERATOR_BYTES {
+                return Err(RtfError::MalformedDocument(
+                    "RTF generator value exceeds the safety limit".to_string(),
+                ));
+            }
+        }
     }
 
     fn parse_revision_author_group(&mut self) -> RtfResult<String> {
@@ -5909,6 +5980,7 @@ pub struct ParsedDocument<'a> {
     /// Extracted fields
     pub fields: Vec<super::field::Field<'a>>,
     pub form_fields: Vec<super::form_field::FormField<'a>>,
+    pub generator: Option<crate::DocumentGenerator<'a>>,
     /// Embedded and linked objects
     pub objects: Vec<super::object::EmbeddedObject<'a>>,
     /// Ordered inert document-variable metadata

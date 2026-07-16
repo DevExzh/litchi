@@ -27,6 +27,8 @@ pub struct RtfDocument<'a> {
     fields: Vec<super::field::Field<'a>>,
     /// Ordered positional legacy form fields.
     form_fields: Vec<super::form_field::FormField<'a>>,
+    /// Inert producer provenance from the generator destination.
+    generator: Option<crate::DocumentGenerator<'a>>,
     /// Embedded and linked objects
     objects: Vec<super::object::EmbeddedObject<'a>>,
     /// Ordered inert document-variable metadata
@@ -228,6 +230,9 @@ impl<'a> RtfDocument<'a> {
                 .into_iter()
                 .map(super::form_field::FormField::into_owned)
                 .collect(),
+            generator: parsed
+                .generator
+                .map(crate::DocumentGenerator::into_owned),
             objects: owned_objects,
             document_variables: parsed
                 .document_variables
@@ -525,6 +530,23 @@ impl<'a> RtfDocument<'a> {
     /// Return ordered positional legacy form fields.
     pub fn form_fields(&self) -> &[super::form_field::FormField<'_>] {
         &self.form_fields
+    }
+
+    /// Return inert producer provenance from the RTF generator destination.
+    pub fn generator(&self) -> Option<&crate::DocumentGenerator<'_>> {
+        self.generator.as_ref()
+    }
+
+    /// Set validated inert producer provenance.
+    pub fn set_generator(&mut self, generator: crate::DocumentGenerator<'a>) -> RtfResult<()> {
+        generator.validate()?;
+        self.generator = Some(generator);
+        Ok(())
+    }
+
+    /// Remove producer provenance metadata.
+    pub fn clear_generator(&mut self) {
+        self.generator = None;
     }
 
     /// Append inert form-field metadata at a valid visible body range.

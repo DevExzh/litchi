@@ -41,6 +41,7 @@ pub mod named_sheet_view;
 pub mod parsers;
 pub mod pivot;
 pub mod shared_strings;
+pub mod sheet_protection;
 pub mod sheet_view;
 mod shared_formula;
 pub mod sort;
@@ -90,6 +91,12 @@ pub use format::{
     CellFormat, DataValidation, DataValidationOperator, DataValidationType,
 };
 pub use shared_strings::SharedStrings;
+pub use sheet_protection::{
+    ProtectedRangeSource, ProtectionPasswordVerifier, ProtectionRangeReference,
+    ProtectionRangeReferenceKind, ProtectionRangeSqref, StrongProtectionPasswordVerifier,
+    WorksheetProtectedRange, WorksheetProtectedRangeCollection, WorksheetProtection,
+    WorksheetProtectionMetadata, parse_worksheet_protection,
+};
 pub use sheet_view::{
     PivotAreaType, PivotSelectionAxis, WorksheetCellReference, WorksheetPanePosition,
     WorksheetPaneState, WorksheetPivotArea, WorksheetPivotSelection, WorksheetRangeReference,

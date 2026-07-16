@@ -5,6 +5,7 @@ use crate::xls::cell::XlsCell;
 use crate::xls::comments::XlsComment;
 use crate::xls::error::XlsError;
 use crate::xls::hyperlinks::XlsHyperlink;
+use crate::xls::layout::{XlsColumnLayout, XlsRowLayout};
 use crate::xls::merged_cells::MergedCellRange;
 use crate::xls::number_format::{XlsExtendedFormat, XlsFormatting, XlsNumberFormat};
 use crate::xls::pivot_table::PivotTable;
@@ -44,6 +45,8 @@ pub struct XlsWorksheet {
     formatting: Arc<XlsFormatting>,
     data_validation_settings: Option<XlsDataValidationSettings>,
     data_validations: Vec<XlsDataValidationRule>,
+    row_layouts: BTreeMap<u16, XlsRowLayout>,
+    column_layouts: Vec<XlsColumnLayout>,
 }
 
 impl XlsWorksheet {
@@ -65,6 +68,8 @@ impl XlsWorksheet {
             formatting: Arc::new(XlsFormatting::default()),
             data_validation_settings: None,
             data_validations: Vec::new(),
+            row_layouts: BTreeMap::new(),
+            column_layouts: Vec::new(),
         }
     }
 
@@ -86,6 +91,8 @@ impl XlsWorksheet {
             formatting: Arc::new(XlsFormatting::default()),
             data_validation_settings: None,
             data_validations: Vec::new(),
+            row_layouts: BTreeMap::new(),
+            column_layouts: Vec::new(),
         }
     }
 
@@ -240,6 +247,38 @@ impl XlsWorksheet {
 
     pub(crate) fn add_data_validation(&mut self, rule: XlsDataValidationRule) {
         self.data_validations.push(rule);
+    }
+
+    /// Layout metadata for a zero-based row index.
+    pub fn row_layout(&self, row: u16) -> Option<&XlsRowLayout> {
+        self.row_layouts.get(&row)
+    }
+
+    /// Row layout metadata in ascending row order.
+    pub fn row_layouts(&self) -> impl ExactSizeIterator<Item = &XlsRowLayout> {
+        self.row_layouts.values()
+    }
+
+    /// Column layout ranges in BIFF record order.
+    pub fn column_layouts(&self) -> &[XlsColumnLayout] {
+        &self.column_layouts
+    }
+
+    /// The first layout range containing a zero-based column index.
+    pub fn column_layout(&self, column: u8) -> Option<&XlsColumnLayout> {
+        let column = u16::from(column);
+        self.column_layouts
+            .iter()
+            .find(|layout| (layout.first_column()..=layout.last_column()).contains(&column))
+    }
+
+    pub(crate) fn set_layouts(
+        &mut self,
+        rows: BTreeMap<u16, XlsRowLayout>,
+        columns: Vec<XlsColumnLayout>,
+    ) {
+        self.row_layouts = rows;
+        self.column_layouts = columns;
     }
 
     pub fn format_for_cell(&self, row: u32, col: u32) -> Option<&XlsExtendedFormat> {

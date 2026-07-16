@@ -15,7 +15,7 @@ use crate::xls::records::{
     RecordIter, SharedStringProperties, SharedStringTable, XlsEncoding,
 };
 use crate::xls::worksheet::XlsWorksheet;
-use crate::xls::{autofilter, comments, hyperlinks, merged_cells, pivot_table, protection, utils};
+use crate::xls::{autofilter, comments, hyperlinks, layout, merged_cells, pivot_table, protection, utils};
 use litchi_cfb::OleFile;
 use litchi_core::sheet::{Result, Worksheet as SheetTrait, WorksheetIterator};
 use std::collections::HashMap;
@@ -448,6 +448,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
 
         let mut comment_collector = comments::CommentCollector::new();
         let mut hyperlink_collector = hyperlinks::HyperlinkCollector::new();
+        let mut layout_collector = layout::LayoutCollector::new();
         let mut pending_string_formula: Option<CellRecord> = None;
         let mut shared_formulas = HashMap::<(u16, u16), SharedFormulaTemplate>::new();
         let mut remaining_data_validations: Option<usize> = None;
@@ -456,6 +457,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             let record = record_result?;
             comment_collector.feed_record(record.header.record_type, &record.data)?;
             hyperlink_collector.feed_record(record.header.record_type, &record.data)?;
+            layout_collector.feed_record(record.header.record_type, &record.data, &formatting)?;
 
             if matches!(remaining_data_validations, Some(1..))
                 && record.header.record_type != super::data_validation::DV_RECORD_TYPE
@@ -747,6 +749,8 @@ impl<R: Read + Seek> XlsWorkbook<R> {
 
         worksheet.set_comments(comment_collector.finish()?);
         worksheet.set_hyperlinks(hyperlink_collector.finish());
+        let (row_layouts, column_layouts) = layout_collector.finish();
+        worksheet.set_layouts(row_layouts, column_layouts);
 
         Ok(worksheet)
     }

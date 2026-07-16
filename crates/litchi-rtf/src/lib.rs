@@ -35,6 +35,7 @@ mod document_variable;
 mod error;
 mod field;
 mod form_field;
+mod generator;
 mod info;
 mod lexer;
 mod list;
@@ -65,6 +66,7 @@ pub use field::{
     ReferenceCode, parse_field_code,
 };
 pub use form_field::{FormField, FormFieldType, FormTextType};
+pub use generator::DocumentGenerator;
 pub use info::{DocumentInfo, DocumentProtection, ProtectionType};
 pub use lexer::CharacterSet;
 pub use user_property::{UserProperty, UserPropertyValue};

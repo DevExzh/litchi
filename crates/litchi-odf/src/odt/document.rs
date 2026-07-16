@@ -497,6 +497,14 @@ impl Document {
         super::parser::OdtParser::parse_track_changes(self.content.xml_content())
     }
 
+    /// Get tracked changes together with their inert container policy metadata.
+    ///
+    /// Protection-key material and digest identifiers are retained for round-trip and
+    /// inspection only; this method never unlocks, accepts, rejects, or evaluates changes.
+    pub fn tracked_changes(&self) -> Result<super::parser::TrackedChanges> {
+        super::parser::OdtParser::parse_tracked_changes(self.content.xml_content())
+    }
+
     /// Get all comments/annotations in the document.
     ///
     /// # Examples
