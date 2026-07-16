@@ -61,6 +61,8 @@ enum BodyEventKind<'b, 'a> {
     RevisionStart(&'b Revision<'a>),
     RevisionEnd,
     RevisionDeletion(&'b Revision<'a>),
+    FormFieldStart(&'b crate::FormField<'a>),
+    FormFieldEnd,
 }
 
 #[derive(Clone, Copy)]
@@ -154,6 +156,7 @@ impl<W: Write> RtfWriter<W> {
             doc.annotations(),
             doc.revisions(),
             doc.navigation_entries(),
+            doc.form_fields(),
         )?;
 
         // Write tables
@@ -924,11 +927,13 @@ impl<W: Write> RtfWriter<W> {
         annotations: &[Annotation<'_>],
         revisions: &[Revision<'_>],
         navigation_entries: &[crate::NavigationEntry<'_>],
+        form_fields: &[crate::FormField<'_>],
     ) -> io::Result<()> {
         if bookmarks.bookmarks().is_empty()
             && annotations.is_empty()
             && revisions.is_empty()
             && navigation_entries.is_empty()
+            && form_fields.is_empty()
         {
             for block in blocks {
                 self.write_style_block(block)?;
@@ -944,7 +949,74 @@ impl<W: Write> RtfWriter<W> {
             .saturating_add(revisions.len())
             .saturating_mul(2);
         let event_count = event_count.saturating_add(navigation_entries.len());
+        let event_count = event_count.saturating_add(form_fields.len().saturating_mul(2));
         let mut events = Vec::with_capacity(event_count);
+        if form_fields.len() > crate::form_field::MAX_FORM_FIELDS {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "RTF form-field count exceeds the safety limit",
+            ));
+        }
+        let mut form_field_bytes = 0usize;
+        let mut form_field_ranges: Vec<&crate::FormField<'_>> = form_fields.iter().collect();
+        form_field_ranges.sort_by_key(|field| (field.position, field.range_end));
+        let mut previous_form_end = 0usize;
+        for field in form_field_ranges {
+            field
+                .validate()
+                .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+            let result = body.get(field.position..field.range_end).ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF form-field range is outside body text or splits a character",
+                )
+            })?;
+            if result != field.result_text {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF form-field result does not match its visible body range",
+                ));
+            }
+            if field.position != field.range_end && field.position < previous_form_end {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF form-field result ranges cannot overlap",
+                ));
+            }
+            if field.position != field.range_end {
+                previous_form_end = field.range_end;
+            }
+            form_field_bytes = form_field_bytes
+                .checked_add(field.text_bytes().ok_or_else(|| {
+                    io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        "RTF form-field aggregate size overflow",
+                    )
+                })?)
+                .ok_or_else(|| {
+                    io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        "RTF form-field aggregate size overflow",
+                    )
+                })?;
+            if form_field_bytes > crate::form_field::MAX_FORM_FIELD_TOTAL_BYTES {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF form-field aggregate text exceeds the safety limit",
+                ));
+            }
+            let empty = field.position == field.range_end;
+            events.push(BodyEvent {
+                offset: field.position,
+                order: 1,
+                kind: BodyEventKind::FormFieldStart(field),
+            });
+            events.push(BodyEvent {
+                offset: field.range_end,
+                order: if empty { 2 } else { 0 },
+                kind: BodyEventKind::FormFieldEnd,
+            });
+        }
         if navigation_entries.len() > crate::navigation_entry::MAX_NAVIGATION_ENTRIES {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
@@ -1147,7 +1219,72 @@ impl<W: Write> RtfWriter<W> {
             BodyEventKind::RevisionStart(revision) => self.write_revision_start(revision),
             BodyEventKind::RevisionEnd => self.write_str("}"),
             BodyEventKind::RevisionDeletion(revision) => self.write_revision(revision),
+            BodyEventKind::FormFieldStart(field) => self.write_form_field_start(field),
+            BodyEventKind::FormFieldEnd => self.write_str("}}"),
         }
+    }
+
+    fn write_form_field_start(&mut self, field: &crate::FormField<'_>) -> io::Result<()> {
+        field
+            .validate()
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+        self.write_str("{\\field{\\*\\fldinst ")?;
+        self.write_str(match field.field_type {
+            crate::FormFieldType::Text => "FORMTEXT",
+            crate::FormFieldType::CheckBox => "FORMCHECKBOX",
+            crate::FormFieldType::DropDown => "FORMDROPDOWN",
+        })?;
+        if !field.data.is_empty() {
+            self.write_str("{\\*\\datafield ")?;
+            for byte in field.data.iter() {
+                write!(self.writer, "{byte:02x}")?;
+            }
+            self.write_str("}")?;
+        }
+        self.write_str("{\\*\\formfield{")?;
+        self.write_control_word("fftype", Some(field.field_type.to_rtf()))?;
+        if let Some(value) = field.text_type {
+            self.write_control_word("fftypetxt", Some(value.to_rtf()))?;
+        }
+        if let Some(value) = field.half_point_size {
+            self.write_control_word("ffhps", Some(value))?;
+        }
+        if field.own_help {
+            self.write_control_word("ffownhelp", None)?;
+        }
+        if field.own_status {
+            self.write_control_word("ffownstat", None)?;
+        }
+        if field.has_list_box {
+            self.write_control_word("ffhaslistbox", None)?;
+        }
+        if let Some(value) = field.default_result {
+            self.write_control_word("ffdefres", Some(value))?;
+        }
+        if let Some(value) = field.result {
+            self.write_control_word("ffres", Some(value))?;
+        }
+        self.write_form_field_value("ffname", field.name.as_deref())?;
+        self.write_form_field_value("ffhelptext", field.help_text.as_deref())?;
+        self.write_form_field_value("ffstattext", field.status_text.as_deref())?;
+        self.write_form_field_value("ffentrymcr", field.entry_macro.as_deref())?;
+        self.write_form_field_value("ffexitmcr", field.exit_macro.as_deref())?;
+        for entry in &field.list_entries {
+            self.write_form_field_value("ffl", Some(entry.as_ref()))?;
+        }
+        self.write_str("}}}")?; // formfield and fldinst
+        self.write_str("{\\fldrslt ")
+    }
+
+    fn write_form_field_value(&mut self, control: &str, value: Option<&str>) -> io::Result<()> {
+        let Some(value) = value else {
+            return Ok(());
+        };
+        self.write_str("{\\*")?;
+        self.write_control_word(control, None)?;
+        self.write_str(" ")?;
+        self.write_destination_text(value)?;
+        self.write_str("}")
     }
 
     /// Write an inert source mark. Marks are canonicalized as hidden; any

@@ -369,7 +369,8 @@ pub use odp::{
     PresentationEffect, PresentationEffectDirection, PresentationEventListener,
     PresentationDateTimeDeclaration, PresentationDateTimeSource, PresentationDeclarationBinding,
     PresentationDeclarationTarget, PresentationDeclarations, PresentationFeatureState,
-    PresentationSettings, PresentationTextDeclaration, CustomPresentationShow,
+    PresentationPageMetadata, PresentationPageMetadataCollection, PresentationSettings,
+    PresentationTextDeclaration, CustomPresentationShow,
     ScriptEventListener, ShapeEventListener, SlideTransition, TransitionDirection, TransitionSound,
     TransitionSoundShow, TransitionSpeed, TransitionStyle, TransitionType,
 };

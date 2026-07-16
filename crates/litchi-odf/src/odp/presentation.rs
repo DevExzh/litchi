@@ -238,6 +238,11 @@ impl Presentation {
         super::parse_presentation_declarations(self.content.xml_content())
     }
 
+    /// Inspect static page names, IDs, and layout/master references.
+    pub fn page_metadata(&self) -> Result<super::PresentationPageMetadataCollection> {
+        super::parse_presentation_page_metadata(self.content.xml_content())
+    }
+
     /// Get a slide by index.
     ///
     /// Returns `Some(slide)` if a slide exists at the given index, `None` otherwise.

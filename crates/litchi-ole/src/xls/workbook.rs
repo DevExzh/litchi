@@ -447,6 +447,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         let mut current_pivot: Option<PivotTable> = None;
 
         let mut comment_collector = comments::CommentCollector::new();
+        let mut hyperlink_collector = hyperlinks::HyperlinkCollector::new();
         let mut pending_string_formula: Option<CellRecord> = None;
         let mut shared_formulas = HashMap::<(u16, u16), SharedFormulaTemplate>::new();
         let mut remaining_data_validations: Option<usize> = None;
@@ -454,6 +455,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         for record_result in record_iter.by_ref() {
             let record = record_result?;
             comment_collector.feed_record(record.header.record_type, &record.data)?;
+            hyperlink_collector.feed_record(record.header.record_type, &record.data)?;
 
             if matches!(remaining_data_validations, Some(1..))
                 && record.header.record_type != super::data_validation::DV_RECORD_TYPE
@@ -641,13 +643,6 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                     }
                 }
 
-                // --- Hyperlinks (HLINK 0x01B8) ---
-                rt if rt == hyperlinks::RECORD_TYPE => {
-                    if let Ok(link) = hyperlinks::parse_hlink_record(&record.data) {
-                        worksheet.add_hyperlink(link);
-                    }
-                }
-
                 // --- AutoFilter (AUTOFILTERINFO 0x009D) ---
                 rt if rt == autofilter::AUTOFILTERINFO_TYPE => {
                     if let Ok(count) = autofilter::parse_autofilterinfo(&record.data) {
@@ -751,6 +746,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         }
 
         worksheet.set_comments(comment_collector.finish()?);
+        worksheet.set_hyperlinks(hyperlink_collector.finish());
 
         Ok(worksheet)
     }

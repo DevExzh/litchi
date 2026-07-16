@@ -294,6 +294,8 @@ pub struct Parser<'a> {
     pictures: Vec<super::picture::Picture<'a>>,
     /// Extracted fields
     fields: Vec<super::field::Field<'a>>,
+    form_fields: Vec<super::form_field::FormField<'a>>,
+    form_field_text_bytes: usize,
     /// Embedded and linked objects
     objects: Vec<super::object::EmbeddedObject<'a>>,
     /// Ordered inert document variables
@@ -368,6 +370,24 @@ pub struct Parser<'a> {
     current_hf_type: Option<super::section::HeaderFooterType>,
 }
 
+#[derive(Default)]
+struct FormFieldBuilder {
+    field_type: Option<super::form_field::FormFieldType>,
+    text_type: Option<super::form_field::FormTextType>,
+    name: Option<String>,
+    default_result: Option<i32>,
+    result: Option<i32>,
+    half_point_size: Option<i32>,
+    own_help: Option<bool>,
+    own_status: Option<bool>,
+    help_text: Option<String>,
+    status_text: Option<String>,
+    entry_macro: Option<String>,
+    exit_macro: Option<String>,
+    list_entries: Vec<String>,
+    has_list_box: Option<bool>,
+}
+
 impl<'a> Parser<'a> {
     /// Create a new parser.
     pub fn new(tokens: &'a [Token<'a>], arena: &'a Bump) -> Self {
@@ -385,6 +405,8 @@ impl<'a> Parser<'a> {
             current_cell_text: SmallVec::new(),
             pictures: Vec::new(),
             fields: Vec::new(),
+            form_fields: Vec::new(),
+            form_field_text_bytes: 0,
             objects: Vec::new(),
             document_variables: Vec::new(),
             document_variable_text_bytes: 0,
@@ -456,6 +478,7 @@ impl<'a> Parser<'a> {
             tables: self.tables,
             pictures: self.pictures,
             fields: self.fields,
+            form_fields: self.form_fields,
             objects: self.objects,
             document_variables: self.document_variables,
             user_properties: self.user_properties,
@@ -593,6 +616,11 @@ impl<'a> Parser<'a> {
                             self.states.pop();
                             return Ok(());
                         },
+                        Some(Token::Control(ControlWord::FormField | ControlWord::DataField)) => {
+                            return Err(RtfError::MalformedDocument(
+                                "orphan RTF formfield/datafield destination".to_string(),
+                            ));
+                        },
                         Some(Token::Control(ControlWord::DocumentVariable)) => {
                             self.parse_document_variable_destination()?;
                             self.states.pop();
@@ -684,6 +712,11 @@ impl<'a> Parser<'a> {
                     self.parse_revision_table()?;
                     self.states.pop();
                     return Ok(());
+                },
+                Token::Control(ControlWord::FormField | ControlWord::DataField) => {
+                    return Err(RtfError::MalformedDocument(
+                        "orphan RTF formfield/datafield destination".to_string(),
+                    ));
                 },
                 Token::Control(ControlWord::Info) => {
                     // Parse document metadata without adding it to body text.
@@ -5058,10 +5091,15 @@ impl<'a> Parser<'a> {
     /// Fields in RTF have the format:
     /// {\field{\*\fldinst INSTRUCTION}{\fldrslt RESULT}}
     fn parse_field(&mut self) -> RtfResult<()> {
+        let field_position = self.body_text_len;
+        let enclosing_destination = self.current_state()?.destination;
+        let field_in_table = self.current_state()?.in_table;
         self.pos += 1; // Skip \field
 
         let mut instruction = SmallVec::<[u8; 128]>::new();
         let mut result = SmallVec::<[u8; 128]>::new();
+        let mut form_field = None;
+        let mut data_field = None;
         let mut in_instruction;
         let mut in_result;
 
@@ -5132,6 +5170,31 @@ impl<'a> Parser<'a> {
                                     }
                                     self.pos += 1;
                                 },
+                                Token::Control(ControlWord::Unicode(first)) => {
+                                    let decoded = self.parse_style_unicode(
+                                        *first,
+                                        self.current_state()?.unicode_skip.max(0),
+                                    )?;
+                                    if in_instruction {
+                                        instruction.extend_from_slice(decoded.as_bytes());
+                                    } else if in_result {
+                                        result.extend_from_slice(decoded.as_bytes());
+                                    }
+                                },
+                                Token::Control(ControlWord::UnicodeSkip(value)) => {
+                                    self.current_state_mut()?.unicode_skip = (*value).max(0);
+                                    self.pos += 1;
+                                },
+                                Token::Control(ControlWord::Par | ControlWord::Line)
+                                    if in_result =>
+                                {
+                                    result.push(b'\n');
+                                    self.pos += 1;
+                                },
+                                Token::Control(ControlWord::Tab) if in_result => {
+                                    result.push(b'\t');
+                                    self.pos += 1;
+                                },
                                 Token::Control(control)
                                     if control_symbol_text(control).is_some() =>
                                 {
@@ -5142,6 +5205,53 @@ impl<'a> Parser<'a> {
                                         result.extend_from_slice(decoded.as_bytes());
                                     }
                                     self.pos += 1;
+                                },
+                                Token::OpenBrace if in_instruction => {
+                                    let destination = match (
+                                        self.tokens.get(self.pos + 1),
+                                        self.tokens.get(self.pos + 2),
+                                    ) {
+                                        (
+                                            Some(Token::Control(
+                                                ControlWord::IgnorableDestination,
+                                            )),
+                                            Some(Token::Control(control)),
+                                        ) => Some(control),
+                                        (Some(Token::Control(control)), _) => Some(control),
+                                        _ => None,
+                                    };
+                                    match destination {
+                                        Some(ControlWord::FormField) => {
+                                            if form_field.is_some() {
+                                                return Err(RtfError::MalformedDocument(
+                                                    "RTF field contains multiple formfield destinations"
+                                                        .to_string(),
+                                                ));
+                                            }
+                                            form_field =
+                                                Some(self.parse_form_field_destination()?);
+                                        },
+                                        Some(ControlWord::DataField) => {
+                                            if data_field.is_some() {
+                                                return Err(RtfError::MalformedDocument(
+                                                    "RTF field contains multiple datafield destinations"
+                                                        .to_string(),
+                                                ));
+                                            }
+                                            data_field = Some(self.parse_data_field_destination()?);
+                                        },
+                                        _ => {
+                                            nested_depth = nested_depth.checked_add(1).ok_or_else(
+                                                || {
+                                                    RtfError::MalformedDocument(
+                                                        "field instruction nesting depth overflow"
+                                                            .to_string(),
+                                                    )
+                                                },
+                                            )?;
+                                            self.pos += 1;
+                                        },
+                                    }
                                 },
                                 Token::OpenBrace
                                     if matches!(
@@ -5165,6 +5275,15 @@ impl<'a> Parser<'a> {
                                     self.pos += 1;
                                 },
                             }
+                            if instruction.len() > super::form_field::MAX_FORM_FIELD_STRING_BYTES
+                                || result.len()
+                                    > super::form_field::MAX_FORM_FIELD_STRING_BYTES
+                            {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF field instruction or result exceeds the safety limit"
+                                        .to_string(),
+                                ));
+                            }
                         }
                     }
                 },
@@ -5174,7 +5293,11 @@ impl<'a> Parser<'a> {
             }
         }
 
-        // Create field if we have instruction
+        let result_text = std::str::from_utf8(&result).map_err(|_| {
+            RtfError::MalformedDocument("RTF field result is not valid UTF-8".to_string())
+        })?;
+
+        // Create the generic field record if we have an instruction.
         if !instruction.is_empty()
             && let Ok(inst_str) = std::str::from_utf8(&instruction)
         {
@@ -5196,7 +5319,368 @@ impl<'a> Parser<'a> {
             self.fields.push(field);
         }
 
+        self.current_state_mut()?.destination = enclosing_destination;
+        if form_field.is_some() && !result_text.is_empty() {
+            self.append_semantic_text(result_text)?;
+        }
+
+        if let Some(builder) = form_field {
+            if self.form_fields.len() >= super::form_field::MAX_FORM_FIELDS {
+                return Err(RtfError::MalformedDocument(
+                    "RTF form-field count exceeds the safety limit".to_string(),
+                ));
+            }
+            let field_type = builder.field_type.ok_or_else(|| {
+                RtfError::MalformedDocument(
+                    "RTF formfield destination is missing fftype".to_string(),
+                )
+            })?;
+            let to_cow = |value: Option<String>| {
+                value.map(|text| Cow::Borrowed(self.arena.alloc_str(&text) as &str))
+            };
+            let form_field = super::form_field::FormField {
+                field_type,
+                text_type: builder.text_type,
+                name: to_cow(builder.name),
+                default_result: builder.default_result,
+                result: builder.result,
+                half_point_size: builder.half_point_size,
+                own_help: builder.own_help.unwrap_or(false),
+                own_status: builder.own_status.unwrap_or(false),
+                help_text: to_cow(builder.help_text),
+                status_text: to_cow(builder.status_text),
+                entry_macro: to_cow(builder.entry_macro),
+                exit_macro: to_cow(builder.exit_macro),
+                list_entries: builder
+                    .list_entries
+                    .into_iter()
+                    .map(|text| Cow::Borrowed(self.arena.alloc_str(&text) as &str))
+                    .collect(),
+                has_list_box: builder.has_list_box.unwrap_or(false),
+                data: Cow::Borrowed(self.arena.alloc_slice_copy(
+                    data_field.as_deref().unwrap_or_default(),
+                )),
+                result_text: Cow::Borrowed(
+                    self.arena
+                        .alloc_str(if field_in_table { "" } else { result_text }),
+                ),
+                position: field_position,
+                range_end: if field_in_table {
+                    field_position
+                } else {
+                    self.body_text_len
+                },
+            };
+            form_field.validate()?;
+            let added = form_field.text_bytes().ok_or_else(|| {
+                RtfError::MalformedDocument("RTF form-field aggregate size overflow".to_string())
+            })?;
+            self.form_field_text_bytes = self
+                .form_field_text_bytes
+                .checked_add(added)
+                .ok_or_else(|| {
+                    RtfError::MalformedDocument(
+                        "RTF form-field aggregate size overflow".to_string(),
+                    )
+                })?;
+            if self.form_field_text_bytes > super::form_field::MAX_FORM_FIELD_TOTAL_BYTES {
+                return Err(RtfError::MalformedDocument(
+                    "RTF form-field aggregate text exceeds the safety limit".to_string(),
+                ));
+            }
+            self.form_fields.push(form_field);
+        } else if data_field.is_some() {
+            // Data fields attached to non-form fields are inert legacy payloads and
+            // are intentionally not exposed as executable/external content.
+        }
+
         Ok(())
+    }
+
+    fn parse_form_field_destination(&mut self) -> RtfResult<FormFieldBuilder> {
+        self.expect_token(Token::OpenBrace)?;
+        if matches!(
+            self.tokens.get(self.pos),
+            Some(Token::Control(ControlWord::IgnorableDestination))
+        ) {
+            self.pos += 1;
+        }
+        if !matches!(
+            self.tokens.get(self.pos),
+            Some(Token::Control(ControlWord::FormField))
+        ) {
+            return Err(RtfError::MalformedDocument(
+                "invalid RTF formfield destination".to_string(),
+            ));
+        }
+        self.pos += 1;
+        let mut builder = FormFieldBuilder::default();
+        let mut depth = 1usize;
+        while self.pos < self.tokens.len() {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    depth -= 1;
+                    if depth == 0 {
+                        return Ok(builder);
+                    }
+                },
+                Some(Token::OpenBrace) => {
+                    let control = match (
+                        self.tokens.get(self.pos + 1),
+                        self.tokens.get(self.pos + 2),
+                    ) {
+                        (
+                            Some(Token::Control(ControlWord::IgnorableDestination)),
+                            Some(Token::Control(control)),
+                        ) => Some(control),
+                        (Some(Token::Control(control)), _) => Some(control),
+                        _ => None,
+                    };
+                    let target = match control {
+                        Some(ControlWord::FormFieldName) => &mut builder.name,
+                        Some(ControlWord::FormFieldHelpText) => &mut builder.help_text,
+                        Some(ControlWord::FormFieldStatusText) => &mut builder.status_text,
+                        Some(ControlWord::FormFieldEntryMacro) => &mut builder.entry_macro,
+                        Some(ControlWord::FormFieldExitMacro) => &mut builder.exit_macro,
+                        Some(ControlWord::FormFieldListEntry) => {
+                            if builder.list_entries.len()
+                                >= super::form_field::MAX_FORM_FIELD_LIST_ENTRIES
+                            {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF form-field list exceeds 25 entries".to_string(),
+                                ));
+                            }
+                            builder
+                                .list_entries
+                                .push(self.parse_form_field_text_destination()?);
+                            continue;
+                        },
+                        Some(
+                            ControlWord::FormFieldType(_)
+                            | ControlWord::FormFieldTextType(_)
+                            | ControlWord::FormFieldDefaultResult(_)
+                            | ControlWord::FormFieldResult(_)
+                            | ControlWord::FormFieldHalfPointSize(_)
+                            | ControlWord::FormFieldOwnHelp(_)
+                            | ControlWord::FormFieldOwnStatus(_)
+                            | ControlWord::FormFieldHasListBox(_),
+                        ) => {
+                            self.pos += 1;
+                            depth = depth.checked_add(1).ok_or_else(|| {
+                                RtfError::MalformedDocument(
+                                    "RTF formfield nesting depth overflow".to_string(),
+                                )
+                            })?;
+                            continue;
+                        },
+                        Some(_) => {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF formfield contains an active or unknown nested destination"
+                                    .to_string(),
+                            ));
+                        },
+                        None => {
+                            self.pos += 1;
+                            depth = depth.checked_add(1).ok_or_else(|| {
+                                RtfError::MalformedDocument(
+                                    "RTF formfield nesting depth overflow".to_string(),
+                                )
+                            })?;
+                            continue;
+                        },
+                    };
+                    if target.is_some() {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF formfield contains a duplicate text destination".to_string(),
+                        ));
+                    }
+                    *target = Some(self.parse_form_field_text_destination()?);
+                },
+                Some(Token::Control(control)) => {
+                    macro_rules! set_once {
+                        ($slot:expr, $value:expr, $name:literal) => {{
+                            if $slot.is_some() {
+                                return Err(RtfError::MalformedDocument(concat!(
+                                    "duplicate RTF formfield ",
+                                    $name
+                                )
+                                .to_string()));
+                            }
+                            $slot = Some($value);
+                        }};
+                    }
+                    match control {
+                        ControlWord::FormFieldType(value) => set_once!(
+                            builder.field_type,
+                            super::form_field::FormFieldType::from_rtf(*value)?,
+                            "fftype"
+                        ),
+                        ControlWord::FormFieldTextType(value) => set_once!(
+                            builder.text_type,
+                            super::form_field::FormTextType::from_rtf(*value)?,
+                            "fftypetxt"
+                        ),
+                        ControlWord::FormFieldDefaultResult(value) => {
+                            set_once!(builder.default_result, *value, "ffdefres")
+                        },
+                        ControlWord::FormFieldResult(value) => {
+                            set_once!(builder.result, *value, "ffres")
+                        },
+                        ControlWord::FormFieldHalfPointSize(value) => {
+                            set_once!(builder.half_point_size, *value, "ffhps")
+                        },
+                        ControlWord::FormFieldOwnHelp(value) => {
+                            set_once!(builder.own_help, *value, "ffownhelp")
+                        },
+                        ControlWord::FormFieldOwnStatus(value) => {
+                            set_once!(builder.own_status, *value, "ffownstat")
+                        },
+                        ControlWord::FormFieldHasListBox(value) => {
+                            set_once!(builder.has_list_box, *value, "ffhaslistbox")
+                        },
+                        _ => {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF formfield contains an unsupported control".to_string(),
+                            ));
+                        },
+                    }
+                    self.pos += 1;
+                },
+                Some(Token::Text(text)) => {
+                    if !self.decode_transport_text(text)?.trim().is_empty() {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF formfield contains orphan text".to_string(),
+                        ));
+                    }
+                    self.pos += 1;
+                },
+                Some(Token::Binary(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF formfield cannot contain binary data".to_string(),
+                    ));
+                },
+                None => return Err(RtfError::UnexpectedEof),
+            }
+        }
+        Err(RtfError::UnexpectedEof)
+    }
+
+    fn parse_form_field_text_destination(&mut self) -> RtfResult<String> {
+        self.expect_token(Token::OpenBrace)?;
+        if matches!(
+            self.tokens.get(self.pos),
+            Some(Token::Control(ControlWord::IgnorableDestination))
+        ) {
+            self.pos += 1;
+        }
+        self.pos += 1; // destination control, classified by caller
+        let mut text = String::new();
+        let mut unicode_skip = self.current_state()?.unicode_skip.max(0);
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    return Ok(text.trim_end_matches(['\r', '\n']).to_string());
+                },
+                Some(Token::Text(value)) => {
+                    text.push_str(&self.decode_transport_text(value)?);
+                    self.pos += 1;
+                },
+                Some(Token::Control(ControlWord::Unicode(first))) => {
+                    text.push_str(&self.parse_style_unicode(*first, unicode_skip)?);
+                },
+                Some(Token::Control(ControlWord::UnicodeSkip(value))) => {
+                    unicode_skip = (*value).max(0);
+                    self.pos += 1;
+                },
+                Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
+                    text.push_str(control_symbol_text(control).unwrap_or_default());
+                    self.pos += 1;
+                },
+                Some(Token::OpenBrace | Token::Binary(_)) | Some(Token::Control(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF form-field text contains active, nested, or binary data".to_string(),
+                    ));
+                },
+                None => return Err(RtfError::UnexpectedEof),
+            }
+            if text.len() > super::form_field::MAX_FORM_FIELD_STRING_BYTES {
+                return Err(RtfError::MalformedDocument(
+                    "RTF form-field string exceeds the safety limit".to_string(),
+                ));
+            }
+        }
+    }
+
+    fn parse_data_field_destination(&mut self) -> RtfResult<Vec<u8>> {
+        self.expect_token(Token::OpenBrace)?;
+        if matches!(
+            self.tokens.get(self.pos),
+            Some(Token::Control(ControlWord::IgnorableDestination))
+        ) {
+            self.pos += 1;
+        }
+        if !matches!(
+            self.tokens.get(self.pos),
+            Some(Token::Control(ControlWord::DataField))
+        ) {
+            return Err(RtfError::MalformedDocument(
+                "invalid RTF datafield destination".to_string(),
+            ));
+        }
+        self.pos += 1;
+        let mut high = None;
+        let mut data = Vec::new();
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    if high.is_some() {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF datafield has an odd hexadecimal digit count".to_string(),
+                        ));
+                    }
+                    return Ok(data);
+                },
+                Some(Token::Text(text)) => {
+                    for byte in text.as_bytes() {
+                        if byte.is_ascii_whitespace() {
+                            continue;
+                        }
+                        let nibble = match byte {
+                            b'0'..=b'9' => byte - b'0',
+                            b'a'..=b'f' => byte - b'a' + 10,
+                            b'A'..=b'F' => byte - b'A' + 10,
+                            _ => {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF datafield contains a non-hexadecimal character"
+                                        .to_string(),
+                                ));
+                            },
+                        };
+                        if let Some(first) = high.take() {
+                            data.push(first << 4 | nibble);
+                        } else {
+                            high = Some(nibble);
+                        }
+                    }
+                    self.pos += 1;
+                },
+                Some(Token::OpenBrace | Token::Binary(_)) | Some(Token::Control(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF datafield cannot contain controls, nesting, or binary data"
+                            .to_string(),
+                    ));
+                },
+                None => return Err(RtfError::UnexpectedEof),
+            }
+            if data.len() > super::form_field::MAX_FORM_FIELD_DATA_BYTES {
+                return Err(RtfError::MalformedDocument(
+                    "RTF datafield exceeds the safety limit".to_string(),
+                ));
+            }
+        }
     }
 
     /// Parse header or footer content.
@@ -5424,6 +5908,7 @@ pub struct ParsedDocument<'a> {
     pub pictures: Vec<super::picture::Picture<'a>>,
     /// Extracted fields
     pub fields: Vec<super::field::Field<'a>>,
+    pub form_fields: Vec<super::form_field::FormField<'a>>,
     /// Embedded and linked objects
     pub objects: Vec<super::object::EmbeddedObject<'a>>,
     /// Ordered inert document-variable metadata

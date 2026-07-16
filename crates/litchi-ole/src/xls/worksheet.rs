@@ -138,14 +138,13 @@ impl XlsWorksheet {
 
     // -- Hyperlinks --
 
-    /// Add a parsed hyperlink.
-    pub fn add_hyperlink(&mut self, link: XlsHyperlink) {
-        self.hyperlinks.push(link);
-    }
-
     /// All hyperlinks in this worksheet.
     pub fn hyperlinks(&self) -> &[XlsHyperlink] {
         &self.hyperlinks
+    }
+
+    pub(crate) fn set_hyperlinks(&mut self, hyperlinks: Vec<XlsHyperlink>) {
+        self.hyperlinks = hyperlinks;
     }
 
     // -- Comments --

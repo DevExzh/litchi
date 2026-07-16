@@ -25,6 +25,8 @@ pub struct RtfDocument<'a> {
     pictures: Vec<super::picture::Picture<'a>>,
     /// Extracted fields
     fields: Vec<super::field::Field<'a>>,
+    /// Ordered positional legacy form fields.
+    form_fields: Vec<super::form_field::FormField<'a>>,
     /// Embedded and linked objects
     objects: Vec<super::object::EmbeddedObject<'a>>,
     /// Ordered inert document-variable metadata
@@ -221,6 +223,11 @@ impl<'a> RtfDocument<'a> {
             tables: owned_tables,
             pictures: owned_pictures,
             fields: owned_fields,
+            form_fields: parsed
+                .form_fields
+                .into_iter()
+                .map(super::form_field::FormField::into_owned)
+                .collect(),
             objects: owned_objects,
             document_variables: parsed
                 .document_variables
@@ -513,6 +520,67 @@ impl<'a> RtfDocument<'a> {
     /// ```
     pub fn fields(&self) -> &[super::field::Field<'_>] {
         &self.fields
+    }
+
+    /// Return ordered positional legacy form fields.
+    pub fn form_fields(&self) -> &[super::form_field::FormField<'_>] {
+        &self.form_fields
+    }
+
+    /// Append inert form-field metadata at a valid visible body range.
+    pub fn push_form_field(
+        &mut self,
+        field: super::form_field::FormField<'a>,
+    ) -> RtfResult<()> {
+        field.validate()?;
+        if self.form_fields.len() >= super::form_field::MAX_FORM_FIELDS {
+            return Err(RtfError::MalformedDocument(
+                "RTF form-field count exceeds the safety limit".to_string(),
+            ));
+        }
+        let body = self.text();
+        let result = body.get(field.position..field.range_end).ok_or_else(|| {
+            RtfError::MalformedDocument(
+                "RTF form-field range is outside body text or splits a character".to_string(),
+            )
+        })?;
+        if result != field.result_text {
+            return Err(RtfError::MalformedDocument(
+                "RTF form-field result does not match its visible body range".to_string(),
+            ));
+        }
+        if field.position != field.range_end
+            && self.form_fields.iter().any(|existing| {
+                existing.position != existing.range_end
+                    && field.position < existing.range_end
+                    && existing.position < field.range_end
+            })
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF form-field result ranges cannot overlap".to_string(),
+            ));
+        }
+        let total = self
+            .form_fields
+            .iter()
+            .try_fold(field.text_bytes().unwrap_or(usize::MAX), |total, existing| {
+                total.checked_add(existing.text_bytes()?)
+            })
+            .ok_or_else(|| {
+                RtfError::MalformedDocument("RTF form-field aggregate size overflow".to_string())
+            })?;
+        if total > super::form_field::MAX_FORM_FIELD_TOTAL_BYTES {
+            return Err(RtfError::MalformedDocument(
+                "RTF form-field aggregate text exceeds the safety limit".to_string(),
+            ));
+        }
+        self.form_fields.push(field);
+        Ok(())
+    }
+
+    /// Remove all legacy form-field metadata without changing visible body text.
+    pub fn clear_form_fields(&mut self) {
+        self.form_fields.clear();
     }
 
     /// Return embedded and linked object records without activating their content.

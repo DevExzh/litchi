@@ -37,6 +37,7 @@ mod drawing;
 pub mod external_links;
 pub mod format;
 mod namespace;
+pub mod named_sheet_view;
 pub mod parsers;
 pub mod pivot;
 pub mod shared_strings;
@@ -94,6 +95,12 @@ pub use sheet_view::{
     WorksheetPaneState, WorksheetPivotArea, WorksheetPivotSelection, WorksheetRangeReference,
     WorksheetViewCollection, WorksheetViewDefinition, WorksheetViewExtension, WorksheetViewPane,
     WorksheetViewSelection, WorksheetViewSqref, WorksheetViewType, parse_worksheet_views,
+};
+pub use named_sheet_view::{
+    NamedSheetView, NamedSheetViewColumnFilter, NamedSheetViewExtension, NamedSheetViewFilter,
+    NamedSheetViewGuid, NamedSheetViewIconSet, NamedSheetViewMarkup, NamedSheetViewRange,
+    NamedSheetViewSortCondition, NamedSheetViewSortConditionKind, NamedSheetViewSortRule,
+    NamedSheetViewSortRules, NamedSheetViews, parse_named_sheet_views,
 };
 pub use sort::{SortBy, SortCondition, SortMethod, SortState};
 pub use sparkline::{

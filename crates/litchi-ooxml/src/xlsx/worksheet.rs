@@ -32,6 +32,7 @@ use super::data_validation::{
 use super::sort::SortState;
 use super::sparkline::{SparklineGroup, parse_sparkline_groups_from_worksheet_xml};
 use super::sheet_view::{WorksheetViewCollection, parse_worksheet_views};
+use super::named_sheet_view::{NamedSheetViews, discover_named_sheet_views};
 use super::table::{Table, parse_table_xml};
 use super::views::SheetView;
 use super::writer::sheet::Image;
@@ -240,6 +241,8 @@ pub struct Worksheet<'a> {
     sheet_views: Vec<SheetView>,
     /// Complete immutable worksheet-view collection.
     sheet_view_collection: Option<WorksheetViewCollection>,
+    /// Static Named Sheet Views part associated with this worksheet.
+    named_sheet_views: Option<NamedSheetViews>,
     /// Manual row page breaks
     row_breaks: Vec<PageBreak>,
     /// Manual column page breaks
@@ -274,6 +277,7 @@ impl<'a> Worksheet<'a> {
             auto_filter_definition: None,
             sheet_views: Vec::new(),
             sheet_view_collection: None,
+            named_sheet_views: None,
             row_breaks: Vec::new(),
             col_breaks: Vec::new(),
             rich_text_cells: HashMap::new(),
@@ -304,6 +308,8 @@ impl<'a> Worksheet<'a> {
         self.load_tables(table_relationship_ids, relationships)?;
         self.load_drawing(drawing_relationship_id.as_deref(), relationships)?;
         self.load_comments(relationships)?;
+        self.named_sheet_views =
+            discover_named_sheet_views(self.workbook.package(), relationships)?;
 
         self.sparkline_groups = parse_sparkline_groups_from_worksheet_xml(content)?;
 
@@ -1416,6 +1422,11 @@ impl<'a> Worksheet<'a> {
     /// Complete immutable worksheet-view collection, with schema defaults applied.
     pub fn sheet_view_collection(&self) -> Option<&WorksheetViewCollection> {
         self.sheet_view_collection.as_ref()
+    }
+
+    /// Static Named Sheet Views associated with this worksheet.
+    pub fn named_sheet_views(&self) -> Option<&NamedSheetViews> {
+        self.named_sheet_views.as_ref()
     }
 
     /// Find cells containing specific text.

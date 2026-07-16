@@ -53,6 +53,8 @@ pub struct MutablePresentation {
     settings: Option<crate::odp::PresentationSettings>,
     /// Inert header/footer/date-time declarations and page bindings.
     declarations: Option<crate::odp::PresentationDeclarations>,
+    /// Static page names, IDs, and layout/master references.
+    page_metadata: Option<crate::odp::PresentationPageMetadataCollection>,
 }
 
 impl MutablePresentation {
@@ -80,6 +82,7 @@ impl MutablePresentation {
         let metadata = presentation.metadata()?;
         let settings = presentation.settings()?;
         let declarations = presentation.declarations()?;
+        let page_metadata = presentation.page_metadata()?;
         let mimetype = "application/vnd.oasis.opendocument.presentation".to_string();
 
         let styles_xml = presentation.styles_xml().map(str::to_owned);
@@ -94,6 +97,7 @@ impl MutablePresentation {
             media_files: BTreeMap::new(),
             settings,
             declarations: (!declarations.is_empty()).then_some(declarations),
+            page_metadata: (!page_metadata.is_empty()).then_some(page_metadata),
         })
     }
 
@@ -116,6 +120,7 @@ impl MutablePresentation {
             media_files: BTreeMap::new(),
             settings: None,
             declarations: None,
+            page_metadata: None,
         }
     }
 
@@ -160,6 +165,30 @@ impl MutablePresentation {
             declarations.validate()?;
         }
         self.declarations = declarations;
+        Ok(())
+    }
+
+    /// Return static page names, IDs, and layout/master references.
+    pub fn page_metadata(&self) -> Option<&crate::odp::PresentationPageMetadataCollection> {
+        self.page_metadata.as_ref()
+    }
+
+    /// Mutably access static page metadata.
+    pub fn page_metadata_mut(
+        &mut self,
+    ) -> Option<&mut crate::odp::PresentationPageMetadataCollection> {
+        self.page_metadata.as_mut()
+    }
+
+    /// Set or clear validated static page metadata.
+    pub fn set_page_metadata(
+        &mut self,
+        metadata: Option<crate::odp::PresentationPageMetadataCollection>,
+    ) -> Result<()> {
+        if let Some(metadata) = &metadata {
+            metadata.validate()?;
+        }
+        self.page_metadata = metadata;
         Ok(())
     }
 
@@ -538,17 +567,24 @@ impl MutablePresentation {
         for (i, slide) in self.slides.iter().enumerate() {
             let page_num = i + 1;
             let slide_style = super::builder::slide_style_name(slide, i);
+            if let Some(metadata) = &self.page_metadata {
+                metadata.validate_for_slides(self.slides.len())?;
+            }
+            let page_attributes = super::page_metadata::write_page_attributes(
+                self.page_metadata.as_ref(),
+                i,
+                &slide_style,
+            )?;
             let declaration_attributes = super::declaration::write_binding_attributes(
                 self.declarations.as_ref(),
                 i,
                 crate::odp::PresentationDeclarationTarget::Slide,
             );
-            body.push_str(&format!(
-                r#"<draw:page draw:name="page{}" draw:style-name="{}" draw:master-page-name="Default"{}>"#,
-                page_num,
-                slide_style,
-                declaration_attributes
-            ));
+            let _ = page_num;
+            body.push_str("<draw:page");
+            body.push_str(&page_attributes);
+            body.push_str(&declaration_attributes);
+            body.push('>');
 
             // Add title frame if title exists
             if let Some(ref title) = slide.title {

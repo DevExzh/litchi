@@ -57,6 +57,7 @@ mod declaration;
 mod legacy_animation;
 mod media;
 mod mutable;
+mod page_metadata;
 mod parser;
 mod presentation;
 mod settings;
@@ -82,6 +83,10 @@ pub use declaration::{
 pub use legacy_animation::{LegacyAnimationKind, LegacyAnimationNode};
 pub use media::{MediaActuate, MediaParameter, MediaReference, MediaShow};
 pub use mutable::MutablePresentation;
+pub use page_metadata::{
+    PresentationPageMetadata, PresentationPageMetadataCollection,
+    parse_presentation_page_metadata,
+};
 pub use presentation::Presentation;
 pub use settings::{
     CustomPresentationShow, PresentationFeatureState, PresentationSettings,
