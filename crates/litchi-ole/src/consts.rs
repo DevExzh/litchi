@@ -249,6 +249,8 @@ pub enum PptRecordType {
     TimeAnimationValue = 0xF143,
     /// Shape or sound animation target atom
     VisualShapeAtom = 0x2AFB,
+    /// PowerPoint 10 animation hash atom
+    HashCode10Atom = 0x2B00,
     /// Slide animation target atom
     VisualPageAtom = 0x2B01,
     /// Named shows container (custom slide shows)
@@ -265,6 +267,10 @@ pub enum PptRecordType {
     CommentIndex10 = 12004,
     /// PowerPoint 10 comment author index atom
     CommentIndex10Atom = 12005,
+    /// PowerPoint 10 slide flags atom
+    SlideFlags10Atom = 12010,
+    /// PowerPoint 10 slide creation time atom
+    SlideTime10Atom = 12011,
 }
 
 impl From<u16> for PptRecordType {
@@ -385,6 +391,7 @@ impl From<u16> for PptRecordType {
             0xF142 => PptRecordType::TimeVariant,
             0xF143 => PptRecordType::TimeAnimationValue,
             0x2AFB => PptRecordType::VisualShapeAtom,
+            0x2B00 => PptRecordType::HashCode10Atom,
             0x2B01 => PptRecordType::VisualPageAtom,
             1040 => PptRecordType::NamedShows,
             1041 => PptRecordType::NamedShow,
@@ -393,6 +400,8 @@ impl From<u16> for PptRecordType {
             12001 => PptRecordType::Comment2000Atom,
             12004 => PptRecordType::CommentIndex10,
             12005 => PptRecordType::CommentIndex10Atom,
+            12010 => PptRecordType::SlideFlags10Atom,
+            12011 => PptRecordType::SlideTime10Atom,
             _ => PptRecordType::Unknown,
         }
     }

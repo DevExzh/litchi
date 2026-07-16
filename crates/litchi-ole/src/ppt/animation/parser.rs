@@ -8,14 +8,14 @@ use super::types::{
     ChartBuildAtom, ChartBuildType, DiagramBuild, DiagramBuildAtom, DiagramBuildType,
     ExtendedTimeNode, LegacyAnimationAtom, LegacyAnimationBuild, LegacyAnimationEffect,
     LegacyTextBuildSubEffect, ParagraphBuild, ParagraphBuildAtom, ParagraphBuildLevel,
-    ParagraphBuildType, SlideAnimationExtension, TimeAnimateBehavior, TimeAnimateBehaviorAtom,
-    TimeAnimateCalculationMode, TimeAnimateColor, TimeAnimateColorBy, TimeAnimateValueType,
-    TimeAnimationValue, TimeAnimationValueList, TimeBehavior, TimeBehaviorAdditive,
-    TimeBehaviorAtom, TimeBehaviorProperty, TimeBehaviorPropertyList, TimeColorBehavior,
-    TimeColorBehaviorAtom, TimeColorDirection, TimeColorModel, TimeCommandBehavior,
-    TimeCommandBehaviorAtom, TimeCommandBehaviorType, TimeCondition, TimeConditionAtom,
-    TimeConditionType, TimeEffectBehavior, TimeEffectBehaviorAtom, TimeEffectFilter,
-    TimeEffectNodeType, TimeEffectTransition, TimeEffectType, TimeIterateData,
+    ParagraphBuildType, PowerPoint10SlideFlags, SlideAnimationExtension, TimeAnimateBehavior,
+    TimeAnimateBehaviorAtom, TimeAnimateCalculationMode, TimeAnimateColor, TimeAnimateColorBy,
+    TimeAnimateValueType, TimeAnimationValue, TimeAnimationValueList, TimeBehavior,
+    TimeBehaviorAdditive, TimeBehaviorAtom, TimeBehaviorProperty, TimeBehaviorPropertyList,
+    TimeColorBehavior, TimeColorBehaviorAtom, TimeColorDirection, TimeColorModel,
+    TimeCommandBehavior, TimeCommandBehaviorAtom, TimeCommandBehaviorType, TimeCondition,
+    TimeConditionAtom, TimeConditionType, TimeEffectBehavior, TimeEffectBehaviorAtom,
+    TimeEffectFilter, TimeEffectNodeType, TimeEffectTransition, TimeEffectType, TimeIterateData,
     TimeIterateDirection, TimeIterateIntervalType, TimeIterateType, TimeMasterRelation,
     TimeModifier, TimeMotionBehavior, TimeMotionBehaviorAtom, TimeMotionOrigin, TimeNodeAtom,
     TimeNodeBehavior, TimeNodeFill, TimeNodeKind, TimeNodeProperty, TimeNodePropertyList,
@@ -630,6 +630,30 @@ pub fn parse_slide_animation_extension(data: &[u8]) -> Result<SlideAnimationExte
                 }
                 extension.build_list = Some(parse_build_list(&record)?);
             },
+            PptRecordType::SlideFlags10Atom => {
+                if extension.slide_flags.is_some() {
+                    return Err(PptError::InvalidFormat(
+                        "___PPT10 contains multiple SlideFlags10Atom records".to_string(),
+                    ));
+                }
+                extension.slide_flags = Some(parse_slide_flags(&record)?);
+            },
+            PptRecordType::SlideTime10Atom => {
+                if extension.creation_time_filetime.is_some() {
+                    return Err(PptError::InvalidFormat(
+                        "___PPT10 contains multiple SlideTime10Atom records".to_string(),
+                    ));
+                }
+                extension.creation_time_filetime = Some(parse_slide_time(&record)?);
+            },
+            PptRecordType::HashCode10Atom => {
+                if extension.animation_hash.is_some() {
+                    return Err(PptError::InvalidFormat(
+                        "___PPT10 contains multiple HashCode10Atom records".to_string(),
+                    ));
+                }
+                extension.animation_hash = Some(parse_animation_hash(&record)?);
+            },
             _ => {},
         }
         offset = offset
@@ -637,6 +661,51 @@ pub fn parse_slide_animation_extension(data: &[u8]) -> Result<SlideAnimationExte
             .ok_or_else(|| PptError::Corrupted("slide binary tag offset overflow".to_string()))?;
     }
     Ok(extension)
+}
+
+fn parse_slide_flags(record: &PptRecord) -> Result<PowerPoint10SlideFlags> {
+    require_atom(
+        record,
+        PptRecordType::SlideFlags10Atom,
+        0,
+        4,
+        "SlideFlags10Atom",
+    )?;
+    let raw =
+        u32::from_le_bytes(record.data[..4].try_into().map_err(|_| {
+            PptError::Corrupted("SlideFlags10Atom payload is truncated".to_string())
+        })?);
+    Ok(PowerPoint10SlideFlags {
+        raw,
+        preserve_master: raw & 1 != 0,
+        override_master_animation: raw & 2 != 0,
+    })
+}
+
+fn parse_slide_time(record: &PptRecord) -> Result<u64> {
+    require_atom(
+        record,
+        PptRecordType::SlideTime10Atom,
+        0,
+        8,
+        "SlideTime10Atom",
+    )?;
+    Ok(u64::from_le_bytes(record.data[..8].try_into().map_err(
+        |_| PptError::Corrupted("SlideTime10Atom payload is truncated".to_string()),
+    )?))
+}
+
+fn parse_animation_hash(record: &PptRecord) -> Result<u32> {
+    require_atom(
+        record,
+        PptRecordType::HashCode10Atom,
+        0,
+        4,
+        "HashCode10Atom",
+    )?;
+    Ok(u32::from_le_bytes(record.data[..4].try_into().map_err(
+        |_| PptError::Corrupted("HashCode10Atom payload is truncated".to_string()),
+    )?))
 }
 
 /// Parse a time-node property list in its containing-node context.
@@ -4980,6 +5049,15 @@ mod tests {
 
     #[test]
     fn parses_slide_animation_extensions_and_rejects_duplicates_or_truncation() {
+        fn atom(record_type: u16, payload: &[u8]) -> Vec<u8> {
+            let mut bytes = Vec::new();
+            bytes.extend(0u16.to_le_bytes());
+            bytes.extend(record_type.to_le_bytes());
+            bytes.extend(u32::try_from(payload.len()).unwrap().to_le_bytes());
+            bytes.extend(payload);
+            bytes
+        }
+
         let node = ExtendedTimeNode {
             atom: TimeNodeAtom {
                 node_type: Some(TimeNodeKind::Sequential),
@@ -4995,14 +5073,39 @@ mod tests {
         data.extend(write_extended_time_node(&node).unwrap());
         let build_bytes = write_build_list(&build_list).unwrap();
         data.extend(&build_bytes);
+        let flags_bytes = atom(12010, &0xffff_ffffu32.to_le_bytes());
+        let time_bytes = atom(12011, &0x0123_4567_89ab_cdefu64.to_le_bytes());
+        let hash_bytes = atom(0x2b00, &0x89ab_cdefu32.to_le_bytes());
+        data.extend(&flags_bytes);
+        data.extend(&time_bytes);
+        data.extend(&hash_bytes);
 
         let parsed = parse_slide_animation_extension(&data).unwrap();
         assert_eq!(parsed.time_node, Some(node));
         assert_eq!(parsed.build_list, Some(build_list));
+        let flags = parsed.slide_flags.unwrap();
+        assert_eq!(flags.raw, 0xffff_ffff);
+        assert!(flags.preserve_master);
+        assert!(flags.override_master_animation);
+        assert_eq!(parsed.creation_time_filetime, Some(0x0123_4567_89ab_cdef));
+        assert_eq!(parsed.animation_hash, Some(0x89ab_cdef));
 
         let mut duplicate = data.clone();
         duplicate.extend(build_bytes);
         assert!(parse_slide_animation_extension(&duplicate).is_err());
+        for atom in [&flags_bytes, &time_bytes, &hash_bytes] {
+            let mut duplicate = data.clone();
+            duplicate.extend(atom);
+            assert!(parse_slide_animation_extension(&duplicate).is_err());
+        }
+
+        for malformed in [
+            atom(12010, &[0; 3]),
+            atom(12011, &[0; 7]),
+            atom(0x2b00, &[0; 3]),
+        ] {
+            assert!(parse_slide_animation_extension(&malformed).is_err());
+        }
 
         let mut truncated = data;
         truncated.pop();

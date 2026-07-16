@@ -351,6 +351,23 @@ pub struct SlideAnimationExtension {
     pub time_node: Option<ExtendedTimeNode>,
     /// Optional shape build list.
     pub build_list: Option<BuildList>,
+    /// Optional slide-level flags.
+    pub slide_flags: Option<PowerPoint10SlideFlags>,
+    /// Optional slide creation time as 100-nanosecond ticks since 1601-01-01 UTC.
+    pub creation_time_filetime: Option<u64>,
+    /// Optional hash of the slide's shape-animation information.
+    pub animation_hash: Option<u32>,
+}
+
+/// PowerPoint 10 slide-level flags.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PowerPoint10SlideFlags {
+    /// Raw flags word. Only bits 0 and 1 are defined by MS-PPT.
+    pub raw: u32,
+    /// Whether an otherwise unused main or title master slide is preserved.
+    pub preserve_master: bool,
+    /// Whether this slide overrides animations inherited from its master.
+    pub override_master_animation: bool,
 }
 
 impl BuildList {

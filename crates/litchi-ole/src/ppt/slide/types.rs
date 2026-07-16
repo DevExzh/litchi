@@ -1684,6 +1684,25 @@ mod tests {
     }
 
     #[test]
+    fn ignores_powerpoint10_slide_settings_in_other_tag_versions() {
+        let flags = record_bytes(
+            0,
+            0,
+            PptRecordType::SlideFlags10Atom.as_u16(),
+            &[3, 0, 0, 0],
+        );
+        let slide_record = create_test_record(
+            PptRecordType::Slide,
+            Vec::new(),
+            vec![prog_tags_record(9, &flags)],
+        );
+        let doc_data = Vec::new();
+        let slide = Slide::from_slide_data(create_slide_data(slide_record, 256, &doc_data), 1);
+
+        assert_eq!(slide.animation_extension().unwrap(), None);
+    }
+
+    #[test]
     fn truncated_comment_atoms_are_rejected_without_panicking() {
         let mut child = Vec::new();
         child.extend(0u16.to_le_bytes());
