@@ -559,6 +559,8 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             crate::xls::calculation::WorksheetCalculationCollector::new();
         let mut scenario_collector = crate::xls::scenario::ScenarioCollector::new();
         let mut vba_collector = crate::xls::vba::WorksheetVbaCollector::new();
+        let mut consolidation_collector =
+            crate::xls::consolidation::ConsolidationCollector::new();
         let mut pending_string_formula: Option<CellRecord> = None;
         let mut shared_formulas = HashMap::<(u16, u16), SharedFormulaTemplate>::new();
         let mut remaining_data_validations: Option<usize> = None;
@@ -576,6 +578,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             calculation_collector.feed_record(record.header.record_type, &record.data)?;
             scenario_collector.feed_record(record.header.record_type, &record.data)?;
             vba_collector.feed_record(record.header.record_type, &record.data)?;
+            consolidation_collector.feed_record(record.header.record_type, &record.data)?;
 
             if matches!(remaining_data_validations, Some(1..))
                 && record.header.record_type != super::data_validation::DV_RECORD_TYPE
@@ -855,6 +858,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         worksheet.set_calculation(calculation_collector.finish()?);
         worksheet.set_scenario_manager(scenario_collector.finish()?);
         worksheet.set_vba_code_name(vba_collector.finish());
+        worksheet.set_consolidation(consolidation_collector.finish());
 
         Ok(worksheet)
     }

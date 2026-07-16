@@ -9,6 +9,73 @@ use std::io::Write;
 
 use super::write_record_header;
 
+fn write_unicode_string<W: Write>(writer: &mut W, value: &str) -> XlsResult<()> {
+    let units = value.encode_utf16().collect::<Vec<_>>();
+    let compressed = units.iter().all(|unit| *unit <= 0xff);
+    writer.write_all(&(units.len() as u16).to_le_bytes())?;
+    writer.write_all(&[u8::from(!compressed)])?;
+    for unit in units {
+        if compressed { writer.write_all(&[unit as u8])?; }
+        else { writer.write_all(&unit.to_le_bytes())?; }
+    }
+    Ok(())
+}
+
+fn write_dcon_file<W: Write>(writer: &mut W, file: &crate::xls::XlsConsolidationFile) -> XlsResult<()> {
+    let units = file.encoded_path().encode_utf16().collect::<Vec<_>>();
+    let compressed = units.iter().all(|unit| *unit <= 0xff);
+    writer.write_all(&(units.len() as u16).to_le_bytes())?;
+    writer.write_all(&[u8::from(!compressed)])?;
+    for unit in units {
+        if compressed { writer.write_all(&[unit as u8])?; }
+        else { writer.write_all(&unit.to_le_bytes())?; }
+    }
+    if file.is_self_reference() {
+        writer.write_all(if compressed { &[0][..] } else { &[0, 0][..] })?;
+    }
+    Ok(())
+}
+
+/// Write one complete contiguous `DCON` worksheet directory.
+pub fn write_consolidation<W: Write>(
+    writer: &mut W,
+    consolidation: &crate::xls::XlsConsolidation,
+) -> XlsResult<()> {
+    consolidation.validate_for_write()?;
+    write_record_header(writer, crate::xls::consolidation::DCON_RECORD_TYPE, 8)?;
+    writer.write_all(&consolidation.function().code().to_le_bytes())?;
+    writer.write_all(&u16::from(consolidation.uses_left_labels()).to_le_bytes())?;
+    writer.write_all(&u16::from(consolidation.uses_top_labels()).to_le_bytes())?;
+    writer.write_all(&u16::from(consolidation.creates_links()).to_le_bytes())?;
+    for source in consolidation.sources() {
+        let mut payload = Vec::new();
+        let record_type = match source {
+            crate::xls::XlsConsolidationSource::CellRange { range, file } => {
+                payload.extend_from_slice(&range.first_row().to_le_bytes());
+                payload.extend_from_slice(&range.last_row().to_le_bytes());
+                payload.push(range.first_column()); payload.push(range.last_column());
+                write_dcon_file(&mut payload, file)?;
+                crate::xls::consolidation::DCON_REF_RECORD_TYPE
+            },
+            crate::xls::XlsConsolidationSource::DefinedName { name, file } => {
+                write_unicode_string(&mut payload, name)?;
+                if let Some(file) = file { write_dcon_file(&mut payload, file)?; }
+                else { payload.extend_from_slice(&0u16.to_le_bytes()); }
+                crate::xls::consolidation::DCON_NAME_RECORD_TYPE
+            },
+            crate::xls::XlsConsolidationSource::BuiltInName { name, file } => {
+                payload.push(name.code()); payload.extend_from_slice(&0u16.to_le_bytes()); payload.push(0);
+                if let Some(file) = file { write_dcon_file(&mut payload, file)?; }
+                else { payload.extend_from_slice(&0u16.to_le_bytes()); }
+                crate::xls::consolidation::DCON_BIN_RECORD_TYPE
+            },
+        };
+        write_record_header(writer, record_type, payload.len() as u16)?;
+        writer.write_all(&payload)?;
+    }
+    Ok(())
+}
+
 fn write_bool_record<W: Write>(writer: &mut W, record_type: u16, value: bool) -> XlsResult<()> {
     write_record_header(writer, record_type, 2)?;
     writer.write_all(&u16::from(value).to_le_bytes())?;

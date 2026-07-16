@@ -59,6 +59,7 @@ pub mod drawing;
 pub mod enums;
 pub mod field;
 pub mod font_table;
+pub mod glossary;
 pub mod footnote;
 pub mod format;
 pub mod header_footer;

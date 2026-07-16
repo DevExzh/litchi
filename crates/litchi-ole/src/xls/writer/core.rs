@@ -2052,6 +2052,26 @@ impl XlsWriter {
         Ok(())
     }
 
+    /// Configure an inert BIFF8 data-consolidation directory for a worksheet.
+    pub fn set_consolidation(
+        &mut self,
+        sheet: usize,
+        consolidation: crate::xls::XlsConsolidation,
+    ) -> XlsResult<()> {
+        consolidation.validate_for_write()?;
+        let worksheet = self.worksheets.get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+        worksheet.consolidation = Some(consolidation);
+        Ok(())
+    }
+
+    pub fn clear_consolidation(&mut self, sheet: usize) -> XlsResult<()> {
+        let worksheet = self.worksheets.get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+        worksheet.consolidation = None;
+        Ok(())
+    }
+
     /// Enable a module-free VBA project scaffold without executable content.
     pub fn enable_empty_vba_project(&mut self, workbook_code_name: &str) -> XlsResult<()> {
         crate::xls::vba::validate_code_name(workbook_code_name)?;

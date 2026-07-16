@@ -402,6 +402,13 @@ pub fn write_page_settings<W: Write>(
     worksheet::write_page_settings(writer, options, horizontal_breaks, vertical_breaks)
 }
 
+pub fn write_consolidation<W: Write>(
+    writer: &mut W,
+    consolidation: &crate::xls::XlsConsolidation,
+) -> XlsResult<()> {
+    worksheet::write_consolidation(writer, consolidation)
+}
+
 /// Write HLINK (hyperlink) record for a cell or cell range.
 ///
 /// Record type: 0x01B8

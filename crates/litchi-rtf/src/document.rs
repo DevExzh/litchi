@@ -73,6 +73,8 @@ pub struct RtfDocument<'a> {
     bookmarks: super::bookmark::BookmarkTable<'a>,
     /// Shapes
     shapes: Vec<super::shape::Shape<'a>>,
+    /// Inert positional legacy drawing text boxes.
+    legacy_text_boxes: Vec<crate::LegacyTextBox<'a>>,
     /// Shape groups
     shape_groups: Vec<super::shape::ShapeGroup<'a>>,
     /// Stylesheet
@@ -289,6 +291,11 @@ impl<'a> RtfDocument<'a> {
             sections: Self::convert_sections_to_owned(parsed.sections),
             bookmarks: Self::convert_bookmarks_to_owned(parsed.bookmarks),
             shapes: Self::convert_shapes_to_owned(parsed.shapes),
+            legacy_text_boxes: parsed
+                .legacy_text_boxes
+                .into_iter()
+                .map(crate::LegacyTextBox::into_owned)
+                .collect(),
             shape_groups: Self::convert_shape_groups_to_owned(parsed.shape_groups),
             stylesheet: Self::convert_stylesheet_to_owned(parsed.stylesheet),
             info: Self::convert_info_to_owned(parsed.info),
@@ -1158,6 +1165,53 @@ impl<'a> RtfDocument<'a> {
     /// Returns drawing objects, text boxes, and other shapes.
     pub fn shapes(&self) -> &[super::shape::Shape<'_>] {
         &self.shapes
+    }
+
+    /// Return inert positional legacy drawing text boxes.
+    pub fn legacy_text_boxes(&self) -> &[crate::LegacyTextBox<'_>] {
+        &self.legacy_text_boxes
+    }
+
+    pub fn push_legacy_text_box(&mut self, text_box: crate::LegacyTextBox<'a>) -> RtfResult<()> {
+        text_box.validate()?;
+        if self.legacy_text_boxes.len() >= crate::legacy_text_box::MAX_LEGACY_TEXT_BOXES {
+            return Err(RtfError::MalformedDocument(
+                "RTF legacy text-box count exceeds the safety limit".to_string(),
+            ));
+        }
+        let body = self.text();
+        if body.get(text_box.position..text_box.position).is_none() {
+            return Err(RtfError::MalformedDocument(
+                "RTF legacy text-box position is not a UTF-8 body boundary".to_string(),
+            ));
+        }
+        if self
+            .legacy_text_boxes
+            .last()
+            .is_some_and(|previous| previous.position > text_box.position)
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF legacy text boxes are out of body order".to_string(),
+            ));
+        }
+        let total = self
+            .legacy_text_boxes
+            .iter()
+            .try_fold(text_box.text.len(), |total, entry| total.checked_add(entry.text.len()))
+            .ok_or_else(|| {
+                RtfError::MalformedDocument("RTF legacy text-box size overflow".to_string())
+            })?;
+        if total > crate::legacy_text_box::MAX_LEGACY_TEXT_BOX_TOTAL_BYTES {
+            return Err(RtfError::MalformedDocument(
+                "RTF legacy text-box text exceeds the aggregate safety limit".to_string(),
+            ));
+        }
+        self.legacy_text_boxes.push(text_box);
+        Ok(())
+    }
+
+    pub fn clear_legacy_text_boxes(&mut self) {
+        self.legacy_text_boxes.clear();
     }
 
     /// Get all shape groups in the document.

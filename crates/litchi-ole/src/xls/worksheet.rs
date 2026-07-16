@@ -60,6 +60,7 @@ pub struct XlsWorksheet {
     scenario_manager: Option<crate::xls::scenario::XlsScenarioManager>,
     vba_code_name: Option<String>,
     conditional_formattings: Vec<XlsConditionalFormatting>,
+    consolidation: Option<crate::xls::consolidation::XlsConsolidation>,
 }
 
 impl XlsWorksheet {
@@ -91,6 +92,7 @@ impl XlsWorksheet {
             scenario_manager: None,
             vba_code_name: None,
             conditional_formattings: Vec::new(),
+            consolidation: None,
         }
     }
 
@@ -122,6 +124,7 @@ impl XlsWorksheet {
             scenario_manager: None,
             vba_code_name: None,
             conditional_formattings: Vec::new(),
+            consolidation: None,
         }
     }
 
@@ -413,6 +416,18 @@ impl XlsWorksheet {
         conditional_formattings: Vec<XlsConditionalFormatting>,
     ) {
         self.conditional_formattings = conditional_formattings;
+    }
+
+    /// Data-consolidation settings and inert source directory for this worksheet.
+    pub fn consolidation(&self) -> Option<&crate::xls::consolidation::XlsConsolidation> {
+        self.consolidation.as_ref()
+    }
+
+    pub(crate) fn set_consolidation(
+        &mut self,
+        consolidation: Option<crate::xls::consolidation::XlsConsolidation>,
+    ) {
+        self.consolidation = consolidation;
     }
 
     pub fn format_for_cell(&self, row: u32, col: u32) -> Option<&XlsExtendedFormat> {

@@ -128,6 +128,7 @@ pub(super) struct WritableWorksheet {
     pub formulas_pending_recalculation: bool,
     pub scenario_manager: Option<crate::xls::scenario::XlsScenarioManager>,
     pub vba_code_name: Option<String>,
+    pub consolidation: Option<crate::xls::consolidation::XlsConsolidation>,
 }
 
 /// A column-level AutoFilter condition for the writer.
@@ -185,6 +186,7 @@ impl WritableWorksheet {
             formulas_pending_recalculation: false,
             scenario_manager: None,
             vba_code_name: None,
+            consolidation: None,
         }
     }
 

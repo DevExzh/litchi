@@ -54,6 +54,7 @@ pub struct RtfWriter<W: Write> {
 #[derive(Clone, Copy)]
 enum BodyEventKind<'b, 'a> {
     GeneratedListMarker(&'b crate::GeneratedListMarker<'a>),
+    LegacyTextBox(&'b crate::LegacyTextBox<'a>),
     NavigationEntry(&'b crate::NavigationEntry<'a>),
     BookmarkStart(&'b Bookmark<'a>),
     BookmarkEnd(&'b Bookmark<'a>),
@@ -192,6 +193,7 @@ impl<W: Write> RtfWriter<W> {
             doc.revisions(),
             doc.navigation_entries(),
             doc.generated_list_markers(),
+            doc.legacy_text_boxes(),
             doc.form_fields(),
         )?;
 
@@ -1594,6 +1596,7 @@ impl<W: Write> RtfWriter<W> {
         revisions: &[Revision<'_>],
         navigation_entries: &[crate::NavigationEntry<'_>],
         generated_list_markers: &[crate::GeneratedListMarker<'_>],
+        legacy_text_boxes: &[crate::LegacyTextBox<'_>],
         form_fields: &[crate::FormField<'_>],
     ) -> io::Result<()> {
         if bookmarks.bookmarks().is_empty()
@@ -1601,6 +1604,7 @@ impl<W: Write> RtfWriter<W> {
             && revisions.is_empty()
             && navigation_entries.is_empty()
             && generated_list_markers.is_empty()
+            && legacy_text_boxes.is_empty()
             && form_fields.is_empty()
         {
             for block in blocks {
@@ -1736,6 +1740,53 @@ impl<W: Write> RtfWriter<W> {
                 kind: BodyEventKind::GeneratedListMarker(marker),
             });
             previous_generated_marker = Some(marker);
+        }
+
+        if legacy_text_boxes.len() > crate::legacy_text_box::MAX_LEGACY_TEXT_BOXES {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "RTF legacy text-box count exceeds the safety limit",
+            ));
+        }
+        let mut legacy_text_box_bytes = 0usize;
+        let mut previous_legacy_text_box_position = None;
+        for text_box in legacy_text_boxes {
+            text_box
+                .validate()
+                .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+            if body.get(text_box.position..text_box.position).is_none() {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF legacy text-box position is not a UTF-8 body boundary",
+                ));
+            }
+            if previous_legacy_text_box_position.is_some_and(|position| position > text_box.position)
+            {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF legacy text boxes are not ordered by body position",
+                ));
+            }
+            legacy_text_box_bytes = legacy_text_box_bytes
+                .checked_add(text_box.text.len())
+                .ok_or_else(|| {
+                    io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        "RTF legacy text-box text size overflow",
+                    )
+                })?;
+            if legacy_text_box_bytes > crate::legacy_text_box::MAX_LEGACY_TEXT_BOX_TOTAL_BYTES {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF legacy text-box text exceeds the aggregate safety limit",
+                ));
+            }
+            events.push(BodyEvent {
+                offset: text_box.position,
+                order: 1,
+                kind: BodyEventKind::LegacyTextBox(text_box),
+            });
+            previous_legacy_text_box_position = Some(text_box.position);
         }
 
         if navigation_entries.len() > crate::navigation_entry::MAX_NAVIGATION_ENTRIES {
@@ -1935,6 +1986,7 @@ impl<W: Write> RtfWriter<W> {
             BodyEventKind::GeneratedListMarker(marker) => {
                 self.write_generated_list_marker(marker)
             },
+            BodyEventKind::LegacyTextBox(text_box) => self.write_legacy_text_box(text_box),
             BodyEventKind::NavigationEntry(entry) => self.write_navigation_entry(entry),
             BodyEventKind::BookmarkStart(bookmark) => self.write_bookmark_start(bookmark),
             BodyEventKind::BookmarkEnd(bookmark) => self.write_bookmark_end(bookmark.name.as_ref()),
@@ -1946,6 +1998,79 @@ impl<W: Write> RtfWriter<W> {
             BodyEventKind::FormFieldStart(field) => self.write_form_field_start(field),
             BodyEventKind::FormFieldEnd => self.write_str("}}"),
         }
+    }
+
+    /// Write one inert legacy drawing text box.
+    pub fn write_legacy_text_box(
+        &mut self,
+        text_box: &crate::LegacyTextBox<'_>,
+    ) -> io::Result<()> {
+        text_box
+            .validate()
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+
+        self.write_str("{\\*\\do")?;
+        if let Some(anchor) = text_box.horizontal_anchor {
+            self.write_control_word(
+                match anchor {
+                    crate::LegacyHorizontalAnchor::Page => "dobxpage",
+                    crate::LegacyHorizontalAnchor::Margin => "dobxmargin",
+                    crate::LegacyHorizontalAnchor::Column => "dobxcolumn",
+                },
+                None,
+            )?;
+        }
+        if let Some(anchor) = text_box.vertical_anchor {
+            self.write_control_word(
+                match anchor {
+                    crate::LegacyVerticalAnchor::Page => "dobypage",
+                    crate::LegacyVerticalAnchor::Margin => "dobymargin",
+                    crate::LegacyVerticalAnchor::Paragraph => "dobypara",
+                },
+                None,
+            )?;
+        }
+        if let Some(value) = text_box.z_order {
+            self.write_control_word("dodhgt", Some(value))?;
+        }
+        self.write_control_word("dptxbx", None)?;
+        if let Some(value) = text_box.margin {
+            self.write_control_word("dptxbxmar", Some(value))?;
+        }
+        self.write_control_word(
+            match text_box.direction {
+                crate::LegacyTextDirection::LeftToRightTopToBottom => "dptxlrtb",
+                crate::LegacyTextDirection::LeftToRightTopToBottomVertical => "dptxlrtbv",
+                crate::LegacyTextDirection::TopToBottomRightToLeft => "dptxtbrl",
+                crate::LegacyTextDirection::TopToBottomRightToLeftVertical => "dptxtbrlv",
+                crate::LegacyTextDirection::BottomToTopLeftToRight => "dptxbtlr",
+            },
+            None,
+        )?;
+        if let Some(value) = text_box.x {
+            self.write_control_word("dpx", Some(value))?;
+        }
+        if let Some(value) = text_box.y {
+            self.write_control_word("dpy", Some(value))?;
+        }
+        if let Some(value) = text_box.width {
+            self.write_control_word("dpxsize", Some(value))?;
+        }
+        if let Some(value) = text_box.height {
+            self.write_control_word("dpysize", Some(value))?;
+        }
+        self.write_str("{\\dptxbxtext ")?;
+        let mut start = 0;
+        for (index, character) in text_box.text.char_indices() {
+            if character != '\t' && character != '\n' {
+                continue;
+            }
+            self.write_destination_text(&text_box.text[start..index])?;
+            self.write_str(if character == '\t' { "\\tab " } else { "\\par " })?;
+            start = index + character.len_utf8();
+        }
+        self.write_destination_text(&text_box.text[start..])?;
+        self.write_str("}}")
     }
 
     /// Write one inert generated list-marker destination.

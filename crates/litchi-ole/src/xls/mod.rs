@@ -47,6 +47,9 @@ mod function_group;
 /// Inert BIFF8 supporting-book links and external cell caches.
 mod external_link;
 
+/// Inert BIFF8 worksheet data-consolidation directories and sources.
+mod consolidation;
+
 /// BIFF formula token rendering
 mod formula;
 
@@ -124,6 +127,10 @@ pub use function_group::{XlsBuiltInFunctionCategories, XlsFunctionGroups};
 pub use external_link::{
     XlsExternalCacheRow, XlsExternalCachedError, XlsExternalCachedValue, XlsExternalLinks,
     XlsExternalSheet, XlsExternalSheetReference, XlsExternalWorkbook, XlsSupportingBook,
+};
+pub use consolidation::{
+    XlsConsolidation, XlsConsolidationBuiltInName, XlsConsolidationFile,
+    XlsConsolidationFunction, XlsConsolidationRange, XlsConsolidationSource,
 };
 pub use data_validation::{
     XlsDataValidationErrorStyle, XlsDataValidationFormula, XlsDataValidationImeMode,

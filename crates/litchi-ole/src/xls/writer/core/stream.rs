@@ -438,6 +438,10 @@ pub(crate) fn generate_workbook_stream(
             biff::write_pivot_sheet_preamble(&mut stream, &worksheet.sheet_layout)?;
         }
 
+        if let Some(consolidation) = &worksheet.consolidation {
+            biff::write_consolidation(&mut stream, consolidation)?;
+        }
+
         // Required sheet records for worksheet substream per MS-XLS.
         //
         // Apache POI writes WINDOW2 first and then (optionally) PANE

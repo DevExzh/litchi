@@ -41,6 +41,7 @@ mod revision_save;
 mod xml_namespace;
 mod theme;
 mod latent_style;
+mod legacy_text_box;
 mod legacy_numbering;
 mod paragraph_group;
 mod note_separator;
@@ -84,6 +85,9 @@ pub use revision_save::RevisionSaveMetadata;
 pub use xml_namespace::XmlNamespace;
 pub use theme::DocumentTheme;
 pub use latent_style::{LatentStyleException, LatentStyles};
+pub use legacy_text_box::{
+    LegacyHorizontalAnchor, LegacyTextBox, LegacyTextDirection, LegacyVerticalAnchor,
+};
 pub use legacy_numbering::{
     LegacyNumberingAlignment, LegacyNumberingFormat, LegacySectionNumbering,
     LegacySectionNumberingLevel,

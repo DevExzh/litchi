@@ -352,6 +352,9 @@ pub struct Parser<'a> {
     next_bookmark_order: usize,
     /// Shapes
     shapes: Vec<super::shape::Shape<'a>>,
+    /// Inert legacy drawing text boxes.
+    legacy_text_boxes: Vec<crate::LegacyTextBox<'a>>,
+    legacy_text_box_text_bytes: usize,
     /// Shape groups
     shape_groups: Vec<super::shape::ShapeGroup<'a>>,
     /// Stylesheet
@@ -415,6 +418,21 @@ struct FormFieldBuilder {
     exit_macro: Option<String>,
     list_entries: Vec<String>,
     has_list_box: Option<bool>,
+}
+
+#[derive(Default)]
+struct LegacyTextBoxBuilder {
+    saw_text_box: bool,
+    text: Option<String>,
+    horizontal_anchor: Option<crate::LegacyHorizontalAnchor>,
+    vertical_anchor: Option<crate::LegacyVerticalAnchor>,
+    x: Option<i32>,
+    y: Option<i32>,
+    width: Option<i32>,
+    height: Option<i32>,
+    margin: Option<i32>,
+    z_order: Option<i32>,
+    direction: Option<crate::LegacyTextDirection>,
 }
 
 #[derive(Default)]
@@ -492,6 +510,8 @@ impl<'a> Parser<'a> {
             body_text_len: 0,
             next_bookmark_order: 0,
             shapes: Vec::new(),
+            legacy_text_boxes: Vec::new(),
+            legacy_text_box_text_bytes: 0,
             shape_groups: Vec::new(),
             stylesheet: super::stylesheet::StyleSheet::new(),
             saw_stylesheet: false,
@@ -597,6 +617,7 @@ impl<'a> Parser<'a> {
             sections: self.sections,
             bookmarks: self.bookmarks,
             shapes: self.shapes,
+            legacy_text_boxes: self.legacy_text_boxes,
             shape_groups: self.shape_groups,
             stylesheet: self.stylesheet,
             info: self.info,
@@ -678,6 +699,11 @@ impl<'a> Parser<'a> {
                     self.parse_generated_list_marker(crate::GeneratedListMarkerKind::Legacy)?;
                     self.states.pop();
                     return Ok(());
+                },
+                Token::Control(ControlWord::LegacyDrawingObject) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF legacy drawing-object destination must be starred".to_string(),
+                    ));
                 },
                 Token::Control(ControlWord::UnicodeAlternate) => {
                     self.parse_unicode_alternate_group()?;
@@ -769,6 +795,21 @@ impl<'a> Parser<'a> {
                                 "RTF generated list-marker destinations must not be starred"
                                     .to_string(),
                             ));
+                        },
+                        Some(Token::Control(
+                            ControlWord::LegacyTextBox | ControlWord::LegacyTextBoxText,
+                        )) => {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF legacy text-box controls must occur inside a starred do destination"
+                                    .to_string(),
+                            ));
+                        },
+                        Some(Token::Control(ControlWord::LegacyDrawingObject)) => {
+                            if let Some(text_box) = self.parse_legacy_text_box()? {
+                                self.legacy_text_boxes.push(text_box);
+                            }
+                            self.states.pop();
+                            return Ok(());
                         },
                         Some(Token::Control(control @ (
                             ControlWord::FootnoteSeparator
@@ -2654,6 +2695,30 @@ impl<'a> Parser<'a> {
             ControlWord::BlipTag(_) | ControlWord::BlipUnitsPerInch(_) => {
                 return Err(RtfError::MalformedDocument(
                     "orphan RTF picture identity control outside pict".to_string(),
+                ));
+            },
+            ControlWord::LegacyDrawingObject
+            | ControlWord::LegacyTextBox
+            | ControlWord::LegacyTextBoxText
+            | ControlWord::LegacyAnchorXPage
+            | ControlWord::LegacyAnchorXMargin
+            | ControlWord::LegacyAnchorXColumn
+            | ControlWord::LegacyAnchorYPage
+            | ControlWord::LegacyAnchorYMargin
+            | ControlWord::LegacyAnchorYParagraph
+            | ControlWord::LegacyDrawingHeight(_)
+            | ControlWord::LegacyTextBoxMargin(_)
+            | ControlWord::LegacyDrawingX(_)
+            | ControlWord::LegacyDrawingY(_)
+            | ControlWord::LegacyDrawingWidth(_)
+            | ControlWord::LegacyDrawingHeightSize(_)
+            | ControlWord::LegacyTextLeftRightTopBottom
+            | ControlWord::LegacyTextLeftRightTopBottomVertical
+            | ControlWord::LegacyTextTopBottomRightLeft
+            | ControlWord::LegacyTextTopBottomRightLeftVertical
+            | ControlWord::LegacyTextBottomTopLeftRight => {
+                return Err(RtfError::MalformedDocument(
+                    "orphan RTF legacy drawing control outside do".to_string(),
                 ));
             },
             ControlWord::GeneratedListText | ControlWord::LegacyGeneratedListText => {
@@ -7776,6 +7841,297 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn apply_legacy_text_box_control(
+        builder: &mut LegacyTextBoxBuilder,
+        control: &ControlWord,
+    ) -> RtfResult<bool> {
+        macro_rules! set_once {
+            ($slot:expr, $value:expr, $name:literal) => {{
+                if $slot.is_some() {
+                    return Err(RtfError::MalformedDocument(
+                        concat!("duplicate RTF legacy text-box ", $name).to_string(),
+                    ));
+                }
+                $slot = Some($value);
+                true
+            }};
+        }
+        Ok(match control {
+            ControlWord::LegacyAnchorXPage => set_once!(
+                builder.horizontal_anchor,
+                crate::LegacyHorizontalAnchor::Page,
+                "horizontal anchor"
+            ),
+            ControlWord::LegacyAnchorXMargin => set_once!(
+                builder.horizontal_anchor,
+                crate::LegacyHorizontalAnchor::Margin,
+                "horizontal anchor"
+            ),
+            ControlWord::LegacyAnchorXColumn => set_once!(
+                builder.horizontal_anchor,
+                crate::LegacyHorizontalAnchor::Column,
+                "horizontal anchor"
+            ),
+            ControlWord::LegacyAnchorYPage => set_once!(
+                builder.vertical_anchor,
+                crate::LegacyVerticalAnchor::Page,
+                "vertical anchor"
+            ),
+            ControlWord::LegacyAnchorYMargin => set_once!(
+                builder.vertical_anchor,
+                crate::LegacyVerticalAnchor::Margin,
+                "vertical anchor"
+            ),
+            ControlWord::LegacyAnchorYParagraph => set_once!(
+                builder.vertical_anchor,
+                crate::LegacyVerticalAnchor::Paragraph,
+                "vertical anchor"
+            ),
+            ControlWord::LegacyDrawingX(value) => set_once!(builder.x, *value, "x"),
+            ControlWord::LegacyDrawingY(value) => set_once!(builder.y, *value, "y"),
+            ControlWord::LegacyDrawingWidth(value) => {
+                set_once!(builder.width, *value, "width")
+            },
+            ControlWord::LegacyDrawingHeightSize(value) => {
+                set_once!(builder.height, *value, "height")
+            },
+            ControlWord::LegacyTextBoxMargin(value) => {
+                set_once!(builder.margin, *value, "margin")
+            },
+            ControlWord::LegacyDrawingHeight(value) => {
+                set_once!(builder.z_order, *value, "z-order")
+            },
+            ControlWord::LegacyTextLeftRightTopBottom => set_once!(
+                builder.direction,
+                crate::LegacyTextDirection::LeftToRightTopToBottom,
+                "direction"
+            ),
+            ControlWord::LegacyTextLeftRightTopBottomVertical => set_once!(
+                builder.direction,
+                crate::LegacyTextDirection::LeftToRightTopToBottomVertical,
+                "direction"
+            ),
+            ControlWord::LegacyTextTopBottomRightLeft => set_once!(
+                builder.direction,
+                crate::LegacyTextDirection::TopToBottomRightToLeft,
+                "direction"
+            ),
+            ControlWord::LegacyTextTopBottomRightLeftVertical => set_once!(
+                builder.direction,
+                crate::LegacyTextDirection::TopToBottomRightToLeftVertical,
+                "direction"
+            ),
+            ControlWord::LegacyTextBottomTopLeftRight => set_once!(
+                builder.direction,
+                crate::LegacyTextDirection::BottomToTopLeftToRight,
+                "direction"
+            ),
+            _ => false,
+        })
+    }
+
+    fn parse_legacy_text_box(&mut self) -> RtfResult<Option<crate::LegacyTextBox<'a>>> {
+        if self.current_state()?.destination != Destination::DocumentBody {
+            return Err(RtfError::MalformedDocument(
+                "RTF legacy drawing text box may occur only in the document body".to_string(),
+            ));
+        }
+        self.pos += 2; // ignorable marker and do
+        let mut builder = LegacyTextBoxBuilder::default();
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    if !builder.saw_text_box {
+                        return Ok(None);
+                    }
+                    let text = builder.text.ok_or_else(|| {
+                        RtfError::MalformedDocument(
+                            "RTF legacy text box lacks dptxbxtext".to_string(),
+                        )
+                    })?;
+                    let text_box = crate::LegacyTextBox {
+                        text: Cow::Borrowed(self.arena.alloc_str(&text) as &str),
+                        position: self.body_text_len,
+                        horizontal_anchor: builder.horizontal_anchor,
+                        vertical_anchor: builder.vertical_anchor,
+                        x: builder.x,
+                        y: builder.y,
+                        width: builder.width,
+                        height: builder.height,
+                        margin: builder.margin,
+                        z_order: builder.z_order,
+                        direction: builder.direction.unwrap_or_default(),
+                    };
+                    text_box.validate()?;
+                    if self.legacy_text_boxes.len()
+                        >= crate::legacy_text_box::MAX_LEGACY_TEXT_BOXES
+                    {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF legacy text-box count exceeds the safety limit".to_string(),
+                        ));
+                    }
+                    self.legacy_text_box_text_bytes = self
+                        .legacy_text_box_text_bytes
+                        .checked_add(text_box.text.len())
+                        .ok_or_else(|| {
+                            RtfError::MalformedDocument(
+                                "RTF legacy text-box text size overflow".to_string(),
+                            )
+                        })?;
+                    if self.legacy_text_box_text_bytes
+                        > crate::legacy_text_box::MAX_LEGACY_TEXT_BOX_TOTAL_BYTES
+                    {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF legacy text-box text exceeds the aggregate safety limit"
+                                .to_string(),
+                        ));
+                    }
+                    return Ok(Some(text_box));
+                },
+                Some(Token::OpenBrace)
+                    if matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::LegacyTextBoxText))
+                    ) =>
+                {
+                    if !builder.saw_text_box {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF legacy drawing dptxbxtext must follow dptxbx".to_string(),
+                        ));
+                    }
+                    if builder.text.is_some() {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF legacy text box contains duplicate dptxbxtext".to_string(),
+                        ));
+                    }
+                    builder.text = Some(self.parse_legacy_text_box_text(&mut builder)?);
+                },
+                Some(Token::OpenBrace) => self.skip_group()?,
+                Some(Token::Control(ControlWord::LegacyTextBox)) => {
+                    if builder.saw_text_box {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF legacy drawing contains duplicate dptxbx".to_string(),
+                        ));
+                    }
+                    builder.saw_text_box = true;
+                    self.pos += 1;
+                },
+                Some(Token::Control(control)) => {
+                    Self::apply_legacy_text_box_control(&mut builder, control)?;
+                    self.pos += 1;
+                },
+                Some(Token::Text(text)) if text.trim().is_empty() => self.pos += 1,
+                Some(Token::Text(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF legacy drawing contains orphan text".to_string(),
+                    ));
+                },
+                Some(Token::Binary(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF legacy drawing cannot contain binary data".to_string(),
+                    ));
+                },
+                None => return Err(RtfError::UnexpectedEof),
+            }
+        }
+    }
+
+    fn parse_legacy_text_box_text(
+        &mut self,
+        builder: &mut LegacyTextBoxBuilder,
+    ) -> RtfResult<String> {
+        self.pos += 2; // opening brace and dptxbxtext
+        let mut depth = 0usize;
+        let mut unicode_skip = self.current_state()?.unicode_skip.max(0);
+        let mut text = String::new();
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) if depth == 0 => {
+                    self.pos += 1;
+                    return Ok(text);
+                },
+                Some(Token::CloseBrace) => {
+                    depth -= 1;
+                    self.pos += 1;
+                },
+                Some(Token::OpenBrace) => {
+                    if matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::IgnorableDestination))
+                    ) || matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(
+                            ControlWord::Field
+                                | ControlWord::Object
+                                | ControlWord::Picture
+                                | ControlWord::Shape
+                                | ControlWord::FormField
+                        ))
+                    ) {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF legacy text box contains an active nested destination"
+                                .to_string(),
+                        ));
+                    }
+                    depth += 1;
+                    self.pos += 1;
+                },
+                Some(Token::Control(control))
+                    if Self::apply_legacy_text_box_control(builder, control)? =>
+                {
+                    self.pos += 1;
+                },
+                Some(Token::Control(ControlWord::Unicode(code))) => {
+                    text.push_str(&self.parse_style_unicode(*code, unicode_skip)?);
+                },
+                Some(Token::Control(ControlWord::UnicodeSkip(value))) => {
+                    unicode_skip = (*value).max(0);
+                    self.pos += 1;
+                },
+                Some(Token::Control(ControlWord::Tab)) => {
+                    text.push('\t');
+                    self.pos += 1;
+                },
+                Some(Token::Control(ControlWord::Par | ControlWord::Line)) => {
+                    text.push('\n');
+                    self.pos += 1;
+                },
+                Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
+                    text.push_str(control_symbol_text(control).unwrap_or_default());
+                    self.pos += 1;
+                },
+                Some(Token::Control(
+                    ControlWord::Field
+                    | ControlWord::Object
+                    | ControlWord::Picture
+                    | ControlWord::Shape
+                    | ControlWord::FormField,
+                )) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF legacy text box contains active content".to_string(),
+                    ));
+                },
+                Some(Token::Control(_)) => self.pos += 1,
+                Some(Token::Text(value)) => {
+                    text.push_str(&self.decode_transport_text(value)?);
+                    self.pos += 1;
+                },
+                Some(Token::Binary(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF legacy text box cannot contain binary data".to_string(),
+                    ));
+                },
+                None => return Err(RtfError::UnexpectedEof),
+            }
+            if text.len() > crate::legacy_text_box::MAX_LEGACY_TEXT_BOX_BYTES {
+                return Err(RtfError::MalformedDocument(
+                    "RTF legacy text-box text exceeds the safety limit".to_string(),
+                ));
+            }
+        }
+    }
+
     /// Parse picture/image content.
     ///
     /// Pictures in RTF have the format:
@@ -8927,6 +9283,8 @@ pub struct ParsedDocument<'a> {
     pub bookmarks: super::bookmark::BookmarkTable<'a>,
     /// Shapes
     pub shapes: Vec<super::shape::Shape<'a>>,
+    /// Inert legacy drawing text boxes.
+    pub legacy_text_boxes: Vec<crate::LegacyTextBox<'a>>,
     /// Shape groups
     pub shape_groups: Vec<super::shape::ShapeGroup<'a>>,
     /// Stylesheet

@@ -30,6 +30,10 @@ pub use core::{
     XlsWorkbookWindowOptions,
     XlsWorksheetLayoutOptions, XlsWriter,
 };
+pub use crate::xls::{
+    XlsConsolidation, XlsConsolidationBuiltInName, XlsConsolidationFile,
+    XlsConsolidationFunction, XlsConsolidationRange, XlsConsolidationSource,
+};
 pub use formatting::{
     BorderStyle, Borders, CellStyle, ExtendedFormat, Fill, FillPattern, Font, FormattingManager,
     HorizontalAlignment, VerticalAlignment,
