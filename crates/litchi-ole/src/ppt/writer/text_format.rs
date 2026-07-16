@@ -13,16 +13,22 @@ use zerocopy_derive::*;
 
 /// Paragraph property mask flags
 pub mod para_mask {
-    /// Has style text prop atom present
+    /// Bullet presence is valid
     pub const HAS_BULLET: u32 = 0x0001;
-    /// Has bullet character
-    pub const BULLET_CHAR: u32 = 0x0002;
-    /// Has bullet font
-    pub const BULLET_FONT: u32 = 0x0004;
-    /// Has bullet size
-    pub const BULLET_SIZE: u32 = 0x0008;
-    /// Has bullet color
-    pub const BULLET_COLOR: u32 = 0x0010;
+    /// Bullet font validity is present in `BulletFlags`
+    pub const BULLET_HAS_FONT: u32 = 0x0002;
+    /// Bullet color validity is present in `BulletFlags`
+    pub const BULLET_HAS_COLOR: u32 = 0x0004;
+    /// Bullet size validity is present in `BulletFlags`
+    pub const BULLET_HAS_SIZE: u32 = 0x0008;
+    /// Bullet font reference exists
+    pub const BULLET_FONT: u32 = 0x0010;
+    /// Bullet color exists
+    pub const BULLET_COLOR: u32 = 0x0020;
+    /// Bullet size exists
+    pub const BULLET_SIZE: u32 = 0x0040;
+    /// Bullet character exists
+    pub const BULLET_CHAR: u32 = 0x0080;
     /// Alignment present
     pub const ALIGNMENT: u32 = 0x0800;
     /// Line spacing present
@@ -476,6 +482,18 @@ impl Paragraph {
         self
     }
 
+    /// Set a direct sRGB bullet color.
+    pub fn bullet_color_rgb(mut self, r: u8, g: u8, b: u8) -> Self {
+        self.bullet_color = Some(TextColor::rgb(r, g, b));
+        self
+    }
+
+    /// Set a color-scheme index for the bullet.
+    pub fn bullet_color_scheme(mut self, index: u8) -> Self {
+        self.bullet_color = Some(TextColor::scheme(index));
+        self
+    }
+
     /// Get total character count for this paragraph's runs only (no paragraph marker)
     pub fn runs_char_count(&self) -> u32 {
         self.runs.iter().map(|r| r.char_count()).sum::<u32>()
@@ -641,12 +659,28 @@ impl TextPropsBuilder {
             if para.bullet_char.is_some() {
                 mask |= para_mask::HAS_BULLET | para_mask::BULLET_CHAR;
             }
+            if para.bullet_color.is_some() {
+                mask |= para_mask::BULLET_HAS_COLOR | para_mask::BULLET_COLOR;
+            }
 
             data.extend_from_slice(&mask.to_le_bytes());
 
             // Write properties according to mask
-            if mask & para_mask::HAS_BULLET != 0 {
-                data.extend_from_slice(&1u16.to_le_bytes()); // hasBullet = true
+            if mask
+                & (para_mask::HAS_BULLET
+                    | para_mask::BULLET_HAS_FONT
+                    | para_mask::BULLET_HAS_COLOR
+                    | para_mask::BULLET_HAS_SIZE)
+                != 0
+            {
+                let mut flags = 0u16;
+                if mask & para_mask::HAS_BULLET != 0 {
+                    flags |= 0x0001;
+                }
+                if mask & para_mask::BULLET_HAS_COLOR != 0 {
+                    flags |= 0x0004;
+                }
+                data.extend_from_slice(&flags.to_le_bytes());
             }
             if mask & para_mask::BULLET_CHAR != 0 {
                 let bullet = para.bullet_char.unwrap_or('•');
@@ -658,11 +692,15 @@ impl TextPropsBuilder {
                 })?;
                 data.extend_from_slice(&ch.to_le_bytes());
             }
-            if mask & para_mask::LEFT_MARGIN != 0 {
-                data.extend_from_slice(&para.left_margin.to_le_bytes());
-            }
-            if mask & para_mask::INDENT != 0 {
-                data.extend_from_slice(&para.indent.to_le_bytes());
+            if mask & para_mask::BULLET_COLOR != 0 {
+                let color = para.bullet_color.unwrap_or(TextColor::BLACK);
+                if color.use_scheme && color.scheme_index > 7 {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "PPT bullet color-scheme index must be between 0 and 7",
+                    ));
+                }
+                data.extend_from_slice(&color.to_ppt_color().to_le_bytes());
             }
             if mask & para_mask::ALIGNMENT != 0 {
                 data.extend_from_slice(&(para.alignment as u16).to_le_bytes());
@@ -675,6 +713,12 @@ impl TextPropsBuilder {
             }
             if mask & para_mask::SPACE_AFTER != 0 {
                 data.extend_from_slice(&para.space_after.to_le_bytes());
+            }
+            if mask & para_mask::LEFT_MARGIN != 0 {
+                data.extend_from_slice(&para.left_margin.to_le_bytes());
+            }
+            if mask & para_mask::INDENT != 0 {
+                data.extend_from_slice(&para.indent.to_le_bytes());
             }
         }
 
@@ -944,6 +988,38 @@ mod tests {
             TextRun::new("x").baseline_position(101),
         ]));
         assert!(invalid_position.build_style_text_prop().is_err());
+    }
+
+    #[test]
+    fn paragraph_properties_round_trip_in_spec_order() {
+        let mut paragraph = Paragraph::new("x")
+            .with_bullet('•')
+            .bullet_color_rgb(1, 2, 3)
+            .center()
+            .line_spacing(120)
+            .space_before(-10)
+            .space_after(20);
+        paragraph.left_margin = 720;
+        paragraph.indent = -360;
+        let mut builder = TextPropsBuilder::new();
+        builder.add_paragraph(paragraph);
+
+        let style = builder.build_style_text_prop().unwrap();
+        let (paragraphs, _) = crate::ppt::text_prop::parse_style_text_prop_atom(&style, 1);
+        let properties = &paragraphs[0];
+
+        assert_eq!(properties.get_value("paragraph.flags"), Some(0x0005));
+        assert_eq!(properties.get_value("bullet.char"), Some(0x2022));
+        assert_eq!(
+            properties.get_value("bullet.color"),
+            Some(0xFE03_0201u32 as i32)
+        );
+        assert_eq!(properties.get_value("alignment"), Some(1));
+        assert_eq!(properties.get_value("linespacing"), Some(120));
+        assert_eq!(properties.get_value("spacebefore"), Some(-10));
+        assert_eq!(properties.get_value("spaceafter"), Some(20));
+        assert_eq!(properties.get_value("text.offset"), Some(720));
+        assert_eq!(properties.get_value("bullet.offset"), Some(-360));
     }
 
     #[test]

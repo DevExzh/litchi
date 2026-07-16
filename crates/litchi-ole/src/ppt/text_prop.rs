@@ -85,21 +85,21 @@ pub fn parse_paragraph_properties(data: &[u8], offset: &mut usize, mask: u32) ->
 
     // The fields occur in TextPFException order, not numeric mask order.
     let prop_defs = [
-        ("paragraph.flags", 2, 0x000F),
-        ("bullet.char", 2, 0x0080),
-        ("bullet.font", 2, 0x0010),
-        ("bullet.size", 2, 0x0040),
-        ("bullet.color", 4, 0x0020),
-        ("alignment", 2, 0x0800),
-        ("linespacing", 2, 0x1000),
-        ("spacebefore", 2, 0x2000),
-        ("spaceafter", 2, 0x4000),
-        ("text.offset", 2, 0x0100),   // left margin
-        ("bullet.offset", 2, 0x0400), // indent
-        ("defaultTabSize", 2, 0x8000),
+        ("paragraph.flags", 2, 0x000F, false),
+        ("bullet.char", 2, 0x0080, false),
+        ("bullet.font", 2, 0x0010, false),
+        ("bullet.size", 2, 0x0040, true),
+        ("bullet.color", 4, 0x0020, false),
+        ("alignment", 2, 0x0800, false),
+        ("linespacing", 2, 0x1000, true),
+        ("spacebefore", 2, 0x2000, true),
+        ("spaceafter", 2, 0x4000, true),
+        ("text.offset", 2, 0x0100, true),   // left margin
+        ("bullet.offset", 2, 0x0400, true), // indent
+        ("defaultTabSize", 2, 0x8000, true),
     ];
 
-    for (name, size, prop_mask) in prop_defs {
+    for (name, size, prop_mask, signed) in prop_defs {
         if (mask & prop_mask) != 0 {
             if *offset + size > data.len() {
                 *offset = data.len();
@@ -107,7 +107,8 @@ pub fn parse_paragraph_properties(data: &[u8], offset: &mut usize, mask: u32) ->
             }
 
             let value = match size {
-                2 => read_i16_le(data, *offset).unwrap_or(0) as i32,
+                2 if signed => read_i16_le(data, *offset).unwrap_or(0) as i32,
+                2 => read_u16_le(data, *offset).unwrap_or(0) as i32,
                 4 => read_i32_le(data, *offset).unwrap_or(0),
                 _ => 0,
             };
@@ -153,7 +154,7 @@ pub fn parse_paragraph_properties(data: &[u8], offset: &mut usize, mask: u32) ->
             }
 
             let value = match size {
-                2 => read_i16_le(data, *offset).unwrap_or(0) as i32,
+                2 => read_u16_le(data, *offset).unwrap_or(0) as i32,
                 4 => read_i32_le(data, *offset).unwrap_or(0),
                 _ => 0,
             };
