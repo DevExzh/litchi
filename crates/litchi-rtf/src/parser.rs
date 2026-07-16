@@ -328,6 +328,7 @@ pub struct Parser<'a> {
     list_override_table: super::list::ListOverrideTable,
     saw_list_override_table: bool,
     legacy_section_numbering: crate::LegacySectionNumbering<'a>,
+    paragraph_group_table: Option<crate::ParagraphGroupPropertyTable>,
     /// Sections
     sections: Vec<super::section::Section<'a>>,
     /// Whether section-specific properties are currently active.
@@ -463,6 +464,7 @@ impl<'a> Parser<'a> {
             list_override_table: super::list::ListOverrideTable::new(),
             saw_list_override_table: false,
             legacy_section_numbering: crate::LegacySectionNumbering::new(),
+            paragraph_group_table: None,
             sections: Vec::new(),
             section_properties_active: false,
             bookmarks: super::bookmark::BookmarkTable::new(),
@@ -569,6 +571,7 @@ impl<'a> Parser<'a> {
             list_table: self.list_table,
             list_override_table: self.list_override_table,
             legacy_section_numbering: self.legacy_section_numbering,
+            paragraph_group_table: self.paragraph_group_table,
             sections: self.sections,
             bookmarks: self.bookmarks,
             shapes: self.shapes,
@@ -775,6 +778,16 @@ impl<'a> Parser<'a> {
                             self.states.pop();
                             return Ok(());
                         },
+                        Some(Token::Control(ControlWord::ParagraphGroupTable)) => {
+                            if self.paragraph_group_table.is_some() {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF contains multiple pgptbl destinations".to_string(),
+                                ));
+                            }
+                            self.paragraph_group_table = Some(self.parse_paragraph_group_table()?);
+                            self.states.pop();
+                            return Ok(());
+                        },
                         Some(Token::Control(ControlWord::DataStore)) => {
                             if self.saw_data_store {
                                 return Err(RtfError::MalformedDocument(
@@ -922,6 +935,11 @@ impl<'a> Parser<'a> {
                 Token::Control(ControlWord::LegacySectionNumberingLevel(_)) => {
                     return Err(RtfError::MalformedDocument(
                         "RTF pnseclvl destination is misplaced or not starred".to_string(),
+                    ));
+                },
+                Token::Control(ControlWord::ParagraphGroupTable | ControlWord::ParagraphGroup) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF paragraph-group destination is misplaced or not starred".to_string(),
                     ));
                 },
                 Token::Control(ControlWord::DataStore) => {
@@ -3118,6 +3136,178 @@ impl<'a> Parser<'a> {
                 None => return Err(RtfError::UnexpectedEof),
             }
         }
+    }
+
+    fn parse_paragraph_group_table(&mut self) -> RtfResult<crate::ParagraphGroupPropertyTable> {
+        if self.states.len() != 3
+            || self.blocks.iter().any(|block| !block.text.trim().is_empty())
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF pgptbl must occur at document scope before body text".to_string(),
+            ));
+        }
+        self.pos += 1; // ignorable-destination marker
+        if !matches!(self.tokens.get(self.pos), Some(Token::Control(ControlWord::ParagraphGroupTable))) {
+            return Err(RtfError::MalformedDocument("invalid RTF pgptbl destination".to_string()));
+        }
+        self.pos += 1;
+        let mut table = crate::ParagraphGroupPropertyTable::new();
+        while self.pos < self.tokens.len() {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    table.validate()?;
+                    return Ok(table);
+                },
+                Some(Token::OpenBrace)
+                    if matches!(self.tokens.get(self.pos + 1), Some(Token::Control(ControlWord::ParagraphGroup))) =>
+                {
+                    let id = u32::try_from(table.entries().len() + 1).map_err(|_| {
+                        RtfError::MalformedDocument("RTF paragraph-group ID overflow".to_string())
+                    })?;
+                    let entry = self.parse_paragraph_group_property(id)?;
+                    table.push(entry)?;
+                    continue;
+                },
+                Some(Token::Text(text)) if text.trim().is_empty() => {},
+                Some(Token::OpenBrace) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF pgptbl cannot contain fields, objects, or unknown destinations".to_string(),
+                    ));
+                },
+                Some(_) => {
+                    return Err(RtfError::MalformedDocument(
+                        "invalid content in RTF pgptbl destination".to_string(),
+                    ));
+                },
+                None => return Err(RtfError::UnexpectedEof),
+            }
+            self.pos += 1;
+        }
+        Err(RtfError::UnexpectedEof)
+    }
+
+    fn parse_paragraph_group_property(
+        &mut self,
+        id: u32,
+    ) -> RtfResult<crate::ParagraphGroupProperty> {
+        self.pos += 2; // opening brace and pgp
+        let mut parent_id = None;
+        let mut nesting = None;
+        let mut left = None;
+        let mut right = None;
+        let mut before = None;
+        let mut after = None;
+        let mut borders = crate::Borders::new();
+        let mut current_border = None;
+        let mut seen = std::collections::HashSet::new();
+        while self.pos < self.tokens.len() {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    let entry = crate::ParagraphGroupProperty {
+                        id,
+                        parent_id: u32::try_from(parent_id.ok_or_else(|| RtfError::MalformedDocument("RTF pgp entry lacks ipgp".to_string()))?)
+                            .map_err(|_| RtfError::MalformedDocument("invalid RTF ipgp reference".to_string()))?,
+                        table_nesting_level: u8::try_from(nesting.ok_or_else(|| RtfError::MalformedDocument("RTF pgp entry lacks itap".to_string()))?)
+                            .map_err(|_| RtfError::MalformedDocument("invalid RTF pgp itap value".to_string()))?,
+                        left_indent: left.ok_or_else(|| RtfError::MalformedDocument("RTF pgp entry lacks li".to_string()))?,
+                        right_indent: right.ok_or_else(|| RtfError::MalformedDocument("RTF pgp entry lacks ri".to_string()))?,
+                        space_before: before.ok_or_else(|| RtfError::MalformedDocument("RTF pgp entry lacks sb".to_string()))?,
+                        space_after: after.ok_or_else(|| RtfError::MalformedDocument("RTF pgp entry lacks sa".to_string()))?,
+                        borders,
+                    };
+                    entry.validate()?;
+                    return Ok(entry);
+                },
+                Some(Token::Control(control)) => match control {
+                    ControlWord::ParagraphGroupParent(value) => {
+                        if !seen.insert("ipgp") { return Err(RtfError::MalformedDocument("duplicate RTF pgp ipgp".to_string())); }
+                        parent_id = Some(*value);
+                    },
+                    ControlWord::TableNestingLevel(value) => {
+                        if !seen.insert("itap") { return Err(RtfError::MalformedDocument("duplicate RTF pgp itap".to_string())); }
+                        nesting = Some(*value);
+                    },
+                    ControlWord::LeftIndent(value) => {
+                        if !seen.insert("li") { return Err(RtfError::MalformedDocument("duplicate RTF pgp li".to_string())); }
+                        left = Some(*value);
+                    },
+                    ControlWord::RightIndent(value) => {
+                        if !seen.insert("ri") { return Err(RtfError::MalformedDocument("duplicate RTF pgp ri".to_string())); }
+                        right = Some(*value);
+                    },
+                    ControlWord::SpaceBefore(value) => {
+                        if !seen.insert("sb") { return Err(RtfError::MalformedDocument("duplicate RTF pgp sb".to_string())); }
+                        before = Some(*value);
+                    },
+                    ControlWord::SpaceAfter(value) => {
+                        if !seen.insert("sa") { return Err(RtfError::MalformedDocument("duplicate RTF pgp sa".to_string())); }
+                        after = Some(*value);
+                    },
+                    ControlWord::BorderTop => {
+                        if !seen.insert("brdrt") { return Err(RtfError::MalformedDocument("duplicate RTF pgp top border".to_string())); }
+                        current_border = Some(0u8);
+                    },
+                    ControlWord::BorderBottom => {
+                        if !seen.insert("brdrb") { return Err(RtfError::MalformedDocument("duplicate RTF pgp bottom border".to_string())); }
+                        current_border = Some(1u8);
+                    },
+                    ControlWord::BorderLeft => {
+                        if !seen.insert("brdrl") { return Err(RtfError::MalformedDocument("duplicate RTF pgp left border".to_string())); }
+                        current_border = Some(2u8);
+                    },
+                    ControlWord::BorderRight => {
+                        if !seen.insert("brdrr") { return Err(RtfError::MalformedDocument("duplicate RTF pgp right border".to_string())); }
+                        current_border = Some(3u8);
+                    },
+                    ControlWord::BorderSingle
+                    | ControlWord::BorderDotted
+                    | ControlWord::BorderDashed
+                    | ControlWord::BorderDouble
+                    | ControlWord::BorderTriple
+                    | ControlWord::BorderWave => {
+                        let border = match current_border {
+                            Some(0) => &mut borders.top,
+                            Some(1) => &mut borders.bottom,
+                            Some(2) => &mut borders.left,
+                            Some(3) => &mut borders.right,
+                            _ => return Err(RtfError::MalformedDocument("RTF pgp border style has no side".to_string())),
+                        };
+                        if border.style != crate::BorderStyle::None {
+                            return Err(RtfError::MalformedDocument("duplicate RTF pgp border style".to_string()));
+                        }
+                        border.style = match control {
+                            ControlWord::BorderSingle => crate::BorderStyle::Single,
+                            ControlWord::BorderDotted => crate::BorderStyle::Dotted,
+                            ControlWord::BorderDashed => crate::BorderStyle::Dashed,
+                            ControlWord::BorderDouble => crate::BorderStyle::Double,
+                            ControlWord::BorderTriple => crate::BorderStyle::Triple,
+                            _ => crate::BorderStyle::Wavy,
+                        };
+                    },
+                    ControlWord::BorderWidth(value) => {
+                        let border = match current_border { Some(0) => &mut borders.top, Some(1) => &mut borders.bottom, Some(2) => &mut borders.left, Some(3) => &mut borders.right, _ => return Err(RtfError::MalformedDocument("RTF pgp border width has no side".to_string())) };
+                        border.width = *value;
+                    },
+                    ControlWord::BorderColor(value) => {
+                        let border = match current_border { Some(0) => &mut borders.top, Some(1) => &mut borders.bottom, Some(2) => &mut borders.left, Some(3) => &mut borders.right, _ => return Err(RtfError::MalformedDocument("RTF pgp border color has no side".to_string())) };
+                        border.color_ref = u16::try_from(*value).map_err(|_| RtfError::MalformedDocument("invalid RTF pgp border color".to_string()))?;
+                    },
+                    ControlWord::BorderSpace(value) => {
+                        let border = match current_border { Some(0) => &mut borders.top, Some(1) => &mut borders.bottom, Some(2) => &mut borders.left, Some(3) => &mut borders.right, _ => return Err(RtfError::MalformedDocument("RTF pgp border space has no side".to_string())) };
+                        border.space = *value;
+                    },
+                    _ => return Err(RtfError::MalformedDocument("unsupported control in RTF pgp entry".to_string())),
+                },
+                Some(Token::Text(text)) if text.trim().is_empty() => {},
+                Some(Token::OpenBrace) => return Err(RtfError::MalformedDocument("RTF pgp entry cannot contain nested destinations".to_string())),
+                Some(_) => return Err(RtfError::MalformedDocument("invalid content in RTF pgp entry".to_string())),
+                None => return Err(RtfError::UnexpectedEof),
+            }
+            self.pos += 1;
+        }
+        Err(RtfError::UnexpectedEof)
     }
 
     fn parse_legacy_section_numbering_level(&mut self) -> RtfResult<()> {
@@ -7834,6 +8024,7 @@ pub struct ParsedDocument<'a> {
     /// List override table
     pub list_override_table: super::list::ListOverrideTable,
     pub legacy_section_numbering: crate::LegacySectionNumbering<'a>,
+    pub paragraph_group_table: Option<crate::ParagraphGroupPropertyTable>,
     /// Sections
     pub sections: Vec<super::section::Section<'a>>,
     /// Bookmarks

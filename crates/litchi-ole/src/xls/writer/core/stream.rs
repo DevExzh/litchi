@@ -397,6 +397,10 @@ pub(crate) fn generate_workbook_stream(
             )?;
         }
 
+        if let Some(manager) = &worksheet.scenario_manager {
+            biff::write_scenario_manager(&mut stream, manager)?;
+        }
+
         if worksheet.pivot_tables.is_empty() {
             biff::write_dimensions(
                 &mut stream,

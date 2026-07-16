@@ -138,6 +138,7 @@ impl<W: Write> RtfWriter<W> {
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
         self.write_list_table(doc.list_table())?;
         self.write_list_override_table(doc.list_override_table())?;
+        self.write_paragraph_group_table(doc.paragraph_group_table())?;
         self.write_legacy_section_numbering(doc.legacy_section_numbering())?;
 
         // Revision controls reference this author table by numeric index.
@@ -616,6 +617,32 @@ impl<W: Write> RtfWriter<W> {
             }
             self.write_str("}")?;
         }
+        Ok(())
+    }
+
+    /// Write the inert paragraph-group property table.
+    pub fn write_paragraph_group_table(
+        &mut self,
+        table: Option<&crate::ParagraphGroupPropertyTable>,
+    ) -> io::Result<()> {
+        let Some(table) = table else { return Ok(()); };
+        table
+            .validate()
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+        self.write_str("{\\*\\pgptbl")?;
+        for entry in table.entries() {
+            self.write_str("{")?;
+            self.write_control_word("pgp", None)?;
+            self.write_control_word("ipgp", Some(i32::try_from(entry.parent_id).map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid pgp parent ID"))?))?;
+            self.write_control_word("itap", Some(i32::from(entry.table_nesting_level)))?;
+            self.write_control_word("li", Some(entry.left_indent))?;
+            self.write_control_word("ri", Some(entry.right_indent))?;
+            self.write_control_word("sb", Some(entry.space_before))?;
+            self.write_control_word("sa", Some(entry.space_after))?;
+            self.write_borders(&entry.borders)?;
+            self.write_str("}")?;
+        }
+        self.write_str("}")?;
         Ok(())
     }
 

@@ -1675,6 +1675,25 @@ impl XlsWriter {
         Ok(())
     }
 
+    pub fn set_scenario_manager(
+        &mut self,
+        sheet: usize,
+        manager: crate::xls::XlsScenarioManager,
+    ) -> XlsResult<()> {
+        manager.validate_for_write()?;
+        let worksheet = self.worksheets.get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+        worksheet.scenario_manager = Some(manager);
+        Ok(())
+    }
+
+    pub fn clear_scenario_manager(&mut self, sheet: usize) -> XlsResult<()> {
+        let worksheet = self.worksheets.get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+        worksheet.scenario_manager = None;
+        Ok(())
+    }
+
     /// Configure the complete primary worksheet print/page settings block.
     pub fn set_page_setup(
         &mut self,

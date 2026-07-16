@@ -56,6 +56,7 @@ pub struct XlsWorksheet {
     worksheet_views: Vec<XlsWorksheetView>,
     page_setup: Option<XlsPageSetup>,
     calculation: crate::xls::calculation::XlsWorksheetCalculation,
+    scenario_manager: Option<crate::xls::scenario::XlsScenarioManager>,
     conditional_formattings: Vec<XlsConditionalFormatting>,
 }
 
@@ -84,6 +85,7 @@ impl XlsWorksheet {
             worksheet_views: Vec::new(),
             page_setup: None,
             calculation: crate::xls::calculation::XlsWorksheetCalculation::default(),
+            scenario_manager: None,
             conditional_formattings: Vec::new(),
         }
     }
@@ -112,6 +114,7 @@ impl XlsWorksheet {
             worksheet_views: Vec::new(),
             page_setup: None,
             calculation: crate::xls::calculation::XlsWorksheetCalculation::default(),
+            scenario_manager: None,
             conditional_formattings: Vec::new(),
         }
     }
@@ -364,6 +367,17 @@ impl XlsWorksheet {
         calculation: crate::xls::calculation::XlsWorksheetCalculation,
     ) {
         self.calculation = calculation;
+    }
+
+    pub fn scenario_manager(&self) -> Option<&crate::xls::scenario::XlsScenarioManager> {
+        self.scenario_manager.as_ref()
+    }
+
+    pub(crate) fn set_scenario_manager(
+        &mut self,
+        scenario_manager: Option<crate::xls::scenario::XlsScenarioManager>,
+    ) {
+        self.scenario_manager = scenario_manager;
     }
 
     /// Legacy conditional formatting groups in worksheet record order.

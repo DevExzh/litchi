@@ -61,6 +61,8 @@ pub struct RtfDocument<'a> {
     list_override_table: super::list::ListOverrideTable,
     /// Ordered inert legacy section-numbering defaults.
     legacy_section_numbering: crate::LegacySectionNumbering<'a>,
+    /// Optional paragraph-group property table.
+    paragraph_group_table: Option<crate::ParagraphGroupPropertyTable>,
     /// Sections
     sections: Vec<super::section::Section<'a>>,
     /// Bookmarks
@@ -289,6 +291,9 @@ impl<'a> RtfDocument<'a> {
             list_table: Self::convert_list_table_to_owned(parsed.list_table),
             list_override_table: parsed.list_override_table,
             legacy_section_numbering: parsed.legacy_section_numbering.into_owned(),
+            paragraph_group_table: parsed
+                .paragraph_group_table
+                .map(crate::ParagraphGroupPropertyTable::into_owned),
             sections: Self::convert_sections_to_owned(parsed.sections),
             bookmarks: Self::convert_bookmarks_to_owned(parsed.bookmarks),
             shapes: Self::convert_shapes_to_owned(parsed.shapes),
@@ -1003,6 +1008,26 @@ impl<'a> RtfDocument<'a> {
     /// Return ordered legacy `pnseclvl` section-numbering defaults.
     pub fn legacy_section_numbering(&self) -> &crate::LegacySectionNumbering<'_> {
         &self.legacy_section_numbering
+    }
+
+    /// Return the inert paragraph-group property table.
+    pub fn paragraph_group_table(&self) -> Option<&crate::ParagraphGroupPropertyTable> {
+        self.paragraph_group_table.as_ref()
+    }
+
+    /// Replace the paragraph-group property table after validation.
+    pub fn set_paragraph_group_table(
+        &mut self,
+        table: crate::ParagraphGroupPropertyTable,
+    ) -> RtfResult<()> {
+        table.validate()?;
+        self.paragraph_group_table = Some(table);
+        Ok(())
+    }
+
+    /// Remove the paragraph-group property table.
+    pub fn clear_paragraph_group_table(&mut self) {
+        self.paragraph_group_table = None;
     }
 
     /// Replace legacy section-numbering defaults after full validation.

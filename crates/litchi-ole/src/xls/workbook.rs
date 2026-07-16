@@ -526,6 +526,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         let mut conditional_format_collector = conditional_format::ConditionalFormatCollector::new();
         let mut calculation_collector =
             crate::xls::calculation::WorksheetCalculationCollector::new();
+        let mut scenario_collector = crate::xls::scenario::ScenarioCollector::new();
         let mut pending_string_formula: Option<CellRecord> = None;
         let mut shared_formulas = HashMap::<(u16, u16), SharedFormulaTemplate>::new();
         let mut remaining_data_validations: Option<usize> = None;
@@ -540,6 +541,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             protection_collector.feed_record(record.header.record_type, &record.data)?;
             conditional_format_collector.feed_record(record.header.record_type, &record.data)?;
             calculation_collector.feed_record(record.header.record_type, &record.data)?;
+            scenario_collector.feed_record(record.header.record_type, &record.data)?;
 
             if matches!(remaining_data_validations, Some(1..))
                 && record.header.record_type != super::data_validation::DV_RECORD_TYPE
@@ -816,6 +818,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         worksheet.set_page_setup(page_setup_collector.finish()?);
         worksheet.set_conditional_formattings(conditional_format_collector.finish()?);
         worksheet.set_calculation(calculation_collector.finish()?);
+        worksheet.set_scenario_manager(scenario_collector.finish()?);
 
         Ok(worksheet)
     }

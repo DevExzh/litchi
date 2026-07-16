@@ -2222,6 +2222,22 @@ impl Workbook {
         crate::xlsx::pivot::read_pivot_tables(self.package())
     }
 
+    /// Load inert query-table metadata associated with a worksheet.
+    pub fn query_tables_on_sheet(
+        &self,
+        sheet_name: &str,
+    ) -> SheetResult<Vec<super::query_table::WorksheetQueryTable>> {
+        let info = self
+            .worksheets
+            .iter()
+            .find(|worksheet| worksheet.name == sheet_name)
+            .cloned()
+            .ok_or_else(|| format!("Worksheet '{sheet_name}' not found"))?;
+        let mut worksheet = Worksheet::new(self, info);
+        worksheet.load_data()?;
+        Ok(worksheet.query_tables().to_vec())
+    }
+
     pub fn pivot_tables_on_sheet(&self, sheet_name: &str) -> SheetResult<Vec<PivotTable>> {
         let all = self.pivot_tables()?;
         Ok(all

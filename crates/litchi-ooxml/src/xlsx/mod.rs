@@ -31,6 +31,7 @@ pub mod cell;
 pub mod auto_filter;
 pub mod calculation_properties;
 pub mod calculation_chain;
+pub mod query_table;
 pub mod chart;
 mod comments;
 pub mod conditional_formatting;
@@ -76,6 +77,12 @@ pub use calculation_properties::{
 pub use calculation_chain::{
     CalculationCell, CalculationChain, CalculationChainConformance,
     CalculationChainExtensionAttribute, parse_calculation_chain,
+};
+pub use query_table::{
+    QueryTable, QueryTableConformance, QueryTableExtensionAttribute, QueryTableExtensionList,
+    QueryTableField, QueryTableGrowShrinkType, QueryTableIconSet, QueryTableRefresh,
+    QueryTableSortBy, QueryTableSortCondition, QueryTableSortMethod, QueryTableSortState,
+    WorksheetQueryTable, parse_query_table, write_query_table,
 };
 pub use auto_filter::{
     AutoFilterDefinition, CalendarType, ColorFilter, CustomFilter, CustomFilterOperator,

@@ -243,6 +243,14 @@ impl Presentation {
         super::parse_presentation_page_metadata(self.content.xml_content())
     }
 
+    /// Inspect named presentation page layouts and their typed placeholders.
+    pub fn page_layouts(&self) -> Result<super::PresentationPageLayouts> {
+        match self.styles.as_ref() {
+            Some(styles) => super::parse_presentation_page_layouts(styles.xml_content()),
+            None => Ok(super::PresentationPageLayouts::default()),
+        }
+    }
+
     /// Get a slide by index.
     ///
     /// Returns `Some(slide)` if a slide exists at the given index, `None` otherwise.

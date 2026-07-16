@@ -44,6 +44,10 @@ pub enum ControlWord<'a> {
     LegacyNumberingFont(i32),
     LegacyNumberingTextBefore,
     LegacyNumberingTextAfter,
+    ParagraphGroupTable,
+    ParagraphGroup,
+    ParagraphGroupParent(i32),
+    TableNestingLevel(i32),
 
     // Stylesheet entries and metadata
     ParagraphStyle(i32),
@@ -740,6 +744,10 @@ impl<'a> Lexer<'a> {
             "pnf" => ControlWord::LegacyNumberingFont(param_value),
             "pntxtb" => ControlWord::LegacyNumberingTextBefore,
             "pntxta" => ControlWord::LegacyNumberingTextAfter,
+            "pgptbl" => ControlWord::ParagraphGroupTable,
+            "pgp" => ControlWord::ParagraphGroup,
+            "ipgp" => ControlWord::ParagraphGroupParent(param_value),
+            "itap" => ControlWord::TableNestingLevel(param_value),
 
             // Stylesheet entries and metadata
             "s" => ControlWord::ParagraphStyle(param_value),

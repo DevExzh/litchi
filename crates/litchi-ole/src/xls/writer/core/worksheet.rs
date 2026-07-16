@@ -125,6 +125,7 @@ pub(super) struct WritableWorksheet {
     /// Pivot tables to write.
     pub pivot_tables: Vec<WritablePivotTable>,
     pub formulas_pending_recalculation: bool,
+    pub scenario_manager: Option<crate::xls::scenario::XlsScenarioManager>,
 }
 
 /// A column-level AutoFilter condition for the writer.
@@ -179,6 +180,7 @@ impl WritableWorksheet {
             sort_config: None,
             pivot_tables: Vec::new(),
             formulas_pending_recalculation: false,
+            scenario_manager: None,
         }
     }
 

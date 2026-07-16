@@ -29,6 +29,9 @@ mod data_validation;
 /// BIFF8 calculation and recalculation records.
 mod calculation;
 
+/// BIFF8 worksheet scenario manager records.
+mod scenario;
+
 /// BIFF formula token rendering
 mod formula;
 
@@ -95,6 +98,7 @@ pub use cell::XlsCell;
 pub use calculation::{
     XlsCalculationMode, XlsReferenceMode, XlsWorkbookCalculation, XlsWorksheetCalculation,
 };
+pub use scenario::{XlsScenario, XlsScenarioCell, XlsScenarioManager, XlsScenarioRange};
 pub use data_validation::{
     XlsDataValidationErrorStyle, XlsDataValidationFormula, XlsDataValidationImeMode,
     XlsDataValidationKind, XlsDataValidationOperator, XlsDataValidationRange,

@@ -54,6 +54,10 @@ use super::phonetic_properties::{
 };
 use super::print_options::{WorksheetPrintOptions, parse_worksheet_print_options};
 use super::table::{Table, parse_table_xml};
+use super::query_table::{
+    QUERY_TABLE_CONTENT_TYPE, WorksheetQueryTable, is_query_table_relationship_type,
+    parse_query_table,
+};
 use super::views::SheetView;
 use super::writer::sheet::Image;
 use super::{
@@ -292,6 +296,7 @@ pub struct Worksheet<'a> {
     rich_text_cells: HashMap<(u32, u32), Vec<RichTextRun>>,
     sparkline_groups: Vec<SparklineGroup>,
     tables: Vec<Table>,
+    query_tables: Vec<WorksheetQueryTable>,
     images: Vec<Image>,
     charts: Vec<WorksheetChart>,
 }
@@ -336,6 +341,7 @@ impl<'a> Worksheet<'a> {
             rich_text_cells: HashMap::new(),
             sparkline_groups: Vec::new(),
             tables: Vec::new(),
+            query_tables: Vec::new(),
             images: Vec::new(),
             charts: Vec::new(),
         }
@@ -359,6 +365,7 @@ impl<'a> Worksheet<'a> {
             self.parse_sheet_data(content)?;
         self.resolve_hyperlinks(hyperlinks, relationships)?;
         self.load_tables(table_relationship_ids, relationships)?;
+        self.load_query_tables(relationships)?;
         self.load_drawing(drawing_relationship_id.as_deref(), relationships)?;
         self.load_comments(relationships)?;
         self.named_sheet_views =
@@ -406,6 +413,11 @@ impl<'a> Worksheet<'a> {
     /// Structured tables defined on this worksheet.
     pub fn tables(&self) -> &[Table] {
         &self.tables
+    }
+
+    /// Static query-table refresh metadata associated with this worksheet.
+    pub fn query_tables(&self) -> &[WorksheetQueryTable] {
+        &self.query_tables
     }
 
     /// Pictures embedded in this worksheet's drawing part.
@@ -834,6 +846,75 @@ impl<'a> Worksheet<'a> {
             tables.push(table);
         }
         self.tables = tables;
+        Ok(())
+    }
+
+    fn load_query_tables(&mut self, relationships: &Relationships) -> Result<()> {
+        const MAX_QUERY_TABLES: usize = 1_024;
+        let mut candidates = Vec::new();
+        for relationship in relationships
+            .iter()
+            .filter(|relationship| is_query_table_relationship_type(relationship.reltype()))
+        {
+            if relationship.is_external() {
+                return Err(format!(
+                    "Worksheet query-table relationship '{}' cannot be external",
+                    relationship.r_id()
+                ).into());
+            }
+            let part_uri = relationship.target_partname()?;
+            candidates.push((relationship.r_id().to_string(), part_uri));
+        }
+        for table_relationship in relationships
+            .iter()
+            .filter(|relationship| matches!(relationship.reltype(), rt::TABLE | rt::STRICT_TABLE))
+        {
+            if table_relationship.is_external() {
+                continue;
+            }
+            let table_uri = table_relationship.target_partname()?;
+            let table_part = self.workbook.package().get_part(&table_uri)?;
+            for relationship in table_part
+                .rels()
+                .iter()
+                .filter(|relationship| is_query_table_relationship_type(relationship.reltype()))
+            {
+                if relationship.is_external() {
+                    return Err(format!(
+                        "Table query-table relationship '{}' cannot be external",
+                        relationship.r_id()
+                    ).into());
+                }
+                candidates.push((relationship.r_id().to_string(), relationship.target_partname()?));
+            }
+        }
+        if candidates.len() > MAX_QUERY_TABLES {
+            return Err("Worksheet has too many query-table relationships".into());
+        }
+        let mut seen_targets = HashSet::with_capacity(candidates.len());
+        let mut query_tables = Vec::with_capacity(candidates.len());
+        for (relationship_id, part_uri) in candidates {
+            if !seen_targets.insert(part_uri.to_string()) {
+                return Err(format!("Duplicate worksheet query-table target '{part_uri}'").into());
+            }
+            let part = self.workbook.package().get_part(&part_uri)?;
+            if part.content_type() != QUERY_TABLE_CONTENT_TYPE {
+                return Err(format!(
+                    "Worksheet query-table part '{part_uri}' has content type '{}', expected '{}'",
+                    part.content_type(), QUERY_TABLE_CONTENT_TYPE
+                ).into());
+            }
+            if part.rels().iter().next().is_some() {
+                return Err(format!("Query-table part '{part_uri}' has unexpected relationships").into());
+            }
+            let query_table = parse_query_table(part.blob())?;
+            query_tables.push(WorksheetQueryTable::new(
+                relationship_id,
+                part_uri.to_string(),
+                query_table,
+            ));
+        }
+        self.query_tables = query_tables;
         Ok(())
     }
 

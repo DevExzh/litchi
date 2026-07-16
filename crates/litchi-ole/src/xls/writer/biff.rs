@@ -26,6 +26,7 @@ mod named_range;
 mod pivot;
 mod pivot_xfext;
 mod sst;
+mod scenario;
 mod validation;
 mod workbook;
 mod worksheet;
@@ -79,6 +80,13 @@ pub fn write_calculation_settings<W: Write>(
     settings: &crate::xls::writer::core::XlsCalculationSettings,
 ) -> XlsResult<()> {
     worksheet::write_calculation_settings(writer, settings)
+}
+
+pub fn write_scenario_manager<W: Write>(
+    writer: &mut W,
+    manager: &crate::xls::scenario::XlsScenarioManager,
+) -> XlsResult<()> {
+    scenario::write_scenario_manager(writer, manager)
 }
 
 /// Write NAME (Lbl) record for a defined name.
