@@ -85,6 +85,12 @@ pub mod char_mask {
     pub const FONT_COLOR: u32 = 0x0004_0000;
     /// Position (superscript/subscript) present
     pub const POSITION: u32 = 0x0008_0000;
+    /// East Asian font reference present
+    pub const ASIAN_FONT_REF: u32 = 0x0020_0000;
+    /// ANSI font reference present
+    pub const ANSI_FONT_REF: u32 = 0x0040_0000;
+    /// Symbol font reference present
+    pub const SYMBOL_FONT_REF: u32 = 0x0080_0000;
 }
 
 // =============================================================================
@@ -412,6 +418,12 @@ pub struct TextRun {
     pub color: TextColor,
     /// Font index (reference to FontCollection, 0 = default)
     pub font_index: u16,
+    /// East Asian font reference
+    pub asian_font_index: Option<u16>,
+    /// ANSI font reference
+    pub ansi_font_index: Option<u16>,
+    /// Symbol font reference
+    pub symbol_font_index: Option<u16>,
     /// Baseline position as a percentage of line height
     pub baseline_position: Option<i16>,
 }
@@ -425,6 +437,9 @@ impl TextRun {
             font_size: 18, // Default 18pt
             color: TextColor::BLACK,
             font_index: 0,
+            asian_font_index: None,
+            ansi_font_index: None,
+            symbol_font_index: None,
             baseline_position: None,
         }
     }
@@ -553,6 +568,24 @@ impl TextRun {
     /// Set font index
     pub fn font(mut self, index: u16) -> Self {
         self.font_index = index;
+        self
+    }
+
+    /// Set the East Asian font reference.
+    pub fn asian_font(mut self, index: u16) -> Self {
+        self.asian_font_index = Some(index);
+        self
+    }
+
+    /// Set the ANSI font reference.
+    pub fn ansi_font(mut self, index: u16) -> Self {
+        self.ansi_font_index = Some(index);
+        self
+    }
+
+    /// Set the symbol font reference.
+    pub fn symbol_font(mut self, index: u16) -> Self {
+        self.symbol_font_index = Some(index);
         self
     }
 
@@ -1265,6 +1298,15 @@ impl TextPropsBuilder {
                 mask |= char_mask::FONT_SIZE; // Always include font size
                 mask |= char_mask::FONT_COLOR; // Always include color
                 mask |= char_mask::FONT_REF; // Always include font reference
+                if run.asian_font_index.is_some() {
+                    mask |= char_mask::ASIAN_FONT_REF;
+                }
+                if run.ansi_font_index.is_some() {
+                    mask |= char_mask::ANSI_FONT_REF;
+                }
+                if run.symbol_font_index.is_some() {
+                    mask |= char_mask::SYMBOL_FONT_REF;
+                }
                 if run.baseline_position.is_some() {
                     mask |= char_mask::POSITION;
                 }
@@ -1279,6 +1321,16 @@ impl TextPropsBuilder {
 
                 // Font reference (if font_ref bit is set)
                 data.extend_from_slice(&run.font_index.to_le_bytes());
+
+                if let Some(index) = run.asian_font_index {
+                    data.extend_from_slice(&index.to_le_bytes());
+                }
+                if let Some(index) = run.ansi_font_index {
+                    data.extend_from_slice(&index.to_le_bytes());
+                }
+                if let Some(index) = run.symbol_font_index {
+                    data.extend_from_slice(&index.to_le_bytes());
+                }
 
                 // Font size is stored directly in points.
                 data.extend_from_slice(&run.font_size.to_le_bytes());
@@ -1504,7 +1556,11 @@ mod tests {
             .kumi(false)
             .strikethrough(true)
             .embossed_value(false)
-            .pp9_run_id(13);
+            .pp9_run_id(13)
+            .font(65_535)
+            .asian_font(65_534)
+            .ansi_font(32_768)
+            .symbol_font(60_000);
         let mut builder = TextPropsBuilder::new();
         builder.add_paragraph(Paragraph::with_runs(vec![run]));
         let style = builder.build_style_text_prop().unwrap();
@@ -1512,6 +1568,19 @@ mod tests {
             crate::ppt::text_prop::parse_style_text_prop_atom_strict(&style, 1).unwrap();
         assert_eq!(character_styles[0].property_mask & 0xFFFF, 0x3FB7);
         assert_eq!(character_styles[0].get_value("char.flags"), Some(0x3532));
+        assert_eq!(character_styles[0].get_value("font.index"), Some(65_535));
+        assert_eq!(
+            character_styles[0].get_value("asian.font.index"),
+            Some(65_534)
+        );
+        assert_eq!(
+            character_styles[0].get_value("ansi.font.index"),
+            Some(32_768)
+        );
+        assert_eq!(
+            character_styles[0].get_value("symbol.font.index"),
+            Some(60_000)
+        );
 
         let text_record = crate::ppt::PptRecord {
             record_type: crate::consts::PptRecordType::TextBytesAtom,
@@ -1546,6 +1615,10 @@ mod tests {
         assert_eq!(formatting.legacy_strikethrough, Some(true));
         assert_eq!(formatting.embossed_explicit, Some(false));
         assert_eq!(formatting.pp9_run_id, Some(13));
+        assert_eq!(formatting.font_index, Some(65_535));
+        assert_eq!(formatting.asian_font_index, Some(65_534));
+        assert_eq!(formatting.ansi_font_index, Some(32_768));
+        assert_eq!(formatting.symbol_font_index, Some(60_000));
     }
 
     #[test]
