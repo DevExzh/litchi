@@ -75,6 +75,7 @@ pub mod current_user;
 pub mod escher_textbox;
 pub mod font;
 pub mod master_style;
+pub mod picture_bullets;
 pub mod text_extensions;
 pub mod text_prop;
 pub mod text_ruler;
@@ -102,6 +103,7 @@ pub use font::{
     EmbeddedPowerPointFont, PowerPointFont, PowerPointFontCollection, PowerPointFontCollections,
 };
 pub use master_style::{TextMasterStyle, TextMasterStyleLevel};
+pub use picture_bullets::{PictureBullet, PictureBulletCollection, PictureBulletType};
 pub use text_extensions::{
     TextCharacterExtension9, TextCharacterExtension10, TextDefaultsExtension9,
     TextDefaultsExtension10, TextMasterStyleExtension9, TextMasterStyleExtension9Level,

@@ -219,8 +219,22 @@ impl ImageExtractor {
         bse_record: &EscherRecord<'_>,
         delay_stream: Option<&[u8]>,
     ) -> Result<Blip<'static>> {
-        let is_in_delayed_stream = bse.is_delay_loaded() && bse_record.length <= 36;
-        let blip_data = if is_in_delayed_stream {
+        let embedded_offset = 36usize
+            .checked_add(usize::from(bse.name_len))
+            .ok_or_else(|| {
+                litchi_core::error::Error::ParseError("BSE name size overflow".into())
+            })?;
+        if embedded_offset > bse_record.data.len() {
+            return Err(litchi_core::error::Error::ParseError(
+                "BSE name extends beyond record data".into(),
+            ));
+        }
+        let blip_data = if bse_record.data.len() == embedded_offset {
+            if !bse.is_delay_loaded() {
+                return Err(litchi_core::error::Error::ParseError(
+                    "BSE has neither an embedded nor delay-loaded BLIP".into(),
+                ));
+            }
             let stream = delay_stream.ok_or_else(|| {
                 litchi_core::error::Error::ParseError(
                     "BSE record is delay-loaded but no data stream was provided".into(),
@@ -234,12 +248,7 @@ impl ImageExtractor {
             }
             &stream[offset..]
         } else {
-            if bse_record.data.len() <= 36 {
-                return Err(litchi_core::error::Error::ParseError(
-                    "BSE record data is too short for embedded BLIP".into(),
-                ));
-            }
-            &bse_record.data[36..]
+            &bse_record.data[embedded_offset..]
         };
 
         if blip_data.len() < 8 {
@@ -247,8 +256,21 @@ impl ImageExtractor {
                 "Insufficient data for BLIP".into(),
             ));
         }
+        let payload_length =
+            u32::from_le_bytes([blip_data[4], blip_data[5], blip_data[6], blip_data[7]]);
+        let record_length = usize::try_from(payload_length)
+            .ok()
+            .and_then(|length| 8usize.checked_add(length))
+            .ok_or_else(|| {
+                litchi_core::error::Error::ParseError("BLIP record size overflow".into())
+            })?;
+        if record_length > blip_data.len() || record_length as u64 != u64::from(bse.size) {
+            return Err(litchi_core::error::Error::ParseError(
+                "BSE size does not match its BLIP record".into(),
+            ));
+        }
 
-        Blip::parse(blip_data).map(|b| b.into_owned())
+        Blip::parse(&blip_data[..record_length]).map(|b| b.into_owned())
     }
 
     /// Extract image from a single Escher record
@@ -271,7 +293,7 @@ impl ImageExtractor {
     /// Extract image from a single Escher record with optional data stream.
     ///
     /// This method handles both BSE (0xF007) and BLIP type records directly.
-    /// For BSE records with delay-loaded BLIPs (offset != 0), the delay_stream
+    /// For BSE records with delay-loaded BLIPs, the `delay_stream`
     /// parameter must be provided to locate the BLIP data.
     ///
     /// # Arguments
@@ -415,6 +437,7 @@ impl ImageExtractor {
             (0xF01B, "wmf"),
             (0xF01C, "pict"),
             (0xF01D, "jpeg"),
+            (0xF02A, "jpeg"),
             (0xF01E, "png"),
             (0xF01F, "dib"),
             (0xF029, "tiff"),
@@ -708,7 +731,7 @@ mod tests {
     #[test]
     fn test_extracted_image_filename() {
         let blip_data = vec![
-            0x0A, 0x00, // version=0, instance=0
+            0xA0, 0x46, // version=0, instance=0x46A
             0x1D, 0xF0, // JPEG BLIP
             0x19, 0x00, 0x00, 0x00, // length = 25
             // UID (16 bytes)
@@ -730,5 +753,55 @@ mod tests {
             5,
         );
         assert_eq!(img_with_name.suggested_filename(), "photo.jpg");
+    }
+
+    fn png_blip() -> Vec<u8> {
+        let mut payload = vec![0; 16];
+        payload.push(0xff);
+        payload.extend_from_slice(&[1, 2, 3]);
+        let mut record = Vec::new();
+        record.extend_from_slice(&(0x6e0u16 << 4).to_le_bytes());
+        record.extend_from_slice(&0xf01eu16.to_le_bytes());
+        record.extend_from_slice(&(payload.len() as u32).to_le_bytes());
+        record.extend_from_slice(&payload);
+        record
+    }
+
+    fn fbse(blip: Option<&[u8]>, offset: u32, name: &[u8]) -> Vec<u8> {
+        let mut payload = vec![0x06, 0x06];
+        payload.extend_from_slice(&[0; 16]);
+        payload.extend_from_slice(&0xffu16.to_le_bytes());
+        payload.extend_from_slice(&(blip.map_or(28, <[u8]>::len) as u32).to_le_bytes());
+        payload.extend_from_slice(&1u32.to_le_bytes());
+        payload.extend_from_slice(&offset.to_le_bytes());
+        payload.push(0);
+        payload.push(name.len() as u8);
+        payload.extend_from_slice(&[0, 0]);
+        payload.extend_from_slice(name);
+        if let Some(blip) = blip {
+            payload.extend_from_slice(blip);
+        }
+        let mut record = Vec::new();
+        record.extend_from_slice(&0x62u16.to_le_bytes());
+        record.extend_from_slice(&0xf007u16.to_le_bytes());
+        record.extend_from_slice(&(payload.len() as u32).to_le_bytes());
+        record.extend_from_slice(&payload);
+        record
+    }
+
+    #[test]
+    fn extracts_named_embedded_and_offset_zero_bse_blips() {
+        let blip = png_blip();
+        let embedded = fbse(Some(&blip), u32::MAX, &[b'A', 0, 0, 0]);
+        let (record, _) = EscherRecord::parse(&embedded, 0).unwrap();
+        let image = ImageExtractor::extract_from_escher_record(&record).unwrap();
+        assert_eq!(image.name.as_deref(), Some("A"));
+        assert_eq!(image.blip.picture_data(), [1, 2, 3]);
+
+        let delayed = fbse(None, 0, &[]);
+        let (record, _) = EscherRecord::parse(&delayed, 0).unwrap();
+        let image =
+            ImageExtractor::extract_from_escher_record_with_stream(&record, Some(&blip)).unwrap();
+        assert_eq!(image.blip.picture_data(), [1, 2, 3]);
     }
 }

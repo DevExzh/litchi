@@ -39,7 +39,7 @@ impl BlipType {
             0xF01A => Some(Self::Emf),
             0xF01B => Some(Self::Wmf),
             0xF01C => Some(Self::Pict),
-            0xF01D => Some(Self::Jpeg),
+            0xF01D | 0xF02A => Some(Self::Jpeg),
             0xF01E => Some(Self::Png),
             0xF01F => Some(Self::Dib),
             0xF029 => Some(Self::Tiff),
@@ -171,8 +171,17 @@ impl<'data> MetafileBlip<'data> {
         offset += 16;
 
         // Check if secondary UID is present
-        let signature = Self::get_signature(header.record_type);
-        let has_secondary = (header.options() ^ signature) == 0x10;
+        let signature = Self::get_signature(header.record_type)
+            .ok_or_else(|| Error::ParseError("Record is not a metafile BLIP".into()))?;
+        let has_secondary = if header.instance == signature {
+            false
+        } else if header.instance == signature + 1 {
+            true
+        } else {
+            return Err(Error::ParseError(
+                "Invalid metafile BLIP record instance".into(),
+            ));
+        };
         let secondary_uid = if has_secondary {
             if offset + 16 > data.len() {
                 return Err(litchi_core::error::Error::ParseError(
@@ -219,9 +228,17 @@ impl<'data> MetafileBlip<'data> {
         let pic_data_len = compressed_size as usize;
         let available_data = data.len() - offset;
 
-        // If compressed_size is larger than available data, use what we have
-        let actual_pic_data_len = pic_data_len.min(available_data);
-        let picture_data = Cow::Borrowed(&data[offset..offset + actual_pic_data_len]);
+        if pic_data_len != available_data {
+            return Err(Error::ParseError(
+                "Metafile BLIP compressed size does not match its record".into(),
+            ));
+        }
+        if !matches!(compression, 0x00 | 0xfe) || filter != 0xfe {
+            return Err(Error::ParseError(
+                "Metafile BLIP has invalid compression metadata".into(),
+            ));
+        }
+        let picture_data = Cow::Borrowed(&data[offset..]);
 
         Ok(Self {
             header,
@@ -238,12 +255,12 @@ impl<'data> MetafileBlip<'data> {
     }
 
     /// Get the signature for a given record type
-    fn get_signature(record_type: u16) -> u16 {
+    fn get_signature(record_type: u16) -> Option<u16> {
         match record_type {
-            0xF01A => 0x3D4, // EMF
-            0xF01B => 0x216, // WMF
-            0xF01C => 0x542, // PICT
-            _ => 0,
+            0xF01A => Some(0x3D4), // EMF
+            0xF01B => Some(0x216), // WMF
+            0xF01C => Some(0x542), // PICT
+            _ => None,
         }
     }
 
@@ -375,6 +392,8 @@ pub struct BitmapBlip<'data> {
     pub header: RecordHeader,
     /// Primary UID (16 bytes MD4/MD5 hash)
     pub uid: [u8; 16],
+    /// Secondary UID, present for the two-UID record instances.
+    pub secondary_uid: Option<[u8; 16]>,
     /// Marker byte (0xFF for external files)
     pub marker: u8,
     /// Picture data (already in the target format) - uses Cow for zero-copy when possible
@@ -403,6 +422,57 @@ impl<'data> BitmapBlip<'data> {
         uid.copy_from_slice(&data[offset..offset + 16]);
         offset += 16;
 
+        let has_secondary_uid = match header.record_type {
+            0xF01D | 0xF02A => match header.instance {
+                0x46A | 0x6E2 => false,
+                0x46B | 0x6E3 => true,
+                _ => {
+                    return Err(Error::ParseError(
+                        "Invalid JPEG BLIP record instance".into(),
+                    ));
+                },
+            },
+            0xF01E => match header.instance {
+                0x6E0 => false,
+                0x6E1 => true,
+                _ => {
+                    return Err(Error::ParseError("Invalid PNG BLIP record instance".into()));
+                },
+            },
+            0xF01F => match header.instance {
+                0x7A8 => false,
+                0x7A9 => true,
+                _ => {
+                    return Err(Error::ParseError("Invalid DIB BLIP record instance".into()));
+                },
+            },
+            0xF029 => match header.instance {
+                0x6E4 => false,
+                0x6E5 => true,
+                _ => {
+                    return Err(Error::ParseError(
+                        "Invalid TIFF BLIP record instance".into(),
+                    ));
+                },
+            },
+            _ => {
+                return Err(Error::ParseError("Record is not a bitmap BLIP".into()));
+            },
+        };
+        let secondary_uid = if has_secondary_uid {
+            if offset + 16 > data.len() {
+                return Err(Error::ParseError(
+                    "Insufficient data for secondary UID".into(),
+                ));
+            }
+            let mut secondary = [0; 16];
+            secondary.copy_from_slice(&data[offset..offset + 16]);
+            offset += 16;
+            Some(secondary)
+        } else {
+            None
+        };
+
         // Parse marker
         if offset >= data.len() {
             return Err(litchi_core::error::Error::ParseError(
@@ -418,6 +488,7 @@ impl<'data> BitmapBlip<'data> {
         Ok(Self {
             header,
             uid,
+            secondary_uid,
             marker,
             picture_data,
         })
@@ -463,6 +534,16 @@ impl<'data> Blip<'data> {
         }
 
         let header = RecordHeader::parse(data)?;
+        if header.version != 0
+            || usize::try_from(header.length)
+                .ok()
+                .and_then(|length| 8usize.checked_add(length))
+                != Some(data.len())
+        {
+            return Err(Error::ParseError(
+                "BLIP record has an invalid version or length".into(),
+            ));
+        }
         let blip_type = BlipType::from_record_id(header.record_type).ok_or_else(|| {
             litchi_core::error::Error::ParseError(format!(
                 "Unknown BLIP record type: 0x{:04X}",
@@ -528,6 +609,7 @@ impl<'data> Blip<'data> {
             Self::Bitmap(b) => Blip::Bitmap(BitmapBlip {
                 header: b.header,
                 uid: b.uid,
+                secondary_uid: b.secondary_uid,
                 marker: b.marker,
                 picture_data: Cow::Owned(b.picture_data.into_owned()),
             }),
@@ -573,5 +655,47 @@ mod tests {
     fn test_blip_type_extension() {
         assert_eq!(BlipType::Emf.extension(), "emf");
         assert_eq!(BlipType::Png.extension(), "png");
+    }
+
+    fn bitmap_record(record_type: u16, instance: u16, secondary_uid: bool) -> Vec<u8> {
+        let mut payload = vec![1; 16];
+        if secondary_uid {
+            payload.extend_from_slice(&[2; 16]);
+        }
+        payload.push(0xff);
+        payload.extend_from_slice(&[3, 4, 5]);
+        let mut record = Vec::new();
+        record.extend_from_slice(&(instance << 4).to_le_bytes());
+        record.extend_from_slice(&record_type.to_le_bytes());
+        record.extend_from_slice(&(payload.len() as u32).to_le_bytes());
+        record.extend_from_slice(&payload);
+        record
+    }
+
+    #[test]
+    fn parses_two_uid_and_alternate_jpeg_blips() {
+        let png_record = bitmap_record(0xf01e, 0x6e1, true);
+        let png = Blip::parse(&png_record).unwrap();
+        let Blip::Bitmap(png) = png else {
+            panic!("expected bitmap BLIP");
+        };
+        assert_eq!(png.secondary_uid, Some([2; 16]));
+        assert_eq!(png.picture_data.as_ref(), [3, 4, 5]);
+
+        let jpeg_record = bitmap_record(0xf02a, 0x46a, false);
+        let jpeg = Blip::parse(&jpeg_record).unwrap();
+        assert_eq!(jpeg.blip_type(), Some(BlipType::Jpeg));
+    }
+
+    #[test]
+    fn rejects_invalid_bitmap_framing() {
+        let mut invalid_instance = bitmap_record(0xf01e, 0x6e0, false);
+        invalid_instance[0] = 0;
+        invalid_instance[1] = 0;
+        assert!(Blip::parse(&invalid_instance).is_err());
+
+        let mut invalid_length = bitmap_record(0xf01e, 0x6e0, false);
+        invalid_length.push(0);
+        assert!(Blip::parse(&invalid_length).is_err());
     }
 }

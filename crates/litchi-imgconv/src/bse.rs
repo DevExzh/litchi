@@ -5,8 +5,8 @@
 // about embedded images.
 //
 // References:
-// - [MS-ODRAW] 2.2.32: OfficeArtBStoreContainerFileBlock
-// - [MS-ODRAW] 2.2.33: OfficeArtBSE
+// - [MS-ODRAW] 2.2.22: OfficeArtBStoreContainerFileBlock
+// - [MS-ODRAW] 2.2.32: OfficeArtFBSE
 
 use crate::BlipType;
 use litchi_core::binary::read_u32_le;
@@ -23,7 +23,7 @@ use std::borrow::Cow;
 /// - Offset to the actual BLIP data (for delay-loaded BLIPs)
 #[derive(Debug, Clone)]
 pub struct BlipStoreEntry<'data> {
-    /// BLIP type indicator (matches Windows BITMAPINFO values)
+    /// Windows persistence type from the `MSOBLIPTYPE` enumeration.
     pub blip_type_win32: u8,
     /// BLIP type
     pub blip_type: BlipType,
@@ -99,7 +99,7 @@ impl<'data> BlipStoreEntry<'data> {
         }
 
         let blip_type_win32 = data[0];
-        let _blip_type_macos = data[1]; // Usually same as Windows type
+        let _blip_type_macos = data[1];
 
         // Parse UID
         let mut uid = [0u8; 16];
@@ -139,19 +139,13 @@ impl<'data> BlipStoreEntry<'data> {
                 .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
                 .collect();
 
-            match String::from_utf16(&utf16_chars) {
-                Ok(s) => Some(Cow::Owned(s)),
-                Err(_) => {
-                    // Fallback: treat as Latin1
-                    Some(Cow::Owned(
-                        name_bytes
-                            .iter()
-                            .filter(|&&b| b != 0)
-                            .map(|&b| b as char)
-                            .collect(),
-                    ))
-                },
+            if utf16_chars.last() != Some(&0) {
+                return Err(Error::ParseError("BSE name is not null-terminated".into()));
             }
+            Some(Cow::Owned(
+                String::from_utf16(&utf16_chars[..utf16_chars.len() - 1])
+                    .map_err(|_| Error::ParseError("Invalid UTF-16 BSE name".into()))?,
+            ))
         } else {
             None
         };
@@ -180,14 +174,13 @@ impl<'data> BlipStoreEntry<'data> {
     /// Based on MS-ODRAW specification
     fn map_windows_blip_type(win32_type: u8) -> Result<BlipType> {
         match win32_type {
-            0x00 => Err(Error::ParseError("Unknown BLIP type".into())),
-            0x01 => Ok(BlipType::Wmf),  // BI_WMF
-            0x02 => Ok(BlipType::Emf),  // BI_EMF
-            0x03 => Ok(BlipType::Pict), // BI_PICT
-            0x04 => Ok(BlipType::Jpeg), // BI_JPEG
-            0x05 => Ok(BlipType::Png),  // BI_PNG
-            0x06 => Ok(BlipType::Dib),  // BI_DIB
-            0x07 => Ok(BlipType::Tiff), // BI_TIFF
+            0x02 => Ok(BlipType::Emf),
+            0x03 => Ok(BlipType::Wmf),
+            0x04 => Ok(BlipType::Pict),
+            0x05 | 0x12 => Ok(BlipType::Jpeg),
+            0x06 => Ok(BlipType::Png),
+            0x07 => Ok(BlipType::Dib),
+            0x11 => Ok(BlipType::Tiff),
             _ => Err(Error::ParseError(format!(
                 "Unsupported BLIP type: 0x{:02X}",
                 win32_type
@@ -200,12 +193,12 @@ impl<'data> BlipStoreEntry<'data> {
         self.blip_type as u16
     }
 
-    /// Check if this BSE has delay-loaded BLIP data
+    /// Check whether `foDelay` identifies a position in the delay stream.
     ///
-    /// When offset is non-zero, the BLIP data is stored separately
-    /// and must be loaded from the specified offset.
+    /// `0xFFFF_FFFF` is the sentinel for no delay-stream position. Offset zero
+    /// is valid and identifies the first record in the stream.
     pub const fn is_delay_loaded(&self) -> bool {
-        self.offset != 0
+        self.offset != u32::MAX
     }
 }
 
@@ -290,12 +283,20 @@ mod tests {
             BlipType::Emf
         );
         assert_eq!(
-            BlipStoreEntry::map_windows_blip_type(0x04).unwrap(),
-            BlipType::Jpeg
+            BlipStoreEntry::map_windows_blip_type(0x03).unwrap(),
+            BlipType::Wmf
         );
         assert_eq!(
             BlipStoreEntry::map_windows_blip_type(0x05).unwrap(),
+            BlipType::Jpeg
+        );
+        assert_eq!(
+            BlipStoreEntry::map_windows_blip_type(0x06).unwrap(),
             BlipType::Png
+        );
+        assert_eq!(
+            BlipStoreEntry::map_windows_blip_type(0x11).unwrap(),
+            BlipType::Tiff
         );
     }
 
@@ -310,7 +311,7 @@ mod tests {
             0x0F, 0x10, 0xFF, 0x00, // tag
             0x00, 0x10, 0x00, 0x00, // size = 4096
             0x01, 0x00, 0x00, 0x00, // ref_count = 1
-            0x00, 0x00, 0x00, 0x00, // offset = 0
+            0xFF, 0xFF, 0xFF, 0xFF, // no delay-stream offset
             0x00, // usage
             0x00, // name_len = 0
             0x00, // unused2

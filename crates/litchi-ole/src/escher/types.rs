@@ -156,7 +156,7 @@ impl From<u16> for EscherRecordType {
             0xF01A => Self::BlipEmf,
             0xF01B => Self::BlipWmf,
             0xF01C => Self::BlipPict,
-            0xF01D => Self::BlipJpeg,
+            0xF01D | 0xF02A => Self::BlipJpeg,
             0xF01E => Self::BlipPng,
             0xF01F => Self::BlipDib,
             0xF029 => Self::BlipTiff,

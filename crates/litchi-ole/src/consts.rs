@@ -33,6 +33,10 @@ pub enum PptRecordType {
     FontCollection = 2005,
     /// PowerPoint 10 international font collection container
     FontCollection10 = 2006,
+    /// PowerPoint 9 picture-bullet collection container
+    BlipCollection9 = 2040,
+    /// PowerPoint 9 picture-bullet atom
+    BlipEntity9Atom = 2041,
     /// Slide persist atom record
     SlidePersistAtom = 1011,
     /// Main master record
@@ -253,6 +257,8 @@ impl From<u16> for PptRecordType {
             1010 => PptRecordType::Environment,
             2005 => PptRecordType::FontCollection,
             2006 => PptRecordType::FontCollection10,
+            2040 => PptRecordType::BlipCollection9,
+            2041 => PptRecordType::BlipEntity9Atom,
             1011 => PptRecordType::SlidePersistAtom,
             1016 => PptRecordType::MainMaster,
             1017 => PptRecordType::SSSlideInfoAtom,

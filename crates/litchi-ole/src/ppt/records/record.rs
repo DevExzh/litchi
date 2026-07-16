@@ -128,6 +128,7 @@ impl PptRecord {
                 | PptRecordType::Environment
                 | PptRecordType::FontCollection
                 | PptRecordType::FontCollection10
+                | PptRecordType::BlipCollection9
                 | PptRecordType::InteractiveInfo
                 | PptRecordType::AnimationInfo
                 | PptRecordType::ProgTags
