@@ -1,7 +1,12 @@
-/// Auto shape implementation.
-///
-/// Auto shapes are predefined shapes like rectangles, ovals, arrows, etc.
-/// that can be used as building blocks for more complex graphics in PowerPoint.
+//! Auto shape implementation.
+//!
+//! Auto shapes are predefined shapes like rectangles, ovals, arrows, etc.
+//! that can be used as building blocks for more complex graphics in PowerPoint.
+
+use super::geometry::{
+    GeometryRect, ShapePathType, extract_geometry_rect, extract_segment_info, extract_shape_path,
+    extract_vertices,
+};
 use super::shape::{Shape, ShapeContainer, ShapeProperties};
 
 /// Types of auto shapes available in PowerPoint.
@@ -119,6 +124,66 @@ pub struct AutoShape<'a> {
     auto_shape_type: AutoShapeType,
     /// Adjustment values for shape parameters (for complex shapes)
     adjustments: Vec<i32>,
+    /// Explicit custom/freeform geometry, when present.
+    geometry: Option<AutoShapeGeometry>,
+}
+
+/// Owned OfficeArt geometry for a custom or freeform shape.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AutoShapeGeometry {
+    coordinate_space: Option<GeometryRect>,
+    path_type: Option<ShapePathType>,
+    vertices: Vec<(i32, i32)>,
+    segment_info: Vec<u16>,
+}
+
+impl AutoShapeGeometry {
+    fn from_properties(props: &super::super::escher::EscherProperties<'_>) -> Option<Self> {
+        let coordinate_space = extract_geometry_rect(props);
+        let path_type = extract_shape_path(props);
+        let vertices: Vec<(i32, i32)> = extract_vertices(props)
+            .map(|vertices| vertices.iter().collect())
+            .unwrap_or_default();
+        let segment_info: Vec<u16> = extract_segment_info(props)
+            .map(|segments| {
+                segments
+                    .chunks_exact(2)
+                    .map(|segment| u16::from_le_bytes([segment[0], segment[1]]))
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        (coordinate_space.is_some()
+            || path_type.is_some()
+            || !vertices.is_empty()
+            || !segment_info.is_empty())
+        .then_some(Self {
+            coordinate_space,
+            path_type,
+            vertices,
+            segment_info,
+        })
+    }
+
+    /// Return the shape's internal geometry coordinate space.
+    pub fn coordinate_space(&self) -> Option<GeometryRect> {
+        self.coordinate_space
+    }
+
+    /// Return the high-level path connectivity mode.
+    pub fn path_type(&self) -> Option<ShapePathType> {
+        self.path_type
+    }
+
+    /// Return the freeform vertices in geometry-space units.
+    pub fn vertices(&self) -> &[(i32, i32)] {
+        &self.vertices
+    }
+
+    /// Return raw MSOPATHINFO words in document order.
+    pub fn segment_info(&self) -> &[u16] {
+        &self.segment_info
+    }
 }
 
 impl<'a> AutoShape<'a> {
@@ -128,6 +193,7 @@ impl<'a> AutoShape<'a> {
             container: ShapeContainer::new(properties, raw_data),
             auto_shape_type: AutoShapeType::Rectangle, // Default
             adjustments: Vec::new(),
+            geometry: None,
         }
     }
 
@@ -142,6 +208,7 @@ impl<'a> AutoShape<'a> {
             shape.auto_shape_type = AutoShapeType::from(native_shape_type);
         }
         shape.adjustments = Self::extract_adjustments_from_properties(escher_properties);
+        shape.geometry = AutoShapeGeometry::from_properties(escher_properties);
         shape
     }
 
@@ -152,11 +219,13 @@ impl<'a> AutoShape<'a> {
 
         // Extract adjustment values if available
         let adjustments = Self::extract_adjustments(&container.raw_data);
+        let geometry = Self::extract_geometry(&container.raw_data);
 
         Self {
             container,
             auto_shape_type,
             adjustments,
+            geometry,
         }
     }
 
@@ -197,6 +266,12 @@ impl<'a> AutoShape<'a> {
         };
         let properties = super::super::escher::EscherProperties::from_opt_record(&opt);
         Self::extract_adjustments_from_properties(&properties)
+    }
+
+    fn extract_geometry(raw_data: &[u8]) -> Option<AutoShapeGeometry> {
+        let opt = Self::find_escher_record(raw_data, super::super::escher::EscherRecordType::Opt)?;
+        let properties = super::super::escher::EscherProperties::from_opt_record(&opt);
+        AutoShapeGeometry::from_properties(&properties)
     }
 
     fn find_escher_record<'data>(
@@ -317,6 +392,11 @@ impl<'a> AutoShape<'a> {
     /// Set the text contained by this shape.
     pub fn set_text(&mut self, text: String) {
         self.container.set_text(text);
+    }
+
+    /// Return explicit custom/freeform geometry, when the shape defines it.
+    pub fn geometry(&self) -> Option<&AutoShapeGeometry> {
+        self.geometry.as_ref()
     }
 
     /// Check if this is a basic geometric shape (rectangle, oval, etc.).

@@ -108,12 +108,16 @@ pub fn extract_geometry_rect<'data>(props: &EscherProperties<'data>) -> Option<G
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
 pub enum ShapePathType {
-    /// Lines only, no curves
-    LinesOnly = 0,
-    /// Lines and curves
-    LinesCurves = 1,
-    /// Closed path
-    Closed = 2,
+    /// Open path made from line segments.
+    Lines = 0,
+    /// Closed path made from line segments.
+    LinesClosed = 1,
+    /// Open path containing curves.
+    Curves = 2,
+    /// Closed path containing curves.
+    CurvesClosed = 3,
+    /// Path connectivity is defined by the segment-info array.
+    Complex = 4,
     /// Unknown path type
     Unknown = 0xFFFFFFFF,
 }
@@ -121,9 +125,11 @@ pub enum ShapePathType {
 impl From<i32> for ShapePathType {
     fn from(value: i32) -> Self {
         match value as u32 {
-            0 => Self::LinesOnly,
-            1 => Self::LinesCurves,
-            2 => Self::Closed,
+            0 => Self::Lines,
+            1 => Self::LinesClosed,
+            2 => Self::Curves,
+            3 => Self::CurvesClosed,
+            4 => Self::Complex,
             _ => Self::Unknown,
         }
     }
@@ -166,6 +172,7 @@ pub struct VertexData<'data> {
     data: &'data [u8],
     /// Number of vertices
     count: usize,
+    element_size: usize,
 }
 
 impl<'data> VertexData<'data> {
@@ -187,6 +194,30 @@ impl<'data> VertexData<'data> {
         Some(Self {
             data,
             count: data.len() / 8,
+            element_size: 8,
+        })
+    }
+
+    /// Create vertex data from an OfficeArt IMsoArray.
+    ///
+    /// Besides full 8-byte POINT records, OfficeArt permits `cbElem =
+    /// 0xFFF0`, which stores each point as two signed 16-bit coordinates.
+    #[inline]
+    pub fn from_array(array: &super::super::escher::EscherArrayProperty<'data>) -> Option<Self> {
+        let element_size = array.element_size();
+        if !matches!(element_size, 4 | 8) {
+            return None;
+        }
+        let data = array.raw_data().get(6..)?;
+        let count = usize::from(array.element_count());
+        let required = count.checked_mul(element_size)?;
+        if data.len() < required {
+            return None;
+        }
+        Some(Self {
+            data: &data[..required],
+            count,
+            element_size,
         })
     }
 
@@ -216,19 +247,24 @@ impl<'data> VertexData<'data> {
             return None;
         }
 
-        let offset = index * 8;
-        let x = i32::from_le_bytes([
-            self.data[offset],
-            self.data[offset + 1],
-            self.data[offset + 2],
-            self.data[offset + 3],
-        ]);
-        let y = i32::from_le_bytes([
-            self.data[offset + 4],
-            self.data[offset + 5],
-            self.data[offset + 6],
-            self.data[offset + 7],
-        ]);
+        let offset = index.checked_mul(self.element_size)?;
+        let (x, y) = if self.element_size == 4 {
+            (
+                i32::from(i16::from_le_bytes([
+                    self.data[offset],
+                    self.data[offset + 1],
+                ])),
+                i32::from(i16::from_le_bytes([
+                    self.data[offset + 2],
+                    self.data[offset + 3],
+                ])),
+            )
+        } else {
+            (
+                i32::from_le_bytes(self.data[offset..offset + 4].try_into().ok()?),
+                i32::from_le_bytes(self.data[offset + 4..offset + 8].try_into().ok()?),
+            )
+        };
 
         Some((x, y))
     }
@@ -276,17 +312,10 @@ impl<'data> VertexData<'data> {
 pub fn extract_vertices<'data>(props: &EscherProperties<'data>) -> Option<VertexData<'data>> {
     // Try to get vertices as array property
     if let Some(array) = props.get_array(EscherPropertyId::Vertices) {
-        // Convert array elements to vertex data
-        // Each element should be 8 bytes (x, y coordinates)
-        let element_size = array.element_size();
-
-        if element_size == 8 {
-            // Get the raw data directly (zero-copy)
-            let raw_data = array.raw_data();
-            if raw_data.len() >= 6 {
-                // Skip the 6-byte header, get element data
-                return VertexData::new(&raw_data[6..]);
-            }
+        // POINT elements can be full 8-byte coordinates or truncated
+        // 4-byte pairs of signed 16-bit coordinates.
+        if let Some(vertices) = VertexData::from_array(array) {
+            return Some(vertices);
         }
     }
 
@@ -315,6 +344,11 @@ pub fn extract_vertices<'data>(props: &EscherProperties<'data>) -> Option<Vertex
 /// - Single property lookup
 #[inline]
 pub fn extract_segment_info<'data>(props: &EscherProperties<'data>) -> Option<&'data [u8]> {
+    if let Some(array) = props.get_array(EscherPropertyId::SegmentInfo) {
+        let data = array.raw_data().get(6..)?;
+        let required = usize::from(array.element_count()).checked_mul(array.element_size())?;
+        return data.get(..required);
+    }
     props.get_binary(EscherPropertyId::SegmentInfo)
 }
 
@@ -371,9 +405,26 @@ mod tests {
 
     #[test]
     fn test_shape_path_type_conversion() {
-        assert_eq!(ShapePathType::from(0), ShapePathType::LinesOnly);
-        assert_eq!(ShapePathType::from(1), ShapePathType::LinesCurves);
-        assert_eq!(ShapePathType::from(2), ShapePathType::Closed);
+        assert_eq!(ShapePathType::from(0), ShapePathType::Lines);
+        assert_eq!(ShapePathType::from(1), ShapePathType::LinesClosed);
+        assert_eq!(ShapePathType::from(2), ShapePathType::Curves);
+        assert_eq!(ShapePathType::from(3), ShapePathType::CurvesClosed);
+        assert_eq!(ShapePathType::from(4), ShapePathType::Complex);
         assert_eq!(ShapePathType::from(99), ShapePathType::Unknown);
+    }
+
+    #[test]
+    fn test_truncated_vertex_array_uses_signed_16_bit_coordinates() {
+        let data = [
+            2, 0, 2, 0, 0xF0, 0xFF, // IMsoArray header
+            10, 0, 20, 0, // (10, 20)
+            0xE2, 0xFF, 40, 0, // (-30, 40)
+        ];
+        let array = super::super::super::escher::EscherArrayProperty::new(&data).unwrap();
+        let vertices = VertexData::from_array(&array).unwrap();
+
+        assert_eq!(vertices.count(), 2);
+        assert_eq!(vertices.get(0), Some((10, 20)));
+        assert_eq!(vertices.get(1), Some((-30, 40)));
     }
 }

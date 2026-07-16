@@ -817,7 +817,18 @@ mod tests {
             vertices.extend_from_slice(&y.to_le_bytes());
         }
         let mut properties = PropertyBuilder::new();
+        properties.add_simple(0x0140, 0);
+        properties.add_simple(0x0141, 0);
+        properties.add_simple(0x0142, 21600);
+        properties.add_simple(0x0143, 21600);
+        properties.add_simple(0x0144, 4);
         properties.add_complex(0x0145, &vertices);
+        let segments = [
+            2, 0, 2, 0, 2, 0, // IMsoArray header
+            0x00, 0x40, // moveTo
+            0x00, 0x80, // end
+        ];
+        properties.add_complex(0x0146, &segments);
         properties.write(&mut shape_children).unwrap();
         write_client_anchor(&mut shape_children, 5, 6, 105, 206).unwrap();
 
@@ -1378,7 +1389,11 @@ mod tests {
 
     #[test]
     fn non_primitive_shape_with_vertices_is_exposed_as_freeform_autoshape() {
-        use crate::ppt::shapes::{Shape, autoshape::AutoShapeType};
+        use crate::ppt::shapes::{
+            Shape,
+            autoshape::AutoShapeType,
+            geometry::{GeometryRect, ShapePathType},
+        };
 
         let doc_data = vec![0u8; 32];
         let ppdrawing = create_test_record(
@@ -1395,6 +1410,14 @@ mod tests {
         assert_eq!(freeform.auto_shape_type(), AutoShapeType::Custom(0));
         assert_eq!(freeform.properties().id, 45);
         assert_eq!(freeform.bounds(), (5, 6, 100, 200));
+        let geometry = freeform.geometry().expect("freeform geometry");
+        assert_eq!(
+            geometry.coordinate_space(),
+            Some(GeometryRect::new(0, 0, 21600, 21600))
+        );
+        assert_eq!(geometry.path_type(), Some(ShapePathType::Complex));
+        assert_eq!(geometry.vertices(), &[(0, 0), (21600, 21600)]);
+        assert_eq!(geometry.segment_info(), &[0x4000, 0x8000]);
     }
 
     #[test]
