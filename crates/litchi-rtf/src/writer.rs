@@ -895,12 +895,18 @@ impl<W: Write> RtfWriter<W> {
             || info.category.is_some()
             || info.keywords.is_some()
             || info.comment.is_some()
+            || info.document_comment.is_some()
+            || info.hyperlink_base.is_some()
             || info.version.is_some()
             || info.revision.is_some()
             || info.creation_time.is_some()
             || info.revision_time.is_some()
             || info.print_time.is_some()
             || info.backup_time.is_some()
+            || info.creation_timestamp.is_some()
+            || info.revision_timestamp.is_some()
+            || info.print_timestamp.is_some()
+            || info.backup_timestamp.is_some()
             || info.editing_time.is_some()
             || info.pages.is_some()
             || info.words.is_some()
@@ -910,6 +916,8 @@ impl<W: Write> RtfWriter<W> {
         if !has_info {
             return Ok(());
         }
+        info.validate()
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
 
         self.write_str("{")?;
         self.write_control_word("info", None)?;
@@ -922,18 +930,20 @@ impl<W: Write> RtfWriter<W> {
         self.write_info_text("category", info.category.as_deref())?;
         self.write_info_text("keywords", info.keywords.as_deref())?;
         self.write_info_text("comment", info.comment.as_deref())?;
-        self.write_info_time("creatim", info.creation_time.as_deref())?;
-        self.write_info_time("revtim", info.revision_time.as_deref())?;
-        self.write_info_time("printim", info.print_time.as_deref())?;
-        self.write_info_time("buptim", info.backup_time.as_deref())?;
-        self.write_optional_i32("version", info.version)?;
-        self.write_optional_i32("vern", info.revision)?;
-        self.write_optional_i32("edmins", info.editing_time)?;
-        self.write_optional_i32("nofpages", info.pages)?;
-        self.write_optional_i32("nofwords", info.words)?;
-        self.write_optional_i32("nofchars", info.characters)?;
-        self.write_optional_i32("nofcharsws", info.characters_with_spaces)?;
-        self.write_optional_i32("id", info.id)?;
+        self.write_info_text("doccomm", info.document_comment.as_deref())?;
+        self.write_info_text("hlinkbase", info.hyperlink_base.as_deref())?;
+        self.write_info_time("creatim", info.creation_timestamp, info.creation_time.as_deref())?;
+        self.write_info_time("revtim", info.revision_timestamp, info.revision_time.as_deref())?;
+        self.write_info_time("printim", info.print_timestamp, info.print_time.as_deref())?;
+        self.write_info_time("buptim", info.backup_timestamp, info.backup_time.as_deref())?;
+        self.write_optional_u32("version", info.version)?;
+        self.write_optional_u32("vern", info.revision)?;
+        self.write_optional_u32("edmins", info.editing_time)?;
+        self.write_optional_u32("nofpages", info.pages)?;
+        self.write_optional_u32("nofwords", info.words)?;
+        self.write_optional_u32("nofchars", info.characters)?;
+        self.write_optional_u32("nofcharsws", info.characters_with_spaces)?;
+        self.write_optional_u32("id", info.id)?;
         self.write_str("}")
     }
 
@@ -942,44 +952,37 @@ impl<W: Write> RtfWriter<W> {
         self.write_str("{")?;
         self.write_control_word(control, None)?;
         self.write_str(" ")?;
-        self.write_text(value)?;
+        self.write_destination_text(value)?;
         self.write_str("}")
     }
 
-    fn write_info_time(&mut self, control: &str, value: Option<&str>) -> io::Result<()> {
-        let Some(value) = value else { return Ok(()) };
-        let (date, time) = value.split_once('T').ok_or_else(|| {
-            io::Error::new(io::ErrorKind::InvalidInput, "RTF info time must contain T")
-        })?;
-        let date: Vec<i32> = date
-            .split('-')
-            .map(|part| part.parse())
-            .collect::<Result<_, _>>()
-            .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid RTF info date"))?;
-        let time: Vec<i32> = time
-            .split(':')
-            .map(|part| part.parse())
-            .collect::<Result<_, _>>()
-            .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid RTF info time"))?;
-        if date.len() != 3 || time.len() != 3 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "RTF info time must use YYYY-MM-DDTHH:MM:SS",
-            ));
-        }
+    fn write_info_time(&mut self, control: &str, typed: Option<RtfTimestamp>, legacy: Option<&str>) -> io::Result<()> {
+        let timestamp = match (typed, legacy) {
+            (Some(value), _) => value,
+            (None, Some(value)) => RtfTimestamp::from_legacy(value)
+                .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?,
+            (None, None) => return Ok(()),
+        };
         self.write_str("{")?;
         self.write_control_word(control, None)?;
         for (name, value) in [
-            ("yr", date[0]),
-            ("mo", date[1]),
-            ("dy", date[2]),
-            ("hr", time[0]),
-            ("min", time[1]),
-            ("sec", time[2]),
+            ("yr", timestamp.year.map(i32::from)),
+            ("mo", timestamp.month.map(i32::from)),
+            ("dy", timestamp.day.map(i32::from)),
+            ("hr", timestamp.hour.map(i32::from)),
+            ("min", timestamp.minute.map(i32::from)),
+            ("sec", timestamp.second.map(i32::from)),
         ] {
-            self.write_control_word(name, Some(value))?;
+            if let Some(value) = value { self.write_control_word(name, Some(value))?; }
         }
         self.write_str("}")
+    }
+
+    fn write_optional_u32(&mut self, control: &str, value: Option<u32>) -> io::Result<()> {
+        if let Some(value) = value {
+            self.write_control_word(control, Some(value as i32))?;
+        }
+        Ok(())
     }
 
     fn write_optional_i32(&mut self, control: &str, value: Option<i32>) -> io::Result<()> {

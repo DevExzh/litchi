@@ -95,6 +95,7 @@ mod source;
 mod spreadsheet;
 mod structure;
 mod style_protection;
+mod table_template;
 mod tracked_changes;
 
 pub use annotation::{AnnotationElement, AnnotationNode, CellAnnotation};
@@ -146,6 +147,7 @@ pub use structure::{
     TableStructure, TableVisibility,
 };
 pub use style_protection::{ConditionalCellStyle, ConditionalCellStyleRule, CellStyleProtection};
+pub use table_template::{TableTemplate, TableTemplateAxis, TableTemplateStyle};
 pub use tracked_changes::{
     SpreadsheetCellContentChange, SpreadsheetChangeAcceptance, SpreadsheetChangeCutOff,
     SpreadsheetChangeDimension, SpreadsheetChangeInfo, SpreadsheetChangeMetadata,

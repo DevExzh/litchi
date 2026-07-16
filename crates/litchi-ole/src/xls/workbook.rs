@@ -890,6 +890,14 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             .and_then(|font| self.palette.color(font.color_index()))
     }
 
+    /// Resolves the global Font record referenced by an XF record.
+    pub fn extended_format_font(
+        &self,
+        format: &crate::xls::number_format::XlsExtendedFormat,
+    ) -> Option<&crate::xls::font::XlsFont> {
+        self.font(format.font_index())
+    }
+
     /// Rich-text and phonetic properties for a shared-string index.
     ///
     /// Returns `None` for an out-of-range index and for an ordinary string

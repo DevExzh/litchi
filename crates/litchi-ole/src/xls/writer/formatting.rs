@@ -295,14 +295,30 @@ impl Default for CellStyle {
 /// * `writer` - Output writer
 /// * `font` - Font definition
 pub fn write_font<W: Write>(writer: &mut W, font: &Font) -> XlsResult<()> {
-    let name_bytes = font.name.as_bytes();
-    let name_len = name_bytes.len().min(255);
+    let mut name_end = 0;
+    let mut name_len = 0;
+    for (offset, character) in font.name.char_indices() {
+        let character_len = character.len_utf16();
+        if name_len + character_len > 31 {
+            break;
+        }
+        name_len += character_len;
+        name_end = offset + character.len_utf8();
+    }
+    if name_len == 0 {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "BIFF8 font name must contain 1..=31 UTF-16 code units",
+        )
+        .into());
+    }
+    let name = &font.name[..name_end];
 
     // Fixed payload is 14 bytes of properties:
     // - Height (2) + Attributes (2) + ColorIdx (2) + Weight (2)
     // - Escapement (2) + Underline (1) + Family (1) + Charset (1) + Reserved (1)
-    // BIFF8 then stores: NameLen (1), Options (1), Name bytes (N).
-    let data_len = 14 + 1 + 1 + name_len; // properties + len + options + name
+    // BIFF8 FONT requires an uncompressed UTF-16LE ShortXLUnicodeString.
+    let data_len = 14 + 1 + 1 + (name_len * 2);
     super::biff::write_record_header(writer, 0x0031, data_len as u16)?;
 
     // Font height in twips
@@ -339,12 +355,13 @@ pub fn write_font<W: Write>(writer: &mut W, font: &Font) -> XlsResult<()> {
     // Font name length
     writer.write_all(&[name_len as u8])?;
 
-    // Options: 0x00 = compressed 8-bit (ASCII), 0x01 = UTF-16LE.
-    // We currently treat font names as ASCII for simplicity/performance.
-    writer.write_all(&[0x00])?;
+    // FONT narrows ShortXLUnicodeString: fHighByte MUST equal 1.
+    writer.write_all(&[0x01])?;
 
-    // Font name bytes
-    writer.write_all(&name_bytes[..name_len])?;
+    // Font name UTF-16LE code units.
+    for unit in name.encode_utf16() {
+        writer.write_all(&unit.to_le_bytes())?;
+    }
 
     Ok(())
 }
@@ -752,6 +769,25 @@ mod tests {
         assert_eq!(font.name, "Arial");
         assert_eq!(font.height, 240);
         assert!(font.italic);
+    }
+
+    #[test]
+    fn written_font_round_trips_through_biff8_reader() {
+        let font = Font {
+            name: "ＭＳ ゴシック".to_string(),
+            height: 240,
+            weight: FONT_WEIGHT_BOLD,
+            italic: true,
+            ..Default::default()
+        };
+        let mut record = Vec::new();
+        write_font(&mut record, &font).unwrap();
+
+        let parsed = crate::xls::font::XlsFont::parse_record(0, &record[4..]).unwrap();
+        assert_eq!(parsed.name(), font.name);
+        assert_eq!(parsed.height_twips(), font.height);
+        assert!(parsed.is_bold());
+        assert!(parsed.is_italic());
     }
 
     #[test]

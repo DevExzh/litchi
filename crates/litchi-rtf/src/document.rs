@@ -1301,16 +1301,22 @@ impl<'a> RtfDocument<'a> {
             category: info.category.map(|value| Cow::Owned(value.into_owned())),
             keywords: info.keywords.map(|value| Cow::Owned(value.into_owned())),
             comment: info.comment.map(|value| Cow::Owned(value.into_owned())),
+            document_comment: info.document_comment.map(|value| Cow::Owned(value.into_owned())),
+            hyperlink_base: info.hyperlink_base.map(|value| Cow::Owned(value.into_owned())),
             version: info.version,
             revision: info.revision,
             creation_time: info
                 .creation_time
                 .map(|value| Cow::Owned(value.into_owned())),
+            creation_timestamp: info.creation_timestamp,
             revision_time: info
                 .revision_time
                 .map(|value| Cow::Owned(value.into_owned())),
+            revision_timestamp: info.revision_timestamp,
             print_time: info.print_time.map(|value| Cow::Owned(value.into_owned())),
+            print_timestamp: info.print_timestamp,
             backup_time: info.backup_time.map(|value| Cow::Owned(value.into_owned())),
+            backup_timestamp: info.backup_timestamp,
             editing_time: info.editing_time,
             pages: info.pages,
             words: info.words,

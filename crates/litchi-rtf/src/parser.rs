@@ -150,6 +150,8 @@ enum InfoTextField {
     Category,
     Keywords,
     Comment,
+    DocumentComment,
+    HyperlinkBase,
 }
 
 #[derive(Clone, Copy)]
@@ -158,16 +160,6 @@ enum InfoTimeField {
     Revision,
     Print,
     Backup,
-}
-
-#[derive(Default)]
-struct InfoTimestamp {
-    year: Option<i32>,
-    month: Option<i32>,
-    day: Option<i32>,
-    hour: Option<i32>,
-    minute: Option<i32>,
-    second: Option<i32>,
 }
 
 const MAX_INFO_TEXT_BYTES: usize = 1_048_576;
@@ -313,6 +305,7 @@ pub struct Parser<'a> {
     saw_data_store: bool,
     math_properties: Option<crate::DocumentMathProperties>,
     language_defaults: crate::DocumentLanguageDefaults,
+    saw_info_group: bool,
     document_direction: Option<crate::TextDirection>,
     gutter_on_right: bool,
     /// Embedded and linked objects
@@ -452,6 +445,7 @@ impl<'a> Parser<'a> {
             saw_data_store: false,
             math_properties: None,
             language_defaults: crate::DocumentLanguageDefaults::default(),
+            saw_info_group: false,
             document_direction: None,
             gutter_on_right: false,
             objects: Vec::new(),
@@ -4532,6 +4526,12 @@ impl<'a> Parser<'a> {
 
     /// Parse the standard RTF `info` destination.
     fn parse_info(&mut self) -> RtfResult<()> {
+        if self.saw_info_group {
+            return Err(RtfError::MalformedDocument(
+                "RTF contains multiple info groups".to_string(),
+            ));
+        }
+        self.saw_info_group = true;
         self.pos += 1; // `info`
         while self.pos < self.tokens.len() {
             match self.tokens.get(self.pos) {
@@ -4563,8 +4563,14 @@ impl<'a> Parser<'a> {
                         Some(Token::Control(ControlWord::Keywords)) => {
                             self.parse_info_text(InfoTextField::Keywords)?;
                         },
-                        Some(Token::Control(ControlWord::Comment | ControlWord::DocComment)) => {
+                        Some(Token::Control(ControlWord::Comment)) => {
                             self.parse_info_text(InfoTextField::Comment)?;
+                        },
+                        Some(Token::Control(ControlWord::DocComment)) => {
+                            self.parse_info_text(InfoTextField::DocumentComment)?;
+                        },
+                        Some(Token::Control(ControlWord::HyperlinkBase)) => {
+                            self.parse_info_text(InfoTextField::HyperlinkBase)?;
                         },
                         Some(Token::Control(ControlWord::CreationTime)) => {
                             self.parse_info_time(InfoTimeField::Creation)?;
@@ -4587,23 +4593,28 @@ impl<'a> Parser<'a> {
                 },
                 Some(Token::Control(control)) => {
                     match control {
-                        ControlWord::InfoVersion(value) => self.info.version = Some(*value),
-                        ControlWord::InfoRevision(value) => self.info.revision = Some(*value),
-                        ControlWord::EditingTime(value) => self.info.editing_time = Some(*value),
-                        ControlWord::NumberOfPages(value) => self.info.pages = Some(*value),
-                        ControlWord::NumberOfWords(value) => self.info.words = Some(*value),
+                        ControlWord::InfoVersion(value) => Self::set_info_number(&mut self.info.version, *value, "version")?,
+                        ControlWord::InfoRevision(value) => Self::set_info_number(&mut self.info.revision, *value, "vern")?,
+                        ControlWord::EditingTime(value) => Self::set_info_number(&mut self.info.editing_time, *value, "edmins")?,
+                        ControlWord::NumberOfPages(value) => Self::set_info_number(&mut self.info.pages, *value, "nofpages")?,
+                        ControlWord::NumberOfWords(value) => Self::set_info_number(&mut self.info.words, *value, "nofwords")?,
                         ControlWord::NumberOfCharacters(value) => {
-                            self.info.characters = Some(*value);
+                            Self::set_info_number(&mut self.info.characters, *value, "nofchars")?;
                         },
                         ControlWord::NumberOfCharactersWithSpaces(value) => {
-                            self.info.characters_with_spaces = Some(*value);
+                            Self::set_info_number(&mut self.info.characters_with_spaces, *value, "nofcharsws")?;
                         },
-                        ControlWord::DocumentId(value) => self.info.id = Some(*value),
+                        ControlWord::DocumentId(value) => Self::set_info_number(&mut self.info.id, *value, "id")?,
                         _ => {},
                     }
                     self.pos += 1;
                 },
-                Some(_) => self.pos += 1,
+                Some(Token::Text(text)) if self.decode_transport_text(text)?.trim().is_empty() => self.pos += 1,
+                Some(Token::Text(_) | Token::Binary(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF info group contains active text or binary data".to_string(),
+                    ));
+                },
                 None => break,
             }
         }
@@ -5102,6 +5113,24 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_info_text(&mut self, field: InfoTextField) -> RtfResult<()> {
+        let duplicate = match field {
+            InfoTextField::Title => self.info.title.is_some(),
+            InfoTextField::Subject => self.info.subject.is_some(),
+            InfoTextField::Author => self.info.author.is_some(),
+            InfoTextField::Manager => self.info.manager.is_some(),
+            InfoTextField::Company => self.info.company.is_some(),
+            InfoTextField::Operator => self.info.operator.is_some(),
+            InfoTextField::Category => self.info.category.is_some(),
+            InfoTextField::Keywords => self.info.keywords.is_some(),
+            InfoTextField::Comment => self.info.comment.is_some(),
+            InfoTextField::DocumentComment => self.info.document_comment.is_some(),
+            InfoTextField::HyperlinkBase => self.info.hyperlink_base.is_some(),
+        };
+        if duplicate {
+            return Err(RtfError::MalformedDocument(
+                "RTF info text destination occurs more than once".to_string(),
+            ));
+        }
         self.pos += 1; // destination control word
         let mut value = String::new();
         let mut depth = 1usize;
@@ -5169,13 +5198,26 @@ impl<'a> Parser<'a> {
             InfoTextField::Category => self.info.category = value,
             InfoTextField::Keywords => self.info.keywords = value,
             InfoTextField::Comment => self.info.comment = value,
+            InfoTextField::DocumentComment => self.info.document_comment = value,
+            InfoTextField::HyperlinkBase => self.info.hyperlink_base = value,
         }
         Ok(())
     }
 
     fn parse_info_time(&mut self, field: InfoTimeField) -> RtfResult<()> {
+        let duplicate = match field {
+            InfoTimeField::Creation => self.info.creation_timestamp.is_some(),
+            InfoTimeField::Revision => self.info.revision_timestamp.is_some(),
+            InfoTimeField::Print => self.info.print_timestamp.is_some(),
+            InfoTimeField::Backup => self.info.backup_timestamp.is_some(),
+        };
+        if duplicate {
+            return Err(RtfError::MalformedDocument(
+                "RTF info timestamp destination occurs more than once".to_string(),
+            ));
+        }
         self.pos += 1; // time destination
-        let mut timestamp = InfoTimestamp::default();
+        let mut timestamp = crate::RtfTimestamp::default();
         let mut depth = 1usize;
         while self.pos < self.tokens.len() && depth > 0 {
             match self.tokens.get(self.pos) {
@@ -5197,23 +5239,27 @@ impl<'a> Parser<'a> {
         if depth != 0 {
             return Err(RtfError::UnexpectedEof);
         }
-        let serialized = format!(
-            "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}",
-            timestamp.year.unwrap_or(0),
-            timestamp.month.unwrap_or(0),
-            timestamp.day.unwrap_or(0),
-            timestamp.hour.unwrap_or(0),
-            timestamp.minute.unwrap_or(0),
-            timestamp.second.unwrap_or(0),
-        );
+        let serialized = timestamp.legacy_string();
         let allocated = self.arena.alloc_str(&serialized);
         let value = Some(Cow::Borrowed(&*allocated));
         match field {
-            InfoTimeField::Creation => self.info.creation_time = value,
-            InfoTimeField::Revision => self.info.revision_time = value,
-            InfoTimeField::Print => self.info.print_time = value,
-            InfoTimeField::Backup => self.info.backup_time = value,
+            InfoTimeField::Creation => { self.info.creation_time = value; self.info.creation_timestamp = Some(timestamp); },
+            InfoTimeField::Revision => { self.info.revision_time = value; self.info.revision_timestamp = Some(timestamp); },
+            InfoTimeField::Print => { self.info.print_time = value; self.info.print_timestamp = Some(timestamp); },
+            InfoTimeField::Backup => { self.info.backup_time = value; self.info.backup_timestamp = Some(timestamp); },
         }
+        Ok(())
+    }
+
+    fn set_info_number(slot: &mut Option<u32>, value: i32, name: &str) -> RtfResult<()> {
+        if slot.is_some() {
+            return Err(RtfError::MalformedDocument(format!(
+                "RTF info numeric control {name} occurs more than once"
+            )));
+        }
+        *slot = Some(u32::try_from(value).map_err(|_| {
+            RtfError::MalformedDocument(format!("RTF info numeric control {name} cannot be negative"))
+        })?);
         Ok(())
     }
 

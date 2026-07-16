@@ -3,7 +3,7 @@
 use super::{
     CalculationSettings, Consolidation, ContentValidation, DataPilotTable, DatabaseRange, DdeLink,
     LabelRange, NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange, Sheet,
-    SheetProtection, SpreadsheetProtection, SpreadsheetTrackedChanges,
+    SheetProtection, SpreadsheetProtection, SpreadsheetTrackedChanges, TableTemplate,
     calculation::parse_calculation_settings,
     consolidation::parse_consolidation,
     data_pilot::parse_data_pilot_tables,
@@ -14,6 +14,7 @@ use super::{
     parser::OdsParser,
     protection::parse_protection,
     style_protection::{ConditionalCellStyle, CellStyleProtection, CellStyleRegistry},
+    table_template::parse_table_templates,
     tracked_changes::parse_tracked_changes,
 };
 use crate::core::{Content, Meta, OwnedPackage, Styles};
@@ -66,6 +67,7 @@ pub struct Spreadsheet {
     sheet_protections: Vec<SheetProtection>,
     cell_styles: CellStyleRegistry,
     tracked_changes: Option<SpreadsheetTrackedChanges>,
+    table_templates: Vec<TableTemplate>,
 }
 
 impl Spreadsheet {
@@ -182,6 +184,11 @@ impl Spreadsheet {
             styles.as_ref().map(Styles::xml_content),
             content.xml_content(),
         )?;
+        let mut template_parts = vec![content.xml_content()];
+        if let Some(styles) = styles.as_ref().map(Styles::xml_content) {
+            template_parts.push(styles);
+        }
+        let table_templates = parse_table_templates(&template_parts)?;
 
         let meta = if package.has_file("meta.xml") {
             let meta_bytes = package.get_file("meta.xml")?;
@@ -207,6 +214,7 @@ impl Spreadsheet {
             sheet_protections,
             cell_styles,
             tracked_changes,
+            table_templates,
         })
     }
 
@@ -233,6 +241,18 @@ impl Spreadsheet {
     /// Return inert spreadsheet change-tracking metadata in document order.
     pub fn tracked_changes(&self) -> Option<&SpreadsheetTrackedChanges> {
         self.tracked_changes.as_ref()
+    }
+
+    /// Return named table-style templates from content and styles parts.
+    pub fn table_templates(&self) -> &[TableTemplate] {
+        &self.table_templates
+    }
+
+    /// Find a table-style template by its ODF name.
+    pub fn table_template(&self, name: &str) -> Option<&TableTemplate> {
+        self.table_templates
+            .iter()
+            .find(|template| template.name == name)
     }
 
     /// Create an ODS spreadsheet from raw bytes (ZIP archive data).

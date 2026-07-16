@@ -52,6 +52,7 @@ pub enum XlsExtendedFormatKind {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct XlsExtendedFormat {
     index: u16,
+    font_index: u16,
     number_format_id: u16,
     kind: XlsExtendedFormatKind,
     locked: bool,
@@ -68,6 +69,11 @@ impl XlsExtendedFormat {
 
     pub fn number_format_id(&self) -> u16 {
         self.number_format_id
+    }
+
+    /// Returns the logical index of the global Font record used by this XF.
+    pub fn font_index(&self) -> u16 {
+        self.font_index
     }
 
     pub fn kind(&self) -> XlsExtendedFormatKind {
@@ -439,11 +445,14 @@ fn parse_xf(data: &[u8], index: u16) -> XlsResult<XlsExtendedFormat> {
             parent_style_xf: parent,
         }
     };
+    let font_index = u16::from_le_bytes([data[0], data[1]]);
+    crate::xls::font::validate_font_index(font_index)?;
     let alignment = crate::xls::alignment::XlsCellAlignment::parse(data[6], data[7], data[8])?;
     let (borders, fill) = crate::xls::border_fill::parse_xf_border_fill(data, style)?;
 
     Ok(XlsExtendedFormat {
         index,
+        font_index,
         number_format_id,
         kind,
         locked,

@@ -1,6 +1,6 @@
 //! BIFF8 workbook font table support.
 
-use super::error::{XlsError, XlsResult};
+use super::{XlsColor, XlsError, XlsPalette, XlsResult};
 
 const FONT_FIXED_LENGTH: usize = 14;
 const MAX_FONT_NAME_LENGTH: usize = 31;
@@ -95,6 +95,10 @@ impl XlsFont {
         self.color_index
     }
 
+    pub fn color(&self, palette: &XlsPalette) -> Option<XlsColor> {
+        palette.color(self.color_index)
+    }
+
     pub fn weight(&self) -> u16 {
         self.weight
     }
@@ -144,9 +148,7 @@ impl XlsFont {
     }
 
     pub(crate) fn parse_record(index: u16, data: &[u8]) -> XlsResult<Self> {
-        if index == 4 || index > 1022 {
-            return Err(invalid(format!("Font logical index {index} is invalid")));
-        }
+        validate_font_index(index)?;
         if data.len() < FONT_FIXED_LENGTH + 2 {
             return Err(invalid(format!(
                 "Font record has {} bytes; expected at least {}",
@@ -162,12 +164,6 @@ impl XlsFont {
             )));
         }
         let flags = u16::from_le_bytes([data[2], data[3]]);
-        if flags & 0xff00 != 0 {
-            return Err(invalid(format!(
-                "Font reserved flags are {:#04x}; expected zero",
-                flags >> 8
-            )));
-        }
 
         let color_index = u16::from_le_bytes([data[4], data[5]]);
         if !valid_color_index(color_index) {
@@ -176,9 +172,9 @@ impl XlsFont {
             )));
         }
         let weight = u16::from_le_bytes([data[6], data[7]]);
-        if !(100..=1000).contains(&weight) {
+        if weight != 0 && !(100..=1000).contains(&weight) {
             return Err(invalid(format!(
-                "Font weight is {weight}; expected 100..=1000"
+                "Font weight is {weight}; expected zero or 100..=1000"
             )));
         }
         let escapement = match u16::from_le_bytes([data[8], data[9]]) {
@@ -221,7 +217,7 @@ impl XlsFont {
             0xb2 => XlsFontCharset::Arabic,
             0xba => XlsFontCharset::Baltic,
             0xcc => XlsFontCharset::Russian,
-            0xde => XlsFontCharset::Thai,
+            0xdd => XlsFontCharset::Thai,
             0xee => XlsFontCharset::EastEurope,
             0xff => XlsFontCharset::Oem,
             value => return Err(invalid(format!("Font character set {value:#04x} is invalid"))),
@@ -234,11 +230,6 @@ impl XlsFont {
             )));
         }
         let string_flags = data[15];
-        if string_flags & !0x01 != 0 {
-            return Err(invalid(format!(
-                "Font name flags {string_flags:#04x} contain reserved bits"
-            )));
-        }
         let wide = string_flags & 0x01 != 0;
         let character_bytes = character_count
             .checked_mul(if wide { 2 } else { 1 })
@@ -256,15 +247,19 @@ impl XlsFont {
 
         let name_bytes = &data[16..];
         let name = if wide {
-            let code_units = name_bytes
-                .chunks_exact(2)
-                .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
-                .collect::<Vec<_>>();
-            String::from_utf16(&code_units)
-                .map_err(|error| invalid(format!("Font name is invalid UTF-16: {error}")))?
+            char::decode_utf16(
+                name_bytes
+                    .chunks_exact(2)
+                    .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]])),
+            )
+            .collect::<Result<String, _>>()
+            .map_err(|error| invalid(format!("Font name is invalid UTF-16: {error}")))?
         } else {
             name_bytes.iter().map(|&value| char::from(value)).collect()
         };
+        if name.contains('\0') {
+            return Err(invalid("Font name contains a null character"));
+        }
 
         Ok(Self {
             index,
@@ -296,12 +291,15 @@ pub(crate) fn logical_font_index(physical_index: usize) -> XlsResult<u16> {
     };
     let logical_index = u16::try_from(logical_index)
         .map_err(|_| invalid("Font index does not fit in BIFF8 FontIndex"))?;
-    if logical_index > 1022 {
-        return Err(invalid(format!(
-            "Font logical index {logical_index} exceeds 1022"
-        )));
-    }
+    validate_font_index(logical_index)?;
     Ok(logical_index)
+}
+
+pub(crate) fn validate_font_index(index: u16) -> XlsResult<()> {
+    if index == 4 || index > 1022 {
+        return Err(invalid(format!("Font logical index {index} is invalid")));
+    }
+    Ok(())
 }
 
 pub(crate) fn validate_font_table(fonts: &[XlsFont]) -> XlsResult<()> {
@@ -346,9 +344,11 @@ mod tests {
         data.push(0);
         data.push(0);
         data.push(0xdf);
-        data.push(name.len() as u8);
-        data.push(0);
-        data.extend_from_slice(name.as_bytes());
+        data.push(name.encode_utf16().count() as u8);
+        data.push(1);
+        for unit in name.encode_utf16() {
+            data.extend_from_slice(&unit.to_le_bytes());
+        }
         data
     }
 
@@ -382,6 +382,42 @@ mod tests {
     }
 
     #[test]
+    fn parses_all_font_attributes_and_unicode_name() {
+        let mut data = font_record(700, true, 0x000c, "ＭＳ ゴシック");
+        data[2..4].copy_from_slice(&0x00fau16.to_le_bytes());
+        data[8..10].copy_from_slice(&1u16.to_le_bytes());
+        data[10] = 0x22;
+        data[11] = 3;
+        data[12] = 0xdd;
+        data[13] = 0xff;
+        data[15] |= 0xfe;
+
+        let font = XlsFont::parse_record(5, &data).unwrap();
+        assert_eq!(font.name(), "ＭＳ ゴシック");
+        assert!(font.is_bold());
+        assert!(font.is_italic());
+        assert!(font.is_struck_out());
+        assert!(font.is_outline());
+        assert!(font.has_shadow());
+        assert!(font.is_condensed());
+        assert!(font.is_extended());
+        assert_eq!(font.escapement(), XlsFontEscapement::Superscript);
+        assert_eq!(font.underline(), XlsFontUnderline::DoubleAccounting);
+        assert_eq!(font.family(), XlsFontFamily::Modern);
+        assert_eq!(font.charset(), XlsFontCharset::Thai);
+        assert!(font.color(&XlsPalette::default()).is_some());
+    }
+
+    #[test]
+    fn accepts_zero_weight_and_ignores_reserved_producer_bits() {
+        let mut data = font_record(0, false, 0x7fff, "Arial");
+        data[2..4].copy_from_slice(&0xff05u16.to_le_bytes());
+        data[13] = 0xff;
+        data[15] = 0xff;
+        XlsFont::parse_record(0, &data).unwrap();
+    }
+
+    #[test]
     fn skips_reserved_logical_index_four() {
         assert_eq!(logical_font_index(0).unwrap(), 0);
         assert_eq!(logical_font_index(3).unwrap(), 3);
@@ -404,7 +440,6 @@ mod tests {
     fn rejects_invalid_scalar_fields() {
         for (offset, bytes) in [
             (0, 19u16.to_le_bytes()),
-            (2, 0x0100u16.to_le_bytes()),
             (4, 0x0042u16.to_le_bytes()),
             (6, 99u16.to_le_bytes()),
             (8, 3u16.to_le_bytes()),
@@ -414,7 +449,7 @@ mod tests {
             assert!(XlsFont::parse_record(0, &data).is_err());
         }
 
-        for (offset, value) in [(10, 3), (11, 6), (12, 3), (15, 2)] {
+        for (offset, value) in [(10, 3), (11, 6), (12, 3), (12, 0xde)] {
             let mut data = font_record(400, false, 0x7fff, "Arial");
             data[offset] = value;
             assert!(XlsFont::parse_record(0, &data).is_err());
@@ -434,5 +469,18 @@ mod tests {
         let mut truncated = font_record(400, false, 0x7fff, "Arial");
         truncated.pop();
         assert!(XlsFont::parse_record(0, &truncated).is_err());
+
+        assert!(XlsFont::parse_record(0, &font_record(400, false, 0x7fff, "A\0B")).is_err());
+    }
+
+    #[test]
+    fn accepts_compressed_font_names_from_nonconformant_producers() {
+        let mut compressed = font_record(400, false, 0x7fff, "Arial");
+        compressed[15] = 0;
+        compressed.truncate(16);
+        compressed.extend_from_slice(b"Arial");
+
+        let font = XlsFont::parse_record(0, &compressed).unwrap();
+        assert_eq!(font.name(), "Arial");
     }
 }

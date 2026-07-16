@@ -45,6 +45,7 @@ pub mod outline_properties;
 pub mod page_margins;
 pub mod page_setup;
 pub mod parsers;
+pub mod phonetic_properties;
 pub mod pivot;
 pub mod print_options;
 pub mod shared_strings;
@@ -143,6 +144,10 @@ pub use page_setup::{
     PageSetupCellComments, PageSetupOrder, PageSetupOrientation, PageSetupPrintErrors,
     PositiveUniversalMeasure, UniversalMeasureUnit, WorksheetPageSetup,
     parse_complete_worksheet_page_setup,
+};
+pub use phonetic_properties::{
+    WorksheetPhoneticAlignment, WorksheetPhoneticProperties, WorksheetPhoneticType,
+    parse_worksheet_phonetic_properties,
 };
 pub use print_options::{WorksheetPrintOptions, parse_worksheet_print_options};
 pub use sort::{SortBy, SortCondition, SortMethod, SortState};

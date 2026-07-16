@@ -46,6 +46,9 @@ use super::named_sheet_view::{NamedSheetViews, discover_named_sheet_views};
 use super::outline_properties::WorksheetOutlineProperties;
 use super::page_margins::{WorksheetPageMargins, parse_worksheet_page_margins};
 use super::page_setup::{WorksheetPageSetup, parse_complete_worksheet_page_setup};
+use super::phonetic_properties::{
+    WorksheetPhoneticProperties, parse_worksheet_phonetic_properties,
+};
 use super::print_options::{WorksheetPrintOptions, parse_worksheet_print_options};
 use super::table::{Table, parse_table_xml};
 use super::views::SheetView;
@@ -275,6 +278,8 @@ pub struct Worksheet<'a> {
     outline_properties: Option<WorksheetOutlineProperties>,
     /// Complete worksheet-level properties from `sheetPr`.
     sheet_properties: Option<WorksheetSheetProperties>,
+    /// Default East Asian phonetic text formatting.
+    phonetic_properties: Option<WorksheetPhoneticProperties>,
     /// Manual row page breaks
     row_breaks: Vec<PageBreak>,
     /// Manual column page breaks
@@ -319,6 +324,7 @@ impl<'a> Worksheet<'a> {
             ignored_errors: None,
             outline_properties: None,
             sheet_properties: None,
+            phonetic_properties: None,
             row_breaks: Vec::new(),
             col_breaks: Vec::new(),
             rich_text_cells: HashMap::new(),
@@ -432,6 +438,7 @@ impl<'a> Worksheet<'a> {
             parse_worksheet_sheet_format_properties(sheet_data.as_bytes())?;
         let ignored_errors = parse_worksheet_ignored_errors(sheet_data.as_bytes())?;
         let sheet_properties = parse_worksheet_sheet_properties(sheet_data.as_bytes())?;
+        let phonetic_properties = parse_worksheet_phonetic_properties(sheet_data.as_bytes())?;
         let outline_properties = sheet_properties.as_ref()
             .and_then(WorksheetSheetProperties::outline_properties).copied();
         self.cells = parsed.cells;
@@ -463,6 +470,7 @@ impl<'a> Worksheet<'a> {
         self.ignored_errors = ignored_errors;
         self.outline_properties = outline_properties;
         self.sheet_properties = sheet_properties;
+        self.phonetic_properties = phonetic_properties;
         self.dimensions = parsed.dimensions;
         Ok((
             parsed.hyperlinks,
@@ -1954,6 +1962,11 @@ impl<'a> Worksheet<'a> {
     /// Complete immutable worksheet-level properties, when `sheetPr` is present.
     pub fn sheet_properties(&self) -> Option<&WorksheetSheetProperties> {
         self.sheet_properties.as_ref()
+    }
+
+    /// Default East Asian phonetic text formatting, when explicitly present.
+    pub fn phonetic_properties(&self) -> Option<&WorksheetPhoneticProperties> {
+        self.phonetic_properties.as_ref()
     }
 
     // ===== Print Options =====
