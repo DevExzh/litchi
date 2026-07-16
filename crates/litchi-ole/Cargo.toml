@@ -22,7 +22,9 @@ litchi-cfb      = { workspace = true }
 litchi-core     = { workspace = true, features = ["ole"] }
 litchi-formula  = { workspace = true, optional = true }
 litchi-imgconv  = { workspace = true, optional = true }
+litchi-opc      = { workspace = true }
 once_cell       = { workspace = true }
+quick-xml       = { workspace = true }
 smallvec        = { workspace = true }
 thiserror       = { workspace = true }
 url             = { workspace = true }

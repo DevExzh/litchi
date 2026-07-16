@@ -183,7 +183,7 @@ impl<'doc> Slide<'doc> {
             .map(Option::as_ref)
     }
 
-    /// Return inert PowerPoint 12 master references stored directly on this slide.
+    /// Return inert PowerPoint 12 metadata stored directly on this slide.
     pub fn powerpoint12_round_trip_metadata(&self) -> Result<&PowerPoint12SlideRoundTripMetadata> {
         self.round_trip_metadata
             .get_or_try_init(|| PowerPoint12SlideRoundTripMetadata::parse(&self.record))

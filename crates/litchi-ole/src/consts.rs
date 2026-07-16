@@ -79,6 +79,10 @@ pub enum PptRecordType {
     OEPlaceholderAtom = 3011,
     /// PowerPoint 12 new placeholder identity atom
     RoundTripNewPlaceholderId12Atom = 0x0BDD,
+    /// PowerPoint 12 embedded animation package atom
+    RoundTripAnimation12Atom = 0x2B0B,
+    /// PowerPoint 12 animation checksum atom
+    RoundTripAnimationHash12Atom = 0x2B0D,
     /// Text header atom record
     TextHeaderAtom = 3999,
     /// Text characters atom record
@@ -332,6 +336,8 @@ impl From<u16> for PptRecordType {
             0x0426 => PptRecordType::RoundTripShapeCheckSumForCustomLayouts12Atom,
             3011 => PptRecordType::OEPlaceholderAtom,
             0x0BDD => PptRecordType::RoundTripNewPlaceholderId12Atom,
+            0x2B0B => PptRecordType::RoundTripAnimation12Atom,
+            0x2B0D => PptRecordType::RoundTripAnimationHash12Atom,
             3999 => PptRecordType::TextHeaderAtom,
             4000 => PptRecordType::TextCharsAtom,
             4008 => PptRecordType::TextBytesAtom,

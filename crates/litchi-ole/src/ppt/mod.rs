@@ -132,7 +132,10 @@ pub use slide_extension::{
     PowerPointHeaderFooterDefaults, PowerPointHeaderFooterPlaceholder, PowerPointNewPlaceholder,
     PowerPointShapeChecksums,
 };
-pub use slide_round_trip::{PowerPoint12SlideRoundTripMetadata, PowerPointContentMasterReference};
+pub use slide_round_trip::{
+    PowerPoint12SlideRoundTripMetadata, PowerPointAnimationPackage,
+    PowerPointContentMasterReference,
+};
 pub use slide_sync::{PowerPointSlideSyncInfo, PowerPointSystemTime};
 pub use smart_tags::{
     PowerPointSmartTag, PowerPointSmartTagProperty, PowerPointSmartTagStore, PowerPointSmartTagType,
