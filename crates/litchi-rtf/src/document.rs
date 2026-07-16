@@ -35,6 +35,8 @@ pub struct RtfDocument<'a> {
     xml_namespaces: Option<Vec<crate::XmlNamespace<'a>>>,
     /// Inert Office theme package and optional color-scheme mapping bytes.
     theme: Option<crate::DocumentTheme<'a>>,
+    /// Inert latent-style defaults and ordered exceptions.
+    latent_styles: Option<crate::LatentStyles<'a>>,
     /// Embedded and linked objects
     objects: Vec<super::object::EmbeddedObject<'a>>,
     /// Ordered inert document-variable metadata
@@ -248,6 +250,7 @@ impl<'a> RtfDocument<'a> {
                     .collect()
             }),
             theme: parsed.theme.map(crate::DocumentTheme::into_owned),
+            latent_styles: parsed.latent_styles.map(crate::LatentStyles::into_owned),
             objects: owned_objects,
             document_variables: parsed
                 .document_variables
@@ -634,6 +637,23 @@ impl<'a> RtfDocument<'a> {
     /// Remove theme and color-scheme mapping payloads.
     pub fn clear_theme(&mut self) {
         self.theme = None;
+    }
+
+    /// Return inert latent-style defaults and ordered exceptions.
+    pub fn latent_styles(&self) -> Option<&crate::LatentStyles<'_>> {
+        self.latent_styles.as_ref()
+    }
+
+    /// Replace latent-style metadata after full validation.
+    pub fn set_latent_styles(&mut self, styles: crate::LatentStyles<'a>) -> RtfResult<()> {
+        styles.validate()?;
+        self.latent_styles = Some(styles);
+        Ok(())
+    }
+
+    /// Remove latent-style metadata.
+    pub fn clear_latent_styles(&mut self) {
+        self.latent_styles = None;
     }
 
     fn validate_xml_namespaces(namespaces: &[crate::XmlNamespace<'_>]) -> RtfResult<()> {

@@ -141,6 +141,8 @@ impl<W: Write> RtfWriter<W> {
 
         self.write_theme(doc.theme())?;
 
+        self.write_latent_styles(doc.latent_styles())?;
+
         // Producer provenance is inert header metadata.
         self.write_generator(doc.generator())?;
 
@@ -621,6 +623,53 @@ impl<W: Write> RtfWriter<W> {
             write!(self.writer, "{byte:02x}")?;
         }
         self.write_str("}")
+    }
+
+    pub fn write_latent_styles(
+        &mut self,
+        styles: Option<&crate::LatentStyles<'_>>,
+    ) -> io::Result<()> {
+        let Some(styles) = styles else {
+            return Ok(());
+        };
+        styles
+            .validate()
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+        self.write_str("{\\*\\latentstyles")?;
+        self.write_control_word("lsdstimax", Some(styles.max_style_index as i32))?;
+        self.write_optional_bool("lsdlockeddef", styles.locked_default)?;
+        self.write_optional_bool("lsdsemihiddendef", styles.semi_hidden_default)?;
+        self.write_optional_bool(
+            "lsdunhideuseddef",
+            styles.unhide_when_used_default,
+        )?;
+        self.write_optional_bool("lsdqformatdef", styles.quick_format_default)?;
+        if let Some(priority) = styles.priority_default {
+            self.write_control_word("lsdprioritydef", Some(i32::from(priority)))?;
+        }
+        if !styles.exceptions.is_empty() {
+            self.write_str("{\\lsdlockedexcept ")?;
+            for exception in &styles.exceptions {
+                self.write_optional_bool("lsdlocked", exception.locked)?;
+                self.write_optional_bool("lsdsemihidden", exception.semi_hidden)?;
+                self.write_optional_bool("lsdunhideused", exception.unhide_when_used)?;
+                self.write_optional_bool("lsdqformat", exception.quick_format)?;
+                if let Some(priority) = exception.priority {
+                    self.write_control_word("lsdpriority", Some(i32::from(priority)))?;
+                }
+                self.write_destination_text(exception.name.as_ref())?;
+                self.write_str(";")?;
+            }
+            self.write_str("}")?;
+        }
+        self.write_str("}")
+    }
+
+    fn write_optional_bool(&mut self, control: &str, value: Option<bool>) -> io::Result<()> {
+        if let Some(value) = value {
+            self.write_control_word(control, Some(i32::from(value)))?;
+        }
+        Ok(())
     }
 
     /// Write an RTF stylesheet destination.

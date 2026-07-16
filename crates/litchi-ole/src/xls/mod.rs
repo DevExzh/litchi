@@ -47,6 +47,9 @@ mod page_setup;
 /// Legacy BIFF8 conditional formatting.
 mod conditional_format;
 
+/// Workbook sheet directory metadata.
+mod sheet_metadata;
+
 /// Shape extraction
 pub mod shapes;
 
@@ -99,6 +102,7 @@ pub use conditional_format::{
     XlsConditionalNumberFormat, XlsConditionalPattern, XlsConditionalProtection,
     XlsConditionalRule, XlsConditionalRuleKind, XlsConditionalStyle,
 };
+pub use sheet_metadata::{XlsSheetKind, XlsSheetMetadata, XlsSheetVisibility};
 pub use records::{
     PhoneticAlignment, PhoneticRun, PhoneticString, PhoneticType, SharedStringFormatRun,
     SharedStringProperties,

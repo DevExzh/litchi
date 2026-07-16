@@ -267,6 +267,22 @@ impl BoundSheetRecord {
             });
         }
 
+        let character_count = usize::from(data[6]);
+        let string_flags = data[7];
+        if string_flags & 0xfe != 0 {
+            return Err(XlsError::InvalidRecord {
+                record_type: 0x0085,
+                message: "BoundSheet8 name has reserved string option bits".to_string(),
+            });
+        }
+        let character_width = if string_flags & 1 != 0 { 2 } else { 1 };
+        if data.len() != 8 + character_count * character_width {
+            return Err(XlsError::InvalidRecord {
+                record_type: 0x0085,
+                message: "BoundSheet8 name length does not match its payload".to_string(),
+            });
+        }
+
         let position = binary::read_u32_le_at(data, 0)?;
         let visible = SheetVisible::from_u8(data[4])?;
         let sheet_type = SheetType::from_u8(data[5])?;
@@ -274,6 +290,20 @@ impl BoundSheetRecord {
         // Skip 2 bytes and parse the name
         let name_data = &data[6..];
         let name = utils::parse_short_string(name_data, encoding)?;
+        let name_length = name.encode_utf16().count();
+        let forbidden = |character| {
+            matches!(character, '\0' | '\u{0003}' | ':' | '\\' | '*' | '?' | '/' | '[' | ']')
+        };
+        if !(1..=31).contains(&name_length)
+            || name.chars().any(forbidden)
+            || name.starts_with('\'')
+            || name.ends_with('\'')
+        {
+            return Err(XlsError::InvalidRecord {
+                record_type: 0x0085,
+                message: format!("Invalid BoundSheet8 sheet name: {name:?}"),
+            });
+        }
 
         Ok(BoundSheetRecord {
             position,

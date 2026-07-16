@@ -308,6 +308,7 @@ pub struct Parser<'a> {
     saw_theme_data: bool,
     color_scheme_mapping: Option<Vec<u8>>,
     saw_color_scheme_mapping: bool,
+    latent_styles: Option<crate::LatentStyles<'a>>,
     /// Embedded and linked objects
     objects: Vec<super::object::EmbeddedObject<'a>>,
     /// Ordered inert document variables
@@ -400,6 +401,15 @@ struct FormFieldBuilder {
     has_list_box: Option<bool>,
 }
 
+#[derive(Default)]
+struct LatentStyleExceptionBuilder {
+    locked: Option<bool>,
+    semi_hidden: Option<bool>,
+    unhide_when_used: Option<bool>,
+    quick_format: Option<bool>,
+    priority: Option<u8>,
+}
+
 impl<'a> Parser<'a> {
     /// Create a new parser.
     pub fn new(tokens: &'a [Token<'a>], arena: &'a Bump) -> Self {
@@ -431,6 +441,7 @@ impl<'a> Parser<'a> {
             saw_theme_data: false,
             color_scheme_mapping: None,
             saw_color_scheme_mapping: false,
+            latent_styles: None,
             objects: Vec::new(),
             document_variables: Vec::new(),
             document_variable_text_bytes: 0,
@@ -529,6 +540,7 @@ impl<'a> Parser<'a> {
             xml_namespaces: self.xml_namespaces,
             saw_xml_namespace_table: self.saw_xml_namespace_table,
             theme,
+            latent_styles: self.latent_styles,
             objects: self.objects,
             document_variables: self.document_variables,
             user_properties: self.user_properties,
@@ -721,6 +733,16 @@ impl<'a> Parser<'a> {
                             self.states.pop();
                             return Ok(());
                         },
+                        Some(Token::Control(ControlWord::LatentStyles)) => {
+                            if self.latent_styles.is_some() {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF contains multiple latentstyles destinations".to_string(),
+                                ));
+                            }
+                            self.latent_styles = Some(self.parse_latent_styles()?);
+                            self.states.pop();
+                            return Ok(());
+                        },
                         Some(Token::Control(ControlWord::DocumentVariable)) => {
                             self.parse_document_variable_destination()?;
                             self.states.pop();
@@ -836,6 +858,11 @@ impl<'a> Parser<'a> {
                 Token::Control(ControlWord::ThemeData | ControlWord::ColorSchemeMapping) => {
                     return Err(RtfError::MalformedDocument(
                         "RTF theme destinations must be starred".to_string(),
+                    ));
+                },
+                Token::Control(ControlWord::LatentStyles | ControlWord::LatentStyleExceptions) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF latent-style destinations are misplaced or not starred".to_string(),
                     ));
                 },
                 Token::Control(ControlWord::Info) => {
@@ -2090,6 +2117,23 @@ impl<'a> Parser<'a> {
                     "orphan RTF theme destination control".to_string(),
                 ));
             },
+            ControlWord::LatentStyles
+            | ControlWord::LatentStyleMax(_)
+            | ControlWord::LatentStyleLockedDefault(_)
+            | ControlWord::LatentStyleSemiHiddenDefault(_)
+            | ControlWord::LatentStyleUnhideUsedDefault(_)
+            | ControlWord::LatentStyleQuickFormatDefault(_)
+            | ControlWord::LatentStylePriorityDefault(_)
+            | ControlWord::LatentStyleExceptions
+            | ControlWord::LatentStyleLocked(_)
+            | ControlWord::LatentStyleSemiHidden(_)
+            | ControlWord::LatentStyleUnhideUsed(_)
+            | ControlWord::LatentStyleQuickFormat(_)
+            | ControlWord::LatentStylePriority(_) => {
+                return Err(RtfError::MalformedDocument(
+                    "orphan RTF latent-style control".to_string(),
+                ));
+            },
             _ => {},
         }
         if self.apply_section_control(control)? {
@@ -2586,6 +2630,335 @@ impl<'a> Parser<'a> {
             }
         }
         Err(RtfError::UnexpectedEof)
+    }
+
+    fn parse_latent_styles(&mut self) -> RtfResult<crate::LatentStyles<'a>> {
+        self.pos += 1; // ignorable-destination marker
+        if !matches!(
+            self.tokens.get(self.pos),
+            Some(Token::Control(ControlWord::LatentStyles))
+        ) {
+            return Err(RtfError::MalformedDocument(
+                "invalid RTF latentstyles destination".to_string(),
+            ));
+        }
+        self.pos += 1;
+        let mut max_style_index = None;
+        let mut locked_default = None;
+        let mut semi_hidden_default = None;
+        let mut unhide_when_used_default = None;
+        let mut quick_format_default = None;
+        let mut priority_default = None;
+        let mut exceptions = None;
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    let styles = crate::LatentStyles {
+                        max_style_index: max_style_index.ok_or_else(|| {
+                            RtfError::MalformedDocument(
+                                "RTF latentstyles is missing lsdstimax".to_string(),
+                            )
+                        })?,
+                        locked_default,
+                        semi_hidden_default,
+                        unhide_when_used_default,
+                        quick_format_default,
+                        priority_default,
+                        exceptions: exceptions.unwrap_or_default(),
+                    };
+                    styles.validate()?;
+                    return Ok(styles);
+                },
+                Some(Token::OpenBrace) => {
+                    if exceptions.is_some()
+                        || !matches!(
+                            self.tokens.get(self.pos + 1),
+                            Some(Token::Control(ControlWord::LatentStyleExceptions))
+                        )
+                    {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF latentstyles contains a duplicate or active nested destination"
+                                .to_string(),
+                        ));
+                    }
+                    exceptions = Some(self.parse_latent_style_exceptions()?);
+                },
+                Some(Token::Control(control)) => {
+                    macro_rules! set_once {
+                        ($slot:expr, $value:expr, $name:literal) => {{
+                            if $slot.is_some() {
+                                return Err(RtfError::MalformedDocument(concat!(
+                                    "duplicate RTF latent-style ",
+                                    $name
+                                )
+                                .to_string()));
+                            }
+                            $slot = Some($value);
+                        }};
+                    }
+                    match control {
+                        ControlWord::LatentStyleMax(value) => {
+                            let value = u32::try_from(*value).map_err(|_| {
+                                RtfError::MalformedDocument(
+                                    "RTF lsdstimax cannot be negative".to_string(),
+                                )
+                            })?;
+                            if value > crate::latent_style::MAX_LATENT_STYLE_INDEX {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF lsdstimax exceeds 65535".to_string(),
+                                ));
+                            }
+                            set_once!(max_style_index, value, "lsdstimax");
+                        },
+                        ControlWord::LatentStyleLockedDefault(value) => set_once!(
+                            locked_default,
+                            Self::parse_latent_style_bool(*value)?,
+                            "lsdlockeddef"
+                        ),
+                        ControlWord::LatentStyleSemiHiddenDefault(value) => set_once!(
+                            semi_hidden_default,
+                            Self::parse_latent_style_bool(*value)?,
+                            "lsdsemihiddendef"
+                        ),
+                        ControlWord::LatentStyleUnhideUsedDefault(value) => set_once!(
+                            unhide_when_used_default,
+                            Self::parse_latent_style_bool(*value)?,
+                            "lsdunhideuseddef"
+                        ),
+                        ControlWord::LatentStyleQuickFormatDefault(value) => set_once!(
+                            quick_format_default,
+                            Self::parse_latent_style_bool(*value)?,
+                            "lsdqformatdef"
+                        ),
+                        ControlWord::LatentStylePriorityDefault(value) => set_once!(
+                            priority_default,
+                            Self::parse_latent_style_priority(*value)?,
+                            "lsdprioritydef"
+                        ),
+                        _ => {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF latentstyles contains an unsupported control".to_string(),
+                            ));
+                        },
+                    }
+                    self.pos += 1;
+                },
+                Some(Token::Text(text)) if self.decode_transport_text(text)?.trim().is_empty() => {
+                    self.pos += 1;
+                },
+                Some(Token::Binary(_)) | Some(Token::Text(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF latentstyles contains orphan text or binary data".to_string(),
+                    ));
+                },
+                None => return Err(RtfError::UnexpectedEof),
+            }
+        }
+    }
+
+    fn parse_latent_style_exceptions(
+        &mut self,
+    ) -> RtfResult<Vec<crate::LatentStyleException<'a>>> {
+        self.expect_token(Token::OpenBrace)?;
+        if !matches!(
+            self.tokens.get(self.pos),
+            Some(Token::Control(ControlWord::LatentStyleExceptions))
+        ) {
+            return Err(RtfError::MalformedDocument(
+                "invalid RTF lsdlockedexcept destination".to_string(),
+            ));
+        }
+        self.pos += 1;
+        let mut entries = Vec::new();
+        let mut builder = LatentStyleExceptionBuilder::default();
+        let mut name = String::new();
+        let mut unicode_skip = self.current_state()?.unicode_skip.max(0);
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    if !name.trim().is_empty()
+                        || builder.locked.is_some()
+                        || builder.semi_hidden.is_some()
+                        || builder.unhide_when_used.is_some()
+                        || builder.quick_format.is_some()
+                        || builder.priority.is_some()
+                    {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF latent-style exception is missing its terminating semicolon"
+                                .to_string(),
+                        ));
+                    }
+                    return Ok(entries);
+                },
+                Some(Token::Control(control)) => {
+                    if matches!(
+                        control,
+                        ControlWord::LatentStyleLocked(_)
+                            | ControlWord::LatentStyleSemiHidden(_)
+                            | ControlWord::LatentStyleUnhideUsed(_)
+                            | ControlWord::LatentStyleQuickFormat(_)
+                            | ControlWord::LatentStylePriority(_)
+                    ) && !name.trim().is_empty()
+                    {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF latent-style properties must precede the style name".to_string(),
+                        ));
+                    }
+                    macro_rules! set_once {
+                        ($slot:expr, $value:expr, $name:literal) => {{
+                            if $slot.is_some() {
+                                return Err(RtfError::MalformedDocument(concat!(
+                                    "duplicate RTF latent-style exception ",
+                                    $name
+                                )
+                                .to_string()));
+                            }
+                            $slot = Some($value);
+                        }};
+                    }
+                    match control {
+                        ControlWord::LatentStyleLocked(value) => set_once!(
+                            builder.locked,
+                            Self::parse_latent_style_bool(*value)?,
+                            "lsdlocked"
+                        ),
+                        ControlWord::LatentStyleSemiHidden(value) => set_once!(
+                            builder.semi_hidden,
+                            Self::parse_latent_style_bool(*value)?,
+                            "lsdsemihidden"
+                        ),
+                        ControlWord::LatentStyleUnhideUsed(value) => set_once!(
+                            builder.unhide_when_used,
+                            Self::parse_latent_style_bool(*value)?,
+                            "lsdunhideused"
+                        ),
+                        ControlWord::LatentStyleQuickFormat(value) => set_once!(
+                            builder.quick_format,
+                            Self::parse_latent_style_bool(*value)?,
+                            "lsdqformat"
+                        ),
+                        ControlWord::LatentStylePriority(value) => set_once!(
+                            builder.priority,
+                            Self::parse_latent_style_priority(*value)?,
+                            "lsdpriority"
+                        ),
+                        ControlWord::Unicode(first) => {
+                            name.push_str(&self.parse_style_unicode(*first, unicode_skip)?);
+                            while let Some(separator) = name.find(';') {
+                                let remainder = name.split_off(separator + 1);
+                                let entry_name = name[..separator].trim();
+                                if entry_name.is_empty() {
+                                    return Err(RtfError::MalformedDocument(
+                                        "RTF latent-style exception name cannot be empty"
+                                            .to_string(),
+                                    ));
+                                }
+                                if entries.len()
+                                    >= crate::latent_style::MAX_LATENT_STYLE_EXCEPTIONS
+                                {
+                                    return Err(RtfError::MalformedDocument(
+                                        "RTF latent-style exception count exceeds the safety limit"
+                                            .to_string(),
+                                    ));
+                                }
+                                entries.push(crate::LatentStyleException {
+                                    name: Cow::Borrowed(self.arena.alloc_str(entry_name)),
+                                    locked: builder.locked.take(),
+                                    semi_hidden: builder.semi_hidden.take(),
+                                    unhide_when_used: builder.unhide_when_used.take(),
+                                    quick_format: builder.quick_format.take(),
+                                    priority: builder.priority.take(),
+                                });
+                                name = remainder;
+                            }
+                            continue;
+                        },
+                        ControlWord::UnicodeSkip(value) => {
+                            unicode_skip = (*value).max(0);
+                            self.pos += 1;
+                            continue;
+                        },
+                        control if control_symbol_text(control).is_some() => {
+                            name.push_str(control_symbol_text(control).unwrap_or_default());
+                            self.pos += 1;
+                            continue;
+                        },
+                        _ => {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF latent-style exception contains an unsupported control"
+                                    .to_string(),
+                            ));
+                        },
+                    }
+                    self.pos += 1;
+                },
+                Some(Token::Text(text)) => {
+                    name.push_str(&self.decode_transport_text(text)?);
+                    self.pos += 1;
+                    while let Some(separator) = name.find(';') {
+                        let remainder = name.split_off(separator + 1);
+                        let entry_name = name[..separator].trim();
+                        if entry_name.is_empty() {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF latent-style exception name cannot be empty".to_string(),
+                            ));
+                        }
+                        if entries.len()
+                            >= crate::latent_style::MAX_LATENT_STYLE_EXCEPTIONS
+                        {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF latent-style exception count exceeds the safety limit"
+                                    .to_string(),
+                            ));
+                        }
+                        entries.push(crate::LatentStyleException {
+                            name: Cow::Borrowed(self.arena.alloc_str(entry_name)),
+                            locked: builder.locked.take(),
+                            semi_hidden: builder.semi_hidden.take(),
+                            unhide_when_used: builder.unhide_when_used.take(),
+                            quick_format: builder.quick_format.take(),
+                            priority: builder.priority.take(),
+                        });
+                        name = remainder;
+                    }
+                },
+                Some(Token::OpenBrace | Token::Binary(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF latent-style exceptions cannot contain nesting or binary data"
+                            .to_string(),
+                    ));
+                },
+                None => return Err(RtfError::UnexpectedEof),
+            }
+            if name.len() > crate::latent_style::MAX_LATENT_STYLE_NAME_BYTES {
+                return Err(RtfError::MalformedDocument(
+                    "RTF latent-style exception name exceeds the safety limit".to_string(),
+                ));
+            }
+        }
+    }
+
+    fn parse_latent_style_bool(value: i32) -> RtfResult<bool> {
+        match value {
+            0 => Ok(false),
+            1 => Ok(true),
+            _ => Err(RtfError::MalformedDocument(
+                "RTF latent-style Boolean values must be 0 or 1".to_string(),
+            )),
+        }
+    }
+
+    fn parse_latent_style_priority(value: i32) -> RtfResult<u8> {
+        u8::try_from(value)
+            .ok()
+            .filter(|priority| *priority <= 99)
+            .ok_or_else(|| {
+                RtfError::MalformedDocument(
+                    "RTF latent-style priority must be in 0..=99".to_string(),
+                )
+            })
     }
 
     fn parse_theme_hex_destination(
@@ -6389,6 +6762,7 @@ pub struct ParsedDocument<'a> {
     pub xml_namespaces: Vec<crate::XmlNamespace<'a>>,
     pub saw_xml_namespace_table: bool,
     pub theme: Option<crate::DocumentTheme<'a>>,
+    pub latent_styles: Option<crate::LatentStyles<'a>>,
     /// Embedded and linked objects
     pub objects: Vec<super::object::EmbeddedObject<'a>>,
     /// Ordered inert document-variable metadata

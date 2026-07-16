@@ -40,6 +40,7 @@ pub mod header_footer;
 mod namespace;
 pub mod named_sheet_view;
 pub mod page_margins;
+pub mod page_setup;
 pub mod parsers;
 pub mod pivot;
 pub mod print_options;
@@ -117,6 +118,11 @@ pub use named_sheet_view::{
     NamedSheetViewSortRules, NamedSheetViews, parse_named_sheet_views,
 };
 pub use page_margins::{PageMargin, WorksheetPageMargins, parse_worksheet_page_margins};
+pub use page_setup::{
+    PageSetupCellComments, PageSetupOrder, PageSetupOrientation, PageSetupPrintErrors,
+    PositiveUniversalMeasure, UniversalMeasureUnit, WorksheetPageSetup,
+    parse_complete_worksheet_page_setup,
+};
 pub use print_options::{WorksheetPrintOptions, parse_worksheet_print_options};
 pub use sort::{SortBy, SortCondition, SortMethod, SortState};
 pub use sparkline::{

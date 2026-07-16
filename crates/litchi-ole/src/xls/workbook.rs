@@ -14,11 +14,12 @@ use crate::xls::records::{
     BiffVersion, BofRecord, BoundSheetRecord, CellRecord, DimensionsRecord, FormulaValue,
     RecordIter, SharedStringProperties, SharedStringTable, XlsEncoding,
 };
+use crate::xls::sheet_metadata::XlsSheetMetadata;
 use crate::xls::worksheet::XlsWorksheet;
 use crate::xls::{autofilter, comments, conditional_format, hyperlinks, layout, merged_cells, page_setup, pivot_table, protection, utils, view};
 use litchi_cfb::OleFile;
 use litchi_core::sheet::{Result, Worksheet as SheetTrait, WorksheetIterator};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::{Read, Seek};
 use std::sync::Arc;
 
@@ -131,6 +132,7 @@ pub struct XlsWorkbook<R: Read + Seek> {
     ole_file: OleFile<R>,
     worksheets: Vec<XlsWorksheet>,
     worksheet_names: Vec<String>,
+    sheets: Vec<XlsSheetMetadata>,
     /// Shared string table (Arc for zero-copy sharing across worksheets)
     shared_strings: Option<Arc<Vec<String>>>,
     /// Sparse rich-text and phonetic properties parallel to `shared_strings`.
@@ -164,6 +166,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             ole_file,
             worksheets: Vec::new(),
             worksheet_names: Vec::new(),
+            sheets: Vec::new(),
             shared_strings: None,
             shared_string_properties: None,
             shared_string_reference_count: 0,
@@ -199,6 +202,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             ole_file,
             worksheets: Vec::new(),
             worksheet_names: Vec::new(),
+            sheets: Vec::new(),
             shared_strings: None,
             shared_string_properties: None,
             shared_string_reference_count: 0,
@@ -242,9 +246,24 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         // Use Arc for zero-copy sharing across worksheets
         self.shared_strings = Some(Arc::new(strings));
         self.shared_string_properties = Some(Arc::new(string_properties));
-        self.worksheet_names = bound_sheets.iter().map(|s| s.name.clone()).collect();
+        let all_sheet_names = bound_sheets.iter().map(|sheet| sheet.name.clone()).collect::<Vec<_>>();
+        let mut unique_sheet_names = HashSet::with_capacity(all_sheet_names.len());
+        for name in &all_sheet_names {
+            if !unique_sheet_names.insert(name.to_lowercase()) {
+                return Err(XlsError::InvalidRecord {
+                    record_type: 0x0085,
+                    message: format!("duplicate case-insensitive BoundSheet8 name: {name:?}"),
+                });
+            }
+        }
+        self.sheets = bound_sheets
+            .iter()
+            .enumerate()
+            .map(|(index, sheet)| XlsSheetMetadata::from_bound_sheet(index, sheet))
+            .collect();
+        self.worksheet_names.clear();
         self.formula_context
-            .set_sheet_names(self.worksheet_names.clone());
+            .set_sheet_names(all_sheet_names);
         self.formula_context.set_defined_names(
             defined_name_slots
                 .iter()
@@ -260,10 +279,16 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             .collect();
 
         // Parse worksheets from positions in the workbook stream
-        for bound_sheet in &bound_sheets {
+        for (sheet_index, bound_sheet) in bound_sheets.iter().enumerate() {
+            if bound_sheet.sheet_type != crate::xls::records::SheetType::WorkSheet {
+                continue;
+            }
             match self.parse_worksheet_from_position(bound_sheet, &encoding, &mut record_iter) {
                 Ok(worksheet) => {
+                    let worksheet_index = self.worksheets.len();
+                    self.worksheet_names.push(bound_sheet.name.clone());
                     self.worksheets.push(worksheet);
+                    self.sheets[sheet_index].set_parsed_worksheet_index(worksheet_index);
                 },
                 Err(_e) => {
                     // Failed to parse worksheet, continue with next
@@ -773,6 +798,21 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         self.worksheets
             .get(index)
             .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet index {}", index)))
+    }
+
+    /// All workbook sheet directory entries in tab order.
+    pub fn sheets(&self) -> &[XlsSheetMetadata] {
+        &self.sheets
+    }
+
+    /// Sheet directory entry at a workbook tab index.
+    pub fn sheet(&self, index: usize) -> Option<&XlsSheetMetadata> {
+        self.sheets.get(index)
+    }
+
+    /// Case-insensitive sheet directory lookup.
+    pub fn sheet_by_name(&self, name: &str) -> Option<&XlsSheetMetadata> {
+        self.sheets.iter().find(|sheet| sheet.name().eq_ignore_ascii_case(name))
     }
 
     /// Total number of cell references represented by the workbook SST.
