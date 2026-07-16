@@ -1036,8 +1036,9 @@ mod tests {
         push_property(&mut data, 0x01FF, 0x0008_0008);
         push_property(&mut data, 0x023F, 0x0002_0002);
         push_property(&mut data, 0x00FF, 0x0020_0020);
+        push_property(&mut data, 0x033F, 0x0001_0001);
 
-        let properties = EscherProperties::from_opt_record(&opt_record(&data, 4));
+        let properties = EscherProperties::from_opt_record(&opt_record(&data, 5));
 
         assert_eq!(properties.get_bool(EscherPropertyId::Filled), Some(true));
         assert_eq!(
@@ -1057,6 +1058,10 @@ mod tests {
         assert_eq!(
             properties.get_bool(EscherPropertyId::GeoTextUnderlineFont),
             None
+        );
+        assert_eq!(
+            properties.get_bool(EscherPropertyId::ShapeBackgroundShape),
+            Some(true)
         );
     }
 

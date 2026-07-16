@@ -258,14 +258,16 @@ pub mod escher_prop {
     pub const FILL_BACK_COLOR: u16 = 0x0183;
     /// Fill blip property (with fComplex flag)
     pub const FILL_BLIP: u16 = 0x4186;
-    /// Line style boolean properties
-    pub const LINE_STYLE_BOOL: u16 = 0x01BF;
+    /// Fill style boolean properties
+    pub const FILL_STYLE_BOOL: u16 = 0x01BF;
     /// Line color property
     pub const LINE_COLOR: u16 = 0x01C0;
     /// Line blip property (with fComplex flag)
     pub const LINE_BLIP: u16 = 0x41C5;
+    /// Line style boolean properties
+    pub const LINE_STYLE_BOOL: u16 = 0x01FF;
     /// Shape boolean properties
-    pub const SHAPE_BOOL: u16 = 0x01FF;
+    pub const SHAPE_BOOL: u16 = 0x033F;
     /// Shadow color property
     pub const SHADOW_COLOR: u16 = 0x0201;
 }
@@ -767,10 +769,11 @@ mod tests {
         assert_eq!(escher_prop::FILL_COLOR, 0x0181);
         assert_eq!(escher_prop::FILL_BACK_COLOR, 0x0183);
         assert_eq!(escher_prop::FILL_BLIP, 0x4186);
-        assert_eq!(escher_prop::LINE_STYLE_BOOL, 0x01BF);
+        assert_eq!(escher_prop::FILL_STYLE_BOOL, 0x01BF);
         assert_eq!(escher_prop::LINE_COLOR, 0x01C0);
         assert_eq!(escher_prop::LINE_BLIP, 0x41C5);
-        assert_eq!(escher_prop::SHAPE_BOOL, 0x01FF);
+        assert_eq!(escher_prop::LINE_STYLE_BOOL, 0x01FF);
+        assert_eq!(escher_prop::SHAPE_BOOL, 0x033F);
         assert_eq!(escher_prop::SHADOW_COLOR, 0x0201);
     }
 

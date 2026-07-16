@@ -59,7 +59,7 @@ pub mod escher_prop {
     pub const LINE_STYLE_BOOL: u16 = 0x01FF;
     pub const SHADOW_COLOR: u16 = 0x0201;
     pub const BW_MODE: u16 = 0x0304; // blackAndWhiteMode
-    pub const BACKGROUND_SHAPE: u16 = 0x017F; // fBackground
+    pub const BACKGROUND_SHAPE: u16 = 0x033F;
     // Complex property flag
     pub const COMPLEX_FLAG: u16 = 0x4000;
 }
@@ -487,6 +487,7 @@ mod tests {
     fn test_master_ppdrawing_structure() {
         assert_eq!(escher_prop::FILL_RECT_RIGHT, 0x0193);
         assert_eq!(escher_prop::FILL_RECT_BOTTOM, 0x0194);
+        assert_eq!(escher_prop::BACKGROUND_SHAPE, 0x033F);
         let built = build_master_ppdrawing();
         // Verify structure starts correctly
         assert!(built.len() > 100, "Built PPDrawing should be substantial");
@@ -494,5 +495,27 @@ mod tests {
         assert_eq!(&built[2..4], &[0x0C, 0x04]); // 0x040C
         // DgContainer at bytes 10-11
         assert_eq!(&built[10..12], &[0x02, 0xF0]); // 0xF002
+
+        let expected_properties = [
+            (0x0181u16, 0x0800_0000u32),
+            (0x0183, 0x0800_0005),
+            (0x0193, 0x0099_A040),
+            (0x0194, 0x0076_BE60),
+            (0x01BF, 0x0012_0012),
+            (0x01FF, 0x0008_0000),
+            (0x0304, 0x0000_0009),
+            (0x033F, 0x0001_0001),
+        ];
+        let mut expected_bytes = Vec::new();
+        for (id, value) in expected_properties {
+            expected_bytes.extend_from_slice(&id.to_le_bytes());
+            expected_bytes.extend_from_slice(&value.to_le_bytes());
+        }
+        assert!(
+            built
+                .windows(expected_bytes.len())
+                .any(|window| window == expected_bytes),
+            "master background must contain the exact OfficeArt property table"
+        );
     }
 }

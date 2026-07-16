@@ -89,7 +89,7 @@ pub mod prop_value {
     pub const SCHEME_LINE: u32 = SCHEME_COLOR | 0x01;
     pub const SCHEME_SHADOW: u32 = SCHEME_COLOR | 0x02;
     pub const LINE_STYLE_DEFAULT: u32 = 0x0010_0010;
-    pub const SHAPE_BOOL_DEFAULT: u32 = 0x0008_0008;
+    pub const LINE_STYLE_BOOL_DEFAULT: u32 = 0x0008_0008;
 }
 
 // =============================================================================

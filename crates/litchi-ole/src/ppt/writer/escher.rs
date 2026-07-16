@@ -82,8 +82,7 @@ pub mod prop_id {
 
     // Shape
     pub const BW_MODE: u16 = 0x0304;
-    pub const SHAPE_BOOL: u16 = 0x01FF;
-    pub const BACKGROUND_SHAPE: u16 = 0x017F; // fBackground per MS-ODRAW
+    pub const BACKGROUND_SHAPE: u16 = 0x033F;
 }
 
 // =============================================================================
@@ -310,7 +309,10 @@ pub const DGG_DEFAULT_PROPERTIES: [EscherProperty; 8] = [
     ),
     EscherProperty::new(prop_id::LINE_COLOR, ppt_prop_value::SCHEME_LINE),
     EscherProperty::new(prop_id::LINE_BLIP, 0),
-    EscherProperty::new(prop_id::SHAPE_BOOL, ppt_prop_value::SHAPE_BOOL_DEFAULT),
+    EscherProperty::new(
+        prop_id::LINE_STYLE_BOOL,
+        ppt_prop_value::LINE_STYLE_BOOL_DEFAULT,
+    ),
     EscherProperty::new(prop_id::SHADOW_COLOR, ppt_prop_value::SCHEME_SHADOW),
 ];
 
@@ -1688,6 +1690,34 @@ mod tests {
         assert_eq!(prop_id::SHADOW_COLOR, 0x0201);
         assert_eq!(prop_id::NO_FILL_HIT_TEST, 0x01BF);
         assert_eq!(prop_id::LINE_STYLE_BOOL, 0x01FF);
+        assert_eq!(prop_id::BACKGROUND_SHAPE, 0x033F);
+    }
+
+    #[test]
+    fn test_default_and_background_boolean_property_groups() {
+        let dgg_line_bool = DGG_DEFAULT_PROPERTIES[6];
+        let dgg_line_bool_id = { dgg_line_bool.prop_id };
+        let dgg_line_bool_value = { dgg_line_bool.value };
+        assert_eq!(dgg_line_bool_id, 0x01FF);
+        assert_eq!(dgg_line_bool_value, 0x0008_0008);
+
+        let actual: Vec<(u16, u32)> = BG_SHAPE_PROPERTIES
+            .iter()
+            .map(|property| ({ property.prop_id }, { property.value }))
+            .collect();
+        assert_eq!(
+            actual,
+            [
+                (0x0181, 0x0800_0000),
+                (0x0183, 0x0800_0005),
+                (0x0193, 0x0099_936E),
+                (0x0194, 0x0076_B1BE),
+                (0x01BF, 0x0012_0012),
+                (0x01FF, 0x0008_0000),
+                (0x0304, 0x0000_0009),
+                (0x033F, 0x0001_0001),
+            ]
+        );
     }
 
     #[test]

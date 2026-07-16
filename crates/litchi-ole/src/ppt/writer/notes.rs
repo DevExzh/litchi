@@ -380,12 +380,12 @@ impl NotesContainerBuilder {
         let bg_props: [(u16, u32); 8] = [
             (0x0181, 0x08000000), // fillColor
             (0x0183, 0x08000005), // fillBackColor
-            (0x0185, 0x0099CCEE), // fillRectRight (approximation)
-            (0x0186, 0x0076B0DE), // fillRectBottom
+            (0x0193, 0x0099CCEE), // fillRectRight (approximation)
+            (0x0194, 0x0076B0DE), // fillRectBottom
             (0x01BF, 0x00120012), // fNoFillHitTest
             (0x01FF, 0x00080000), // lineBool
-            (0x03BF, 0x00000009), // shadowBool
-            (0x03FF, 0x00010001), // shapeBool - BACKGROUND_SHAPE
+            (0x0304, 0x00000009), // blackAndWhiteMode
+            (0x033F, 0x00010001), // fBackground
         ];
         let mut opt = Vec::new();
         write_escher_header(
@@ -901,5 +901,32 @@ mod tests {
         // Check container starts with Notes record type
         let rec_type = u16::from_le_bytes([container[2], container[3]]);
         assert_eq!(rec_type, record_type::NOTES);
+    }
+
+    #[test]
+    fn test_notes_background_uses_shape_boolean_group() {
+        let builder = NotesContainerBuilder::new(NotesPage::new(1), 3);
+        let background = builder.build_background_shape(0x0C04).unwrap();
+        let expected_properties = [
+            (0x0181u16, 0x0800_0000u32),
+            (0x0183, 0x0800_0005),
+            (0x0193, 0x0099_CCEE),
+            (0x0194, 0x0076_B0DE),
+            (0x01BF, 0x0012_0012),
+            (0x01FF, 0x0008_0000),
+            (0x0304, 0x0000_0009),
+            (0x033F, 0x0001_0001),
+        ];
+        let mut expected_bytes = Vec::new();
+        for (id, value) in expected_properties {
+            expected_bytes.extend_from_slice(&id.to_le_bytes());
+            expected_bytes.extend_from_slice(&value.to_le_bytes());
+        }
+        assert!(
+            background
+                .windows(expected_bytes.len())
+                .any(|window| window == expected_bytes),
+            "notes background must contain the exact OfficeArt property table"
+        );
     }
 }
