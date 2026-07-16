@@ -1,6 +1,8 @@
 use super::super::package::{PptError, Result};
 use super::super::records::PptRecord;
-use super::super::text_extensions::TextStyleExtension9;
+use super::super::text_extensions::{
+    TextStyleExtension9, TextStyleExtension10, TextStyleExtension11,
+};
 /// Escher record parsing for PowerPoint shapes.
 ///
 /// This module provides functionality to parse Escher binary records
@@ -716,6 +718,39 @@ impl<'a> EscherRecord<'a> {
     /// MS-PPT stores `StyleTextProp9Atom` in the shape's `ClientData`, under
     /// the `___PPT9` programmable binary tag, rather than in `ClientTextbox`.
     pub fn extract_text_style_extension9(&self) -> Result<Option<TextStyleExtension9>> {
+        self.extract_versioned_text_style_record(
+            9,
+            crate::consts::PptRecordType::StyleTextProp9Atom,
+        )?
+        .map(|record| TextStyleExtension9::parse(&record.data))
+        .transpose()
+    }
+
+    /// Extract PowerPoint 10 alternate-script font formatting for this text.
+    pub fn extract_text_style_extension10(&self) -> Result<Option<TextStyleExtension10>> {
+        self.extract_versioned_text_style_record(
+            10,
+            crate::consts::PptRecordType::StyleTextProp10Atom,
+        )?
+        .map(|record| TextStyleExtension10::parse(&record.data))
+        .transpose()
+    }
+
+    /// Extract PowerPoint 11 smart-tag formatting for this text.
+    pub fn extract_text_style_extension11(&self) -> Result<Option<TextStyleExtension11>> {
+        self.extract_versioned_text_style_record(
+            11,
+            crate::consts::PptRecordType::StyleTextProp11Atom,
+        )?
+        .map(|record| TextStyleExtension11::parse(&record.data))
+        .transpose()
+    }
+
+    fn extract_versioned_text_style_record(
+        &self,
+        version: u8,
+        record_type: crate::consts::PptRecordType,
+    ) -> Result<Option<PptRecord>> {
         let Some(client_data) = (self.record_type == EscherRecordType::ClientData)
             .then_some(self)
             .or_else(|| self.find_child(EscherRecordType::ClientData))
@@ -728,47 +763,47 @@ impl<'a> EscherRecord<'a> {
             if record.record_type != crate::consts::PptRecordType::ProgTags {
                 continue;
             }
-            for tag in parse_ppt_record_sequence(&record.data, "PPT9 ProgTags")? {
+            for tag in parse_ppt_record_sequence(&record.data, &format!("PPT{version} ProgTags"))? {
                 if tag.record_type != crate::consts::PptRecordType::ProgBinaryTag {
                     continue;
                 }
-                let tag_children = parse_ppt_record_sequence(&tag.data, "PPT9 ProgBinaryTag")?;
+                let tag_children =
+                    parse_ppt_record_sequence(&tag.data, &format!("PPT{version} ProgBinaryTag"))?;
                 let Some(name) = tag_children
                     .iter()
                     .find(|child| child.record_type == crate::consts::PptRecordType::CString)
                 else {
                     continue;
                 };
-                if !is_ppt9_tag_name(name) {
+                if !is_versioned_ppt_tag_name(name, version) {
                     continue;
                 }
                 let blob = tag_children
                     .iter()
                     .find(|child| child.record_type == crate::consts::PptRecordType::BinaryTagData)
                     .ok_or_else(|| {
-                        PptError::Corrupted(
-                            "___PPT9 programmable tag is missing BinaryTagData".to_string(),
-                        )
+                        PptError::Corrupted(format!(
+                            "___PPT{version} programmable tag is missing BinaryTagData"
+                        ))
                     })?;
-                for extension_record in
-                    parse_ppt_record_sequence(&blob.data, "___PPT9 BinaryTagData")?
-                {
-                    if extension_record.record_type
-                        != crate::consts::PptRecordType::StyleTextProp9Atom
-                    {
+                for extension_record in parse_ppt_record_sequence(
+                    &blob.data,
+                    &format!("___PPT{version} BinaryTagData"),
+                )? {
+                    if extension_record.record_type != record_type {
                         continue;
                     }
                     if extension_record.version != 0 || extension_record.instance != 0 {
-                        return Err(PptError::Corrupted(
-                            "StyleTextProp9Atom has an invalid record header".to_string(),
-                        ));
+                        return Err(PptError::Corrupted(format!(
+                            "Versioned text style atom {record_type:?} has an invalid header"
+                        )));
                     }
                     if result.is_some() {
-                        return Err(PptError::Corrupted(
-                            "Shape contains multiple StyleTextProp9Atom records".to_string(),
-                        ));
+                        return Err(PptError::Corrupted(format!(
+                            "Shape contains multiple {record_type:?} records"
+                        )));
                     }
-                    result = Some(TextStyleExtension9::parse(&extension_record.data)?);
+                    result = Some(extension_record);
                 }
             }
         }
@@ -842,16 +877,21 @@ fn parse_ppt_record_sequence(data: &[u8], context: &str) -> Result<Vec<PptRecord
     Ok(records)
 }
 
-fn is_ppt9_tag_name(record: &PptRecord) -> bool {
-    const PPT9: [u16; 7] = [0x5f, 0x5f, 0x5f, 0x50, 0x50, 0x54, 0x39];
+fn is_versioned_ppt_tag_name(record: &PptRecord, version: u8) -> bool {
+    let expected: &[u16] = match version {
+        9 => &[0x5f, 0x5f, 0x5f, 0x50, 0x50, 0x54, 0x39],
+        10 => &[0x5f, 0x5f, 0x5f, 0x50, 0x50, 0x54, 0x31, 0x30],
+        11 => &[0x5f, 0x5f, 0x5f, 0x50, 0x50, 0x54, 0x31, 0x31],
+        _ => return false,
+    };
     record.version == 0
         && record.instance == 0
-        && record.data.len() == PPT9.len() * 2
+        && record.data.len() == expected.len() * 2
         && record
             .data
             .chunks_exact(2)
             .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
-            .eq(PPT9)
+            .eq(expected.iter().copied())
 }
 
 /// Parser for Escher-based shape data with zero-copy optimization.
@@ -979,13 +1019,15 @@ mod tests {
         data
     }
 
-    fn shape_with_ppt9_extension(style_version: u16) -> EscherRecord<'static> {
-        let style = ppt_record(style_version, 0, 4012, &[0; 12]);
+    fn shape_with_versioned_extension(
+        tag_name: &str,
+        record_type: u16,
+        style_version: u16,
+        payload: &[u8],
+    ) -> EscherRecord<'static> {
+        let style = ppt_record(style_version, 0, record_type, payload);
         let blob = ppt_record(0, 0, 0x138b, &style);
-        let tag_name: Vec<u8> = "___PPT9"
-            .encode_utf16()
-            .flat_map(u16::to_le_bytes)
-            .collect();
+        let tag_name: Vec<u8> = tag_name.encode_utf16().flat_map(u16::to_le_bytes).collect();
         let mut tag_payload = ppt_record(0, 0, 4026, &tag_name);
         tag_payload.extend_from_slice(&blob);
         let tag = ppt_record(0x0f, 0, 0x138a, &tag_payload);
@@ -1012,13 +1054,34 @@ mod tests {
 
     #[test]
     fn extracts_style_text_prop9_from_shape_client_data() {
-        let shape = shape_with_ppt9_extension(0);
+        let shape = shape_with_versioned_extension("___PPT9", 4012, 0, &[0; 12]);
         let extension = shape.extract_text_style_extension9().unwrap().unwrap();
         assert_eq!(extension.runs.len(), 1);
         assert_eq!(extension.runs[0].paragraph.mask, 0);
 
-        let malformed = shape_with_ppt9_extension(1);
+        let malformed = shape_with_versioned_extension("___PPT9", 4012, 1, &[0; 12]);
         assert!(malformed.extract_text_style_extension9().is_err());
+    }
+
+    #[test]
+    fn extracts_powerpoint_10_and_11_text_styles_from_client_data() {
+        let mut font_payload = Vec::new();
+        font_payload.extend_from_slice(&0x0300_0000u32.to_le_bytes());
+        font_payload.extend_from_slice(&17u16.to_le_bytes());
+        font_payload.extend_from_slice(&23u16.to_le_bytes());
+        let shape = shape_with_versioned_extension("___PPT10", 4017, 0, &font_payload);
+        let extension = shape.extract_text_style_extension10().unwrap().unwrap();
+        assert_eq!(extension.runs[0].new_east_asian_font_ref, Some(17));
+        assert_eq!(extension.runs[0].complex_script_font_ref, Some(23));
+        assert!(shape.extract_text_style_extension11().unwrap().is_none());
+
+        let mut smart_tag_payload = Vec::new();
+        smart_tag_payload.extend_from_slice(&0x0200u32.to_le_bytes());
+        smart_tag_payload.extend_from_slice(&1u32.to_le_bytes());
+        smart_tag_payload.extend_from_slice(&99u32.to_le_bytes());
+        let shape = shape_with_versioned_extension("___PPT11", 4022, 0, &smart_tag_payload);
+        let extension = shape.extract_text_style_extension11().unwrap().unwrap();
+        assert_eq!(extension.runs[0].smart_tag_indices, vec![99]);
     }
 
     #[test]

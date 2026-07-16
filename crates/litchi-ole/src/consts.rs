@@ -65,6 +65,26 @@ pub enum PptRecordType {
     DefaultRulerAtom = 4011,
     /// PowerPoint 9 additional text properties atom record
     StyleTextProp9Atom = 4012,
+    /// PowerPoint 9 master text style atom record
+    TextMasterStyle9Atom = 4013,
+    /// PowerPoint 9 outline text properties container
+    OutlineTextProps9 = 4014,
+    /// PowerPoint 9 outline text properties header atom
+    OutlineTextPropsHeader9Atom = 4015,
+    /// PowerPoint 9 default text properties atom
+    TextDefaults9Atom = 4016,
+    /// PowerPoint 10 additional character properties atom
+    StyleTextProp10Atom = 4017,
+    /// PowerPoint 10 master text style atom record
+    TextMasterStyle10Atom = 4018,
+    /// PowerPoint 10 outline text properties container
+    OutlineTextProps10 = 4019,
+    /// PowerPoint 10 default text properties atom
+    TextDefaults10Atom = 4020,
+    /// PowerPoint 11 outline text properties container
+    OutlineTextProps11 = 4021,
+    /// PowerPoint 11 additional text properties atom
+    StyleTextProp11Atom = 4022,
     /// Style text prop atom record
     StyleTextPropAtom = 4001,
     /// Master text prop atom record
@@ -243,6 +263,16 @@ impl From<u16> for PptRecordType {
             4010 => PptRecordType::TextSpecInfoAtom,
             4011 => PptRecordType::DefaultRulerAtom,
             4012 => PptRecordType::StyleTextProp9Atom,
+            4013 => PptRecordType::TextMasterStyle9Atom,
+            4014 => PptRecordType::OutlineTextProps9,
+            4015 => PptRecordType::OutlineTextPropsHeader9Atom,
+            4016 => PptRecordType::TextDefaults9Atom,
+            4017 => PptRecordType::StyleTextProp10Atom,
+            4018 => PptRecordType::TextMasterStyle10Atom,
+            4019 => PptRecordType::OutlineTextProps10,
+            4020 => PptRecordType::TextDefaults10Atom,
+            4021 => PptRecordType::OutlineTextProps11,
+            4022 => PptRecordType::StyleTextProp11Atom,
             4001 => PptRecordType::StyleTextPropAtom,
             4002 => PptRecordType::MasterTextPropAtom,
             4003 => PptRecordType::TxMasterStyleAtom,

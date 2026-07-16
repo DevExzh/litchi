@@ -99,8 +99,9 @@ pub use current_user::CurrentUser;
 pub use escher_textbox::EscherTextboxWrapper;
 pub use master_style::{TextMasterStyle, TextMasterStyleLevel};
 pub use text_extensions::{
-    TextCharacterExtension9, TextParagraphExtension9, TextSpecialInfoExtension9,
-    TextStyleExtension9, TextStyleExtension9Run,
+    TextCharacterExtension9, TextCharacterExtension10, TextParagraphExtension9,
+    TextSpecialInfoExtension9, TextSpecialInfoExtension11, TextStyleExtension9,
+    TextStyleExtension9Run, TextStyleExtension10, TextStyleExtension11,
 };
 pub use text_prop::{TextProp, TextPropCollection, TextPropType, TextTabStop};
 pub use text_ruler::{TextRuler, TextRulerLevel};

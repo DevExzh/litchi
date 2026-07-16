@@ -131,6 +131,9 @@ impl PptRecord {
                 | PptRecordType::ProgTags
                 | PptRecordType::ProgStringTag
                 | PptRecordType::ProgBinaryTag
+                | PptRecordType::OutlineTextProps9
+                | PptRecordType::OutlineTextProps10
+                | PptRecordType::OutlineTextProps11
                 | PptRecordType::Comment2000
                 | PptRecordType::BuildList
                 | PptRecordType::ChartBuild

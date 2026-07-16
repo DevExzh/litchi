@@ -261,6 +261,170 @@ impl TextStyleExtension9 {
     }
 }
 
+/// Additional character formatting from one `TextCFException10`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TextCharacterExtension10 {
+    /// Original `CFMasks` value.
+    pub mask: u32,
+    /// Font index in `FontCollection10Container` for East Asian text.
+    pub new_east_asian_font_ref: Option<u16>,
+    /// Font index in `FontCollection10Container` for complex-script text.
+    pub complex_script_font_ref: Option<u16>,
+    /// Raw undefined `pp11ext` word, preserved when present.
+    pub pp11_extension: Option<u32>,
+}
+
+impl TextCharacterExtension10 {
+    fn parse_prefix(data: &[u8]) -> Result<(Self, usize)> {
+        require_bytes(data, 0, 4, "TextCFException10 mask")?;
+        let mask = read_u32_le(data, 0).unwrap_or(0);
+        // Bits 3, 6, 8, 14, and 15 are undefined fields that readers ignore.
+        // Only the three PowerPoint 10 fields may otherwise be set.
+        if mask & !0x0700_c148 != 0 {
+            return Err(PptError::Corrupted(
+                "TextCFException10 has unsupported character mask bits".to_string(),
+            ));
+        }
+        let mut offset = 4usize;
+        let new_east_asian_font_ref =
+            read_optional_u16(data, &mut offset, mask & 0x0100_0000 != 0, "new EA font")?;
+        let complex_script_font_ref = read_optional_u16(
+            data,
+            &mut offset,
+            mask & 0x0200_0000 != 0,
+            "complex-script font",
+        )?;
+        let pp11_extension = if mask & 0x0400_0000 != 0 {
+            require_bytes(data, offset, 4, "TextCFException10 PP11 extension")?;
+            let value = read_u32_le(data, offset).unwrap_or(0);
+            offset += 4;
+            Some(value)
+        } else {
+            None
+        };
+        Ok((
+            Self {
+                mask,
+                new_east_asian_font_ref,
+                complex_script_font_ref,
+                pp11_extension,
+            },
+            offset,
+        ))
+    }
+}
+
+/// Parsed payload of a `StyleTextProp10Atom`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TextStyleExtension10 {
+    /// Character extensions indexed through PowerPoint 9 `pp10runid` values.
+    pub runs: Vec<TextCharacterExtension10>,
+}
+
+impl TextStyleExtension10 {
+    /// Parse a complete `StyleTextProp10Atom` payload.
+    pub fn parse(data: &[u8]) -> Result<Self> {
+        let mut offset = 0usize;
+        let mut runs = Vec::new();
+        while offset < data.len() {
+            let (run, consumed) = TextCharacterExtension10::parse_prefix(&data[offset..])?;
+            offset += consumed;
+            runs.push(run);
+        }
+        Ok(Self { runs })
+    }
+}
+
+/// Smart-tag information from one PowerPoint 11 `StyleTextProp11` run.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TextSpecialInfoExtension11 {
+    /// Original `TextSIException` mask.
+    pub mask: u32,
+    /// Indices into the document-wide smart-tag store.
+    pub smart_tag_indices: Vec<u32>,
+}
+
+impl TextSpecialInfoExtension11 {
+    fn parse_prefix(data: &[u8]) -> Result<(Self, usize)> {
+        require_bytes(data, 0, 4, "StyleTextProp11 TextSIException mask")?;
+        let mask = read_u32_le(data, 0).unwrap_or(0);
+        // StyleTextProp11 permits only smart tags. Bits 3, 4, and 7 are
+        // undefined and ignored; all other TextSIException fields MUST be zero.
+        if mask & !0x0000_0298 != 0 {
+            return Err(PptError::Corrupted(
+                "StyleTextProp11 has unsupported special-info mask bits".to_string(),
+            ));
+        }
+        let mut offset = 4usize;
+        let mut smart_tag_indices = Vec::new();
+        if mask & 0x0200 != 0 {
+            require_bytes(data, offset, 4, "StyleTextProp11 smart-tag count")?;
+            let count = read_u32_le(data, offset).unwrap_or(0);
+            offset += 4;
+            let count = usize::try_from(count).map_err(|_| {
+                PptError::Corrupted("StyleTextProp11 smart-tag count overflow".to_string())
+            })?;
+            let byte_count = count.checked_mul(4).ok_or_else(|| {
+                PptError::Corrupted("StyleTextProp11 smart-tag size overflow".to_string())
+            })?;
+            require_bytes(
+                data,
+                offset,
+                byte_count,
+                "StyleTextProp11 smart-tag indices",
+            )?;
+            smart_tag_indices.reserve(count);
+            for _ in 0..count {
+                smart_tag_indices.push(read_u32_le(data, offset).unwrap_or(0));
+                offset += 4;
+            }
+        }
+        Ok((
+            Self {
+                mask,
+                smart_tag_indices,
+            },
+            offset,
+        ))
+    }
+}
+
+/// Parsed payload of a `StyleTextProp11Atom`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TextStyleExtension11 {
+    /// Smart-tag runs indexed through PowerPoint 9 SI `pp10runid` values.
+    pub runs: Vec<TextSpecialInfoExtension11>,
+}
+
+impl TextStyleExtension11 {
+    /// Parse a complete `StyleTextProp11Atom` payload.
+    pub fn parse(data: &[u8]) -> Result<Self> {
+        let mut offset = 0usize;
+        let mut runs = Vec::new();
+        while offset < data.len() {
+            let (run, consumed) = TextSpecialInfoExtension11::parse_prefix(&data[offset..])?;
+            offset += consumed;
+            runs.push(run);
+        }
+        Ok(Self { runs })
+    }
+}
+
+fn read_optional_u16(
+    data: &[u8],
+    offset: &mut usize,
+    present: bool,
+    field: &str,
+) -> Result<Option<u16>> {
+    if !present {
+        return Ok(None);
+    }
+    require_bytes(data, *offset, 2, field)?;
+    let value = read_u16_le(data, *offset).unwrap_or(0);
+    *offset += 2;
+    Ok(Some(value))
+}
+
 fn require_bytes(data: &[u8], offset: usize, size: usize, field: &str) -> Result<()> {
     let end = offset
         .checked_add(size)
@@ -381,5 +545,61 @@ mod tests {
         assert!(TextStyleExtension9::parse(&reserved_pp10).is_err());
 
         assert!(TextStyleExtension9::parse(&[0; 11]).is_err());
+    }
+
+    #[test]
+    fn parses_powerpoint_10_character_extensions() {
+        let mut data = Vec::new();
+        data.extend_from_slice(&0x0700_0000u32.to_le_bytes());
+        data.extend_from_slice(&65_535u16.to_le_bytes());
+        data.extend_from_slice(&42u16.to_le_bytes());
+        data.extend_from_slice(&0xdead_beefu32.to_le_bytes());
+        data.extend_from_slice(&0u32.to_le_bytes());
+
+        let style = TextStyleExtension10::parse(&data).unwrap();
+
+        assert_eq!(style.runs.len(), 2);
+        assert_eq!(style.runs[0].new_east_asian_font_ref, Some(65_535));
+        assert_eq!(style.runs[0].complex_script_font_ref, Some(42));
+        assert_eq!(style.runs[0].pp11_extension, Some(0xdead_beef));
+        assert_eq!(style.runs[1].mask, 0);
+    }
+
+    #[test]
+    fn rejects_malformed_powerpoint_10_character_extensions() {
+        assert!(TextStyleExtension10::parse(&[0; 3]).is_err());
+        assert!(TextStyleExtension10::parse(&1u32.to_le_bytes()).is_err());
+
+        let truncated = 0x0100_0000u32.to_le_bytes();
+        assert!(TextStyleExtension10::parse(&truncated).is_err());
+    }
+
+    #[test]
+    fn parses_powerpoint_11_smart_tag_runs() {
+        let mut data = Vec::new();
+        data.extend_from_slice(&0x0200u32.to_le_bytes());
+        data.extend_from_slice(&3u32.to_le_bytes());
+        data.extend_from_slice(&7u32.to_le_bytes());
+        data.extend_from_slice(&11u32.to_le_bytes());
+        data.extend_from_slice(&13u32.to_le_bytes());
+        data.extend_from_slice(&0u32.to_le_bytes());
+
+        let style = TextStyleExtension11::parse(&data).unwrap();
+
+        assert_eq!(style.runs.len(), 2);
+        assert_eq!(style.runs[0].smart_tag_indices, vec![7, 11, 13]);
+        assert!(style.runs[1].smart_tag_indices.is_empty());
+    }
+
+    #[test]
+    fn rejects_malformed_powerpoint_11_smart_tag_runs() {
+        assert!(TextStyleExtension11::parse(&[0; 3]).is_err());
+        assert!(TextStyleExtension11::parse(&1u32.to_le_bytes()).is_err());
+
+        let mut truncated = Vec::new();
+        truncated.extend_from_slice(&0x0200u32.to_le_bytes());
+        truncated.extend_from_slice(&2u32.to_le_bytes());
+        truncated.extend_from_slice(&1u32.to_le_bytes());
+        assert!(TextStyleExtension11::parse(&truncated).is_err());
     }
 }
