@@ -5,7 +5,7 @@ use super::package::{PptError, Result};
 /// Based on Apache POI's EscherTextboxWrapper, this wraps an Escher textbox record
 /// and provides access to its child PPT records (TextCharsAtom, TextBytesAtom, StyleTextPropAtom).
 use super::records::PptRecord;
-use super::text_run::{TextRun, TextRunExtractor};
+use super::text_run::{ParagraphRun, TextRun, TextRunExtractor};
 
 /// Wrapper around Escher textbox data.
 ///
@@ -20,6 +20,8 @@ pub struct EscherTextboxWrapper {
     text: String,
     /// Text split into character-formatting runs
     runs: Vec<TextRun>,
+    /// Text split into paragraph-formatting runs
+    paragraph_runs: Vec<ParagraphRun>,
 }
 
 impl EscherTextboxWrapper {
@@ -35,12 +37,14 @@ impl EscherTextboxWrapper {
         extractor.extract_from_records(&child_records)?;
         let text = extractor.text().to_string();
         let runs = extractor.runs().to_vec();
+        let paragraph_runs = extractor.paragraph_runs().to_vec();
 
         Ok(Self {
             data,
             child_records,
             text,
             runs,
+            paragraph_runs,
         })
     }
 
@@ -105,6 +109,11 @@ impl EscherTextboxWrapper {
     /// Get the character-formatting runs extracted from `StyleTextPropAtom`.
     pub fn runs(&self) -> &[TextRun] {
         &self.runs
+    }
+
+    /// Get paragraph-formatting runs extracted from `StyleTextPropAtom`.
+    pub fn paragraph_runs(&self) -> &[ParagraphRun] {
+        &self.paragraph_runs
     }
 
     /// Find a StyleTextPropAtom record.

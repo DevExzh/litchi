@@ -3,7 +3,7 @@
 /// Text boxes are shapes that contain text content and are commonly used
 /// for titles, bullet points, and other text elements in PowerPoint slides.
 use super::shape::{Shape, ShapeContainer, ShapeProperties};
-use crate::ppt::text_run::{TextRun, TextRunFormatting};
+use crate::ppt::text_run::{ParagraphRun, ParagraphRunFormatting, TextRun, TextRunFormatting};
 
 /// Type alias for text formatting tuple to reduce complexity.
 type TextFormattingResult = (Option<u16>, Option<u32>, bool, bool, bool);
@@ -20,6 +20,8 @@ pub struct TextBox<'a> {
     text: String,
     /// Character-formatting runs from the embedded `StyleTextPropAtom`
     runs: Vec<TextRun>,
+    /// Paragraph-formatting runs from the embedded `StyleTextPropAtom`
+    paragraph_runs: Vec<ParagraphRun>,
     /// Font size in points
     font_size: Option<u16>,
     /// Font color (RGB)
@@ -39,6 +41,7 @@ impl<'a> TextBox<'a> {
             container: ShapeContainer::new(properties, raw_data),
             text: String::new(),
             runs: Vec::new(),
+            paragraph_runs: Vec::new(),
             font_size: None,
             font_color: None,
             bold: false,
@@ -54,13 +57,17 @@ impl<'a> TextBox<'a> {
         // Extract basic shape properties
         let properties = record.extract_shape_properties()?;
 
-        let (text, runs) = if let Some(textbox_record) =
+        let (text, runs, paragraph_runs) = if let Some(textbox_record) =
             Self::find_descendant(record, super::escher::EscherRecordType::ClientTextbox)
         {
             let wrapper = crate::ppt::EscherTextboxWrapper::new(textbox_record.data.to_vec())?;
-            (wrapper.text().to_string(), wrapper.runs().to_vec())
+            (
+                wrapper.text().to_string(),
+                wrapper.runs().to_vec(),
+                wrapper.paragraph_runs().to_vec(),
+            )
         } else {
-            (String::new(), Vec::new())
+            (String::new(), Vec::new(), Vec::new())
         };
         let (font_size, font_color, bold, italic, underline) = Self::formatting_from_runs(&runs);
 
@@ -74,6 +81,7 @@ impl<'a> TextBox<'a> {
             container,
             text,
             runs,
+            paragraph_runs,
             font_size,
             font_color,
             bold,
@@ -91,11 +99,21 @@ impl<'a> TextBox<'a> {
         } else {
             vec![TextRun::new(text.clone(), 0)]
         };
+        let paragraph_runs = if text.is_empty() {
+            Vec::new()
+        } else {
+            vec![ParagraphRun::with_formatting(
+                text.clone(),
+                0,
+                ParagraphRunFormatting::default(),
+            )]
+        };
 
         Self {
             container,
             text,
             runs,
+            paragraph_runs,
             font_size: None,
             font_color: None,
             bold: false,
@@ -330,6 +348,11 @@ impl<'a> TextBox<'a> {
         &self.runs
     }
 
+    /// Get the paragraph-formatting runs in document order.
+    pub fn paragraph_runs(&self) -> &[ParagraphRun] {
+        &self.paragraph_runs
+    }
+
     /// Set the text content of the text box.
     pub fn set_text(&mut self, text: String) {
         self.text = text.clone();
@@ -340,6 +363,15 @@ impl<'a> TextBox<'a> {
                 text.clone(),
                 0,
                 self.current_run_formatting(),
+            )]
+        };
+        self.paragraph_runs = if text.is_empty() {
+            Vec::new()
+        } else {
+            vec![ParagraphRun::with_formatting(
+                text.clone(),
+                0,
+                ParagraphRunFormatting::default(),
             )]
         };
         self.container.set_text(text);
@@ -688,6 +720,8 @@ mod tests {
 
         assert_eq!(textbox.text(), "Hello World");
         assert!(textbox.has_text());
+        assert_eq!(textbox.paragraph_runs().len(), 1);
+        assert_eq!(textbox.paragraph_runs()[0].text, "Hello World");
     }
 
     #[test]
@@ -720,6 +754,9 @@ mod tests {
 
         assert_eq!(textbox.text(), "abcd");
         assert_eq!(textbox.runs().len(), 2);
+        assert_eq!(textbox.paragraph_runs().len(), 1);
+        assert_eq!(textbox.paragraph_runs()[0].text, "abcd");
+        assert_eq!(textbox.paragraph_runs()[0].formatting.property_mask, 0);
         assert_eq!(textbox.runs()[0].text, "ab");
         assert_eq!(textbox.runs()[0].formatting.font_size, Some(18));
         assert_eq!(textbox.runs()[0].formatting.font_color, Some(0x0011_2233));

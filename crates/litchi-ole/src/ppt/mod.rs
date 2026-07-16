@@ -94,8 +94,12 @@ pub use shapes::{AutoShape, Placeholder, PlaceholderSize, PlaceholderType, Shape
 // Re-export legacy types
 pub use current_user::CurrentUser;
 pub use escher_textbox::EscherTextboxWrapper;
-pub use text_prop::{TextProp, TextPropCollection, TextPropType};
-pub use text_run::{TextRun, TextRunExtractor, TextRunFormatting};
+pub use text_prop::{TextProp, TextPropCollection, TextPropType, TextTabStop};
+pub use text_run::{
+    ParagraphAlignment, ParagraphFontAlignment, ParagraphRun, ParagraphRunFormatting,
+    ParagraphTabAlignment, ParagraphTabStop, ParagraphTextDirection, TextRun, TextRunExtractor,
+    TextRunFormatting,
+};
 
 // Re-export writer types
 pub use writer::{

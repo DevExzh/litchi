@@ -40,6 +40,15 @@ pub enum TextPropType {
     Character,
 }
 
+/// A raw tab stop from a PowerPoint paragraph property run.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TextTabStop {
+    /// Signed offset in PowerPoint master units.
+    pub position: i16,
+    /// Raw `TextTabTypeEnum` value.
+    pub alignment: u16,
+}
+
 /// Collection of text properties for a run of characters.
 ///
 /// Based on Apache POI's TextPropCollection.
@@ -47,10 +56,14 @@ pub enum TextPropType {
 pub struct TextPropCollection {
     /// Number of characters this styling applies to
     pub characters_covered: u32,
-    /// Indent level (for paragraphs, -1 if not set)
-    pub indent_level: i16,
+    /// Unsigned paragraph indent level
+    pub indent_level: u16,
     /// The properties in this collection
     pub properties: Vec<TextProp>,
+    /// Original property-presence mask for this collection
+    pub property_mask: u32,
+    /// Tab stops carried by a paragraph property run
+    pub tab_stops: Vec<TextTabStop>,
     /// Type of collection
     pub prop_type: TextPropType,
 }
@@ -60,8 +73,10 @@ impl TextPropCollection {
     pub fn new(characters_covered: u32, prop_type: TextPropType) -> Self {
         Self {
             characters_covered,
-            indent_level: -1,
+            indent_level: 0,
             properties: Vec::new(),
+            property_mask: 0,
+            tab_stops: Vec::new(),
             prop_type,
         }
     }
@@ -80,8 +95,13 @@ impl TextPropCollection {
 /// Parse paragraph text properties from binary data.
 ///
 /// Based on POI's paragraph text property types.
-pub fn parse_paragraph_properties(data: &[u8], offset: &mut usize, mask: u32) -> Vec<TextProp> {
+pub fn parse_paragraph_properties(
+    data: &[u8],
+    offset: &mut usize,
+    mask: u32,
+) -> (Vec<TextProp>, Vec<TextTabStop>) {
     let mut props = Vec::new();
+    let mut tab_stops = Vec::new();
 
     // The fields occur in TextPFException order, not numeric mask order.
     let prop_defs = [
@@ -103,7 +123,7 @@ pub fn parse_paragraph_properties(data: &[u8], offset: &mut usize, mask: u32) ->
         if (mask & prop_mask) != 0 {
             if *offset + size > data.len() {
                 *offset = data.len();
-                return props;
+                return (props, tab_stops);
             }
 
             let value = match size {
@@ -123,20 +143,28 @@ pub fn parse_paragraph_properties(data: &[u8], offset: &mut usize, mask: u32) ->
     if (mask & 0x100000) != 0 {
         if *offset + 2 > data.len() {
             *offset = data.len();
-            return props;
+            return (props, tab_stops);
         }
         let count = read_u16_le(data, *offset).unwrap_or(0) as usize;
         let Some(size) = count.checked_mul(4).and_then(|size| size.checked_add(2)) else {
             *offset = data.len();
-            return props;
+            return (props, tab_stops);
         };
         if *offset + size > data.len() {
             *offset = data.len();
-            return props;
+            return (props, tab_stops);
         }
         let mut prop = TextProp::new("tabStops", size, 0x100000);
         prop.value = count as i32;
         props.push(prop);
+        let mut tab_offset = *offset + 2;
+        for _ in 0..count {
+            tab_stops.push(TextTabStop {
+                position: read_i16_le(data, tab_offset).unwrap_or(0),
+                alignment: read_u16_le(data, tab_offset + 2).unwrap_or(0),
+            });
+            tab_offset += 4;
+        }
         *offset += size;
     }
 
@@ -150,7 +178,7 @@ pub fn parse_paragraph_properties(data: &[u8], offset: &mut usize, mask: u32) ->
         if (mask & prop_mask) != 0 {
             if *offset + size > data.len() {
                 *offset = data.len();
-                return props;
+                return (props, tab_stops);
             }
 
             let value = match size {
@@ -166,7 +194,7 @@ pub fn parse_paragraph_properties(data: &[u8], offset: &mut usize, mask: u32) ->
         }
     }
 
-    props
+    (props, tab_stops)
 }
 
 /// Parse character text properties from binary data.
@@ -245,7 +273,7 @@ pub fn parse_style_text_prop_atom(
         }
 
         // Read indent level (2 bytes)
-        let indent_level = read_i16_le(data, offset).unwrap_or(0);
+        let indent_level = read_u16_le(data, offset).unwrap_or(0);
         offset += 2;
 
         // Read mask (4 bytes)
@@ -256,11 +284,13 @@ pub fn parse_style_text_prop_atom(
         offset += 4;
 
         // Parse properties based on mask
-        let properties = parse_paragraph_properties(data, &mut offset, mask);
+        let (properties, tab_stops) = parse_paragraph_properties(data, &mut offset, mask);
 
         let mut collection = TextPropCollection::new(char_count, TextPropType::Paragraph);
         collection.indent_level = indent_level;
         collection.properties = properties;
+        collection.property_mask = mask;
+        collection.tab_stops = tab_stops;
         paragraph_styles.push(collection);
 
         para_chars_covered += char_count;
@@ -291,6 +321,7 @@ pub fn parse_style_text_prop_atom(
 
         let mut collection = TextPropCollection::new(char_count, TextPropType::Character);
         collection.properties = properties;
+        collection.property_mask = mask;
         character_styles.push(collection);
 
         char_chars_covered += char_count;
@@ -372,6 +403,14 @@ mod tests {
         assert_eq!(paragraphs[0].get_value("bullet.char"), Some(0x2022));
         assert_eq!(paragraphs[0].get_value("alignment"), Some(2));
         assert_eq!(paragraphs[0].get_value("tabStops"), Some(1));
+        assert_eq!(paragraphs[0].property_mask, 0x0010_08FF);
+        assert_eq!(
+            paragraphs[0].tab_stops,
+            vec![TextTabStop {
+                position: 720,
+                alignment: 0,
+            }]
+        );
         assert_eq!(characters.len(), 1);
         assert_eq!(characters[0].get_value("char.flags"), Some(2));
         assert_eq!(characters[0].get_value("font.size"), Some(20));
