@@ -46,6 +46,8 @@ pub struct ParagraphStyle {
     pub alignment: TextAlignment,
     /// Native line-spacing mode and amount.
     pub line_spacing: ParagraphLineSpacing,
+    /// Space inserted before and after the paragraph.
+    pub spacing: ParagraphSpacing,
 }
 
 impl ParagraphStyle {
@@ -54,7 +56,55 @@ impl ParagraphStyle {
         Self {
             alignment: TextAlignment::Natural,
             line_spacing: ParagraphLineSpacing::default(),
+            spacing: ParagraphSpacing::default(),
         }
+    }
+}
+
+/// Nonnegative paragraph spacing in typographic points.
+///
+/// Pages, Numbers, and Keynote clamp negative paragraph spacing to zero.
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
+pub struct ParagraphSpacingPoints(f32);
+
+impl ParagraphSpacingPoints {
+    pub const ZERO: Self = Self(0.0);
+
+    /// Construct a finite, nonnegative paragraph spacing distance.
+    pub fn from_points(points: f32) -> crate::Result<Self> {
+        if !points.is_finite() || points < 0.0 {
+            return Err(crate::Error::InvalidFormat(
+                "paragraph spacing must be finite and nonnegative".to_owned(),
+            ));
+        }
+        Ok(if points == 0.0 {
+            Self::ZERO
+        } else {
+            Self(points)
+        })
+    }
+
+    /// Return the distance in typographic points.
+    pub const fn points(self) -> f32 {
+        self.0
+    }
+}
+
+/// Space inserted before and after a paragraph.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct ParagraphSpacing {
+    pub before: ParagraphSpacingPoints,
+    pub after: ParagraphSpacingPoints,
+}
+
+impl ParagraphSpacing {
+    pub const NONE: Self = Self {
+        before: ParagraphSpacingPoints::ZERO,
+        after: ParagraphSpacingPoints::ZERO,
+    };
+
+    pub const fn new(before: ParagraphSpacingPoints, after: ParagraphSpacingPoints) -> Self {
+        Self { before, after }
     }
 }
 
@@ -194,6 +244,7 @@ mod tests {
             para.line_spacing,
             ParagraphLineSpacing::Relative(ParagraphLineSpacingMultiple::SINGLE)
         );
+        assert_eq!(para.spacing, ParagraphSpacing::NONE);
     }
 
     #[test]
@@ -231,5 +282,27 @@ mod tests {
         assert!(ParagraphLineSpacingMultiple::new(f32::NAN).is_err());
         assert!(ParagraphLineSpacingPoints::from_points(0.0).is_err());
         assert!(ParagraphLineSpacingPoints::from_points(f32::INFINITY).is_err());
+    }
+
+    #[test]
+    fn paragraph_spacing_points_are_strict_and_allow_zero() {
+        assert_eq!(
+            ParagraphSpacingPoints::from_points(0.0).unwrap(),
+            ParagraphSpacingPoints::ZERO
+        );
+        assert_eq!(
+            ParagraphSpacingPoints::from_points(-0.0)
+                .unwrap()
+                .points()
+                .to_bits(),
+            0.0_f32.to_bits()
+        );
+        assert_eq!(
+            ParagraphSpacingPoints::from_points(12.5).unwrap().points(),
+            12.5
+        );
+        assert!(ParagraphSpacingPoints::from_points(-0.1).is_err());
+        assert!(ParagraphSpacingPoints::from_points(f32::NAN).is_err());
+        assert!(ParagraphSpacingPoints::from_points(f32::INFINITY).is_err());
     }
 }

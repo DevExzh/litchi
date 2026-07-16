@@ -13,18 +13,20 @@ use crate::shapes::{insert_style_variation, remove_style_variation};
 use crate::{Error, IWorkPackage, Result};
 
 use self::native::ParagraphStyleOverrides;
-use super::style::{ParagraphLineSpacing, TextAlignment};
+use super::style::{ParagraphLineSpacing, ParagraphSpacing, TextAlignment};
 
 #[derive(Debug, Clone, Copy)]
 enum ParagraphProperty {
     Alignment(TextAlignment),
     LineSpacing(ParagraphLineSpacing),
+    Spacing(ParagraphSpacing),
 }
 
 #[derive(Debug, Clone, Copy)]
 enum ParagraphPropertyKind {
     Alignment,
     LineSpacing,
+    Spacing,
 }
 
 pub(super) fn paragraph_alignment(
@@ -77,6 +79,29 @@ pub(super) fn reset_paragraph_line_spacing(
     storage_id: u64,
 ) -> Result<bool> {
     reset_property(package, storage_id, ParagraphPropertyKind::LineSpacing)
+}
+
+pub(super) fn paragraph_spacing(
+    package: &IWorkPackage,
+    storage_id: u64,
+) -> Result<ParagraphSpacing> {
+    let storage = storage::locate(package, storage_id)?;
+    native::inherited_spacing(package, storage.style_id)
+}
+
+pub(super) fn set_paragraph_spacing(
+    package: &mut IWorkPackage,
+    storage_id: u64,
+    spacing: ParagraphSpacing,
+) -> Result<()> {
+    if paragraph_spacing(package, storage_id)? == spacing {
+        return Ok(());
+    }
+    set_property(package, storage_id, ParagraphProperty::Spacing(spacing))
+}
+
+pub(super) fn reset_paragraph_spacing(package: &mut IWorkPackage, storage_id: u64) -> Result<bool> {
+    reset_property(package, storage_id, ParagraphPropertyKind::Spacing)
 }
 
 fn set_property(
@@ -207,6 +232,10 @@ fn apply_property(overrides: &mut ParagraphStyleOverrides, property: ParagraphPr
     match property {
         ParagraphProperty::Alignment(alignment) => overrides.alignment = Some(alignment),
         ParagraphProperty::LineSpacing(spacing) => overrides.line_spacing = Some(spacing),
+        ParagraphProperty::Spacing(spacing) => {
+            overrides.space_before = Some(spacing.before);
+            overrides.space_after = Some(spacing.after);
+        },
     }
 }
 
@@ -214,6 +243,9 @@ fn has_property(overrides: ParagraphStyleOverrides, kind: ParagraphPropertyKind)
     match kind {
         ParagraphPropertyKind::Alignment => overrides.alignment.is_some(),
         ParagraphPropertyKind::LineSpacing => overrides.line_spacing.is_some(),
+        ParagraphPropertyKind::Spacing => {
+            overrides.space_before.is_some() || overrides.space_after.is_some()
+        },
     }
 }
 
@@ -221,6 +253,10 @@ fn clear_property(overrides: &mut ParagraphStyleOverrides, kind: ParagraphProper
     match kind {
         ParagraphPropertyKind::Alignment => overrides.alignment = None,
         ParagraphPropertyKind::LineSpacing => overrides.line_spacing = None,
+        ParagraphPropertyKind::Spacing => {
+            overrides.space_before = None;
+            overrides.space_after = None;
+        },
     }
 }
 
@@ -235,6 +271,9 @@ fn inherited_property(
         )),
         ParagraphPropertyKind::LineSpacing => Ok(ParagraphProperty::LineSpacing(
             native::inherited_line_spacing(package, style_id)?,
+        )),
+        ParagraphPropertyKind::Spacing => Ok(ParagraphProperty::Spacing(
+            native::inherited_spacing(package, style_id)?,
         )),
     }
 }
@@ -261,6 +300,7 @@ fn validate_expected_property(
         ParagraphProperty::LineSpacing(spacing) => {
             paragraph_line_spacing(package, storage_id)? == spacing
         },
+        ParagraphProperty::Spacing(spacing) => paragraph_spacing(package, storage_id)? == spacing,
     };
     if matches {
         Ok(())

@@ -8,8 +8,8 @@ use crate::pages::PagesEditor;
 use crate::protobuf::tswp;
 use crate::shapes::{DrawablePoint, DrawableSize};
 use crate::text::{
-    IWorkTextEditor, ParagraphLineSpacingMultiple, ParagraphLineSpacingPoints, TextColumnCount,
-    TextColumns,
+    IWorkTextEditor, ParagraphLineSpacingMultiple, ParagraphLineSpacingPoints, ParagraphSpacing,
+    ParagraphSpacingPoints, TextColumnCount, TextColumns,
 };
 
 const STORAGE_MESSAGE_TYPES: &[u32] = &[2_001, 2_022];
@@ -62,12 +62,19 @@ fn pages_paragraph_overrides_compose_and_reset_independently() {
         .set_text_box_columns(first.drawable_object_id, &columns)
         .unwrap();
     let spacing = ParagraphLineSpacing::Relative(ParagraphLineSpacingMultiple::ONE_POINT_FIVE);
+    let paragraph_spacing = ParagraphSpacing::new(
+        ParagraphSpacingPoints::from_points(9.0).unwrap(),
+        ParagraphSpacingPoints::from_points(15.0).unwrap(),
+    );
 
     editor
         .set_text_box_paragraph_alignment(first.drawable_object_id, TextAlignment::Center)
         .unwrap();
     editor
         .set_text_box_paragraph_line_spacing(first.drawable_object_id, spacing)
+        .unwrap();
+    editor
+        .set_text_box_paragraph_spacing(first.drawable_object_id, paragraph_spacing)
         .unwrap();
     assert_eq!(
         editor
@@ -80,6 +87,12 @@ fn pages_paragraph_overrides_compose_and_reset_independently() {
             .text_box_paragraph_line_spacing(second.drawable_object_id)
             .unwrap(),
         ParagraphLineSpacing::default()
+    );
+    assert_eq!(
+        editor
+            .text_box_paragraph_spacing(second.drawable_object_id)
+            .unwrap(),
+        ParagraphSpacing::NONE
     );
 
     let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -96,6 +109,12 @@ fn pages_paragraph_overrides_compose_and_reset_independently() {
         spacing
     );
     assert_eq!(
+        reopened
+            .text_box_paragraph_spacing(first.drawable_object_id)
+            .unwrap(),
+        paragraph_spacing
+    );
+    assert_eq!(
         reopened.text_box_columns(first.drawable_object_id).unwrap(),
         columns
     );
@@ -110,6 +129,12 @@ fn pages_paragraph_overrides_compose_and_reset_independently() {
             .unwrap(),
         spacing
     );
+    assert_eq!(
+        reopened
+            .text_box_paragraph_spacing(first.drawable_object_id)
+            .unwrap(),
+        paragraph_spacing
+    );
     assert!(
         reopened
             .reset_text_box_paragraph_line_spacing(first.drawable_object_id)
@@ -120,6 +145,17 @@ fn pages_paragraph_overrides_compose_and_reset_independently() {
             .text_box_paragraph_line_spacing(first.drawable_object_id)
             .unwrap(),
         ParagraphLineSpacing::default()
+    );
+    assert!(
+        reopened
+            .reset_text_box_paragraph_spacing(first.drawable_object_id)
+            .unwrap()
+    );
+    assert_eq!(
+        reopened
+            .text_box_paragraph_spacing(first.drawable_object_id)
+            .unwrap(),
+        ParagraphSpacing::NONE
     );
     assert!(
         !reopened
@@ -144,6 +180,17 @@ fn every_native_line_spacing_mode_round_trips_in_numbers() {
         )
         .unwrap();
     let twelve = ParagraphLineSpacingPoints::from_points(12.0).unwrap();
+    let paragraph_spacing = ParagraphSpacing::new(
+        ParagraphSpacingPoints::from_points(11.0).unwrap(),
+        ParagraphSpacingPoints::from_points(17.0).unwrap(),
+    );
+    editor
+        .set_sheet_text_box_paragraph_spacing(
+            sheet_id,
+            created.drawable_object_id,
+            paragraph_spacing,
+        )
+        .unwrap();
     for spacing in [
         ParagraphLineSpacing::AtLeast(twelve),
         ParagraphLineSpacing::Exactly(twelve),
@@ -166,10 +213,21 @@ fn every_native_line_spacing_mode_round_trips_in_numbers() {
                 .unwrap(),
             spacing
         );
+        assert_eq!(
+            reopened
+                .sheet_text_box_paragraph_spacing(sheet_id, created.drawable_object_id)
+                .unwrap(),
+            paragraph_spacing
+        );
     }
     assert!(
         editor
             .reset_sheet_text_box_paragraph_line_spacing(sheet_id, created.drawable_object_id)
+            .unwrap()
+    );
+    assert!(
+        editor
+            .reset_sheet_text_box_paragraph_spacing(sheet_id, created.drawable_object_id)
             .unwrap()
     );
 }
@@ -190,6 +248,10 @@ fn keynote_spacing_reset_preserves_alignment() {
         .unwrap();
     let spacing =
         ParagraphLineSpacing::Between(ParagraphLineSpacingPoints::from_points(6.0).unwrap());
+    let paragraph_spacing = ParagraphSpacing::new(
+        ParagraphSpacingPoints::from_points(13.0).unwrap(),
+        ParagraphSpacingPoints::from_points(19.0).unwrap(),
+    );
     editor
         .set_slide_text_box_paragraph_alignment(
             0,
@@ -200,8 +262,28 @@ fn keynote_spacing_reset_preserves_alignment() {
     editor
         .set_slide_text_box_paragraph_line_spacing(0, created.drawable_object_id, spacing)
         .unwrap();
+    editor
+        .set_slide_text_box_paragraph_spacing(0, created.drawable_object_id, paragraph_spacing)
+        .unwrap();
     let mut reopened =
         crate::keynote::KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened
+            .slide_text_box_paragraph_line_spacing(0, created.drawable_object_id)
+            .unwrap(),
+        spacing
+    );
+    assert_eq!(
+        reopened
+            .slide_text_box_paragraph_spacing(0, created.drawable_object_id)
+            .unwrap(),
+        paragraph_spacing
+    );
+    assert!(
+        reopened
+            .reset_slide_text_box_paragraph_spacing(0, created.drawable_object_id)
+            .unwrap()
+    );
     assert_eq!(
         reopened
             .slide_text_box_paragraph_line_spacing(0, created.drawable_object_id)
@@ -284,6 +366,17 @@ fn multiple_paragraph_boundaries_are_rejected_transactionally() {
             .set_paragraph_line_spacing(
                 storage_id,
                 ParagraphLineSpacing::Relative(ParagraphLineSpacingMultiple::DOUBLE),
+            )
+            .is_err()
+    );
+    assert!(
+        editor
+            .set_paragraph_spacing(
+                storage_id,
+                ParagraphSpacing::new(
+                    ParagraphSpacingPoints::from_points(8.0).unwrap(),
+                    ParagraphSpacingPoints::from_points(12.0).unwrap(),
+                ),
             )
             .is_err()
     );

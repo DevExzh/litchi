@@ -18,10 +18,11 @@ use crate::wire::{
 use crate::{Error, IWorkPackage, Result};
 
 use super::paragraph_alignment::{
-    paragraph_alignment, paragraph_line_spacing, reset_paragraph_alignment,
-    reset_paragraph_line_spacing, set_paragraph_alignment, set_paragraph_line_spacing,
+    paragraph_alignment, paragraph_line_spacing, paragraph_spacing, reset_paragraph_alignment,
+    reset_paragraph_line_spacing, reset_paragraph_spacing, set_paragraph_alignment,
+    set_paragraph_line_spacing, set_paragraph_spacing,
 };
-use super::style::{ParagraphLineSpacing, TextAlignment};
+use super::style::{ParagraphLineSpacing, ParagraphSpacing, TextAlignment};
 
 const STORAGE_MESSAGE_TYPES: &[u32] = &[2001, 2022];
 
@@ -210,6 +211,42 @@ impl IWorkTextEditor {
     pub fn reset_paragraph_line_spacing(&mut self, object_id: u64) -> Result<bool> {
         let mut staged = self.package.clone();
         let changed = reset_paragraph_line_spacing(&mut staged, object_id)?;
+        if changed {
+            let bytes = staged.to_bytes()?;
+            IWorkPackage::from_bytes(&bytes)?;
+            self.package = staged;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective before/after spacing of a uniformly styled text storage.
+    pub fn paragraph_spacing(&self, object_id: u64) -> Result<ParagraphSpacing> {
+        paragraph_spacing(&self.package, object_id)
+    }
+
+    /// Atomically set before/after paragraph spacing across a uniform text storage.
+    pub fn set_paragraph_spacing(
+        &mut self,
+        object_id: u64,
+        spacing: ParagraphSpacing,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        set_paragraph_spacing(&mut staged, object_id, spacing)?;
+        let bytes = staged.to_bytes()?;
+        let verified = IWorkPackage::from_bytes(&bytes)?;
+        if paragraph_spacing(&verified, object_id)? != spacing {
+            return Err(Error::InvalidFormat(
+                "iWork paragraph spacing update failed round-trip validation".to_owned(),
+            ));
+        }
+        self.package = staged;
+        Ok(())
+    }
+
+    /// Restore inherited before/after spacing while preserving sibling overrides.
+    pub fn reset_paragraph_spacing(&mut self, object_id: u64) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = reset_paragraph_spacing(&mut staged, object_id)?;
         if changed {
             let bytes = staged.to_bytes()?;
             IWorkPackage::from_bytes(&bytes)?;

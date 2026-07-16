@@ -8,8 +8,8 @@ use litchi_iwa::shapes::{
     ShapeTextLayout, ShapeTextVerticalAlignment,
 };
 use litchi_iwa::text::{
-    ParagraphLineSpacing, ParagraphLineSpacingMultiple, TextAlignment, TextColumnCount,
-    TextColumnGap, TextColumns,
+    ParagraphLineSpacing, ParagraphLineSpacingMultiple, ParagraphSpacing, ParagraphSpacingPoints,
+    TextAlignment, TextColumnCount, TextColumnGap, TextColumns,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -54,6 +54,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_text_box_paragraph_line_spacing(
         created.drawable_object_id,
         ParagraphLineSpacing::Relative(ParagraphLineSpacingMultiple::ONE_POINT_FIVE),
+    )?;
+    editor.set_text_box_paragraph_spacing(
+        created.drawable_object_id,
+        ParagraphSpacing::new(
+            ParagraphSpacingPoints::from_points(9.0)?,
+            ParagraphSpacingPoints::from_points(15.0)?,
+        ),
     )?;
     editor.save(output)?;
     println!(

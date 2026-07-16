@@ -42,6 +42,8 @@ println!("{}", structured.summary());
   explicit password-protected document rejection
 - Semantic editors for Numbers sheets/tables/cells/formulas, Pages
   body/header/footer/text-box text, and Keynote slides/placeholders/text boxes/speaker notes
+- Typed copy-on-write text-box paragraph alignment, native line-spacing modes,
+  and atomic before/after paragraph spacing across Pages, Numbers, and Keynote
 - Lossless Pages document body/header/footer visibility, facing-page layout,
   automatic hyphenation, and ligature options
 - Typed Numbers table header/footer counts, freeze state, and repeating-header

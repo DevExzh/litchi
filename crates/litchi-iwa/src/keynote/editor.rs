@@ -26,7 +26,8 @@ use crate::shapes::{
     set_shape_text_layout, shape_geometry, shape_properties, shape_text_columns, shape_text_layout,
 };
 use crate::text::{
-    IWorkTextEditor, ParagraphLineSpacing, TextAlignment, TextColumns, TextStorageInfo,
+    IWorkTextEditor, ParagraphLineSpacing, ParagraphSpacing, TextAlignment, TextColumns,
+    TextStorageInfo,
 };
 use crate::wire::{
     append_repeated_length_delimited_field, parse_wire_fields, patch_fixed32_field,
@@ -1336,6 +1337,51 @@ impl KeynoteEditor {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();
         let changed = staged.reset_paragraph_line_spacing(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read effective before/after paragraph spacing of an ordinary slide text box.
+    pub fn slide_text_box_paragraph_spacing(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<ParagraphSpacing> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text.paragraph_spacing(graph.storage_id)
+    }
+
+    /// Atomically set before/after paragraph spacing across an ordinary slide text box.
+    pub fn set_slide_text_box_paragraph_spacing(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        spacing: ParagraphSpacing,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_paragraph_spacing(graph.storage_id, spacing)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified.slide_text_box_paragraph_spacing(slide_index, drawable_object_id)? != spacing {
+            return Err(Error::InvalidFormat(
+                "Keynote text-box paragraph spacing update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore inherited paragraph spacing while preserving sibling overrides.
+    pub fn reset_slide_text_box_paragraph_spacing(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_paragraph_spacing(graph.storage_id)?;
         if changed {
             *self = Self::from_package(staged.into_package())?;
         }

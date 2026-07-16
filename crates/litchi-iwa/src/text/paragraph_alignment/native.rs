@@ -10,7 +10,8 @@ use crate::wire::{parse_wire_fields, repeated_length_delimited_payloads};
 use crate::{Error, IWorkPackage, Result};
 
 use super::super::style::{
-    ParagraphLineSpacing, ParagraphLineSpacingMultiple, ParagraphLineSpacingPoints, TextAlignment,
+    ParagraphLineSpacing, ParagraphLineSpacingMultiple, ParagraphLineSpacingPoints,
+    ParagraphSpacing, ParagraphSpacingPoints, TextAlignment,
 };
 
 const STORAGE_MESSAGE_TYPES: &[u32] = &[2_001, 2_022];
@@ -27,6 +28,8 @@ const STYLE_VARIATION_FIELD: u32 = 4;
 const STYLE_STYLESHEET_FIELD: u32 = 5;
 const PARAGRAPH_ALIGNMENT_FIELD: u32 = 1;
 const PARAGRAPH_LINE_SPACING_FIELD: u32 = 13;
+const PARAGRAPH_SPACE_AFTER_FIELD: u32 = 20;
+const PARAGRAPH_SPACE_BEFORE_FIELD: u32 = 21;
 const LINE_SPACING_MODE_FIELD: u32 = 1;
 const LINE_SPACING_AMOUNT_FIELD: u32 = 2;
 
@@ -46,11 +49,16 @@ pub(super) struct ParagraphStyleLocation {
 pub(super) struct ParagraphStyleOverrides {
     pub(super) alignment: Option<TextAlignment>,
     pub(super) line_spacing: Option<ParagraphLineSpacing>,
+    pub(super) space_before: Option<ParagraphSpacingPoints>,
+    pub(super) space_after: Option<ParagraphSpacingPoints>,
 }
 
 impl ParagraphStyleOverrides {
     pub(super) fn count(self) -> u32 {
-        u32::from(self.alignment.is_some()) + u32::from(self.line_spacing.is_some())
+        u32::from(self.alignment.is_some())
+            + u32::from(self.line_spacing.is_some())
+            + u32::from(self.space_before.is_some())
+            + u32::from(self.space_after.is_some())
     }
 
     pub(super) fn is_empty(self) -> bool {
@@ -124,6 +132,51 @@ pub(super) fn inherited_line_spacing(
     .map_or(Ok(ParagraphLineSpacing::default()), Ok)
 }
 
+pub(super) fn inherited_spacing(
+    package: &IWorkPackage,
+    first_style_id: u64,
+) -> Result<ParagraphSpacing> {
+    let mut visited = HashSet::new();
+    let mut style_id = Some(first_style_id);
+    let mut before = None;
+    let mut after = None;
+    for _ in 0..MAX_STYLE_INHERITANCE_DEPTH {
+        let Some(identifier) = style_id else {
+            return Ok(ParagraphSpacing::new(
+                before.unwrap_or(ParagraphSpacingPoints::ZERO),
+                after.unwrap_or(ParagraphSpacingPoints::ZERO),
+            ));
+        };
+        if !visited.insert(identifier) {
+            return Err(Error::InvalidFormat(format!(
+                "iWork paragraph style inheritance cycles at {identifier}"
+            )));
+        }
+        let location = locate_style(package, identifier)?;
+        if let Some(properties) = location.style.para_properties.as_ref() {
+            if before.is_none() {
+                before = properties
+                    .space_before
+                    .map(ParagraphSpacingPoints::from_points)
+                    .transpose()?;
+            }
+            if after.is_none() {
+                after = properties
+                    .space_after
+                    .map(ParagraphSpacingPoints::from_points)
+                    .transpose()?;
+            }
+            if let (Some(before), Some(after)) = (before, after) {
+                return Ok(ParagraphSpacing::new(before, after));
+            }
+        }
+        style_id = location.style.super_.parent.map(|parent| parent.identifier);
+    }
+    Err(Error::InvalidFormat(format!(
+        "iWork paragraph style inheritance exceeds {MAX_STYLE_INHERITANCE_DEPTH} levels"
+    )))
+}
+
 fn walk_inheritance<T, F>(
     package: &IWorkPackage,
     first_style_id: u64,
@@ -170,13 +223,25 @@ pub(super) fn direct_overrides(
         .as_ref()
         .map(line_spacing_from_archive)
         .transpose()?;
+    let space_before = properties
+        .space_before
+        .map(ParagraphSpacingPoints::from_points)
+        .transpose()?;
+    let space_after = properties
+        .space_after
+        .map(ParagraphSpacingPoints::from_points)
+        .transpose()?;
     let overrides = ParagraphStyleOverrides {
         alignment,
         line_spacing,
+        space_before,
+        space_after,
     };
     let mut remaining = properties.clone();
     remaining.alignment = None;
     remaining.line_spacing = None;
+    remaining.space_before = None;
+    remaining.space_after = None;
     let semantic = !overrides.is_empty()
         && remaining == tswp::ParagraphStylePropertiesArchive::default()
         && style.override_count == Some(overrides.count())
@@ -204,7 +269,7 @@ pub(super) fn direct_overrides(
         STYLE_PARAGRAPH_PROPERTIES_FIELD,
         "paragraph properties",
     )?;
-    let mut paragraph_fields = Vec::with_capacity(2);
+    let mut paragraph_fields = Vec::with_capacity(4);
     if alignment.is_some() {
         paragraph_fields.push(PARAGRAPH_ALIGNMENT_FIELD);
     }
@@ -223,6 +288,12 @@ pub(super) fn direct_overrides(
         if !has_exact_fields(line_spacing_raw, &expected)? {
             return Ok(None);
         }
+    }
+    if space_after.is_some() {
+        paragraph_fields.push(PARAGRAPH_SPACE_AFTER_FIELD);
+    }
+    if space_before.is_some() {
+        paragraph_fields.push(PARAGRAPH_SPACE_BEFORE_FIELD);
     }
     let exact = has_exact_fields(
         raw,
@@ -267,6 +338,8 @@ pub(super) fn variation_object(
         para_properties: Some(tswp::ParagraphStylePropertiesArchive {
             alignment: overrides.alignment.map(TextAlignment::native_value),
             line_spacing: overrides.line_spacing.map(line_spacing_archive),
+            space_before: overrides.space_before.map(ParagraphSpacingPoints::points),
+            space_after: overrides.space_after.map(ParagraphSpacingPoints::points),
             ..Default::default()
         }),
     }
