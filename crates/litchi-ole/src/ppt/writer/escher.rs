@@ -53,6 +53,7 @@ pub mod prop_id {
     pub const SEGMENT_INFO: u16 = 0x0146;
     pub const ADJUST_VALUE: u16 = 0x0147;
     pub const ADJUST2_VALUE: u16 = 0x0148;
+    pub const ADJUST10_VALUE: u16 = 0x0150;
 
     // Fill style (MS-ODRAW section 2.3.7)
     pub const FILL_TYPE: u16 = 0x0180;
@@ -865,6 +866,8 @@ pub struct UserShapeData {
     pub flip_v: bool,
     /// Shape rotation in signed 16.16 fixed-point degrees.
     pub rotation: Option<i32>,
+    /// Shape-specific adjustment values, at indices 0 through 9.
+    pub adjust_values: Vec<i32>,
     /// Hyperlink ID (reference to ExObjList)
     pub hyperlink_id: Option<u32>,
     /// Hyperlink action type (for InteractiveInfoAtom)
@@ -917,6 +920,7 @@ impl Default for UserShapeData {
             flip_h: false,
             flip_v: false,
             rotation: None,
+            adjust_values: Vec::new(),
             hyperlink_id: None,
             hyperlink_action: 4, // ACTION_HYPERLINK
             hyperlink_jump: 0,   // JUMP_NONE
@@ -1012,6 +1016,12 @@ pub fn create_dg_container_with_shapes(
 
 /// Create a user shape SpContainer
 fn create_user_shape_container(shape_id: u32, shape: &UserShapeData) -> Result<Vec<u8>, PptError> {
+    if shape.adjust_values.len() > 10 {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "OfficeArt shapes support at most 10 adjustment values",
+        ));
+    }
     let mut container = EscherBuilder::new(header_version::CONTAINER, 0, record_type::SP_CONTAINER);
 
     // Shape flags
@@ -1234,6 +1244,12 @@ fn build_shape_properties(shape: &UserShapeData) -> Vec<EscherProperty> {
 
     if let Some(rotation) = shape.rotation {
         props.push(EscherProperty::new(prop_id::ROTATION, rotation as u32));
+    }
+    for (index, &value) in shape.adjust_values.iter().enumerate() {
+        props.push(EscherProperty::new(
+            prop_id::ADJUST_VALUE + index as u16,
+            value as u32,
+        ));
     }
 
     // Picture shapes have special handling - BLIP reference only, no fill/line
@@ -1757,6 +1773,38 @@ mod tests {
         assert!(properties.iter().any(|property| {
             property.prop_id == prop_id::ROTATION && property.value == (-90i32 * 65536) as u32
         }));
+    }
+
+    #[test]
+    fn test_shape_properties_preserve_all_ten_adjustments() {
+        let shape = UserShapeData {
+            adjust_values: (0..10).map(|index| index * -100).collect(),
+            ..Default::default()
+        };
+        let properties = build_shape_properties(&shape);
+        let adjustments: Vec<(u16, u32)> = properties
+            .iter()
+            .filter_map(|property| {
+                let id = { property.prop_id };
+                (prop_id::ADJUST_VALUE..=prop_id::ADJUST10_VALUE)
+                    .contains(&id)
+                    .then_some((id, { property.value }))
+            })
+            .collect();
+
+        assert_eq!(adjustments.len(), 10);
+        assert_eq!(adjustments[0], (0x0147, 0));
+        assert_eq!(adjustments[9], (0x0150, (-900i32) as u32));
+    }
+
+    #[test]
+    fn test_user_shape_rejects_more_than_ten_adjustments() {
+        let shape = UserShapeData {
+            adjust_values: vec![0; 11],
+            ..Default::default()
+        };
+
+        assert!(create_user_shape_container(1, &shape).is_err());
     }
 
     #[test]

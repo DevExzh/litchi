@@ -276,6 +276,8 @@ pub struct ShapeProperties {
     pub shadow: Option<ShadowStyle>,
     /// Rotation in degrees
     pub rotation: f32,
+    /// Shape-specific adjustment values, at indices 0 through 9.
+    pub adjust_values: Vec<i32>,
     /// Flip horizontal
     pub flip_h: bool,
     /// Flip vertical
@@ -312,6 +314,7 @@ impl Default for ShapeProperties {
             line: None,
             shadow: None,
             rotation: 0.0,
+            adjust_values: Vec::new(),
             flip_h: false,
             flip_v: false,
             picture_index: None,
@@ -486,6 +489,7 @@ fn convert_shape_to_escher(
         flip_h: props.flip_h,
         flip_v: props.flip_v,
         rotation: shape_rotation_to_fixed(props.rotation),
+        adjust_values: props.adjust_values.clone(),
         hyperlink_id: props.hyperlink_id,
         hyperlink_action: get_hyperlink_info(props.hyperlink_id, hyperlinks).0,
         hyperlink_jump: get_hyperlink_info(props.hyperlink_id, hyperlinks).1,
@@ -1117,6 +1121,33 @@ impl PptWriter {
             .last_mut()
             .ok_or_else(|| PptWriteError::InvalidData("No shapes on slide".to_string()))?;
         shape.properties.rotation = degrees;
+        Ok(())
+    }
+
+    /// Set one of the ten OfficeArt adjustment values on the last shape.
+    pub fn set_last_shape_adjustment(
+        &mut self,
+        slide: usize,
+        index: usize,
+        value: i32,
+    ) -> Result<(), PptWriteError> {
+        if index >= 10 {
+            return Err(PptWriteError::InvalidData(
+                "shape adjustment index must be in the range 0..10".to_string(),
+            ));
+        }
+        let slide_data = self
+            .slides
+            .get_mut(slide)
+            .ok_or_else(|| PptWriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+        let shape = slide_data
+            .shapes
+            .last_mut()
+            .ok_or_else(|| PptWriteError::InvalidData("No shapes on slide".to_string()))?;
+        if shape.properties.adjust_values.len() <= index {
+            shape.properties.adjust_values.resize(index + 1, 0);
+        }
+        shape.properties.adjust_values[index] = value;
         Ok(())
     }
 
@@ -2107,6 +2138,37 @@ mod tests {
     }
 
     #[test]
+    fn test_shape_adjustment_setter_preserves_sparse_positions() {
+        let mut writer = PptWriter::new();
+        let slide = writer.add_slide().unwrap();
+        writer
+            .add_styled_shape(
+                slide,
+                ShapeType::Arrow,
+                0,
+                0,
+                200,
+                100,
+                ShapeStyle::default(),
+            )
+            .unwrap();
+
+        writer.set_last_shape_adjustment(slide, 3, -42).unwrap();
+        assert_eq!(
+            writer.slides[slide].shapes[0].properties.adjust_values,
+            [0, 0, 0, -42]
+        );
+        let shape = convert_shape_to_escher(&writer.slides[slide].shapes[0], &writer.hyperlinks);
+        assert_eq!(shape.adjust_values, [0, 0, 0, -42]);
+
+        assert!(writer.set_last_shape_adjustment(slide, 10, 7).is_err());
+        assert_eq!(
+            writer.slides[slide].shapes[0].properties.adjust_values,
+            [0, 0, 0, -42]
+        );
+    }
+
+    #[test]
     fn test_add_textbox_invalid_slide() {
         let mut writer = PptWriter::new();
         let result = writer.add_textbox(0, 10, 10, 100, 50, "Test");
@@ -2263,6 +2325,7 @@ mod tests {
             line: None,
             shadow: None,
             rotation: 45.0,
+            adjust_values: Vec::new(),
             flip_h: true,
             flip_v: false,
             hyperlink_id: None,
