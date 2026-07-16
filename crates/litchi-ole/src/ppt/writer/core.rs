@@ -366,12 +366,12 @@ fn convert_shape_to_escher(
     let props = &shape.properties;
 
     // Extract fill properties from FillStyle
-    let (fill_color, fill_type, fill_opacity, fill_back_color, fill_angle) = props
+    let (fill_color, fill_type, fill_opacity, fill_back_color, fill_angle, fill_blip_index) = props
         .fill
         .as_ref()
-        .map_or((None, None, None, None, None), |fill| {
+        .map_or((None, None, None, None, None, None), |fill| {
             if !fill.enabled {
-                return (None, None, None, None, None);
+                return (None, None, None, None, None, None);
             }
 
             let color = Some(fill.color.to_rgbx());
@@ -393,7 +393,14 @@ fn convert_shape_to_escher(
             // PPT format: 0° = vertical up, so we need: PPT_angle = 90 - user_angle
             let angle = fill.gradient_angle.map(|a| ((90 - a) as i32) * 65536);
 
-            (color, fill_type, opacity, back_color, angle)
+            (
+                color,
+                fill_type,
+                opacity,
+                back_color,
+                angle,
+                fill.picture_index,
+            )
         });
 
     // Extract line color, width, dash style, and arrows from LineStyleConfig
@@ -476,6 +483,7 @@ fn convert_shape_to_escher(
         fill_opacity,
         fill_back_color,
         fill_angle,
+        fill_blip_index,
         line_color,
         line_width,
         line_dash_style,
@@ -1011,8 +1019,14 @@ impl PptWriter {
         height: i32,
         image_data: Vec<u8>,
     ) -> Result<(), PptWriteError> {
+        if slide >= self.slides.len() {
+            return Err(PptWriteError::InvalidData(format!(
+                "Slide {} does not exist",
+                slide
+            )));
+        }
         // Add picture to BLIP store
-        let blip_index = self.blip_store.add_picture(image_data);
+        let blip_index = self.add_picture_data(image_data);
 
         let slide_data = self
             .slides
@@ -1049,7 +1063,13 @@ impl PptWriter {
         image_data: Vec<u8>,
         blip_type: BlipType,
     ) -> Result<(), PptWriteError> {
-        let blip_index = self.blip_store.add_picture_with_type(image_data, blip_type);
+        if slide >= self.slides.len() {
+            return Err(PptWriteError::InvalidData(format!(
+                "Slide {} does not exist",
+                slide
+            )));
+        }
+        let blip_index = self.add_picture_data_with_type(image_data, blip_type);
 
         let slide_data = self
             .slides
@@ -1072,6 +1092,19 @@ impl PptWriter {
 
         slide_data.shapes.push(shape);
         Ok(())
+    }
+
+    /// Register picture data in the BLIP store and return its 1-based index.
+    ///
+    /// Use the returned index with [`FillStyle::picture`] to create a picture
+    /// or texture fill without adding a picture-frame shape.
+    pub fn add_picture_data(&mut self, image_data: Vec<u8>) -> u32 {
+        self.blip_store.add_picture(image_data)
+    }
+
+    /// Register explicitly typed picture data and return its 1-based BLIP index.
+    pub fn add_picture_data_with_type(&mut self, image_data: Vec<u8>, blip_type: BlipType) -> u32 {
+        self.blip_store.add_picture_with_type(image_data, blip_type)
     }
 
     /// Add a hyperlink and return its ID
@@ -2578,6 +2611,39 @@ mod tests {
         let mut buffer = Cursor::new(Vec::new());
         let result = writer.write_to(&mut buffer);
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_picture_fill_registers_and_serializes_blip_reference() {
+        let mut writer = PptWriter::new();
+        let slide = writer.add_slide().unwrap();
+        let blip_index =
+            writer.add_picture_data_with_type(vec![0x89, b'P', b'N', b'G'], BlipType::Png);
+        let style = ShapeStyle::new().with_fill(FillStyle::picture(blip_index));
+        writer
+            .add_styled_shape(slide, ShapeType::Rectangle, 10, 10, 100, 100, style)
+            .unwrap();
+
+        let shape = convert_shape_to_escher(&writer.slides[slide].shapes[0], &writer.hyperlinks);
+        assert_eq!(shape.fill_type, Some(3));
+        assert_eq!(shape.fill_blip_index, Some(1));
+        assert_eq!(writer.picture_count(), 1);
+
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).unwrap();
+        assert!(!output.into_inner().is_empty());
+    }
+
+    #[test]
+    fn test_invalid_slide_picture_does_not_mutate_blip_store() {
+        let mut writer = PptWriter::new();
+
+        assert!(
+            writer
+                .add_picture(7, 0, 0, 100, 100, vec![0x89, b'P', b'N', b'G'])
+                .is_err()
+        );
+        assert_eq!(writer.picture_count(), 0);
     }
 
     #[test]

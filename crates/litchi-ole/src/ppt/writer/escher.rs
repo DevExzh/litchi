@@ -840,6 +840,8 @@ pub struct UserShapeData {
     pub fill_back_color: Option<u32>,
     /// Fill gradient angle (in degrees * 65536)
     pub fill_angle: Option<i32>,
+    /// Fill BLIP index for pattern, texture, or picture fills.
+    pub fill_blip_index: Option<u32>,
     /// Line color (RGB, None = no line)
     pub line_color: Option<u32>,
     /// Line width in EMUs (12700 = 1pt)
@@ -907,6 +909,7 @@ impl Default for UserShapeData {
             fill_opacity: None,
             fill_back_color: None,
             fill_angle: None,
+            fill_blip_index: None,
             line_color: None,
             line_width: None,
             line_dash_style: None,
@@ -1297,6 +1300,10 @@ fn build_shape_properties(shape: &UserShapeData) -> Vec<EscherProperty> {
         props.push(EscherProperty::new(prop_id::FILL_COLOR, 0x0800_0004)); // scheme fill
         props.push(EscherProperty::new(prop_id::FILL_BACK_COLOR, 0x0800_0000));
         props.push(EscherProperty::new(prop_id::NO_FILL_HIT_TEST, 0x0010_0000)); // no fill
+    }
+
+    if let Some(blip_index) = shape.fill_blip_index {
+        props.push(EscherProperty::new(prop_id::FILL_BLIP, blip_index));
     }
 
     // Line properties (based on POI HSLFSimpleShape)
@@ -1839,6 +1846,24 @@ mod tests {
         assert!(has_fill_type);
         assert!(has_back_color);
         assert!(has_fill_angle);
+    }
+
+    #[test]
+    fn test_shape_properties_preserve_fill_blip_reference() {
+        let shape = UserShapeData {
+            fill_color: Some(0),
+            fill_type: Some(3),
+            fill_blip_index: Some(2),
+            ..Default::default()
+        };
+        let properties = build_shape_properties(&shape);
+
+        assert!(
+            properties
+                .iter()
+                .any(|property| { property.prop_id == prop_id::FILL_BLIP && property.value == 2 })
+        );
+        assert_eq!(prop_id::FILL_BLIP, 0x4186);
     }
 
     #[test]
