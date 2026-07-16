@@ -33,7 +33,7 @@ use crate::protobuf::tst::{
 use crate::protobuf::{tn, tsce, tsd, tsp, tswp};
 use crate::registry::{Application, detect_application_from_document};
 use crate::shapes::{
-    DrawableGeometry, DrawableProperties, ShapeTextLayout, reset_shape_text_columns,
+    DrawableGeometry, DrawableProperties, RgbaColor, ShapeTextLayout, reset_shape_text_columns,
     reset_shape_text_layout, set_shape_geometry, set_shape_properties, set_shape_text_columns,
     set_shape_text_layout, shape_geometry, shape_properties, shape_text_columns, shape_text_layout,
 };
@@ -667,6 +667,51 @@ impl NumbersEditor {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
         let changed = text.reset_text_decorations(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(text.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective uniform text color of a sheet-owned text box.
+    pub fn sheet_text_box_text_color(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<RgbaColor> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        IWorkTextEditor::from_package(self.package.clone()).text_color(graph.storage_id)
+    }
+
+    /// Atomically set one text color across a sheet-owned text box.
+    pub fn set_sheet_text_box_text_color(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        color: RgbaColor,
+    ) -> Result<()> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        text.set_text_color(graph.storage_id, color)?;
+        let verified = Self::from_package(text.into_package())?;
+        if verified.sheet_text_box_text_color(sheet_id, drawable_object_id)? != color {
+            return Err(Error::InvalidFormat(
+                "Numbers text-box color update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore the inherited text color while preserving sibling overrides.
+    pub fn reset_sheet_text_box_text_color(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let changed = text.reset_text_color(graph.storage_id)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
         }

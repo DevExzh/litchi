@@ -1,9 +1,9 @@
-//! Validated drawing colors and native RGB conversion.
+//! Validated iWork colors and native RGB conversion.
 
 use crate::protobuf::tsp;
 use crate::{Error, Result};
 
-/// RGB color space used by native iWork drawing colors.
+/// RGB color space used by native iWork colors.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum RgbColorSpace {
     #[default]
@@ -38,7 +38,7 @@ impl RgbaColor {
         ] {
             if !value.is_finite() || !(0.0..=1.0).contains(&value) {
                 return Err(Error::ParseError(format!(
-                    "iWork drawing {name} channel must be finite and between 0 and 1"
+                    "iWork {name} color channel must be finite and between 0 and 1"
                 )));
             }
         }
@@ -91,30 +91,30 @@ pub(crate) fn color_from_native(color: &tsp::Color) -> Result<RgbaColor> {
         || color.w.is_some()
     {
         return Err(Error::InvalidFormat(
-            "native iWork drawing color is not RGB".to_owned(),
+            "native iWork color is not RGB".to_owned(),
         ));
     }
     let color_space =
         match tsp::color::RgbColorSpace::try_from(color.rgbspace.ok_or_else(|| {
-            Error::InvalidFormat("native iWork drawing color has no RGB color space".to_owned())
+            Error::InvalidFormat("native iWork color has no RGB color space".to_owned())
         })?) {
             Ok(tsp::color::RgbColorSpace::Srgb) => RgbColorSpace::Srgb,
             Ok(tsp::color::RgbColorSpace::P3) => RgbColorSpace::DisplayP3,
             Err(_) => {
                 return Err(Error::InvalidFormat(
-                    "native iWork drawing color uses an unknown RGB color space".to_owned(),
+                    "native iWork color uses an unknown RGB color space".to_owned(),
                 ));
             },
         };
     RgbaColor::new(
         color.r.ok_or_else(|| {
-            Error::InvalidFormat("native iWork drawing color has no red channel".to_owned())
+            Error::InvalidFormat("native iWork color has no red channel".to_owned())
         })?,
         color.g.ok_or_else(|| {
-            Error::InvalidFormat("native iWork drawing color has no green channel".to_owned())
+            Error::InvalidFormat("native iWork color has no green channel".to_owned())
         })?,
         color.b.ok_or_else(|| {
-            Error::InvalidFormat("native iWork drawing color has no blue channel".to_owned())
+            Error::InvalidFormat("native iWork color has no blue channel".to_owned())
         })?,
         color.a.unwrap_or(1.0),
         color_space,

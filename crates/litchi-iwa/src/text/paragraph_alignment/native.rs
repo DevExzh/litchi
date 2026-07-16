@@ -6,7 +6,8 @@ mod tabs;
 use prost::Message;
 
 use crate::archive::{ArchiveObject, RawMessage};
-use crate::protobuf::{tsp, tss, tswp};
+use crate::protobuf::{tsd, tsp, tss, tswp};
+use crate::shapes::{RgbaColor, color_from_native, color_to_native};
 use crate::wire::{parse_wire_fields, repeated_length_delimited_payloads};
 use crate::{Error, IWorkPackage, Result};
 
@@ -32,8 +33,17 @@ const STYLE_STYLESHEET_FIELD: u32 = 5;
 const CHARACTER_BOLD_FIELD: u32 = 1;
 const CHARACTER_ITALIC_FIELD: u32 = 2;
 const CHARACTER_FONT_SIZE_FIELD: u32 = 3;
+const CHARACTER_FONT_COLOR_FIELD: u32 = 7;
 const CHARACTER_UNDERLINE_FIELD: u32 = 11;
 const CHARACTER_STRIKETHROUGH_FIELD: u32 = 12;
+const CHARACTER_DRAWING_FILL_FIELD: u32 = 46;
+const DRAWING_FILL_COLOR_FIELD: u32 = 1;
+const COLOR_MODEL_FIELD: u32 = 1;
+const COLOR_RED_FIELD: u32 = 3;
+const COLOR_GREEN_FIELD: u32 = 4;
+const COLOR_BLUE_FIELD: u32 = 5;
+const COLOR_ALPHA_FIELD: u32 = 6;
+const COLOR_RGB_SPACE_FIELD: u32 = 12;
 const PARAGRAPH_ALIGNMENT_FIELD: u32 = 1;
 const PARAGRAPH_FIRST_LINE_INDENT_FIELD: u32 = 7;
 const PARAGRAPH_LEFT_INDENT_FIELD: u32 = 11;
@@ -62,6 +72,7 @@ pub(super) struct ParagraphStyleOverrides {
     pub(super) bold: Option<bool>,
     pub(super) italic: Option<bool>,
     pub(super) point_size: Option<TextPointSize>,
+    pub(super) font_color: Option<RgbaColor>,
     pub(super) underline: Option<TextUnderline>,
     pub(super) strikethrough: Option<TextStrikethrough>,
     pub(super) alignment: Option<TextAlignment>,
@@ -79,6 +90,7 @@ impl ParagraphStyleOverrides {
         u32::from(self.bold.is_some())
             + u32::from(self.italic.is_some())
             + u32::from(self.point_size.is_some())
+            + u32::from(self.font_color.is_some())
             + u32::from(self.underline.is_some())
             + u32::from(self.strikethrough.is_some())
             + u32::from(self.alignment.is_some())
@@ -148,6 +160,13 @@ pub(super) fn inherited_text_decorations(
     inheritance::text_decorations(package, first_style_id)
 }
 
+pub(super) fn inherited_text_color(
+    package: &IWorkPackage,
+    first_style_id: u64,
+) -> Result<RgbaColor> {
+    inheritance::text_color(package, first_style_id)
+}
+
 pub(super) fn inherited_line_spacing(
     package: &IWorkPackage,
     first_style_id: u64,
@@ -192,6 +211,7 @@ pub(super) fn direct_overrides(
         .font_size
         .map(TextPointSize::from_points)
         .transpose()?;
+    let font_color = text_color_from_character(character_properties)?;
     let underline = character_properties
         .underline
         .map(TextUnderline::from_native_value)
@@ -238,6 +258,7 @@ pub(super) fn direct_overrides(
         bold,
         italic,
         point_size,
+        font_color,
         underline,
         strikethrough,
         alignment,
@@ -262,6 +283,8 @@ pub(super) fn direct_overrides(
     remaining_character.bold = None;
     remaining_character.italic = None;
     remaining_character.font_size = None;
+    remaining_character.font_color = None;
+    remaining_character.tsd_fill = None;
     remaining_character.underline = None;
     remaining_character.strikethru = None;
     let semantic = !overrides.is_empty()
@@ -288,7 +311,7 @@ pub(super) fn direct_overrides(
         STYLE_PARAGRAPH_PROPERTIES_FIELD,
         "paragraph properties",
     )?;
-    let mut character_fields = Vec::with_capacity(5);
+    let mut character_fields = Vec::with_capacity(7);
     if bold.is_some() {
         character_fields.push(CHARACTER_BOLD_FIELD);
     }
@@ -297,6 +320,31 @@ pub(super) fn direct_overrides(
     }
     if point_size.is_some() {
         character_fields.push(CHARACTER_FONT_SIZE_FIELD);
+    }
+    if font_color.is_some() {
+        character_fields.push(CHARACTER_FONT_COLOR_FIELD);
+        character_fields.push(CHARACTER_DRAWING_FILL_FIELD);
+        let legacy_color_raw = required_payload(
+            character_raw,
+            CHARACTER_FONT_COLOR_FIELD,
+            "paragraph font color",
+        )?;
+        let drawing_fill_raw = required_payload(
+            character_raw,
+            CHARACTER_DRAWING_FILL_FIELD,
+            "paragraph text fill",
+        )?;
+        let drawing_color_raw = required_payload(
+            drawing_fill_raw,
+            DRAWING_FILL_COLOR_FIELD,
+            "paragraph text fill color",
+        )?;
+        if !has_canonical_color_wire(legacy_color_raw)?
+            || !has_exact_fields(drawing_fill_raw, &[DRAWING_FILL_COLOR_FIELD])?
+            || !has_canonical_color_wire(drawing_color_raw)?
+        {
+            return Ok(None);
+        }
     }
     if underline.is_some() {
         character_fields.push(CHARACTER_UNDERLINE_FIELD);
@@ -389,8 +437,13 @@ pub(super) fn variation_object(
             bold: overrides.bold,
             italic: overrides.italic,
             font_size: overrides.point_size.map(TextPointSize::points),
+            font_color: overrides.font_color.map(color_to_native),
             underline: overrides.underline.map(TextUnderline::native_value),
             strikethru: overrides.strikethrough.map(TextStrikethrough::native_value),
+            tsd_fill: overrides.font_color.map(|color| tsd::FillArchive {
+                color: Some(color_to_native(color)),
+                ..Default::default()
+            }),
             ..Default::default()
         }),
         para_properties: Some(tswp::ParagraphStylePropertiesArchive {
@@ -420,6 +473,11 @@ pub(super) fn variation_object(
     object.archive_info.message_infos[0]
         .object_references
         .push(parent_style_id);
+    if overrides.font_color.is_some() {
+        object.archive_info.message_infos[0]
+            .field_infos
+            .push(text_fill_field_info());
+    }
     Ok(object)
 }
 
@@ -429,6 +487,10 @@ pub(super) fn replace_variation(
     style_id: u64,
     mut replacement: ArchiveObject,
 ) -> Result<()> {
+    let has_text_fill_info = replacement.archive_info.message_infos[0]
+        .field_infos
+        .iter()
+        .any(is_text_fill_field_info);
     let message = replacement.messages.pop().ok_or_else(|| {
         Error::InvalidFormat("replacement paragraph style has no payload".to_owned())
     })?;
@@ -454,8 +516,90 @@ pub(super) fn replace_variation(
             )));
         };
         object.replace_message(*index, message)?;
+        let info = &mut object.archive_info.message_infos[*index];
+        info.field_infos
+            .retain(|field| !is_text_fill_field_info(field));
+        if has_text_fill_info {
+            info.field_infos.push(text_fill_field_info());
+        }
         Ok(())
     })
+}
+
+pub(super) fn text_color_from_character(
+    properties: &tswp::CharacterStylePropertiesArchive,
+) -> Result<Option<RgbaColor>> {
+    if properties.font_color_null == Some(true) || properties.tsd_fill_null == Some(true) {
+        if properties.font_color.is_some() || properties.tsd_fill.is_some() {
+            return Err(Error::InvalidFormat(
+                "native iWork text color is both null and populated".to_owned(),
+            ));
+        }
+        return Ok(Some(RgbaColor::black()));
+    }
+    let legacy = properties
+        .font_color
+        .as_ref()
+        .map(color_from_native)
+        .transpose()?;
+    let drawing = properties
+        .tsd_fill
+        .as_ref()
+        .map(|fill| {
+            if fill.gradient.is_some() || fill.image.is_some() {
+                return Err(Error::InvalidFormat(
+                    "native iWork text fill is not a solid color".to_owned(),
+                ));
+            }
+            let color = fill.color.as_ref().ok_or_else(|| {
+                Error::InvalidFormat("native iWork text fill has no color".to_owned())
+            })?;
+            color_from_native(color)
+        })
+        .transpose()?;
+    match (legacy, drawing) {
+        (Some(legacy), Some(drawing)) if legacy != drawing => Err(Error::InvalidFormat(
+            "native iWork legacy and drawing text colors disagree".to_owned(),
+        )),
+        (Some(color), _) | (_, Some(color)) => Ok(Some(color)),
+        (None, None) => Ok(None),
+    }
+}
+
+fn has_canonical_color_wire(raw: &[u8]) -> Result<bool> {
+    has_exact_fields(
+        raw,
+        &[
+            COLOR_MODEL_FIELD,
+            COLOR_RED_FIELD,
+            COLOR_GREEN_FIELD,
+            COLOR_BLUE_FIELD,
+            COLOR_ALPHA_FIELD,
+            COLOR_RGB_SPACE_FIELD,
+        ],
+    )
+}
+
+fn text_fill_field_info() -> tsp::FieldInfo {
+    tsp::FieldInfo {
+        path: tsp::FieldPath {
+            path: vec![
+                STYLE_CHARACTER_PROPERTIES_FIELD,
+                CHARACTER_DRAWING_FILL_FIELD,
+            ],
+        },
+        r#type: Some(tsp::field_info::Type::Message as i32),
+        unknown_field_rule: Some(tsp::field_info::UnknownFieldRule::IgnoreAndPreserve as i32),
+        ..Default::default()
+    }
+}
+
+fn is_text_fill_field_info(field: &tsp::FieldInfo) -> bool {
+    field.path.path
+        == [
+            STYLE_CHARACTER_PROPERTIES_FIELD,
+            CHARACTER_DRAWING_FILL_FIELD,
+        ]
 }
 
 pub(super) fn is_exclusive(package: &IWorkPackage, style_id: u64) -> Result<bool> {

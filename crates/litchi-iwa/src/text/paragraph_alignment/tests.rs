@@ -6,7 +6,7 @@ use crate::keynote::KeynoteDocumentBuilder;
 use crate::numbers::NumbersDocumentBuilder;
 use crate::pages::PagesEditor;
 use crate::protobuf::tswp;
-use crate::shapes::{DrawablePoint, DrawableSize};
+use crate::shapes::{DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor};
 use crate::text::{
     IWorkTextEditor, ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacingMultiple,
     ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, ParagraphTabAlignment,
@@ -50,6 +50,163 @@ fn native_decoration_overrides_are_minimal_and_reversible() {
     assert_eq!(
         native::direct_overrides(&archive, &message.data).unwrap(),
         Some(overrides)
+    );
+}
+
+#[test]
+fn native_text_color_override_is_canonical_and_reversible() {
+    let color = RgbaColor::new(0.12, 0.48, 0.91, 0.8, RgbColorSpace::DisplayP3).unwrap();
+    let overrides = ParagraphStyleOverrides {
+        font_color: Some(color),
+        ..Default::default()
+    };
+    let object = native::variation_object(20, 21, 22, overrides.clone()).unwrap();
+    let message = &object.messages[0];
+    let archive = tswp::ParagraphStyleArchive::decode(message.data.as_slice()).unwrap();
+    assert_eq!(archive.override_count, Some(1));
+    assert!(
+        archive
+            .char_properties
+            .as_ref()
+            .and_then(|properties| properties.tsd_fill.as_ref())
+            .and_then(|fill| fill.color.as_ref())
+            .is_some()
+    );
+    assert!(
+        object.archive_info.message_infos[0]
+            .field_infos
+            .iter()
+            .any(|field| field.path.path == [11, 46])
+    );
+    assert_eq!(
+        native::direct_overrides(&archive, &message.data).unwrap(),
+        Some(overrides)
+    );
+}
+
+#[test]
+fn uniform_text_color_round_trips_isolates_and_resets_in_every_suite() {
+    let pages_color = RgbaColor::new(0.9, 0.2, 0.1, 1.0, RgbColorSpace::DisplayP3).unwrap();
+    let mut pages = PagesEditor::create_with_text("Colors").unwrap();
+    let pages_box = pages
+        .add_text_box(
+            6,
+            "Colored Pages text",
+            DrawablePoint { x: 20.0, y: 40.0 },
+            DrawableSize {
+                width: 240.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    let pages_sibling = pages
+        .add_text_box(
+            7,
+            "Plain Pages text",
+            DrawablePoint { x: 280.0, y: 40.0 },
+            DrawableSize {
+                width: 240.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    let decorations = TextDecorations::new(TextUnderline::Single, TextStrikethrough::Double);
+    pages
+        .set_text_box_text_decorations(pages_box.drawable_object_id, decorations)
+        .unwrap();
+    pages
+        .set_text_box_text_color(pages_box.drawable_object_id, pages_color)
+        .unwrap();
+    assert_eq!(
+        pages
+            .text_box_text_color(pages_sibling.drawable_object_id)
+            .unwrap(),
+        RgbaColor::black()
+    );
+    let mut pages = PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        pages
+            .text_box_text_color(pages_box.drawable_object_id)
+            .unwrap(),
+        pages_color
+    );
+    assert!(
+        pages
+            .reset_text_box_text_color(pages_box.drawable_object_id)
+            .unwrap()
+    );
+    assert_eq!(
+        pages
+            .text_box_text_color(pages_box.drawable_object_id)
+            .unwrap(),
+        RgbaColor::black()
+    );
+    assert_eq!(
+        pages
+            .text_box_text_decorations(pages_box.drawable_object_id)
+            .unwrap(),
+        decorations
+    );
+
+    let numbers_color = RgbaColor::new(0.2, 0.8, 0.3, 1.0, RgbColorSpace::Srgb).unwrap();
+    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let sheet_id = numbers.sheets().unwrap()[0].object_id;
+    let numbers_box = numbers
+        .add_sheet_text_box(
+            sheet_id,
+            "Colored Numbers text",
+            DrawablePoint { x: 20.0, y: 200.0 },
+            DrawableSize {
+                width: 240.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    numbers
+        .set_sheet_text_box_text_color(sheet_id, numbers_box.drawable_object_id, numbers_color)
+        .unwrap();
+    let mut numbers =
+        crate::numbers::NumbersEditor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        numbers
+            .sheet_text_box_text_color(sheet_id, numbers_box.drawable_object_id)
+            .unwrap(),
+        numbers_color
+    );
+    assert!(
+        numbers
+            .reset_sheet_text_box_text_color(sheet_id, numbers_box.drawable_object_id)
+            .unwrap()
+    );
+
+    let keynote_color = RgbaColor::new(0.1, 0.5, 1.0, 0.75, RgbColorSpace::Srgb).unwrap();
+    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let keynote_box = keynote
+        .add_slide_text_box(
+            0,
+            "Colored Keynote text",
+            DrawablePoint { x: 80.0, y: 500.0 },
+            DrawableSize {
+                width: 500.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    keynote
+        .set_slide_text_box_text_color(0, keynote_box.drawable_object_id, keynote_color)
+        .unwrap();
+    let mut keynote =
+        crate::keynote::KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        keynote
+            .slide_text_box_text_color(0, keynote_box.drawable_object_id)
+            .unwrap(),
+        keynote_color
+    );
+    assert!(
+        keynote
+            .reset_slide_text_box_text_color(0, keynote_box.drawable_object_id)
+            .unwrap()
     );
 }
 
@@ -947,6 +1104,14 @@ fn multiple_paragraph_boundaries_are_rejected_transactionally() {
             .set_text_decorations(
                 storage_id,
                 TextDecorations::new(TextUnderline::Single, TextStrikethrough::Single),
+            )
+            .is_err()
+    );
+    assert!(
+        editor
+            .set_text_color(
+                storage_id,
+                RgbaColor::new(0.2, 0.4, 0.8, 1.0, RgbColorSpace::Srgb).unwrap(),
             )
             .is_err()
     );

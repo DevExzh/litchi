@@ -24,9 +24,9 @@ use crate::protobuf::tswp::{
 };
 use crate::shapes::ShapeTextLayout;
 use crate::shapes::{
-    DrawableGeometry, DrawableProperties, reset_shape_text_columns, reset_shape_text_layout,
-    set_shape_geometry, set_shape_properties, set_shape_text_columns, set_shape_text_layout,
-    shape_geometry, shape_properties, shape_text_columns, shape_text_layout,
+    DrawableGeometry, DrawableProperties, RgbaColor, reset_shape_text_columns,
+    reset_shape_text_layout, set_shape_geometry, set_shape_properties, set_shape_text_columns,
+    set_shape_text_layout, shape_geometry, shape_properties, shape_text_columns, shape_text_layout,
 };
 use crate::text::{
     IWorkTextEditor, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphIndents,
@@ -423,6 +423,42 @@ impl PagesEditor {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
         let changed = staged.reset_text_decorations(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective uniform text color of a reachable ordinary text box.
+    pub fn text_box_text_color(&self, drawable_object_id: u64) -> Result<RgbaColor> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        self.text.text_color(graph.storage_id)
+    }
+
+    /// Atomically set one text color across a reachable ordinary text box.
+    pub fn set_text_box_text_color(
+        &mut self,
+        drawable_object_id: u64,
+        color: RgbaColor,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_text_color(graph.storage_id, color)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified.text_box_text_color(drawable_object_id)? != color {
+            return Err(Error::InvalidFormat(
+                "Pages text-box color update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore the inherited text color while preserving sibling overrides.
+    pub fn reset_text_box_text_color(&mut self, drawable_object_id: u64) -> Result<bool> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_text_color(graph.storage_id)?;
         if changed {
             *self = Self::from_package(staged.into_package())?;
         }

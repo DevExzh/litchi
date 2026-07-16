@@ -4,8 +4,8 @@ use std::env;
 
 use litchi_iwa::pages::PagesEditor;
 use litchi_iwa::shapes::{
-    DrawablePoint, DrawableSize, ShapeTextAutoSize, ShapeTextInset, ShapeTextInsets,
-    ShapeTextLayout, ShapeTextVerticalAlignment,
+    DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeTextAutoSize, ShapeTextInset,
+    ShapeTextInsets, ShapeTextLayout, ShapeTextVerticalAlignment,
 };
 use litchi_iwa::text::{
     DropCapCharacterCount, DropCapLineCount, DropCapOutdent, DropCapPadding, DropCapRaisedLines,
@@ -61,6 +61,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_text_box_text_decorations(
         created.drawable_object_id,
         TextDecorations::new(TextUnderline::Single, TextStrikethrough::Single),
+    )?;
+    editor.set_text_box_text_color(
+        created.drawable_object_id,
+        RgbaColor::new(0.84, 0.16, 0.12, 1.0, RgbColorSpace::Srgb)?,
     )?;
     editor.set_text_box_paragraph_alignment(created.drawable_object_id, TextAlignment::Center)?;
     editor.set_text_box_paragraph_line_spacing(

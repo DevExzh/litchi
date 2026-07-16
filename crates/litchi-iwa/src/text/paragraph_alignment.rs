@@ -8,7 +8,7 @@ use std::borrow::Cow;
 use crate::package_metadata::{
     next_object_identifier, release_package_identifier_suffix, set_package_last_object_identifier,
 };
-use crate::shapes::{insert_style_variation, remove_style_variation};
+use crate::shapes::{RgbaColor, insert_style_variation, remove_style_variation};
 use crate::{Error, IWorkPackage, Result};
 
 use self::native::ParagraphStyleOverrides;
@@ -25,6 +25,7 @@ use super::style_registry::{
 enum ParagraphProperty<'a> {
     TextStyle(TextStyle),
     TextDecorations(TextDecorations),
+    TextColor(RgbaColor),
     Alignment(TextAlignment),
     LineSpacing(ParagraphLineSpacing),
     Spacing(ParagraphSpacing),
@@ -36,6 +37,7 @@ enum ParagraphProperty<'a> {
 enum ParagraphPropertyKind {
     TextStyle,
     TextDecorations,
+    TextColor,
     Alignment,
     LineSpacing,
     Spacing,
@@ -48,6 +50,7 @@ enum InheritedCharacterProperty {
     None,
     TextStyle(TextStyle),
     TextDecorations(TextDecorations),
+    TextColor(RgbaColor),
 }
 
 pub(super) fn text_style(package: &IWorkPackage, storage_id: u64) -> Result<TextStyle> {
@@ -92,6 +95,26 @@ pub(super) fn set_text_decorations(
 
 pub(super) fn reset_text_decorations(package: &mut IWorkPackage, storage_id: u64) -> Result<bool> {
     reset_property(package, storage_id, ParagraphPropertyKind::TextDecorations)
+}
+
+pub(super) fn text_color(package: &IWorkPackage, storage_id: u64) -> Result<RgbaColor> {
+    let storage = storage::locate(package, storage_id)?;
+    native::inherited_text_color(package, storage.style_id)
+}
+
+pub(super) fn set_text_color(
+    package: &mut IWorkPackage,
+    storage_id: u64,
+    color: RgbaColor,
+) -> Result<()> {
+    if text_color(package, storage_id)? == color {
+        return Ok(());
+    }
+    set_property(package, storage_id, ParagraphProperty::TextColor(color))
+}
+
+pub(super) fn reset_text_color(package: &mut IWorkPackage, storage_id: u64) -> Result<bool> {
+    reset_property(package, storage_id, ParagraphPropertyKind::TextColor)
 }
 
 pub(super) fn paragraph_alignment(
@@ -388,6 +411,8 @@ fn inherited_character_property(
             native::inherited_text_decorations(package, parent_style_id)
                 .map(InheritedCharacterProperty::TextDecorations)
         },
+        ParagraphProperty::TextColor(_) => native::inherited_text_color(package, parent_style_id)
+            .map(InheritedCharacterProperty::TextColor),
         _ => Ok(InheritedCharacterProperty::None),
     }
 }
@@ -420,6 +445,14 @@ fn apply_property(
             overrides.strikethrough = (decorations.strikethrough != inherited.strikethrough)
                 .then_some(decorations.strikethrough);
         },
+        ParagraphProperty::TextColor(color) => {
+            let InheritedCharacterProperty::TextColor(inherited) = inherited else {
+                return Err(Error::InvalidFormat(
+                    "text-color mutation has no inherited character color".to_owned(),
+                ));
+            };
+            overrides.font_color = (*color != inherited).then_some(*color);
+        },
         ParagraphProperty::Alignment(alignment) => overrides.alignment = Some(*alignment),
         ParagraphProperty::LineSpacing(spacing) => overrides.line_spacing = Some(*spacing),
         ParagraphProperty::Spacing(spacing) => {
@@ -446,6 +479,7 @@ fn has_property(overrides: &ParagraphStyleOverrides, kind: ParagraphPropertyKind
         ParagraphPropertyKind::TextDecorations => {
             overrides.underline.is_some() || overrides.strikethrough.is_some()
         },
+        ParagraphPropertyKind::TextColor => overrides.font_color.is_some(),
         ParagraphPropertyKind::Alignment => overrides.alignment.is_some(),
         ParagraphPropertyKind::LineSpacing => overrides.line_spacing.is_some(),
         ParagraphPropertyKind::Spacing => {
@@ -471,6 +505,7 @@ fn clear_property(overrides: &mut ParagraphStyleOverrides, kind: ParagraphProper
             overrides.underline = None;
             overrides.strikethrough = None;
         },
+        ParagraphPropertyKind::TextColor => overrides.font_color = None,
         ParagraphPropertyKind::Alignment => overrides.alignment = None,
         ParagraphPropertyKind::LineSpacing => overrides.line_spacing = None,
         ParagraphPropertyKind::Spacing => {
@@ -497,6 +532,9 @@ fn inherited_property(
         )),
         ParagraphPropertyKind::TextDecorations => Ok(ParagraphProperty::TextDecorations(
             native::inherited_text_decorations(package, style_id)?,
+        )),
+        ParagraphPropertyKind::TextColor => Ok(ParagraphProperty::TextColor(
+            native::inherited_text_color(package, style_id)?,
         )),
         ParagraphPropertyKind::Alignment => Ok(ParagraphProperty::Alignment(
             native::inherited_alignment(package, style_id)?,
@@ -536,6 +574,7 @@ fn validate_expected_property(
         ParagraphProperty::TextDecorations(decorations) => {
             text_decorations(package, storage_id)? == decorations
         },
+        ParagraphProperty::TextColor(color) => text_color(package, storage_id)? == color,
         ParagraphProperty::Alignment(alignment) => {
             paragraph_alignment(package, storage_id)? == alignment
         },

@@ -18,17 +18,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         match (
             editor.text_style(storage.object_id),
             editor.text_decorations(storage.object_id),
+            editor.text_color(storage.object_id),
         ) {
-            (Ok(style), Ok(decorations)) => println!(
-                "storage={} points={} bold={} italic={} underline={:?} strikethrough={:?}",
+            (Ok(style), Ok(decorations), Ok(color)) => println!(
+                "storage={} points={} bold={} italic={} underline={:?} strikethrough={:?} rgba=({},{},{},{}) color_space={:?}",
                 storage.object_id,
                 style.point_size.points(),
                 style.bold,
                 style.italic,
                 decorations.underline,
-                decorations.strikethrough
+                decorations.strikethrough,
+                color.red(),
+                color.green(),
+                color.blue(),
+                color.alpha(),
+                color.color_space()
             ),
-            (Err(error), _) | (_, Err(error)) => {
+            (Err(error), _, _) | (_, Err(error), _) | (_, _, Err(error)) => {
                 println!("storage={} unavailable={error}", storage.object_id)
             },
         }

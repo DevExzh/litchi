@@ -4,8 +4,8 @@ use std::env;
 
 use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::shapes::{
-    DrawablePoint, DrawableSize, ShapeTextAutoSize, ShapeTextInset, ShapeTextInsets,
-    ShapeTextLayout, ShapeTextVerticalAlignment,
+    DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeTextAutoSize, ShapeTextInset,
+    ShapeTextInsets, ShapeTextLayout, ShapeTextVerticalAlignment,
 };
 use litchi_iwa::text::{
     DropCapCharacterCount, DropCapLineCount, DropCapOutdent, DropCapPadding, DropCapRaisedLines,
@@ -68,6 +68,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         sheet_id,
         created.drawable_object_id,
         TextDecorations::new(TextUnderline::Single, TextStrikethrough::Single),
+    )?;
+    editor.set_sheet_text_box_text_color(
+        sheet_id,
+        created.drawable_object_id,
+        RgbaColor::new(0.12, 0.62, 0.24, 1.0, RgbColorSpace::Srgb)?,
     )?;
     editor.set_sheet_text_box_paragraph_alignment(
         sheet_id,
