@@ -5,6 +5,7 @@ use super::super::shapes::ShapeEnum;
 use super::factory::SlideData;
 use crate::consts::PptRecordType;
 use crate::ppt::animation::{ShapeAnimation, SlideAnimationExtension};
+use crate::ppt::slide_extension::PowerPoint12SlideExtension;
 use once_cell::unsync::OnceCell;
 
 /// A slide in a PowerPoint presentation with lazy-loaded shapes.
@@ -32,6 +33,8 @@ pub struct Slide<'doc> {
     animations: OnceCell<Vec<ShapeAnimation>>,
     /// Lazily parsed PowerPoint 2002 slide animation extension.
     animation_extension: OnceCell<Option<SlideAnimationExtension>>,
+    /// Lazily parsed PowerPoint 12 slide/master round-trip metadata.
+    powerpoint12_extension: OnceCell<PowerPoint12SlideExtension>,
 }
 
 impl<'doc> Slide<'doc> {
@@ -47,6 +50,7 @@ impl<'doc> Slide<'doc> {
             text_cache: OnceCell::new(),
             animations: OnceCell::new(),
             animation_extension: OnceCell::new(),
+            powerpoint12_extension: OnceCell::new(),
         }
     }
 
@@ -156,6 +160,12 @@ impl<'doc> Slide<'doc> {
                 .chunks_exact(2)
                 .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
                 .eq(PPT10)
+    }
+
+    /// Return PowerPoint 12 slide/master round-trip metadata from `___PPT12`.
+    pub fn powerpoint12_extension(&self) -> Result<&PowerPoint12SlideExtension> {
+        self.powerpoint12_extension
+            .get_or_try_init(|| PowerPoint12SlideExtension::parse(&self.record))
     }
 
     /// Extract all text from this slide (lazy-loaded).
