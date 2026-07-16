@@ -343,7 +343,7 @@ impl TextRun {
         self
     }
 
-    /// Get character count (including any trailing CR/LF)
+    /// Get the number of UTF-16 code units in this run.
     pub fn char_count(&self) -> u32 {
         self.text.encode_utf16().count() as u32
     }
@@ -522,8 +522,9 @@ impl TextPropsBuilder {
         self.paragraphs.push(para);
     }
 
-    /// Build TextCharsAtom (UTF-16LE text)
-    /// Adds CR between paragraphs and after the last paragraph (for StyleTextPropAtom compatibility)
+    /// Build TextCharsAtom (UTF-16LE text), adding CR between paragraphs.
+    ///
+    /// The final paragraph break is implicit and is not stored in the text atom.
     pub fn build_text_chars(&self) -> Vec<u8> {
         let mut data = Vec::new();
         for (i, para) in self.paragraphs.iter().enumerate() {
@@ -621,6 +622,13 @@ impl TextPropsBuilder {
         // Write one entry per run. The last run in each paragraph gets +1 for CR/terminator.
         for para in &self.paragraphs {
             let num_runs = para.runs.len();
+
+            if num_runs == 0 {
+                // Cover the paragraph separator or the implicit final paragraph break.
+                data.extend_from_slice(&1u32.to_le_bytes());
+                data.extend_from_slice(&0u32.to_le_bytes());
+                continue;
+            }
 
             for (run_idx, run) in para.runs.iter().enumerate() {
                 let is_last_run = run_idx == num_runs - 1;
@@ -782,10 +790,30 @@ mod tests {
     }
 
     #[test]
+    fn text_run_counts_utf16_code_units() {
+        let run = TextRun::new("😀x");
+        assert_eq!(run.char_count(), 3);
+    }
+
+    #[test]
     fn test_paragraph() {
         let para = Paragraph::new("Test").center();
         assert_eq!(para.alignment, TextAlign::Center);
         assert_eq!(para.char_count(), 5); // 4 chars + 1 end marker
+    }
+
+    #[test]
+    fn empty_rich_paragraph_has_character_style_coverage() {
+        let mut builder = TextPropsBuilder::new();
+        builder.add_paragraph(Paragraph::with_runs(Vec::new()));
+
+        let style = builder.build_style_text_prop();
+        let (paragraphs, characters) = crate::ppt::text_prop::parse_style_text_prop_atom(&style, 0);
+
+        assert_eq!(paragraphs.len(), 1);
+        assert_eq!(paragraphs[0].characters_covered, 1);
+        assert_eq!(characters.len(), 1);
+        assert_eq!(characters[0].characters_covered, 1);
     }
 
     #[test]

@@ -1468,7 +1468,14 @@ fn build_client_textbox(text: &str, text_type: u32) -> Result<Vec<u8>, PptError>
     }
 
     // StyleTextPropAtom with no formatting
-    let char_count = text.chars().count() as u32 + 1;
+    let too_large = || {
+        PptError::new(
+            std::io::ErrorKind::InvalidInput,
+            "ClientTextbox text exceeds the PPT size limit",
+        )
+    };
+    let text_units = u32::try_from(text.encode_utf16().count()).map_err(|_| too_large())?;
+    let char_count = text_units.checked_add(1).ok_or_else(too_large)?;
     let mut style_atom = RecordBuilder::new(0, 0, ppt_rt::STYLE_TEXT_PROP_ATOM);
     style_atom.write_data(&char_count.to_le_bytes()); // para char count
     style_atom.write_data(&0u16.to_le_bytes()); // indent
@@ -2015,6 +2022,20 @@ mod tests {
     }
 
     #[test]
+    fn client_textbox_plain_style_counts_utf16_code_units() {
+        let data = build_client_textbox("😀", 4).unwrap();
+        let wrapper = crate::ppt::EscherTextboxWrapper::new(data[8..].to_vec()).unwrap();
+        let style = wrapper.find_style_text_prop_atom().unwrap();
+
+        assert_eq!(u32::from_le_bytes(style.data[0..4].try_into().unwrap()), 3);
+        assert_eq!(
+            u32::from_le_bytes(style.data[10..14].try_into().unwrap()),
+            3
+        );
+        assert_eq!(wrapper.text(), "😀");
+    }
+
+    #[test]
     fn test_client_textbox_empty() {
         let textbox = build_client_textbox("", 4);
         assert!(textbox.is_ok());
@@ -2034,6 +2055,23 @@ mod tests {
         assert!(textbox.is_ok());
         let data = textbox.unwrap();
         assert!(!data.is_empty());
+    }
+
+    #[test]
+    fn formatted_textbox_round_trips_non_bmp_multi_paragraph_runs() {
+        let paragraphs = vec![
+            Paragraph::with_runs(vec![TextRun::new("😀").bold()]),
+            Paragraph::with_runs(vec![TextRun::new("x").italic()]),
+        ];
+        let data = build_client_textbox_formatted(&paragraphs, 1).unwrap();
+        let wrapper = crate::ppt::EscherTextboxWrapper::new(data[8..].to_vec()).unwrap();
+
+        assert_eq!(wrapper.text(), "😀\rx");
+        assert_eq!(wrapper.runs().len(), 2);
+        assert_eq!(wrapper.runs()[0].text, "😀\r");
+        assert!(wrapper.runs()[0].formatting.bold);
+        assert_eq!(wrapper.runs()[1].text, "x");
+        assert!(wrapper.runs()[1].formatting.italic);
     }
 
     #[test]
