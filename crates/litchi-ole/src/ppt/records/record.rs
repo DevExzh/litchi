@@ -130,6 +130,8 @@ impl PptRecord {
                 | PptRecordType::FontCollection10
                 | PptRecordType::BlipCollection9
                 | PptRecordType::Kinsoku
+                | PptRecordType::ExternalHyperlink
+                | PptRecordType::ExternalHyperlink9
                 | PptRecordType::InteractiveInfo
                 | PptRecordType::AnimationInfo
                 | PptRecordType::ProgTags

@@ -115,6 +115,12 @@ pub enum PptRecordType {
     Kinsoku = 4040,
     /// East Asian line-breaking settings atom
     KinsokuAtom = 4050,
+    /// External hyperlink atom or hyperlink reference atom
+    ExternalHyperlinkAtom = 4051,
+    /// External hyperlink container
+    ExternalHyperlink = 4055,
+    /// PowerPoint 9 external hyperlink extension container
+    ExternalHyperlink9 = 4068,
     /// Headers footers container record
     HeadersFooters = 4057,
     /// Headers footers atom record
@@ -141,6 +147,8 @@ pub enum PptRecordType {
     AnimationInfo = 4116,
     /// Animation info atom record
     AnimationInfoAtom = 4081,
+    /// PowerPoint 9 external hyperlink flags atom
+    ExternalHyperlinkFlagsAtom = 4120,
     /// Build list record
     BuildList = 0x2B02,
     /// Build atom record
@@ -302,6 +310,9 @@ impl From<u16> for PptRecordType {
             4026 => PptRecordType::CString,
             4040 => PptRecordType::Kinsoku,
             4050 => PptRecordType::KinsokuAtom,
+            4051 => PptRecordType::ExternalHyperlinkAtom,
+            4055 => PptRecordType::ExternalHyperlink,
+            4068 => PptRecordType::ExternalHyperlink9,
             4057 => PptRecordType::HeadersFooters,
             4058 => PptRecordType::HeadersFootersAtom,
             4082 => PptRecordType::InteractiveInfo,
@@ -315,6 +326,7 @@ impl From<u16> for PptRecordType {
             0x138B => PptRecordType::BinaryTagData,
             4116 => PptRecordType::AnimationInfo,
             4081 => PptRecordType::AnimationInfoAtom,
+            4120 => PptRecordType::ExternalHyperlinkFlagsAtom,
             0x2B02 => PptRecordType::BuildList,
             0x2B03 => PptRecordType::BuildAtom,
             0x2B04 => PptRecordType::ChartBuild,

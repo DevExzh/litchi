@@ -74,6 +74,7 @@ pub mod escher;
 pub mod current_user;
 pub mod escher_textbox;
 pub mod font;
+pub mod hyperlink;
 pub mod kinsoku;
 pub mod master_style;
 pub mod picture_bullets;
@@ -103,6 +104,7 @@ pub use escher_textbox::EscherTextboxWrapper;
 pub use font::{
     EmbeddedPowerPointFont, PowerPointFont, PowerPointFontCollection, PowerPointFontCollections,
 };
+pub use hyperlink::{PowerPointHyperlink, PowerPointHyperlinkExtension, PowerPointHyperlinks};
 pub use kinsoku::{
     BaseKinsokuSettings, KinsokuLanguage, KinsokuLevel, PowerPoint9KinsokuSettings,
     PowerPointKinsoku,
