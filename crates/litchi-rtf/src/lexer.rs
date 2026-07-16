@@ -97,6 +97,20 @@ pub enum ControlWord<'a> {
     FieldEdit,
     FieldPrivate,
 
+    // Index and table-of-contents source marks
+    IndexEntry,
+    IndexIdentifier(Option<i32>),
+    IndexBold(bool),
+    IndexItalic(bool),
+    IndexReplacementText,
+    IndexBookmarkRange,
+    IndexYomi,
+    IndexPronunciation,
+    TableOfContentsEntry,
+    TableOfContentsEntryNoPage,
+    TableOfContentsTable(i32),
+    TableOfContentsLevel(i32),
+
     // Font properties
     FontNumber(i32),
     FontSize(i32),
@@ -673,6 +687,20 @@ impl<'a> Lexer<'a> {
             "flddirty" => ControlWord::FieldDirty,
             "fldedit" => ControlWord::FieldEdit,
             "fldpriv" => ControlWord::FieldPrivate,
+
+            // Index and table-of-contents source marks
+            "xe" => ControlWord::IndexEntry,
+            "xef" => ControlWord::IndexIdentifier(param),
+            "bxe" => ControlWord::IndexBold(param_bool),
+            "ixe" => ControlWord::IndexItalic(param_bool),
+            "txe" => ControlWord::IndexReplacementText,
+            "rxe" => ControlWord::IndexBookmarkRange,
+            "yxe" => ControlWord::IndexYomi,
+            "pxe" => ControlWord::IndexPronunciation,
+            "tc" => ControlWord::TableOfContentsEntry,
+            "tcn" => ControlWord::TableOfContentsEntryNoPage,
+            "tcf" => ControlWord::TableOfContentsTable(param.unwrap_or(67)),
+            "tcl" => ControlWord::TableOfContentsLevel(param.unwrap_or(1)),
 
             // Fonts
             "f" => ControlWord::FontNumber(param_value),

@@ -6,6 +6,7 @@ use crate::xls::comments::XlsComment;
 use crate::xls::error::XlsError;
 use crate::xls::hyperlinks::XlsHyperlink;
 use crate::xls::merged_cells::MergedCellRange;
+use crate::xls::number_format::{XlsExtendedFormat, XlsFormatting, XlsNumberFormat};
 use crate::xls::pivot_table::PivotTable;
 use crate::xls::protection::SheetProtection;
 use litchi_core::sheet::{
@@ -38,6 +39,7 @@ pub struct XlsWorksheet {
     pivot_tables: Vec<PivotTable>,
     /// Sheet protection state (PROTECT/OBJECTPROTECT/SCENPROTECT/PASSWORD)
     protection: SheetProtection,
+    formatting: Arc<XlsFormatting>,
 }
 
 impl XlsWorksheet {
@@ -56,6 +58,7 @@ impl XlsWorksheet {
             sort_info: None,
             pivot_tables: Vec::new(),
             protection: SheetProtection::default(),
+            formatting: Arc::new(XlsFormatting::default()),
         }
     }
 
@@ -74,6 +77,7 @@ impl XlsWorksheet {
             sort_info: None,
             pivot_tables: Vec::new(),
             protection: SheetProtection::default(),
+            formatting: Arc::new(XlsFormatting::default()),
         }
     }
 
@@ -209,6 +213,33 @@ impl XlsWorksheet {
     /// Get a mutable reference to the sheet protection state.
     pub fn protection_mut(&mut self) -> &mut SheetProtection {
         &mut self.protection
+    }
+
+    pub(crate) fn set_formatting(&mut self, formatting: Arc<XlsFormatting>) {
+        self.formatting = formatting;
+    }
+
+    pub fn formatting(&self) -> &XlsFormatting {
+        &self.formatting
+    }
+
+    pub fn format_for_cell(&self, row: u32, col: u32) -> Option<&XlsExtendedFormat> {
+        let cell = self.get_cell(row, col)?;
+        self.formatting.cell_format(cell.xf_index())
+    }
+
+    pub fn number_format_for_cell(&self, row: u32, col: u32) -> Option<&XlsNumberFormat> {
+        let format = self.format_for_cell(row, col)?;
+        self.formatting.number_format(format.number_format_id())
+    }
+
+    pub fn is_date_time_formatted(&self, row: u32, col: u32) -> bool {
+        self.format_for_cell(row, col)
+            .map(|format| {
+                self.formatting
+                    .is_date_time_format(format.number_format_id())
+            })
+            .unwrap_or(false)
     }
 }
 

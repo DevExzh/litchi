@@ -37,6 +37,7 @@ mod field;
 mod info;
 mod lexer;
 mod list;
+mod navigation_entry;
 mod object;
 mod parser;
 mod picture;
@@ -68,6 +69,9 @@ pub use user_property::{UserProperty, UserPropertyValue};
 pub use list::{
     List, ListFollow, ListJustification, ListLevel, ListLevelType, ListOverride, ListOverrideTable,
     ListTable,
+};
+pub use navigation_entry::{
+    IndexEntry, IndexPageReference, NavigationEntry, TableOfContentsEntry,
 };
 pub use object::{EmbeddedObject, ObjectKind, OleObjectHeader};
 pub use picture::{ImageType, Picture, detect_image_type};

@@ -1,6 +1,7 @@
 //! Cell representation for XLS files
 
 use crate::xls::formula::{FormulaContext, render_formula};
+use crate::xls::number_format::XlsFormatting;
 use crate::xls::records::{BoolErrValue, CellRecord, FormulaValue};
 use crate::xls::utils;
 use litchi_core::sheet::{Cell, CellValue};
@@ -14,6 +15,7 @@ pub struct XlsCell {
     formula: Option<String>,
     formula_bytes: Option<Vec<u8>>,
     shared_string_index: Option<u32>,
+    xf_index: u16,
 }
 
 impl XlsCell {
@@ -26,6 +28,7 @@ impl XlsCell {
             formula: None,
             formula_bytes: None,
             shared_string_index: None,
+            xf_index: 0,
         }
     }
 
@@ -38,19 +41,22 @@ impl XlsCell {
             formula: Some(formula),
             formula_bytes: None,
             shared_string_index: None,
+            xf_index: 0,
         }
     }
 
     /// Create cell from BIFF record
     pub fn from_record(record: &CellRecord, sst: Option<&[String]>) -> Option<Self> {
-        Self::from_record_with_formula_context(record, sst, None)
+        Self::from_record_with_formula_context(record, sst, None, None)
     }
 
     pub(crate) fn from_record_with_formula_context(
         record: &CellRecord,
         sst: Option<&[String]>,
         formula_context: Option<&FormulaContext>,
+        formatting: Option<&XlsFormatting>,
     ) -> Option<Self> {
+        let xf_index = record_xf_index(record);
         let shared_string_index = match record {
             CellRecord::LabelSst { sst_index, .. } => Some(*sst_index),
             _ => None,
@@ -143,6 +149,20 @@ impl XlsCell {
             },
         };
 
+        let value = match value {
+            CellValue::Float(serial)
+                if serial.is_finite()
+                    && serial >= 0.0
+                    && formatting
+                        .and_then(|table| table.cell_format(xf_index))
+                        .map(|format| table_is_date_time(formatting, format.number_format_id()))
+                        .unwrap_or(false) =>
+            {
+                CellValue::DateTime(serial)
+            },
+            value => value,
+        };
+
         Some(XlsCell {
             row,
             col,
@@ -150,7 +170,12 @@ impl XlsCell {
             formula,
             formula_bytes,
             shared_string_index,
+            xf_index,
         })
+    }
+
+    pub fn xf_index(&self) -> u16 {
+        self.xf_index
     }
 
     /// Original SST index for a BIFF `LabelSst` cell.
@@ -175,6 +200,24 @@ impl XlsCell {
     pub(crate) fn set_rendered_formula(&mut self, formula: Option<String>) {
         self.formula = formula;
     }
+}
+
+fn record_xf_index(record: &CellRecord) -> u16 {
+    match record {
+        CellRecord::Blank { xf_index, .. }
+        | CellRecord::Number { xf_index, .. }
+        | CellRecord::Label { xf_index, .. }
+        | CellRecord::BoolErr { xf_index, .. }
+        | CellRecord::Rk { xf_index, .. }
+        | CellRecord::LabelSst { xf_index, .. }
+        | CellRecord::Formula { xf_index, .. } => *xf_index,
+    }
+}
+
+fn table_is_date_time(formatting: Option<&XlsFormatting>, format_id: u16) -> bool {
+    formatting
+        .map(|table| table.is_date_time_format(format_id))
+        .unwrap_or(false)
 }
 
 impl Cell for XlsCell {
@@ -499,7 +542,7 @@ mod tests {
         };
 
         let cell =
-            XlsCell::from_record_with_formula_context(&record, None, Some(&context)).unwrap();
+            XlsCell::from_record_with_formula_context(&record, None, Some(&context), None).unwrap();
         assert_eq!(cell.formula(), Some("='Data 2026'!C5"));
     }
 

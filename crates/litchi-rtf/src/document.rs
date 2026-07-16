@@ -31,6 +31,8 @@ pub struct RtfDocument<'a> {
     document_variables: Vec<super::document_variable::DocumentVariable<'a>>,
     /// Ordered inert user-defined document properties
     user_properties: Vec<super::user_property::UserProperty<'a>>,
+    /// Ordered inert index and table-of-contents source marks
+    navigation_entries: Vec<super::navigation_entry::NavigationEntry<'a>>,
     /// List table
     list_table: super::list::ListTable<'a>,
     /// List override table
@@ -227,6 +229,11 @@ impl<'a> RtfDocument<'a> {
                 .user_properties
                 .into_iter()
                 .map(super::user_property::UserProperty::into_owned)
+                .collect(),
+            navigation_entries: parsed
+                .navigation_entries
+                .into_iter()
+                .map(super::navigation_entry::NavigationEntry::into_owned)
                 .collect(),
             list_table: Self::convert_list_table_to_owned(parsed.list_table),
             list_override_table: parsed.list_override_table,
@@ -592,6 +599,54 @@ impl<'a> RtfDocument<'a> {
     /// Remove all user-defined properties.
     pub fn clear_user_properties(&mut self) {
         self.user_properties.clear();
+    }
+
+    /// Return ordered, inert index and table-of-contents source marks.
+    pub fn navigation_entries(&self) -> &[super::navigation_entry::NavigationEntry<'_>] {
+        &self.navigation_entries
+    }
+
+    /// Append an inert source mark at a valid UTF-8 body position.
+    pub fn push_navigation_entry(
+        &mut self,
+        entry: super::navigation_entry::NavigationEntry<'a>,
+    ) -> RtfResult<()> {
+        entry.validate()?;
+        let body = self.text();
+        if body.get(entry.position()..entry.position()).is_none() {
+            return Err(RtfError::MalformedDocument(
+                "RTF navigation-entry position is outside body text or splits a character"
+                    .to_string(),
+            ));
+        }
+        if self.navigation_entries.len()
+            >= super::navigation_entry::MAX_NAVIGATION_ENTRIES
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF navigation-entry count limit exceeded".to_string(),
+            ));
+        }
+        let aggregate = entry.text_bytes().and_then(|initial| {
+            self.navigation_entries
+                .iter()
+                .try_fold(initial, |size, existing| {
+                    size.checked_add(existing.text_bytes()?)
+                })
+        });
+        if aggregate.is_none_or(|size| {
+            size > super::navigation_entry::MAX_NAVIGATION_ENTRY_TEXT_TOTAL_BYTES
+        }) {
+            return Err(RtfError::MalformedDocument(
+                "RTF navigation-entry aggregate text limit exceeded".to_string(),
+            ));
+        }
+        self.navigation_entries.push(entry);
+        Ok(())
+    }
+
+    /// Remove all index and table-of-contents source marks.
+    pub fn clear_navigation_entries(&mut self) {
+        self.navigation_entries.clear();
     }
 
     /// Get the list table.

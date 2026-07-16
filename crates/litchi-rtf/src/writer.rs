@@ -53,6 +53,7 @@ pub struct RtfWriter<W: Write> {
 
 #[derive(Clone, Copy)]
 enum BodyEventKind<'b, 'a> {
+    NavigationEntry(&'b crate::NavigationEntry<'a>),
     BookmarkStart(&'b Bookmark<'a>),
     BookmarkEnd(&'b Bookmark<'a>),
     AnnotationStart(&'b Annotation<'a>),
@@ -151,6 +152,7 @@ impl<W: Write> RtfWriter<W> {
             doc.bookmarks(),
             doc.annotations(),
             doc.revisions(),
+            doc.navigation_entries(),
         )?;
 
         // Write tables
@@ -889,8 +891,13 @@ impl<W: Write> RtfWriter<W> {
         bookmarks: &BookmarkTable<'_>,
         annotations: &[Annotation<'_>],
         revisions: &[Revision<'_>],
+        navigation_entries: &[crate::NavigationEntry<'_>],
     ) -> io::Result<()> {
-        if bookmarks.bookmarks().is_empty() && annotations.is_empty() && revisions.is_empty() {
+        if bookmarks.bookmarks().is_empty()
+            && annotations.is_empty()
+            && revisions.is_empty()
+            && navigation_entries.is_empty()
+        {
             for block in blocks {
                 self.write_style_block(block)?;
             }
@@ -904,7 +911,46 @@ impl<W: Write> RtfWriter<W> {
             .saturating_add(annotations.len())
             .saturating_add(revisions.len())
             .saturating_mul(2);
+        let event_count = event_count.saturating_add(navigation_entries.len());
         let mut events = Vec::with_capacity(event_count);
+        if navigation_entries.len() > crate::navigation_entry::MAX_NAVIGATION_ENTRIES {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "RTF navigation-entry count limit exceeded",
+            ));
+        }
+        let mut navigation_text_bytes = 0usize;
+        for entry in navigation_entries {
+            entry
+                .validate()
+                .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error))?;
+            if body.get(entry.position()..entry.position()).is_none() {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF navigation-entry position is outside body text or splits a character",
+                ));
+            }
+            navigation_text_bytes = navigation_text_bytes
+                .checked_add(entry.text_bytes().ok_or_else(|| {
+                    io::Error::new(io::ErrorKind::InvalidInput, "navigation-entry size overflow")
+                })?)
+                .ok_or_else(|| {
+                    io::Error::new(io::ErrorKind::InvalidInput, "navigation-entry size overflow")
+                })?;
+            if navigation_text_bytes
+                > crate::navigation_entry::MAX_NAVIGATION_ENTRY_TEXT_TOTAL_BYTES
+            {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF navigation-entry aggregate text limit exceeded",
+                ));
+            }
+            events.push(BodyEvent {
+                offset: entry.position(),
+                order: 1,
+                kind: BodyEventKind::NavigationEntry(entry),
+            });
+        }
         for bookmark in bookmarks.bookmarks() {
             let end = bookmark
                 .position
@@ -1036,6 +1082,7 @@ impl<W: Write> RtfWriter<W> {
 
     fn write_body_event(&mut self, event: BodyEvent<'_, '_>) -> io::Result<()> {
         match event.kind {
+            BodyEventKind::NavigationEntry(entry) => self.write_navigation_entry(entry),
             BodyEventKind::BookmarkStart(bookmark) => self.write_bookmark_start(bookmark),
             BodyEventKind::BookmarkEnd(bookmark) => self.write_bookmark_end(bookmark.name.as_ref()),
             BodyEventKind::AnnotationStart(annotation) => self.write_annotation_start(annotation),
@@ -1043,6 +1090,73 @@ impl<W: Write> RtfWriter<W> {
             BodyEventKind::RevisionStart(revision) => self.write_revision_start(revision),
             BodyEventKind::RevisionEnd => self.write_str("}"),
         }
+    }
+
+    /// Write an inert source mark. Marks are canonicalized as hidden; any
+    /// originally visible entry text remains in the ordinary body stream.
+    pub fn write_navigation_entry(
+        &mut self,
+        entry: &crate::NavigationEntry<'_>,
+    ) -> io::Result<()> {
+        entry
+            .validate()
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error))?;
+        self.write_str("{")?;
+        match entry {
+            crate::NavigationEntry::Index(entry) => {
+                self.write_control_word("xe", None)?;
+                self.write_control_word("v", None)?;
+                if let Some(index_id) = entry.index_id {
+                    self.write_control_word("xef", Some(i32::from(index_id)))?;
+                }
+                if entry.bold_page_number {
+                    self.write_control_word("bxe", None)?;
+                }
+                if entry.italic_page_number {
+                    self.write_control_word("ixe", None)?;
+                }
+                self.write_str(" ")?;
+                self.write_destination_text(entry.text.as_ref())?;
+                match &entry.page_reference {
+                    crate::IndexPageReference::CurrentPage => {},
+                    crate::IndexPageReference::ReplacementText(value) => {
+                        self.write_str("{")?;
+                        self.write_control_word("txe", None)?;
+                        self.write_str(" ")?;
+                        self.write_destination_text(value.as_ref())?;
+                        self.write_str("}")?;
+                    },
+                    crate::IndexPageReference::BookmarkRange(value) => {
+                        self.write_str("{")?;
+                        self.write_control_word("rxe", None)?;
+                        self.write_str(" ")?;
+                        self.write_destination_text(value.as_ref())?;
+                        self.write_str("}")?;
+                    },
+                }
+                if let Some(yomi) = &entry.yomi {
+                    self.write_str("{")?;
+                    self.write_control_word("yxe", None)?;
+                    self.write_str("{\\*")?;
+                    self.write_control_word("pxe", None)?;
+                    self.write_str(" ")?;
+                    self.write_destination_text(yomi.as_ref())?;
+                    self.write_str("}}")?;
+                }
+            },
+            crate::NavigationEntry::TableOfContents(entry) => {
+                self.write_control_word(
+                    if entry.suppress_page_number { "tcn" } else { "tc" },
+                    None,
+                )?;
+                self.write_control_word("v", None)?;
+                self.write_control_word("tcf", Some(i32::from(entry.table_id)))?;
+                self.write_control_word("tcl", Some(i32::from(entry.level)))?;
+                self.write_str(" ")?;
+                self.write_destination_text(entry.text.as_ref())?;
+            },
+        }
+        self.write_str("}")
     }
 
     fn write_style_block_fragment(

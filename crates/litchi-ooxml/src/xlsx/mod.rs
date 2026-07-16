@@ -31,6 +31,7 @@ pub mod cell;
 pub mod chart;
 mod comments;
 pub mod conditional_formatting;
+pub mod data_validation;
 mod drawing;
 pub mod external_links;
 pub mod format;
@@ -67,6 +68,12 @@ pub use conditional_formatting::{
     ConditionalFormattingRule, ConditionalFormattingSource, ConditionalRuleType, DataBar,
     DifferentialFormat, DifferentialFormatComponent, DifferentialFormatRef,
     DifferentialNumberFormat, ExtensionAssociation, IconSet, NamedColor, SpreadsheetColor,
+};
+pub use data_validation::{
+    DataValidationCollection, DataValidationFormula, DataValidationRange, DataValidationSource,
+    DataValidationSqref, ParsedDataValidation, ParsedDataValidationErrorStyle,
+    ParsedDataValidationImeMode, ParsedDataValidationOperator, ParsedDataValidationType,
+    ValidationListSource,
 };
 // Re-export shared formatting types
 pub use format::{

@@ -589,15 +589,18 @@ impl FormattingManager {
         Ok(())
     }
 
-    /// Write all FORMAT records (0x041E): built-in indices 0..7 and any
+    /// Write all FORMAT records (0x041E): the eight BIFF8 default records and any
     /// registered user-defined formats.
     pub fn write_number_formats<W: Write>(&self, writer: &mut W) -> XlsResult<()> {
-        // POI's InternalWorkbook.createWorkbook emits FORMAT records for
-        // built-in indices 0..7. We mirror that behavior here to keep
-        // record streams comparable, even though Excel does not strictly
-        // require FORMAT records for built-ins.
-        for (index, format_str) in BUILTIN_NUMBER_FORMATS.iter().enumerate().take(8) {
-            super::biff::write_format_record(writer, index as u16, format_str)?;
+        // [MS-XLS] 2.4.126 permits the default locale-sensitive groups 5..=8
+        // and 41..=44. Built-ins 0..=4 are referenced directly by XF records
+        // and MUST NOT be serialized as Format records.
+        for index in [5u16, 6, 7, 8, 41, 42, 43, 44] {
+            super::biff::write_format_record(
+                writer,
+                index,
+                BUILTIN_NUMBER_FORMATS[index as usize],
+            )?;
         }
 
         for (code, pattern) in &self.number_formats {

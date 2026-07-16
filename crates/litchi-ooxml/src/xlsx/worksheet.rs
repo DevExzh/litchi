@@ -24,6 +24,10 @@ use super::conditional_formatting::{
     ConditionalFormattingRule as ParsedConditionalFormattingRule, DifferentialFormat,
     DifferentialFormatRef, ExtensionAssociation,
 };
+use super::data_validation::{
+    DataValidationCollection as ParsedDataValidationCollection,
+    ParsedDataValidation, parse_data_validation_collections,
+};
 use super::sort::SortState;
 use super::sparkline::{SparklineGroup, parse_sparkline_groups_from_worksheet_xml};
 use super::table::{Table, parse_table_xml};
@@ -220,6 +224,7 @@ pub struct Worksheet<'a> {
     rows: HashMap<u32, RowInfo>,
     /// Data validations
     data_validations: Vec<DataValidationRule>,
+    data_validation_collections: Vec<ParsedDataValidationCollection>,
     /// Conditional formatting rules
     conditional_formats: Vec<ConditionalFormatRule>,
     /// Complete conditional-formatting containers and rules.
@@ -256,6 +261,7 @@ impl<'a> Worksheet<'a> {
             columns: HashMap::new(),
             rows: HashMap::new(),
             data_validations: Vec::new(),
+            data_validation_collections: Vec::new(),
             conditional_formats: Vec::new(),
             conditional_formattings: Vec::new(),
             page_setup: PageSetup::default(),
@@ -360,6 +366,7 @@ impl<'a> Worksheet<'a> {
             sheet_data.as_bytes(),
             self.workbook.styles().differential_format_count(),
         )?;
+        let data_validation_collections = parse_data_validation_collections(sheet_data.as_bytes())?;
         self.cells = parsed.cells;
         self.cell_styles = parsed.cell_styles;
         self.rows = parsed.rows;
@@ -367,6 +374,10 @@ impl<'a> Worksheet<'a> {
         self.merged_regions = parsed.merged_regions;
         self.columns = parsed.columns;
         self.data_validations = parsed.data_validations;
+        self.data_validations.extend(data_validation_collections.iter()
+            .filter(|collection| collection.source() == super::data_validation::DataValidationSource::Office2010)
+            .flat_map(|collection| collection.validations().iter().map(ParsedDataValidation::to_legacy)));
+        self.data_validation_collections = data_validation_collections;
         self.conditional_formats = parsed.conditional_formats;
         self.conditional_formattings = conditional_formattings;
         self.page_setup = parsed.page_setup.unwrap_or_default();
@@ -1844,6 +1855,16 @@ impl<'a> Worksheet<'a> {
     /// ```
     pub fn get_data_validations(&self) -> &[DataValidationRule] {
         &self.data_validations
+    }
+
+    /// Complete core and Office 2010 data-validation collections in document order.
+    pub fn data_validation_collections(&self) -> &[ParsedDataValidationCollection] {
+        &self.data_validation_collections
+    }
+
+    /// Complete core and Office 2010 validation rules in document order.
+    pub fn parsed_data_validations(&self) -> impl Iterator<Item = &ParsedDataValidation> {
+        self.data_validation_collections.iter().flat_map(|collection| collection.validations())
     }
 
     // ===== Conditional Formatting =====

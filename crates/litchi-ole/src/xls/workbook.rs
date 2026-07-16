@@ -8,6 +8,7 @@ use crate::xls::defined_names::{
     XlsNameScope,
 };
 use crate::xls::formula::{FormulaContext, ptg_exp_anchor, render_formula, render_shared_formula};
+use crate::xls::number_format::{XlsDateSystem, XlsExtendedFormat, XlsFormatting, XlsNumberFormat};
 use crate::xls::pivot_table::PivotTable;
 use crate::xls::records::{
     BiffVersion, BofRecord, BoundSheetRecord, CellRecord, DimensionsRecord, FormulaValue,
@@ -29,6 +30,18 @@ struct SharedFormulaTemplate {
     last_col: u16,
     tokens: Vec<u8>,
     relative: bool,
+}
+
+fn cell_record_xf(record: &CellRecord) -> u16 {
+    match record {
+        CellRecord::Blank { xf_index, .. }
+        | CellRecord::Number { xf_index, .. }
+        | CellRecord::Label { xf_index, .. }
+        | CellRecord::BoolErr { xf_index, .. }
+        | CellRecord::Rk { xf_index, .. }
+        | CellRecord::LabelSst { xf_index, .. }
+        | CellRecord::Formula { xf_index, .. } => *xf_index,
+    }
 }
 
 impl SharedFormulaTemplate {
@@ -127,6 +140,7 @@ pub struct XlsWorkbook<R: Read + Seek> {
     is_1904_date_system: bool,
     formula_context: FormulaContext,
     defined_names: Vec<XlsDefinedName>,
+    formatting: Arc<XlsFormatting>,
 }
 
 /// Options for opening a legacy XLS workbook.
@@ -157,6 +171,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             is_1904_date_system: false,
             formula_context: FormulaContext::default(),
             defined_names: Vec::new(),
+            formatting: Arc::new(XlsFormatting::default()),
         };
 
         workbook.parse_workbook(options.password)?;
@@ -191,6 +206,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             is_1904_date_system: false,
             formula_context: FormulaContext::default(),
             defined_names: Vec::new(),
+            formatting: Arc::new(XlsFormatting::default()),
         };
 
         workbook.parse_workbook(options.password)?;
@@ -278,6 +294,9 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                 break;
             }
         }
+
+        self.formatting = Arc::new(XlsFormatting::parse_globals(&records)?);
+        self.is_1904_date_system = self.formatting.date_system() == XlsDateSystem::Excel1904;
 
         let mut i = 0;
         while i < records.len() {
@@ -407,6 +426,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             &bound_sheet.name,
             shared_strings,
             Some(&self.formula_context),
+            self.formatting.clone(),
         )
     }
 
@@ -417,8 +437,10 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         name: &str,
         shared_strings: Arc<Vec<String>>,
         formula_context: Option<&FormulaContext>,
+        formatting: Arc<XlsFormatting>,
     ) -> XlsResult<XlsWorksheet> {
         let mut worksheet = XlsWorksheet::with_shared_strings(name.to_string(), shared_strings);
+        worksheet.set_formatting(formatting.clone());
 
         // Accumulator for pivot table records: we collect SX* records in order
         // and assemble complete PivotTable structs when SXVIEW boundaries are hit.
@@ -444,10 +466,12 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                 if let CellRecord::Formula { value, .. } = &mut formula {
                     *value = FormulaValue::String(text);
                 }
+                formatting.validate_cell_xf(cell_record_xf(&formula))?;
                 if let Some(mut cell) = XlsCell::from_record_with_formula_context(
                     &formula,
                     worksheet.shared_strings(),
                     formula_context,
+                    Some(&formatting),
                 ) {
                     if let CellRecord::Formula {
                         row, col, formula, ..
@@ -494,6 +518,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                 0x0006   // Formula
                 => {
                     let cell_record = CellRecord::parse(record.header.record_type, &record.data, encoding)?;
+                    formatting.validate_cell_xf(cell_record_xf(&cell_record))?;
                     if matches!(
                         &cell_record,
                         CellRecord::Formula {
@@ -506,6 +531,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                         &cell_record,
                         worksheet.shared_strings(),
                         formula_context,
+                        Some(&formatting),
                     ) {
                         if let CellRecord::Formula {
                             row, col, formula, ..
@@ -544,10 +570,12 @@ impl<R: Read + Seek> XlsWorkbook<R> {
 
                 0x00BD => { // MulRk
                     for cell_record in CellRecord::parse_mul_rk(&record.data)? {
+                        formatting.validate_cell_xf(cell_record_xf(&cell_record))?;
                         if let Some(cell) = XlsCell::from_record_with_formula_context(
                             &cell_record,
                             worksheet.shared_strings(),
                             formula_context,
+                            Some(&formatting),
                         ) {
                             worksheet.add_cell(cell);
                         }
@@ -556,10 +584,12 @@ impl<R: Read + Seek> XlsWorkbook<R> {
 
                 0x00BE => { // MulBlank
                     for cell_record in CellRecord::parse_mul_blank(&record.data)? {
+                        formatting.validate_cell_xf(cell_record_xf(&cell_record))?;
                         if let Some(cell) = XlsCell::from_record_with_formula_context(
                             &cell_record,
                             worksheet.shared_strings(),
                             formula_context,
+                            Some(&formatting),
                         ) {
                             worksheet.add_cell(cell);
                         }
@@ -718,6 +748,22 @@ impl<R: Read + Seek> XlsWorkbook<R> {
     /// Total number of cell references represented by the workbook SST.
     pub fn shared_string_reference_count(&self) -> u32 {
         self.shared_string_reference_count
+    }
+
+    pub fn formatting(&self) -> &XlsFormatting {
+        &self.formatting
+    }
+
+    pub fn date_system(&self) -> XlsDateSystem {
+        self.formatting.date_system()
+    }
+
+    pub fn number_formats(&self) -> &[XlsNumberFormat] {
+        self.formatting.number_formats()
+    }
+
+    pub fn extended_formats(&self) -> &[XlsExtendedFormat] {
+        self.formatting.extended_formats()
     }
 
     /// Rich-text and phonetic properties for a shared-string index.
@@ -1015,6 +1061,7 @@ mod tests {
             "Sheet1",
             Arc::new(Vec::new()),
             None,
+            Arc::new(XlsFormatting::default()),
         )
         .unwrap();
 
@@ -1051,6 +1098,7 @@ mod tests {
             "Sheet1",
             Arc::new(Vec::new()),
             None,
+            Arc::new(XlsFormatting::default()),
         )
         .unwrap();
         let cell = worksheet.get_cell(4, 5).unwrap();
@@ -1075,6 +1123,7 @@ mod tests {
             "Sheet1",
             Arc::new(Vec::new()),
             None,
+            Arc::new(XlsFormatting::default()),
         );
 
         assert!(result.is_err());
@@ -1106,6 +1155,7 @@ mod tests {
             "Sheet1",
             Arc::new(Vec::new()),
             None,
+            Arc::new(XlsFormatting::default()),
         )
         .unwrap();
 
@@ -1142,6 +1192,7 @@ mod tests {
             "Sheet1",
             Arc::new(Vec::new()),
             None,
+            Arc::new(XlsFormatting::default()),
         )
         .unwrap();
 

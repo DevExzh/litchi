@@ -29,6 +29,9 @@ mod formula;
 /// Internal workbook and sheet defined names (`Lbl`).
 mod defined_names;
 
+/// BIFF8 number formats, XF slots, and workbook date system.
+mod number_format;
+
 /// Shape extraction
 pub mod shapes;
 
@@ -60,6 +63,9 @@ pub use cell::XlsCell;
 pub use error::{XlsEncryptionKind, XlsError, XlsResult};
 pub use defined_names::{
     XlsBuiltInName, XlsDefinedName, XlsDefinedNameKind, XlsNameScope,
+};
+pub use number_format::{
+    XlsDateSystem, XlsExtendedFormat, XlsExtendedFormatKind, XlsFormatting, XlsNumberFormat,
 };
 pub use records::{
     PhoneticAlignment, PhoneticRun, PhoneticString, PhoneticType, SharedStringFormatRun,
