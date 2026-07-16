@@ -1,8 +1,8 @@
 //! Sheet structures for ODS spreadsheets.
 
 use super::{
-    Column, Row, SheetPrintSettings, SheetProtection, SheetScenario, SheetStyle, SheetTableSource,
-    TableStructure,
+    Column, DdeSource, Row, SheetPrintSettings, SheetProtection, SheetScenario, SheetStyle,
+    SheetTableSource, TableStructure,
 };
 use litchi_core::Result;
 
@@ -31,6 +31,8 @@ pub struct Sheet {
     pub description: Option<String>,
     /// Optional inert external linked-table metadata.
     pub table_source: Option<SheetTableSource>,
+    /// Optional inert Dynamic Data Exchange source for this sheet.
+    pub dde_source: Option<DdeSource>,
     /// Optional what-if scenario metadata.
     pub scenario: Option<SheetScenario>,
     /// Inert images anchored in the sheet's `table:shapes` container.
@@ -90,6 +92,11 @@ impl Sheet {
         self.table_source.as_ref()
     }
 
+    /// Get the sheet's DDE source without contacting or refreshing it.
+    pub fn dde_source(&self) -> Option<&DdeSource> {
+        self.dde_source.as_ref()
+    }
+
     /// Get the optional what-if scenario metadata.
     pub fn scenario(&self) -> Option<&SheetScenario> {
         self.scenario.as_ref()
@@ -139,6 +146,7 @@ mod tests {
             title: None,
             description: None,
             table_source: None,
+            dde_source: None,
             scenario: None,
             images: Vec::new(),
             protection: SheetProtection::default(),
@@ -161,6 +169,7 @@ mod tests {
             title: None,
             description: None,
             table_source: None,
+            dde_source: None,
             scenario: None,
             images: Vec::new(),
             protection: SheetProtection::default(),
@@ -181,6 +190,7 @@ mod tests {
             title: None,
             description: None,
             table_source: None,
+            dde_source: None,
             scenario: None,
             images: Vec::new(),
             protection: SheetProtection::default(),
@@ -218,6 +228,7 @@ mod tests {
             title: None,
             description: None,
             table_source: None,
+            dde_source: None,
             scenario: None,
             images: Vec::new(),
             protection: SheetProtection::default(),
@@ -336,6 +347,7 @@ mod tests {
             title: None,
             description: None,
             table_source: None,
+            dde_source: None,
             scenario: None,
             images: Vec::new(),
             protection: SheetProtection::default(),
@@ -356,6 +368,7 @@ mod tests {
             title: None,
             description: None,
             table_source: None,
+            dde_source: None,
             scenario: None,
             images: Vec::new(),
             protection: SheetProtection::default(),
@@ -465,6 +478,7 @@ mod tests {
             title: None,
             description: None,
             table_source: None,
+            dde_source: None,
             scenario: None,
             images: Vec::new(),
             protection: SheetProtection::default(),

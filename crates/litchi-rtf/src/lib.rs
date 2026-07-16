@@ -69,7 +69,8 @@ mod writer;
 pub use annotation::{Annotation, AnnotationType, Revision, RevisionAuthor, RevisionType};
 pub use bookmark::{Bookmark, BookmarkTable};
 pub use border::{
-    Border, BorderStyle, Borders, Shading, ShadingPattern, TabAlignment, TabLeader, TabStop,
+    Border, BorderStyle, Borders, CharacterBorder, CharacterBorderStyle, CharacterShading,
+    Shading, ShadingPattern, TabAlignment, TabLeader, TabStop,
 };
 pub use compressed::{compress, decompress, is_compressed_rtf};
 pub use document::RtfDocument;

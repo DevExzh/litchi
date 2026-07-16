@@ -218,6 +218,10 @@ struct BookmarkSpan {
 struct State {
     /// Current character formatting
     formatting: Formatting,
+    /// Whether generic border controls currently belong to `chbrdr`.
+    character_border_active: bool,
+    /// Components already supplied for the current character border.
+    character_border_seen: u8,
     /// Current paragraph properties
     paragraph: Paragraph,
     /// Unicode skip count (characters to skip after \u)
@@ -319,6 +323,8 @@ impl Default for State {
     fn default() -> Self {
         Self {
             formatting: Formatting::default(),
+            character_border_active: false,
+            character_border_seen: 0,
             paragraph: Paragraph::default(),
             unicode_skip: 1,
             in_table: false,
@@ -2721,6 +2727,7 @@ impl<'a> Parser<'a> {
                     if !text_buffer.is_empty() {
                         self.flush_text_buffer(&mut text_buffer)?;
                     }
+                    self.current_state_mut()?.character_border_active = false;
                     self.parse_group()?;
                 },
                 Token::Control(control) => {
@@ -2821,6 +2828,7 @@ impl<'a> Parser<'a> {
                 },
                 Token::Text(text) => {
                     self.pos += 1;
+                    self.current_state_mut()?.character_border_active = false;
                     // Skip empty text tokens
                     if text.is_empty() {
                         continue;
@@ -3279,6 +3287,10 @@ impl<'a> Parser<'a> {
         let language_defaults = self.language_defaults;
         let state = self.current_state_mut()?;
 
+        if Self::apply_character_decoration_control(state, control)? {
+            return Ok(());
+        }
+
         match control {
             // Font formatting
             ControlWord::FontNumber(n) => {
@@ -3390,6 +3402,8 @@ impl<'a> Parser<'a> {
                 state.formatting.language_no_proof = language_defaults.primary;
                 state.formatting.east_asian_language_no_proof = language_defaults.east_asian;
                 state.formatting.associated.language = language_defaults.complex_script;
+                state.character_border_active = false;
+                state.character_border_seen = 0;
             },
 
             // Paragraph alignment
@@ -4226,7 +4240,8 @@ impl<'a> Parser<'a> {
                         if !seen.insert("brdrr") { return Err(RtfError::MalformedDocument("duplicate RTF pgp right border".to_string())); }
                         current_border = Some(3u8);
                     },
-                    ControlWord::BorderSingle
+                    ControlWord::BorderNone
+                    | ControlWord::BorderSingle
                     | ControlWord::BorderDotted
                     | ControlWord::BorderDashed
                     | ControlWord::BorderDouble
@@ -4239,10 +4254,13 @@ impl<'a> Parser<'a> {
                             Some(3) => &mut borders.right,
                             _ => return Err(RtfError::MalformedDocument("RTF pgp border style has no side".to_string())),
                         };
-                        if border.style != crate::BorderStyle::None {
+                        if border.style != crate::BorderStyle::None
+                            && !matches!(control, ControlWord::BorderNone)
+                        {
                             return Err(RtfError::MalformedDocument("duplicate RTF pgp border style".to_string()));
                         }
                         border.style = match control {
+                            ControlWord::BorderNone => crate::BorderStyle::None,
                             ControlWord::BorderSingle => crate::BorderStyle::Single,
                             ControlWord::BorderDotted => crate::BorderStyle::Dotted,
                             ControlWord::BorderDashed => crate::BorderStyle::Dashed,
@@ -4253,15 +4271,15 @@ impl<'a> Parser<'a> {
                     },
                     ControlWord::BorderWidth(value) => {
                         let border = match current_border { Some(0) => &mut borders.top, Some(1) => &mut borders.bottom, Some(2) => &mut borders.left, Some(3) => &mut borders.right, _ => return Err(RtfError::MalformedDocument("RTF pgp border width has no side".to_string())) };
-                        border.width = *value;
+                        border.width = value.ok_or_else(|| RtfError::MalformedDocument("RTF pgp brdrw requires a numeric parameter".to_string()))?;
                     },
                     ControlWord::BorderColor(value) => {
                         let border = match current_border { Some(0) => &mut borders.top, Some(1) => &mut borders.bottom, Some(2) => &mut borders.left, Some(3) => &mut borders.right, _ => return Err(RtfError::MalformedDocument("RTF pgp border color has no side".to_string())) };
-                        border.color_ref = u16::try_from(*value).map_err(|_| RtfError::MalformedDocument("invalid RTF pgp border color".to_string()))?;
+                        border.color_ref = u16::try_from(value.ok_or_else(|| RtfError::MalformedDocument("RTF pgp brdrcf requires a numeric parameter".to_string()))?).map_err(|_| RtfError::MalformedDocument("invalid RTF pgp border color".to_string()))?;
                     },
                     ControlWord::BorderSpace(value) => {
                         let border = match current_border { Some(0) => &mut borders.top, Some(1) => &mut borders.bottom, Some(2) => &mut borders.left, Some(3) => &mut borders.right, _ => return Err(RtfError::MalformedDocument("RTF pgp border space has no side".to_string())) };
-                        border.space = *value;
+                        border.space = value.ok_or_else(|| RtfError::MalformedDocument("RTF pgp brsp requires a numeric parameter".to_string()))?;
                     },
                     _ => return Err(RtfError::MalformedDocument("unsupported control in RTF pgp entry".to_string())),
                 },
@@ -5960,7 +5978,175 @@ impl<'a> Parser<'a> {
         Ok(decoded)
     }
 
+    fn required_character_value(
+        value: Option<i32>,
+        control: &str,
+        maximum: u16,
+    ) -> RtfResult<u16> {
+        let value = value.ok_or_else(|| {
+            RtfError::MalformedDocument(format!(
+                "RTF {control} requires a numeric parameter"
+            ))
+        })?;
+        let value = u16::try_from(value).map_err(|_| {
+            RtfError::MalformedDocument(format!(
+                "RTF {control} value must be in 0..={maximum}"
+            ))
+        })?;
+        if value > maximum {
+            return Err(RtfError::MalformedDocument(format!(
+                "RTF {control} value must be in 0..={maximum}"
+            )));
+        }
+        Ok(value)
+    }
+
+    fn character_border_style(
+        control: &ControlWord<'_>,
+    ) -> Option<crate::CharacterBorderStyle> {
+        use crate::CharacterBorderStyle as Style;
+        Some(match control {
+            ControlWord::BorderNone => Style::None,
+            ControlWord::BorderSingle => Style::Single,
+            ControlWord::BorderThick => Style::Thick,
+            ControlWord::BorderDotted => Style::Dotted,
+            ControlWord::BorderDashed => Style::Dashed,
+            ControlWord::BorderDashSmall => Style::DashSmallGap,
+            ControlWord::BorderDotDash => Style::DotDash,
+            ControlWord::BorderDotDotDash => Style::DotDotDash,
+            ControlWord::BorderDouble => Style::Double,
+            ControlWord::BorderTriple => Style::Triple,
+            ControlWord::BorderThinThickSmall => Style::ThinThickSmallGap,
+            ControlWord::BorderThickThinSmall => Style::ThickThinSmallGap,
+            ControlWord::BorderThinThickThinSmall => Style::ThinThickThinSmallGap,
+            ControlWord::BorderThinThickMedium => Style::ThinThickMediumGap,
+            ControlWord::BorderThickThinMedium => Style::ThickThinMediumGap,
+            ControlWord::BorderThinThickThinMedium => Style::ThinThickThinMediumGap,
+            ControlWord::BorderThinThickLarge => Style::ThinThickLargeGap,
+            ControlWord::BorderThickThinLarge => Style::ThickThinLargeGap,
+            ControlWord::BorderThinThickThinLarge => Style::ThinThickThinLargeGap,
+            ControlWord::BorderWave => Style::Wavy,
+            ControlWord::BorderWavyDouble => Style::DoubleWavy,
+            ControlWord::BorderStriped => Style::Striped,
+            ControlWord::BorderEmbossed => Style::Embossed,
+            ControlWord::BorderEngraved => Style::Engraved,
+            ControlWord::BorderOutset => Style::Outset,
+            ControlWord::BorderInset => Style::Inset,
+            _ => return None,
+        })
+    }
+
+    fn apply_character_decoration_control(
+        state: &mut State,
+        control: &ControlWord<'_>,
+    ) -> RtfResult<bool> {
+        const STYLE: u8 = 1;
+        const WIDTH: u8 = 2;
+        const COLOR: u8 = 4;
+        const SPACE: u8 = 8;
+        const SHADOW: u8 = 16;
+        const FRAME: u8 = 32;
+
+        match control {
+            ControlWord::CharacterBorder(parameter) => {
+                if parameter.is_some() {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF chbrdr must not have a numeric parameter".to_string(),
+                    ));
+                }
+                state.formatting.character_border = Some(crate::CharacterBorder::default());
+                state.character_border_active = true;
+                state.character_border_seen = 0;
+                return Ok(true);
+            },
+            ControlWord::CharacterShading(value) => {
+                state.character_border_active = false;
+                let amount = Self::required_character_value(*value, "chshdng", 10_000)?;
+                state
+                    .formatting
+                    .character_shading
+                    .get_or_insert_default()
+                    .amount = amount;
+                return Ok(true);
+            },
+            ControlWord::CharacterForegroundPattern(value) => {
+                state.character_border_active = false;
+                let color = Self::required_character_value(*value, "chcfpat", u16::MAX)?;
+                state
+                    .formatting
+                    .character_shading
+                    .get_or_insert_default()
+                    .foreground_color = color;
+                return Ok(true);
+            },
+            ControlWord::CharacterBackgroundPattern(value) => {
+                state.character_border_active = false;
+                let color = Self::required_character_value(*value, "chcbpat", u16::MAX)?;
+                state
+                    .formatting
+                    .character_shading
+                    .get_or_insert_default()
+                    .background_color = color;
+                return Ok(true);
+            },
+            _ => {},
+        }
+
+        if !state.character_border_active {
+            return Ok(false);
+        }
+        let (component, duplicate_name) = if Self::character_border_style(control).is_some() {
+            (STYLE, "style")
+        } else {
+            match control {
+                ControlWord::BorderWidth(_) => (WIDTH, "width"),
+                ControlWord::BorderColor(_) => (COLOR, "color"),
+                ControlWord::BorderSpace(_) => (SPACE, "space"),
+                ControlWord::BorderShadow => (SHADOW, "shadow"),
+                ControlWord::BorderFrame => (FRAME, "frame"),
+                _ => {
+                    state.character_border_active = false;
+                    return Ok(false);
+                },
+            }
+        };
+        if state.character_border_seen & component != 0 {
+            return Err(RtfError::MalformedDocument(format!(
+                "duplicate RTF character-border {duplicate_name}"
+            )));
+        }
+        state.character_border_seen |= component;
+        let border = state
+            .formatting
+            .character_border
+            .as_mut()
+            .expect("active character border");
+        if let Some(style) = Self::character_border_style(control) {
+            border.style = style;
+        } else {
+            match control {
+                ControlWord::BorderWidth(value) => {
+                    border.width = Self::required_character_value(*value, "brdrw", 75)?;
+                },
+                ControlWord::BorderColor(value) => {
+                    border.color_ref =
+                        Self::required_character_value(*value, "brdrcf", u16::MAX)?;
+                },
+                ControlWord::BorderSpace(value) => {
+                    border.space = Self::required_character_value(*value, "brsp", u16::MAX)?;
+                },
+                ControlWord::BorderShadow => border.shadow = true,
+                ControlWord::BorderFrame => border.frame = true,
+                _ => unreachable!("classified character-border component"),
+            }
+        }
+        Ok(true)
+    }
+
     fn apply_style_property(state: &mut State, control: &ControlWord<'_>) -> RtfResult<()> {
+        if Self::apply_character_decoration_control(state, control)? {
+            return Ok(());
+        }
         match control {
             ControlWord::FontNumber(value) => state.formatting.font_ref = *value as FontRef,
             ControlWord::FontSize(value) => {
@@ -6043,7 +6229,11 @@ impl<'a> Parser<'a> {
             ControlWord::RightToLeftCharacter => {
                 state.formatting.direction = Some(TextDirection::RightToLeft);
             },
-            ControlWord::Plain => state.formatting = Formatting::default(),
+            ControlWord::Plain => {
+                state.formatting = Formatting::default();
+                state.character_border_active = false;
+                state.character_border_seen = 0;
+            },
             ControlWord::LeftAlign => state.paragraph.alignment = Alignment::Left,
             ControlWord::RightAlign => state.paragraph.alignment = Alignment::Right,
             ControlWord::Center => state.paragraph.alignment = Alignment::Center,

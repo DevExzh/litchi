@@ -53,6 +53,7 @@ pub mod pivot;
 pub mod pptx;
 pub mod xlsb;
 pub mod xlsx;
+pub mod web_extensions;
 
 #[cfg(feature = "encryption")]
 pub mod crypto;

@@ -403,6 +403,7 @@ impl SpreadsheetBuilder {
             title: None,
             description: None,
             table_source: None,
+            dde_source: None,
             scenario: None,
             images: Vec::new(),
             protection: crate::ods::SheetProtection::default(),
@@ -1312,6 +1313,24 @@ impl SpreadsheetBuilder {
         Ok(self)
     }
 
+    /// Set or clear the current sheet's inert DDE source declaration.
+    pub fn set_sheet_dde_source(
+        &mut self,
+        dde_source: Option<crate::DdeSource>,
+    ) -> Result<&mut Self> {
+        if let Some(source) = &dde_source {
+            source.validate()?;
+        }
+        if self.sheets.is_empty() {
+            self.add_sheet("Sheet1")?;
+        }
+        self.sheets
+            .last_mut()
+            .expect("default sheet was added")
+            .dde_source = dde_source;
+        Ok(self)
+    }
+
     /// Set or clear the current sheet's what-if scenario metadata.
     pub fn set_sheet_scenario(&mut self, scenario: Option<SheetScenario>) -> Result<&mut Self> {
         if let Some(scenario) = &scenario {
@@ -1502,6 +1521,7 @@ impl SpreadsheetBuilder {
             sheet.title.as_deref(),
             sheet.description.as_deref(),
             sheet.table_source.as_ref(),
+            sheet.dde_source.as_ref(),
             sheet.scenario.as_ref(),
         )?;
         write_sheet_options(out, &sheet.protection.options);
@@ -2190,6 +2210,7 @@ mod tests {
             title: None,
             description: None,
             table_source: None,
+            dde_source: None,
             scenario: None,
             images: Vec::new(),
             protection: crate::ods::SheetProtection::default(),

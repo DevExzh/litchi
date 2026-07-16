@@ -1,7 +1,8 @@
 //! ODS what-if scenario metadata.
 
 use super::{
-    SheetTableSource, source::write_table_source, structure::validate_cell_range_addresses,
+    DdeSource, SheetTableSource, dde::write_dde_source, source::write_table_source,
+    structure::validate_cell_range_addresses,
 };
 use litchi_core::{Error, Result, xml::escape_xml};
 
@@ -97,6 +98,7 @@ pub(crate) fn write_sheet_preamble(
     title: Option<&str>,
     description: Option<&str>,
     table_source: Option<&SheetTableSource>,
+    dde_source: Option<&DdeSource>,
     scenario: Option<&SheetScenario>,
 ) -> Result<()> {
     if let Some(title) = title {
@@ -111,6 +113,9 @@ pub(crate) fn write_sheet_preamble(
     }
     if let Some(table_source) = table_source {
         write_table_source(out, table_source)?;
+    }
+    if let Some(dde_source) = dde_source {
+        write_dde_source(out, dde_source)?;
     }
     if let Some(scenario) = scenario {
         write_scenario(out, scenario)?;

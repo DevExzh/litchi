@@ -22,6 +22,8 @@ const OFFICE_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0
 const TABLE_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:table:1.0";
 const TEXT_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
 const MAX_DDE_LINKS: usize = 65_536;
+const MAX_DDE_SOURCE_VALUE_BYTES: usize = 65_536;
+const MAX_DDE_SOURCE_TOTAL_BYTES: usize = 262_144;
 
 /// How an application converts values obtained from a DDE source.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -93,6 +95,44 @@ impl DdeSource {
 
     /// Validate the source declaration without contacting it.
     pub fn validate(&self) -> Result<()> {
+        let values = [
+            ("office:dde-application", self.application.as_str(), true),
+            ("office:dde-topic", self.topic.as_str(), true),
+            ("office:dde-item", self.item.as_str(), true),
+        ];
+        let mut total = 0usize;
+        for (name, value, required) in values {
+            if (required && value.is_empty())
+                || value.len() > MAX_DDE_SOURCE_VALUE_BYTES
+                || value
+                    .chars()
+                    .any(|character| character == '\0' || (character.is_control() && !matches!(character, '\t' | '\n' | '\r')))
+            {
+                return Err(Error::InvalidFormat(format!("invalid or oversized {name}")));
+            }
+            total = total.checked_add(value.len()).ok_or_else(|| {
+                Error::InvalidFormat("DDE source text size overflow".to_string())
+            })?;
+        }
+        if let Some(name) = &self.name {
+            if name.len() > MAX_DDE_SOURCE_VALUE_BYTES
+                || name
+                    .chars()
+                    .any(|character| character == '\0' || (character.is_control() && !matches!(character, '\t' | '\n' | '\r')))
+            {
+                return Err(Error::InvalidFormat(
+                    "invalid or oversized office:name".to_string(),
+                ));
+            }
+            total = total.checked_add(name.len()).ok_or_else(|| {
+                Error::InvalidFormat("DDE source text size overflow".to_string())
+            })?;
+        }
+        if total > MAX_DDE_SOURCE_TOTAL_BYTES {
+            return Err(Error::InvalidFormat(format!(
+                "DDE source text exceeds the {MAX_DDE_SOURCE_TOTAL_BYTES} byte safety limit"
+            )));
+        }
         Ok(())
     }
 }
@@ -434,7 +474,7 @@ pub(crate) fn parse_dde_links(xml: &str) -> Result<Vec<DdeLink>> {
     Ok(links)
 }
 
-fn parse_source(
+pub(crate) fn parse_source(
     element: &BytesStart<'_>,
     decoder: Decoder,
     namespaces: &BTreeMap<String, String>,
@@ -449,10 +489,18 @@ fn parse_source(
     for attribute in element.attributes() {
         let attribute = attribute
             .map_err(|error| Error::InvalidFormat(format!("invalid DDE attribute: {error}")))?;
+        let attribute_name = std::str::from_utf8(attribute.key.as_ref()).map_err(|_| {
+            Error::InvalidFormat("invalid UTF-8 in DDE attribute name".to_string())
+        })?;
+        if attribute_name == "xmlns" || attribute_name.starts_with("xmlns:") {
+            continue;
+        }
         let Some(local_name) =
             attribute_local_name(attribute.key.as_ref(), namespaces, OFFICE_NAMESPACE)
         else {
-            continue;
+            return Err(Error::InvalidFormat(format!(
+                "unsupported or spoofed office:dde-source attribute '{attribute_name}'"
+            )));
         };
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
@@ -483,7 +531,11 @@ fn parse_source(
                 }
                 continue;
             },
-            _ => continue,
+            _ => {
+                return Err(Error::InvalidFormat(format!(
+                    "unsupported office:dde-source attribute 'office:{local_name}'"
+                )));
+            },
         };
         if slot.replace(value).is_some() {
             return Err(Error::InvalidFormat(format!(
@@ -492,7 +544,7 @@ fn parse_source(
         }
     }
 
-    Ok(DdeSource {
+    let source = DdeSource {
         application: application.ok_or_else(|| {
             Error::InvalidFormat("office:dde-source requires office:dde-application".to_string())
         })?,
@@ -505,7 +557,9 @@ fn parse_source(
         name,
         conversion_mode,
         automatic_update,
-    })
+    };
+    source.validate()?;
+    Ok(source)
 }
 
 fn parse_cached_table(raw_table: &str, namespaces: &BTreeMap<String, String>) -> Result<Sheet> {
@@ -685,31 +739,39 @@ pub(crate) fn write_dde_links(output: &mut String, links: &[DdeLink]) -> Result<
     output.push_str("<table:dde-links>");
     for link in links {
         link.validate()?;
-        output.push_str("<table:dde-link><office:dde-source office:dde-application=\"");
-        output.push_str(&escape_xml(&link.source.application));
-        output.push_str("\" office:dde-topic=\"");
-        output.push_str(&escape_xml(&link.source.topic));
-        output.push_str("\" office:dde-item=\"");
-        output.push_str(&escape_xml(&link.source.item));
-        output.push('"');
-        write_optional_attribute(output, "office:name", link.source.name.as_deref());
-        write_optional_attribute(
-            output,
-            "office:conversion-mode",
-            link.source.conversion_mode.map(DdeConversionMode::as_str),
-        );
-        if let Some(value) = link.source.automatic_update {
-            write_optional_attribute(
-                output,
-                "office:automatic-update",
-                Some(if value { "true" } else { "false" }),
-            );
-        }
-        output.push_str("/>");
+        output.push_str("<table:dde-link>");
+        write_dde_source(output, &link.source)?;
         write_cached_table(output, &link.cached_table)?;
         output.push_str("</table:dde-link>");
     }
     output.push_str("</table:dde-links>");
+    Ok(())
+}
+
+/// Write one inert DDE source declaration without contacting it.
+pub(crate) fn write_dde_source(output: &mut String, source: &DdeSource) -> Result<()> {
+    source.validate()?;
+    output.push_str("<office:dde-source office:dde-application=\"");
+    output.push_str(&escape_xml(&source.application));
+    output.push_str("\" office:dde-topic=\"");
+    output.push_str(&escape_xml(&source.topic));
+    output.push_str("\" office:dde-item=\"");
+    output.push_str(&escape_xml(&source.item));
+    output.push('"');
+    write_optional_attribute(output, "office:name", source.name.as_deref());
+    write_optional_attribute(
+        output,
+        "office:conversion-mode",
+        source.conversion_mode.map(DdeConversionMode::as_str),
+    );
+    if let Some(value) = source.automatic_update {
+        write_optional_attribute(
+            output,
+            "office:automatic-update",
+            Some(if value { "true" } else { "false" }),
+        );
+    }
+    output.push_str("/>");
     Ok(())
 }
 
@@ -725,6 +787,7 @@ fn write_cached_table(output: &mut String, sheet: &Sheet) -> Result<()> {
         sheet.title.as_deref(),
         sheet.description.as_deref(),
         sheet.table_source.as_ref(),
+        sheet.dde_source.as_ref(),
         sheet.scenario.as_ref(),
     )?;
     write_sheet_options(output, &sheet.protection.options);

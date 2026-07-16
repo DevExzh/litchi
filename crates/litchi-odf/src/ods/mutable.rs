@@ -552,6 +552,7 @@ impl MutableSpreadsheet {
             title: None,
             description: None,
             table_source: None,
+            dde_source: None,
             scenario: None,
             images: Vec::new(),
             protection: crate::ods::SheetProtection::default(),
@@ -1254,6 +1255,22 @@ impl MutableSpreadsheet {
         Ok(())
     }
 
+    /// Set or clear a sheet's inert DDE source declaration.
+    pub fn set_sheet_dde_source(
+        &mut self,
+        sheet_index: usize,
+        dde_source: Option<crate::DdeSource>,
+    ) -> Result<()> {
+        if let Some(source) = &dde_source {
+            source.validate()?;
+        }
+        let sheet = self.sheets.get_mut(sheet_index).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(format!("Sheet index {sheet_index} out of bounds"))
+        })?;
+        sheet.dde_source = dde_source;
+        Ok(())
+    }
+
     /// Set or clear a sheet's what-if scenario metadata.
     pub fn set_sheet_scenario(
         &mut self,
@@ -1420,6 +1437,7 @@ impl MutableSpreadsheet {
                 sheet.title.as_deref(),
                 sheet.description.as_deref(),
                 sheet.table_source.as_ref(),
+                sheet.dde_source.as_ref(),
                 sheet.scenario.as_ref(),
             )?;
             write_sheet_options(&mut body, &sheet.protection.options);

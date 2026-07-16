@@ -84,6 +84,7 @@ pub use parts::fields::{
 };
 pub use parts::numbering::{ListLevel, ListTables, NumberFormat};
 pub use parts::pap::ParagraphConditionalFormatting;
+pub use parts::saved_by::{SavedByEntry, SavedByTable};
 pub use parts::styles::{
     StyleDefinition, StyleFlags, StyleKind, StylePost2000, StyleRevisionMark, StyleSheet,
     StyleSheetHeader,

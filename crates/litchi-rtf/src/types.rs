@@ -1,6 +1,6 @@
 //! RTF document type definitions.
 
-use super::border::{Borders, Shading};
+use super::border::{CharacterBorder, CharacterShading, Borders, Shading};
 use crate::{RtfError, RtfResult};
 use std::borrow::Cow;
 use std::num::NonZeroU16;
@@ -388,6 +388,10 @@ pub struct Formatting {
     pub color_ref: ColorRef,
     /// Background/highlight color reference
     pub highlight_color: Option<ColorRef>,
+    /// Character border introduced by `chbrdr`.
+    pub character_border: Option<CharacterBorder>,
+    /// Exact character shading controls.
+    pub character_shading: Option<CharacterShading>,
     /// Bold
     pub bold: bool,
     /// Italic
@@ -446,6 +450,8 @@ impl Default for Formatting {
             font_size: unsafe { NonZeroU16::new_unchecked(24) },
             color_ref: 0,
             highlight_color: None,
+            character_border: None,
+            character_shading: None,
             bold: false,
             italic: false,
             underline: UnderlineStyle::default(),

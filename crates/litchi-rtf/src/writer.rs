@@ -2469,6 +2469,38 @@ impl<W: Write> RtfWriter<W> {
             self.write_control_word("highlight", Some(highlight as i32))?;
         }
 
+        if let Some(border) = fmt.character_border {
+            border
+                .validate()
+                .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+            self.write_control_word("chbrdr", None)?;
+            self.write_control_word(border.style.control_word(), None)?;
+            self.write_control_word("brdrw", Some(i32::from(border.width)))?;
+            self.write_control_word("brdrcf", Some(i32::from(border.color_ref)))?;
+            self.write_control_word("brsp", Some(i32::from(border.space)))?;
+            if border.shadow {
+                self.write_control_word("brdrsh", None)?;
+            }
+            if border.frame {
+                self.write_control_word("brdrframe", None)?;
+            }
+        }
+
+        if let Some(shading) = fmt.character_shading {
+            shading
+                .validate()
+                .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+            self.write_control_word("chshdng", Some(i32::from(shading.amount)))?;
+            self.write_control_word(
+                "chcfpat",
+                Some(i32::from(shading.foreground_color)),
+            )?;
+            self.write_control_word(
+                "chcbpat",
+                Some(i32::from(shading.background_color)),
+            )?;
+        }
+
         // Bold
         if fmt.bold {
             self.write_control_word("b", None)?;

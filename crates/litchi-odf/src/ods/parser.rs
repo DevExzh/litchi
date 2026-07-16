@@ -7,6 +7,7 @@ use super::{
     Sheet, SheetPrintSettings, SheetScenario, SheetStyle, SheetTableSource, TableGroup, TableRange,
     TableSourceMode, TableStructure, TableVisibility,
     annotation::{AnnotationBuilder, decode_reference},
+    dde::parse_source as parse_dde_source,
     scenario::validate_scenario,
     source::validate_table_source,
     structure::{
@@ -78,6 +79,7 @@ impl OdsParser {
         let mut element_depth = 0usize;
         let mut spreadsheet_depth = None;
         let mut current_sheet_depth = None;
+        let mut sheet_dde_source_depth = None;
 
         loop {
             match reader.read_event_into(&mut buf) {
@@ -95,7 +97,37 @@ impl OdsParser {
                         spreadsheet_depth = Some(element_depth);
                     }
 
-                    if let Some(builder) = detective_builder.as_mut() {
+                    if sheet_dde_source_depth.is_some() {
+                        return Err(Error::InvalidFormat(
+                            "office:dde-source must not contain child elements".to_string(),
+                        ));
+                    } else if current_sheet.is_some()
+                        && current_row.is_none()
+                        && current_sheet_depth
+                            .is_some_and(|depth| element_depth == depth + 1)
+                        && e.local_name().as_ref() == b"dde-source"
+                    {
+                        if !Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            OFFICE_NAMESPACE,
+                            "dde-source",
+                        ) {
+                            return Err(Error::InvalidFormat(
+                                "spoofed office:dde-source namespace".to_string(),
+                            ));
+                        }
+                        let source = parse_dde_source(
+                            e,
+                            reader.decoder(),
+                            &document_namespaces,
+                        )?;
+                        current_sheet
+                            .as_mut()
+                            .expect("checked current sheet")
+                            .set_dde_source(source)?;
+                        sheet_dde_source_depth = Some(element_depth);
+                    } else if let Some(builder) = detective_builder.as_mut() {
                         if detective_child_open {
                             return Err(Error::InvalidFormat(
                                 "table:detective child elements must be empty".to_string(),
@@ -357,6 +389,40 @@ impl OdsParser {
                 Ok(Event::Empty(ref e)) => {
                     let empty_scope =
                         Self::push_namespace_scope(e, reader.decoder(), &mut document_namespaces)?;
+                    if sheet_dde_source_depth.is_some() {
+                        return Err(Error::InvalidFormat(
+                            "office:dde-source must not contain child elements".to_string(),
+                        ));
+                    }
+                    if current_sheet.is_some()
+                        && current_row.is_none()
+                        && current_sheet_depth
+                            .is_some_and(|depth| element_depth == depth)
+                        && e.local_name().as_ref() == b"dde-source"
+                    {
+                        if !Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            OFFICE_NAMESPACE,
+                            "dde-source",
+                        ) {
+                            return Err(Error::InvalidFormat(
+                                "spoofed office:dde-source namespace".to_string(),
+                            ));
+                        }
+                        let source = parse_dde_source(
+                            e,
+                            reader.decoder(),
+                            &document_namespaces,
+                        )?;
+                        current_sheet
+                            .as_mut()
+                            .expect("checked current sheet")
+                            .set_dde_source(source)?;
+                        Self::pop_namespace_scope(&mut document_namespaces, Some(empty_scope));
+                        buf.clear();
+                        continue;
+                    }
                     if spreadsheet_depth == Some(element_depth)
                         && Self::element_name_is(
                             e.name().as_ref(),
@@ -595,6 +661,13 @@ impl OdsParser {
                         "table:detective cannot contain entity references".to_string(),
                     ));
                 },
+                Ok(Event::Text(_)) | Ok(Event::CData(_)) | Ok(Event::GeneralRef(_))
+                    if sheet_dde_source_depth.is_some() =>
+                {
+                    return Err(Error::InvalidFormat(
+                        "office:dde-source must be empty".to_string(),
+                    ));
+                },
                 Ok(Event::Text(ref t)) if annotation_builder.is_some() => {
                     if let Some(builder) = annotation_builder.as_mut() {
                         builder.text(t)?;
@@ -649,6 +722,13 @@ impl OdsParser {
                     text_content.push_str(&decode_reference(reference)?);
                 },
                 Ok(Event::End(ref e)) => {
+                    let closes_sheet_dde_source = sheet_dde_source_depth == Some(element_depth)
+                        && Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            OFFICE_NAMESPACE,
+                            "dde-source",
+                        );
                     let closes_current_sheet = current_sheet_depth == Some(element_depth)
                         && Self::element_name_is(
                             e.name().as_ref(),
@@ -664,6 +744,15 @@ impl OdsParser {
                             "spreadsheet",
                         );
                     element_depth = element_depth.saturating_sub(1);
+                    if closes_sheet_dde_source {
+                        sheet_dde_source_depth = None;
+                        Self::pop_namespace_scope(
+                            &mut document_namespaces,
+                            namespace_scopes.pop(),
+                        );
+                        buf.clear();
+                        continue;
+                    }
                     if detective_builder.is_some() {
                         if detective_child_open {
                             detective_child_open = false;
@@ -819,6 +908,12 @@ impl OdsParser {
                 _ => {},
             }
             buf.clear();
+        }
+
+        if sheet_dde_source_depth.is_some() {
+            return Err(Error::InvalidFormat(
+                "unterminated office:dde-source".to_string(),
+            ));
         }
 
         let images = crate::media::scan_content_images(xml_content)?;
@@ -2128,6 +2223,7 @@ pub(crate) struct SheetBuilder {
     title: Option<String>,
     description: Option<String>,
     table_source: Option<SheetTableSource>,
+    dde_source: Option<super::DdeSource>,
     scenario: Option<SheetScenario>,
     images: Vec<crate::OdfImage>,
     cell_count: usize,
@@ -2155,6 +2251,7 @@ impl SheetBuilder {
             title: None,
             description: None,
             table_source: None,
+            dde_source: None,
             scenario: None,
             images: Vec::new(),
             cell_count: 0,
@@ -2170,7 +2267,27 @@ impl SheetBuilder {
         Ok(())
     }
 
+    fn set_dde_source(&mut self, source: super::DdeSource) -> Result<()> {
+        if self.scenario.is_some() {
+            return Err(Error::InvalidFormat(
+                "office:dde-source must precede table:scenario".to_string(),
+            ));
+        }
+        if self.dde_source.replace(source).is_some() {
+            return Err(Error::InvalidFormat(
+                "a table must not contain more than one office:dde-source".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
     fn set_table_source(&mut self, source: SheetTableSource) -> Result<()> {
+        if self.dde_source.is_some() || self.scenario.is_some() {
+            return Err(Error::InvalidFormat(
+                "table:table-source must precede office:dde-source and table:scenario"
+                    .to_string(),
+            ));
+        }
         if self.table_source.replace(source).is_some() {
             return Err(Error::InvalidFormat(
                 "a table must not contain more than one table source".to_string(),
@@ -2267,6 +2384,7 @@ impl SheetBuilder {
             title: self.title,
             description: self.description,
             table_source: self.table_source,
+            dde_source: self.dde_source,
             scenario: self.scenario,
             images: self.images,
             protection: super::SheetProtection::default(),

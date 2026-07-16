@@ -4,6 +4,128 @@
 
 use super::types::ColorRef;
 
+/// RTF 1.9.1 character-border line style selected after `chbrdr`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum CharacterBorderStyle {
+    #[default]
+    None,
+    Single,
+    Thick,
+    Dotted,
+    Dashed,
+    DashSmallGap,
+    DotDash,
+    DotDotDash,
+    Double,
+    Triple,
+    ThinThickSmallGap,
+    ThickThinSmallGap,
+    ThinThickThinSmallGap,
+    ThinThickMediumGap,
+    ThickThinMediumGap,
+    ThinThickThinMediumGap,
+    ThinThickLargeGap,
+    ThickThinLargeGap,
+    ThinThickThinLargeGap,
+    Wavy,
+    DoubleWavy,
+    Striped,
+    Embossed,
+    Engraved,
+    Outset,
+    Inset,
+}
+
+impl CharacterBorderStyle {
+    pub(crate) const fn control_word(self) -> &'static str {
+        match self {
+            Self::None => "brdrnone",
+            Self::Single => "brdrs",
+            Self::Thick => "brdrth",
+            Self::Dotted => "brdrdot",
+            Self::Dashed => "brdrdash",
+            Self::DashSmallGap => "brdrdashsm",
+            Self::DotDash => "brdrdashd",
+            Self::DotDotDash => "brdrdashdd",
+            Self::Double => "brdrdb",
+            Self::Triple => "brdrtriple",
+            Self::ThinThickSmallGap => "brdrtnthsg",
+            Self::ThickThinSmallGap => "brdrthtnsg",
+            Self::ThinThickThinSmallGap => "brdrtnthtnsg",
+            Self::ThinThickMediumGap => "brdrtnthmg",
+            Self::ThickThinMediumGap => "brdrthtnmg",
+            Self::ThinThickThinMediumGap => "brdrtnthtnmg",
+            Self::ThinThickLargeGap => "brdrtnthlg",
+            Self::ThickThinLargeGap => "brdrthtnlg",
+            Self::ThinThickThinLargeGap => "brdrtnthtnlg",
+            Self::Wavy => "brdrwavy",
+            Self::DoubleWavy => "brdrwavydb",
+            Self::Striped => "brdrdashdotstr",
+            Self::Embossed => "brdremboss",
+            Self::Engraved => "brdrengrave",
+            Self::Outset => "brdroutset",
+            Self::Inset => "brdrinset",
+        }
+    }
+}
+
+/// One character border. RTF applies the same border to every side of the run.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CharacterBorder {
+    pub style: CharacterBorderStyle,
+    /// Width in twips; RTF 1.9.1 limits `brdrw` to 75.
+    pub width: u16,
+    pub color_ref: ColorRef,
+    /// Space between the border and text, in twips.
+    pub space: u16,
+    pub shadow: bool,
+    pub frame: bool,
+}
+
+impl Default for CharacterBorder {
+    fn default() -> Self {
+        Self {
+            style: CharacterBorderStyle::None,
+            width: 10,
+            color_ref: 0,
+            space: 0,
+            shadow: false,
+            frame: false,
+        }
+    }
+}
+
+impl CharacterBorder {
+    pub fn validate(&self) -> crate::RtfResult<()> {
+        if self.width > 75 {
+            return Err(crate::RtfError::MalformedDocument(
+                "RTF character-border width must be in 0..=75 twips".to_string(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// Exact character shading from `chshdng`, `chcfpat`, and `chcbpat`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct CharacterShading {
+    /// Shading in hundredths of a percent, from 0 through 10000.
+    pub amount: u16,
+    pub foreground_color: ColorRef,
+    pub background_color: ColorRef,
+}
+
+impl CharacterShading {
+    pub fn validate(&self) -> crate::RtfResult<()> {
+        if self.amount > 10_000 {
+            return Err(crate::RtfError::MalformedDocument(
+                "RTF character shading must be in 0..=10000".to_string(),
+            ));
+        }
+        Ok(())
+    }
+}
+
 /// Border style
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum BorderStyle {
