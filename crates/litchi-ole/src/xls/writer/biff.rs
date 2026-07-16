@@ -337,6 +337,15 @@ pub fn write_sheet_protection<W: Write>(
     worksheet::write_sheet_protection(writer, protect_objects, protect_scenarios, password_hash)
 }
 
+pub fn write_page_settings<W: Write>(
+    writer: &mut W,
+    options: &crate::xls::writer::core::XlsPageSetupOptions,
+    horizontal_breaks: &[(u16, u16, u16)],
+    vertical_breaks: &[(u16, u16, u16)],
+) -> XlsResult<()> {
+    worksheet::write_page_settings(writer, options, horizontal_breaks, vertical_breaks)
+}
+
 /// Write HLINK (hyperlink) record for a cell or cell range.
 ///
 /// Record type: 0x01B8

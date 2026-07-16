@@ -4,10 +4,16 @@ use crate::xls::error::{XlsError, XlsResult};
 
 const HEADER_RECORD_TYPE: u16 = 0x0014;
 const FOOTER_RECORD_TYPE: u16 = 0x0015;
+const VERTICAL_PAGE_BREAKS_RECORD_TYPE: u16 = 0x001a;
+const HORIZONTAL_PAGE_BREAKS_RECORD_TYPE: u16 = 0x001b;
+const PRINT_HEADERS_RECORD_TYPE: u16 = 0x002a;
+const PRINT_GRIDLINES_RECORD_TYPE: u16 = 0x002b;
 const LEFT_MARGIN_RECORD_TYPE: u16 = 0x0026;
 const RIGHT_MARGIN_RECORD_TYPE: u16 = 0x0027;
 const TOP_MARGIN_RECORD_TYPE: u16 = 0x0028;
 const BOTTOM_MARGIN_RECORD_TYPE: u16 = 0x0029;
+const PLS_RECORD_TYPE: u16 = 0x004d;
+const CONTINUE_RECORD_TYPE: u16 = 0x003c;
 const HCENTER_RECORD_TYPE: u16 = 0x0083;
 const VCENTER_RECORD_TYPE: u16 = 0x0084;
 const SETUP_RECORD_TYPE: u16 = 0x00a1;
@@ -60,6 +66,21 @@ pub enum XlsPrintComments {
     AtEnd,
 }
 
+/// One explicit page break and the inclusive perpendicular page span.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct XlsPageBreak {
+    position: u16,
+    range_start: u16,
+    range_end: u16,
+}
+
+impl XlsPageBreak {
+    /// First row below a horizontal break, or first column right of a vertical break.
+    pub const fn position(&self) -> u16 { self.position }
+    pub const fn range_start(&self) -> u16 { self.range_start }
+    pub const fn range_end(&self) -> u16 { self.range_end }
+}
+
 /// Fixed `SETUP` print configuration.
 #[derive(Debug, Clone, PartialEq)]
 pub struct XlsPrintSetup {
@@ -102,9 +123,35 @@ impl XlsPrintSetup {
     pub fn copies(&self) -> Option<u16> { self.copies }
 }
 
+impl Default for XlsPrintSetup {
+    fn default() -> Self {
+        Self {
+            printer_settings_available: false,
+            paper_size: None,
+            scale_percent: None,
+            starting_page_number: None,
+            fit_width_pages: 0,
+            fit_height_pages: 0,
+            print_order: XlsPrintOrder::DownThenOver,
+            orientation: None,
+            black_and_white: false,
+            draft_quality: false,
+            comments: XlsPrintComments::None,
+            errors: XlsPrintErrors::Displayed,
+            horizontal_resolution_dpi: None,
+            vertical_resolution_dpi: None,
+            header_margin_inches: 0.5,
+            footer_margin_inches: 0.5,
+            copies: None,
+        }
+    }
+}
+
 /// Print configuration associated with a worksheet.
 #[derive(Debug, Clone, PartialEq)]
 pub struct XlsPageSetup {
+    print_headers: bool,
+    print_gridlines: bool,
     header: String,
     footer: String,
     horizontally_centered: bool,
@@ -113,10 +160,15 @@ pub struct XlsPageSetup {
     right_margin_inches: Option<f64>,
     top_margin_inches: Option<f64>,
     bottom_margin_inches: Option<f64>,
+    horizontal_page_breaks: Vec<XlsPageBreak>,
+    vertical_page_breaks: Vec<XlsPageBreak>,
+    printer_driver_data: Vec<Vec<u8>>,
     print_setup: XlsPrintSetup,
 }
 
 impl XlsPageSetup {
+    pub const fn print_headers(&self) -> bool { self.print_headers }
+    pub const fn print_gridlines(&self) -> bool { self.print_gridlines }
     /// Raw header text, including `&L`, `&C`, `&R`, and formatting commands.
     pub fn header(&self) -> &str { &self.header }
     /// Raw footer text, including `&L`, `&C`, `&R`, and formatting commands.
@@ -127,6 +179,10 @@ impl XlsPageSetup {
     pub fn right_margin_inches(&self) -> Option<f64> { self.right_margin_inches }
     pub fn top_margin_inches(&self) -> Option<f64> { self.top_margin_inches }
     pub fn bottom_margin_inches(&self) -> Option<f64> { self.bottom_margin_inches }
+    pub fn horizontal_page_breaks(&self) -> &[XlsPageBreak] { &self.horizontal_page_breaks }
+    pub fn vertical_page_breaks(&self) -> &[XlsPageBreak] { &self.vertical_page_breaks }
+    /// Opaque DEVMODE payloads from `PLS`; these bytes are never executed.
+    pub fn printer_driver_data(&self) -> &[Vec<u8>] { &self.printer_driver_data }
     pub fn print_setup(&self) -> &XlsPrintSetup { &self.print_setup }
 }
 
@@ -184,6 +240,62 @@ fn parse_margin(data: &[u8], record_type: u16) -> XlsResult<f64> {
         return Err(invalid(record_type, "page margin must be finite and between 0 and 49 inches"));
     }
     Ok(margin)
+}
+
+fn parse_page_breaks(data: &[u8], record_type: u16) -> XlsResult<Vec<XlsPageBreak>> {
+    if data.len() < 2 {
+        return Err(invalid(record_type, "page-break record is missing its count"));
+    }
+    let count = usize::from(read_u16(data, 0));
+    let maximum = if record_type == HORIZONTAL_PAGE_BREAKS_RECORD_TYPE { 1026 } else { 255 };
+    if count > maximum {
+        return Err(invalid(record_type, format!("page-break count exceeds {maximum}")));
+    }
+    let expected = 2 + count * 6;
+    if data.len() != expected {
+        return Err(invalid(record_type, format!("page-break count requires {expected} bytes, found {}", data.len())));
+    }
+    let mut breaks: Vec<XlsPageBreak> = Vec::with_capacity(count);
+    for chunk in data[2..].chunks_exact(6) {
+        let page_break = XlsPageBreak {
+            position: read_u16(chunk, 0),
+            range_start: read_u16(chunk, 2),
+            range_end: read_u16(chunk, 4),
+        };
+        if page_break.range_end <= page_break.range_start {
+            return Err(invalid(record_type, "page-break range end must be greater than its start"));
+        }
+        if record_type == HORIZONTAL_PAGE_BREAKS_RECORD_TYPE && page_break.range_end > 16383 {
+            return Err(invalid(record_type, "horizontal page-break column exceeds 16383"));
+        }
+        if record_type == VERTICAL_PAGE_BREAKS_RECORD_TYPE && page_break.position > 255 {
+            return Err(invalid(record_type, "vertical page-break column exceeds 255"));
+        }
+        if let Some(previous) = breaks.last() {
+            if (page_break.position, page_break.range_start)
+                < (previous.position, previous.range_start)
+            {
+                return Err(invalid(record_type, "page breaks are not sorted"));
+            }
+            if page_break.position == previous.position
+                && page_break.range_start <= previous.range_end
+            {
+                return Err(invalid(record_type, "page-break ranges overlap"));
+            }
+        }
+        breaks.push(page_break);
+    }
+    Ok(breaks)
+}
+
+fn parse_pls(data: &[u8]) -> XlsResult<Vec<u8>> {
+    if data.len() < 2 {
+        return Err(invalid(PLS_RECORD_TYPE, "PLS is missing its reserved field"));
+    }
+    if read_u16(data, 0) != 0 {
+        return Err(invalid(PLS_RECORD_TYPE, "PLS reserved field must be zero"));
+    }
+    Ok(data[2..].to_vec())
 }
 
 fn parse_setup(data: &[u8]) -> XlsResult<XlsPrintSetup> {
@@ -258,6 +370,8 @@ fn parse_setup(data: &[u8]) -> XlsResult<XlsPrintSetup> {
 
 #[derive(Default)]
 struct PartialPageSetup {
+    print_headers: Option<bool>,
+    print_gridlines: Option<bool>,
     header: Option<String>,
     footer: Option<String>,
     horizontally_centered: Option<bool>,
@@ -266,6 +380,9 @@ struct PartialPageSetup {
     right_margin_inches: Option<f64>,
     top_margin_inches: Option<f64>,
     bottom_margin_inches: Option<f64>,
+    horizontal_page_breaks: Option<Vec<XlsPageBreak>>,
+    vertical_page_breaks: Option<Vec<XlsPageBreak>>,
+    printer_driver_data: Vec<Vec<u8>>,
     print_setup: Option<XlsPrintSetup>,
 }
 
@@ -273,6 +390,7 @@ struct PartialPageSetup {
 pub(crate) struct PageSetupCollector {
     page: PartialPageSetup,
     in_custom_view: bool,
+    collecting_pls: bool,
 }
 
 impl PageSetupCollector {
@@ -280,6 +398,7 @@ impl PageSetupCollector {
         Self {
             page: PartialPageSetup::default(),
             in_custom_view: false,
+            collecting_pls: false,
         }
     }
 
@@ -288,6 +407,13 @@ impl PageSetupCollector {
     }
 
     pub(crate) fn feed_record(&mut self, record_type: u16, data: &[u8]) -> XlsResult<()> {
+        if self.collecting_pls {
+            if record_type == CONTINUE_RECORD_TYPE {
+                self.page.printer_driver_data.last_mut().unwrap().extend_from_slice(data);
+                return Ok(());
+            }
+            self.collecting_pls = false;
+        }
         if record_type == USER_SVIEW_BEGIN_RECORD_TYPE {
             self.in_custom_view = true;
             return Ok(());
@@ -300,6 +426,25 @@ impl PageSetupCollector {
             return Ok(());
         }
         match record_type {
+            PRINT_HEADERS_RECORD_TYPE => {
+                if self.page.print_headers.is_some() { return Err(Self::duplicate(record_type)); }
+                self.page.print_headers = Some(parse_bool(data, record_type)?);
+            }
+            PRINT_GRIDLINES_RECORD_TYPE => {
+                if self.page.print_gridlines.is_some() { return Err(Self::duplicate(record_type)); }
+                if data.len() != 2 {
+                    return Err(invalid(record_type, "PRINTGRIDLINES payload must be 2 bytes"));
+                }
+                self.page.print_gridlines = Some(read_u16(data, 0) & 1 != 0);
+            }
+            HORIZONTAL_PAGE_BREAKS_RECORD_TYPE => {
+                if self.page.horizontal_page_breaks.is_some() { return Err(Self::duplicate(record_type)); }
+                self.page.horizontal_page_breaks = Some(parse_page_breaks(data, record_type)?);
+            }
+            VERTICAL_PAGE_BREAKS_RECORD_TYPE => {
+                if self.page.vertical_page_breaks.is_some() { return Err(Self::duplicate(record_type)); }
+                self.page.vertical_page_breaks = Some(parse_page_breaks(data, record_type)?);
+            }
             HEADER_RECORD_TYPE => {
                 if self.page.header.is_some() { return Err(Self::duplicate(record_type)); }
                 self.page.header = Some(parse_header_footer(data, record_type)?);
@@ -332,6 +477,10 @@ impl PageSetupCollector {
                 if self.page.bottom_margin_inches.is_some() { return Err(Self::duplicate(record_type)); }
                 self.page.bottom_margin_inches = Some(parse_margin(data, record_type)?);
             }
+            PLS_RECORD_TYPE => {
+                self.page.printer_driver_data.push(parse_pls(data)?);
+                self.collecting_pls = true;
+            }
             SETUP_RECORD_TYPE => {
                 if self.page.print_setup.is_some() { return Err(Self::duplicate(record_type)); }
                 self.page.print_setup = Some(parse_setup(data)?);
@@ -342,8 +491,12 @@ impl PageSetupCollector {
     }
 
     pub(crate) fn finish(self) -> XlsResult<Option<XlsPageSetup>> {
-        let Some(print_setup) = self.page.print_setup else {
-            let has_partial = self.page.header.is_some()
+        let has_partial = self.page.print_headers.is_some()
+                || self.page.print_gridlines.is_some()
+                || self.page.horizontal_page_breaks.is_some()
+                || self.page.vertical_page_breaks.is_some()
+                || !self.page.printer_driver_data.is_empty()
+                || self.page.header.is_some()
                 || self.page.footer.is_some()
                 || self.page.horizontally_centered.is_some()
                 || self.page.vertically_centered.is_some()
@@ -351,13 +504,12 @@ impl PageSetupCollector {
                 || self.page.right_margin_inches.is_some()
                 || self.page.top_margin_inches.is_some()
                 || self.page.bottom_margin_inches.is_some();
-            return if has_partial {
-                Err(invalid(SETUP_RECORD_TYPE, "worksheet page settings are missing the required SETUP record"))
-            } else {
-                Ok(None)
-            };
-        };
+        if !has_partial && self.page.print_setup.is_none() {
+            return Ok(None);
+        }
         Ok(Some(XlsPageSetup {
+            print_headers: self.page.print_headers.unwrap_or(false),
+            print_gridlines: self.page.print_gridlines.unwrap_or(false),
             header: self.page.header.unwrap_or_default(),
             footer: self.page.footer.unwrap_or_default(),
             horizontally_centered: self.page.horizontally_centered.unwrap_or(false),
@@ -366,7 +518,10 @@ impl PageSetupCollector {
             right_margin_inches: self.page.right_margin_inches,
             top_margin_inches: self.page.top_margin_inches,
             bottom_margin_inches: self.page.bottom_margin_inches,
-            print_setup,
+            horizontal_page_breaks: self.page.horizontal_page_breaks.unwrap_or_default(),
+            vertical_page_breaks: self.page.vertical_page_breaks.unwrap_or_default(),
+            printer_driver_data: self.page.printer_driver_data,
+            print_setup: self.page.print_setup.unwrap_or_default(),
         }))
     }
 }
@@ -428,6 +583,21 @@ mod tests {
         let mut collector = PageSetupCollector::new();
         collector.feed_record(HEADER_RECORD_TYPE, &[]).unwrap();
         assert!(collector.feed_record(HEADER_RECORD_TYPE, &[]).is_err());
+
+        assert!(parse_page_breaks(&[1, 0, 4, 0, 2, 0, 2, 0], HORIZONTAL_PAGE_BREAKS_RECORD_TYPE).is_err());
+        let overlapping = [2, 0, 4, 0, 0, 0, 10, 0, 4, 0, 9, 0, 12, 0];
+        assert!(parse_page_breaks(&overlapping, HORIZONTAL_PAGE_BREAKS_RECORD_TYPE).is_err());
+        assert!(parse_pls(&[1, 0]).is_err());
+    }
+
+    #[test]
+    fn partial_page_block_uses_tolerant_defaults() {
+        let mut collector = PageSetupCollector::new();
+        collector.feed_record(PRINT_HEADERS_RECORD_TYPE, &[1, 0]).unwrap();
+        let page = collector.finish().unwrap().unwrap();
+        assert!(page.print_headers());
+        assert!(!page.print_gridlines());
+        assert!(!page.print_setup().printer_settings_available());
     }
 
     #[test]
@@ -465,6 +635,16 @@ mod tests {
         assert_eq!(page.footer(), "&L\u{091c}\u{093e}&C\u{091c}\u{093e}&R\u{091c}\u{093e}");
         assert_eq!(page.print_setup().orientation(), Some(XlsPrintOrientation::Portrait));
         assert_eq!(page.print_setup().paper_size(), Some(1));
+
+        let breaks = XlsWorkbook::new(
+            File::open(fixture("SimpleWithPageBreaks.xls")).unwrap(),
+        )
+        .unwrap();
+        let page = breaks.xls_worksheet(0).unwrap().page_setup().unwrap();
+        assert!(
+            !page.horizontal_page_breaks().is_empty()
+                || !page.vertical_page_breaks().is_empty()
+        );
 
     }
 }

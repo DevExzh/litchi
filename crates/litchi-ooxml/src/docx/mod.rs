@@ -66,6 +66,7 @@ pub mod image;
 mod namespace;
 pub mod numbering;
 pub mod list;
+pub mod mail_merge;
 pub mod package;
 pub mod paragraph;
 pub mod parts;
@@ -94,6 +95,11 @@ pub use field::Field;
 pub use footnote::{Note, NoteType};
 pub use header_footer::HeaderFooter;
 pub use hyperlink::Hyperlink;
+pub use mail_merge::{
+    MailMergeConformance, MailMergeDataSourceObject, MailMergeDataType, MailMergeDestination,
+    MailMergeFieldMap, MailMergeFieldMappingType, MailMergeMainDocumentType, MailMergeRecipient,
+    MailMergeRecipients, MailMergeSettings,
+};
 pub use image::InlineImage;
 pub use numbering::{AbstractNum, Num, Numbering};
 pub use package::Package;

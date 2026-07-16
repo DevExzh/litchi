@@ -168,8 +168,7 @@ const MAX_BOOKMARK_NAME_BYTES: usize = 65_536;
 const MAX_ANNOTATIONS: usize = super::annotation::MAX_ANNOTATIONS;
 const MAX_ANNOTATION_TEXT_BYTES: usize = 4 * 1_048_576;
 const MAX_SECTIONS: usize = 4_096;
-const MAX_STYLES: usize = 65_536;
-const MAX_STYLE_NAME_BYTES: usize = 65_536;
+use super::stylesheet::{MAX_STYLES, MAX_STYLE_NAME_BYTES};
 const MAX_LISTS: usize = 65_536;
 const MAX_LIST_LEVELS: usize = 9;
 const MAX_LIST_TEXT_BYTES: usize = 65_536;
@@ -348,6 +347,8 @@ pub struct Parser<'a> {
     shape_groups: Vec<super::shape::ShapeGroup<'a>>,
     /// Stylesheet
     stylesheet: super::stylesheet::StyleSheet<'a>,
+    /// Whether the unique root stylesheet destination was seen.
+    saw_stylesheet: bool,
     /// Document information
     info: super::info::DocumentInfo<'a>,
     /// Annotations
@@ -468,6 +469,7 @@ impl<'a> Parser<'a> {
             shapes: Vec::new(),
             shape_groups: Vec::new(),
             stylesheet: super::stylesheet::StyleSheet::new(),
+            saw_stylesheet: false,
             info: super::info::DocumentInfo::new(),
             annotations: Vec::new(),
             annotation_ranges: HashMap::new(),
@@ -1598,7 +1600,12 @@ impl<'a> Parser<'a> {
         // The destination group is one level below the RTF root. Body text is
         // flushed before nested groups, so a nonzero body length also rejects
         // document variables that appear after body content has begun.
-        if self.states.len() != 3 || self.body_text_len != 0 {
+        if self.states.len() != 3
+            || self
+                .blocks
+                .iter()
+                .any(|block| !block.text.trim().is_empty())
+        {
             return Err(RtfError::MalformedDocument(
                 "RTF docvar destination must occur in the root document header".to_string(),
             ));
@@ -4140,12 +4147,29 @@ impl<'a> Parser<'a> {
 
     /// Parse the standard RTF stylesheet destination.
     fn parse_stylesheet(&mut self) -> RtfResult<()> {
+        if self.saw_stylesheet {
+            return Err(RtfError::MalformedDocument(
+                "RTF document contains multiple stylesheet destinations".to_string(),
+            ));
+        }
+        if self.states.len() != 3
+            || self
+                .blocks
+                .iter()
+                .any(|block| !block.text.trim().is_empty())
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF stylesheet must occur in the root document header".to_string(),
+            ));
+        }
+        self.saw_stylesheet = true;
         self.pos += 1; // `stylesheet`
         while self.pos < self.tokens.len() {
             match self.tokens.get(self.pos) {
                 Some(Token::OpenBrace) => self.parse_style_entry()?,
                 Some(Token::CloseBrace) => {
                     self.pos += 1;
+                    self.stylesheet.validate()?;
                     return Ok(());
                 },
                 Some(_) => self.pos += 1,
@@ -4157,9 +4181,18 @@ impl<'a> Parser<'a> {
 
     fn parse_style_entry(&mut self) -> RtfResult<()> {
         self.pos += 1; // opening brace
+        let starred = matches!(
+            self.tokens.get(self.pos),
+            Some(Token::Control(ControlWord::IgnorableDestination))
+        );
+        if starred {
+            self.pos += 1;
+        }
         let mut style_type = None;
         let mut id = None;
+        let inherited_unicode_skip = self.current_state()?.unicode_skip;
         let mut state = State::default();
+        state.unicode_skip = inherited_unicode_skip;
         let mut name = String::new();
         let mut name_complete = false;
         let mut based_on = None;
@@ -4177,6 +4210,19 @@ impl<'a> Parser<'a> {
         let mut personal = false;
         let mut compose = false;
         let mut reply = false;
+        let mut seen_metadata = std::collections::HashSet::new();
+        let mut saw_content_before_selector = false;
+        macro_rules! set_style_once {
+            ($key:literal, $target:expr, $value:expr) => {{
+                if !seen_metadata.insert($key) {
+                    return Err(RtfError::MalformedDocument(format!(
+                        "duplicate RTF style metadata control: {}",
+                        $key
+                    )));
+                }
+                $target = $value;
+            }};
+        }
 
         while self.pos < self.tokens.len() {
             match self.tokens.get(self.pos) {
@@ -4191,9 +4237,15 @@ impl<'a> Parser<'a> {
                 },
                 Some(Token::Text(text)) if !name_complete => {
                     let decoded = self.decode_transport_text(text)?;
+                    if style_type.is_none() && name.is_empty() && decoded.trim().is_empty() {
+                        self.pos += 1;
+                        continue;
+                    }
+                    saw_content_before_selector = true;
                     Self::append_style_name(&mut name, &decoded, &mut name_complete);
                 },
                 Some(Token::Control(ControlWord::Unicode(first))) if !name_complete => {
+                    saw_content_before_selector = true;
                     let decoded = self.parse_style_unicode(*first, state.unicode_skip)?;
                     Self::append_style_name(&mut name, &decoded, &mut name_complete);
                     if name.len() > MAX_STYLE_NAME_BYTES {
@@ -4212,44 +4264,79 @@ impl<'a> Parser<'a> {
                         );
                     },
                     ControlWord::ParagraphStyle(value) => {
+                        if style_type.is_some() || saw_content_before_selector {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF style selector is duplicated or out of order".to_string(),
+                            ));
+                        }
                         style_type = Some(super::stylesheet::StyleType::Paragraph);
                         id = Some(Self::style_id(*value, "style")?);
                     },
                     ControlWord::CharacterStyle(value) => {
+                        if style_type.is_some() || saw_content_before_selector {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF style selector is duplicated or out of order".to_string(),
+                            ));
+                        }
                         style_type = Some(super::stylesheet::StyleType::Character);
                         id = Some(Self::style_id(*value, "style")?);
                     },
                     ControlWord::SectionStyle(value) => {
+                        if style_type.is_some() || saw_content_before_selector {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF style selector is duplicated or out of order".to_string(),
+                            ));
+                        }
                         style_type = Some(super::stylesheet::StyleType::Section);
                         id = Some(Self::style_id(*value, "style")?);
                     },
                     ControlWord::TableStyle(value) => {
+                        if style_type.is_some() || saw_content_before_selector {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF style selector is duplicated or out of order".to_string(),
+                            ));
+                        }
                         style_type = Some(super::stylesheet::StyleType::Table);
                         id = Some(Self::style_id(*value, "style")?);
                     },
                     ControlWord::StyleBasedOn(value) => {
+                        if !seen_metadata.insert("sbasedon") {
+                            return Err(RtfError::MalformedDocument("duplicate RTF sbasedon".to_string()));
+                        }
                         based_on = Some(Self::style_id(*value, "based-on style")?);
                     },
                     ControlWord::StyleNext(value) => {
+                        if !seen_metadata.insert("snext") {
+                            return Err(RtfError::MalformedDocument("duplicate RTF snext".to_string()));
+                        }
                         next_style = Some(Self::style_id(*value, "next style")?);
                     },
                     ControlWord::StyleLink(value) => {
+                        if !seen_metadata.insert("slink") {
+                            return Err(RtfError::MalformedDocument("duplicate RTF slink".to_string()));
+                        }
                         linked_style = Some(Self::style_id(*value, "linked style")?);
                     },
-                    ControlWord::StyleAdditive(value) => additive = *value,
-                    ControlWord::StyleAutoUpdate(value) => auto_update = *value,
-                    ControlWord::StyleHidden(value) => hidden = *value,
-                    ControlWord::StyleLocked(value) => locked = *value,
-                    ControlWord::StyleSemiHidden(value) => semi_hidden = *value,
-                    ControlWord::StyleUnhideWhenUsed(value) => unhide_when_used = *value,
-                    ControlWord::StyleQuickFormat(value) => quick_format = *value,
-                    ControlWord::StylePriority(value) => priority = Some(*value),
-                    ControlWord::StyleRevisionId(value) => revision_id = Some(*value),
-                    ControlWord::StylePersonal(value) => personal = *value,
-                    ControlWord::StyleCompose(value) => compose = *value,
-                    ControlWord::StyleReply(value) => reply = *value,
+                    ControlWord::StyleAdditive(value) => set_style_once!("additive", additive, *value),
+                    ControlWord::StyleAutoUpdate(value) => set_style_once!("sautoupd", auto_update, *value),
+                    ControlWord::StyleHidden(value) => set_style_once!("shidden", hidden, *value),
+                    ControlWord::StyleLocked(value) => set_style_once!("slocked", locked, *value),
+                    ControlWord::StyleSemiHidden(value) => set_style_once!("ssemihidden", semi_hidden, *value),
+                    ControlWord::StyleUnhideWhenUsed(value) => set_style_once!("sunhideused", unhide_when_used, *value),
+                    ControlWord::StyleQuickFormat(value) => set_style_once!("sqformat", quick_format, *value),
+                    ControlWord::StylePriority(value) => set_style_once!("spriority", priority, Some(*value)),
+                    ControlWord::StyleRevisionId(value) => {
+                        if !seen_metadata.insert("styrsid") {
+                            return Err(RtfError::MalformedDocument("duplicate RTF styrsid".to_string()));
+                        }
+                        revision_id = Some(*value);
+                    },
+                    ControlWord::StylePersonal(value) => set_style_once!("spersonal", personal, *value),
+                    ControlWord::StyleCompose(value) => set_style_once!("scompose", compose, *value),
+                    ControlWord::StyleReply(value) => set_style_once!("sreply", reply, *value),
                     ControlWord::UnicodeSkip(value) => state.unicode_skip = (*value).max(0),
                     _ => {
+                        saw_content_before_selector = style_type.is_none();
                         Self::apply_style_property(&mut state, control);
                     },
                 },
@@ -4264,10 +4351,24 @@ impl<'a> Parser<'a> {
             }
         }
 
+        if style_type.is_none() && !starred && name_complete {
+            style_type = Some(super::stylesheet::StyleType::Paragraph);
+            id = Some(0);
+        }
         let (Some(style_type), Some(id)) = (style_type, id) else {
-            // Unknown extension groups are permitted inside a stylesheet.
+            // Unknown starred extension groups are permitted inside a stylesheet.
             return Ok(());
         };
+        if !name_complete {
+            return Err(RtfError::MalformedDocument(
+                "RTF style name must end with a semicolon".to_string(),
+            ));
+        }
+        if style_type != super::stylesheet::StyleType::Paragraph && !starred {
+            return Err(RtfError::MalformedDocument(
+                "RTF non-paragraph style entries must be starred".to_string(),
+            ));
+        }
         if self.stylesheet.styles().len() >= MAX_STYLES {
             return Err(RtfError::MalformedDocument(
                 "RTF style count exceeds the safety limit".to_string(),

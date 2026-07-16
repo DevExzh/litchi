@@ -16,6 +16,7 @@ use crate::docx::paragraph::Paragraph;
 use crate::docx::parts::DocumentPart;
 use crate::docx::section::{Section, Sections};
 use crate::docx::settings::DocumentSettings;
+use crate::docx::mail_merge::{MailMergeRecipients, is_settings_relationship};
 use crate::docx::smart_tag::SmartTag;
 use crate::docx::statistics::{
     DocumentStatistics, count_characters, count_characters_no_spaces, count_words,
@@ -1292,20 +1293,25 @@ impl<'a> Document<'a> {
     /// ```
     pub fn settings(&self) -> Result<Option<DocumentSettings>> {
         let main_part = self.opc.main_document_part()?;
-        let rels = main_part.rels();
+        let mut matches = main_part.rels().iter().filter(|rel| is_settings_relationship(rel.reltype()));
+        let Some(rel) = matches.next() else { return Ok(None); };
+        if matches.next().is_some() { return Err(OoxmlError::InvalidFormat("document has multiple settings relationships".into())); }
+        if rel.is_external() { return Err(OoxmlError::InvalidFormat("settings relationship cannot be external".into())); }
+        let target = rel.target_partname()?;
+        let settings_part = self.opc.get_part(&target)?;
+        Ok(Some(DocumentSettings::extract_from_part(settings_part)?))
+    }
 
-        // Look for settings relationship
-        match rels.part_with_reltype(relationship_type::SETTINGS) {
-            Ok(rel) => {
-                let target = rel.target_partname()?;
-                let settings_part = self.opc.get_part(&target)?;
-                Ok(Some(DocumentSettings::extract_from_part(settings_part)?))
-            },
-            Err(_) => {
-                // No settings in document
-                Ok(None)
-            },
-        }
+    /// Load the ISO mail-merge recipient-data part referenced by `settings.xml`.
+    pub fn mail_merge_recipients(&self) -> Result<Option<MailMergeRecipients>> {
+        let Some(settings) = self.settings()? else { return Ok(None); };
+        let Some(relationship_id) = settings.mail_merge().and_then(|merge| merge.odso()).and_then(|odso| odso.recipient_data_relationship_id()) else { return Ok(None); };
+        let main_part = self.opc.main_document_part()?;
+        let settings_relationship = main_part.rels().iter().find(|rel| is_settings_relationship(rel.reltype())).ok_or_else(|| OoxmlError::InvalidFormat("settings relationship is missing".into()))?;
+        let settings_part = self.opc.get_part(&settings_relationship.target_partname()?)?;
+        let relationship = settings_part.rels().get(relationship_id).ok_or_else(|| OoxmlError::InvalidFormat(format!("recipient-data relationship '{relationship_id}' is missing")))?;
+        let recipient_part = self.opc.get_part(&relationship.target_partname()?)?;
+        Ok(Some(MailMergeRecipients::extract_from_part(recipient_part)?))
     }
 
     /// Get the document's web-output settings, if a web-settings part exists.

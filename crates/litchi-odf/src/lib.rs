@@ -306,6 +306,7 @@ mod media;
 mod variable_declaration;
 mod document_scripts;
 mod font_face;
+mod line_numbering;
 mod dde_connection;
 pub use dde_connection::{OdfDdeConnectionDeclaration, OdfDdeConnectionUse};
 mod bibliography_configuration;
@@ -367,6 +368,10 @@ pub use font_face::{
     OdfFontFace, OdfFontFaceDeclarations, OdfFontFaceLink, OdfFontFaceSource, OdfFontMetric,
     OdfFontMetricKind, OdfFontPitch, OdfFontStretch, OdfFontStyle, OdfFontVariant,
     OdfFontWeight, OdfGenericFontFamily, OdfPositiveLength, parse_font_face_declarations,
+};
+pub use line_numbering::{
+    OdfLineNumberFormat, OdfLineNumberPosition, OdfLineNumberingConfiguration,
+    OdfLineNumberingSeparator, OdfNonNegativeLength, parse_line_numbering_configuration,
 };
 pub use embedded_object::{
     OdfEmbeddedObject, OdfEmbeddedObjectKind, OdfEmbeddedObjectPart,

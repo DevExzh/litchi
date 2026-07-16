@@ -795,12 +795,9 @@ impl<W: Write> RtfWriter<W> {
         if stylesheet.styles().is_empty() {
             return Ok(());
         }
-        if stylesheet.styles().len() > 65_536 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "RTF stylesheet exceeds the supported style count",
-            ));
-        }
+        stylesheet
+            .validate()
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
 
         self.write_str("{")?;
         self.write_control_word("stylesheet", None)?;

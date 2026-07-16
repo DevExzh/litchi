@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use super::{XlsCellValue, XlsConditionalFormat, XlsDataValidation};
+use super::{XlsCellValue, XlsConditionalFormat, XlsDataValidation, XlsPageSetupOptions};
 use crate::xls::writer::biff::AutoFilterConditionWrite;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -101,6 +101,9 @@ pub(super) struct WritableWorksheet {
     /// Optional non-default worksheet zoom as an SCL numerator and denominator.
     pub zoom: Option<(u16, u16)>,
     pub sheet_protection: Option<XlsSheetProtection>,
+    pub page_setup: Option<XlsPageSetupOptions>,
+    pub horizontal_page_breaks: Vec<(u16, u16, u16)>,
+    pub vertical_page_breaks: Vec<(u16, u16, u16)>,
     pub auto_filter: Option<AutoFilterRange>,
     /// Cell or range hyperlinks stored for this worksheet.
     pub hyperlinks: Vec<XlsHyperlink>,
@@ -154,6 +157,9 @@ impl WritableWorksheet {
             freeze_panes: None,
             zoom: None,
             sheet_protection: None,
+            page_setup: None,
+            horizontal_page_breaks: Vec::new(),
+            vertical_page_breaks: Vec::new(),
             auto_filter: None,
             hyperlinks: Vec::new(),
             auto_filter_columns: Vec::new(),

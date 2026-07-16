@@ -1,9 +1,157 @@
 //! Worksheet-level BIFF8 record writers.
 
 use crate::xls::{XlsError, XlsResult};
+use crate::xls::page_setup::{
+    XlsPrintComments, XlsPrintErrors, XlsPrintOrder, XlsPrintOrientation,
+};
+use crate::xls::writer::core::XlsPageSetupOptions;
 use std::io::Write;
 
 use super::write_record_header;
+
+fn write_bool_record<W: Write>(writer: &mut W, record_type: u16, value: bool) -> XlsResult<()> {
+    write_record_header(writer, record_type, 2)?;
+    writer.write_all(&u16::from(value).to_le_bytes())?;
+    Ok(())
+}
+
+fn write_header_footer<W: Write>(writer: &mut W, record_type: u16, text: &str) -> XlsResult<()> {
+    let units = text.encode_utf16().collect::<Vec<_>>();
+    if units.len() > 255 {
+        return Err(XlsError::InvalidData(
+            "header/footer exceeds 255 UTF-16 code units".to_string(),
+        ));
+    }
+    let compressed = units.iter().all(|unit| *unit <= 0x00ff);
+    let data_len = 3 + units.len() * if compressed { 1 } else { 2 };
+    write_record_header(writer, record_type, data_len as u16)?;
+    writer.write_all(&(units.len() as u16).to_le_bytes())?;
+    writer.write_all(&[u8::from(!compressed)])?;
+    for unit in units {
+        if compressed {
+            writer.write_all(&[unit as u8])?;
+        } else {
+            writer.write_all(&unit.to_le_bytes())?;
+        }
+    }
+    Ok(())
+}
+
+fn write_page_breaks<W: Write>(
+    writer: &mut W,
+    record_type: u16,
+    page_breaks: &[(u16, u16, u16)],
+) -> XlsResult<()> {
+    if page_breaks.is_empty() {
+        return Ok(());
+    }
+    let maximum = if record_type == 0x001b { 1026 } else { 255 };
+    if page_breaks.len() > maximum {
+        return Err(XlsError::InvalidData("page-break count exceeds BIFF8 limit".to_string()));
+    }
+    let mut ordered = page_breaks.to_vec();
+    ordered.sort_unstable();
+    for (index, &(position, range_start, range_end)) in ordered.iter().enumerate() {
+        if range_end <= range_start
+            || (record_type == 0x001b && range_end > 16383)
+            || (record_type == 0x001a && position > 255)
+        {
+            return Err(XlsError::InvalidData("page-break range is invalid".to_string()));
+        }
+        if index > 0 {
+            let previous = ordered[index - 1];
+            if position == previous.0 && range_start <= previous.2 {
+                return Err(XlsError::InvalidData("page-break ranges overlap".to_string()));
+            }
+        }
+    }
+    write_record_header(writer, record_type, 2 + ordered.len() as u16 * 6)?;
+    writer.write_all(&(ordered.len() as u16).to_le_bytes())?;
+    for (position, range_start, range_end) in ordered {
+        writer.write_all(&position.to_le_bytes())?;
+        writer.write_all(&range_start.to_le_bytes())?;
+        writer.write_all(&range_end.to_le_bytes())?;
+    }
+    Ok(())
+}
+
+fn write_pls<W: Write>(writer: &mut W, driver_data: &[u8]) -> XlsResult<()> {
+    const MAX_PAYLOAD: usize = 8224;
+    let first_len = driver_data.len().min(MAX_PAYLOAD - 2);
+    write_record_header(writer, 0x004d, (first_len + 2) as u16)?;
+    writer.write_all(&0u16.to_le_bytes())?;
+    writer.write_all(&driver_data[..first_len])?;
+    for chunk in driver_data[first_len..].chunks(MAX_PAYLOAD) {
+        write_record_header(writer, 0x003c, chunk.len() as u16)?;
+        writer.write_all(chunk)?;
+    }
+    Ok(())
+}
+
+/// Write the primary BIFF8 worksheet page-settings records in canonical order.
+pub fn write_page_settings<W: Write>(
+    writer: &mut W,
+    options: &XlsPageSetupOptions,
+    horizontal_breaks: &[(u16, u16, u16)],
+    vertical_breaks: &[(u16, u16, u16)],
+) -> XlsResult<()> {
+    write_bool_record(writer, 0x002a, options.print_headers)?;
+    write_bool_record(writer, 0x002b, options.print_gridlines)?;
+    write_page_breaks(writer, 0x001b, horizontal_breaks)?;
+    write_page_breaks(writer, 0x001a, vertical_breaks)?;
+    write_header_footer(writer, 0x0014, &options.header)?;
+    write_header_footer(writer, 0x0015, &options.footer)?;
+    write_bool_record(writer, 0x0083, options.horizontally_centered)?;
+    write_bool_record(writer, 0x0084, options.vertically_centered)?;
+    for (record_type, value) in [
+        (0x0026, options.left_margin_inches),
+        (0x0027, options.right_margin_inches),
+        (0x0028, options.top_margin_inches),
+        (0x0029, options.bottom_margin_inches),
+    ] {
+        write_record_header(writer, record_type, 8)?;
+        writer.write_all(&value.to_le_bytes())?;
+    }
+    if let Some(driver_data) = &options.printer_driver_data {
+        write_pls(writer, driver_data)?;
+    }
+
+    let mut flags = 0u16;
+    if options.print_order == XlsPrintOrder::OverThenDown { flags |= 0x0001; }
+    if options.printer_driver_data.is_none() { flags |= 0x0004; }
+    match options.orientation {
+        Some(XlsPrintOrientation::Portrait) => flags |= 0x0002,
+        Some(XlsPrintOrientation::Landscape) => {},
+        None => flags |= 0x0040,
+    }
+    if options.black_and_white { flags |= 0x0008; }
+    if options.draft_quality { flags |= 0x0010; }
+    match options.comments {
+        XlsPrintComments::None => {},
+        XlsPrintComments::AsDisplayed => flags |= 0x0020,
+        XlsPrintComments::AtEnd => flags |= 0x0220,
+    }
+    if options.starting_page_number.is_some() { flags |= 0x0080; }
+    flags |= match options.errors {
+        XlsPrintErrors::Displayed => 0,
+        XlsPrintErrors::Blank => 1 << 10,
+        XlsPrintErrors::Dashes => 2 << 10,
+        XlsPrintErrors::NotAvailable => 3 << 10,
+    };
+    write_record_header(writer, 0x00a1, 34)?;
+    writer.write_all(&options.paper_size.to_le_bytes())?;
+    writer.write_all(&options.scale_percent.to_le_bytes())?;
+    writer.write_all(&(options.starting_page_number.unwrap_or(1) as u16).to_le_bytes())?;
+    writer.write_all(&options.fit_width_pages.to_le_bytes())?;
+    writer.write_all(&options.fit_height_pages.to_le_bytes())?;
+    writer.write_all(&flags.to_le_bytes())?;
+    writer.write_all(&options.horizontal_resolution_dpi.to_le_bytes())?;
+    writer.write_all(&options.vertical_resolution_dpi.to_le_bytes())?;
+    writer.write_all(&options.header_margin_inches.to_le_bytes())?;
+    writer.write_all(&options.footer_margin_inches.to_le_bytes())?;
+    writer.write_all(&options.copies.to_le_bytes())?;
+    Ok(())
+}
 
 /// Write DEFCOLWIDTH record.
 ///

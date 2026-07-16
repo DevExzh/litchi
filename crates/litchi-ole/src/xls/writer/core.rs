@@ -32,6 +32,9 @@
 use super::super::error::{XlsError, XlsResult};
 use super::biff::AutoFilterConditionWrite;
 use super::formatting::{CellStyle, ExtendedFormat, FormattingManager};
+use crate::xls::page_setup::{
+    XlsPrintComments, XlsPrintErrors, XlsPrintOrder, XlsPrintOrientation,
+};
 use litchi_cfb::writer::OleWriter;
 use std::collections::HashMap;
 
@@ -214,6 +217,73 @@ pub enum XlsCellValue {
     Formula(String),
     /// Blank/empty cell
     Blank,
+}
+
+/// BIFF8 worksheet print/page setup written by `XlsWriter::set_page_setup`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct XlsPageSetupOptions {
+    pub print_headers: bool,
+    pub print_gridlines: bool,
+    pub header: String,
+    pub footer: String,
+    pub horizontally_centered: bool,
+    pub vertically_centered: bool,
+    pub left_margin_inches: f64,
+    pub right_margin_inches: f64,
+    pub top_margin_inches: f64,
+    pub bottom_margin_inches: f64,
+    pub paper_size: u16,
+    pub scale_percent: u16,
+    pub starting_page_number: Option<i16>,
+    pub fit_width_pages: u16,
+    pub fit_height_pages: u16,
+    pub print_order: XlsPrintOrder,
+    pub orientation: Option<XlsPrintOrientation>,
+    pub black_and_white: bool,
+    pub draft_quality: bool,
+    pub comments: XlsPrintComments,
+    pub errors: XlsPrintErrors,
+    pub horizontal_resolution_dpi: u16,
+    pub vertical_resolution_dpi: u16,
+    pub header_margin_inches: f64,
+    pub footer_margin_inches: f64,
+    pub copies: u16,
+    /// Opaque DEVMODE bytes. They are serialized but never interpreted or executed.
+    pub printer_driver_data: Option<Vec<u8>>,
+}
+
+impl Default for XlsPageSetupOptions {
+    fn default() -> Self {
+        Self {
+            print_headers: false,
+            print_gridlines: false,
+            header: String::new(),
+            footer: String::new(),
+            horizontally_centered: false,
+            vertically_centered: false,
+            left_margin_inches: 0.75,
+            right_margin_inches: 0.75,
+            top_margin_inches: 1.0,
+            bottom_margin_inches: 1.0,
+            paper_size: 1,
+            scale_percent: 100,
+            starting_page_number: None,
+            fit_width_pages: 1,
+            fit_height_pages: 1,
+            print_order: XlsPrintOrder::DownThenOver,
+            orientation: Some(XlsPrintOrientation::Portrait),
+            black_and_white: false,
+            draft_quality: false,
+            comments: XlsPrintComments::None,
+            errors: XlsPrintErrors::Displayed,
+            horizontal_resolution_dpi: 600,
+            vertical_resolution_dpi: 600,
+            header_margin_inches: 0.5,
+            footer_margin_inches: 0.5,
+            copies: 1,
+            printer_driver_data: None,
+        }
+    }
 }
 #[derive(Debug, Clone, Copy, Default)]
 struct XlsWorkbookProtection {
@@ -1487,6 +1557,115 @@ impl XlsWriter {
     /// * `use_1904` - True to use 1904 date system (Mac), false for 1900 (Windows, default)
     pub fn set_1904_dates(&mut self, use_1904: bool) {
         self.use_1904_dates = use_1904;
+    }
+
+    /// Configure the complete primary worksheet print/page settings block.
+    pub fn set_page_setup(
+        &mut self,
+        sheet: usize,
+        options: XlsPageSetupOptions,
+    ) -> XlsResult<()> {
+        let valid_margin = |value: f64| value.is_finite() && (0.0..49.0).contains(&value);
+        if !valid_margin(options.left_margin_inches)
+            || !valid_margin(options.right_margin_inches)
+            || !valid_margin(options.top_margin_inches)
+            || !valid_margin(options.bottom_margin_inches)
+            || !valid_margin(options.header_margin_inches)
+            || !valid_margin(options.footer_margin_inches)
+        {
+            return Err(XlsError::InvalidData(
+                "page margins must be finite and between 0 and 49 inches".to_string(),
+            ));
+        }
+        if options.header.encode_utf16().count() > 255
+            || options.footer.encode_utf16().count() > 255
+        {
+            return Err(XlsError::InvalidData(
+                "header and footer must not exceed 255 UTF-16 code units".to_string(),
+            ));
+        }
+        if (118..=255).contains(&options.paper_size)
+            || !(10..=400).contains(&options.scale_percent)
+            || options.fit_width_pages > 32767
+            || options.fit_height_pages > 32767
+            || options.horizontal_resolution_dpi == 0
+            || options.vertical_resolution_dpi == 0
+            || options.copies == 0
+            || options.copies > 32767
+        {
+            return Err(XlsError::InvalidData(
+                "page setup contains an out-of-range dimension".to_string(),
+            ));
+        }
+        let worksheet = self
+            .worksheets
+            .get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+        worksheet.page_setup = Some(options);
+        Ok(())
+    }
+
+    pub fn clear_page_setup(&mut self, sheet: usize) -> XlsResult<()> {
+        let worksheet = self
+            .worksheets
+            .get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+        worksheet.page_setup = None;
+        worksheet.horizontal_page_breaks.clear();
+        worksheet.vertical_page_breaks.clear();
+        Ok(())
+    }
+
+    /// Add a horizontal break at the first row below the break.
+    pub fn add_horizontal_page_break(
+        &mut self,
+        sheet: usize,
+        row: u16,
+        col_start: u16,
+        col_end: u16,
+    ) -> XlsResult<()> {
+        if col_end <= col_start || col_end > 16383 {
+            return Err(XlsError::InvalidData(
+                "horizontal page-break columns are invalid".to_string(),
+            ));
+        }
+        let worksheet = self
+            .worksheets
+            .get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+        if worksheet.horizontal_page_breaks.len() == 1026 {
+            return Err(XlsError::InvalidData(
+                "horizontal page-break count exceeds 1026".to_string(),
+            ));
+        }
+        worksheet.horizontal_page_breaks.push((row, col_start, col_end));
+        Ok(())
+    }
+
+    /// Add a vertical break at the first column right of the break.
+    pub fn add_vertical_page_break(
+        &mut self,
+        sheet: usize,
+        column: u16,
+        row_start: u16,
+        row_end: u16,
+    ) -> XlsResult<()> {
+        if column > 255 || row_end <= row_start {
+            return Err(XlsError::InvalidData(
+                "vertical page-break range is invalid".to_string(),
+            ));
+        }
+        let worksheet = self
+            .worksheets
+            .get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+        if worksheet.vertical_page_breaks.len() == 255 {
+            return Err(XlsError::InvalidData(
+                "vertical page-break count exceeds 255".to_string(),
+            ));
+        }
+        worksheet.vertical_page_breaks.push((column, row_start, row_end));
+        Ok(())
     }
 
     pub fn protect_workbook(

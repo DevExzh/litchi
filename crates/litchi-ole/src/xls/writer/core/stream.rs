@@ -379,6 +379,15 @@ pub(crate) fn generate_workbook_stream(
                 None
             };
 
+        if let Some(page_setup) = &worksheet.page_setup {
+            biff::write_page_settings(
+                &mut stream,
+                page_setup,
+                &worksheet.horizontal_page_breaks,
+                &worksheet.vertical_page_breaks,
+            )?;
+        }
+
         if worksheet.pivot_tables.is_empty() {
             biff::write_dimensions(
                 &mut stream,

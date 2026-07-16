@@ -4,6 +4,9 @@
 //! and protection status.
 
 use crate::docx::namespace::{is_wordprocessing_namespace, word_attribute_value};
+use crate::docx::mail_merge::{
+    MailMergeSettings, parse_settings_mail_merge, validate_mail_merge_relationships,
+};
 use crate::error::{OoxmlError, Result};
 use litchi_opc::part::Part;
 use quick_xml::encoding::Decoder;
@@ -43,6 +46,8 @@ pub struct DocumentSettings {
     smart_tag_types: Vec<SmartTagType>,
     /// Whether applications should omit embedded smart-tag data when saving.
     do_not_embed_smart_tags: bool,
+    /// Inert mail-merge connection and display metadata.
+    mail_merge: Option<MailMergeSettings>,
 }
 
 /// A smart-tag vocabulary declaration from `settings.xml`.
@@ -119,6 +124,7 @@ impl DocumentSettings {
             zoom_percent: None,
             smart_tag_types: Vec::new(),
             do_not_embed_smart_tags: false,
+            mail_merge: None,
         }
     }
 
@@ -158,6 +164,12 @@ impl DocumentSettings {
         self.do_not_embed_smart_tags
     }
 
+    /// Return the document's inert mail-merge metadata, if present.
+    #[inline]
+    pub fn mail_merge(&self) -> Option<&MailMergeSettings> {
+        self.mail_merge.as_ref()
+    }
+
     /// Extract settings from a settings.xml part.
     ///
     /// # Arguments
@@ -169,13 +181,16 @@ impl DocumentSettings {
     /// A DocumentSettings object
     pub(crate) fn extract_from_part(part: &dyn Part) -> Result<Self> {
         let xml = crate::common::mce::process_part(part)?;
-        Self::extract_from_xml(xml.as_ref())
+        let settings = Self::extract_from_xml(xml.as_ref())?;
+        validate_mail_merge_relationships(part, settings.mail_merge.as_ref())?;
+        Ok(settings)
     }
 
     fn extract_from_xml(xml_bytes: &[u8]) -> Result<Self> {
         let mut reader = NsReader::from_reader(xml_bytes);
 
         let mut settings = Self::new();
+        settings.mail_merge = parse_settings_mail_merge(xml_bytes)?;
         let mut depth = 0usize;
         let mut saw_root = false;
         let mut saw_do_not_embed_smart_tags = false;

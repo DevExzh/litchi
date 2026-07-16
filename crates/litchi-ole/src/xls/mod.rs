@@ -114,7 +114,7 @@ pub use border_fill::{
 pub use layout::{XlsColumnLayout, XlsRowLayout};
 pub use view::{XlsPane, XlsPaneType, XlsSelection, XlsSelectionRange, XlsWorksheetView};
 pub use page_setup::{
-    XlsPageSetup, XlsPrintComments, XlsPrintErrors, XlsPrintOrder, XlsPrintOrientation,
+    XlsPageBreak, XlsPageSetup, XlsPrintComments, XlsPrintErrors, XlsPrintOrder, XlsPrintOrientation,
     XlsPrintSetup,
 };
 pub use conditional_format::{

@@ -3,10 +3,15 @@
 //! This module provides support for RTF stylesheets and style definitions.
 
 use super::types::{Formatting, Paragraph};
+use crate::{RtfError, RtfResult};
 use std::borrow::Cow;
+use std::collections::HashSet;
+
+pub(crate) const MAX_STYLES: usize = 65_536;
+pub(crate) const MAX_STYLE_NAME_BYTES: usize = 65_536;
 
 /// Style type
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum StyleType {
     /// Paragraph style
     #[default]
@@ -20,7 +25,7 @@ pub enum StyleType {
 }
 
 /// RTF style definition
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Style<'a> {
     /// Style index/ID
     pub id: u16,
@@ -136,7 +141,7 @@ impl<'a> Style<'a> {
 }
 
 /// Stylesheet containing all style definitions
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct StyleSheet<'a> {
     /// Style definitions
     styles: Vec<Style<'a>>,
@@ -192,5 +197,67 @@ impl<'a> StyleSheet<'a> {
             .iter()
             .filter(|s| s.is_character_style())
             .collect()
+    }
+
+    /// Return the based-on chain from the root ancestor to the selected style.
+    ///
+    /// Raw definitions remain unchanged so explicit resets survive writing.
+    pub fn inheritance_chain(
+        &self,
+        style_type: StyleType,
+        id: u16,
+    ) -> RtfResult<Vec<&Style<'a>>> {
+        let mut chain = Vec::new();
+        let mut seen = HashSet::new();
+        let mut current = self.get_typed(style_type, id);
+        while let Some(style) = current {
+            if !seen.insert((style.style_type, style.id)) {
+                return Err(RtfError::MalformedDocument(
+                    "RTF stylesheet contains a based-on cycle".to_string(),
+                ));
+            }
+            chain.push(style);
+            current = style
+                .based_on
+                .and_then(|parent| self.get_typed(style.style_type, parent));
+        }
+        chain.reverse();
+        Ok(chain)
+    }
+
+    pub(crate) fn validate(&self) -> RtfResult<()> {
+        if self.styles.len() > MAX_STYLES {
+            return Err(RtfError::MalformedDocument(
+                "RTF stylesheet exceeds the supported style count".to_string(),
+            ));
+        }
+        let mut ids = HashSet::with_capacity(self.styles.len());
+        for style in &self.styles {
+            if !ids.insert((style.style_type, style.id)) {
+                return Err(RtfError::MalformedDocument(
+                    "RTF stylesheet contains a duplicate typed style ID".to_string(),
+                ));
+            }
+            if style.name.is_empty()
+                || style.name.len() > MAX_STYLE_NAME_BYTES
+                || style.name.contains(';')
+            {
+                return Err(RtfError::MalformedDocument(
+                    "RTF style name is empty, too long, or contains a semicolon".to_string(),
+                ));
+            }
+            if style.priority.is_some_and(|value| !(0..=99).contains(&value)) {
+                return Err(RtfError::MalformedDocument(
+                    "RTF style priority must be in 0..=99".to_string(),
+                ));
+            }
+            if style.revision_id.is_some_and(|value| value < 0) {
+                return Err(RtfError::MalformedDocument(
+                    "RTF style revision ID cannot be negative".to_string(),
+                ));
+            }
+            self.inheritance_chain(style.style_type, style.id)?;
+        }
+        Ok(())
     }
 }
