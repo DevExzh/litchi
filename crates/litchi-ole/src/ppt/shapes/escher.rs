@@ -19,36 +19,54 @@ use zerocopy::{
 #[repr(u16)]
 pub enum EscherPropertyType {
     /// Transform properties
-    Transform = 0x0000,
-    /// Fill style properties
-    FillStyle = 0x0001,
-    /// Line style properties
-    LineStyle = 0x0002,
-    /// Shadow style properties
-    ShadowStyle = 0x0003,
+    Transform,
+    /// Shape protection properties
+    Protection,
+    /// Text box properties
+    Text,
+    /// WordArt text properties
+    GeoText,
+    /// Picture properties
+    Blip,
     /// Geometry properties
-    Geometry = 0x0004,
-    /// Text properties
-    Text = 0x0005,
+    Geometry,
+    /// Fill style properties
+    FillStyle,
+    /// Line style properties
+    LineStyle,
+    /// Shadow style properties
+    ShadowStyle,
+    /// Perspective properties
+    Perspective,
     /// 3D properties
-    Properties3D = 0x0006,
+    Properties3D,
+    /// Shape properties
+    Shape,
+    /// Callout properties
+    Callout,
     /// Group shape properties
-    GroupShape = 0x0007,
+    GroupShape,
     /// Unknown property type
-    Unknown = 0xFFFF,
+    Unknown,
 }
 
 impl From<u16> for EscherPropertyType {
     fn from(value: u16) -> Self {
         match value {
-            0x0000 => EscherPropertyType::Transform,
-            0x0001 => EscherPropertyType::FillStyle,
-            0x0002 => EscherPropertyType::LineStyle,
-            0x0003 => EscherPropertyType::ShadowStyle,
-            0x0004 => EscherPropertyType::Geometry,
-            0x0005 => EscherPropertyType::Text,
-            0x0006 => EscherPropertyType::Properties3D,
-            0x0007 => EscherPropertyType::GroupShape,
+            0x0000..=0x003F => EscherPropertyType::Transform,
+            0x0040..=0x007F => EscherPropertyType::Protection,
+            0x0080..=0x00BF => EscherPropertyType::Text,
+            0x00C0..=0x00FF => EscherPropertyType::GeoText,
+            0x0100..=0x013F => EscherPropertyType::Blip,
+            0x0140..=0x017F => EscherPropertyType::Geometry,
+            0x0180..=0x01BF => EscherPropertyType::FillStyle,
+            0x01C0..=0x01FF => EscherPropertyType::LineStyle,
+            0x0200..=0x023F => EscherPropertyType::ShadowStyle,
+            0x0240..=0x027F => EscherPropertyType::Perspective,
+            0x0280..=0x02FF => EscherPropertyType::Properties3D,
+            0x0300..=0x033F => EscherPropertyType::Shape,
+            0x0340..=0x037F => EscherPropertyType::Callout,
+            0x0380..=0x03BF => EscherPropertyType::GroupShape,
             _ => EscherPropertyType::Unknown,
         }
     }
@@ -158,19 +176,15 @@ impl<'a> EscherProperty<'a> {
 
     /// Get the property holder type based on the property number
     pub fn property_holder(&self) -> EscherPropertyHolder {
-        // Based on POI's EscherPropertyTypes.forPropertyID logic
         match self.property_number() {
-            // Boolean properties (0x00BF - 0x013F)
-            0x00BF..=0x013F => EscherPropertyHolder::Boolean,
-            // RGB properties (0x0140 - 0x017F)
-            0x0140..=0x017F => EscherPropertyHolder::RGB,
-            // Shape path properties (0x0180 - 0x01BF)
-            0x0180..=0x01BF => EscherPropertyHolder::ShapePath,
-            // Array properties (0x01C0 - 0x01FF)
-            0x01C0..=0x01FF => EscherPropertyHolder::Array,
-            // Complex properties (0x0200 - 0x03FF)
-            0x0200..=0x03FF => EscherPropertyHolder::Complex,
-            // Simple properties (everything else)
+            0x007F | 0x00BF | 0x00FF | 0x013F | 0x017F | 0x01BF | 0x01FF | 0x023F | 0x027F
+            | 0x02BF | 0x033F | 0x057F | 0x05BF | 0x05FF | 0x063F => EscherPropertyHolder::Boolean,
+            0x0181 | 0x0183 | 0x01C0 | 0x01C2 | 0x0201 | 0x0287 | 0x02BE => {
+                EscherPropertyHolder::RGB
+            },
+            0x0144 => EscherPropertyHolder::ShapePath,
+            0x0145 | 0x0146 | 0x0197 | 0x01CF | 0x0383 | 0x03A0 => EscherPropertyHolder::Array,
+            _ if self.is_complex() => EscherPropertyHolder::Complex,
             _ => EscherPropertyHolder::Simple,
         }
     }
@@ -182,46 +196,86 @@ impl<'a> EscherProperty<'a> {
             return Ok(Vec::new());
         }
 
-        // Pre-allocate with exact size to avoid reallocations
-        let mut properties = Vec::with_capacity(num_properties as usize);
-        let mut offset = 0;
+        let property_count = usize::from(num_properties);
+        let header_size = property_count.checked_mul(6).ok_or_else(|| {
+            PptError::Corrupted("Escher property header size overflow".to_string())
+        })?;
+        if header_size > data.len() {
+            return Err(PptError::Corrupted(format!(
+                "Escher property headers require {header_size} bytes, found {}",
+                data.len()
+            )));
+        }
 
-        for _ in 0..num_properties {
-            if offset + 6 > data.len() {
-                break; // Not enough data for property header
-            }
-
-            // Use zerocopy for safe, zero-copy parsing
+        let mut descriptors = Vec::with_capacity(property_count);
+        for index in 0..property_count {
+            let offset = index * 6;
             let prop_id = U16::<LittleEndian>::read_from_bytes(&data[offset..offset + 2])
                 .map(|v| v.get())
                 .unwrap_or(0);
             let prop_data = U32::<LittleEndian>::read_from_bytes(&data[offset + 2..offset + 6])
                 .map(|v| v.get())
                 .unwrap_or(0);
-
-            let is_complex = (prop_id & 0x8000) != 0;
-
-            let property = if is_complex {
-                // Parse complex property data with zero-copy borrowing
-                let complex_size = (prop_data >> 16) as usize; // High 16 bits contain size
-                if offset + 6 + complex_size > data.len() {
-                    break; // Not enough data for complex property
-                }
-                let complex_data = &data[offset + 6..offset + 6 + complex_size];
-                offset += 6 + complex_size;
-
-                Self::new_complex_borrowed(prop_id, prop_data, complex_data)
-            } else {
-                // Simple property - advance offset without additional bounds check
-                offset += 6;
-                Self::new(prop_id, prop_data)
-            };
-
-            properties.push(property);
+            descriptors.push((prop_id, prop_data));
         }
 
-        // Shrink to fit if we allocated more than needed
-        properties.shrink_to_fit();
+        let mut properties = Vec::with_capacity(property_count);
+        let mut complex_offset = header_size;
+        for (prop_id, prop_data) in descriptors {
+            let mut property = Self::new(prop_id, prop_data);
+            if property.is_complex() {
+                let declared_size = usize::try_from(prop_data).map_err(|_| {
+                    PptError::Corrupted("Escher complex property size overflow".to_string())
+                })?;
+                let complex_size = if property.property_holder() == EscherPropertyHolder::Array
+                    && declared_size > 0
+                    && complex_offset
+                        .checked_add(6)
+                        .is_some_and(|end| end <= data.len())
+                {
+                    let count = usize::from(u16::from_le_bytes([
+                        data[complex_offset],
+                        data[complex_offset + 1],
+                    ]));
+                    let raw_element_size =
+                        i16::from_le_bytes([data[complex_offset + 4], data[complex_offset + 5]]);
+                    let element_size = if raw_element_size < 0 {
+                        usize::from(raw_element_size.unsigned_abs() >> 2)
+                    } else {
+                        raw_element_size as usize
+                    };
+                    let payload_size = count.checked_mul(element_size).ok_or_else(|| {
+                        PptError::Corrupted("Escher array property size overflow".to_string())
+                    })?;
+                    if payload_size == declared_size {
+                        declared_size.checked_add(6).ok_or_else(|| {
+                            PptError::Corrupted("Escher array property size overflow".to_string())
+                        })?
+                    } else {
+                        declared_size
+                    }
+                } else {
+                    declared_size
+                };
+                let complex_end = complex_offset.checked_add(complex_size).ok_or_else(|| {
+                    PptError::Corrupted("Escher complex property offset overflow".to_string())
+                })?;
+                if complex_end > data.len() {
+                    return Err(PptError::Corrupted(format!(
+                        "Escher complex property requires {complex_size} bytes, found {}",
+                        data.len().saturating_sub(complex_offset)
+                    )));
+                }
+                let complex_data = &data[complex_offset..complex_end];
+                property = if property.property_holder() == EscherPropertyHolder::Array {
+                    Self::new_array_borrowed(prop_id, prop_data, complex_data)
+                } else {
+                    Self::new_complex_borrowed(prop_id, prop_data, complex_data)
+                };
+                complex_offset = complex_end;
+            }
+            properties.push(property);
+        }
         Ok(properties)
     }
 }
@@ -230,17 +284,17 @@ impl<'a> EscherProperty<'a> {
 #[derive(Debug, Clone, Default)]
 pub struct PropertyValues {
     // Fill properties
-    pub fill_type: Option<u16>,
+    pub fill_type: Option<u32>,
     pub fill_color: Option<u32>,
-    pub fill_opacity: Option<u16>,
+    pub fill_opacity: Option<u32>,
     pub fill_back_color: Option<u32>,
 
     // Line properties
     pub line_color: Option<u32>,
-    pub line_opacity: Option<u16>,
-    pub line_width: Option<u16>,
-    pub line_style: Option<u16>,
-    pub line_dash_style: Option<u16>,
+    pub line_opacity: Option<u32>,
+    pub line_width: Option<i32>,
+    pub line_style: Option<u32>,
+    pub line_dash_style: Option<u32>,
 
     // Shadow properties
     pub shadow_type: Option<u32>,
@@ -256,10 +310,10 @@ pub struct PropertyValues {
     pub text_top_margin: Option<i32>,
     pub text_right_margin: Option<i32>,
     pub text_bottom_margin: Option<i32>,
-    pub text_anchor: Option<u16>,
+    pub text_anchor: Option<u32>,
 
     // Transform properties
-    pub rotation: Option<u32>,
+    pub rotation: Option<i32>,
     pub lock_aspect_ratio: Option<bool>,
 }
 
@@ -539,17 +593,17 @@ impl<'a> EscherRecord<'a> {
         for property in &self.properties {
             match property.property_number() as u32 {
                 // Fill properties
-                0x00BF => values.fill_type = Some(property.data as u16),
-                0x00C0 => values.fill_color = Some(property.data),
-                0x00C1 => values.fill_opacity = Some((property.data & 0xFFFF) as u16),
-                0x00C2 => values.fill_back_color = Some(property.data),
+                0x0180 => values.fill_type = Some(property.data),
+                0x0181 => values.fill_color = Some(property.data),
+                0x0182 => values.fill_opacity = Some(property.data),
+                0x0183 => values.fill_back_color = Some(property.data),
 
                 // Line properties
-                0x0140 => values.line_color = Some(property.data),
-                0x0141 => values.line_opacity = Some((property.data & 0xFFFF) as u16),
-                0x0142 => values.line_width = Some(property.data as u16),
-                0x0143 => values.line_style = Some(property.data as u16),
-                0x0144 => values.line_dash_style = Some(property.data as u16),
+                0x01C0 => values.line_color = Some(property.data),
+                0x01C1 => values.line_opacity = Some(property.data),
+                0x01CB => values.line_width = Some(property.data as i32),
+                0x01CD => values.line_style = Some(property.data),
+                0x01CE => values.line_dash_style = Some(property.data),
 
                 // Shadow properties
                 0x0200 => values.shadow_type = Some(property.data),
@@ -568,15 +622,20 @@ impl<'a> EscherRecord<'a> {
                 },
 
                 // Text properties
-                0x01C0 => values.text_left_margin = Some(property.data as i32),
-                0x01C1 => values.text_top_margin = Some(property.data as i32),
-                0x01C2 => values.text_right_margin = Some(property.data as i32),
-                0x01C3 => values.text_bottom_margin = Some(property.data as i32),
-                0x01C4 => values.text_anchor = Some(property.data as u16),
+                0x0081 => values.text_left_margin = Some(property.data as i32),
+                0x0082 => values.text_top_margin = Some(property.data as i32),
+                0x0083 => values.text_right_margin = Some(property.data as i32),
+                0x0084 => values.text_bottom_margin = Some(property.data as i32),
+                0x0087 => values.text_anchor = Some(property.data),
 
                 // Transform properties
-                0x0000 => values.rotation = Some(property.data),
-                0x0001 => values.lock_aspect_ratio = Some(property.data != 0),
+                0x0004 => values.rotation = Some(property.data as i32),
+                0x007F => {
+                    let use_mask = 0x0080_0000;
+                    if property.data & use_mask != 0 {
+                        values.lock_aspect_ratio = Some(property.data & 0x0000_0080 != 0);
+                    }
+                },
 
                 _ => {}, // Ignore unknown properties for now
             }
@@ -690,7 +749,8 @@ impl<'a> EscherRecord<'a> {
                 props.line_color = Some(line_color);
             }
             if let Some(line_width) = prop_values.line_width {
-                props.line_width = Some(line_width);
+                let rounded_points = line_width.max(0).saturating_add(6_350) / 12_700;
+                props.line_width = Some(u16::try_from(rounded_points).unwrap_or(u16::MAX));
             }
 
             // Apply shadow properties
@@ -994,6 +1054,84 @@ mod tests {
     use super::*;
 
     #[test]
+    fn classifies_officeart_properties_by_spec_table() {
+        assert_eq!(
+            EscherProperty::new(0x0004, 0).property_type(),
+            EscherPropertyType::Transform
+        );
+        assert_eq!(
+            EscherProperty::new(0x007F, 0).property_type(),
+            EscherPropertyType::Protection
+        );
+        assert_eq!(
+            EscherProperty::new(0x0081, 0).property_type(),
+            EscherPropertyType::Text
+        );
+        assert_eq!(
+            EscherProperty::new(0x00C0, 0).property_type(),
+            EscherPropertyType::GeoText
+        );
+        assert_eq!(
+            EscherProperty::new(0x4104, 0).property_type(),
+            EscherPropertyType::Blip
+        );
+        assert_eq!(
+            EscherProperty::new(0x8145, 0).property_holder(),
+            EscherPropertyHolder::Array
+        );
+        assert_eq!(
+            EscherProperty::new(0x0181, 0).property_holder(),
+            EscherPropertyHolder::RGB
+        );
+        assert_eq!(
+            EscherProperty::new(0x01FF, 0).property_holder(),
+            EscherPropertyHolder::Boolean
+        );
+        assert_eq!(
+            EscherProperty::new(0x0144, 0).property_holder(),
+            EscherPropertyHolder::ShapePath
+        );
+        assert_eq!(
+            EscherProperty::new(0x8400, 0).property_holder(),
+            EscherPropertyHolder::Complex
+        );
+        assert_eq!(
+            EscherProperty::new(0x0400, 0).property_type(),
+            EscherPropertyType::Unknown
+        );
+    }
+
+    #[test]
+    fn parses_all_property_headers_before_complex_payloads() {
+        let array_data = [2, 0, 2, 0, 2, 0, 1, 2, 3, 4];
+        let text_data = [b'A', 0, 0, 0];
+        let mut data = Vec::new();
+        data.extend_from_slice(&0x8145_u16.to_le_bytes());
+        data.extend_from_slice(&4_u32.to_le_bytes()); // Array size excluding its 6-byte header.
+        data.extend_from_slice(&0x0181_u16.to_le_bytes());
+        data.extend_from_slice(&0x0012_3456_u32.to_le_bytes());
+        data.extend_from_slice(&0x80C0_u16.to_le_bytes());
+        data.extend_from_slice(&(text_data.len() as u32).to_le_bytes());
+        data.extend_from_slice(&array_data);
+        data.extend_from_slice(&text_data);
+
+        let properties = EscherProperty::parse_properties(&data, 3).unwrap();
+        assert_eq!(properties.len(), 3);
+        assert_eq!(
+            properties[0].array_data.as_deref(),
+            Some(array_data.as_slice())
+        );
+        assert_eq!(properties[1].data, 0x0012_3456);
+        assert_eq!(
+            properties[2].complex_data.as_deref(),
+            Some(text_data.as_slice())
+        );
+
+        let truncated = &data[..18];
+        assert!(EscherProperty::parse_properties(truncated, 3).is_err());
+    }
+
+    #[test]
     fn test_escher_record_creation() {
         let data_vec = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
         let record = EscherRecord {
@@ -1052,6 +1190,59 @@ mod tests {
         assert_eq!(values.shadow_offset_y, Some(25_400));
         assert_eq!(values.shadow_enabled, Some(true));
         assert_eq!(values.shadow_obscured, None);
+    }
+
+    #[test]
+    fn extracts_common_properties_with_spec_ids_and_full_width_values() {
+        let record = EscherRecord {
+            record_type: EscherRecordType::Options,
+            version: 3,
+            instance: 17,
+            data_length: 0,
+            data: Cow::Borrowed(&[]),
+            children: Vec::new(),
+            properties: vec![
+                EscherProperty::new(0x0004, (-90_i32 * 65_536) as u32),
+                EscherProperty::new(0x007F, 0x0080_0080),
+                EscherProperty::new(0x0081, (-12_700_i32) as u32),
+                EscherProperty::new(0x0082, 25_400),
+                EscherProperty::new(0x0083, 38_100),
+                EscherProperty::new(0x0084, 50_800),
+                EscherProperty::new(0x0087, 4),
+                EscherProperty::new(0x0180, 4),
+                EscherProperty::new(0x0181, 0x0012_3456),
+                EscherProperty::new(0x0182, 65_536),
+                EscherProperty::new(0x0183, 0x0065_4321),
+                EscherProperty::new(0x01C0, 0x00AB_CDEF),
+                EscherProperty::new(0x01C1, 32_768),
+                EscherProperty::new(0x01CB, 25_400),
+                EscherProperty::new(0x01CD, 1),
+                EscherProperty::new(0x01CE, 2),
+            ],
+        };
+
+        let values = record.extract_property_values();
+        assert_eq!(values.rotation, Some(-90 * 65_536));
+        assert_eq!(values.lock_aspect_ratio, Some(true));
+        assert_eq!(values.text_left_margin, Some(-12_700));
+        assert_eq!(values.text_top_margin, Some(25_400));
+        assert_eq!(values.text_right_margin, Some(38_100));
+        assert_eq!(values.text_bottom_margin, Some(50_800));
+        assert_eq!(values.text_anchor, Some(4));
+        assert_eq!(values.fill_type, Some(4));
+        assert_eq!(values.fill_color, Some(0x0012_3456));
+        assert_eq!(values.fill_opacity, Some(65_536));
+        assert_eq!(values.fill_back_color, Some(0x0065_4321));
+        assert_eq!(values.line_color, Some(0x00AB_CDEF));
+        assert_eq!(values.line_opacity, Some(32_768));
+        assert_eq!(values.line_width, Some(25_400));
+        assert_eq!(values.line_style, Some(1));
+        assert_eq!(values.line_dash_style, Some(2));
+
+        let shape = record.extract_shape_properties().unwrap();
+        assert_eq!(shape.fill_color, Some(0x0012_3456));
+        assert_eq!(shape.line_color, Some(0x00AB_CDEF));
+        assert_eq!(shape.line_width, Some(2));
     }
 
     #[test]
