@@ -66,6 +66,21 @@ pub(crate) fn write_record_header<W: Write>(
     Ok(())
 }
 
+pub fn write_force_full_calculation<W: Write>(writer: &mut W, force: bool) -> XlsResult<()> {
+    workbook::write_force_full_calculation(writer, force)
+}
+
+pub fn write_uncalced<W: Write>(writer: &mut W) -> XlsResult<()> {
+    worksheet::write_uncalced(writer)
+}
+
+pub fn write_calculation_settings<W: Write>(
+    writer: &mut W,
+    settings: &crate::xls::writer::core::XlsCalculationSettings,
+) -> XlsResult<()> {
+    worksheet::write_calculation_settings(writer, settings)
+}
+
 /// Write NAME (Lbl) record for a defined name.
 ///
 /// Record type: 0x0018

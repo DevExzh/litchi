@@ -124,6 +124,7 @@ pub(super) struct WritableWorksheet {
     pub sort_config: Option<SortConfig>,
     /// Pivot tables to write.
     pub pivot_tables: Vec<WritablePivotTable>,
+    pub formulas_pending_recalculation: bool,
 }
 
 /// A column-level AutoFilter condition for the writer.
@@ -177,6 +178,7 @@ impl WritableWorksheet {
             auto_filter_columns: Vec::new(),
             sort_config: None,
             pivot_tables: Vec::new(),
+            formulas_pending_recalculation: false,
         }
     }
 

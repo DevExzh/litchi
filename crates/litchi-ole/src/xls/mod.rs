@@ -26,6 +26,9 @@ mod cell;
 /// BIFF8 worksheet data-validation records.
 mod data_validation;
 
+/// BIFF8 calculation and recalculation records.
+mod calculation;
+
 /// BIFF formula token rendering
 mod formula;
 
@@ -89,6 +92,9 @@ pub mod protection;
 pub mod writer;
 
 pub use cell::XlsCell;
+pub use calculation::{
+    XlsCalculationMode, XlsReferenceMode, XlsWorkbookCalculation, XlsWorksheetCalculation,
+};
 pub use data_validation::{
     XlsDataValidationErrorStyle, XlsDataValidationFormula, XlsDataValidationImeMode,
     XlsDataValidationKind, XlsDataValidationOperator, XlsDataValidationRange,

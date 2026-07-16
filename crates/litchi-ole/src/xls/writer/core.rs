@@ -302,6 +302,34 @@ struct XlsFileSharing {
     password_hash: Option<u16>,
     user_name: String,
 }
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct XlsCalculationSettings {
+    pub mode: crate::xls::XlsCalculationMode,
+    pub maximum_iterations: u16,
+    pub iteration_enabled: bool,
+    pub iteration_delta: f64,
+    pub full_precision: bool,
+    pub reference_mode: crate::xls::XlsReferenceMode,
+    pub recalculate_before_save: bool,
+    pub recalculation_engine_id: u32,
+    pub force_full_calculation: bool,
+}
+
+impl Default for XlsCalculationSettings {
+    fn default() -> Self {
+        Self {
+            mode: crate::xls::XlsCalculationMode::Automatic,
+            maximum_iterations: 100,
+            iteration_enabled: false,
+            iteration_delta: 0.001,
+            full_precision: true,
+            reference_mode: crate::xls::XlsReferenceMode::A1,
+            recalculate_before_save: true,
+            recalculation_engine_id: 0x000E_EA35,
+            force_full_calculation: false,
+        }
+    }
+}
 /// XLS file writer
 ///
 /// Provides methods to create and modify XLS (BIFF8) files.
@@ -321,6 +349,7 @@ pub struct XlsWriter {
     file_sharing: Option<XlsFileSharing>,
     /// Use 1904 date system (Mac) instead of 1900 (Windows)
     use_1904_dates: bool,
+    calculation_settings: XlsCalculationSettings,
 }
 
 impl XlsWriter {
@@ -336,6 +365,7 @@ impl XlsWriter {
             workbook_protection: None,
             file_sharing: None,
             use_1904_dates: false,
+            calculation_settings: XlsCalculationSettings::default(),
         }
     }
 
@@ -1623,6 +1653,28 @@ impl XlsWriter {
         self.use_1904_dates = use_1904;
     }
 
+    pub fn set_calculation_settings(&mut self, settings: XlsCalculationSettings) -> XlsResult<()> {
+        if !(1..=32_767).contains(&settings.maximum_iterations) {
+            return Err(XlsError::InvalidData(
+                "maximum calculation iterations must be 1..=32767".to_string(),
+            ));
+        }
+        if !settings.iteration_delta.is_finite() || settings.iteration_delta < 0.0 {
+            return Err(XlsError::InvalidData(
+                "calculation iteration delta must be finite and non-negative".to_string(),
+            ));
+        }
+        self.calculation_settings = settings;
+        Ok(())
+    }
+
+    pub fn set_recalculation_pending(&mut self, sheet: usize, pending: bool) -> XlsResult<()> {
+        let worksheet = self.worksheets.get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+        worksheet.formulas_pending_recalculation = pending;
+        Ok(())
+    }
+
     /// Configure the complete primary worksheet print/page settings block.
     pub fn set_page_setup(
         &mut self,
@@ -1944,6 +1996,7 @@ impl XlsWriter {
     fn generate_workbook_streams(&self) -> XlsResult<stream::WorkbookStreams> {
         stream::generate_workbook_stream(
             self.use_1904_dates,
+            self.calculation_settings,
             &self.fmt,
             &self.defined_names,
             &self.shared_strings,

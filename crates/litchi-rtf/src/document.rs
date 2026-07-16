@@ -59,6 +59,8 @@ pub struct RtfDocument<'a> {
     list_table: super::list::ListTable<'a>,
     /// List override table
     list_override_table: super::list::ListOverrideTable,
+    /// Ordered inert legacy section-numbering defaults.
+    legacy_section_numbering: crate::LegacySectionNumbering<'a>,
     /// Sections
     sections: Vec<super::section::Section<'a>>,
     /// Bookmarks
@@ -286,6 +288,7 @@ impl<'a> RtfDocument<'a> {
                 .collect(),
             list_table: Self::convert_list_table_to_owned(parsed.list_table),
             list_override_table: parsed.list_override_table,
+            legacy_section_numbering: parsed.legacy_section_numbering.into_owned(),
             sections: Self::convert_sections_to_owned(parsed.sections),
             bookmarks: Self::convert_bookmarks_to_owned(parsed.bookmarks),
             shapes: Self::convert_shapes_to_owned(parsed.shapes),
@@ -995,6 +998,26 @@ impl<'a> RtfDocument<'a> {
     /// Returns list instances that override base list definitions.
     pub fn list_override_table(&self) -> &super::list::ListOverrideTable {
         &self.list_override_table
+    }
+
+    /// Return ordered legacy `pnseclvl` section-numbering defaults.
+    pub fn legacy_section_numbering(&self) -> &crate::LegacySectionNumbering<'_> {
+        &self.legacy_section_numbering
+    }
+
+    /// Replace legacy section-numbering defaults after full validation.
+    pub fn set_legacy_section_numbering(
+        &mut self,
+        numbering: crate::LegacySectionNumbering<'a>,
+    ) -> RtfResult<()> {
+        numbering.validate()?;
+        self.legacy_section_numbering = numbering;
+        Ok(())
+    }
+
+    /// Remove all legacy section-numbering defaults.
+    pub fn clear_legacy_section_numbering(&mut self) {
+        self.legacy_section_numbering = crate::LegacySectionNumbering::new();
     }
 
     /// Resolve a paragraph's list override and effective level definition.

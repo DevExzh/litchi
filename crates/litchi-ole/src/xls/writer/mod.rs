@@ -18,7 +18,7 @@ pub mod formula;
 // Re-export public types
 pub use biff::AutoFilterConditionWrite;
 pub use core::{
-    PivotCacheValue, XlsCellValue, XlsConditionalFormat, XlsConditionalFormatType,
+    PivotCacheValue, XlsCalculationSettings, XlsCellValue, XlsConditionalFormat, XlsConditionalFormatType,
     XlsConditionalPattern, XlsDataValidation, XlsDataValidationErrorStyle,
     XlsDataValidationFormulaKind, XlsDataValidationImeMode, XlsDataValidationOperator,
     XlsDataValidationOptions, XlsDataValidationRange, XlsDataValidationTableOptions,

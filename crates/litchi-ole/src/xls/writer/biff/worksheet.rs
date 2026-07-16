@@ -233,8 +233,47 @@ pub fn write_wsbool<W: Write>(writer: &mut W) -> XlsResult<()> {
     Ok(())
 }
 
+pub fn write_uncalced<W: Write>(writer: &mut W) -> XlsResult<()> {
+    write_record_header(writer, 0x005E, 2)?;
+    writer.write_all(&0u16.to_le_bytes())?;
+    Ok(())
+}
+
+pub fn write_calculation_settings<W: Write>(
+    writer: &mut W,
+    settings: &crate::xls::writer::core::XlsCalculationSettings,
+) -> XlsResult<()> {
+    if !(1..=32_767).contains(&settings.maximum_iterations)
+        || !settings.iteration_delta.is_finite()
+        || settings.iteration_delta < 0.0
+    {
+        return Err(XlsError::InvalidData("invalid BIFF8 calculation settings".to_string()));
+    }
+    let mode = match settings.mode {
+        crate::xls::XlsCalculationMode::Manual => 0u16,
+        crate::xls::XlsCalculationMode::Automatic => 1u16,
+        crate::xls::XlsCalculationMode::AutomaticExceptTables => 2u16,
+    };
+    let reference_mode = match settings.reference_mode {
+        crate::xls::XlsReferenceMode::R1C1 => 0u16,
+        crate::xls::XlsReferenceMode::A1 => 1u16,
+    };
+    write_record_header(writer, 0x000D, 2)?;
+    writer.write_all(&mode.to_le_bytes())?;
+    write_record_header(writer, 0x000C, 2)?;
+    writer.write_all(&settings.maximum_iterations.to_le_bytes())?;
+    write_record_header(writer, 0x000F, 2)?;
+    writer.write_all(&reference_mode.to_le_bytes())?;
+    write_record_header(writer, 0x0011, 2)?;
+    writer.write_all(&u16::from(settings.iteration_enabled).to_le_bytes())?;
+    write_record_header(writer, 0x0010, 8)?;
+    writer.write_all(&settings.iteration_delta.to_le_bytes())?;
+    write_record_header(writer, 0x005F, 2)?;
+    writer.write_all(&u16::from(settings.recalculate_before_save).to_le_bytes())?;
+    Ok(())
+}
+
 pub fn write_pivot_sheet_preamble<W: Write>(writer: &mut W) -> XlsResult<()> {
-    const DELTA_BYTES: [u8; 8] = [0xFC, 0xA9, 0xF1, 0xD2, 0x4D, 0x62, 0x50, 0x3F];
     const MARGIN_BYTES: [u8; 8] = [0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0xE6, 0x3F];
     const TOP_BOTTOM_MARGIN_BYTES: [u8; 8] = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xE8, 0x3F];
     const PRINT_SETUP_BYTES: [u8; 34] = [
@@ -248,18 +287,6 @@ pub fn write_pivot_sheet_preamble<W: Write>(writer: &mut W) -> XlsResult<()> {
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     ];
 
-    write_record_header(writer, 0x000D, 2)?;
-    writer.write_all(&0x0001u16.to_le_bytes())?;
-    write_record_header(writer, 0x000C, 2)?;
-    writer.write_all(&0x0064u16.to_le_bytes())?;
-    write_record_header(writer, 0x000F, 2)?;
-    writer.write_all(&0x0001u16.to_le_bytes())?;
-    write_record_header(writer, 0x0011, 2)?;
-    writer.write_all(&0x0000u16.to_le_bytes())?;
-    write_record_header(writer, 0x0010, 8)?;
-    writer.write_all(&DELTA_BYTES)?;
-    write_record_header(writer, 0x005F, 2)?;
-    writer.write_all(&0x0001u16.to_le_bytes())?;
     write_record_header(writer, 0x002A, 2)?;
     writer.write_all(&0x0000u16.to_le_bytes())?;
     write_record_header(writer, 0x002B, 2)?;

@@ -15,6 +15,7 @@ use crate::xlsx::external_links::{ExternalLinkEntry, load_external_link};
 use crate::xlsx::calculation_properties::{
     WorkbookCalculationProperties, parse_workbook_calculation_properties,
 };
+use crate::xlsx::calculation_chain::{CalculationChain, load_calculation_chain};
 use litchi_core::sheet::{
     Result as SheetResult, WorkbookTrait, Worksheet as WorksheetTrait, WorksheetIterator,
 };
@@ -49,6 +50,8 @@ pub struct Workbook {
     is_1904_date_system: bool,
     /// Effective workbook formula calculation policy.
     calculation_properties: Option<WorkbookCalculationProperties>,
+    /// Inert workbook calculation order from `calcChain.xml`.
+    calculation_chain: Option<CalculationChain>,
     external_links: Vec<ExternalLinkEntry>,
 }
 
@@ -201,10 +204,12 @@ impl Workbook {
             properties: DocumentProperties::new(),
             is_1904_date_system: false,
             calculation_properties: None,
+            calculation_chain: None,
             external_links: Vec::new(),
         };
 
         workbook.load_workbook_info()?;
+        workbook.calculation_chain = load_calculation_chain(&workbook.package, &workbook.workbook_uri)?;
         workbook.load_external_links()?;
         workbook.load_shared_strings()?;
         workbook.load_styles()?;
@@ -264,6 +269,11 @@ impl Workbook {
     /// Effective workbook formula calculation policy, when `calcPr` is present.
     pub fn calculation_properties(&self) -> Option<&WorkbookCalculationProperties> {
         self.calculation_properties.as_ref()
+    }
+
+    /// Return the optional inert calculation-chain metadata.
+    pub fn calculation_chain(&self) -> Option<&CalculationChain> {
+        self.calculation_chain.as_ref()
     }
 
     pub fn external_link(&self, one_based_index: u32) -> Option<&ExternalLinkEntry> {

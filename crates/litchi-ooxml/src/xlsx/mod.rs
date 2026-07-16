@@ -30,6 +30,7 @@
 pub mod cell;
 pub mod auto_filter;
 pub mod calculation_properties;
+pub mod calculation_chain;
 pub mod chart;
 mod comments;
 pub mod conditional_formatting;
@@ -71,6 +72,10 @@ pub use cell::Cell;
 pub use calculation_properties::{
     WorkbookCalculationMode, WorkbookCalculationProperties, WorkbookReferenceMode,
     parse_workbook_calculation_properties,
+};
+pub use calculation_chain::{
+    CalculationCell, CalculationChain, CalculationChainConformance,
+    CalculationChainExtensionAttribute, parse_calculation_chain,
 };
 pub use auto_filter::{
     AutoFilterDefinition, CalendarType, ColorFilter, CustomFilter, CustomFilterOperator,

@@ -138,6 +138,7 @@ impl<W: Write> RtfWriter<W> {
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
         self.write_list_table(doc.list_table())?;
         self.write_list_override_table(doc.list_override_table())?;
+        self.write_legacy_section_numbering(doc.legacy_section_numbering())?;
 
         // Revision controls reference this author table by numeric index.
         self.write_revision_table(doc.revision_authors(), doc.revisions())?;
@@ -547,6 +548,74 @@ impl<W: Write> RtfWriter<W> {
             self.write_str("}")?;
         }
         self.write_str("}")?;
+        Ok(())
+    }
+
+    /// Write ordered inert legacy section-numbering defaults.
+    pub fn write_legacy_section_numbering(
+        &mut self,
+        numbering: &crate::LegacySectionNumbering<'_>,
+    ) -> io::Result<()> {
+        numbering
+            .validate()
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+        for level in numbering.levels() {
+            self.write_str("{\\*")?;
+            self.write_control_word("pnseclvl", Some(i32::from(level.level)))?;
+            self.write_control_word(
+                match level.format {
+                    crate::LegacyNumberingFormat::Decimal => "pndec",
+                    crate::LegacyNumberingFormat::UpperRoman => "pnucrm",
+                    crate::LegacyNumberingFormat::LowerRoman => "pnlcrm",
+                    crate::LegacyNumberingFormat::UpperLetter => "pnucltr",
+                    crate::LegacyNumberingFormat::LowerLetter => "pnlcltr",
+                },
+                None,
+            )?;
+            if let Some(alignment) = level.alignment {
+                self.write_control_word(
+                    match alignment {
+                        crate::LegacyNumberingAlignment::Left => "pnql",
+                        crate::LegacyNumberingAlignment::Center => "pnqc",
+                        crate::LegacyNumberingAlignment::Right => "pnqr",
+                    },
+                    None,
+                )?;
+            }
+            if let Some(start_at) = level.start_at {
+                self.write_control_word("pnstart", Some(start_at))?;
+            }
+            if let Some(indent) = level.indent {
+                self.write_control_word("pnindent", Some(indent))?;
+            }
+            if let Some(space) = level.space {
+                self.write_control_word("pnsp", Some(space))?;
+            }
+            if level.hanging {
+                self.write_control_word("pnhang", None)?;
+            }
+            if level.previous {
+                self.write_control_word("pnprev", None)?;
+            }
+            if let Some(font_ref) = level.font_ref {
+                self.write_control_word("pnf", Some(i32::from(font_ref)))?;
+            }
+            if !level.text_before.is_empty() {
+                self.write_str("{")?;
+                self.write_control_word("pntxtb", None)?;
+                self.write_str(" ")?;
+                self.write_text(level.text_before.as_ref())?;
+                self.write_str("}")?;
+            }
+            if !level.text_after.is_empty() {
+                self.write_str("{")?;
+                self.write_control_word("pntxta", None)?;
+                self.write_str(" ")?;
+                self.write_text(level.text_after.as_ref())?;
+                self.write_str("}")?;
+            }
+            self.write_str("}")?;
+        }
         Ok(())
     }
 

@@ -281,6 +281,15 @@ pub fn write_recalc_id<W: Write>(writer: &mut W, engine_id: u32) -> XlsResult<()
     Ok(())
 }
 
+pub fn write_force_full_calculation<W: Write>(writer: &mut W, force: bool) -> XlsResult<()> {
+    write_record_header(writer, 0x08A3, 16)?;
+    writer.write_all(&0x08A3u16.to_le_bytes())?;
+    writer.write_all(&0u16.to_le_bytes())?;
+    writer.write_all(&0u64.to_le_bytes())?;
+    writer.write_all(&u32::from(force).to_le_bytes())?;
+    Ok(())
+}
+
 /// Write FORMAT record (number format string)
 ///
 /// Record type: 0x041E

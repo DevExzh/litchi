@@ -146,6 +146,7 @@ pub struct XlsWorkbook<R: Read + Seek> {
     defined_names: Vec<XlsDefinedName>,
     formatting: Arc<XlsFormatting>,
     protection: protection::WorkbookProtection,
+    calculation: crate::xls::calculation::XlsWorkbookCalculation,
 }
 
 /// Options for opening a legacy XLS workbook.
@@ -181,6 +182,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             defined_names: Vec::new(),
             formatting: Arc::new(XlsFormatting::default()),
             protection: protection::WorkbookProtection::default(),
+            calculation: crate::xls::calculation::XlsWorkbookCalculation::default(),
         };
 
         workbook.parse_workbook(options.password)?;
@@ -220,6 +222,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             defined_names: Vec::new(),
             formatting: Arc::new(XlsFormatting::default()),
             protection: protection::WorkbookProtection::default(),
+            calculation: crate::xls::calculation::XlsWorkbookCalculation::default(),
         };
 
         workbook.parse_workbook(options.password)?;
@@ -334,10 +337,13 @@ impl<R: Read + Seek> XlsWorkbook<R> {
 
         let mut palette_seen = false;
         let mut protection_collector = protection::WorkbookProtectionCollector::new();
+        let mut calculation_collector =
+            crate::xls::calculation::WorkbookCalculationCollector::new();
         let mut i = 0;
         while i < records.len() {
             let record = &records[i];
             protection_collector.feed_record(record.header.record_type, &record.data)?;
+            calculation_collector.feed_record(record.header.record_type, &record.data)?;
 
             match record.header.record_type {
                 0x0031 => {
@@ -431,6 +437,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                     // EOF - End of workbook globals
                     crate::xls::font::validate_font_table(&self.fonts)?;
                     self.protection = protection_collector.finish()?;
+                    self.calculation = calculation_collector.finish();
                     break;
                 },
                 _ => {
@@ -517,6 +524,8 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         let mut page_setup_collector = page_setup::PageSetupCollector::new();
         let mut protection_collector = protection::SheetProtectionCollector::new();
         let mut conditional_format_collector = conditional_format::ConditionalFormatCollector::new();
+        let mut calculation_collector =
+            crate::xls::calculation::WorksheetCalculationCollector::new();
         let mut pending_string_formula: Option<CellRecord> = None;
         let mut shared_formulas = HashMap::<(u16, u16), SharedFormulaTemplate>::new();
         let mut remaining_data_validations: Option<usize> = None;
@@ -530,6 +539,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             page_setup_collector.feed_record(record.header.record_type, &record.data)?;
             protection_collector.feed_record(record.header.record_type, &record.data)?;
             conditional_format_collector.feed_record(record.header.record_type, &record.data)?;
+            calculation_collector.feed_record(record.header.record_type, &record.data)?;
 
             if matches!(remaining_data_validations, Some(1..))
                 && record.header.record_type != super::data_validation::DV_RECORD_TYPE
@@ -805,6 +815,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         worksheet.set_worksheet_views(view_collector.finish()?);
         worksheet.set_page_setup(page_setup_collector.finish()?);
         worksheet.set_conditional_formattings(conditional_format_collector.finish()?);
+        worksheet.set_calculation(calculation_collector.finish()?);
 
         Ok(worksheet)
     }
@@ -850,6 +861,10 @@ impl<R: Read + Seek> XlsWorkbook<R> {
 
     pub fn protection(&self) -> &protection::WorkbookProtection {
         &self.protection
+    }
+
+    pub fn calculation(&self) -> &crate::xls::calculation::XlsWorkbookCalculation {
+        &self.calculation
     }
 
     pub fn number_formats(&self) -> &[XlsNumberFormat] {

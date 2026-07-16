@@ -327,6 +327,7 @@ pub struct Parser<'a> {
     /// List override table
     list_override_table: super::list::ListOverrideTable,
     saw_list_override_table: bool,
+    legacy_section_numbering: crate::LegacySectionNumbering<'a>,
     /// Sections
     sections: Vec<super::section::Section<'a>>,
     /// Whether section-specific properties are currently active.
@@ -461,6 +462,7 @@ impl<'a> Parser<'a> {
             saw_list_table: false,
             list_override_table: super::list::ListOverrideTable::new(),
             saw_list_override_table: false,
+            legacy_section_numbering: crate::LegacySectionNumbering::new(),
             sections: Vec::new(),
             section_properties_active: false,
             bookmarks: super::bookmark::BookmarkTable::new(),
@@ -566,6 +568,7 @@ impl<'a> Parser<'a> {
             navigation_entries: self.navigation_entries,
             list_table: self.list_table,
             list_override_table: self.list_override_table,
+            legacy_section_numbering: self.legacy_section_numbering,
             sections: self.sections,
             bookmarks: self.bookmarks,
             shapes: self.shapes,
@@ -767,6 +770,11 @@ impl<'a> Parser<'a> {
                             self.states.pop();
                             return Ok(());
                         },
+                        Some(Token::Control(ControlWord::LegacySectionNumberingLevel(_))) => {
+                            self.parse_legacy_section_numbering_level()?;
+                            self.states.pop();
+                            return Ok(());
+                        },
                         Some(Token::Control(ControlWord::DataStore)) => {
                             if self.saw_data_store {
                                 return Err(RtfError::MalformedDocument(
@@ -909,6 +917,11 @@ impl<'a> Parser<'a> {
                 Token::Control(ControlWord::LatentStyles | ControlWord::LatentStyleExceptions) => {
                     return Err(RtfError::MalformedDocument(
                         "RTF latent-style destinations are misplaced or not starred".to_string(),
+                    ));
+                },
+                Token::Control(ControlWord::LegacySectionNumberingLevel(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF pnseclvl destination is misplaced or not starred".to_string(),
                     ));
                 },
                 Token::Control(ControlWord::DataStore) => {
@@ -3105,6 +3118,240 @@ impl<'a> Parser<'a> {
                 None => return Err(RtfError::UnexpectedEof),
             }
         }
+    }
+
+    fn parse_legacy_section_numbering_level(&mut self) -> RtfResult<()> {
+        if self.states.len() != 3
+            || self.blocks.iter().any(|block| !block.text.trim().is_empty())
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF pnseclvl destinations must occur at document scope before body text"
+                    .to_string(),
+            ));
+        }
+        self.pos += 1; // ignorable-destination marker
+        let level_index = match self.tokens.get(self.pos) {
+            Some(Token::Control(ControlWord::LegacySectionNumberingLevel(value))) => {
+                u8::try_from(*value).map_err(|_| {
+                    RtfError::MalformedDocument(
+                        "RTF pnseclvl index must be between 1 and 9".to_string(),
+                    )
+                })?
+            },
+            _ => {
+                return Err(RtfError::MalformedDocument(
+                    "invalid RTF pnseclvl destination".to_string(),
+                ));
+            },
+        };
+        self.pos += 1;
+        let mut format = None;
+        let mut start_at = None;
+        let mut indent = None;
+        let mut space = None;
+        let mut hanging = false;
+        let mut previous = false;
+        let mut alignment = None;
+        let mut font_ref = None;
+        let mut text_before = String::new();
+        let mut text_after = String::new();
+        let mut seen = std::collections::HashSet::new();
+        while self.pos < self.tokens.len() {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    let format = format.ok_or_else(|| {
+                        RtfError::MalformedDocument(
+                            "RTF pnseclvl destination has no numbering format".to_string(),
+                        )
+                    })?;
+                    let mut level = crate::LegacySectionNumberingLevel::new(level_index, format);
+                    level.start_at = start_at;
+                    level.indent = indent;
+                    level.space = space;
+                    level.hanging = hanging;
+                    level.previous = previous;
+                    level.alignment = alignment;
+                    level.font_ref = font_ref;
+                    level.text_before = Cow::Owned(text_before);
+                    level.text_after = Cow::Owned(text_after);
+                    return self.legacy_section_numbering.add(level);
+                },
+                Some(Token::OpenBrace)
+                    if matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::LegacyNumberingTextBefore))
+                    ) =>
+                {
+                    if !seen.insert("text-before") {
+                        return Err(RtfError::MalformedDocument(
+                            "duplicate RTF pntxtb destination".to_string(),
+                        ));
+                    }
+                    text_before = self.parse_legacy_numbering_text(
+                        ControlWord::LegacyNumberingTextBefore,
+                    )?;
+                    continue;
+                },
+                Some(Token::OpenBrace)
+                    if matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::LegacyNumberingTextAfter))
+                    ) =>
+                {
+                    if !seen.insert("text-after") {
+                        return Err(RtfError::MalformedDocument(
+                            "duplicate RTF pntxta destination".to_string(),
+                        ));
+                    }
+                    text_after = self.parse_legacy_numbering_text(
+                        ControlWord::LegacyNumberingTextAfter,
+                    )?;
+                    continue;
+                },
+                Some(Token::OpenBrace) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF pnseclvl cannot contain nested fields, objects, or destinations"
+                            .to_string(),
+                    ));
+                },
+                Some(Token::Control(control)) => {
+                    let (key, new_format) = match control {
+                        ControlWord::LegacyNumberingDecimal => ("format", Some(crate::LegacyNumberingFormat::Decimal)),
+                        ControlWord::LegacyNumberingUpperRoman => ("format", Some(crate::LegacyNumberingFormat::UpperRoman)),
+                        ControlWord::LegacyNumberingLowerRoman => ("format", Some(crate::LegacyNumberingFormat::LowerRoman)),
+                        ControlWord::LegacyNumberingUpperLetter => ("format", Some(crate::LegacyNumberingFormat::UpperLetter)),
+                        ControlWord::LegacyNumberingLowerLetter => ("format", Some(crate::LegacyNumberingFormat::LowerLetter)),
+                        ControlWord::LegacyNumberingStart(value) => {
+                            if !seen.insert("start") { return Err(RtfError::MalformedDocument("duplicate RTF pnstart".to_string())); }
+                            start_at = Some(*value);
+                            self.pos += 1;
+                            continue;
+                        },
+                        ControlWord::LegacyNumberingIndent(value) => {
+                            if !seen.insert("indent") { return Err(RtfError::MalformedDocument("duplicate RTF pnindent".to_string())); }
+                            indent = Some(*value);
+                            self.pos += 1;
+                            continue;
+                        },
+                        ControlWord::LegacyNumberingSpace(value) => {
+                            if !seen.insert("space") { return Err(RtfError::MalformedDocument("duplicate RTF pnsp".to_string())); }
+                            space = Some(*value);
+                            self.pos += 1;
+                            continue;
+                        },
+                        ControlWord::LegacyNumberingHanging => {
+                            if !seen.insert("hanging") { return Err(RtfError::MalformedDocument("duplicate RTF pnhang".to_string())); }
+                            hanging = true;
+                            self.pos += 1;
+                            continue;
+                        },
+                        ControlWord::LegacyNumberingPrevious => {
+                            if !seen.insert("previous") { return Err(RtfError::MalformedDocument("duplicate RTF pnprev".to_string())); }
+                            previous = true;
+                            self.pos += 1;
+                            continue;
+                        },
+                        ControlWord::LegacyNumberingAlignLeft => ("alignment", None),
+                        ControlWord::LegacyNumberingAlignCenter => ("alignment-center", None),
+                        ControlWord::LegacyNumberingAlignRight => ("alignment-right", None),
+                        ControlWord::LegacyNumberingFont(value) => {
+                            if !seen.insert("font") { return Err(RtfError::MalformedDocument("duplicate RTF pnf".to_string())); }
+                            font_ref = Some(u16::try_from(*value).map_err(|_| RtfError::MalformedDocument("invalid RTF pnf reference".to_string()))?);
+                            self.pos += 1;
+                            continue;
+                        },
+                        _ => {
+                            return Err(RtfError::MalformedDocument(
+                                "unsupported control in RTF pnseclvl destination".to_string(),
+                            ));
+                        },
+                    };
+                    if key == "format" {
+                        if !seen.insert(key) {
+                            return Err(RtfError::MalformedDocument(
+                                "duplicate RTF pnseclvl numbering format".to_string(),
+                            ));
+                        }
+                        format = new_format;
+                    } else {
+                        if !seen.insert("alignment") {
+                            return Err(RtfError::MalformedDocument(
+                                "duplicate RTF pnseclvl alignment".to_string(),
+                            ));
+                        }
+                        alignment = Some(match control {
+                            ControlWord::LegacyNumberingAlignCenter => crate::LegacyNumberingAlignment::Center,
+                            ControlWord::LegacyNumberingAlignRight => crate::LegacyNumberingAlignment::Right,
+                            _ => crate::LegacyNumberingAlignment::Left,
+                        });
+                    }
+                },
+                Some(Token::Text(text)) if text.trim().is_empty() => {},
+                Some(_) => {
+                    return Err(RtfError::MalformedDocument(
+                        "invalid content in RTF pnseclvl destination".to_string(),
+                    ));
+                },
+                None => return Err(RtfError::UnexpectedEof),
+            }
+            self.pos += 1;
+        }
+        Err(RtfError::UnexpectedEof)
+    }
+
+    fn parse_legacy_numbering_text(&mut self, expected: ControlWord<'a>) -> RtfResult<String> {
+        if !matches!(self.tokens.get(self.pos), Some(Token::OpenBrace))
+            || self.tokens.get(self.pos + 1) != Some(&Token::Control(expected))
+        {
+            return Err(RtfError::MalformedDocument(
+                "invalid RTF legacy-numbering text destination".to_string(),
+            ));
+        }
+        self.pos += 2;
+        let mut value = String::new();
+        let mut unicode_skip = self.current_state()?.unicode_skip.max(0);
+        while self.pos < self.tokens.len() {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    return Ok(value);
+                },
+                Some(Token::OpenBrace) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF legacy-numbering text cannot contain nested destinations".to_string(),
+                    ));
+                },
+                Some(Token::Text(text)) => value.push_str(&self.decode_transport_text(text)?),
+                Some(Token::Control(ControlWord::Unicode(first))) => {
+                    value.push_str(&self.parse_style_unicode(*first, unicode_skip)?);
+                    continue;
+                },
+                Some(Token::Control(ControlWord::UnicodeSkip(value))) => {
+                    unicode_skip = (*value).max(0);
+                },
+                Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
+                    value.push_str(control_symbol_text(control).unwrap_or_default());
+                },
+                // Character-type selectors affect only which run font decodes
+                // the following text. `dbch` is emitted by Word in pnseclvl
+                // punctuation destinations and carries no textual payload.
+                Some(Token::Control(ControlWord::Unknown("dbch", None))) => {},
+                Some(Token::Control(_)) | Some(Token::Binary(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF legacy-numbering text contains a non-text control".to_string(),
+                    ));
+                },
+                None => return Err(RtfError::UnexpectedEof),
+            }
+            self.pos += 1;
+            if value.len() > crate::legacy_numbering::MAX_LEGACY_NUMBERING_TEXT_BYTES {
+                return Err(RtfError::MalformedDocument(
+                    "RTF pnseclvl text exceeds the safety limit".to_string(),
+                ));
+            }
+        }
+        Err(RtfError::UnexpectedEof)
     }
 
     fn parse_latent_styles(&mut self) -> RtfResult<crate::LatentStyles<'a>> {
@@ -7586,6 +7833,7 @@ pub struct ParsedDocument<'a> {
     pub list_table: super::list::ListTable<'a>,
     /// List override table
     pub list_override_table: super::list::ListOverrideTable,
+    pub legacy_section_numbering: crate::LegacySectionNumbering<'a>,
     /// Sections
     pub sections: Vec<super::section::Section<'a>>,
     /// Bookmarks

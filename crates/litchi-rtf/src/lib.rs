@@ -40,6 +40,7 @@ mod revision_save;
 mod xml_namespace;
 mod theme;
 mod latent_style;
+mod legacy_numbering;
 mod data_store;
 mod info;
 mod lexer;
@@ -78,6 +79,10 @@ pub use revision_save::RevisionSaveMetadata;
 pub use xml_namespace::XmlNamespace;
 pub use theme::DocumentTheme;
 pub use latent_style::{LatentStyleException, LatentStyles};
+pub use legacy_numbering::{
+    LegacyNumberingAlignment, LegacyNumberingFormat, LegacySectionNumbering,
+    LegacySectionNumberingLevel,
+};
 pub use data_store::DocumentDataStore;
 pub use info::{
     DocumentInfo, DocumentProtection, ProtectionLevel, ProtectionType, RtfTimestamp,

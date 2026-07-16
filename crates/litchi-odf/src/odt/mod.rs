@@ -66,6 +66,7 @@ mod page_layout;
 mod parser;
 mod reference_mark;
 mod ruby;
+mod tracked_changes;
 
 pub use builder::DocumentBuilder;
 pub use document::Document;
@@ -86,4 +87,5 @@ pub use ruby::Ruby;
 #[allow(unused_imports)] // Library public API
 pub use parser::{
     ChangeType, Comment, Section, SectionDdeSource, SectionDisplay, SectionSource, TrackChange,
+    TrackedChanges,
 };

@@ -55,6 +55,7 @@ pub struct XlsWorksheet {
     column_layouts: Vec<XlsColumnLayout>,
     worksheet_views: Vec<XlsWorksheetView>,
     page_setup: Option<XlsPageSetup>,
+    calculation: crate::xls::calculation::XlsWorksheetCalculation,
     conditional_formattings: Vec<XlsConditionalFormatting>,
 }
 
@@ -82,6 +83,7 @@ impl XlsWorksheet {
             column_layouts: Vec::new(),
             worksheet_views: Vec::new(),
             page_setup: None,
+            calculation: crate::xls::calculation::XlsWorksheetCalculation::default(),
             conditional_formattings: Vec::new(),
         }
     }
@@ -109,6 +111,7 @@ impl XlsWorksheet {
             column_layouts: Vec::new(),
             worksheet_views: Vec::new(),
             page_setup: None,
+            calculation: crate::xls::calculation::XlsWorksheetCalculation::default(),
             conditional_formattings: Vec::new(),
         }
     }
@@ -350,6 +353,17 @@ impl XlsWorksheet {
 
     pub(crate) fn set_page_setup(&mut self, page_setup: Option<XlsPageSetup>) {
         self.page_setup = page_setup;
+    }
+
+    pub fn calculation(&self) -> &crate::xls::calculation::XlsWorksheetCalculation {
+        &self.calculation
+    }
+
+    pub(crate) fn set_calculation(
+        &mut self,
+        calculation: crate::xls::calculation::XlsWorksheetCalculation,
+    ) {
+        self.calculation = calculation;
     }
 
     /// Legacy conditional formatting groups in worksheet record order.

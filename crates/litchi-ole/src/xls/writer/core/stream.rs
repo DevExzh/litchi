@@ -7,10 +7,9 @@ use crate::xls::{XlsError, XlsResult};
 
 use super::named_range::XlsDefinedName as InternalDefinedName;
 use super::worksheet::WritableWorksheet;
-use super::{XlsCellValue, XlsFileSharing, XlsWorkbookProtection};
+use super::{XlsCalculationSettings, XlsCellValue, XlsFileSharing, XlsWorkbookProtection};
 
 const DEFAULT_WRITE_ACCESS_USER: &str = "litchi";
-const DEFAULT_RECALC_ENGINE_ID: u32 = 0x000E_EA35;
 const DEFAULT_FUNCTION_GROUP_COUNT: u16 = 17;
 const DEFAULT_COUNTRY_CODE: u16 = 1;
 
@@ -27,6 +26,7 @@ pub(crate) struct WorkbookStreams {
 #[allow(clippy::too_many_arguments)] // TODO: Refactor this function to accept a struct
 pub(crate) fn generate_workbook_stream(
     use_1904_dates: bool,
+    calculation_settings: XlsCalculationSettings,
     fmt: &FormattingManager,
     defined_names: &[InternalDefinedName],
     shared_strings: &[String],
@@ -94,7 +94,7 @@ pub(crate) fn generate_workbook_stream(
     biff::write_backup(&mut stream, false)?;
     biff::write_hide_obj(&mut stream, 0)?;
     biff::write_date1904(&mut stream, use_1904_dates)?;
-    biff::write_precision(&mut stream, true)?;
+    biff::write_precision(&mut stream, calculation_settings.full_precision)?;
     biff::write_refresh_all(&mut stream, false)?;
     biff::write_book_bool(&mut stream, false)?;
 
@@ -292,7 +292,10 @@ pub(crate) fn generate_workbook_stream(
     if !has_pivot_tables {
         biff::write_excel9_file(&mut stream)?;
     }
-    biff::write_recalc_id(&mut stream, DEFAULT_RECALC_ENGINE_ID)?;
+    if calculation_settings.force_full_calculation {
+        biff::write_force_full_calculation(&mut stream, true)?;
+    }
+    biff::write_recalc_id(&mut stream, calculation_settings.recalculation_engine_id)?;
 
     // EOF record (end of workbook globals)
     biff::write_eof(&mut stream)?;
@@ -363,6 +366,10 @@ pub(crate) fn generate_workbook_stream(
         // BOF record (worksheet)
         biff::write_bof(&mut stream, 0x0010)?;
 
+        if worksheet.formulas_pending_recalculation {
+            biff::write_uncalced(&mut stream)?;
+        }
+
         let pivot_index_record_pos =
             if !worksheet.pivot_tables.is_empty() && pivot_row_block_count > 0 {
                 let index_record_pos = stream.len();
@@ -378,6 +385,8 @@ pub(crate) fn generate_workbook_stream(
             } else {
                 None
             };
+
+        biff::write_calculation_settings(&mut stream, &calculation_settings)?;
 
         if let Some(page_setup) = &worksheet.page_setup {
             biff::write_page_settings(
