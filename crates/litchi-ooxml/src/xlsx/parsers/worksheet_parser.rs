@@ -1393,13 +1393,13 @@ impl Parser {
                 "worksheet sheet-view color ID",
             )?,
             zoom_scale: optional_zoom(element, b"zoomScale", decoder)?,
-            zoom_scale_normal: optional_zoom(element, b"zoomScaleNormal", decoder)?,
-            zoom_scale_sheet_layout_view: optional_zoom(
+            zoom_scale_normal: optional_remembered_zoom(element, b"zoomScaleNormal", decoder)?,
+            zoom_scale_sheet_layout_view: optional_remembered_zoom(
                 element,
                 b"zoomScaleSheetLayoutView",
                 decoder,
             )?,
-            zoom_scale_page_layout_view: optional_zoom(
+            zoom_scale_page_layout_view: optional_remembered_zoom(
                 element,
                 b"zoomScalePageLayoutView",
                 decoder,
@@ -2381,6 +2381,25 @@ fn optional_zoom(element: &BytesStart<'_>, name: &[u8], decoder: Decoder) -> Res
             } else {
                 Err(invalid(format!(
                     "worksheet sheet-view zoom {value} is outside 10..=400"
+                )))
+            }
+        })
+        .transpose()
+}
+
+fn optional_remembered_zoom(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+) -> Result<Option<u16>> {
+    let value = optional_u32(element, name, decoder, "worksheet sheet-view remembered zoom")?;
+    value
+        .map(|value| {
+            if value == 0 || (10..=400).contains(&value) {
+                Ok(value as u16)
+            } else {
+                Err(invalid(format!(
+                    "worksheet sheet-view remembered zoom {value} is neither automatic nor within 10..=400"
                 )))
             }
         })

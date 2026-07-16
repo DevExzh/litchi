@@ -60,6 +60,7 @@ enum BodyEventKind<'b, 'a> {
     AnnotationEnd(&'b Annotation<'a>),
     RevisionStart(&'b Revision<'a>),
     RevisionEnd,
+    RevisionDeletion(&'b Revision<'a>),
 }
 
 #[derive(Clone, Copy)]
@@ -130,7 +131,7 @@ impl<W: Write> RtfWriter<W> {
         self.write_list_override_table(doc.list_override_table())?;
 
         // Revision controls reference this author table by numeric index.
-        self.write_revision_table(doc.revisions())?;
+        self.write_revision_table(doc.revision_authors(), doc.revisions())?;
 
         // Write document properties before body content.
         self.write_document_info(doc.info())?;
@@ -433,47 +434,68 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write the revision-author table referenced by tracked-change runs.
-    pub fn write_revision_table(&mut self, revisions: &[Revision<'_>]) -> io::Result<()> {
-        if revisions.is_empty() {
+    pub fn write_revision_table(
+        &mut self,
+        authors: &[crate::RevisionAuthor<'_>],
+        revisions: &[Revision<'_>],
+    ) -> io::Result<()> {
+        if authors.is_empty() && revisions.is_empty() {
             return Ok(());
         }
-        let max_id = revisions.iter().try_fold(0usize, |maximum, revision| {
-            let id = usize::try_from(revision.id).map_err(|_| {
+        if authors.len() > crate::annotation::MAX_REVISION_AUTHORS {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "RTF revision-author table exceeds the safety limit",
+            ));
+        }
+        let author_bytes = authors.iter().try_fold(0usize, |total, author| {
+            author.validate().map_err(|error| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    error.to_string(),
+                )
+            })?;
+            total.checked_add(author.name.len()).ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF aggregate revision-author size overflow",
+                )
+            })
+        })?;
+        if author_bytes > crate::annotation::MAX_REVISION_AUTHOR_TEXT_TOTAL_BYTES {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "RTF aggregate revision-author text exceeds the safety limit",
+            ));
+        }
+        for revision in revisions {
+            revision.validate().map_err(|error| {
+                io::Error::new(io::ErrorKind::InvalidInput, error.to_string())
+            })?;
+            let index = usize::try_from(revision.id).map_err(|_| {
                 io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "RTF revision author indices cannot be negative",
                 )
             })?;
-            if id >= 65_536 {
+            let author = authors.get(index).ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF revision author index is outside revtbl",
+                )
+            })?;
+            if author.name != revision.author {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
-                    "RTF revision author index exceeds the safety limit",
+                    "RTF revision author does not match its revtbl entry",
                 ));
-            }
-            Ok(maximum.max(id))
-        })?;
-        let mut authors = vec![None::<&str>; max_id + 1];
-        for revision in revisions {
-            let index = revision.id as usize;
-            let author = revision.author.as_ref();
-            if let Some(existing) = authors[index]
-                && !author.is_empty()
-                && existing != author
-            {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "RTF revisions assign different authors to the same author index",
-                ));
-            }
-            if !author.is_empty() {
-                authors[index] = Some(author);
             }
         }
 
         self.write_str("{\\*\\revtbl")?;
         for author in authors {
             self.write_str("{")?;
-            self.write_text(author.unwrap_or("Unknown"))?;
+            self.write_text(author.name.as_ref())?;
             self.write_str(";}")?;
         }
         self.write_str("}")?;
@@ -1018,7 +1040,10 @@ impl<W: Write> RtfWriter<W> {
                 kind: BodyEventKind::AnnotationEnd(annotation),
             });
         }
-        let mut revision_ranges: Vec<&Revision<'_>> = revisions.iter().collect();
+        let mut revision_ranges: Vec<&Revision<'_>> = revisions
+            .iter()
+            .filter(|revision| revision.revision_type == RevisionType::Insertion)
+            .collect();
         revision_ranges.sort_by_key(|revision| (revision.position, revision.range_end));
         let mut previous_end = 0usize;
         for revision in revision_ranges {
@@ -1048,6 +1073,25 @@ impl<W: Write> RtfWriter<W> {
                 offset: revision.range_end,
                 order: 0,
                 kind: BodyEventKind::RevisionEnd,
+            });
+        }
+        for revision in revisions
+            .iter()
+            .filter(|revision| revision.revision_type == RevisionType::Deletion)
+        {
+            revision.validate().map_err(|error| {
+                io::Error::new(io::ErrorKind::InvalidInput, error.to_string())
+            })?;
+            if body.get(..revision.position).is_none() {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF deletion position is outside body text or splits a character",
+                ));
+            }
+            events.push(BodyEvent {
+                offset: revision.position,
+                order: 0,
+                kind: BodyEventKind::RevisionDeletion(revision),
             });
         }
         events.sort_by_key(|event| (event.offset, event.order));
@@ -1102,6 +1146,7 @@ impl<W: Write> RtfWriter<W> {
             BodyEventKind::AnnotationEnd(annotation) => self.write_annotation_end(annotation),
             BodyEventKind::RevisionStart(revision) => self.write_revision_start(revision),
             BodyEventKind::RevisionEnd => self.write_str("}"),
+            BodyEventKind::RevisionDeletion(revision) => self.write_revision(revision),
         }
     }
 
@@ -1774,6 +1819,9 @@ impl<W: Write> RtfWriter<W> {
 
     /// Write a revision mark (track changes)
     pub fn write_revision(&mut self, revision: &Revision) -> io::Result<()> {
+        revision
+            .validate()
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
         self.write_revision_start(revision)?;
         self.write_text(revision.content.as_ref())?;
         self.write_str("}")?;
@@ -2118,7 +2166,12 @@ mod tests {
             .write_document(&document)
             .unwrap();
 
-        let reparsed = RtfDocument::from_bytes(&output).unwrap();
+        let reparsed = RtfDocument::from_bytes(&output).unwrap_or_else(|error| {
+            panic!(
+                "failed to parse revision writer output: {error}\n{}",
+                String::from_utf8_lossy(&output)
+            )
+        });
         assert_eq!(reparsed.text(), document.text());
         assert_eq!(reparsed.revisions().len(), 2);
         for (actual, expected) in reparsed.revisions().iter().zip(document.revisions()) {

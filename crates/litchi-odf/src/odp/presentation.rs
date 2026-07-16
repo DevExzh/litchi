@@ -233,6 +233,11 @@ impl Presentation {
         super::parse_presentation_settings(self.content.xml_content())
     }
 
+    /// Inspect inert header, footer, date-time, and page-binding declarations.
+    pub fn declarations(&self) -> Result<super::PresentationDeclarations> {
+        super::parse_presentation_declarations(self.content.xml_content())
+    }
+
     /// Get a slide by index.
     ///
     /// Returns `Some(slide)` if a slide exists at the given index, `None` otherwise.

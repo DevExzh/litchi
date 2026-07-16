@@ -40,6 +40,7 @@ mod namespace;
 pub mod parsers;
 pub mod pivot;
 pub mod shared_strings;
+pub mod sheet_view;
 mod shared_formula;
 pub mod sort;
 pub mod sparkline;
@@ -88,6 +89,12 @@ pub use format::{
     CellFormat, DataValidation, DataValidationOperator, DataValidationType,
 };
 pub use shared_strings::SharedStrings;
+pub use sheet_view::{
+    PivotAreaType, PivotSelectionAxis, WorksheetCellReference, WorksheetPanePosition,
+    WorksheetPaneState, WorksheetPivotArea, WorksheetPivotSelection, WorksheetRangeReference,
+    WorksheetViewCollection, WorksheetViewDefinition, WorksheetViewExtension, WorksheetViewPane,
+    WorksheetViewSelection, WorksheetViewSqref, WorksheetViewType, parse_worksheet_views,
+};
 pub use sort::{SortBy, SortCondition, SortMethod, SortState};
 pub use sparkline::{
     Sparkline, SparklineAxisMinMax, SparklineColor, SparklineDisplayEmptyCellsAs, SparklineGroup,

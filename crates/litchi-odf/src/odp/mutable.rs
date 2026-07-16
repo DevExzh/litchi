@@ -51,6 +51,8 @@ pub struct MutablePresentation {
     media_files: BTreeMap<String, EmbeddedMedia>,
     /// Inert slide-show settings and custom shows.
     settings: Option<crate::odp::PresentationSettings>,
+    /// Inert header/footer/date-time declarations and page bindings.
+    declarations: Option<crate::odp::PresentationDeclarations>,
 }
 
 impl MutablePresentation {
@@ -77,6 +79,7 @@ impl MutablePresentation {
         let slides = presentation.slides()?;
         let metadata = presentation.metadata()?;
         let settings = presentation.settings()?;
+        let declarations = presentation.declarations()?;
         let mimetype = "application/vnd.oasis.opendocument.presentation".to_string();
 
         let styles_xml = presentation.styles_xml().map(str::to_owned);
@@ -90,6 +93,7 @@ impl MutablePresentation {
             source_package,
             media_files: BTreeMap::new(),
             settings,
+            declarations: (!declarations.is_empty()).then_some(declarations),
         })
     }
 
@@ -111,6 +115,7 @@ impl MutablePresentation {
             source_package: None,
             media_files: BTreeMap::new(),
             settings: None,
+            declarations: None,
         }
     }
 
@@ -133,6 +138,28 @@ impl MutablePresentation {
             settings.validate()?;
         }
         self.settings = settings;
+        Ok(())
+    }
+
+    /// Return inert presentation declarations and page bindings.
+    pub fn declarations(&self) -> Option<&crate::odp::PresentationDeclarations> {
+        self.declarations.as_ref()
+    }
+
+    /// Mutably access presentation declarations and page bindings.
+    pub fn declarations_mut(&mut self) -> Option<&mut crate::odp::PresentationDeclarations> {
+        self.declarations.as_mut()
+    }
+
+    /// Set or clear validated presentation declarations and page bindings.
+    pub fn set_declarations(
+        &mut self,
+        declarations: Option<crate::odp::PresentationDeclarations>,
+    ) -> Result<()> {
+        if let Some(declarations) = &declarations {
+            declarations.validate()?;
+        }
+        self.declarations = declarations;
         Ok(())
     }
 
@@ -503,13 +530,24 @@ impl MutablePresentation {
 
         let mut body = String::with_capacity(estimated);
 
+        body.push_str(&super::declaration::write_declaration_elements(
+            self.declarations.as_ref(),
+            self.slides.len(),
+        )?);
+
         for (i, slide) in self.slides.iter().enumerate() {
             let page_num = i + 1;
             let slide_style = super::builder::slide_style_name(slide, i);
-            body.push_str(&xml_minifier::minified_xml_format!(
-                r#"<draw:page draw:name="page{}" draw:style-name="{}" draw:master-page-name="Default">"#,
+            let declaration_attributes = super::declaration::write_binding_attributes(
+                self.declarations.as_ref(),
+                i,
+                crate::odp::PresentationDeclarationTarget::Slide,
+            );
+            body.push_str(&format!(
+                r#"<draw:page draw:name="page{}" draw:style-name="{}" draw:master-page-name="Default"{}>"#,
                 page_num,
-                slide_style
+                slide_style,
+                declaration_attributes
             ));
 
             // Add title frame if title exists
@@ -551,9 +589,15 @@ impl MutablePresentation {
                 animation.write_xml(&mut body, &extension_namespaces)?;
             }
 
-            body.push_str(&super::builder::PresentationBuilder::generate_notes_xml(
-                slide.notes.as_deref(),
-            ));
+            let notes_attributes = super::declaration::write_binding_attributes(
+                self.declarations.as_ref(),
+                i,
+                crate::odp::PresentationDeclarationTarget::Notes,
+            );
+            body.push_str(&super::declaration::apply_notes_binding(
+                super::builder::PresentationBuilder::generate_notes_xml(slide.notes.as_deref()),
+                &notes_attributes,
+            )?);
 
             body.push_str("</draw:page>");
         }

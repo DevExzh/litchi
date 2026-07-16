@@ -53,6 +53,7 @@
 mod action;
 mod animation;
 mod builder;
+mod declaration;
 mod legacy_animation;
 mod media;
 mod mutable;
@@ -73,6 +74,11 @@ pub use animation::{
     AnimationAttribute, AnimationAttributeNamespace, AnimationKind, AnimationNode,
 };
 pub use builder::PresentationBuilder;
+pub use declaration::{
+    PresentationDateTimeDeclaration, PresentationDateTimeSource,
+    PresentationDeclarationBinding, PresentationDeclarationTarget, PresentationDeclarations,
+    PresentationTextDeclaration, parse_presentation_declarations,
+};
 pub use legacy_animation::{LegacyAnimationKind, LegacyAnimationNode};
 pub use media::{MediaActuate, MediaParameter, MediaReference, MediaShow};
 pub use mutable::MutablePresentation;

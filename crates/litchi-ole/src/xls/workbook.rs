@@ -446,14 +446,14 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         // and assemble complete PivotTable structs when SXVIEW boundaries are hit.
         let mut current_pivot: Option<PivotTable> = None;
 
-        // Collector for TXO comment text: tracks OBJ→TXO→CONTINUE sequences.
-        let mut txo_collector = comments::TxoCollector::new();
+        let mut comment_collector = comments::CommentCollector::new();
         let mut pending_string_formula: Option<CellRecord> = None;
         let mut shared_formulas = HashMap::<(u16, u16), SharedFormulaTemplate>::new();
         let mut remaining_data_validations: Option<usize> = None;
 
         for record_result in record_iter.by_ref() {
             let record = record_result?;
+            comment_collector.feed_record(record.header.record_type, &record.data)?;
 
             if matches!(remaining_data_validations, Some(1..))
                 && record.header.record_type != super::data_validation::DV_RECORD_TYPE
@@ -648,28 +648,6 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                     }
                 }
 
-                // --- Comments (NOTE 0x001C) ---
-                rt if rt == comments::RECORD_TYPE => {
-                    if let Ok(comment) = comments::parse_note_record(&record.data) {
-                        worksheet.add_comment(comment);
-                    }
-                }
-
-                // --- OBJ record (0x005D) — extract object ID for TXO linking ---
-                rt if rt == comments::OBJ_TYPE => {
-                    txo_collector.feed_obj(&record.data);
-                }
-
-                // --- TXO record (0x01B6) — text object header ---
-                rt if rt == comments::TXO_TYPE => {
-                    txo_collector.feed_txo(&record.data);
-                }
-
-                // --- CONTINUE record (0x003C) — may carry TXO text data ---
-                rt if rt == comments::CONTINUE_TYPE => {
-                    txo_collector.feed_continue(&record.data);
-                }
-
                 // --- AutoFilter (AUTOFILTERINFO 0x009D) ---
                 rt if rt == autofilter::AUTOFILTERINFO_TYPE => {
                     if let Ok(count) = autofilter::parse_autofilterinfo(&record.data) {
@@ -772,8 +750,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             });
         }
 
-        // Resolve comment texts from TXO data collected during parsing.
-        txo_collector.resolve_comment_texts(worksheet.comments_mut());
+        worksheet.set_comments(comment_collector.finish()?);
 
         Ok(worksheet)
     }

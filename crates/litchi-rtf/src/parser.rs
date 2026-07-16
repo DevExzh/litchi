@@ -181,9 +181,9 @@ const MAX_STYLE_NAME_BYTES: usize = 65_536;
 const MAX_LISTS: usize = 65_536;
 const MAX_LIST_LEVELS: usize = 9;
 const MAX_LIST_TEXT_BYTES: usize = 65_536;
-const MAX_REVISION_AUTHORS: usize = 65_536;
+const MAX_REVISION_AUTHORS: usize = super::annotation::MAX_REVISION_AUTHORS;
 const MAX_REVISION_AUTHOR_BYTES: usize = 65_536;
-const MAX_REVISIONS: usize = 65_536;
+const MAX_REVISIONS: usize = super::annotation::MAX_REVISIONS;
 const MAX_SHAPES: usize = 65_536;
 const MAX_SHAPE_GROUPS: usize = 16_384;
 const MAX_SHAPES_PER_GROUP: usize = 65_536;
@@ -352,7 +352,13 @@ pub struct Parser<'a> {
     /// Track changes/revisions
     revisions: Vec<super::annotation::Revision<'a>>,
     /// Authors referenced by tracked-change author indices
-    revision_authors: Vec<Cow<'a, str>>,
+    revision_authors: Vec<super::annotation::RevisionAuthor<'a>>,
+    /// Whether the unique revision-author table has been parsed.
+    saw_revision_table: bool,
+    /// Aggregate decoded author-table text.
+    revision_author_text_bytes: usize,
+    /// Aggregate decoded tracked-change text.
+    revision_text_bytes: usize,
     /// Current header/footer being parsed
     #[allow(dead_code)]
     current_header_footer: Option<super::section::HeaderFooter<'a>>,
@@ -410,6 +416,9 @@ impl<'a> Parser<'a> {
             notes: Vec::new(),
             revisions: Vec::new(),
             revision_authors: Vec::new(),
+            saw_revision_table: false,
+            revision_author_text_bytes: 0,
+            revision_text_bytes: 0,
             current_header_footer: None,
             current_note_buffer: SmallVec::new(),
             current_hf_type: None,
@@ -462,6 +471,7 @@ impl<'a> Parser<'a> {
             annotations: self.annotations,
             notes: self.notes,
             revisions: self.revisions,
+            revision_authors: self.revision_authors,
         })
     }
 
@@ -474,6 +484,46 @@ impl<'a> Parser<'a> {
             self.states.push(current.clone());
         } else {
             self.states.push(State::default());
+        }
+
+        if self.current_state()?.revision_type.is_some()
+            && matches!(
+                self.tokens.get(self.pos),
+                Some(Token::Control(
+                    ControlWord::IgnorableDestination
+                        | ControlWord::UserProperties
+                        | ControlWord::IndexEntry
+                        | ControlWord::TableOfContentsEntry
+                        | ControlWord::TableOfContentsEntryNoPage
+                        | ControlWord::FontTable
+                        | ControlWord::ColorTable
+                        | ControlWord::StyleSheet
+                        | ControlWord::ListTable
+                        | ControlWord::ListOverrideTable
+                        | ControlWord::RevisionTable
+                        | ControlWord::Info
+                        | ControlWord::Shape
+                        | ControlWord::ShapeGroup
+                        | ControlWord::Picture
+                        | ControlWord::Object
+                        | ControlWord::Result
+                        | ControlWord::Field
+                        | ControlWord::Header
+                        | ControlWord::HeaderFirst
+                        | ControlWord::HeaderLeft
+                        | ControlWord::HeaderRight
+                        | ControlWord::Footer
+                        | ControlWord::FooterFirst
+                        | ControlWord::FooterLeft
+                        | ControlWord::FooterRight
+                        | ControlWord::Footnote
+                        | ControlWord::Endnote
+                ))
+            )
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF revision text cannot contain active or external destinations".to_string(),
+            ));
         }
 
         // Check if this is a special group (header, destination, etc.)
@@ -806,8 +856,17 @@ impl<'a> Parser<'a> {
             }
         }
 
-        // Parse group content
+        // Parse group content. A scoped revision marker without any inert text
+        // is an orphan rather than an empty tracked change.
+        let revision_text_bytes_before = self.revision_text_bytes;
         self.parse_content()?;
+        if self.current_state()?.revision_type.is_some()
+            && self.revision_text_bytes == revision_text_bytes_before
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF revision marker has no tracked text".to_string(),
+            ));
+        }
 
         // Pop state
         self.states.pop();
@@ -1685,7 +1744,14 @@ impl<'a> Parser<'a> {
                         append_transport_bytes(&mut text_buffer, text)?;
                     }
                 },
-                Token::Binary(_) => self.pos += 1,
+                Token::Binary(_) => {
+                    if self.current_state()?.revision_type.is_some() {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF revision text cannot contain binary data".to_string(),
+                        ));
+                    }
+                    self.pos += 1;
+                },
             }
         }
 
@@ -1707,8 +1773,13 @@ impl<'a> Parser<'a> {
 
             // Allocate in arena and create block
             let text = self.arena.alloc_str(&decoded_str);
-            let block = StyleBlock::new(Cow::Borrowed(text), state.formatting, state.paragraph);
             let start = self.body_text_len;
+            if state.revision_type == Some(super::annotation::RevisionType::Deletion) {
+                self.append_revision_text(&state, text, start, start)?;
+                buffer.clear();
+                return Ok(());
+            }
+            let block = StyleBlock::new(Cow::Borrowed(text), state.formatting, state.paragraph);
             self.body_text_len = self.body_text_len.checked_add(text.len()).ok_or_else(|| {
                 RtfError::MalformedDocument("RTF body text length overflow".to_string())
             })?;
@@ -1737,6 +1808,9 @@ impl<'a> Parser<'a> {
         }
         let text = self.arena.alloc_str(text);
         let start = self.body_text_len;
+        if state.revision_type == Some(super::annotation::RevisionType::Deletion) {
+            return self.append_revision_text(&state, text, start, start);
+        }
         self.body_text_len = self.body_text_len.checked_add(text.len()).ok_or_else(|| {
             RtfError::MalformedDocument("RTF body text length overflow".to_string())
         })?;
@@ -1758,14 +1832,33 @@ impl<'a> Parser<'a> {
         let Some(revision_type) = state.revision_type else {
             return Ok(());
         };
-        let id = state.revision_author_id.unwrap_or(0);
-        let author = usize::try_from(id)
-            .ok()
-            .and_then(|index| self.revision_authors.get(index))
-            .map_or_else(|| Cow::Borrowed("Unknown"), Clone::clone);
+        let id = state.revision_author_id.ok_or_else(|| {
+            RtfError::MalformedDocument("RTF revision text is missing an author index".to_string())
+        })?;
+        let index = usize::try_from(id).map_err(|_| {
+            RtfError::MalformedDocument("RTF revision author index cannot be negative".to_string())
+        })?;
+        let author = self.revision_authors.get(index).ok_or_else(|| {
+            RtfError::MalformedDocument("RTF revision author index is outside revtbl".to_string())
+        })?;
+        let author = author.name.clone();
         let date = state
             .revision_date
             .map(|value| Cow::Owned(value.to_string()));
+
+        self.revision_text_bytes = self
+            .revision_text_bytes
+            .checked_add(text.len())
+            .ok_or_else(|| {
+                RtfError::MalformedDocument(
+                    "RTF aggregate revision text size overflow".to_string(),
+                )
+            })?;
+        if self.revision_text_bytes > super::annotation::MAX_REVISION_TEXT_TOTAL_BYTES {
+            return Err(RtfError::MalformedDocument(
+                "RTF aggregate revision text exceeds the safety limit".to_string(),
+            ));
+        }
 
         if let Some(previous) = self.revisions.last_mut()
             && previous.revision_type == revision_type
@@ -1773,7 +1866,16 @@ impl<'a> Parser<'a> {
             && previous.author == author
             && previous.date == date
             && previous.range_end == start
+            && (revision_type != super::annotation::RevisionType::Deletion
+                || previous.position == start)
         {
+            if previous.content.len().saturating_add(text.len())
+                > super::annotation::MAX_REVISION_TEXT_BYTES
+            {
+                return Err(RtfError::MalformedDocument(
+                    "RTF revision text exceeds the safety limit".to_string(),
+                ));
+            }
             previous.content.to_mut().push_str(text);
             previous.range_end = end;
             return Ok(());
@@ -1783,7 +1885,7 @@ impl<'a> Parser<'a> {
                 "RTF revision count exceeds the safety limit".to_string(),
             ));
         }
-        self.revisions.push(super::annotation::Revision {
+        let revision = super::annotation::Revision {
             revision_type,
             author,
             date,
@@ -1791,7 +1893,9 @@ impl<'a> Parser<'a> {
             content: Cow::Owned(text.to_string()),
             position: start,
             range_end: end,
-        });
+        };
+        revision.validate()?;
+        self.revisions.push(revision);
         Ok(())
     }
 
@@ -1920,22 +2024,76 @@ impl<'a> Parser<'a> {
             // Tracked revisions
             ControlWord::Revised(value) => {
                 if *value {
+                    if state.in_table {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF positional revisions inside tables are unsupported".to_string(),
+                        ));
+                    }
+                    if state.revision_type.is_some() {
+                        return Err(RtfError::MalformedDocument(
+                            "conflicting or duplicate RTF revision marker".to_string(),
+                        ));
+                    }
                     state.revision_type = Some(super::annotation::RevisionType::Insertion);
                 } else if state.revision_type == Some(super::annotation::RevisionType::Insertion) {
                     state.revision_type = None;
+                    state.revision_author_id = None;
+                    state.revision_date = None;
                 }
             },
             ControlWord::Deleted(value) => {
                 if *value {
+                    if state.in_table {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF positional revisions inside tables are unsupported".to_string(),
+                        ));
+                    }
+                    if state.revision_type.is_some() {
+                        return Err(RtfError::MalformedDocument(
+                            "conflicting or duplicate RTF revision marker".to_string(),
+                        ));
+                    }
                     state.revision_type = Some(super::annotation::RevisionType::Deletion);
                 } else if state.revision_type == Some(super::annotation::RevisionType::Deletion) {
                     state.revision_type = None;
+                    state.revision_author_id = None;
+                    state.revision_date = None;
                 }
             },
-            ControlWord::RevisionAuthor(value) | ControlWord::DeletedRevisionAuthor(value) => {
+            ControlWord::RevisionAuthor(value) => {
+                if state.revision_type.is_none() || state.revision_author_id.is_some() {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF revauth requires one active revision marker".to_string(),
+                    ));
+                }
                 state.revision_author_id = Some(*value);
             },
-            ControlWord::RevisionDate(value) | ControlWord::DeletedRevisionDate(value) => {
+            ControlWord::DeletedRevisionAuthor(value) => {
+                if state.revision_type != Some(super::annotation::RevisionType::Deletion)
+                    || state.revision_author_id.is_some()
+                {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF revauthdel requires one active deletion marker".to_string(),
+                    ));
+                }
+                state.revision_author_id = Some(*value);
+            },
+            ControlWord::RevisionDate(value) => {
+                if state.revision_type.is_none() || state.revision_date.is_some() {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF revdttm requires one active revision marker".to_string(),
+                    ));
+                }
+                state.revision_date = Some(*value);
+            },
+            ControlWord::DeletedRevisionDate(value) => {
+                if state.revision_type != Some(super::annotation::RevisionType::Deletion)
+                    || state.revision_date.is_some()
+                {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF revdttmdel requires one active deletion marker".to_string(),
+                    ));
+                }
                 state.revision_date = Some(*value);
             },
 
@@ -2126,6 +2284,12 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_revision_table(&mut self) -> RtfResult<()> {
+        if self.saw_revision_table {
+            return Err(RtfError::MalformedDocument(
+                "RTF contains multiple revision-author tables".to_string(),
+            ));
+        }
+        self.saw_revision_table = true;
         self.pos += 1; // `revtbl`
         let mut direct_text = String::new();
         let mut unicode_skip = self.current_state()?.unicode_skip.max(0);
@@ -2157,7 +2321,12 @@ impl<'a> Parser<'a> {
                 Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
                     direct_text.push_str(control_symbol_text(control).unwrap_or_default());
                 },
-                Some(_) => {},
+                Some(Token::Control(_)) | Some(Token::Binary(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF revision-author table contains a non-text control or binary data"
+                            .to_string(),
+                    ));
+                },
                 None => break,
             }
             self.pos += 1;
@@ -2187,8 +2356,9 @@ impl<'a> Parser<'a> {
                         .to_string());
                 },
                 Some(Token::OpenBrace) => {
-                    self.skip_group()?;
-                    continue;
+                    return Err(RtfError::MalformedDocument(
+                        "RTF revision author contains a nested destination".to_string(),
+                    ));
                 },
                 Some(Token::Text(text)) => author.push_str(&self.decode_transport_text(text)?),
                 Some(Token::Control(ControlWord::Unicode(first))) => {
@@ -2202,7 +2372,12 @@ impl<'a> Parser<'a> {
                 Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
                     author.push_str(control_symbol_text(control).unwrap_or_default());
                 },
-                Some(_) => {},
+                Some(Token::Control(_)) | Some(Token::Binary(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF revision author contains a non-text control or binary data"
+                            .to_string(),
+                    ));
+                },
                 None => break,
             }
             self.pos += 1;
@@ -2231,8 +2406,26 @@ impl<'a> Parser<'a> {
                 "RTF revision author count exceeds the safety limit".to_string(),
             ));
         }
-        self.revision_authors
-            .push(Cow::Borrowed(self.arena.alloc_str(&author)));
+        self.revision_author_text_bytes = self
+            .revision_author_text_bytes
+            .checked_add(author.len())
+            .ok_or_else(|| {
+                RtfError::MalformedDocument(
+                    "RTF aggregate revision-author size overflow".to_string(),
+                )
+            })?;
+        if self.revision_author_text_bytes
+            > super::annotation::MAX_REVISION_AUTHOR_TEXT_TOTAL_BYTES
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF aggregate revision-author text exceeds the safety limit".to_string(),
+            ));
+        }
+        let author = super::annotation::RevisionAuthor::new(Cow::Borrowed(
+            self.arena.alloc_str(&author),
+        ))?;
+        author.validate()?;
+        self.revision_authors.push(author);
         Ok(())
     }
 
@@ -3881,17 +4074,21 @@ impl<'a> Parser<'a> {
         } else {
             // Add the Unicode sequence to the document as its own formatted block.
             let allocated = self.arena.alloc_str(&unicode_str);
-            let block =
-                StyleBlock::new(Cow::Borrowed(allocated), state.formatting, state.paragraph);
             let start = self.body_text_len;
-            self.body_text_len =
-                self.body_text_len
+            if state.revision_type == Some(super::annotation::RevisionType::Deletion) {
+                self.append_revision_text(&state, allocated, start, start)?;
+            } else {
+                let block =
+                    StyleBlock::new(Cow::Borrowed(allocated), state.formatting, state.paragraph);
+                self.body_text_len = self
+                    .body_text_len
                     .checked_add(allocated.len())
                     .ok_or_else(|| {
                         RtfError::MalformedDocument("RTF body text length overflow".into())
                     })?;
-            self.blocks.push(block);
-            self.append_revision_text(&state, allocated, start, self.body_text_len)?;
+                self.blocks.push(block);
+                self.append_revision_text(&state, allocated, start, self.body_text_len)?;
+            }
 
             // A fallback and subsequent text often share one lexer token. Preserve
             // the portion after the configured fallback character count.
@@ -5257,4 +5454,6 @@ pub struct ParsedDocument<'a> {
     pub notes: Vec<super::section::Note<'a>>,
     /// Track changes/revisions
     pub revisions: Vec<super::annotation::Revision<'a>>,
+    /// Ordered inert revision-author table.
+    pub revision_authors: Vec<super::annotation::RevisionAuthor<'a>>,
 }

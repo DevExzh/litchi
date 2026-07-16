@@ -10,6 +10,12 @@ pub(crate) const MAX_ANNOTATIONS: usize = 65_536;
 pub(crate) const MAX_ANNOTATION_METADATA_BYTES: usize = 65_536;
 pub(crate) const MAX_ANNOTATION_BODY_BYTES: usize = 4 * 1_048_576;
 pub(crate) const MAX_ANNOTATION_TEXT_TOTAL_BYTES: usize = 16 * 1_048_576;
+pub(crate) const MAX_REVISION_AUTHORS: usize = 65_536;
+pub(crate) const MAX_REVISION_AUTHOR_BYTES: usize = 65_536;
+pub(crate) const MAX_REVISION_AUTHOR_TEXT_TOTAL_BYTES: usize = 16 * 1_048_576;
+pub(crate) const MAX_REVISIONS: usize = 65_536;
+pub(crate) const MAX_REVISION_TEXT_BYTES: usize = 4 * 1_048_576;
+pub(crate) const MAX_REVISION_TEXT_TOTAL_BYTES: usize = 16 * 1_048_576;
 
 /// Annotation type
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -170,7 +176,7 @@ impl<'a> Annotation<'a> {
 }
 
 /// Revision information (tracked change)
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Revision<'a> {
     /// Revision type
     pub revision_type: RevisionType,
@@ -213,5 +219,94 @@ impl<'a> Revision<'a> {
     #[inline]
     pub fn deletion(author: Cow<'a, str>, content: Cow<'a, str>) -> Self {
         Self::new(RevisionType::Deletion, author, content)
+    }
+
+    pub(crate) fn validate(&self) -> RtfResult<()> {
+        if self.id < 0 {
+            return Err(RtfError::MalformedDocument(
+                "RTF revision author index cannot be negative".to_string(),
+            ));
+        }
+        if self.content.is_empty() {
+            return Err(RtfError::MalformedDocument(
+                "RTF revision content cannot be empty".to_string(),
+            ));
+        }
+        if self.content.len() > MAX_REVISION_TEXT_BYTES {
+            return Err(RtfError::MalformedDocument(
+                "RTF revision content exceeds the safety limit".to_string(),
+            ));
+        }
+        if self
+            .date
+            .as_deref()
+            .is_some_and(|date| date.parse::<i32>().is_err())
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF revision date must contain a packed signed DTTM value".to_string(),
+            ));
+        }
+        match self.revision_type {
+            RevisionType::Insertion if self.range_end <= self.position => {
+                return Err(RtfError::MalformedDocument(
+                    "RTF insertion revision must cover a non-empty body range".to_string(),
+                ));
+            },
+            RevisionType::Deletion if self.range_end != self.position => {
+                return Err(RtfError::MalformedDocument(
+                    "RTF deletion revision must be positioned between visible body characters"
+                        .to_string(),
+                ));
+            },
+            RevisionType::FormatChange | RevisionType::MovedFrom | RevisionType::MovedTo => {
+                return Err(RtfError::MalformedDocument(
+                    "this RTF revision kind has no lossless scoped-run representation"
+                        .to_string(),
+                ));
+            },
+            _ => {},
+        }
+        Ok(())
+    }
+
+    pub fn into_owned(self) -> Revision<'static> {
+        Revision {
+            revision_type: self.revision_type,
+            author: Cow::Owned(self.author.into_owned()),
+            date: self.date.map(|date| Cow::Owned(date.into_owned())),
+            id: self.id,
+            content: Cow::Owned(self.content.into_owned()),
+            position: self.position,
+            range_end: self.range_end,
+        }
+    }
+}
+
+/// One ordered entry in the inert RTF `revtbl` author table.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RevisionAuthor<'a> {
+    pub name: Cow<'a, str>,
+}
+
+impl<'a> RevisionAuthor<'a> {
+    pub fn new(name: impl Into<Cow<'a, str>>) -> RtfResult<Self> {
+        let author = Self { name: name.into() };
+        author.validate()?;
+        Ok(author)
+    }
+
+    pub(crate) fn validate(&self) -> RtfResult<()> {
+        if self.name.len() > MAX_REVISION_AUTHOR_BYTES {
+            return Err(RtfError::MalformedDocument(
+                "RTF revision author exceeds the safety limit".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    pub fn into_owned(self) -> RevisionAuthor<'static> {
+        RevisionAuthor {
+            name: Cow::Owned(self.name.into_owned()),
+        }
     }
 }

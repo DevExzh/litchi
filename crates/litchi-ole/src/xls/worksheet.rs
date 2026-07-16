@@ -150,19 +150,13 @@ impl XlsWorksheet {
 
     // -- Comments --
 
-    /// Add a parsed comment/note.
-    pub fn add_comment(&mut self, comment: XlsComment) {
-        self.comments.push(comment);
-    }
-
     /// All comments/notes in this worksheet.
     pub fn comments(&self) -> &[XlsComment] {
         &self.comments
     }
 
-    /// Mutable access to comments (used to resolve TXO text after parsing).
-    pub fn comments_mut(&mut self) -> &mut [XlsComment] {
-        &mut self.comments
+    pub(crate) fn set_comments(&mut self, comments: Vec<XlsComment>) {
+        self.comments = comments;
     }
 
     // -- AutoFilter --

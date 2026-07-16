@@ -31,6 +31,7 @@ use super::data_validation::{
 };
 use super::sort::SortState;
 use super::sparkline::{SparklineGroup, parse_sparkline_groups_from_worksheet_xml};
+use super::sheet_view::{WorksheetViewCollection, parse_worksheet_views};
 use super::table::{Table, parse_table_xml};
 use super::views::SheetView;
 use super::writer::sheet::Image;
@@ -237,6 +238,8 @@ pub struct Worksheet<'a> {
     auto_filter_definition: Option<AutoFilterDefinition>,
     /// Sheet view settings for each workbook window.
     sheet_views: Vec<SheetView>,
+    /// Complete immutable worksheet-view collection.
+    sheet_view_collection: Option<WorksheetViewCollection>,
     /// Manual row page breaks
     row_breaks: Vec<PageBreak>,
     /// Manual column page breaks
@@ -270,6 +273,7 @@ impl<'a> Worksheet<'a> {
             auto_filter: None,
             auto_filter_definition: None,
             sheet_views: Vec::new(),
+            sheet_view_collection: None,
             row_breaks: Vec::new(),
             col_breaks: Vec::new(),
             rich_text_cells: HashMap::new(),
@@ -371,6 +375,7 @@ impl<'a> Worksheet<'a> {
         )?;
         let data_validation_collections = parse_data_validation_collections(sheet_data.as_bytes())?;
         let auto_filter_definition = parse_auto_filter(sheet_data.as_bytes())?;
+        let sheet_view_collection = parse_worksheet_views(sheet_data.as_bytes())?;
         self.cells = parsed.cells;
         self.cell_styles = parsed.cell_styles;
         self.rows = parsed.rows;
@@ -390,6 +395,7 @@ impl<'a> Worksheet<'a> {
         self.auto_filter = parsed.auto_filter;
         self.auto_filter_definition = auto_filter_definition;
         self.sheet_views = parsed.sheet_views;
+        self.sheet_view_collection = sheet_view_collection;
         self.dimensions = parsed.dimensions;
         Ok((
             parsed.hyperlinks,
@@ -1405,6 +1411,11 @@ impl<'a> Worksheet<'a> {
     /// Get all worksheet views, one for each workbook window.
     pub fn sheet_views(&self) -> &[SheetView] {
         &self.sheet_views
+    }
+
+    /// Complete immutable worksheet-view collection, with schema defaults applied.
+    pub fn sheet_view_collection(&self) -> Option<&WorksheetViewCollection> {
+        self.sheet_view_collection.as_ref()
     }
 
     /// Find cells containing specific text.

@@ -50,7 +50,7 @@ mod user_property;
 mod writer;
 
 // Re-exports
-pub use annotation::{Annotation, AnnotationType, Revision, RevisionType};
+pub use annotation::{Annotation, AnnotationType, Revision, RevisionAuthor, RevisionType};
 pub use bookmark::{Bookmark, BookmarkTable};
 pub use border::{
     Border, BorderStyle, Borders, Shading, ShadingPattern, TabAlignment, TabLeader, TabStop,

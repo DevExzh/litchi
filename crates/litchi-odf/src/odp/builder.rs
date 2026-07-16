@@ -37,6 +37,7 @@ pub struct PresentationBuilder {
     metadata: Metadata,
     media_files: BTreeMap<String, EmbeddedMedia>,
     settings: Option<crate::odp::PresentationSettings>,
+    declarations: Option<crate::odp::PresentationDeclarations>,
 }
 
 fn encode_text_content(text: &str) -> String {
@@ -373,6 +374,7 @@ impl PresentationBuilder {
             metadata: Metadata::default(),
             media_files: BTreeMap::new(),
             settings: None,
+            declarations: None,
         }
     }
 
@@ -390,6 +392,23 @@ impl PresentationBuilder {
             settings.validate()?;
         }
         self.settings = settings;
+        Ok(self)
+    }
+
+    /// Return inert presentation declarations and page bindings.
+    pub fn declarations(&self) -> Option<&crate::odp::PresentationDeclarations> {
+        self.declarations.as_ref()
+    }
+
+    /// Set or clear validated presentation declarations and page bindings.
+    pub fn set_declarations(
+        &mut self,
+        declarations: Option<crate::odp::PresentationDeclarations>,
+    ) -> Result<&mut Self> {
+        if let Some(declarations) = &declarations {
+            declarations.validate()?;
+        }
+        self.declarations = declarations;
         Ok(self)
     }
 
@@ -944,12 +963,23 @@ impl PresentationBuilder {
 
         let mut body = String::with_capacity(estimated);
 
+        body.push_str(&super::declaration::write_declaration_elements(
+            self.declarations.as_ref(),
+            self.slides.len(),
+        )?);
+
         for (i, slide) in self.slides.iter().enumerate() {
             let slide_style = slide_style_name(slide, i);
+            let declaration_attributes = super::declaration::write_binding_attributes(
+                self.declarations.as_ref(),
+                i,
+                crate::odp::PresentationDeclarationTarget::Slide,
+            );
             body.push_str(&format!(
-                r#"<draw:page draw:name="page{}" draw:style-name="{}" draw:master-page-name="Default">"#,
+                r#"<draw:page draw:name="page{}" draw:style-name="{}" draw:master-page-name="Default"{}>"#,
                 i + 1,
-                slide_style
+                slide_style,
+                declaration_attributes
             ));
 
             // Add title frame if title exists
@@ -986,7 +1016,15 @@ impl PresentationBuilder {
                 animation.write_xml(&mut body, extension_namespaces)?;
             }
 
-            body.push_str(&Self::generate_notes_xml(slide.notes.as_deref()));
+            let notes_attributes = super::declaration::write_binding_attributes(
+                self.declarations.as_ref(),
+                i,
+                crate::odp::PresentationDeclarationTarget::Notes,
+            );
+            body.push_str(&super::declaration::apply_notes_binding(
+                Self::generate_notes_xml(slide.notes.as_deref()),
+                &notes_attributes,
+            )?);
 
             body.push_str("</draw:page>");
         }

@@ -55,6 +55,8 @@ pub struct RtfDocument<'a> {
     notes: Vec<super::section::Note<'a>>,
     /// Track changes/revisions
     revisions: Vec<super::annotation::Revision<'a>>,
+    /// Ordered revision-author table referenced by revision author indices.
+    revision_authors: Vec<super::annotation::RevisionAuthor<'a>>,
 }
 
 impl<'a> RtfDocument<'a> {
@@ -246,6 +248,11 @@ impl<'a> RtfDocument<'a> {
             annotations: Self::convert_annotations_to_owned(parsed.annotations),
             notes: Self::convert_notes_to_owned(parsed.notes),
             revisions: Self::convert_revisions_to_owned(parsed.revisions),
+            revision_authors: parsed
+                .revision_authors
+                .into_iter()
+                .map(super::annotation::RevisionAuthor::into_owned)
+                .collect(),
         })
     }
 
@@ -1063,6 +1070,145 @@ impl<'a> RtfDocument<'a> {
     pub fn revisions(&self) -> &[super::annotation::Revision<'_>] {
         &self.revisions
     }
+
+    /// Get the ordered revision-author table.
+    pub fn revision_authors(&self) -> &[super::annotation::RevisionAuthor<'_>] {
+        &self.revision_authors
+    }
+
+    /// Append an entry to the ordered revision-author table.
+    pub fn push_revision_author(
+        &mut self,
+        author: super::annotation::RevisionAuthor<'a>,
+    ) -> RtfResult<()> {
+        author.validate()?;
+        if self.revision_authors.len() >= super::annotation::MAX_REVISION_AUTHORS {
+            return Err(RtfError::MalformedDocument(
+                "RTF revision author count exceeds the safety limit".to_string(),
+            ));
+        }
+        let total = self
+            .revision_authors
+            .iter()
+            .try_fold(author.name.len(), |total, existing| {
+                total.checked_add(existing.name.len())
+            })
+            .ok_or_else(|| {
+                RtfError::MalformedDocument(
+                    "RTF aggregate revision-author size overflow".to_string(),
+                )
+            })?;
+        if total > super::annotation::MAX_REVISION_AUTHOR_TEXT_TOTAL_BYTES {
+            return Err(RtfError::MalformedDocument(
+                "RTF aggregate revision-author text exceeds the safety limit".to_string(),
+            ));
+        }
+        self.revision_authors.push(author);
+        Ok(())
+    }
+
+    /// Remove the revision-author table when no revision still references it.
+    pub fn clear_revision_authors(&mut self) -> RtfResult<()> {
+        if !self.revisions.is_empty() {
+            return Err(RtfError::MalformedDocument(
+                "cannot clear an RTF revision-author table while revisions reference it"
+                    .to_string(),
+            ));
+        }
+        self.revision_authors.clear();
+        Ok(())
+    }
+
+    /// Append a validated tracked change.
+    pub fn push_revision(
+        &mut self,
+        revision: super::annotation::Revision<'a>,
+    ) -> RtfResult<()> {
+        revision.validate()?;
+        if self.revisions.len() >= super::annotation::MAX_REVISIONS {
+            return Err(RtfError::MalformedDocument(
+                "RTF revision count exceeds the safety limit".to_string(),
+            ));
+        }
+        let author_index = usize::try_from(revision.id).map_err(|_| {
+            RtfError::MalformedDocument(
+                "RTF revision author index cannot be negative".to_string(),
+            )
+        })?;
+        let author = self.revision_authors.get(author_index).ok_or_else(|| {
+            RtfError::MalformedDocument(
+                "RTF revision author index is outside revtbl".to_string(),
+            )
+        })?;
+        if author.name != revision.author {
+            return Err(RtfError::MalformedDocument(
+                "RTF revision author does not match its revtbl entry".to_string(),
+            ));
+        }
+
+        let body = self.text();
+        match revision.revision_type {
+            super::annotation::RevisionType::Insertion => {
+                let content = body
+                    .get(revision.position..revision.range_end)
+                    .ok_or_else(|| {
+                        RtfError::MalformedDocument(
+                            "RTF insertion range is outside body text or splits a character"
+                                .to_string(),
+                        )
+                    })?;
+                if content != revision.content {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF insertion content does not match its visible body range".to_string(),
+                    ));
+                }
+                if self.revisions.iter().any(|existing| {
+                    existing.revision_type == super::annotation::RevisionType::Insertion
+                        && revision.position < existing.range_end
+                        && existing.position < revision.range_end
+                }) {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF insertion ranges cannot overlap".to_string(),
+                    ));
+                }
+            },
+            super::annotation::RevisionType::Deletion => {
+                if body.get(..revision.position).is_none() {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF deletion position is outside body text or splits a character"
+                            .to_string(),
+                    ));
+                }
+            },
+            _ => {
+                return Err(RtfError::MalformedDocument(
+                    "this RTF revision kind has no lossless scoped-run representation"
+                        .to_string(),
+                ));
+            },
+        }
+        let total = self
+            .revisions
+            .iter()
+            .try_fold(revision.content.len(), |total, existing| {
+                total.checked_add(existing.content.len())
+            })
+            .ok_or_else(|| {
+                RtfError::MalformedDocument("RTF aggregate revision size overflow".to_string())
+            })?;
+        if total > super::annotation::MAX_REVISION_TEXT_TOTAL_BYTES {
+            return Err(RtfError::MalformedDocument(
+                "RTF aggregate revision text exceeds the safety limit".to_string(),
+            ));
+        }
+        self.revisions.push(revision);
+        Ok(())
+    }
+
+    /// Remove all tracked changes while retaining the ordered author table.
+    pub fn clear_revisions(&mut self) {
+        self.revisions.clear();
+    }
 }
 
 #[cfg(test)]
@@ -1488,7 +1634,7 @@ mod tests {
             and {\revised\revauth1\revdttm-1501115711 new text} after}"#;
         let doc = RtfDocument::parse(rtf).unwrap();
         let body = doc.text();
-        assert!(body.contains("Before old 你 text"));
+        assert!(!body.contains("old 你 text"));
         assert!(body.contains("and new text after"));
         assert_eq!(doc.revisions().len(), 2);
 
@@ -1498,10 +1644,8 @@ mod tests {
         assert_eq!(deletion.author, "Max 你");
         assert_eq!(deletion.date.as_deref(), Some("1199059860"));
         assert_eq!(deletion.content, "old 你 text");
-        assert_eq!(
-            body.get(deletion.position..deletion.range_end),
-            Some(deletion.content.as_ref())
-        );
+        assert_eq!(deletion.position, deletion.range_end);
+        assert!(!body.contains(deletion.content.as_ref()));
 
         let insertion = &doc.revisions()[1];
         assert_eq!(insertion.revision_type, RevisionType::Insertion);
@@ -1517,7 +1661,7 @@ mod tests {
     #[test]
     fn revision_toggle_boundaries_flush_preceding_text() {
         let doc = RtfDocument::parse(
-            r#"{\rtf1{\*\revtbl Unknown;}plain \revised\revauth0 changed\revised0 plain}"#,
+            r#"{\rtf1{\*\revtbl Unknown;}plain \revised\revauth0\revdttm1 changed\revised0 plain}"#,
         )
         .unwrap();
         assert_eq!(doc.text(), "plain changedplain");
