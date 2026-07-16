@@ -171,6 +171,14 @@ pub enum ControlWord<'a> {
     RightToLeftRow,
     TableRightToLeft(bool),
     RightGutter(bool),
+    FormProtection(Option<i32>),
+    AnnotationProtection(Option<i32>),
+    RevisionProtection(Option<i32>),
+    ReadOnlyProtection(Option<i32>),
+    AllProtection(Option<i32>),
+    EnforceProtection(Option<i32>),
+    ProtectionLevel(Option<i32>),
+    Password,
 
     // Index and table-of-contents source marks
     IndexEntry,
@@ -838,6 +846,14 @@ impl<'a> Lexer<'a> {
             "rtlrow" => ControlWord::RightToLeftRow,
             "taprtl" => ControlWord::TableRightToLeft(param_bool),
             "rtlgutter" => ControlWord::RightGutter(param_bool),
+            "formprot" => ControlWord::FormProtection(param),
+            "annotprot" => ControlWord::AnnotationProtection(param),
+            "revprot" => ControlWord::RevisionProtection(param),
+            "readprot" => ControlWord::ReadOnlyProtection(param),
+            "allprot" => ControlWord::AllProtection(param),
+            "enforceprot" => ControlWord::EnforceProtection(param),
+            "protlevel" => ControlWord::ProtectionLevel(param),
+            "password" => ControlWord::Password,
 
             // Index and table-of-contents source marks
             "xe" => ControlWord::IndexEntry,

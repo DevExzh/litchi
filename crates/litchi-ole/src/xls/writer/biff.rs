@@ -272,6 +272,18 @@ pub fn write_window2<W: Write>(writer: &mut W, has_freeze_panes: bool) -> XlsRes
     worksheet::write_window2(writer, has_freeze_panes)
 }
 
+pub fn write_scl<W: Write>(writer: &mut W, numerator: u16, denominator: u16) -> XlsResult<()> {
+    worksheet::write_scl(writer, numerator, denominator)
+}
+
+pub fn write_default_selection<W: Write>(
+    writer: &mut W,
+    freeze_rows: u16,
+    freeze_cols: u16,
+) -> XlsResult<()> {
+    worksheet::write_default_selection(writer, freeze_rows, freeze_cols)
+}
+
 pub fn write_pivot_window2<W: Write>(writer: &mut W) -> XlsResult<()> {
     worksheet::write_pivot_window2(writer)
 }

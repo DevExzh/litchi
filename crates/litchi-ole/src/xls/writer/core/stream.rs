@@ -388,15 +388,25 @@ pub(crate) fn generate_workbook_stream(
         let has_freeze_panes = worksheet.freeze_panes.is_some();
         if worksheet.pivot_tables.is_empty() {
             biff::write_window2(&mut stream, has_freeze_panes)?;
-        }
-
-        // MsoDrawing (0x00EC) for non-pivot sheets
-        if has_any_page_fields && worksheet.pivot_tables.is_empty() {
-            biff::write_mso_drawing_sheet1(&mut stream)?;
+            if let Some((numerator, denominator)) = worksheet.zoom {
+                biff::write_scl(&mut stream, numerator, denominator)?;
+            }
         }
 
         if let Some(panes) = worksheet.freeze_panes {
             biff::write_pane(&mut stream, panes.freeze_rows, panes.freeze_cols)?;
+            biff::write_default_selection(
+                &mut stream,
+                panes.freeze_rows as u16,
+                panes.freeze_cols,
+            )?;
+        } else if worksheet.pivot_tables.is_empty() {
+            biff::write_default_selection(&mut stream, 0, 0)?;
+        }
+
+        // MsoDrawing (0x00EC) for non-pivot sheets. Window view records must remain contiguous.
+        if has_any_page_fields && worksheet.pivot_tables.is_empty() {
+            biff::write_mso_drawing_sheet1(&mut stream)?;
         }
 
         if let Some(protection) = worksheet.sheet_protection {

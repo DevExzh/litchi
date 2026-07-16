@@ -1952,6 +1952,19 @@ impl<'a> Parser<'a> {
                             self.pos += 1;
                             self.apply_control_word(control)?;
                         },
+                        ControlWord::FormProtection(_)
+                        | ControlWord::AnnotationProtection(_)
+                        | ControlWord::RevisionProtection(_)
+                        | ControlWord::ReadOnlyProtection(_)
+                        | ControlWord::AllProtection(_)
+                        | ControlWord::EnforceProtection(_)
+                        | ControlWord::ProtectionLevel(_) => {
+                            if !text_buffer.is_empty() {
+                                self.flush_text_buffer(&mut text_buffer)?;
+                            }
+                            self.pos += 1;
+                            self.apply_control_word(control)?;
+                        },
                         _ => {
                             self.pos += 1;
                             // Apply formatting changes
@@ -2244,6 +2257,61 @@ impl<'a> Parser<'a> {
             ControlWord::RightGutter(value) => {
                 self.gutter_on_right = *value;
                 return Ok(());
+            },
+            ControlWord::FormProtection(value) => {
+                self.ensure_protection_scope()?;
+                Self::set_protection_flag(&mut self.info.protection.forms, *value, "formprot")?;
+                return Ok(());
+            },
+            ControlWord::AnnotationProtection(value) => {
+                self.ensure_protection_scope()?;
+                Self::set_protection_flag(&mut self.info.protection.annotations, *value, "annotprot")?;
+                return Ok(());
+            },
+            ControlWord::RevisionProtection(value) => {
+                self.ensure_protection_scope()?;
+                Self::set_protection_flag(&mut self.info.protection.revisions, *value, "revprot")?;
+                return Ok(());
+            },
+            ControlWord::ReadOnlyProtection(value) => {
+                self.ensure_protection_scope()?;
+                Self::set_protection_flag(&mut self.info.protection.read_only, *value, "readprot")?;
+                return Ok(());
+            },
+            ControlWord::AllProtection(value) => {
+                self.ensure_protection_scope()?;
+                Self::set_protection_flag(&mut self.info.protection.all, *value, "allprot")?;
+                return Ok(());
+            },
+            ControlWord::EnforceProtection(Some(value)) => {
+                self.ensure_protection_scope()?;
+                Self::set_required_protection_flag(&mut self.info.protection.enforced, *value, "enforceprot")?;
+                return Ok(());
+            },
+            ControlWord::EnforceProtection(None) => {
+                return Err(RtfError::MalformedDocument(
+                    "RTF enforceprot requires a numeric parameter".to_string(),
+                ));
+            },
+            ControlWord::ProtectionLevel(Some(value)) => {
+                self.ensure_protection_scope()?;
+                if self.info.protection.level.is_some() {
+                    return Err(RtfError::MalformedDocument(
+                        "duplicate RTF protlevel control".to_string(),
+                    ));
+                }
+                self.info.protection.level = Some(crate::ProtectionLevel::from_rtf(*value)?);
+                return Ok(());
+            },
+            ControlWord::ProtectionLevel(None) => {
+                return Err(RtfError::MalformedDocument(
+                    "RTF protlevel requires a numeric parameter".to_string(),
+                ));
+            },
+            ControlWord::Password => {
+                return Err(RtfError::MalformedDocument(
+                    "RTF password hash is misplaced or not a starred info destination".to_string(),
+                ));
             },
             _ => {},
         }
@@ -4584,6 +4652,19 @@ impl<'a> Parser<'a> {
                         Some(Token::Control(ControlWord::BackupTime)) => {
                             self.parse_info_time(InfoTimeField::Backup)?;
                         },
+                        Some(Token::Control(ControlWord::IgnorableDestination))
+                            if matches!(
+                                self.tokens.get(self.pos + 1),
+                                Some(Token::Control(ControlWord::Password))
+                            ) =>
+                        {
+                            self.parse_info_password()?;
+                        },
+                        Some(Token::Control(ControlWord::Password)) => {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF password hash destination must be starred".to_string(),
+                            ));
+                        },
                         _ => self.skip_open_info_group()?,
                     }
                 },
@@ -5260,6 +5341,61 @@ impl<'a> Parser<'a> {
         *slot = Some(u32::try_from(value).map_err(|_| {
             RtfError::MalformedDocument(format!("RTF info numeric control {name} cannot be negative"))
         })?);
+        Ok(())
+    }
+
+    fn parse_info_password(&mut self) -> RtfResult<()> {
+        if self.info.protection.password_hash.is_some() {
+            return Err(RtfError::MalformedDocument(
+                "duplicate RTF protection password hash".to_string(),
+            ));
+        }
+        self.pos += 2; // ignorable marker and password destination
+        let value = self.parse_inert_text_group_contents(
+            crate::info::PROTECTION_PASSWORD_HASH_BYTES,
+            "protection password hash",
+        )?;
+        self.info.protection.password_hash = Some(Cow::Owned(value));
+        self.info.protection.validate()
+    }
+
+    fn ensure_protection_scope(&self) -> RtfResult<()> {
+        if self.states.len() != 2 || self.body_text_len != 0 {
+            return Err(RtfError::MalformedDocument(
+                "RTF document protection controls must occur in the root header".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn set_protection_flag(
+        slot: &mut Option<bool>,
+        value: Option<i32>,
+        name: &str,
+    ) -> RtfResult<()> {
+        let value = value.unwrap_or(1);
+        Self::set_required_protection_flag(slot, value, name)
+    }
+
+    fn set_required_protection_flag(
+        slot: &mut Option<bool>,
+        value: i32,
+        name: &str,
+    ) -> RtfResult<()> {
+        if slot.is_some() {
+            return Err(RtfError::MalformedDocument(format!(
+                "duplicate RTF {name} control"
+            )));
+        }
+        *slot = Some(match value {
+            0 => false,
+            1 => true,
+            _ => {
+                return Err(RtfError::MalformedDocument(format!(
+                    "RTF {name} parameter must be 0 or 1"
+                )));
+            },
+        });
         Ok(())
     }
 

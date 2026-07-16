@@ -912,39 +912,71 @@ impl<W: Write> RtfWriter<W> {
             || info.words.is_some()
             || info.characters.is_some()
             || info.characters_with_spaces.is_some()
-            || info.id.is_some();
-        if !has_info {
-            return Ok(());
-        }
+            || info.id.is_some()
+            || info.protection.password_hash.is_some();
         info.validate()
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
 
-        self.write_str("{")?;
-        self.write_control_word("info", None)?;
-        self.write_info_text("title", info.title.as_deref())?;
-        self.write_info_text("subject", info.subject.as_deref())?;
-        self.write_info_text("author", info.author.as_deref())?;
-        self.write_info_text("manager", info.manager.as_deref())?;
-        self.write_info_text("company", info.company.as_deref())?;
-        self.write_info_text("operator", info.operator.as_deref())?;
-        self.write_info_text("category", info.category.as_deref())?;
-        self.write_info_text("keywords", info.keywords.as_deref())?;
-        self.write_info_text("comment", info.comment.as_deref())?;
-        self.write_info_text("doccomm", info.document_comment.as_deref())?;
-        self.write_info_text("hlinkbase", info.hyperlink_base.as_deref())?;
-        self.write_info_time("creatim", info.creation_timestamp, info.creation_time.as_deref())?;
-        self.write_info_time("revtim", info.revision_timestamp, info.revision_time.as_deref())?;
-        self.write_info_time("printim", info.print_timestamp, info.print_time.as_deref())?;
-        self.write_info_time("buptim", info.backup_timestamp, info.backup_time.as_deref())?;
-        self.write_optional_u32("version", info.version)?;
-        self.write_optional_u32("vern", info.revision)?;
-        self.write_optional_u32("edmins", info.editing_time)?;
-        self.write_optional_u32("nofpages", info.pages)?;
-        self.write_optional_u32("nofwords", info.words)?;
-        self.write_optional_u32("nofchars", info.characters)?;
-        self.write_optional_u32("nofcharsws", info.characters_with_spaces)?;
-        self.write_optional_u32("id", info.id)?;
-        self.write_str("}")
+        if has_info {
+            self.write_str("{")?;
+            self.write_control_word("info", None)?;
+            self.write_info_text("title", info.title.as_deref())?;
+            self.write_info_text("subject", info.subject.as_deref())?;
+            self.write_info_text("author", info.author.as_deref())?;
+            self.write_info_text("manager", info.manager.as_deref())?;
+            self.write_info_text("company", info.company.as_deref())?;
+            self.write_info_text("operator", info.operator.as_deref())?;
+            self.write_info_text("category", info.category.as_deref())?;
+            self.write_info_text("keywords", info.keywords.as_deref())?;
+            self.write_info_text("comment", info.comment.as_deref())?;
+            self.write_info_text("doccomm", info.document_comment.as_deref())?;
+            self.write_info_text("hlinkbase", info.hyperlink_base.as_deref())?;
+            self.write_info_time("creatim", info.creation_timestamp, info.creation_time.as_deref())?;
+            self.write_info_time("revtim", info.revision_timestamp, info.revision_time.as_deref())?;
+            self.write_info_time("printim", info.print_timestamp, info.print_time.as_deref())?;
+            self.write_info_time("buptim", info.backup_timestamp, info.backup_time.as_deref())?;
+            self.write_optional_u32("version", info.version)?;
+            self.write_optional_u32("vern", info.revision)?;
+            self.write_optional_u32("edmins", info.editing_time)?;
+            self.write_optional_u32("nofpages", info.pages)?;
+            self.write_optional_u32("nofwords", info.words)?;
+            self.write_optional_u32("nofchars", info.characters)?;
+            self.write_optional_u32("nofcharsws", info.characters_with_spaces)?;
+            self.write_optional_u32("id", info.id)?;
+            if let Some(hash) = info.protection.password_hash.as_deref() {
+                self.write_str("{\\*")?;
+                self.write_control_word("password", None)?;
+                self.write_str(" ")?;
+                self.write_str(hash)?;
+                self.write_str("}")?;
+            }
+            self.write_str("}")?;
+        }
+        self.write_protection_controls(&info.protection)
+    }
+
+    fn write_protection_controls(
+        &mut self,
+        protection: &crate::DocumentProtection<'_>,
+    ) -> io::Result<()> {
+        for (control, value) in [
+            ("formprot", protection.forms),
+            ("annotprot", protection.annotations),
+            ("revprot", protection.revisions),
+            ("readprot", protection.read_only),
+            ("allprot", protection.all),
+        ] {
+            if let Some(value) = value {
+                self.write_control_word(control, (!value).then_some(0))?;
+            }
+        }
+        if let Some(value) = protection.enforced {
+            self.write_control_word("enforceprot", Some(i32::from(value)))?;
+        }
+        if let Some(level) = protection.level {
+            self.write_control_word("protlevel", Some(level.rtf_value()))?;
+        }
+        Ok(())
     }
 
     fn write_info_text(&mut self, control: &str, value: Option<&str>) -> io::Result<()> {

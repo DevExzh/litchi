@@ -1282,6 +1282,25 @@ impl XlsWriter {
         Ok(())
     }
 
+    /// Set worksheet zoom as a BIFF8 SCL fraction between 10% and 400%.
+    pub fn set_zoom(&mut self, sheet: usize, numerator: u16, denominator: u16) -> XlsResult<()> {
+        if numerator == 0
+            || denominator == 0
+            || u32::from(numerator) * 10 < u32::from(denominator)
+            || u32::from(numerator) > u32::from(denominator) * 4
+        {
+            return Err(XlsError::InvalidData(
+                "worksheet zoom must be between 1/10 and 4 with positive terms".to_string(),
+            ));
+        }
+        let worksheet = self
+            .worksheets
+            .get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+        worksheet.set_zoom(numerator, denominator);
+        Ok(())
+    }
+
     /// Set the height of a row in points.
     ///
     /// The row index is 0-based (0 = first row), and the height is specified

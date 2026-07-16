@@ -34,6 +34,7 @@ pub mod chart;
 mod comments;
 pub mod conditional_formatting;
 pub mod data_validation;
+pub mod data_consolidation;
 mod drawing;
 pub mod external_links;
 pub mod format;
@@ -98,6 +99,12 @@ pub use data_validation::{
     DataValidationSqref, ParsedDataValidation, ParsedDataValidationErrorStyle,
     ParsedDataValidationImeMode, ParsedDataValidationOperator, ParsedDataValidationType,
     ValidationListSource,
+};
+pub use data_consolidation::{
+    WorksheetDataConsolidation, WorksheetDataConsolidationConformance,
+    WorksheetDataConsolidationFunction, WorksheetDataConsolidationRangeReference,
+    WorksheetDataReference, WorksheetDataReferenceSource, WorksheetDataReferences,
+    parse_worksheet_data_consolidation, write_worksheet_data_consolidation,
 };
 // Re-export shared formatting types
 pub use format::{

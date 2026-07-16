@@ -98,6 +98,8 @@ pub(super) struct WritableWorksheet {
     pub conditional_formats: Vec<XlsConditionalFormat>,
     /// Optional freeze panes configuration.
     pub freeze_panes: Option<FreezePanes>,
+    /// Optional non-default worksheet zoom as an SCL numerator and denominator.
+    pub zoom: Option<(u16, u16)>,
     pub sheet_protection: Option<XlsSheetProtection>,
     pub auto_filter: Option<AutoFilterRange>,
     /// Cell or range hyperlinks stored for this worksheet.
@@ -150,6 +152,7 @@ impl WritableWorksheet {
             data_validations: Vec::new(),
             conditional_formats: Vec::new(),
             freeze_panes: None,
+            zoom: None,
             sheet_protection: None,
             auto_filter: None,
             hyperlinks: Vec::new(),
@@ -197,6 +200,10 @@ impl WritableWorksheet {
 
     pub(super) fn clear_freeze_panes(&mut self) {
         self.freeze_panes = None;
+    }
+
+    pub(super) fn set_zoom(&mut self, numerator: u16, denominator: u16) {
+        self.zoom = (numerator != denominator).then_some((numerator, denominator));
     }
 
     pub(super) fn set_column_width(&mut self, col: u16, width: u16) {

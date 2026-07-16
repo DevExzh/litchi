@@ -129,6 +129,50 @@ impl XlsWorksheetView {
     pub fn zoom_fraction(&self) -> Option<(u16, u16)> { self.zoom_fraction }
     pub fn pane(&self) -> Option<&XlsPane> { self.pane.as_ref() }
     pub fn selections(&self) -> &[XlsSelection] { &self.selections }
+
+    fn validate_selection_groups(&self) -> XlsResult<()> {
+        let mut start = 0;
+        while start < self.selections.len() {
+            let first = &self.selections[start];
+            let mut end = start + 1;
+            let mut range_count = first.ranges.len();
+            while end < self.selections.len() && self.selections[end].pane == first.pane {
+                range_count = range_count
+                    .checked_add(self.selections[end].ranges.len())
+                    .ok_or_else(|| invalid(SELECTION_RECORD_TYPE, "SELECTION range aggregation overflows"))?;
+                end += 1;
+            }
+            let active_index = usize::from(first.active_range_index);
+            if active_index >= range_count {
+                return Err(invalid(
+                    SELECTION_RECORD_TYPE,
+                    "SELECTION active range index is outside its contiguous range aggregation",
+                ));
+            }
+            let mut remaining = active_index;
+            let mut active_range = None;
+            for selection in &self.selections[start..end] {
+                if remaining < selection.ranges.len() {
+                    active_range = selection.ranges.get(remaining);
+                    break;
+                }
+                remaining -= selection.ranges.len();
+            }
+            let range = active_range.expect("validated active selection index");
+            if first.active_row < range.first_row
+                || first.active_row > range.last_row
+                || first.active_column < range.first_column
+                || first.active_column > range.last_column
+            {
+                return Err(invalid(
+                    SELECTION_RECORD_TYPE,
+                    "SELECTION active range does not contain the active cell",
+                ));
+            }
+            start = end;
+        }
+        Ok(())
+    }
 }
 
 fn parse_zoom_percent(value: u16, record_type: u16, name: &str) -> XlsResult<Option<u16>> {
@@ -290,17 +334,19 @@ impl ViewCollector {
         }
     }
 
-    fn finish_current(&mut self) {
+    fn finish_current(&mut self) -> XlsResult<()> {
         if let Some(view) = self.current.take() {
+            view.validate_selection_groups()?;
             self.views.push(view);
         }
         self.phase = ViewPhase::Start;
         self.saw_plv = false;
+        Ok(())
     }
 
     pub(crate) fn feed_record(&mut self, record_type: u16, data: &[u8]) -> XlsResult<()> {
         if record_type == WINDOW2_RECORD_TYPE {
-            self.finish_current();
+            self.finish_current()?;
             self.current = Some(parse_window2(data)?);
             return Ok(());
         }
@@ -335,14 +381,14 @@ impl ViewCollector {
             PLV_RECORD_TYPE | SCL_RECORD_TYPE | PANE_RECORD_TYPE => {
                 return Err(invalid(record_type, "record is out of order in the WINDOW production"));
             }
-            _ => self.finish_current(),
+            _ => self.finish_current()?,
         }
         Ok(())
     }
 
-    pub(crate) fn finish(mut self) -> Vec<XlsWorksheetView> {
-        self.finish_current();
-        self.views
+    pub(crate) fn finish(mut self) -> XlsResult<Vec<XlsWorksheetView>> {
+        self.finish_current()?;
+        Ok(self.views)
     }
 }
 
@@ -374,7 +420,7 @@ mod tests {
         collector.feed_record(SCL_RECORD_TYPE, &[3, 0, 4, 0]).unwrap();
         collector.feed_record(PANE_RECORD_TYPE, &pane()).unwrap();
         collector.feed_record(SELECTION_RECORD_TYPE, &selection(0)).unwrap();
-        let views = collector.finish();
+        let views = collector.finish().unwrap();
         let view = &views[0];
         assert!(view.has_frozen_panes());
         assert!(view.is_frozen_without_split());
@@ -404,8 +450,28 @@ mod tests {
         collector.feed_record(SELECTION_RECORD_TYPE, &selection(3)).unwrap();
         collector.feed_record(0x01aa, &[]).unwrap();
         collector.feed_record(SELECTION_RECORD_TYPE, &selection(0)).unwrap();
-        let views = collector.finish();
+        let views = collector.finish().unwrap();
         assert_eq!(views[0].selections().len(), 1);
+    }
+
+    #[test]
+    fn validates_active_range_across_contiguous_selection_records() {
+        let mut first = selection(0);
+        first[5..7].copy_from_slice(&1u16.to_le_bytes());
+        let mut collector = ViewCollector::new();
+        collector.feed_record(WINDOW2_RECORD_TYPE, &window2(0x002e)).unwrap();
+        collector.feed_record(SELECTION_RECORD_TYPE, &first).unwrap();
+        let mut second = selection(0);
+        second[5..7].copy_from_slice(&1u16.to_le_bytes());
+        collector.feed_record(SELECTION_RECORD_TYPE, &second).unwrap();
+        assert!(collector.finish().is_ok());
+
+        let mut invalid = selection(0);
+        invalid[1..3].copy_from_slice(&8u16.to_le_bytes());
+        let mut collector = ViewCollector::new();
+        collector.feed_record(WINDOW2_RECORD_TYPE, &window2(0x002e)).unwrap();
+        collector.feed_record(SELECTION_RECORD_TYPE, &invalid).unwrap();
+        assert!(collector.finish().is_err());
     }
 
     #[test]

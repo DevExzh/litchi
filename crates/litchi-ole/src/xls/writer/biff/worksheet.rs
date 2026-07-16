@@ -219,6 +219,11 @@ pub fn write_pane<W: Write>(writer: &mut W, freeze_rows: u32, freeze_cols: u16) 
             "freeze_panes: freeze_rows exceeds BIFF8 limit 65535 for PANE record".to_string(),
         )
     })?;
+    if freeze_cols > 255 {
+        return Err(XlsError::InvalidData(
+            "freeze_panes: freeze_cols exceeds BIFF8 frozen PANE limit 255".to_string(),
+        ));
+    }
     let x = freeze_cols;
 
     let top_row = y;
@@ -697,6 +702,52 @@ pub fn write_window2<W: Write>(writer: &mut W, has_freeze_panes: bool) -> XlsRes
     Ok(())
 }
 
+/// Write an SCL record for a non-default worksheet zoom fraction.
+pub fn write_scl<W: Write>(writer: &mut W, numerator: u16, denominator: u16) -> XlsResult<()> {
+    if numerator == 0
+        || denominator == 0
+        || u32::from(numerator) * 10 < u32::from(denominator)
+        || u32::from(numerator) > u32::from(denominator) * 4
+    {
+        return Err(XlsError::InvalidData(
+            "SCL zoom fraction must be between 1/10 and 4 with positive terms".to_string(),
+        ));
+    }
+    write_record_header(writer, 0x00A0, 4)?;
+    writer.write_all(&numerator.to_le_bytes())?;
+    writer.write_all(&denominator.to_le_bytes())?;
+    Ok(())
+}
+
+/// Write the primary selection for a regular worksheet window.
+pub fn write_default_selection<W: Write>(
+    writer: &mut W,
+    freeze_rows: u16,
+    freeze_cols: u16,
+) -> XlsResult<()> {
+    if freeze_cols > 255 {
+        return Err(XlsError::InvalidData(
+            "SELECTION active column exceeds BIFF8 limit 255".to_string(),
+        ));
+    }
+    let pane: u8 = match (freeze_cols > 0, freeze_rows > 0) {
+        (true, true) => 0,
+        (true, false) => 1,
+        (false, true) => 2,
+        (false, false) => 3,
+    };
+    write_record_header(writer, 0x001D, 15)?;
+    writer.write_all(&[pane])?;
+    writer.write_all(&freeze_rows.to_le_bytes())?;
+    writer.write_all(&freeze_cols.to_le_bytes())?;
+    writer.write_all(&0u16.to_le_bytes())?;
+    writer.write_all(&1u16.to_le_bytes())?;
+    writer.write_all(&freeze_rows.to_le_bytes())?;
+    writer.write_all(&freeze_rows.to_le_bytes())?;
+    writer.write_all(&[freeze_cols as u8, freeze_cols as u8])?;
+    Ok(())
+}
+
 pub fn write_pivot_window2<W: Write>(writer: &mut W) -> XlsResult<()> {
     static DATA: &[u8] = &[
         0xB6, 0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x11,
@@ -724,6 +775,49 @@ pub fn write_selection<W: Write>(writer: &mut W) -> XlsResult<()> {
     write_record_header(writer, 0x001D, DATA.len() as u16)?;
     writer.write_all(DATA)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod view_round_trip_tests {
+    use super::*;
+    use crate::xls::view::{ViewCollector, PANE_RECORD_TYPE, SCL_RECORD_TYPE, SELECTION_RECORD_TYPE, WINDOW2_RECORD_TYPE};
+
+    fn payload(record: &[u8]) -> &[u8] {
+        let length = usize::from(u16::from_le_bytes([record[2], record[3]]));
+        &record[4..4 + length]
+    }
+
+    #[test]
+    fn writes_view_records_that_round_trip_through_reader() {
+        let mut window = Vec::new();
+        let mut scl = Vec::new();
+        let mut pane = Vec::new();
+        let mut selection = Vec::new();
+        write_window2(&mut window, true).unwrap();
+        write_scl(&mut scl, 3, 4).unwrap();
+        write_pane(&mut pane, 7, 5).unwrap();
+        write_default_selection(&mut selection, 7, 5).unwrap();
+
+        let mut collector = ViewCollector::new();
+        collector.feed_record(WINDOW2_RECORD_TYPE, payload(&window)).unwrap();
+        collector.feed_record(SCL_RECORD_TYPE, payload(&scl)).unwrap();
+        collector.feed_record(PANE_RECORD_TYPE, payload(&pane)).unwrap();
+        collector.feed_record(SELECTION_RECORD_TYPE, payload(&selection)).unwrap();
+        let views = collector.finish().unwrap();
+        let view = &views[0];
+        assert_eq!(view.zoom_fraction(), Some((3, 4)));
+        assert_eq!(view.pane().unwrap().active_pane(), crate::xls::view::XlsPaneType::LowerRight);
+        assert_eq!(view.selections()[0].active_row(), 7);
+        assert_eq!(view.selections()[0].active_column(), 5);
+    }
+
+    #[test]
+    fn rejects_invalid_writer_view_bounds() {
+        assert!(write_scl(&mut Vec::new(), 0, 1).is_err());
+        assert!(write_scl(&mut Vec::new(), 5, 1).is_err());
+        assert!(write_pane(&mut Vec::new(), 1, 256).is_err());
+        assert!(write_default_selection(&mut Vec::new(), 0, 256).is_err());
+    }
 }
 
 pub fn write_phonetic_pr<W: Write>(writer: &mut W) -> XlsResult<()> {

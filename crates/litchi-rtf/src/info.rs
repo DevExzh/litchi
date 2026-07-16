@@ -4,6 +4,7 @@ use crate::{RtfError, RtfResult};
 use std::borrow::Cow;
 
 pub(crate) const MAX_INFO_TEXT_BYTES: usize = 1_048_576;
+pub(crate) const PROTECTION_PASSWORD_HASH_BYTES: usize = 8;
 
 /// A possibly partial timestamp from an RTF information destination.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -132,6 +133,7 @@ pub struct DocumentInfo<'a> {
     pub characters: Option<u32>,
     pub characters_with_spaces: Option<u32>,
     pub id: Option<u32>,
+    pub protection: DocumentProtection<'a>,
 }
 
 impl<'a> DocumentInfo<'a> {
@@ -187,6 +189,7 @@ impl<'a> DocumentInfo<'a> {
                 RtfTimestamp::from_legacy(legacy)?;
             }
         }
+        self.protection.validate()?;
         Ok(())
     }
 }
@@ -200,21 +203,119 @@ pub enum ProtectionType {
     RevisionTracking,
     Comments,
     Forms,
+    All,
+}
+
+/// The bounded numeric value carried by `\protlevel`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProtectionLevel {
+    Level0,
+    Level1,
+    Level2,
+    Level3,
+}
+
+impl ProtectionLevel {
+    pub(crate) fn from_rtf(value: i32) -> RtfResult<Self> {
+        match value {
+            0 => Ok(Self::Level0),
+            1 => Ok(Self::Level1),
+            2 => Ok(Self::Level2),
+            3 => Ok(Self::Level3),
+            _ => Err(RtfError::MalformedDocument(
+                "RTF protection level must be in 0..=3".to_string(),
+            )),
+        }
+    }
+
+    #[must_use]
+    pub fn rtf_value(self) -> i32 {
+        match self {
+            Self::Level0 => 0,
+            Self::Level1 => 1,
+            Self::Level2 => 2,
+            Self::Level3 => 3,
+        }
+    }
 }
 
 /// Document protection settings.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct DocumentProtection {
-    pub protection_type: ProtectionType,
-    pub enforced: bool,
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct DocumentProtection<'a> {
+    pub forms: Option<bool>,
+    pub annotations: Option<bool>,
+    pub revisions: Option<bool>,
+    pub read_only: Option<bool>,
+    pub all: Option<bool>,
+    pub enforced: Option<bool>,
+    pub level: Option<ProtectionLevel>,
+    /// Exact inert hexadecimal payload from `\password`; never interpreted.
+    pub password_hash: Option<Cow<'a, str>>,
 }
 
-impl DocumentProtection {
+impl<'a> DocumentProtection<'a> {
     pub fn new(protection_type: ProtectionType) -> Self {
-        Self { protection_type, enforced: true }
+        let mut protection = Self {
+            enforced: Some(true),
+            ..Self::default()
+        };
+        match protection_type {
+            ProtectionType::None => {},
+            ProtectionType::ReadOnly => protection.read_only = Some(true),
+            ProtectionType::RevisionTracking => protection.revisions = Some(true),
+            ProtectionType::Comments => protection.annotations = Some(true),
+            ProtectionType::Forms => protection.forms = Some(true),
+            ProtectionType::All => protection.all = Some(true),
+        }
+        protection
+    }
+
+    #[must_use]
+    pub fn protection_type(&self) -> ProtectionType {
+        if self.read_only == Some(true) {
+            ProtectionType::ReadOnly
+        } else if self.revisions == Some(true) {
+            ProtectionType::RevisionTracking
+        } else if self.annotations == Some(true) {
+            ProtectionType::Comments
+        } else if self.forms == Some(true) {
+            ProtectionType::Forms
+        } else if self.all == Some(true) {
+            ProtectionType::All
+        } else {
+            ProtectionType::None
+        }
     }
 
     pub fn is_protected(&self) -> bool {
-        self.enforced && self.protection_type != ProtectionType::None
+        self.enforced != Some(false) && self.protection_type() != ProtectionType::None
+    }
+
+    pub(crate) fn validate(&self) -> RtfResult<()> {
+        if let Some(hash) = &self.password_hash
+            && (hash.len() != PROTECTION_PASSWORD_HASH_BYTES
+                || !hash.as_bytes().iter().all(u8::is_ascii_hexdigit))
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF protection password hash must contain exactly eight hexadecimal digits"
+                    .to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    pub fn into_owned(self) -> DocumentProtection<'static> {
+        DocumentProtection {
+            forms: self.forms,
+            annotations: self.annotations,
+            revisions: self.revisions,
+            read_only: self.read_only,
+            all: self.all,
+            enforced: self.enforced,
+            level: self.level,
+            password_hash: self
+                .password_hash
+                .map(|value| Cow::Owned(value.into_owned())),
+        }
     }
 }

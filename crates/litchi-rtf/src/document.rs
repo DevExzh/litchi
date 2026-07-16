@@ -1039,6 +1039,23 @@ impl<'a> RtfDocument<'a> {
         &self.info
     }
 
+    /// Return inert document and revision-protection metadata.
+    pub fn protection(&self) -> &crate::DocumentProtection<'_> {
+        &self.info.protection
+    }
+
+    /// Replace inert document-protection metadata.
+    pub fn set_protection(&mut self, protection: crate::DocumentProtection<'a>) -> RtfResult<()> {
+        protection.validate()?;
+        self.info.protection = protection;
+        Ok(())
+    }
+
+    /// Remove all document-protection metadata.
+    pub fn clear_protection(&mut self) {
+        self.info.protection = crate::DocumentProtection::default();
+    }
+
     /// Get all annotations (comments) in the document.
     ///
     /// Returns document annotations and revisions.
@@ -1323,6 +1340,7 @@ impl<'a> RtfDocument<'a> {
             characters: info.characters,
             characters_with_spaces: info.characters_with_spaces,
             id: info.id,
+            protection: info.protection.into_owned(),
         }
     }
 

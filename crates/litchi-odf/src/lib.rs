@@ -304,6 +304,7 @@ mod generic;
 /// Shared semantic discovery of images in OpenDocument XML and packages.
 mod media;
 mod variable_declaration;
+mod document_scripts;
 mod dde_connection;
 pub use dde_connection::{OdfDdeConnectionDeclaration, OdfDdeConnectionUse};
 mod bibliography_configuration;
@@ -356,6 +357,10 @@ pub use variable_declaration::{
     OdfVariableDeclarationGroup, OdfVariableDeclarations, OdfVariableHeaderFooter,
     OdfVariableKind, OdfVariablePart, OdfVariableScope, OdfVariableValue,
     OdfVariableValueType,
+};
+pub use document_scripts::{
+    OdfDocumentEventListener, OdfDocumentScripts, OdfEmbeddedScript, OdfScriptBinding,
+    OdfScriptEventListener, parse_document_scripts,
 };
 pub use embedded_object::{
     OdfEmbeddedObject, OdfEmbeddedObjectKind, OdfEmbeddedObjectPart,

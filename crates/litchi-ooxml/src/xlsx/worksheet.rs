@@ -31,6 +31,9 @@ use super::data_validation::{
     DataValidationCollection as ParsedDataValidationCollection,
     ParsedDataValidation, parse_data_validation_collections,
 };
+use super::data_consolidation::{
+    WorksheetDataConsolidation, parse_worksheet_data_consolidation,
+};
 use super::sort::SortState;
 use super::sparkline::{SparklineGroup, parse_sparkline_groups_from_worksheet_xml};
 use super::sheet_view::{WorksheetViewCollection, parse_worksheet_views};
@@ -280,6 +283,8 @@ pub struct Worksheet<'a> {
     sheet_properties: Option<WorksheetSheetProperties>,
     /// Default East Asian phonetic text formatting.
     phonetic_properties: Option<WorksheetPhoneticProperties>,
+    /// Data consolidation function, labels, linking, and source references.
+    data_consolidation: Option<WorksheetDataConsolidation>,
     /// Manual row page breaks
     row_breaks: Vec<PageBreak>,
     /// Manual column page breaks
@@ -325,6 +330,7 @@ impl<'a> Worksheet<'a> {
             outline_properties: None,
             sheet_properties: None,
             phonetic_properties: None,
+            data_consolidation: None,
             row_breaks: Vec::new(),
             col_breaks: Vec::new(),
             rich_text_cells: HashMap::new(),
@@ -439,6 +445,7 @@ impl<'a> Worksheet<'a> {
         let ignored_errors = parse_worksheet_ignored_errors(sheet_data.as_bytes())?;
         let sheet_properties = parse_worksheet_sheet_properties(sheet_data.as_bytes())?;
         let phonetic_properties = parse_worksheet_phonetic_properties(sheet_data.as_bytes())?;
+        let data_consolidation = parse_worksheet_data_consolidation(sheet_data.as_bytes())?;
         let outline_properties = sheet_properties.as_ref()
             .and_then(WorksheetSheetProperties::outline_properties).copied();
         self.cells = parsed.cells;
@@ -471,6 +478,7 @@ impl<'a> Worksheet<'a> {
         self.outline_properties = outline_properties;
         self.sheet_properties = sheet_properties;
         self.phonetic_properties = phonetic_properties;
+        self.data_consolidation = data_consolidation;
         self.dimensions = parsed.dimensions;
         Ok((
             parsed.hyperlinks,
@@ -1967,6 +1975,11 @@ impl<'a> Worksheet<'a> {
     /// Default East Asian phonetic text formatting, when explicitly present.
     pub fn phonetic_properties(&self) -> Option<&WorksheetPhoneticProperties> {
         self.phonetic_properties.as_ref()
+    }
+
+    /// Immutable worksheet data-consolidation settings, when explicitly present.
+    pub fn data_consolidation(&self) -> Option<&WorksheetDataConsolidation> {
+        self.data_consolidation.as_ref()
     }
 
     // ===== Print Options =====

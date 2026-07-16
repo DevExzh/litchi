@@ -79,7 +79,9 @@ pub use xml_namespace::XmlNamespace;
 pub use theme::DocumentTheme;
 pub use latent_style::{LatentStyleException, LatentStyles};
 pub use data_store::DocumentDataStore;
-pub use info::{DocumentInfo, DocumentProtection, ProtectionType, RtfTimestamp};
+pub use info::{
+    DocumentInfo, DocumentProtection, ProtectionLevel, ProtectionType, RtfTimestamp,
+};
 pub use lexer::CharacterSet;
 pub use user_property::{
     UserProperty, UserPropertyDateTime, UserPropertyType, UserPropertyValue,

@@ -815,7 +815,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         worksheet.set_hyperlinks(hyperlink_collector.finish());
         let (row_layouts, column_layouts) = layout_collector.finish();
         worksheet.set_layouts(row_layouts, column_layouts);
-        worksheet.set_worksheet_views(view_collector.finish());
+        worksheet.set_worksheet_views(view_collector.finish()?);
         worksheet.set_page_setup(page_setup_collector.finish()?);
         worksheet.set_conditional_formattings(conditional_format_collector.finish()?);
 
