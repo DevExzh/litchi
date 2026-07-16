@@ -72,6 +72,15 @@ pub struct PowerPoint10DocumentProperties {
     pub photo_album: Option<PowerPointPhotoAlbumSettings>,
 }
 
+/// Document-level settings stored in the `___PPT12` extension.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct PowerPoint12DocumentProperties {
+    /// Whether pictures are automatically compressed when the presentation is saved.
+    ///
+    /// `None` means that the optional `RoundTripDocFlags12Atom` is absent.
+    pub compress_pictures_on_save: Option<bool>,
+}
+
 impl PowerPoint10DocumentProperties {
     /// Discover and parse document properties from every `___PPT10` programmable tag below `root`.
     pub fn parse(root: &PptRecord) -> Result<Self> {
@@ -140,6 +149,36 @@ impl PowerPoint10DocumentProperties {
                 },
                 _ => {},
             }
+        }
+        Ok(properties)
+    }
+}
+
+impl PowerPoint12DocumentProperties {
+    /// Discover and parse document properties from every `___PPT12` programmable tag below `root`.
+    pub fn parse(root: &PptRecord) -> Result<Self> {
+        let mut properties = Self::default();
+        for record in root.versioned_binary_tag_records(12)? {
+            if record.record_type != PptRecordType::RoundTripDocFlags12Atom {
+                continue;
+            }
+            if properties.compress_pictures_on_save.is_some() {
+                return Err(PptError::Corrupted(
+                    "PowerPoint 12 document extension contains duplicate document flags"
+                        .to_string(),
+                ));
+            }
+            if record.version != 0 || record.instance != 0 || record.data.len() != 1 {
+                return Err(PptError::Corrupted(
+                    "RoundTripDocFlags12Atom has an invalid record header or size".to_string(),
+                ));
+            }
+            if record.data[0] & 0xfe != 0 {
+                return Err(PptError::Corrupted(
+                    "RoundTripDocFlags12Atom has nonzero reserved bits".to_string(),
+                ));
+            }
+            properties.compress_pictures_on_save = Some(record.data[0] & 1 != 0);
         }
         Ok(properties)
     }
@@ -425,5 +464,38 @@ mod tests {
             let document = root(vec![prog_tags_record(10, &record)]);
             assert!(PowerPoint10DocumentProperties::parse(&document).is_err());
         }
+    }
+
+    #[test]
+    fn parses_powerpoint12_document_flags_and_isolates_versions() {
+        let flags = record_bytes(0, 0, 0x0425, &[1]);
+        let properties =
+            PowerPoint12DocumentProperties::parse(&root(vec![prog_tags_record(12, &flags)]))
+                .unwrap();
+        assert_eq!(properties.compress_pictures_on_save, Some(true));
+
+        let properties =
+            PowerPoint12DocumentProperties::parse(&root(vec![prog_tags_record(11, &flags)]))
+                .unwrap();
+        assert_eq!(properties.compress_pictures_on_save, None);
+    }
+
+    #[test]
+    fn rejects_malformed_or_duplicate_powerpoint12_document_flags() {
+        for flags in [
+            record_bytes(1, 0, 0x0425, &[0]),
+            record_bytes(0, 1, 0x0425, &[0]),
+            record_bytes(0, 0, 0x0425, &[]),
+            record_bytes(0, 0, 0x0425, &[2]),
+        ] {
+            let document = root(vec![prog_tags_record(12, &flags)]);
+            assert!(PowerPoint12DocumentProperties::parse(&document).is_err());
+        }
+
+        let flags = record_bytes(0, 0, 0x0425, &[0]);
+        let mut duplicate = flags.clone();
+        duplicate.extend_from_slice(&flags);
+        let document = root(vec![prog_tags_record(12, &duplicate)]);
+        assert!(PowerPoint12DocumentProperties::parse(&document).is_err());
     }
 }

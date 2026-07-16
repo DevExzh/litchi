@@ -212,7 +212,7 @@ impl PptRecord {
     /// `BinaryTagData` is an atom whose payload is itself a strict sequence of
     /// PPT records, so these records do not appear in the ordinary child tree.
     pub fn versioned_binary_tag_records(&self, version: u8) -> Result<Vec<PptRecord>> {
-        if !matches!(version, 9..=11) {
+        if !matches!(version, 9..=12) {
             return Err(PptError::Corrupted(
                 "Unsupported PowerPoint programmable-tag version".to_string(),
             ));

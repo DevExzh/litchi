@@ -967,5 +967,6 @@ mod tests {
         assert_eq!(defaults.powerpoint10.unwrap().character.mask, 0);
 
         assert!(root.versioned_binary_tag_records(8).is_err());
+        assert!(root.versioned_binary_tag_records(13).is_err());
     }
 }

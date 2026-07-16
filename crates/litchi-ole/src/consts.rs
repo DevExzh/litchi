@@ -61,6 +61,8 @@ pub enum PptRecordType {
     PPDrawing = 1036,
     /// PowerPoint 10 square-grid spacing atom
     GridSpacing10Atom = 1037,
+    /// PowerPoint 12 document round-trip flags atom
+    RoundTripDocFlags12Atom = 0x0425,
     /// OE placeholder atom record (placeholder data)
     OEPlaceholderAtom = 3011,
     /// Text header atom record
@@ -303,6 +305,7 @@ impl From<u16> for PptRecordType {
             1035 => PptRecordType::PPDrawingGroup,
             1036 => PptRecordType::PPDrawing,
             1037 => PptRecordType::GridSpacing10Atom,
+            0x0425 => PptRecordType::RoundTripDocFlags12Atom,
             3011 => PptRecordType::OEPlaceholderAtom,
             3999 => PptRecordType::TextHeaderAtom,
             4000 => PptRecordType::TextCharsAtom,
