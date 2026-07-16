@@ -213,7 +213,7 @@ pub fn build_sound_collection(
     }
 
     // SoundCollection container
-    let mut container = RecordBuilder::new(0x0F, 0, PptRecordType::SoundCollection as u16);
+    let mut container = RecordBuilder::new(0x0F, 5, PptRecordType::SoundCollection as u16);
     container.write_data(&children);
 
     Ok((container.build()?, id_to_ref))

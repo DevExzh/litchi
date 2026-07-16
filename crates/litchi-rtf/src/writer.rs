@@ -142,6 +142,7 @@ impl<W: Write> RtfWriter<W> {
 
         // Write named paragraph, character, section, and table styles.
         self.write_stylesheet(doc.stylesheet())?;
+        self.write_note_options(doc.note_options())?;
         self.write_note_separators(doc.note_separators())?;
 
         // Write list definitions before body paragraphs reference them.
@@ -803,6 +804,128 @@ impl<W: Write> RtfWriter<W> {
         }
         self.write_str("}")?;
         Ok(())
+    }
+
+    /// Write explicit document-level footnote and endnote configuration.
+    pub fn write_note_options(&mut self, options: &crate::NoteOptions) -> io::Result<()> {
+        options
+            .validate()
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+
+        if let Some(value) = options.present_kinds {
+            self.write_control_word(
+                "fet",
+                Some(match value {
+                    crate::PresentNoteKinds::FootnotesOnly => 0,
+                    crate::PresentNoteKinds::EndnotesOnly => 1,
+                    crate::PresentNoteKinds::FootnotesAndEndnotes => 2,
+                }),
+            )?;
+        }
+        if let Some(value) = options.footnote_placement {
+            self.write_control_word(
+                match value {
+                    crate::NotePlacement::EndOfSection => "endnotes",
+                    crate::NotePlacement::EndOfDocument => "enddoc",
+                    crate::NotePlacement::BeneathText => "ftntj",
+                    crate::NotePlacement::BottomOfPage => "ftnbj",
+                },
+                None,
+            )?;
+        }
+        if let Some(value) = options.footnote_start {
+            self.write_control_word("ftnstart", Some(value))?;
+        }
+        if let Some(value) = options.footnote_restart {
+            self.write_control_word(
+                match value {
+                    crate::FootnoteRestart::Continuous => "ftnrstcont",
+                    crate::FootnoteRestart::EachSection => "ftnrestart",
+                    crate::FootnoteRestart::EachPage => "ftnrstpg",
+                },
+                None,
+            )?;
+        }
+        if let Some(value) = options.footnote_numbering {
+            self.write_control_word(Self::note_numbering_control(value, false), None)?;
+        }
+        if let Some(value) = options.endnote_placement {
+            self.write_control_word(
+                match value {
+                    crate::NotePlacement::EndOfSection => "aendnotes",
+                    crate::NotePlacement::EndOfDocument => "aenddoc",
+                    crate::NotePlacement::BeneathText => "aftntj",
+                    crate::NotePlacement::BottomOfPage => "aftnbj",
+                },
+                None,
+            )?;
+        }
+        if let Some(value) = options.endnote_start {
+            self.write_control_word("aftnstart", Some(value))?;
+        }
+        if let Some(value) = options.endnote_restart {
+            self.write_control_word(
+                match value {
+                    crate::EndnoteRestart::Continuous => "aftnrstcont",
+                    crate::EndnoteRestart::EachSection => "aftnrestart",
+                },
+                None,
+            )?;
+        }
+        if let Some(value) = options.endnote_numbering {
+            self.write_control_word(Self::note_numbering_control(value, true), None)?;
+        }
+        Ok(())
+    }
+
+    fn note_numbering_control(
+        style: crate::NoteNumberingStyle,
+        endnote: bool,
+    ) -> &'static str {
+        match (endnote, style) {
+            (false, crate::NoteNumberingStyle::Arabic) => "ftnnar",
+            (false, crate::NoteNumberingStyle::LowercaseLetter) => "ftnnalc",
+            (false, crate::NoteNumberingStyle::UppercaseLetter) => "ftnnauc",
+            (false, crate::NoteNumberingStyle::LowercaseRoman) => "ftnnrlc",
+            (false, crate::NoteNumberingStyle::UppercaseRoman) => "ftnnruc",
+            (false, crate::NoteNumberingStyle::Chicago) => "ftnnchi",
+            (false, crate::NoteNumberingStyle::KoreanChosung) => "ftnnchosung",
+            (false, crate::NoteNumberingStyle::Circle) => "ftnncnum",
+            (false, crate::NoteNumberingStyle::KanjiDigitless) => "ftnndbnum",
+            (false, crate::NoteNumberingStyle::KanjiWithDigit) => "ftnndbnumd",
+            (false, crate::NoteNumberingStyle::KanjiThree) => "ftnndbnumt",
+            (false, crate::NoteNumberingStyle::KanjiFour) => "ftnndbnumk",
+            (false, crate::NoteNumberingStyle::DoubleByte) => "ftnndbar",
+            (false, crate::NoteNumberingStyle::KoreanGanada) => "ftnnganada",
+            (false, crate::NoteNumberingStyle::ChineseOne) => "ftnngbnum",
+            (false, crate::NoteNumberingStyle::ChineseTwo) => "ftnngbnumd",
+            (false, crate::NoteNumberingStyle::ChineseThree) => "ftnngbnuml",
+            (false, crate::NoteNumberingStyle::ChineseFour) => "ftnngbnumk",
+            (false, crate::NoteNumberingStyle::ZodiacOne) => "ftnnzodiac",
+            (false, crate::NoteNumberingStyle::ZodiacTwo) => "ftnnzodiacd",
+            (false, crate::NoteNumberingStyle::ZodiacThree) => "ftnnzodiacl",
+            (true, crate::NoteNumberingStyle::Arabic) => "aftnnar",
+            (true, crate::NoteNumberingStyle::LowercaseLetter) => "aftnnalc",
+            (true, crate::NoteNumberingStyle::UppercaseLetter) => "aftnnauc",
+            (true, crate::NoteNumberingStyle::LowercaseRoman) => "aftnnrlc",
+            (true, crate::NoteNumberingStyle::UppercaseRoman) => "aftnnruc",
+            (true, crate::NoteNumberingStyle::Chicago) => "aftnnchi",
+            (true, crate::NoteNumberingStyle::KoreanChosung) => "aftnnchosung",
+            (true, crate::NoteNumberingStyle::Circle) => "aftnncnum",
+            (true, crate::NoteNumberingStyle::KanjiDigitless) => "aftnndbnum",
+            (true, crate::NoteNumberingStyle::KanjiWithDigit) => "aftnndbnumd",
+            (true, crate::NoteNumberingStyle::KanjiThree) => "aftnndbnumt",
+            (true, crate::NoteNumberingStyle::KanjiFour) => "aftnndbnumk",
+            (true, crate::NoteNumberingStyle::DoubleByte) => "aftnndbar",
+            (true, crate::NoteNumberingStyle::KoreanGanada) => "aftnnganada",
+            (true, crate::NoteNumberingStyle::ChineseOne) => "aftnngbnum",
+            (true, crate::NoteNumberingStyle::ChineseTwo) => "aftnngbnumd",
+            (true, crate::NoteNumberingStyle::ChineseThree) => "aftnngbnuml",
+            (true, crate::NoteNumberingStyle::ChineseFour) => "aftnngbnumk",
+            (true, crate::NoteNumberingStyle::ZodiacOne) => "aftnnzodiac",
+            (true, crate::NoteNumberingStyle::ZodiacTwo) => "aftnnzodiacd",
+            (true, crate::NoteNumberingStyle::ZodiacThree) => "aftnnzodiacl",
+        }
     }
 
     /// Write ordered semantic note-separator destinations.

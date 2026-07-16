@@ -9,6 +9,7 @@ use super::package::{PptError, PptOpenOptions, Result};
 use super::parsers::PptRecordParser;
 use super::persist::PersistMapping;
 use super::slide::{Slide, SlideDirectory, SlideFactory};
+use super::sound_collection::PowerPointSoundCollection;
 use crate::consts::PptRecordType;
 #[cfg(feature = "imgconv")]
 use crate::extractor::{ExtractedImage, ImageExtractor};
@@ -214,6 +215,38 @@ impl Presentation {
             ));
         }
         PowerPoint12DocumentProperties::parse(document)
+    }
+
+    /// Return the strictly validated document-level embedded sound collection.
+    ///
+    /// Sound bytes remain borrowed and inert. This method never decodes audio,
+    /// invokes a codec, plays media, or resolves an external resource.
+    pub fn embedded_sounds(&self) -> Result<Option<PowerPointSoundCollection<'_>>> {
+        let records = self.parser.find_records_ref();
+        let mut documents = records
+            .into_iter()
+            .filter(|record| record.record_type == PptRecordType::Document);
+        let document = documents.next().ok_or_else(|| {
+            PptError::Corrupted("PowerPoint document has no Document container".to_string())
+        })?;
+        if documents.next().is_some() {
+            return Err(PptError::Corrupted(
+                "PowerPoint document has multiple Document containers".to_string(),
+            ));
+        }
+        let mut collections = document
+            .children
+            .iter()
+            .filter(|record| record.record_type == PptRecordType::SoundCollection);
+        let Some(collection) = collections.next() else {
+            return Ok(None);
+        };
+        if collections.next().is_some() {
+            return Err(PptError::Corrupted(
+                "PowerPoint document has multiple SoundCollection containers".to_string(),
+            ));
+        }
+        PowerPointSoundCollection::parse(collection).map(Some)
     }
 
     /// Extract all text from the presentation.

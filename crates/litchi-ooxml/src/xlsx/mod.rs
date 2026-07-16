@@ -34,6 +34,7 @@ pub mod calculation_chain;
 pub mod query_table;
 pub mod volatile_dependencies;
 pub mod xml_maps;
+pub mod connections;
 pub mod chart;
 mod comments;
 pub mod conditional_formatting;

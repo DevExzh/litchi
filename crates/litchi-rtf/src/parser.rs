@@ -376,6 +376,8 @@ pub struct Parser<'a> {
     pending_annotation_mark: bool,
     /// Footnotes and endnotes
     notes: Vec<super::section::Note<'a>>,
+    note_options: crate::NoteOptions,
+    note_options_closed: bool,
     note_separators: crate::NoteSeparatorTable<'a>,
     /// Track changes/revisions
     revisions: Vec<super::annotation::Revision<'a>>,
@@ -524,6 +526,8 @@ impl<'a> Parser<'a> {
             pending_annotation_initials_seen: false,
             pending_annotation_mark: false,
             notes: Vec::new(),
+            note_options: crate::NoteOptions::default(),
+            note_options_closed: false,
             note_separators: crate::NoteSeparatorTable::new(),
             revisions: Vec::new(),
             revision_authors: Vec::new(),
@@ -543,6 +547,29 @@ impl<'a> Parser<'a> {
             return Err(RtfError::MalformedDocument(
                 "Empty token stream".to_string(),
             ));
+        }
+        let mut brace_depth = 0usize;
+        for token in self.tokens.iter() {
+            match token {
+                Token::OpenBrace => brace_depth = brace_depth.saturating_add(1),
+                Token::CloseBrace => brace_depth = brace_depth.saturating_sub(1),
+                Token::Control(
+                    ControlWord::NoteKinds(_)
+                    | ControlWord::FootnotePlacement(_)
+                    | ControlWord::EndnotePlacement(_)
+                    | ControlWord::FootnoteStart(_)
+                    | ControlWord::EndnoteStart(_)
+                    | ControlWord::FootnoteRestart(_)
+                    | ControlWord::EndnoteRestart(_)
+                    | ControlWord::FootnoteNumbering(_)
+                    | ControlWord::EndnoteNumbering(_),
+                ) if brace_depth != 1 => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF note options must be root document-format controls".to_string(),
+                    ));
+                },
+                _ => {},
+            }
         }
 
         // Expect opening brace
@@ -623,6 +650,7 @@ impl<'a> Parser<'a> {
             info: self.info,
             annotations: self.annotations,
             notes: self.notes,
+            note_options: self.note_options,
             note_separators: self.note_separators,
             revisions: self.revisions,
             revision_authors: self.revision_authors,
@@ -801,6 +829,22 @@ impl<'a> Parser<'a> {
                         )) => {
                             return Err(RtfError::MalformedDocument(
                                 "RTF legacy text-box controls must occur inside a starred do destination"
+                                    .to_string(),
+                            ));
+                        },
+                        Some(Token::Control(
+                            ControlWord::NoteKinds(_)
+                            | ControlWord::FootnotePlacement(_)
+                            | ControlWord::EndnotePlacement(_)
+                            | ControlWord::FootnoteStart(_)
+                            | ControlWord::EndnoteStart(_)
+                            | ControlWord::FootnoteRestart(_)
+                            | ControlWord::EndnoteRestart(_)
+                            | ControlWord::FootnoteNumbering(_)
+                            | ControlWord::EndnoteNumbering(_),
+                        )) => {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF note options must be unstarred root document-format controls"
                                     .to_string(),
                             ));
                         },
@@ -2498,6 +2542,12 @@ impl<'a> Parser<'a> {
                     if text.is_empty() {
                         continue;
                     }
+                    if self.states.last().is_some_and(|state| {
+                        state.destination == Destination::DocumentBody
+                    }) && !text.trim().is_empty()
+                    {
+                        self.note_options_closed = true;
+                    }
                     // Check if we're in a table
                     if self.current_state().map(|s| s.in_table).unwrap_or(false) {
                         let encoding = self.current_state()?.encoding;
@@ -2696,6 +2746,74 @@ impl<'a> Parser<'a> {
                 return Err(RtfError::MalformedDocument(
                     "orphan RTF picture identity control outside pict".to_string(),
                 ));
+            },
+            control @ (ControlWord::NoteKinds(_)
+            | ControlWord::FootnotePlacement(_)
+            | ControlWord::EndnotePlacement(_)
+            | ControlWord::FootnoteStart(_)
+            | ControlWord::EndnoteStart(_)
+            | ControlWord::FootnoteRestart(_)
+            | ControlWord::EndnoteRestart(_)
+            | ControlWord::FootnoteNumbering(_)
+            | ControlWord::EndnoteNumbering(_)) => {
+                if self.states.len() != 2
+                    || self.note_options_closed
+                    || self.blocks.iter().any(|block| !block.text.is_empty())
+                {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF note options must precede body text at document root".to_string(),
+                    ));
+                }
+                match control {
+                    ControlWord::NoteKinds(value) => {
+                        self.note_options.present_kinds = Some(match value {
+                            0 => crate::PresentNoteKinds::FootnotesOnly,
+                            1 => crate::PresentNoteKinds::EndnotesOnly,
+                            2 => crate::PresentNoteKinds::FootnotesAndEndnotes,
+                            _ => {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF fet value must be between 0 and 2".to_string(),
+                                ));
+                            },
+                        });
+                    },
+                    ControlWord::FootnotePlacement(value) => {
+                        self.note_options.footnote_placement = Some(*value);
+                    },
+                    ControlWord::EndnotePlacement(value) => {
+                        self.note_options.endnote_placement = Some(*value);
+                    },
+                    ControlWord::FootnoteStart(value) => {
+                        if *value <= 0 {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF footnote starting number must be positive".to_string(),
+                            ));
+                        }
+                        self.note_options.footnote_start = Some(*value);
+                    },
+                    ControlWord::EndnoteStart(value) => {
+                        if *value <= 0 {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF endnote starting number must be positive".to_string(),
+                            ));
+                        }
+                        self.note_options.endnote_start = Some(*value);
+                    },
+                    ControlWord::FootnoteRestart(value) => {
+                        self.note_options.footnote_restart = Some(*value);
+                    },
+                    ControlWord::EndnoteRestart(value) => {
+                        self.note_options.endnote_restart = Some(*value);
+                    },
+                    ControlWord::FootnoteNumbering(value) => {
+                        self.note_options.footnote_numbering = Some(*value);
+                    },
+                    ControlWord::EndnoteNumbering(value) => {
+                        self.note_options.endnote_numbering = Some(*value);
+                    },
+                    _ => unreachable!(),
+                }
+                return Ok(());
             },
             ControlWord::LegacyDrawingObject
             | ControlWord::LegacyTextBox
@@ -9295,6 +9413,8 @@ pub struct ParsedDocument<'a> {
     pub annotations: Vec<super::annotation::Annotation<'a>>,
     /// Footnotes and endnotes
     pub notes: Vec<super::section::Note<'a>>,
+    /// Explicit document-level footnote and endnote configuration.
+    pub note_options: crate::NoteOptions,
     pub note_separators: crate::NoteSeparatorTable<'a>,
     /// Track changes/revisions
     pub revisions: Vec<super::annotation::Revision<'a>>,

@@ -53,6 +53,7 @@
 // Core modules
 pub mod package;
 pub mod presentation;
+pub mod sound_collection;
 
 /// PPT file writing
 pub mod writer;
@@ -94,6 +95,7 @@ pub mod text_run;
 // Re-export main types for convenience
 pub use package::{Package, PptEncryptionKind, PptError, PptOpenOptions};
 pub use presentation::Presentation;
+pub use sound_collection::{EmbeddedPowerPointSound, PowerPointSoundCollection};
 pub use slide::{
     Slide, SlideData, SlideDirectory, SlideDirectoryEntry, SlideFactory, SpeakerNotes,
 };

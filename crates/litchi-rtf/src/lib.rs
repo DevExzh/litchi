@@ -44,6 +44,7 @@ mod latent_style;
 mod legacy_text_box;
 mod legacy_numbering;
 mod paragraph_group;
+mod note_options;
 mod note_separator;
 mod file_table;
 mod data_store;
@@ -93,6 +94,10 @@ pub use legacy_numbering::{
     LegacySectionNumberingLevel,
 };
 pub use paragraph_group::{ParagraphGroupProperty, ParagraphGroupPropertyTable};
+pub use note_options::{
+    EndnoteRestart, FootnoteRestart, NoteNumberingStyle, NoteOptions, NotePlacement,
+    PresentNoteKinds,
+};
 pub use note_separator::{
     NoteSeparator, NoteSeparatorElement, NoteSeparatorKind, NoteSeparatorTable,
 };

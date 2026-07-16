@@ -85,6 +85,8 @@ pub struct RtfDocument<'a> {
     annotations: Vec<super::annotation::Annotation<'a>>,
     /// Footnotes and endnotes
     notes: Vec<super::section::Note<'a>>,
+    /// Explicit document-level footnote and endnote configuration.
+    note_options: crate::NoteOptions,
     /// Ordered inert footnote/endnote separator destinations.
     note_separators: crate::NoteSeparatorTable<'a>,
     /// Track changes/revisions
@@ -301,6 +303,7 @@ impl<'a> RtfDocument<'a> {
             info: Self::convert_info_to_owned(parsed.info),
             annotations: Self::convert_annotations_to_owned(parsed.annotations),
             notes: Self::convert_notes_to_owned(parsed.notes),
+            note_options: parsed.note_options,
             note_separators: parsed.note_separators.into_owned(),
             revisions: Self::convert_revisions_to_owned(parsed.revisions),
             revision_authors: parsed
@@ -1609,6 +1612,18 @@ impl<'a> RtfDocument<'a> {
     /// Get all footnotes and endnotes in the document.
     pub fn notes(&self) -> &[super::section::Note<'_>] {
         &self.notes
+    }
+
+    /// Return explicit document-level footnote and endnote configuration.
+    pub fn note_options(&self) -> &crate::NoteOptions {
+        &self.note_options
+    }
+
+    /// Replace document-level footnote and endnote configuration after validation.
+    pub fn set_note_options(&mut self, options: crate::NoteOptions) -> RtfResult<()> {
+        options.validate()?;
+        self.note_options = options;
+        Ok(())
     }
 
     /// Return ordered footnote and endnote separator destinations.
