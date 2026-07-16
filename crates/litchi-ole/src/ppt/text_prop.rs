@@ -418,7 +418,7 @@ pub fn parse_style_text_prop_atom_strict(
     Ok((paragraph_styles, character_styles))
 }
 
-fn paragraph_property_size(data: &[u8], offset: usize, mask: u32) -> Result<usize> {
+pub(crate) fn paragraph_property_size(data: &[u8], offset: usize, mask: u32) -> Result<usize> {
     let mut size = 0usize;
     if mask & 0x000F != 0 {
         size += 2;
@@ -460,7 +460,7 @@ fn paragraph_property_size(data: &[u8], offset: usize, mask: u32) -> Result<usiz
     Ok(size)
 }
 
-fn character_property_size(mask: u32) -> usize {
+pub(crate) fn character_property_size(mask: u32) -> usize {
     let mut size = usize::from(mask & 0x0000_FFFF != 0) * 2;
     for (property_mask, property_size) in [
         (0x0001_0000, 2usize),
@@ -478,7 +478,12 @@ fn character_property_size(mask: u32) -> usize {
     size
 }
 
-fn require_style_bytes(data: &[u8], offset: usize, size: usize, field: &str) -> Result<()> {
+pub(crate) fn require_style_bytes(
+    data: &[u8],
+    offset: usize,
+    size: usize,
+    field: &str,
+) -> Result<()> {
     let end = offset
         .checked_add(size)
         .ok_or_else(|| PptError::Corrupted(format!("{field} offset overflow")))?;

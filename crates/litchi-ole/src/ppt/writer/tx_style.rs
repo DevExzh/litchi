@@ -311,21 +311,36 @@ impl IndentedLevelEntry {
 /// Builder for TxMasterStyleAtom (MS-PPT 2.9.45)
 pub struct TxMasterStyleBuilder {
     data: Vec<u8>,
+    text_type: u16,
+    next_level: u16,
 }
 
 impl TxMasterStyleBuilder {
     /// Create a new builder with the specified number of indent levels
     pub fn new(levels: u16) -> Self {
+        Self::for_text_type(0, levels)
+    }
+
+    /// Create a builder for a specific `TextTypeEnum` record instance.
+    pub fn for_text_type(text_type: u16, levels: u16) -> Self {
         let mut data = Vec::new();
         data.extend_from_slice(&levels.to_le_bytes());
-        Self { data }
+        Self {
+            data,
+            text_type,
+            next_level: 0,
+        }
     }
 
     /// Add a full style level (used by Title, Body, Notes, Other styles)
     pub fn add_full_level(&mut self, level: &FullStyleLevel) {
+        if self.text_type >= 5 {
+            self.data.extend_from_slice(&self.next_level.to_le_bytes());
+        }
+        self.next_level = self.next_level.saturating_add(1);
         // TextPFException
         self.data.extend_from_slice(&level.pf_mask.to_le_bytes());
-        if level.pf_mask & pf_mask::BULLET_CHAR != 0 {
+        if level.pf_mask & 0x000F != 0 {
             self.data
                 .extend_from_slice(&level.bullet_flags.to_le_bytes());
         }
@@ -373,11 +388,24 @@ impl TxMasterStyleBuilder {
         }
 
         // TextCFException
-        self.data.extend_from_slice(&level.cf_mask.to_le_bytes());
-        if level.cf_mask != 0 {
+        let mut cf_mask = level.cf_mask;
+        if level.has_font_index {
+            cf_mask |= 0x0001_0000;
+        }
+        if level.has_font_size {
+            cf_mask |= 0x0002_0000;
+        }
+        if level.has_font_color {
+            cf_mask |= 0x0004_0000;
+        }
+        if level.has_position {
+            cf_mask |= 0x0008_0000;
+        }
+        self.data.extend_from_slice(&cf_mask.to_le_bytes());
+        if cf_mask & 0x0000_FFFF != 0 {
             self.data.extend_from_slice(&level.cf_flags.to_le_bytes());
         }
-        if level.cf_mask & cf_mask::STYLE_INDEX != 0 {
+        if level.has_font_index {
             self.data.extend_from_slice(&level.font_index.to_le_bytes());
         }
         if level.has_font_size {
@@ -393,6 +421,10 @@ impl TxMasterStyleBuilder {
 
     /// Add a simple style level (used by CenterBody, HalfBody, QuarterBody)
     pub fn add_simple_level(&mut self, level: &SimpleStyleLevel) {
+        if self.text_type >= 5 {
+            self.data.extend_from_slice(&self.next_level.to_le_bytes());
+        }
+        self.next_level = self.next_level.saturating_add(1);
         // Minimal TextPFException: just mask + indent
         self.data.extend_from_slice(&level.pf_mask.to_le_bytes());
         if level.pf_mask & pf_mask::LEFT_MARGIN != 0 {
@@ -404,8 +436,12 @@ impl TxMasterStyleBuilder {
         }
 
         // Minimal TextCFException
-        self.data.extend_from_slice(&level.cf_mask.to_le_bytes());
-        if level.cf_mask != 0 {
+        let mut cf_mask = level.cf_mask;
+        if level.has_font_size {
+            cf_mask |= 0x0002_0000;
+        }
+        self.data.extend_from_slice(&cf_mask.to_le_bytes());
+        if cf_mask & 0x0000_FFFF != 0 {
             self.data.extend_from_slice(&level.cf_flags.to_le_bytes());
         }
         if level.has_font_size {
@@ -437,7 +473,7 @@ pub struct FullStyleLevel {
     pub indent: u16,
     pub default_tab_size: u16,
     // Character formatting
-    pub cf_mask: u16,
+    pub cf_mask: u32,
     pub cf_flags: u16,
     pub font_index: u16,
     pub font_size: u16,
@@ -447,6 +483,7 @@ pub struct FullStyleLevel {
     pub has_font_size: bool,
     pub has_font_color: bool,
     pub has_position: bool,
+    pub has_font_index: bool,
 }
 
 /// Simple style level (CenterBody, HalfBody, QuarterBody, CenterTitle)
@@ -455,7 +492,7 @@ pub struct SimpleStyleLevel {
     pub pf_mask: u32,
     pub left_margin: u16,
     pub indent: u16,
-    pub cf_mask: u16,
+    pub cf_mask: u32,
     pub cf_flags: u16,
     pub font_size: u16,
     pub has_font_size: bool,
@@ -1144,6 +1181,34 @@ mod tests {
         let data = builder.build();
         assert!(!data.is_empty());
         assert_eq!(u16::from_le_bytes([data[0], data[1]]), 5);
+    }
+
+    #[test]
+    fn generic_master_style_builder_round_trips_strictly() {
+        let mut builder = TxMasterStyleBuilder::for_text_type(5, 1);
+        builder.add_simple_level(&SimpleStyleLevel {
+            pf_mask: pf_mask::LEFT_MARGIN | pf_mask::INDENT,
+            left_margin: 720,
+            indent: 360,
+            cf_mask: u32::from(cf_mask::BOLD),
+            cf_flags: cf_mask::BOLD,
+            font_size: 24,
+            has_font_size: true,
+        });
+
+        let style = crate::ppt::TextMasterStyle::parse(&builder.build(), 5).unwrap();
+
+        assert_eq!(style.levels[0].explicit_level, Some(0));
+        assert_eq!(
+            style.levels[0].paragraph.get_value("text.offset"),
+            Some(720)
+        );
+        assert_eq!(
+            style.levels[0].paragraph.get_value("bullet.offset"),
+            Some(360)
+        );
+        assert_eq!(style.levels[0].character.get_value("char.flags"), Some(1));
+        assert_eq!(style.levels[0].character.get_value("font.size"), Some(24));
     }
 
     // =============================================================================
