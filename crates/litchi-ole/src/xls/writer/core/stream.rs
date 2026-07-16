@@ -7,10 +7,9 @@ use crate::xls::{XlsError, XlsResult};
 
 use super::named_range::XlsDefinedName as InternalDefinedName;
 use super::worksheet::WritableWorksheet;
-use super::{XlsCalculationSettings, XlsCellValue, XlsFileSharing, XlsVbaWriteMetadata, XlsWorkbookEnvironmentOptions, XlsWorkbookProtection, XlsWorkbookWindowOptions};
+use super::{XlsCalculationSettings, XlsCellValue, XlsFileSharing, XlsFunctionGroupOptions, XlsVbaWriteMetadata, XlsWorkbookEnvironmentOptions, XlsWorkbookProtection, XlsWorkbookWindowOptions};
 
 const DEFAULT_WRITE_ACCESS_USER: &str = "litchi";
-const DEFAULT_FUNCTION_GROUP_COUNT: u16 = 17;
 
 /// Result of generating the workbook: the Workbook stream plus any pivot
 /// cache storage streams that must be placed in `_SX_DB_CUR/nnnn`.
@@ -29,6 +28,7 @@ pub(crate) fn generate_workbook_stream(
     vba_metadata: Option<&XlsVbaWriteMetadata>,
     environment: XlsWorkbookEnvironmentOptions,
     workbook_window: XlsWorkbookWindowOptions,
+    function_groups: &XlsFunctionGroupOptions,
     fmt: &FormattingManager,
     defined_names: &[InternalDefinedName],
     shared_strings: &[String],
@@ -88,7 +88,7 @@ pub(crate) fn generate_workbook_stream(
         biff::write_ob_no_macros(&mut stream)?;
         biff::write_code_name(&mut stream, &metadata.workbook_code_name)?;
     }
-    biff::write_fn_group_count(&mut stream, DEFAULT_FUNCTION_GROUP_COUNT)?;
+    biff::write_function_groups(&mut stream, function_groups)?;
     biff::write_window_protect(&mut stream, protect_windows)?;
     biff::write_protect(&mut stream, protect_structure)?;
     biff::write_password(&mut stream, password_hash)?;

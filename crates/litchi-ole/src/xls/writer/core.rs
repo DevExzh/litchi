@@ -430,6 +430,40 @@ pub struct XlsWorkbookWindowOptions {
     pub sheet_tab_ratio_per_mille: u16,
 }
 
+/// BIFF8 built-in and custom function-category settings.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct XlsFunctionGroupOptions {
+    pub built_in: crate::xls::XlsBuiltInFunctionCategories,
+    pub custom_categories: Vec<String>,
+}
+
+impl Default for XlsFunctionGroupOptions {
+    fn default() -> Self {
+        Self {
+            built_in: crate::xls::XlsBuiltInFunctionCategories::Fourteen,
+            custom_categories: Vec::new(),
+        }
+    }
+}
+
+impl XlsFunctionGroupOptions {
+    pub(super) fn validate(&self) -> XlsResult<()> {
+        if usize::from(self.built_in.count()) + self.custom_categories.len() > 256 {
+            return Err(XlsError::InvalidData("function category count exceeds 256".to_string()));
+        }
+        let mut unique = std::collections::HashSet::with_capacity(self.custom_categories.len());
+        for name in &self.custom_categories {
+            if name.encode_utf16().count() > 32 {
+                return Err(XlsError::InvalidData("function category name exceeds 32 UTF-16 code units".to_string()));
+            }
+            if !unique.insert(name) {
+                return Err(XlsError::InvalidData("function category names must be unique".to_string()));
+            }
+        }
+        Ok(())
+    }
+}
+
 impl Default for XlsWorkbookWindowOptions {
     fn default() -> Self {
         Self {
@@ -546,6 +580,7 @@ pub struct XlsWriter {
     vba_metadata: Option<XlsVbaWriteMetadata>,
     environment_options: XlsWorkbookEnvironmentOptions,
     workbook_window_options: XlsWorkbookWindowOptions,
+    function_group_options: XlsFunctionGroupOptions,
 }
 
 impl XlsWriter {
@@ -565,6 +600,7 @@ impl XlsWriter {
             vba_metadata: None,
             environment_options: XlsWorkbookEnvironmentOptions::default(),
             workbook_window_options: XlsWorkbookWindowOptions::default(),
+            function_group_options: XlsFunctionGroupOptions::default(),
         }
     }
 
@@ -1877,6 +1913,12 @@ impl XlsWriter {
         Ok(())
     }
 
+    pub fn set_function_groups(&mut self, options: XlsFunctionGroupOptions) -> XlsResult<()> {
+        options.validate()?;
+        self.function_group_options = options;
+        Ok(())
+    }
+
     pub fn set_calculation_settings(&mut self, settings: XlsCalculationSettings) -> XlsResult<()> {
         if !(1..=32_767).contains(&settings.maximum_iterations) {
             return Err(XlsError::InvalidData(
@@ -2299,6 +2341,7 @@ impl XlsWriter {
             self.vba_metadata.as_ref(),
             self.environment_options,
             self.workbook_window_options,
+            &self.function_group_options,
             &self.fmt,
             &self.defined_names,
             &self.shared_strings,

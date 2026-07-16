@@ -41,6 +41,9 @@ mod environment;
 /// BIFF8 workbook windows and stable sheet-tab identifiers.
 mod workbook_view;
 
+/// BIFF8 built-in and user-defined function categories.
+mod function_group;
+
 /// BIFF formula token rendering
 mod formula;
 
@@ -114,6 +117,7 @@ pub use scenario::{XlsScenario, XlsScenarioCell, XlsScenarioManager, XlsScenario
 pub use vba::XlsVbaMetadata;
 pub use environment::{XlsLinkUpdateMode, XlsObjectDisplayMode, XlsWorkbookEnvironment};
 pub use workbook_view::{XlsWorkbookView, XlsWorkbookWindow};
+pub use function_group::{XlsBuiltInFunctionCategories, XlsFunctionGroups};
 pub use data_validation::{
     XlsDataValidationErrorStyle, XlsDataValidationFormula, XlsDataValidationImeMode,
     XlsDataValidationKind, XlsDataValidationOperator, XlsDataValidationRange,

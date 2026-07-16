@@ -9,7 +9,49 @@
 //! - DIB (Device Independent Bitmap)
 //! - BMP
 
+use crate::{RtfError, RtfResult};
 use std::borrow::Cow;
+
+pub(crate) const MAX_PICTURE_WRITE_BYTES: usize = 64 * 1_048_576;
+
+/// Inert identity metadata attached to one RTF picture payload.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct PictureIdentity<'a> {
+    /// Producer-defined signed cache tag.
+    pub tag: Option<i32>,
+    /// Source bitmap resolution in units per inch.
+    pub units_per_inch: Option<u16>,
+    /// Producer-defined 16-byte image identifier. Some producers emit an empty value.
+    pub uid: Option<Cow<'a, [u8]>>,
+}
+
+impl PictureIdentity<'_> {
+    pub fn validate(&self) -> RtfResult<()> {
+        if self.units_per_inch == Some(0) {
+            return Err(RtfError::MalformedDocument(
+                "RTF blipupi must be positive".to_string(),
+            ));
+        }
+        if self
+            .uid
+            .as_ref()
+            .is_some_and(|uid| !uid.is_empty() && uid.len() != 16)
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF blipuid must contain exactly 16 bytes or be empty".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    pub(crate) fn into_owned(self) -> PictureIdentity<'static> {
+        PictureIdentity {
+            tag: self.tag,
+            units_per_inch: self.units_per_inch,
+            uid: self.uid.map(|uid| Cow::Owned(uid.into_owned())),
+        }
+    }
+}
 
 /// Image type in RTF documents.
 ///
@@ -34,12 +76,14 @@ pub enum ImageType {
 }
 
 /// Extracted picture from RTF document.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Picture<'a> {
     /// Image type
     pub image_type: ImageType,
     /// Image data (hex-encoded in RTF, decoded here)
     pub data: Cow<'a, [u8]>,
+    /// Optional cache/source identity metadata.
+    pub identity: Option<PictureIdentity<'a>>,
     /// Picture width (in twips, 1/1440 inch)
     pub width: Option<i32>,
     /// Picture height (in twips)
@@ -61,6 +105,7 @@ impl<'a> Picture<'a> {
         Self {
             image_type,
             data,
+            identity: None,
             width: None,
             height: None,
             goal_width: None,
@@ -74,6 +119,32 @@ impl<'a> Picture<'a> {
     #[inline]
     pub fn data(&self) -> &[u8] {
         &self.data
+    }
+
+    pub fn validate(&self) -> RtfResult<()> {
+        if self.data.is_empty() || self.data.len() > MAX_PICTURE_WRITE_BYTES {
+            return Err(RtfError::MalformedDocument(
+                "RTF picture payload is empty or exceeds the writing limit".to_string(),
+            ));
+        }
+        if let Some(identity) = &self.identity {
+            identity.validate()?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn into_owned(self) -> Picture<'static> {
+        Picture {
+            image_type: self.image_type,
+            data: Cow::Owned(self.data.into_owned()),
+            identity: self.identity.map(PictureIdentity::into_owned),
+            width: self.width,
+            height: self.height,
+            goal_width: self.goal_width,
+            goal_height: self.goal_height,
+            scale_x: self.scale_x,
+            scale_y: self.scale_y,
+        }
     }
 
     /// Get the computed width in twips, considering scaling.
@@ -186,6 +257,7 @@ mod tests {
         let pic = Picture {
             image_type: ImageType::Png,
             data: Cow::Borrowed(&[]),
+            identity: None,
             width: Some(1440), // 1 inch
             height: Some(1440),
             goal_width: None,

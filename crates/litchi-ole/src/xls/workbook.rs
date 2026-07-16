@@ -150,6 +150,7 @@ pub struct XlsWorkbook<R: Read + Seek> {
     vba_metadata: crate::xls::vba::XlsVbaMetadata,
     environment: crate::xls::environment::XlsWorkbookEnvironment,
     workbook_view: crate::xls::workbook_view::XlsWorkbookView,
+    function_groups: Option<crate::xls::function_group::XlsFunctionGroups>,
 }
 
 /// Options for opening a legacy XLS workbook.
@@ -189,6 +190,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             vba_metadata: crate::xls::vba::XlsVbaMetadata::default(),
             environment: crate::xls::environment::XlsWorkbookEnvironment::default(),
             workbook_view: crate::xls::workbook_view::XlsWorkbookView::default(),
+            function_groups: None,
         };
 
         workbook.parse_workbook(options.password)?;
@@ -232,6 +234,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             vba_metadata: crate::xls::vba::XlsVbaMetadata::default(),
             environment: crate::xls::environment::XlsWorkbookEnvironment::default(),
             workbook_view: crate::xls::workbook_view::XlsWorkbookView::default(),
+            function_groups: None,
         };
 
         workbook.parse_workbook(options.password)?;
@@ -351,6 +354,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         let mut vba_collector = crate::xls::vba::WorkbookVbaCollector::new();
         let mut environment_collector = crate::xls::environment::EnvironmentCollector::new();
         let mut workbook_view_collector = crate::xls::workbook_view::WorkbookViewCollector::new();
+        let mut function_group_collector = crate::xls::function_group::FunctionGroupCollector::new();
         let mut i = 0;
         while i < records.len() {
             let record = &records[i];
@@ -359,6 +363,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             vba_collector.feed_record(record.header.record_type, &record.data)?;
             environment_collector.feed_record(record.header.record_type, &record.data)?;
             workbook_view_collector.feed_record(record.header.record_type, &record.data)?;
+            function_group_collector.feed_record(record.header.record_type, &record.data)?;
 
             match record.header.record_type {
                 0x0031 => {
@@ -456,6 +461,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                     self.vba_metadata = vba_collector.finish();
                     self.environment = environment_collector.finish()?;
                     self.workbook_view = workbook_view_collector.finish(bound_sheets.len())?;
+                    self.function_groups = function_group_collector.finish()?;
                     break;
                 },
                 _ => {
@@ -850,6 +856,11 @@ impl<R: Read + Seek> XlsWorkbook<R> {
     /// Workbook window state and stable sheet identifiers.
     pub fn workbook_view(&self) -> &crate::xls::workbook_view::XlsWorkbookView {
         &self.workbook_view
+    }
+
+    /// Built-in and custom function categories, when the FNGROUPS collection exists.
+    pub fn function_groups(&self) -> Option<&crate::xls::function_group::XlsFunctionGroups> {
+        self.function_groups.as_ref()
     }
 
     /// Access the typed `XlsWorksheet` at the given index.

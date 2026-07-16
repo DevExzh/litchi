@@ -259,8 +259,11 @@ pub fn write_tab_id<W: Write>(writer: &mut W, sheet_count: u16) -> XlsResult<()>
     workbook::write_tab_id(writer, sheet_count)
 }
 
-pub fn write_fn_group_count<W: Write>(writer: &mut W, count: u16) -> XlsResult<()> {
-    workbook::write_fn_group_count(writer, count)
+pub fn write_function_groups<W: Write>(
+    writer: &mut W,
+    options: &crate::xls::writer::core::XlsFunctionGroupOptions,
+) -> XlsResult<()> {
+    workbook::write_function_groups(writer, options)
 }
 
 pub fn write_refresh_all<W: Write>(writer: &mut W, refresh_all: bool) -> XlsResult<()> {
@@ -1046,9 +1049,12 @@ mod tests {
     }
 
     #[test]
-    fn test_write_fn_group_count() {
+    fn test_write_function_groups() {
         let mut buf = Vec::new();
-        write_fn_group_count(&mut buf, 14).unwrap();
+        write_function_groups(
+            &mut buf,
+            &crate::xls::writer::core::XlsFunctionGroupOptions::default(),
+        ).unwrap();
 
         assert_eq!(&buf[0..2], &[0x9C, 0x00]); // Record type 0x009C
         // Record data follows the 4-byte header

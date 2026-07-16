@@ -233,6 +233,53 @@ pub fn write_fn_group_count<W: Write>(writer: &mut W, count: u16) -> XlsResult<(
     Ok(())
 }
 
+fn write_function_group_name<W: Write>(
+    writer: &mut W,
+    record_type: u16,
+    name: &str,
+) -> XlsResult<()> {
+    let units = name.encode_utf16().collect::<Vec<_>>();
+    if units.len() > 32 {
+        return Err(XlsError::InvalidData("function category name exceeds 32 UTF-16 code units".to_string()));
+    }
+    let compressed = units.iter().all(|unit| *unit <= 0x00ff);
+    let string_size = 3 + units.len() * if compressed { 1 } else { 2 };
+    let header_size = if record_type == 0x0898 { 12 } else { 0 };
+    write_record_header(writer, record_type, (header_size + string_size) as u16)?;
+    if record_type == 0x0898 {
+        writer.write_all(&0x0898u16.to_le_bytes())?;
+        writer.write_all(&0u16.to_le_bytes())?;
+        writer.write_all(&[0; 8])?;
+    }
+    writer.write_all(&(units.len() as u16).to_le_bytes())?;
+    writer.write_all(&[u8::from(!compressed)])?;
+    for unit in units {
+        if compressed {
+            writer.write_all(&[unit as u8])?;
+        } else {
+            writer.write_all(&unit.to_le_bytes())?;
+        }
+    }
+    Ok(())
+}
+
+pub fn write_function_groups<W: Write>(
+    writer: &mut W,
+    options: &crate::xls::writer::core::XlsFunctionGroupOptions,
+) -> XlsResult<()> {
+    options.validate()?;
+    let built_in = options.built_in.count();
+    write_fn_group_count(writer, built_in)?;
+    let classic_count = options.custom_categories.len().min(32 - usize::from(built_in));
+    for name in &options.custom_categories[..classic_count] {
+        write_function_group_name(writer, 0x009a, name)?;
+    }
+    for name in &options.custom_categories[classic_count..] {
+        write_function_group_name(writer, 0x0898, name)?;
+    }
+    Ok(())
+}
+
 /// Write REFRESHALL record.
 ///
 /// Record type: 0x01B7

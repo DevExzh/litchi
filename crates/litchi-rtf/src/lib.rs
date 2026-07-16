@@ -112,7 +112,7 @@ pub use navigation_entry::{
     IndexEntry, IndexPageReference, NavigationEntry, TableOfContentsEntry,
 };
 pub use object::{EmbeddedObject, ObjectKind, OleObjectHeader};
-pub use picture::{ImageType, Picture, detect_image_type};
+pub use picture::{ImageType, Picture, PictureIdentity, detect_image_type};
 pub use section::{
     HeaderFooter, HeaderFooterParagraph, HeaderFooterType, Note, PageNumberFormat, PageOrientation,
     Section, SectionBreakType, SectionProperties, VerticalAlignment,

@@ -23,6 +23,7 @@ pub use core::{
     XlsDataValidationFormulaKind, XlsDataValidationImeMode, XlsDataValidationOperator,
     XlsDataValidationOptions, XlsDataValidationRange, XlsDataValidationTableOptions,
     XlsDataValidationType,
+    XlsFunctionGroupOptions,
     XlsDefinedName, XlsPivotDataItemConfig, XlsPivotFieldConfig, XlsPivotItemConfig,
     XlsPageSetupOptions, XlsPivotTableConfig, XlsWorkbookEnvironmentOptions,
     XlsWorkbookWindowOptions,

@@ -108,6 +108,9 @@ pub enum ControlWord<'a> {
     Wmetafile(i32),
     Dibitmap(i32),
     Wbitmap(i32),
+    BlipTag(i32),
+    BlipUid,
+    BlipUnitsPerInch(i32),
 
     // Field support
     Field,
@@ -839,6 +842,9 @@ impl<'a> Lexer<'a> {
             "wmetafile" => ControlWord::Wmetafile(param_value),
             "dibitmap" => ControlWord::Dibitmap(param_value),
             "wbitmap" => ControlWord::Wbitmap(param_value),
+            "bliptag" => ControlWord::BlipTag(param_value),
+            "blipuid" => ControlWord::BlipUid,
+            "blipupi" => ControlWord::BlipUnitsPerInch(param_value),
 
             // Field support
             "field" => ControlWord::Field,

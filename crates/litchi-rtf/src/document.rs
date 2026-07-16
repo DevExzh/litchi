@@ -193,16 +193,7 @@ impl<'a> RtfDocument<'a> {
         let owned_pictures: Vec<super::picture::Picture<'static>> = parsed
             .pictures
             .into_iter()
-            .map(|pic| super::picture::Picture {
-                image_type: pic.image_type,
-                data: Cow::Owned(pic.data.into_owned()),
-                width: pic.width,
-                height: pic.height,
-                goal_width: pic.goal_width,
-                goal_height: pic.goal_height,
-                scale_x: pic.scale_x,
-                scale_y: pic.scale_y,
-            })
+            .map(super::picture::Picture::into_owned)
             .collect();
 
         // Convert fields to owned

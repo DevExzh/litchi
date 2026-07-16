@@ -411,6 +411,60 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write the list-definition table.
+    pub fn write_picture(&mut self, picture: &Picture<'_>) -> io::Result<()> {
+        picture
+            .validate()
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+        self.write_str("{\\pict")?;
+        match picture.image_type {
+            ImageType::Emf => self.write_control_word("emfblip", None)?,
+            ImageType::Wmf => self.write_control_word("wmetafile", Some(8))?,
+            ImageType::Png => self.write_control_word("pngblip", None)?,
+            ImageType::Jpeg => self.write_control_word("jpegblip", None)?,
+            ImageType::Dib => self.write_control_word("dibitmap", Some(0))?,
+            ImageType::Pict => self.write_control_word("macpict", None)?,
+            ImageType::Unknown => {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "cannot write a picture with unknown image type",
+                ));
+            },
+        }
+        for (control, value) in [
+            ("picw", picture.width),
+            ("pich", picture.height),
+            ("picwgoal", picture.goal_width),
+            ("pichgoal", picture.goal_height),
+            ("picscalex", picture.scale_x),
+            ("picscaley", picture.scale_y),
+        ] {
+            if let Some(value) = value {
+                self.write_control_word(control, Some(value))?;
+            }
+        }
+        if let Some(identity) = &picture.identity {
+            if let Some(tag) = identity.tag {
+                self.write_control_word("bliptag", Some(tag))?;
+            }
+            if let Some(upi) = identity.units_per_inch {
+                self.write_control_word("blipupi", Some(i32::from(upi)))?;
+            }
+            if let Some(uid) = &identity.uid {
+                self.write_str("{\\*\\blipuid ")?;
+                for byte in uid.iter() {
+                    write!(self.writer, "{byte:02x}")?;
+                }
+                self.write_str("}")?;
+            }
+        }
+        self.write_str(" ")?;
+        for byte in picture.data.iter() {
+            write!(self.writer, "{byte:02x}")?;
+        }
+        self.write_str("}")
+    }
+
+    /// Write the list-definition table.
     pub fn write_list_table(&mut self, table: &ListTable<'_>) -> io::Result<()> {
         table
             .validate()

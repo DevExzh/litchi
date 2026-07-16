@@ -71,6 +71,7 @@ pub mod protection;
 pub mod sections;
 pub mod shapes;
 pub mod slide;
+pub mod presentation_properties;
 pub mod smartart;
 pub mod tags;
 pub mod template;

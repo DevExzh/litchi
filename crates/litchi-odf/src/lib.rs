@@ -290,6 +290,7 @@ mod core;
 pub mod datatype;
 pub mod drawing_gradient;
 pub mod drawing_hatch;
+pub mod drawing_fill_image;
 pub mod drawing_marker;
 pub mod drawing_stroke_dash;
 /// ODF XML element classes

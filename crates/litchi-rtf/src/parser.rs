@@ -655,7 +655,9 @@ impl<'a> Parser<'a> {
         // Check if this is a special group (header, destination, etc.)
         if self.pos < self.tokens.len() {
             match &self.tokens[self.pos] {
-                Token::Control(ControlWord::FileTable | ControlWord::FileEntry) => {
+                Token::Control(
+                    ControlWord::FileTable | ControlWord::FileEntry | ControlWord::BlipUid,
+                ) => {
                     return Err(RtfError::MalformedDocument(
                         "RTF file-table destinations are misplaced or not starred".to_string(),
                     ));
@@ -736,6 +738,11 @@ impl<'a> Parser<'a> {
                             self.file_table = Some(self.parse_file_table()?);
                             self.states.pop();
                             return Ok(());
+                        },
+                        Some(Token::Control(ControlWord::BlipUid)) => {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF blipuid destination may occur only inside pict".to_string(),
+                            ));
                         },
                         Some(Token::Control(control @ (
                             ControlWord::FootnoteSeparator
@@ -2474,6 +2481,11 @@ impl<'a> Parser<'a> {
             ControlWord::RevisionSaveId(_) => {
                 return Err(RtfError::MalformedDocument(
                     "orphan RTF rsid control outside rsidtbl".to_string(),
+                ));
+            },
+            ControlWord::BlipTag(_) | ControlWord::BlipUnitsPerInch(_) => {
+                return Err(RtfError::MalformedDocument(
+                    "orphan RTF picture identity control outside pict".to_string(),
                 ));
             },
             ControlWord::XmlNamespace(_) => {
@@ -7605,6 +7617,11 @@ impl<'a> Parser<'a> {
         let mut goal_height = None;
         let mut scale_x = None;
         let mut scale_y = None;
+        let mut blip_tag = None;
+        let mut blip_upi = None;
+        let mut blip_uid = None;
+        let mut identity_stage = 0u8;
+        let mut data_started = false;
         let mut data = Vec::new();
         let mut high_nibble = None;
 
@@ -7633,10 +7650,44 @@ impl<'a> Parser<'a> {
                         ControlWord::PictureGoalHeight(h) => goal_height = Some(*h),
                         ControlWord::PictureScaleX(s) => scale_x = Some(*s),
                         ControlWord::PictureScaleY(s) => scale_y = Some(*s),
+                        ControlWord::BlipTag(value) => {
+                            if data_started || blip_tag.is_some() || identity_stage > 1 {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF bliptag is duplicated, late, or out of order".to_string(),
+                                ));
+                            }
+                            blip_tag = Some(*value);
+                            identity_stage = 1;
+                        },
+                        ControlWord::BlipUnitsPerInch(value) => {
+                            if data_started || blip_upi.is_some() || identity_stage > 2 {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF blipupi is duplicated, late, or out of order".to_string(),
+                                ));
+                            }
+                            let value = u16::try_from(*value).map_err(|_| {
+                                RtfError::MalformedDocument(
+                                    "RTF blipupi is outside 1..=65535".to_string(),
+                                )
+                            })?;
+                            if value == 0 {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF blipupi must be positive".to_string(),
+                                ));
+                            }
+                            blip_upi = Some(value);
+                            identity_stage = 2;
+                        },
+                        ControlWord::BlipUid => {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF blipuid destination must be starred and grouped".to_string(),
+                            ));
+                        },
                         _ => {},
                     }
                 },
                 Token::Text(text) => {
+                    data_started |= text.bytes().any(|byte| !byte.is_ascii_whitespace());
                     for byte in text.bytes().filter(|byte| !byte.is_ascii_whitespace()) {
                         let nibble = Self::hex_nibble(byte).ok_or_else(|| {
                             RtfError::MalformedDocument(
@@ -7657,6 +7708,7 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 Token::Binary(bytes) => {
+                    data_started = true;
                     if high_nibble.is_some() {
                         return Err(RtfError::MalformedDocument(
                             "RTF picture binary payload splits a hexadecimal byte".to_string(),
@@ -7671,8 +7723,32 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 Token::OpenBrace => {
-                    // Skip nested groups
-                    self.skip_group()?;
+                    if matches!(
+                        self.tokens.get(self.pos..self.pos + 3),
+                        Some([
+                            Token::OpenBrace,
+                            Token::Control(ControlWord::IgnorableDestination),
+                            Token::Control(ControlWord::BlipUid),
+                        ])
+                    ) {
+                        if data_started || blip_uid.is_some() {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF blipuid is duplicated or occurs after picture data"
+                                    .to_string(),
+                            ));
+                        }
+                        blip_uid = Some(self.parse_picture_uid()?);
+                        identity_stage = 3;
+                    } else if matches!(
+                        self.tokens.get(self.pos..self.pos + 2),
+                        Some([Token::OpenBrace, Token::Control(ControlWord::BlipUid)])
+                    ) {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF blipuid destination must be starred".to_string(),
+                        ));
+                    } else {
+                        self.skip_group()?;
+                    }
                 },
             }
         }
@@ -7698,11 +7774,73 @@ impl<'a> Parser<'a> {
             picture.goal_height = goal_height;
             picture.scale_x = scale_x;
             picture.scale_y = scale_y;
+            if blip_tag.is_some() || blip_upi.is_some() || blip_uid.is_some() {
+                let identity = super::picture::PictureIdentity {
+                    tag: blip_tag,
+                    units_per_inch: blip_upi,
+                    uid: blip_uid.map(|uid| {
+                        Cow::Borrowed(self.arena.alloc_slice_copy(&uid) as &[u8])
+                    }),
+                };
+                identity.validate()?;
+                picture.identity = Some(identity);
+            }
 
             self.pictures.push(picture);
         }
 
         Ok(())
+    }
+
+    fn parse_picture_uid(&mut self) -> RtfResult<Vec<u8>> {
+        self.pos += 3; // opening brace, ignorable marker, and blipuid
+        let mut bytes = Vec::with_capacity(16);
+        let mut high_nibble = None;
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    if high_nibble.is_some() {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF blipuid contains an odd number of hexadecimal digits"
+                                .to_string(),
+                        ));
+                    }
+                    if !bytes.is_empty() && bytes.len() != 16 {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF blipuid must contain exactly 16 bytes or be empty".to_string(),
+                        ));
+                    }
+                    return Ok(bytes);
+                },
+                Some(Token::Text(text)) => {
+                    for byte in text.bytes().filter(|byte| !byte.is_ascii_whitespace()) {
+                        let nibble = Self::hex_nibble(byte).ok_or_else(|| {
+                            RtfError::MalformedDocument(
+                                "RTF blipuid contains a non-hexadecimal character".to_string(),
+                            )
+                        })?;
+                        if let Some(high) = high_nibble.take() {
+                            bytes.push((high << 4) | nibble);
+                            if bytes.len() > 16 {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF blipuid exceeds 16 bytes".to_string(),
+                                ));
+                            }
+                        } else {
+                            high_nibble = Some(nibble);
+                        }
+                    }
+                    self.pos += 1;
+                },
+                Some(Token::OpenBrace | Token::Control(_) | Token::Binary(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF blipuid contains active, nested, or binary content".to_string(),
+                    ));
+                },
+                None => return Err(RtfError::UnexpectedEof),
+            }
+        }
     }
 
     /// Parse field content.
