@@ -105,6 +105,10 @@ pub(crate) fn reset_shape_text_layout(
     let style_archive_name = object_archive_name(&package, old_style_id)?;
     let old_style_message = shape_style_message(&package, &style_archive_name, old_style_id)?;
     let old_style = tswp::ShapeStyleArchive::decode(old_style_message.data.as_slice())?;
+    let Some(mut direct) = direct_shape_style_overrides(&old_style, &old_style_message.data)?
+    else {
+        return Ok((package, false));
+    };
     let has_direct_layout = old_style
         .shape_properties
         .as_ref()
@@ -117,12 +121,6 @@ pub(crate) fn reset_shape_text_layout(
     if !has_direct_layout {
         return Ok((package, false));
     }
-    let mut direct = direct_shape_style_overrides(&old_style, &old_style_message.data)?
-        .ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "iWork shape style {old_style_id} has text layout plus unsupported direct overrides"
-            ))
-        })?;
     let stylesheet_id = stylesheet_id(&package, &style_archive_name, old_style_id, &old_style)?;
     let parent_style_id = parent_style_id(old_style_id, &old_style)?;
     let inherited = inherited_shape_text_layout(&package, parent_style_id)?;
@@ -368,6 +366,17 @@ fn direct_insets(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::keynote::KeynoteEditor;
+    use crate::numbers::NumbersEditor;
+    use crate::pages::PagesEditor;
+    use crate::shapes::{DrawablePoint, DrawableSize, ShapeTextInset};
+    use crate::text::{TextColumnCount, TextColumns};
+
+    const POSITION: DrawablePoint = DrawablePoint { x: 96.0, y: 120.0 };
+    const SIZE: DrawableSize = DrawableSize {
+        width: 360.0,
+        height: 180.0,
+    };
 
     #[test]
     fn malformed_padding_presence_is_rejected() {
@@ -396,6 +405,107 @@ mod tests {
             })
             .unwrap(),
             Some(ShapeTextInsets::ZERO)
+        );
+    }
+
+    #[test]
+    fn scratch_suite_text_boxes_support_composable_layout_crud() {
+        let inset = ShapeTextInset::from_points(9.0).unwrap();
+        let layout = ShapeTextLayout::new(
+            ShapeTextVerticalAlignment::Middle,
+            ShapeTextInsets::uniform(inset),
+            ShapeTextAutoSize::ShrinkToFit,
+        );
+        let columns = TextColumns::equal(TextColumnCount::new(2).unwrap(), None);
+
+        let mut pages = PagesEditor::create_with_text("Body").unwrap();
+        let pages_box = pages
+            .add_text_box(4, "Pages layout", POSITION, SIZE)
+            .unwrap();
+        let pages_inherited = pages
+            .text_box_text_layout(pages_box.drawable_object_id)
+            .unwrap();
+        pages
+            .set_text_box_columns(pages_box.drawable_object_id, &columns)
+            .unwrap();
+        pages
+            .set_text_box_text_layout(pages_box.drawable_object_id, layout)
+            .unwrap();
+        let mut pages = PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            pages
+                .text_box_text_layout(pages_box.drawable_object_id)
+                .unwrap(),
+            layout
+        );
+        assert_eq!(
+            pages
+                .text_box_columns(pages_box.drawable_object_id)
+                .unwrap(),
+            columns
+        );
+        assert!(
+            pages
+                .reset_text_box_text_layout(pages_box.drawable_object_id)
+                .unwrap()
+        );
+        assert_eq!(
+            pages
+                .text_box_text_layout(pages_box.drawable_object_id)
+                .unwrap(),
+            pages_inherited
+        );
+        assert_eq!(
+            pages
+                .text_box_columns(pages_box.drawable_object_id)
+                .unwrap(),
+            columns
+        );
+        assert!(
+            !pages
+                .reset_text_box_text_layout(pages_box.drawable_object_id)
+                .unwrap()
+        );
+
+        let mut numbers = NumbersEditor::create().unwrap();
+        let sheet_id = numbers.sheets().unwrap()[0].object_id;
+        let numbers_box = numbers
+            .add_sheet_text_box(sheet_id, "Numbers layout", POSITION, SIZE)
+            .unwrap();
+        numbers
+            .set_sheet_text_box_text_layout(sheet_id, numbers_box.drawable_object_id, layout)
+            .unwrap();
+        let mut numbers = NumbersEditor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            numbers
+                .sheet_text_box_text_layout(sheet_id, numbers_box.drawable_object_id)
+                .unwrap(),
+            layout
+        );
+        assert!(
+            numbers
+                .reset_sheet_text_box_text_layout(sheet_id, numbers_box.drawable_object_id)
+                .unwrap()
+        );
+
+        let mut keynote = KeynoteEditor::create().unwrap();
+        let keynote_box = keynote
+            .add_slide_text_box(0, "Keynote layout", POSITION, SIZE)
+            .unwrap();
+        keynote
+            .set_slide_text_box_text_layout(0, keynote_box.drawable_object_id, layout)
+            .unwrap();
+        let mut keynote = KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            keynote
+                .slide_text_box_text_layout(0, keynote_box.drawable_object_id)
+                .unwrap(),
+            layout
+        );
+        assert!(
+            keynote
+                .reset_slide_text_box_text_layout(0, keynote_box.drawable_object_id)
+                .unwrap()
         );
     }
 }

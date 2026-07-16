@@ -21,9 +21,9 @@ use crate::package_metadata::{
 };
 use crate::protobuf::{kn, tsd, tsp, tss, tswp};
 use crate::shapes::{
-    DrawableGeometry, DrawableProperties, reset_shape_text_columns, set_shape_geometry,
-    set_shape_properties, set_shape_text_columns, shape_geometry, shape_properties,
-    shape_text_columns,
+    DrawableGeometry, DrawableProperties, ShapeTextLayout, reset_shape_text_columns,
+    reset_shape_text_layout, set_shape_geometry, set_shape_properties, set_shape_text_columns,
+    set_shape_text_layout, shape_geometry, shape_properties, shape_text_columns, shape_text_layout,
 };
 use crate::text::{IWorkTextEditor, TextColumns, TextStorageInfo};
 use crate::wire::{
@@ -1140,6 +1140,58 @@ impl KeynoteEditor {
         }
         *self = verified;
         Ok(())
+    }
+
+    /// Read vertical alignment, edge insets, and autosizing for a text box.
+    pub fn slide_text_box_text_layout(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<ShapeTextLayout> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        shape_text_layout(self.package(), &graph.archive_name, drawable_object_id)
+    }
+
+    /// Replace text-frame layout while preserving text, columns, and drawing style.
+    pub fn set_slide_text_box_text_layout(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        layout: ShapeTextLayout,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let staged = set_shape_text_layout(
+            self.package().clone(),
+            &graph.archive_name,
+            drawable_object_id,
+            layout,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.slide_text_box_text_layout(slide_index, drawable_object_id)? != layout {
+            return Err(Error::InvalidFormat(
+                "Keynote text-box layout update failed validation".into(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove crate-authored text-frame layout overrides.
+    pub fn reset_slide_text_box_text_layout(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let (staged, changed) = reset_shape_text_layout(
+            self.package().clone(),
+            &graph.archive_name,
+            drawable_object_id,
+        )?;
+        if changed {
+            *self = Self::from_package(staged)?;
+        }
+        Ok(changed)
     }
 
     /// Read the uniform column layout of an ordinary slide text box.

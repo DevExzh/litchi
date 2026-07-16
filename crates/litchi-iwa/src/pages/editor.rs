@@ -22,10 +22,11 @@ use crate::protobuf::tsp;
 use crate::protobuf::tswp::{
     DrawableAttachmentArchive, StorageArchive, object_attribute_table::ObjectAttribute,
 };
+use crate::shapes::ShapeTextLayout;
 use crate::shapes::{
-    DrawableGeometry, DrawableProperties, reset_shape_text_columns, set_shape_geometry,
-    set_shape_properties, set_shape_text_columns, shape_geometry, shape_properties,
-    shape_text_columns,
+    DrawableGeometry, DrawableProperties, reset_shape_text_columns, reset_shape_text_layout,
+    set_shape_geometry, set_shape_properties, set_shape_text_columns, set_shape_text_layout,
+    shape_geometry, shape_properties, shape_text_columns, shape_text_layout,
 };
 use crate::text::{IWorkTextEditor, TextColumns, TextStorageInfo};
 use crate::wire::{
@@ -264,6 +265,49 @@ impl PagesEditor {
         }
         *self = verified;
         Ok(())
+    }
+
+    /// Read vertical alignment, edge insets, and autosizing for a text box.
+    pub fn text_box_text_layout(&self, drawable_object_id: u64) -> Result<ShapeTextLayout> {
+        self.text_box_graph(drawable_object_id)?;
+        let archive_name = find_object_archive(self.package(), drawable_object_id)?;
+        shape_text_layout(self.package(), &archive_name, drawable_object_id)
+    }
+
+    /// Replace text-frame layout while preserving text, columns, and drawing style.
+    pub fn set_text_box_text_layout(
+        &mut self,
+        drawable_object_id: u64,
+        layout: ShapeTextLayout,
+    ) -> Result<()> {
+        self.text_box_graph(drawable_object_id)?;
+        let archive_name = find_object_archive(self.package(), drawable_object_id)?;
+        let staged = set_shape_text_layout(
+            self.package().clone(),
+            &archive_name,
+            drawable_object_id,
+            layout,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.text_box_text_layout(drawable_object_id)? != layout {
+            return Err(Error::InvalidFormat(
+                "Pages text-box layout update failed validation".into(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove crate-authored text-frame layout overrides.
+    pub fn reset_text_box_text_layout(&mut self, drawable_object_id: u64) -> Result<bool> {
+        self.text_box_graph(drawable_object_id)?;
+        let archive_name = find_object_archive(self.package(), drawable_object_id)?;
+        let (staged, changed) =
+            reset_shape_text_layout(self.package().clone(), &archive_name, drawable_object_id)?;
+        if changed {
+            *self = Self::from_package(staged)?;
+        }
+        Ok(changed)
     }
 
     /// Read the uniform column layout of a reachable ordinary text box.

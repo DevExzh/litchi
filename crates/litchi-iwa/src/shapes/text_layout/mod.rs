@@ -1,7 +1,8 @@
-//! Typed frame-level layout for text inside ordinary shapes.
+//! Typed frame-level layout for text inside shapes and ordinary text boxes.
 //!
 //! iWork stores vertical alignment, edge insets, and autosizing on the shape
-//! style. Text-flow columns are stored through a separate text column style.
+//! style. Text-box columns are another independently composable shape-style
+//! property; document-body columns use a separate column-style archive.
 
 mod native;
 mod style;
@@ -10,7 +11,7 @@ use crate::{Error, Result};
 
 pub(crate) use style::{reset_shape_text_layout, set_shape_text_layout, shape_text_layout};
 
-/// Vertical placement of text inside an ordinary shape.
+/// Vertical placement of text inside a shape or ordinary text box.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum ShapeTextVerticalAlignment {
     #[default]

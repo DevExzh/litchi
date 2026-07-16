@@ -33,9 +33,9 @@ use crate::protobuf::tst::{
 use crate::protobuf::{tn, tsce, tsd, tsp, tswp};
 use crate::registry::{Application, detect_application_from_document};
 use crate::shapes::{
-    DrawableGeometry, DrawableProperties, reset_shape_text_columns, set_shape_geometry,
-    set_shape_properties, set_shape_text_columns, shape_geometry, shape_properties,
-    shape_text_columns,
+    DrawableGeometry, DrawableProperties, ShapeTextLayout, reset_shape_text_columns,
+    reset_shape_text_layout, set_shape_geometry, set_shape_properties, set_shape_text_columns,
+    set_shape_text_layout, shape_geometry, shape_properties, shape_text_columns, shape_text_layout,
 };
 use crate::text::{IWorkTextEditor, TextColumns, TextStorageInfo};
 use crate::wire::{
@@ -473,6 +473,58 @@ impl NumbersEditor {
         }
         *self = verified;
         Ok(())
+    }
+
+    /// Read vertical alignment, edge insets, and autosizing for a text box.
+    pub fn sheet_text_box_text_layout(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<ShapeTextLayout> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        shape_text_layout(&self.package, &graph.archive_name, drawable_object_id)
+    }
+
+    /// Replace text-frame layout while preserving text, columns, and drawing style.
+    pub fn set_sheet_text_box_text_layout(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        layout: ShapeTextLayout,
+    ) -> Result<()> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let staged = set_shape_text_layout(
+            self.package.clone(),
+            &graph.archive_name,
+            drawable_object_id,
+            layout,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.sheet_text_box_text_layout(sheet_id, drawable_object_id)? != layout {
+            return Err(Error::InvalidFormat(
+                "Numbers text-box layout update failed validation".into(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove crate-authored text-frame layout overrides.
+    pub fn reset_sheet_text_box_text_layout(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let (staged, changed) = reset_shape_text_layout(
+            self.package.clone(),
+            &graph.archive_name,
+            drawable_object_id,
+        )?;
+        if changed {
+            *self = Self::from_package(staged)?;
+        }
+        Ok(changed)
     }
 
     /// Read the uniform column layout of an ordinary sheet text box.

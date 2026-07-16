@@ -3,7 +3,10 @@
 use std::env;
 
 use litchi_iwa::pages::PagesEditor;
-use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_iwa::shapes::{
+    DrawablePoint, DrawableSize, ShapeTextAutoSize, ShapeTextInset, ShapeTextInsets,
+    ShapeTextLayout, ShapeTextVerticalAlignment,
+};
 use litchi_iwa::text::{TextColumnCount, TextColumnGap, TextColumns};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -34,6 +37,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &TextColumns::equal(
             TextColumnCount::new(2)?,
             Some(TextColumnGap::from_points(18.0)?),
+        ),
+    )?;
+    editor.set_text_box_text_layout(
+        created.drawable_object_id,
+        ShapeTextLayout::new(
+            ShapeTextVerticalAlignment::Middle,
+            ShapeTextInsets::uniform(ShapeTextInset::from_points(9.0)?),
+            ShapeTextAutoSize::ShrinkToFit,
         ),
     )?;
     editor.save(output)?;
