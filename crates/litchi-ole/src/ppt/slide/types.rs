@@ -6,6 +6,7 @@ use super::factory::SlideData;
 use crate::consts::PptRecordType;
 use crate::ppt::animation::{ShapeAnimation, SlideAnimationExtension};
 use crate::ppt::slide_extension::PowerPoint12SlideExtension;
+use crate::ppt::slide_round_trip::PowerPoint12SlideRoundTripMetadata;
 use crate::ppt::slide_sync::PowerPointSlideSyncInfo;
 use once_cell::unsync::OnceCell;
 
@@ -38,6 +39,8 @@ pub struct Slide<'doc> {
     powerpoint12_extension: OnceCell<PowerPoint12SlideExtension>,
     /// Lazily parsed, inert slide-library synchronization metadata.
     sync_info: OnceCell<Option<PowerPointSlideSyncInfo>>,
+    /// Lazily parsed direct PowerPoint 12 slide round-trip metadata.
+    round_trip_metadata: OnceCell<PowerPoint12SlideRoundTripMetadata>,
 }
 
 impl<'doc> Slide<'doc> {
@@ -55,6 +58,7 @@ impl<'doc> Slide<'doc> {
             animation_extension: OnceCell::new(),
             powerpoint12_extension: OnceCell::new(),
             sync_info: OnceCell::new(),
+            round_trip_metadata: OnceCell::new(),
         }
     }
 
@@ -177,6 +181,12 @@ impl<'doc> Slide<'doc> {
         self.sync_info
             .get_or_try_init(|| PowerPointSlideSyncInfo::parse(&self.record))
             .map(Option::as_ref)
+    }
+
+    /// Return inert PowerPoint 12 master references stored directly on this slide.
+    pub fn powerpoint12_round_trip_metadata(&self) -> Result<&PowerPoint12SlideRoundTripMetadata> {
+        self.round_trip_metadata
+            .get_or_try_init(|| PowerPoint12SlideRoundTripMetadata::parse(&self.record))
     }
 
     /// Extract all text from this slide (lazy-loaded).
@@ -1138,6 +1148,44 @@ mod tests {
         assert_eq!(sync.server_modified.year, 2026);
         assert_eq!(sync.client_inserted.year, 2025);
         assert!(std::ptr::eq(sync, slide.sync_info().unwrap().unwrap()));
+    }
+
+    #[test]
+    fn exposes_direct_powerpoint12_slide_master_references() {
+        let composite = PptRecord {
+            version: 0,
+            instance: 0,
+            record_type: PptRecordType::RoundTripCompositeMasterId12Atom,
+            record_type_raw: 0x041d,
+            data_length: 4,
+            data: 17u32.to_le_bytes().to_vec(),
+            children: Vec::new(),
+        };
+        let mut content_data = Vec::new();
+        content_data.extend_from_slice(&23u32.to_le_bytes());
+        content_data.extend_from_slice(&5u16.to_le_bytes());
+        content_data.extend_from_slice(&9u16.to_le_bytes());
+        let content = PptRecord {
+            version: 0,
+            instance: 7,
+            record_type: PptRecordType::RoundTripContentMasterId12Atom,
+            record_type_raw: 0x0422,
+            data_length: 8,
+            data: content_data,
+            children: Vec::new(),
+        };
+        let slide_record =
+            create_test_record(PptRecordType::Slide, Vec::new(), vec![composite, content]);
+        let doc_data = vec![0u8; 32];
+        let slide = Slide::from_slide_data(create_slide_data(slide_record, 256, &doc_data), 1);
+
+        let metadata = slide.powerpoint12_round_trip_metadata().unwrap();
+        assert_eq!(metadata.composite_master_id, Some(17));
+        let content = metadata.content_master.unwrap();
+        assert_eq!(content.record_instance, 7);
+        assert_eq!(content.main_master_id, 23);
+        assert_eq!(content.layout_instance_id, 5);
+        assert_eq!(content.unused, 9);
     }
 
     #[test]

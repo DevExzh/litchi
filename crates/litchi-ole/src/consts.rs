@@ -61,10 +61,14 @@ pub enum PptRecordType {
     PPDrawing = 1036,
     /// PowerPoint 10 square-grid spacing atom
     GridSpacing10Atom = 1037,
+    /// PowerPoint 12 composite master identifier atom
+    RoundTripCompositeMasterId12Atom = 0x041D,
     /// PowerPoint 12 round-trip shape identifier atom
     RoundTripShapeId12Atom = 0x041F,
     /// PowerPoint 12 header/footer placeholder identity atom
     RoundTripHFPlaceholder12Atom = 0x0420,
+    /// PowerPoint 12 content master identifier atom
+    RoundTripContentMasterId12Atom = 0x0422,
     /// PowerPoint 12 default header and footer flags atom
     RoundTripHeaderFooterDefaults12Atom = 0x0424,
     /// PowerPoint 12 document round-trip flags atom
@@ -319,8 +323,10 @@ impl From<u16> for PptRecordType {
             1035 => PptRecordType::PPDrawingGroup,
             1036 => PptRecordType::PPDrawing,
             1037 => PptRecordType::GridSpacing10Atom,
+            0x041D => PptRecordType::RoundTripCompositeMasterId12Atom,
             0x041F => PptRecordType::RoundTripShapeId12Atom,
             0x0420 => PptRecordType::RoundTripHFPlaceholder12Atom,
+            0x0422 => PptRecordType::RoundTripContentMasterId12Atom,
             0x0424 => PptRecordType::RoundTripHeaderFooterDefaults12Atom,
             0x0425 => PptRecordType::RoundTripDocFlags12Atom,
             0x0426 => PptRecordType::RoundTripShapeCheckSumForCustomLayouts12Atom,

@@ -81,6 +81,7 @@ pub mod kinsoku;
 pub mod master_style;
 pub mod picture_bullets;
 pub mod slide_extension;
+pub mod slide_round_trip;
 pub mod slide_sync;
 pub mod smart_tags;
 pub mod text_extensions;
@@ -131,6 +132,7 @@ pub use slide_extension::{
     PowerPointHeaderFooterDefaults, PowerPointHeaderFooterPlaceholder, PowerPointNewPlaceholder,
     PowerPointShapeChecksums,
 };
+pub use slide_round_trip::{PowerPoint12SlideRoundTripMetadata, PowerPointContentMasterReference};
 pub use slide_sync::{PowerPointSlideSyncInfo, PowerPointSystemTime};
 pub use smart_tags::{
     PowerPointSmartTag, PowerPointSmartTagProperty, PowerPointSmartTagStore, PowerPointSmartTagType,
