@@ -109,6 +109,16 @@ impl<'a> Slide<'a> {
         &self.part
     }
 
+    /// Load all programmable tag-list parts related to this slide.
+    pub fn tag_lists(&self) -> Result<Vec<crate::pptx::tags::SlideTagList>> {
+        let package = self.package.ok_or_else(|| {
+            crate::error::OoxmlError::InvalidFormat(
+                "slide tag lists require package-backed slide access".into(),
+            )
+        })?;
+        crate::pptx::tags::load_slide_tag_lists(self.part.part(), package)
+    }
+
     /// Get all shapes on this slide.
     ///
     /// Returns a vector of BaseShape objects that provide access to text,

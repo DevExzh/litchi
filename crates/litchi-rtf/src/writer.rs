@@ -137,6 +137,7 @@ impl<W: Write> RtfWriter<W> {
 
         // Write named paragraph, character, section, and table styles.
         self.write_stylesheet(doc.stylesheet())?;
+        self.write_note_separators(doc.note_separators())?;
 
         // Write list definitions before body paragraphs reference them.
         doc.list_override_table()
@@ -692,6 +693,42 @@ impl<W: Write> RtfWriter<W> {
             self.write_str("}")?;
         }
         self.write_str("}")?;
+        Ok(())
+    }
+
+    /// Write ordered semantic note-separator destinations.
+    pub fn write_note_separators(
+        &mut self,
+        table: &crate::NoteSeparatorTable<'_>,
+    ) -> io::Result<()> {
+        table
+            .validate()
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+        for separator in table.entries() {
+            self.write_str("{\\*")?;
+            self.write_control_word(
+                match separator.kind {
+                    crate::NoteSeparatorKind::FootnoteSeparator => "ftnsep",
+                    crate::NoteSeparatorKind::FootnoteContinuationSeparator => "ftnsepc",
+                    crate::NoteSeparatorKind::FootnoteContinuationNotice => "ftncn",
+                    crate::NoteSeparatorKind::EndnoteSeparator => "aftnsep",
+                    crate::NoteSeparatorKind::EndnoteContinuationSeparator => "aftnsepc",
+                    crate::NoteSeparatorKind::EndnoteContinuationNotice => "aftncn",
+                },
+                None,
+            )?;
+            self.write_str(" ")?;
+            for element in &separator.elements {
+                match element {
+                    crate::NoteSeparatorElement::Text(text) => self.write_text(text.as_ref())?,
+                    crate::NoteSeparatorElement::SeparatorMark => self.write_control_word("chftnsep", None)?,
+                    crate::NoteSeparatorElement::ContinuationSeparatorMark => self.write_control_word("chftnsepc", None)?,
+                    crate::NoteSeparatorElement::ParagraphBreak => self.write_control_word("par", None)?,
+                    crate::NoteSeparatorElement::LineBreak => self.write_control_word("line", None)?,
+                }
+            }
+            self.write_str("}")?;
+        }
         Ok(())
     }
 

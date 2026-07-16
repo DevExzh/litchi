@@ -319,6 +319,54 @@ pub struct XlsCalculationSettings {
     pub force_full_calculation: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct XlsWorkbookEnvironmentOptions {
+    pub template: bool,
+    pub has_biff5_stream: bool,
+    pub create_backup_copy: bool,
+    pub object_display_mode: crate::xls::XlsObjectDisplayMode,
+    pub refresh_external_data_on_load: bool,
+    pub save_external_link_values: bool,
+    pub has_envelope: bool,
+    pub envelope_visible: bool,
+    pub envelope_initialized: bool,
+    pub link_update_mode: crate::xls::XlsLinkUpdateMode,
+    pub hide_unselected_table_borders: bool,
+    pub supports_natural_language_formulas: bool,
+    pub default_country_code: u16,
+    pub current_country_code: u16,
+}
+
+impl Default for XlsWorkbookEnvironmentOptions {
+    fn default() -> Self {
+        Self {
+            template: false, has_biff5_stream: false, create_backup_copy: false,
+            object_display_mode: crate::xls::XlsObjectDisplayMode::ShowAll,
+            refresh_external_data_on_load: false, save_external_link_values: true,
+            has_envelope: false, envelope_visible: false, envelope_initialized: false,
+            link_update_mode: crate::xls::XlsLinkUpdateMode::Prompt,
+            hide_unselected_table_borders: false,
+            supports_natural_language_formulas: false,
+            default_country_code: 1, current_country_code: 1,
+        }
+    }
+}
+
+impl XlsWorkbookEnvironmentOptions {
+    pub(super) fn book_bool_bits(self) -> u16 {
+        u16::from(!self.save_external_link_values)
+            | (u16::from(self.has_envelope) << 2)
+            | (u16::from(self.envelope_visible) << 3)
+            | (u16::from(self.envelope_initialized) << 4)
+            | ((match self.link_update_mode {
+                crate::xls::XlsLinkUpdateMode::Prompt => 0,
+                crate::xls::XlsLinkUpdateMode::Never => 1,
+                crate::xls::XlsLinkUpdateMode::Silent => 2,
+            }) << 5)
+            | (u16::from(self.hide_unselected_table_borders) << 8)
+    }
+}
+
 impl Default for XlsCalculationSettings {
     fn default() -> Self {
         Self {
@@ -355,6 +403,7 @@ pub struct XlsWriter {
     use_1904_dates: bool,
     calculation_settings: XlsCalculationSettings,
     vba_metadata: Option<XlsVbaWriteMetadata>,
+    environment_options: XlsWorkbookEnvironmentOptions,
 }
 
 impl XlsWriter {
@@ -372,6 +421,7 @@ impl XlsWriter {
             use_1904_dates: false,
             calculation_settings: XlsCalculationSettings::default(),
             vba_metadata: None,
+            environment_options: XlsWorkbookEnvironmentOptions::default(),
         }
     }
 
@@ -1659,6 +1709,25 @@ impl XlsWriter {
         self.use_1904_dates = use_1904;
     }
 
+    pub fn set_workbook_environment(
+        &mut self,
+        options: XlsWorkbookEnvironmentOptions,
+    ) -> XlsResult<()> {
+        if options.refresh_external_data_on_load && !options.template {
+            return Err(XlsError::InvalidData("RefreshAll requires a template workbook".to_string()));
+        }
+        if (options.envelope_visible || options.envelope_initialized) && !options.has_envelope {
+            return Err(XlsError::InvalidData("envelope state flags require has_envelope".to_string()));
+        }
+        if !(1..=981).contains(&options.default_country_code)
+            || !(1..=981).contains(&options.current_country_code)
+        {
+            return Err(XlsError::InvalidData("country codes must be 1..=981".to_string()));
+        }
+        self.environment_options = options;
+        Ok(())
+    }
+
     pub fn set_calculation_settings(&mut self, settings: XlsCalculationSettings) -> XlsResult<()> {
         if !(1..=32_767).contains(&settings.maximum_iterations) {
             return Err(XlsError::InvalidData(
@@ -2064,6 +2133,7 @@ impl XlsWriter {
             self.use_1904_dates,
             self.calculation_settings,
             self.vba_metadata.as_ref(),
+            self.environment_options,
             &self.fmt,
             &self.defined_names,
             &self.shared_strings,

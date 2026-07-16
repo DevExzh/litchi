@@ -183,6 +183,7 @@ pub fn write_dv<W: Write>(
 ///
 /// Record type: 0x0160, Length: 2
 /// A value of 0 disables natural language formulas (modern Excel default).
+#[allow(dead_code)] // Compatibility wrapper for the former fixed-value writer API.
 pub fn write_usesel_fs<W: Write>(writer: &mut W) -> XlsResult<()> {
     workbook::write_usesel_fs(writer)
 }
@@ -266,8 +267,18 @@ pub fn write_refresh_all<W: Write>(writer: &mut W, refresh_all: bool) -> XlsResu
     workbook::write_refresh_all(writer, refresh_all)
 }
 
+#[allow(dead_code)] // Compatibility wrapper retained for existing internal callers.
 pub fn write_book_bool<W: Write>(writer: &mut W, save_link_values: bool) -> XlsResult<()> {
     workbook::write_book_bool(writer, save_link_values)
+}
+pub fn write_book_bool_raw<W: Write>(writer: &mut W, bits: u16) -> XlsResult<()> {
+    workbook::write_book_bool_raw(writer, bits)
+}
+pub fn write_usesel_fs_value<W: Write>(writer: &mut W, enabled: bool) -> XlsResult<()> {
+    workbook::write_usesel_fs_value(writer, enabled)
+}
+pub fn write_template<W: Write>(writer: &mut W) -> XlsResult<()> {
+    workbook::write_template(writer)
 }
 
 pub fn write_country<W: Write>(

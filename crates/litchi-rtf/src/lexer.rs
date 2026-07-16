@@ -401,7 +401,14 @@ pub enum ControlWord<'a> {
     Footnote,
     Endnote,
     FootnoteNumber(i32),
-    EndnoteNumber(i32),
+    FootnoteSeparator,
+    FootnoteContinuationSeparator,
+    FootnoteContinuationNotice,
+    EndnoteSeparator,
+    EndnoteContinuationSeparator,
+    EndnoteContinuationNotice,
+    NoteSeparatorCharacter,
+    NoteContinuationSeparatorCharacter,
 
     // Bookmarks
     BookmarkStart,
@@ -1116,7 +1123,14 @@ impl<'a> Lexer<'a> {
             "footnote" => ControlWord::Footnote,
             "endnote" => ControlWord::Endnote,
             "chftn" => ControlWord::FootnoteNumber(param_value),
-            "chftnsepc" => ControlWord::EndnoteNumber(param_value),
+            "ftnsep" => ControlWord::FootnoteSeparator,
+            "ftnsepc" => ControlWord::FootnoteContinuationSeparator,
+            "ftncn" => ControlWord::FootnoteContinuationNotice,
+            "aftnsep" => ControlWord::EndnoteSeparator,
+            "aftnsepc" => ControlWord::EndnoteContinuationSeparator,
+            "aftncn" => ControlWord::EndnoteContinuationNotice,
+            "chftnsep" => ControlWord::NoteSeparatorCharacter,
+            "chftnsepc" => ControlWord::NoteContinuationSeparatorCharacter,
 
             // Bookmarks
             "bkmkstart" => ControlWord::BookmarkStart,

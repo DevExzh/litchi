@@ -42,6 +42,7 @@ mod theme;
 mod latent_style;
 mod legacy_numbering;
 mod paragraph_group;
+mod note_separator;
 mod data_store;
 mod info;
 mod lexer;
@@ -85,6 +86,9 @@ pub use legacy_numbering::{
     LegacySectionNumberingLevel,
 };
 pub use paragraph_group::{ParagraphGroupProperty, ParagraphGroupPropertyTable};
+pub use note_separator::{
+    NoteSeparator, NoteSeparatorElement, NoteSeparatorKind, NoteSeparatorTable,
+};
 pub use data_store::DocumentDataStore;
 pub use info::{
     DocumentInfo, DocumentProtection, ProtectionLevel, ProtectionType, RtfTimestamp,

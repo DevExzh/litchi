@@ -289,6 +289,7 @@ mod core;
 /// ODF data type conversions (Boolean, Date, DateTime, Duration)
 pub mod datatype;
 pub mod drawing_gradient;
+pub mod drawing_hatch;
 /// ODF XML element classes
 pub mod elements;
 pub use elements::field::{

@@ -79,6 +79,8 @@ pub struct RtfDocument<'a> {
     annotations: Vec<super::annotation::Annotation<'a>>,
     /// Footnotes and endnotes
     notes: Vec<super::section::Note<'a>>,
+    /// Ordered inert footnote/endnote separator destinations.
+    note_separators: crate::NoteSeparatorTable<'a>,
     /// Track changes/revisions
     revisions: Vec<super::annotation::Revision<'a>>,
     /// Ordered revision-author table referenced by revision author indices.
@@ -291,6 +293,7 @@ impl<'a> RtfDocument<'a> {
             info: Self::convert_info_to_owned(parsed.info),
             annotations: Self::convert_annotations_to_owned(parsed.annotations),
             notes: Self::convert_notes_to_owned(parsed.notes),
+            note_separators: parsed.note_separators.into_owned(),
             revisions: Self::convert_revisions_to_owned(parsed.revisions),
             revision_authors: parsed
                 .revision_authors
@@ -1480,6 +1483,23 @@ impl<'a> RtfDocument<'a> {
     /// Get all footnotes and endnotes in the document.
     pub fn notes(&self) -> &[super::section::Note<'_>] {
         &self.notes
+    }
+
+    /// Return ordered footnote and endnote separator destinations.
+    pub fn note_separators(&self) -> &crate::NoteSeparatorTable<'_> {
+        &self.note_separators
+    }
+
+    /// Replace note-separator destinations after validation.
+    pub fn set_note_separators(&mut self, separators: crate::NoteSeparatorTable<'a>) -> RtfResult<()> {
+        separators.validate()?;
+        self.note_separators = separators;
+        Ok(())
+    }
+
+    /// Remove all note-separator destinations.
+    pub fn clear_note_separators(&mut self) {
+        self.note_separators = crate::NoteSeparatorTable::new();
     }
 
     /// Get all footnotes in the document.

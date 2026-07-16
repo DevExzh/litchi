@@ -368,6 +368,7 @@ pub struct Parser<'a> {
     pending_annotation_mark: bool,
     /// Footnotes and endnotes
     notes: Vec<super::section::Note<'a>>,
+    note_separators: crate::NoteSeparatorTable<'a>,
     /// Track changes/revisions
     revisions: Vec<super::annotation::Revision<'a>>,
     /// Authors referenced by tracked-change author indices
@@ -489,6 +490,7 @@ impl<'a> Parser<'a> {
             pending_annotation_initials_seen: false,
             pending_annotation_mark: false,
             notes: Vec::new(),
+            note_separators: crate::NoteSeparatorTable::new(),
             revisions: Vec::new(),
             revision_authors: Vec::new(),
             saw_revision_table: false,
@@ -584,6 +586,7 @@ impl<'a> Parser<'a> {
             info: self.info,
             annotations: self.annotations,
             notes: self.notes,
+            note_separators: self.note_separators,
             revisions: self.revisions,
             revision_authors: self.revision_authors,
         })
@@ -710,6 +713,27 @@ impl<'a> Parser<'a> {
                         return Ok(());
                     }
                     match self.tokens.get(self.pos + 1) {
+                        Some(Token::Control(control @ (
+                            ControlWord::FootnoteSeparator
+                            | ControlWord::FootnoteContinuationSeparator
+                            | ControlWord::FootnoteContinuationNotice
+                            | ControlWord::EndnoteSeparator
+                            | ControlWord::EndnoteContinuationSeparator
+                            | ControlWord::EndnoteContinuationNotice
+                        ))) => {
+                            let kind = match control {
+                                ControlWord::FootnoteSeparator => crate::NoteSeparatorKind::FootnoteSeparator,
+                                ControlWord::FootnoteContinuationSeparator => crate::NoteSeparatorKind::FootnoteContinuationSeparator,
+                                ControlWord::FootnoteContinuationNotice => crate::NoteSeparatorKind::FootnoteContinuationNotice,
+                                ControlWord::EndnoteSeparator => crate::NoteSeparatorKind::EndnoteSeparator,
+                                ControlWord::EndnoteContinuationSeparator => crate::NoteSeparatorKind::EndnoteContinuationSeparator,
+                                _ => crate::NoteSeparatorKind::EndnoteContinuationNotice,
+                            };
+                            let separator = self.parse_note_separator_destination(kind)?;
+                            self.note_separators.add(separator)?;
+                            self.states.pop();
+                            return Ok(());
+                        },
                         Some(Token::Control(ControlWord::UnicodeAlternateDestination)) => {
                             return Err(RtfError::MalformedDocument(
                                 "RTF ud destination must be the Unicode branch of upr".to_string(),
@@ -1140,6 +1164,18 @@ impl<'a> Parser<'a> {
                     self.states.pop();
                     return Ok(());
                 },
+                Token::Control(
+                    ControlWord::FootnoteSeparator
+                    | ControlWord::FootnoteContinuationSeparator
+                    | ControlWord::FootnoteContinuationNotice
+                    | ControlWord::EndnoteSeparator
+                    | ControlWord::EndnoteContinuationSeparator
+                    | ControlWord::EndnoteContinuationNotice,
+                ) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF note-separator destinations must be starred".to_string(),
+                    ));
+                },
                 Token::Control(ControlWord::Endnote) => {
                     self.pos += 1;
                     if let Some(state) = self.states.last_mut() {
@@ -1207,6 +1243,134 @@ impl<'a> Parser<'a> {
         parsed?;
         self.expect_token(Token::CloseBrace)?; // outer upr group
         Ok(())
+    }
+
+    fn parse_note_separator_destination(
+        &mut self,
+        kind: crate::NoteSeparatorKind,
+    ) -> RtfResult<crate::NoteSeparator<'a>> {
+        if self.states.len() != 3
+            || self.blocks.iter().any(|block| !block.text.trim().is_empty())
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF note separators must occur at document scope before body text".to_string(),
+            ));
+        }
+        self.pos += 2; // ignorable marker and destination
+        let mut elements = Vec::new();
+        let mut unicode_skip = self.current_state()?.unicode_skip.max(0);
+        self.parse_note_separator_elements(&mut elements, &mut unicode_skip, 0)?;
+        let separator = crate::NoteSeparator { kind, elements };
+        separator.validate()?;
+        Ok(separator)
+    }
+
+    fn parse_note_separator_elements(
+        &mut self,
+        elements: &mut Vec<crate::NoteSeparatorElement<'a>>,
+        unicode_skip: &mut i32,
+        depth: usize,
+    ) -> RtfResult<()> {
+        if depth > 16 {
+            return Err(RtfError::MalformedDocument(
+                "RTF note-separator nesting exceeds the safety limit".to_string(),
+            ));
+        }
+        while self.pos < self.tokens.len() {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    return Ok(());
+                },
+                Some(Token::OpenBrace) => {
+                    let direct = self.tokens.get(self.pos + 1);
+                    let starred = self.tokens.get(self.pos + 2);
+                    if matches!(direct, Some(Token::Control(
+                        ControlWord::Field
+                        | ControlWord::Object
+                        | ControlWord::Picture
+                        | ControlWord::Shape
+                        | ControlWord::ShapeGroup
+                        | ControlWord::Footnote
+                        | ControlWord::Endnote
+                    ))) || (matches!(direct, Some(Token::Control(ControlWord::IgnorableDestination)))
+                        && matches!(starred, Some(Token::Control(
+                            ControlWord::Field
+                            | ControlWord::Object
+                            | ControlWord::Picture
+                            | ControlWord::Shape
+                            | ControlWord::ShapeGroup
+                        ))))
+                    {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF note separator cannot contain fields, objects, pictures, or active destinations".to_string(),
+                        ));
+                    }
+                    self.pos += 1;
+                    self.parse_note_separator_elements(elements, unicode_skip, depth + 1)?;
+                    continue;
+                },
+                Some(Token::Text(text)) => {
+                    let decoded = self.decode_transport_text(text)?;
+                    Self::push_note_separator_text(elements, decoded);
+                },
+                Some(Token::Control(ControlWord::Unicode(first))) => {
+                    let decoded = self.parse_style_unicode(*first, *unicode_skip)?;
+                    Self::push_note_separator_text(elements, decoded);
+                    continue;
+                },
+                Some(Token::Control(ControlWord::UnicodeSkip(value))) => *unicode_skip = (*value).max(0),
+                Some(Token::Control(ControlWord::NoteSeparatorCharacter)) => {
+                    elements.push(crate::NoteSeparatorElement::SeparatorMark)
+                },
+                Some(Token::Control(ControlWord::NoteContinuationSeparatorCharacter)) => {
+                    elements.push(crate::NoteSeparatorElement::ContinuationSeparatorMark)
+                },
+                Some(Token::Control(ControlWord::Par)) => elements.push(crate::NoteSeparatorElement::ParagraphBreak),
+                Some(Token::Control(ControlWord::Line)) => elements.push(crate::NoteSeparatorElement::LineBreak),
+                Some(Token::Control(ControlWord::Tab)) => Self::push_note_separator_text(elements, "\t".to_string()),
+                Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
+                    Self::push_note_separator_text(elements, control_symbol_text(control).unwrap_or_default().to_string())
+                },
+                Some(Token::Binary(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF note separator cannot contain binary data".to_string(),
+                    ));
+                },
+                Some(Token::Control(_)) => {}, // formatting is inert
+                None => return Err(RtfError::UnexpectedEof),
+            }
+            self.pos += 1;
+            if elements.len() > crate::note_separator::MAX_NOTE_SEPARATOR_ELEMENTS {
+                return Err(RtfError::MalformedDocument(
+                    "RTF note separator contains too many elements".to_string(),
+                ));
+            }
+            let text_bytes = elements.iter().map(|element| match element {
+                crate::NoteSeparatorElement::Text(text) => text.len(),
+                _ => 0,
+            }).sum::<usize>();
+            if text_bytes > crate::note_separator::MAX_NOTE_SEPARATOR_TEXT_BYTES {
+                return Err(RtfError::MalformedDocument(
+                    "RTF note-separator text exceeds the safety limit".to_string(),
+                ));
+            }
+        }
+        Err(RtfError::UnexpectedEof)
+    }
+
+    fn push_note_separator_text(
+        elements: &mut Vec<crate::NoteSeparatorElement<'a>>,
+        text: String,
+    ) {
+        if text.is_empty() {
+            return;
+        }
+        if let Some(crate::NoteSeparatorElement::Text(existing)) = elements.last_mut() {
+            existing.to_mut().push_str(&text);
+        } else {
+            elements.push(crate::NoteSeparatorElement::Text(Cow::Owned(text)));
+        }
     }
 
     fn parse_navigation_entry_destination(&mut self) -> RtfResult<()> {
@@ -8249,6 +8413,7 @@ pub struct ParsedDocument<'a> {
     pub annotations: Vec<super::annotation::Annotation<'a>>,
     /// Footnotes and endnotes
     pub notes: Vec<super::section::Note<'a>>,
+    pub note_separators: crate::NoteSeparatorTable<'a>,
     /// Track changes/revisions
     pub revisions: Vec<super::annotation::Revision<'a>>,
     /// Ordered inert revision-author table.

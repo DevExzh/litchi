@@ -7,11 +7,10 @@ use crate::xls::{XlsError, XlsResult};
 
 use super::named_range::XlsDefinedName as InternalDefinedName;
 use super::worksheet::WritableWorksheet;
-use super::{XlsCalculationSettings, XlsCellValue, XlsFileSharing, XlsVbaWriteMetadata, XlsWorkbookProtection};
+use super::{XlsCalculationSettings, XlsCellValue, XlsFileSharing, XlsVbaWriteMetadata, XlsWorkbookEnvironmentOptions, XlsWorkbookProtection};
 
 const DEFAULT_WRITE_ACCESS_USER: &str = "litchi";
 const DEFAULT_FUNCTION_GROUP_COUNT: u16 = 17;
-const DEFAULT_COUNTRY_CODE: u16 = 1;
 
 /// Result of generating the workbook: the Workbook stream plus any pivot
 /// cache storage streams that must be placed in `_SX_DB_CUR/nnnn`.
@@ -28,6 +27,7 @@ pub(crate) fn generate_workbook_stream(
     use_1904_dates: bool,
     calculation_settings: XlsCalculationSettings,
     vba_metadata: Option<&XlsVbaWriteMetadata>,
+    environment: XlsWorkbookEnvironmentOptions,
     fmt: &FormattingManager,
     defined_names: &[InternalDefinedName],
     shared_strings: &[String],
@@ -58,6 +58,8 @@ pub(crate) fn generate_workbook_stream(
     // BOF record (workbook)
     biff::write_bof(&mut stream, 0x0005)?;
 
+    if environment.template { biff::write_template(&mut stream)?; }
+
     biff::write_interface_hdr(&mut stream, 0x04B0)?;
     biff::write_mms(&mut stream)?;
     biff::write_interface_end(&mut stream)?;
@@ -77,10 +79,8 @@ pub(crate) fn generate_workbook_stream(
     // CodePage record - BIFF8 requires Unicode codepage 1200 (0x04B0)
     biff::write_codepage(&mut stream, 0x04B0)?;
 
-    biff::write_dsf(&mut stream, false)?;
-    if has_pivot_tables {
-        biff::write_excel9_file(&mut stream)?;
-    }
+    biff::write_dsf(&mut stream, environment.has_biff5_stream)?;
+    biff::write_excel9_file(&mut stream)?;
     biff::write_tab_id(&mut stream, sheet_count)?;
     if let Some(metadata) = vba_metadata {
         biff::write_ob_proj(&mut stream)?;
@@ -97,12 +97,16 @@ pub(crate) fn generate_workbook_stream(
     // Window1 record (workbook window properties)
     biff::write_window1(&mut stream)?;
 
-    biff::write_backup(&mut stream, false)?;
-    biff::write_hide_obj(&mut stream, 0)?;
+    biff::write_backup(&mut stream, environment.create_backup_copy)?;
+    biff::write_hide_obj(&mut stream, match environment.object_display_mode {
+        crate::xls::XlsObjectDisplayMode::ShowAll => 0,
+        crate::xls::XlsObjectDisplayMode::ShowPlaceholders => 1,
+        crate::xls::XlsObjectDisplayMode::HideAll => 2,
+    })?;
     biff::write_date1904(&mut stream, use_1904_dates)?;
     biff::write_precision(&mut stream, calculation_settings.full_precision)?;
-    biff::write_refresh_all(&mut stream, false)?;
-    biff::write_book_bool(&mut stream, false)?;
+    biff::write_refresh_all(&mut stream, environment.refresh_external_data_on_load)?;
+    biff::write_book_bool_raw(&mut stream, environment.book_bool_bits())?;
 
     // Write minimal formatting tables so XF index 0 is valid.
     // Order mirrors Apache POI's workbook creation:
@@ -271,7 +275,7 @@ pub(crate) fn generate_workbook_stream(
         }
     }
 
-    biff::write_usesel_fs(&mut stream)?;
+    biff::write_usesel_fs_value(&mut stream, environment.supports_natural_language_formulas)?;
 
     for worksheet in worksheets {
         boundsheet_positions.push(stream.len());
@@ -288,16 +292,13 @@ pub(crate) fn generate_workbook_stream(
         biff::write_mso_drawing_group(&mut stream)?;
     }
 
-    biff::write_country(&mut stream, DEFAULT_COUNTRY_CODE, DEFAULT_COUNTRY_CODE)?;
+    biff::write_country(&mut stream, environment.default_country_code, environment.current_country_code)?;
 
     // SST record (shared string table)
     if !shared_strings.is_empty() {
         biff::write_sst(&mut stream, shared_strings, sst_total)?;
     }
 
-    if !has_pivot_tables {
-        biff::write_excel9_file(&mut stream)?;
-    }
     if calculation_settings.force_full_calculation {
         biff::write_force_full_calculation(&mut stream, true)?;
     }

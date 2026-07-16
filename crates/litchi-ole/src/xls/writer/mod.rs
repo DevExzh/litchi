@@ -24,7 +24,7 @@ pub use core::{
     XlsDataValidationOptions, XlsDataValidationRange, XlsDataValidationTableOptions,
     XlsDataValidationType,
     XlsDefinedName, XlsPivotDataItemConfig, XlsPivotFieldConfig, XlsPivotItemConfig,
-    XlsPageSetupOptions, XlsPivotTableConfig, XlsWriter,
+    XlsPageSetupOptions, XlsPivotTableConfig, XlsWorkbookEnvironmentOptions, XlsWriter,
 };
 pub use formatting::{
     BorderStyle, Borders, CellStyle, ExtendedFormat, Fill, FillPattern, Font, FormattingManager,

@@ -72,6 +72,7 @@ pub mod sections;
 pub mod shapes;
 pub mod slide;
 pub mod smartart;
+pub mod tags;
 pub mod template;
 pub mod transitions;
 pub mod writer;
@@ -94,6 +95,10 @@ pub use protection::{
 };
 pub use sections::{Section, SectionList};
 pub use slide::{Slide, SlideLayout, SlideMaster};
+pub use tags::{
+    ProgrammableTag, SlideTagList, TagExtensionAttribute, TagList, TagListConformance,
+    parse_tag_list, write_tag_list,
+};
 pub use smartart::{DiagramNode, DiagramType, SmartArt, SmartArtBuilder};
 pub use transitions::{SlideTransition, TransitionDirection, TransitionSpeed, TransitionType};
 pub use writer::{MutablePresentation, MutableShape, MutableSlide};

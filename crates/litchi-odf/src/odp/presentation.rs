@@ -259,6 +259,14 @@ impl Presentation {
         }
     }
 
+    /// Inspect named drawing hatch resources without resolving style use sites.
+    pub fn drawing_hatches(&self) -> Result<crate::drawing_hatch::OdfDrawingHatches> {
+        match self.styles.as_ref() {
+            Some(styles) => crate::drawing_hatch::parse_drawing_hatches(styles.xml_content()),
+            None => Ok(crate::drawing_hatch::OdfDrawingHatches::default()),
+        }
+    }
+
     /// Get a slide by index.
     ///
     /// Returns `Some(slide)` if a slide exists at the given index, `None` otherwise.
