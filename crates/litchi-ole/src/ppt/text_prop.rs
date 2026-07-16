@@ -4,6 +4,8 @@
 /// This module handles the complex structure of text styling in PPT files.
 use litchi_core::binary::{read_i16_le, read_i32_le, read_u16_le, read_u32_le};
 
+use super::package::{PptError, Result};
+
 /// Text property definition.
 ///
 /// Based on Apache POI's TextProp. Each property has a size, mask, and value.
@@ -330,6 +332,162 @@ pub fn parse_style_text_prop_atom(
     (paragraph_styles, character_styles)
 }
 
+/// Parse `StyleTextPropAtom` data with strict MS-PPT framing validation.
+///
+/// Unlike [`parse_style_text_prop_atom`], this rejects zero-length runs,
+/// truncated property payloads, coverage beyond or below `text_length + 1`,
+/// and unexplained trailing bytes.
+pub fn parse_style_text_prop_atom_strict(
+    data: &[u8],
+    text_length: usize,
+) -> Result<(Vec<TextPropCollection>, Vec<TextPropCollection>)> {
+    let style_length = u32::try_from(text_length)
+        .map_err(|_| PptError::Corrupted("StyleTextPropAtom text length exceeds u32".to_string()))?
+        .checked_add(1)
+        .ok_or_else(|| PptError::Corrupted("StyleTextPropAtom text length overflow".to_string()))?;
+    let mut paragraph_styles = Vec::new();
+    let mut character_styles = Vec::new();
+    let mut offset = 0usize;
+    let mut paragraph_coverage = 0u32;
+
+    while paragraph_coverage < style_length {
+        require_style_bytes(data, offset, 10, "TextPFRun header")?;
+        let char_count = read_u32_le(data, offset).unwrap_or(0);
+        if char_count == 0 || char_count > style_length - paragraph_coverage {
+            return Err(PptError::Corrupted(
+                "TextPFRun has invalid character coverage".to_string(),
+            ));
+        }
+        let indent_level = read_u16_le(data, offset + 4).unwrap_or(0);
+        let mask = read_u32_le(data, offset + 6).unwrap_or(0);
+        offset += 10;
+
+        let property_size = paragraph_property_size(data, offset, mask)?;
+        require_style_bytes(data, offset, property_size, "TextPFException")?;
+        let property_end = offset + property_size;
+        let (properties, tab_stops) = parse_paragraph_properties(data, &mut offset, mask);
+        if offset != property_end {
+            return Err(PptError::Corrupted(
+                "TextPFException property size mismatch".to_string(),
+            ));
+        }
+
+        let mut collection = TextPropCollection::new(char_count, TextPropType::Paragraph);
+        collection.indent_level = indent_level;
+        collection.properties = properties;
+        collection.property_mask = mask;
+        collection.tab_stops = tab_stops;
+        paragraph_styles.push(collection);
+        paragraph_coverage += char_count;
+    }
+
+    let mut character_coverage = 0u32;
+    while character_coverage < style_length {
+        require_style_bytes(data, offset, 8, "TextCFRun header")?;
+        let char_count = read_u32_le(data, offset).unwrap_or(0);
+        if char_count == 0 || char_count > style_length - character_coverage {
+            return Err(PptError::Corrupted(
+                "TextCFRun has invalid character coverage".to_string(),
+            ));
+        }
+        let mask = read_u32_le(data, offset + 4).unwrap_or(0);
+        offset += 8;
+
+        let property_size = character_property_size(mask);
+        require_style_bytes(data, offset, property_size, "TextCFException")?;
+        let property_end = offset + property_size;
+        let properties = parse_character_properties(data, &mut offset, mask);
+        if offset != property_end {
+            return Err(PptError::Corrupted(
+                "TextCFException property size mismatch".to_string(),
+            ));
+        }
+
+        let mut collection = TextPropCollection::new(char_count, TextPropType::Character);
+        collection.properties = properties;
+        collection.property_mask = mask;
+        character_styles.push(collection);
+        character_coverage += char_count;
+    }
+
+    if offset != data.len() {
+        return Err(PptError::Corrupted(
+            "StyleTextPropAtom has trailing bytes".to_string(),
+        ));
+    }
+    Ok((paragraph_styles, character_styles))
+}
+
+fn paragraph_property_size(data: &[u8], offset: usize, mask: u32) -> Result<usize> {
+    let mut size = 0usize;
+    if mask & 0x000F != 0 {
+        size += 2;
+    }
+    for (property_mask, property_size) in [
+        (0x0080, 2usize),
+        (0x0010, 2),
+        (0x0040, 2),
+        (0x0020, 4),
+        (0x0800, 2),
+        (0x1000, 2),
+        (0x2000, 2),
+        (0x4000, 2),
+        (0x0100, 2),
+        (0x0400, 2),
+        (0x8000, 2),
+    ] {
+        if mask & property_mask != 0 {
+            size += property_size;
+        }
+    }
+    if mask & 0x0010_0000 != 0 {
+        require_style_bytes(data, offset, size + 2, "TabStops count")?;
+        let count = read_u16_le(data, offset + size).unwrap_or(0) as usize;
+        size = size
+            .checked_add(2)
+            .and_then(|size| count.checked_mul(4).and_then(|tabs| size.checked_add(tabs)))
+            .ok_or_else(|| PptError::Corrupted("TabStops size overflow".to_string()))?;
+    }
+    if mask & 0x0001_0000 != 0 {
+        size += 2;
+    }
+    if mask & 0x000E_0000 != 0 {
+        size += 2;
+    }
+    if mask & 0x0020_0000 != 0 {
+        size += 2;
+    }
+    Ok(size)
+}
+
+fn character_property_size(mask: u32) -> usize {
+    let mut size = usize::from(mask & 0x0000_FFFF != 0) * 2;
+    for (property_mask, property_size) in [
+        (0x0001_0000, 2usize),
+        (0x0020_0000, 2),
+        (0x0040_0000, 2),
+        (0x0080_0000, 2),
+        (0x0002_0000, 2),
+        (0x0004_0000, 4),
+        (0x0008_0000, 2),
+    ] {
+        if mask & property_mask != 0 {
+            size += property_size;
+        }
+    }
+    size
+}
+
+fn require_style_bytes(data: &[u8], offset: usize, size: usize, field: &str) -> Result<()> {
+    let end = offset
+        .checked_add(size)
+        .ok_or_else(|| PptError::Corrupted(format!("{field} offset overflow")))?;
+    if end > data.len() {
+        return Err(PptError::Corrupted(format!("Truncated {field}")));
+    }
+    Ok(())
+}
+
 /// Extract formatting from character flags.
 ///
 /// Character flags (mask 0x0001) contains packed boolean properties:
@@ -422,5 +580,59 @@ mod tests {
         let properties = parse_character_properties(&[0xFF, 0xFF], &mut offset, 0x10000);
 
         assert_eq!(properties[0].value, 65_535);
+    }
+
+    fn minimal_style_data() -> Vec<u8> {
+        let mut data = Vec::new();
+        data.extend_from_slice(&2u32.to_le_bytes());
+        data.extend_from_slice(&0u16.to_le_bytes());
+        data.extend_from_slice(&0u32.to_le_bytes());
+        data.extend_from_slice(&2u32.to_le_bytes());
+        data.extend_from_slice(&0u32.to_le_bytes());
+        data
+    }
+
+    #[test]
+    fn strict_style_parser_requires_exact_run_coverage() {
+        let mut zero_count = minimal_style_data();
+        zero_count[..4].copy_from_slice(&0u32.to_le_bytes());
+        assert!(parse_style_text_prop_atom_strict(&zero_count, 1).is_err());
+
+        let mut overlong = minimal_style_data();
+        overlong[..4].copy_from_slice(&3u32.to_le_bytes());
+        assert!(parse_style_text_prop_atom_strict(&overlong, 1).is_err());
+
+        let mut underlong = minimal_style_data();
+        underlong[..4].copy_from_slice(&1u32.to_le_bytes());
+        assert!(parse_style_text_prop_atom_strict(&underlong, 1).is_err());
+    }
+
+    #[test]
+    fn strict_style_parser_rejects_truncation_and_trailing_bytes() {
+        let valid = minimal_style_data();
+        assert!(parse_style_text_prop_atom_strict(&valid, 1).is_ok());
+
+        for length in 0..valid.len() {
+            assert!(parse_style_text_prop_atom_strict(&valid[..length], 1).is_err());
+        }
+
+        let mut trailing = valid;
+        trailing.push(0);
+        let error = parse_style_text_prop_atom_strict(&trailing, 1).unwrap_err();
+        assert!(error.to_string().contains("trailing bytes"));
+    }
+
+    #[test]
+    fn strict_style_parser_bounds_checks_tab_stop_arrays() {
+        let mut data = Vec::new();
+        data.extend_from_slice(&2u32.to_le_bytes());
+        data.extend_from_slice(&0u16.to_le_bytes());
+        data.extend_from_slice(&0x0010_0000u32.to_le_bytes());
+        data.extend_from_slice(&2u16.to_le_bytes());
+        data.extend_from_slice(&10i16.to_le_bytes());
+        data.extend_from_slice(&0u16.to_le_bytes());
+
+        let error = parse_style_text_prop_atom_strict(&data, 1).unwrap_err();
+        assert!(error.to_string().contains("TextPFException"));
     }
 }

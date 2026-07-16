@@ -436,7 +436,7 @@ impl TextRunExtractor {
         };
         let text_length = source_text.encode_utf16().count();
         let (paragraph_styles, character_styles) =
-            super::text_prop::parse_style_text_prop_atom(&record.data, text_length);
+            super::text_prop::parse_style_text_prop_atom_strict(&record.data, text_length)?;
 
         self.apply_paragraph_styles(&source_text, start_index, &paragraph_styles)?;
 
@@ -972,6 +972,8 @@ mod tests {
         style_data.extend_from_slice(&1i16.to_le_bytes());
         style_data.extend_from_slice(&0x0800u32.to_le_bytes());
         style_data.extend_from_slice(&2u16.to_le_bytes());
+        style_data.extend_from_slice(&6u32.to_le_bytes());
+        style_data.extend_from_slice(&0u32.to_le_bytes());
         let style_record = PptRecord {
             record_type: PptRecordType::StyleTextPropAtom,
             record_type_raw: 4001,
