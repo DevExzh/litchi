@@ -15,7 +15,7 @@ use super::super::paragraph_tabs::ParagraphTabStops;
 use super::super::style::{
     ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingMultiple,
     ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, TextAlignment,
-    TextCapitalization, TextDecorations, TextPointSize, TextStrikethrough, TextStyle,
+    TextCapitalization, TextDecorations, TextPointSize, TextScript, TextStrikethrough, TextStyle,
     TextUnderline,
 };
 use super::super::style_registry::object_archive_name;
@@ -35,6 +35,7 @@ const CHARACTER_BOLD_FIELD: u32 = 1;
 const CHARACTER_ITALIC_FIELD: u32 = 2;
 const CHARACTER_FONT_SIZE_FIELD: u32 = 3;
 const CHARACTER_FONT_COLOR_FIELD: u32 = 7;
+const CHARACTER_SCRIPT_FIELD: u32 = 10;
 const CHARACTER_UNDERLINE_FIELD: u32 = 11;
 const CHARACTER_STRIKETHROUGH_FIELD: u32 = 12;
 const CHARACTER_CAPITALIZATION_FIELD: u32 = 13;
@@ -77,6 +78,7 @@ pub(super) struct ParagraphStyleOverrides {
     pub(super) point_size: Option<TextPointSize>,
     pub(super) font_color: Option<RgbaColor>,
     pub(super) capitalization: Option<TextCapitalization>,
+    pub(super) script: Option<TextScript>,
     pub(super) underline: Option<TextUnderline>,
     pub(super) strikethrough: Option<TextStrikethrough>,
     pub(super) alignment: Option<TextAlignment>,
@@ -98,6 +100,7 @@ impl ParagraphStyleOverrides {
             + self
                 .capitalization
                 .map_or(0, TextCapitalization::native_override_count)
+            + u32::from(self.script.is_some())
             + u32::from(self.underline.is_some())
             + u32::from(self.strikethrough.is_some())
             + u32::from(self.alignment.is_some())
@@ -181,6 +184,13 @@ pub(super) fn inherited_text_capitalization(
     inheritance::text_capitalization(package, first_style_id)
 }
 
+pub(super) fn inherited_text_script(
+    package: &IWorkPackage,
+    first_style_id: u64,
+) -> Result<TextScript> {
+    inheritance::text_script(package, first_style_id)
+}
+
 pub(super) fn inherited_line_spacing(
     package: &IWorkPackage,
     first_style_id: u64,
@@ -227,6 +237,10 @@ pub(super) fn direct_overrides(
         .transpose()?;
     let font_color = text_color_from_character(character_properties)?;
     let capitalization = capitalization_from_character(character_properties)?;
+    let script = character_properties
+        .superscript
+        .map(TextScript::from_native_value)
+        .transpose()?;
     let underline = character_properties
         .underline
         .map(TextUnderline::from_native_value)
@@ -275,6 +289,7 @@ pub(super) fn direct_overrides(
         point_size,
         font_color,
         capitalization,
+        script,
         underline,
         strikethrough,
         alignment,
@@ -305,6 +320,7 @@ pub(super) fn direct_overrides(
         remaining_character.capitalization = None;
         remaining_character.capitalization_uses_linguistics = None;
     }
+    remaining_character.superscript = None;
     remaining_character.underline = None;
     remaining_character.strikethru = None;
     let semantic = !overrides.is_empty()
@@ -331,7 +347,7 @@ pub(super) fn direct_overrides(
         STYLE_PARAGRAPH_PROPERTIES_FIELD,
         "paragraph properties",
     )?;
-    let mut character_fields = Vec::with_capacity(9);
+    let mut character_fields = Vec::with_capacity(10);
     if bold.is_some() {
         character_fields.push(CHARACTER_BOLD_FIELD);
     }
@@ -371,6 +387,9 @@ pub(super) fn direct_overrides(
         if capitalization.uses_linguistics().is_some() {
             character_fields.push(CHARACTER_CAPITALIZATION_LINGUISTICS_FIELD);
         }
+    }
+    if script.is_some() {
+        character_fields.push(CHARACTER_SCRIPT_FIELD);
     }
     if underline.is_some() {
         character_fields.push(CHARACTER_UNDERLINE_FIELD);
@@ -467,6 +486,7 @@ pub(super) fn variation_object(
             capitalization: overrides
                 .capitalization
                 .map(TextCapitalization::native_value),
+            superscript: overrides.script.map(TextScript::native_value),
             underline: overrides.underline.map(TextUnderline::native_value),
             strikethru: overrides.strikethrough.map(TextStrikethrough::native_value),
             tsd_fill: overrides.font_color.map(|color| tsd::FillArchive {

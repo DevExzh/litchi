@@ -28,7 +28,7 @@ use crate::shapes::{
 use crate::text::{
     IWorkTextEditor, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphIndents,
     ParagraphLineSpacing, ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment,
-    TextCapitalization, TextColumns, TextDecorations, TextStorageInfo, TextStyle,
+    TextCapitalization, TextColumns, TextDecorations, TextScript, TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     append_repeated_length_delimited_field, parse_wire_fields, patch_fixed32_field,
@@ -1427,6 +1427,51 @@ impl KeynoteEditor {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();
         let changed = staged.reset_text_capitalization(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read effective uniform baseline script from an ordinary slide text box.
+    pub fn slide_text_box_text_script(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<TextScript> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text.text_script(graph.storage_id)
+    }
+
+    /// Atomically set normal, superscript, or subscript formatting.
+    pub fn set_slide_text_box_text_script(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        script: TextScript,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_text_script(graph.storage_id, script)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified.slide_text_box_text_script(slide_index, drawable_object_id)? != script {
+            return Err(Error::InvalidFormat(
+                "Keynote text-box script update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore inherited baseline script while preserving sibling overrides.
+    pub fn reset_slide_text_box_text_script(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_text_script(graph.storage_id)?;
         if changed {
             *self = Self::from_package(staged.into_package())?;
         }

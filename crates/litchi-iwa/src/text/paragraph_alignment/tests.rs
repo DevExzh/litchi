@@ -11,7 +11,7 @@ use crate::text::{
     IWorkTextEditor, ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacingMultiple,
     ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, ParagraphTabAlignment,
     ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops,
-    TextCapitalization, TextColumnCount, TextColumns, TextDecorations, TextPointSize,
+    TextCapitalization, TextColumnCount, TextColumns, TextDecorations, TextPointSize, TextScript,
     TextStrikethrough, TextStyle, TextUnderline,
 };
 
@@ -112,6 +112,189 @@ fn native_capitalization_values_are_strict_canonical_and_reversible() {
     }
     assert!(TextCapitalization::from_native_value(4, None).is_err());
     assert!(TextCapitalization::from_native_value(1, Some(true)).is_err());
+}
+
+#[test]
+fn native_script_values_are_strict_canonical_and_reversible() {
+    for script in [
+        TextScript::Normal,
+        TextScript::Superscript,
+        TextScript::Subscript,
+    ] {
+        let overrides = ParagraphStyleOverrides {
+            script: Some(script),
+            ..Default::default()
+        };
+        let object = native::variation_object(33, 34, 35, overrides.clone()).unwrap();
+        let message = &object.messages[0];
+        let archive = tswp::ParagraphStyleArchive::decode(message.data.as_slice()).unwrap();
+        assert_eq!(archive.override_count, Some(1));
+        assert_eq!(
+            archive
+                .char_properties
+                .as_ref()
+                .and_then(|properties| properties.superscript),
+            Some(script.native_value())
+        );
+        assert_eq!(
+            native::direct_overrides(&archive, &message.data).unwrap(),
+            Some(overrides)
+        );
+    }
+    assert!(TextScript::from_native_value(-1).is_err());
+    assert!(TextScript::from_native_value(3).is_err());
+}
+
+#[test]
+fn uniform_text_script_round_trips_isolates_and_resets_in_every_suite() {
+    let mut pages = PagesEditor::create_with_text("Scripts").unwrap();
+    let pages_box = pages
+        .add_text_box(
+            7,
+            "Pages superscript",
+            DrawablePoint { x: 20.0, y: 40.0 },
+            DrawableSize {
+                width: 240.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    let pages_sibling = pages
+        .add_text_box(
+            7,
+            "Plain Pages text",
+            DrawablePoint { x: 280.0, y: 40.0 },
+            DrawableSize {
+                width: 240.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    pages
+        .set_text_box_text_capitalization(pages_box.drawable_object_id, TextCapitalization::AllCaps)
+        .unwrap();
+    pages
+        .set_text_box_text_script(pages_box.drawable_object_id, TextScript::Superscript)
+        .unwrap();
+    assert_eq!(
+        pages
+            .text_box_text_script(pages_sibling.drawable_object_id)
+            .unwrap(),
+        TextScript::Normal
+    );
+    let mut pages = PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        pages
+            .text_box_text_script(pages_box.drawable_object_id)
+            .unwrap(),
+        TextScript::Superscript
+    );
+    assert!(
+        pages
+            .reset_text_box_text_script(pages_box.drawable_object_id)
+            .unwrap()
+    );
+    assert_eq!(
+        pages
+            .text_box_text_script(pages_box.drawable_object_id)
+            .unwrap(),
+        TextScript::Normal
+    );
+    assert_eq!(
+        pages
+            .text_box_text_capitalization(pages_box.drawable_object_id)
+            .unwrap(),
+        TextCapitalization::AllCaps
+    );
+
+    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let sheet_id = numbers.sheets().unwrap()[0].object_id;
+    let numbers_box = numbers
+        .add_sheet_text_box(
+            sheet_id,
+            "Numbers subscript",
+            DrawablePoint { x: 20.0, y: 200.0 },
+            DrawableSize {
+                width: 240.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    numbers
+        .set_sheet_text_box_text_capitalization(
+            sheet_id,
+            numbers_box.drawable_object_id,
+            TextCapitalization::SmallCaps,
+        )
+        .unwrap();
+    numbers
+        .set_sheet_text_box_text_script(
+            sheet_id,
+            numbers_box.drawable_object_id,
+            TextScript::Subscript,
+        )
+        .unwrap();
+    let mut numbers =
+        crate::numbers::NumbersEditor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        numbers
+            .sheet_text_box_text_script(sheet_id, numbers_box.drawable_object_id)
+            .unwrap(),
+        TextScript::Subscript
+    );
+    assert!(
+        numbers
+            .reset_sheet_text_box_text_script(sheet_id, numbers_box.drawable_object_id)
+            .unwrap()
+    );
+    assert_eq!(
+        numbers
+            .sheet_text_box_text_capitalization(sheet_id, numbers_box.drawable_object_id)
+            .unwrap(),
+        TextCapitalization::SmallCaps
+    );
+
+    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let keynote_box = keynote
+        .add_slide_text_box(
+            0,
+            "Keynote superscript",
+            DrawablePoint { x: 80.0, y: 500.0 },
+            DrawableSize {
+                width: 500.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    keynote
+        .set_slide_text_box_text_capitalization(
+            0,
+            keynote_box.drawable_object_id,
+            TextCapitalization::TitleCase,
+        )
+        .unwrap();
+    keynote
+        .set_slide_text_box_text_script(0, keynote_box.drawable_object_id, TextScript::Superscript)
+        .unwrap();
+    let mut keynote =
+        crate::keynote::KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        keynote
+            .slide_text_box_text_script(0, keynote_box.drawable_object_id)
+            .unwrap(),
+        TextScript::Superscript
+    );
+    assert!(
+        keynote
+            .reset_slide_text_box_text_script(0, keynote_box.drawable_object_id)
+            .unwrap()
+    );
+    assert_eq!(
+        keynote
+            .slide_text_box_text_capitalization(0, keynote_box.drawable_object_id)
+            .unwrap(),
+        TextCapitalization::TitleCase
+    );
 }
 
 #[test]
@@ -1279,6 +1462,11 @@ fn multiple_paragraph_boundaries_are_rejected_transactionally() {
     assert!(
         editor
             .set_text_capitalization(storage_id, TextCapitalization::StartCase)
+            .is_err()
+    );
+    assert!(
+        editor
+            .set_text_script(storage_id, TextScript::Superscript)
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before);

@@ -13,7 +13,8 @@ use litchi_iwa::text::{
     ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, ParagraphStart,
     ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
     ParagraphTabStops, TextAlignment, TextCapitalization, TextColumnCount, TextColumnGap,
-    TextColumns, TextDecorations, TextPointSize, TextStrikethrough, TextStyle, TextUnderline,
+    TextColumns, TextDecorations, TextPointSize, TextScript, TextStrikethrough, TextStyle,
+    TextUnderline,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -78,6 +79,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         sheet_id,
         created.drawable_object_id,
         TextCapitalization::SmallCaps,
+    )?;
+    editor.set_sheet_text_box_text_script(
+        sheet_id,
+        created.drawable_object_id,
+        TextScript::Subscript,
     )?;
     editor.set_sheet_text_box_paragraph_alignment(
         sheet_id,

@@ -225,6 +225,39 @@ impl TextCapitalization {
     }
 }
 
+/// Effective uniform baseline script applied by a native iWork character style.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum TextScript {
+    /// Keep characters on the normal text baseline.
+    #[default]
+    Normal,
+    /// Raise and resize characters as superscript.
+    Superscript,
+    /// Lower and resize characters as subscript.
+    Subscript,
+}
+
+impl TextScript {
+    pub(crate) const fn native_value(self) -> i32 {
+        match self {
+            Self::Normal => 0,
+            Self::Superscript => 1,
+            Self::Subscript => 2,
+        }
+    }
+
+    pub(crate) fn from_native_value(value: i32) -> crate::Result<Self> {
+        match value {
+            0 => Ok(Self::Normal),
+            1 => Ok(Self::Superscript),
+            2 => Ok(Self::Subscript),
+            _ => Err(crate::Error::InvalidFormat(format!(
+                "unsupported native iWork text script {value}"
+            ))),
+        }
+    }
+}
+
 /// Uniform paragraph properties currently supported by the shared text editor.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ParagraphStyle {

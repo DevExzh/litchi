@@ -8,7 +8,7 @@ use crate::text::paragraph_tabs::ParagraphTabStops;
 use crate::text::style::{
     ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing, ParagraphSpacing,
     ParagraphSpacingPoints, TextAlignment, TextCapitalization, TextDecorations, TextPointSize,
-    TextStrikethrough, TextStyle, TextUnderline,
+    TextScript, TextStrikethrough, TextStyle, TextUnderline,
 };
 use crate::{Error, IWorkPackage, Result};
 
@@ -121,6 +121,21 @@ pub(super) fn text_capitalization(
             return Ok(InheritanceControl::Continue);
         };
         *value = Some(capitalization);
+        Ok(InheritanceControl::Complete)
+    })?;
+    Ok(value.unwrap_or_default())
+}
+
+pub(super) fn text_script(package: &IWorkPackage, first_style_id: u64) -> Result<TextScript> {
+    let value = walk(package, first_style_id, None, |value, style| {
+        let Some(script) = style
+            .char_properties
+            .as_ref()
+            .and_then(|properties| properties.superscript)
+        else {
+            return Ok(InheritanceControl::Continue);
+        };
+        *value = Some(TextScript::from_native_value(script)?);
         Ok(InheritanceControl::Complete)
     })?;
     Ok(value.unwrap_or_default())

@@ -20,9 +20,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             editor.text_decorations(storage.object_id),
             editor.text_color(storage.object_id),
             editor.text_capitalization(storage.object_id),
+            editor.text_script(storage.object_id),
         ) {
-            (Ok(style), Ok(decorations), Ok(color), Ok(capitalization)) => println!(
-                "storage={} points={} bold={} italic={} underline={:?} strikethrough={:?} rgba=({},{},{},{}) color_space={:?} capitalization={capitalization:?}",
+            (Ok(style), Ok(decorations), Ok(color), Ok(capitalization), Ok(script)) => println!(
+                "storage={} points={} bold={} italic={} underline={:?} strikethrough={:?} rgba=({},{},{},{}) color_space={:?} capitalization={capitalization:?} script={script:?}",
                 storage.object_id,
                 style.point_size.points(),
                 style.bold,
@@ -35,10 +36,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 color.alpha(),
                 color.color_space()
             ),
-            (Err(error), _, _, _)
-            | (_, Err(error), _, _)
-            | (_, _, Err(error), _)
-            | (_, _, _, Err(error)) => {
+            (Err(error), _, _, _, _)
+            | (_, Err(error), _, _, _)
+            | (_, _, Err(error), _, _)
+            | (_, _, _, Err(error), _)
+            | (_, _, _, _, Err(error)) => {
                 println!("storage={} unavailable={error}", storage.object_id)
             },
         }

@@ -33,6 +33,6 @@ pub use storage::{TextFragment, TextRun, TextStorage};
 pub use style::{
     ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingMultiple,
     ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, ParagraphStyle,
-    TextAlignment, TextCapitalization, TextDecorations, TextPointSize, TextStrikethrough,
-    TextStyle, TextUnderline,
+    TextAlignment, TextCapitalization, TextDecorations, TextPointSize, TextScript,
+    TextStrikethrough, TextStyle, TextUnderline,
 };
