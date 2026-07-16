@@ -3,11 +3,16 @@
 //! This module provides shared text extraction functionality used across
 //! Pages, Numbers, and Keynote documents.
 
+pub(crate) mod columns;
 pub mod editor;
 pub mod extractor;
 pub mod storage;
 pub mod style;
 
+pub use columns::{
+    EqualTextColumns, FollowingTextColumn, TextColumnCount, TextColumnGap, TextColumnWidth,
+    TextColumns, VariableTextColumns,
+};
 pub use editor::{IWorkTextEditor, TextStorageInfo};
 
 pub use extractor::TextExtractor;

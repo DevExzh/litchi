@@ -4,6 +4,7 @@ use std::env;
 
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_iwa::text::{TextColumnCount, TextColumns};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -30,9 +31,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             height: 120.0,
         },
     )?;
+    editor.set_slide_text_box_columns(
+        0,
+        created.drawable_object_id,
+        &TextColumns::equal(TextColumnCount::new(4)?, None),
+    )?;
     editor.save(output)?;
     println!(
-        "created Keynote text box {} with storage {}",
+        "created four-column Keynote text box {} with storage {}",
         created.drawable_object_id, created.storage.object_id
     );
     Ok(())

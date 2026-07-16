@@ -35,8 +35,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             } else {
                 None
             };
+            let columns = if text.role == KeynoteSlideTextRole::TextBox {
+                Some(editor.slide_text_box_columns(slide.index, text.drawable_object_id)?)
+            } else {
+                None
+            };
             println!(
-                "  text_index={text_index} text_box_index={ordinary_index:?} role={:?} drawable={} storage={} text={:?} geometry={geometry:?} properties={properties:?}",
+                "  text_index={text_index} text_box_index={ordinary_index:?} role={:?} drawable={} storage={} text={:?} geometry={geometry:?} properties={properties:?} columns={columns:?}",
                 text.role, text.drawable_object_id, text.storage.object_id, text.storage.text
             );
         }

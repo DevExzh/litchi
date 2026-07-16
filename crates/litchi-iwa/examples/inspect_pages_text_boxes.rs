@@ -49,8 +49,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for text in editor.drawable_text_storages()? {
         let geometry = editor.text_box_geometry(text.drawable_object_id).ok();
         let properties = editor.text_box_properties(text.drawable_object_id).ok();
+        let columns = editor.text_box_columns(text.drawable_object_id).ok();
         println!(
-            "drawable={} storage={} kind={:?} text={:?} geometry={geometry:?} properties={properties:?}",
+            "drawable={} storage={} kind={:?} text={:?} geometry={geometry:?} properties={properties:?} columns={columns:?}",
             text.drawable_object_id, text.storage.object_id, text.storage.kind, text.storage.text,
         );
         for name in package.iwa_entry_names() {

@@ -25,8 +25,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 editor.sheet_text_box_properties(sheet.object_id, text_box.drawable_object_id)?;
             let comment =
                 editor.sheet_drawable_comment(sheet.object_id, text_box.drawable_object_id)?;
+            let columns =
+                editor.sheet_text_box_columns(sheet.object_id, text_box.drawable_object_id)?;
             println!(
-                "  text_box_index={index} drawable={} storage={} text={:?} geometry={geometry:?} properties={properties:?} comment={:?}",
+                "  text_box_index={index} drawable={} storage={} text={:?} geometry={geometry:?} properties={properties:?} columns={columns:?} comment={:?}",
                 text_box.drawable_object_id,
                 text_box.storage.object_id,
                 text_box.storage.text,

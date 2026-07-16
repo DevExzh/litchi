@@ -33,10 +33,11 @@ use crate::protobuf::tst::{
 use crate::protobuf::{tn, tsce, tsd, tsp, tswp};
 use crate::registry::{Application, detect_application_from_document};
 use crate::shapes::{
-    DrawableGeometry, DrawableProperties, set_shape_geometry, set_shape_properties, shape_geometry,
-    shape_properties,
+    DrawableGeometry, DrawableProperties, reset_shape_text_columns, set_shape_geometry,
+    set_shape_properties, set_shape_text_columns, shape_geometry, shape_properties,
+    shape_text_columns,
 };
-use crate::text::{IWorkTextEditor, TextStorageInfo};
+use crate::text::{IWorkTextEditor, TextColumns, TextStorageInfo};
 use crate::wire::{
     patch_length_delimited_field, patch_nested_fixed32_field, patch_nested_length_delimited_field,
     patch_nested_varint_field, patch_varint_field, repeated_length_delimited_payloads,
@@ -472,6 +473,58 @@ impl NumbersEditor {
         }
         *self = verified;
         Ok(())
+    }
+
+    /// Read the uniform column layout of an ordinary sheet text box.
+    pub fn sheet_text_box_columns(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<TextColumns> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        shape_text_columns(&self.package, &graph.archive_name, drawable_object_id)
+    }
+
+    /// Replace the uniform column layout of an ordinary sheet text box.
+    pub fn set_sheet_text_box_columns(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        columns: &TextColumns,
+    ) -> Result<()> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let staged = set_shape_text_columns(
+            self.package.clone(),
+            &graph.archive_name,
+            drawable_object_id,
+            columns,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if &verified.sheet_text_box_columns(sheet_id, drawable_object_id)? != columns {
+            return Err(Error::InvalidFormat(
+                "Numbers text-box column update failed validation".into(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore the inherited column layout after a crate-authored override.
+    pub fn reset_sheet_text_box_columns(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let (staged, changed) = reset_shape_text_columns(
+            self.package.clone(),
+            &graph.archive_name,
+            drawable_object_id,
+        )?;
+        if changed {
+            *self = Self::from_package(staged)?;
+        }
+        Ok(changed)
     }
 
     /// Remove an ordinary sheet-owned text box and its private object graph.

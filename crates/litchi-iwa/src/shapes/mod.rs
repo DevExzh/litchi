@@ -17,6 +17,7 @@ mod path;
 mod properties;
 mod shadow;
 mod stroke;
+mod text_columns;
 pub mod text_extractor;
 mod text_layout;
 
@@ -57,6 +58,9 @@ pub use stroke::{
     LineStyle, ShapeStroke, StrokeCap, StrokeJoin, StrokeMiterLimit, StrokePattern, StrokeWidth,
 };
 pub(crate) use stroke::{reset_shape_stroke, set_shape_stroke, shape_stroke};
+pub(crate) use text_columns::{
+    reset_shape_text_columns, set_shape_text_columns, shape_text_columns,
+};
 pub use text_extractor::ShapeTextExtractor;
 pub use text_layout::{
     ShapeTextAutoSize, ShapeTextInset, ShapeTextInsets, ShapeTextLayout, ShapeTextVerticalAlignment,

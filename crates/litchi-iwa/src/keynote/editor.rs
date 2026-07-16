@@ -21,10 +21,11 @@ use crate::package_metadata::{
 };
 use crate::protobuf::{kn, tsd, tsp, tss, tswp};
 use crate::shapes::{
-    DrawableGeometry, DrawableProperties, set_shape_geometry, set_shape_properties, shape_geometry,
-    shape_properties,
+    DrawableGeometry, DrawableProperties, reset_shape_text_columns, set_shape_geometry,
+    set_shape_properties, set_shape_text_columns, shape_geometry, shape_properties,
+    shape_text_columns,
 };
-use crate::text::{IWorkTextEditor, TextStorageInfo};
+use crate::text::{IWorkTextEditor, TextColumns, TextStorageInfo};
 use crate::wire::{
     append_repeated_length_delimited_field, parse_wire_fields, patch_fixed32_field,
     patch_fixed64_field, patch_length_delimited_field, patch_nested_fixed32_field,
@@ -1139,6 +1140,58 @@ impl KeynoteEditor {
         }
         *self = verified;
         Ok(())
+    }
+
+    /// Read the uniform column layout of an ordinary slide text box.
+    pub fn slide_text_box_columns(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<TextColumns> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        shape_text_columns(self.package(), &graph.archive_name, drawable_object_id)
+    }
+
+    /// Replace the uniform column layout of an ordinary slide text box.
+    pub fn set_slide_text_box_columns(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        columns: &TextColumns,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let staged = set_shape_text_columns(
+            self.package().clone(),
+            &graph.archive_name,
+            drawable_object_id,
+            columns,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if &verified.slide_text_box_columns(slide_index, drawable_object_id)? != columns {
+            return Err(Error::InvalidFormat(
+                "Keynote text-box column update failed validation".into(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore the inherited column layout after a crate-authored override.
+    pub fn reset_slide_text_box_columns(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let (staged, changed) = reset_shape_text_columns(
+            self.package().clone(),
+            &graph.archive_name,
+            drawable_object_id,
+        )?;
+        if changed {
+            *self = Self::from_package(staged)?;
+        }
+        Ok(changed)
     }
 
     /// Duplicate an ordinary slide-owned text box with independent storage.

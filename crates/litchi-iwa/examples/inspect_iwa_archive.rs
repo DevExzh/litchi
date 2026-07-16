@@ -18,8 +18,8 @@ use litchi_iwa::protobuf::tss::StylesheetArchive;
 use litchi_iwa::protobuf::tst::TableDataList;
 use litchi_iwa::protobuf::tst::{TableInfoArchive, TableModelArchive};
 use litchi_iwa::protobuf::tswp::{
-    CharacterStyleArchive, ListStyleArchive, ParagraphStyleArchive, ShapeInfoArchive,
-    ShapeStyleArchive, StorageArchive,
+    CharacterStyleArchive, ColumnStyleArchive, ListStyleArchive, ParagraphStyleArchive,
+    ShapeInfoArchive, ShapeStyleArchive, StorageArchive,
 };
 use prost::Message;
 
@@ -262,6 +262,11 @@ fn print_archive(archive: litchi_iwa::archive::Archive, object_id: Option<u64>) 
                 && let Ok(style) = ListStyleArchive::decode(message.data.as_slice())
             {
                 println!("  list_style={style:#?}");
+            }
+            if message.type_ == 2_024
+                && let Ok(style) = ColumnStyleArchive::decode(message.data.as_slice())
+            {
+                println!("  column_style={style:#?}");
             }
             if message.type_ == 2_025
                 && let Ok(style) = ShapeStyleArchive::decode(message.data.as_slice())
