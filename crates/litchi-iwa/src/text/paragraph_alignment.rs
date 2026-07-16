@@ -14,8 +14,8 @@ use crate::{Error, IWorkPackage, Result};
 use self::native::ParagraphStyleOverrides;
 use super::paragraph_tabs::ParagraphTabStops;
 use super::style::{
-    ParagraphIndents, ParagraphLineSpacing, ParagraphSpacing, TextAlignment, TextDecorations,
-    TextStyle,
+    ParagraphIndents, ParagraphLineSpacing, ParagraphSpacing, TextAlignment, TextCapitalization,
+    TextDecorations, TextStyle,
 };
 use super::style_registry::{
     object_archive_name, register_private_style, unregister_private_style,
@@ -26,6 +26,7 @@ enum ParagraphProperty<'a> {
     TextStyle(TextStyle),
     TextDecorations(TextDecorations),
     TextColor(RgbaColor),
+    TextCapitalization(TextCapitalization),
     Alignment(TextAlignment),
     LineSpacing(ParagraphLineSpacing),
     Spacing(ParagraphSpacing),
@@ -38,6 +39,7 @@ enum ParagraphPropertyKind {
     TextStyle,
     TextDecorations,
     TextColor,
+    TextCapitalization,
     Alignment,
     LineSpacing,
     Spacing,
@@ -51,6 +53,7 @@ enum InheritedCharacterProperty {
     TextStyle(TextStyle),
     TextDecorations(TextDecorations),
     TextColor(RgbaColor),
+    TextCapitalization(TextCapitalization),
 }
 
 pub(super) fn text_style(package: &IWorkPackage, storage_id: u64) -> Result<TextStyle> {
@@ -115,6 +118,40 @@ pub(super) fn set_text_color(
 
 pub(super) fn reset_text_color(package: &mut IWorkPackage, storage_id: u64) -> Result<bool> {
     reset_property(package, storage_id, ParagraphPropertyKind::TextColor)
+}
+
+pub(super) fn text_capitalization(
+    package: &IWorkPackage,
+    storage_id: u64,
+) -> Result<TextCapitalization> {
+    let storage = storage::locate(package, storage_id)?;
+    native::inherited_text_capitalization(package, storage.style_id)
+}
+
+pub(super) fn set_text_capitalization(
+    package: &mut IWorkPackage,
+    storage_id: u64,
+    capitalization: TextCapitalization,
+) -> Result<()> {
+    if text_capitalization(package, storage_id)? == capitalization {
+        return Ok(());
+    }
+    set_property(
+        package,
+        storage_id,
+        ParagraphProperty::TextCapitalization(capitalization),
+    )
+}
+
+pub(super) fn reset_text_capitalization(
+    package: &mut IWorkPackage,
+    storage_id: u64,
+) -> Result<bool> {
+    reset_property(
+        package,
+        storage_id,
+        ParagraphPropertyKind::TextCapitalization,
+    )
 }
 
 pub(super) fn paragraph_alignment(
@@ -413,6 +450,10 @@ fn inherited_character_property(
         },
         ParagraphProperty::TextColor(_) => native::inherited_text_color(package, parent_style_id)
             .map(InheritedCharacterProperty::TextColor),
+        ParagraphProperty::TextCapitalization(_) => {
+            native::inherited_text_capitalization(package, parent_style_id)
+                .map(InheritedCharacterProperty::TextCapitalization)
+        },
         _ => Ok(InheritedCharacterProperty::None),
     }
 }
@@ -453,6 +494,14 @@ fn apply_property(
             };
             overrides.font_color = (*color != inherited).then_some(*color);
         },
+        ParagraphProperty::TextCapitalization(capitalization) => {
+            let InheritedCharacterProperty::TextCapitalization(inherited) = inherited else {
+                return Err(Error::InvalidFormat(
+                    "text-capitalization mutation has no inherited character formatting".to_owned(),
+                ));
+            };
+            overrides.capitalization = (*capitalization != inherited).then_some(*capitalization);
+        },
         ParagraphProperty::Alignment(alignment) => overrides.alignment = Some(*alignment),
         ParagraphProperty::LineSpacing(spacing) => overrides.line_spacing = Some(*spacing),
         ParagraphProperty::Spacing(spacing) => {
@@ -480,6 +529,7 @@ fn has_property(overrides: &ParagraphStyleOverrides, kind: ParagraphPropertyKind
             overrides.underline.is_some() || overrides.strikethrough.is_some()
         },
         ParagraphPropertyKind::TextColor => overrides.font_color.is_some(),
+        ParagraphPropertyKind::TextCapitalization => overrides.capitalization.is_some(),
         ParagraphPropertyKind::Alignment => overrides.alignment.is_some(),
         ParagraphPropertyKind::LineSpacing => overrides.line_spacing.is_some(),
         ParagraphPropertyKind::Spacing => {
@@ -506,6 +556,7 @@ fn clear_property(overrides: &mut ParagraphStyleOverrides, kind: ParagraphProper
             overrides.strikethrough = None;
         },
         ParagraphPropertyKind::TextColor => overrides.font_color = None,
+        ParagraphPropertyKind::TextCapitalization => overrides.capitalization = None,
         ParagraphPropertyKind::Alignment => overrides.alignment = None,
         ParagraphPropertyKind::LineSpacing => overrides.line_spacing = None,
         ParagraphPropertyKind::Spacing => {
@@ -535,6 +586,9 @@ fn inherited_property(
         )),
         ParagraphPropertyKind::TextColor => Ok(ParagraphProperty::TextColor(
             native::inherited_text_color(package, style_id)?,
+        )),
+        ParagraphPropertyKind::TextCapitalization => Ok(ParagraphProperty::TextCapitalization(
+            native::inherited_text_capitalization(package, style_id)?,
         )),
         ParagraphPropertyKind::Alignment => Ok(ParagraphProperty::Alignment(
             native::inherited_alignment(package, style_id)?,
@@ -575,6 +629,9 @@ fn validate_expected_property(
             text_decorations(package, storage_id)? == decorations
         },
         ParagraphProperty::TextColor(color) => text_color(package, storage_id)? == color,
+        ParagraphProperty::TextCapitalization(capitalization) => {
+            text_capitalization(package, storage_id)? == capitalization
+        },
         ParagraphProperty::Alignment(alignment) => {
             paragraph_alignment(package, storage_id)? == alignment
         },

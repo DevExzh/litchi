@@ -166,6 +166,65 @@ impl TextDecorations {
     }
 }
 
+/// Effective uniform capitalization applied by a native iWork character style.
+///
+/// Title Case and Start Case share iWork's native titled mode. iWork marks
+/// Title Case with a separate linguistic-boundaries flag and leaves that flag
+/// unset for Start Case.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum TextCapitalization {
+    #[default]
+    None,
+    AllCaps,
+    SmallCaps,
+    TitleCase,
+    StartCase,
+}
+
+impl TextCapitalization {
+    pub(crate) const fn native_value(self) -> i32 {
+        match self {
+            Self::None => 0,
+            Self::AllCaps => 1,
+            Self::SmallCaps => 2,
+            Self::TitleCase | Self::StartCase => 3,
+        }
+    }
+
+    pub(crate) const fn uses_linguistics(self) -> Option<bool> {
+        match self {
+            Self::TitleCase => Some(true),
+            _ => None,
+        }
+    }
+
+    pub(crate) const fn native_override_count(self) -> u32 {
+        match self {
+            Self::TitleCase => 2,
+            _ => 1,
+        }
+    }
+
+    pub(crate) fn from_native_value(
+        value: i32,
+        uses_linguistics: Option<bool>,
+    ) -> crate::Result<Self> {
+        match (value, uses_linguistics.unwrap_or(false)) {
+            (0, false) => Ok(Self::None),
+            (1, false) => Ok(Self::AllCaps),
+            (2, false) => Ok(Self::SmallCaps),
+            (3, true) => Ok(Self::TitleCase),
+            (3, false) => Ok(Self::StartCase),
+            (0..=2, true) => Err(crate::Error::InvalidFormat(
+                "native iWork linguistic capitalization is not title case".to_owned(),
+            )),
+            _ => Err(crate::Error::InvalidFormat(format!(
+                "unsupported native iWork capitalization type {value}"
+            ))),
+        }
+    }
+}
+
 /// Uniform paragraph properties currently supported by the shared text editor.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ParagraphStyle {

@@ -26,15 +26,16 @@ use super::paragraph_alignment::{
     paragraph_alignment, paragraph_indents, paragraph_line_spacing, paragraph_spacing,
     paragraph_tab_stops, reset_paragraph_alignment, reset_paragraph_indents,
     reset_paragraph_line_spacing, reset_paragraph_spacing, reset_paragraph_tab_stops,
-    reset_text_color, reset_text_decorations, reset_text_style, set_paragraph_alignment,
-    set_paragraph_indents, set_paragraph_line_spacing, set_paragraph_spacing,
-    set_paragraph_tab_stops, set_text_color, set_text_decorations, set_text_style, text_color,
-    text_decorations, text_style,
+    reset_text_capitalization, reset_text_color, reset_text_decorations, reset_text_style,
+    set_paragraph_alignment, set_paragraph_indents, set_paragraph_line_spacing,
+    set_paragraph_spacing, set_paragraph_tab_stops, set_text_capitalization, set_text_color,
+    set_text_decorations, set_text_style, text_capitalization, text_color, text_decorations,
+    text_style,
 };
 use super::paragraph_tabs::ParagraphTabStops;
 use super::style::{
-    ParagraphIndents, ParagraphLineSpacing, ParagraphSpacing, TextAlignment, TextDecorations,
-    TextStyle,
+    ParagraphIndents, ParagraphLineSpacing, ParagraphSpacing, TextAlignment, TextCapitalization,
+    TextDecorations, TextStyle,
 };
 
 const STORAGE_MESSAGE_TYPES: &[u32] = &[2001, 2022];
@@ -258,6 +259,45 @@ impl IWorkTextEditor {
     pub fn reset_text_color(&mut self, object_id: u64) -> Result<bool> {
         let mut staged = self.package.clone();
         let changed = reset_text_color(&mut staged, object_id)?;
+        if changed {
+            let bytes = staged.to_bytes()?;
+            IWorkPackage::from_bytes(&bytes)?;
+            self.package = staged;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective uniform capitalization mode.
+    pub fn text_capitalization(&self, object_id: u64) -> Result<TextCapitalization> {
+        text_capitalization(&self.package, object_id)
+    }
+
+    /// Atomically set one capitalization mode across a uniformly styled storage.
+    ///
+    /// Rich text containing multiple paragraph-style boundaries is rejected so
+    /// the operation cannot flatten independently formatted paragraphs.
+    pub fn set_text_capitalization(
+        &mut self,
+        object_id: u64,
+        capitalization: TextCapitalization,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        set_text_capitalization(&mut staged, object_id, capitalization)?;
+        let bytes = staged.to_bytes()?;
+        let verified = IWorkPackage::from_bytes(&bytes)?;
+        if text_capitalization(&verified, object_id)? != capitalization {
+            return Err(Error::InvalidFormat(
+                "iWork text-capitalization update failed round-trip validation".to_owned(),
+            ));
+        }
+        self.package = staged;
+        Ok(())
+    }
+
+    /// Restore inherited capitalization while preserving sibling overrides.
+    pub fn reset_text_capitalization(&mut self, object_id: u64) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = reset_text_capitalization(&mut staged, object_id)?;
         if changed {
             let bytes = staged.to_bytes()?;
             IWorkPackage::from_bytes(&bytes)?;

@@ -31,7 +31,7 @@ use crate::shapes::{
 use crate::text::{
     IWorkTextEditor, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphIndents,
     ParagraphLineSpacing, ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment,
-    TextColumns, TextDecorations, TextStorageInfo, TextStyle,
+    TextCapitalization, TextColumns, TextDecorations, TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     append_repeated_length_delimited_field, patch_fixed32_field, patch_length_delimited_field,
@@ -459,6 +459,45 @@ impl PagesEditor {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
         let changed = staged.reset_text_color(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read effective uniform capitalization from a reachable ordinary text box.
+    pub fn text_box_text_capitalization(
+        &self,
+        drawable_object_id: u64,
+    ) -> Result<TextCapitalization> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        self.text.text_capitalization(graph.storage_id)
+    }
+
+    /// Atomically set one capitalization mode across a reachable ordinary text box.
+    pub fn set_text_box_text_capitalization(
+        &mut self,
+        drawable_object_id: u64,
+        capitalization: TextCapitalization,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_text_capitalization(graph.storage_id, capitalization)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified.text_box_text_capitalization(drawable_object_id)? != capitalization {
+            return Err(Error::InvalidFormat(
+                "Pages text-box capitalization update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore inherited capitalization while preserving sibling overrides.
+    pub fn reset_text_box_text_capitalization(&mut self, drawable_object_id: u64) -> Result<bool> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_text_capitalization(graph.storage_id)?;
         if changed {
             *self = Self::from_package(staged.into_package())?;
         }

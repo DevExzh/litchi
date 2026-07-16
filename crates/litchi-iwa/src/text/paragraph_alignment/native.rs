@@ -15,7 +15,8 @@ use super::super::paragraph_tabs::ParagraphTabStops;
 use super::super::style::{
     ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingMultiple,
     ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, TextAlignment,
-    TextDecorations, TextPointSize, TextStrikethrough, TextStyle, TextUnderline,
+    TextCapitalization, TextDecorations, TextPointSize, TextStrikethrough, TextStyle,
+    TextUnderline,
 };
 use super::super::style_registry::object_archive_name;
 
@@ -36,7 +37,9 @@ const CHARACTER_FONT_SIZE_FIELD: u32 = 3;
 const CHARACTER_FONT_COLOR_FIELD: u32 = 7;
 const CHARACTER_UNDERLINE_FIELD: u32 = 11;
 const CHARACTER_STRIKETHROUGH_FIELD: u32 = 12;
+const CHARACTER_CAPITALIZATION_FIELD: u32 = 13;
 const CHARACTER_DRAWING_FILL_FIELD: u32 = 46;
+const CHARACTER_CAPITALIZATION_LINGUISTICS_FIELD: u32 = 41;
 const DRAWING_FILL_COLOR_FIELD: u32 = 1;
 const COLOR_MODEL_FIELD: u32 = 1;
 const COLOR_RED_FIELD: u32 = 3;
@@ -73,6 +76,7 @@ pub(super) struct ParagraphStyleOverrides {
     pub(super) italic: Option<bool>,
     pub(super) point_size: Option<TextPointSize>,
     pub(super) font_color: Option<RgbaColor>,
+    pub(super) capitalization: Option<TextCapitalization>,
     pub(super) underline: Option<TextUnderline>,
     pub(super) strikethrough: Option<TextStrikethrough>,
     pub(super) alignment: Option<TextAlignment>,
@@ -91,6 +95,9 @@ impl ParagraphStyleOverrides {
             + u32::from(self.italic.is_some())
             + u32::from(self.point_size.is_some())
             + u32::from(self.font_color.is_some())
+            + self
+                .capitalization
+                .map_or(0, TextCapitalization::native_override_count)
             + u32::from(self.underline.is_some())
             + u32::from(self.strikethrough.is_some())
             + u32::from(self.alignment.is_some())
@@ -167,6 +174,13 @@ pub(super) fn inherited_text_color(
     inheritance::text_color(package, first_style_id)
 }
 
+pub(super) fn inherited_text_capitalization(
+    package: &IWorkPackage,
+    first_style_id: u64,
+) -> Result<TextCapitalization> {
+    inheritance::text_capitalization(package, first_style_id)
+}
+
 pub(super) fn inherited_line_spacing(
     package: &IWorkPackage,
     first_style_id: u64,
@@ -212,6 +226,7 @@ pub(super) fn direct_overrides(
         .map(TextPointSize::from_points)
         .transpose()?;
     let font_color = text_color_from_character(character_properties)?;
+    let capitalization = capitalization_from_character(character_properties)?;
     let underline = character_properties
         .underline
         .map(TextUnderline::from_native_value)
@@ -259,6 +274,7 @@ pub(super) fn direct_overrides(
         italic,
         point_size,
         font_color,
+        capitalization,
         underline,
         strikethrough,
         alignment,
@@ -285,6 +301,10 @@ pub(super) fn direct_overrides(
     remaining_character.font_size = None;
     remaining_character.font_color = None;
     remaining_character.tsd_fill = None;
+    if capitalization.is_some() {
+        remaining_character.capitalization = None;
+        remaining_character.capitalization_uses_linguistics = None;
+    }
     remaining_character.underline = None;
     remaining_character.strikethru = None;
     let semantic = !overrides.is_empty()
@@ -311,7 +331,7 @@ pub(super) fn direct_overrides(
         STYLE_PARAGRAPH_PROPERTIES_FIELD,
         "paragraph properties",
     )?;
-    let mut character_fields = Vec::with_capacity(7);
+    let mut character_fields = Vec::with_capacity(9);
     if bold.is_some() {
         character_fields.push(CHARACTER_BOLD_FIELD);
     }
@@ -344,6 +364,12 @@ pub(super) fn direct_overrides(
             || !has_canonical_color_wire(drawing_color_raw)?
         {
             return Ok(None);
+        }
+    }
+    if let Some(capitalization) = capitalization {
+        character_fields.push(CHARACTER_CAPITALIZATION_FIELD);
+        if capitalization.uses_linguistics().is_some() {
+            character_fields.push(CHARACTER_CAPITALIZATION_LINGUISTICS_FIELD);
         }
     }
     if underline.is_some() {
@@ -438,12 +464,18 @@ pub(super) fn variation_object(
             italic: overrides.italic,
             font_size: overrides.point_size.map(TextPointSize::points),
             font_color: overrides.font_color.map(color_to_native),
+            capitalization: overrides
+                .capitalization
+                .map(TextCapitalization::native_value),
             underline: overrides.underline.map(TextUnderline::native_value),
             strikethru: overrides.strikethrough.map(TextStrikethrough::native_value),
             tsd_fill: overrides.font_color.map(|color| tsd::FillArchive {
                 color: Some(color_to_native(color)),
                 ..Default::default()
             }),
+            capitalization_uses_linguistics: overrides
+                .capitalization
+                .and_then(TextCapitalization::uses_linguistics),
             ..Default::default()
         }),
         para_properties: Some(tswp::ParagraphStylePropertiesArchive {
@@ -564,6 +596,21 @@ pub(super) fn text_color_from_character(
         (Some(color), _) | (_, Some(color)) => Ok(Some(color)),
         (None, None) => Ok(None),
     }
+}
+
+pub(super) fn capitalization_from_character(
+    properties: &tswp::CharacterStylePropertiesArchive,
+) -> Result<Option<TextCapitalization>> {
+    let Some(value) = properties.capitalization else {
+        if properties.capitalization_uses_linguistics.is_some() {
+            return Err(Error::InvalidFormat(
+                "native iWork linguistic capitalization has no capitalization type".to_owned(),
+            ));
+        }
+        return Ok(None);
+    };
+    TextCapitalization::from_native_value(value, properties.capitalization_uses_linguistics)
+        .map(Some)
 }
 
 fn has_canonical_color_wire(raw: &[u8]) -> Result<bool> {

@@ -7,12 +7,15 @@ use crate::shapes::RgbaColor;
 use crate::text::paragraph_tabs::ParagraphTabStops;
 use crate::text::style::{
     ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing, ParagraphSpacing,
-    ParagraphSpacingPoints, TextAlignment, TextDecorations, TextPointSize, TextStrikethrough,
-    TextStyle, TextUnderline,
+    ParagraphSpacingPoints, TextAlignment, TextCapitalization, TextDecorations, TextPointSize,
+    TextStrikethrough, TextStyle, TextUnderline,
 };
 use crate::{Error, IWorkPackage, Result};
 
-use super::{line_spacing_from_archive, locate_style, tabs, text_color_from_character};
+use super::{
+    capitalization_from_character, line_spacing_from_archive, locate_style, tabs,
+    text_color_from_character,
+};
 
 const MAX_STYLE_INHERITANCE_DEPTH: usize = 64;
 
@@ -104,6 +107,23 @@ pub(super) fn text_color(package: &IWorkPackage, first_style_id: u64) -> Result<
         Ok(InheritanceControl::Complete)
     })?;
     Ok(value.unwrap_or_else(RgbaColor::black))
+}
+
+pub(super) fn text_capitalization(
+    package: &IWorkPackage,
+    first_style_id: u64,
+) -> Result<TextCapitalization> {
+    let value = walk(package, first_style_id, None, |value, style| {
+        let Some(properties) = style.char_properties.as_ref() else {
+            return Ok(InheritanceControl::Continue);
+        };
+        let Some(capitalization) = capitalization_from_character(properties)? else {
+            return Ok(InheritanceControl::Continue);
+        };
+        *value = Some(capitalization);
+        Ok(InheritanceControl::Complete)
+    })?;
+    Ok(value.unwrap_or_default())
 }
 
 pub(super) fn alignment(package: &IWorkPackage, first_style_id: u64) -> Result<TextAlignment> {

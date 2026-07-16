@@ -40,7 +40,7 @@ use crate::shapes::{
 use crate::text::{
     IWorkTextEditor, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphIndents,
     ParagraphLineSpacing, ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment,
-    TextColumns, TextDecorations, TextStorageInfo, TextStyle,
+    TextCapitalization, TextColumns, TextDecorations, TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     patch_length_delimited_field, patch_nested_fixed32_field, patch_nested_length_delimited_field,
@@ -712,6 +712,53 @@ impl NumbersEditor {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
         let changed = text.reset_text_color(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(text.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read effective uniform capitalization from a sheet-owned text box.
+    pub fn sheet_text_box_text_capitalization(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<TextCapitalization> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        IWorkTextEditor::from_package(self.package.clone()).text_capitalization(graph.storage_id)
+    }
+
+    /// Atomically set one capitalization mode across a sheet-owned text box.
+    pub fn set_sheet_text_box_text_capitalization(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        capitalization: TextCapitalization,
+    ) -> Result<()> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        text.set_text_capitalization(graph.storage_id, capitalization)?;
+        let verified = Self::from_package(text.into_package())?;
+        if verified.sheet_text_box_text_capitalization(sheet_id, drawable_object_id)?
+            != capitalization
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers text-box capitalization update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore inherited capitalization while preserving sibling overrides.
+    pub fn reset_sheet_text_box_text_capitalization(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let changed = text.reset_text_capitalization(graph.storage_id)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
         }
