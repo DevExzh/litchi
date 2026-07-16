@@ -32,7 +32,7 @@ use crate::text::{
     IWorkTextEditor, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphIndents,
     ParagraphLineSpacing, ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment,
     TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumns, TextDecorations,
-    TextScript, TextStorageInfo, TextStyle,
+    TextLigatures, TextScript, TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     append_repeated_length_delimited_field, patch_fixed32_field, patch_length_delimited_field,
@@ -616,6 +616,42 @@ impl PagesEditor {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
         let changed = staged.reset_text_character_spacing(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective ligature policy of a reachable ordinary text box.
+    pub fn text_box_text_ligatures(&self, drawable_object_id: u64) -> Result<TextLigatures> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        self.text.text_ligatures(graph.storage_id)
+    }
+
+    /// Atomically set the ligature policy across a reachable ordinary text box.
+    pub fn set_text_box_text_ligatures(
+        &mut self,
+        drawable_object_id: u64,
+        ligatures: TextLigatures,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_text_ligatures(graph.storage_id, ligatures)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified.text_box_text_ligatures(drawable_object_id)? != ligatures {
+            return Err(Error::InvalidFormat(
+                "Pages text-box ligature update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore inherited ligatures while preserving sibling overrides.
+    pub fn reset_text_box_text_ligatures(&mut self, drawable_object_id: u64) -> Result<bool> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_text_ligatures(graph.storage_id)?;
         if changed {
             *self = Self::from_package(staged.into_package())?;
         }

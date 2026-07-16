@@ -41,7 +41,7 @@ use crate::text::{
     IWorkTextEditor, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphIndents,
     ParagraphLineSpacing, ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment,
     TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumns, TextDecorations,
-    TextScript, TextStorageInfo, TextStyle,
+    TextLigatures, TextScript, TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     patch_length_delimited_field, patch_nested_fixed32_field, patch_nested_length_delimited_field,
@@ -896,6 +896,51 @@ impl NumbersEditor {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
         let changed = text.reset_text_character_spacing(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(text.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective ligature policy of a sheet-owned text box.
+    pub fn sheet_text_box_text_ligatures(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<TextLigatures> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        IWorkTextEditor::from_package(self.package.clone()).text_ligatures(graph.storage_id)
+    }
+
+    /// Atomically set the ligature policy across a sheet-owned text box.
+    pub fn set_sheet_text_box_text_ligatures(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        ligatures: TextLigatures,
+    ) -> Result<()> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        text.set_text_ligatures(graph.storage_id, ligatures)?;
+        let verified = Self::from_package(text.into_package())?;
+        if verified.sheet_text_box_text_ligatures(sheet_id, drawable_object_id)? != ligatures {
+            return Err(Error::InvalidFormat(
+                "Numbers text-box ligature update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore inherited ligatures while preserving sibling overrides.
+    pub fn reset_sheet_text_box_text_ligatures(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let changed = text.reset_text_ligatures(graph.storage_id)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
         }

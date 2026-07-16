@@ -13,8 +13,8 @@ use litchi_iwa::text::{
     ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, ParagraphStart,
     ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
     ParagraphTabStops, TextAlignment, TextBaselineShift, TextCapitalization, TextCharacterSpacing,
-    TextColumnCount, TextColumns, TextDecorations, TextPointSize, TextScript, TextStrikethrough,
-    TextStyle, TextUnderline,
+    TextColumnCount, TextColumns, TextDecorations, TextLigatures, TextPointSize, TextScript,
+    TextStrikethrough, TextStyle, TextUnderline,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -92,6 +92,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         0,
         created.drawable_object_id,
         TextCharacterSpacing::from_percent(6.0)?,
+    )?;
+    editor.set_slide_text_box_text_ligatures(
+        0,
+        created.drawable_object_id,
+        TextLigatures::Standard,
     )?;
     editor.set_slide_text_box_paragraph_alignment(
         0,

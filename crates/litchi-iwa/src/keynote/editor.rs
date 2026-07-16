@@ -29,7 +29,7 @@ use crate::text::{
     IWorkTextEditor, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphIndents,
     ParagraphLineSpacing, ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment,
     TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumns, TextDecorations,
-    TextScript, TextStorageInfo, TextStyle,
+    TextLigatures, TextScript, TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     append_repeated_length_delimited_field, parse_wire_fields, patch_fixed32_field,
@@ -1565,6 +1565,51 @@ impl KeynoteEditor {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();
         let changed = staged.reset_text_character_spacing(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective ligature policy of an ordinary slide text box.
+    pub fn slide_text_box_text_ligatures(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<TextLigatures> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text.text_ligatures(graph.storage_id)
+    }
+
+    /// Atomically set the ligature policy across an ordinary slide text box.
+    pub fn set_slide_text_box_text_ligatures(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        ligatures: TextLigatures,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_text_ligatures(graph.storage_id, ligatures)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified.slide_text_box_text_ligatures(slide_index, drawable_object_id)? != ligatures {
+            return Err(Error::InvalidFormat(
+                "Keynote text-box ligature update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore inherited ligatures while preserving sibling overrides.
+    pub fn reset_slide_text_box_text_ligatures(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_text_ligatures(graph.storage_id)?;
         if changed {
             *self = Self::from_package(staged.into_package())?;
         }

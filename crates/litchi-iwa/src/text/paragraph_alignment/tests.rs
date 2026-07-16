@@ -12,7 +12,8 @@ use crate::text::{
     ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, ParagraphTabAlignment,
     ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops,
     TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumnCount, TextColumns,
-    TextDecorations, TextPointSize, TextScript, TextStrikethrough, TextStyle, TextUnderline,
+    TextDecorations, TextLigatures, TextPointSize, TextScript, TextStrikethrough, TextStyle,
+    TextUnderline,
 };
 
 const STORAGE_MESSAGE_TYPES: &[u32] = &[2_001, 2_022];
@@ -213,6 +214,41 @@ fn native_character_spacing_is_bounded_canonical_and_reversible() {
             Some(overrides)
         );
     }
+}
+
+#[test]
+fn native_ligature_values_are_strict_canonical_and_reversible() {
+    for ligatures in [
+        TextLigatures::RequiredOnly,
+        TextLigatures::Standard,
+        TextLigatures::All,
+    ] {
+        let overrides = ParagraphStyleOverrides {
+            ligatures: Some(ligatures),
+            ..Default::default()
+        };
+        let object = native::variation_object(42, 43, 44, overrides.clone()).unwrap();
+        let message = &object.messages[0];
+        let archive = tswp::ParagraphStyleArchive::decode(message.data.as_slice()).unwrap();
+        assert_eq!(archive.override_count, Some(1));
+        assert_eq!(
+            archive
+                .char_properties
+                .as_ref()
+                .and_then(|properties| properties.ligatures),
+            Some(ligatures.native_value())
+        );
+        assert_eq!(
+            native::direct_overrides(&archive, &message.data).unwrap(),
+            Some(overrides)
+        );
+        assert_eq!(
+            TextLigatures::from_native_value(ligatures.native_value()).unwrap(),
+            ligatures
+        );
+    }
+    assert!(TextLigatures::from_native_value(-1).is_err());
+    assert!(TextLigatures::from_native_value(3).is_err());
 }
 
 #[test]
@@ -668,6 +704,164 @@ fn uniform_character_spacing_round_trips_isolates_and_resets_in_every_suite() {
     assert!(
         keynote
             .reset_slide_text_box_text_character_spacing(0, keynote_box.drawable_object_id)
+            .unwrap()
+    );
+    assert_eq!(
+        keynote
+            .slide_text_box_text_capitalization(0, keynote_box.drawable_object_id)
+            .unwrap(),
+        TextCapitalization::TitleCase
+    );
+}
+
+#[test]
+fn uniform_ligatures_round_trip_isolate_and_reset_in_every_suite() {
+    let pages_spacing = TextCharacterSpacing::from_percent(12.0).unwrap();
+    let mut pages = PagesEditor::create_with_text("Ligatures").unwrap();
+    let pages_box = pages
+        .add_text_box(
+            7,
+            "Pages ligatures",
+            DrawablePoint { x: 20.0, y: 40.0 },
+            DrawableSize {
+                width: 240.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    let pages_sibling = pages
+        .add_text_box(
+            7,
+            "Standard Pages ligatures",
+            DrawablePoint { x: 280.0, y: 40.0 },
+            DrawableSize {
+                width: 240.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    pages
+        .set_text_box_text_character_spacing(pages_box.drawable_object_id, pages_spacing)
+        .unwrap();
+    pages
+        .set_text_box_text_ligatures(pages_box.drawable_object_id, TextLigatures::RequiredOnly)
+        .unwrap();
+    assert_eq!(
+        pages
+            .text_box_text_ligatures(pages_sibling.drawable_object_id)
+            .unwrap(),
+        TextLigatures::Standard
+    );
+    let mut pages = PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        pages
+            .text_box_text_ligatures(pages_box.drawable_object_id)
+            .unwrap(),
+        TextLigatures::RequiredOnly
+    );
+    assert!(
+        pages
+            .reset_text_box_text_ligatures(pages_box.drawable_object_id)
+            .unwrap()
+    );
+    assert_eq!(
+        pages
+            .text_box_text_ligatures(pages_box.drawable_object_id)
+            .unwrap(),
+        TextLigatures::Standard
+    );
+    assert_eq!(
+        pages
+            .text_box_text_character_spacing(pages_box.drawable_object_id)
+            .unwrap(),
+        pages_spacing
+    );
+
+    let numbers_shift = TextBaselineShift::from_points(-3.0).unwrap();
+    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let sheet_id = numbers.sheets().unwrap()[0].object_id;
+    let numbers_box = numbers
+        .add_sheet_text_box(
+            sheet_id,
+            "Numbers ligatures",
+            DrawablePoint { x: 20.0, y: 200.0 },
+            DrawableSize {
+                width: 240.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    numbers
+        .set_sheet_text_box_text_baseline_shift(
+            sheet_id,
+            numbers_box.drawable_object_id,
+            numbers_shift,
+        )
+        .unwrap();
+    numbers
+        .set_sheet_text_box_text_ligatures(
+            sheet_id,
+            numbers_box.drawable_object_id,
+            TextLigatures::All,
+        )
+        .unwrap();
+    let mut numbers =
+        crate::numbers::NumbersEditor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        numbers
+            .sheet_text_box_text_ligatures(sheet_id, numbers_box.drawable_object_id)
+            .unwrap(),
+        TextLigatures::All
+    );
+    assert!(
+        numbers
+            .reset_sheet_text_box_text_ligatures(sheet_id, numbers_box.drawable_object_id)
+            .unwrap()
+    );
+    assert_eq!(
+        numbers
+            .sheet_text_box_text_baseline_shift(sheet_id, numbers_box.drawable_object_id)
+            .unwrap(),
+        numbers_shift
+    );
+
+    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let keynote_box = keynote
+        .add_slide_text_box(
+            0,
+            "Keynote ligatures",
+            DrawablePoint { x: 80.0, y: 500.0 },
+            DrawableSize {
+                width: 500.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    keynote
+        .set_slide_text_box_text_capitalization(
+            0,
+            keynote_box.drawable_object_id,
+            TextCapitalization::TitleCase,
+        )
+        .unwrap();
+    keynote
+        .set_slide_text_box_text_ligatures(
+            0,
+            keynote_box.drawable_object_id,
+            TextLigatures::RequiredOnly,
+        )
+        .unwrap();
+    let mut keynote =
+        crate::keynote::KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        keynote
+            .slide_text_box_text_ligatures(0, keynote_box.drawable_object_id)
+            .unwrap(),
+        TextLigatures::RequiredOnly
+    );
+    assert!(
+        keynote
+            .reset_slide_text_box_text_ligatures(0, keynote_box.drawable_object_id)
             .unwrap()
     );
     assert_eq!(
@@ -1861,6 +2055,11 @@ fn multiple_paragraph_boundaries_are_rejected_transactionally() {
                 storage_id,
                 TextCharacterSpacing::from_percent(12.0).unwrap(),
             )
+            .is_err()
+    );
+    assert!(
+        editor
+            .set_text_ligatures(storage_id, TextLigatures::All)
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before);

@@ -8,8 +8,8 @@ use crate::text::paragraph_tabs::ParagraphTabStops;
 use crate::text::style::{
     ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing, ParagraphSpacing,
     ParagraphSpacingPoints, TextAlignment, TextBaselineShift, TextCapitalization,
-    TextCharacterSpacing, TextDecorations, TextPointSize, TextScript, TextStrikethrough, TextStyle,
-    TextUnderline,
+    TextCharacterSpacing, TextDecorations, TextLigatures, TextPointSize, TextScript,
+    TextStrikethrough, TextStyle, TextUnderline,
 };
 use crate::{Error, IWorkPackage, Result};
 
@@ -173,6 +173,21 @@ pub(super) fn text_character_spacing(
             return Ok(InheritanceControl::Continue);
         };
         *value = Some(TextCharacterSpacing::from_native_ratio(spacing)?);
+        Ok(InheritanceControl::Complete)
+    })?;
+    Ok(value.unwrap_or_default())
+}
+
+pub(super) fn text_ligatures(package: &IWorkPackage, first_style_id: u64) -> Result<TextLigatures> {
+    let value = walk(package, first_style_id, None, |value, style| {
+        let Some(ligatures) = style
+            .char_properties
+            .as_ref()
+            .and_then(|properties| properties.ligatures)
+        else {
+            return Ok(InheritanceControl::Continue);
+        };
+        *value = Some(TextLigatures::from_native_value(ligatures)?);
         Ok(InheritanceControl::Complete)
     })?;
     Ok(value.unwrap_or_default())

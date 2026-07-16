@@ -356,6 +356,43 @@ impl Default for TextCharacterSpacing {
     }
 }
 
+/// Uniform ligature policy applied by a native iWork character style.
+///
+/// The names describe iWork's native behavior. The applications present
+/// these as “Use None”, “Use Default”, and “Use All”, respectively. Even the
+/// first policy retains ligatures required by the writing system.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum TextLigatures {
+    /// Keep only ligatures required by the writing system (“Use None”).
+    RequiredOnly,
+    /// Use the font's standard ligatures (“Use Default”).
+    #[default]
+    Standard,
+    /// Use every ligature supported by the font (“Use All”).
+    All,
+}
+
+impl TextLigatures {
+    pub(crate) const fn native_value(self) -> i32 {
+        match self {
+            Self::RequiredOnly => 0,
+            Self::Standard => 1,
+            Self::All => 2,
+        }
+    }
+
+    pub(crate) fn from_native_value(value: i32) -> crate::Result<Self> {
+        match value {
+            0 => Ok(Self::RequiredOnly),
+            1 => Ok(Self::Standard),
+            2 => Ok(Self::All),
+            _ => Err(crate::Error::InvalidFormat(format!(
+                "unsupported native iWork ligature policy {value}"
+            ))),
+        }
+    }
+}
+
 /// Uniform paragraph properties currently supported by the shared text editor.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ParagraphStyle {

@@ -15,8 +15,8 @@ use super::super::paragraph_tabs::ParagraphTabStops;
 use super::super::style::{
     ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingMultiple,
     ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, TextAlignment,
-    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextDecorations, TextPointSize,
-    TextScript, TextStrikethrough, TextStyle, TextUnderline,
+    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextDecorations, TextLigatures,
+    TextPointSize, TextScript, TextStrikethrough, TextStyle, TextUnderline,
 };
 use super::super::style_registry::object_archive_name;
 
@@ -40,6 +40,7 @@ const CHARACTER_UNDERLINE_FIELD: u32 = 11;
 const CHARACTER_STRIKETHROUGH_FIELD: u32 = 12;
 const CHARACTER_CAPITALIZATION_FIELD: u32 = 13;
 const CHARACTER_BASELINE_SHIFT_FIELD: u32 = 14;
+const CHARACTER_LIGATURES_FIELD: u32 = 16;
 const CHARACTER_TRACKING_FIELD: u32 = 27;
 const CHARACTER_DRAWING_FILL_FIELD: u32 = 46;
 const CHARACTER_CAPITALIZATION_LINGUISTICS_FIELD: u32 = 41;
@@ -83,6 +84,7 @@ pub(super) struct ParagraphStyleOverrides {
     pub(super) script: Option<TextScript>,
     pub(super) baseline_shift: Option<TextBaselineShift>,
     pub(super) character_spacing: Option<TextCharacterSpacing>,
+    pub(super) ligatures: Option<TextLigatures>,
     pub(super) underline: Option<TextUnderline>,
     pub(super) strikethrough: Option<TextStrikethrough>,
     pub(super) alignment: Option<TextAlignment>,
@@ -107,6 +109,7 @@ impl ParagraphStyleOverrides {
             + u32::from(self.script.is_some())
             + u32::from(self.baseline_shift.is_some())
             + u32::from(self.character_spacing.is_some())
+            + u32::from(self.ligatures.is_some())
             + u32::from(self.underline.is_some())
             + u32::from(self.strikethrough.is_some())
             + u32::from(self.alignment.is_some())
@@ -211,6 +214,13 @@ pub(super) fn inherited_text_character_spacing(
     inheritance::text_character_spacing(package, first_style_id)
 }
 
+pub(super) fn inherited_text_ligatures(
+    package: &IWorkPackage,
+    first_style_id: u64,
+) -> Result<TextLigatures> {
+    inheritance::text_ligatures(package, first_style_id)
+}
+
 pub(super) fn inherited_line_spacing(
     package: &IWorkPackage,
     first_style_id: u64,
@@ -269,6 +279,10 @@ pub(super) fn direct_overrides(
         .tracking
         .map(TextCharacterSpacing::from_native_ratio)
         .transpose()?;
+    let ligatures = character_properties
+        .ligatures
+        .map(TextLigatures::from_native_value)
+        .transpose()?;
     let underline = character_properties
         .underline
         .map(TextUnderline::from_native_value)
@@ -320,6 +334,7 @@ pub(super) fn direct_overrides(
         script,
         baseline_shift,
         character_spacing,
+        ligatures,
         underline,
         strikethrough,
         alignment,
@@ -353,6 +368,7 @@ pub(super) fn direct_overrides(
     remaining_character.superscript = None;
     remaining_character.baseline_shift = None;
     remaining_character.tracking = None;
+    remaining_character.ligatures = None;
     remaining_character.underline = None;
     remaining_character.strikethru = None;
     let semantic = !overrides.is_empty()
@@ -379,7 +395,7 @@ pub(super) fn direct_overrides(
         STYLE_PARAGRAPH_PROPERTIES_FIELD,
         "paragraph properties",
     )?;
-    let mut character_fields = Vec::with_capacity(12);
+    let mut character_fields = Vec::with_capacity(13);
     if bold.is_some() {
         character_fields.push(CHARACTER_BOLD_FIELD);
     }
@@ -428,6 +444,9 @@ pub(super) fn direct_overrides(
     }
     if character_spacing.is_some() {
         character_fields.push(CHARACTER_TRACKING_FIELD);
+    }
+    if ligatures.is_some() {
+        character_fields.push(CHARACTER_LIGATURES_FIELD);
     }
     if underline.is_some() {
         character_fields.push(CHARACTER_UNDERLINE_FIELD);
@@ -529,6 +548,7 @@ pub(super) fn variation_object(
             tracking: overrides
                 .character_spacing
                 .map(TextCharacterSpacing::native_ratio),
+            ligatures: overrides.ligatures.map(TextLigatures::native_value),
             underline: overrides.underline.map(TextUnderline::native_value),
             strikethru: overrides.strikethrough.map(TextStrikethrough::native_value),
             tsd_fill: overrides.font_color.map(|color| tsd::FillArchive {
