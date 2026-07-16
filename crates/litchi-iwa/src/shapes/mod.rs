@@ -9,6 +9,7 @@
 
 mod geometry;
 mod line;
+mod line_end;
 mod path;
 mod properties;
 pub mod text_extractor;
@@ -22,6 +23,8 @@ pub(crate) use line::{
     line_geometry, line_path_source, line_segments_match, set_shape_line_segment,
     shape_line_segment,
 };
+pub use line_end::{LineEndpoint, LineEndpoints};
+pub(crate) use line_end::{set_shape_line_endpoints, shape_line_endpoints};
 pub use path::{
     ShapeCornerRadius, ShapePathKind, ShapePolygonSides, ShapePreset, ShapeStarInnerRatio,
     ShapeStarPoints,

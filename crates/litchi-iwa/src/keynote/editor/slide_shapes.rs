@@ -5,10 +5,10 @@ use std::ops::Range;
 
 use super::*;
 use crate::shapes::{
-    DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, LineSegment, ShapePathKind,
-    ShapePreset, line_geometry, line_path_source, line_segments_match, set_shape_geometry,
-    set_shape_line_segment, set_shape_preset, shape_line_segment, shape_path_kind,
-    shape_path_source, shape_preset,
+    DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, LineEndpoints, LineSegment,
+    ShapePathKind, ShapePreset, line_geometry, line_path_source, line_segments_match,
+    set_shape_geometry, set_shape_line_endpoints, set_shape_line_segment, set_shape_preset,
+    shape_line_endpoints, shape_line_segment, shape_path_kind, shape_path_source, shape_preset,
 };
 use crate::text::TextStorageInfo;
 
@@ -36,6 +36,8 @@ pub struct KeynoteSlideShapeInfo {
     pub preset: Option<ShapePreset>,
     /// Slide-space endpoints when this shape is a native straight line.
     pub line_segment: Option<LineSegment>,
+    /// Directed start/end decorations when this shape is a native straight line.
+    pub line_endpoints: Option<LineEndpoints>,
     pub storage: TextStorageInfo,
     pub geometry: DrawableGeometry,
     pub properties: DrawableProperties,
@@ -121,6 +123,19 @@ impl KeynoteEditor {
             None,
             Some(segment),
         )
+    }
+
+    /// Add a native straight line with independently typed start and end decorations.
+    pub fn add_slide_line_with_endpoints(
+        &mut self,
+        slide_index: usize,
+        start: DrawablePoint,
+        end: DrawablePoint,
+        endpoints: LineEndpoints,
+    ) -> Result<KeynoteSlideShapeInfo> {
+        let created = self.add_slide_line(slide_index, start, end)?;
+        self.set_slide_line_endpoints(slide_index, created.drawable_object_id, endpoints)?;
+        Ok(shape_graph(self, slide_index, created.drawable_object_id)?.info)
     }
 
     fn add_slide_shape_path(
@@ -230,6 +245,66 @@ impl KeynoteEditor {
                     "Keynote drawable {drawable_object_id} is not a native straight line"
                 ))
             })
+    }
+
+    /// Read the directed start and end decorations of one native straight line.
+    pub fn slide_line_endpoints(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<LineEndpoints> {
+        let source = shape_graph(self, slide_index, drawable_object_id)?;
+        source.info.line_endpoints.ok_or_else(|| {
+            Error::ParseError(format!(
+                "Keynote drawable {drawable_object_id} is not a native straight line"
+            ))
+        })
+    }
+
+    /// Replace both decorations transactionally, using copy-on-write when the style is shared.
+    pub fn set_slide_line_endpoints(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        endpoints: LineEndpoints,
+    ) -> Result<()> {
+        let source = shape_graph(self, slide_index, drawable_object_id)?;
+        if source.info.line_segment.is_none() {
+            return Err(Error::ParseError(format!(
+                "Keynote drawable {drawable_object_id} is not a native straight line"
+            )));
+        }
+        let mut staged = self.package().clone();
+        set_shape_line_endpoints(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            endpoints,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.slide_line_endpoints(slide_index, drawable_object_id)? != endpoints {
+            return Err(Error::InvalidFormat(
+                "Keynote line endpoint-style update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Delete explicit endpoint decorations and restore undecorated style inheritance.
+    ///
+    /// Returns `true` when decorations were reset and `false` when the line was
+    /// already undecorated.
+    pub fn reset_slide_line_endpoints(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        if self.slide_line_endpoints(slide_index, drawable_object_id)? == LineEndpoints::default() {
+            return Ok(false);
+        }
+        self.set_slide_line_endpoints(slide_index, drawable_object_id, LineEndpoints::default())?;
+        Ok(true)
     }
 
     /// Move or resize one native straight line by replacing its endpoints.
@@ -632,12 +707,18 @@ fn shape_info(
             "Keynote shape {drawable_object_id} has inconsistent storage ownership"
         )));
     }
+    let archive_name = graph.archive_name(drawable_object_id)?;
+    let line_segment = shape_line_segment(shape)?;
+    let line_endpoints = line_segment
+        .map(|_| shape_line_endpoints(editor.package(), archive_name, drawable_object_id))
+        .transpose()?;
     Ok(KeynoteSlideShapeInfo {
         slide_index,
         drawable_object_id,
         kind: shape_path_kind(shape)?,
         preset: shape_preset(shape)?,
-        line_segment: shape_line_segment(shape)?,
+        line_segment,
+        line_endpoints,
         storage: editor.text.storage(storage_id)?,
         geometry: shape_geometry(
             editor.package(),
@@ -896,6 +977,55 @@ mod tests {
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), before_cross_type);
+    }
+
+    #[test]
+    fn scratch_presentation_supports_typed_line_endpoint_crud() {
+        use crate::shapes::{LineEndpoint, LineEndpoints};
+
+        let mut editor = KeynoteDocumentBuilder::new()
+            .title("Endpoint styles")
+            .subtitle("Built from native line-end paths")
+            .build()
+            .unwrap();
+        let created = editor
+            .add_slide_line_with_endpoints(
+                0,
+                LINE_START,
+                LINE_END,
+                LineEndpoints::new(LineEndpoint::OpenSquare, LineEndpoint::FilledDiamond),
+            )
+            .unwrap();
+        assert_eq!(
+            created.line_endpoints,
+            Some(LineEndpoints::new(
+                LineEndpoint::OpenSquare,
+                LineEndpoint::FilledDiamond
+            ))
+        );
+
+        let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let replacement = LineEndpoints::new(LineEndpoint::SimpleArrow, LineEndpoint::OpenCircle);
+        reopened
+            .set_slide_line_endpoints(0, created.drawable_object_id, replacement)
+            .unwrap();
+        assert_eq!(
+            reopened
+                .slide_line_endpoints(0, created.drawable_object_id)
+                .unwrap(),
+            replacement
+        );
+        assert!(
+            reopened
+                .reset_slide_line_endpoints(0, created.drawable_object_id)
+                .unwrap()
+        );
+        assert_eq!(
+            reopened
+                .slide_line_endpoints(0, created.drawable_object_id)
+                .unwrap(),
+            LineEndpoints::default()
+        );
     }
 
     #[test]

@@ -318,6 +318,10 @@ fn body_shape_graph_from_text(
     }
     let kind = shape_path_kind(&shape)?;
     let preset = shape_preset(&shape)?;
+    let line_segment = shape_line_segment(&shape)?;
+    let line_endpoints = line_segment
+        .map(|_| shape_line_endpoints(editor.package(), &archive_name, drawable_object_id))
+        .transpose()?;
     let geometry = shape_geometry(editor.package(), &archive_name, drawable_object_id)?;
     let properties = shape_properties(editor.package(), &archive_name, drawable_object_id)?;
     Ok(BodyShapeGraph {
@@ -327,7 +331,8 @@ fn body_shape_graph_from_text(
             anchor_character_index: *anchor_character_index,
             kind,
             preset,
-            line_segment: shape_line_segment(&shape)?,
+            line_segment,
+            line_endpoints,
             storage: text.storage,
             geometry,
             properties,

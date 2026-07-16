@@ -8,9 +8,10 @@ use crate::package_metadata::{
     remove_component_external_references_to_object,
 };
 use crate::shapes::{
-    DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, LineSegment, ShapePathKind,
-    ShapePreset, line_geometry, line_path_source, line_segments_match, set_shape_geometry,
-    set_shape_line_segment, set_shape_preset, shape_path_source,
+    DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, LineEndpoints, LineSegment,
+    ShapePathKind, ShapePreset, line_geometry, line_path_source, line_segments_match,
+    set_shape_geometry, set_shape_line_endpoints, set_shape_line_segment, set_shape_preset,
+    shape_line_endpoints, shape_path_source,
 };
 
 use super::text_box_create::{
@@ -35,6 +36,8 @@ pub struct PagesBodyShapeInfo {
     pub preset: Option<ShapePreset>,
     /// Document-space endpoints when this shape is a native straight line.
     pub line_segment: Option<LineSegment>,
+    /// Directed start/end decorations when this shape is a native straight line.
+    pub line_endpoints: Option<LineEndpoints>,
     pub storage: TextStorageInfo,
     pub geometry: DrawableGeometry,
     pub properties: DrawableProperties,
@@ -117,6 +120,19 @@ impl PagesEditor {
             None,
             Some(segment),
         )
+    }
+
+    /// Add a native straight line with independently typed start and end decorations.
+    pub fn add_body_line_with_endpoints(
+        &mut self,
+        anchor_character_index: usize,
+        start: DrawablePoint,
+        end: DrawablePoint,
+        endpoints: LineEndpoints,
+    ) -> Result<PagesBodyShapeInfo> {
+        let created = self.add_body_line(anchor_character_index, start, end)?;
+        self.set_body_line_endpoints(created.drawable_object_id, endpoints)?;
+        Ok(body_shape_graph(self, created.drawable_object_id)?.info)
     }
 
     fn add_body_shape_path(
@@ -239,6 +255,57 @@ impl PagesEditor {
                     "Pages drawable {drawable_object_id} is not a native straight line"
                 ))
             })
+    }
+
+    /// Read the directed start and end decorations of one native straight line.
+    pub fn body_line_endpoints(&self, drawable_object_id: u64) -> Result<LineEndpoints> {
+        let source = body_shape_graph(self, drawable_object_id)?;
+        source.info.line_endpoints.ok_or_else(|| {
+            Error::ParseError(format!(
+                "Pages drawable {drawable_object_id} is not a native straight line"
+            ))
+        })
+    }
+
+    /// Replace both decorations transactionally, using copy-on-write when the style is shared.
+    pub fn set_body_line_endpoints(
+        &mut self,
+        drawable_object_id: u64,
+        endpoints: LineEndpoints,
+    ) -> Result<()> {
+        let source = body_shape_graph(self, drawable_object_id)?;
+        if source.info.line_segment.is_none() {
+            return Err(Error::ParseError(format!(
+                "Pages drawable {drawable_object_id} is not a native straight line"
+            )));
+        }
+        let mut staged = self.package().clone();
+        set_shape_line_endpoints(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            endpoints,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.body_line_endpoints(drawable_object_id)? != endpoints {
+            return Err(Error::InvalidFormat(
+                "Pages line endpoint-style update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Delete explicit endpoint decorations and restore undecorated style inheritance.
+    ///
+    /// Returns `true` when decorations were reset and `false` when the line was
+    /// already undecorated.
+    pub fn reset_body_line_endpoints(&mut self, drawable_object_id: u64) -> Result<bool> {
+        if self.body_line_endpoints(drawable_object_id)? == LineEndpoints::default() {
+            return Ok(false);
+        }
+        self.set_body_line_endpoints(drawable_object_id, LineEndpoints::default())?;
+        Ok(true)
     }
 
     /// Move or resize one native straight line by replacing its endpoints.
@@ -597,6 +664,78 @@ mod tests {
         assert_eq!(removed.shape.kind, PagesBodyShapeKind::Line);
         assert_eq!(editor.body_text().unwrap(), baseline_body);
         assert!(editor.body_shapes().unwrap().is_empty());
+    }
+
+    #[test]
+    fn scratch_document_supports_typed_line_endpoint_crud() {
+        use crate::shapes::{LineEndpoint, LineEndpoints};
+
+        let mut editor = PagesEditor::create_with_text("Body").unwrap();
+        let created = editor
+            .add_body_line_with_endpoints(
+                4,
+                LINE_START,
+                LINE_END,
+                LineEndpoints::new(LineEndpoint::OpenCircle, LineEndpoint::FilledArrow),
+            )
+            .unwrap();
+        assert_eq!(
+            created.line_endpoints,
+            Some(LineEndpoints::new(
+                LineEndpoint::OpenCircle,
+                LineEndpoint::FilledArrow
+            ))
+        );
+        let object_count_after_create = editor
+            .package()
+            .iwa_entry_names()
+            .map(|name| editor.package().archive(name).unwrap().objects.len())
+            .sum::<usize>();
+
+        let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let replacement = LineEndpoints::new(LineEndpoint::Line, LineEndpoint::SimpleArrow);
+        reopened
+            .set_body_line_endpoints(created.drawable_object_id, replacement)
+            .unwrap();
+        assert_eq!(
+            reopened
+                .body_line_endpoints(created.drawable_object_id)
+                .unwrap(),
+            replacement
+        );
+        let bytes_after_update = reopened.to_bytes().unwrap();
+        reopened
+            .set_body_line_endpoints(created.drawable_object_id, replacement)
+            .unwrap();
+        assert_eq!(reopened.to_bytes().unwrap(), bytes_after_update);
+        let object_count_after_update = reopened
+            .package()
+            .iwa_entry_names()
+            .map(|name| reopened.package().archive(name).unwrap().objects.len())
+            .sum::<usize>();
+        assert_eq!(object_count_after_update, object_count_after_create);
+        assert!(
+            reopened
+                .reset_body_line_endpoints(created.drawable_object_id)
+                .unwrap()
+        );
+        assert!(
+            !reopened
+                .reset_body_line_endpoints(created.drawable_object_id)
+                .unwrap()
+        );
+        assert_eq!(
+            reopened
+                .body_line_endpoints(created.drawable_object_id)
+                .unwrap(),
+            LineEndpoints::default()
+        );
+        let object_count_after_reset = reopened
+            .package()
+            .iwa_entry_names()
+            .map(|name| reopened.package().archive(name).unwrap().objects.len())
+            .sum::<usize>();
+        assert_eq!(object_count_after_reset + 1, object_count_after_create);
     }
 
     #[test]

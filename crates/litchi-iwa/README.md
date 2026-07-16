@@ -126,25 +126,31 @@ pages.save("created-with-shape.pages")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
 
-Straight lines use validated document-space endpoints and native zero-height
-line geometry. Their path, empty writable storage, stand-ins, attachment,
-z-order, and UUID graph are all source-built:
+Straight lines use validated document-space points and typed native endpoint
+styles. Their path, empty writable storage, stand-ins, attachment, z-order,
+style inheritance, and UUID graph are all source-built:
 
 ```rust
 use litchi_iwa::pages::PagesEditor;
-use litchi_iwa::shapes::DrawablePoint;
+use litchi_iwa::shapes::{DrawablePoint, LineEndpoint, LineEndpoints};
 
 let mut pages = PagesEditor::create_with_text("Built without a template")?;
-let line = pages.add_body_line(
+let line = pages.add_body_line_with_endpoints(
     pages.body_text()?.encode_utf16().count(),
     DrawablePoint { x: 180.0, y: 240.0 },
     DrawablePoint { x: 480.0, y: 390.0 },
+    LineEndpoints::new(LineEndpoint::OpenCircle, LineEndpoint::FilledArrow),
 )?;
 pages.set_body_line_segment(
     line.drawable_object_id,
     DrawablePoint { x: 96.0, y: 180.0 },
     DrawablePoint { x: 456.0, y: 180.0 },
 )?;
+assert_eq!(
+    pages.body_line_endpoints(line.drawable_object_id)?.end,
+    LineEndpoint::FilledArrow,
+);
+// pages.reset_body_line_endpoints(line.drawable_object_id)?; // delete decorations
 pages.save("created-with-line.pages")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
@@ -280,20 +286,21 @@ numbers.save("created-with-shape.numbers")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
 
-Straight lines are constructed from validated sheet-space endpoints. The
-native path, empty storage, stand-ins, ownership, style reference, and UUID
-graph are emitted without a source package:
+Straight lines are constructed from validated sheet-space points and typed
+native endpoint styles. The path, empty storage, stand-ins, ownership, style
+inheritance, and UUID graph are emitted without a source package:
 
 ```rust
 use litchi_iwa::numbers::NumbersDocumentBuilder;
-use litchi_iwa::shapes::DrawablePoint;
+use litchi_iwa::shapes::{DrawablePoint, LineEndpoint, LineEndpoints};
 
 let mut numbers = NumbersDocumentBuilder::new().build()?;
 let sheet_id = numbers.sheets()?[0].object_id;
-let line = numbers.add_sheet_line(
+let line = numbers.add_sheet_line_with_endpoints(
     sheet_id,
     DrawablePoint { x: 420.0, y: 300.0 },
     DrawablePoint { x: 720.0, y: 450.0 },
+    LineEndpoints::new(LineEndpoint::FilledCircle, LineEndpoint::SimpleArrow),
 )?;
 numbers.set_sheet_line_segment(
     sheet_id,
@@ -301,6 +308,13 @@ numbers.set_sheet_line_segment(
     DrawablePoint { x: 72.0, y: 180.0 },
     DrawablePoint { x: 432.0, y: 180.0 },
 )?;
+assert_eq!(
+    numbers
+        .sheet_line_endpoints(sheet_id, line.drawable_object_id)?
+        .start,
+    LineEndpoint::FilledCircle,
+);
+// numbers.reset_sheet_line_endpoints(sheet_id, line.drawable_object_id)?;
 numbers.save("created-with-line.numbers")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
@@ -433,19 +447,20 @@ keynote.save("created-with-shape.key")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
 
-Straight lines use validated slide-space endpoints and the native two-element
-Bézier representation. Their path, empty storage, stand-ins, ownership,
-z-order, style relationship, and UUIDs are source-built:
+Straight lines use validated slide-space points, typed endpoint styles, and
+the native two-element Bézier representation. Their path, empty storage,
+stand-ins, ownership, z-order, style inheritance, and UUIDs are source-built:
 
 ```rust
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
-use litchi_iwa::shapes::DrawablePoint;
+use litchi_iwa::shapes::{DrawablePoint, LineEndpoint, LineEndpoints};
 
 let mut keynote = KeynoteDocumentBuilder::new().build()?;
-let line = keynote.add_slide_line(
+let line = keynote.add_slide_line_with_endpoints(
     0,
     DrawablePoint { x: 720.0, y: 660.0 },
     DrawablePoint { x: 1_200.0, y: 900.0 },
+    LineEndpoints::new(LineEndpoint::OpenSquare, LineEndpoint::FilledDiamond),
 )?;
 keynote.set_slide_line_segment(
     0,
@@ -453,6 +468,13 @@ keynote.set_slide_line_segment(
     DrawablePoint { x: 96.0, y: 108.0 },
     DrawablePoint { x: 456.0, y: 108.0 },
 )?;
+assert_eq!(
+    keynote
+        .slide_line_endpoints(0, line.drawable_object_id)?
+        .end,
+    LineEndpoint::FilledDiamond,
+);
+// keynote.reset_slide_line_endpoints(0, line.drawable_object_id)?;
 keynote.save("created-with-line.key")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```

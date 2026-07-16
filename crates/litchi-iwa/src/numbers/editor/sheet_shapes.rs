@@ -5,10 +5,10 @@ use std::ops::Range;
 
 use super::*;
 use crate::shapes::{
-    DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, LineSegment, ShapePathKind,
-    ShapePreset, line_geometry, line_path_source, line_segments_match, set_shape_geometry,
-    set_shape_line_segment, set_shape_preset, shape_line_segment, shape_path_kind,
-    shape_path_source, shape_preset,
+    DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, LineEndpoints, LineSegment,
+    ShapePathKind, ShapePreset, line_geometry, line_path_source, line_segments_match,
+    set_shape_geometry, set_shape_line_endpoints, set_shape_line_segment, set_shape_preset,
+    shape_line_endpoints, shape_line_segment, shape_path_kind, shape_path_source, shape_preset,
 };
 
 use super::text_box_create::{
@@ -31,6 +31,8 @@ pub struct NumbersSheetShapeInfo {
     pub preset: Option<ShapePreset>,
     /// Sheet-space endpoints when this shape is a native straight line.
     pub line_segment: Option<LineSegment>,
+    /// Directed start/end decorations when this shape is a native straight line.
+    pub line_endpoints: Option<LineEndpoints>,
     pub storage: TextStorageInfo,
     pub geometry: DrawableGeometry,
     pub properties: DrawableProperties,
@@ -116,6 +118,19 @@ impl NumbersEditor {
             None,
             Some(segment),
         )
+    }
+
+    /// Add a native straight line with independently typed start and end decorations.
+    pub fn add_sheet_line_with_endpoints(
+        &mut self,
+        sheet_id: u64,
+        start: DrawablePoint,
+        end: DrawablePoint,
+        endpoints: LineEndpoints,
+    ) -> Result<NumbersSheetShapeInfo> {
+        let created = self.add_sheet_line(sheet_id, start, end)?;
+        self.set_sheet_line_endpoints(sheet_id, created.drawable_object_id, endpoints)?;
+        Ok(shape_graph(self, sheet_id, created.drawable_object_id)?.info)
     }
 
     fn add_sheet_shape_path(
@@ -232,6 +247,66 @@ impl NumbersEditor {
                     "Numbers drawable {drawable_object_id} is not a native straight line"
                 ))
             })
+    }
+
+    /// Read the directed start and end decorations of one native straight line.
+    pub fn sheet_line_endpoints(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<LineEndpoints> {
+        let source = shape_graph(self, sheet_id, drawable_object_id)?;
+        source.info.line_endpoints.ok_or_else(|| {
+            Error::ParseError(format!(
+                "Numbers drawable {drawable_object_id} is not a native straight line"
+            ))
+        })
+    }
+
+    /// Replace both decorations transactionally, using copy-on-write when the style is shared.
+    pub fn set_sheet_line_endpoints(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        endpoints: LineEndpoints,
+    ) -> Result<()> {
+        let source = shape_graph(self, sheet_id, drawable_object_id)?;
+        if source.info.line_segment.is_none() {
+            return Err(Error::ParseError(format!(
+                "Numbers drawable {drawable_object_id} is not a native straight line"
+            )));
+        }
+        let mut staged = self.package.clone();
+        set_shape_line_endpoints(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            endpoints,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.sheet_line_endpoints(sheet_id, drawable_object_id)? != endpoints {
+            return Err(Error::InvalidFormat(
+                "Numbers line endpoint-style update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Delete explicit endpoint decorations and restore undecorated style inheritance.
+    ///
+    /// Returns `true` when decorations were reset and `false` when the line was
+    /// already undecorated.
+    pub fn reset_sheet_line_endpoints(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        if self.sheet_line_endpoints(sheet_id, drawable_object_id)? == LineEndpoints::default() {
+            return Ok(false);
+        }
+        self.set_sheet_line_endpoints(sheet_id, drawable_object_id, LineEndpoints::default())?;
+        Ok(true)
     }
 
     /// Move or resize one native straight line by replacing its endpoints.
@@ -789,12 +864,17 @@ fn shape_info(
         )));
     }
     let text = IWorkTextEditor::from_package(editor.package.clone());
+    let line_segment = shape_line_segment(shape)?;
+    let line_endpoints = line_segment
+        .map(|_| shape_line_endpoints(editor.package(), archive_name, drawable_object_id))
+        .transpose()?;
     Ok(NumbersSheetShapeInfo {
         sheet_id,
         drawable_object_id,
         kind: shape_path_kind(shape)?,
         preset: shape_preset(shape)?,
-        line_segment: shape_line_segment(shape)?,
+        line_segment,
+        line_endpoints,
         storage: text.storage(storage_id)?,
         geometry: shape_geometry(editor.package(), archive_name, drawable_object_id)?,
         properties: shape_properties(editor.package(), archive_name, drawable_object_id)?,
@@ -949,6 +1029,57 @@ mod tests {
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), before_cross_type);
+    }
+
+    #[test]
+    fn scratch_spreadsheet_supports_typed_line_endpoint_crud() {
+        use crate::shapes::{LineEndpoint, LineEndpoints};
+
+        let mut editor = NumbersDocumentBuilder::new()
+            .sheet_name("Endpoint Styles")
+            .table_name("Source Data")
+            .build()
+            .unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let created = editor
+            .add_sheet_line_with_endpoints(
+                sheet_id,
+                LINE_START,
+                LINE_END,
+                LineEndpoints::new(LineEndpoint::FilledSquare, LineEndpoint::OpenArrow),
+            )
+            .unwrap();
+        assert_eq!(
+            created.line_endpoints,
+            Some(LineEndpoints::new(
+                LineEndpoint::FilledSquare,
+                LineEndpoint::OpenArrow
+            ))
+        );
+
+        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let replacement =
+            LineEndpoints::new(LineEndpoint::InvertedArrow, LineEndpoint::FilledCircle);
+        reopened
+            .set_sheet_line_endpoints(sheet_id, created.drawable_object_id, replacement)
+            .unwrap();
+        assert_eq!(
+            reopened
+                .sheet_line_endpoints(sheet_id, created.drawable_object_id)
+                .unwrap(),
+            replacement
+        );
+        assert!(
+            reopened
+                .reset_sheet_line_endpoints(sheet_id, created.drawable_object_id)
+                .unwrap()
+        );
+        assert_eq!(
+            reopened
+                .sheet_line_endpoints(sheet_id, created.drawable_object_id)
+                .unwrap(),
+            LineEndpoints::default()
+        );
     }
 
     #[test]
