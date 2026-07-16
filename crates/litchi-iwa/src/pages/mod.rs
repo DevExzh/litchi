@@ -37,12 +37,13 @@ pub mod section;
 pub use creation::PagesDocumentBuilder;
 pub use document::PagesDocument;
 pub use editor::{
-    PagesBodyShapeInfo, PagesBodyShapeKind, PagesDocumentOptions, PagesDrawableTextInfo,
-    PagesEditor, PagesFootnoteFormat, PagesFootnoteGap, PagesFootnoteKind, PagesFootnoteNumbering,
-    PagesFootnoteSettings, PagesHeaderFooterInfo, PagesHeaderFooterKind, PagesImageInfo,
-    PagesMovieInfo, PagesMovieOptions, PagesPageLayout, PagesPageNumber, PagesPageOrientation,
-    PagesRgbColorSpace, PagesRgbaColor, PagesSectionBackground, PagesSectionInfo,
-    PagesSectionPageNumbering, PagesSectionSettings, PagesSectionStart, PagesTemplateKind,
+    PagesAudioInfo, PagesAudioOptions, PagesBodyShapeInfo, PagesBodyShapeKind,
+    PagesDocumentOptions, PagesDrawableTextInfo, PagesEditor, PagesFootnoteFormat,
+    PagesFootnoteGap, PagesFootnoteKind, PagesFootnoteNumbering, PagesFootnoteSettings,
+    PagesHeaderFooterInfo, PagesHeaderFooterKind, PagesImageInfo, PagesMovieInfo,
+    PagesMovieOptions, PagesPageLayout, PagesPageNumber, PagesPageOrientation, PagesRgbColorSpace,
+    PagesRgbaColor, PagesSectionBackground, PagesSectionInfo, PagesSectionPageNumbering,
+    PagesSectionSettings, PagesSectionStart, PagesTemplateKind, RemovedPagesAudio,
     RemovedPagesBodyShape, RemovedPagesImage, RemovedPagesMovie, RemovedPagesTextBox,
 };
 pub use section::{PagesSection, PagesSectionType};

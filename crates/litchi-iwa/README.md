@@ -180,6 +180,33 @@ pages.save("created-with-movie.pages")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
 
+Audio-only media controls use the same source-free body ownership model. The
+audio asset, playback bounds, zero-size control geometry, body attachment,
+stand-ins, z-order, style relationship, UUIDs, and component data reference are
+created directly from typed objects:
+
+```rust
+use std::fs;
+use std::time::Duration;
+use litchi_iwa::pages::{PagesAudioOptions, PagesEditor};
+use litchi_iwa::shapes::DrawablePoint;
+
+let body = "Interview notes";
+let audio = fs::read("interview.aiff")?;
+let mut pages = PagesEditor::create_with_text(body)?;
+pages.add_body_audio(
+    body.encode_utf16().count(),
+    "interview.aiff",
+    &audio,
+    PagesAudioOptions::new(
+        DrawablePoint { x: 180.0, y: 240.0 },
+        Duration::from_secs(30),
+    ),
+)?;
+pages.save("created-with-audio.pages")?;
+# Ok::<(), litchi_iwa::Error>(())
+```
+
 ### Create Numbers spreadsheets from scratch
 
 Scratch-created spreadsheets can add ordinary text boxes directly to a sheet.

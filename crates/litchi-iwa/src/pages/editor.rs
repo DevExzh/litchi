@@ -2613,6 +2613,7 @@ fn insert_unique<T>(
     Ok(())
 }
 
+mod audio;
 mod body_shapes;
 mod document_options;
 mod footnote_settings;
@@ -2625,6 +2626,7 @@ mod section_settings;
 mod text_box_create;
 mod types;
 
+pub use audio::{PagesAudioInfo, PagesAudioOptions, RemovedPagesAudio};
 pub use body_shapes::{PagesBodyShapeInfo, PagesBodyShapeKind, RemovedPagesBodyShape};
 pub use images::{PagesImageInfo, RemovedPagesImage};
 pub use movies::{PagesMovieInfo, PagesMovieOptions, RemovedPagesMovie};
