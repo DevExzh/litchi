@@ -101,7 +101,10 @@ pub use shapes::{AutoShape, Placeholder, PlaceholderSize, PlaceholderType, Shape
 
 // Re-export legacy types
 pub use current_user::CurrentUser;
-pub use document_properties::PowerPoint10DocumentProperties;
+pub use document_properties::{
+    PowerPoint10DocumentProperties, PowerPointGridSpacing, PowerPointPhotoAlbumFrameShape,
+    PowerPointPhotoAlbumLayout, PowerPointPhotoAlbumSettings,
+};
 pub use escher_textbox::EscherTextboxWrapper;
 pub use font::{
     EmbeddedPowerPointFont, PowerPointFont, PowerPointFontCollection, PowerPointFontCollections,

@@ -59,6 +59,8 @@ pub enum PptRecordType {
     PPDrawingGroup = 1035,
     /// PP drawing record
     PPDrawing = 1036,
+    /// PowerPoint 10 square-grid spacing atom
+    GridSpacing10Atom = 1037,
     /// OE placeholder atom record (placeholder data)
     OEPlaceholderAtom = 3011,
     /// Text header atom record
@@ -113,6 +115,8 @@ pub enum PptRecordType {
     FontEmbedFlags10Atom = 0x32C8,
     /// PowerPoint 10 privacy flags atom
     FilterPrivacyFlags10Atom = 0x36B0,
+    /// PowerPoint 10 photo album settings atom
+    PhotoAlbumInfo10Atom = 0x36B2,
     /// CString record
     CString = 4026,
     /// East Asian line-breaking settings container
@@ -286,6 +290,7 @@ impl From<u16> for PptRecordType {
             1034 => PptRecordType::ExObjListAtom,
             1035 => PptRecordType::PPDrawingGroup,
             1036 => PptRecordType::PPDrawing,
+            1037 => PptRecordType::GridSpacing10Atom,
             3011 => PptRecordType::OEPlaceholderAtom,
             3999 => PptRecordType::TextHeaderAtom,
             4000 => PptRecordType::TextCharsAtom,
@@ -313,6 +318,7 @@ impl From<u16> for PptRecordType {
             4024 => PptRecordType::FontEmbeddedData,
             0x32C8 => PptRecordType::FontEmbedFlags10Atom,
             0x36B0 => PptRecordType::FilterPrivacyFlags10Atom,
+            0x36B2 => PptRecordType::PhotoAlbumInfo10Atom,
             4026 => PptRecordType::CString,
             4040 => PptRecordType::Kinsoku,
             4050 => PptRecordType::KinsokuAtom,
