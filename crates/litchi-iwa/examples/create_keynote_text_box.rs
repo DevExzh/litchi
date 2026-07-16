@@ -14,7 +14,7 @@ use litchi_iwa::text::{
     ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
     ParagraphTabStops, TextAlignment, TextBaselineShift, TextCapitalization, TextCharacterSpacing,
     TextColumnCount, TextColumns, TextDecorations, TextLigatures, TextOutline, TextPointSize,
-    TextScript, TextStrikethrough, TextStyle, TextUnderline,
+    TextScript, TextShadow, TextStrikethrough, TextStyle, TextUnderline,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -103,6 +103,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         created.drawable_object_id,
         TextOutline::standard(),
     )?;
+    editor.set_slide_text_box_text_shadow(0, created.drawable_object_id, TextShadow::standard())?;
     editor.set_slide_text_box_paragraph_alignment(
         0,
         created.drawable_object_id,

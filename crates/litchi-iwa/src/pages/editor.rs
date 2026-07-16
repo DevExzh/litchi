@@ -32,7 +32,7 @@ use crate::text::{
     IWorkTextEditor, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphIndents,
     ParagraphLineSpacing, ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment,
     TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumns, TextDecorations,
-    TextLigatures, TextOutline, TextScript, TextStorageInfo, TextStyle,
+    TextLigatures, TextOutline, TextScript, TextShadow, TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     append_repeated_length_delimited_field, patch_fixed32_field, patch_length_delimited_field,
@@ -688,6 +688,42 @@ impl PagesEditor {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
         let changed = staged.reset_text_outline(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective shadow of a reachable ordinary text box.
+    pub fn text_box_text_shadow(&self, drawable_object_id: u64) -> Result<TextShadow> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        self.text.text_shadow(graph.storage_id)
+    }
+
+    /// Atomically set a typed drop shadow across a reachable ordinary text box.
+    pub fn set_text_box_text_shadow(
+        &mut self,
+        drawable_object_id: u64,
+        shadow: TextShadow,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_text_shadow(graph.storage_id, shadow)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified.text_box_text_shadow(drawable_object_id)? != shadow {
+            return Err(Error::InvalidFormat(
+                "Pages text-box shadow update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore the inherited shadow while preserving sibling overrides.
+    pub fn reset_text_box_text_shadow(&mut self, drawable_object_id: u64) -> Result<bool> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_text_shadow(graph.storage_id)?;
         if changed {
             *self = Self::from_package(staged.into_package())?;
         }

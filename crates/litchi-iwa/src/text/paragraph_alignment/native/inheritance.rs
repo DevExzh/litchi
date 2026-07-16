@@ -9,13 +9,13 @@ use crate::text::style::{
     ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing, ParagraphSpacing,
     ParagraphSpacingPoints, TextAlignment, TextBaselineShift, TextCapitalization,
     TextCharacterSpacing, TextDecorations, TextLigatures, TextOutline, TextPointSize, TextScript,
-    TextStrikethrough, TextStyle, TextUnderline,
+    TextShadow, TextStrikethrough, TextStyle, TextUnderline,
 };
 use crate::{Error, IWorkPackage, Result};
 
 use super::{
     capitalization_from_character, line_spacing_from_archive, locate_style, tabs,
-    text_color_from_character, text_outline_from_character,
+    text_color_from_character, text_outline_from_character, text_shadow_from_character,
 };
 
 const MAX_STYLE_INHERITANCE_DEPTH: usize = 64;
@@ -202,6 +202,20 @@ pub(super) fn text_outline(package: &IWorkPackage, first_style_id: u64) -> Resul
             return Ok(InheritanceControl::Continue);
         };
         *value = Some(outline);
+        Ok(InheritanceControl::Complete)
+    })?;
+    Ok(value.unwrap_or_default())
+}
+
+pub(super) fn text_shadow(package: &IWorkPackage, first_style_id: u64) -> Result<TextShadow> {
+    let value = walk(package, first_style_id, None, |value, style| {
+        let Some(properties) = style.char_properties.as_ref() else {
+            return Ok(InheritanceControl::Continue);
+        };
+        let Some(shadow) = text_shadow_from_character(properties)? else {
+            return Ok(InheritanceControl::Continue);
+        };
+        *value = Some(shadow);
         Ok(InheritanceControl::Complete)
     })?;
     Ok(value.unwrap_or_default())

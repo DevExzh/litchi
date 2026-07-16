@@ -56,7 +56,9 @@ pub use shadow::{
     ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowCurve, ShapeShadowOffset,
     ShapeShadowOpacity, ShapeShadowPerspective,
 };
-pub(crate) use shadow::{reset_shape_shadow, set_shape_shadow, shape_shadow};
+pub(crate) use shadow::{
+    reset_shape_shadow, set_shape_shadow, shadow_from_native, shadow_to_native, shape_shadow,
+};
 pub use stroke::{
     LineStyle, ShapeStroke, StrokeCap, StrokeJoin, StrokeMiterLimit, StrokePattern, StrokeWidth,
 };

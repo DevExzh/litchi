@@ -34,6 +34,6 @@ pub use style::{
     ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingMultiple,
     ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, ParagraphStyle,
     TextAlignment, TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextDecorations,
-    TextLigatures, TextOutline, TextPointSize, TextScript, TextStrikethrough, TextStyle,
-    TextUnderline,
+    TextLigatures, TextOutline, TextPointSize, TextScript, TextShadow, TextStrikethrough,
+    TextStyle, TextUnderline,
 };

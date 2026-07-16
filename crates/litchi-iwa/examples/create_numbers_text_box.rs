@@ -14,7 +14,7 @@ use litchi_iwa::text::{
     ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
     ParagraphTabStops, TextAlignment, TextBaselineShift, TextCapitalization, TextCharacterSpacing,
     TextColumnCount, TextColumnGap, TextColumns, TextDecorations, TextLigatures, TextOutline,
-    TextPointSize, TextScript, TextStrikethrough, TextStyle, TextUnderline,
+    TextPointSize, TextScript, TextShadow, TextStrikethrough, TextStyle, TextUnderline,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -104,6 +104,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         sheet_id,
         created.drawable_object_id,
         TextOutline::standard(),
+    )?;
+    editor.set_sheet_text_box_text_shadow(
+        sheet_id,
+        created.drawable_object_id,
+        TextShadow::standard(),
     )?;
     editor.set_sheet_text_box_paragraph_alignment(
         sheet_id,

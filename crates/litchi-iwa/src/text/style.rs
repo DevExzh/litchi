@@ -3,7 +3,11 @@
 //! iWork documents support rich text with character-level and paragraph-level styling.
 
 use super::paragraph_tabs::ParagraphTabStops;
-use crate::shapes::{RgbaColor, ShapeStroke, StrokePattern, StrokeWidth};
+use crate::shapes::{
+    RgbaColor, ShapeDropShadow, ShapeShadow, ShapeShadowAngle, ShapeShadowAppearance,
+    ShapeShadowBlurRadius, ShapeShadowOffset, ShapeShadowOpacity, ShapeStroke, StrokePattern,
+    StrokeWidth,
+};
 
 /// Positive character size in typographic points.
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
@@ -417,6 +421,52 @@ impl TextOutline {
             StrokeWidth::ONE,
             StrokePattern::Solid,
         ))
+    }
+}
+
+/// Effective drop shadow applied to uniformly styled text.
+///
+/// Text shadows use iWork's native drawing-shadow archive, but the text
+/// inspector supports only drop shadows. [`TextShadow::standard`] reproduces
+/// the checkbox-authored value in Pages, Numbers, and Keynote.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub enum TextShadow {
+    /// Render text without a shadow.
+    #[default]
+    None,
+    /// Render text with a typed native drop shadow.
+    Drop(ShapeDropShadow),
+}
+
+impl TextShadow {
+    /// Construct the exact shadow written by current iWork applications.
+    pub const fn standard() -> Self {
+        Self::Drop(ShapeDropShadow::new(
+            ShapeShadowAppearance::new(
+                RgbaColor::black(),
+                ShapeShadowBlurRadius::ONE_POINT,
+                ShapeShadowOffset::FIVE_POINTS,
+                ShapeShadowOpacity::OPAQUE,
+            ),
+            ShapeShadowAngle::FORTY_FIVE_DEGREES,
+        ))
+    }
+
+    pub(crate) const fn into_shape_shadow(self) -> ShapeShadow {
+        match self {
+            Self::None => ShapeShadow::Disabled,
+            Self::Drop(shadow) => ShapeShadow::Drop(shadow),
+        }
+    }
+
+    pub(crate) fn from_shape_shadow(shadow: ShapeShadow) -> crate::Result<Self> {
+        match shadow {
+            ShapeShadow::Disabled => Ok(Self::None),
+            ShapeShadow::Drop(shadow) => Ok(Self::Drop(shadow)),
+            ShapeShadow::Contact(_) | ShapeShadow::Curved(_) => Err(crate::Error::InvalidFormat(
+                "native iWork text uses a non-drop shadow".to_owned(),
+            )),
+        }
     }
 }
 

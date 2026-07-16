@@ -7,6 +7,7 @@ use crate::{Error, Result};
 
 use super::RgbaColor;
 
+pub(crate) use native::{shadow_from_native, shadow_to_native};
 pub(crate) use style::{reset_shape_shadow, set_shape_shadow, shape_shadow};
 
 const FULL_TURN_DEGREES: f32 = 360.0;
@@ -19,6 +20,8 @@ pub struct ShapeShadowAngle(f32);
 
 impl ShapeShadowAngle {
     pub const ZERO: Self = Self(0.0);
+    /// Forty-five-degree direction used by standard iWork text shadows.
+    pub const FORTY_FIVE_DEGREES: Self = Self(45.0);
 
     pub fn from_degrees(degrees: f32) -> Result<Self> {
         if !degrees.is_finite() || !(0.0..FULL_TURN_DEGREES).contains(&degrees) {
@@ -40,6 +43,8 @@ pub struct ShapeShadowOffset(f32);
 
 impl ShapeShadowOffset {
     pub const ZERO: Self = Self(0.0);
+    /// Five-point offset used by standard iWork text shadows.
+    pub const FIVE_POINTS: Self = Self(5.0);
 
     pub fn from_points(points: f32) -> Result<Self> {
         if !points.is_finite() || points < 0.0 {
@@ -61,6 +66,8 @@ pub struct ShapeShadowBlurRadius(u32);
 
 impl ShapeShadowBlurRadius {
     pub const ZERO: Self = Self(0);
+    /// One-point blur radius used by standard iWork text shadows.
+    pub const ONE_POINT: Self = Self(1);
 
     pub fn from_points(points: u32) -> Result<Self> {
         if points > MAX_NATIVE_BLUR_RADIUS {

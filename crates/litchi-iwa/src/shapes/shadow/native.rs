@@ -18,7 +18,7 @@ const DEFAULT_OPACITY: f32 = 1.0;
 const DEFAULT_CONTACT_HEIGHT: f32 = 0.2;
 const DEFAULT_CURVE: f32 = 0.6;
 
-pub(super) fn shadow_from_native(native: &tsd::ShadowArchive) -> Result<ShapeShadow> {
+pub(crate) fn shadow_from_native(native: &tsd::ShadowArchive) -> Result<ShapeShadow> {
     if native == &tsd::ShadowArchive::default() {
         return Ok(ShapeShadow::Disabled);
     }
@@ -86,7 +86,7 @@ pub(super) fn shadow_from_native(native: &tsd::ShadowArchive) -> Result<ShapeSha
     }
 }
 
-pub(super) fn shadow_to_native(shadow: ShapeShadow) -> tsd::ShadowArchive {
+pub(crate) fn shadow_to_native(shadow: ShapeShadow) -> tsd::ShadowArchive {
     match shadow {
         ShapeShadow::Disabled => tsd::ShadowArchive::default(),
         ShapeShadow::Drop(drop) => tsd::ShadowArchive {

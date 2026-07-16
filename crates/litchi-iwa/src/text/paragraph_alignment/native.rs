@@ -8,7 +8,8 @@ use prost::Message;
 use crate::archive::{ArchiveObject, RawMessage};
 use crate::protobuf::{tsd, tsp, tss, tswp};
 use crate::shapes::{
-    RgbaColor, color_from_native, color_to_native, stroke_from_native, stroke_to_native,
+    RgbaColor, color_from_native, color_to_native, shadow_from_native, shadow_to_native,
+    stroke_from_native, stroke_to_native,
 };
 use crate::wire::{parse_wire_fields, repeated_length_delimited_payloads};
 use crate::{Error, IWorkPackage, Result};
@@ -18,7 +19,8 @@ use super::super::style::{
     ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingMultiple,
     ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, TextAlignment,
     TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextDecorations, TextLigatures,
-    TextOutline, TextPointSize, TextScript, TextStrikethrough, TextStyle, TextUnderline,
+    TextOutline, TextPointSize, TextScript, TextShadow, TextStrikethrough, TextStyle,
+    TextUnderline,
 };
 use super::super::style_registry::object_archive_name;
 
@@ -43,6 +45,8 @@ const CHARACTER_STRIKETHROUGH_FIELD: u32 = 12;
 const CHARACTER_CAPITALIZATION_FIELD: u32 = 13;
 const CHARACTER_BASELINE_SHIFT_FIELD: u32 = 14;
 const CHARACTER_LIGATURES_FIELD: u32 = 16;
+const CHARACTER_SHADOW_NULL_FIELD: u32 = 20;
+const CHARACTER_SHADOW_FIELD: u32 = 21;
 const CHARACTER_TRACKING_FIELD: u32 = 27;
 const CHARACTER_DRAWING_STROKE_NULL_FIELD: u32 = 43;
 const CHARACTER_DRAWING_STROKE_FIELD: u32 = 44;
@@ -90,6 +94,7 @@ pub(super) struct ParagraphStyleOverrides {
     pub(super) character_spacing: Option<TextCharacterSpacing>,
     pub(super) ligatures: Option<TextLigatures>,
     pub(super) outline: Option<TextOutline>,
+    pub(super) shadow: Option<TextShadow>,
     pub(super) underline: Option<TextUnderline>,
     pub(super) strikethrough: Option<TextStrikethrough>,
     pub(super) alignment: Option<TextAlignment>,
@@ -116,6 +121,7 @@ impl ParagraphStyleOverrides {
             + u32::from(self.character_spacing.is_some())
             + u32::from(self.ligatures.is_some())
             + u32::from(self.outline.is_some())
+            + u32::from(self.shadow.is_some())
             + u32::from(self.underline.is_some())
             + u32::from(self.strikethrough.is_some())
             + u32::from(self.alignment.is_some())
@@ -234,6 +240,13 @@ pub(super) fn inherited_text_outline(
     inheritance::text_outline(package, first_style_id)
 }
 
+pub(super) fn inherited_text_shadow(
+    package: &IWorkPackage,
+    first_style_id: u64,
+) -> Result<TextShadow> {
+    inheritance::text_shadow(package, first_style_id)
+}
+
 pub(super) fn inherited_line_spacing(
     package: &IWorkPackage,
     first_style_id: u64,
@@ -297,6 +310,7 @@ pub(super) fn direct_overrides(
         .map(TextLigatures::from_native_value)
         .transpose()?;
     let outline = text_outline_from_character(character_properties)?;
+    let shadow = text_shadow_from_character(character_properties)?;
     let underline = character_properties
         .underline
         .map(TextUnderline::from_native_value)
@@ -350,6 +364,7 @@ pub(super) fn direct_overrides(
         character_spacing,
         ligatures,
         outline,
+        shadow,
         underline,
         strikethrough,
         alignment,
@@ -388,6 +403,10 @@ pub(super) fn direct_overrides(
         remaining_character.tsd_stroke_null = None;
         remaining_character.tsd_stroke = None;
     }
+    if shadow.is_some() {
+        remaining_character.shadow_null = None;
+        remaining_character.shadow = None;
+    }
     remaining_character.underline = None;
     remaining_character.strikethru = None;
     let semantic = !overrides.is_empty()
@@ -414,7 +433,7 @@ pub(super) fn direct_overrides(
         STYLE_PARAGRAPH_PROPERTIES_FIELD,
         "paragraph properties",
     )?;
-    let mut character_fields = Vec::with_capacity(14);
+    let mut character_fields = Vec::with_capacity(15);
     if bold.is_some() {
         character_fields.push(CHARACTER_BOLD_FIELD);
     }
@@ -471,6 +490,12 @@ pub(super) fn direct_overrides(
         character_fields.push(match outline {
             TextOutline::None => CHARACTER_DRAWING_STROKE_NULL_FIELD,
             TextOutline::Stroke(_) => CHARACTER_DRAWING_STROKE_FIELD,
+        });
+    }
+    if let Some(shadow) = shadow {
+        character_fields.push(match shadow {
+            TextShadow::None => CHARACTER_SHADOW_NULL_FIELD,
+            TextShadow::Drop(_) => CHARACTER_SHADOW_FIELD,
         });
     }
     if underline.is_some() {
@@ -579,6 +604,14 @@ pub(super) fn variation_object(
                 TextOutline::None => None,
                 TextOutline::Stroke(stroke) => Some(stroke_to_native(stroke)),
             }),
+            shadow_null: matches!(overrides.shadow, Some(TextShadow::None)).then_some(true),
+            shadow: overrides
+                .shadow
+                .map(TextShadow::into_shape_shadow)
+                .and_then(|shadow| match shadow {
+                    crate::shapes::ShapeShadow::Disabled => None,
+                    enabled => Some(shadow_to_native(enabled)),
+                }),
             underline: overrides.underline.map(TextUnderline::native_value),
             strikethru: overrides.strikethrough.map(TextStrikethrough::native_value),
             tsd_fill: overrides.font_color.map(|color| tsd::FillArchive {
@@ -627,6 +660,11 @@ pub(super) fn variation_object(
             .field_infos
             .push(text_stroke_field_info());
     }
+    if matches!(overrides.shadow, Some(TextShadow::Drop(_))) {
+        object.archive_info.message_infos[0]
+            .field_infos
+            .push(text_shadow_field_info());
+    }
     Ok(object)
 }
 
@@ -644,6 +682,10 @@ pub(super) fn replace_variation(
         .field_infos
         .iter()
         .any(is_text_stroke_field_info);
+    let has_text_shadow_info = replacement.archive_info.message_infos[0]
+        .field_infos
+        .iter()
+        .any(is_text_shadow_field_info);
     let message = replacement.messages.pop().ok_or_else(|| {
         Error::InvalidFormat("replacement paragraph style has no payload".to_owned())
     })?;
@@ -670,13 +712,19 @@ pub(super) fn replace_variation(
         };
         object.replace_message(*index, message)?;
         let info = &mut object.archive_info.message_infos[*index];
-        info.field_infos
-            .retain(|field| !is_text_fill_field_info(field) && !is_text_stroke_field_info(field));
+        info.field_infos.retain(|field| {
+            !is_text_fill_field_info(field)
+                && !is_text_stroke_field_info(field)
+                && !is_text_shadow_field_info(field)
+        });
         if has_text_fill_info {
             info.field_infos.push(text_fill_field_info());
         }
         if has_text_stroke_info {
             info.field_infos.push(text_stroke_field_info());
+        }
+        if has_text_shadow_info {
+            info.field_infos.push(text_shadow_field_info());
         }
         Ok(())
     })
@@ -748,6 +796,29 @@ pub(super) fn text_outline_from_character(
         .transpose()
 }
 
+pub(super) fn text_shadow_from_character(
+    properties: &tswp::CharacterStylePropertiesArchive,
+) -> Result<Option<TextShadow>> {
+    if properties.shadow_null == Some(true) {
+        if properties.shadow.is_some() {
+            return Err(Error::InvalidFormat(
+                "native iWork text shadow is both null and populated".to_owned(),
+            ));
+        }
+        return Ok(Some(TextShadow::None));
+    }
+    if properties.shadow_null == Some(false) && properties.shadow.is_none() {
+        return Err(Error::InvalidFormat(
+            "native iWork text shadow has a false null marker without a shadow".to_owned(),
+        ));
+    }
+    properties
+        .shadow
+        .as_ref()
+        .map(|shadow| shadow_from_native(shadow).and_then(TextShadow::from_shape_shadow))
+        .transpose()
+}
+
 pub(super) fn capitalization_from_character(
     properties: &tswp::CharacterStylePropertiesArchive,
 ) -> Result<Option<TextCapitalization>> {
@@ -805,6 +876,17 @@ fn text_stroke_field_info() -> tsp::FieldInfo {
     }
 }
 
+fn text_shadow_field_info() -> tsp::FieldInfo {
+    tsp::FieldInfo {
+        path: tsp::FieldPath {
+            path: vec![STYLE_CHARACTER_PROPERTIES_FIELD, CHARACTER_SHADOW_FIELD],
+        },
+        r#type: Some(tsp::field_info::Type::Message as i32),
+        unknown_field_rule: Some(tsp::field_info::UnknownFieldRule::IgnoreAndPreserve as i32),
+        ..Default::default()
+    }
+}
+
 fn is_text_fill_field_info(field: &tsp::FieldInfo) -> bool {
     field.path.path
         == [
@@ -819,6 +901,10 @@ fn is_text_stroke_field_info(field: &tsp::FieldInfo) -> bool {
             STYLE_CHARACTER_PROPERTIES_FIELD,
             CHARACTER_DRAWING_STROKE_FIELD,
         ]
+}
+
+fn is_text_shadow_field_info(field: &tsp::FieldInfo) -> bool {
+    field.path.path == [STYLE_CHARACTER_PROPERTIES_FIELD, CHARACTER_SHADOW_FIELD]
 }
 
 pub(super) fn is_exclusive(package: &IWorkPackage, style_id: u64) -> Result<bool> {

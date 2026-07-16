@@ -41,7 +41,7 @@ use crate::text::{
     IWorkTextEditor, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphIndents,
     ParagraphLineSpacing, ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment,
     TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumns, TextDecorations,
-    TextLigatures, TextOutline, TextScript, TextStorageInfo, TextStyle,
+    TextLigatures, TextOutline, TextScript, TextShadow, TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     patch_length_delimited_field, patch_nested_fixed32_field, patch_nested_length_delimited_field,
@@ -986,6 +986,51 @@ impl NumbersEditor {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
         let changed = text.reset_text_outline(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(text.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective shadow of a sheet-owned text box.
+    pub fn sheet_text_box_text_shadow(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<TextShadow> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        IWorkTextEditor::from_package(self.package.clone()).text_shadow(graph.storage_id)
+    }
+
+    /// Atomically set a typed drop shadow across a sheet-owned text box.
+    pub fn set_sheet_text_box_text_shadow(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        shadow: TextShadow,
+    ) -> Result<()> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        text.set_text_shadow(graph.storage_id, shadow)?;
+        let verified = Self::from_package(text.into_package())?;
+        if verified.sheet_text_box_text_shadow(sheet_id, drawable_object_id)? != shadow {
+            return Err(Error::InvalidFormat(
+                "Numbers text-box shadow update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore the inherited shadow while preserving sibling overrides.
+    pub fn reset_sheet_text_box_text_shadow(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let changed = text.reset_text_shadow(graph.storage_id)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
         }
