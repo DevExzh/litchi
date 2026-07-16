@@ -409,11 +409,14 @@ impl<'doc> Slide<'doc> {
                     properties.height = a.height();
                 }
 
-                let autoshape = AutoShape::from_escher(
+                let mut autoshape = AutoShape::from_escher(
                     properties,
                     escher_shape.native_shape_type(),
                     escher_shape.properties(),
                 );
+                if let Some(text) = escher_shape.text().filter(|text| !text.is_empty()) {
+                    autoshape.set_text(text);
+                }
                 Some(ShapeEnum::AutoShape(autoshape))
             },
 
@@ -751,7 +754,8 @@ mod tests {
 
     fn create_autoshape_escher_drawing() -> Vec<u8> {
         use crate::escher::writer::{
-            PropertyBuilder, ShapeBuilder, record_type, write_client_anchor, write_container,
+            PropertyBuilder, ShapeBuilder, record_type, write_atom, write_client_anchor,
+            write_container,
         };
 
         let mut shape_children = Vec::new();
@@ -763,6 +767,21 @@ mod tests {
         properties.add_simple(0x0149, -123);
         properties.write(&mut shape_children).unwrap();
         write_client_anchor(&mut shape_children, 11, 22, 211, 122).unwrap();
+
+        let utf16: Vec<u8> = "Arrow label"
+            .encode_utf16()
+            .flat_map(u16::to_le_bytes)
+            .collect();
+        let mut embedded_text = Vec::new();
+        write_atom(&mut embedded_text, 0, 0, 4000, &utf16).unwrap();
+        write_atom(
+            &mut shape_children,
+            0,
+            0,
+            record_type::CLIENT_TEXTBOX,
+            &embedded_text,
+        )
+        .unwrap();
 
         let mut shape_container = Vec::new();
         write_container(
@@ -1315,6 +1334,9 @@ mod tests {
         assert_eq!(autoshape.auto_shape_type(), AutoShapeType::Arrow);
         assert_eq!(autoshape.adjustments(), &[32_768, 0, -123]);
         assert_eq!(autoshape.bounds(), (11, 22, 200, 100));
+        assert_eq!(autoshape.text(), "Arrow label");
+        assert!(autoshape.has_text());
+        assert_eq!(Shape::text(autoshape).unwrap(), "Arrow label");
     }
 
     #[test]

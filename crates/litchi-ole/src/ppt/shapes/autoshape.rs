@@ -309,6 +309,16 @@ impl<'a> AutoShape<'a> {
         self.adjustments = adjustments;
     }
 
+    /// Get the text contained by this shape.
+    pub fn text(&self) -> &str {
+        self.container.text_content.as_deref().unwrap_or_default()
+    }
+
+    /// Set the text contained by this shape.
+    pub fn set_text(&mut self, text: String) {
+        self.container.set_text(text);
+    }
+
     /// Check if this is a basic geometric shape (rectangle, oval, etc.).
     pub fn is_basic_shape(&self) -> bool {
         matches!(
@@ -350,12 +360,11 @@ where
     }
 
     fn text(&self) -> super::super::package::Result<String> {
-        // Auto shapes may contain text, but it's optional
-        Ok(String::new())
+        Ok(self.text().to_owned())
     }
 
     fn has_text(&self) -> bool {
-        false // Auto shapes typically don't have inherent text
+        !self.text().is_empty()
     }
 
     fn clone_box(&self) -> Box<dyn Shape> {
