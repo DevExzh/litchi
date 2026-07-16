@@ -139,6 +139,7 @@ pub struct XlsWorkbook<R: Read + Seek> {
     shared_string_properties: Option<Arc<Vec<Option<Box<SharedStringProperties>>>>>,
     shared_string_reference_count: u32,
     palette: crate::xls::palette::XlsPalette,
+    fonts: Vec<crate::xls::font::XlsFont>,
     biff_version: BiffVersion,
     is_1904_date_system: bool,
     formula_context: FormulaContext,
@@ -172,6 +173,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             shared_string_properties: None,
             shared_string_reference_count: 0,
             palette: crate::xls::palette::XlsPalette::default(),
+            fonts: Vec::new(),
             biff_version: BiffVersion::Biff8,
             is_1904_date_system: false,
             formula_context: FormulaContext::default(),
@@ -209,6 +211,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             shared_string_properties: None,
             shared_string_reference_count: 0,
             palette: crate::xls::palette::XlsPalette::default(),
+            fonts: Vec::new(),
             biff_version: BiffVersion::Biff8,
             is_1904_date_system: false,
             formula_context: FormulaContext::default(),
@@ -332,6 +335,13 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             let record = &records[i];
 
             match record.header.record_type {
+                0x0031 => {
+                    let index = crate::xls::font::logical_font_index(self.fonts.len())?;
+                    self.fonts.push(crate::xls::font::XlsFont::parse_record(
+                        index,
+                        &record.data,
+                    )?);
+                },
                 0x0092 => {
                     self.palette = crate::xls::palette::XlsPalette::parse_unique_record(
                         &record.data,
@@ -414,6 +424,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                 },
                 0x000A => {
                     // EOF - End of workbook globals
+                    crate::xls::font::validate_font_table(&self.fonts)?;
                     break;
                 },
                 _ => {
@@ -861,6 +872,22 @@ impl<R: Read + Seek> XlsWorkbook<R> {
     /// Workbook color palette, using BIFF8 defaults when no `Palette` record exists.
     pub fn palette(&self) -> &crate::xls::palette::XlsPalette {
         &self.palette
+    }
+
+    /// Font records in physical workbook order.
+    pub fn fonts(&self) -> &[crate::xls::font::XlsFont] {
+        &self.fonts
+    }
+
+    /// Resolve a BIFF8 logical font index. Index 4 is reserved and returns `None`.
+    pub fn font(&self, index: u16) -> Option<&crate::xls::font::XlsFont> {
+        self.fonts.iter().find(|font| font.index() == index)
+    }
+
+    /// Resolve a font's color through the workbook palette.
+    pub fn font_color(&self, index: u16) -> Option<crate::xls::palette::XlsColor> {
+        self.font(index)
+            .and_then(|font| self.palette.color(font.color_index()))
     }
 
     /// Rich-text and phonetic properties for a shared-string index.

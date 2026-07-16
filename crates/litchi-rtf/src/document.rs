@@ -41,6 +41,8 @@ pub struct RtfDocument<'a> {
     data_store: Option<crate::DocumentDataStore<'a>>,
     /// Document-level defaults for mathematical layout.
     math_properties: Option<crate::DocumentMathProperties>,
+    /// Default primary, East Asian, and complex-script languages.
+    language_defaults: crate::DocumentLanguageDefaults,
     /// Embedded and linked objects
     objects: Vec<super::object::EmbeddedObject<'a>>,
     /// Ordered inert document-variable metadata
@@ -257,6 +259,7 @@ impl<'a> RtfDocument<'a> {
             latent_styles: parsed.latent_styles.map(crate::LatentStyles::into_owned),
             data_store: parsed.data_store.map(crate::DocumentDataStore::into_owned),
             math_properties: parsed.math_properties,
+            language_defaults: parsed.language_defaults,
             objects: owned_objects,
             document_variables: parsed
                 .document_variables
@@ -697,6 +700,26 @@ impl<'a> RtfDocument<'a> {
     /// Remove document-level mathematical layout defaults.
     pub fn clear_math_properties(&mut self) {
         self.math_properties = None;
+    }
+
+    /// Return language defaults declared by the RTF header.
+    pub fn language_defaults(&self) -> &crate::DocumentLanguageDefaults {
+        &self.language_defaults
+    }
+
+    /// Replace document language defaults.
+    pub fn set_language_defaults(
+        &mut self,
+        defaults: crate::DocumentLanguageDefaults,
+    ) -> RtfResult<()> {
+        defaults.validate()?;
+        self.language_defaults = defaults;
+        Ok(())
+    }
+
+    /// Remove all document language defaults.
+    pub fn clear_language_defaults(&mut self) {
+        self.language_defaults = crate::DocumentLanguageDefaults::default();
     }
 
     fn validate_xml_namespaces(namespaces: &[crate::XmlNamespace<'_>]) -> RtfResult<()> {

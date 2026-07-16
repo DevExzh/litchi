@@ -38,6 +38,7 @@ mod drawing;
 pub mod external_links;
 pub mod format;
 pub mod header_footer;
+pub mod ignored_errors;
 mod namespace;
 pub mod named_sheet_view;
 pub mod page_margins;
@@ -103,6 +104,10 @@ pub use format::{
 pub use header_footer::{
     HeaderFooterSectionKind, HeaderFooterText, WorksheetHeaderFooter,
     parse_worksheet_header_footer,
+};
+pub use ignored_errors::{
+    IgnoredErrorRangeReference, WorksheetIgnoredError, WorksheetIgnoredErrorType,
+    WorksheetIgnoredErrors, WorksheetIgnoredErrorsExtension, parse_worksheet_ignored_errors,
 };
 pub use shared_strings::SharedStrings;
 pub use sheet_format::{

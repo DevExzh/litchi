@@ -305,6 +305,16 @@ pub struct Formatting {
     pub char_scale: i32,
     /// Kerning (in half-points)
     pub kerning: i32,
+    /// Primary language applied to this run.
+    pub language: Option<crate::LanguageId>,
+    /// East Asian language applied to this run.
+    pub east_asian_language: Option<crate::LanguageId>,
+    /// Primary language retained while proofing is disabled.
+    pub language_no_proof: Option<crate::LanguageId>,
+    /// East Asian language retained while proofing is disabled.
+    pub east_asian_language_no_proof: Option<crate::LanguageId>,
+    /// Whether spelling and grammar proofing is disabled for this run.
+    pub no_proof: bool,
 }
 
 impl Default for Formatting {
@@ -332,6 +342,11 @@ impl Default for Formatting {
             char_spacing: 0,
             char_scale: 100,
             kerning: 0,
+            language: None,
+            east_asian_language: None,
+            language_no_proof: None,
+            east_asian_language_no_proof: None,
+            no_proof: false,
         }
     }
 }

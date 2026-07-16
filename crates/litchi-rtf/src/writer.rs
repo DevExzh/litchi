@@ -119,6 +119,8 @@ impl<W: Write> RtfWriter<W> {
         // Write document header
         self.write_document_header()?;
 
+        self.write_language_defaults(doc.language_defaults())?;
+
         // Write font table
         self.write_font_table()?;
 
@@ -198,6 +200,25 @@ impl<W: Write> RtfWriter<W> {
         self.write_control_word("deff", Some(self.options.default_font as i32))?;
         self.write_control_word("deftab", Some(self.options.default_tab_width))?;
 
+        Ok(())
+    }
+
+    pub fn write_language_defaults(
+        &mut self,
+        defaults: &crate::DocumentLanguageDefaults,
+    ) -> io::Result<()> {
+        defaults
+            .validate()
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+        if let Some(language) = defaults.primary {
+            self.write_control_word("deflang", Some(language.rtf_value()))?;
+        }
+        if let Some(language) = defaults.east_asian {
+            self.write_control_word("deflangfe", Some(language.rtf_value()))?;
+        }
+        if let Some(language) = defaults.complex_script {
+            self.write_control_word("adeflang", Some(language.rtf_value()))?;
+        }
         Ok(())
     }
 
@@ -1642,6 +1663,22 @@ impl<W: Write> RtfWriter<W> {
 
     /// Write character formatting
     fn write_formatting(&mut self, fmt: &Formatting) -> io::Result<()> {
+        if let Some(language) = fmt.language {
+            self.write_control_word("lang", Some(language.rtf_value()))?;
+        }
+        if let Some(language) = fmt.east_asian_language {
+            self.write_control_word("langfe", Some(language.rtf_value()))?;
+        }
+        if let Some(language) = fmt.language_no_proof {
+            self.write_control_word("langnp", Some(language.rtf_value()))?;
+        }
+        if let Some(language) = fmt.east_asian_language_no_proof {
+            self.write_control_word("langfenp", Some(language.rtf_value()))?;
+        }
+        if fmt.no_proof {
+            self.write_control_word("noproof", None)?;
+        }
+
         // Font
         if fmt.font_ref != 0 {
             self.write_control_word("f", Some(fmt.font_ref as i32))?;

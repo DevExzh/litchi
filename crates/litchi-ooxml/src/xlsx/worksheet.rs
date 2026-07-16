@@ -19,6 +19,7 @@ use super::comments::parse_comments_xml;
 use super::drawing::parse_drawing_xml;
 use super::format::{CellBorder, CellFill, CellFont, CellFormat};
 use super::header_footer::{WorksheetHeaderFooter, parse_worksheet_header_footer};
+use super::ignored_errors::{WorksheetIgnoredErrors, parse_worksheet_ignored_errors};
 use super::parsers::worksheet_parser;
 use super::conditional_formatting::{
     parse_conditional_formattings, ConditionalFormatting as ParsedConditionalFormatting,
@@ -266,6 +267,8 @@ pub struct Worksheet<'a> {
     complete_page_setup: Option<WorksheetPageSetup>,
     /// Effective static worksheet row/column defaults and outline metadata.
     sheet_format_properties: Option<WorksheetSheetFormatProperties>,
+    /// User-reviewed worksheet error-checking exceptions.
+    ignored_errors: Option<WorksheetIgnoredErrors>,
     /// Manual row page breaks
     row_breaks: Vec<PageBreak>,
     /// Manual column page breaks
@@ -307,6 +310,7 @@ impl<'a> Worksheet<'a> {
             print_options: None,
             complete_page_setup: None,
             sheet_format_properties: None,
+            ignored_errors: None,
             row_breaks: Vec::new(),
             col_breaks: Vec::new(),
             rich_text_cells: HashMap::new(),
@@ -418,6 +422,7 @@ impl<'a> Worksheet<'a> {
         let complete_page_setup = parse_complete_worksheet_page_setup(sheet_data.as_bytes())?;
         let sheet_format_properties =
             parse_worksheet_sheet_format_properties(sheet_data.as_bytes())?;
+        let ignored_errors = parse_worksheet_ignored_errors(sheet_data.as_bytes())?;
         self.cells = parsed.cells;
         self.cell_styles = parsed.cell_styles;
         self.rows = parsed.rows;
@@ -444,6 +449,7 @@ impl<'a> Worksheet<'a> {
         self.print_options = print_options;
         self.complete_page_setup = complete_page_setup;
         self.sheet_format_properties = sheet_format_properties;
+        self.ignored_errors = ignored_errors;
         self.dimensions = parsed.dimensions;
         Ok((
             parsed.hyperlinks,
@@ -1916,6 +1922,13 @@ impl<'a> Worksheet<'a> {
     /// Effective worksheet row/column defaults and outline metadata.
     pub fn sheet_format_properties(&self) -> Option<&WorksheetSheetFormatProperties> {
         self.sheet_format_properties.as_ref()
+    }
+
+    // ===== Ignored Errors =====
+
+    /// User-reviewed worksheet error-checking exceptions, when present.
+    pub fn ignored_errors(&self) -> Option<&WorksheetIgnoredErrors> {
+        self.ignored_errors.as_ref()
     }
 
     // ===== Print Options =====

@@ -194,6 +194,8 @@ pub struct OdfVariableDeclarations {
     pub dde_connections: Vec<crate::OdfDdeConnectionDeclaration>,
     /// Validated references to DDE declarations in document order.
     pub dde_connection_uses: Vec<crate::OdfDdeConnectionUse>,
+    /// Optional document-wide bibliography formatting and sorting policy.
+    pub bibliography_configuration: Option<crate::OdfBibliographyConfiguration>,
 }
 
 impl OdfVariableDeclarations {
@@ -283,6 +285,8 @@ pub(crate) fn parse_variable_declaration_parts(
     let dde = crate::dde_connection::parse_dde_connection_parts(parts)?;
     result.dde_connections = dde.declarations;
     result.dde_connection_uses = dde.uses;
+    result.bibliography_configuration =
+        crate::bibliography_configuration::parse_bibliography_configuration_parts(parts)?;
     Ok(result)
 }
 

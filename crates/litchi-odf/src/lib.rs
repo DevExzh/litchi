@@ -302,6 +302,10 @@ mod media;
 mod variable_declaration;
 mod dde_connection;
 pub use dde_connection::{OdfDdeConnectionDeclaration, OdfDdeConnectionUse};
+mod bibliography_configuration;
+pub use bibliography_configuration::{
+    OdfBibliographyConfiguration, OdfBibliographyField, OdfBibliographySortKey,
+};
 /// Inert semantic discovery of embedded OpenDocument and OLE objects.
 mod embedded_object;
 /// OpenDocument database front-end (.odb) support.

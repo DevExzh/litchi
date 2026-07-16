@@ -151,6 +151,14 @@ pub enum ControlWord<'a> {
     MathSmallFractions(i32),
     MathWrapIndent(i32),
     MathWrapRight(i32),
+    DefaultLanguage(i32),
+    DefaultLanguageEastAsian(i32),
+    DefaultLanguageComplexScript(i32),
+    Language(i32),
+    LanguageEastAsian(i32),
+    LanguageNoProof(i32),
+    LanguageEastAsianNoProof(i32),
+    NoProof(bool),
 
     // Index and table-of-contents source marks
     IndexEntry,
@@ -797,6 +805,14 @@ impl<'a> Lexer<'a> {
             "msmallFrac" => ControlWord::MathSmallFractions(param.unwrap_or(0)),
             "mwrapIndent" => ControlWord::MathWrapIndent(param.unwrap_or(1440)),
             "mwrapRight" => ControlWord::MathWrapRight(param.unwrap_or(0)),
+            "deflang" => ControlWord::DefaultLanguage(param_value),
+            "deflangfe" => ControlWord::DefaultLanguageEastAsian(param_value),
+            "adeflang" => ControlWord::DefaultLanguageComplexScript(param_value),
+            "lang" => ControlWord::Language(param_value),
+            "langfe" => ControlWord::LanguageEastAsian(param_value),
+            "langnp" => ControlWord::LanguageNoProof(param_value),
+            "langfenp" => ControlWord::LanguageEastAsianNoProof(param_value),
+            "noproof" => ControlWord::NoProof(param_bool),
 
             // Index and table-of-contents source marks
             "xe" => ControlWord::IndexEntry,

@@ -312,6 +312,7 @@ pub struct Parser<'a> {
     data_store: Option<Vec<u8>>,
     saw_data_store: bool,
     math_properties: Option<crate::DocumentMathProperties>,
+    language_defaults: crate::DocumentLanguageDefaults,
     /// Embedded and linked objects
     objects: Vec<super::object::EmbeddedObject<'a>>,
     /// Ordered inert document variables
@@ -448,6 +449,7 @@ impl<'a> Parser<'a> {
             data_store: None,
             saw_data_store: false,
             math_properties: None,
+            language_defaults: crate::DocumentLanguageDefaults::default(),
             objects: Vec::new(),
             document_variables: Vec::new(),
             document_variable_text_bytes: 0,
@@ -553,6 +555,7 @@ impl<'a> Parser<'a> {
             latent_styles: self.latent_styles,
             data_store,
             math_properties: self.math_properties,
+            language_defaults: self.language_defaults,
             objects: self.objects,
             document_variables: self.document_variables,
             user_properties: self.user_properties,
@@ -2209,11 +2212,33 @@ impl<'a> Parser<'a> {
                     "orphan RTF document math-properties control".to_string(),
                 ));
             },
+            ControlWord::DefaultLanguage(value) => {
+                let language = crate::LanguageId::from_rtf(*value)?;
+                self.language_defaults.primary = Some(language);
+                let state = self.current_state_mut()?;
+                state.formatting.language = Some(language);
+                state.formatting.language_no_proof = Some(language);
+                return Ok(());
+            },
+            ControlWord::DefaultLanguageEastAsian(value) => {
+                let language = crate::LanguageId::from_rtf(*value)?;
+                self.language_defaults.east_asian = Some(language);
+                let state = self.current_state_mut()?;
+                state.formatting.east_asian_language = Some(language);
+                state.formatting.east_asian_language_no_proof = Some(language);
+                return Ok(());
+            },
+            ControlWord::DefaultLanguageComplexScript(value) => {
+                self.language_defaults.complex_script =
+                    Some(crate::LanguageId::from_rtf(*value)?);
+                return Ok(());
+            },
             _ => {},
         }
         if self.apply_section_control(control)? {
             return Ok(());
         }
+        let language_defaults = self.language_defaults;
         let state = self.current_state_mut()?;
 
         match control {
@@ -2221,6 +2246,22 @@ impl<'a> Parser<'a> {
             ControlWord::FontNumber(n) => {
                 state.formatting.font_ref = *n as FontRef;
             },
+            ControlWord::Language(value) => {
+                state.formatting.language = Some(crate::LanguageId::from_rtf(*value)?);
+            },
+            ControlWord::LanguageEastAsian(value) => {
+                state.formatting.east_asian_language =
+                    Some(crate::LanguageId::from_rtf(*value)?);
+            },
+            ControlWord::LanguageNoProof(value) => {
+                state.formatting.language_no_proof =
+                    Some(crate::LanguageId::from_rtf(*value)?);
+            },
+            ControlWord::LanguageEastAsianNoProof(value) => {
+                state.formatting.east_asian_language_no_proof =
+                    Some(crate::LanguageId::from_rtf(*value)?);
+            },
+            ControlWord::NoProof(value) => state.formatting.no_proof = *value,
             ControlWord::FontSize(size) => {
                 if let Some(nz) = NonZeroU16::new((*size).max(0) as u16) {
                     state.formatting.font_size = nz;
@@ -2285,6 +2326,10 @@ impl<'a> Parser<'a> {
             ControlWord::Plain => {
                 // Reset to default formatting
                 state.formatting = Formatting::default();
+                state.formatting.language = language_defaults.primary;
+                state.formatting.east_asian_language = language_defaults.east_asian;
+                state.formatting.language_no_proof = language_defaults.primary;
+                state.formatting.east_asian_language_no_proof = language_defaults.east_asian;
             },
 
             // Paragraph alignment
@@ -4229,6 +4274,20 @@ impl<'a> Parser<'a> {
             ControlWord::CharSpacing(value) => state.formatting.char_spacing = *value,
             ControlWord::CharScale(value) => state.formatting.char_scale = *value,
             ControlWord::Kerning(value) => state.formatting.kerning = *value,
+            ControlWord::Language(value) => {
+                state.formatting.language = crate::LanguageId::from_rtf(*value).ok();
+            },
+            ControlWord::LanguageEastAsian(value) => {
+                state.formatting.east_asian_language = crate::LanguageId::from_rtf(*value).ok();
+            },
+            ControlWord::LanguageNoProof(value) => {
+                state.formatting.language_no_proof = crate::LanguageId::from_rtf(*value).ok();
+            },
+            ControlWord::LanguageEastAsianNoProof(value) => {
+                state.formatting.east_asian_language_no_proof =
+                    crate::LanguageId::from_rtf(*value).ok();
+            },
+            ControlWord::NoProof(value) => state.formatting.no_proof = *value,
             ControlWord::Plain => state.formatting = Formatting::default(),
             ControlWord::LeftAlign => state.paragraph.alignment = Alignment::Left,
             ControlWord::RightAlign => state.paragraph.alignment = Alignment::Right,
@@ -7048,6 +7107,7 @@ pub struct ParsedDocument<'a> {
     pub latent_styles: Option<crate::LatentStyles<'a>>,
     pub data_store: Option<crate::DocumentDataStore<'a>>,
     pub math_properties: Option<crate::DocumentMathProperties>,
+    pub language_defaults: crate::DocumentLanguageDefaults,
     /// Embedded and linked objects
     pub objects: Vec<super::object::EmbeddedObject<'a>>,
     /// Ordered inert document-variable metadata
