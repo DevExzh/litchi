@@ -3,7 +3,9 @@
 use litchi_core::binary::{read_i16_le, read_u16_le, read_u32_le};
 
 use super::package::{PptError, Result};
+use super::records::PptRecord;
 use super::text_prop::TextTabStop;
+use crate::consts::PptRecordType;
 
 /// Margin and first-line indent overrides for one paragraph level.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -36,6 +38,11 @@ impl TextRuler {
     pub fn parse(data: &[u8]) -> Result<Self> {
         require_bytes(data, 0, 4, "TextRuler mask")?;
         let mask = read_u32_le(data, 0).unwrap_or(0);
+        if mask & !0x0000_1fff != 0 {
+            return Err(PptError::Corrupted(
+                "TextRuler has nonzero reserved mask bits".to_string(),
+            ));
+        }
         let mut offset = 4usize;
 
         let level_count = read_optional_i16(data, &mut offset, mask & 0x0002 != 0, "cLevels")?;
@@ -103,6 +110,49 @@ impl TextRuler {
             tab_stops,
             levels,
         })
+    }
+
+    /// Parse a `DefaultRulerAtom` payload and require all default fields.
+    pub fn parse_default(data: &[u8]) -> Result<Self> {
+        let ruler = Self::parse(data)?;
+        if ruler.mask & 0x0000_1fff != 0x0000_1fff {
+            return Err(PptError::Corrupted(
+                "DefaultRulerAtom omits required ruler fields".to_string(),
+            ));
+        }
+        Ok(ruler)
+    }
+}
+
+/// Discover and parse the document-wide `DefaultRulerAtom` below `root`.
+pub fn parse_default_text_ruler(root: &PptRecord) -> Result<Option<TextRuler>> {
+    let mut records = Vec::new();
+    collect_default_rulers(root, &mut records);
+    if records.len() > 1 {
+        return Err(PptError::Corrupted(
+            "Record tree contains multiple DefaultRulerAtom records".to_string(),
+        ));
+    }
+    records
+        .first()
+        .map(|record| {
+            if record.version != 0 || record.instance != 0 {
+                return Err(PptError::Corrupted(
+                    "DefaultRulerAtom has an invalid record header".to_string(),
+                ));
+            }
+            TextRuler::parse_default(&record.data)
+        })
+        .transpose()
+}
+
+fn collect_default_rulers<'a>(record: &'a PptRecord, output: &mut Vec<&'a PptRecord>) {
+    if record.record_type == PptRecordType::DefaultRulerAtom {
+        output.push(record);
+        return;
+    }
+    for child in &record.children {
+        collect_default_rulers(child, output);
     }
 }
 
@@ -185,5 +235,53 @@ mod tests {
         let mut trailing = 0u32.to_le_bytes().to_vec();
         trailing.push(0);
         assert!(TextRuler::parse(&trailing).is_err());
+
+        assert!(TextRuler::parse(&0x2000u32.to_le_bytes()).is_err());
+        assert!(TextRuler::parse_default(&0u32.to_le_bytes()).is_err());
+    }
+
+    #[test]
+    fn parses_complete_default_ruler() {
+        let mut data = Vec::new();
+        data.extend_from_slice(&0x1fffu32.to_le_bytes());
+        data.extend_from_slice(&5i16.to_le_bytes());
+        data.extend_from_slice(&720i16.to_le_bytes());
+        data.extend_from_slice(&0u16.to_le_bytes());
+        for level in 0..5i16 {
+            data.extend_from_slice(&(level * 100).to_le_bytes());
+            data.extend_from_slice(&(level * 100 - 25).to_le_bytes());
+        }
+
+        let ruler = TextRuler::parse_default(&data).unwrap();
+        assert_eq!(ruler.level_count, Some(5));
+        assert_eq!(ruler.default_tab_size, Some(720));
+        assert_eq!(ruler.levels[4].left_margin, Some(400));
+        assert_eq!(ruler.levels[4].indent, Some(375));
+
+        let atom = PptRecord {
+            record_type: PptRecordType::DefaultRulerAtom,
+            record_type_raw: 4011,
+            version: 0,
+            instance: 0,
+            data_length: data.len() as u32,
+            data,
+            children: Vec::new(),
+        };
+        let root = PptRecord {
+            record_type: PptRecordType::Environment,
+            record_type_raw: 1010,
+            version: 0x0f,
+            instance: 0,
+            data_length: 0,
+            data: Vec::new(),
+            children: vec![atom],
+        };
+        assert_eq!(
+            parse_default_text_ruler(&root)
+                .unwrap()
+                .unwrap()
+                .default_tab_size,
+            Some(720)
+        );
     }
 }

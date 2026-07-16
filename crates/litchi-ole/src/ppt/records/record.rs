@@ -126,6 +126,8 @@ impl PptRecord {
                 | PptRecordType::VBAInfo
                 | PptRecordType::SlideListWithText
                 | PptRecordType::Environment
+                | PptRecordType::FontCollection
+                | PptRecordType::FontCollection10
                 | PptRecordType::InteractiveInfo
                 | PptRecordType::AnimationInfo
                 | PptRecordType::ProgTags
@@ -259,7 +261,7 @@ impl PptRecord {
         Ok(records)
     }
 
-    fn parse_sequence_strict(data: &[u8], context: &str) -> Result<Vec<PptRecord>> {
+    pub(crate) fn parse_sequence_strict(data: &[u8], context: &str) -> Result<Vec<PptRecord>> {
         let mut records = Vec::new();
         let mut offset = 0usize;
         while offset < data.len() {

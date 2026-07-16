@@ -73,6 +73,7 @@ pub mod escher;
 // Legacy compatibility modules
 pub mod current_user;
 pub mod escher_textbox;
+pub mod font;
 pub mod master_style;
 pub mod text_extensions;
 pub mod text_prop;
@@ -97,6 +98,9 @@ pub use shapes::{AutoShape, Placeholder, PlaceholderSize, PlaceholderType, Shape
 // Re-export legacy types
 pub use current_user::CurrentUser;
 pub use escher_textbox::EscherTextboxWrapper;
+pub use font::{
+    EmbeddedPowerPointFont, PowerPointFont, PowerPointFontCollection, PowerPointFontCollections,
+};
 pub use master_style::{TextMasterStyle, TextMasterStyleLevel};
 pub use text_extensions::{
     TextCharacterExtension9, TextCharacterExtension10, TextDefaultsExtension9,
@@ -106,7 +110,7 @@ pub use text_extensions::{
     TextStyleExtension11, VersionedTextDefaults, VersionedTextMasterStyles,
 };
 pub use text_prop::{TextProp, TextPropCollection, TextPropType, TextTabStop};
-pub use text_ruler::{TextRuler, TextRulerLevel};
+pub use text_ruler::{TextRuler, TextRulerLevel, parse_default_text_ruler};
 pub use text_run::{
     ParagraphAlignment, ParagraphFontAlignment, ParagraphRun, ParagraphRunFormatting,
     ParagraphTabAlignment, ParagraphTabStop, ParagraphTextDirection, TextRun, TextRunExtractor,

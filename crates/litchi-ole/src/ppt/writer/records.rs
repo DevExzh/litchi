@@ -54,7 +54,7 @@ pub mod record_type {
     pub const PP_DRAWING_GROUP: u16 = 1035;
     pub const PP_DRAWING: u16 = 1036;
     pub const FONT_COLLECTION: u16 = 2005;
-    pub const FONT_ENTITY_ATOM: u16 = 2006;
+    pub const FONT_ENTITY_ATOM: u16 = 4023;
     pub const COLOR_SCHEME_ATOM: u16 = 2032;
     pub const TX_MASTER_STYLE_ATOM: u16 = 4003; // TxMasterStyleAtom
     pub const TX_CF_STYLE_ATOM: u16 = 4004; // TxCFStyleAtom
@@ -714,6 +714,16 @@ mod tests {
         assert!(!env.is_empty());
         // Should contain FontCollection and other required atoms
         assert!(env.len() > 100);
+
+        let (environment, consumed) = crate::ppt::records::PptRecord::parse(&env, 0).unwrap();
+        assert_eq!(consumed, env.len());
+        let collection = environment
+            .find_child(crate::consts::PptRecordType::FontCollection)
+            .unwrap();
+        let fonts = crate::ppt::PowerPointFontCollection::parse(collection).unwrap();
+        assert_eq!(fonts.fonts.len(), 1);
+        assert_eq!(fonts.fonts[0].name, "Arial");
+        assert!(fonts.fonts[0].truetype);
     }
 
     #[test]

@@ -29,6 +29,10 @@ pub enum PptRecordType {
     NotesAtom = 1009,
     /// Environment record
     Environment = 1010,
+    /// Font collection container
+    FontCollection = 2005,
+    /// PowerPoint 10 international font collection container
+    FontCollection10 = 2006,
     /// Slide persist atom record
     SlidePersistAtom = 1011,
     /// Main master record
@@ -99,6 +103,8 @@ pub enum PptRecordType {
     TextRulerAtom = 4006,
     /// Font entity atom record
     FontEntityAtom = 4023,
+    /// Embedded font data atom record
+    FontEmbeddedData = 4024,
     /// CString record
     CString = 4026,
     /// Headers footers container record
@@ -245,6 +251,8 @@ impl From<u16> for PptRecordType {
             1008 => PptRecordType::Notes,
             1009 => PptRecordType::NotesAtom,
             1010 => PptRecordType::Environment,
+            2005 => PptRecordType::FontCollection,
+            2006 => PptRecordType::FontCollection10,
             1011 => PptRecordType::SlidePersistAtom,
             1016 => PptRecordType::MainMaster,
             1017 => PptRecordType::SSSlideInfoAtom,
@@ -280,6 +288,7 @@ impl From<u16> for PptRecordType {
             4005 => PptRecordType::TxPFStyleAtom,
             4006 => PptRecordType::TextRulerAtom,
             4023 => PptRecordType::FontEntityAtom,
+            4024 => PptRecordType::FontEmbeddedData,
             4026 => PptRecordType::CString,
             4057 => PptRecordType::HeadersFooters,
             4058 => PptRecordType::HeadersFootersAtom,

@@ -1369,7 +1369,7 @@ impl Default for TextPropsBuilder {
 pub struct FontEntity {
     /// Font face name (max 32 characters)
     pub name: String,
-    /// Font type (0x00 = raster, 0x02 = device, 0x04 = TrueType)
+    /// Font type flags (0x01 = raster, 0x02 = device, 0x04 = TrueType)
     pub font_type: u8,
     /// Pitch and family
     pub pitch_family: u8,
@@ -1413,17 +1413,17 @@ impl FontEntity {
         let mut data = vec![0u8; 68];
 
         // Write font name as UTF-16LE (max 32 chars = 64 bytes)
-        for (i, ch) in self.name.encode_utf16().take(32).enumerate() {
+        for (i, ch) in self.name.encode_utf16().take(31).enumerate() {
             let bytes = ch.to_le_bytes();
             data[i * 2] = bytes[0];
             data[i * 2 + 1] = bytes[1];
         }
 
         // Font metadata at offset 64-67
-        data[64] = self.pitch_family;
-        data[65] = self.charset;
+        data[64] = self.charset;
+        data[65] = 0;
         data[66] = self.font_type;
-        data[67] = 0; // Reserved
+        data[67] = self.pitch_family;
 
         data
     }
@@ -1726,5 +1726,13 @@ mod tests {
         // Check "Arial" in UTF-16LE
         assert_eq!(data[0], b'A');
         assert_eq!(data[1], 0);
+        assert_eq!(&data[10..12], &[0, 0]);
+        assert_eq!(data[64], 0x00);
+        assert_eq!(data[65], 0x00);
+        assert_eq!(data[66], 0x04);
+        assert_eq!(data[67], 0x22);
+
+        let long = FontEntity::new("12345678901234567890123456789012").build();
+        assert_eq!(&long[62..64], &[0, 0]);
     }
 }
