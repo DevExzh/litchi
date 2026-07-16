@@ -95,6 +95,8 @@ pub mod prop_value {
     pub const SCHEME_SHADOW: u32 = SCHEME_COLOR | 0x02;
     pub const LINE_STYLE_DEFAULT: u32 = 0x0010_0010;
     pub const LINE_STYLE_BOOL_DEFAULT: u32 = 0x0008_0008;
+    pub const FILL_STYLE_DISABLED: u32 = 0x0010_0000;
+    pub const FILL_STYLE_ENABLED: u32 = 0x0015_0011;
 }
 
 // =============================================================================

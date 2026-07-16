@@ -1288,7 +1288,10 @@ fn build_shape_properties(shape: &UserShapeData) -> Vec<EscherProperty> {
         // BLIP__BLIPTODISPLAY (0x4104) - with isBlipId flag (0x4000 + 0x0104)
         props.push(EscherProperty::new(0x4104, picture_index));
         // No fill for pictures (picture IS the fill)
-        props.push(EscherProperty::new(prop_id::NO_FILL_HIT_TEST, 0x0010_0000));
+        props.push(EscherProperty::new(
+            prop_id::NO_FILL_HIT_TEST,
+            ppt_prop_value::FILL_STYLE_DISABLED,
+        ));
         // No line for pictures
         props.push(EscherProperty::new(prop_id::LINE_STYLE_BOOL, 0x0008_0000));
         return props;
@@ -1319,13 +1322,20 @@ fn build_shape_properties(shape: &UserShapeData) -> Vec<EscherProperty> {
             props.push(EscherProperty::new(prop_id::FILL_OPACITY, opacity));
         }
 
-        // Fill boolean: filled = true (0x00010001 per POI)
-        props.push(EscherProperty::new(prop_id::NO_FILL_HIT_TEST, 0x0001_0001));
+        // Match POI setForegroundColor: filled=true, fillShape=false,
+        // and noFillHitTest=true, with all three use bits set.
+        props.push(EscherProperty::new(
+            prop_id::NO_FILL_HIT_TEST,
+            ppt_prop_value::FILL_STYLE_ENABLED,
+        ));
     } else {
         // Default: scheme fill colors with no-fill flag
         props.push(EscherProperty::new(prop_id::FILL_COLOR, 0x0800_0004)); // scheme fill
         props.push(EscherProperty::new(prop_id::FILL_BACK_COLOR, 0x0800_0000));
-        props.push(EscherProperty::new(prop_id::NO_FILL_HIT_TEST, 0x0010_0000)); // no fill
+        props.push(EscherProperty::new(
+            prop_id::NO_FILL_HIT_TEST,
+            ppt_prop_value::FILL_STYLE_DISABLED,
+        ));
     }
 
     if let Some(blip_index) = shape.fill_blip_index {
@@ -1778,6 +1788,10 @@ mod tests {
         assert!(!props.is_empty());
         // Should have fill and line properties
         assert!(props.len() >= 4);
+        assert!(props.iter().any(|property| {
+            property.prop_id == prop_id::NO_FILL_HIT_TEST
+                && property.value == ppt_prop_value::FILL_STYLE_ENABLED
+        }));
     }
 
     #[test]
@@ -1789,7 +1803,10 @@ mod tests {
         };
         let props = build_shape_properties(&shape);
         // Should have scheme fill with no-fill flag
-        let has_no_fill = props.iter().any(|p| p.prop_id == prop_id::NO_FILL_HIT_TEST);
+        let has_no_fill = props.iter().any(|property| {
+            property.prop_id == prop_id::NO_FILL_HIT_TEST
+                && property.value == ppt_prop_value::FILL_STYLE_DISABLED
+        });
         assert!(has_no_fill);
     }
 

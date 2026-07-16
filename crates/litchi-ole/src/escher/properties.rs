@@ -1077,6 +1077,26 @@ mod tests {
     }
 
     #[test]
+    fn decodes_writer_fill_enabled_and_disabled_masks() {
+        let mut enabled_data = Vec::new();
+        push_property(&mut enabled_data, 0x01BF, 0x0015_0011);
+        let enabled = EscherProperties::from_opt_record(&opt_record(&enabled_data, 1));
+
+        assert_eq!(enabled.get_bool(EscherPropertyId::Filled), Some(true));
+        assert_eq!(enabled.get_bool(EscherPropertyId::FillShape), Some(false));
+        assert_eq!(
+            enabled.get_bool(EscherPropertyId::NoFillHitTest),
+            Some(true)
+        );
+        assert_eq!(enabled.get_bool(EscherPropertyId::HitTestFill), None);
+
+        let mut disabled_data = Vec::new();
+        push_property(&mut disabled_data, 0x01BF, 0x0010_0000);
+        let disabled = EscherProperties::from_opt_record(&opt_record(&disabled_data, 1));
+        assert_eq!(disabled.get_bool(EscherPropertyId::Filled), Some(false));
+    }
+
+    #[test]
     fn accepts_direct_boolean_properties_from_lenient_producers() {
         let mut data = Vec::new();
         push_property(&mut data, EscherPropertyId::Filled as u16, 1);

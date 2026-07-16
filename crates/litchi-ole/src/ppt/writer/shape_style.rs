@@ -449,7 +449,10 @@ impl FillStyle {
 
         if !self.enabled {
             // No fill - set the boolean property
-            props.push((fill_prop::FILL_STYLE_BOOL, 0x0001_0000)); // fNoFillHitTest = false, fFilled = false
+            props.push((
+                fill_prop::FILL_STYLE_BOOL,
+                crate::escher::writer::prop_value::FILL_STYLE_DISABLED,
+            ));
             return props;
         }
 
@@ -481,8 +484,11 @@ impl FillStyle {
             props.push((fill_prop::FILL_BLIP, blip_idx));
         }
 
-        // Boolean properties (filled, hit test)
-        props.push((fill_prop::FILL_STYLE_BOOL, 0x0011_0001)); // fNoFillHitTest = false, fFilled = true
+        // Explicitly enable filling, keep fillShape clear, and disable fill hit-testing.
+        props.push((
+            fill_prop::FILL_STYLE_BOOL,
+            crate::escher::writer::prop_value::FILL_STYLE_ENABLED,
+        ));
 
         props
     }
@@ -902,6 +908,19 @@ mod tests {
         let props = fill.build_properties();
         assert!(!props.is_empty());
         assert!(props.iter().any(|(id, _)| *id == fill_prop::FILL_COLOR));
+        assert!(props.contains(&(
+            fill_prop::FILL_STYLE_BOOL,
+            crate::escher::writer::prop_value::FILL_STYLE_ENABLED,
+        )));
+
+        let no_fill = FillStyle::none().build_properties();
+        assert_eq!(
+            no_fill,
+            [(
+                fill_prop::FILL_STYLE_BOOL,
+                crate::escher::writer::prop_value::FILL_STYLE_DISABLED,
+            )]
+        );
     }
 
     #[test]
