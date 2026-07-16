@@ -410,6 +410,74 @@ pub struct XlsWorkbookEnvironmentOptions {
     pub current_country_code: u16,
 }
 
+/// Primary BIFF8 workbook window and sheet-tab navigation settings.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct XlsWorkbookWindowOptions {
+    pub horizontal_position_twips: i16,
+    pub vertical_position_twips: i16,
+    pub width_twips: i16,
+    pub height_twips: i16,
+    pub hidden: bool,
+    pub minimized: bool,
+    pub very_hidden: bool,
+    pub show_horizontal_scrollbar: bool,
+    pub show_vertical_scrollbar: bool,
+    pub show_sheet_tabs: bool,
+    pub group_dates_in_autofilter: bool,
+    pub active_sheet_index: u16,
+    pub first_visible_sheet_index: u16,
+    pub selected_sheet_count: u16,
+    pub sheet_tab_ratio_per_mille: u16,
+}
+
+impl Default for XlsWorkbookWindowOptions {
+    fn default() -> Self {
+        Self {
+            horizontal_position_twips: i16::MAX,
+            vertical_position_twips: i16::MAX,
+            width_twips: 0x4b2d,
+            height_twips: 0x1e62,
+            hidden: false,
+            minimized: false,
+            very_hidden: false,
+            show_horizontal_scrollbar: true,
+            show_vertical_scrollbar: true,
+            show_sheet_tabs: true,
+            group_dates_in_autofilter: true,
+            active_sheet_index: 0,
+            first_visible_sheet_index: 0,
+            selected_sheet_count: 1,
+            sheet_tab_ratio_per_mille: 600,
+        }
+    }
+}
+
+impl XlsWorkbookWindowOptions {
+    pub(super) fn validate_intrinsic(self) -> XlsResult<()> {
+        if self.width_twips < 1 || self.height_twips < 1 {
+            return Err(XlsError::InvalidData("workbook window dimensions must be positive".to_string()));
+        }
+        if self.sheet_tab_ratio_per_mille > 1000 {
+            return Err(XlsError::InvalidData("sheet tab ratio must be at most 1000".to_string()));
+        }
+        Ok(())
+    }
+
+    pub(super) fn validate_for_sheet_count(self, sheet_count: usize) -> XlsResult<()> {
+        self.validate_intrinsic()?;
+        if sheet_count == 0 || sheet_count > 4112 {
+            return Err(XlsError::InvalidData("RRTabId writer supports 1..=4112 sheets".to_string()));
+        }
+        if usize::from(self.active_sheet_index) >= sheet_count
+            || usize::from(self.first_visible_sheet_index) >= sheet_count
+            || usize::from(self.selected_sheet_count) > sheet_count
+        {
+            return Err(XlsError::InvalidData("workbook window tab reference is outside the sheet collection".to_string()));
+        }
+        Ok(())
+    }
+}
+
 impl Default for XlsWorkbookEnvironmentOptions {
     fn default() -> Self {
         Self {
@@ -477,6 +545,7 @@ pub struct XlsWriter {
     calculation_settings: XlsCalculationSettings,
     vba_metadata: Option<XlsVbaWriteMetadata>,
     environment_options: XlsWorkbookEnvironmentOptions,
+    workbook_window_options: XlsWorkbookWindowOptions,
 }
 
 impl XlsWriter {
@@ -495,6 +564,7 @@ impl XlsWriter {
             calculation_settings: XlsCalculationSettings::default(),
             vba_metadata: None,
             environment_options: XlsWorkbookEnvironmentOptions::default(),
+            workbook_window_options: XlsWorkbookWindowOptions::default(),
         }
     }
 
@@ -1801,6 +1871,12 @@ impl XlsWriter {
         Ok(())
     }
 
+    pub fn set_workbook_window(&mut self, options: XlsWorkbookWindowOptions) -> XlsResult<()> {
+        options.validate_intrinsic()?;
+        self.workbook_window_options = options;
+        Ok(())
+    }
+
     pub fn set_calculation_settings(&mut self, settings: XlsCalculationSettings) -> XlsResult<()> {
         if !(1..=32_767).contains(&settings.maximum_iterations) {
             return Err(XlsError::InvalidData(
@@ -2222,6 +2298,7 @@ impl XlsWriter {
             self.calculation_settings,
             self.vba_metadata.as_ref(),
             self.environment_options,
+            self.workbook_window_options,
             &self.fmt,
             &self.defined_names,
             &self.shared_strings,

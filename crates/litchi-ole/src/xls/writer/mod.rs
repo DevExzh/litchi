@@ -25,6 +25,7 @@ pub use core::{
     XlsDataValidationType,
     XlsDefinedName, XlsPivotDataItemConfig, XlsPivotFieldConfig, XlsPivotItemConfig,
     XlsPageSetupOptions, XlsPivotTableConfig, XlsWorkbookEnvironmentOptions,
+    XlsWorkbookWindowOptions,
     XlsWorksheetLayoutOptions, XlsWriter,
 };
 pub use formatting::{

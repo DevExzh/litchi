@@ -214,7 +214,10 @@ pub fn write_dsf<W: Write>(writer: &mut W, has_biff5_stream: bool) -> XlsResult<
 ///
 /// Record type: 0x013D
 pub fn write_tab_id<W: Write>(writer: &mut W, sheet_count: u16) -> XlsResult<()> {
-    write_record_header(writer, 0x013D, sheet_count.saturating_mul(2))?;
+    if sheet_count == 0 || sheet_count > 4112 {
+        return Err(XlsError::InvalidData("RRTabId requires 1..=4112 sheets".to_string()));
+    }
+    write_record_header(writer, 0x013D, sheet_count * 2)?;
     for sheet_idx in 0..sheet_count {
         writer.write_all(&sheet_idx.saturating_add(1).to_le_bytes())?;
     }
@@ -474,17 +477,29 @@ pub fn write_date1904<W: Write>(writer: &mut W, is_1904: bool) -> XlsResult<()> 
 /// Write WINDOW1 record (workbook window properties)
 ///
 /// Record type: 0x003D
-pub fn write_window1<W: Write>(writer: &mut W) -> XlsResult<()> {
+pub fn write_window1<W: Write>(
+    writer: &mut W,
+    options: &crate::xls::writer::core::XlsWorkbookWindowOptions,
+    sheet_count: usize,
+) -> XlsResult<()> {
+    options.validate_for_sheet_count(sheet_count)?;
     write_record_header(writer, 0x003D, 18)?;
-    writer.write_all(&0x7FFFu16.to_le_bytes())?;
-    writer.write_all(&0x7FFFu16.to_le_bytes())?;
-    writer.write_all(&0x4B2Du16.to_le_bytes())?;
-    writer.write_all(&0x1E62u16.to_le_bytes())?;
-    writer.write_all(&0x0038u16.to_le_bytes())?;
-    writer.write_all(&0u16.to_le_bytes())?;
-    writer.write_all(&0u16.to_le_bytes())?;
-    writer.write_all(&1u16.to_le_bytes())?;
-    writer.write_all(&0x0258u16.to_le_bytes())?;
+    writer.write_all(&options.horizontal_position_twips.to_le_bytes())?;
+    writer.write_all(&options.vertical_position_twips.to_le_bytes())?;
+    writer.write_all(&options.width_twips.to_le_bytes())?;
+    writer.write_all(&options.height_twips.to_le_bytes())?;
+    let flags = u16::from(options.hidden)
+        | (u16::from(options.minimized) << 1)
+        | (u16::from(options.very_hidden) << 2)
+        | (u16::from(options.show_horizontal_scrollbar) << 3)
+        | (u16::from(options.show_vertical_scrollbar) << 4)
+        | (u16::from(options.show_sheet_tabs) << 5)
+        | (u16::from(!options.group_dates_in_autofilter) << 6);
+    writer.write_all(&flags.to_le_bytes())?;
+    writer.write_all(&options.active_sheet_index.to_le_bytes())?;
+    writer.write_all(&options.first_visible_sheet_index.to_le_bytes())?;
+    writer.write_all(&options.selected_sheet_count.to_le_bytes())?;
+    writer.write_all(&options.sheet_tab_ratio_per_mille.to_le_bytes())?;
 
     Ok(())
 }

@@ -1856,8 +1856,20 @@ impl<W: Write> RtfWriter<W> {
         if let Some(value) = field.text_type {
             self.write_control_word("fftypetxt", Some(value.to_rtf()))?;
         }
+        if let Some(value) = field.max_length {
+            self.write_control_word("ffmaxlen", Some(i32::from(value)))?;
+        }
         if let Some(value) = field.half_point_size {
             self.write_control_word("ffhps", Some(value))?;
+        }
+        if field.protected {
+            self.write_control_word("ffprot", None)?;
+        }
+        if field.calculate_on_exit {
+            self.write_control_word("ffrecalc", None)?;
+        }
+        if field.size_automatically {
+            self.write_control_word("ffsize", None)?;
         }
         if field.own_help {
             self.write_control_word("ffownhelp", None)?;
@@ -1875,6 +1887,8 @@ impl<W: Write> RtfWriter<W> {
             self.write_control_word("ffres", Some(value))?;
         }
         self.write_form_field_value("ffname", field.name.as_deref())?;
+        self.write_form_field_value("ffformat", field.format.as_deref())?;
+        self.write_form_field_value("ffdeftext", field.default_text.as_deref())?;
         self.write_form_field_value("ffhelptext", field.help_text.as_deref())?;
         self.write_form_field_value("ffstattext", field.status_text.as_deref())?;
         self.write_form_field_value("ffentrymcr", field.entry_macro.as_deref())?;

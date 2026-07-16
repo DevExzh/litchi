@@ -72,9 +72,18 @@ pub struct FormField<'a> {
     pub field_type: FormFieldType,
     pub text_type: Option<FormTextType>,
     pub name: Option<Cow<'a, str>>,
+    /// Maximum text length; zero means unlimited in RTF.
+    pub max_length: Option<u16>,
+    /// Inert text-format pattern from `ffformat`.
+    pub format: Option<Cow<'a, str>>,
+    /// Inert default text from `ffdeftext`.
+    pub default_text: Option<Cow<'a, str>>,
     pub default_result: Option<i32>,
     pub result: Option<i32>,
     pub half_point_size: Option<i32>,
+    pub protected: bool,
+    pub calculate_on_exit: bool,
+    pub size_automatically: bool,
     pub own_help: bool,
     pub own_status: bool,
     pub help_text: Option<Cow<'a, str>>,
@@ -123,6 +132,8 @@ impl FormField<'_> {
     pub(crate) fn text_bytes(&self) -> Option<usize> {
         let strings = [
             self.name.as_deref(),
+            self.format.as_deref(),
+            self.default_text.as_deref(),
             self.help_text.as_deref(),
             self.status_text.as_deref(),
             self.entry_macro.as_deref(),
@@ -159,6 +170,8 @@ impl FormField<'_> {
         }
         for value in [
             self.name.as_deref(),
+            self.format.as_deref(),
+            self.default_text.as_deref(),
             self.help_text.as_deref(),
             self.status_text.as_deref(),
             self.entry_macro.as_deref(),
@@ -203,6 +216,7 @@ impl FormField<'_> {
             FormFieldType::Text => {
                 if !self.list_entries.is_empty()
                     || self.has_list_box
+                    || self.size_automatically
                     || self.default_result.is_some()
                     || self.result.is_some()
                 {
@@ -213,6 +227,9 @@ impl FormField<'_> {
             },
             FormFieldType::CheckBox => {
                 if self.text_type.is_some_and(|value| value != FormTextType::Regular)
+                    || self.max_length.is_some()
+                    || self.format.is_some()
+                    || self.default_text.is_some()
                     || !self.list_entries.is_empty()
                     || self.has_list_box
                     || self.default_result.is_some_and(|value| !(0..=1).contains(&value))
@@ -228,6 +245,10 @@ impl FormField<'_> {
             },
             FormFieldType::DropDown => {
                 if self.text_type.is_some_and(|value| value != FormTextType::Regular)
+                    || self.max_length.is_some()
+                    || self.format.is_some()
+                    || self.default_text.is_some()
+                    || self.size_automatically
                     || !self.has_list_box
                     || self.list_entries.is_empty()
                     || self.default_result.is_some_and(|value| !valid_index(value))
@@ -248,9 +269,17 @@ impl FormField<'_> {
             field_type: self.field_type,
             text_type: self.text_type,
             name: self.name.map(|value| Cow::Owned(value.into_owned())),
+            max_length: self.max_length,
+            format: self.format.map(|value| Cow::Owned(value.into_owned())),
+            default_text: self
+                .default_text
+                .map(|value| Cow::Owned(value.into_owned())),
             default_result: self.default_result,
             result: self.result,
             half_point_size: self.half_point_size,
+            protected: self.protected,
+            calculate_on_exit: self.calculate_on_exit,
+            size_automatically: self.size_automatically,
             own_help: self.own_help,
             own_status: self.own_status,
             help_text: self.help_text.map(|value| Cow::Owned(value.into_owned())),

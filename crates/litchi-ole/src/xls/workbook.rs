@@ -149,6 +149,7 @@ pub struct XlsWorkbook<R: Read + Seek> {
     calculation: crate::xls::calculation::XlsWorkbookCalculation,
     vba_metadata: crate::xls::vba::XlsVbaMetadata,
     environment: crate::xls::environment::XlsWorkbookEnvironment,
+    workbook_view: crate::xls::workbook_view::XlsWorkbookView,
 }
 
 /// Options for opening a legacy XLS workbook.
@@ -187,6 +188,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             calculation: crate::xls::calculation::XlsWorkbookCalculation::default(),
             vba_metadata: crate::xls::vba::XlsVbaMetadata::default(),
             environment: crate::xls::environment::XlsWorkbookEnvironment::default(),
+            workbook_view: crate::xls::workbook_view::XlsWorkbookView::default(),
         };
 
         workbook.parse_workbook(options.password)?;
@@ -229,6 +231,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             calculation: crate::xls::calculation::XlsWorkbookCalculation::default(),
             vba_metadata: crate::xls::vba::XlsVbaMetadata::default(),
             environment: crate::xls::environment::XlsWorkbookEnvironment::default(),
+            workbook_view: crate::xls::workbook_view::XlsWorkbookView::default(),
         };
 
         workbook.parse_workbook(options.password)?;
@@ -347,6 +350,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             crate::xls::calculation::WorkbookCalculationCollector::new();
         let mut vba_collector = crate::xls::vba::WorkbookVbaCollector::new();
         let mut environment_collector = crate::xls::environment::EnvironmentCollector::new();
+        let mut workbook_view_collector = crate::xls::workbook_view::WorkbookViewCollector::new();
         let mut i = 0;
         while i < records.len() {
             let record = &records[i];
@@ -354,6 +358,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             calculation_collector.feed_record(record.header.record_type, &record.data)?;
             vba_collector.feed_record(record.header.record_type, &record.data)?;
             environment_collector.feed_record(record.header.record_type, &record.data)?;
+            workbook_view_collector.feed_record(record.header.record_type, &record.data)?;
 
             match record.header.record_type {
                 0x0031 => {
@@ -450,6 +455,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                     self.calculation = calculation_collector.finish();
                     self.vba_metadata = vba_collector.finish();
                     self.environment = environment_collector.finish()?;
+                    self.workbook_view = workbook_view_collector.finish(bound_sheets.len())?;
                     break;
                 },
                 _ => {
@@ -839,6 +845,11 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         worksheet.set_vba_code_name(vba_collector.finish());
 
         Ok(worksheet)
+    }
+
+    /// Workbook window state and stable sheet identifiers.
+    pub fn workbook_view(&self) -> &crate::xls::workbook_view::XlsWorkbookView {
+        &self.workbook_view
     }
 
     /// Access the typed `XlsWorksheet` at the given index.

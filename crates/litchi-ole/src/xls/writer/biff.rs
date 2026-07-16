@@ -451,8 +451,12 @@ pub fn write_date1904<W: Write>(writer: &mut W, is_1904: bool) -> XlsResult<()> 
 /// Write WINDOW1 record (workbook window properties)
 ///
 /// Record type: 0x003D
-pub fn write_window1<W: Write>(writer: &mut W) -> XlsResult<()> {
-    workbook::write_window1(writer)
+pub fn write_window1<W: Write>(
+    writer: &mut W,
+    options: &crate::xls::writer::core::XlsWorkbookWindowOptions,
+    sheet_count: usize,
+) -> XlsResult<()> {
+    workbook::write_window1(writer, options, sheet_count)
 }
 
 /// Write internal SUPBOOK record used for 3D references within this
@@ -890,7 +894,11 @@ mod tests {
     #[test]
     fn test_write_window1() {
         let mut buf = Vec::new();
-        write_window1(&mut buf).unwrap();
+        write_window1(
+            &mut buf,
+            &crate::xls::writer::core::XlsWorkbookWindowOptions::default(),
+            1,
+        ).unwrap();
 
         assert_eq!(&buf[0..2], &[0x3D, 0x00]); // Record type 0x003D
         assert_eq!(&buf[2..4], &[18, 0]); // Length = 18

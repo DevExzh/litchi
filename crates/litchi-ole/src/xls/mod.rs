@@ -38,6 +38,9 @@ mod vba;
 /// BIFF8 workbook-global environment and behavioral options.
 mod environment;
 
+/// BIFF8 workbook windows and stable sheet-tab identifiers.
+mod workbook_view;
+
 /// BIFF formula token rendering
 mod formula;
 
@@ -110,6 +113,7 @@ pub use calculation::{
 pub use scenario::{XlsScenario, XlsScenarioCell, XlsScenarioManager, XlsScenarioRange};
 pub use vba::XlsVbaMetadata;
 pub use environment::{XlsLinkUpdateMode, XlsObjectDisplayMode, XlsWorkbookEnvironment};
+pub use workbook_view::{XlsWorkbookView, XlsWorkbookWindow};
 pub use data_validation::{
     XlsDataValidationErrorStyle, XlsDataValidationFormula, XlsDataValidationImeMode,
     XlsDataValidationKind, XlsDataValidationOperator, XlsDataValidationRange,

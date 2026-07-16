@@ -7,7 +7,7 @@ use crate::xls::{XlsError, XlsResult};
 
 use super::named_range::XlsDefinedName as InternalDefinedName;
 use super::worksheet::WritableWorksheet;
-use super::{XlsCalculationSettings, XlsCellValue, XlsFileSharing, XlsVbaWriteMetadata, XlsWorkbookEnvironmentOptions, XlsWorkbookProtection};
+use super::{XlsCalculationSettings, XlsCellValue, XlsFileSharing, XlsVbaWriteMetadata, XlsWorkbookEnvironmentOptions, XlsWorkbookProtection, XlsWorkbookWindowOptions};
 
 const DEFAULT_WRITE_ACCESS_USER: &str = "litchi";
 const DEFAULT_FUNCTION_GROUP_COUNT: u16 = 17;
@@ -28,6 +28,7 @@ pub(crate) fn generate_workbook_stream(
     calculation_settings: XlsCalculationSettings,
     vba_metadata: Option<&XlsVbaWriteMetadata>,
     environment: XlsWorkbookEnvironmentOptions,
+    workbook_window: XlsWorkbookWindowOptions,
     fmt: &FormattingManager,
     defined_names: &[InternalDefinedName],
     shared_strings: &[String],
@@ -95,7 +96,11 @@ pub(crate) fn generate_workbook_stream(
     biff::write_password_rev4(&mut stream, revision_hash)?;
 
     // Window1 record (workbook window properties)
-    biff::write_window1(&mut stream)?;
+    biff::write_window1(
+        &mut stream,
+        &workbook_window,
+        worksheets.len(),
+    )?;
 
     biff::write_backup(&mut stream, environment.create_backup_copy)?;
     biff::write_hide_obj(&mut stream, match environment.object_display_mode {

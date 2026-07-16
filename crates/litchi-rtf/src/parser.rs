@@ -394,9 +394,15 @@ struct FormFieldBuilder {
     field_type: Option<super::form_field::FormFieldType>,
     text_type: Option<super::form_field::FormTextType>,
     name: Option<String>,
+    max_length: Option<u16>,
+    format: Option<String>,
+    default_text: Option<String>,
     default_result: Option<i32>,
     result: Option<i32>,
     half_point_size: Option<i32>,
+    protected: Option<bool>,
+    calculate_on_exit: Option<bool>,
+    size_automatically: Option<bool>,
     own_help: Option<bool>,
     own_status: Option<bool>,
     help_text: Option<String>,
@@ -7955,9 +7961,15 @@ impl<'a> Parser<'a> {
                 field_type,
                 text_type: builder.text_type,
                 name: to_cow(builder.name),
+                max_length: builder.max_length,
+                format: to_cow(builder.format),
+                default_text: to_cow(builder.default_text),
                 default_result: builder.default_result,
                 result: builder.result,
                 half_point_size: builder.half_point_size,
+                protected: builder.protected.unwrap_or(false),
+                calculate_on_exit: builder.calculate_on_exit.unwrap_or(false),
+                size_automatically: builder.size_automatically.unwrap_or(false),
                 own_help: builder.own_help.unwrap_or(false),
                 own_status: builder.own_status.unwrap_or(false),
                 help_text: to_cow(builder.help_text),
@@ -8012,12 +8024,15 @@ impl<'a> Parser<'a> {
 
     fn parse_form_field_destination(&mut self) -> RtfResult<FormFieldBuilder> {
         self.expect_token(Token::OpenBrace)?;
-        if matches!(
+        if !matches!(
             self.tokens.get(self.pos),
             Some(Token::Control(ControlWord::IgnorableDestination))
         ) {
-            self.pos += 1;
+            return Err(RtfError::MalformedDocument(
+                "RTF formfield destination must be starred".to_string(),
+            ));
         }
+        self.pos += 1;
         if !matches!(
             self.tokens.get(self.pos),
             Some(Token::Control(ControlWord::FormField))
@@ -8039,6 +8054,10 @@ impl<'a> Parser<'a> {
                     }
                 },
                 Some(Token::OpenBrace) => {
+                    let starred = matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::IgnorableDestination))
+                    );
                     let control = match (
                         self.tokens.get(self.pos + 1),
                         self.tokens.get(self.pos + 2),
@@ -8050,8 +8069,29 @@ impl<'a> Parser<'a> {
                         (Some(Token::Control(control)), _) => Some(control),
                         _ => None,
                     };
+                    if !starred
+                        && matches!(
+                            control,
+                            Some(
+                                ControlWord::FormFieldName
+                                    | ControlWord::FormFieldFormat
+                                    | ControlWord::FormFieldDefaultText
+                                    | ControlWord::FormFieldHelpText
+                                    | ControlWord::FormFieldStatusText
+                                    | ControlWord::FormFieldEntryMacro
+                                    | ControlWord::FormFieldExitMacro
+                                    | ControlWord::FormFieldListEntry
+                            )
+                        )
+                    {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF formfield text destinations must be starred".to_string(),
+                        ));
+                    }
                     let target = match control {
                         Some(ControlWord::FormFieldName) => &mut builder.name,
+                        Some(ControlWord::FormFieldFormat) => &mut builder.format,
+                        Some(ControlWord::FormFieldDefaultText) => &mut builder.default_text,
                         Some(ControlWord::FormFieldHelpText) => &mut builder.help_text,
                         Some(ControlWord::FormFieldStatusText) => &mut builder.status_text,
                         Some(ControlWord::FormFieldEntryMacro) => &mut builder.entry_macro,
@@ -8072,6 +8112,10 @@ impl<'a> Parser<'a> {
                         Some(
                             ControlWord::FormFieldType(_)
                             | ControlWord::FormFieldTextType(_)
+                            | ControlWord::FormFieldMaxLength(_)
+                            | ControlWord::FormFieldProtected(_)
+                            | ControlWord::FormFieldRecalculate(_)
+                            | ControlWord::FormFieldAutomaticSize(_)
                             | ControlWord::FormFieldDefaultResult(_)
                             | ControlWord::FormFieldResult(_)
                             | ControlWord::FormFieldHalfPointSize(_)
@@ -8134,6 +8178,22 @@ impl<'a> Parser<'a> {
                             super::form_field::FormTextType::from_rtf(*value)?,
                             "fftypetxt"
                         ),
+                        ControlWord::FormFieldMaxLength(value) => set_once!(
+                            builder.max_length,
+                            u16::try_from(*value).map_err(|_| RtfError::MalformedDocument(
+                                "RTF ffmaxlen is outside 0..=65535".to_string()
+                            ))?,
+                            "ffmaxlen"
+                        ),
+                        ControlWord::FormFieldProtected(value) => {
+                            set_once!(builder.protected, *value, "ffprot")
+                        },
+                        ControlWord::FormFieldRecalculate(value) => {
+                            set_once!(builder.calculate_on_exit, *value, "ffrecalc")
+                        },
+                        ControlWord::FormFieldAutomaticSize(value) => {
+                            set_once!(builder.size_automatically, *value, "ffsize")
+                        },
                         ControlWord::FormFieldDefaultResult(value) => {
                             set_once!(builder.default_result, *value, "ffdefres")
                         },
