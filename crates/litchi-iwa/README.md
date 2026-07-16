@@ -221,6 +221,36 @@ numbers.save("created-with-image.numbers")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
 
+File-backed movies are likewise sheet-owned and source-built. Their video and
+poster assets, drawable graph, playback bounds, media style, stand-ins, UUIDs,
+and component data references are generated without an input package:
+
+```rust
+use std::fs;
+use std::time::Duration;
+use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersSheetMovieOptions};
+use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+
+let movie = fs::read("demo.mov")?;
+let poster = fs::read("demo-poster.png")?;
+let mut numbers = NumbersDocumentBuilder::new().build()?;
+let sheet_id = numbers.sheets()?[0].object_id;
+numbers.add_sheet_movie(
+    sheet_id,
+    "demo.mov",
+    &movie,
+    "demo-poster.png",
+    &poster,
+    NumbersSheetMovieOptions::new(
+        DrawablePoint { x: 420.0, y: 180.0 },
+        DrawableSize { width: 320.0, height: 180.0 },
+        Duration::from_secs(8),
+    ),
+)?;
+numbers.save("created-with-movie.numbers")?;
+# Ok::<(), litchi_iwa::Error>(())
+```
+
 ### Create Keynote presentations from scratch
 
 Scratch-created presentations can add ordinary text boxes directly to any
