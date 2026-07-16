@@ -365,10 +365,36 @@ impl<'a> TextBox<'a> {
 
     /// Set the font color (RGB).
     pub fn set_font_color(&mut self, color: u32) {
+        let color = color & 0x00FF_FFFF;
         self.font_color = Some(color);
+        let red = (color >> 16) & 0xFF;
+        let green = (color >> 8) & 0xFF;
+        let blue = color & 0xFF;
+        let raw = red | (green << 8) | (blue << 16) | 0xFE00_0000;
         for run in &mut self.runs {
             run.formatting.font_color = Some(color);
+            run.formatting.font_color_raw = Some(raw);
+            run.formatting.font_scheme_color = None;
         }
+    }
+
+    /// Get the raw `ColorIndexStruct` value of the first text run.
+    pub fn font_color_raw(&self) -> Option<u32> {
+        self.runs
+            .first()
+            .and_then(|run| run.formatting.font_color_raw)
+    }
+
+    /// Get the PowerPoint color-scheme index of the first text run.
+    pub fn font_scheme_color(&self) -> Option<u8> {
+        self.runs
+            .first()
+            .and_then(|run| run.formatting.font_scheme_color)
+    }
+
+    /// Get the zero-based font reference of the first text run.
+    pub fn font_index(&self) -> Option<u16> {
+        self.runs.first().and_then(|run| run.formatting.font_index)
     }
 
     /// Check if the text is bold.
@@ -490,10 +516,24 @@ impl<'a> TextBox<'a> {
         TextRunFormatting {
             font_size: self.font_size,
             font_color: self.font_color,
+            font_color_raw: self.font_color.map(|color| {
+                let red = (color >> 16) & 0xFF;
+                let green = (color >> 8) & 0xFF;
+                let blue = color & 0xFF;
+                red | (green << 8) | (blue << 16) | 0xFE00_0000
+            }),
+            font_scheme_color: None,
             bold: self.bold,
             italic: self.italic,
             underline: self.underline,
+            shadow: false,
+            embossed: false,
+            baseline_position: None,
             font_name: None,
+            font_index: None,
+            asian_font_index: None,
+            ansi_font_index: None,
+            symbol_font_index: None,
         }
     }
 }
@@ -567,12 +607,12 @@ mod tests {
         style.extend_from_slice(&0x0006_0001u32.to_le_bytes());
         style.extend_from_slice(&1i16.to_le_bytes());
         style.extend_from_slice(&18i16.to_le_bytes());
-        style.extend_from_slice(&0x0011_2233i32.to_le_bytes());
+        style.extend_from_slice(&(0xFE33_2211u32 as i32).to_le_bytes());
         style.extend_from_slice(&3u32.to_le_bytes());
         style.extend_from_slice(&0x0006_0002u32.to_le_bytes());
         style.extend_from_slice(&2i16.to_le_bytes());
         style.extend_from_slice(&24i16.to_le_bytes());
-        style.extend_from_slice(&0x0044_5566i32.to_le_bytes());
+        style.extend_from_slice(&0x0400_0000i32.to_le_bytes());
         push_record(&mut ppt_records, 0, 0, 4001, &style);
 
         let properties = [
@@ -683,14 +723,22 @@ mod tests {
         assert_eq!(textbox.runs()[0].text, "ab");
         assert_eq!(textbox.runs()[0].formatting.font_size, Some(18));
         assert_eq!(textbox.runs()[0].formatting.font_color, Some(0x0011_2233));
+        assert_eq!(
+            textbox.runs()[0].formatting.font_color_raw,
+            Some(0xFE33_2211)
+        );
+        assert_eq!(textbox.runs()[0].formatting.font_scheme_color, None);
         assert!(textbox.runs()[0].formatting.bold);
         assert!(!textbox.runs()[0].formatting.italic);
         assert_eq!(textbox.runs()[1].text, "cd");
         assert_eq!(textbox.runs()[1].formatting.font_size, Some(24));
-        assert_eq!(textbox.runs()[1].formatting.font_color, Some(0x0044_5566));
+        assert_eq!(textbox.runs()[1].formatting.font_color, None);
+        assert_eq!(textbox.runs()[1].formatting.font_scheme_color, Some(4));
         assert!(!textbox.runs()[1].formatting.bold);
         assert!(textbox.runs()[1].formatting.italic);
         assert_eq!(textbox.formatting().font_size, Some(18));
+        assert_eq!(textbox.font_color_raw(), Some(0xFE33_2211));
+        assert_eq!(textbox.font_scheme_color(), None);
         assert!(textbox.bold());
         assert_eq!(
             textbox.text_margins(),
@@ -718,12 +766,15 @@ mod tests {
         let mut textbox = TextBox::new(ShapeProperties::default(), Vec::new());
         textbox.set_bold(true);
         textbox.set_font_size(20);
+        textbox.set_font_color(0x12_34_56);
         textbox.set_text("hello".to_string());
         textbox.set_italic(true);
 
         assert_eq!(textbox.runs().len(), 1);
         assert_eq!(textbox.runs()[0].text, "hello");
         assert_eq!(textbox.runs()[0].formatting.font_size, Some(20));
+        assert_eq!(textbox.runs()[0].formatting.font_color, Some(0x12_34_56));
+        assert_eq!(textbox.font_color_raw(), Some(0xFE56_3412));
         assert!(textbox.runs()[0].formatting.bold);
         assert!(textbox.runs()[0].formatting.italic);
     }

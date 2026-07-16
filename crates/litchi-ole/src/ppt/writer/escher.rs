@@ -1521,7 +1521,7 @@ fn build_client_textbox_formatted(
     ppt_content.extend_from_slice(&text_atom.build()?);
 
     // StyleTextPropAtom with full formatting
-    let style_data = builder.build_style_text_prop();
+    let style_data = builder.build_style_text_prop()?;
     let mut style_atom = RecordBuilder::new(0, 0, ppt_rt::STYLE_TEXT_PROP_ATOM);
     style_atom.write_data(&style_data);
     ppt_content.extend_from_slice(&style_atom.build()?);
@@ -2060,8 +2060,24 @@ mod tests {
     #[test]
     fn formatted_textbox_round_trips_non_bmp_multi_paragraph_runs() {
         let paragraphs = vec![
-            Paragraph::with_runs(vec![TextRun::new("😀").bold()]),
-            Paragraph::with_runs(vec![TextRun::new("x").italic()]),
+            Paragraph::with_runs(vec![
+                TextRun::new("😀")
+                    .bold()
+                    .shadow()
+                    .size(24)
+                    .color_rgb(10, 20, 30)
+                    .font(2)
+                    .baseline_position(30),
+            ]),
+            Paragraph::with_runs(vec![
+                TextRun::new("x")
+                    .italic()
+                    .embossed()
+                    .size(14)
+                    .color_scheme(4)
+                    .font(3)
+                    .baseline_position(-25),
+            ]),
         ];
         let data = build_client_textbox_formatted(&paragraphs, 1).unwrap();
         let wrapper = crate::ppt::EscherTextboxWrapper::new(data[8..].to_vec()).unwrap();
@@ -2070,8 +2086,19 @@ mod tests {
         assert_eq!(wrapper.runs().len(), 2);
         assert_eq!(wrapper.runs()[0].text, "😀\r");
         assert!(wrapper.runs()[0].formatting.bold);
+        assert!(wrapper.runs()[0].formatting.shadow);
+        assert_eq!(wrapper.runs()[0].formatting.baseline_position, Some(30));
+        assert_eq!(wrapper.runs()[0].formatting.font_size, Some(24));
+        assert_eq!(wrapper.runs()[0].formatting.font_color, Some(0x000A_141E));
+        assert_eq!(wrapper.runs()[0].formatting.font_index, Some(2));
         assert_eq!(wrapper.runs()[1].text, "x");
         assert!(wrapper.runs()[1].formatting.italic);
+        assert!(wrapper.runs()[1].formatting.embossed);
+        assert_eq!(wrapper.runs()[1].formatting.baseline_position, Some(-25));
+        assert_eq!(wrapper.runs()[1].formatting.font_size, Some(14));
+        assert_eq!(wrapper.runs()[1].formatting.font_color, None);
+        assert_eq!(wrapper.runs()[1].formatting.font_scheme_color, Some(4));
+        assert_eq!(wrapper.runs()[1].formatting.font_index, Some(3));
     }
 
     #[test]

@@ -176,17 +176,17 @@ pub fn parse_character_properties(data: &[u8], offset: &mut usize, mask: u32) ->
 
     // Character property definitions (from POI's TextPropCollection)
     let prop_defs = [
-        ("char.flags", 2, 0xFFFF), // bold, italic, underline, etc.
-        ("font.index", 2, 0x10000),
-        ("asian.font.index", 2, 0x200000),
-        ("ansi.font.index", 2, 0x400000),
-        ("symbol.font.index", 2, 0x800000),
-        ("font.size", 2, 0x20000),
-        ("font.color", 4, 0x40000),
-        ("superscript", 2, 0x80000),
+        ("char.flags", 2, 0xFFFF, false), // bold, italic, underline, etc.
+        ("font.index", 2, 0x10000, false),
+        ("asian.font.index", 2, 0x200000, false),
+        ("ansi.font.index", 2, 0x400000, false),
+        ("symbol.font.index", 2, 0x800000, false),
+        ("font.size", 2, 0x20000, true),
+        ("font.color", 4, 0x40000, false),
+        ("superscript", 2, 0x80000, true),
     ];
 
-    for (name, size, prop_mask) in prop_defs {
+    for (name, size, prop_mask, signed) in prop_defs {
         if (mask & prop_mask) != 0 {
             if *offset + size > data.len() {
                 *offset = data.len();
@@ -194,7 +194,8 @@ pub fn parse_character_properties(data: &[u8], offset: &mut usize, mask: u32) ->
             }
 
             let value = match size {
-                2 => read_i16_le(data, *offset).unwrap_or(0) as i32,
+                2 if signed => read_i16_le(data, *offset).unwrap_or(0) as i32,
+                2 => read_u16_le(data, *offset).unwrap_or(0) as i32,
                 4 => read_i32_le(data, *offset).unwrap_or(0),
                 _ => 0,
             };
@@ -373,5 +374,13 @@ mod tests {
         assert_eq!(characters.len(), 1);
         assert_eq!(characters[0].get_value("char.flags"), Some(2));
         assert_eq!(characters[0].get_value("font.size"), Some(20));
+    }
+
+    #[test]
+    fn parses_font_references_as_unsigned_values() {
+        let mut offset = 0;
+        let properties = parse_character_properties(&[0xFF, 0xFF], &mut offset, 0x10000);
+
+        assert_eq!(properties[0].value, 65_535);
     }
 }

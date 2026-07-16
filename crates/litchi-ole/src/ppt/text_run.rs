@@ -3,7 +3,7 @@ use super::super::consts::PptRecordType;
 ///
 /// Based on Apache POI's HSLF TextRun and related classes, this module
 /// provides proper text extraction with formatting from PPT files.
-use super::package::Result;
+use super::package::{PptError, Result};
 use super::records::PptRecord;
 use super::text::extractor::{decode_text_bytes, from_utf16le_lossy};
 
@@ -16,14 +16,32 @@ pub struct TextRunFormatting {
     pub font_size: Option<u16>,
     /// Font color (RGB)
     pub font_color: Option<u32>,
+    /// Raw PowerPoint `ColorIndexStruct` value
+    pub font_color_raw: Option<u32>,
+    /// PowerPoint color-scheme index when the color is not direct sRGB
+    pub font_scheme_color: Option<u8>,
     /// Bold formatting
     pub bold: bool,
     /// Italic formatting
     pub italic: bool,
     /// Underline formatting
     pub underline: bool,
+    /// Shadow formatting
+    pub shadow: bool,
+    /// Embossed/relief formatting
+    pub embossed: bool,
+    /// Baseline position as a percentage of line height
+    pub baseline_position: Option<i16>,
     /// Font name
     pub font_name: Option<String>,
+    /// Zero-based font reference in the PowerPoint font collection
+    pub font_index: Option<u16>,
+    /// East Asian font reference
+    pub asian_font_index: Option<u16>,
+    /// ANSI font reference
+    pub ansi_font_index: Option<u16>,
+    /// Symbol font reference
+    pub symbol_font_index: Option<u16>,
 }
 
 /// A text run with formatting.
@@ -262,7 +280,7 @@ impl TextRunExtractor {
             }
 
             let text = remaining[..byte_count].to_string();
-            let formatting = formatting_from_style(char_style);
+            let formatting = formatting_from_style(char_style)?;
             self.runs.push(TextRun::with_formatting(
                 text,
                 source_run.start_index + character_offset,
@@ -299,12 +317,62 @@ impl TextRunExtractor {
     }
 }
 
-fn formatting_from_style(style: &super::text_prop::TextPropCollection) -> TextRunFormatting {
+fn formatting_from_style(
+    style: &super::text_prop::TextPropCollection,
+) -> Result<TextRunFormatting> {
+    let font_color_raw = style.get_value("font.color").map(|color| color as u32);
+    if font_color_raw.is_some_and(|raw| !matches!((raw >> 24) as u8, 0x00..=0x07 | 0xFE | 0xFF)) {
+        return Err(PptError::Corrupted(
+            "TextCFRun has an invalid ColorIndexStruct index".to_string(),
+        ));
+    }
+    let (font_color, font_scheme_color) = font_color_raw
+        .map(decode_color_index_struct)
+        .unwrap_or((None, None));
+    let font_size = style
+        .get_value("font.size")
+        .map(|size| {
+            if (1..=4000).contains(&size) {
+                Ok(size as u16)
+            } else {
+                Err(PptError::Corrupted(
+                    "TextCFRun font size is outside the 1..=4000 point range".to_string(),
+                ))
+            }
+        })
+        .transpose()?;
+    let font_index = |name| -> Result<Option<u16>> {
+        style
+            .get_value(name)
+            .map(|index| {
+                u16::try_from(index).map_err(|_| {
+                    PptError::Corrupted("TextCFRun has an invalid font index".to_string())
+                })
+            })
+            .transpose()
+    };
+    let baseline_position = style
+        .get_value("superscript")
+        .map(|position| {
+            if (-100..=100).contains(&position) {
+                Ok(position as i16)
+            } else {
+                Err(PptError::Corrupted(
+                    "TextCFRun baseline position is outside the -100..=100 range".to_string(),
+                ))
+            }
+        })
+        .transpose()?;
     let mut formatting = TextRunFormatting {
-        font_size: style
-            .get_value("font.size")
-            .and_then(|size| u16::try_from(size).ok()),
-        font_color: style.get_value("font.color").map(|color| color as u32),
+        font_size,
+        font_color,
+        font_color_raw,
+        font_scheme_color,
+        font_index: font_index("font.index")?,
+        asian_font_index: font_index("asian.font.index")?,
+        ansi_font_index: font_index("ansi.font.index")?,
+        symbol_font_index: font_index("symbol.font.index")?,
+        baseline_position,
         ..TextRunFormatting::default()
     };
 
@@ -313,8 +381,21 @@ fn formatting_from_style(style: &super::text_prop::TextPropCollection) -> TextRu
         formatting.bold = bold;
         formatting.italic = italic;
         formatting.underline = underline;
+        formatting.shadow = flags & 0x0010 != 0;
+        formatting.embossed = flags & 0x0200 != 0;
     }
-    formatting
+    Ok(formatting)
+}
+
+fn decode_color_index_struct(raw: u32) -> (Option<u32>, Option<u8>) {
+    let red = raw & 0xFF;
+    let green = (raw >> 8) & 0xFF;
+    let blue = (raw >> 16) & 0xFF;
+    match (raw >> 24) as u8 {
+        0xFE => (Some((red << 16) | (green << 8) | blue), None),
+        index @ 0x00..=0x07 => (None, Some(index)),
+        _ => (None, None),
+    }
 }
 
 fn utf16_prefix(text: &str, requested_units: usize) -> (usize, usize) {
@@ -471,5 +552,71 @@ mod tests {
     fn style_spans_count_utf16_code_units_without_splitting_surrogates() {
         assert_eq!(utf16_prefix("😀x", 2), ("😀".len(), 1));
         assert_eq!(utf16_prefix("😀x", 3), ("😀x".len(), 2));
+    }
+
+    #[test]
+    fn decodes_direct_and_scheme_color_index_structs() {
+        assert_eq!(
+            decode_color_index_struct(0xFE33_2211),
+            (Some(0x0011_2233), None)
+        );
+        assert_eq!(decode_color_index_struct(0x0400_0000), (None, Some(4)));
+        assert_eq!(decode_color_index_struct(0xFF00_0000), (None, None));
+    }
+
+    #[test]
+    fn rejects_invalid_text_cf_font_sizes() {
+        let text_record = PptRecord {
+            record_type: PptRecordType::TextBytesAtom,
+            record_type_raw: 4008,
+            version: 0,
+            instance: 0,
+            data_length: 1,
+            data: b"x".to_vec(),
+            children: Vec::new(),
+        };
+        let mut style_data = Vec::new();
+        style_data.extend_from_slice(&2u32.to_le_bytes());
+        style_data.extend_from_slice(&0i16.to_le_bytes());
+        style_data.extend_from_slice(&0u32.to_le_bytes());
+        style_data.extend_from_slice(&2u32.to_le_bytes());
+        style_data.extend_from_slice(&0x0002_0000u32.to_le_bytes());
+        style_data.extend_from_slice(&0i16.to_le_bytes());
+        let style_record = PptRecord {
+            record_type: PptRecordType::StyleTextPropAtom,
+            record_type_raw: 4001,
+            version: 0,
+            instance: 0,
+            data_length: style_data.len() as u32,
+            data: style_data,
+            children: Vec::new(),
+        };
+        let mut extractor = TextRunExtractor::new();
+
+        let error = extractor
+            .extract_from_records(&[text_record, style_record])
+            .unwrap_err();
+        assert!(error.to_string().contains("font size"));
+    }
+
+    #[test]
+    fn rejects_invalid_text_cf_color_and_baseline_values() {
+        let mut invalid_color = super::super::text_prop::TextPropCollection::new(
+            1,
+            super::super::text_prop::TextPropType::Character,
+        );
+        let mut color = super::super::text_prop::TextProp::new("font.color", 4, 0x40000);
+        color.value = 0x0800_0000;
+        invalid_color.properties.push(color);
+        assert!(formatting_from_style(&invalid_color).is_err());
+
+        let mut invalid_position = super::super::text_prop::TextPropCollection::new(
+            1,
+            super::super::text_prop::TextPropType::Character,
+        );
+        let mut position = super::super::text_prop::TextProp::new("superscript", 2, 0x80000);
+        position.value = 101;
+        invalid_position.properties.push(position);
+        assert!(formatting_from_style(&invalid_position).is_err());
     }
 }

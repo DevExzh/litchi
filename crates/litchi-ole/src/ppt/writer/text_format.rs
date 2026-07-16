@@ -254,8 +254,8 @@ impl TextColor {
     /// (254 << 24) | (blue << 16) | (green << 8) | red
     pub fn to_ppt_color(&self) -> u32 {
         if self.use_scheme {
-            // Scheme color reference
-            0xFE00_0000 | (self.scheme_index as u32)
+            // ColorIndexStruct stores the scheme index in its fourth byte.
+            (self.scheme_index as u32) << 24
         } else {
             // Format: R | (G << 8) | (B << 16) | (alpha << 24)
             // Alpha = 0xFE (254) for opaque colors
@@ -287,6 +287,8 @@ pub struct TextRun {
     pub color: TextColor,
     /// Font index (reference to FontCollection, 0 = default)
     pub font_index: u16,
+    /// Baseline position as a percentage of line height
+    pub baseline_position: Option<i16>,
 }
 
 impl TextRun {
@@ -298,6 +300,7 @@ impl TextRun {
             font_size: 18, // Default 18pt
             color: TextColor::BLACK,
             font_index: 0,
+            baseline_position: None,
         }
     }
 
@@ -319,6 +322,18 @@ impl TextRun {
         self
     }
 
+    /// Set shadow formatting.
+    pub fn shadow(mut self) -> Self {
+        self.style.shadow = true;
+        self
+    }
+
+    /// Set embossed/relief formatting.
+    pub fn embossed(mut self) -> Self {
+        self.style.emboss = true;
+        self
+    }
+
     /// Set font size in points
     pub fn size(mut self, points: u16) -> Self {
         self.font_size = points;
@@ -337,9 +352,21 @@ impl TextRun {
         self
     }
 
+    /// Set a color-scheme index.
+    pub fn color_scheme(mut self, index: u8) -> Self {
+        self.color = TextColor::scheme(index);
+        self
+    }
+
     /// Set font index
     pub fn font(mut self, index: u16) -> Self {
         self.font_index = index;
+        self
+    }
+
+    /// Set superscript (positive) or subscript (negative) baseline position.
+    pub fn baseline_position(mut self, percent: i16) -> Self {
+        self.baseline_position = Some(percent);
         self
     }
 
@@ -548,17 +575,44 @@ impl TextPropsBuilder {
     /// - Sum of paragraph character counts = total text length + 1
     /// - Sum of character run counts = total text length + 1
     /// - The +1 accounts for an implicit terminating character
-    pub fn build_style_text_prop(&self) -> Vec<u8> {
+    pub fn build_style_text_prop(&self) -> std::io::Result<Vec<u8>> {
         let mut data = Vec::new();
+
+        if self.paragraphs.is_empty() {
+            data.extend_from_slice(&1u32.to_le_bytes());
+            data.extend_from_slice(&0i16.to_le_bytes());
+            data.extend_from_slice(&0u32.to_le_bytes());
+            data.extend_from_slice(&1u32.to_le_bytes());
+            data.extend_from_slice(&0u32.to_le_bytes());
+            return Ok(data);
+        }
 
         // Paragraph properties (TextPFRun entries)
         // Each paragraph covers its runs + CR separator (except last paragraph gets +1 for terminator)
         for para in &self.paragraphs {
-            let para_text_len = para.runs_char_count();
+            let para_text_len = para.runs.iter().try_fold(0u32, |total, run| {
+                let count = u32::try_from(run.text.encode_utf16().count()).map_err(|_| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "PowerPoint text run exceeds the PPT size limit",
+                    )
+                })?;
+                total.checked_add(count).ok_or_else(|| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "PowerPoint paragraph exceeds the PPT size limit",
+                    )
+                })
+            })?;
 
             // Character count: text + CR (or +1 for last paragraph terminator)
             // +1 for either CR separator or implicit terminating character
-            let char_count = para_text_len + 1;
+            let char_count = para_text_len.checked_add(1).ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "PowerPoint paragraph exceeds the PPT size limit",
+                )
+            })?;
             data.extend_from_slice(&char_count.to_le_bytes());
 
             // Indent level (0 for top-level)
@@ -595,7 +649,13 @@ impl TextPropsBuilder {
                 data.extend_from_slice(&1u16.to_le_bytes()); // hasBullet = true
             }
             if mask & para_mask::BULLET_CHAR != 0 {
-                let ch = para.bullet_char.unwrap_or('•') as u16;
+                let bullet = para.bullet_char.unwrap_or('•');
+                let ch = u16::try_from(bullet as u32).map_err(|_| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "PPT bullet characters must fit in one UTF-16 code unit",
+                    )
+                })?;
                 data.extend_from_slice(&ch.to_le_bytes());
             }
             if mask & para_mask::LEFT_MARGIN != 0 {
@@ -631,15 +691,47 @@ impl TextPropsBuilder {
             }
 
             for (run_idx, run) in para.runs.iter().enumerate() {
+                if !(1..=4000).contains(&run.font_size) {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "PPT font size must be between 1 and 4000 points",
+                    ));
+                }
+                if run.color.use_scheme && run.color.scheme_index > 7 {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "PPT color-scheme index must be between 0 and 7",
+                    ));
+                }
+                if run
+                    .baseline_position
+                    .is_some_and(|position| !(-100..=100).contains(&position))
+                {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "PPT baseline position must be between -100 and 100 percent",
+                    ));
+                }
                 let is_last_run = run_idx == num_runs - 1;
 
                 // Character count for this run
                 // Last run of last paragraph gets +1 for terminator
                 // Last run of non-last paragraph gets +1 for CR separator
+                let run_units = u32::try_from(run.text.encode_utf16().count()).map_err(|_| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "PowerPoint text run exceeds the PPT size limit",
+                    )
+                })?;
                 let char_count = if is_last_run {
-                    run.char_count() + 1
+                    run_units.checked_add(1).ok_or_else(|| {
+                        std::io::Error::new(
+                            std::io::ErrorKind::InvalidInput,
+                            "PowerPoint text run exceeds the PPT size limit",
+                        )
+                    })?
                 } else {
-                    run.char_count()
+                    run_units
                 };
                 data.extend_from_slice(&char_count.to_le_bytes());
 
@@ -648,6 +740,9 @@ impl TextPropsBuilder {
                 mask |= char_mask::FONT_SIZE; // Always include font size
                 mask |= char_mask::FONT_COLOR; // Always include color
                 mask |= char_mask::FONT_REF; // Always include font reference
+                if run.baseline_position.is_some() {
+                    mask |= char_mask::POSITION;
+                }
 
                 data.extend_from_slice(&mask.to_le_bytes());
 
@@ -660,17 +755,20 @@ impl TextPropsBuilder {
                 // Font reference (if font_ref bit is set)
                 data.extend_from_slice(&run.font_index.to_le_bytes());
 
-                // Font size (in half-points, so multiply by 2)
-                let half_points = run.font_size * 2;
-                data.extend_from_slice(&half_points.to_le_bytes());
+                // Font size is stored directly in points.
+                data.extend_from_slice(&run.font_size.to_le_bytes());
 
                 // Color (POI format: R | G<<8 | B<<16 | 0xFE<<24)
                 let color = run.color.to_ppt_color();
                 data.extend_from_slice(&color.to_le_bytes());
+
+                if let Some(position) = run.baseline_position {
+                    data.extend_from_slice(&position.to_le_bytes());
+                }
             }
         }
 
-        data
+        Ok(data)
     }
 
     /// Get total character count
@@ -776,9 +874,9 @@ mod tests {
         let red = TextColor::RED;
         assert_eq!(red.to_ppt_color(), 0xFE0000FF);
 
-        // Scheme color with alpha
+        // Scheme color index occupies the fourth byte.
         let scheme = TextColor::scheme(4);
-        assert_eq!(scheme.to_ppt_color(), 0xFE000004);
+        assert_eq!(scheme.to_ppt_color(), 0x04000000);
     }
 
     #[test]
@@ -807,13 +905,45 @@ mod tests {
         let mut builder = TextPropsBuilder::new();
         builder.add_paragraph(Paragraph::with_runs(Vec::new()));
 
-        let style = builder.build_style_text_prop();
+        let style = builder.build_style_text_prop().unwrap();
         let (paragraphs, characters) = crate::ppt::text_prop::parse_style_text_prop_atom(&style, 0);
 
         assert_eq!(paragraphs.len(), 1);
         assert_eq!(paragraphs[0].characters_covered, 1);
         assert_eq!(characters.len(), 1);
         assert_eq!(characters[0].characters_covered, 1);
+    }
+
+    #[test]
+    fn empty_rich_text_has_complete_style_coverage() {
+        let style = TextPropsBuilder::new().build_style_text_prop().unwrap();
+        let (paragraphs, characters) = crate::ppt::text_prop::parse_style_text_prop_atom(&style, 0);
+
+        assert_eq!(paragraphs[0].characters_covered, 1);
+        assert_eq!(characters[0].characters_covered, 1);
+    }
+
+    #[test]
+    fn rejects_invalid_text_cf_values() {
+        let mut invalid_size = TextPropsBuilder::new();
+        invalid_size.add_paragraph(Paragraph::with_runs(vec![TextRun::new("x").size(0)]));
+        assert!(invalid_size.build_style_text_prop().is_err());
+
+        let mut invalid_scheme = TextPropsBuilder::new();
+        invalid_scheme.add_paragraph(Paragraph::with_runs(vec![
+            TextRun::new("x").color_scheme(8),
+        ]));
+        assert!(invalid_scheme.build_style_text_prop().is_err());
+
+        let mut invalid_bullet = TextPropsBuilder::new();
+        invalid_bullet.add_paragraph(Paragraph::new("x").with_bullet('😀'));
+        assert!(invalid_bullet.build_style_text_prop().is_err());
+
+        let mut invalid_position = TextPropsBuilder::new();
+        invalid_position.add_paragraph(Paragraph::with_runs(vec![
+            TextRun::new("x").baseline_position(101),
+        ]));
+        assert!(invalid_position.build_style_text_prop().is_err());
     }
 
     #[test]
