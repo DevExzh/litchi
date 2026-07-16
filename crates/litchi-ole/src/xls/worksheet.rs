@@ -8,6 +8,7 @@ use crate::xls::hyperlinks::XlsHyperlink;
 use crate::xls::layout::{XlsColumnLayout, XlsRowLayout};
 use crate::xls::view::XlsWorksheetView;
 use crate::xls::page_setup::XlsPageSetup;
+use crate::xls::conditional_format::XlsConditionalFormatting;
 use crate::xls::merged_cells::MergedCellRange;
 use crate::xls::number_format::{XlsExtendedFormat, XlsFormatting, XlsNumberFormat};
 use crate::xls::pivot_table::PivotTable;
@@ -51,6 +52,7 @@ pub struct XlsWorksheet {
     column_layouts: Vec<XlsColumnLayout>,
     worksheet_views: Vec<XlsWorksheetView>,
     page_setup: Option<XlsPageSetup>,
+    conditional_formattings: Vec<XlsConditionalFormatting>,
 }
 
 impl XlsWorksheet {
@@ -76,6 +78,7 @@ impl XlsWorksheet {
             column_layouts: Vec::new(),
             worksheet_views: Vec::new(),
             page_setup: None,
+            conditional_formattings: Vec::new(),
         }
     }
 
@@ -101,6 +104,7 @@ impl XlsWorksheet {
             column_layouts: Vec::new(),
             worksheet_views: Vec::new(),
             page_setup: None,
+            conditional_formattings: Vec::new(),
         }
     }
 
@@ -310,6 +314,18 @@ impl XlsWorksheet {
 
     pub(crate) fn set_page_setup(&mut self, page_setup: Option<XlsPageSetup>) {
         self.page_setup = page_setup;
+    }
+
+    /// Legacy conditional formatting groups in worksheet record order.
+    pub fn conditional_formattings(&self) -> &[XlsConditionalFormatting] {
+        &self.conditional_formattings
+    }
+
+    pub(crate) fn set_conditional_formattings(
+        &mut self,
+        conditional_formattings: Vec<XlsConditionalFormatting>,
+    ) {
+        self.conditional_formattings = conditional_formattings;
     }
 
     pub fn format_for_cell(&self, row: u32, col: u32) -> Option<&XlsExtendedFormat> {

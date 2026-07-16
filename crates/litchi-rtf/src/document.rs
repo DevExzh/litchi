@@ -33,6 +33,8 @@ pub struct RtfDocument<'a> {
     revision_save: Option<crate::RevisionSaveMetadata>,
     /// Ordered inert XML namespace table; `Some([])` preserves an empty table.
     xml_namespaces: Option<Vec<crate::XmlNamespace<'a>>>,
+    /// Inert Office theme package and optional color-scheme mapping bytes.
+    theme: Option<crate::DocumentTheme<'a>>,
     /// Embedded and linked objects
     objects: Vec<super::object::EmbeddedObject<'a>>,
     /// Ordered inert document-variable metadata
@@ -245,6 +247,7 @@ impl<'a> RtfDocument<'a> {
                     .map(crate::XmlNamespace::into_owned)
                     .collect()
             }),
+            theme: parsed.theme.map(crate::DocumentTheme::into_owned),
             objects: owned_objects,
             document_variables: parsed
                 .document_variables
@@ -614,6 +617,23 @@ impl<'a> RtfDocument<'a> {
     /// Remove the XML namespace table entirely.
     pub fn clear_xml_namespaces(&mut self) {
         self.xml_namespaces = None;
+    }
+
+    /// Return inert Office theme bytes without interpreting their contents.
+    pub fn theme(&self) -> Option<&crate::DocumentTheme<'_>> {
+        self.theme.as_ref()
+    }
+
+    /// Replace inert Office theme bytes after bounds validation.
+    pub fn set_theme(&mut self, theme: crate::DocumentTheme<'a>) -> RtfResult<()> {
+        theme.validate()?;
+        self.theme = Some(theme);
+        Ok(())
+    }
+
+    /// Remove theme and color-scheme mapping payloads.
+    pub fn clear_theme(&mut self) {
+        self.theme = None;
     }
 
     fn validate_xml_namespaces(namespaces: &[crate::XmlNamespace<'_>]) -> RtfResult<()> {

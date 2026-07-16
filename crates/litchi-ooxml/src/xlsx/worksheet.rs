@@ -39,6 +39,7 @@ use super::sheet_protection::{
 };
 use super::named_sheet_view::{NamedSheetViews, discover_named_sheet_views};
 use super::page_margins::{WorksheetPageMargins, parse_worksheet_page_margins};
+use super::print_options::{WorksheetPrintOptions, parse_worksheet_print_options};
 use super::table::{Table, parse_table_xml};
 use super::views::SheetView;
 use super::writer::sheet::Image;
@@ -255,6 +256,8 @@ pub struct Worksheet<'a> {
     header_footer: Option<WorksheetHeaderFooter>,
     /// Static worksheet page margins.
     page_margins: Option<WorksheetPageMargins>,
+    /// Static worksheet print options.
+    print_options: Option<WorksheetPrintOptions>,
     /// Manual row page breaks
     row_breaks: Vec<PageBreak>,
     /// Manual column page breaks
@@ -293,6 +296,7 @@ impl<'a> Worksheet<'a> {
             protection_metadata: WorksheetProtectionMetadata::default(),
             header_footer: None,
             page_margins: None,
+            print_options: None,
             row_breaks: Vec::new(),
             col_breaks: Vec::new(),
             rich_text_cells: HashMap::new(),
@@ -400,6 +404,7 @@ impl<'a> Worksheet<'a> {
         let protection_metadata = parse_worksheet_protection(sheet_data.as_bytes())?;
         let header_footer = parse_worksheet_header_footer(sheet_data.as_bytes())?;
         let page_margins = parse_worksheet_page_margins(sheet_data.as_bytes())?;
+        let print_options = parse_worksheet_print_options(sheet_data.as_bytes())?;
         self.cells = parsed.cells;
         self.cell_styles = parsed.cell_styles;
         self.rows = parsed.rows;
@@ -423,6 +428,7 @@ impl<'a> Worksheet<'a> {
         self.protection_metadata = protection_metadata;
         self.header_footer = header_footer;
         self.page_margins = page_margins;
+        self.print_options = print_options;
         self.dimensions = parsed.dimensions;
         Ok((
             parsed.hyperlinks,
@@ -1881,6 +1887,13 @@ impl<'a> Worksheet<'a> {
     /// * `row` - Row number (1-based)
     pub fn get_row_info(&self, row: u32) -> Option<&RowInfo> {
         self.rows.get(&row)
+    }
+
+    // ===== Print Options =====
+
+    /// Complete immutable worksheet print options, when explicitly present.
+    pub fn print_options(&self) -> Option<&WorksheetPrintOptions> {
+        self.print_options.as_ref()
     }
 
     // ===== Page Margins =====

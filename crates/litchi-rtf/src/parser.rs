@@ -304,6 +304,10 @@ pub struct Parser<'a> {
     xml_namespaces: Vec<crate::XmlNamespace<'a>>,
     saw_xml_namespace_table: bool,
     xml_namespace_text_bytes: usize,
+    theme_data: Option<Vec<u8>>,
+    saw_theme_data: bool,
+    color_scheme_mapping: Option<Vec<u8>>,
+    saw_color_scheme_mapping: bool,
     /// Embedded and linked objects
     objects: Vec<super::object::EmbeddedObject<'a>>,
     /// Ordered inert document variables
@@ -423,6 +427,10 @@ impl<'a> Parser<'a> {
             xml_namespaces: Vec::new(),
             saw_xml_namespace_table: false,
             xml_namespace_text_bytes: 0,
+            theme_data: None,
+            saw_theme_data: false,
+            color_scheme_mapping: None,
+            saw_color_scheme_mapping: false,
             objects: Vec::new(),
             document_variables: Vec::new(),
             document_variable_text_bytes: 0,
@@ -495,6 +503,18 @@ impl<'a> Parser<'a> {
         } else {
             None
         };
+        let theme = match (self.theme_data, self.color_scheme_mapping) {
+            (Some(data), mapping) => Some(crate::DocumentTheme::new(
+                Cow::Owned(data),
+                mapping.map(Cow::Owned),
+            )?),
+            (None, Some(_)) => {
+                return Err(RtfError::MalformedDocument(
+                    "RTF color-scheme mapping is orphaned without theme data".to_string(),
+                ));
+            },
+            (None, None) => None,
+        };
 
         Ok(ParsedDocument {
             font_table: self.font_table.into_inner(),
@@ -508,6 +528,7 @@ impl<'a> Parser<'a> {
             revision_save,
             xml_namespaces: self.xml_namespaces,
             saw_xml_namespace_table: self.saw_xml_namespace_table,
+            theme,
             objects: self.objects,
             document_variables: self.document_variables,
             user_properties: self.user_properties,
@@ -672,6 +693,34 @@ impl<'a> Parser<'a> {
                             self.states.pop();
                             return Ok(());
                         },
+                        Some(Token::Control(ControlWord::ThemeData)) => {
+                            if self.saw_theme_data {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF contains multiple theme-data destinations".to_string(),
+                                ));
+                            }
+                            self.saw_theme_data = true;
+                            self.theme_data = Some(self.parse_theme_hex_destination(
+                                ControlWord::ThemeData,
+                                crate::theme::MAX_THEME_DATA_BYTES,
+                            )?);
+                            self.states.pop();
+                            return Ok(());
+                        },
+                        Some(Token::Control(ControlWord::ColorSchemeMapping)) => {
+                            if self.saw_color_scheme_mapping {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF contains multiple color-scheme mappings".to_string(),
+                                ));
+                            }
+                            self.saw_color_scheme_mapping = true;
+                            self.color_scheme_mapping = Some(self.parse_theme_hex_destination(
+                                ControlWord::ColorSchemeMapping,
+                                crate::theme::MAX_COLOR_SCHEME_MAPPING_BYTES,
+                            )?);
+                            self.states.pop();
+                            return Ok(());
+                        },
                         Some(Token::Control(ControlWord::DocumentVariable)) => {
                             self.parse_document_variable_destination()?;
                             self.states.pop();
@@ -782,6 +831,11 @@ impl<'a> Parser<'a> {
                 Token::Control(ControlWord::XmlNamespaceTable) => {
                     return Err(RtfError::MalformedDocument(
                         "RTF XML namespace table must be starred".to_string(),
+                    ));
+                },
+                Token::Control(ControlWord::ThemeData | ControlWord::ColorSchemeMapping) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF theme destinations must be starred".to_string(),
                     ));
                 },
                 Token::Control(ControlWord::Info) => {
@@ -2031,6 +2085,11 @@ impl<'a> Parser<'a> {
                     "orphan RTF xmlns control outside xmlnstbl".to_string(),
                 ));
             },
+            ControlWord::ThemeData | ControlWord::ColorSchemeMapping => {
+                return Err(RtfError::MalformedDocument(
+                    "orphan RTF theme destination control".to_string(),
+                ));
+            },
             _ => {},
         }
         if self.apply_section_control(control)? {
@@ -2527,6 +2586,84 @@ impl<'a> Parser<'a> {
             }
         }
         Err(RtfError::UnexpectedEof)
+    }
+
+    fn parse_theme_hex_destination(
+        &mut self,
+        expected: ControlWord<'a>,
+        limit: usize,
+    ) -> RtfResult<Vec<u8>> {
+        self.pos += 1; // ignorable-destination marker
+        let matches_expected = matches!(
+            (&expected, self.tokens.get(self.pos)),
+            (ControlWord::ThemeData, Some(Token::Control(ControlWord::ThemeData)))
+                | (
+                    ControlWord::ColorSchemeMapping,
+                    Some(Token::Control(ControlWord::ColorSchemeMapping))
+                )
+        );
+        if !matches_expected {
+            return Err(RtfError::MalformedDocument(
+                "invalid RTF theme destination".to_string(),
+            ));
+        }
+        self.pos += 1;
+        let mut data = Vec::new();
+        let mut high = None;
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    if high.is_some() {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF theme payload has an odd hexadecimal digit count".to_string(),
+                        ));
+                    }
+                    if data.is_empty() {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF theme payload cannot be empty".to_string(),
+                        ));
+                    }
+                    return Ok(data);
+                },
+                Some(Token::Text(text)) => {
+                    for byte in text.as_bytes() {
+                        if byte.is_ascii_whitespace() {
+                            continue;
+                        }
+                        let nibble = match byte {
+                            b'0'..=b'9' => byte - b'0',
+                            b'a'..=b'f' => byte - b'a' + 10,
+                            b'A'..=b'F' => byte - b'A' + 10,
+                            _ => {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF theme payload contains a non-hexadecimal character"
+                                        .to_string(),
+                                ));
+                            },
+                        };
+                        if let Some(first) = high.take() {
+                            data.push(first << 4 | nibble);
+                        } else {
+                            high = Some(nibble);
+                        }
+                    }
+                    self.pos += 1;
+                },
+                Some(Token::OpenBrace | Token::Binary(_)) | Some(Token::Control(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF theme payload cannot contain controls, nesting, or binary data"
+                            .to_string(),
+                    ));
+                },
+                None => return Err(RtfError::UnexpectedEof),
+            }
+            if data.len() > limit {
+                return Err(RtfError::MalformedDocument(
+                    "RTF theme payload exceeds the safety limit".to_string(),
+                ));
+            }
+        }
     }
 
     fn parse_xml_namespace_table(&mut self) -> RtfResult<()> {
@@ -6251,6 +6388,7 @@ pub struct ParsedDocument<'a> {
     pub revision_save: Option<crate::RevisionSaveMetadata>,
     pub xml_namespaces: Vec<crate::XmlNamespace<'a>>,
     pub saw_xml_namespace_table: bool,
+    pub theme: Option<crate::DocumentTheme<'a>>,
     /// Embedded and linked objects
     pub objects: Vec<super::object::EmbeddedObject<'a>>,
     /// Ordered inert document-variable metadata

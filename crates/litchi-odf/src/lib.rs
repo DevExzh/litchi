@@ -351,7 +351,11 @@ pub use litchi_core::unit::{Length, LengthUnit};
 pub use odb::{
     DatabaseAttribute, DatabaseContent, DatabaseDocument, DatabaseElement, DatabaseElementKind,
 };
-pub use odc::{ChartAttribute, ChartDocument, ChartElement, ChartElementKind};
+pub use odc::{
+    ChartAttribute, ChartAxis, ChartAxisDimension, ChartDataPoint, ChartDataSourceLabels,
+    ChartDocument, ChartElement, ChartElementKind, ChartGrid, ChartGridClass, ChartLegend,
+    ChartLegendPosition, ChartPlotArea, ChartSeries,
+};
 pub use odg::{
     DrawingDocument, DrawingLayer, DrawingLayerDisplay, DrawingPage, DrawingPageProperties,
 };

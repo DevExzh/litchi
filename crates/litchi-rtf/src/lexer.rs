@@ -118,6 +118,8 @@ pub enum ControlWord<'a> {
     RevisionSaveRoot(i32),
     XmlNamespaceTable,
     XmlNamespace(i32),
+    ThemeData,
+    ColorSchemeMapping,
 
     // Index and table-of-contents source marks
     IndexEntry,
@@ -731,6 +733,8 @@ impl<'a> Lexer<'a> {
             "rsidroot" => ControlWord::RevisionSaveRoot(param_value),
             "xmlnstbl" => ControlWord::XmlNamespaceTable,
             "xmlns" => ControlWord::XmlNamespace(param_value),
+            "themedata" => ControlWord::ThemeData,
+            "colorschememapping" => ControlWord::ColorSchemeMapping,
 
             // Index and table-of-contents source marks
             "xe" => ControlWord::IndexEntry,

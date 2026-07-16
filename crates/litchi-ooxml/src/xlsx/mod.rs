@@ -42,6 +42,7 @@ pub mod named_sheet_view;
 pub mod page_margins;
 pub mod parsers;
 pub mod pivot;
+pub mod print_options;
 pub mod shared_strings;
 pub mod sheet_protection;
 pub mod sheet_view;
@@ -116,6 +117,7 @@ pub use named_sheet_view::{
     NamedSheetViewSortRules, NamedSheetViews, parse_named_sheet_views,
 };
 pub use page_margins::{PageMargin, WorksheetPageMargins, parse_worksheet_page_margins};
+pub use print_options::{WorksheetPrintOptions, parse_worksheet_print_options};
 pub use sort::{SortBy, SortCondition, SortMethod, SortState};
 pub use sparkline::{
     Sparkline, SparklineAxisMinMax, SparklineColor, SparklineDisplayEmptyCellsAs, SparklineGroup,

@@ -44,6 +44,9 @@ mod view;
 /// BIFF8 worksheet print and page setup.
 mod page_setup;
 
+/// Legacy BIFF8 conditional formatting.
+mod conditional_format;
+
 /// Shape extraction
 pub mod shapes;
 
@@ -89,6 +92,12 @@ pub use view::{XlsPane, XlsPaneType, XlsSelection, XlsSelectionRange, XlsWorkshe
 pub use page_setup::{
     XlsPageSetup, XlsPrintComments, XlsPrintErrors, XlsPrintOrder, XlsPrintOrientation,
     XlsPrintSetup,
+};
+pub use conditional_format::{
+    XlsConditionalAlignment, XlsConditionalBorder, XlsConditionalComparison,
+    XlsConditionalFont, XlsConditionalFormatRange, XlsConditionalFormatting,
+    XlsConditionalNumberFormat, XlsConditionalPattern, XlsConditionalProtection,
+    XlsConditionalRule, XlsConditionalRuleKind, XlsConditionalStyle,
 };
 pub use records::{
     PhoneticAlignment, PhoneticRun, PhoneticString, PhoneticType, SharedStringFormatRun,

@@ -139,6 +139,8 @@ impl<W: Write> RtfWriter<W> {
 
         self.write_xml_namespace_table(doc.xml_namespaces())?;
 
+        self.write_theme(doc.theme())?;
+
         // Producer provenance is inert header metadata.
         self.write_generator(doc.generator())?;
 
@@ -593,6 +595,30 @@ impl<W: Write> RtfWriter<W> {
             self.write_str(" ")?;
             self.write_destination_text(namespace.namespace.as_ref())?;
             self.write_str("}")?;
+        }
+        self.write_str("}")
+    }
+
+    pub fn write_theme(&mut self, theme: Option<&crate::DocumentTheme<'_>>) -> io::Result<()> {
+        let Some(theme) = theme else {
+            return Ok(());
+        };
+        theme
+            .validate()
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+        self.write_hex_destination("themedata", theme.data.as_ref())?;
+        if let Some(mapping) = theme.color_scheme_mapping.as_deref() {
+            self.write_hex_destination("colorschememapping", mapping)?;
+        }
+        Ok(())
+    }
+
+    fn write_hex_destination(&mut self, control: &str, data: &[u8]) -> io::Result<()> {
+        self.write_str("{\\*")?;
+        self.write_control_word(control, None)?;
+        self.write_str(" ")?;
+        for byte in data {
+            write!(self.writer, "{byte:02x}")?;
         }
         self.write_str("}")
     }
