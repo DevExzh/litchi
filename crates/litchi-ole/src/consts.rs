@@ -111,6 +111,10 @@ pub enum PptRecordType {
     FontEmbeddedData = 4024,
     /// CString record
     CString = 4026,
+    /// East Asian line-breaking settings container
+    Kinsoku = 4040,
+    /// East Asian line-breaking settings atom
+    KinsokuAtom = 4050,
     /// Headers footers container record
     HeadersFooters = 4057,
     /// Headers footers atom record
@@ -296,6 +300,8 @@ impl From<u16> for PptRecordType {
             4023 => PptRecordType::FontEntityAtom,
             4024 => PptRecordType::FontEmbeddedData,
             4026 => PptRecordType::CString,
+            4040 => PptRecordType::Kinsoku,
+            4050 => PptRecordType::KinsokuAtom,
             4057 => PptRecordType::HeadersFooters,
             4058 => PptRecordType::HeadersFootersAtom,
             4082 => PptRecordType::InteractiveInfo,

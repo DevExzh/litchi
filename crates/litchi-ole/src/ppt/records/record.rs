@@ -129,6 +129,7 @@ impl PptRecord {
                 | PptRecordType::FontCollection
                 | PptRecordType::FontCollection10
                 | PptRecordType::BlipCollection9
+                | PptRecordType::Kinsoku
                 | PptRecordType::InteractiveInfo
                 | PptRecordType::AnimationInfo
                 | PptRecordType::ProgTags
