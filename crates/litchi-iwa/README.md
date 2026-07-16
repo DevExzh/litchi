@@ -149,6 +149,37 @@ pages.save("created-with-image.pages")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
 
+File-backed movies are also body-anchored and source-built. Their video and
+poster assets, playback bounds, drawable graph, stand-ins, body attachment,
+z-order, style relationship, UUIDs, and component data references are generated
+without an input package:
+
+```rust
+use std::fs;
+use std::time::Duration;
+use litchi_iwa::pages::{PagesEditor, PagesMovieOptions};
+use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+
+let body = "Quarterly report";
+let movie = fs::read("demo.mov")?;
+let poster = fs::read("demo-poster.png")?;
+let mut pages = PagesEditor::create_with_text(body)?;
+pages.add_body_movie(
+    body.encode_utf16().count(),
+    "demo.mov",
+    &movie,
+    "demo-poster.png",
+    &poster,
+    PagesMovieOptions::new(
+        DrawablePoint { x: 96.0, y: 144.0 },
+        DrawableSize { width: 320.0, height: 180.0 },
+        Duration::from_secs(8),
+    ),
+)?;
+pages.save("created-with-movie.pages")?;
+# Ok::<(), litchi_iwa::Error>(())
+```
+
 ### Create Numbers spreadsheets from scratch
 
 Scratch-created spreadsheets can add ordinary text boxes directly to a sheet.

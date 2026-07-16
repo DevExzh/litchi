@@ -2617,6 +2617,7 @@ mod body_shapes;
 mod document_options;
 mod footnote_settings;
 mod images;
+mod movies;
 mod page_layout;
 mod section_background;
 mod section_content;
@@ -2626,6 +2627,7 @@ mod types;
 
 pub use body_shapes::{PagesBodyShapeInfo, PagesBodyShapeKind, RemovedPagesBodyShape};
 pub use images::{PagesImageInfo, RemovedPagesImage};
+pub use movies::{PagesMovieInfo, PagesMovieOptions, RemovedPagesMovie};
 
 #[cfg(test)]
 mod tests;

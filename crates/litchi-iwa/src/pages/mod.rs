@@ -40,9 +40,9 @@ pub use editor::{
     PagesBodyShapeInfo, PagesBodyShapeKind, PagesDocumentOptions, PagesDrawableTextInfo,
     PagesEditor, PagesFootnoteFormat, PagesFootnoteGap, PagesFootnoteKind, PagesFootnoteNumbering,
     PagesFootnoteSettings, PagesHeaderFooterInfo, PagesHeaderFooterKind, PagesImageInfo,
-    PagesPageLayout, PagesPageNumber, PagesPageOrientation, PagesRgbColorSpace, PagesRgbaColor,
-    PagesSectionBackground, PagesSectionInfo, PagesSectionPageNumbering, PagesSectionSettings,
-    PagesSectionStart, PagesTemplateKind, RemovedPagesBodyShape, RemovedPagesImage,
-    RemovedPagesTextBox,
+    PagesMovieInfo, PagesMovieOptions, PagesPageLayout, PagesPageNumber, PagesPageOrientation,
+    PagesRgbColorSpace, PagesRgbaColor, PagesSectionBackground, PagesSectionInfo,
+    PagesSectionPageNumbering, PagesSectionSettings, PagesSectionStart, PagesTemplateKind,
+    RemovedPagesBodyShape, RemovedPagesImage, RemovedPagesMovie, RemovedPagesTextBox,
 };
 pub use section::{PagesSection, PagesSectionType};
