@@ -200,6 +200,97 @@ impl<'data> EscherShape<'data> {
         self.placeholder
     }
 
+    /// Parse inert PowerPoint 12 placeholder round-trip metadata from OfficeArt client data.
+    pub fn powerpoint12_placeholder_metadata(
+        &self,
+    ) -> crate::ppt::package::Result<Option<crate::ppt::PowerPoint12PlaceholderMetadata>> {
+        use crate::consts::PptRecordType;
+        use crate::ppt::{
+            PowerPoint12PlaceholderMetadata, PowerPointHeaderFooterPlaceholder,
+            PowerPointNewPlaceholder,
+        };
+
+        let group_header = if self.is_group {
+            self.container
+                .find_child(EscherRecordType::SpContainer)
+                .map(EscherContainer::new)
+        } else {
+            None
+        };
+        let metadata_container = group_header.as_ref().unwrap_or(&self.container);
+        let Some(client_data) = metadata_container.find_child(EscherRecordType::ClientData) else {
+            return Ok(None);
+        };
+
+        let mut metadata = PowerPoint12PlaceholderMetadata::default();
+        let mut found = false;
+        let mut offset = 0usize;
+        while offset < client_data.data.len() {
+            let (record, consumed) =
+                crate::ppt::records::PptRecord::parse(client_data.data, offset)?;
+            match record.record_type {
+                PptRecordType::RoundTripHFPlaceholder12Atom => {
+                    if metadata.header_footer.is_some() {
+                        return Err(crate::ppt::package::PptError::Corrupted(
+                            "Shape contains duplicate RoundTripHFPlaceholder12Atom records"
+                                .to_string(),
+                        ));
+                    }
+                    validate_placeholder_round_trip_atom(&record, "RoundTripHFPlaceholder12Atom")?;
+                    metadata.header_footer = Some(match record.data[0] {
+                        7 => PowerPointHeaderFooterPlaceholder::Date,
+                        8 => PowerPointHeaderFooterPlaceholder::SlideNumber,
+                        9 => PowerPointHeaderFooterPlaceholder::Footer,
+                        10 => PowerPointHeaderFooterPlaceholder::Header,
+                        _ => {
+                            return Err(crate::ppt::package::PptError::Corrupted(
+                                "RoundTripHFPlaceholder12Atom has an invalid placeholder ID"
+                                    .to_string(),
+                            ));
+                        },
+                    });
+                    found = true;
+                },
+                PptRecordType::RoundTripNewPlaceholderId12Atom => {
+                    if metadata.new_placeholder.is_some() {
+                        return Err(crate::ppt::package::PptError::Corrupted(
+                            "Shape contains duplicate RoundTripNewPlaceholderId12Atom records"
+                                .to_string(),
+                        ));
+                    }
+                    validate_placeholder_round_trip_atom(
+                        &record,
+                        "RoundTripNewPlaceholderId12Atom",
+                    )?;
+                    metadata.new_placeholder = Some(match record.data[0] {
+                        25 => PowerPointNewPlaceholder::VerticalObject,
+                        26 => PowerPointNewPlaceholder::Picture,
+                        _ => {
+                            return Err(crate::ppt::package::PptError::Corrupted(
+                                "RoundTripNewPlaceholderId12Atom has an invalid placeholder ID"
+                                    .to_string(),
+                            ));
+                        },
+                    });
+                    found = true;
+                },
+                _ => {},
+            }
+            if consumed == 0 {
+                return Err(crate::ppt::package::PptError::Corrupted(
+                    "Zero-length PPT record in OfficeArt client data".to_string(),
+                ));
+            }
+            offset = offset.checked_add(consumed).ok_or_else(|| {
+                crate::ppt::package::PptError::Corrupted(
+                    "OfficeArt client-data offset overflow".to_string(),
+                )
+            })?;
+        }
+
+        Ok(found.then_some(metadata))
+    }
+
     /// Return the external object reference used by an OLE or media frame.
     #[inline]
     pub fn external_object_id(&self) -> Option<u32> {
@@ -432,4 +523,20 @@ impl<'data> EscherShape<'data> {
 struct EscherFrameInfo {
     kind: Option<EscherShapeType>,
     external_object_id: Option<u32>,
+}
+
+fn validate_placeholder_round_trip_atom(
+    record: &crate::ppt::records::PptRecord,
+    name: &str,
+) -> crate::ppt::package::Result<()> {
+    if record.version != 0
+        || record.instance != 0
+        || record.data_length != 1
+        || record.data.len() != 1
+    {
+        return Err(crate::ppt::package::PptError::Corrupted(format!(
+            "{name} has an invalid record header or size"
+        )));
+    }
+    Ok(())
 }

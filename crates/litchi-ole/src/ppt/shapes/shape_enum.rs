@@ -6,6 +6,7 @@ use super::picture::PictureShape;
 use super::shape::{Shape, ShapeType};
 use super::{AutoShape, Placeholder, TextBox};
 use crate::ppt::package::Result;
+use crate::ppt::slide_extension::PowerPoint12PlaceholderMetadata;
 
 /// Represents any shape on a slide using an enum for zero-cost abstraction.
 ///
@@ -179,6 +180,31 @@ where
             _ => None,
         }
     }
+
+    /// Return inert PowerPoint 12 placeholder metadata retained for round trips.
+    pub fn powerpoint12_placeholder_metadata(&self) -> Option<&PowerPoint12PlaceholderMetadata> {
+        match self {
+            ShapeEnum::TextBox(shape) => shape
+                .properties()
+                .powerpoint12_placeholder_metadata
+                .as_ref(),
+            ShapeEnum::Placeholder(shape) => shape
+                .properties()
+                .powerpoint12_placeholder_metadata
+                .as_ref(),
+            ShapeEnum::AutoShape(shape) => shape
+                .properties()
+                .powerpoint12_placeholder_metadata
+                .as_ref(),
+            ShapeEnum::Picture(shape) => shape
+                .properties()
+                .powerpoint12_placeholder_metadata
+                .as_ref(),
+            ShapeEnum::Table(shape) => shape.powerpoint12_placeholder_metadata.as_ref(),
+            ShapeEnum::Group(shape) => shape.powerpoint12_placeholder_metadata.as_ref(),
+            ShapeEnum::Line(shape) => shape.powerpoint12_placeholder_metadata.as_ref(),
+        }
+    }
 }
 
 // PictureShape is now defined in picture.rs and re-exported
@@ -204,6 +230,7 @@ pub struct TableShape {
     width: i32,
     /// Height
     height: i32,
+    powerpoint12_placeholder_metadata: Option<PowerPoint12PlaceholderMetadata>,
 }
 
 impl TableShape {
@@ -219,6 +246,7 @@ impl TableShape {
             top: 0,
             width: 0,
             height: 0,
+            powerpoint12_placeholder_metadata: None,
         }
     }
 
@@ -277,6 +305,13 @@ impl TableShape {
     pub fn height(&self) -> i32 {
         self.height
     }
+
+    pub(crate) fn set_powerpoint12_placeholder_metadata(
+        &mut self,
+        metadata: Option<PowerPoint12PlaceholderMetadata>,
+    ) {
+        self.powerpoint12_placeholder_metadata = metadata;
+    }
 }
 
 /// Group shape containing other shapes.
@@ -296,6 +331,7 @@ pub struct GroupShape<'a> {
     width: i32,
     /// Height
     height: i32,
+    powerpoint12_placeholder_metadata: Option<PowerPoint12PlaceholderMetadata>,
 }
 
 impl<'a> GroupShape<'a> {
@@ -308,6 +344,7 @@ impl<'a> GroupShape<'a> {
             top: 0,
             width: 0,
             height: 0,
+            powerpoint12_placeholder_metadata: None,
         }
     }
 
@@ -353,6 +390,13 @@ impl<'a> GroupShape<'a> {
     pub fn height(&self) -> i32 {
         self.height
     }
+
+    pub(crate) fn set_powerpoint12_placeholder_metadata(
+        &mut self,
+        metadata: Option<PowerPoint12PlaceholderMetadata>,
+    ) {
+        self.powerpoint12_placeholder_metadata = metadata;
+    }
 }
 
 /// Line/connector shape.
@@ -374,6 +418,7 @@ pub struct LineShape {
     width: i32,
     /// Line color
     color: Option<u32>,
+    powerpoint12_placeholder_metadata: Option<PowerPoint12PlaceholderMetadata>,
 }
 
 impl LineShape {
@@ -387,6 +432,7 @@ impl LineShape {
             y2,
             width: 1,
             color: None,
+            powerpoint12_placeholder_metadata: None,
         }
     }
 
@@ -410,5 +456,12 @@ impl LineShape {
         let dx = (self.x2 - self.x1) as f64;
         let dy = (self.y2 - self.y1) as f64;
         (dx * dx + dy * dy).sqrt()
+    }
+
+    pub(crate) fn set_powerpoint12_placeholder_metadata(
+        &mut self,
+        metadata: Option<PowerPoint12PlaceholderMetadata>,
+    ) {
+        self.powerpoint12_placeholder_metadata = metadata;
     }
 }

@@ -20,6 +20,40 @@ pub struct PowerPointHeaderFooterDefaults {
     pub include_slide_number: bool,
 }
 
+/// Header or footer placeholder identity retained for PowerPoint 12 round trips.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PowerPointHeaderFooterPlaceholder {
+    /// Master date placeholder (`PT_MasterDate`).
+    Date,
+    /// Master slide- or page-number placeholder (`PT_MasterSlideNumber`).
+    SlideNumber,
+    /// Master footer placeholder (`PT_MasterFooter`).
+    Footer,
+    /// Master header placeholder (`PT_MasterHeader`).
+    Header,
+}
+
+/// Placeholder identities added by PowerPoint 12 and retained for round trips.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PowerPointNewPlaceholder {
+    /// Vertical object placeholder (`PT_VerticalObject`).
+    VerticalObject,
+    /// Picture placeholder (`PT_Picture`).
+    Picture,
+}
+
+/// Inert PowerPoint 12 placeholder metadata stored in OfficeArt client data.
+///
+/// MS-PPT recommends ignoring these compatibility atoms while preserving them. The legacy
+/// `PlaceholderAtom`, when present, remains authoritative for the resolved placeholder type.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct PowerPoint12PlaceholderMetadata {
+    /// Header/footer identity from `RoundTripHFPlaceholder12Atom`.
+    pub header_footer: Option<PowerPointHeaderFooterPlaceholder>,
+    /// New identity from `RoundTripNewPlaceholderId12Atom`.
+    pub new_placeholder: Option<PowerPointNewPlaceholder>,
+}
+
 /// Metadata stored in a `___PPT12` slide programmable-tag extension.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct PowerPoint12SlideExtension {

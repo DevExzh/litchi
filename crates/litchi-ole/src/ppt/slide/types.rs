@@ -207,10 +207,12 @@ impl<'doc> Slide<'doc> {
             super::super::escher::EscherShapeFactory::extract_shapes_from_drawing(&ppdrawing.data)?;
 
         // Convert Escher shapes to ShapeEnum with full property extraction
-        let shapes: Vec<ShapeEnum<'static>> = escher_shapes
-            .iter()
-            .filter_map(|escher_shape| Self::convert_escher_to_shape_enum(escher_shape))
-            .collect();
+        let mut shapes = Vec::with_capacity(escher_shapes.len());
+        for escher_shape in &escher_shapes {
+            if let Some(shape) = Self::convert_escher_to_shape_enum(escher_shape)? {
+                shapes.push(shape);
+            }
+        }
 
         Ok(shapes)
     }
@@ -223,42 +225,77 @@ impl<'doc> Slide<'doc> {
     /// - Pattern matching for type dispatch
     fn convert_escher_to_shape_enum(
         escher_shape: &super::super::escher::EscherShape<'_>,
-    ) -> Option<ShapeEnum<'static>> {
+    ) -> Result<Option<ShapeEnum<'static>>> {
         use super::super::escher::EscherShapeType;
         use super::super::shapes::*;
+        use crate::ppt::slide_extension::PowerPointHeaderFooterPlaceholder;
 
         let shape_id = escher_shape.shape_id().unwrap_or(0);
         let anchor = escher_shape.anchor();
+        let powerpoint12_placeholder_metadata = escher_shape.powerpoint12_placeholder_metadata()?;
+
+        if let Some(placeholder_info) = escher_shape.placeholder() {
+            let mut properties = shape::ShapeProperties {
+                id: shape_id,
+                shape_type: shape::ShapeType::Placeholder,
+                powerpoint12_placeholder_metadata,
+                ..Default::default()
+            };
+            if let Some(a) = anchor {
+                properties.x = a.left;
+                properties.y = a.top;
+                properties.width = a.width();
+                properties.height = a.height();
+            }
+
+            return Ok(Some(ShapeEnum::Placeholder(Placeholder::from_parsed(
+                properties,
+                PlaceholderType::from_native_slide(placeholder_info.placeholder_type),
+                placeholder_info.size,
+                u16::try_from(placeholder_info.position).ok(),
+                escher_shape.text(),
+            ))));
+        }
+
+        if let Some(header_footer) =
+            powerpoint12_placeholder_metadata.and_then(|metadata| metadata.header_footer)
+        {
+            let placeholder_type = match header_footer {
+                PowerPointHeaderFooterPlaceholder::Date => PlaceholderType::DateAndTime,
+                PowerPointHeaderFooterPlaceholder::SlideNumber => PlaceholderType::SlideNumber,
+                PowerPointHeaderFooterPlaceholder::Footer => PlaceholderType::Footer,
+                PowerPointHeaderFooterPlaceholder::Header => PlaceholderType::Header,
+            };
+            let mut properties = shape::ShapeProperties {
+                id: shape_id,
+                shape_type: shape::ShapeType::Placeholder,
+                powerpoint12_placeholder_metadata,
+                ..Default::default()
+            };
+            if let Some(a) = anchor {
+                properties.x = a.left;
+                properties.y = a.top;
+                properties.width = a.width();
+                properties.height = a.height();
+            }
+            return Ok(Some(ShapeEnum::Placeholder(Placeholder::from_parsed(
+                properties,
+                placeholder_type,
+                1,
+                None,
+                escher_shape.text(),
+            ))));
+        }
 
         match escher_shape.shape_type() {
-            EscherShapeType::Placeholder => {
-                let placeholder_info = escher_shape.placeholder()?;
-                let mut properties = shape::ShapeProperties {
-                    id: shape_id,
-                    shape_type: shape::ShapeType::Placeholder,
-                    ..Default::default()
-                };
-                if let Some(a) = anchor {
-                    properties.x = a.left;
-                    properties.y = a.top;
-                    properties.width = a.width();
-                    properties.height = a.height();
-                }
-
-                Some(ShapeEnum::Placeholder(Placeholder::from_parsed(
-                    properties,
-                    PlaceholderType::from_native_slide(placeholder_info.placeholder_type),
-                    placeholder_info.size,
-                    u16::try_from(placeholder_info.position).ok(),
-                    escher_shape.text(),
-                )))
-            },
+            EscherShapeType::Placeholder => Ok(None),
 
             EscherShapeType::TextBox => {
                 // Create TextBox with proper properties
                 let mut properties = shape::ShapeProperties {
                     id: shape_id,
                     shape_type: shape::ShapeType::TextBox,
+                    powerpoint12_placeholder_metadata,
                     ..Default::default()
                 };
 
@@ -278,7 +315,7 @@ impl<'doc> Slide<'doc> {
                     textbox.set_text(text);
                 }
 
-                Some(ShapeEnum::TextBox(textbox))
+                Ok(Some(ShapeEnum::TextBox(textbox)))
             },
 
             EscherShapeType::Picture | EscherShapeType::Object | EscherShapeType::Media => {
@@ -298,6 +335,8 @@ impl<'doc> Slide<'doc> {
                 if let Some(a) = anchor {
                     picture.set_bounds(a.left, a.top, a.width(), a.height());
                 }
+                picture.properties_mut().powerpoint12_placeholder_metadata =
+                    powerpoint12_placeholder_metadata;
 
                 // Extract the one-based BLIP store index from the pib property.
                 use super::super::escher::EscherPropertyId;
@@ -310,7 +349,7 @@ impl<'doc> Slide<'doc> {
                     picture.set_blip_id(blip_id);
                 }
 
-                Some(ShapeEnum::Picture(picture))
+                Ok(Some(ShapeEnum::Picture(picture)))
             },
 
             EscherShapeType::Line => {
@@ -333,10 +372,11 @@ impl<'doc> Slide<'doc> {
                     {
                         line.set_color(color);
                     }
+                    line.set_powerpoint12_placeholder_metadata(powerpoint12_placeholder_metadata);
 
-                    Some(ShapeEnum::Line(line))
+                    Ok(Some(ShapeEnum::Line(line)))
                 } else {
-                    None
+                    Ok(None)
                 }
             },
 
@@ -347,16 +387,17 @@ impl<'doc> Slide<'doc> {
                 if let Some(a) = anchor {
                     group.set_bounds(a.left, a.top, a.width(), a.height());
                 }
+                group.set_powerpoint12_placeholder_metadata(powerpoint12_placeholder_metadata);
 
                 // Recursively parse child shapes
                 // This follows Apache POI's approach: iterate child shapes and convert them
                 for child_escher in escher_shape.children() {
-                    if let Some(child_shape) = Self::convert_escher_to_shape_enum(child_escher) {
+                    if let Some(child_shape) = Self::convert_escher_to_shape_enum(child_escher)? {
                         group.add_child(child_shape);
                     }
                 }
 
-                Some(ShapeEnum::Group(group))
+                Ok(Some(ShapeEnum::Group(group)))
             },
 
             EscherShapeType::Table => {
@@ -390,6 +431,7 @@ impl<'doc> Slide<'doc> {
                 if let Some(a) = anchor {
                     table.set_bounds(a.left, a.top, a.width(), a.height());
                 }
+                table.set_powerpoint12_placeholder_metadata(powerpoint12_placeholder_metadata);
 
                 for (cell, cell_anchor) in cells {
                     let Ok(row) = row_positions.binary_search(&cell_anchor.top) else {
@@ -401,7 +443,7 @@ impl<'doc> Slide<'doc> {
                     table.set_cell_text(row, column, cell.text().unwrap_or_default());
                 }
 
-                Some(ShapeEnum::Table(table))
+                Ok(Some(ShapeEnum::Table(table)))
             },
 
             EscherShapeType::Rectangle
@@ -412,6 +454,7 @@ impl<'doc> Slide<'doc> {
                 let mut properties = shape::ShapeProperties {
                     id: shape_id,
                     shape_type: shape::ShapeType::AutoShape,
+                    powerpoint12_placeholder_metadata,
                     ..Default::default()
                 };
 
@@ -430,11 +473,11 @@ impl<'doc> Slide<'doc> {
                 if let Some(text) = escher_shape.text().filter(|text| !text.is_empty()) {
                     autoshape.set_text(text);
                 }
-                Some(ShapeEnum::AutoShape(autoshape))
+                Ok(Some(ShapeEnum::AutoShape(autoshape)))
             },
 
             // Unknown or unsupported shape types
-            _ => None,
+            _ => Ok(None),
         }
     }
 
@@ -782,7 +825,7 @@ mod tests {
         drawing
     }
 
-    fn create_placeholder_escher_drawing() -> Vec<u8> {
+    fn create_placeholder_escher_drawing(round_trip_records: &[u8]) -> Vec<u8> {
         use crate::escher::writer::{
             ShapeBuilder, record_type, write_atom, write_client_anchor, write_container,
         };
@@ -815,6 +858,7 @@ mod tests {
         placeholder_data.extend_from_slice(&0u16.to_le_bytes());
         let mut client_data_children = Vec::new();
         write_atom(&mut client_data_children, 0, 0, 3011, &placeholder_data).unwrap();
+        client_data_children.extend_from_slice(round_trip_records);
         write_container(
             &mut shape_children,
             0,
@@ -832,6 +876,40 @@ mod tests {
         )
         .unwrap();
 
+        let mut drawing = Vec::new();
+        write_container(&mut drawing, 0, record_type::DG_CONTAINER, &shape_container).unwrap();
+        drawing
+    }
+
+    fn create_round_trip_placeholder_escher_drawing(
+        shape_type: u16,
+        round_trip_records: &[u8],
+    ) -> Vec<u8> {
+        use crate::escher::writer::{
+            ShapeBuilder, record_type, write_client_anchor, write_container,
+        };
+
+        let mut shape_children = Vec::new();
+        ShapeBuilder::new(shape_type, 46)
+            .write(&mut shape_children)
+            .unwrap();
+        write_client_anchor(&mut shape_children, 20, 30, 220, 130).unwrap();
+        write_container(
+            &mut shape_children,
+            0,
+            record_type::CLIENT_DATA,
+            round_trip_records,
+        )
+        .unwrap();
+
+        let mut shape_container = Vec::new();
+        write_container(
+            &mut shape_container,
+            0,
+            record_type::SP_CONTAINER,
+            &shape_children,
+        )
+        .unwrap();
         let mut drawing = Vec::new();
         write_container(&mut drawing, 0, record_type::DG_CONTAINER, &shape_container).unwrap();
         drawing
@@ -1408,7 +1486,7 @@ mod tests {
         let doc_data = vec![0u8; 32];
         let ppdrawing = create_test_record(
             PptRecordType::PPDrawing,
-            create_placeholder_escher_drawing(),
+            create_placeholder_escher_drawing(&[]),
             Vec::new(),
         );
         let record = create_test_record(PptRecordType::Slide, Vec::new(), vec![ppdrawing]);
@@ -1424,6 +1502,175 @@ mod tests {
         assert_eq!(placeholder.bounds(), (15, 25, 300, 100));
         assert_eq!(shapes[0].text().unwrap(), "Slide title");
         assert!(placeholder.has_text());
+    }
+
+    #[test]
+    fn powerpoint12_header_footer_placeholder_is_exposed_with_new_identity() {
+        use crate::ppt::shapes::{PlaceholderSize, PlaceholderType};
+        use crate::ppt::{
+            PowerPoint12PlaceholderMetadata, PowerPointHeaderFooterPlaceholder,
+            PowerPointNewPlaceholder,
+        };
+
+        let records = [
+            record_bytes(0, 0, 0x0420, &[10]),
+            record_bytes(0, 0, 0x0bdd, &[26]),
+        ]
+        .concat();
+        let doc_data = vec![0u8; 32];
+        let ppdrawing = create_test_record(
+            PptRecordType::PPDrawing,
+            create_round_trip_placeholder_escher_drawing(202, &records),
+            Vec::new(),
+        );
+        let slide_record = create_test_record(PptRecordType::Slide, Vec::new(), vec![ppdrawing]);
+        let slide = Slide::from_slide_data(create_slide_data(slide_record, 256, &doc_data), 1);
+
+        let shapes = slide.shapes().unwrap();
+        let placeholder = shapes[0].as_placeholder().expect("header placeholder");
+        assert_eq!(placeholder.placeholder_type(), PlaceholderType::Header);
+        assert_eq!(placeholder.placeholder_size(), PlaceholderSize::Half);
+        assert_eq!(placeholder.index(), None);
+        assert_eq!(
+            shapes[0].powerpoint12_placeholder_metadata(),
+            Some(&PowerPoint12PlaceholderMetadata {
+                header_footer: Some(PowerPointHeaderFooterPlaceholder::Header),
+                new_placeholder: Some(PowerPointNewPlaceholder::Picture),
+            })
+        );
+    }
+
+    #[test]
+    fn legacy_placeholder_identity_precedes_powerpoint12_round_trip_identity() {
+        use crate::ppt::PowerPointHeaderFooterPlaceholder;
+        use crate::ppt::shapes::PlaceholderType;
+
+        let footer = record_bytes(0, 0, 0x0420, &[9]);
+        let doc_data = vec![0u8; 32];
+        let ppdrawing = create_test_record(
+            PptRecordType::PPDrawing,
+            create_placeholder_escher_drawing(&footer),
+            Vec::new(),
+        );
+        let slide_record = create_test_record(PptRecordType::Slide, Vec::new(), vec![ppdrawing]);
+        let slide = Slide::from_slide_data(create_slide_data(slide_record, 256, &doc_data), 1);
+
+        let shapes = slide.shapes().unwrap();
+        let placeholder = shapes[0].as_placeholder().expect("title placeholder");
+        assert_eq!(placeholder.placeholder_type(), PlaceholderType::Title);
+        assert_eq!(
+            shapes[0]
+                .powerpoint12_placeholder_metadata()
+                .and_then(|metadata| metadata.header_footer),
+            Some(PowerPointHeaderFooterPlaceholder::Footer)
+        );
+    }
+
+    #[test]
+    fn new_placeholder_identity_is_inert_on_non_placeholder_shapes() {
+        use crate::ppt::PowerPointNewPlaceholder;
+
+        let picture = record_bytes(0, 0, 0x0bdd, &[26]);
+        let doc_data = vec![0u8; 32];
+        let ppdrawing = create_test_record(
+            PptRecordType::PPDrawing,
+            create_round_trip_placeholder_escher_drawing(1, &picture),
+            Vec::new(),
+        );
+        let slide_record = create_test_record(PptRecordType::Slide, Vec::new(), vec![ppdrawing]);
+        let slide = Slide::from_slide_data(create_slide_data(slide_record, 256, &doc_data), 1);
+
+        let shapes = slide.shapes().unwrap();
+        assert!(shapes[0].as_autoshape().is_some());
+        assert_eq!(
+            shapes[0]
+                .powerpoint12_placeholder_metadata()
+                .and_then(|metadata| metadata.new_placeholder),
+            Some(PowerPointNewPlaceholder::Picture)
+        );
+    }
+
+    #[test]
+    fn rejects_malformed_or_duplicate_powerpoint12_placeholder_atoms() {
+        let mut truncated = record_bytes(0, 0, 0x0420, &[7]);
+        truncated[4..8].copy_from_slice(&2u32.to_le_bytes());
+        let duplicate_hf = [
+            record_bytes(0, 0, 0x0420, &[7]),
+            record_bytes(0, 0, 0x0420, &[8]),
+        ]
+        .concat();
+        let duplicate_new = [
+            record_bytes(0, 0, 0x0bdd, &[25]),
+            record_bytes(0, 0, 0x0bdd, &[26]),
+        ]
+        .concat();
+
+        for malformed in [
+            record_bytes(1, 0, 0x0420, &[7]),
+            record_bytes(0, 1, 0x0420, &[7]),
+            record_bytes(0, 0, 0x0420, &[]),
+            record_bytes(0, 0, 0x0420, &[6]),
+            record_bytes(0, 0, 0x0420, &[11]),
+            record_bytes(0, 0, 0x0bdd, &[24]),
+            record_bytes(0, 0, 0x0bdd, &[27]),
+            truncated,
+            duplicate_hf,
+            duplicate_new,
+        ] {
+            let doc_data = vec![0u8; 32];
+            let ppdrawing = create_test_record(
+                PptRecordType::PPDrawing,
+                create_round_trip_placeholder_escher_drawing(202, &malformed),
+                Vec::new(),
+            );
+            let slide_record =
+                create_test_record(PptRecordType::Slide, Vec::new(), vec![ppdrawing]);
+            let slide = Slide::from_slide_data(create_slide_data(slide_record, 256, &doc_data), 1);
+            assert!(slide.shapes().is_err());
+        }
+    }
+
+    #[test]
+    fn accepts_every_powerpoint12_placeholder_identity() {
+        use crate::ppt::{PowerPointHeaderFooterPlaceholder, PowerPointNewPlaceholder};
+
+        for (id, expected) in [
+            (7, PowerPointHeaderFooterPlaceholder::Date),
+            (8, PowerPointHeaderFooterPlaceholder::SlideNumber),
+            (9, PowerPointHeaderFooterPlaceholder::Footer),
+            (10, PowerPointHeaderFooterPlaceholder::Header),
+        ] {
+            let atom = record_bytes(0, 0, 0x0420, &[id]);
+            let drawing = create_round_trip_placeholder_escher_drawing(202, &atom);
+            let shapes =
+                crate::ppt::escher::EscherShapeFactory::extract_shapes_from_drawing(&drawing)
+                    .unwrap();
+            assert_eq!(
+                shapes[0]
+                    .powerpoint12_placeholder_metadata()
+                    .unwrap()
+                    .and_then(|metadata| metadata.header_footer),
+                Some(expected)
+            );
+        }
+
+        for (id, expected) in [
+            (25, PowerPointNewPlaceholder::VerticalObject),
+            (26, PowerPointNewPlaceholder::Picture),
+        ] {
+            let atom = record_bytes(0, 0, 0x0bdd, &[id]);
+            let drawing = create_round_trip_placeholder_escher_drawing(1, &atom);
+            let shapes =
+                crate::ppt::escher::EscherShapeFactory::extract_shapes_from_drawing(&drawing)
+                    .unwrap();
+            assert_eq!(
+                shapes[0]
+                    .powerpoint12_placeholder_metadata()
+                    .unwrap()
+                    .and_then(|metadata| metadata.new_placeholder),
+                Some(expected)
+            );
+        }
     }
 
     #[test]
