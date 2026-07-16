@@ -62,6 +62,42 @@ pub enum VerticalAlignment {
     Bottom,
 }
 
+/// Section-level footnote placement override.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SectionFootnotePlacement {
+    BeneathText,
+    BottomOfPage,
+}
+
+/// Explicit section-level footnote and endnote overrides.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct SectionNoteOptions {
+    pub footnote_placement: Option<SectionFootnotePlacement>,
+    pub footnote_start: Option<i32>,
+    pub endnote_start: Option<i32>,
+    pub footnote_restart: Option<crate::FootnoteRestart>,
+    pub endnote_restart: Option<crate::EndnoteRestart>,
+    pub footnote_numbering: Option<crate::NoteNumberingStyle>,
+    pub endnote_numbering: Option<crate::NoteNumberingStyle>,
+}
+
+impl SectionNoteOptions {
+    pub fn validate(&self) -> crate::RtfResult<()> {
+        if self.footnote_start.is_some_and(|value| value <= 0)
+            || self.endnote_start.is_some_and(|value| value <= 0)
+        {
+            return Err(crate::RtfError::MalformedDocument(
+                "RTF section note starting numbers must be positive".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    pub fn is_empty(&self) -> bool {
+        *self == Self::default()
+    }
+}
+
 /// Section properties
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SectionProperties {
@@ -103,6 +139,8 @@ pub struct SectionProperties {
     pub line_numbering: bool,
     /// Line number restart on each page
     pub line_number_restart: bool,
+    /// Explicit section-level footnote and endnote overrides.
+    pub note_options: SectionNoteOptions,
 }
 
 impl Default for SectionProperties {
@@ -127,6 +165,7 @@ impl Default for SectionProperties {
             vertical_alignment: VerticalAlignment::default(),
             line_numbering: false,
             line_number_restart: false,
+            note_options: SectionNoteOptions::default(),
         }
     }
 }

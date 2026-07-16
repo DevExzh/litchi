@@ -3066,6 +3066,7 @@ impl<W: Write> RtfWriter<W> {
     pub fn write_section(&mut self, section: &Section) -> io::Result<()> {
         // Write section properties
         self.write_control_word("sectd", None)?;
+        self.write_section_note_options(&section.properties.note_options)?;
 
         if let Some(direction) = section.properties.direction {
             self.write_control_word(
@@ -3143,6 +3144,107 @@ impl<W: Write> RtfWriter<W> {
         }
 
         Ok(())
+    }
+
+    /// Write explicit section-level footnote and endnote overrides.
+    pub fn write_section_note_options(
+        &mut self,
+        options: &crate::SectionNoteOptions,
+    ) -> io::Result<()> {
+        options
+            .validate()
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+        if let Some(value) = options.footnote_placement {
+            self.write_control_word(
+                match value {
+                    crate::SectionFootnotePlacement::BeneathText => "sftntj",
+                    crate::SectionFootnotePlacement::BottomOfPage => "sftnbj",
+                },
+                None,
+            )?;
+        }
+        if let Some(value) = options.footnote_start {
+            self.write_control_word("sftnstart", Some(value))?;
+        }
+        if let Some(value) = options.footnote_restart {
+            self.write_control_word(
+                match value {
+                    crate::FootnoteRestart::Continuous => "sftnrstcont",
+                    crate::FootnoteRestart::EachSection => "sftnrestart",
+                    crate::FootnoteRestart::EachPage => "sftnrstpg",
+                },
+                None,
+            )?;
+        }
+        if let Some(value) = options.footnote_numbering {
+            self.write_control_word(Self::section_note_numbering_control(value, false), None)?;
+        }
+        if let Some(value) = options.endnote_start {
+            self.write_control_word("saftnstart", Some(value))?;
+        }
+        if let Some(value) = options.endnote_restart {
+            self.write_control_word(
+                match value {
+                    crate::EndnoteRestart::Continuous => "saftnrstcont",
+                    crate::EndnoteRestart::EachSection => "saftnrestart",
+                },
+                None,
+            )?;
+        }
+        if let Some(value) = options.endnote_numbering {
+            self.write_control_word(Self::section_note_numbering_control(value, true), None)?;
+        }
+        Ok(())
+    }
+
+    fn section_note_numbering_control(
+        style: crate::NoteNumberingStyle,
+        endnote: bool,
+    ) -> &'static str {
+        match (endnote, style) {
+            (false, crate::NoteNumberingStyle::Arabic) => "sftnnar",
+            (false, crate::NoteNumberingStyle::LowercaseLetter) => "sftnnalc",
+            (false, crate::NoteNumberingStyle::UppercaseLetter) => "sftnnauc",
+            (false, crate::NoteNumberingStyle::LowercaseRoman) => "sftnnrlc",
+            (false, crate::NoteNumberingStyle::UppercaseRoman) => "sftnnruc",
+            (false, crate::NoteNumberingStyle::Chicago) => "sftnnchi",
+            (false, crate::NoteNumberingStyle::KoreanChosung) => "sftnnchosung",
+            (false, crate::NoteNumberingStyle::Circle) => "sftnncnum",
+            (false, crate::NoteNumberingStyle::KanjiDigitless) => "sftnndbnum",
+            (false, crate::NoteNumberingStyle::KanjiWithDigit) => "sftnndbnumd",
+            (false, crate::NoteNumberingStyle::KanjiThree) => "sftnndbnumt",
+            (false, crate::NoteNumberingStyle::KanjiFour) => "sftnndbnumk",
+            (false, crate::NoteNumberingStyle::DoubleByte) => "sftnndbar",
+            (false, crate::NoteNumberingStyle::KoreanGanada) => "sftnnganada",
+            (false, crate::NoteNumberingStyle::ChineseOne) => "sftnngbnum",
+            (false, crate::NoteNumberingStyle::ChineseTwo) => "sftnngbnumd",
+            (false, crate::NoteNumberingStyle::ChineseThree) => "sftnngbnuml",
+            (false, crate::NoteNumberingStyle::ChineseFour) => "sftnngbnumk",
+            (false, crate::NoteNumberingStyle::ZodiacOne) => "sftnnzodiac",
+            (false, crate::NoteNumberingStyle::ZodiacTwo) => "sftnnzodiacd",
+            (false, crate::NoteNumberingStyle::ZodiacThree) => "sftnnzodiacl",
+            (true, crate::NoteNumberingStyle::Arabic) => "saftnnar",
+            (true, crate::NoteNumberingStyle::LowercaseLetter) => "saftnnalc",
+            (true, crate::NoteNumberingStyle::UppercaseLetter) => "saftnnauc",
+            (true, crate::NoteNumberingStyle::LowercaseRoman) => "saftnnrlc",
+            (true, crate::NoteNumberingStyle::UppercaseRoman) => "saftnnruc",
+            (true, crate::NoteNumberingStyle::Chicago) => "saftnnchi",
+            (true, crate::NoteNumberingStyle::KoreanChosung) => "saftnnchosung",
+            (true, crate::NoteNumberingStyle::Circle) => "saftnncnum",
+            (true, crate::NoteNumberingStyle::KanjiDigitless) => "saftnndbnum",
+            (true, crate::NoteNumberingStyle::KanjiWithDigit) => "saftnndbnumd",
+            (true, crate::NoteNumberingStyle::KanjiThree) => "saftnndbnumt",
+            (true, crate::NoteNumberingStyle::KanjiFour) => "saftnndbnumk",
+            (true, crate::NoteNumberingStyle::DoubleByte) => "saftnndbar",
+            (true, crate::NoteNumberingStyle::KoreanGanada) => "saftnnganada",
+            (true, crate::NoteNumberingStyle::ChineseOne) => "saftnngbnum",
+            (true, crate::NoteNumberingStyle::ChineseTwo) => "saftnngbnumd",
+            (true, crate::NoteNumberingStyle::ChineseThree) => "saftnngbnuml",
+            (true, crate::NoteNumberingStyle::ChineseFour) => "saftnngbnumk",
+            (true, crate::NoteNumberingStyle::ZodiacOne) => "saftnnzodiac",
+            (true, crate::NoteNumberingStyle::ZodiacTwo) => "saftnnzodiacd",
+            (true, crate::NoteNumberingStyle::ZodiacThree) => "saftnnzodiacl",
+        }
     }
 }
 

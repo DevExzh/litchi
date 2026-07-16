@@ -78,6 +78,7 @@ pub mod document_properties;
 mod encryption;
 pub mod escher_textbox;
 pub mod font;
+pub mod header_footer;
 pub mod hyperlink;
 pub mod kinsoku;
 pub mod main_master;
@@ -122,6 +123,12 @@ pub use escher_textbox::EscherTextboxWrapper;
 pub use font::{
     EmbeddedPowerPointFont, PowerPointFont, PowerPointFontCollection, PowerPointFontCollections,
     PowerPointFontEmbeddingFlags,
+};
+pub use header_footer::{
+    PowerPointDateTimeFormatId, PowerPointHeaderFooter, PowerPointHeaderFooterDisplayText,
+    PowerPointHeaderFooterOptions, PowerPointHeaderFooterParent,
+    PowerPointHeaderFooterParentOrdinal, PowerPointHeaderFooterScope, PowerPointHeaderFooters,
+    PowerPointScopedHeaderFooterDisplayText,
 };
 pub use hyperlink::{
     InteractionAction, InteractionJump, InteractionLinkTarget, InteractionTrigger,

@@ -296,6 +296,7 @@ pub mod drawing_layer;
 pub mod drawing_opacity;
 pub mod drawing_stroke_dash;
 pub mod named_expression;
+pub mod content_validation;
 /// ODF XML element classes
 pub mod elements;
 pub use elements::field::{

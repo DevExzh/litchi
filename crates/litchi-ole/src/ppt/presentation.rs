@@ -4,6 +4,10 @@ use super::document_properties::PowerPoint12DocumentProperties;
 use super::encryption::decrypt_pictures;
 use super::encryption::decrypt_powerpoint_document;
 use super::main_master::PowerPoint12MainMasterMetadata;
+use super::header_footer::{
+    PowerPointHeaderFooterDisplayText, PowerPointHeaderFooterParent,
+    PowerPointHeaderFooterParentOrdinal, PowerPointHeaderFooterScope, PowerPointHeaderFooters,
+};
 /// High-performance Presentation API with zero-copy slide parsing.
 use super::package::{PptError, PptOpenOptions, Result};
 use super::parsers::PptRecordParser;
@@ -249,6 +253,89 @@ impl Presentation {
         PowerPointSoundCollection::parse(collection).map(Some)
     }
 
+    /// Return strictly validated header/footer metadata from all specification-defined scopes.
+    ///
+    /// Date identifiers and text remain inert metadata. This method does not format dates,
+    /// execute content, resolve resources, or modify the underlying OLE file.
+    pub fn header_footers(&self) -> Result<PowerPointHeaderFooters> {
+        let records = self.parser.find_records_ref();
+        let mut values = PowerPointHeaderFooters::parse_record_tree(&records)?;
+
+        let mut first_master_display = None;
+        let mut master_ordinal = 0usize;
+        for master in records
+            .iter()
+            .filter(|record| record.record_type == PptRecordType::MainMaster)
+        {
+            if let Some(display) = placeholder_display_from_record(master)? {
+                let scope = PowerPointHeaderFooterScope::Local {
+                    parent: PowerPointHeaderFooterParent::MainMaster,
+                    parent_ordinal: PowerPointHeaderFooterParentOrdinal::new(master_ordinal),
+                };
+                if values.has_scope(scope) {
+                    values.attach_placeholder_display(scope, display.clone())?;
+                }
+                if first_master_display.is_none() {
+                    first_master_display = Some(display);
+                }
+            }
+            master_ordinal += 1;
+        }
+        let has_master_display = first_master_display.is_some();
+        if let Some(display) = first_master_display {
+            values.attach_placeholder_display(
+                PowerPointHeaderFooterScope::PresentationSlides,
+                display,
+            )?;
+        }
+
+        let mut first_unoverridden_slide_display = None;
+        let mut first_notes_display = None;
+        for (ordinal, slide) in records
+            .iter()
+            .filter(|record| record.record_type == PptRecordType::Slide)
+            .enumerate()
+        {
+            let scope = PowerPointHeaderFooterScope::Local {
+                parent: PowerPointHeaderFooterParent::Slide,
+                parent_ordinal: PowerPointHeaderFooterParentOrdinal::new(ordinal),
+            };
+            if let Some(display) = placeholder_display_from_record(slide)? {
+                if values.has_scope(scope) {
+                    values.attach_placeholder_display(scope, display)?;
+                } else {
+                    if first_unoverridden_slide_display.is_none() {
+                        first_unoverridden_slide_display = Some(display.clone());
+                    }
+                    values.attach_placeholder_display(scope, display)?;
+                }
+            }
+        }
+        for slide in self.slides()? {
+            if first_notes_display.is_some() {
+                break;
+            }
+            if let Some(notes) = slide.speaker_notes()? {
+                first_notes_display = placeholder_display_from_shapes(notes.shapes()?)?;
+            }
+        }
+        if !has_master_display
+            && let Some(display) = first_unoverridden_slide_display
+        {
+            values.attach_placeholder_display(
+                PowerPointHeaderFooterScope::PresentationSlides,
+                display,
+            )?;
+        }
+        if let Some(display) = first_notes_display {
+            values.attach_placeholder_display(
+                PowerPointHeaderFooterScope::NotesAndHandouts,
+                display,
+            )?;
+        }
+        Ok(values)
+    }
+
     /// Extract all text from the presentation.
     ///
     /// # Performance
@@ -474,6 +561,53 @@ impl Presentation {
                 }
             }
         }
+    }
+}
+
+fn placeholder_display_from_record(
+    record: &crate::ppt::records::PptRecord,
+) -> Result<Option<PowerPointHeaderFooterDisplayText>> {
+    let Some(drawing) = record.find_child(PptRecordType::PPDrawing) else {
+        return Ok(None);
+    };
+    let parsed = crate::ppt::escher::EscherShapeFactory::extract_shapes_from_drawing(&drawing.data)?;
+    let mut shapes = Vec::with_capacity(parsed.len());
+    for shape in &parsed {
+        if let Some(shape) = Slide::<'static>::convert_escher_to_shape_enum(shape)? {
+            shapes.push(shape);
+        }
+    }
+    placeholder_display_from_shapes(&shapes)
+}
+
+fn placeholder_display_from_shapes(
+    shapes: &[crate::ppt::shapes::ShapeEnum<'static>],
+) -> Result<Option<PowerPointHeaderFooterDisplayText>> {
+    use crate::ppt::shapes::PlaceholderType;
+
+    let mut display = PowerPointHeaderFooterDisplayText::default();
+    for shape in shapes {
+        let Some(placeholder) = shape.as_placeholder() else {
+            continue;
+        };
+        let target = match placeholder.placeholder_type() {
+            PlaceholderType::DateAndTime => &mut display.user_date,
+            PlaceholderType::Header => &mut display.header,
+            PlaceholderType::Footer => &mut display.footer,
+            _ => continue,
+        };
+        if target.is_some() {
+            continue;
+        }
+        let text = shape.text()?;
+        if !text.is_empty() && text != "*" {
+            *target = Some(text);
+        }
+    }
+    if display == PowerPointHeaderFooterDisplayText::default() {
+        Ok(None)
+    } else {
+        Ok(Some(display))
     }
 }
 

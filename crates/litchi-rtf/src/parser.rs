@@ -228,6 +228,8 @@ struct State {
     cell_boundaries: SmallVec<[i32; 8]>,
     /// Current destination (for skipping non-document content)
     destination: Destination,
+    /// Whether this body-flow group is an explicit section-format snapshot.
+    visible_section_format: bool,
     /// Current text encoding
     encoding: RtfEncoding,
     /// Active tracked-change kind for text emitted in this state
@@ -236,6 +238,53 @@ struct State {
     revision_author_id: Option<i32>,
     /// Packed RTF revision timestamp
     revision_date: Option<i32>,
+}
+
+fn is_section_control(control: &ControlWord<'_>) -> bool {
+    matches!(
+        control,
+        ControlWord::SectionDefault
+            | ControlWord::SectionBreak
+            | ControlWord::SectionContinuous
+            | ControlWord::SectionColumn
+            | ControlWord::SectionPage
+            | ControlWord::SectionEvenPage
+            | ControlWord::SectionOddPage
+            | ControlWord::PageWidth(_)
+            | ControlWord::PageHeight(_)
+            | ControlWord::MarginLeft(_)
+            | ControlWord::MarginRight(_)
+            | ControlWord::MarginTop(_)
+            | ControlWord::MarginBottom(_)
+            | ControlWord::MarginGutter(_)
+            | ControlWord::HeaderDistance(_)
+            | ControlWord::FooterDistance(_)
+            | ControlWord::Landscape
+            | ControlWord::Columns(_)
+            | ControlWord::ColumnSpace(_)
+            | ControlWord::PageNumberStart(_)
+            | ControlWord::PageNumberDecimal
+            | ControlWord::PageNumberUpperRoman
+            | ControlWord::PageNumberLowerRoman
+            | ControlWord::PageNumberUpperLetter
+            | ControlWord::PageNumberLowerLetter
+            | ControlWord::VerticalAlignTop
+            | ControlWord::VerticalAlignCenter
+            | ControlWord::VerticalAlignJustify
+            | ControlWord::VerticalAlignBottom
+            | ControlWord::LineNumbering(_)
+            | ControlWord::LineNumberRestartPage
+            | ControlWord::LineNumberContinuous
+            | ControlWord::LeftToRightSection
+            | ControlWord::RightToLeftSection
+            | ControlWord::SectionFootnotePlacement(_)
+            | ControlWord::SectionFootnoteStart(_)
+            | ControlWord::SectionEndnoteStart(_)
+            | ControlWord::SectionFootnoteRestart(_)
+            | ControlWord::SectionEndnoteRestart(_)
+            | ControlWord::SectionFootnoteNumbering(_)
+            | ControlWord::SectionEndnoteNumbering(_)
+    )
 }
 
 impl Default for State {
@@ -247,6 +296,7 @@ impl Default for State {
             in_table: false,
             cell_boundaries: SmallVec::new(),
             destination: Destination::DocumentBody,
+            visible_section_format: false,
             encoding: RtfEncoding::Standard(encoding_rs::WINDOWS_1252),
             revision_type: None,
             revision_author_id: None,
@@ -340,6 +390,10 @@ pub struct Parser<'a> {
     sections: Vec<super::section::Section<'a>>,
     /// Whether section-specific properties are currently active.
     section_properties_active: bool,
+    /// Whether header/footer or body content has closed the active section-format prefix.
+    section_note_options_closed: bool,
+    /// Whether the root body is in an explicit late section-format run.
+    root_section_format_run: bool,
     /// Bookmarks
     bookmarks: super::bookmark::BookmarkTable<'a>,
     /// Open bookmark ranges, indexed by name.
@@ -506,6 +560,8 @@ impl<'a> Parser<'a> {
             paragraph_group_table: None,
             sections: Vec::new(),
             section_properties_active: false,
+            section_note_options_closed: false,
+            root_section_format_run: false,
             bookmarks: super::bookmark::BookmarkTable::new(),
             open_bookmarks: HashMap::new(),
             bookmark_spans: Vec::new(),
@@ -548,11 +604,167 @@ impl<'a> Parser<'a> {
                 "Empty token stream".to_string(),
             ));
         }
-        let mut brace_depth = 0usize;
-        for token in self.tokens.iter() {
+        #[derive(Clone, Copy)]
+        struct NoteGuardContext {
+            body_flow: bool,
+            visible_field_result: bool,
+            visible_section_format: bool,
+            direct_header_footer: bool,
+            direct_field_instruction: bool,
+            inert_section_format: bool,
+        }
+
+        let mut contexts: Vec<NoteGuardContext> = Vec::new();
+        for (index, token) in self.tokens.iter().enumerate() {
             match token {
-                Token::OpenBrace => brace_depth = brace_depth.saturating_add(1),
-                Token::CloseBrace => brace_depth = brace_depth.saturating_sub(1),
+                Token::OpenBrace => {
+                    if let Some(parent) = contexts.last_mut() {
+                        parent.inert_section_format = false;
+                    }
+                    let parent = contexts.last().copied().unwrap_or(NoteGuardContext {
+                        body_flow: true,
+                        visible_field_result: false,
+                        visible_section_format: false,
+                        direct_header_footer: false,
+                        direct_field_instruction: false,
+                        inert_section_format: false,
+                    });
+                    let mut destination_index = index + 1;
+                    let starred = matches!(
+                        self.tokens.get(destination_index),
+                        Some(Token::Control(ControlWord::IgnorableDestination))
+                    );
+                    if starred {
+                        destination_index += 1;
+                    }
+                    let destination = match self.tokens.get(destination_index) {
+                        Some(Token::Control(control)) => Some(control),
+                        _ => None,
+                    };
+                    let context = match destination {
+                        Some(ControlWord::FieldResult) if parent.body_flow => NoteGuardContext {
+                            body_flow: true,
+                            visible_field_result: true,
+                            visible_section_format: false,
+                            direct_header_footer: false,
+                            direct_field_instruction: false,
+                            inert_section_format: false,
+                        },
+                        Some(ControlWord::Field) => NoteGuardContext {
+                            body_flow: parent.body_flow,
+                            visible_field_result: false,
+                            visible_section_format: false,
+                            direct_header_footer: false,
+                            direct_field_instruction: false,
+                            inert_section_format: false,
+                        },
+                        Some(ControlWord::SectionDefault) if parent.body_flow && !starred => {
+                            NoteGuardContext {
+                                body_flow: true,
+                                visible_field_result: parent.visible_field_result,
+                                visible_section_format: true,
+                                direct_header_footer: false,
+                                direct_field_instruction: false,
+                                inert_section_format: false,
+                            }
+                        },
+                        Some(
+                            ControlWord::Header
+                            | ControlWord::HeaderFirst
+                            | ControlWord::HeaderLeft
+                            | ControlWord::HeaderRight
+                            | ControlWord::Footer
+                            | ControlWord::FooterFirst
+                            | ControlWord::FooterLeft
+                            | ControlWord::FooterRight,
+                        ) => NoteGuardContext {
+                            body_flow: false,
+                            visible_field_result: false,
+                            visible_section_format: false,
+                            direct_header_footer: true,
+                            direct_field_instruction: false,
+                            inert_section_format: false,
+                        },
+                        Some(ControlWord::FieldInstruction) => NoteGuardContext {
+                            body_flow: false,
+                            visible_field_result: false,
+                            visible_section_format: false,
+                            direct_header_footer: false,
+                            direct_field_instruction: true,
+                            inert_section_format: false,
+                        },
+                        Some(
+                            ControlWord::Annotation
+                            | ControlWord::Footnote
+                            | ControlWord::Endnote
+                            | ControlWord::Object
+                            | ControlWord::Result
+                            | ControlWord::Picture
+                            | ControlWord::Shape
+                            | ControlWord::ShapeGroup,
+                        ) => NoteGuardContext {
+                            body_flow: false,
+                            visible_field_result: false,
+                            visible_section_format: false,
+                            direct_header_footer: false,
+                            direct_field_instruction: false,
+                            inert_section_format: false,
+                        },
+                        _ if starred => NoteGuardContext {
+                            body_flow: false,
+                            visible_field_result: false,
+                            visible_section_format: false,
+                            direct_header_footer: false,
+                            direct_field_instruction: false,
+                            inert_section_format: false,
+                        },
+                        _ => NoteGuardContext {
+                            body_flow: parent.body_flow,
+                            visible_field_result: parent.visible_field_result,
+                            visible_section_format: parent.visible_section_format,
+                            direct_header_footer: false,
+                            direct_field_instruction: false,
+                            inert_section_format: false,
+                        },
+                    };
+                    contexts.push(context);
+                },
+                Token::CloseBrace => {
+                    contexts.pop();
+                    if contexts.is_empty() {
+                        break;
+                    }
+                },
+                Token::Control(ControlWord::SectionDefault) => {
+                    if let Some(context) = contexts.last_mut()
+                        && (context.direct_header_footer || context.direct_field_instruction)
+                    {
+                        context.inert_section_format = true;
+                    }
+                },
+                Token::Control(ControlWord::SectionBreak) => {
+                    if let Some(context) = contexts.last_mut() {
+                        context.inert_section_format = false;
+                    }
+                },
+                Token::Text(text) if !text.is_empty() => {
+                    if let Some(context) = contexts.last_mut() {
+                        context.inert_section_format = false;
+                    }
+                },
+                Token::Control(control)
+                    if matches!(
+                        control,
+                        ControlWord::Par
+                            | ControlWord::Line
+                            | ControlWord::Tab
+                            | ControlWord::Unicode(_)
+                    ) || control_symbol_text(control).is_some() =>
+                {
+                    if let Some(context) = contexts.last_mut() {
+                        context.inert_section_format = false;
+                    }
+                },
                 Token::Control(
                     ControlWord::NoteKinds(_)
                     | ControlWord::FootnotePlacement(_)
@@ -563,9 +775,31 @@ impl<'a> Parser<'a> {
                     | ControlWord::EndnoteRestart(_)
                     | ControlWord::FootnoteNumbering(_)
                     | ControlWord::EndnoteNumbering(_),
-                ) if brace_depth != 1 => {
+                ) if contexts.len() != 1 => {
                     return Err(RtfError::MalformedDocument(
                         "RTF note options must be root document-format controls".to_string(),
+                    ));
+                },
+                Token::Control(
+                    ControlWord::SectionFootnotePlacement(_)
+                    | ControlWord::SectionFootnoteStart(_)
+                    | ControlWord::SectionEndnoteStart(_)
+                    | ControlWord::SectionFootnoteRestart(_)
+                    | ControlWord::SectionEndnoteRestart(_)
+                    | ControlWord::SectionFootnoteNumbering(_)
+                    | ControlWord::SectionEndnoteNumbering(_),
+                ) if contexts.len() != 1
+                    && !contexts
+                        .last()
+                        .is_some_and(|context| {
+                            context.visible_field_result
+                                || context.visible_section_format
+                                || context.inert_section_format
+                        }) =>
+                {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF section note options must be root controls or visible field-result formatting"
+                            .to_string(),
                     ));
                 },
                 _ => {},
@@ -661,11 +895,26 @@ impl<'a> Parser<'a> {
     fn parse_group(&mut self) -> RtfResult<()> {
         self.expect_token(Token::OpenBrace)?;
 
+        if self.states.len() == 2 {
+            self.root_section_format_run = false;
+        }
+        let starts_visible_section_format = self
+            .states
+            .last()
+            .is_some_and(|state| state.destination == Destination::DocumentBody)
+            && matches!(
+                self.tokens.get(self.pos),
+                Some(Token::Control(ControlWord::SectionDefault))
+            );
+
         // Push new state (inherit from parent)
         if let Some(current) = self.states.last() {
             self.states.push(current.clone());
         } else {
             self.states.push(State::default());
+        }
+        if starts_visible_section_format {
+            self.current_state_mut()?.visible_section_format = true;
         }
 
         if self.current_state()?.revision_type.is_some()
@@ -2462,6 +2711,12 @@ impl<'a> Parser<'a> {
                         },
                         ControlWord::Unicode(code) => {
                             // Handle Unicode character with potential fallback
+                            if self.states.last().is_some_and(|state| {
+                                state.destination == Destination::DocumentBody
+                            }) {
+                                self.section_note_options_closed = true;
+                                self.root_section_format_run = false;
+                            }
                             if !text_buffer.is_empty() {
                                 self.flush_text_buffer(&mut text_buffer)?;
                             }
@@ -2547,6 +2802,8 @@ impl<'a> Parser<'a> {
                     }) && !text.trim().is_empty()
                     {
                         self.note_options_closed = true;
+                        self.section_note_options_closed = true;
+                        self.root_section_format_run = false;
                     }
                     // Check if we're in a table
                     if self.current_state().map(|s| s.in_table).unwrap_or(false) {
@@ -3310,47 +3567,53 @@ impl<'a> Parser<'a> {
 
         if matches!(control, ControlWord::Section) {
             self.section_properties_active = false;
+            self.section_note_options_closed = false;
+            self.root_section_format_run = false;
             return Ok(true);
         }
-        let is_section_control = matches!(
+        let is_section_note_control = matches!(
             control,
-            ControlWord::SectionDefault
-                | ControlWord::SectionBreak
-                | ControlWord::SectionContinuous
-                | ControlWord::SectionColumn
-                | ControlWord::SectionPage
-                | ControlWord::SectionEvenPage
-                | ControlWord::SectionOddPage
-                | ControlWord::PageWidth(_)
-                | ControlWord::PageHeight(_)
-                | ControlWord::MarginLeft(_)
-                | ControlWord::MarginRight(_)
-                | ControlWord::MarginTop(_)
-                | ControlWord::MarginBottom(_)
-                | ControlWord::MarginGutter(_)
-                | ControlWord::HeaderDistance(_)
-                | ControlWord::FooterDistance(_)
-                | ControlWord::Landscape
-                | ControlWord::Columns(_)
-                | ControlWord::ColumnSpace(_)
-                | ControlWord::PageNumberStart(_)
-                | ControlWord::PageNumberDecimal
-                | ControlWord::PageNumberUpperRoman
-                | ControlWord::PageNumberLowerRoman
-                | ControlWord::PageNumberUpperLetter
-                | ControlWord::PageNumberLowerLetter
-                | ControlWord::VerticalAlignTop
-                | ControlWord::VerticalAlignCenter
-                | ControlWord::VerticalAlignJustify
-                | ControlWord::VerticalAlignBottom
-                | ControlWord::LineNumbering(_)
-                | ControlWord::LineNumberRestartPage
-                | ControlWord::LineNumberContinuous
-                | ControlWord::LeftToRightSection
-                | ControlWord::RightToLeftSection
+            ControlWord::SectionFootnotePlacement(_)
+                | ControlWord::SectionFootnoteStart(_)
+                | ControlWord::SectionEndnoteStart(_)
+                | ControlWord::SectionFootnoteRestart(_)
+                | ControlWord::SectionEndnoteRestart(_)
+                | ControlWord::SectionFootnoteNumbering(_)
+                | ControlWord::SectionEndnoteNumbering(_)
         );
-        if !is_section_control {
+        if !is_section_control(control) {
             return Ok(false);
+        }
+        let in_root_document_body = self.states.len() == 2
+            && self
+                .states
+                .last()
+                .is_some_and(|state| state.destination == Destination::DocumentBody);
+        if matches!(control, ControlWord::SectionDefault) && in_root_document_body {
+            self.root_section_format_run = true;
+        } else if matches!(control, ControlWord::SectionBreak) {
+            self.root_section_format_run = false;
+        }
+        let in_visible_section_format = self.states.last().is_some_and(|state| {
+            state.destination == Destination::DocumentBody && state.visible_section_format
+        });
+        let in_root_section_prefix = self.states.len() == 2
+            && !self.section_note_options_closed
+            && self
+                .sections
+                .last()
+                .is_none_or(|section| section.headers_footers.is_empty());
+        let in_root_section_format_run =
+            in_root_document_body && self.root_section_format_run;
+        if is_section_note_control
+            && !in_root_section_prefix
+            && !in_visible_section_format
+            && !in_root_section_format_run
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF section note options must precede section content at document root"
+                    .to_string(),
+            ));
         }
 
         if !self.section_properties_active {
@@ -3359,7 +3622,14 @@ impl<'a> Parser<'a> {
                     "RTF section count exceeds the safety limit".to_string(),
                 ));
             }
-            self.sections.push(super::section::Section::new());
+            let inherited = self
+                .sections
+                .last()
+                .map(|section| section.properties)
+                .unwrap_or_default();
+            let mut section = super::section::Section::new();
+            section.properties = inherited;
+            self.sections.push(section);
             self.section_properties_active = true;
         }
         let section = self.sections.last_mut().ok_or_else(|| {
@@ -3369,6 +3639,37 @@ impl<'a> Parser<'a> {
         match control {
             ControlWord::SectionDefault => {
                 *properties = super::section::SectionProperties::default();
+            },
+            ControlWord::SectionFootnotePlacement(value) => {
+                properties.note_options.footnote_placement = Some(*value);
+            },
+            ControlWord::SectionFootnoteStart(value) => {
+                if *value <= 0 {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF section footnote starting number must be positive".to_string(),
+                    ));
+                }
+                properties.note_options.footnote_start = Some(*value);
+            },
+            ControlWord::SectionEndnoteStart(value) => {
+                if *value <= 0 {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF section endnote starting number must be positive".to_string(),
+                    ));
+                }
+                properties.note_options.endnote_start = Some(*value);
+            },
+            ControlWord::SectionFootnoteRestart(value) => {
+                properties.note_options.footnote_restart = Some(*value);
+            },
+            ControlWord::SectionEndnoteRestart(value) => {
+                properties.note_options.endnote_restart = Some(*value);
+            },
+            ControlWord::SectionFootnoteNumbering(value) => {
+                properties.note_options.footnote_numbering = Some(*value);
+            },
+            ControlWord::SectionEndnoteNumbering(value) => {
+                properties.note_options.endnote_numbering = Some(*value);
             },
             ControlWord::LeftToRightSection => {
                 properties.direction = Some(TextDirection::LeftToRight);
@@ -9150,6 +9451,7 @@ impl<'a> Parser<'a> {
         let mut hf = super::section::HeaderFooter::new(hf_type);
         let mut text_buffer = SmallVec::<[u8; 256]>::new();
         let default_state = State::default();
+        let mut inert_section_format = false;
 
         while self.pos < self.tokens.len() {
             match &self.tokens[self.pos] {
@@ -9171,6 +9473,7 @@ impl<'a> Parser<'a> {
                     break;
                 },
                 Token::OpenBrace => {
+                    inert_section_format = false;
                     if !text_buffer.is_empty() {
                         if let Ok(text) = std::str::from_utf8(&text_buffer) {
                             let state = self.current_state().ok().unwrap_or(&default_state);
@@ -9187,6 +9490,7 @@ impl<'a> Parser<'a> {
                     self.parse_group()?;
                 },
                 Token::Control(ControlWord::Par | ControlWord::Line) => {
+                    inert_section_format = false;
                     self.pos += 1;
                     if !text_buffer.is_empty() {
                         if let Ok(text) = std::str::from_utf8(&text_buffer) {
@@ -9203,18 +9507,34 @@ impl<'a> Parser<'a> {
                     }
                 },
                 Token::Control(ControlWord::Tab) => {
+                    inert_section_format = false;
                     self.pos += 1;
                     text_buffer.push(b'\t');
                 },
                 Token::Control(ControlWord::Unicode(code)) => {
+                    inert_section_format = false;
                     let decoded = self.parse_destination_unicode_sequence(*code)?;
                     text_buffer.extend_from_slice(decoded.as_bytes());
                 },
                 Token::Control(control) if control_symbol_text(control).is_some() => {
+                    inert_section_format = false;
                     self.pos += 1;
                     text_buffer.extend_from_slice(
                         control_symbol_text(control).unwrap_or_default().as_bytes(),
                     );
+                },
+                Token::Control(ControlWord::SectionDefault) => {
+                    self.pos += 1;
+                    inert_section_format = true;
+                },
+                Token::Control(ControlWord::SectionBreak) if inert_section_format => {
+                    self.pos += 1;
+                    inert_section_format = false;
+                },
+                Token::Control(control)
+                    if inert_section_format && is_section_control(control) =>
+                {
+                    self.pos += 1;
                 },
                 Token::Control(control) => {
                     self.pos += 1;
@@ -9223,6 +9543,9 @@ impl<'a> Parser<'a> {
                 Token::Text(text) => {
                     let decoded = self.decode_transport_text(text)?;
                     self.pos += 1;
+                    if !decoded.is_empty() {
+                        inert_section_format = false;
+                    }
                     text_buffer.extend_from_slice(decoded.as_bytes());
                 },
                 _ => {

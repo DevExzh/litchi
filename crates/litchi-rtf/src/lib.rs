@@ -98,6 +98,7 @@ pub use note_options::{
     EndnoteRestart, FootnoteRestart, NoteNumberingStyle, NoteOptions, NotePlacement,
     PresentNoteKinds,
 };
+pub use section::{SectionFootnotePlacement, SectionNoteOptions};
 pub use note_separator::{
     NoteSeparator, NoteSeparatorElement, NoteSeparatorKind, NoteSeparatorTable,
 };
