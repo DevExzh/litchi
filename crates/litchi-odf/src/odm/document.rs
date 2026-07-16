@@ -195,6 +195,11 @@ impl MasterDocument {
         &self.document
     }
 
+    /// Inspect ordered ODF variable declarations without evaluating fields or formulas.
+    pub fn variable_declarations(&self) -> Result<crate::OdfVariableDeclarations> {
+        self.document.variable_declarations()
+    }
+
     /// Extract cached visible text without opening linked documents.
     pub fn text(&self) -> Result<String> {
         self.document.text()

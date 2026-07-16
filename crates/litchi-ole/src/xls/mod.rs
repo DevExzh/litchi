@@ -26,6 +26,9 @@ mod cell;
 /// BIFF formula token rendering
 mod formula;
 
+/// Internal workbook and sheet defined names (`Lbl`).
+mod defined_names;
+
 /// Shape extraction
 pub mod shapes;
 
@@ -55,6 +58,9 @@ pub mod writer;
 
 pub use cell::XlsCell;
 pub use error::{XlsEncryptionKind, XlsError, XlsResult};
+pub use defined_names::{
+    XlsBuiltInName, XlsDefinedName, XlsDefinedNameKind, XlsNameScope,
+};
 pub use records::{
     PhoneticAlignment, PhoneticRun, PhoneticString, PhoneticType, SharedStringFormatRun,
     SharedStringProperties,

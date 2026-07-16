@@ -11,6 +11,7 @@ pub(crate) struct FormulaContext {
     sup_books: Vec<SupBookKind>,
     extern_sheets: Vec<ExternSheetRef>,
     sheet_names: Vec<String>,
+    defined_names: Vec<Option<String>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -59,6 +60,15 @@ impl FormulaContext {
 
     pub(crate) fn set_sheet_names(&mut self, sheet_names: Vec<String>) {
         self.sheet_names = sheet_names;
+    }
+
+    pub(crate) fn set_defined_names(&mut self, defined_names: Vec<Option<String>>) {
+        self.defined_names = defined_names;
+    }
+
+    fn defined_name(&self, one_based_index: u32) -> Option<&str> {
+        let index = usize::try_from(one_based_index.checked_sub(1)?).ok()?;
+        self.defined_names.get(index)?.as_deref()
     }
 
     fn sheet_prefix(&self, extern_sheet: u16) -> Option<String> {
@@ -251,6 +261,15 @@ impl<'a> FormulaDecoder<'a> {
                 let (name, _) = function_metadata(raw_index).ok_or(())?;
                 self.function(name, args)
             },
+            0x23 => {
+                let index = self.u32()?;
+                let name = self
+                    .context
+                    .and_then(|context| context.defined_name(index))
+                    .ok_or(())?;
+                self.stack.push(name.to_string());
+                Ok(())
+            },
             0x24 => {
                 let row = self.u16()?;
                 let col = self.u16()?;
@@ -329,6 +348,26 @@ impl<'a> FormulaDecoder<'a> {
                 let first = cell_reference(first_row, first_col)?;
                 let last = cell_reference(last_row, last_col)?;
                 self.stack.push(format!("{prefix}{first}:{last}"));
+                Ok(())
+            },
+            0x3c => {
+                let extern_sheet = self.u16()?;
+                self.skip(4)?;
+                let prefix = self
+                    .context
+                    .and_then(|context| context.sheet_prefix(extern_sheet))
+                    .ok_or(())?;
+                self.stack.push(format!("{prefix}#REF!"));
+                Ok(())
+            },
+            0x3d => {
+                let extern_sheet = self.u16()?;
+                self.skip(8)?;
+                let prefix = self
+                    .context
+                    .and_then(|context| context.sheet_prefix(extern_sheet))
+                    .ok_or(())?;
+                self.stack.push(format!("{prefix}#REF!"));
                 Ok(())
             },
             _ => Err(()),
@@ -415,6 +454,11 @@ impl<'a> FormulaDecoder<'a> {
     fn u16(&mut self) -> Result<u16, ()> {
         let bytes = self.take(2)?;
         Ok(u16::from_le_bytes([bytes[0], bytes[1]]))
+    }
+
+    fn u32(&mut self) -> Result<u32, ()> {
+        let bytes = self.take(4)?;
+        Ok(u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
     }
 
     fn f64(&mut self) -> Result<f64, ()> {
@@ -588,6 +632,42 @@ mod tests {
             render_formula(&area, Some(&context)).as_deref(),
             Some("='Sheet One:O''Brien'!$A$1:$B$3")
         );
+    }
+
+    #[test]
+    fn renders_deleted_internal_3d_references() {
+        let mut context = FormulaContext::default();
+        context.add_sup_book(&[2, 0, 0x01, 0x04]);
+        context
+            .add_extern_sheet(&[1, 0, 0, 0, 0, 0, 0, 0])
+            .unwrap();
+        context.set_sheet_names(vec!["Sheet1".to_string()]);
+
+        assert_eq!(
+            render_formula(&[0x3c, 0, 0, 0, 0, 0, 0], Some(&context)).as_deref(),
+            Some("='Sheet1'!#REF!")
+        );
+        assert_eq!(
+            render_formula(
+                &[0x3d, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                Some(&context)
+            )
+            .as_deref(),
+            Some("='Sheet1'!#REF!")
+        );
+    }
+
+    #[test]
+    fn renders_one_based_internal_name_without_expanding_it() {
+        let mut context = FormulaContext::default();
+        context.set_defined_names(vec![None, Some("TaxRate".to_string())]);
+        assert_eq!(
+            render_formula(&[0x23, 2, 0, 0, 0], Some(&context)).as_deref(),
+            Some("=TaxRate")
+        );
+        assert_eq!(render_formula(&[0x23, 1, 0, 0, 0], Some(&context)), None);
+        assert_eq!(render_formula(&[0x23, 3, 0, 0, 0], Some(&context)), None);
+        assert_eq!(render_formula(&[0x23, 0, 0, 0, 0], Some(&context)), None);
     }
 
     #[test]

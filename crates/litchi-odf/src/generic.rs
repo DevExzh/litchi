@@ -152,6 +152,14 @@ impl FlatOpenDocument {
         crate::form::parse_form_parts(&[(self.xml(), crate::OdfFormPart::Flat)])
     }
 
+    /// Inspect ordered ODF variable declarations without evaluating fields or formulas.
+    pub fn variable_declarations(&self) -> Result<crate::OdfVariableDeclarations> {
+        crate::variable_declaration::parse_variable_declaration_parts(&[(
+            self.xml(),
+            crate::OdfVariablePart::Flat,
+        )])
+    }
+
     /// Discover inert inline and linked embedded objects.
     pub fn embedded_objects(&self) -> Result<Vec<crate::OdfEmbeddedObject>> {
         crate::embedded_object::scan_flat_objects(&self.xml)
@@ -453,6 +461,17 @@ impl OpenDocumentPackage {
             parts.push((styles, crate::OdfFormPart::Styles));
         }
         crate::form::parse_form_parts(&parts)
+    }
+
+    /// Inspect ordered ODF variable declarations in content and styles.
+    pub fn variable_declarations(&self) -> Result<crate::OdfVariableDeclarations> {
+        let content = self.content_xml()?;
+        let styles = self.styles_xml()?;
+        let mut parts = vec![(content.as_str(), crate::OdfVariablePart::Content)];
+        if let Some(styles) = styles.as_deref() {
+            parts.push((styles, crate::OdfVariablePart::Styles));
+        }
+        crate::variable_declaration::parse_variable_declaration_parts(&parts)
     }
 
     /// Discover package, inline, missing, and inert linked embedded objects.

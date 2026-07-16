@@ -282,6 +282,11 @@ impl DrawingDocument {
         crate::form::parse_form_parts(&parts)
     }
 
+    /// Inspect ordered ODF variable declarations without evaluating fields or formulas.
+    pub fn variable_declarations(&self) -> Result<crate::OdfVariableDeclarations> {
+        self.package.variable_declarations()
+    }
+
     /// Extract the complete format-specific OpenDocument metadata model.
     pub fn odf_metadata(&self) -> Result<Option<OdfMetadata>> {
         self.package.odf_metadata()

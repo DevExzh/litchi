@@ -49,6 +49,7 @@ pub use number_format::NumberFormat;
 use std::collections::HashMap;
 
 use crate::error::Result;
+use crate::xlsx::conditional_formatting::DifferentialFormat;
 
 /// Styles collection for an Excel workbook.
 ///
@@ -68,6 +69,8 @@ pub struct Styles {
     pub cell_styles: Vec<CellStyle>,
     /// Cell format records (cellXfs - the actual styles applied to cells)
     pub cell_xfs: Vec<CellStyle>,
+    /// Differential formats referenced by conditional-formatting rules.
+    pub differential_formats: Vec<DifferentialFormat>,
 }
 
 impl Styles {
@@ -117,6 +120,18 @@ impl Styles {
     #[inline]
     pub fn get_border(&self, id: usize) -> Option<&Border> {
         self.borders.get(id)
+    }
+
+    /// Get a differential format by its zero-based DXF index.
+    #[inline]
+    pub fn get_differential_format(&self, id: usize) -> Option<&DifferentialFormat> {
+        self.differential_formats.get(id)
+    }
+
+    /// Number of differential formats available to conditional formatting.
+    #[inline]
+    pub fn differential_format_count(&self) -> usize {
+        self.differential_formats.len()
     }
 
     /// Get a cell style by ID (index).

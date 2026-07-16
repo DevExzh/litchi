@@ -835,6 +835,15 @@ impl Document {
         crate::form::parse_form_parts(&parts)
     }
 
+    /// Inspect ordered ODF variable declarations without evaluating fields or formulas.
+    pub fn variable_declarations(&self) -> Result<crate::OdfVariableDeclarations> {
+        let mut parts = vec![(self.content.xml_content(), crate::OdfVariablePart::Content)];
+        if let Some(styles) = self.styles.as_ref().map(Styles::xml_content) {
+            parts.push((styles, crate::OdfVariablePart::Styles));
+        }
+        crate::variable_declaration::parse_variable_declaration_parts(&parts)
+    }
+
     /// Discover package, inline, missing, and inert linked embedded objects.
     pub fn embedded_objects(&self) -> Result<Vec<crate::OdfEmbeddedObject>> {
         let package = self.package.package()?;

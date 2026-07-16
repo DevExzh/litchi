@@ -200,6 +200,11 @@ impl ChartDocument {
         &self.chart
     }
 
+    /// Inspect ordered ODF variable declarations without evaluating fields or formulas.
+    pub fn variable_declarations(&self) -> Result<crate::OdfVariableDeclarations> {
+        self.package.variable_declarations()
+    }
+
     pub fn text(&self) -> String {
         self.chart.all_text()
     }

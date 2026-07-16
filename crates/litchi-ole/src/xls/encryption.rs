@@ -219,6 +219,13 @@ pub(crate) fn prepare_workbook_stream(
             )));
         }
 
+        // FILEPASS is a workbook-globals record. Once the globals EOF is
+        // reached without one, worksheet substreams and trailing OLE padding
+        // cannot change the workbook's encryption state.
+        if sid == 0x000A && !saw_filepass {
+            return Ok(workbook);
+        }
+
         if sid == FILEPASS_SID {
             if saw_filepass {
                 return Err(XlsError::MalformedFilePass(

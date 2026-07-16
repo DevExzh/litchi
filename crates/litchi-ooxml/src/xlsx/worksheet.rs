@@ -19,6 +19,11 @@ use super::comments::parse_comments_xml;
 use super::drawing::parse_drawing_xml;
 use super::format::{CellBorder, CellFill, CellFont, CellFormat};
 use super::parsers::worksheet_parser;
+use super::conditional_formatting::{
+    parse_conditional_formattings, ConditionalFormatting as ParsedConditionalFormatting,
+    ConditionalFormattingRule as ParsedConditionalFormattingRule, DifferentialFormat,
+    DifferentialFormatRef, ExtensionAssociation,
+};
 use super::sort::SortState;
 use super::sparkline::{SparklineGroup, parse_sparkline_groups_from_worksheet_xml};
 use super::table::{Table, parse_table_xml};
@@ -217,6 +222,8 @@ pub struct Worksheet<'a> {
     data_validations: Vec<DataValidationRule>,
     /// Conditional formatting rules
     conditional_formats: Vec<ConditionalFormatRule>,
+    /// Complete conditional-formatting containers and rules.
+    conditional_formattings: Vec<ParsedConditionalFormatting>,
     /// Page setup
     page_setup: PageSetup,
     /// Auto-filter
@@ -250,6 +257,7 @@ impl<'a> Worksheet<'a> {
             rows: HashMap::new(),
             data_validations: Vec::new(),
             conditional_formats: Vec::new(),
+            conditional_formattings: Vec::new(),
             page_setup: PageSetup::default(),
             auto_filter: None,
             sheet_views: Vec::new(),
@@ -348,6 +356,10 @@ impl<'a> Worksheet<'a> {
         Option<String>,
     )> {
         let parsed = worksheet_parser::parse_worksheet_data(sheet_data)?;
+        let conditional_formattings = parse_conditional_formattings(
+            sheet_data.as_bytes(),
+            self.workbook.styles().differential_format_count(),
+        )?;
         self.cells = parsed.cells;
         self.cell_styles = parsed.cell_styles;
         self.rows = parsed.rows;
@@ -356,6 +368,7 @@ impl<'a> Worksheet<'a> {
         self.columns = parsed.columns;
         self.data_validations = parsed.data_validations;
         self.conditional_formats = parsed.conditional_formats;
+        self.conditional_formattings = conditional_formattings;
         self.page_setup = parsed.page_setup.unwrap_or_default();
         self.row_breaks = parsed.row_breaks;
         self.col_breaks = parsed.col_breaks;
@@ -1853,6 +1866,40 @@ impl<'a> Worksheet<'a> {
     /// ```
     pub fn get_conditional_formatting(&self) -> &[ConditionalFormatRule] {
         &self.conditional_formats
+    }
+
+    /// Complete conditional-formatting containers in worksheet document order.
+    pub fn conditional_formattings(&self) -> &[ParsedConditionalFormatting] {
+        &self.conditional_formattings
+    }
+
+    /// Active rules in priority order, retaining document order for equal priorities.
+    pub fn conditional_formatting_rules_by_priority(
+        &self,
+    ) -> Vec<&ParsedConditionalFormattingRule> {
+        let mut rules: Vec<_> = self
+            .conditional_formattings
+            .iter()
+            .flat_map(|formatting| formatting.rules.iter())
+            .filter(|rule| rule.extension_association != ExtensionAssociation::UnmatchedIgnored)
+            .collect();
+        rules.sort_by_key(|rule| rule.priority);
+        rules
+    }
+
+    /// Resolve a rule's style-sheet DXF or Office 2010 inline DXF.
+    pub fn differential_format_for_rule<'b>(
+        &'b self,
+        rule: &'b ParsedConditionalFormattingRule,
+    ) -> Option<&'b DifferentialFormat> {
+        match &rule.differential_format {
+            Some(DifferentialFormatRef::StylesIndex(index)) => self
+                .workbook
+                .styles()
+                .get_differential_format(*index as usize),
+            Some(DifferentialFormatRef::Inline(format)) => Some(format),
+            None => None,
+        }
     }
 
     // ===== Page Setup =====

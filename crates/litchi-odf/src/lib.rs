@@ -298,6 +298,7 @@ mod form;
 mod generic;
 /// Shared semantic discovery of images in OpenDocument XML and packages.
 mod media;
+mod variable_declaration;
 /// Inert semantic discovery of embedded OpenDocument and OLE objects.
 mod embedded_object;
 /// OpenDocument database front-end (.odb) support.
@@ -335,6 +336,12 @@ pub use form::{
 };
 pub use generic::{FlatOpenDocument, OpenDocumentFamily, OpenDocumentPackage};
 pub use media::{OdfImage, OdfImageFrame, OdfImagePart, OdfImageSource};
+pub use variable_declaration::{
+    OdfVariableBody, OdfVariableDateValue, OdfVariableDeclaration,
+    OdfVariableDeclarationGroup, OdfVariableDeclarations, OdfVariableHeaderFooter,
+    OdfVariableKind, OdfVariablePart, OdfVariableScope, OdfVariableValue,
+    OdfVariableValueType,
+};
 pub use embedded_object::{
     OdfEmbeddedObject, OdfEmbeddedObjectKind, OdfEmbeddedObjectPart,
     OdfEmbeddedObjectSource, OdfInlineObjectRoot,

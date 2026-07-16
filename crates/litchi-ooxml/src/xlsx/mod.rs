@@ -30,6 +30,7 @@
 pub mod cell;
 pub mod chart;
 mod comments;
+pub mod conditional_formatting;
 mod drawing;
 pub mod external_links;
 pub mod format;
@@ -59,6 +60,13 @@ pub use chart::{
 pub use external_links::{
     ExternalCell, ExternalCellType, ExternalDefinedName, ExternalLinkEntry, ExternalLinkKind,
     ExternalRow, ExternalSheetData, ExternalWorkbookLink, ExternalWorkbookTarget,
+};
+pub use conditional_formatting::{
+    CellRangeRef, ColorScale, ConditionalFormatOperator, ConditionalFormatPayload,
+    ConditionalFormatValue, ConditionalFormatValueType, ConditionalFormatting,
+    ConditionalFormattingRule, ConditionalFormattingSource, ConditionalRuleType, DataBar,
+    DifferentialFormat, DifferentialFormatComponent, DifferentialFormatRef,
+    DifferentialNumberFormat, ExtensionAssociation, IconSet, NamedColor, SpreadsheetColor,
 };
 // Re-export shared formatting types
 pub use format::{

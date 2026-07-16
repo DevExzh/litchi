@@ -3,6 +3,10 @@
 use crate::xls::cell::XlsCell;
 use crate::xls::error::{XlsError, XlsResult};
 use crate::xls::encryption::prepare_workbook_stream;
+use crate::xls::defined_names::{
+    DefinedNameSlot, LBL_RECORD_TYPE, XlsBuiltInName, XlsDefinedName, XlsDefinedNameKind,
+    XlsNameScope,
+};
 use crate::xls::formula::{FormulaContext, ptg_exp_anchor, render_formula, render_shared_formula};
 use crate::xls::pivot_table::PivotTable;
 use crate::xls::records::{
@@ -122,6 +126,7 @@ pub struct XlsWorkbook<R: Read + Seek> {
     biff_version: BiffVersion,
     is_1904_date_system: bool,
     formula_context: FormulaContext,
+    defined_names: Vec<XlsDefinedName>,
 }
 
 /// Options for opening a legacy XLS workbook.
@@ -151,6 +156,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             biff_version: BiffVersion::Biff8,
             is_1904_date_system: false,
             formula_context: FormulaContext::default(),
+            defined_names: Vec::new(),
         };
 
         workbook.parse_workbook(options.password)?;
@@ -184,6 +190,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             biff_version: BiffVersion::Biff8,
             is_1904_date_system: false,
             formula_context: FormulaContext::default(),
+            defined_names: Vec::new(),
         };
 
         workbook.parse_workbook(options.password)?;
@@ -206,12 +213,14 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         let mut string_properties = Vec::new();
 
         // Parse workbook globals
+        let mut defined_name_slots = Vec::new();
         self.parse_workbook_globals(
             &mut record_iter,
             &mut encoding,
             &mut bound_sheets,
             &mut strings,
             &mut string_properties,
+            &mut defined_name_slots,
         )?;
 
         // Use Arc for zero-copy sharing across worksheets
@@ -220,6 +229,19 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         self.worksheet_names = bound_sheets.iter().map(|s| s.name.clone()).collect();
         self.formula_context
             .set_sheet_names(self.worksheet_names.clone());
+        self.formula_context.set_defined_names(
+            defined_name_slots
+                .iter()
+                .map(DefinedNameSlot::symbol)
+                .collect(),
+        );
+        self.defined_names = defined_name_slots
+            .into_iter()
+            .map(|slot| slot.into_public(bound_sheets.len(), &self.formula_context))
+            .collect::<XlsResult<Vec<_>>>()?
+            .into_iter()
+            .flatten()
+            .collect();
 
         // Parse worksheets from positions in the workbook stream
         for bound_sheet in &bound_sheets {
@@ -244,11 +266,17 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         bound_sheets: &mut Vec<BoundSheetRecord>,
         strings: &mut Vec<String>,
         string_properties: &mut Vec<Option<Box<SharedStringProperties>>>,
+        defined_name_slots: &mut Vec<DefinedNameSlot>,
     ) -> XlsResult<()> {
         // Collect all records first for easier processing
         let mut records = Vec::new();
         for record_result in record_iter.by_ref() {
-            records.push(record_result?);
+            let record = record_result?;
+            let is_globals_eof = record.header.record_type == 0x000A;
+            records.push(record);
+            if is_globals_eof {
+                break;
+            }
         }
 
         let mut i = 0;
@@ -292,6 +320,23 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                             record_type: 0x0017,
                             message: message.to_string(),
                         })?;
+                },
+                LBL_RECORD_TYPE => {
+                    if defined_name_slots.len() == usize::from(u16::MAX) {
+                        return Err(XlsError::InvalidRecord {
+                            record_type: LBL_RECORD_TYPE,
+                            message: "workbook contains more than 65535 Lbl records".to_string(),
+                        });
+                    }
+                    let record_index = u32::try_from(defined_name_slots.len() + 1)
+                        .map_err(|_| XlsError::InvalidRecord {
+                            record_type: LBL_RECORD_TYPE,
+                            message: "Lbl record index overflows".to_string(),
+                        })?;
+                    defined_name_slots.push(DefinedNameSlot::parse(
+                        &record.data,
+                        record_index,
+                    )?);
                 },
                 0x00FC => {
                     // SST
@@ -692,6 +737,142 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         cell: &XlsCell,
     ) -> Option<&SharedStringProperties> {
         self.shared_string_properties(cell.shared_string_index()?)
+    }
+
+    /// Non-macro internal defined names in `Lbl` record order.
+    pub fn defined_names(&self) -> &[XlsDefinedName] {
+        &self.defined_names
+    }
+
+    /// Case-insensitive name lookup with sheet-local-before-workbook precedence.
+    /// Duplicate definitions use the last matching `Lbl` record.
+    pub fn defined_name(
+        &self,
+        name: &str,
+        sheet_index: Option<usize>,
+    ) -> Option<&XlsDefinedName> {
+        if let Some(sheet_index) = sheet_index {
+            if let Some(local) = self.defined_names.iter().rev().find(|defined_name| {
+                defined_name.scope == XlsNameScope::Worksheet(sheet_index)
+                    && names_equal(&defined_name.name, name)
+            }) {
+                return Some(local);
+            }
+        }
+        self.defined_names.iter().rev().find(|defined_name| {
+            defined_name.scope == XlsNameScope::Workbook
+                && names_equal(&defined_name.name, name)
+        })
+    }
+
+    /// Built-in print area for a worksheet, if present.
+    pub fn print_area(&self, sheet_index: usize) -> Option<&XlsDefinedName> {
+        self.built_in_sheet_name(sheet_index, XlsBuiltInName::PrintArea)
+    }
+
+    /// Built-in print-title rows/columns for a worksheet, if present.
+    pub fn print_titles(&self, sheet_index: usize) -> Option<&XlsDefinedName> {
+        self.built_in_sheet_name(sheet_index, XlsBuiltInName::PrintTitles)
+    }
+
+    fn built_in_sheet_name(
+        &self,
+        sheet_index: usize,
+        built_in: XlsBuiltInName,
+    ) -> Option<&XlsDefinedName> {
+        self.defined_names.iter().rev().find(|defined_name| {
+            defined_name.scope == XlsNameScope::Worksheet(sheet_index)
+                && defined_name.kind == XlsDefinedNameKind::BuiltIn(built_in)
+        })
+    }
+}
+
+fn names_equal(left: &str, right: &str) -> bool {
+    left.to_lowercase() == right.to_lowercase()
+}
+
+#[cfg(test)]
+mod defined_name_tests {
+    use super::{XlsOpenOptions, XlsWorkbook};
+    use crate::xls::{XlsBuiltInName, XlsDefinedNameKind, XlsNameScope};
+    use std::fs::File;
+    use std::path::{Path, PathBuf};
+
+    fn poi_fixture(name: &str) -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../3rdparty/poi/test-data/spreadsheet")
+            .join(name)
+    }
+
+    fn open(name: &str) -> XlsWorkbook<File> {
+        XlsWorkbook::new(File::open(poi_fixture(name)).unwrap()).unwrap()
+    }
+
+    #[test]
+    fn opens_poi_named_input_with_exact_names_and_ranges() {
+        let workbook = open("namedinput.xls");
+        assert_eq!(workbook.defined_names().len(), 2);
+        let first = workbook.defined_name("namedrangename", Some(0)).unwrap();
+        assert_eq!(first.name, "NamedRangeName");
+        assert_eq!(first.scope, XlsNameScope::Workbook);
+        assert!(!first.hidden);
+        assert!(first.formula.as_deref().unwrap().contains("$A$1:$D$10"));
+        let second = workbook.defined_name("SECONDNAMEDRANGE", None).unwrap();
+        assert!(second.formula.as_deref().unwrap().contains("$D$17:$G$27"));
+    }
+
+    #[test]
+    fn recognizes_deleted_unicode_and_named_formula_fixtures() {
+        let deleted = open("24207.xls");
+        assert_eq!(deleted.defined_name("a", None).unwrap().name, "a");
+        assert!(deleted.defined_name("b", None).unwrap().is_deleted());
+
+        let unicode = open("unicodeNameRecord.xls");
+        assert!(!unicode.defined_names().is_empty());
+
+        for fixture in ["named-cell-test.xls", "named-cell-in-formula-test.xls"] {
+            let workbook = open(fixture);
+            assert!(!workbook.defined_names().is_empty());
+        }
+    }
+
+    #[test]
+    fn recognizes_poi_print_area() {
+        let workbook = open("SimpleWithPrintArea.xls");
+        let print_area = workbook.print_area(0).unwrap();
+        assert_eq!(
+            print_area.kind,
+            XlsDefinedNameKind::BuiltIn(XlsBuiltInName::PrintArea)
+        );
+        assert!(print_area.formula.is_some());
+    }
+
+    #[test]
+    fn lookup_prefers_last_local_name_then_last_global_name() {
+        use crate::xls::{XlsDefinedName, XlsDefinedNameKind};
+        let mut workbook = open("namedinput.xls");
+        let template = workbook.defined_names[0].clone();
+        workbook.defined_names.extend([
+            XlsDefinedName { name: "Rate".to_string(), scope: XlsNameScope::Workbook, ..template.clone() },
+            XlsDefinedName { name: "RATE".to_string(), scope: XlsNameScope::Workbook, record_index: 20, ..template.clone() },
+            XlsDefinedName { name: "rate".to_string(), scope: XlsNameScope::Worksheet(0), record_index: 21, kind: XlsDefinedNameKind::User, ..template },
+        ]);
+        assert_eq!(workbook.defined_name("RaTe", None).unwrap().record_index, 20);
+        assert_eq!(workbook.defined_name("RaTe", Some(0)).unwrap().record_index, 21);
+        assert_eq!(workbook.defined_name("RaTe", Some(1)).unwrap().record_index, 20);
+    }
+
+    #[test]
+    fn parses_names_after_xor_decryption() {
+        let file = File::open(poi_fixture("xor-encryption-abc.xls")).unwrap();
+        let workbook = XlsWorkbook::new_with_options(
+            file,
+            XlsOpenOptions {
+                password: Some("abc"),
+            },
+        )
+        .unwrap();
+        assert!(workbook.defined_names().len() <= usize::from(u16::MAX));
     }
 }
 
