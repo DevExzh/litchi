@@ -131,7 +131,8 @@ pub use sheet_protection::{
     ProtectedRangeSource, ProtectionPasswordVerifier, ProtectionRangeReference,
     ProtectionRangeReferenceKind, ProtectionRangeSqref, StrongProtectionPasswordVerifier,
     WorksheetProtectedRange, WorksheetProtectedRangeCollection, WorksheetProtection,
-    WorksheetProtectionMetadata, parse_worksheet_protection,
+    WorksheetProtectionConformance, WorksheetProtectionMetadata, parse_worksheet_protection,
+    write_worksheet_protection,
 };
 pub use sheet_view::{
     PivotAreaType, PivotSelectionAxis, WorksheetCellReference, WorksheetPanePosition,

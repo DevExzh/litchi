@@ -1,10 +1,13 @@
 //! Immutable worksheet-protection metadata for SpreadsheetML worksheets.
 
+use std::collections::HashSet;
+use std::fmt::Write;
+
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
-use quick_xml::name::ResolveResult;
+use quick_xml::name::{NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
 use quick_xml::XmlVersion;
 
@@ -25,6 +28,19 @@ const MAX_BINARY_BYTES: usize = 1024 * 1024;
 const MAX_SPIN_COUNT: u32 = 10_000_000;
 const MAX_ROW: u32 = 1_048_576;
 const MAX_COLUMN: u32 = 16_384;
+
+/// SpreadsheetML namespace form used by the deterministic writer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WorksheetProtectionConformance { Transitional, Strict }
+
+impl WorksheetProtectionConformance {
+    fn namespace(self) -> &'static str {
+        match self {
+            Self::Transitional => std::str::from_utf8(CORE).unwrap(),
+            Self::Strict => std::str::from_utf8(STRICT).unwrap(),
+        }
+    }
+}
 
 /// Source schema for a protected-range collection.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -231,8 +247,7 @@ pub fn parse_worksheet_protection(xml: &[u8]) -> Result<WorksheetProtectionMetad
         local_name: "protectedRanges".into(),
     });
     let validated = process_markup_compatibility(xml, &capabilities, &MceLimits::default())?;
-    let selected = if validated.report.alternate_content_count == 0 { xml } else { validated.xml.as_ref() };
-    parse_selected(selected)
+    parse_selected(validated.xml.as_ref())
 }
 
 fn parse_selected(xml: &[u8]) -> Result<WorksheetProtectionMetadata> {
@@ -248,6 +263,7 @@ fn parse_selected(xml: &[u8]) -> Result<WorksheetProtectionMetadata> {
     let mut pending: Option<(usize, PendingRange)> = None;
     let mut sqref_text: Option<(usize, String)> = None;
     let mut sheet_protection_depth = None;
+    let mut worksheet_order = 0u8;
 
     loop {
         let decoder = reader.decoder();
@@ -265,17 +281,20 @@ fn parse_selected(xml: &[u8]) -> Result<WorksheetProtectionMetadata> {
                     root_seen = true;
                     continue;
                 }
+                if depth == 2 {
+                    update_worksheet_order(&namespace, element.local_name().as_ref(), &mut worksheet_order)?;
+                }
                 if sheet_protection_depth.is_some() { return Err(invalid("sheetProtection must be empty")); }
                 if let Some((sqref_depth, _)) = sqref_text.as_ref() {
                     if depth > *sqref_depth { return Err(invalid("protected-range sqref must contain only text")); }
                 }
                 if spreadsheet(&namespace) && element.local_name().as_ref() == b"ext" {
-                    if attribute(&element, decoder, b"uri")?.as_deref() == Some(PROTECTED_RANGES_EXTENSION_URI) {
+                    if attribute(&element, decoder, &resolver, b"uri")?.as_deref() == Some(PROTECTED_RANGES_EXTENSION_URI) {
                         extension_depth = Some(depth);
                     }
                 } else if depth == 2 && spreadsheet(&namespace) && element.local_name().as_ref() == b"sheetProtection" {
                     if metadata.sheet_protection.is_some() { return Err(invalid("duplicate sheetProtection element")); }
-                    metadata.sheet_protection = Some(parse_sheet_protection(&element, decoder)?);
+                    metadata.sheet_protection = Some(parse_sheet_protection(&element, decoder, &resolver)?);
                     sheet_protection_depth = Some(depth);
                 } else if depth == 2 && spreadsheet(&namespace) && element.local_name().as_ref() == b"protectedRanges" {
                     if core_collection.is_some() || metadata.protected_range_collections.iter().any(|c| c.source == ProtectedRangeSource::Core) {
@@ -283,12 +302,14 @@ fn parse_selected(xml: &[u8]) -> Result<WorksheetProtectionMetadata> {
                     }
                     core_collection = Some((depth, Vec::new()));
                 } else if exact(&namespace, X14) && element.local_name().as_ref() == b"protectedRanges" && extension_depth.is_some() {
-                    if x14_collection.is_some() { return Err(invalid("nested x14 protectedRanges element")); }
+                    if x14_collection.is_some() || metadata.protected_range_collections.iter().any(|c| c.source == ProtectedRangeSource::Office2010) {
+                        return Err(invalid("duplicate x14 protectedRanges element"));
+                    }
                     x14_collection = Some((depth, Vec::new()));
                 } else if element.local_name().as_ref() == b"protectedRange" {
                     let source = collection_source(depth, &namespace, &core_collection, &x14_collection)?;
                     if pending.is_some() { return Err(invalid("nested protectedRange element")); }
-                    pending = Some((depth, parse_pending_range(&element, decoder, source)?));
+                    pending = Some((depth, parse_pending_range(&element, decoder, &resolver, source)?));
                 } else if exact(&namespace, XM)
                     && element.local_name().as_ref() == b"sqref"
                     && x14_collection.is_some()
@@ -300,16 +321,21 @@ fn parse_selected(xml: &[u8]) -> Result<WorksheetProtectionMetadata> {
                     sqref_text = Some((depth, String::new()));
                 } else if pending.is_some() {
                     return Err(invalid("unexpected child in protectedRange"));
+                } else if direct_collection_child(depth, &core_collection, &x14_collection) {
+                    return Err(invalid("unknown protectedRanges child element"));
                 }
             }
             Event::Empty(element) => {
                 if sheet_protection_depth.is_some() { return Err(invalid("sheetProtection must be empty")); }
+                if depth == 1 {
+                    update_worksheet_order(&namespace, element.local_name().as_ref(), &mut worksheet_order)?;
+                }
                 if depth == 1 && spreadsheet(&namespace) && element.local_name().as_ref() == b"sheetProtection" {
                     if metadata.sheet_protection.is_some() { return Err(invalid("duplicate sheetProtection element")); }
-                    metadata.sheet_protection = Some(parse_sheet_protection(&element, decoder)?);
+                    metadata.sheet_protection = Some(parse_sheet_protection(&element, decoder, &resolver)?);
                 } else if element.local_name().as_ref() == b"protectedRange" {
                     let source = collection_source(depth + 1, &namespace, &core_collection, &x14_collection)?;
-                    let range = finish_range(parse_pending_range(&element, decoder, source)?)?;
+                    let range = finish_range(parse_pending_range(&element, decoder, &resolver, source)?)?;
                     push_range(range, &mut core_collection, &mut x14_collection)?;
                 } else if exact(&namespace, XM)
                     && element.local_name().as_ref() == b"sqref"
@@ -319,6 +345,8 @@ fn parse_selected(xml: &[u8]) -> Result<WorksheetProtectionMetadata> {
                         return Err(invalid("x14 protected-range sqref cannot be empty"));
                     }
                     return Err(invalid("x14 sqref is outside protectedRange"));
+                } else if direct_collection_child(depth + 1, &core_collection, &x14_collection) {
+                    return Err(invalid("unknown protectedRanges child element"));
                 }
             }
             Event::Text(text) => {
@@ -326,7 +354,8 @@ fn parse_selected(xml: &[u8]) -> Result<WorksheetProtectionMetadata> {
                     let decoded = text.decode().map_err(xml_error)?;
                     if value.len().saturating_add(decoded.len()) > MAX_STRING_BYTES { return Err(invalid("protected-range sqref is too large")); }
                     value.push_str(&decoded);
-                } else if (sheet_protection_depth.is_some() || pending.is_some()) && !text.as_ref().iter().all(u8::is_ascii_whitespace) {
+                } else if (sheet_protection_depth.is_some() || pending.is_some() || core_collection.is_some() || x14_collection.is_some())
+                    && !text.as_ref().iter().all(u8::is_ascii_whitespace) {
                     return Err(invalid("protection elements cannot contain text"));
                 }
             }
@@ -400,17 +429,21 @@ fn push_range(
     Ok(())
 }
 
-fn parse_sheet_protection(element: &BytesStart<'_>, decoder: Decoder) -> Result<WorksheetProtection> {
+fn parse_sheet_protection(element: &BytesStart<'_>, decoder: Decoder, resolver: &NamespaceResolver) -> Result<WorksheetProtection> {
     let mut value = WorksheetProtection::default();
     let mut credential = RawCredential::default();
+    let mut seen = HashSet::new();
     for attr in element.attributes() {
         let attr = attr.map_err(xml_error)?;
-        if attr.key.as_ref().contains(&b':') { continue; }
+        if namespace_declaration(attr.key.as_ref()) { continue; }
+        let (namespace, local) = resolver.resolve_attribute(attr.key);
+        require_unqualified_attribute(&namespace, "sheetProtection")?;
+        if !seen.insert(local.as_ref().to_vec()) { return Err(invalid("duplicate sheetProtection attribute")); }
         let text = attr
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
             .map_err(xml_error)?
             .into_owned();
-        match attr.key.local_name().as_ref() {
+        match local.as_ref() {
             b"password" => set_once(&mut credential.password, text, "password")?,
             b"algorithmName" => set_once(&mut credential.algorithm_name, text, "algorithmName")?,
             b"hashValue" => set_once(&mut credential.hash_value, text, "hashValue")?,
@@ -439,19 +472,23 @@ fn parse_sheet_protection(element: &BytesStart<'_>, decoder: Decoder) -> Result<
     Ok(value)
 }
 
-fn parse_pending_range(element: &BytesStart<'_>, decoder: Decoder, source: ProtectedRangeSource) -> Result<PendingRange> {
+fn parse_pending_range(element: &BytesStart<'_>, decoder: Decoder, resolver: &NamespaceResolver, source: ProtectedRangeSource) -> Result<PendingRange> {
     let mut name = None;
     let mut sqref = None;
     let mut security_descriptor = None;
     let mut credential = RawCredential::default();
+    let mut seen = HashSet::new();
     for attr in element.attributes() {
         let attr = attr.map_err(xml_error)?;
-        if attr.key.as_ref().contains(&b':') { continue; }
+        if namespace_declaration(attr.key.as_ref()) { continue; }
+        let (namespace, local) = resolver.resolve_attribute(attr.key);
+        require_unqualified_attribute(&namespace, "protectedRange")?;
+        if !seen.insert(local.as_ref().to_vec()) { return Err(invalid("duplicate protectedRange attribute")); }
         let text = attr
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
             .map_err(xml_error)?
             .into_owned();
-        match attr.key.local_name().as_ref() {
+        match local.as_ref() {
             b"name" => set_once(&mut name, text, "name")?,
             b"sqref" if source == ProtectedRangeSource::Core => set_once(&mut sqref, text, "sqref")?,
             b"password" => set_once(&mut credential.password, text, "password")?,
@@ -558,19 +595,145 @@ fn parse_row(value: &str) -> Result<u32> {
     Ok(row)
 }
 
+/// Writes canonical worksheet protection fragments in worksheet schema order.
+///
+/// Verifiers are serialized as inert metadata; this function never computes or checks a password.
+pub fn write_worksheet_protection(
+    metadata: &WorksheetProtectionMetadata,
+    conformance: WorksheetProtectionConformance,
+) -> Result<String> {
+    let mut xml = String::new();
+    if let Some(protection) = &metadata.sheet_protection {
+        write!(xml, "<sheetProtection xmlns=\"{}\"", conformance.namespace()).unwrap();
+        write_verifier_attributes(&mut xml, protection.verifier.as_ref());
+        write_nondefault_bool(&mut xml, "sheet", protection.sheet, false);
+        write_nondefault_bool(&mut xml, "objects", protection.objects, false);
+        write_nondefault_bool(&mut xml, "scenarios", protection.scenarios, false);
+        write_nondefault_bool(&mut xml, "formatCells", protection.format_cells, true);
+        write_nondefault_bool(&mut xml, "formatColumns", protection.format_columns, true);
+        write_nondefault_bool(&mut xml, "formatRows", protection.format_rows, true);
+        write_nondefault_bool(&mut xml, "insertColumns", protection.insert_columns, true);
+        write_nondefault_bool(&mut xml, "insertRows", protection.insert_rows, true);
+        write_nondefault_bool(&mut xml, "insertHyperlinks", protection.insert_hyperlinks, true);
+        write_nondefault_bool(&mut xml, "deleteColumns", protection.delete_columns, true);
+        write_nondefault_bool(&mut xml, "deleteRows", protection.delete_rows, true);
+        write_nondefault_bool(&mut xml, "selectLockedCells", protection.select_locked_cells, false);
+        write_nondefault_bool(&mut xml, "sort", protection.sort, true);
+        write_nondefault_bool(&mut xml, "autoFilter", protection.auto_filter, true);
+        write_nondefault_bool(&mut xml, "pivotTables", protection.pivot_tables, true);
+        write_nondefault_bool(&mut xml, "selectUnlockedCells", protection.select_unlocked_cells, false);
+        xml.push_str("/>");
+    }
+
+    let mut office2010 = None;
+    for collection in &metadata.protected_range_collections {
+        if collection.ranges.is_empty() || collection.ranges.len() > MAX_RANGES {
+            return Err(invalid("protectedRanges has an invalid range count"));
+        }
+        match collection.source {
+            ProtectedRangeSource::Core => {
+                write!(xml, "<protectedRanges xmlns=\"{}\">", conformance.namespace()).unwrap();
+                for range in &collection.ranges { write_core_range(&mut xml, range)?; }
+                xml.push_str("</protectedRanges>");
+            }
+            ProtectedRangeSource::Office2010 => {
+                if office2010.replace(collection).is_some() {
+                    return Err(invalid("duplicate x14 protectedRanges collection"));
+                }
+            }
+        }
+    }
+    if let Some(collection) = office2010 {
+        write!(xml, "<extLst xmlns=\"{}\"><ext uri=\"{}\"><x14:protectedRanges xmlns:x14=\"{}\" xmlns:xm=\"{}\">",
+            conformance.namespace(), PROTECTED_RANGES_EXTENSION_URI,
+            std::str::from_utf8(X14).unwrap(), std::str::from_utf8(XM).unwrap()).unwrap();
+        for range in &collection.ranges {
+            xml.push_str("<x14:protectedRange");
+            write_xml_attribute(&mut xml, "name", &range.name);
+            write_verifier_attributes(&mut xml, range.verifier.as_ref());
+            if let Some(descriptor) = &range.security_descriptor {
+                write_xml_attribute(&mut xml, "securityDescriptor", descriptor);
+            }
+            xml.push_str("><xm:sqref>");
+            write_xml_text(&mut xml, &canonical_sqref(&range.sqref));
+            xml.push_str("</xm:sqref></x14:protectedRange>");
+        }
+        xml.push_str("</x14:protectedRanges></ext></extLst>");
+    }
+    Ok(xml)
+}
+
+fn write_core_range(xml: &mut String, range: &WorksheetProtectedRange) -> Result<()> {
+    if range.source != ProtectedRangeSource::Core { return Err(invalid("non-core range in core collection")); }
+    xml.push_str("<protectedRange");
+    write_xml_attribute(xml, "name", &range.name);
+    write_xml_attribute(xml, "sqref", &canonical_sqref(&range.sqref));
+    write_verifier_attributes(xml, range.verifier.as_ref());
+    if let Some(descriptor) = &range.security_descriptor {
+        write_xml_attribute(xml, "securityDescriptor", descriptor);
+    }
+    xml.push_str("/>");
+    Ok(())
+}
+
+fn canonical_sqref(sqref: &ProtectionRangeSqref) -> String {
+    sqref.references.iter().map(|reference| reference.raw.as_str()).collect::<Vec<_>>().join(" ")
+}
+
+fn write_verifier_attributes(xml: &mut String, verifier: Option<&ProtectionPasswordVerifier>) {
+    match verifier {
+        None => {}
+        Some(ProtectionPasswordVerifier::Legacy(value)) => {
+            write!(xml, " password=\"{value:04X}\"").unwrap();
+        }
+        Some(ProtectionPasswordVerifier::Strong(value)) => {
+            write_xml_attribute(xml, "algorithmName", &value.algorithm_name);
+            write_xml_attribute(xml, "hashValue", &BASE64.encode(&value.hash_value));
+            write_xml_attribute(xml, "saltValue", &BASE64.encode(&value.salt_value));
+            write!(xml, " spinCount=\"{}\"", value.spin_count).unwrap();
+        }
+    }
+}
+
+fn write_nondefault_bool(xml: &mut String, name: &str, value: bool, default: bool) {
+    if value != default { write!(xml, " {name}=\"{}\"", if value { '1' } else { '0' }).unwrap(); }
+}
+
+fn write_xml_attribute(xml: &mut String, name: &str, value: &str) {
+    write!(xml, " {name}=\"").unwrap();
+    write_xml_escaped(xml, value, true);
+    xml.push('"');
+}
+
+fn write_xml_text(xml: &mut String, value: &str) { write_xml_escaped(xml, value, false); }
+
+fn write_xml_escaped(xml: &mut String, value: &str, attribute: bool) {
+    for character in value.chars() {
+        match character {
+            '&' => xml.push_str("&amp;"), '<' => xml.push_str("&lt;"), '>' => xml.push_str("&gt;"),
+            '"' if attribute => xml.push_str("&quot;"), '\'' if attribute => xml.push_str("&apos;"),
+            _ => xml.push(character),
+        }
+    }
+}
+
 fn decode_base64(value: &str, field: &str) -> Result<Vec<u8>> {
     let compact: String = value.chars().filter(|character| !character.is_ascii_whitespace()).collect();
     if compact.len() > MAX_BINARY_BYTES.saturating_mul(2) { return Err(invalid(format!("{field} is too large"))); }
     let decoded = BASE64.decode(compact.as_bytes()).map_err(|_| invalid(format!("invalid base64 in {field}")))?;
-    if decoded.len() > MAX_BINARY_BYTES { return Err(invalid(format!("{field} is too large"))); }
+    if decoded.is_empty() || decoded.len() > MAX_BINARY_BYTES || BASE64.encode(&decoded) != compact {
+        return Err(invalid(format!("{field} is empty, non-canonical, or too large")));
+    }
     Ok(decoded)
 }
 
-fn attribute(element: &BytesStart<'_>, decoder: Decoder, name: &[u8]) -> Result<Option<String>> {
+fn attribute(element: &BytesStart<'_>, decoder: Decoder, resolver: &NamespaceResolver, name: &[u8]) -> Result<Option<String>> {
     let mut value = None;
     for attr in element.attributes() {
         let attr = attr.map_err(xml_error)?;
-        if !attr.key.as_ref().contains(&b':') && attr.key.local_name().as_ref() == name {
+        if namespace_declaration(attr.key.as_ref()) { continue; }
+        let (namespace, local) = resolver.resolve_attribute(attr.key);
+        if matches!(namespace, ResolveResult::Unbound) && local.as_ref() == name {
             set_once(
                 &mut value,
                 attr.decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
@@ -581,6 +744,45 @@ fn attribute(element: &BytesStart<'_>, decoder: Decoder, name: &[u8]) -> Result<
         }
     }
     Ok(value)
+}
+
+fn direct_collection_child(
+    element_depth: usize,
+    core: &Option<(usize, Vec<WorksheetProtectedRange>)>,
+    x14: &Option<(usize, Vec<WorksheetProtectedRange>)>,
+) -> bool {
+    core.as_ref().is_some_and(|(depth, _)| element_depth == *depth + 1)
+        || x14.as_ref().is_some_and(|(depth, _)| element_depth == *depth + 1)
+}
+
+fn update_worksheet_order(namespace: &ResolveResult<'_>, local: &[u8], order: &mut u8) -> Result<()> {
+    if !spreadsheet(namespace) {
+        if matches!(local, b"sheetProtection" | b"protectedRanges") {
+            return Err(invalid("spoofed worksheet protection element namespace"));
+        }
+        return Ok(());
+    }
+    let rank = if matches!(local, b"sheetPr" | b"dimension" | b"sheetViews" | b"sheetFormatPr" | b"cols" | b"sheetData" | b"sheetCalcPr") {
+        Some(0)
+    } else if local == b"sheetProtection" { Some(1) }
+    else if local == b"protectedRanges" { Some(2) }
+    else if matches!(local, b"scenarios" | b"autoFilter" | b"sortState" | b"dataConsolidate" | b"customSheetViews" | b"mergeCells" | b"phoneticPr" | b"conditionalFormatting" | b"dataValidations" | b"hyperlinks" | b"printOptions" | b"pageMargins" | b"pageSetup" | b"headerFooter" | b"rowBreaks" | b"colBreaks" | b"customProperties" | b"cellWatches" | b"ignoredErrors" | b"smartTags" | b"drawing" | b"legacyDrawing" | b"legacyDrawingHF" | b"picture" | b"oleObjects" | b"controls" | b"webPublishItems" | b"tableParts" | b"extLst") { Some(3) }
+    else { None };
+    if let Some(rank) = rank {
+        if rank < *order { return Err(invalid("worksheet protection family is out of schema order")); }
+        *order = (*order).max(rank);
+    }
+    Ok(())
+}
+
+fn namespace_declaration(name: &[u8]) -> bool { name == b"xmlns" || name.starts_with(b"xmlns:") }
+
+fn require_unqualified_attribute(namespace: &ResolveResult<'_>, element: &str) -> Result<()> {
+    match namespace {
+        ResolveResult::Unbound => Ok(()),
+        ResolveResult::Unknown(prefix) => Err(invalid(format!("unbound namespace prefix {} on {element}", String::from_utf8_lossy(prefix)))),
+        ResolveResult::Bound(_) => Err(invalid(format!("unknown namespaced {element} attribute"))),
+    }
 }
 
 fn set_once(target: &mut Option<String>, value: String, field: &str) -> Result<()> {
@@ -656,4 +858,96 @@ mod tests {
         assert!(parse(r#"<protectedRanges><protectedRange name="bad" sqref="A1" password="1234" algorithmName="SHA-512" hashValue="AQI=" saltValue="AwQ=" spinCount="1"/></protectedRanges>"#).is_err());
         assert!(parse(r#"<protectedRanges><protectedRange name="bad" sqref="XFE1"/></protectedRanges>"#).is_err());
     }
+
+    #[test]
+    fn deterministic_writer_round_trips_core_x14_and_strict_metadata() {
+        let source = format!(r#"<worksheet xmlns="{}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x14="{}" xmlns:xm="{}" mc:Ignorable="x14 xm"><sheetProtection algorithmName="SHA-512" hashValue="AQI=" saltValue="AwQ=" spinCount="0" sheet="1" formatCells="0"/><protectedRanges><protectedRange name="A&amp;B" sqref="A1  C:C" password="00af" securityDescriptor="D:&quot;test&quot;"/></protectedRanges><extLst><ext uri="{}"><x14:protectedRanges><x14:protectedRange name="X"><xm:sqref>$B$2:$C$4</xm:sqref></x14:protectedRange></x14:protectedRanges></ext></extLst></worksheet>"#,
+            std::str::from_utf8(STRICT).unwrap(), std::str::from_utf8(X14).unwrap(),
+            std::str::from_utf8(XM).unwrap(), PROTECTED_RANGES_EXTENSION_URI);
+        let metadata = parse_worksheet_protection(source.as_bytes()).unwrap();
+        let fragment = write_worksheet_protection(&metadata, WorksheetProtectionConformance::Strict).unwrap();
+        assert!(fragment.contains("password=\"00AF\""));
+        assert!(fragment.contains("sqref=\"A1 C:C\""));
+        assert!(fragment.contains("<x14:protectedRanges"));
+        let wrapped = format!(r#"<worksheet xmlns="{}">{fragment}</worksheet>"#, std::str::from_utf8(STRICT).unwrap());
+        let reparsed = parse_worksheet_protection(wrapped.as_bytes()).unwrap();
+        assert_eq!(write_worksheet_protection(&reparsed, WorksheetProtectionConformance::Strict).unwrap(), fragment);
+    }
+
+    #[test]
+    fn rejects_spoofed_unknown_out_of_order_and_noncanonical_metadata() {
+        let invalid = [
+            r#"<sheetProtection xmlns:f="urn:fake" f:sheet="1"/>"#,
+            r#"<protectedRanges><protectedRange name="R" sqref="A1"/></protectedRanges><sheetProtection/>"#,
+            r#"<sheetProtection/><sheetData/>"#,
+            r#"<protectedRanges><unknown/></protectedRanges>"#,
+            r#"<protectedRanges><protectedRange name="R" sqref="A1" algorithmName="SHA-512" hashValue="" saltValue="AQ==" spinCount="1"/></protectedRanges>"#,
+            r#"<protectedRanges><protectedRange name="R" sqref="A1" algorithmName="SHA-512" hashValue="AQI=" saltValue="AQ=" spinCount="1"/></protectedRanges>"#,
+            r#"<f:sheetProtection xmlns:f="urn:fake"/>"#,
+        ];
+        for body in invalid { assert!(parse(body).is_err(), "accepted {body}"); }
+
+        let ignored = format!(r#"<worksheet xmlns="{}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:test" mc:Ignorable="x"><sheetProtection x:future="1"/></worksheet>"#, std::str::from_utf8(CORE).unwrap());
+        assert!(parse_worksheet_protection(ignored.as_bytes()).is_ok());
+        let preserved = format!(r#"<worksheet xmlns="{}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:test" mc:Ignorable="x" mc:PreserveAttributes="x:*"><sheetProtection x:future="1"/></worksheet>"#, std::str::from_utf8(CORE).unwrap());
+        assert!(parse_worksheet_protection(preserved.as_bytes()).is_err());
+    }
+
+    #[test]
+    fn reads_poi_libreoffice_and_synthetic_package_through_worksheet_accessor() {
+        use crate::xlsx::{Workbook, Worksheet, WorksheetInfo};
+        use std::fs;
+        use std::path::Path;
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        fn inspect(path: &Path, relationship_id: &str, expected_ranges: usize, strong_sheet: bool) {
+            let workbook = Workbook::open(path).unwrap();
+            let mut worksheet = Worksheet::new(&workbook, WorksheetInfo {
+                name: "Sheet1".into(), relationship_id: relationship_id.into(), sheet_id: 1,
+                is_active: true, print_area: None, repeating_rows: None, repeating_columns: None,
+            });
+            worksheet.load_data().unwrap();
+            let metadata = worksheet.protection_metadata();
+            assert_eq!(metadata.protected_ranges().count(), expected_ranges);
+            if strong_sheet {
+                assert!(matches!(metadata.sheet_protection().unwrap().verifier(), Some(ProtectionPasswordVerifier::Strong(_))));
+            }
+        }
+
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        inspect(&root.join("3rdparty/poi/test-data/spreadsheet/workbookProtection-sheet_password-2013.xlsx"), "rId1", 0, true);
+        inspect(&root.join("3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/enhanced-protection.xlsx"), "rId1", 5, false);
+        inspect(&root.join("3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/enhancedProtectionRangeShorthand.xlsx"), "rId2", 1, false);
+
+        let metadata = parse(r#"<sheetData/><sheetProtection password="CC3D" sheet="1"/><protectedRanges><protectedRange name="Editable" sqref="A1:B2"/></protectedRanges>"#).unwrap();
+        let fragment = write_worksheet_protection(&metadata, WorksheetProtectionConformance::Transitional).unwrap();
+        let sheet = format!(r#"<?xml version="1.0"?><worksheet xmlns="{}"><sheetData/>{fragment}</worksheet>"#, std::str::from_utf8(CORE).unwrap());
+        let package = make_package(&[
+            ("[Content_Types].xml", r#"<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>"#),
+            ("_rels/.rels", r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>"#),
+            ("xl/workbook.xml", r#"<?xml version="1.0"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets></workbook>"#),
+            ("xl/_rels/workbook.xml.rels", r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>"#),
+            ("xl/worksheets/sheet1.xml", &sheet),
+        ]);
+        let path = std::env::temp_dir().join(format!("litchi-sheet-protection-{}-{}.xlsx", std::process::id(), SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()));
+        fs::write(&path, package).unwrap();
+        inspect(&path, "rId1", 1, false);
+        fs::remove_file(path).unwrap();
+    }
+
+    fn make_package(entries: &[(&str, &str)]) -> Vec<u8> {
+        let mut bytes = Vec::new(); let mut central = Vec::new();
+        for (name, value) in entries {
+            let offset = bytes.len() as u32; let data = value.as_bytes(); let crc = crc32(data);
+            push32(&mut bytes, 0x04034b50); push16(&mut bytes, 20); push16(&mut bytes, 0); push16(&mut bytes, 0); push16(&mut bytes, 0); push16(&mut bytes, 0);
+            push32(&mut bytes, crc); push32(&mut bytes, data.len() as u32); push32(&mut bytes, data.len() as u32); push16(&mut bytes, name.len() as u16); push16(&mut bytes, 0); bytes.extend_from_slice(name.as_bytes()); bytes.extend_from_slice(data);
+            push32(&mut central, 0x02014b50); push16(&mut central, 20); push16(&mut central, 20); push16(&mut central, 0); push16(&mut central, 0); push16(&mut central, 0); push16(&mut central, 0);
+            push32(&mut central, crc); push32(&mut central, data.len() as u32); push32(&mut central, data.len() as u32); push16(&mut central, name.len() as u16); push16(&mut central, 0); push16(&mut central, 0); push16(&mut central, 0); push16(&mut central, 0); push32(&mut central, 0); push32(&mut central, offset); central.extend_from_slice(name.as_bytes());
+        }
+        let offset = bytes.len() as u32; let size = central.len() as u32; bytes.extend_from_slice(&central);
+        push32(&mut bytes, 0x06054b50); push16(&mut bytes, 0); push16(&mut bytes, 0); push16(&mut bytes, entries.len() as u16); push16(&mut bytes, entries.len() as u16); push32(&mut bytes, size); push32(&mut bytes, offset); push16(&mut bytes, 0); bytes
+    }
+    fn crc32(data: &[u8]) -> u32 { let mut crc = !0u32; for byte in data { crc ^= u32::from(*byte); for _ in 0..8 { crc = if crc & 1 != 0 { (crc >> 1) ^ 0xedb88320 } else { crc >> 1 }; } } !crc }
+    fn push16(out: &mut Vec<u8>, value: u16) { out.extend_from_slice(&value.to_le_bytes()); }
+    fn push32(out: &mut Vec<u8>, value: u32) { out.extend_from_slice(&value.to_le_bytes()); }
 }

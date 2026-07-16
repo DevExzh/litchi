@@ -305,6 +305,7 @@ mod generic;
 mod media;
 mod variable_declaration;
 mod document_scripts;
+mod font_face;
 mod dde_connection;
 pub use dde_connection::{OdfDdeConnectionDeclaration, OdfDdeConnectionUse};
 mod bibliography_configuration;
@@ -361,6 +362,11 @@ pub use variable_declaration::{
 pub use document_scripts::{
     OdfDocumentEventListener, OdfDocumentScripts, OdfEmbeddedScript, OdfScriptBinding,
     OdfScriptEventListener, parse_document_scripts,
+};
+pub use font_face::{
+    OdfFontFace, OdfFontFaceDeclarations, OdfFontFaceLink, OdfFontFaceSource, OdfFontMetric,
+    OdfFontMetricKind, OdfFontPitch, OdfFontStretch, OdfFontStyle, OdfFontVariant,
+    OdfFontWeight, OdfGenericFontFamily, OdfPositiveLength, parse_font_face_declarations,
 };
 pub use embedded_object::{
     OdfEmbeddedObject, OdfEmbeddedObjectKind, OdfEmbeddedObjectPart,

@@ -215,11 +215,20 @@ pub enum XlsCellValue {
     /// Blank/empty cell
     Blank,
 }
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 struct XlsWorkbookProtection {
     protect_structure: bool,
     protect_windows: bool,
     password_hash: Option<u16>,
+    protect_revisions: bool,
+    revision_password_hash: Option<u16>,
+}
+
+#[derive(Debug, Clone)]
+struct XlsFileSharing {
+    read_only_recommended: bool,
+    password_hash: Option<u16>,
+    user_name: String,
 }
 /// XLS file writer
 ///
@@ -237,6 +246,7 @@ pub struct XlsWriter {
     /// Total number of string occurrences (including duplicates) for SST.cstTotal
     sst_total: u32,
     workbook_protection: Option<XlsWorkbookProtection>,
+    file_sharing: Option<XlsFileSharing>,
     /// Use 1904 date system (Mac) instead of 1900 (Windows)
     use_1904_dates: bool,
 }
@@ -252,6 +262,7 @@ impl XlsWriter {
             sst_total: 0,
             fmt: FormattingManager::new(),
             workbook_protection: None,
+            file_sharing: None,
             use_1904_dates: false,
         }
     }
@@ -1489,16 +1500,64 @@ impl XlsWriter {
             return;
         }
 
-        let password_hash = password.map(Self::hash_password);
-        self.workbook_protection = Some(XlsWorkbookProtection {
-            protect_structure,
-            protect_windows,
-            password_hash,
-        });
+        let mut protection = self.workbook_protection.unwrap_or_default();
+        protection.protect_structure = protect_structure;
+        protection.protect_windows = protect_windows;
+        protection.password_hash = password.map(Self::hash_password);
+        self.workbook_protection = Some(protection);
     }
 
     pub fn unprotect_workbook(&mut self) {
-        self.workbook_protection = None;
+        if let Some(mut protection) = self.workbook_protection {
+            protection.protect_structure = false;
+            protection.protect_windows = false;
+            protection.password_hash = None;
+            self.workbook_protection = protection.protect_revisions.then_some(protection);
+        }
+    }
+
+    /// Configure legacy shared-workbook revision protection.
+    pub fn protect_revisions(&mut self, password: Option<&str>) {
+        let mut protection = self.workbook_protection.unwrap_or_default();
+        protection.protect_revisions = true;
+        protection.revision_password_hash = password.map(Self::hash_password);
+        self.workbook_protection = Some(protection);
+    }
+
+    /// Remove shared-workbook revision protection.
+    pub fn unprotect_revisions(&mut self) {
+        if let Some(mut protection) = self.workbook_protection {
+            protection.protect_revisions = false;
+            protection.revision_password_hash = None;
+            self.workbook_protection = (protection.protect_structure
+                || protection.protect_windows
+                || protection.password_hash.is_some())
+            .then_some(protection);
+        }
+    }
+
+    /// Configure read-only recommendation and an optional write-reservation password.
+    pub fn set_file_sharing(
+        &mut self,
+        read_only_recommended: bool,
+        password: Option<&str>,
+        user_name: &str,
+    ) -> XlsResult<()> {
+        if user_name.encode_utf16().count() > 54 {
+            return Err(XlsError::InvalidData(
+                "FILESHARING username exceeds 54 UTF-16 code units".to_string(),
+            ));
+        }
+        self.file_sharing = Some(XlsFileSharing {
+            read_only_recommended,
+            password_hash: password.map(Self::hash_password),
+            user_name: user_name.to_string(),
+        });
+        Ok(())
+    }
+
+    pub fn clear_file_sharing(&mut self) {
+        self.file_sharing = None;
     }
 
     pub fn protect_sheet(
@@ -1647,6 +1706,7 @@ impl XlsWriter {
             &self.shared_strings,
             self.sst_total,
             self.workbook_protection,
+            self.file_sharing.as_ref(),
             &self.worksheets,
             &self.string_map,
         )

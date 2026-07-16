@@ -145,6 +145,7 @@ pub struct XlsWorkbook<R: Read + Seek> {
     formula_context: FormulaContext,
     defined_names: Vec<XlsDefinedName>,
     formatting: Arc<XlsFormatting>,
+    protection: protection::WorkbookProtection,
 }
 
 /// Options for opening a legacy XLS workbook.
@@ -179,6 +180,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             formula_context: FormulaContext::default(),
             defined_names: Vec::new(),
             formatting: Arc::new(XlsFormatting::default()),
+            protection: protection::WorkbookProtection::default(),
         };
 
         workbook.parse_workbook(options.password)?;
@@ -217,6 +219,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             formula_context: FormulaContext::default(),
             defined_names: Vec::new(),
             formatting: Arc::new(XlsFormatting::default()),
+            protection: protection::WorkbookProtection::default(),
         };
 
         workbook.parse_workbook(options.password)?;
@@ -330,9 +333,11 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         self.is_1904_date_system = self.formatting.date_system() == XlsDateSystem::Excel1904;
 
         let mut palette_seen = false;
+        let mut protection_collector = protection::WorkbookProtectionCollector::new();
         let mut i = 0;
         while i < records.len() {
             let record = &records[i];
+            protection_collector.feed_record(record.header.record_type, &record.data)?;
 
             match record.header.record_type {
                 0x0031 => {
@@ -425,6 +430,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                 0x000A => {
                     // EOF - End of workbook globals
                     crate::xls::font::validate_font_table(&self.fonts)?;
+                    self.protection = protection_collector.finish()?;
                     break;
                 },
                 _ => {
@@ -509,6 +515,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         let mut layout_collector = layout::LayoutCollector::new();
         let mut view_collector = view::ViewCollector::new();
         let mut page_setup_collector = page_setup::PageSetupCollector::new();
+        let mut protection_collector = protection::SheetProtectionCollector::new();
         let mut conditional_format_collector = conditional_format::ConditionalFormatCollector::new();
         let mut pending_string_formula: Option<CellRecord> = None;
         let mut shared_formulas = HashMap::<(u16, u16), SharedFormulaTemplate>::new();
@@ -521,6 +528,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             layout_collector.feed_record(record.header.record_type, &record.data, &formatting)?;
             view_collector.feed_record(record.header.record_type, &record.data)?;
             page_setup_collector.feed_record(record.header.record_type, &record.data)?;
+            protection_collector.feed_record(record.header.record_type, &record.data)?;
             conditional_format_collector.feed_record(record.header.record_type, &record.data)?;
 
             if matches!(remaining_data_validations, Some(1..))
@@ -605,6 +613,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                     if let Some(pt) = current_pivot.take() {
                         worksheet.add_pivot_table(pt);
                     }
+                    *worksheet.protection_mut() = protection_collector.finish()?;
                     break;
                 }
                 0x0200 => { // Dimensions
@@ -730,28 +739,6 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                     }
                 }
 
-                // --- Sheet protection records ---
-                rt if rt == protection::PROTECT_TYPE => {
-                    if let Ok(val) = protection::parse_protect_bool(&record.data) {
-                        worksheet.protection_mut().sheet_protected = val;
-                    }
-                }
-                rt if rt == protection::OBJECTPROTECT_TYPE => {
-                    if let Ok(val) = protection::parse_protect_bool(&record.data) {
-                        worksheet.protection_mut().objects_protected = val;
-                    }
-                }
-                rt if rt == protection::SCENPROTECT_TYPE => {
-                    if let Ok(val) = protection::parse_protect_bool(&record.data) {
-                        worksheet.protection_mut().scenarios_protected = val;
-                    }
-                }
-                rt if rt == protection::PASSWORD_TYPE => {
-                    if let Ok(hash) = protection::parse_password(&record.data) {
-                        worksheet.protection_mut().password_hash = hash;
-                    }
-                }
-
                 // --- Pivot table records ---
                 rt if rt == pivot_table::SXVIEW_TYPE => {
                     // New SXVIEW starts a new pivot table; flush previous if any
@@ -859,6 +846,10 @@ impl<R: Read + Seek> XlsWorkbook<R> {
 
     pub fn date_system(&self) -> XlsDateSystem {
         self.formatting.date_system()
+    }
+
+    pub fn protection(&self) -> &protection::WorkbookProtection {
+        &self.protection
     }
 
     pub fn number_formats(&self) -> &[XlsNumberFormat] {

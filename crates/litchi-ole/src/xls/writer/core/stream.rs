@@ -7,7 +7,7 @@ use crate::xls::{XlsError, XlsResult};
 
 use super::named_range::XlsDefinedName as InternalDefinedName;
 use super::worksheet::WritableWorksheet;
-use super::{XlsCellValue, XlsWorkbookProtection};
+use super::{XlsCellValue, XlsFileSharing, XlsWorkbookProtection};
 
 const DEFAULT_WRITE_ACCESS_USER: &str = "litchi";
 const DEFAULT_RECALC_ENGINE_ID: u32 = 0x000E_EA35;
@@ -32,21 +32,25 @@ pub(crate) fn generate_workbook_stream(
     shared_strings: &[String],
     sst_total: u32,
     workbook_protection: Option<XlsWorkbookProtection>,
+    file_sharing: Option<&XlsFileSharing>,
     worksheets: &[WritableWorksheet],
     string_map: &HashMap<String, u32>,
 ) -> XlsResult<WorkbookStreams> {
     let mut stream = Vec::new();
     let has_pivot_tables = worksheets.iter().any(|ws| !ws.pivot_tables.is_empty());
     let sheet_count = u16::try_from(worksheets.len()).unwrap_or(u16::MAX);
-    let (protect_structure, protect_windows, password_hash) = workbook_protection
+    let (protect_structure, protect_windows, password_hash, protect_revisions, revision_hash) =
+        workbook_protection
         .map(|protection| {
             (
                 protection.protect_structure,
                 protection.protect_windows,
                 protection.password_hash.unwrap_or(0),
+                protection.protect_revisions,
+                protection.revision_password_hash.unwrap_or(0),
             )
         })
-        .unwrap_or((false, false, 0));
+        .unwrap_or((false, false, 0, false, 0));
 
     // === Workbook Globals ===
 
@@ -57,6 +61,17 @@ pub(crate) fn generate_workbook_stream(
     biff::write_mms(&mut stream)?;
     biff::write_interface_end(&mut stream)?;
     biff::write_write_access(&mut stream, DEFAULT_WRITE_ACCESS_USER)?;
+    if let Some(sharing) = file_sharing {
+        if sharing.password_hash.is_some() {
+            biff::write_write_protect(&mut stream)?;
+        }
+        biff::write_file_sharing(
+            &mut stream,
+            sharing.read_only_recommended,
+            sharing.password_hash,
+            &sharing.user_name,
+        )?;
+    }
 
     // CodePage record - BIFF8 requires Unicode codepage 1200 (0x04B0)
     biff::write_codepage(&mut stream, 0x04B0)?;
@@ -68,10 +83,10 @@ pub(crate) fn generate_workbook_stream(
     biff::write_tab_id(&mut stream, sheet_count)?;
     biff::write_fn_group_count(&mut stream, DEFAULT_FUNCTION_GROUP_COUNT)?;
     biff::write_window_protect(&mut stream, protect_windows)?;
-    biff::write_protect(&mut stream, protect_structure || protect_windows)?;
+    biff::write_protect(&mut stream, protect_structure)?;
     biff::write_password(&mut stream, password_hash)?;
-    biff::write_protection_rev4(&mut stream, false)?;
-    biff::write_password_rev4(&mut stream, 0)?;
+    biff::write_protection_rev4(&mut stream, protect_revisions)?;
+    biff::write_password_rev4(&mut stream, revision_hash)?;
 
     // Window1 record (workbook window properties)
     biff::write_window1(&mut stream)?;

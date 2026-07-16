@@ -654,6 +654,11 @@ impl<'a> Parser<'a> {
                         "RTF userprops destination must be starred".to_string(),
                     ));
                 },
+                Token::Control(ControlWord::DocumentVariable) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF docvar destination must be starred".to_string(),
+                    ));
+                },
                 Token::Control(
                     ControlWord::IndexEntry
                     | ControlWord::TableOfContentsEntry
@@ -1590,6 +1595,14 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_document_variable_destination(&mut self) -> RtfResult<()> {
+        // The destination group is one level below the RTF root. Body text is
+        // flushed before nested groups, so a nonzero body length also rejects
+        // document variables that appear after body content has begun.
+        if self.states.len() != 3 || self.body_text_len != 0 {
+            return Err(RtfError::MalformedDocument(
+                "RTF docvar destination must occur in the root document header".to_string(),
+            ));
+        }
         if self.document_variables.len() >= MAX_DOCUMENT_VARIABLES {
             return Err(RtfError::MalformedDocument(format!(
                 "RTF document exceeds {MAX_DOCUMENT_VARIABLES} document variables"

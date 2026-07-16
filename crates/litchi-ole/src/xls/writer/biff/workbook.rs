@@ -126,6 +126,54 @@ pub fn write_password_rev4<W: Write>(writer: &mut W, password_hash: u16) -> XlsR
     Ok(())
 }
 
+/// Write the empty WRITEPROTECT marker.
+pub fn write_write_protect<W: Write>(writer: &mut W) -> XlsResult<()> {
+    write_record_header(writer, 0x0086, 0)?;
+    Ok(())
+}
+
+/// Write FILESHARING write-reservation metadata.
+pub fn write_file_sharing<W: Write>(
+    writer: &mut W,
+    read_only_recommended: bool,
+    password_hash: Option<u16>,
+    user_name: &str,
+) -> XlsResult<()> {
+    let password_hash = password_hash.unwrap_or(0);
+    if password_hash == 0 {
+        write_record_header(writer, 0x005B, 6)?;
+        writer.write_all(&u16::from(read_only_recommended).to_le_bytes())?;
+        writer.write_all(&0u16.to_le_bytes())?;
+        writer.write_all(&0u16.to_le_bytes())?;
+        return Ok(());
+    }
+
+    let utf16 = user_name.encode_utf16().collect::<Vec<_>>();
+    if utf16.len() > 54 {
+        return Err(XlsError::InvalidData(
+            "FILESHARING username exceeds 54 UTF-16 code units".to_string(),
+        ));
+    }
+    let compressed = utf16.iter().all(|unit| *unit <= 0x00FF);
+    let char_bytes = utf16.len() * if compressed { 1 } else { 2 };
+    let data_len = u16::try_from(7 + char_bytes).map_err(|_| {
+        XlsError::InvalidData("FILESHARING payload exceeds BIFF8 record size".to_string())
+    })?;
+    write_record_header(writer, 0x005B, data_len)?;
+    writer.write_all(&u16::from(read_only_recommended).to_le_bytes())?;
+    writer.write_all(&password_hash.to_le_bytes())?;
+    writer.write_all(&(utf16.len() as u16).to_le_bytes())?;
+    writer.write_all(&[u8::from(!compressed)])?;
+    for unit in utf16 {
+        if compressed {
+            writer.write_all(&[unit as u8])?;
+        } else {
+            writer.write_all(&unit.to_le_bytes())?;
+        }
+    }
+    Ok(())
+}
+
 /// Write BACKUP record.
 ///
 /// Record type: 0x0040

@@ -193,6 +193,19 @@ pub fn write_password_rev4<W: Write>(writer: &mut W, password_hash: u16) -> XlsR
     workbook::write_password_rev4(writer, password_hash)
 }
 
+pub fn write_write_protect<W: Write>(writer: &mut W) -> XlsResult<()> {
+    workbook::write_write_protect(writer)
+}
+
+pub fn write_file_sharing<W: Write>(
+    writer: &mut W,
+    read_only_recommended: bool,
+    password_hash: Option<u16>,
+    user_name: &str,
+) -> XlsResult<()> {
+    workbook::write_file_sharing(writer, read_only_recommended, password_hash, user_name)
+}
+
 pub fn write_backup<W: Write>(writer: &mut W, backup: bool) -> XlsResult<()> {
     workbook::write_backup(writer, backup)
 }
