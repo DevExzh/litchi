@@ -265,6 +265,8 @@ pub struct Parser<'a> {
     states: Vec<State>,
     /// Font table
     font_table: RefCell<FontTable<'a>>,
+    saw_font_table: bool,
+    unicode_alternate_depth: usize,
     /// Color table
     color_table: RefCell<ColorTable>,
     /// Parsed style blocks
@@ -420,6 +422,8 @@ impl<'a> Parser<'a> {
             pos: 0,
             states: vec![State::default()],
             font_table: RefCell::new(FontTable::new()),
+            saw_font_table: false,
+            unicode_alternate_depth: 0,
             color_table: RefCell::new(ColorTable::new()),
             blocks: Vec::new(),
             arena,
@@ -639,7 +643,23 @@ impl<'a> Parser<'a> {
         // Check if this is a special group (header, destination, etc.)
         if self.pos < self.tokens.len() {
             match &self.tokens[self.pos] {
+                Token::Control(ControlWord::UnicodeAlternate) => {
+                    self.parse_unicode_alternate_group()?;
+                    self.states.pop();
+                    return Ok(());
+                },
                 Token::Control(ControlWord::FontTable) => {
+                    let valid_scope = self.states.len() == 3
+                        || (self.unicode_alternate_depth == 1 && self.states.len() == 4);
+                    if self.saw_font_table
+                        || !valid_scope
+                        || self.blocks.iter().any(|block| !block.text.trim().is_empty())
+                    {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF font table must occur exactly once at document scope before body text".to_string(),
+                        ));
+                    }
+                    self.saw_font_table = true;
                     // Mark this as font table destination
                     if let Some(state) = self.states.last_mut() {
                         state.destination = Destination::FontTable;
@@ -690,6 +710,11 @@ impl<'a> Parser<'a> {
                         return Ok(());
                     }
                     match self.tokens.get(self.pos + 1) {
+                        Some(Token::Control(ControlWord::UnicodeAlternateDestination)) => {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF ud destination must be the Unicode branch of upr".to_string(),
+                            ));
+                        },
                         Some(Token::Control(ControlWord::ListTable)) => {
                             self.pos += 1;
                             self.parse_list_table()?;
@@ -1143,6 +1168,44 @@ impl<'a> Parser<'a> {
         // Pop state
         self.states.pop();
 
+        Ok(())
+    }
+
+    fn parse_unicode_alternate_group(&mut self) -> RtfResult<()> {
+        self.pos += 1; // upr
+        if !matches!(self.tokens.get(self.pos), Some(Token::OpenBrace)) {
+            return Err(RtfError::MalformedDocument(
+                "RTF upr lacks its ANSI fallback group".to_string(),
+            ));
+        }
+        // A Unicode-aware reader must ignore the first (ANSI) representation.
+        self.skip_group()?;
+        if !matches!(
+            self.tokens.get(self.pos..self.pos + 3),
+            Some([
+                Token::OpenBrace,
+                Token::Control(ControlWord::IgnorableDestination),
+                Token::Control(ControlWord::UnicodeAlternateDestination),
+            ])
+        ) {
+            return Err(RtfError::MalformedDocument(
+                "RTF upr lacks its starred ud destination".to_string(),
+            ));
+        }
+        self.pos += 3;
+        self.unicode_alternate_depth = self
+            .unicode_alternate_depth
+            .checked_add(1)
+            .ok_or_else(|| RtfError::MalformedDocument("RTF upr nesting overflow".to_string()))?;
+        if self.unicode_alternate_depth > 8 {
+            return Err(RtfError::MalformedDocument(
+                "RTF upr nesting exceeds the safety limit".to_string(),
+            ));
+        }
+        let parsed = self.parse_content();
+        self.unicode_alternate_depth -= 1;
+        parsed?;
+        self.expect_token(Token::CloseBrace)?; // outer upr group
         Ok(())
     }
 
@@ -5107,6 +5170,7 @@ impl<'a> Parser<'a> {
         while self.pos < self.tokens.len() {
             match &self.tokens[self.pos] {
                 Token::CloseBrace => {
+                    self.font_table.borrow().validate()?;
                     return Ok(());
                 },
                 Token::OpenBrace => {
@@ -5125,10 +5189,17 @@ impl<'a> Parser<'a> {
     fn parse_font_entry(&mut self) -> RtfResult<()> {
         self.pos += 1; // Skip {
 
-        let mut font_num = 0;
+        let mut font_num = None;
         let mut font_family = FontFamily::Nil;
-        let mut charset = 0;
-        let mut name_parts = SmallVec::<[String; 4]>::new();
+        let mut charset = None;
+        let mut pitch = crate::FontPitch::Default;
+        let mut code_page = None;
+        let mut alternate_name = None;
+        let mut non_tagged_name = None;
+        let mut panose = None;
+        let mut name = String::new();
+        let mut unicode_skip = self.current_state()?.unicode_skip.max(0);
+        let mut seen = std::collections::HashSet::new();
 
         while self.pos < self.tokens.len() {
             match &self.tokens[self.pos] {
@@ -5136,15 +5207,48 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                     break;
                 },
+                Token::OpenBrace
+                    if matches!(
+                        self.tokens.get(self.pos + 1..self.pos + 3),
+                        Some([Token::Control(ControlWord::IgnorableDestination), Token::Control(ControlWord::FontAlternateName)])
+                    ) => {
+                        if !seen.insert("falt") { return Err(RtfError::MalformedDocument("duplicate RTF falt destination".to_string())); }
+                        alternate_name = Some(self.parse_font_name_destination(ControlWord::FontAlternateName)?);
+                    },
+                Token::OpenBrace
+                    if matches!(
+                        self.tokens.get(self.pos + 1..self.pos + 3),
+                        Some([Token::Control(ControlWord::IgnorableDestination), Token::Control(ControlWord::FontNonTaggedName)])
+                    ) => {
+                        if !seen.insert("fname") { return Err(RtfError::MalformedDocument("duplicate RTF fname destination".to_string())); }
+                        non_tagged_name = Some(self.parse_font_name_destination(ControlWord::FontNonTaggedName)?);
+                    },
+                Token::OpenBrace
+                    if matches!(
+                        self.tokens.get(self.pos + 1..self.pos + 3),
+                        Some([Token::Control(ControlWord::IgnorableDestination), Token::Control(ControlWord::FontPanose)])
+                    ) => {
+                        if !seen.insert("panose") { return Err(RtfError::MalformedDocument("duplicate RTF panose destination".to_string())); }
+                        panose = Some(self.parse_font_panose_destination()?);
+                    },
                 Token::OpenBrace => {
-                    // Skip nested groups (e.g., {\*\panose ...})
+                    if matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::Field | ControlWord::Object))
+                    ) {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF font entry cannot contain fields or objects".to_string(),
+                        ));
+                    }
                     self.skip_group()?;
                 },
                 Token::Control(ControlWord::FontNumber(n)) => {
-                    font_num = *n as FontRef;
+                    if !seen.insert("font-number") { return Err(RtfError::MalformedDocument("duplicate RTF font ID".to_string())); }
+                    font_num = Some(FontRef::try_from(*n).map_err(|_| RtfError::MalformedDocument("invalid RTF font ID".to_string()))?);
                     self.pos += 1;
                 },
                 Token::Control(ControlWord::FontFamily(family)) => {
+                    if !seen.insert("family") { return Err(RtfError::MalformedDocument("duplicate RTF font family".to_string())); }
                     font_family = match *family {
                         "roman" => FontFamily::Roman,
                         "swiss" => FontFamily::Swiss,
@@ -5157,37 +5261,141 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 Token::Control(ControlWord::FontCharset(cs)) => {
-                    charset = *cs as u8;
+                    if !seen.insert("charset") { return Err(RtfError::MalformedDocument("duplicate RTF font charset".to_string())); }
+                    charset = Some(u8::try_from(*cs).map_err(|_| RtfError::MalformedDocument("invalid RTF font charset".to_string()))?);
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::FontPitch(value)) => {
+                    if !seen.insert("pitch") { return Err(RtfError::MalformedDocument("duplicate RTF font pitch".to_string())); }
+                    pitch = match *value {
+                        0 => crate::FontPitch::Default,
+                        1 => crate::FontPitch::Fixed,
+                        2 => crate::FontPitch::Variable,
+                        _ => return Err(RtfError::MalformedDocument("invalid RTF font pitch".to_string())),
+                    };
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::FontCodePage(value)) => {
+                    if !seen.insert("code-page") { return Err(RtfError::MalformedDocument("duplicate RTF font code page".to_string())); }
+                    code_page = Some(u16::try_from(*value).map_err(|_| RtfError::MalformedDocument("invalid RTF font code page".to_string()))?);
                     self.pos += 1;
                 },
                 Token::Text(text) => {
-                    // Font name (may contain semicolon at the end)
-                    let decoded = self.decode_transport_text(text)?;
-                    let trimmed = decoded.trim_end_matches(';').trim();
-                    if !trimmed.is_empty() {
-                        name_parts.push(trimmed.to_string());
-                    }
+                    name.push_str(&self.decode_transport_text(text)?);
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::Unicode(first)) => {
+                    name.push_str(&self.parse_style_unicode(*first, unicode_skip)?);
+                },
+                Token::Control(ControlWord::UnicodeSkip(value)) => {
+                    unicode_skip = (*value).max(0);
+                    self.pos += 1;
+                },
+                Token::Control(control) if control_symbol_text(control).is_some() => {
+                    name.push_str(control_symbol_text(control).unwrap_or_default());
                     self.pos += 1;
                 },
                 _ => {
                     self.pos += 1;
                 },
             }
+            if name.len() > 4_096 {
+                return Err(RtfError::MalformedDocument("RTF font name exceeds the safety limit".to_string()));
+            }
         }
 
-        // Combine name parts
-        let name = if name_parts.is_empty() {
-            Cow::Borrowed("")
-        } else {
-            let combined = name_parts.join(" ");
-            let allocated = self.arena.alloc_str(&combined);
-            Cow::Borrowed(allocated)
-        };
-
-        let font = Font::new(name, font_family, charset);
+        let font_num = font_num.ok_or_else(|| RtfError::MalformedDocument("RTF font entry lacks an ID".to_string()))?;
+        let name = name.trim().strip_suffix(';').unwrap_or(name.trim()).trim();
+        let mut font = Font::new(Cow::Owned(name.to_string()), font_family, charset.unwrap_or(0));
+        font.alternate_name = alternate_name.map(Cow::Owned);
+        font.non_tagged_name = non_tagged_name.map(Cow::Owned);
+        font.panose = panose;
+        font.pitch = pitch;
+        font.code_page = code_page;
+        font.validate()?;
+        if let Some(existing) = self.font_table.borrow().get(font_num) {
+            if existing == &font {
+                return Ok(());
+            }
+            return Err(RtfError::MalformedDocument(
+                "conflicting duplicate RTF font ID".to_string(),
+            ));
+        }
         self.font_table.borrow_mut().insert(font_num, font);
 
         Ok(())
+    }
+
+    fn parse_font_name_destination(&mut self, expected: ControlWord<'a>) -> RtfResult<String> {
+        if !matches!(self.tokens.get(self.pos), Some(Token::OpenBrace))
+            || !matches!(self.tokens.get(self.pos + 1), Some(Token::Control(ControlWord::IgnorableDestination)))
+            || self.tokens.get(self.pos + 2) != Some(&Token::Control(expected))
+        {
+            return Err(RtfError::MalformedDocument("invalid RTF font-name destination".to_string()));
+        }
+        self.pos += 3;
+        let mut value = String::new();
+        let mut unicode_skip = self.current_state()?.unicode_skip.max(0);
+        while self.pos < self.tokens.len() {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    let value = value.trim().strip_suffix(';').unwrap_or(value.trim()).trim().to_string();
+                    if value.is_empty() || value.len() > 4_096 {
+                        return Err(RtfError::MalformedDocument("invalid or oversized RTF alternate font name".to_string()));
+                    }
+                    return Ok(value);
+                },
+                Some(Token::Text(text)) => value.push_str(&self.decode_transport_text(text)?),
+                Some(Token::Control(ControlWord::Unicode(first))) => {
+                    value.push_str(&self.parse_style_unicode(*first, unicode_skip)?);
+                    continue;
+                },
+                Some(Token::Control(ControlWord::UnicodeSkip(count))) => unicode_skip = (*count).max(0),
+                Some(Token::Control(control)) if control_symbol_text(control).is_some() => value.push_str(control_symbol_text(control).unwrap_or_default()),
+                Some(Token::OpenBrace) | Some(Token::Control(_)) | Some(Token::Binary(_)) => {
+                    return Err(RtfError::MalformedDocument("RTF font-name destination contains non-text content".to_string()));
+                },
+                None => return Err(RtfError::UnexpectedEof),
+            }
+            self.pos += 1;
+            if value.len() > 4_096 {
+                return Err(RtfError::MalformedDocument("RTF alternate font name exceeds the safety limit".to_string()));
+            }
+        }
+        Err(RtfError::UnexpectedEof)
+    }
+
+    fn parse_font_panose_destination(&mut self) -> RtfResult<[u8; 10]> {
+        self.pos += 3; // opening brace, ignorable marker, panose
+        let mut digits = String::new();
+        while self.pos < self.tokens.len() {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    let compact: String = digits.chars().filter(|ch| !ch.is_whitespace()).collect();
+                    if compact.len() != 20 || !compact.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+                        return Err(RtfError::MalformedDocument("RTF panose must contain exactly ten hexadecimal bytes".to_string()));
+                    }
+                    let mut panose = [0u8; 10];
+                    for (index, byte) in panose.iter_mut().enumerate() {
+                        *byte = u8::from_str_radix(&compact[index * 2..index * 2 + 2], 16)
+                            .map_err(|_| RtfError::MalformedDocument("invalid RTF panose payload".to_string()))?;
+                    }
+                    return Ok(panose);
+                },
+                Some(Token::Text(text)) => digits.push_str(text),
+                Some(Token::OpenBrace) | Some(Token::Control(_)) | Some(Token::Binary(_)) => {
+                    return Err(RtfError::MalformedDocument("RTF panose contains non-hexadecimal content".to_string()));
+                },
+                None => return Err(RtfError::UnexpectedEof),
+            }
+            self.pos += 1;
+            if digits.len() > 64 {
+                return Err(RtfError::MalformedDocument("RTF panose payload exceeds the safety limit".to_string()));
+            }
+        }
+        Err(RtfError::UnexpectedEof)
     }
 
     /// Parse color table.

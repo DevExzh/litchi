@@ -302,6 +302,10 @@ struct XlsFileSharing {
     password_hash: Option<u16>,
     user_name: String,
 }
+#[derive(Debug, Clone)]
+pub(super) struct XlsVbaWriteMetadata {
+    pub workbook_code_name: String,
+}
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct XlsCalculationSettings {
     pub mode: crate::xls::XlsCalculationMode,
@@ -350,6 +354,7 @@ pub struct XlsWriter {
     /// Use 1904 date system (Mac) instead of 1900 (Windows)
     use_1904_dates: bool,
     calculation_settings: XlsCalculationSettings,
+    vba_metadata: Option<XlsVbaWriteMetadata>,
 }
 
 impl XlsWriter {
@@ -366,6 +371,7 @@ impl XlsWriter {
             file_sharing: None,
             use_1904_dates: false,
             calculation_settings: XlsCalculationSettings::default(),
+            vba_metadata: None,
         }
     }
 
@@ -1694,6 +1700,37 @@ impl XlsWriter {
         Ok(())
     }
 
+    /// Enable a module-free VBA project scaffold without executable content.
+    pub fn enable_empty_vba_project(&mut self, workbook_code_name: &str) -> XlsResult<()> {
+        crate::xls::vba::validate_code_name(workbook_code_name)?;
+        self.vba_metadata = Some(XlsVbaWriteMetadata {
+            workbook_code_name: workbook_code_name.to_string(),
+        });
+        Ok(())
+    }
+
+    pub fn disable_vba_project_metadata(&mut self) {
+        self.vba_metadata = None;
+        for worksheet in &mut self.worksheets { worksheet.vba_code_name = None; }
+    }
+
+    pub fn set_worksheet_vba_code_name(
+        &mut self,
+        sheet: usize,
+        code_name: Option<&str>,
+    ) -> XlsResult<()> {
+        if self.vba_metadata.is_none() && code_name.is_some() {
+            return Err(XlsError::InvalidData(
+                "worksheet VBA code names require an enabled empty VBA project".to_string(),
+            ));
+        }
+        if let Some(value) = code_name { crate::xls::vba::validate_code_name(value)?; }
+        let worksheet = self.worksheets.get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+        worksheet.vba_code_name = code_name.map(str::to_string);
+        Ok(())
+    }
+
     /// Configure the complete primary worksheet print/page settings block.
     pub fn set_page_setup(
         &mut self,
@@ -1935,6 +1972,11 @@ impl XlsWriter {
         // Create OLE compound document
         let mut ole_writer = OleWriter::new();
         ole_writer.create_stream(&["Workbook"], &streams.workbook)?;
+        if self.vba_metadata.is_some() {
+            ole_writer.create_storage(&["_VBA_PROJECT_CUR"])?;
+            ole_writer.create_storage(&["_VBA_PROJECT_CUR", "VBA"])?;
+            ole_writer.create_stream(&["_VBA_PROJECT_CUR", "VBA", "dir"], &[])?;
+        }
 
         // Pivot cache storage: _SX_DB_CUR/XXXX
         // Stream names use 4-digit uppercase hex per LO ScfTools::GetHexStr.
@@ -1971,6 +2013,11 @@ impl XlsWriter {
         // Create OLE compound document
         let mut ole_writer = OleWriter::new();
         ole_writer.create_stream(&["Workbook"], &streams.workbook)?;
+        if self.vba_metadata.is_some() {
+            ole_writer.create_storage(&["_VBA_PROJECT_CUR"])?;
+            ole_writer.create_storage(&["_VBA_PROJECT_CUR", "VBA"])?;
+            ole_writer.create_stream(&["_VBA_PROJECT_CUR", "VBA", "dir"], &[])?;
+        }
 
         // Pivot cache storage: _SX_DB_CUR/XXXX
         if !streams.pivot_caches.is_empty() {
@@ -2016,6 +2063,7 @@ impl XlsWriter {
         stream::generate_workbook_stream(
             self.use_1904_dates,
             self.calculation_settings,
+            self.vba_metadata.as_ref(),
             &self.fmt,
             &self.defined_names,
             &self.shared_strings,

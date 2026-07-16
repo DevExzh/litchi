@@ -220,6 +220,13 @@ pub enum ControlWord<'a> {
     FontSize(i32),
     FontCharset(i32),
     FontFamily(&'a str),
+    FontPitch(i32),
+    FontCodePage(i32),
+    FontAlternateName,
+    FontNonTaggedName,
+    FontPanose,
+    UnicodeAlternate,
+    UnicodeAlternateDestination,
 
     // Colors
     Red(i32),
@@ -926,6 +933,13 @@ impl<'a> Lexer<'a> {
             "fscript" => ControlWord::FontFamily("script"),
             "fdecor" => ControlWord::FontFamily("decor"),
             "ftech" => ControlWord::FontFamily("tech"),
+            "fprq" => ControlWord::FontPitch(param_value),
+            "cpg" => ControlWord::FontCodePage(param_value),
+            "falt" => ControlWord::FontAlternateName,
+            "fname" => ControlWord::FontNonTaggedName,
+            "panose" => ControlWord::FontPanose,
+            "upr" => ControlWord::UnicodeAlternate,
+            "ud" => ControlWord::UnicodeAlternateDestination,
 
             // Colors
             "red" => ControlWord::Red(param_value),

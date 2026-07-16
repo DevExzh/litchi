@@ -58,6 +58,7 @@ pub mod document;
 pub mod drawing;
 pub mod enums;
 pub mod field;
+pub mod font_table;
 pub mod footnote;
 pub mod format;
 pub mod header_footer;
@@ -92,6 +93,11 @@ pub use document::Document;
 pub use drawing::{DrawingObject, ShapeType};
 pub use enums::{WdHeaderFooter, WdOrientation, WdSectionStart, WdStyleType};
 pub use field::Field;
+pub use font_table::{
+    EmbeddedFont, EmbeddedFontResource, EmbeddedFontStyle, Font, FontCharacterSet, FontFamily,
+    FontPitch, FontSignature, FontTable, FontTableConformance, FontTableExtensionAttribute,
+    parse_font_table, write_font_table,
+};
 pub use footnote::{Note, NoteType};
 pub use header_footer::HeaderFooter;
 pub use hyperlink::Hyperlink;

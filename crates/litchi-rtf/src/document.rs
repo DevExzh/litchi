@@ -162,18 +162,7 @@ impl<'a> RtfDocument<'a> {
             .collect();
 
         // Convert font table to owned
-        let owned_font_table = FontTable {
-            fonts: parsed
-                .font_table
-                .fonts
-                .into_iter()
-                .map(|font| super::types::Font {
-                    name: Cow::Owned(font.name.into_owned()),
-                    family: font.family,
-                    charset: font.charset,
-                })
-                .collect(),
-        };
+        let owned_font_table = parsed.font_table.into_owned();
 
         // Convert tables to owned
         let owned_tables: Vec<super::table::Table<'static>> = parsed

@@ -251,6 +251,14 @@ impl Presentation {
         }
     }
 
+    /// Inspect named legacy and SVG drawing gradients without resolving style use sites.
+    pub fn drawing_gradients(&self) -> Result<crate::drawing_gradient::OdfDrawingGradients> {
+        match self.styles.as_ref() {
+            Some(styles) => crate::drawing_gradient::parse_drawing_gradients(styles.xml_content()),
+            None => Ok(crate::drawing_gradient::OdfDrawingGradients::default()),
+        }
+    }
+
     /// Get a slide by index.
     ///
     /// Returns `Some(slide)` if a slide exists at the given index, `None` otherwise.

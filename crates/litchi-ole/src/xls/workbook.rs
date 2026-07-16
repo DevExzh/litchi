@@ -147,6 +147,7 @@ pub struct XlsWorkbook<R: Read + Seek> {
     formatting: Arc<XlsFormatting>,
     protection: protection::WorkbookProtection,
     calculation: crate::xls::calculation::XlsWorkbookCalculation,
+    vba_metadata: crate::xls::vba::XlsVbaMetadata,
 }
 
 /// Options for opening a legacy XLS workbook.
@@ -183,6 +184,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             formatting: Arc::new(XlsFormatting::default()),
             protection: protection::WorkbookProtection::default(),
             calculation: crate::xls::calculation::XlsWorkbookCalculation::default(),
+            vba_metadata: crate::xls::vba::XlsVbaMetadata::default(),
         };
 
         workbook.parse_workbook(options.password)?;
@@ -223,6 +225,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             formatting: Arc::new(XlsFormatting::default()),
             protection: protection::WorkbookProtection::default(),
             calculation: crate::xls::calculation::XlsWorkbookCalculation::default(),
+            vba_metadata: crate::xls::vba::XlsVbaMetadata::default(),
         };
 
         workbook.parse_workbook(options.password)?;
@@ -339,11 +342,13 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         let mut protection_collector = protection::WorkbookProtectionCollector::new();
         let mut calculation_collector =
             crate::xls::calculation::WorkbookCalculationCollector::new();
+        let mut vba_collector = crate::xls::vba::WorkbookVbaCollector::new();
         let mut i = 0;
         while i < records.len() {
             let record = &records[i];
             protection_collector.feed_record(record.header.record_type, &record.data)?;
             calculation_collector.feed_record(record.header.record_type, &record.data)?;
+            vba_collector.feed_record(record.header.record_type, &record.data)?;
 
             match record.header.record_type {
                 0x0031 => {
@@ -438,6 +443,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                     crate::xls::font::validate_font_table(&self.fonts)?;
                     self.protection = protection_collector.finish()?;
                     self.calculation = calculation_collector.finish();
+                    self.vba_metadata = vba_collector.finish();
                     break;
                 },
                 _ => {
@@ -527,6 +533,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         let mut calculation_collector =
             crate::xls::calculation::WorksheetCalculationCollector::new();
         let mut scenario_collector = crate::xls::scenario::ScenarioCollector::new();
+        let mut vba_collector = crate::xls::vba::WorksheetVbaCollector::new();
         let mut pending_string_formula: Option<CellRecord> = None;
         let mut shared_formulas = HashMap::<(u16, u16), SharedFormulaTemplate>::new();
         let mut remaining_data_validations: Option<usize> = None;
@@ -542,6 +549,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             conditional_format_collector.feed_record(record.header.record_type, &record.data)?;
             calculation_collector.feed_record(record.header.record_type, &record.data)?;
             scenario_collector.feed_record(record.header.record_type, &record.data)?;
+            vba_collector.feed_record(record.header.record_type, &record.data)?;
 
             if matches!(remaining_data_validations, Some(1..))
                 && record.header.record_type != super::data_validation::DV_RECORD_TYPE
@@ -819,6 +827,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         worksheet.set_conditional_formattings(conditional_format_collector.finish()?);
         worksheet.set_calculation(calculation_collector.finish()?);
         worksheet.set_scenario_manager(scenario_collector.finish()?);
+        worksheet.set_vba_code_name(vba_collector.finish());
 
         Ok(worksheet)
     }
@@ -868,6 +877,14 @@ impl<R: Read + Seek> XlsWorkbook<R> {
 
     pub fn calculation(&self) -> &crate::xls::calculation::XlsWorkbookCalculation {
         &self.calculation
+    }
+
+    pub fn vba_metadata(&self) -> crate::xls::vba::XlsVbaMetadata {
+        let mut metadata = self.vba_metadata.clone();
+        metadata.set_project_storage_present(self.ole_file.list_streams().iter().any(|path| {
+            path.first().is_some_and(|name| name.eq_ignore_ascii_case("_VBA_PROJECT_CUR"))
+        }));
+        metadata
     }
 
     pub fn number_formats(&self) -> &[XlsNumberFormat] {

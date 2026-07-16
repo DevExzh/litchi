@@ -108,8 +108,14 @@ impl<W: Write> RtfWriter<W> {
                     name: std::borrow::Cow::Owned(f.name.to_string()),
                     family: f.family,
                     charset: f.charset,
+                    alternate_name: f.alternate_name.as_ref().map(|name| std::borrow::Cow::Owned(name.to_string())),
+                    non_tagged_name: f.non_tagged_name.as_ref().map(|name| std::borrow::Cow::Owned(name.to_string())),
+                    panose: f.panose,
+                    pitch: f.pitch,
+                    code_page: f.code_page,
                 })
                 .collect(),
+            defined: doc.font_table().defined.clone(),
         };
         let color_table = doc.color_table().clone();
 
@@ -247,6 +253,9 @@ impl<W: Write> RtfWriter<W> {
 
     /// Write font table
     fn write_font_table(&mut self) -> io::Result<()> {
+        self.font_table
+            .validate()
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
         if self.font_table.fonts().is_empty() {
             return Ok(());
         }
@@ -257,6 +266,12 @@ impl<W: Write> RtfWriter<W> {
         // Clone fonts to avoid borrowing issues
         let fonts: Vec<_> = self.font_table.fonts().to_vec();
         for (idx, font) in fonts.iter().enumerate() {
+            if !self.font_table.is_defined(idx as FontRef) {
+                continue;
+            }
+            font
+                .validate()
+                .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
             self.write_str("{")?;
             self.write_control_word("f", Some(idx as i32))?;
 
@@ -275,10 +290,44 @@ impl<W: Write> RtfWriter<W> {
             if font.charset != 0 {
                 self.write_control_word("fcharset", Some(font.charset as i32))?;
             }
+            self.write_control_word(
+                "fprq",
+                Some(match font.pitch {
+                    crate::FontPitch::Default => 0,
+                    crate::FontPitch::Fixed => 1,
+                    crate::FontPitch::Variable => 2,
+                }),
+            )?;
+            if let Some(code_page) = font.code_page {
+                self.write_control_word("cpg", Some(i32::from(code_page)))?;
+            }
+            if let Some(panose) = font.panose {
+                self.write_str("{\\*")?;
+                self.write_control_word("panose", None)?;
+                self.write_str(" ")?;
+                for byte in panose {
+                    write!(self.writer, "{byte:02x}")?;
+                }
+                self.write_str("}")?;
+            }
+            if let Some(name) = font.non_tagged_name.as_deref() {
+                self.write_str("{\\*")?;
+                self.write_control_word("fname", None)?;
+                self.write_str(" ")?;
+                self.write_text(name)?;
+                self.write_str("}")?;
+            }
 
             // Write font name
             self.write_str(" ")?;
             self.write_text(font.name.as_ref())?;
+            if let Some(name) = font.alternate_name.as_deref() {
+                self.write_str("{\\*")?;
+                self.write_control_word("falt", None)?;
+                self.write_str(" ")?;
+                self.write_text(name)?;
+                self.write_str("}")?;
+            }
             self.write_str(";")?;
             self.write_str("}")?;
         }

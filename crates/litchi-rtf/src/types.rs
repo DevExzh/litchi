@@ -1,6 +1,7 @@
 //! RTF document type definitions.
 
 use super::border::{Borders, Shading};
+use crate::{RtfError, RtfResult};
 use std::borrow::Cow;
 use std::num::NonZeroU16;
 
@@ -101,8 +102,17 @@ pub enum FontFamily {
     Tech,
 }
 
+/// Font pitch preference from `fprq`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum FontPitch {
+    #[default]
+    Default,
+    Fixed,
+    Variable,
+}
+
 /// Font definition.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Font<'a> {
     /// Font name
     pub name: Cow<'a, str>,
@@ -110,6 +120,16 @@ pub struct Font<'a> {
     pub family: FontFamily,
     /// Character set (Windows codepage)
     pub charset: u8,
+    /// Alternate font name from the inert `falt` destination.
+    pub alternate_name: Option<Cow<'a, str>>,
+    /// Non-tagged font name from the inert `fname` destination.
+    pub non_tagged_name: Option<Cow<'a, str>>,
+    /// Ten-byte PANOSE classification.
+    pub panose: Option<[u8; 10]>,
+    /// Pitch preference.
+    pub pitch: FontPitch,
+    /// Explicit font code page.
+    pub code_page: Option<u16>,
 }
 
 impl<'a> Font<'a> {
@@ -120,21 +140,52 @@ impl<'a> Font<'a> {
             name,
             family,
             charset,
+            alternate_name: None,
+            non_tagged_name: None,
+            panose: None,
+            pitch: FontPitch::Default,
+            code_page: None,
+        }
+    }
+
+    pub fn validate(&self) -> RtfResult<()> {
+        const MAX_FONT_NAME_BYTES: usize = 4_096;
+        if self.name.is_empty()
+            || self.name.len() > MAX_FONT_NAME_BYTES
+            || self.alternate_name.as_ref().is_some_and(|name| name.is_empty() || name.len() > MAX_FONT_NAME_BYTES)
+            || self.non_tagged_name.as_ref().is_some_and(|name| name.is_empty() || name.len() > MAX_FONT_NAME_BYTES)
+        {
+            return Err(RtfError::MalformedDocument("invalid or oversized RTF font name".to_string()));
+        }
+        Ok(())
+    }
+
+    pub(crate) fn into_owned(self) -> Font<'static> {
+        Font {
+            name: Cow::Owned(self.name.into_owned()),
+            family: self.family,
+            charset: self.charset,
+            alternate_name: self.alternate_name.map(|name| Cow::Owned(name.into_owned())),
+            non_tagged_name: self.non_tagged_name.map(|name| Cow::Owned(name.into_owned())),
+            panose: self.panose,
+            pitch: self.pitch,
+            code_page: self.code_page,
         }
     }
 }
 
 /// Font table containing document fonts.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FontTable<'a> {
     pub(crate) fonts: Vec<Font<'a>>,
+    pub(crate) defined: Vec<bool>,
 }
 
 impl<'a> FontTable<'a> {
     /// Create a new font table.
     #[inline]
     pub fn new() -> Self {
-        Self { fonts: Vec::new() }
+        Self { fonts: Vec::new(), defined: Vec::new() }
     }
 
     /// Add a font to the table at a specific index.
@@ -146,20 +197,59 @@ impl<'a> FontTable<'a> {
                 (index as usize) + 1,
                 Font::new(Cow::Borrowed(""), FontFamily::Nil, 0),
             );
+            self.defined.resize((index as usize) + 1, false);
         }
         self.fonts[index as usize] = font;
+        self.defined[index as usize] = true;
     }
 
     /// Get a font by reference.
     #[inline]
     pub fn get(&self, font_ref: FontRef) -> Option<&Font<'a>> {
-        self.fonts.get(font_ref as usize)
+        self.defined
+            .get(font_ref as usize)
+            .copied()
+            .unwrap_or(false)
+            .then(|| &self.fonts[font_ref as usize])
     }
 
     /// Get all fonts in the table.
     #[inline]
     pub fn fonts(&self) -> &[Font<'a>] {
         &self.fonts
+    }
+
+    pub fn is_defined(&self, font_ref: FontRef) -> bool {
+        self.defined.get(font_ref as usize).copied().unwrap_or(false)
+    }
+
+    pub fn validate(&self) -> RtfResult<()> {
+        if self.fonts.len() > 65_536 || self.defined.len() != self.fonts.len() {
+            return Err(RtfError::MalformedDocument("invalid RTF font-table size".to_string()));
+        }
+        let mut aggregate = 0usize;
+        for (font, defined) in self.fonts.iter().zip(&self.defined) {
+            if !defined {
+                continue;
+            }
+            font.validate()?;
+            aggregate = aggregate
+                .checked_add(font.name.len())
+                .and_then(|total| total.checked_add(font.alternate_name.as_ref().map_or(0, |name| name.len())))
+                .and_then(|total| total.checked_add(font.non_tagged_name.as_ref().map_or(0, |name| name.len())))
+                .ok_or_else(|| RtfError::MalformedDocument("RTF font-table text size overflow".to_string()))?;
+        }
+        if aggregate > 16 * 1_048_576 {
+            return Err(RtfError::MalformedDocument("RTF font-table text exceeds the safety limit".to_string()));
+        }
+        Ok(())
+    }
+
+    pub(crate) fn into_owned(self) -> FontTable<'static> {
+        FontTable {
+            fonts: self.fonts.into_iter().map(Font::into_owned).collect(),
+            defined: self.defined,
+        }
     }
 }
 

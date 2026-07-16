@@ -288,6 +288,7 @@ pub mod coordinates;
 mod core;
 /// ODF data type conversions (Boolean, Date, DateTime, Duration)
 pub mod datatype;
+pub mod drawing_gradient;
 /// ODF XML element classes
 pub mod elements;
 pub use elements::field::{

@@ -28,6 +28,7 @@ mod pivot_xfext;
 mod sst;
 mod scenario;
 mod validation;
+mod vba;
 mod workbook;
 mod worksheet;
 
@@ -87,6 +88,14 @@ pub fn write_scenario_manager<W: Write>(
     manager: &crate::xls::scenario::XlsScenarioManager,
 ) -> XlsResult<()> {
     scenario::write_scenario_manager(writer, manager)
+}
+
+pub fn write_ob_proj<W: Write>(writer: &mut W) -> XlsResult<()> { vba::write_ob_proj(writer) }
+pub fn write_ob_no_macros<W: Write>(writer: &mut W) -> XlsResult<()> {
+    vba::write_ob_no_macros(writer)
+}
+pub fn write_code_name<W: Write>(writer: &mut W, value: &str) -> XlsResult<()> {
+    vba::write_code_name(writer, value)
 }
 
 /// Write NAME (Lbl) record for a defined name.

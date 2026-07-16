@@ -7,7 +7,7 @@ use crate::xls::{XlsError, XlsResult};
 
 use super::named_range::XlsDefinedName as InternalDefinedName;
 use super::worksheet::WritableWorksheet;
-use super::{XlsCalculationSettings, XlsCellValue, XlsFileSharing, XlsWorkbookProtection};
+use super::{XlsCalculationSettings, XlsCellValue, XlsFileSharing, XlsVbaWriteMetadata, XlsWorkbookProtection};
 
 const DEFAULT_WRITE_ACCESS_USER: &str = "litchi";
 const DEFAULT_FUNCTION_GROUP_COUNT: u16 = 17;
@@ -27,6 +27,7 @@ pub(crate) struct WorkbookStreams {
 pub(crate) fn generate_workbook_stream(
     use_1904_dates: bool,
     calculation_settings: XlsCalculationSettings,
+    vba_metadata: Option<&XlsVbaWriteMetadata>,
     fmt: &FormattingManager,
     defined_names: &[InternalDefinedName],
     shared_strings: &[String],
@@ -81,6 +82,11 @@ pub(crate) fn generate_workbook_stream(
         biff::write_excel9_file(&mut stream)?;
     }
     biff::write_tab_id(&mut stream, sheet_count)?;
+    if let Some(metadata) = vba_metadata {
+        biff::write_ob_proj(&mut stream)?;
+        biff::write_ob_no_macros(&mut stream)?;
+        biff::write_code_name(&mut stream, &metadata.workbook_code_name)?;
+    }
     biff::write_fn_group_count(&mut stream, DEFAULT_FUNCTION_GROUP_COUNT)?;
     biff::write_window_protect(&mut stream, protect_windows)?;
     biff::write_protect(&mut stream, protect_structure)?;
@@ -999,6 +1005,10 @@ pub(crate) fn generate_workbook_stream(
             biff::write_selection(&mut stream)?;
             biff::write_phonetic_pr(&mut stream)?;
             biff::write_sheet_ext(&mut stream)?;
+        }
+
+        if let Some(code_name) = &worksheet.vba_code_name {
+            biff::write_code_name(&mut stream, code_name)?;
         }
 
         // EOF record (end of worksheet)

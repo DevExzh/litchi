@@ -57,6 +57,7 @@ pub struct XlsWorksheet {
     page_setup: Option<XlsPageSetup>,
     calculation: crate::xls::calculation::XlsWorksheetCalculation,
     scenario_manager: Option<crate::xls::scenario::XlsScenarioManager>,
+    vba_code_name: Option<String>,
     conditional_formattings: Vec<XlsConditionalFormatting>,
 }
 
@@ -86,6 +87,7 @@ impl XlsWorksheet {
             page_setup: None,
             calculation: crate::xls::calculation::XlsWorksheetCalculation::default(),
             scenario_manager: None,
+            vba_code_name: None,
             conditional_formattings: Vec::new(),
         }
     }
@@ -115,6 +117,7 @@ impl XlsWorksheet {
             page_setup: None,
             calculation: crate::xls::calculation::XlsWorksheetCalculation::default(),
             scenario_manager: None,
+            vba_code_name: None,
             conditional_formattings: Vec::new(),
         }
     }
@@ -378,6 +381,11 @@ impl XlsWorksheet {
         scenario_manager: Option<crate::xls::scenario::XlsScenarioManager>,
     ) {
         self.scenario_manager = scenario_manager;
+    }
+
+    pub fn vba_code_name(&self) -> Option<&str> { self.vba_code_name.as_deref() }
+    pub(crate) fn set_vba_code_name(&mut self, code_name: Option<String>) {
+        self.vba_code_name = code_name;
     }
 
     /// Legacy conditional formatting groups in worksheet record order.

@@ -32,6 +32,9 @@ mod calculation;
 /// BIFF8 worksheet scenario manager records.
 mod scenario;
 
+/// Inert BIFF8 VBA project markers and object code names.
+mod vba;
+
 /// BIFF formula token rendering
 mod formula;
 
@@ -99,6 +102,7 @@ pub use calculation::{
     XlsCalculationMode, XlsReferenceMode, XlsWorkbookCalculation, XlsWorksheetCalculation,
 };
 pub use scenario::{XlsScenario, XlsScenarioCell, XlsScenarioManager, XlsScenarioRange};
+pub use vba::XlsVbaMetadata;
 pub use data_validation::{
     XlsDataValidationErrorStyle, XlsDataValidationFormula, XlsDataValidationImeMode,
     XlsDataValidationKind, XlsDataValidationOperator, XlsDataValidationRange,
