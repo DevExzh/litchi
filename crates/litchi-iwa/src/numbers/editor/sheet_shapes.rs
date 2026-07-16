@@ -6,12 +6,13 @@ use std::ops::Range;
 use super::*;
 use crate::shapes::{
     DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, LineEndpoints, LineSegment,
-    LineStyle, RgbaColor, ShapeFill, ShapeImageFill, ShapeImageFillTechnique, ShapePathKind,
-    ShapePreset, ShapeStroke, line_geometry, line_path_source, line_segments_match,
-    reset_shape_fill, reset_shape_stroke, set_shape_fill, set_shape_geometry,
-    set_shape_image_fill_data, set_shape_line_endpoints, set_shape_line_segment, set_shape_preset,
-    set_shape_stroke, shape_fill, shape_line_endpoints, shape_line_segment, shape_path_kind,
-    shape_path_source, shape_preset, shape_stroke,
+    LineStyle, RgbaColor, ShapeEffects, ShapeFill, ShapeImageFill, ShapeImageFillTechnique,
+    ShapePathKind, ShapePreset, ShapeStroke, line_geometry, line_path_source, line_segments_match,
+    reset_shape_effects, reset_shape_fill, reset_shape_stroke, set_shape_effects, set_shape_fill,
+    set_shape_geometry, set_shape_image_fill_data, set_shape_line_endpoints,
+    set_shape_line_segment, set_shape_preset, set_shape_stroke, shape_effects, shape_fill,
+    shape_line_endpoints, shape_line_segment, shape_path_kind, shape_path_source, shape_preset,
+    shape_stroke,
 };
 
 use super::text_box_create::{
@@ -465,6 +466,56 @@ impl NumbersEditor {
         let source = shape_graph(self, sheet_id, drawable_object_id)?;
         let mut staged = self.package.clone();
         let changed = reset_shape_fill(&mut staged, &source.archive_name, drawable_object_id)?;
+        if changed {
+            *self = Self::from_package(staged)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read effective whole-object opacity and reflection settings.
+    pub fn sheet_shape_effects(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<ShapeEffects> {
+        let source = shape_graph(self, sheet_id, drawable_object_id)?;
+        shape_effects(&self.package, &source.archive_name, drawable_object_id)
+    }
+
+    /// Replace opacity and reflection atomically while preserving other style properties.
+    pub fn set_sheet_shape_effects(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        effects: ShapeEffects,
+    ) -> Result<()> {
+        let source = shape_graph(self, sheet_id, drawable_object_id)?;
+        let mut staged = self.package.clone();
+        set_shape_effects(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            effects,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.sheet_shape_effects(sheet_id, drawable_object_id)? != effects {
+            return Err(Error::InvalidFormat(
+                "Numbers shape effect update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove direct effect overrides and restore inherited values.
+    pub fn reset_sheet_shape_effects(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let source = shape_graph(self, sheet_id, drawable_object_id)?;
+        let mut staged = self.package.clone();
+        let changed = reset_shape_effects(&mut staged, &source.archive_name, drawable_object_id)?;
         if changed {
             *self = Self::from_package(staged)?;
         }
@@ -1051,7 +1102,8 @@ mod tests {
     use crate::numbers::NumbersDocumentBuilder;
     use crate::shapes::{
         LineEndpoint, RgbColorSpace, RgbaColor, ShapeCornerRadius, ShapeGradient,
-        ShapeGradientAngle, StrokePattern, StrokeWidth,
+        ShapeGradientAngle, ShapeOpacity, ShapeReflection, ShapeReflectionOpacity, StrokePattern,
+        StrokeWidth,
     };
 
     const POSITION: DrawablePoint = DrawablePoint { x: 420.0, y: 300.0 };
@@ -1350,6 +1402,48 @@ mod tests {
             inherited
         );
         assert!(reopened.media_assets().unwrap().is_empty());
+    }
+
+    #[test]
+    fn scratch_spreadsheet_supports_shape_effect_crud() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .sheet_name("Effects")
+            .table_name("Data")
+            .build()
+            .unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let created = editor
+            .add_sheet_shape(sheet_id, "Effects", POSITION, SIZE, ShapePreset::Rectangle)
+            .unwrap();
+        let inherited = editor
+            .sheet_shape_effects(sheet_id, created.drawable_object_id)
+            .unwrap();
+        let effects = ShapeEffects::new(
+            ShapeOpacity::new(0.84).unwrap(),
+            ShapeReflection::Enabled(ShapeReflectionOpacity::new(0.65).unwrap()),
+        );
+        editor
+            .set_sheet_shape_effects(sheet_id, created.drawable_object_id, effects)
+            .unwrap();
+
+        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .sheet_shape_effects(sheet_id, created.drawable_object_id)
+                .unwrap(),
+            effects
+        );
+        assert!(
+            reopened
+                .reset_sheet_shape_effects(sheet_id, created.drawable_object_id)
+                .unwrap()
+        );
+        assert_eq!(
+            reopened
+                .sheet_shape_effects(sheet_id, created.drawable_object_id)
+                .unwrap(),
+            inherited
+        );
     }
 
     #[test]

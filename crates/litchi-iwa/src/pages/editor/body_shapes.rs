@@ -9,11 +9,12 @@ use crate::package_metadata::{
 };
 use crate::shapes::{
     DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, LineEndpoints, LineSegment,
-    LineStyle, RgbaColor, ShapeFill, ShapeImageFill, ShapeImageFillTechnique, ShapePathKind,
-    ShapePreset, ShapeStroke, line_geometry, line_path_source, line_segments_match,
-    reset_shape_fill, reset_shape_stroke, set_shape_fill, set_shape_geometry,
-    set_shape_image_fill_data, set_shape_line_endpoints, set_shape_line_segment, set_shape_preset,
-    set_shape_stroke, shape_fill, shape_line_endpoints, shape_path_source, shape_stroke,
+    LineStyle, RgbaColor, ShapeEffects, ShapeFill, ShapeImageFill, ShapeImageFillTechnique,
+    ShapePathKind, ShapePreset, ShapeStroke, line_geometry, line_path_source, line_segments_match,
+    reset_shape_effects, reset_shape_fill, reset_shape_stroke, set_shape_effects, set_shape_fill,
+    set_shape_geometry, set_shape_image_fill_data, set_shape_line_endpoints,
+    set_shape_line_segment, set_shape_preset, set_shape_stroke, shape_effects, shape_fill,
+    shape_line_endpoints, shape_path_source, shape_stroke,
 };
 
 use super::text_box_create::{
@@ -448,6 +449,47 @@ impl PagesEditor {
         Ok(changed)
     }
 
+    /// Read effective whole-object opacity and reflection settings.
+    pub fn body_shape_effects(&self, drawable_object_id: u64) -> Result<ShapeEffects> {
+        let source = body_shape_graph(self, drawable_object_id)?;
+        shape_effects(self.package(), &source.archive_name, drawable_object_id)
+    }
+
+    /// Replace opacity and reflection atomically while preserving other style properties.
+    pub fn set_body_shape_effects(
+        &mut self,
+        drawable_object_id: u64,
+        effects: ShapeEffects,
+    ) -> Result<()> {
+        let source = body_shape_graph(self, drawable_object_id)?;
+        let mut staged = self.package().clone();
+        set_shape_effects(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            effects,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.body_shape_effects(drawable_object_id)? != effects {
+            return Err(Error::InvalidFormat(
+                "Pages shape effect update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove direct effect overrides and restore inherited values.
+    pub fn reset_body_shape_effects(&mut self, drawable_object_id: u64) -> Result<bool> {
+        let source = body_shape_graph(self, drawable_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = reset_shape_effects(&mut staged, &source.archive_name, drawable_object_id)?;
+        if changed {
+            *self = Self::from_package(staged)?;
+        }
+        Ok(changed)
+    }
+
     /// Move or resize one native straight line by replacing its endpoints.
     pub fn set_body_line_segment(
         &mut self,
@@ -665,7 +707,8 @@ mod tests {
     use super::*;
     use crate::shapes::{
         LineEndpoint, RgbColorSpace, RgbaColor, ShapeCornerRadius, ShapeGradient,
-        ShapeGradientAngle, StrokePattern, StrokeWidth,
+        ShapeGradientAngle, ShapeOpacity, ShapeReflection, ShapeReflectionOpacity, StrokePattern,
+        StrokeWidth,
     };
 
     const POSITION: DrawablePoint = DrawablePoint { x: 180.0, y: 240.0 };
@@ -1085,6 +1128,74 @@ mod tests {
             inherited
         );
         assert!(reopened.media_assets().unwrap().is_empty());
+    }
+
+    #[test]
+    fn scratch_document_supports_composable_shape_effect_crud() {
+        let mut editor = PagesEditor::create_with_text("Body").unwrap();
+        let fill =
+            ShapeFill::Solid(RgbaColor::new(0.15, 0.45, 0.85, 1.0, RgbColorSpace::Srgb).unwrap());
+        let created = editor
+            .add_body_shape(4, "Effects", POSITION, SIZE, ShapePreset::Rectangle)
+            .unwrap();
+        editor
+            .set_body_shape_fill(created.drawable_object_id, &fill)
+            .unwrap();
+        let inherited = editor
+            .body_shape_effects(created.drawable_object_id)
+            .unwrap();
+        let effects = ShapeEffects::new(
+            ShapeOpacity::new(0.72).unwrap(),
+            ShapeReflection::Enabled(ShapeReflectionOpacity::new(0.35).unwrap()),
+        );
+        editor
+            .set_body_shape_effects(created.drawable_object_id, effects)
+            .unwrap();
+        assert_eq!(
+            editor
+                .body_shape_effects(created.drawable_object_id)
+                .unwrap(),
+            effects
+        );
+        assert_eq!(
+            editor.body_shape_fill(created.drawable_object_id).unwrap(),
+            fill
+        );
+
+        let replacement =
+            ShapeEffects::new(ShapeOpacity::new(0.48).unwrap(), ShapeReflection::Disabled);
+        editor
+            .set_body_shape_effects(created.drawable_object_id, replacement)
+            .unwrap();
+        let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .body_shape_effects(created.drawable_object_id)
+                .unwrap(),
+            replacement
+        );
+        assert!(
+            reopened
+                .reset_body_shape_effects(created.drawable_object_id)
+                .unwrap()
+        );
+        assert_eq!(
+            reopened
+                .body_shape_effects(created.drawable_object_id)
+                .unwrap(),
+            inherited
+        );
+        assert_eq!(
+            reopened
+                .body_shape_fill(created.drawable_object_id)
+                .unwrap(),
+            fill
+        );
+        assert!(
+            !reopened
+                .reset_body_shape_effects(created.drawable_object_id)
+                .unwrap()
+        );
     }
 
     #[test]

@@ -57,7 +57,6 @@ fn image_from_native(native: &tsd::ImageFillArchive) -> Result<ShapeImageFill> {
     if native.originalimagedata.is_some()
         || native.database_imagedata.is_some()
         || native.database_originalimagedata.is_some()
-        || native.referencecolor.is_some()
     {
         return Err(Error::InvalidFormat(
             "legacy or database-backed iWork shape image fills are not supported".to_owned(),
@@ -116,6 +115,9 @@ fn image_from_native(native: &tsd::ImageFillArchive) -> Result<ShapeImageFill> {
     if let Some(tint) = native.tint.as_ref() {
         image = image.with_tint(color_from_native(tint)?);
     }
+    if let Some(reference_color) = native.referencecolor.as_ref() {
+        image = image.with_reference_color(color_from_native(reference_color)?);
+    }
     Ok(image.with_generic_untagged_image(
         native
             .interprets_untagged_image_data_as_generic
@@ -158,7 +160,7 @@ fn image_to_native(image: &ShapeImageFill) -> tsd::ImageFillArchive {
         interprets_untagged_image_data_as_generic: Some(
             image.interprets_untagged_image_as_generic(),
         ),
-        referencecolor: None,
+        referencecolor: image.reference_color().map(color_to_native),
         database_imagedata: None,
         database_originalimagedata: None,
     }
@@ -299,6 +301,7 @@ mod tests {
                 )
                 .unwrap()
                 .with_tint(start)
+                .with_reference_color(end)
                 .with_generic_untagged_image(true),
             ),
         ] {

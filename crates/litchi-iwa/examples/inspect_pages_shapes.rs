@@ -12,8 +12,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for (index, shape) in editor.body_shapes()?.iter().enumerate() {
         let fill = editor.body_shape_fill(shape.drawable_object_id)?;
         let stroke = editor.body_shape_stroke(shape.drawable_object_id)?;
+        let effects = editor.body_shape_effects(shape.drawable_object_id)?;
         println!(
-            "shape[{index}] drawable={} storage={} anchor={} kind={:?} preset={:?} line={:?} endpoints={:?} fill={fill:?} stroke={stroke:?} text={:?} geometry={:?} properties={:?}",
+            "shape[{index}] drawable={} storage={} anchor={} kind={:?} preset={:?} line={:?} endpoints={:?} fill={fill:?} stroke={stroke:?} effects={effects:?} text={:?} geometry={:?} properties={:?}",
             shape.drawable_object_id,
             shape.storage.object_id,
             shape.anchor_character_index,

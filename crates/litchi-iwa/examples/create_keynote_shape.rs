@@ -4,9 +4,10 @@ use std::{env, fs, path::Path};
 
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::shapes::{
-    DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeFill, ShapeGradient,
+    DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeEffects, ShapeFill, ShapeGradient,
     ShapeGradientAngle, ShapeGradientKind, ShapeGradientOpacity, ShapeGradientStop,
-    ShapeGradientStopMidpoint, ShapeGradientStopPosition, ShapeImageFillTechnique, ShapePreset,
+    ShapeGradientStopMidpoint, ShapeGradientStopPosition, ShapeImageFillTechnique, ShapeOpacity,
+    ShapePreset, ShapeReflection, ShapeReflectionOpacity,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -64,6 +65,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Some(RgbaColor::new(0.0, 0.0, 0.0, 0.5, RgbColorSpace::Srgb)?),
         )?;
     }
+    editor.set_slide_shape_effects(
+        0,
+        created.drawable_object_id,
+        ShapeEffects::new(
+            ShapeOpacity::new(0.61)?,
+            ShapeReflection::Enabled(ShapeReflectionOpacity::new(0.2)?),
+        ),
+    )?;
     editor.save(output)?;
     println!(
         "created Keynote {:?} {:?} {} with storage {}",

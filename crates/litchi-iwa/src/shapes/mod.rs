@@ -8,6 +8,7 @@
 //! from these elements.
 
 mod color;
+mod effects;
 mod fill;
 mod geometry;
 mod line;
@@ -18,6 +19,8 @@ mod stroke;
 pub mod text_extractor;
 
 pub use color::{RgbColorSpace, RgbaColor};
+pub use effects::{ShapeEffects, ShapeOpacity, ShapeReflection, ShapeReflectionOpacity};
+pub(crate) use effects::{reset_shape_effects, set_shape_effects, shape_effects};
 pub use fill::{
     ShapeFill, ShapeGradient, ShapeGradientAngle, ShapeGradientKind, ShapeGradientOpacity,
     ShapeGradientStop, ShapeGradientStopMidpoint, ShapeGradientStopPosition,

@@ -6,12 +6,13 @@ use std::ops::Range;
 use super::*;
 use crate::shapes::{
     DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, LineEndpoints, LineSegment,
-    LineStyle, RgbaColor, ShapeFill, ShapeImageFill, ShapeImageFillTechnique, ShapePathKind,
-    ShapePreset, ShapeStroke, line_geometry, line_path_source, line_segments_match,
-    reset_shape_fill, reset_shape_stroke, set_shape_fill, set_shape_geometry,
-    set_shape_image_fill_data, set_shape_line_endpoints, set_shape_line_segment, set_shape_preset,
-    set_shape_stroke, shape_fill, shape_line_endpoints, shape_line_segment, shape_path_kind,
-    shape_path_source, shape_preset, shape_stroke,
+    LineStyle, RgbaColor, ShapeEffects, ShapeFill, ShapeImageFill, ShapeImageFillTechnique,
+    ShapePathKind, ShapePreset, ShapeStroke, line_geometry, line_path_source, line_segments_match,
+    reset_shape_effects, reset_shape_fill, reset_shape_stroke, set_shape_effects, set_shape_fill,
+    set_shape_geometry, set_shape_image_fill_data, set_shape_line_endpoints,
+    set_shape_line_segment, set_shape_preset, set_shape_stroke, shape_effects, shape_fill,
+    shape_line_endpoints, shape_line_segment, shape_path_kind, shape_path_source, shape_preset,
+    shape_stroke,
 };
 use crate::text::TextStorageInfo;
 
@@ -467,6 +468,56 @@ impl KeynoteEditor {
         let source = shape_graph(self, slide_index, drawable_object_id)?;
         let mut staged = self.package().clone();
         let changed = reset_shape_fill(&mut staged, &source.archive_name, drawable_object_id)?;
+        if changed {
+            *self = Self::from_package(staged)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read effective whole-object opacity and reflection settings.
+    pub fn slide_shape_effects(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<ShapeEffects> {
+        let source = shape_graph(self, slide_index, drawable_object_id)?;
+        shape_effects(self.package(), &source.archive_name, drawable_object_id)
+    }
+
+    /// Replace opacity and reflection atomically while preserving other style properties.
+    pub fn set_slide_shape_effects(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        effects: ShapeEffects,
+    ) -> Result<()> {
+        let source = shape_graph(self, slide_index, drawable_object_id)?;
+        let mut staged = self.package().clone();
+        set_shape_effects(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            effects,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.slide_shape_effects(slide_index, drawable_object_id)? != effects {
+            return Err(Error::InvalidFormat(
+                "Keynote shape effect update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove direct effect overrides and restore inherited values.
+    pub fn reset_slide_shape_effects(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let source = shape_graph(self, slide_index, drawable_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = reset_shape_effects(&mut staged, &source.archive_name, drawable_object_id)?;
         if changed {
             *self = Self::from_package(staged)?;
         }
@@ -997,8 +1048,9 @@ mod tests {
     use crate::shapes::{
         LineEndpoint, RgbColorSpace, RgbaColor, ShapeCornerRadius, ShapeGradient,
         ShapeGradientAngle, ShapeGradientKind, ShapeGradientOpacity, ShapeGradientStop,
-        ShapeGradientStopMidpoint, ShapeGradientStopPosition, ShapePolygonSides,
-        ShapeStarInnerRatio, ShapeStarPoints, StrokePattern, StrokeWidth,
+        ShapeGradientStopMidpoint, ShapeGradientStopPosition, ShapeOpacity, ShapePolygonSides,
+        ShapeReflection, ShapeReflectionOpacity, ShapeStarInnerRatio, ShapeStarPoints,
+        StrokePattern, StrokeWidth,
     };
 
     const POSITION: DrawablePoint = DrawablePoint { x: 320.0, y: 240.0 };
@@ -1318,6 +1370,47 @@ mod tests {
             inherited
         );
         assert!(reopened.media_assets().unwrap().is_empty());
+    }
+
+    #[test]
+    fn scratch_presentation_supports_shape_effect_crud() {
+        let mut editor = KeynoteDocumentBuilder::new()
+            .title("Effects")
+            .subtitle("Typed object opacity and reflection")
+            .build()
+            .unwrap();
+        let created = editor
+            .add_slide_shape(0, "Effects", POSITION, SIZE, ShapePreset::Rectangle)
+            .unwrap();
+        let inherited = editor
+            .slide_shape_effects(0, created.drawable_object_id)
+            .unwrap();
+        let effects = ShapeEffects::new(
+            ShapeOpacity::new(0.61).unwrap(),
+            ShapeReflection::Enabled(ShapeReflectionOpacity::new(0.2).unwrap()),
+        );
+        editor
+            .set_slide_shape_effects(0, created.drawable_object_id, effects)
+            .unwrap();
+
+        let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .slide_shape_effects(0, created.drawable_object_id)
+                .unwrap(),
+            effects
+        );
+        assert!(
+            reopened
+                .reset_slide_shape_effects(0, created.drawable_object_id)
+                .unwrap()
+        );
+        assert_eq!(
+            reopened
+                .slide_shape_effects(0, created.drawable_object_id)
+                .unwrap(),
+            inherited
+        );
     }
 
     #[test]

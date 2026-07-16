@@ -4,8 +4,9 @@ use std::{env, fs, path::Path};
 
 use litchi_iwa::pages::PagesEditor;
 use litchi_iwa::shapes::{
-    DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeFill, ShapeGradient,
-    ShapeGradientAngle, ShapeImageFillTechnique, ShapePreset,
+    DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeEffects, ShapeFill, ShapeGradient,
+    ShapeGradientAngle, ShapeImageFillTechnique, ShapeOpacity, ShapePreset, ShapeReflection,
+    ShapeReflectionOpacity,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -48,6 +49,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             None,
         )?;
     }
+    editor.set_body_shape_effects(
+        created.drawable_object_id,
+        ShapeEffects::new(
+            ShapeOpacity::new(0.72)?,
+            ShapeReflection::Enabled(ShapeReflectionOpacity::new(0.35)?),
+        ),
+    )?;
     editor.save(output)?;
     println!(
         "created Pages {:?} {:?} {} with storage {} at UTF-16 anchor {}",

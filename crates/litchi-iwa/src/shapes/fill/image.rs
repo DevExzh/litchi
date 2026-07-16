@@ -48,6 +48,7 @@ pub struct ShapeImageFill {
     technique: ShapeImageFillTechnique,
     fill_size: DrawableSize,
     tint: Option<RgbaColor>,
+    reference_color: Option<RgbaColor>,
     interprets_untagged_image_as_generic: bool,
 }
 
@@ -80,6 +81,7 @@ impl ShapeImageFill {
             technique,
             fill_size,
             tint: None,
+            reference_color: None,
             interprets_untagged_image_as_generic: false,
         })
     }
@@ -93,6 +95,18 @@ impl ShapeImageFill {
     /// Remove the tint, converting the application presentation to Image Fill.
     pub fn without_tint(mut self) -> Self {
         self.tint = None;
+        self
+    }
+
+    /// Preserve iWork's representative color sampled from the source image.
+    pub fn with_reference_color(mut self, color: RgbaColor) -> Self {
+        self.reference_color = Some(color);
+        self
+    }
+
+    /// Remove representative-color metadata.
+    pub fn without_reference_color(mut self) -> Self {
+        self.reference_color = None;
         self
     }
 
@@ -129,6 +143,10 @@ impl ShapeImageFill {
 
     pub const fn tint(&self) -> Option<RgbaColor> {
         self.tint
+    }
+
+    pub const fn reference_color(&self) -> Option<RgbaColor> {
+        self.reference_color
     }
 
     pub const fn interprets_untagged_image_as_generic(&self) -> bool {
@@ -181,11 +199,13 @@ mod tests {
             ShapeImageFill::embedded(identifier, ShapeImageFillTechnique::ScaleToFit, FILL_SIZE)
                 .unwrap()
                 .with_tint(tint)
+                .with_reference_color(tint)
                 .with_generic_untagged_image(true);
         assert_eq!(fill.data_identifier(), Some(identifier));
         assert_eq!(fill.technique(), ShapeImageFillTechnique::ScaleToFit);
         assert_eq!(fill.fill_size(), FILL_SIZE);
         assert_eq!(fill.tint(), Some(tint));
+        assert_eq!(fill.reference_color(), Some(tint));
         assert!(fill.interprets_untagged_image_as_generic());
     }
 }
