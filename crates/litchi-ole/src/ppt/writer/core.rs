@@ -55,7 +55,10 @@ use super::records::{
     create_slide_list_with_text_master, record_type, wrap_dg_into_ppdrawing,
     wrap_dgg_into_ppdrawing_group,
 };
-use super::shape_style::{ArrowStyle, FillStyle, LineStyleConfig, ShadowStyle, ShapeStyle};
+use super::shape_style::{
+    ArrowStyle, FillStyle, LineCapStyle, LineJoinStyle, LineStyle, LineStyleConfig, ShadowStyle,
+    ShapeStyle,
+};
 #[allow(unused_imports)]
 use super::shapes::ShapeKind;
 use super::slide_timing::SlideTiming;
@@ -299,6 +302,47 @@ struct WritableShape {
     animation_info: Option<AnimationInfo>,
 }
 
+#[derive(Default)]
+struct ConvertedLineProperties {
+    color: Option<u32>,
+    width: Option<i32>,
+    opacity: Option<u32>,
+    style: Option<u32>,
+    dash_style: Option<u32>,
+    start_arrow: Option<u32>,
+    end_arrow: Option<u32>,
+    start_arrow_width: Option<u32>,
+    start_arrow_length: Option<u32>,
+    end_arrow_width: Option<u32>,
+    end_arrow_length: Option<u32>,
+    join_style: Option<u32>,
+    end_cap_style: Option<u32>,
+}
+
+fn convert_line_properties(line: Option<&LineStyleConfig>) -> ConvertedLineProperties {
+    let Some(line) = line.filter(|line| line.enabled && line.width > 0) else {
+        return ConvertedLineProperties::default();
+    };
+    let has_start_arrow = line.start_arrow != ArrowStyle::None;
+    let has_end_arrow = line.end_arrow != ArrowStyle::None;
+    ConvertedLineProperties {
+        color: Some(line.color.to_rgbx()),
+        width: Some(line.width as i32),
+        opacity: (line.opacity < 100).then(|| (u32::from(line.opacity) * 65536) / 100),
+        style: (line.style != LineStyle::Simple).then_some(line.style as u32),
+        dash_style: (line.dash != super::shape_style::LineDashStyle::Solid)
+            .then_some(line.dash as u32),
+        start_arrow: has_start_arrow.then_some(line.start_arrow as u32),
+        end_arrow: has_end_arrow.then_some(line.end_arrow as u32),
+        start_arrow_width: has_start_arrow.then_some(line.start_arrow_width as u32),
+        start_arrow_length: has_start_arrow.then_some(line.start_arrow_length as u32),
+        end_arrow_width: has_end_arrow.then_some(line.end_arrow_width as u32),
+        end_arrow_length: has_end_arrow.then_some(line.end_arrow_length as u32),
+        join_style: (line.join != LineJoinStyle::Miter).then_some(line.join as u32),
+        end_cap_style: (line.cap != LineCapStyle::Round).then_some(line.cap as u32),
+    }
+}
+
 impl Default for ShapeProperties {
     fn default() -> Self {
         Self {
@@ -403,37 +447,7 @@ fn convert_shape_to_escher(
             )
         });
 
-    // Extract line color, width, dash style, and arrows from LineStyleConfig
-    let (line_color, line_width, line_dash_style, line_start_arrow, line_end_arrow) = props
-        .line
-        .as_ref()
-        .map_or((None, None, None, None, None), |line| {
-            if line.width > 0 && line.enabled {
-                let dash = match line.dash {
-                    super::shape_style::LineDashStyle::Solid => None,
-                    _ => Some(line.dash as u32),
-                };
-                let start_arrow = if line.start_arrow != super::shape_style::ArrowStyle::None {
-                    Some(line.start_arrow as u32)
-                } else {
-                    None
-                };
-                let end_arrow = if line.end_arrow != super::shape_style::ArrowStyle::None {
-                    Some(line.end_arrow as u32)
-                } else {
-                    None
-                };
-                (
-                    Some(line.color.to_rgbx()),
-                    Some(line.width as i32),
-                    dash,
-                    start_arrow,
-                    end_arrow,
-                )
-            } else {
-                (None, None, None, None, None)
-            }
-        });
+    let line = convert_line_properties(props.line.as_ref());
 
     // Extract shadow properties from ShadowStyle
     let (has_shadow, shadow_color, shadow_offset_x, shadow_offset_y, shadow_opacity, shadow_type) =
@@ -484,11 +498,19 @@ fn convert_shape_to_escher(
         fill_back_color,
         fill_angle,
         fill_blip_index,
-        line_color,
-        line_width,
-        line_dash_style,
-        line_start_arrow,
-        line_end_arrow,
+        line_color: line.color,
+        line_width: line.width,
+        line_opacity: line.opacity,
+        line_style: line.style,
+        line_dash_style: line.dash_style,
+        line_start_arrow: line.start_arrow,
+        line_end_arrow: line.end_arrow,
+        line_start_arrow_width: line.start_arrow_width,
+        line_start_arrow_length: line.start_arrow_length,
+        line_end_arrow_width: line.end_arrow_width,
+        line_end_arrow_length: line.end_arrow_length,
+        line_join_style: line.join_style,
+        line_end_cap_style: line.end_cap_style,
         text,
         paragraphs,
         text_type: 4,           // OTHER for regular shapes
@@ -1996,7 +2018,7 @@ impl Default for PptWriter {
 mod tests {
     use super::*;
     use crate::ppt::shapes::geometry::{GeometryRect, ShapePathType};
-    use crate::ppt::writer::shape_style::ShapeColor;
+    use crate::ppt::writer::shape_style::{ArrowSize, ShapeColor};
     use std::io::Cursor;
 
     #[test]
@@ -2611,6 +2633,44 @@ mod tests {
         let mut buffer = Cursor::new(Vec::new());
         let result = writer.write_to(&mut buffer);
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_extended_line_style_reaches_escher_shape() {
+        let mut writer = PptWriter::new();
+        let slide = writer.add_slide().unwrap();
+        let mut line = LineStyleConfig::with_color_and_width(ShapeColor::RED, 2.0);
+        line.opacity = 50;
+        line.style = LineStyle::Triple;
+        line.cap = LineCapStyle::Flat;
+        line.join = LineJoinStyle::Round;
+        line.start_arrow = ArrowStyle::Triangle;
+        line.start_arrow_width = ArrowSize::Small;
+        line.start_arrow_length = ArrowSize::Large;
+        line.end_arrow = ArrowStyle::Open;
+        line.end_arrow_width = ArrowSize::Large;
+        line.end_arrow_length = ArrowSize::Small;
+        let style = ShapeStyle::new().with_line(line);
+
+        writer
+            .add_styled_shape(slide, ShapeType::Rectangle, 10, 10, 100, 100, style)
+            .unwrap();
+        let shape = convert_shape_to_escher(&writer.slides[slide].shapes[0], &writer.hyperlinks);
+
+        assert_eq!(shape.line_opacity, Some(32768));
+        assert_eq!(shape.line_style, Some(LineStyle::Triple as u32));
+        assert_eq!(shape.line_end_cap_style, Some(LineCapStyle::Flat as u32));
+        assert_eq!(shape.line_join_style, Some(LineJoinStyle::Round as u32));
+        assert_eq!(shape.line_start_arrow_width, Some(ArrowSize::Small as u32));
+        assert_eq!(shape.line_start_arrow_length, Some(ArrowSize::Large as u32));
+        assert_eq!(shape.line_end_arrow_width, Some(ArrowSize::Large as u32));
+        assert_eq!(shape.line_end_arrow_length, Some(ArrowSize::Small as u32));
+
+        let default_line = convert_line_properties(Some(&LineStyleConfig::default_line()));
+        assert_eq!(default_line.opacity, None);
+        assert_eq!(default_line.style, None);
+        assert_eq!(default_line.end_cap_style, None);
+        assert_eq!(default_line.join_style, None);
     }
 
     #[test]

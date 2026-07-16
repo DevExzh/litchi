@@ -84,6 +84,8 @@ pub mod prop_id {
     pub const LINE_START_ARROW_LENGTH: u16 = 0x01D3;
     pub const LINE_END_ARROW_WIDTH: u16 = 0x01D4;
     pub const LINE_END_ARROW_LENGTH: u16 = 0x01D5;
+    pub const LINE_JOIN_STYLE: u16 = 0x01D6;
+    pub const LINE_END_CAP_STYLE: u16 = 0x01D7;
     pub const LINE_BLIP: u16 = 0x41C5;
     pub const LINE_STYLE_BOOL: u16 = 0x01FF;
 
@@ -846,12 +848,28 @@ pub struct UserShapeData {
     pub line_color: Option<u32>,
     /// Line width in EMUs (12700 = 1pt)
     pub line_width: Option<i32>,
+    /// Line opacity (0-65536, 65536 = 100%).
+    pub line_opacity: Option<u32>,
+    /// Compound line style.
+    pub line_style: Option<u32>,
     /// Line dash style (0=solid, 1=dash, 2=dot, etc.)
     pub line_dash_style: Option<u32>,
     /// Line start arrow style
     pub line_start_arrow: Option<u32>,
     /// Line end arrow style
     pub line_end_arrow: Option<u32>,
+    /// Line start arrow width.
+    pub line_start_arrow_width: Option<u32>,
+    /// Line start arrow length.
+    pub line_start_arrow_length: Option<u32>,
+    /// Line end arrow width.
+    pub line_end_arrow_width: Option<u32>,
+    /// Line end arrow length.
+    pub line_end_arrow_length: Option<u32>,
+    /// Line join style.
+    pub line_join_style: Option<u32>,
+    /// Line end-cap style.
+    pub line_end_cap_style: Option<u32>,
     /// Text content (simple string, ignored if paragraphs set)
     pub text: Option<String>,
     /// Rich text paragraphs (with formatting)
@@ -912,9 +930,17 @@ impl Default for UserShapeData {
             fill_blip_index: None,
             line_color: None,
             line_width: None,
+            line_opacity: None,
+            line_style: None,
             line_dash_style: None,
             line_start_arrow: None,
             line_end_arrow: None,
+            line_start_arrow_width: None,
+            line_start_arrow_length: None,
+            line_end_arrow_width: None,
+            line_end_arrow_length: None,
+            line_join_style: None,
+            line_end_cap_style: None,
             text: None,
             paragraphs: None,
             text_type: 4,           // OTHER by default
@@ -1309,8 +1335,14 @@ fn build_shape_properties(shape: &UserShapeData) -> Vec<EscherProperty> {
     // Line properties (based on POI HSLFSimpleShape)
     if let Some(line_color) = shape.line_color {
         props.push(EscherProperty::new(prop_id::LINE_COLOR, line_color));
+        if let Some(opacity) = shape.line_opacity {
+            props.push(EscherProperty::new(prop_id::LINE_OPACITY, opacity));
+        }
         if let Some(width) = shape.line_width {
             props.push(EscherProperty::new(prop_id::LINE_WIDTH, width as u32));
+        }
+        if let Some(style) = shape.line_style {
+            props.push(EscherProperty::new(prop_id::LINE_STYLE, style));
         }
         // Line dash style
         if let Some(dash) = shape.line_dash_style {
@@ -1319,14 +1351,35 @@ fn build_shape_properties(shape: &UserShapeData) -> Vec<EscherProperty> {
         // Line start arrow
         if let Some(arrow) = shape.line_start_arrow {
             props.push(EscherProperty::new(prop_id::LINE_START_ARROW, arrow));
-            props.push(EscherProperty::new(prop_id::LINE_START_ARROW_WIDTH, 1)); // Medium
-            props.push(EscherProperty::new(prop_id::LINE_START_ARROW_LENGTH, 1)); // Medium
+            props.push(EscherProperty::new(
+                prop_id::LINE_START_ARROW_WIDTH,
+                shape.line_start_arrow_width.unwrap_or(1),
+            ));
+            props.push(EscherProperty::new(
+                prop_id::LINE_START_ARROW_LENGTH,
+                shape.line_start_arrow_length.unwrap_or(1),
+            ));
         }
         // Line end arrow
         if let Some(arrow) = shape.line_end_arrow {
             props.push(EscherProperty::new(prop_id::LINE_END_ARROW, arrow));
-            props.push(EscherProperty::new(prop_id::LINE_END_ARROW_WIDTH, 1)); // Medium
-            props.push(EscherProperty::new(prop_id::LINE_END_ARROW_LENGTH, 1)); // Medium
+            props.push(EscherProperty::new(
+                prop_id::LINE_END_ARROW_WIDTH,
+                shape.line_end_arrow_width.unwrap_or(1),
+            ));
+            props.push(EscherProperty::new(
+                prop_id::LINE_END_ARROW_LENGTH,
+                shape.line_end_arrow_length.unwrap_or(1),
+            ));
+        }
+        if let Some(join_style) = shape.line_join_style {
+            props.push(EscherProperty::new(prop_id::LINE_JOIN_STYLE, join_style));
+        }
+        if let Some(end_cap_style) = shape.line_end_cap_style {
+            props.push(EscherProperty::new(
+                prop_id::LINE_END_CAP_STYLE,
+                end_cap_style,
+            ));
         }
         // Enable line: 0x180018 = line visible
         props.push(EscherProperty::new(prop_id::LINE_STYLE_BOOL, 0x0018_0018));
@@ -1826,6 +1879,41 @@ mod tests {
         // Should have arrow properties
         let has_arrow = props.iter().any(|p| p.prop_id == prop_id::LINE_END_ARROW);
         assert!(has_arrow);
+    }
+
+    #[test]
+    fn test_shape_properties_preserve_extended_line_style() {
+        let shape = UserShapeData {
+            line_color: Some(0x0000_00FF),
+            line_width: Some(25400),
+            line_opacity: Some(32768),
+            line_style: Some(4),
+            line_start_arrow: Some(1),
+            line_end_arrow: Some(5),
+            line_start_arrow_width: Some(0),
+            line_start_arrow_length: Some(2),
+            line_end_arrow_width: Some(2),
+            line_end_arrow_length: Some(0),
+            line_join_style: Some(2),
+            line_end_cap_style: Some(2),
+            ..Default::default()
+        };
+        let properties = build_shape_properties(&shape);
+        let value = |id| {
+            properties
+                .iter()
+                .find(|property| property.prop_id == id)
+                .map(|property| property.value)
+        };
+
+        assert_eq!(value(prop_id::LINE_OPACITY), Some(32768));
+        assert_eq!(value(prop_id::LINE_STYLE), Some(4));
+        assert_eq!(value(prop_id::LINE_START_ARROW_WIDTH), Some(0));
+        assert_eq!(value(prop_id::LINE_START_ARROW_LENGTH), Some(2));
+        assert_eq!(value(prop_id::LINE_END_ARROW_WIDTH), Some(2));
+        assert_eq!(value(prop_id::LINE_END_ARROW_LENGTH), Some(0));
+        assert_eq!(value(prop_id::LINE_JOIN_STYLE), Some(2));
+        assert_eq!(value(prop_id::LINE_END_CAP_STYLE), Some(2));
     }
 
     #[test]
