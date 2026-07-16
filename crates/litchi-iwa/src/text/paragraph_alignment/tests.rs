@@ -11,7 +11,7 @@ use crate::text::{
     IWorkTextEditor, ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacingMultiple,
     ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, ParagraphTabAlignment,
     ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops, TextColumnCount,
-    TextColumns, TextPointSize, TextStyle,
+    TextColumns, TextDecorations, TextPointSize, TextStrikethrough, TextStyle, TextUnderline,
 };
 
 const STORAGE_MESSAGE_TYPES: &[u32] = &[2_001, 2_022];
@@ -32,6 +32,175 @@ fn all_native_alignment_values_are_strict_and_reversible() {
     }
     assert!(TextAlignment::from_native_value(-1).is_err());
     assert!(TextAlignment::from_native_value(5).is_err());
+}
+
+#[test]
+fn native_decoration_overrides_are_minimal_and_reversible() {
+    let overrides = ParagraphStyleOverrides {
+        bold: Some(true),
+        underline: Some(TextUnderline::Wavy),
+        strikethrough: Some(TextStrikethrough::Triple),
+        alignment: Some(TextAlignment::Center),
+        ..Default::default()
+    };
+    let object = native::variation_object(10, 11, 12, overrides.clone()).unwrap();
+    let message = &object.messages[0];
+    let archive = tswp::ParagraphStyleArchive::decode(message.data.as_slice()).unwrap();
+    assert_eq!(archive.override_count, Some(4));
+    assert_eq!(
+        native::direct_overrides(&archive, &message.data).unwrap(),
+        Some(overrides)
+    );
+}
+
+#[test]
+fn uniform_text_decorations_round_trip_and_reset_independently_in_every_suite() {
+    let pages_decorations = TextDecorations::new(TextUnderline::Single, TextStrikethrough::Double);
+    let mut pages = PagesEditor::create_with_text("Decorations").unwrap();
+    let pages_box = pages
+        .add_text_box(
+            11,
+            "Decorated Pages text",
+            DrawablePoint { x: 20.0, y: 40.0 },
+            DrawableSize {
+                width: 240.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    let pages_sibling = pages
+        .add_text_box(
+            12,
+            "Plain Pages text",
+            DrawablePoint { x: 280.0, y: 40.0 },
+            DrawableSize {
+                width: 240.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    let pages_style = TextStyle::new(TextPointSize::from_points(18.0).unwrap()).with_bold(true);
+    pages
+        .set_text_box_text_style(pages_box.drawable_object_id, pages_style)
+        .unwrap();
+    pages
+        .set_text_box_text_decorations(pages_box.drawable_object_id, pages_decorations)
+        .unwrap();
+    assert_eq!(
+        pages
+            .text_box_text_decorations(pages_sibling.drawable_object_id)
+            .unwrap(),
+        TextDecorations::NONE
+    );
+    let mut pages = PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        pages
+            .text_box_text_decorations(pages_box.drawable_object_id)
+            .unwrap(),
+        pages_decorations
+    );
+    assert!(
+        pages
+            .reset_text_box_text_decorations(pages_box.drawable_object_id)
+            .unwrap()
+    );
+    assert_eq!(
+        pages
+            .text_box_text_decorations(pages_box.drawable_object_id)
+            .unwrap(),
+        TextDecorations::NONE
+    );
+    assert_eq!(
+        pages
+            .text_box_text_style(pages_box.drawable_object_id)
+            .unwrap(),
+        pages_style
+    );
+
+    let numbers_decorations =
+        TextDecorations::new(TextUnderline::Double, TextStrikethrough::Triple);
+    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let sheet_id = numbers.sheets().unwrap()[0].object_id;
+    let numbers_box = numbers
+        .add_sheet_text_box(
+            sheet_id,
+            "Decorated Numbers text",
+            DrawablePoint { x: 20.0, y: 200.0 },
+            DrawableSize {
+                width: 240.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    numbers
+        .set_sheet_text_box_paragraph_alignment(
+            sheet_id,
+            numbers_box.drawable_object_id,
+            TextAlignment::Right,
+        )
+        .unwrap();
+    numbers
+        .set_sheet_text_box_text_decorations(
+            sheet_id,
+            numbers_box.drawable_object_id,
+            numbers_decorations,
+        )
+        .unwrap();
+    let mut numbers =
+        crate::numbers::NumbersEditor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        numbers
+            .sheet_text_box_text_decorations(sheet_id, numbers_box.drawable_object_id)
+            .unwrap(),
+        numbers_decorations
+    );
+    assert!(
+        numbers
+            .reset_sheet_text_box_text_decorations(sheet_id, numbers_box.drawable_object_id)
+            .unwrap()
+    );
+    assert_eq!(
+        numbers
+            .sheet_text_box_paragraph_alignment(sheet_id, numbers_box.drawable_object_id)
+            .unwrap(),
+        TextAlignment::Right
+    );
+
+    let keynote_decorations = TextDecorations::new(TextUnderline::Wavy, TextStrikethrough::Single);
+    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let keynote_box = keynote
+        .add_slide_text_box(
+            0,
+            "Decorated Keynote text",
+            DrawablePoint { x: 80.0, y: 500.0 },
+            DrawableSize {
+                width: 500.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    keynote
+        .set_slide_text_box_text_decorations(0, keynote_box.drawable_object_id, keynote_decorations)
+        .unwrap();
+    let mut keynote =
+        crate::keynote::KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        keynote
+            .slide_text_box_text_decorations(0, keynote_box.drawable_object_id)
+            .unwrap(),
+        keynote_decorations
+    );
+    assert!(
+        keynote
+            .reset_slide_text_box_text_decorations(0, keynote_box.drawable_object_id)
+            .unwrap()
+    );
+    assert_eq!(
+        keynote
+            .slide_text_box_text_decorations(0, keynote_box.drawable_object_id)
+            .unwrap(),
+        TextDecorations::NONE
+    );
 }
 
 #[test]
@@ -770,6 +939,14 @@ fn multiple_paragraph_boundaries_are_rejected_transactionally() {
             .set_text_style(
                 storage_id,
                 TextStyle::new(TextPointSize::from_points(18.0).unwrap()).with_bold(true),
+            )
+            .is_err()
+    );
+    assert!(
+        editor
+            .set_text_decorations(
+                storage_id,
+                TextDecorations::new(TextUnderline::Single, TextStrikethrough::Single),
             )
             .is_err()
     );

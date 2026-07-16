@@ -15,15 +15,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let editor = IWorkTextEditor::open(input)?;
     for storage in editor.storages()? {
-        match editor.text_style(storage.object_id) {
-            Ok(style) => println!(
-                "storage={} points={} bold={} italic={}",
+        match (
+            editor.text_style(storage.object_id),
+            editor.text_decorations(storage.object_id),
+        ) {
+            (Ok(style), Ok(decorations)) => println!(
+                "storage={} points={} bold={} italic={} underline={:?} strikethrough={:?}",
                 storage.object_id,
                 style.point_size.points(),
                 style.bold,
-                style.italic
+                style.italic,
+                decorations.underline,
+                decorations.strikethrough
             ),
-            Err(error) => println!("storage={} unavailable={error}", storage.object_id),
+            (Err(error), _) | (_, Err(error)) => {
+                println!("storage={} unavailable={error}", storage.object_id)
+            },
         }
     }
     Ok(())

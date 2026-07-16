@@ -79,6 +79,93 @@ impl Default for TextStyle {
     }
 }
 
+/// Underline treatment stored by native iWork character styles.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum TextUnderline {
+    #[default]
+    None,
+    Single,
+    Double,
+    Wavy,
+}
+
+impl TextUnderline {
+    pub(crate) const fn native_value(self) -> i32 {
+        match self {
+            Self::None => 0,
+            Self::Single => 1,
+            Self::Double => 2,
+            Self::Wavy => 3,
+        }
+    }
+
+    pub(crate) fn from_native_value(value: i32) -> crate::Result<Self> {
+        match value {
+            0 => Ok(Self::None),
+            1 => Ok(Self::Single),
+            2 => Ok(Self::Double),
+            3 => Ok(Self::Wavy),
+            _ => Err(crate::Error::InvalidFormat(format!(
+                "unsupported native iWork underline type {value}"
+            ))),
+        }
+    }
+}
+
+/// Strikethrough treatment stored by native iWork character styles.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum TextStrikethrough {
+    #[default]
+    None,
+    Single,
+    Double,
+    Triple,
+}
+
+impl TextStrikethrough {
+    pub(crate) const fn native_value(self) -> i32 {
+        match self {
+            Self::None => 0,
+            Self::Single => 1,
+            Self::Double => 2,
+            Self::Triple => 3,
+        }
+    }
+
+    pub(crate) fn from_native_value(value: i32) -> crate::Result<Self> {
+        match value {
+            0 => Ok(Self::None),
+            1 => Ok(Self::Single),
+            2 => Ok(Self::Double),
+            3 => Ok(Self::Triple),
+            _ => Err(crate::Error::InvalidFormat(format!(
+                "unsupported native iWork strikethrough type {value}"
+            ))),
+        }
+    }
+}
+
+/// Effective uniform underline and strikethrough formatting.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub struct TextDecorations {
+    pub underline: TextUnderline,
+    pub strikethrough: TextStrikethrough,
+}
+
+impl TextDecorations {
+    pub const NONE: Self = Self {
+        underline: TextUnderline::None,
+        strikethrough: TextStrikethrough::None,
+    };
+
+    pub const fn new(underline: TextUnderline, strikethrough: TextStrikethrough) -> Self {
+        Self {
+            underline,
+            strikethrough,
+        }
+    }
+}
+
 /// Uniform paragraph properties currently supported by the shared text editor.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ParagraphStyle {
@@ -344,6 +431,34 @@ mod tests {
                 italic: true,
             }
         );
+    }
+
+    #[test]
+    fn text_decoration_native_values_are_strict_and_reversible() {
+        for underline in [
+            TextUnderline::None,
+            TextUnderline::Single,
+            TextUnderline::Double,
+            TextUnderline::Wavy,
+        ] {
+            assert_eq!(
+                TextUnderline::from_native_value(underline.native_value()).unwrap(),
+                underline
+            );
+        }
+        for strikethrough in [
+            TextStrikethrough::None,
+            TextStrikethrough::Single,
+            TextStrikethrough::Double,
+            TextStrikethrough::Triple,
+        ] {
+            assert_eq!(
+                TextStrikethrough::from_native_value(strikethrough.native_value()).unwrap(),
+                strikethrough
+            );
+        }
+        assert!(TextUnderline::from_native_value(4).is_err());
+        assert!(TextStrikethrough::from_native_value(-1).is_err());
     }
 
     #[test]

@@ -28,7 +28,7 @@ use crate::shapes::{
 use crate::text::{
     IWorkTextEditor, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphIndents,
     ParagraphLineSpacing, ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment,
-    TextColumns, TextStorageInfo, TextStyle,
+    TextColumns, TextDecorations, TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     append_repeated_length_delimited_field, parse_wire_fields, patch_fixed32_field,
@@ -1289,6 +1289,52 @@ impl KeynoteEditor {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();
         let changed = staged.reset_text_style(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read effective uniform underline and strikethrough formatting.
+    pub fn slide_text_box_text_decorations(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<TextDecorations> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text.text_decorations(graph.storage_id)
+    }
+
+    /// Atomically set uniform underline and strikethrough formatting.
+    pub fn set_slide_text_box_text_decorations(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        decorations: TextDecorations,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_text_decorations(graph.storage_id, decorations)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified.slide_text_box_text_decorations(slide_index, drawable_object_id)? != decorations
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote text-box decoration update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore inherited decorations while preserving sibling overrides.
+    pub fn reset_slide_text_box_text_decorations(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_text_decorations(graph.storage_id)?;
         if changed {
             *self = Self::from_package(staged.into_package())?;
         }

@@ -14,7 +14,7 @@ use super::super::paragraph_tabs::ParagraphTabStops;
 use super::super::style::{
     ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingMultiple,
     ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, TextAlignment,
-    TextPointSize, TextStyle,
+    TextDecorations, TextPointSize, TextStrikethrough, TextStyle, TextUnderline,
 };
 use super::super::style_registry::object_archive_name;
 
@@ -32,6 +32,8 @@ const STYLE_STYLESHEET_FIELD: u32 = 5;
 const CHARACTER_BOLD_FIELD: u32 = 1;
 const CHARACTER_ITALIC_FIELD: u32 = 2;
 const CHARACTER_FONT_SIZE_FIELD: u32 = 3;
+const CHARACTER_UNDERLINE_FIELD: u32 = 11;
+const CHARACTER_STRIKETHROUGH_FIELD: u32 = 12;
 const PARAGRAPH_ALIGNMENT_FIELD: u32 = 1;
 const PARAGRAPH_FIRST_LINE_INDENT_FIELD: u32 = 7;
 const PARAGRAPH_LEFT_INDENT_FIELD: u32 = 11;
@@ -60,6 +62,8 @@ pub(super) struct ParagraphStyleOverrides {
     pub(super) bold: Option<bool>,
     pub(super) italic: Option<bool>,
     pub(super) point_size: Option<TextPointSize>,
+    pub(super) underline: Option<TextUnderline>,
+    pub(super) strikethrough: Option<TextStrikethrough>,
     pub(super) alignment: Option<TextAlignment>,
     pub(super) line_spacing: Option<ParagraphLineSpacing>,
     pub(super) space_before: Option<ParagraphSpacingPoints>,
@@ -75,6 +79,8 @@ impl ParagraphStyleOverrides {
         u32::from(self.bold.is_some())
             + u32::from(self.italic.is_some())
             + u32::from(self.point_size.is_some())
+            + u32::from(self.underline.is_some())
+            + u32::from(self.strikethrough.is_some())
             + u32::from(self.alignment.is_some())
             + u32::from(self.line_spacing.is_some())
             + u32::from(self.space_before.is_some())
@@ -135,6 +141,13 @@ pub(super) fn inherited_text_style(
     inheritance::text_style(package, first_style_id)
 }
 
+pub(super) fn inherited_text_decorations(
+    package: &IWorkPackage,
+    first_style_id: u64,
+) -> Result<TextDecorations> {
+    inheritance::text_decorations(package, first_style_id)
+}
+
 pub(super) fn inherited_line_spacing(
     package: &IWorkPackage,
     first_style_id: u64,
@@ -179,6 +192,14 @@ pub(super) fn direct_overrides(
         .font_size
         .map(TextPointSize::from_points)
         .transpose()?;
+    let underline = character_properties
+        .underline
+        .map(TextUnderline::from_native_value)
+        .transpose()?;
+    let strikethrough = character_properties
+        .strikethru
+        .map(TextStrikethrough::from_native_value)
+        .transpose()?;
     let alignment = properties
         .alignment
         .map(TextAlignment::from_native_value)
@@ -217,6 +238,8 @@ pub(super) fn direct_overrides(
         bold,
         italic,
         point_size,
+        underline,
+        strikethrough,
         alignment,
         line_spacing,
         space_before,
@@ -239,6 +262,8 @@ pub(super) fn direct_overrides(
     remaining_character.bold = None;
     remaining_character.italic = None;
     remaining_character.font_size = None;
+    remaining_character.underline = None;
+    remaining_character.strikethru = None;
     let semantic = !overrides.is_empty()
         && remaining == tswp::ParagraphStylePropertiesArchive::default()
         && remaining_character == tswp::CharacterStylePropertiesArchive::default()
@@ -263,7 +288,7 @@ pub(super) fn direct_overrides(
         STYLE_PARAGRAPH_PROPERTIES_FIELD,
         "paragraph properties",
     )?;
-    let mut character_fields = Vec::with_capacity(3);
+    let mut character_fields = Vec::with_capacity(5);
     if bold.is_some() {
         character_fields.push(CHARACTER_BOLD_FIELD);
     }
@@ -272,6 +297,12 @@ pub(super) fn direct_overrides(
     }
     if point_size.is_some() {
         character_fields.push(CHARACTER_FONT_SIZE_FIELD);
+    }
+    if underline.is_some() {
+        character_fields.push(CHARACTER_UNDERLINE_FIELD);
+    }
+    if strikethrough.is_some() {
+        character_fields.push(CHARACTER_STRIKETHROUGH_FIELD);
     }
     let mut paragraph_fields = Vec::with_capacity(8);
     if alignment.is_some() {
@@ -358,6 +389,8 @@ pub(super) fn variation_object(
             bold: overrides.bold,
             italic: overrides.italic,
             font_size: overrides.point_size.map(TextPointSize::points),
+            underline: overrides.underline.map(TextUnderline::native_value),
+            strikethru: overrides.strikethrough.map(TextStrikethrough::native_value),
             ..Default::default()
         }),
         para_properties: Some(tswp::ParagraphStylePropertiesArchive {

@@ -14,7 +14,8 @@ use crate::{Error, IWorkPackage, Result};
 use self::native::ParagraphStyleOverrides;
 use super::paragraph_tabs::ParagraphTabStops;
 use super::style::{
-    ParagraphIndents, ParagraphLineSpacing, ParagraphSpacing, TextAlignment, TextStyle,
+    ParagraphIndents, ParagraphLineSpacing, ParagraphSpacing, TextAlignment, TextDecorations,
+    TextStyle,
 };
 use super::style_registry::{
     object_archive_name, register_private_style, unregister_private_style,
@@ -23,6 +24,7 @@ use super::style_registry::{
 #[derive(Debug, Clone)]
 enum ParagraphProperty<'a> {
     TextStyle(TextStyle),
+    TextDecorations(TextDecorations),
     Alignment(TextAlignment),
     LineSpacing(ParagraphLineSpacing),
     Spacing(ParagraphSpacing),
@@ -33,11 +35,19 @@ enum ParagraphProperty<'a> {
 #[derive(Debug, Clone, Copy)]
 enum ParagraphPropertyKind {
     TextStyle,
+    TextDecorations,
     Alignment,
     LineSpacing,
     Spacing,
     Indents,
     TabStops,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum InheritedCharacterProperty {
+    None,
+    TextStyle(TextStyle),
+    TextDecorations(TextDecorations),
 }
 
 pub(super) fn text_style(package: &IWorkPackage, storage_id: u64) -> Result<TextStyle> {
@@ -58,6 +68,30 @@ pub(super) fn set_text_style(
 
 pub(super) fn reset_text_style(package: &mut IWorkPackage, storage_id: u64) -> Result<bool> {
     reset_property(package, storage_id, ParagraphPropertyKind::TextStyle)
+}
+
+pub(super) fn text_decorations(package: &IWorkPackage, storage_id: u64) -> Result<TextDecorations> {
+    let storage = storage::locate(package, storage_id)?;
+    native::inherited_text_decorations(package, storage.style_id)
+}
+
+pub(super) fn set_text_decorations(
+    package: &mut IWorkPackage,
+    storage_id: u64,
+    decorations: TextDecorations,
+) -> Result<()> {
+    if text_decorations(package, storage_id)? == decorations {
+        return Ok(());
+    }
+    set_property(
+        package,
+        storage_id,
+        ParagraphProperty::TextDecorations(decorations),
+    )
+}
+
+pub(super) fn reset_text_decorations(package: &mut IWorkPackage, storage_id: u64) -> Result<bool> {
+    reset_property(package, storage_id, ParagraphPropertyKind::TextDecorations)
 }
 
 pub(super) fn paragraph_alignment(
@@ -208,9 +242,8 @@ fn set_property(
         && native::is_exclusive(package, storage.style_id)?
     {
         let parent_style_id = native::parent_style_id(&style.style, storage.style_id)?;
-        let inherited_text_style =
-            inherited_text_style_for_property(package, parent_style_id, &property)?;
-        apply_property(&mut overrides, &property, inherited_text_style)?;
+        let inherited = inherited_character_property(package, parent_style_id, &property)?;
+        apply_property(&mut overrides, &property, inherited)?;
         if overrides.is_empty() {
             let mut staged = package.clone();
             storage::patch_style_reference(
@@ -255,9 +288,8 @@ fn set_property(
 
     let new_style_id = next_object_identifier(package)?;
     let mut overrides = ParagraphStyleOverrides::default();
-    let inherited_text_style =
-        inherited_text_style_for_property(package, storage.style_id, &property)?;
-    apply_property(&mut overrides, &property, inherited_text_style)?;
+    let inherited = inherited_character_property(package, storage.style_id, &property)?;
+    apply_property(&mut overrides, &property, inherited)?;
     let new_style =
         native::variation_object(new_style_id, storage.style_id, stylesheet_id, overrides)?;
     let mut staged = package.clone();
@@ -344,35 +376,49 @@ fn reset_property(
     Ok(true)
 }
 
-fn inherited_text_style_for_property(
+fn inherited_character_property(
     package: &IWorkPackage,
     parent_style_id: u64,
     property: &ParagraphProperty<'_>,
-) -> Result<Option<TextStyle>> {
+) -> Result<InheritedCharacterProperty> {
     match property {
-        ParagraphProperty::TextStyle(_) => {
-            native::inherited_text_style(package, parent_style_id).map(Some)
+        ParagraphProperty::TextStyle(_) => native::inherited_text_style(package, parent_style_id)
+            .map(InheritedCharacterProperty::TextStyle),
+        ParagraphProperty::TextDecorations(_) => {
+            native::inherited_text_decorations(package, parent_style_id)
+                .map(InheritedCharacterProperty::TextDecorations)
         },
-        _ => Ok(None),
+        _ => Ok(InheritedCharacterProperty::None),
     }
 }
 
 fn apply_property(
     overrides: &mut ParagraphStyleOverrides,
     property: &ParagraphProperty<'_>,
-    inherited_text_style: Option<TextStyle>,
+    inherited: InheritedCharacterProperty,
 ) -> Result<()> {
     match property {
         ParagraphProperty::TextStyle(style) => {
-            let inherited = inherited_text_style.ok_or_else(|| {
-                Error::InvalidFormat(
+            let InheritedCharacterProperty::TextStyle(inherited) = inherited else {
+                return Err(Error::InvalidFormat(
                     "text-style mutation has no inherited character formatting".to_owned(),
-                )
-            })?;
+                ));
+            };
             overrides.point_size =
                 (style.point_size != inherited.point_size).then_some(style.point_size);
             overrides.bold = (style.bold != inherited.bold).then_some(style.bold);
             overrides.italic = (style.italic != inherited.italic).then_some(style.italic);
+        },
+        ParagraphProperty::TextDecorations(decorations) => {
+            let InheritedCharacterProperty::TextDecorations(inherited) = inherited else {
+                return Err(Error::InvalidFormat(
+                    "text-decoration mutation has no inherited character formatting".to_owned(),
+                ));
+            };
+            overrides.underline =
+                (decorations.underline != inherited.underline).then_some(decorations.underline);
+            overrides.strikethrough = (decorations.strikethrough != inherited.strikethrough)
+                .then_some(decorations.strikethrough);
         },
         ParagraphProperty::Alignment(alignment) => overrides.alignment = Some(*alignment),
         ParagraphProperty::LineSpacing(spacing) => overrides.line_spacing = Some(*spacing),
@@ -397,6 +443,9 @@ fn has_property(overrides: &ParagraphStyleOverrides, kind: ParagraphPropertyKind
         ParagraphPropertyKind::TextStyle => {
             overrides.point_size.is_some() || overrides.bold.is_some() || overrides.italic.is_some()
         },
+        ParagraphPropertyKind::TextDecorations => {
+            overrides.underline.is_some() || overrides.strikethrough.is_some()
+        },
         ParagraphPropertyKind::Alignment => overrides.alignment.is_some(),
         ParagraphPropertyKind::LineSpacing => overrides.line_spacing.is_some(),
         ParagraphPropertyKind::Spacing => {
@@ -417,6 +466,10 @@ fn clear_property(overrides: &mut ParagraphStyleOverrides, kind: ParagraphProper
             overrides.point_size = None;
             overrides.bold = None;
             overrides.italic = None;
+        },
+        ParagraphPropertyKind::TextDecorations => {
+            overrides.underline = None;
+            overrides.strikethrough = None;
         },
         ParagraphPropertyKind::Alignment => overrides.alignment = None,
         ParagraphPropertyKind::LineSpacing => overrides.line_spacing = None,
@@ -441,6 +494,9 @@ fn inherited_property(
     match kind {
         ParagraphPropertyKind::TextStyle => Ok(ParagraphProperty::TextStyle(
             native::inherited_text_style(package, style_id)?,
+        )),
+        ParagraphPropertyKind::TextDecorations => Ok(ParagraphProperty::TextDecorations(
+            native::inherited_text_decorations(package, style_id)?,
         )),
         ParagraphPropertyKind::Alignment => Ok(ParagraphProperty::Alignment(
             native::inherited_alignment(package, style_id)?,
@@ -477,6 +533,9 @@ fn validate_expected_property(
 ) -> Result<()> {
     let matches = match expected {
         ParagraphProperty::TextStyle(style) => text_style(package, storage_id)? == style,
+        ParagraphProperty::TextDecorations(decorations) => {
+            text_decorations(package, storage_id)? == decorations
+        },
         ParagraphProperty::Alignment(alignment) => {
             paragraph_alignment(package, storage_id)? == alignment
         },

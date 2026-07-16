@@ -180,7 +180,8 @@ pub use ref_graph::ReferenceGraph;
 pub use snappy::SnappyStream;
 pub use structured::{CellValue, Section, Slide, StructuredData, Table};
 pub use text::{
-    ParagraphStyle, TextExtractor, TextFragment, TextPointSize, TextStorage, TextStyle,
+    ParagraphStyle, TextDecorations, TextExtractor, TextFragment, TextPointSize, TextStorage,
+    TextStrikethrough, TextStyle, TextUnderline,
 };
 pub use theme::{IWorkThemeArchive, IWorkThemeExtensions};
 pub use zip_utils::{

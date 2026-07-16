@@ -6,7 +6,8 @@ use crate::protobuf::tswp;
 use crate::text::paragraph_tabs::ParagraphTabStops;
 use crate::text::style::{
     ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing, ParagraphSpacing,
-    ParagraphSpacingPoints, TextAlignment, TextPointSize, TextStyle,
+    ParagraphSpacingPoints, TextAlignment, TextDecorations, TextPointSize, TextStrikethrough,
+    TextStyle, TextUnderline,
 };
 use crate::{Error, IWorkPackage, Result};
 
@@ -52,6 +53,42 @@ pub(super) fn text_style(package: &IWorkPackage, first_style_id: u64) -> Result<
     Ok(TextStyle::new(point_size.unwrap_or_default())
         .with_bold(bold.unwrap_or(false))
         .with_italic(italic.unwrap_or(false)))
+}
+
+pub(super) fn text_decorations(
+    package: &IWorkPackage,
+    first_style_id: u64,
+) -> Result<TextDecorations> {
+    let (underline, strikethrough) = walk(
+        package,
+        first_style_id,
+        (None, None),
+        |(underline, strikethrough), style| {
+            if let Some(properties) = style.char_properties.as_ref() {
+                if underline.is_none() {
+                    *underline = properties
+                        .underline
+                        .map(TextUnderline::from_native_value)
+                        .transpose()?;
+                }
+                if strikethrough.is_none() {
+                    *strikethrough = properties
+                        .strikethru
+                        .map(TextStrikethrough::from_native_value)
+                        .transpose()?;
+                }
+            }
+            Ok(if underline.is_some() && strikethrough.is_some() {
+                InheritanceControl::Complete
+            } else {
+                InheritanceControl::Continue
+            })
+        },
+    )?;
+    Ok(TextDecorations::new(
+        underline.unwrap_or_default(),
+        strikethrough.unwrap_or_default(),
+    ))
 }
 
 pub(super) fn alignment(package: &IWorkPackage, first_style_id: u64) -> Result<TextAlignment> {
