@@ -307,6 +307,7 @@ mod variable_declaration;
 mod document_scripts;
 mod font_face;
 mod line_numbering;
+mod notes_configuration;
 mod dde_connection;
 pub use dde_connection::{OdfDdeConnectionDeclaration, OdfDdeConnectionUse};
 mod bibliography_configuration;
@@ -372,6 +373,10 @@ pub use font_face::{
 pub use line_numbering::{
     OdfLineNumberFormat, OdfLineNumberPosition, OdfLineNumberingConfiguration,
     OdfLineNumberingSeparator, OdfNonNegativeLength, parse_line_numbering_configuration,
+};
+pub use notes_configuration::{
+    OdfFootnotePosition, OdfNoteClass, OdfNoteNumberingScope, OdfNotesConfiguration,
+    OdfNotesConfigurations, parse_notes_configurations,
 };
 pub use embedded_object::{
     OdfEmbeddedObject, OdfEmbeddedObjectKind, OdfEmbeddedObjectPart,

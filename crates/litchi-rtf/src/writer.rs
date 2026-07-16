@@ -133,6 +133,9 @@ impl<W: Write> RtfWriter<W> {
         self.write_stylesheet(doc.stylesheet())?;
 
         // Write list definitions before body paragraphs reference them.
+        doc.list_override_table()
+            .validate(doc.list_table())
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
         self.write_list_table(doc.list_table())?;
         self.write_list_override_table(doc.list_override_table())?;
 
@@ -306,7 +309,10 @@ impl<W: Write> RtfWriter<W> {
 
     /// Write the list-definition table.
     pub fn write_list_table(&mut self, table: &ListTable<'_>) -> io::Result<()> {
-        if table.lists().is_empty() {
+        table
+            .validate()
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+        if table.lists().is_empty() && table.picture_bullet_count == 0 {
             return Ok(());
         }
         if table.lists().len() > 65_536 {
@@ -316,6 +322,9 @@ impl<W: Write> RtfWriter<W> {
             ));
         }
         self.write_str("{\\*\\listtable")?;
+        for _ in 0..table.picture_bullet_count {
+            self.write_str("{\\*\\listpicture}")?;
+        }
         for list in table.lists() {
             self.write_list_definition(list)?;
         }
@@ -361,6 +370,16 @@ impl<W: Write> RtfWriter<W> {
             self.write_text(list.name.as_ref())?;
             self.write_str(";}")?;
         }
+        if !list.style_name.is_empty() {
+            self.write_str("{\\*")?;
+            self.write_control_word("liststylename", None)?;
+            self.write_str(" ")?;
+            self.write_text(list.style_name.as_ref())?;
+            self.write_str(";}")?;
+        }
+        if let Some(priority) = list.style_priority {
+            self.write_control_word("spriority", Some(priority))?;
+        }
         self.write_control_word("listid", Some(list.id))?;
         self.write_str("}")?;
         Ok(())
@@ -392,7 +411,27 @@ impl<W: Write> RtfWriter<W> {
         self.write_control_word("levelstartat", Some(level.start_at))?;
         self.write_control_word("levelspace", Some(level.space))?;
         self.write_control_word("levelindent", Some(level.indent))?;
-        self.write_list_level_text(level.number_text.as_ref())?;
+        if let Some(left_indent) = level.left_indent {
+            self.write_control_word("li", Some(left_indent))?;
+        }
+        if let Some(first_line_indent) = level.first_line_indent {
+            self.write_control_word("fi", Some(first_line_indent))?;
+        }
+        for tab in &level.tabs {
+            self.write_control_word("tx", Some(*tab))?;
+        }
+        if let Some(picture_index) = level.picture_index {
+            self.write_control_word(
+                "levelpicture",
+                Some(i32::try_from(picture_index).map_err(|_| {
+                    io::Error::new(io::ErrorKind::InvalidInput, "invalid list picture index")
+                })?),
+            )?;
+        }
+        self.write_list_level_text(
+            level.number_text.as_ref(),
+            level.number_positions.as_ref(),
+        )?;
         if level.font_ref != 0 {
             self.write_control_word("f", Some(i32::from(level.font_ref)))?;
         }
@@ -416,7 +455,7 @@ impl<W: Write> RtfWriter<W> {
         }
     }
 
-    fn write_list_level_text(&mut self, text: &str) -> io::Result<()> {
+    fn write_list_level_text(&mut self, text: &str, positions: &str) -> io::Result<()> {
         let count = u8::try_from(text.chars().count()).map_err(|_| {
             io::Error::new(
                 io::ErrorKind::InvalidInput,
@@ -438,12 +477,18 @@ impl<W: Write> RtfWriter<W> {
 
         self.write_str("{")?;
         self.write_control_word("levelnumbers", None)?;
-        for (index, ch) in text.chars().enumerate() {
-            if u32::from(ch) <= 8 {
-                let position = u8::try_from(index + 1).map_err(|_| {
-                    io::Error::new(io::ErrorKind::InvalidInput, "invalid RTF list placeholder")
-                })?;
-                self.write_hex_byte(position)?;
+        if positions.is_empty() {
+            for (index, ch) in text.chars().enumerate() {
+                if u32::from(ch) <= 8 {
+                    let position = u8::try_from(index + 1).map_err(|_| {
+                        io::Error::new(io::ErrorKind::InvalidInput, "invalid RTF list placeholder")
+                    })?;
+                    self.write_hex_byte(position)?;
+                }
+            }
+        } else {
+            for byte in positions.bytes() {
+                self.write_hex_byte(byte)?;
             }
         }
         self.write_str(";}")?;
@@ -473,14 +518,29 @@ impl<W: Write> RtfWriter<W> {
             self.write_control_word(
                 "listoverridecount",
                 Some(i32::from(entry.level_count_override.unwrap_or_else(|| {
-                    u8::from(entry.start_at_override.is_some())
+                    u8::try_from(entry.levels.len())
+                        .unwrap_or_else(|_| u8::from(entry.start_at_override.is_some()))
                 }))),
             )?;
-            if let Some(start_at) = entry.start_at_override {
+            if entry.levels.is_empty() {
+                if let Some(start_at) = entry.start_at_override {
+                    self.write_str("{")?;
+                    self.write_control_word("lfolevel", None)?;
+                    self.write_control_word("listoverridestartat", None)?;
+                    self.write_control_word("levelstartat", Some(start_at))?;
+                    self.write_str("}")?;
+                }
+            }
+            for level in &entry.levels {
                 self.write_str("{")?;
                 self.write_control_word("lfolevel", None)?;
-                self.write_control_word("listoverridestartat", None)?;
-                self.write_control_word("levelstartat", Some(start_at))?;
+                if level.format_override {
+                    self.write_control_word("listoverrideformat", None)?;
+                }
+                if let Some(start_at) = level.start_at {
+                    self.write_control_word("listoverridestartat", None)?;
+                    self.write_control_word("levelstartat", Some(start_at))?;
+                }
                 self.write_str("}")?;
             }
             self.write_control_word("ls", Some(entry.index))?;

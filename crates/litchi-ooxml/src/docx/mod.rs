@@ -119,7 +119,7 @@ pub use variables::DocumentVariables;
 pub use web_settings::{
     Frame, FrameLayout, FrameScrollbarVisibility, Frameset, FramesetChild, FramesetColor,
     FramesetSplitBar, HtmlDiv, HtmlDivBorder, HtmlDivBorders, TargetScreenSize, ThemeColor,
-    WebSettings,
+    WebSettings, WebSettingsConformance,
 };
 // Re-export shared formatting types
 pub use format::{ImageFormat, LineSpacing, ParagraphAlignment, TableBorderStyle, UnderlineStyle};

@@ -45,7 +45,7 @@ pub(crate) use pivot::{
     write_sxvs,
 };
 pub(crate) use pivot_xfext::write_pivot_xfext_block;
-pub(crate) use validation::DvConfig;
+pub(crate) use validation::{DvConfig, DvalConfig};
 pub use worksheet::AutoFilterConditionWrite;
 
 /// Write a BIFF record header
@@ -135,8 +135,8 @@ pub fn write_builtin_styles<W: Write>(writer: &mut W) -> XlsResult<()> {
     workbook::write_builtin_styles(writer)
 }
 
-pub fn write_dval<W: Write>(writer: &mut W, dv_count: u32) -> XlsResult<()> {
-    validation::write_dval(writer, dv_count)
+pub fn write_dval<W: Write>(writer: &mut W, cfg: DvalConfig) -> XlsResult<()> {
+    validation::write_dval(writer, cfg)
 }
 
 pub fn write_dv<W: Write>(

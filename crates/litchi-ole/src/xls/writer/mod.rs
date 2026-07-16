@@ -19,7 +19,10 @@ pub mod formula;
 pub use biff::AutoFilterConditionWrite;
 pub use core::{
     PivotCacheValue, XlsCellValue, XlsConditionalFormat, XlsConditionalFormatType,
-    XlsConditionalPattern, XlsDataValidation, XlsDataValidationOperator, XlsDataValidationType,
+    XlsConditionalPattern, XlsDataValidation, XlsDataValidationErrorStyle,
+    XlsDataValidationFormulaKind, XlsDataValidationImeMode, XlsDataValidationOperator,
+    XlsDataValidationOptions, XlsDataValidationRange, XlsDataValidationTableOptions,
+    XlsDataValidationType,
     XlsDefinedName, XlsPivotDataItemConfig, XlsPivotFieldConfig, XlsPivotItemConfig,
     XlsPageSetupOptions, XlsPivotTableConfig, XlsWriter,
 };

@@ -12,6 +12,7 @@ pub(crate) struct DvConfig<'a> {
     pub empty_cell_allowed: bool,
     pub suppress_dropdown_arrow: bool,
     pub is_explicit_list_formula: bool,
+    pub ime_mode: u8,
     pub show_prompt_on_cell_selected: bool,
     pub prompt_title: Option<&'a str>,
     pub prompt_text: Option<&'a str>,
@@ -22,7 +23,22 @@ pub(crate) struct DvConfig<'a> {
     pub formula2: Option<&'a [u8]>,
 }
 
-pub fn write_dval<W: Write>(writer: &mut W, dv_count: u32) -> XlsResult<()> {
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct DvalConfig {
+    pub window_closed: bool,
+    pub x_left: u32,
+    pub y_top: u32,
+    pub dropdown_object_id: Option<u16>,
+    pub dv_count: u32,
+}
+
+pub fn write_dval<W: Write>(writer: &mut W, cfg: DvalConfig) -> XlsResult<()> {
+    if cfg.x_left > 65_535 || cfg.y_top > 65_535 || cfg.dv_count > 65_534
+        || matches!(cfg.dropdown_object_id, Some(0))
+        || cfg.dropdown_object_id.is_some_and(|id| id > 32_767)
+    {
+        return Err(XlsError::InvalidData("DVAL metadata is out of range".to_string()));
+    }
     // DVAL: options(2) + horiz_pos(4) + vert_pos(4) + cbo_id(4) + dv_no(4) = 18 bytes
     write_record_header(writer, 0x01B2, 18)?;
 
@@ -31,11 +47,11 @@ pub fn write_dval<W: Write>(writer: &mut W, dv_count: u32) -> XlsResult<()> {
     //  - horiz/vert positions = 0
     //  - cbo_id = 0xFFFFFFFF (no associated drop-down object)
     //  - dv_no = number of following DV records
-    writer.write_all(&0u16.to_le_bytes())?; // options
-    writer.write_all(&0u32.to_le_bytes())?; // horiz_pos
-    writer.write_all(&0u32.to_le_bytes())?; // vert_pos
-    writer.write_all(&0xFFFFFFFFu32.to_le_bytes())?; // cbo_id
-    writer.write_all(&dv_count.to_le_bytes())?; // dv_no
+    writer.write_all(&u16::from(cfg.window_closed).to_le_bytes())?;
+    writer.write_all(&cfg.x_left.to_le_bytes())?;
+    writer.write_all(&cfg.y_top.to_le_bytes())?;
+    writer.write_all(&cfg.dropdown_object_id.map_or(-1, i32::from).to_le_bytes())?;
+    writer.write_all(&cfg.dv_count.to_le_bytes())?;
 
     Ok(())
 }
@@ -51,9 +67,10 @@ pub fn write_dv<W: Write>(
         ));
     }
 
-    let dv_count_u16 = u16::try_from(ranges.len()).map_err(|_| {
-        XlsError::InvalidData("Too many ranges in data validation rule".to_string())
-    })?;
+    if ranges.len() > 432 {
+        return Err(XlsError::InvalidData("DV range count exceeds 432".to_string()));
+    }
+    let dv_count_u16 = ranges.len() as u16;
 
     // Normalise titles/text: Excel encodes "not present" as a single NUL character.
     let prompt_title_val: &str = match cfg.prompt_title {
@@ -128,6 +145,7 @@ pub fn write_dv<W: Write>(
     if cfg.suppress_dropdown_arrow {
         option_flags |= 0x0000_0200;
     }
+    option_flags |= u32::from(cfg.ime_mode) << 10;
     if cfg.show_prompt_on_cell_selected {
         option_flags |= 0x0004_0000;
     }
@@ -161,6 +179,9 @@ pub fn write_dv<W: Write>(
     // CellRangeAddressList with all affected ranges
     writer.write_all(&dv_count_u16.to_le_bytes())?;
     for (first_row_u32, last_row_u32, first_col, last_col) in ranges {
+        if first_row_u32 > last_row_u32 || first_col > last_col || *last_col > 255 {
+            return Err(XlsError::InvalidData("DV contains an invalid target range".to_string()));
+        }
         let first_row = u16::try_from(*first_row_u32).map_err(|_| {
             XlsError::InvalidData(format!(
                 "Row index {} exceeds BIFF8 limit 65535 for DV record",

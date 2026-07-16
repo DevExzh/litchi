@@ -87,8 +87,8 @@ pub use user_property::{
     UserProperty, UserPropertyDateTime, UserPropertyType, UserPropertyValue,
 };
 pub use list::{
-    List, ListFollow, ListJustification, ListLevel, ListLevelType, ListOverride, ListOverrideTable,
-    ListTable,
+    List, ListFollow, ListJustification, ListLevel, ListLevelType, ListOverride, ListOverrideLevel,
+    ListOverrideTable, ListTable,
 };
 pub use language::{DocumentLanguageDefaults, LanguageId};
 pub use math_properties::{

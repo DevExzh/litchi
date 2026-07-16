@@ -48,7 +48,9 @@ pub use self::conditional_format::{
     XlsConditionalFormat, XlsConditionalFormatType, XlsConditionalPattern,
 };
 pub use self::data_validation::{
-    XlsDataValidation, XlsDataValidationOperator, XlsDataValidationType,
+    XlsDataValidation, XlsDataValidationErrorStyle, XlsDataValidationFormulaKind,
+    XlsDataValidationImeMode, XlsDataValidationOperator, XlsDataValidationOptions,
+    XlsDataValidationRange, XlsDataValidationTableOptions, XlsDataValidationType,
 };
 pub use self::named_range::XlsDefinedName;
 use self::named_range::XlsDefinedName as InternalDefinedName;
@@ -1463,31 +1465,31 @@ impl XlsWriter {
         }
 
         if let Some(title) = validation.input_title.as_ref()
-            && title.len() > 32
+            && title.encode_utf16().count() > 32
         {
             return Err(XlsError::InvalidData(
                 "Input message title must be at most 32 characters".to_string(),
             ));
         }
         if let Some(text) = validation.input_message.as_ref()
-            && text.len() > 255
+            && text.encode_utf16().count() > 255
         {
             return Err(XlsError::InvalidData(
                 "Input message text must be at most 255 characters".to_string(),
             ));
         }
         if let Some(title) = validation.error_title.as_ref()
-            && title.len() > 32
+            && title.encode_utf16().count() > 32
         {
             return Err(XlsError::InvalidData(
                 "Error message title must be at most 32 characters".to_string(),
             ));
         }
         if let Some(text) = validation.error_message.as_ref()
-            && text.len() > 255
+            && text.encode_utf16().count() > 225
         {
             return Err(XlsError::InvalidData(
-                "Error message text must be at most 255 characters".to_string(),
+                "Error message text must be at most 225 characters".to_string(),
             ));
         }
 
@@ -1496,8 +1498,70 @@ impl XlsWriter {
             .get_mut(sheet)
             .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
 
-        worksheet.add_data_validation(validation);
+        let range = XlsDataValidationRange {
+            first_row: validation.first_row,
+            last_row: validation.last_row,
+            first_col: validation.first_col,
+            last_col: validation.last_col,
+        };
+        worksheet.add_data_validation(validation, vec![range], XlsDataValidationOptions::default());
 
+        Ok(())
+    }
+
+    /// Add a validation with typed flags and additional target ranges.
+    pub fn add_data_validation_with_options(
+        &mut self,
+        sheet: usize,
+        validation: XlsDataValidation,
+        additional_ranges: &[XlsDataValidationRange],
+        options: XlsDataValidationOptions,
+    ) -> XlsResult<()> {
+        self.add_data_validation(sheet, validation)?;
+        let worksheet = self.worksheets.get_mut(sheet).unwrap();
+        let written = worksheet.data_validations.last_mut().unwrap();
+        if written.ranges.len() + additional_ranges.len() > 432 {
+            worksheet.data_validations.pop();
+            return Err(XlsError::InvalidData(
+                "DV range count exceeds 432".to_string(),
+            ));
+        }
+        for range in additional_ranges {
+            if range.first_row > range.last_row
+                || range.first_col > range.last_col
+                || range.last_row > 65_535
+                || range.last_col > 255
+            {
+                worksheet.data_validations.pop();
+                return Err(XlsError::InvalidData(
+                    "DV contains an invalid target range".to_string(),
+                ));
+            }
+        }
+        written.ranges.extend_from_slice(additional_ranges);
+        written.ranges.sort_unstable_by_key(|range| {
+            (range.first_row, range.first_col, range.last_row, range.last_col)
+        });
+        written.ranges.dedup();
+        written.options = options;
+        Ok(())
+    }
+
+    /// Configure worksheet-level DVAL window/dropdown metadata.
+    pub fn set_data_validation_table_options(
+        &mut self,
+        sheet: usize,
+        options: XlsDataValidationTableOptions,
+    ) -> XlsResult<()> {
+        if options.x_left > 65_535 || options.y_top > 65_535
+            || matches!(options.dropdown_object_id, Some(0))
+            || options.dropdown_object_id.is_some_and(|id| id > 32_767)
+        {
+            return Err(XlsError::InvalidData("DVAL metadata is out of range".to_string()));
+        }
+        let worksheet = self.worksheets.get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+        worksheet.data_validation_table_options = options;
         Ok(())
     }
 
@@ -2293,7 +2357,16 @@ mod tests {
             error_title: None,
             error_message: None,
         };
-        ws.add_data_validation(dv);
+        ws.add_data_validation(
+            dv,
+            vec![XlsDataValidationRange {
+                first_row: 0,
+                last_row: 9,
+                first_col: 0,
+                last_col: 0,
+            }],
+            XlsDataValidationOptions::default(),
+        );
         assert_eq!(ws.data_validations.len(), 1);
     }
 

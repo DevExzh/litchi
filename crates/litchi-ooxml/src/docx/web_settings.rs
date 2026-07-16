@@ -38,6 +38,32 @@ pub struct WebSettings {
     save_smart_tags_as_xml: Option<bool>,
 }
 
+/// Namespace family used when serializing `word/webSettings.xml`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum WebSettingsConformance {
+    /// ECMA-376 / ISO Transitional namespaces.
+    #[default]
+    Transitional,
+    /// ISO/IEC 29500 Strict namespaces.
+    Strict,
+}
+
+impl WebSettingsConformance {
+    const fn wordprocessingml(self) -> &'static str {
+        match self {
+            Self::Transitional => "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+            Self::Strict => "http://purl.oclc.org/ooxml/wordprocessingml/main",
+        }
+    }
+
+    const fn relationships(self) -> &'static str {
+        match self {
+            Self::Transitional => "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+            Self::Strict => "http://purl.oclc.org/ooxml/officeDocument/relationships",
+        }
+    }
+}
+
 /// Fidelity information for one HTML `div`, `body`, or `blockquote` element.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct HtmlDiv {
@@ -1255,11 +1281,21 @@ impl WebSettings {
     /// bounds recursive framesets and HTML divisions to the same safety limit
     /// used by the reader.
     pub fn to_xml(&self) -> Result<String> {
+        self.to_xml_with_conformance(WebSettingsConformance::Transitional)
+    }
+
+    /// Serialize deterministically using the selected OOXML namespace family.
+    pub fn to_xml_with_conformance(
+        &self,
+        conformance: WebSettingsConformance,
+    ) -> Result<String> {
         let mut xml = String::with_capacity(1024);
         xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
-        xml.push_str(
-            r#"<w:webSettings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">"#,
-        );
+        xml.push_str("<w:webSettings xmlns:w=\"");
+        xml.push_str(conformance.wordprocessingml());
+        xml.push_str("\" xmlns:r=\"");
+        xml.push_str(conformance.relationships());
+        xml.push_str("\">");
 
         if let Some(frameset) = &self.frameset {
             write_frameset(&mut xml, frameset, 1)?;

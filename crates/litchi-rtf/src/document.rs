@@ -997,6 +997,36 @@ impl<'a> RtfDocument<'a> {
         &self.list_override_table
     }
 
+    /// Resolve a paragraph's list override and effective level definition.
+    ///
+    /// The returned start value is the per-level override when present, followed
+    /// by the legacy first-level override used by older producers.
+    pub fn resolve_paragraph_list<'s>(
+        &'s self,
+        paragraph: &crate::Paragraph,
+    ) -> Option<(
+        &'s super::list::ListOverride,
+        &'s super::list::ListLevel<'s>,
+        Option<i32>,
+    )> {
+        let override_index = paragraph.list_override?;
+        let level_index = paragraph.list_level.unwrap_or(0);
+        let (list_override, list) = self
+            .list_override_table
+            .resolve(override_index, &self.list_table)?;
+        let level = list
+            .levels
+            .iter()
+            .find(|candidate| candidate.level == level_index)?;
+        let start_at = list_override
+            .levels
+            .iter()
+            .find(|candidate| candidate.level == level_index)
+            .and_then(|candidate| candidate.start_at)
+            .or_else(|| (level_index == 0).then_some(list_override.start_at_override).flatten());
+        Some((list_override, level, start_at))
+    }
+
     /// Get all sections in the document.
     ///
     /// Returns section information including page layout, headers, and footers.
@@ -1129,6 +1159,8 @@ impl<'a> RtfDocument<'a> {
                 simple: list.simple,
                 hybrid: list.hybrid,
                 name: Cow::Owned(list.name.clone().into_owned()),
+                style_name: Cow::Owned(list.style_name.clone().into_owned()),
+                style_priority: list.style_priority,
                 levels: list
                     .levels
                     .iter()
@@ -1136,6 +1168,7 @@ impl<'a> RtfDocument<'a> {
                         level: level.level,
                         level_type: level.level_type,
                         number_text: Cow::Owned(level.number_text.clone().into_owned()),
+                        number_positions: Cow::Owned(level.number_positions.clone().into_owned()),
                         start_at: level.start_at,
                         justification: level.justification,
                         follow_previous: level.follow_previous,
@@ -1143,10 +1176,15 @@ impl<'a> RtfDocument<'a> {
                         font_ref: level.font_ref,
                         indent: level.indent,
                         space: level.space,
+                        left_indent: level.left_indent,
+                        first_line_indent: level.first_line_indent,
+                        tabs: level.tabs.clone(),
+                        picture_index: level.picture_index,
                     })
                     .collect(),
             });
         }
+        owned.picture_bullet_count = table.picture_bullet_count;
         owned
     }
 

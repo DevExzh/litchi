@@ -1,6 +1,9 @@
 use std::collections::{HashMap, HashSet};
 
-use super::{XlsCellValue, XlsConditionalFormat, XlsDataValidation, XlsPageSetupOptions};
+use super::{
+    XlsCellValue, XlsConditionalFormat, XlsDataValidation, XlsDataValidationOptions,
+    XlsDataValidationRange, XlsDataValidationTableOptions, XlsPageSetupOptions,
+};
 use crate::xls::writer::biff::AutoFilterConditionWrite;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -55,6 +58,13 @@ pub(super) struct XlsSheetProtection {
     pub password_hash: Option<u16>,
 }
 
+#[derive(Debug, Clone)]
+pub(super) struct WritableDataValidation {
+    pub validation: XlsDataValidation,
+    pub ranges: Vec<XlsDataValidationRange>,
+    pub options: XlsDataValidationOptions,
+}
+
 /// Hyperlink target within a worksheet.
 #[derive(Debug, Clone)]
 pub(super) struct XlsHyperlink {
@@ -94,7 +104,8 @@ pub(super) struct WritableWorksheet {
     /// Hidden rows (0-based indices).
     pub hidden_rows: HashSet<u32>,
     pub merged_ranges: Vec<MergedRange>,
-    pub data_validations: Vec<XlsDataValidation>,
+    pub data_validations: Vec<WritableDataValidation>,
+    pub data_validation_table_options: XlsDataValidationTableOptions,
     pub conditional_formats: Vec<XlsConditionalFormat>,
     /// Optional freeze panes configuration.
     pub freeze_panes: Option<FreezePanes>,
@@ -153,6 +164,7 @@ impl WritableWorksheet {
             hidden_rows: HashSet::new(),
             merged_ranges: Vec::new(),
             data_validations: Vec::new(),
+            data_validation_table_options: XlsDataValidationTableOptions::default(),
             conditional_formats: Vec::new(),
             freeze_panes: None,
             zoom: None,
@@ -189,8 +201,13 @@ impl WritableWorksheet {
         self.merged_ranges.push(range);
     }
 
-    pub(super) fn add_data_validation(&mut self, dv: XlsDataValidation) {
-        self.data_validations.push(dv);
+    pub(super) fn add_data_validation(
+        &mut self,
+        validation: XlsDataValidation,
+        ranges: Vec<XlsDataValidationRange>,
+        options: XlsDataValidationOptions,
+    ) {
+        self.data_validations.push(WritableDataValidation { validation, ranges, options });
     }
 
     pub(super) fn add_conditional_format(&mut self, cf: XlsConditionalFormat) {

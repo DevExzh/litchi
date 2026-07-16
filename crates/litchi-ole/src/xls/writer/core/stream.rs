@@ -728,12 +728,22 @@ pub(crate) fn generate_workbook_stream(
 
         if !worksheet.data_validations.is_empty() {
             let dv_count = worksheet.data_validations.len() as u32;
-            biff::write_dval(&mut stream, dv_count)?;
+            let table = worksheet.data_validation_table_options;
+            biff::write_dval(&mut stream, biff::DvalConfig {
+                window_closed: table.window_closed,
+                x_left: table.x_left,
+                y_top: table.y_top,
+                dropdown_object_id: table.dropdown_object_id,
+                dv_count,
+            })?;
 
-            for dv in &worksheet.data_validations {
+            for writable in &worksheet.data_validations {
+                let dv = &writable.validation;
                 let payload = dv.validation_type.to_biff_payload()?;
 
-                let ranges = [(dv.first_row, dv.last_row, dv.first_col, dv.last_col)];
+                let ranges = writable.ranges.iter().map(|range| {
+                    (range.first_row, range.last_row, range.first_col, range.last_col)
+                }).collect::<Vec<_>>();
 
                 let formula1 = payload.formula1.as_deref();
                 let formula2 = payload.formula2.as_deref();
@@ -741,10 +751,11 @@ pub(crate) fn generate_workbook_stream(
                 let dv_config = biff::DvConfig {
                     data_type: payload.data_type,
                     operator: payload.operator,
-                    error_style: 0, // errorStyle: STOP
-                    empty_cell_allowed: true,
-                    suppress_dropdown_arrow: false,
+                    error_style: writable.options.error_style.to_biff_code(),
+                    empty_cell_allowed: writable.options.allow_blank,
+                    suppress_dropdown_arrow: writable.options.suppress_dropdown,
                     is_explicit_list_formula: payload.is_explicit_list,
+                    ime_mode: writable.options.ime_mode.to_biff_code(),
                     show_prompt_on_cell_selected: dv.show_input_message,
                     prompt_title: dv.input_title.as_deref(),
                     prompt_text: dv.input_message.as_deref(),

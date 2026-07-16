@@ -169,9 +169,7 @@ const MAX_ANNOTATIONS: usize = super::annotation::MAX_ANNOTATIONS;
 const MAX_ANNOTATION_TEXT_BYTES: usize = 4 * 1_048_576;
 const MAX_SECTIONS: usize = 4_096;
 use super::stylesheet::{MAX_STYLES, MAX_STYLE_NAME_BYTES};
-const MAX_LISTS: usize = 65_536;
-const MAX_LIST_LEVELS: usize = 9;
-const MAX_LIST_TEXT_BYTES: usize = 65_536;
+use super::list::{MAX_LISTS, MAX_LIST_LEVELS, MAX_LIST_TEXT_BYTES, MAX_LIST_TABS};
 const MAX_REVISION_AUTHORS: usize = super::annotation::MAX_REVISION_AUTHORS;
 const MAX_REVISION_AUTHOR_BYTES: usize = 65_536;
 const MAX_REVISIONS: usize = super::annotation::MAX_REVISIONS;
@@ -325,8 +323,10 @@ pub struct Parser<'a> {
     saw_user_properties: bool,
     /// List table
     list_table: super::list::ListTable<'a>,
+    saw_list_table: bool,
     /// List override table
     list_override_table: super::list::ListOverrideTable,
+    saw_list_override_table: bool,
     /// Sections
     sections: Vec<super::section::Section<'a>>,
     /// Whether section-specific properties are currently active.
@@ -458,7 +458,9 @@ impl<'a> Parser<'a> {
             navigation_entry_text_bytes: 0,
             saw_user_properties: false,
             list_table: super::list::ListTable::new(),
+            saw_list_table: false,
             list_override_table: super::list::ListOverrideTable::new(),
+            saw_list_override_table: false,
             sections: Vec::new(),
             section_properties_active: false,
             bookmarks: super::bookmark::BookmarkTable::new(),
@@ -3784,6 +3786,13 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_list_table(&mut self) -> RtfResult<()> {
+        if self.saw_list_table {
+            return Err(RtfError::MalformedDocument("RTF document contains multiple list tables".to_string()));
+        }
+        if self.states.len() != 3 || self.blocks.iter().any(|block| !block.text.trim().is_empty()) {
+            return Err(RtfError::MalformedDocument("RTF list table must occur in the root header".to_string()));
+        }
+        self.saw_list_table = true;
         self.pos += 1; // `listtable`
         while self.pos < self.tokens.len() {
             match self.tokens.get(self.pos) {
@@ -3795,9 +3804,27 @@ impl<'a> Parser<'a> {
                 {
                     self.parse_list_definition()?;
                 },
+                Some(Token::OpenBrace)
+                    if matches!(
+                        self.tokens.get(self.pos..self.pos + 3),
+                        Some([
+                            Token::OpenBrace,
+                            Token::Control(ControlWord::IgnorableDestination),
+                            Token::Control(ControlWord::ListPicture),
+                        ])
+                    ) =>
+                {
+                    self.list_table.picture_bullet_count = self
+                        .list_table
+                        .picture_bullet_count
+                        .checked_add(1)
+                        .ok_or_else(|| RtfError::MalformedDocument("RTF list-picture count overflow".to_string()))?;
+                    self.skip_group()?;
+                },
                 Some(Token::OpenBrace) => self.skip_group()?,
                 Some(Token::CloseBrace) => {
                     self.pos += 1;
+                    self.list_table.validate()?;
                     return Ok(());
                 },
                 Some(_) => self.pos += 1,
@@ -3837,8 +3864,22 @@ impl<'a> Parser<'a> {
                         Some(Token::Control(ControlWord::ListName))
                     ) =>
                 {
-                    let name = self.parse_list_text_group(true)?;
+                    let name = self.parse_list_text_group(true, false)?;
                     list.name = Cow::Borrowed(self.arena.alloc_str(&name));
+                    continue;
+                },
+                Some(Token::OpenBrace)
+                    if matches!(
+                        self.tokens.get(self.pos..self.pos + 3),
+                        Some([
+                            Token::OpenBrace,
+                            Token::Control(ControlWord::IgnorableDestination),
+                            Token::Control(ControlWord::ListStyleName),
+                        ])
+                    ) =>
+                {
+                    let name = self.parse_list_text_group(true, false)?;
+                    list.style_name = Cow::Borrowed(self.arena.alloc_str(&name));
                     continue;
                 },
                 Some(Token::OpenBrace) => {
@@ -3861,6 +3902,7 @@ impl<'a> Parser<'a> {
                         list.id = *value;
                         has_id = true;
                     },
+                    ControlWord::StylePriority(value) => list.style_priority = Some(*value),
                     _ => {},
                 },
                 Some(_) => {},
@@ -3902,7 +3944,7 @@ impl<'a> Parser<'a> {
                         Some(Token::Control(ControlWord::ListNumberText))
                     ) =>
                 {
-                    let text = self.parse_list_text_group(false)?;
+                    let text = self.parse_list_text_group(false, true)?;
                     level.number_text = Cow::Borrowed(self.arena.alloc_str(&text));
                     continue;
                 },
@@ -3912,7 +3954,8 @@ impl<'a> Parser<'a> {
                         Some(Token::Control(ControlWord::ListLevelNumbers))
                     ) =>
                 {
-                    self.skip_group()?;
+                    let positions = self.parse_list_text_group(false, false)?;
+                    level.number_positions = Cow::Borrowed(self.arena.alloc_str(&positions));
                     continue;
                 },
                 Some(Token::OpenBrace) => {
@@ -3956,7 +3999,24 @@ impl<'a> Parser<'a> {
                             )
                         })?;
                     },
-                    ControlWord::LeftIndent(value) if !explicit_indent => level.indent = *value,
+                    ControlWord::LeftIndent(value) => {
+                        level.left_indent = Some(*value);
+                        if !explicit_indent {
+                            level.indent = *value;
+                        }
+                    },
+                    ControlWord::FirstLineIndent(value) => level.first_line_indent = Some(*value),
+                    ControlWord::TabPosition(value) => {
+                        if level.tabs.len() >= MAX_LIST_TABS {
+                            return Err(RtfError::MalformedDocument("RTF list level has too many tabs".to_string()));
+                        }
+                        level.tabs.push(*value);
+                    },
+                    ControlWord::ListLevelPicture(value) => {
+                        level.picture_index = Some(u32::try_from(*value).map_err(|_| {
+                            RtfError::MalformedDocument("RTF list picture index cannot be negative".to_string())
+                        })?);
+                    },
                     _ => {},
                 },
                 Some(_) => {},
@@ -3967,8 +4027,11 @@ impl<'a> Parser<'a> {
         Err(RtfError::UnexpectedEof)
     }
 
-    fn parse_list_text_group(&mut self, is_name: bool) -> RtfResult<String> {
-        self.pos += 2; // opening brace and destination control
+    fn parse_list_text_group(&mut self, is_name: bool, strip_length: bool) -> RtfResult<String> {
+        self.pos += if matches!(
+            self.tokens.get(self.pos + 1),
+            Some(Token::Control(ControlWord::IgnorableDestination))
+        ) { 3 } else { 2 };
         let mut value = String::new();
         let mut unicode_skip = self.current_state()?.unicode_skip.max(0);
         while self.pos < self.tokens.len() {
@@ -3980,12 +4043,11 @@ impl<'a> Parser<'a> {
                     if is_name {
                         return Ok(trimmed.trim().to_string());
                     }
-                    let mut chars = trimmed.chars();
-                    if chars
-                        .next()
-                        .is_some_and(|ch| u32::from(ch) <= u8::MAX.into())
-                    {
-                        return Ok(chars.collect());
+                    if strip_length {
+                        let mut chars = trimmed.chars();
+                        if chars.next().is_some_and(|ch| u32::from(ch) <= u8::MAX.into()) {
+                            return Ok(chars.collect());
+                        }
                     }
                     return Ok(trimmed.to_string());
                 },
@@ -4040,6 +4102,15 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_list_override_table(&mut self) -> RtfResult<()> {
+        if self.saw_list_override_table {
+            return Err(RtfError::MalformedDocument("RTF document contains multiple list override tables".to_string()));
+        }
+        if !self.saw_list_table || self.states.len() != 3
+            || self.blocks.iter().any(|block| !block.text.trim().is_empty())
+        {
+            return Err(RtfError::MalformedDocument("RTF list override table must follow listtable in the root header".to_string()));
+        }
+        self.saw_list_override_table = true;
         self.pos += 1; // `listoverridetable`
         while self.pos < self.tokens.len() {
             match self.tokens.get(self.pos) {
@@ -4054,6 +4125,7 @@ impl<'a> Parser<'a> {
                 Some(Token::OpenBrace) => self.skip_group()?,
                 Some(Token::CloseBrace) => {
                     self.pos += 1;
+                    self.list_override_table.validate(&self.list_table)?;
                     return Ok(());
                 },
                 Some(_) => self.pos += 1,
@@ -4069,6 +4141,7 @@ impl<'a> Parser<'a> {
         let mut index = None;
         let mut level_count = None;
         let mut start_at = None;
+        let mut override_levels = Vec::new();
         let mut closed = false;
         while self.pos < self.tokens.len() {
             match self.tokens.get(self.pos) {
@@ -4080,6 +4153,11 @@ impl<'a> Parser<'a> {
                 {
                     self.pos += 2;
                     let mut has_start_override = false;
+                    let mut has_format_override = false;
+                    let mut level_start_at = None;
+                    let override_index = u8::try_from(override_levels.len()).map_err(|_| {
+                        RtfError::MalformedDocument("RTF list override has too many levels".to_string())
+                    })?;
                     while self.pos < self.tokens.len() {
                         match self.tokens.get(self.pos) {
                             Some(Token::CloseBrace) => {
@@ -4089,9 +4167,13 @@ impl<'a> Parser<'a> {
                             Some(Token::Control(ControlWord::ListOverrideStartAt(value))) => {
                                 has_start_override = *value;
                             },
+                            Some(Token::Control(ControlWord::ListOverrideFormat(value))) => {
+                                has_format_override = *value;
+                            },
                             Some(Token::Control(ControlWord::ListLevelStartAt(value)))
                                 if has_start_override =>
                             {
+                                level_start_at = Some(*value);
                                 start_at = Some(*value);
                             },
                             Some(Token::OpenBrace) => {
@@ -4103,6 +4185,16 @@ impl<'a> Parser<'a> {
                         }
                         self.pos += 1;
                     }
+                    let level_start = if has_start_override {
+                        level_start_at
+                    } else {
+                        None
+                    };
+                    override_levels.push(super::list::ListOverrideLevel {
+                        level: override_index,
+                        start_at: level_start,
+                        format_override: has_format_override,
+                    });
                     continue;
                 },
                 Some(Token::OpenBrace) => {
@@ -4140,6 +4232,7 @@ impl<'a> Parser<'a> {
             let mut entry = super::list::ListOverride::new(index, list_id);
             entry.level_count_override = level_count;
             entry.start_at_override = start_at;
+            entry.levels = override_levels;
             self.list_override_table.add(entry);
         }
         Ok(())
