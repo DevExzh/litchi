@@ -3,6 +3,8 @@
 mod native;
 mod storage;
 
+use std::borrow::Cow;
+
 use crate::package_metadata::{
     add_component_external_reference, add_component_object_uuids, component_identifier_for_entry,
     next_object_identifier, release_package_identifier_suffix,
@@ -13,14 +15,16 @@ use crate::shapes::{insert_style_variation, remove_style_variation};
 use crate::{Error, IWorkPackage, Result};
 
 use self::native::ParagraphStyleOverrides;
+use super::paragraph_tabs::ParagraphTabStops;
 use super::style::{ParagraphIndents, ParagraphLineSpacing, ParagraphSpacing, TextAlignment};
 
-#[derive(Debug, Clone, Copy)]
-enum ParagraphProperty {
+#[derive(Debug, Clone)]
+enum ParagraphProperty<'a> {
     Alignment(TextAlignment),
     LineSpacing(ParagraphLineSpacing),
     Spacing(ParagraphSpacing),
     Indents(ParagraphIndents),
+    TabStops(Cow<'a, ParagraphTabStops>),
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -29,6 +33,7 @@ enum ParagraphPropertyKind {
     LineSpacing,
     Spacing,
     Indents,
+    TabStops,
 }
 
 pub(super) fn paragraph_alignment(
@@ -129,10 +134,40 @@ pub(super) fn reset_paragraph_indents(package: &mut IWorkPackage, storage_id: u6
     reset_property(package, storage_id, ParagraphPropertyKind::Indents)
 }
 
+pub(super) fn paragraph_tab_stops(
+    package: &IWorkPackage,
+    storage_id: u64,
+) -> Result<ParagraphTabStops> {
+    let storage = storage::locate(package, storage_id)?;
+    native::inherited_tab_stops(package, storage.style_id)
+}
+
+pub(super) fn set_paragraph_tab_stops(
+    package: &mut IWorkPackage,
+    storage_id: u64,
+    stops: &ParagraphTabStops,
+) -> Result<()> {
+    if paragraph_tab_stops(package, storage_id)?.as_slice() == stops.as_slice() {
+        return Ok(());
+    }
+    set_property(
+        package,
+        storage_id,
+        ParagraphProperty::TabStops(Cow::Borrowed(stops)),
+    )
+}
+
+pub(super) fn reset_paragraph_tab_stops(
+    package: &mut IWorkPackage,
+    storage_id: u64,
+) -> Result<bool> {
+    reset_property(package, storage_id, ParagraphPropertyKind::TabStops)
+}
+
 fn set_property(
     package: &mut IWorkPackage,
     storage_id: u64,
-    property: ParagraphProperty,
+    property: ParagraphProperty<'_>,
 ) -> Result<()> {
     let storage = storage::locate(package, storage_id)?;
     let style = native::locate_style(package, storage.style_id)?;
@@ -148,7 +183,7 @@ fn set_property(
     if let Some(mut overrides) = native::direct_overrides(&style.style, &style.message.data)?
         && native::is_exclusive(package, storage.style_id)?
     {
-        apply_property(&mut overrides, property);
+        apply_property(&mut overrides, &property);
         let parent_style_id = native::parent_style_id(&style.style, storage.style_id)?;
         let replacement =
             native::variation_object(storage.style_id, parent_style_id, stylesheet_id, overrides)?;
@@ -166,7 +201,7 @@ fn set_property(
 
     let new_style_id = next_object_identifier(package)?;
     let mut overrides = ParagraphStyleOverrides::default();
-    apply_property(&mut overrides, property);
+    apply_property(&mut overrides, &property);
     let new_style =
         native::variation_object(new_style_id, storage.style_id, stylesheet_id, overrides)?;
     let mut staged = package.clone();
@@ -207,7 +242,7 @@ fn reset_property(
     let Some(mut overrides) = native::direct_overrides(&style.style, &style.message.data)? else {
         return Ok(false);
     };
-    if !has_property(overrides, kind) || !native::is_exclusive(package, storage.style_id)? {
+    if !has_property(&overrides, kind) || !native::is_exclusive(package, storage.style_id)? {
         return Ok(false);
     }
     clear_property(&mut overrides, kind);
@@ -253,10 +288,10 @@ fn reset_property(
     Ok(true)
 }
 
-fn apply_property(overrides: &mut ParagraphStyleOverrides, property: ParagraphProperty) {
+fn apply_property(overrides: &mut ParagraphStyleOverrides, property: &ParagraphProperty<'_>) {
     match property {
-        ParagraphProperty::Alignment(alignment) => overrides.alignment = Some(alignment),
-        ParagraphProperty::LineSpacing(spacing) => overrides.line_spacing = Some(spacing),
+        ParagraphProperty::Alignment(alignment) => overrides.alignment = Some(*alignment),
+        ParagraphProperty::LineSpacing(spacing) => overrides.line_spacing = Some(*spacing),
         ParagraphProperty::Spacing(spacing) => {
             overrides.space_before = Some(spacing.before);
             overrides.space_after = Some(spacing.after);
@@ -266,10 +301,13 @@ fn apply_property(overrides: &mut ParagraphStyleOverrides, property: ParagraphPr
             overrides.left_indent = Some(indents.left);
             overrides.right_indent = Some(indents.right);
         },
+        ParagraphProperty::TabStops(stops) => {
+            overrides.tab_stops = Some(stops.as_ref().clone());
+        },
     }
 }
 
-fn has_property(overrides: ParagraphStyleOverrides, kind: ParagraphPropertyKind) -> bool {
+fn has_property(overrides: &ParagraphStyleOverrides, kind: ParagraphPropertyKind) -> bool {
     match kind {
         ParagraphPropertyKind::Alignment => overrides.alignment.is_some(),
         ParagraphPropertyKind::LineSpacing => overrides.line_spacing.is_some(),
@@ -281,6 +319,7 @@ fn has_property(overrides: ParagraphStyleOverrides, kind: ParagraphPropertyKind)
                 || overrides.left_indent.is_some()
                 || overrides.right_indent.is_some()
         },
+        ParagraphPropertyKind::TabStops => overrides.tab_stops.is_some(),
     }
 }
 
@@ -297,6 +336,7 @@ fn clear_property(overrides: &mut ParagraphStyleOverrides, kind: ParagraphProper
             overrides.left_indent = None;
             overrides.right_indent = None;
         },
+        ParagraphPropertyKind::TabStops => overrides.tab_stops = None,
     }
 }
 
@@ -304,7 +344,7 @@ fn inherited_property(
     package: &IWorkPackage,
     style_id: u64,
     kind: ParagraphPropertyKind,
-) -> Result<ParagraphProperty> {
+) -> Result<ParagraphProperty<'static>> {
     match kind {
         ParagraphPropertyKind::Alignment => Ok(ParagraphProperty::Alignment(
             native::inherited_alignment(package, style_id)?,
@@ -318,13 +358,16 @@ fn inherited_property(
         ParagraphPropertyKind::Indents => Ok(ParagraphProperty::Indents(
             native::inherited_indents(package, style_id)?,
         )),
+        ParagraphPropertyKind::TabStops => Ok(ParagraphProperty::TabStops(Cow::Owned(
+            native::inherited_tab_stops(package, style_id)?,
+        ))),
     }
 }
 
 fn validate_property(
     package: &IWorkPackage,
     storage_id: u64,
-    expected: ParagraphProperty,
+    expected: ParagraphProperty<'_>,
 ) -> Result<()> {
     validate_expected_property(package, storage_id, expected).map_err(|_| {
         Error::InvalidFormat("iWork paragraph-style update failed validation".to_owned())
@@ -334,7 +377,7 @@ fn validate_property(
 fn validate_expected_property(
     package: &IWorkPackage,
     storage_id: u64,
-    expected: ParagraphProperty,
+    expected: ParagraphProperty<'_>,
 ) -> Result<()> {
     let matches = match expected {
         ParagraphProperty::Alignment(alignment) => {
@@ -345,6 +388,9 @@ fn validate_expected_property(
         },
         ParagraphProperty::Spacing(spacing) => paragraph_spacing(package, storage_id)? == spacing,
         ParagraphProperty::Indents(indents) => paragraph_indents(package, storage_id)? == indents,
+        ParagraphProperty::TabStops(stops) => {
+            paragraph_tab_stops(package, storage_id)?.as_slice() == stops.as_ref().as_slice()
+        },
     };
     if matches {
         Ok(())

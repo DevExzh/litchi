@@ -29,8 +29,8 @@ use crate::shapes::{
     shape_geometry, shape_properties, shape_text_columns, shape_text_layout,
 };
 use crate::text::{
-    IWorkTextEditor, ParagraphIndents, ParagraphLineSpacing, ParagraphSpacing, TextAlignment,
-    TextColumns, TextStorageInfo,
+    IWorkTextEditor, ParagraphIndents, ParagraphLineSpacing, ParagraphSpacing, ParagraphTabStops,
+    TextAlignment, TextColumns, TextStorageInfo,
 };
 use crate::wire::{
     append_repeated_length_delimited_field, patch_fixed32_field, patch_length_delimited_field,
@@ -500,6 +500,46 @@ impl PagesEditor {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
         let changed = staged.reset_paragraph_indents(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective ordered ruler tab stops of an ordinary text box.
+    pub fn text_box_paragraph_tab_stops(
+        &self,
+        drawable_object_id: u64,
+    ) -> Result<ParagraphTabStops> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        self.text.paragraph_tab_stops(graph.storage_id)
+    }
+
+    /// Atomically replace every explicit ruler tab stop of an ordinary text box.
+    pub fn set_text_box_paragraph_tab_stops(
+        &mut self,
+        drawable_object_id: u64,
+        stops: ParagraphTabStops,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_paragraph_tab_stops(graph.storage_id, stops)?;
+        let expected = staged.paragraph_tab_stops(graph.storage_id)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified.text_box_paragraph_tab_stops(drawable_object_id)? != expected {
+            return Err(Error::InvalidFormat(
+                "Pages text-box paragraph tab-stop update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore inherited tab stops while preserving sibling paragraph overrides.
+    pub fn reset_text_box_paragraph_tab_stops(&mut self, drawable_object_id: u64) -> Result<bool> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_paragraph_tab_stops(graph.storage_id)?;
         if changed {
             *self = Self::from_package(staged.into_package())?;
         }

@@ -19,10 +19,12 @@ use crate::{Error, IWorkPackage, Result};
 
 use super::paragraph_alignment::{
     paragraph_alignment, paragraph_indents, paragraph_line_spacing, paragraph_spacing,
-    reset_paragraph_alignment, reset_paragraph_indents, reset_paragraph_line_spacing,
-    reset_paragraph_spacing, set_paragraph_alignment, set_paragraph_indents,
-    set_paragraph_line_spacing, set_paragraph_spacing,
+    paragraph_tab_stops, reset_paragraph_alignment, reset_paragraph_indents,
+    reset_paragraph_line_spacing, reset_paragraph_spacing, reset_paragraph_tab_stops,
+    set_paragraph_alignment, set_paragraph_indents, set_paragraph_line_spacing,
+    set_paragraph_spacing, set_paragraph_tab_stops,
 };
+use super::paragraph_tabs::ParagraphTabStops;
 use super::style::{ParagraphIndents, ParagraphLineSpacing, ParagraphSpacing, TextAlignment};
 
 const STORAGE_MESSAGE_TYPES: &[u32] = &[2001, 2022];
@@ -284,6 +286,42 @@ impl IWorkTextEditor {
     pub fn reset_paragraph_indents(&mut self, object_id: u64) -> Result<bool> {
         let mut staged = self.package.clone();
         let changed = reset_paragraph_indents(&mut staged, object_id)?;
+        if changed {
+            let bytes = staged.to_bytes()?;
+            IWorkPackage::from_bytes(&bytes)?;
+            self.package = staged;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective ordered ruler tab stops of a uniform text storage.
+    pub fn paragraph_tab_stops(&self, object_id: u64) -> Result<ParagraphTabStops> {
+        paragraph_tab_stops(&self.package, object_id)
+    }
+
+    /// Atomically replace every explicit ruler tab stop of a uniform text storage.
+    pub fn set_paragraph_tab_stops(
+        &mut self,
+        object_id: u64,
+        stops: ParagraphTabStops,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        set_paragraph_tab_stops(&mut staged, object_id, &stops)?;
+        let bytes = staged.to_bytes()?;
+        let verified = IWorkPackage::from_bytes(&bytes)?;
+        if paragraph_tab_stops(&verified, object_id)? != stops {
+            return Err(Error::InvalidFormat(
+                "iWork paragraph tab-stop update failed round-trip validation".to_owned(),
+            ));
+        }
+        self.package = staged;
+        Ok(())
+    }
+
+    /// Restore inherited tab stops while preserving sibling paragraph overrides.
+    pub fn reset_paragraph_tab_stops(&mut self, object_id: u64) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = reset_paragraph_tab_stops(&mut staged, object_id)?;
         if changed {
             let bytes = staged.to_bytes()?;
             IWorkPackage::from_bytes(&bytes)?;

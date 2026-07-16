@@ -38,8 +38,8 @@ use crate::shapes::{
     set_shape_text_layout, shape_geometry, shape_properties, shape_text_columns, shape_text_layout,
 };
 use crate::text::{
-    IWorkTextEditor, ParagraphIndents, ParagraphLineSpacing, ParagraphSpacing, TextAlignment,
-    TextColumns, TextStorageInfo,
+    IWorkTextEditor, ParagraphIndents, ParagraphLineSpacing, ParagraphSpacing, ParagraphTabStops,
+    TextAlignment, TextColumns, TextStorageInfo,
 };
 use crate::wire::{
     patch_length_delimited_field, patch_nested_fixed32_field, patch_nested_length_delimited_field,
@@ -757,6 +757,52 @@ impl NumbersEditor {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
         let changed = text.reset_paragraph_indents(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(text.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective ordered ruler tab stops of a sheet text box.
+    pub fn sheet_text_box_paragraph_tab_stops(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<ParagraphTabStops> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        IWorkTextEditor::from_package(self.package.clone()).paragraph_tab_stops(graph.storage_id)
+    }
+
+    /// Atomically replace every explicit ruler tab stop of a sheet text box.
+    pub fn set_sheet_text_box_paragraph_tab_stops(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        stops: ParagraphTabStops,
+    ) -> Result<()> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        text.set_paragraph_tab_stops(graph.storage_id, stops)?;
+        let expected = text.paragraph_tab_stops(graph.storage_id)?;
+        let verified = Self::from_package(text.into_package())?;
+        if verified.sheet_text_box_paragraph_tab_stops(sheet_id, drawable_object_id)? != expected {
+            return Err(Error::InvalidFormat(
+                "Numbers text-box paragraph tab-stop update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore inherited tab stops while preserving sibling paragraph overrides.
+    pub fn reset_sheet_text_box_paragraph_tab_stops(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let changed = text.reset_paragraph_tab_stops(graph.storage_id)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
         }

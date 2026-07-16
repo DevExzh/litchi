@@ -7,6 +7,7 @@ pub(crate) mod columns;
 pub mod editor;
 pub mod extractor;
 mod paragraph_alignment;
+mod paragraph_tabs;
 pub mod storage;
 pub mod style;
 
@@ -15,6 +16,10 @@ pub use columns::{
     TextColumns, VariableTextColumns,
 };
 pub use editor::{IWorkTextEditor, TextStorageInfo};
+pub use paragraph_tabs::{
+    ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
+    ParagraphTabStops,
+};
 
 pub use extractor::TextExtractor;
 pub use storage::{TextFragment, TextRun, TextStorage};

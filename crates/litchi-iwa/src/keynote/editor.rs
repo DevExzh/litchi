@@ -26,8 +26,8 @@ use crate::shapes::{
     set_shape_text_layout, shape_geometry, shape_properties, shape_text_columns, shape_text_layout,
 };
 use crate::text::{
-    IWorkTextEditor, ParagraphIndents, ParagraphLineSpacing, ParagraphSpacing, TextAlignment,
-    TextColumns, TextStorageInfo,
+    IWorkTextEditor, ParagraphIndents, ParagraphLineSpacing, ParagraphSpacing, ParagraphTabStops,
+    TextAlignment, TextColumns, TextStorageInfo,
 };
 use crate::wire::{
     append_repeated_length_delimited_field, parse_wire_fields, patch_fixed32_field,
@@ -1427,6 +1427,53 @@ impl KeynoteEditor {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();
         let changed = staged.reset_paragraph_indents(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective ordered ruler tab stops of a slide text box.
+    pub fn slide_text_box_paragraph_tab_stops(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<ParagraphTabStops> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text.paragraph_tab_stops(graph.storage_id)
+    }
+
+    /// Atomically replace every explicit ruler tab stop of a slide text box.
+    pub fn set_slide_text_box_paragraph_tab_stops(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        stops: ParagraphTabStops,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_paragraph_tab_stops(graph.storage_id, stops)?;
+        let expected = staged.paragraph_tab_stops(graph.storage_id)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified.slide_text_box_paragraph_tab_stops(slide_index, drawable_object_id)? != expected
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote text-box paragraph tab-stop update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore inherited tab stops while preserving sibling paragraph overrides.
+    pub fn reset_slide_text_box_paragraph_tab_stops(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_paragraph_tab_stops(graph.storage_id)?;
         if changed {
             *self = Self::from_package(staged.into_package())?;
         }

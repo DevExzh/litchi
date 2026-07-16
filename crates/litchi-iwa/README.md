@@ -43,8 +43,8 @@ println!("{}", structured.summary());
 - Semantic editors for Numbers sheets/tables/cells/formulas, Pages
   body/header/footer/text-box text, and Keynote slides/placeholders/text boxes/speaker notes
 - Typed copy-on-write text-box paragraph alignment, native line-spacing modes,
-  atomic before/after spacing, and first-line/left/right indentation across
-  Pages, Numbers, and Keynote
+  atomic before/after spacing, first-line/left/right indentation, and ordered
+  left/center/right/decimal tab stops with leaders across Pages, Numbers, and Keynote
 - Lossless Pages document body/header/footer visibility, facing-page layout,
   automatic hyphenation, and ligature options
 - Typed Numbers table header/footer counts, freeze state, and repeating-header

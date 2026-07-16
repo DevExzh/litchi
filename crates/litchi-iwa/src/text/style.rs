@@ -2,6 +2,8 @@
 //!
 //! iWork documents support rich text with character-level and paragraph-level styling.
 
+use super::paragraph_tabs::ParagraphTabStops;
+
 /// Text style properties (character-level)
 #[derive(Debug, Clone, Default)]
 pub struct TextStyle {
@@ -40,7 +42,7 @@ impl TextStyle {
 }
 
 /// Uniform paragraph properties currently supported by the shared text editor.
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct ParagraphStyle {
     /// Native paragraph alignment.
     pub alignment: TextAlignment,
@@ -50,6 +52,8 @@ pub struct ParagraphStyle {
     pub spacing: ParagraphSpacing,
     /// First-line, left, and right paragraph indentation.
     pub indents: ParagraphIndents,
+    /// Explicit ruler tab stops inherited by the paragraph.
+    pub tab_stops: ParagraphTabStops,
 }
 
 impl ParagraphStyle {
@@ -60,6 +64,7 @@ impl ParagraphStyle {
             line_spacing: ParagraphLineSpacing::default(),
             spacing: ParagraphSpacing::default(),
             indents: ParagraphIndents::default(),
+            tab_stops: ParagraphTabStops::default(),
         }
     }
 }
@@ -307,6 +312,7 @@ mod tests {
         );
         assert_eq!(para.spacing, ParagraphSpacing::NONE);
         assert_eq!(para.indents, ParagraphIndents::NONE);
+        assert!(para.tab_stops.is_empty());
     }
 
     #[test]

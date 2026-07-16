@@ -9,7 +9,9 @@ use litchi_iwa::shapes::{
 };
 use litchi_iwa::text::{
     ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingPoints,
-    ParagraphSpacing, ParagraphSpacingPoints, TextAlignment, TextColumnCount, TextColumns,
+    ParagraphSpacing, ParagraphSpacingPoints, ParagraphTabAlignment, ParagraphTabLeader,
+    ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops, TextAlignment, TextColumnCount,
+    TextColumns,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -19,7 +21,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .ok_or("usage: create_keynote_text_box <output.key> [text]")?;
     let text = arguments
         .next()
-        .unwrap_or_else(|| "Built from typed IWA objects".to_owned());
+        .unwrap_or_else(|| "Quarterly result\t42.50 — built from typed IWA objects".to_owned());
     if arguments.next().is_some() {
         return Err("unexpected extra arguments".into());
     }
@@ -77,6 +79,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ParagraphIndentPoints::from_points(13.0)?,
             ParagraphIndentPoints::from_points(10.5)?,
         ),
+    )?;
+    editor.set_slide_text_box_paragraph_tab_stops(
+        0,
+        created.drawable_object_id,
+        ParagraphTabStops::new(vec![
+            ParagraphTabStop::new(
+                ParagraphTabPosition::from_points(63.0)?,
+                ParagraphTabAlignment::Decimal,
+            )
+            .with_leader(ParagraphTabLeader::new(".")?),
+        ])?,
     )?;
     editor.save(output)?;
     println!(

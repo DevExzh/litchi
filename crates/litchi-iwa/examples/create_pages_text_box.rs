@@ -9,8 +9,9 @@ use litchi_iwa::shapes::{
 };
 use litchi_iwa::text::{
     ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingMultiple,
-    ParagraphSpacing, ParagraphSpacingPoints, TextAlignment, TextColumnCount, TextColumnGap,
-    TextColumns,
+    ParagraphSpacing, ParagraphSpacingPoints, ParagraphTabAlignment, ParagraphTabLeader,
+    ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops, TextAlignment, TextColumnCount,
+    TextColumnGap, TextColumns,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -19,7 +20,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .next()
         .ok_or("usage: create_pages_text_box <output.pages> [text]")?;
     let text = arguments.next().unwrap_or_else(|| {
-        "A typed, two-column Pages text box created entirely from scratch. ".repeat(12)
+        "Overview\tPage 1 — a typed Pages text box created entirely from scratch.".to_owned()
     });
     if arguments.next().is_some() {
         return Err("unexpected extra arguments".into());
@@ -70,6 +71,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ParagraphIndentPoints::from_points(12.5)?,
             ParagraphIndentPoints::from_points(12.0)?,
         ),
+    )?;
+    editor.set_text_box_paragraph_tab_stops(
+        created.drawable_object_id,
+        ParagraphTabStops::new(vec![
+            ParagraphTabStop::new(
+                ParagraphTabPosition::from_points(48.5)?,
+                ParagraphTabAlignment::Left,
+            ),
+            ParagraphTabStop::new(
+                ParagraphTabPosition::from_points(56.0)?,
+                ParagraphTabAlignment::Center,
+            )
+            .with_leader(ParagraphTabLeader::new(".")?),
+        ])?,
     )?;
     editor.save(output)?;
     println!(

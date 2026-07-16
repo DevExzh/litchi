@@ -1,6 +1,7 @@
 //! Native paragraph-style inheritance, minimal variations, and ownership checks.
 
 mod inheritance;
+mod tabs;
 
 use prost::Message;
 
@@ -9,6 +10,7 @@ use crate::protobuf::{tsp, tss, tswp};
 use crate::wire::{parse_wire_fields, repeated_length_delimited_payloads};
 use crate::{Error, IWorkPackage, Result};
 
+use super::super::paragraph_tabs::ParagraphTabStops;
 use super::super::style::{
     ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingMultiple,
     ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, TextAlignment,
@@ -32,6 +34,7 @@ const PARAGRAPH_LINE_SPACING_FIELD: u32 = 13;
 const PARAGRAPH_RIGHT_INDENT_FIELD: u32 = 19;
 const PARAGRAPH_SPACE_AFTER_FIELD: u32 = 20;
 const PARAGRAPH_SPACE_BEFORE_FIELD: u32 = 21;
+const PARAGRAPH_TABS_FIELD: u32 = 25;
 const LINE_SPACING_MODE_FIELD: u32 = 1;
 const LINE_SPACING_AMOUNT_FIELD: u32 = 2;
 
@@ -47,7 +50,7 @@ pub(super) struct ParagraphStyleLocation {
     pub(super) style: tswp::ParagraphStyleArchive,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub(super) struct ParagraphStyleOverrides {
     pub(super) alignment: Option<TextAlignment>,
     pub(super) line_spacing: Option<ParagraphLineSpacing>,
@@ -56,10 +59,11 @@ pub(super) struct ParagraphStyleOverrides {
     pub(super) first_line_indent: Option<ParagraphIndentPoints>,
     pub(super) left_indent: Option<ParagraphIndentPoints>,
     pub(super) right_indent: Option<ParagraphIndentPoints>,
+    pub(super) tab_stops: Option<ParagraphTabStops>,
 }
 
 impl ParagraphStyleOverrides {
-    pub(super) fn count(self) -> u32 {
+    pub(super) fn count(&self) -> u32 {
         u32::from(self.alignment.is_some())
             + u32::from(self.line_spacing.is_some())
             + u32::from(self.space_before.is_some())
@@ -67,9 +71,10 @@ impl ParagraphStyleOverrides {
             + u32::from(self.first_line_indent.is_some())
             + u32::from(self.left_indent.is_some())
             + u32::from(self.right_indent.is_some())
+            + u32::from(self.tab_stops.is_some())
     }
 
-    pub(super) fn is_empty(self) -> bool {
+    pub(super) fn is_empty(&self) -> bool {
         self.count() == 0
     }
 }
@@ -133,6 +138,13 @@ pub(super) fn inherited_indents(
     inheritance::indents(package, first_style_id)
 }
 
+pub(super) fn inherited_tab_stops(
+    package: &IWorkPackage,
+    first_style_id: u64,
+) -> Result<ParagraphTabStops> {
+    inheritance::tab_stops(package, first_style_id)
+}
+
 pub(super) fn direct_overrides(
     style: &tswp::ParagraphStyleArchive,
     raw: &[u8],
@@ -169,6 +181,11 @@ pub(super) fn direct_overrides(
         .right_indent
         .map(ParagraphIndentPoints::from_points)
         .transpose()?;
+    let tab_stops = properties
+        .tabs
+        .as_ref()
+        .map(tabs::from_archive)
+        .transpose()?;
     let overrides = ParagraphStyleOverrides {
         alignment,
         line_spacing,
@@ -177,6 +194,7 @@ pub(super) fn direct_overrides(
         first_line_indent,
         left_indent,
         right_indent,
+        tab_stops,
     };
     let mut remaining = properties.clone();
     remaining.alignment = None;
@@ -186,6 +204,7 @@ pub(super) fn direct_overrides(
     remaining.first_line_indent = None;
     remaining.left_indent = None;
     remaining.right_indent = None;
+    remaining.tabs = None;
     let semantic = !overrides.is_empty()
         && remaining == tswp::ParagraphStylePropertiesArchive::default()
         && style.override_count == Some(overrides.count())
@@ -213,7 +232,7 @@ pub(super) fn direct_overrides(
         STYLE_PARAGRAPH_PROPERTIES_FIELD,
         "paragraph properties",
     )?;
-    let mut paragraph_fields = Vec::with_capacity(7);
+    let mut paragraph_fields = Vec::with_capacity(8);
     if alignment.is_some() {
         paragraph_fields.push(PARAGRAPH_ALIGNMENT_FIELD);
     }
@@ -247,6 +266,13 @@ pub(super) fn direct_overrides(
     }
     if right_indent.is_some() {
         paragraph_fields.push(PARAGRAPH_RIGHT_INDENT_FIELD);
+    }
+    if let Some(stops) = overrides.tab_stops.as_ref() {
+        paragraph_fields.push(PARAGRAPH_TABS_FIELD);
+        let tabs_raw = required_payload(paragraph_raw, PARAGRAPH_TABS_FIELD, "paragraph tabs")?;
+        if !tabs::has_canonical_wire(tabs_raw, stops)? {
+            return Ok(None);
+        }
     }
     let exact = has_exact_fields(
         raw,
@@ -298,6 +324,7 @@ pub(super) fn variation_object(
                 .map(ParagraphIndentPoints::points),
             left_indent: overrides.left_indent.map(ParagraphIndentPoints::points),
             right_indent: overrides.right_indent.map(ParagraphIndentPoints::points),
+            tabs: overrides.tab_stops.as_ref().map(tabs::archive),
             ..Default::default()
         }),
     }

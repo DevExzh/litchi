@@ -3,13 +3,14 @@
 use std::collections::HashSet;
 
 use crate::protobuf::tswp;
+use crate::text::paragraph_tabs::ParagraphTabStops;
 use crate::text::style::{
     ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing, ParagraphSpacing,
     ParagraphSpacingPoints, TextAlignment,
 };
 use crate::{Error, IWorkPackage, Result};
 
-use super::{line_spacing_from_archive, locate_style};
+use super::{line_spacing_from_archive, locate_style, tabs};
 
 const MAX_STYLE_INHERITANCE_DEPTH: usize = 64;
 
@@ -128,6 +129,29 @@ pub(super) fn indents(package: &IWorkPackage, first_style_id: u64) -> Result<Par
         left.unwrap_or(ParagraphIndentPoints::ZERO),
         right.unwrap_or(ParagraphIndentPoints::ZERO),
     ))
+}
+
+pub(super) fn tab_stops(package: &IWorkPackage, first_style_id: u64) -> Result<ParagraphTabStops> {
+    let value = walk(package, first_style_id, None, |value, style| {
+        let Some(properties) = style.para_properties.as_ref() else {
+            return Ok(InheritanceControl::Continue);
+        };
+        if properties.tabs_null == Some(true) {
+            if properties.tabs.is_some() {
+                return Err(Error::InvalidFormat(
+                    "native iWork paragraph tabs are both null and populated".to_owned(),
+                ));
+            }
+            *value = Some(ParagraphTabStops::default());
+            return Ok(InheritanceControl::Complete);
+        }
+        let Some(archive) = properties.tabs.as_ref() else {
+            return Ok(InheritanceControl::Continue);
+        };
+        *value = Some(tabs::from_archive(archive)?);
+        Ok(InheritanceControl::Complete)
+    })?;
+    Ok(value.unwrap_or_default())
 }
 
 fn walk<T, F>(package: &IWorkPackage, first_style_id: u64, mut state: T, mut visit: F) -> Result<T>
