@@ -13,13 +13,16 @@ use crate::{Error, IWorkPackage, Result};
 
 use self::native::ParagraphStyleOverrides;
 use super::paragraph_tabs::ParagraphTabStops;
-use super::style::{ParagraphIndents, ParagraphLineSpacing, ParagraphSpacing, TextAlignment};
+use super::style::{
+    ParagraphIndents, ParagraphLineSpacing, ParagraphSpacing, TextAlignment, TextStyle,
+};
 use super::style_registry::{
     object_archive_name, register_private_style, unregister_private_style,
 };
 
 #[derive(Debug, Clone)]
 enum ParagraphProperty<'a> {
+    TextStyle(TextStyle),
     Alignment(TextAlignment),
     LineSpacing(ParagraphLineSpacing),
     Spacing(ParagraphSpacing),
@@ -29,11 +32,32 @@ enum ParagraphProperty<'a> {
 
 #[derive(Debug, Clone, Copy)]
 enum ParagraphPropertyKind {
+    TextStyle,
     Alignment,
     LineSpacing,
     Spacing,
     Indents,
     TabStops,
+}
+
+pub(super) fn text_style(package: &IWorkPackage, storage_id: u64) -> Result<TextStyle> {
+    let storage = storage::locate(package, storage_id)?;
+    native::inherited_text_style(package, storage.style_id)
+}
+
+pub(super) fn set_text_style(
+    package: &mut IWorkPackage,
+    storage_id: u64,
+    style: TextStyle,
+) -> Result<()> {
+    if text_style(package, storage_id)? == style {
+        return Ok(());
+    }
+    set_property(package, storage_id, ParagraphProperty::TextStyle(style))
+}
+
+pub(super) fn reset_text_style(package: &mut IWorkPackage, storage_id: u64) -> Result<bool> {
+    reset_property(package, storage_id, ParagraphPropertyKind::TextStyle)
 }
 
 pub(super) fn paragraph_alignment(
@@ -183,8 +207,38 @@ fn set_property(
     if let Some(mut overrides) = native::direct_overrides(&style.style, &style.message.data)?
         && native::is_exclusive(package, storage.style_id)?
     {
-        apply_property(&mut overrides, &property);
         let parent_style_id = native::parent_style_id(&style.style, storage.style_id)?;
+        let inherited_text_style =
+            inherited_text_style_for_property(package, parent_style_id, &property)?;
+        apply_property(&mut overrides, &property, inherited_text_style)?;
+        if overrides.is_empty() {
+            let mut staged = package.clone();
+            storage::patch_style_reference(
+                &mut staged,
+                &storage.archive_name,
+                storage_id,
+                storage.style_id,
+                parent_style_id,
+            )?;
+            remove_style_variation(
+                &mut staged,
+                &style.archive_name,
+                stylesheet_id,
+                parent_style_id,
+                storage.style_id,
+            )?;
+            unregister_private_style(
+                &mut staged,
+                &storage.archive_name,
+                &style.archive_name,
+                storage.style_id,
+                Some(parent_style_id),
+            )?;
+            release_package_identifier_suffix(&mut staged, &[storage.style_id])?;
+            validate_property(&staged, storage_id, property)?;
+            *package = staged;
+            return Ok(());
+        }
         let replacement =
             native::variation_object(storage.style_id, parent_style_id, stylesheet_id, overrides)?;
         let mut staged = package.clone();
@@ -201,7 +255,9 @@ fn set_property(
 
     let new_style_id = next_object_identifier(package)?;
     let mut overrides = ParagraphStyleOverrides::default();
-    apply_property(&mut overrides, &property);
+    let inherited_text_style =
+        inherited_text_style_for_property(package, storage.style_id, &property)?;
+    apply_property(&mut overrides, &property, inherited_text_style)?;
     let new_style =
         native::variation_object(new_style_id, storage.style_id, stylesheet_id, overrides)?;
     let mut staged = package.clone();
@@ -288,8 +344,36 @@ fn reset_property(
     Ok(true)
 }
 
-fn apply_property(overrides: &mut ParagraphStyleOverrides, property: &ParagraphProperty<'_>) {
+fn inherited_text_style_for_property(
+    package: &IWorkPackage,
+    parent_style_id: u64,
+    property: &ParagraphProperty<'_>,
+) -> Result<Option<TextStyle>> {
     match property {
+        ParagraphProperty::TextStyle(_) => {
+            native::inherited_text_style(package, parent_style_id).map(Some)
+        },
+        _ => Ok(None),
+    }
+}
+
+fn apply_property(
+    overrides: &mut ParagraphStyleOverrides,
+    property: &ParagraphProperty<'_>,
+    inherited_text_style: Option<TextStyle>,
+) -> Result<()> {
+    match property {
+        ParagraphProperty::TextStyle(style) => {
+            let inherited = inherited_text_style.ok_or_else(|| {
+                Error::InvalidFormat(
+                    "text-style mutation has no inherited character formatting".to_owned(),
+                )
+            })?;
+            overrides.point_size =
+                (style.point_size != inherited.point_size).then_some(style.point_size);
+            overrides.bold = (style.bold != inherited.bold).then_some(style.bold);
+            overrides.italic = (style.italic != inherited.italic).then_some(style.italic);
+        },
         ParagraphProperty::Alignment(alignment) => overrides.alignment = Some(*alignment),
         ParagraphProperty::LineSpacing(spacing) => overrides.line_spacing = Some(*spacing),
         ParagraphProperty::Spacing(spacing) => {
@@ -305,10 +389,14 @@ fn apply_property(overrides: &mut ParagraphStyleOverrides, property: &ParagraphP
             overrides.tab_stops = Some(stops.as_ref().clone());
         },
     }
+    Ok(())
 }
 
 fn has_property(overrides: &ParagraphStyleOverrides, kind: ParagraphPropertyKind) -> bool {
     match kind {
+        ParagraphPropertyKind::TextStyle => {
+            overrides.point_size.is_some() || overrides.bold.is_some() || overrides.italic.is_some()
+        },
         ParagraphPropertyKind::Alignment => overrides.alignment.is_some(),
         ParagraphPropertyKind::LineSpacing => overrides.line_spacing.is_some(),
         ParagraphPropertyKind::Spacing => {
@@ -325,6 +413,11 @@ fn has_property(overrides: &ParagraphStyleOverrides, kind: ParagraphPropertyKind
 
 fn clear_property(overrides: &mut ParagraphStyleOverrides, kind: ParagraphPropertyKind) {
     match kind {
+        ParagraphPropertyKind::TextStyle => {
+            overrides.point_size = None;
+            overrides.bold = None;
+            overrides.italic = None;
+        },
         ParagraphPropertyKind::Alignment => overrides.alignment = None,
         ParagraphPropertyKind::LineSpacing => overrides.line_spacing = None,
         ParagraphPropertyKind::Spacing => {
@@ -346,6 +439,9 @@ fn inherited_property(
     kind: ParagraphPropertyKind,
 ) -> Result<ParagraphProperty<'static>> {
     match kind {
+        ParagraphPropertyKind::TextStyle => Ok(ParagraphProperty::TextStyle(
+            native::inherited_text_style(package, style_id)?,
+        )),
         ParagraphPropertyKind::Alignment => Ok(ParagraphProperty::Alignment(
             native::inherited_alignment(package, style_id)?,
         )),
@@ -380,6 +476,7 @@ fn validate_expected_property(
     expected: ParagraphProperty<'_>,
 ) -> Result<()> {
     let matches = match expected {
+        ParagraphProperty::TextStyle(style) => text_style(package, storage_id)? == style,
         ParagraphProperty::Alignment(alignment) => {
             paragraph_alignment(package, storage_id)? == alignment
         },

@@ -25,11 +25,13 @@ use super::paragraph_alignment::{
     paragraph_alignment, paragraph_indents, paragraph_line_spacing, paragraph_spacing,
     paragraph_tab_stops, reset_paragraph_alignment, reset_paragraph_indents,
     reset_paragraph_line_spacing, reset_paragraph_spacing, reset_paragraph_tab_stops,
-    set_paragraph_alignment, set_paragraph_indents, set_paragraph_line_spacing,
-    set_paragraph_spacing, set_paragraph_tab_stops,
+    reset_text_style, set_paragraph_alignment, set_paragraph_indents, set_paragraph_line_spacing,
+    set_paragraph_spacing, set_paragraph_tab_stops, set_text_style, text_style,
 };
 use super::paragraph_tabs::ParagraphTabStops;
-use super::style::{ParagraphIndents, ParagraphLineSpacing, ParagraphSpacing, TextAlignment};
+use super::style::{
+    ParagraphIndents, ParagraphLineSpacing, ParagraphSpacing, TextAlignment, TextStyle,
+};
 
 const STORAGE_MESSAGE_TYPES: &[u32] = &[2001, 2022];
 
@@ -149,6 +151,41 @@ impl IWorkTextEditor {
             0..storage.text.encode_utf16().count(),
             replacement,
         )
+    }
+
+    /// Read effective uniform font size, bold, and italic formatting.
+    pub fn text_style(&self, object_id: u64) -> Result<TextStyle> {
+        text_style(&self.package, object_id)
+    }
+
+    /// Atomically set uniform font size, bold, and italic formatting.
+    ///
+    /// Rich text containing multiple paragraph-style boundaries is rejected so
+    /// the operation cannot flatten independently formatted paragraphs.
+    pub fn set_text_style(&mut self, object_id: u64, style: TextStyle) -> Result<()> {
+        let mut staged = self.package.clone();
+        set_text_style(&mut staged, object_id, style)?;
+        let bytes = staged.to_bytes()?;
+        let verified = IWorkPackage::from_bytes(&bytes)?;
+        if text_style(&verified, object_id)? != style {
+            return Err(Error::InvalidFormat(
+                "iWork text-style update failed round-trip validation".to_owned(),
+            ));
+        }
+        self.package = staged;
+        Ok(())
+    }
+
+    /// Restore inherited character formatting while preserving paragraph overrides.
+    pub fn reset_text_style(&mut self, object_id: u64) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = reset_text_style(&mut staged, object_id)?;
+        if changed {
+            let bytes = staged.to_bytes()?;
+            IWorkPackage::from_bytes(&bytes)?;
+            self.package = staged;
+        }
+        Ok(changed)
     }
 
     /// Read the effective uniform paragraph alignment of a text storage.

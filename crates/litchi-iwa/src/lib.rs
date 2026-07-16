@@ -179,7 +179,9 @@ pub use package::IWorkPackage;
 pub use ref_graph::ReferenceGraph;
 pub use snappy::SnappyStream;
 pub use structured::{CellValue, Section, Slide, StructuredData, Table};
-pub use text::{ParagraphStyle, TextExtractor, TextFragment, TextStorage, TextStyle};
+pub use text::{
+    ParagraphStyle, TextExtractor, TextFragment, TextPointSize, TextStorage, TextStyle,
+};
 pub use theme::{IWorkThemeArchive, IWorkThemeExtensions};
 pub use zip_utils::{
     FileStructureInfo, analyze_file_structure, extract_message_types_from_archive,

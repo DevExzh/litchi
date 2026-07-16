@@ -14,6 +14,7 @@ use super::super::paragraph_tabs::ParagraphTabStops;
 use super::super::style::{
     ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingMultiple,
     ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, TextAlignment,
+    TextPointSize, TextStyle,
 };
 use super::super::style_registry::object_archive_name;
 
@@ -28,6 +29,9 @@ const STYLE_PARAGRAPH_PROPERTIES_FIELD: u32 = 12;
 const STYLE_PARENT_FIELD: u32 = 3;
 const STYLE_VARIATION_FIELD: u32 = 4;
 const STYLE_STYLESHEET_FIELD: u32 = 5;
+const CHARACTER_BOLD_FIELD: u32 = 1;
+const CHARACTER_ITALIC_FIELD: u32 = 2;
+const CHARACTER_FONT_SIZE_FIELD: u32 = 3;
 const PARAGRAPH_ALIGNMENT_FIELD: u32 = 1;
 const PARAGRAPH_FIRST_LINE_INDENT_FIELD: u32 = 7;
 const PARAGRAPH_LEFT_INDENT_FIELD: u32 = 11;
@@ -53,6 +57,9 @@ pub(super) struct ParagraphStyleLocation {
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub(super) struct ParagraphStyleOverrides {
+    pub(super) bold: Option<bool>,
+    pub(super) italic: Option<bool>,
+    pub(super) point_size: Option<TextPointSize>,
     pub(super) alignment: Option<TextAlignment>,
     pub(super) line_spacing: Option<ParagraphLineSpacing>,
     pub(super) space_before: Option<ParagraphSpacingPoints>,
@@ -65,7 +72,10 @@ pub(super) struct ParagraphStyleOverrides {
 
 impl ParagraphStyleOverrides {
     pub(super) fn count(&self) -> u32 {
-        u32::from(self.alignment.is_some())
+        u32::from(self.bold.is_some())
+            + u32::from(self.italic.is_some())
+            + u32::from(self.point_size.is_some())
+            + u32::from(self.alignment.is_some())
             + u32::from(self.line_spacing.is_some())
             + u32::from(self.space_before.is_some())
             + u32::from(self.space_after.is_some())
@@ -118,6 +128,13 @@ pub(super) fn inherited_alignment(
     inheritance::alignment(package, first_style_id)
 }
 
+pub(super) fn inherited_text_style(
+    package: &IWorkPackage,
+    first_style_id: u64,
+) -> Result<TextStyle> {
+    inheritance::text_style(package, first_style_id)
+}
+
 pub(super) fn inherited_line_spacing(
     package: &IWorkPackage,
     first_style_id: u64,
@@ -150,9 +167,18 @@ pub(super) fn direct_overrides(
     style: &tswp::ParagraphStyleArchive,
     raw: &[u8],
 ) -> Result<Option<ParagraphStyleOverrides>> {
+    let Some(character_properties) = style.char_properties.as_ref() else {
+        return Ok(None);
+    };
     let Some(properties) = style.para_properties.as_ref() else {
         return Ok(None);
     };
+    let bold = character_properties.bold;
+    let italic = character_properties.italic;
+    let point_size = character_properties
+        .font_size
+        .map(TextPointSize::from_points)
+        .transpose()?;
     let alignment = properties
         .alignment
         .map(TextAlignment::from_native_value)
@@ -188,6 +214,9 @@ pub(super) fn direct_overrides(
         .map(tabs::from_archive)
         .transpose()?;
     let overrides = ParagraphStyleOverrides {
+        bold,
+        italic,
+        point_size,
         alignment,
         line_spacing,
         space_before,
@@ -206,13 +235,14 @@ pub(super) fn direct_overrides(
     remaining.left_indent = None;
     remaining.right_indent = None;
     remaining.tabs = None;
+    let mut remaining_character = character_properties.clone();
+    remaining_character.bold = None;
+    remaining_character.italic = None;
+    remaining_character.font_size = None;
     let semantic = !overrides.is_empty()
         && remaining == tswp::ParagraphStylePropertiesArchive::default()
+        && remaining_character == tswp::CharacterStylePropertiesArchive::default()
         && style.override_count == Some(overrides.count())
-        && style
-            .char_properties
-            .as_ref()
-            .is_some_and(|value| *value == tswp::CharacterStylePropertiesArchive::default())
         && style.super_.name.is_none()
         && style.super_.style_identifier.is_none()
         && style.super_.parent.is_some()
@@ -233,6 +263,16 @@ pub(super) fn direct_overrides(
         STYLE_PARAGRAPH_PROPERTIES_FIELD,
         "paragraph properties",
     )?;
+    let mut character_fields = Vec::with_capacity(3);
+    if bold.is_some() {
+        character_fields.push(CHARACTER_BOLD_FIELD);
+    }
+    if italic.is_some() {
+        character_fields.push(CHARACTER_ITALIC_FIELD);
+    }
+    if point_size.is_some() {
+        character_fields.push(CHARACTER_FONT_SIZE_FIELD);
+    }
     let mut paragraph_fields = Vec::with_capacity(8);
     if alignment.is_some() {
         paragraph_fields.push(PARAGRAPH_ALIGNMENT_FIELD);
@@ -290,7 +330,7 @@ pub(super) fn direct_overrides(
             STYLE_VARIATION_FIELD,
             STYLE_STYLESHEET_FIELD,
         ],
-    )? && has_exact_fields(character_raw, &[])?
+    )? && has_exact_fields(character_raw, &character_fields)?
         && has_exact_fields(paragraph_raw, &paragraph_fields)?;
     Ok(exact.then_some(overrides))
 }
@@ -314,7 +354,12 @@ pub(super) fn variation_object(
             ..Default::default()
         },
         override_count: Some(overrides.count()),
-        char_properties: Some(tswp::CharacterStylePropertiesArchive::default()),
+        char_properties: Some(tswp::CharacterStylePropertiesArchive {
+            bold: overrides.bold,
+            italic: overrides.italic,
+            font_size: overrides.point_size.map(TextPointSize::points),
+            ..Default::default()
+        }),
         para_properties: Some(tswp::ParagraphStylePropertiesArchive {
             alignment: overrides.alignment.map(TextAlignment::native_value),
             line_spacing: overrides.line_spacing.map(line_spacing_archive),

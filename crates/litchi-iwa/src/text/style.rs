@@ -4,40 +4,78 @@
 
 use super::paragraph_tabs::ParagraphTabStops;
 
-/// Text style properties (character-level)
-#[derive(Debug, Clone, Default)]
+/// Positive character size in typographic points.
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+pub struct TextPointSize(f32);
+
+impl TextPointSize {
+    /// Default size used by scratch iWork text styles.
+    pub const TWELVE: Self = Self(12.0);
+
+    /// Construct a finite character size greater than zero.
+    pub fn from_points(points: f32) -> crate::Result<Self> {
+        if !points.is_finite() || points <= 0.0 {
+            return Err(crate::Error::InvalidFormat(
+                "text point size must be finite and greater than zero".to_owned(),
+            ));
+        }
+        Ok(Self(points))
+    }
+
+    /// Return the character size in typographic points.
+    pub const fn points(self) -> f32 {
+        self.0
+    }
+}
+
+impl Default for TextPointSize {
+    fn default() -> Self {
+        Self::TWELVE
+    }
+}
+
+/// Effective uniform character formatting attached to a paragraph style.
+///
+/// Pages, Numbers, and Keynote store whole-paragraph direct font formatting
+/// in the paragraph-style inheritance graph. Partially formatted ranges use a
+/// separate character-style table and are intentionally not represented by
+/// this uniform value.
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TextStyle {
-    /// Font family name
-    pub font_family: Option<String>,
-    /// Font size in points
-    pub font_size: Option<f32>,
-    /// Bold formatting
+    /// Effective font size.
+    pub point_size: TextPointSize,
+    /// Whether bold emphasis is enabled.
     pub bold: bool,
-    /// Italic formatting
+    /// Whether italic emphasis is enabled.
     pub italic: bool,
-    /// Underline formatting
-    pub underline: bool,
-    /// Strikethrough formatting
-    pub strikethrough: bool,
-    /// Text color (RGB)
-    pub color: Option<(u8, u8, u8)>,
 }
 
 impl TextStyle {
-    /// Create a new default text style
-    pub fn new() -> Self {
-        Self::default()
+    /// Construct character formatting with no emphasis.
+    pub const fn new(point_size: TextPointSize) -> Self {
+        Self {
+            point_size,
+            bold: false,
+            italic: false,
+        }
     }
 
-    /// Check if style has any formatting applied
-    pub fn has_formatting(&self) -> bool {
-        self.bold
-            || self.italic
-            || self.underline
-            || self.strikethrough
-            || self.font_family.is_some()
-            || self.font_size.is_some()
-            || self.color.is_some()
+    /// Enable or disable bold emphasis.
+    pub const fn with_bold(mut self, bold: bool) -> Self {
+        self.bold = bold;
+        self
+    }
+
+    /// Enable or disable italic emphasis.
+    pub const fn with_italic(mut self, italic: bool) -> Self {
+        self.italic = italic;
+        self
+    }
+}
+
+impl Default for TextStyle {
+    fn default() -> Self {
+        Self::new(TextPointSize::TWELVE)
     }
 }
 
@@ -292,14 +330,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_text_style_creation() {
-        let style = TextStyle::new();
-        assert!(!style.has_formatting());
-
-        let mut styled = TextStyle::new();
-        styled.bold = true;
-        styled.font_size = Some(14.0);
-        assert!(styled.has_formatting());
+    fn text_style_scalars_are_strict() {
+        assert!(TextPointSize::from_points(0.0).is_err());
+        assert!(TextPointSize::from_points(-1.0).is_err());
+        assert!(TextPointSize::from_points(f32::NAN).is_err());
+        assert_eq!(
+            TextStyle::new(TextPointSize::from_points(19.5).unwrap())
+                .with_bold(true)
+                .with_italic(true),
+            TextStyle {
+                point_size: TextPointSize::from_points(19.5).unwrap(),
+                bold: true,
+                italic: true,
+            }
+        );
     }
 
     #[test]

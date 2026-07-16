@@ -6,7 +6,7 @@ use crate::protobuf::tswp;
 use crate::text::paragraph_tabs::ParagraphTabStops;
 use crate::text::style::{
     ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing, ParagraphSpacing,
-    ParagraphSpacingPoints, TextAlignment,
+    ParagraphSpacingPoints, TextAlignment, TextPointSize, TextStyle,
 };
 use crate::{Error, IWorkPackage, Result};
 
@@ -18,6 +18,40 @@ const MAX_STYLE_INHERITANCE_DEPTH: usize = 64;
 enum InheritanceControl {
     Continue,
     Complete,
+}
+
+pub(super) fn text_style(package: &IWorkPackage, first_style_id: u64) -> Result<TextStyle> {
+    let (point_size, bold, italic) = walk(
+        package,
+        first_style_id,
+        (None, None, None),
+        |(point_size, bold, italic), style| {
+            if let Some(properties) = style.char_properties.as_ref() {
+                if point_size.is_none() {
+                    *point_size = properties
+                        .font_size
+                        .map(TextPointSize::from_points)
+                        .transpose()?;
+                }
+                if bold.is_none() {
+                    *bold = properties.bold;
+                }
+                if italic.is_none() {
+                    *italic = properties.italic;
+                }
+            }
+            Ok(
+                if point_size.is_some() && bold.is_some() && italic.is_some() {
+                    InheritanceControl::Complete
+                } else {
+                    InheritanceControl::Continue
+                },
+            )
+        },
+    )?;
+    Ok(TextStyle::new(point_size.unwrap_or_default())
+        .with_bold(bold.unwrap_or(false))
+        .with_italic(italic.unwrap_or(false)))
 }
 
 pub(super) fn alignment(package: &IWorkPackage, first_style_id: u64) -> Result<TextAlignment> {

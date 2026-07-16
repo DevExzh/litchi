@@ -28,7 +28,7 @@ use crate::shapes::{
 use crate::text::{
     IWorkTextEditor, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphIndents,
     ParagraphLineSpacing, ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment,
-    TextColumns, TextStorageInfo,
+    TextColumns, TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     append_repeated_length_delimited_field, parse_wire_fields, patch_fixed32_field,
@@ -1246,6 +1246,51 @@ impl KeynoteEditor {
         )?;
         if changed {
             *self = Self::from_package(staged)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read effective uniform font size, bold, and italic formatting.
+    pub fn slide_text_box_text_style(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<TextStyle> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text.text_style(graph.storage_id)
+    }
+
+    /// Atomically set uniform font size, bold, and italic formatting.
+    pub fn set_slide_text_box_text_style(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        style: TextStyle,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_text_style(graph.storage_id, style)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified.slide_text_box_text_style(slide_index, drawable_object_id)? != style {
+            return Err(Error::InvalidFormat(
+                "Keynote text-box character formatting update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore inherited character formatting while preserving paragraph overrides.
+    pub fn reset_slide_text_box_text_style(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_text_style(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
         }
         Ok(changed)
     }

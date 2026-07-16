@@ -12,7 +12,7 @@ use litchi_iwa::text::{
     DropCapWrap, ParagraphDropCap, ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing,
     ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, ParagraphStart,
     ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
-    ParagraphTabStops, TextAlignment, TextColumnCount, TextColumns,
+    ParagraphTabStops, TextAlignment, TextColumnCount, TextColumns, TextPointSize, TextStyle,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -53,6 +53,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ShapeTextInsets::uniform(ShapeTextInset::from_points(12.0)?),
             ShapeTextAutoSize::ShrinkToFit,
         ),
+    )?;
+    editor.set_slide_text_box_text_style(
+        0,
+        created.drawable_object_id,
+        TextStyle::new(TextPointSize::from_points(23.0)?)
+            .with_bold(true)
+            .with_italic(true),
     )?;
     editor.set_slide_text_box_paragraph_alignment(
         0,

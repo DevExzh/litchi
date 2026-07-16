@@ -12,7 +12,8 @@ use litchi_iwa::text::{
     ParagraphDropCap, ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing,
     ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, ParagraphStart,
     ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
-    ParagraphTabStops, TextAlignment, TextColumnCount, TextColumnGap, TextColumns,
+    ParagraphTabStops, TextAlignment, TextColumnCount, TextColumnGap, TextColumns, TextPointSize,
+    TextStyle,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -57,6 +58,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ShapeTextInsets::uniform(ShapeTextInset::from_points(6.0)?),
             ShapeTextAutoSize::Fixed,
         ),
+    )?;
+    editor.set_sheet_text_box_text_style(
+        sheet_id,
+        created.drawable_object_id,
+        TextStyle::new(TextPointSize::from_points(21.0)?).with_italic(true),
     )?;
     editor.set_sheet_text_box_paragraph_alignment(
         sheet_id,

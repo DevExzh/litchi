@@ -40,7 +40,7 @@ use crate::shapes::{
 use crate::text::{
     IWorkTextEditor, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphIndents,
     ParagraphLineSpacing, ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment,
-    TextColumns, TextStorageInfo,
+    TextColumns, TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     patch_length_delimited_field, patch_nested_fixed32_field, patch_nested_length_delimited_field,
@@ -579,6 +579,51 @@ impl NumbersEditor {
         )?;
         if changed {
             *self = Self::from_package(staged)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read effective uniform font size, bold, and italic formatting.
+    pub fn sheet_text_box_text_style(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<TextStyle> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        IWorkTextEditor::from_package(self.package.clone()).text_style(graph.storage_id)
+    }
+
+    /// Atomically set uniform font size, bold, and italic formatting.
+    pub fn set_sheet_text_box_text_style(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        style: TextStyle,
+    ) -> Result<()> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        text.set_text_style(graph.storage_id, style)?;
+        let verified = Self::from_package(text.into_package())?;
+        if verified.sheet_text_box_text_style(sheet_id, drawable_object_id)? != style {
+            return Err(Error::InvalidFormat(
+                "Numbers text-box character formatting update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore inherited character formatting while preserving paragraph overrides.
+    pub fn reset_sheet_text_box_text_style(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let changed = text.reset_text_style(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(text.into_package())?;
         }
         Ok(changed)
     }

@@ -31,7 +31,7 @@ use crate::shapes::{
 use crate::text::{
     IWorkTextEditor, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphIndents,
     ParagraphLineSpacing, ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment,
-    TextColumns, TextStorageInfo,
+    TextColumns, TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     append_repeated_length_delimited_field, patch_fixed32_field, patch_length_delimited_field,
@@ -353,6 +353,42 @@ impl PagesEditor {
             reset_shape_text_columns(self.package().clone(), &archive_name, drawable_object_id)?;
         if changed {
             *self = Self::from_package(staged)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read effective uniform font size, bold, and italic formatting.
+    pub fn text_box_text_style(&self, drawable_object_id: u64) -> Result<TextStyle> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        self.text.text_style(graph.storage_id)
+    }
+
+    /// Atomically set uniform font size, bold, and italic formatting.
+    pub fn set_text_box_text_style(
+        &mut self,
+        drawable_object_id: u64,
+        style: TextStyle,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_text_style(graph.storage_id, style)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified.text_box_text_style(drawable_object_id)? != style {
+            return Err(Error::InvalidFormat(
+                "Pages text-box character formatting update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore inherited character formatting while preserving paragraph overrides.
+    pub fn reset_text_box_text_style(&mut self, drawable_object_id: u64) -> Result<bool> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_text_style(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
         }
         Ok(changed)
     }
