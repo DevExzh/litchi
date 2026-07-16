@@ -57,6 +57,11 @@ pub struct PowerPoint10DocumentProperties {
     pub copyright: Option<String>,
     /// Optional document keywords.
     pub keywords: Option<String>,
+    /// Optional password required for modify access.
+    ///
+    /// MS-PPT also requires presentations containing this field to be encrypted; this field alone
+    /// does not establish that the surrounding encryption was validated.
+    pub modify_password: Option<String>,
     /// Whether personally identifiable information is removed when saving.
     ///
     /// `None` means that the optional `FilterPrivacyFlags10Atom` is absent.
@@ -80,7 +85,8 @@ impl PowerPoint10DocumentProperties {
                                 .to_string(),
                         ));
                     }
-                    properties.copyright = Some(parse_summary_string(&record, "CopyrightAtom")?);
+                    properties.copyright =
+                        Some(parse_document_string(&record, 1, "CopyrightAtom")?);
                 },
                 (PptRecordType::CString, 2) => {
                     if properties.keywords.is_some() {
@@ -89,7 +95,17 @@ impl PowerPoint10DocumentProperties {
                                 .to_string(),
                         ));
                     }
-                    properties.keywords = Some(parse_summary_string(&record, "KeywordsAtom")?);
+                    properties.keywords = Some(parse_document_string(&record, 2, "KeywordsAtom")?);
+                },
+                (PptRecordType::CString, 3) => {
+                    if properties.modify_password.is_some() {
+                        return Err(PptError::Corrupted(
+                            "PowerPoint 10 document extension contains duplicate modify password"
+                                .to_string(),
+                        ));
+                    }
+                    properties.modify_password =
+                        Some(parse_document_string(&record, 3, "ModifyPasswordAtom")?);
                 },
                 (PptRecordType::FilterPrivacyFlags10Atom, _) => {
                     if properties
@@ -129,10 +145,10 @@ impl PowerPoint10DocumentProperties {
     }
 }
 
-fn parse_summary_string(record: &PptRecord, name: &str) -> Result<String> {
+fn parse_document_string(record: &PptRecord, instance: u16, name: &str) -> Result<String> {
     if record.record_type != PptRecordType::CString
         || record.version != 0
-        || !matches!(record.instance, 1 | 2)
+        || record.instance != instance
         || record.data.len() > 510
         || record.data.len() & 1 != 0
     {
@@ -304,6 +320,7 @@ mod tests {
     fn parses_powerpoint10_document_properties() {
         let mut records = record_bytes(0, 1, 4026, &utf16("Copyright © 2026"));
         records.extend_from_slice(&record_bytes(0, 2, 4026, &utf16("rust; ooxml")));
+        records.extend_from_slice(&record_bytes(0, 3, 4026, &utf16("edit-only")));
         records.extend_from_slice(&record_bytes(0, 0, 0x36b0, &1u32.to_le_bytes()));
         let mut spacing = 0x0000_5ab8i32.to_le_bytes().to_vec();
         spacing.extend_from_slice(&0x0000_5ab8i32.to_le_bytes());
@@ -316,6 +333,7 @@ mod tests {
 
         assert_eq!(properties.copyright.as_deref(), Some("Copyright © 2026"));
         assert_eq!(properties.keywords.as_deref(), Some("rust; ooxml"));
+        assert_eq!(properties.modify_password.as_deref(), Some("edit-only"));
         assert_eq!(
             properties.remove_personally_identifiable_information,
             Some(true)
@@ -336,14 +354,16 @@ mod tests {
     fn ignores_other_versions_and_preserves_absent_privacy_flags() {
         let copyright = record_bytes(0, 1, 4026, &utf16("old"));
         let keywords = record_bytes(0, 2, 4026, &utf16("current"));
+        let password = record_bytes(0, 3, 4026, &utf16("old-password"));
         let properties = PowerPoint10DocumentProperties::parse(&root(vec![
-            prog_tags_record(9, &copyright),
+            prog_tags_record(9, &[copyright, password].concat()),
             prog_tags_record(10, &keywords),
         ]))
         .unwrap();
 
         assert_eq!(properties.copyright, None);
         assert_eq!(properties.keywords.as_deref(), Some("current"));
+        assert_eq!(properties.modify_password, None);
         assert_eq!(properties.remove_personally_identifiable_information, None);
         assert_eq!(properties.grid_spacing, None);
         assert_eq!(properties.photo_album, None);
@@ -357,6 +377,8 @@ mod tests {
             record_bytes(0, 2, 4026, &vec![0; 512]),
             record_bytes(0, 2, 4026, &[0x01, 0x00]),
             record_bytes(0, 2, 4026, &[0x00, 0xd8]),
+            record_bytes(0, 3, 4026, &vec![0; 512]),
+            record_bytes(0, 3, 4026, &[0x01, 0]),
             record_bytes(0, 1, 0x36b0, &0u32.to_le_bytes()),
             record_bytes(0, 0, 0x36b0, &[0, 0, 0]),
             record_bytes(0, 0, 0x36b0, &2u32.to_le_bytes()),
@@ -372,6 +394,7 @@ mod tests {
         for record in [
             record_bytes(0, 1, 4026, &utf16("copyright")),
             record_bytes(0, 2, 4026, &utf16("keywords")),
+            record_bytes(0, 3, 4026, &utf16("password")),
             record_bytes(0, 0, 0x36b0, &0u32.to_le_bytes()),
             record_bytes(0, 0, 1037, &[0xb8, 0x5a, 0, 0, 0xb8, 0x5a, 0, 0]),
             record_bytes(0, 0, 0x36b2, &[0, 0, 0, 0, 0, 0]),
