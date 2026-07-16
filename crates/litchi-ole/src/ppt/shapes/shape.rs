@@ -251,30 +251,30 @@ pub struct ShapeContainer<'a> {
     pub children: Vec<Box<dyn Shape>>,
 
     // Escher text properties (from OfficeArtFOPT records)
-    /// Text left margin in master units (1/576 inch)
+    /// Text left margin in EMUs
     /// Property ID: 0x0081 (TEXT_LEFT)
     pub text_left: Option<i32>,
 
-    /// Text top margin in master units (1/576 inch)
+    /// Text top margin in EMUs
     /// Property ID: 0x0082 (TEXT_TOP)
     pub text_top: Option<i32>,
 
-    /// Text right margin in master units (1/576 inch)
+    /// Text right margin in EMUs
     /// Property ID: 0x0083 (TEXT_RIGHT)
     pub text_right: Option<i32>,
 
-    /// Text bottom margin in master units (1/576 inch)
+    /// Text bottom margin in EMUs
     /// Property ID: 0x0084 (TEXT_BOTTOM)
     pub text_bottom: Option<i32>,
 
     /// Text flow direction
-    /// Property ID: 0x0085 (TEXT_FLOW)
+    /// Property ID: 0x0088 (TEXT_FLOW)
     /// Values: 0=horizontal, 1=vertical, 2=vertical rotated, 3=word art vertical
     pub text_flow: Option<u16>,
 
-    /// Wrap text in text box
-    /// Property ID: 0x0086 (WRAP_TEXT)
-    pub wrap_text: Option<bool>,
+    /// Text wrapping mode (`MSOWRAPMODE`)
+    /// Property ID: 0x0085 (WRAP_TEXT)
+    pub wrap_text: Option<u16>,
 
     /// Text anchor (vertical alignment)
     /// Property ID: 0x0087 (ANCHOR_TEXT)
@@ -458,7 +458,7 @@ impl<'a> ShapeContainer<'a> {
     ///
     /// # Arguments
     ///
-    /// * `margins` - Tuple of (left, top, right, bottom) margins in master units
+    /// * `margins` - Tuple of (left, top, right, bottom) margins in EMUs
     ///
     /// # Example
     ///
@@ -520,9 +520,16 @@ impl<'a> ShapeContainer<'a> {
         self.anchor_text = anchor;
     }
 
-    /// Set wrap text flag.
-    pub fn set_wrap_text(&mut self, wrap: Option<bool>) {
+    /// Set the raw `MSOWRAPMODE` text wrapping value.
+    pub fn set_wrap_text(&mut self, wrap: Option<u16>) {
         self.wrap_text = wrap;
+    }
+
+    /// Whether the wrapping mode allows wrapping within the shape.
+    ///
+    /// `msowrapNone` is encoded as 2; every other defined mode wraps text.
+    pub fn word_wrap_enabled(&self) -> Option<bool> {
+        self.wrap_text.map(|mode| mode != 2)
     }
 
     /// Set rotate text with shape flag.

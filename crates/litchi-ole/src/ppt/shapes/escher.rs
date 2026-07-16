@@ -339,46 +339,6 @@ pub struct EscherRecord<'a> {
     pub properties: Vec<EscherProperty<'a>>,
 }
 
-/// Actions to take when processing text characters in UTF-16LE decoding.
-#[derive(Debug, Clone, Copy)]
-enum CharacterAction {
-    /// Add the character to the text
-    Add(char),
-    /// Stop processing (control character encountered)
-    Stop,
-    /// Skip this character (invalid or unhandled)
-    Skip,
-}
-
-impl CharacterAction {
-    /// Process a UTF-16LE code unit and determine the appropriate action.
-    /// This replaces the previous if-else chain with a more idiomatic match expression.
-    fn process_text_character(code_unit: u16) -> Self {
-        match code_unit {
-            // Null terminator - stop processing
-            0 => CharacterAction::Stop,
-            // Vertical tab (often used as paragraph separator) - stop processing
-            0x0B => CharacterAction::Stop,
-            // ASCII range (0x01-0x7F) - add as character (excluding 0 and 0x0B)
-            0x01..=0x0A | 0x0C..=0x7F => {
-                if let Some(ch) = char::from_u32(code_unit as u32) {
-                    CharacterAction::Add(ch)
-                } else {
-                    CharacterAction::Skip
-                }
-            },
-            // Unicode range (0x80 and above) - try to decode as Unicode
-            0x80.. => {
-                if let Some(ch) = char::from_u32(code_unit as u32) {
-                    CharacterAction::Add(ch)
-                } else {
-                    CharacterAction::Skip
-                }
-            },
-        }
-    }
-}
-
 impl<'a> EscherRecord<'a> {
     /// Parse an Escher record from binary data with zero-copy optimization.
     /// Uses `Cow` to borrow data when possible, avoiding unnecessary allocations.
@@ -761,47 +721,8 @@ impl<'a> EscherRecord<'a> {
             return Ok(String::new());
         }
 
-        // Use EscherTextboxWrapper to properly parse the textbox data
-        // This follows POI's approach of wrapping the Escher textbox and
-        // extracting child PPT records
-        // Note: EscherTextboxWrapper requires owned data, so we clone when needed
-        match super::super::escher_textbox::EscherTextboxWrapper::new(text_data.to_vec()) {
-            Ok(wrapper) => Ok(wrapper.text().to_string()),
-            Err(_) => {
-                // Fallback: try simple UTF-16LE decoding for backward compatibility
-                if text_data.len() >= 2 {
-                    let start_offset =
-                        if text_data.len() >= 2 && text_data[0] == 0xFF && text_data[1] == 0xFE {
-                            2 // Skip BOM
-                        } else {
-                            0
-                        };
-
-                    let mut text = String::new();
-                    let mut i = start_offset;
-
-                    while i + 1 < text_data.len() {
-                        let code_unit = U16::<LittleEndian>::read_from_bytes(&text_data[i..i + 2])
-                            .map(|v| v.get())
-                            .unwrap_or(0);
-                        i += 2;
-
-                        match CharacterAction::process_text_character(code_unit) {
-                            CharacterAction::Add(ch) => text.push(ch),
-                            CharacterAction::Stop => {
-                                // Stop processing, but trim any trailing nulls
-                                break;
-                            },
-                            CharacterAction::Skip => continue,
-                        }
-                    }
-
-                    Ok(text.trim_end_matches('\u{0}').to_string())
-                } else {
-                    Ok(String::new())
-                }
-            },
-        }
+        let wrapper = super::super::escher_textbox::EscherTextboxWrapper::new(text_data.to_vec())?;
+        Ok(wrapper.text().to_string())
     }
 
     /// Parse a complete shape from Escher data with zero-copy optimization.
@@ -1239,20 +1160,16 @@ mod tests {
 
     #[test]
     fn test_text_extraction() {
-        // Create a container with a text record child
-        let text_data = vec![
-            0x48, 0x00, // 'H'
-            0x65, 0x00, // 'e'
-            0x6C, 0x00, // 'l'
-            0x6C, 0x00, // 'l'
-            0x6F, 0x00, // 'o'
-            0x00, 0x00, // null terminator
-        ];
+        let mut text_data = Vec::new();
+        text_data.extend_from_slice(&0u16.to_le_bytes());
+        text_data.extend_from_slice(&4000u16.to_le_bytes());
+        text_data.extend_from_slice(&10u32.to_le_bytes());
+        text_data.extend_from_slice(&[0x48, 0x00, 0x65, 0x00, 0x6C, 0x00, 0x6C, 0x00, 0x6F, 0x00]);
         let text_record = EscherRecord {
             record_type: EscherRecordType::ClientTextbox,
             version: 1,
             instance: 0,
-            data_length: 10,
+            data_length: text_data.len() as u32,
             data: Cow::Owned(text_data),
             children: Vec::new(),
             properties: Vec::new(),

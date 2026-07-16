@@ -3,6 +3,7 @@
 /// Text boxes are shapes that contain text content and are commonly used
 /// for titles, bullet points, and other text elements in PowerPoint slides.
 use super::shape::{Shape, ShapeContainer, ShapeProperties};
+use crate::ppt::text_run::{TextRun, TextRunFormatting};
 
 /// Type alias for text formatting tuple to reduce complexity.
 type TextFormattingResult = (Option<u16>, Option<u32>, bool, bool, bool);
@@ -17,6 +18,8 @@ pub struct TextBox<'a> {
     container: ShapeContainer<'a>,
     /// Text content of the text box
     text: String,
+    /// Character-formatting runs from the embedded `StyleTextPropAtom`
+    runs: Vec<TextRun>,
     /// Font size in points
     font_size: Option<u16>,
     /// Font color (RGB)
@@ -35,6 +38,7 @@ impl<'a> TextBox<'a> {
         Self {
             container: ShapeContainer::new(properties, raw_data),
             text: String::new(),
+            runs: Vec::new(),
             font_size: None,
             font_color: None,
             bold: false,
@@ -50,12 +54,15 @@ impl<'a> TextBox<'a> {
         // Extract basic shape properties
         let properties = record.extract_shape_properties()?;
 
-        // Extract text content
-        let text = record.extract_text().unwrap_or_default();
-
-        // Extract text formatting from text properties if available
-        let (font_size, font_color, bold, italic, underline) =
-            Self::extract_text_formatting(record)?;
+        let (text, runs) = if let Some(textbox_record) =
+            Self::find_descendant(record, super::escher::EscherRecordType::ClientTextbox)
+        {
+            let wrapper = crate::ppt::EscherTextboxWrapper::new(textbox_record.data.to_vec())?;
+            (wrapper.text().to_string(), wrapper.runs().to_vec())
+        } else {
+            (String::new(), Vec::new())
+        };
+        let (font_size, font_color, bold, italic, underline) = Self::formatting_from_runs(&runs);
 
         // Extract additional properties from Escher records with zero-copy
         let mut container = ShapeContainer::new_borrowed(properties, &record.data);
@@ -66,6 +73,7 @@ impl<'a> TextBox<'a> {
         Ok(Self {
             container,
             text,
+            runs,
             font_size,
             font_color,
             bold,
@@ -78,10 +86,16 @@ impl<'a> TextBox<'a> {
     pub fn from_container(mut container: ShapeContainer<'a>) -> Self {
         // Extract text from container if available
         let text = container.text_content.take().unwrap_or_default();
+        let runs = if text.is_empty() {
+            Vec::new()
+        } else {
+            vec![TextRun::new(text.clone(), 0)]
+        };
 
         Self {
             container,
             text,
+            runs,
             font_size: None,
             font_color: None,
             bold: false,
@@ -90,39 +104,32 @@ impl<'a> TextBox<'a> {
         }
     }
 
-    /// Extract text formatting information from Escher records.
-    /// This follows POI's text formatting parsing logic.
-    fn extract_text_formatting(
-        record: &super::escher::EscherRecord,
-    ) -> super::super::package::Result<TextFormattingResult> {
-        let mut font_size = None;
-        let mut font_color = None;
-        let mut bold = false;
-        let mut italic = false;
-        let mut underline = false;
-
-        // Extract from Escher properties if available (Options record)
-        if !record.properties.is_empty() {
-            // Check for font size (0x20000)
-            if let Some(size_prop) = record.find_property(0x20000u32) {
-                font_size = Some((size_prop.data & 0xFFFF) as u16);
-            }
-
-            // Check for font color (0x40000)
-            if let Some(color_prop) = record.find_property(0x40000u32) {
-                font_color = Some(color_prop.data);
-            }
-
-            // Check for character flags (0x100000)
-            if let Some(flags_prop) = record.find_property(0x100000u32) {
-                let flags = (flags_prop.data & 0xFFFF) as u16;
-                bold = (flags & 0x0001) != 0; // Bold flag
-                italic = (flags & 0x0002) != 0; // Italic flag
-                underline = (flags & 0x0004) != 0; // Underline flag
-            }
+    fn find_descendant<'record>(
+        record: &'record super::escher::EscherRecord<'a>,
+        record_type: super::escher::EscherRecordType,
+    ) -> Option<&'record super::escher::EscherRecord<'a>> {
+        if record.record_type == record_type {
+            return Some(record);
         }
+        record
+            .children
+            .iter()
+            .find_map(|child| Self::find_descendant(child, record_type))
+    }
 
-        Ok((font_size, font_color, bold, italic, underline))
+    fn formatting_from_runs(runs: &[TextRun]) -> TextFormattingResult {
+        let formatting = runs
+            .first()
+            .map(|run| &run.formatting)
+            .cloned()
+            .unwrap_or_default();
+        (
+            formatting.font_size,
+            formatting.font_color,
+            formatting.bold,
+            formatting.italic,
+            formatting.underline,
+        )
     }
 
     /// Extract additional text properties from Escher records.
@@ -156,150 +163,52 @@ impl<'a> TextBox<'a> {
     /// - Text flow settings
     /// - Text anchor/alignment settings
     fn extract_escher_text_properties(
-        record: &super::escher::EscherRecord,
+        record: &super::escher::EscherRecord<'a>,
         container: &mut ShapeContainer<'a>,
     ) -> super::super::package::Result<()> {
-        // Extract text-related properties from the record's properties
-        // The record may contain Escher properties that define text margins,
-        // flow, anchor, and other text layout settings
-
-        if record.properties.is_empty() {
-            // No properties to extract
+        let Some(options) = Self::find_descendant(record, super::escher::EscherRecordType::Opt)
+            .or_else(|| {
+                Self::find_descendant(record, super::escher::EscherRecordType::SecondaryOpt)
+            })
+            .or_else(|| {
+                Self::find_descendant(record, super::escher::EscherRecordType::TertiaryOpt)
+            })
+        else {
             return Ok(());
-        }
+        };
 
         // Property IDs for text-related properties (from MS-ODRAW)
         const TEXT_LEFT: u32 = 0x0081; // Text left margin
         const TEXT_TOP: u32 = 0x0082; // Text top margin
         const TEXT_RIGHT: u32 = 0x0083; // Text right margin
         const TEXT_BOTTOM: u32 = 0x0084; // Text bottom margin
+        const WRAP_TEXT: u32 = 0x0085; // MSOWRAPMODE
         const ANCHOR_TEXT: u32 = 0x0087; // Text anchor (vertical alignment)
-        const TEXT_FLOW: u32 = 0x0085; // Text flow direction
-        const WRAP_TEXT: u32 = 0x0086; // Text wrapping
-        const FONT_SIZE: u32 = 0x00C0; // GeoText font size (for WordArt)
-        const FONT_BOLD: u32 = 0x00FD; // GeoText bold flag
-        const FONT_ITALIC: u32 = 0x00FE; // GeoText italic flag
-        const FONT_UNDERLINE: u32 = 0x00FF; // GeoText underline flag
+        const TEXT_FLOW: u32 = 0x0088; // Text flow direction
 
-        // Extract text margins (in master units, 1/576 inch)
+        // Extract text margins in EMUs.
         if let (Some(left), Some(top), Some(right), Some(bottom)) = (
-            record.find_property(TEXT_LEFT).map(|p| p.data as i32),
-            record.find_property(TEXT_TOP).map(|p| p.data as i32),
-            record.find_property(TEXT_RIGHT).map(|p| p.data as i32),
-            record.find_property(TEXT_BOTTOM).map(|p| p.data as i32),
+            options.find_property(TEXT_LEFT).map(|p| p.data as i32),
+            options.find_property(TEXT_TOP).map(|p| p.data as i32),
+            options.find_property(TEXT_RIGHT).map(|p| p.data as i32),
+            options.find_property(TEXT_BOTTOM).map(|p| p.data as i32),
         ) {
-            // Store margins in container
             container.set_text_margins(Some((left, top, right, bottom)));
-
-            #[cfg(debug_assertions)]
-            {
-                eprintln!(
-                    "Extracted text margins - L: {}, T: {}, R: {}, B: {}",
-                    left, top, right, bottom
-                );
-            }
         }
 
-        // Extract text flow (0 = horizontal, 1 = vertical, etc.)
-        if let Some(flow_prop) = record.find_property(TEXT_FLOW) {
-            let flow = flow_prop.data as u16;
-
-            // Store in container
-            container.set_text_flow(Some(flow));
-
-            #[cfg(debug_assertions)]
-            {
-                let flow_type = match flow {
-                    0 => "horizontal",
-                    1 => "vertical",
-                    2 => "vertical rotated",
-                    3 => "word art vertical",
-                    _ => "unknown",
-                };
-                eprintln!("Text flow: {} ({})", flow, flow_type);
-            }
+        if let Some(flow_prop) = options.find_property(TEXT_FLOW) {
+            container.set_text_flow(Some(flow_prop.data as u16));
         }
 
         // Extract text anchor (vertical alignment)
         // 0 = top, 1 = middle, 2 = bottom, 3 = top centered, etc.
-        if let Some(anchor_prop) = record.find_property(ANCHOR_TEXT) {
-            let anchor = anchor_prop.data as u16;
-
-            // Store in container
-            container.set_anchor_text(Some(anchor));
-
-            #[cfg(debug_assertions)]
-            {
-                let anchor_type = match anchor {
-                    0 => "top",
-                    1 => "middle",
-                    2 => "bottom",
-                    3 => "top centered",
-                    4 => "middle centered",
-                    5 => "bottom centered",
-                    6 => "top baseline",
-                    7 => "bottom baseline",
-                    8 => "top centered baseline",
-                    _ => "unknown",
-                };
-                eprintln!("Text anchor: {} ({})", anchor, anchor_type);
-            }
+        if let Some(anchor_prop) = options.find_property(ANCHOR_TEXT) {
+            container.set_anchor_text(Some(anchor_prop.data as u16));
         }
 
-        // Extract text wrap setting
-        if let Some(wrap_prop) = record.find_property(WRAP_TEXT) {
-            let wrap = wrap_prop.data != 0;
-
-            // Store in container
-            container.set_wrap_text(Some(wrap));
-
-            #[cfg(debug_assertions)]
-            {
-                eprintln!("Text wrapping: {}", wrap);
-            }
+        if let Some(wrap_prop) = options.find_property(WRAP_TEXT) {
+            container.set_wrap_text(Some(wrap_prop.data as u16));
         }
-
-        // Extract geometric text properties (for WordArt and special text effects)
-        // These are less commonly used for normal text boxes
-        if let Some(font_size_prop) = record.find_property(FONT_SIZE) {
-            let size = font_size_prop.data;
-
-            #[cfg(debug_assertions)]
-            {
-                // Font size is stored in 16.16 fixed point
-                let size_points = (size >> 16) as f32 + ((size & 0xFFFF) as f32 / 65536.0);
-                eprintln!("GeoText font size: {} points", size_points);
-            }
-
-            let _ = size; // Use the value
-        }
-
-        // Extract font style flags (for WordArt)
-        let bold = record
-            .find_property(FONT_BOLD)
-            .map(|p| p.data != 0)
-            .unwrap_or(false);
-        let italic = record
-            .find_property(FONT_ITALIC)
-            .map(|p| p.data != 0)
-            .unwrap_or(false);
-        let underline = record
-            .find_property(FONT_UNDERLINE)
-            .map(|p| p.data != 0)
-            .unwrap_or(false);
-
-        if bold || italic || underline {
-            #[cfg(debug_assertions)]
-            {
-                eprintln!(
-                    "GeoText styles - Bold: {}, Italic: {}, Underline: {}",
-                    bold, italic, underline
-                );
-            }
-        }
-
-        // All extracted properties have been stored in the container
-        // and are now available for text rendering and layout
 
         Ok(())
     }
@@ -382,9 +291,23 @@ impl<'a> TextBox<'a> {
         &self.text
     }
 
+    /// Get the character-formatting runs in document order.
+    pub fn runs(&self) -> &[TextRun] {
+        &self.runs
+    }
+
     /// Set the text content of the text box.
     pub fn set_text(&mut self, text: String) {
         self.text = text.clone();
+        self.runs = if text.is_empty() {
+            Vec::new()
+        } else {
+            vec![TextRun::with_formatting(
+                text.clone(),
+                0,
+                self.current_run_formatting(),
+            )]
+        };
         self.container.set_text(text);
     }
 
@@ -396,6 +319,9 @@ impl<'a> TextBox<'a> {
     /// Set the font size in points.
     pub fn set_font_size(&mut self, size: u16) {
         self.font_size = Some(size);
+        for run in &mut self.runs {
+            run.formatting.font_size = Some(size);
+        }
     }
 
     /// Get the font color (RGB).
@@ -406,6 +332,9 @@ impl<'a> TextBox<'a> {
     /// Set the font color (RGB).
     pub fn set_font_color(&mut self, color: u32) {
         self.font_color = Some(color);
+        for run in &mut self.runs {
+            run.formatting.font_color = Some(color);
+        }
     }
 
     /// Check if the text is bold.
@@ -416,6 +345,9 @@ impl<'a> TextBox<'a> {
     /// Set bold formatting.
     pub fn set_bold(&mut self, bold: bool) {
         self.bold = bold;
+        for run in &mut self.runs {
+            run.formatting.bold = bold;
+        }
     }
 
     /// Check if the text is italic.
@@ -426,6 +358,9 @@ impl<'a> TextBox<'a> {
     /// Set italic formatting.
     pub fn set_italic(&mut self, italic: bool) {
         self.italic = italic;
+        for run in &mut self.runs {
+            run.formatting.italic = italic;
+        }
     }
 
     /// Check if the text is underlined.
@@ -436,6 +371,9 @@ impl<'a> TextBox<'a> {
     /// Set underline formatting.
     pub fn set_underline(&mut self, underline: bool) {
         self.underline = underline;
+        for run in &mut self.runs {
+            run.formatting.underline = underline;
+        }
     }
 
     /// Get the text formatting information.
@@ -446,6 +384,42 @@ impl<'a> TextBox<'a> {
             bold: self.bold,
             italic: self.italic,
             underline: self.underline,
+        }
+    }
+
+    /// Get text inset values `(left, top, right, bottom)` in EMUs.
+    pub fn text_margins(&self) -> Option<(i32, i32, i32, i32)> {
+        self.container.text_margins()
+    }
+
+    /// Get the raw `MSOTXFL` text-flow value.
+    pub fn text_flow(&self) -> Option<u16> {
+        self.container.text_flow
+    }
+
+    /// Get the raw `MSOWRAPMODE` wrapping value.
+    pub fn wrap_mode(&self) -> Option<u16> {
+        self.container.wrap_text
+    }
+
+    /// Whether the wrapping mode allows wrapping within the shape.
+    pub fn word_wrap_enabled(&self) -> Option<bool> {
+        self.container.word_wrap_enabled()
+    }
+
+    /// Get the raw `MSOANCHOR` vertical text anchor value.
+    pub fn text_anchor(&self) -> Option<u16> {
+        self.container.anchor_text
+    }
+
+    fn current_run_formatting(&self) -> TextRunFormatting {
+        TextRunFormatting {
+            font_size: self.font_size,
+            font_color: self.font_color,
+            bold: self.bold,
+            italic: self.italic,
+            underline: self.underline,
+            font_name: None,
         }
     }
 }
@@ -499,6 +473,62 @@ mod tests {
     use super::super::shape::ShapeType;
     use super::*;
 
+    fn push_record(target: &mut Vec<u8>, version: u16, instance: u16, kind: u16, data: &[u8]) {
+        target.extend_from_slice(&(version | (instance << 4)).to_le_bytes());
+        target.extend_from_slice(&kind.to_le_bytes());
+        target.extend_from_slice(&(data.len() as u32).to_le_bytes());
+        target.extend_from_slice(data);
+    }
+
+    fn formatted_textbox_record() -> Vec<u8> {
+        let mut ppt_records = Vec::new();
+        push_record(&mut ppt_records, 0, 0, 3999, &4u32.to_le_bytes());
+        push_record(&mut ppt_records, 0, 0, 4008, b"abcd");
+
+        let mut style = Vec::new();
+        style.extend_from_slice(&5u32.to_le_bytes());
+        style.extend_from_slice(&0i16.to_le_bytes());
+        style.extend_from_slice(&0u32.to_le_bytes());
+        style.extend_from_slice(&2u32.to_le_bytes());
+        style.extend_from_slice(&0x0006_0001u32.to_le_bytes());
+        style.extend_from_slice(&1i16.to_le_bytes());
+        style.extend_from_slice(&18i16.to_le_bytes());
+        style.extend_from_slice(&0x0011_2233i32.to_le_bytes());
+        style.extend_from_slice(&3u32.to_le_bytes());
+        style.extend_from_slice(&0x0006_0002u32.to_le_bytes());
+        style.extend_from_slice(&2i16.to_le_bytes());
+        style.extend_from_slice(&24i16.to_le_bytes());
+        style.extend_from_slice(&0x0044_5566i32.to_le_bytes());
+        push_record(&mut ppt_records, 0, 0, 4001, &style);
+
+        let properties = [
+            (0x0081u16, 91_440u32),
+            (0x0082u16, 45_720u32),
+            (0x0083u16, 91_440u32),
+            (0x0084u16, 45_720u32),
+            (0x0085u16, 0u32),
+            (0x0087u16, 2u32),
+            (0x0088u16, 1u32),
+        ];
+        let mut opt = Vec::new();
+        for (id, value) in properties {
+            opt.extend_from_slice(&id.to_le_bytes());
+            opt.extend_from_slice(&value.to_le_bytes());
+        }
+
+        let mut shape = Vec::new();
+        let mut sp = Vec::new();
+        sp.extend_from_slice(&1001u32.to_le_bytes());
+        sp.extend_from_slice(&0x0A00u32.to_le_bytes());
+        push_record(&mut shape, 2, 24, 0xF00A, &sp);
+        push_record(&mut shape, 3, properties.len() as u16, 0xF00B, &opt);
+        push_record(&mut shape, 0xF, 0, 0xF00D, &ppt_records);
+
+        let mut result = Vec::new();
+        push_record(&mut result, 0xF, 0, 0xF004, &shape);
+        result
+    }
+
     #[test]
     #[allow(clippy::field_reassign_with_default)]
     fn test_textbox_creation() {
@@ -548,5 +578,52 @@ mod tests {
         assert!(formatting.bold);
         assert!(formatting.italic);
         assert!(!formatting.underline);
+    }
+
+    #[test]
+    fn parses_embedded_style_runs_and_nested_text_options() {
+        let data = formatted_textbox_record();
+        let (record, consumed) = super::super::escher::EscherRecord::parse(&data, 0).unwrap();
+        assert_eq!(consumed, data.len());
+
+        let textbox = TextBox::from_escher_record(&record).unwrap();
+
+        assert_eq!(textbox.text(), "abcd");
+        assert_eq!(textbox.runs().len(), 2);
+        assert_eq!(textbox.runs()[0].text, "ab");
+        assert_eq!(textbox.runs()[0].formatting.font_size, Some(18));
+        assert_eq!(textbox.runs()[0].formatting.font_color, Some(0x0011_2233));
+        assert!(textbox.runs()[0].formatting.bold);
+        assert!(!textbox.runs()[0].formatting.italic);
+        assert_eq!(textbox.runs()[1].text, "cd");
+        assert_eq!(textbox.runs()[1].formatting.font_size, Some(24));
+        assert_eq!(textbox.runs()[1].formatting.font_color, Some(0x0044_5566));
+        assert!(!textbox.runs()[1].formatting.bold);
+        assert!(textbox.runs()[1].formatting.italic);
+        assert_eq!(textbox.formatting().font_size, Some(18));
+        assert!(textbox.bold());
+        assert_eq!(
+            textbox.text_margins(),
+            Some((91_440, 45_720, 91_440, 45_720))
+        );
+        assert_eq!(textbox.wrap_mode(), Some(0));
+        assert_eq!(textbox.word_wrap_enabled(), Some(true));
+        assert_eq!(textbox.text_anchor(), Some(2));
+        assert_eq!(textbox.text_flow(), Some(1));
+    }
+
+    #[test]
+    fn setters_keep_character_runs_consistent() {
+        let mut textbox = TextBox::new(ShapeProperties::default(), Vec::new());
+        textbox.set_bold(true);
+        textbox.set_font_size(20);
+        textbox.set_text("hello".to_string());
+        textbox.set_italic(true);
+
+        assert_eq!(textbox.runs().len(), 1);
+        assert_eq!(textbox.runs()[0].text, "hello");
+        assert_eq!(textbox.runs()[0].formatting.font_size, Some(20));
+        assert!(textbox.runs()[0].formatting.bold);
+        assert!(textbox.runs()[0].formatting.italic);
     }
 }
