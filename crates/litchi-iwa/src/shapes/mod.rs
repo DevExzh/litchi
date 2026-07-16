@@ -21,8 +21,9 @@ pub use color::{RgbColorSpace, RgbaColor};
 pub use fill::{
     ShapeFill, ShapeGradient, ShapeGradientAngle, ShapeGradientKind, ShapeGradientOpacity,
     ShapeGradientStop, ShapeGradientStopMidpoint, ShapeGradientStopPosition,
+    ShapeImageDataIdentifier, ShapeImageFill, ShapeImageFillTechnique,
 };
-pub(crate) use fill::{reset_shape_fill, set_shape_fill, shape_fill};
+pub(crate) use fill::{reset_shape_fill, set_shape_fill, set_shape_image_fill_data, shape_fill};
 pub use geometry::{DrawableGeometry, DrawablePoint, DrawableSize};
 pub(crate) use geometry::{
     geometry_from_drawable, patch_drawable_geometry, set_shape_geometry, shape_geometry,

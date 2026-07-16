@@ -9,10 +9,11 @@ use crate::package_metadata::{
 };
 use crate::shapes::{
     DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, LineEndpoints, LineSegment,
-    LineStyle, ShapeFill, ShapePathKind, ShapePreset, ShapeStroke, line_geometry, line_path_source,
-    line_segments_match, reset_shape_fill, reset_shape_stroke, set_shape_fill, set_shape_geometry,
-    set_shape_line_endpoints, set_shape_line_segment, set_shape_preset, set_shape_stroke,
-    shape_fill, shape_line_endpoints, shape_path_source, shape_stroke,
+    LineStyle, RgbaColor, ShapeFill, ShapeImageFill, ShapeImageFillTechnique, ShapePathKind,
+    ShapePreset, ShapeStroke, line_geometry, line_path_source, line_segments_match,
+    reset_shape_fill, reset_shape_stroke, set_shape_fill, set_shape_geometry,
+    set_shape_image_fill_data, set_shape_line_endpoints, set_shape_line_segment, set_shape_preset,
+    set_shape_stroke, shape_fill, shape_line_endpoints, shape_path_source, shape_stroke,
 };
 
 use super::text_box_create::{
@@ -400,6 +401,42 @@ impl PagesEditor {
         Ok(())
     }
 
+    /// Embed image bytes and use them as a simple or tinted native shape fill.
+    pub fn set_body_shape_image_fill(
+        &mut self,
+        drawable_object_id: u64,
+        preferred_filename: &str,
+        data: &[u8],
+        technique: ShapeImageFillTechnique,
+        tint: Option<RgbaColor>,
+    ) -> Result<ShapeImageFill> {
+        let source = body_shape_graph(self, drawable_object_id)?;
+        let fill_size = source.info.geometry.size.ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Pages shape {drawable_object_id} has no image-fill dimensions"
+            ))
+        })?;
+        let mut staged = self.package().clone();
+        let image = set_shape_image_fill_data(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            preferred_filename,
+            data,
+            technique,
+            fill_size,
+            tint,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.body_shape_fill(drawable_object_id)? != ShapeFill::Image(image.clone()) {
+            return Err(Error::InvalidFormat(
+                "Pages shape image-fill update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(image)
+    }
+
     /// Remove a direct fill override and restore the inherited appearance.
     pub fn reset_body_shape_fill(&mut self, drawable_object_id: u64) -> Result<bool> {
         let source = body_shape_graph(self, drawable_object_id)?;
@@ -623,6 +660,8 @@ impl PagesEditor {
 
 #[cfg(test)]
 mod tests {
+    use std::{fs, path::PathBuf};
+
     use super::*;
     use crate::shapes::{
         LineEndpoint, RgbColorSpace, RgbaColor, ShapeCornerRadius, ShapeGradient,
@@ -638,6 +677,11 @@ mod tests {
     const LINE_END: DrawablePoint = DrawablePoint { x: 480.0, y: 390.0 };
     const UPDATED_LINE_START: DrawablePoint = DrawablePoint { x: 96.0, y: 180.0 };
     const UPDATED_LINE_END: DrawablePoint = DrawablePoint { x: 456.0, y: 180.0 };
+
+    fn fixture(relative: &str) -> Vec<u8> {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+        fs::read(root.join(relative)).unwrap()
+    }
 
     #[test]
     fn scratch_document_supports_rectangle_crud_without_a_source_drawable() {
@@ -983,6 +1027,64 @@ mod tests {
                 .reset_body_shape_fill(created.drawable_object_id)
                 .unwrap()
         );
+    }
+
+    #[test]
+    fn scratch_document_supports_embedded_shape_image_fill_crud() {
+        let image_bytes = fixture("test-data/images/png/lena.png");
+        let replacement_bytes = fixture("crates/soapberry-zip/assets/gophercolor16x16.png");
+        let mut editor = PagesEditor::create_with_text("Body").unwrap();
+        let created = editor
+            .add_body_shape(4, "Image", POSITION, SIZE, ShapePreset::Rectangle)
+            .unwrap();
+        let inherited = editor.body_shape_fill(created.drawable_object_id).unwrap();
+        let image = editor
+            .set_body_shape_image_fill(
+                created.drawable_object_id,
+                "lena.png",
+                &image_bytes,
+                ShapeImageFillTechnique::ScaleToFill,
+                None,
+            )
+            .unwrap();
+        let identifier = image.data_identifier().unwrap();
+        assert_eq!(image.fill_size(), SIZE);
+        assert_eq!(editor.extract_media(identifier.get()).unwrap(), image_bytes);
+        assert_eq!(editor.media_assets().unwrap().len(), 1);
+
+        let advanced = image
+            .with_technique(ShapeImageFillTechnique::Tile)
+            .with_tint(RgbaColor::new(0.2, 0.4, 0.8, 0.5, RgbColorSpace::Srgb).unwrap());
+        editor
+            .set_body_shape_fill(
+                created.drawable_object_id,
+                &ShapeFill::Image(advanced.clone()),
+            )
+            .unwrap();
+        assert_eq!(
+            editor.body_shape_fill(created.drawable_object_id).unwrap(),
+            ShapeFill::Image(advanced)
+        );
+        assert_eq!(
+            editor
+                .replace_media(identifier.get(), &replacement_bytes)
+                .unwrap(),
+            image_bytes
+        );
+
+        let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert!(
+            reopened
+                .reset_body_shape_fill(created.drawable_object_id)
+                .unwrap()
+        );
+        assert_eq!(
+            reopened
+                .body_shape_fill(created.drawable_object_id)
+                .unwrap(),
+            inherited
+        );
+        assert!(reopened.media_assets().unwrap().is_empty());
     }
 
     #[test]

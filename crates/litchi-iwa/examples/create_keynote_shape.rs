@@ -1,22 +1,23 @@
 //! Create a Keynote presentation and editable preset shape without an input package.
 
-use std::env;
+use std::{env, fs, path::Path};
 
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::shapes::{
     DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeFill, ShapeGradient,
     ShapeGradientAngle, ShapeGradientKind, ShapeGradientOpacity, ShapeGradientStop,
-    ShapeGradientStopMidpoint, ShapeGradientStopPosition, ShapePreset,
+    ShapeGradientStopMidpoint, ShapeGradientStopPosition, ShapeImageFillTechnique, ShapePreset,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
     let output = arguments
         .next()
-        .ok_or("usage: create_keynote_shape <output.key> [text]")?;
+        .ok_or("usage: create_keynote_shape <output.key> [text] [fill-image]")?;
     let text = arguments
         .next()
         .unwrap_or_else(|| "Built from typed IWA objects".to_owned());
+    let fill_image = arguments.next();
     if arguments.next().is_some() {
         return Err("unexpected extra arguments".into());
     }
@@ -52,10 +53,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ShapeGradientAngle::from_degrees(315.0)?,
         )?),
     )?;
+    if let Some(path) = fill_image {
+        let filename = preferred_filename(&path)?;
+        editor.set_slide_shape_image_fill(
+            0,
+            created.drawable_object_id,
+            filename,
+            &fs::read(&path)?,
+            ShapeImageFillTechnique::Tile,
+            Some(RgbaColor::new(0.0, 0.0, 0.0, 0.5, RgbColorSpace::Srgb)?),
+        )?;
+    }
     editor.save(output)?;
     println!(
         "created Keynote {:?} {:?} {} with storage {}",
         created.kind, created.preset, created.drawable_object_id, created.storage.object_id
     );
     Ok(())
+}
+
+fn preferred_filename(path: &str) -> Result<&str, Box<dyn std::error::Error>> {
+    Path::new(path)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| "fill image path has no UTF-8 filename".into())
 }

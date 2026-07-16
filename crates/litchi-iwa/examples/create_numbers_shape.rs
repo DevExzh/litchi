@@ -1,21 +1,22 @@
 //! Create a Numbers spreadsheet and editable preset shape without an input package.
 
-use std::env;
+use std::{env, fs, path::Path};
 
 use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::shapes::{
     DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeFill, ShapeGradient,
-    ShapeGradientAngle, ShapePreset,
+    ShapeGradientAngle, ShapeImageFillTechnique, ShapePreset,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
     let output = arguments
         .next()
-        .ok_or("usage: create_numbers_shape <output.numbers> [text]")?;
+        .ok_or("usage: create_numbers_shape <output.numbers> [text] [fill-image]")?;
     let text = arguments
         .next()
         .unwrap_or_else(|| "Built from typed IWA objects".to_owned());
+    let fill_image = arguments.next();
     if arguments.next().is_some() {
         return Err("unexpected extra arguments".into());
     }
@@ -40,6 +41,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ShapeGradientAngle::from_degrees(0.0)?,
         )),
     )?;
+    if let Some(path) = fill_image {
+        let filename = preferred_filename(&path)?;
+        editor.set_sheet_shape_image_fill(
+            sheet_id,
+            created.drawable_object_id,
+            filename,
+            &fs::read(&path)?,
+            ShapeImageFillTechnique::ScaleToFit,
+            None,
+        )?;
+    }
     editor.save(output)?;
     println!(
         "created Numbers {:?} {:?} {} with storage {} on sheet {}",
@@ -50,4 +62,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         sheet_id
     );
     Ok(())
+}
+
+fn preferred_filename(path: &str) -> Result<&str, Box<dyn std::error::Error>> {
+    Path::new(path)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| "fill image path has no UTF-8 filename".into())
 }

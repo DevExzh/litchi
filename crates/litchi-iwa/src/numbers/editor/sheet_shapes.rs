@@ -6,11 +6,12 @@ use std::ops::Range;
 use super::*;
 use crate::shapes::{
     DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, LineEndpoints, LineSegment,
-    LineStyle, ShapeFill, ShapePathKind, ShapePreset, ShapeStroke, line_geometry, line_path_source,
-    line_segments_match, reset_shape_fill, reset_shape_stroke, set_shape_fill, set_shape_geometry,
-    set_shape_line_endpoints, set_shape_line_segment, set_shape_preset, set_shape_stroke,
-    shape_fill, shape_line_endpoints, shape_line_segment, shape_path_kind, shape_path_source,
-    shape_preset, shape_stroke,
+    LineStyle, RgbaColor, ShapeFill, ShapeImageFill, ShapeImageFillTechnique, ShapePathKind,
+    ShapePreset, ShapeStroke, line_geometry, line_path_source, line_segments_match,
+    reset_shape_fill, reset_shape_stroke, set_shape_fill, set_shape_geometry,
+    set_shape_image_fill_data, set_shape_line_endpoints, set_shape_line_segment, set_shape_preset,
+    set_shape_stroke, shape_fill, shape_line_endpoints, shape_line_segment, shape_path_kind,
+    shape_path_source, shape_preset, shape_stroke,
 };
 
 use super::text_box_create::{
@@ -414,6 +415,45 @@ impl NumbersEditor {
         }
         *self = verified;
         Ok(())
+    }
+
+    /// Embed image bytes and use them as a simple or tinted native shape fill.
+    pub fn set_sheet_shape_image_fill(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        preferred_filename: &str,
+        data: &[u8],
+        technique: ShapeImageFillTechnique,
+        tint: Option<RgbaColor>,
+    ) -> Result<ShapeImageFill> {
+        let source = shape_graph(self, sheet_id, drawable_object_id)?;
+        let fill_size = source.info.geometry.size.ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Numbers shape {drawable_object_id} has no image-fill dimensions"
+            ))
+        })?;
+        let mut staged = self.package.clone();
+        let image = set_shape_image_fill_data(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            preferred_filename,
+            data,
+            technique,
+            fill_size,
+            tint,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.sheet_shape_fill(sheet_id, drawable_object_id)?
+            != ShapeFill::Image(image.clone())
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers shape image-fill update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(image)
     }
 
     /// Remove a direct fill override and restore the inherited appearance.
@@ -1005,6 +1045,8 @@ fn shape_info(
 
 #[cfg(test)]
 mod tests {
+    use std::{fs, path::PathBuf};
+
     use super::*;
     use crate::numbers::NumbersDocumentBuilder;
     use crate::shapes::{
@@ -1021,6 +1063,11 @@ mod tests {
     const LINE_END: DrawablePoint = DrawablePoint { x: 720.0, y: 450.0 };
     const UPDATED_LINE_START: DrawablePoint = DrawablePoint { x: 72.0, y: 180.0 };
     const UPDATED_LINE_END: DrawablePoint = DrawablePoint { x: 432.0, y: 180.0 };
+
+    fn fixture(relative: &str) -> Vec<u8> {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+        fs::read(root.join(relative)).unwrap()
+    }
 
     #[test]
     fn scratch_spreadsheet_supports_rectangle_crud_without_a_source_drawable() {
@@ -1250,6 +1297,59 @@ mod tests {
                 .unwrap(),
             inherited_fill
         );
+    }
+
+    #[test]
+    fn scratch_spreadsheet_supports_embedded_shape_image_fill_crud() {
+        let bytes = fixture("test-data/images/png/lena.png");
+        let mut editor = NumbersDocumentBuilder::new()
+            .sheet_name("Image Fill")
+            .table_name("Data")
+            .build()
+            .unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let created = editor
+            .add_sheet_shape(sheet_id, "Image", POSITION, SIZE, ShapePreset::Rectangle)
+            .unwrap();
+        let inherited = editor
+            .sheet_shape_fill(sheet_id, created.drawable_object_id)
+            .unwrap();
+        let image = editor
+            .set_sheet_shape_image_fill(
+                sheet_id,
+                created.drawable_object_id,
+                "lena.png",
+                &bytes,
+                ShapeImageFillTechnique::ScaleToFit,
+                None,
+            )
+            .unwrap();
+        assert_eq!(
+            editor
+                .extract_media(image.data_identifier().unwrap().get())
+                .unwrap(),
+            bytes
+        );
+
+        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .sheet_shape_fill(sheet_id, created.drawable_object_id)
+                .unwrap(),
+            ShapeFill::Image(image)
+        );
+        assert!(
+            reopened
+                .reset_sheet_shape_fill(sheet_id, created.drawable_object_id)
+                .unwrap()
+        );
+        assert_eq!(
+            reopened
+                .sheet_shape_fill(sheet_id, created.drawable_object_id)
+                .unwrap(),
+            inherited
+        );
+        assert!(reopened.media_assets().unwrap().is_empty());
     }
 
     #[test]

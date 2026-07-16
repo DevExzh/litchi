@@ -4,12 +4,15 @@ use std::collections::HashSet;
 
 use prost::Message;
 
+use crate::data_reference_registry::{
+    add_component_data_reference, remove_component_data_reference,
+};
 use crate::package_metadata::{
     add_component_external_reference, add_component_object_uuids, component_identifier_for_entry,
     next_object_identifier, set_package_last_object_identifier,
 };
 use crate::protobuf::tswp;
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, IWorkMediaEditor, IWorkPackage, MediaType, Result};
 
 use super::super::line_end::{
     ShapeStyleOverrides, ShapeStyleVariationLocation, collapse_style_variation,
@@ -17,8 +20,9 @@ use super::super::line_end::{
     patch_shape_style_reference, replace_style_variation, shape_payload, shape_style,
     shape_style_is_exclusive, shape_style_message, shape_style_variation_object,
 };
-use super::ShapeFill;
-use super::native::{fill_from_native, fill_to_native};
+use super::super::{DrawableSize, RgbaColor};
+use super::native::{fill_from_native, fill_to_native, image_data_identifier};
+use super::{ShapeFill, ShapeImageDataIdentifier, ShapeImageFill, ShapeImageFillTechnique};
 
 const MAX_STYLE_INHERITANCE_DEPTH: usize = 64;
 
@@ -43,9 +47,12 @@ pub(crate) fn set_shape_fill(
     drawable_id: u64,
     fill: &ShapeFill,
 ) -> Result<()> {
-    if &shape_fill(package, archive_name, drawable_id)? == fill {
+    let current_fill = shape_fill(package, archive_name, drawable_id)?;
+    if &current_fill == fill {
         return Ok(());
     }
+    let old_data_identifier = image_data_identifier(&current_fill);
+    validate_image_asset(package, fill)?;
     let shape = shape_payload(package, archive_name, drawable_id)?;
     let old_style_id = shape
         .super_
@@ -73,7 +80,15 @@ pub(crate) fn set_shape_fill(
             shape_style_variation_object(old_style_id, parent_style_id, stylesheet_id, overrides)?;
         let mut staged = package.clone();
         replace_style_variation(&mut staged, &style_archive_name, old_style_id, replacement)?;
+        adjust_style_data_reference(
+            &mut staged,
+            &style_archive_name,
+            old_style_id,
+            old_data_identifier,
+            image_data_identifier(fill),
+        )?;
         validate_fill(&staged, archive_name, drawable_id, fill)?;
+        remove_orphaned_image_asset(&mut staged, old_data_identifier)?;
         *package = staged;
         return Ok(());
     }
@@ -93,6 +108,52 @@ pub(crate) fn set_shape_fill(
     )
 }
 
+/// Embed image bytes and attach them as one shape's native image fill.
+pub(crate) fn set_shape_image_fill_data(
+    package: &mut IWorkPackage,
+    archive_name: &str,
+    drawable_id: u64,
+    preferred_filename: &str,
+    data: &[u8],
+    technique: ShapeImageFillTechnique,
+    fill_size: DrawableSize,
+    tint: Option<RgbaColor>,
+) -> Result<ShapeImageFill> {
+    let mut media = IWorkMediaEditor::from_package(package.clone())?;
+    let asset = media.insert_unreferenced(preferred_filename, data)?;
+    if asset.media_type != MediaType::Image {
+        return Err(Error::Bundle(format!(
+            "Shape image fills require image data, not {}",
+            asset.media_type.name()
+        )));
+    }
+    let mut staged = media.into_package();
+    let mut image = ShapeImageFill::embedded(
+        ShapeImageDataIdentifier::new(asset.data_identifier)?,
+        technique,
+        fill_size,
+    )?;
+    if let Some(tint) = tint {
+        image = image.with_tint(tint);
+    }
+    set_shape_fill(
+        &mut staged,
+        archive_name,
+        drawable_id,
+        &ShapeFill::Image(image.clone()),
+    )?;
+    let package_path = asset.package_path.as_deref().ok_or_else(|| {
+        Error::InvalidFormat("Shape image-fill asset is not materialized".to_owned())
+    })?;
+    if staged.entry(package_path) != Some(data) {
+        return Err(Error::InvalidFormat(
+            "Shape image-fill insertion failed validation".to_owned(),
+        ));
+    }
+    *package = staged;
+    Ok(image)
+}
+
 /// Remove a direct fill override and restore the inherited appearance.
 pub(crate) fn reset_shape_fill(
     package: &mut IWorkPackage,
@@ -109,14 +170,15 @@ pub(crate) fn reset_shape_fill(
     let style_archive_name = object_archive_name(package, old_style_id)?;
     let old_style_message = shape_style_message(package, &style_archive_name, old_style_id)?;
     let old_style = tswp::ShapeStyleArchive::decode(old_style_message.data.as_slice())?;
-    let direct_native_fill = old_style
+    let Some(direct_native_fill) = old_style
         .super_
         .shape_properties
         .as_ref()
-        .and_then(|properties| properties.fill.as_ref());
-    if direct_native_fill.is_none() {
+        .and_then(|properties| properties.fill.as_ref())
+    else {
         return Ok(false);
-    }
+    };
+    let direct_data_identifier = image_data_identifier(&fill_from_native(direct_native_fill)?);
     let mut direct = direct_shape_style_overrides(&old_style, &old_style_message.data)?
         .ok_or_else(|| {
             Error::InvalidFormat(format!(
@@ -131,6 +193,12 @@ pub(crate) fn reset_shape_fill(
         direct.fill = None;
         let mut staged = package.clone();
         if direct.is_empty() {
+            remove_style_data_reference(
+                &mut staged,
+                &style_archive_name,
+                old_style_id,
+                direct_data_identifier,
+            )?;
             collapse_style_variation(
                 &mut staged,
                 ShapeStyleVariationLocation {
@@ -146,8 +214,15 @@ pub(crate) fn reset_shape_fill(
             let replacement =
                 shape_style_variation_object(old_style_id, parent_style_id, stylesheet_id, direct)?;
             replace_style_variation(&mut staged, &style_archive_name, old_style_id, replacement)?;
+            remove_style_data_reference(
+                &mut staged,
+                &style_archive_name,
+                old_style_id,
+                direct_data_identifier,
+            )?;
         }
         validate_fill(&staged, archive_name, drawable_id, &inherited)?;
+        remove_orphaned_image_asset(&mut staged, direct_data_identifier)?;
         *package = staged;
         return Ok(true);
     }
@@ -200,8 +275,17 @@ fn insert_fill_variation(
         new_style_id,
         new_style,
     )?;
+    let expected_data_identifier = image_data_identifier(expected);
     if let Some(style_component) = component_identifier_for_entry(&staged, style_archive_name)? {
         add_component_object_uuids(&mut staged, style_component, &[new_style_id])?;
+        if let Some(data_identifier) = expected_data_identifier {
+            add_component_data_reference(
+                &mut staged,
+                style_component,
+                data_identifier,
+                new_style_id,
+            )?;
+        }
         if let Some(drawable_component) =
             component_identifier_for_entry(&staged, drawable_archive_name)?
             && drawable_component != style_component
@@ -213,10 +297,88 @@ fn insert_fill_variation(
                 new_style_id,
             )?;
         }
+    } else if expected_data_identifier.is_some() {
+        return Err(Error::InvalidFormat(
+            "iWork stylesheet has no component for an image-fill reference".to_owned(),
+        ));
     }
     set_package_last_object_identifier(&mut staged, new_style_id)?;
     validate_fill(&staged, drawable_archive_name, drawable_id, expected)?;
     *package = staged;
+    Ok(())
+}
+
+fn validate_image_asset(package: &IWorkPackage, fill: &ShapeFill) -> Result<()> {
+    let Some(data_identifier) = image_data_identifier(fill) else {
+        return Ok(());
+    };
+    let assets = crate::media::embedded_assets(package)?;
+    let asset = assets
+        .iter()
+        .find(|asset| asset.data_identifier == data_identifier)
+        .ok_or_else(|| {
+            Error::Bundle(format!(
+                "Shape image fill references missing data identifier {data_identifier}"
+            ))
+        })?;
+    if asset.media_type != MediaType::Image || !asset.is_materialized() {
+        return Err(Error::Bundle(format!(
+            "Shape image fill data identifier {data_identifier} must be a materialized image"
+        )));
+    }
+    Ok(())
+}
+
+fn adjust_style_data_reference(
+    package: &mut IWorkPackage,
+    style_archive_name: &str,
+    style_id: u64,
+    old_data_identifier: Option<u64>,
+    new_data_identifier: Option<u64>,
+) -> Result<()> {
+    if old_data_identifier == new_data_identifier {
+        return Ok(());
+    }
+    let style_component = component_identifier_for_entry(package, style_archive_name)?
+        .ok_or_else(|| Error::InvalidFormat("iWork stylesheet has no component".to_owned()))?;
+    if let Some(identifier) = old_data_identifier {
+        remove_component_data_reference(package, style_component, identifier, style_id)?;
+    }
+    if let Some(identifier) = new_data_identifier {
+        add_component_data_reference(package, style_component, identifier, style_id)?;
+    }
+    Ok(())
+}
+
+fn remove_style_data_reference(
+    package: &mut IWorkPackage,
+    style_archive_name: &str,
+    style_id: u64,
+    data_identifier: Option<u64>,
+) -> Result<()> {
+    let Some(data_identifier) = data_identifier else {
+        return Ok(());
+    };
+    let style_component = component_identifier_for_entry(package, style_archive_name)?
+        .ok_or_else(|| Error::InvalidFormat("iWork stylesheet has no component".to_owned()))?;
+    remove_component_data_reference(package, style_component, data_identifier, style_id)
+}
+
+fn remove_orphaned_image_asset(
+    package: &mut IWorkPackage,
+    data_identifier: Option<u64>,
+) -> Result<()> {
+    let Some(data_identifier) = data_identifier else {
+        return Ok(());
+    };
+    let mut media = IWorkMediaEditor::from_package(package.clone())?;
+    if media
+        .asset(data_identifier)
+        .is_some_and(|asset| !asset.is_referenced())
+    {
+        media.remove_unreferenced(data_identifier)?;
+        *package = media.into_package();
+    }
     Ok(())
 }
 

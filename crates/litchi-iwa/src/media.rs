@@ -742,7 +742,7 @@ fn materialized_file_name(preferred_filename: &str, data_identifier: u64) -> Res
     )
 }
 
-fn embedded_assets(package: &IWorkPackage) -> Result<Vec<EmbeddedMediaAsset>> {
+pub(crate) fn embedded_assets(package: &IWorkPackage) -> Result<Vec<EmbeddedMediaAsset>> {
     let metadata = decode_package_metadata(package)?;
     let mut component_counts = HashMap::<u64, u64>::new();
     let mut component_record_counts = HashMap::<u64, usize>::new();

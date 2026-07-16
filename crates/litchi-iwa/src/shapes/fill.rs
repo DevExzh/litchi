@@ -1,6 +1,7 @@
 //! Typed native fills for ordinary iWork drawing shapes.
 
 mod gradient;
+mod image;
 mod native;
 mod style;
 
@@ -10,7 +11,8 @@ pub use gradient::{
     ShapeGradient, ShapeGradientAngle, ShapeGradientKind, ShapeGradientOpacity, ShapeGradientStop,
     ShapeGradientStopMidpoint, ShapeGradientStopPosition,
 };
-pub(crate) use style::{reset_shape_fill, set_shape_fill, shape_fill};
+pub use image::{ShapeImageDataIdentifier, ShapeImageFill, ShapeImageFillTechnique};
+pub(crate) use style::{reset_shape_fill, set_shape_fill, set_shape_image_fill_data, shape_fill};
 
 /// Standard shape fills shared by Pages, Numbers, and Keynote.
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -22,4 +24,6 @@ pub enum ShapeFill {
     Solid(RgbaColor),
     /// A validated simple or advanced linear/radial gradient.
     Gradient(ShapeGradient),
+    /// A validated simple or tinted image fill.
+    Image(ShapeImageFill),
 }

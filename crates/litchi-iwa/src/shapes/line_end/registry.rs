@@ -252,6 +252,13 @@ pub(crate) fn shape_style_variation_object(
             "an iWork shape-style variation must contain at least one override".to_owned(),
         ));
     }
+    let data_identifier = overrides
+        .fill
+        .as_ref()
+        .and_then(|fill| fill.image.as_ref())
+        .and_then(|image| image.imagedata.as_ref())
+        .map(|reference| reference.identifier)
+        .filter(|identifier| *identifier != 0);
     let data = tswp::ShapeStyleArchive {
         super_: tsd::ShapeStyleArchive {
             super_: tss::StyleArchive {
@@ -285,6 +292,11 @@ pub(crate) fn shape_style_variation_object(
     object.archive_info.message_infos[0]
         .object_references
         .push(parent_style_id);
+    if let Some(identifier) = data_identifier {
+        object.archive_info.message_infos[0]
+            .data_references
+            .push(identifier);
+    }
     Ok(object)
 }
 
@@ -416,6 +428,14 @@ pub(crate) fn replace_style_variation(
             "replacement iWork line style payload disappeared".to_owned(),
         ));
     };
+    let replacement_data_references = replacement
+        .archive_info
+        .message_infos
+        .first()
+        .map(|info| info.data_references.clone())
+        .ok_or_else(|| {
+            Error::InvalidFormat("replacement iWork line style metadata disappeared".to_owned())
+        })?;
     package.update_archive(archive_name, |archive| {
         let object = archive.object_mut(style_id).ok_or_else(|| {
             Error::InvalidFormat(format!("iWork shape style {style_id} is missing"))
@@ -432,7 +452,9 @@ pub(crate) fn replace_style_variation(
                 "iWork style {style_id} must have exactly one ShapeStyle payload"
             )));
         };
-        object.replace_message(*index, message).map(|_| ())
+        object.replace_message(*index, message)?;
+        object.archive_info.message_infos[*index].data_references = replacement_data_references;
+        Ok(())
     })
 }
 
