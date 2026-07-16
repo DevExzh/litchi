@@ -4,6 +4,196 @@ use super::package::{PptError, Result};
 use super::records::PptRecord;
 use crate::consts::PptRecordType;
 
+/// Mouse event that triggers an interactive action.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InteractionTrigger {
+    /// Mouse click.
+    Click,
+    /// Mouse pointer moved over the object.
+    MouseOver,
+}
+
+/// Action stored in an `InteractiveInfoAtom`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InteractionAction {
+    NoAction,
+    Macro,
+    RunProgram,
+    Jump,
+    Hyperlink,
+    Ole,
+    Media,
+    CustomShow,
+}
+
+/// Relative slide-show jump target.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InteractionJump {
+    None,
+    NextSlide,
+    PreviousSlide,
+    FirstSlide,
+    LastSlide,
+    LastSlideViewed,
+    EndShow,
+}
+
+/// Interpretation of an interactive hyperlink reference.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InteractionLinkTarget {
+    NextSlide,
+    PreviousSlide,
+    FirstSlide,
+    LastSlide,
+    CustomShow,
+    SlideNumber,
+    Url,
+    OtherPresentation,
+    OtherFile,
+    Nil,
+}
+
+/// One click or mouse-over action attached to a shape or text range.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PowerPointInteraction {
+    pub trigger: InteractionTrigger,
+    pub sound_id: u32,
+    pub hyperlink_id: u32,
+    pub action: InteractionAction,
+    pub ole_verb: u8,
+    pub jump: InteractionJump,
+    pub animated: bool,
+    pub stop_sound: bool,
+    pub custom_show_return: bool,
+    pub visited: bool,
+    pub link_target: InteractionLinkTarget,
+    pub macro_name: Option<String>,
+}
+
+impl PowerPointInteraction {
+    /// Parse an `InteractiveInfo` click or mouse-over container.
+    pub fn parse(record: &PptRecord) -> Result<Self> {
+        if record.record_type != PptRecordType::InteractiveInfo || record.version != 0x0f {
+            return Err(PptError::Corrupted(
+                "InteractiveInfo has an invalid record header".to_string(),
+            ));
+        }
+        let trigger = match record.instance {
+            0 => InteractionTrigger::Click,
+            1 => InteractionTrigger::MouseOver,
+            _ => {
+                return Err(PptError::Corrupted(
+                    "InteractiveInfo has an invalid trigger instance".to_string(),
+                ));
+            },
+        };
+        let children = PptRecord::parse_sequence_strict(&record.data, "interactive information")?;
+        if !matches!(children.len(), 1 | 2) {
+            return Err(PptError::Corrupted(
+                "InteractiveInfo has an invalid child count".to_string(),
+            ));
+        }
+        let atom = &children[0];
+        if atom.record_type != PptRecordType::InteractiveInfoAtom
+            || atom.version != 0
+            || atom.instance != 0
+            || atom.data.len() != 16
+        {
+            return Err(PptError::Corrupted(
+                "InteractiveInfoAtom has an invalid header or size".to_string(),
+            ));
+        }
+        let action = parse_action(atom.data[8])?;
+        let flags = atom.data[11];
+        if flags & 0xf0 != 0 {
+            return Err(PptError::Corrupted(
+                "InteractiveInfoAtom has nonzero reserved flag bits".to_string(),
+            ));
+        }
+        let macro_name = if children.len() == 2 {
+            let name = &children[1];
+            if name.record_type != PptRecordType::CString || name.version != 0 || name.instance != 2
+            {
+                return Err(PptError::Corrupted(
+                    "MacroNameAtom has an invalid record header".to_string(),
+                ));
+            }
+            Some(parse_unicode_string(&name.data)?)
+        } else {
+            None
+        };
+        Ok(Self {
+            trigger,
+            sound_id: u32::from_le_bytes(atom.data[0..4].try_into().unwrap()),
+            hyperlink_id: u32::from_le_bytes(atom.data[4..8].try_into().unwrap()),
+            action,
+            ole_verb: atom.data[9],
+            jump: parse_jump(atom.data[10])?,
+            animated: flags & 0x01 != 0,
+            stop_sound: flags & 0x02 != 0,
+            custom_show_return: flags & 0x04 != 0,
+            visited: flags & 0x08 != 0,
+            link_target: parse_link_target(atom.data[12])?,
+            macro_name,
+        })
+    }
+
+    /// Resolve this action's hyperlink reference.
+    pub fn hyperlink<'a>(
+        &self,
+        hyperlinks: &'a PowerPointHyperlinks,
+    ) -> Option<&'a PowerPointHyperlink> {
+        hyperlinks.get(self.hyperlink_id)
+    }
+}
+
+fn parse_action(value: u8) -> Result<InteractionAction> {
+    match value {
+        0 => Ok(InteractionAction::NoAction),
+        1 => Ok(InteractionAction::Macro),
+        2 => Ok(InteractionAction::RunProgram),
+        3 => Ok(InteractionAction::Jump),
+        4 => Ok(InteractionAction::Hyperlink),
+        5 => Ok(InteractionAction::Ole),
+        6 => Ok(InteractionAction::Media),
+        7 => Ok(InteractionAction::CustomShow),
+        _ => Err(PptError::Corrupted(
+            "Invalid interactive action".to_string(),
+        )),
+    }
+}
+
+fn parse_jump(value: u8) -> Result<InteractionJump> {
+    match value {
+        0 => Ok(InteractionJump::None),
+        1 => Ok(InteractionJump::NextSlide),
+        2 => Ok(InteractionJump::PreviousSlide),
+        3 => Ok(InteractionJump::FirstSlide),
+        4 => Ok(InteractionJump::LastSlide),
+        5 => Ok(InteractionJump::LastSlideViewed),
+        6 => Ok(InteractionJump::EndShow),
+        _ => Err(PptError::Corrupted("Invalid interactive jump".to_string())),
+    }
+}
+
+fn parse_link_target(value: u8) -> Result<InteractionLinkTarget> {
+    match value {
+        0 => Ok(InteractionLinkTarget::NextSlide),
+        1 => Ok(InteractionLinkTarget::PreviousSlide),
+        2 => Ok(InteractionLinkTarget::FirstSlide),
+        3 => Ok(InteractionLinkTarget::LastSlide),
+        6 => Ok(InteractionLinkTarget::CustomShow),
+        7 => Ok(InteractionLinkTarget::SlideNumber),
+        8 => Ok(InteractionLinkTarget::Url),
+        9 => Ok(InteractionLinkTarget::OtherPresentation),
+        10 => Ok(InteractionLinkTarget::OtherFile),
+        0xff => Ok(InteractionLinkTarget::Nil),
+        _ => Err(PptError::Corrupted(
+            "Invalid hyperlink target type".to_string(),
+        )),
+    }
+}
+
 /// Additional hyperlink data introduced by PowerPoint 9.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PowerPointHyperlinkExtension {
@@ -397,6 +587,18 @@ mod tests {
         }
     }
 
+    fn interaction_record(trigger: u16, flags: u8, target: u8) -> PptRecord {
+        let mut atom = [0u8; 16];
+        atom[4..8].copy_from_slice(&3u32.to_le_bytes());
+        atom[8] = 4;
+        atom[10] = 0;
+        atom[11] = flags;
+        atom[12] = target;
+        let payload = record_bytes(0, 0, 4083, &atom);
+        let bytes = record_bytes(0x0f, trigger, 4082, &payload);
+        PptRecord::parse(&bytes, 0).unwrap().0
+    }
+
     fn root(list: Option<PptRecord>, extensions: &[Vec<u8>]) -> PptRecord {
         let mut children = Vec::new();
         if let Some(list) = list {
@@ -434,6 +636,32 @@ mod tests {
         assert!(extension.inserted_with_dialog);
         assert!(extension.location_is_named_show);
         assert!(extension.named_show_returns_to_slide);
+    }
+
+    #[test]
+    fn parses_and_resolves_interactive_hyperlinks() {
+        let interaction = PowerPointInteraction::parse(&interaction_record(0, 0x09, 8)).unwrap();
+        assert_eq!(interaction.trigger, InteractionTrigger::Click);
+        assert_eq!(interaction.action, InteractionAction::Hyperlink);
+        assert_eq!(interaction.link_target, InteractionLinkTarget::Url);
+        assert!(interaction.animated);
+        assert!(interaction.visited);
+
+        let hyperlinks =
+            PowerPointHyperlinks::parse(&root(Some(external_object_list(3, &[hyperlink(3)])), &[]))
+                .unwrap();
+        assert_eq!(
+            interaction
+                .hyperlink(&hyperlinks)
+                .unwrap()
+                .target
+                .as_deref(),
+            Some("https://example.test")
+        );
+
+        assert!(PowerPointInteraction::parse(&interaction_record(2, 0, 8)).is_err());
+        assert!(PowerPointInteraction::parse(&interaction_record(0, 0x10, 8)).is_err());
+        assert!(PowerPointInteraction::parse(&interaction_record(0, 0, 4)).is_err());
     }
 
     #[test]

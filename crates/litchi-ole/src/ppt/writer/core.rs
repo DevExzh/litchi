@@ -558,17 +558,17 @@ fn get_hyperlink_info(hyperlink_id: Option<u32>, hyperlinks: &HyperlinkCollectio
 
     // Per POI HSLFHyperlink:
     // - URL/File links: action=ACTION_HYPERLINK(4), jump=JUMP_NONE(0), hyperlinkType=LINK_Url(8)
-    // - Slide number: action=ACTION_HYPERLINK(4), jump=JUMP_NONE(0), hyperlinkType=LINK_SlideNumber(3)
+    // - Slide number: action=ACTION_HYPERLINK(4), jump=JUMP_NONE(0), hyperlinkType=LINK_SlideNumber(7)
     // - Next/Prev/First/Last: action=ACTION_JUMP(3), jump=varies, hyperlinkType=varies
     match &hyperlink.target {
         HyperlinkTarget::Url(_) | HyperlinkTarget::File(_) => (4, 0, 8), // ACTION_HYPERLINK, JUMP_NONE, LINK_Url
-        HyperlinkTarget::Slide(_) => (4, 0, 3), // ACTION_HYPERLINK (not JUMP!), JUMP_NONE, LINK_SlideNumber
-        HyperlinkTarget::NextSlide => (3, 1, 1), // ACTION_JUMP, JUMP_NEXTSLIDE, LINK_NextSlide
-        HyperlinkTarget::PrevSlide => (3, 2, 2), // ACTION_JUMP, JUMP_PREVIOUSSLIDE, LINK_PreviousSlide
-        HyperlinkTarget::FirstSlide => (3, 3, 3), // ACTION_JUMP, JUMP_FIRSTSLIDE, LINK_FirstSlide
-        HyperlinkTarget::LastSlide => (3, 4, 4), // ACTION_JUMP, JUMP_LASTSLIDE, LINK_LastSlide
+        HyperlinkTarget::Slide(_) => (4, 0, 7), // ACTION_HYPERLINK, JUMP_NONE, LINK_SlideNumber
+        HyperlinkTarget::NextSlide => (3, 1, 0), // ACTION_JUMP, JUMP_NEXTSLIDE, LINK_NextSlide
+        HyperlinkTarget::PrevSlide => (3, 2, 1), // ACTION_JUMP, JUMP_PREVIOUSSLIDE, LINK_PreviousSlide
+        HyperlinkTarget::FirstSlide => (3, 3, 2), // ACTION_JUMP, JUMP_FIRSTSLIDE, LINK_FirstSlide
+        HyperlinkTarget::LastSlide => (3, 4, 3), // ACTION_JUMP, JUMP_LASTSLIDE, LINK_LastSlide
         HyperlinkTarget::EndShow => (3, 6, 0xFF), // ACTION_JUMP, JUMP_ENDSHOW, LINK_NULL
-        HyperlinkTarget::CustomShow(_) => (7, 0, 5), // ACTION_CUSTOMSHOW, JUMP_NONE, LINK_CustomShow
+        HyperlinkTarget::CustomShow(_) => (7, 0, 6), // ACTION_CUSTOMSHOW, JUMP_NONE, LINK_CustomShow
     }
 }
 
@@ -2332,6 +2332,24 @@ mod tests {
         assert_eq!(id, 1);
         assert_eq!(writer.hyperlink_count(), 1);
         assert!(writer.hyperlinks.get(1).is_some());
+    }
+
+    #[test]
+    fn maps_writer_hyperlinks_to_spec_link_targets() {
+        let mut links = HyperlinkCollection::new();
+        let slide = links.add(Hyperlink::slide(2));
+        assert_eq!(get_hyperlink_info(Some(slide), &links), (4, 0, 7));
+
+        let next = links.add(Hyperlink::next_slide());
+        assert_eq!(get_hyperlink_info(Some(next), &links), (3, 1, 0));
+
+        let custom = links.add(Hyperlink {
+            id: 0,
+            display_text: None,
+            target: crate::ppt::writer::hyperlink::HyperlinkTarget::CustomShow("Demo".to_string()),
+            target_frame: None,
+        });
+        assert_eq!(get_hyperlink_info(Some(custom), &links), (7, 0, 6));
     }
 
     #[test]

@@ -104,6 +104,10 @@ pub use escher_textbox::EscherTextboxWrapper;
 pub use font::{
     EmbeddedPowerPointFont, PowerPointFont, PowerPointFontCollection, PowerPointFontCollections,
 };
+pub use hyperlink::{
+    InteractionAction, InteractionJump, InteractionLinkTarget, InteractionTrigger,
+    PowerPointInteraction,
+};
 pub use hyperlink::{PowerPointHyperlink, PowerPointHyperlinkExtension, PowerPointHyperlinks};
 pub use kinsoku::{
     BaseKinsokuSettings, KinsokuLanguage, KinsokuLevel, PowerPoint9KinsokuSettings,

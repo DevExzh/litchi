@@ -1,3 +1,4 @@
+use super::super::hyperlink::PowerPointInteraction;
 use super::super::package::{PptError, Result};
 use super::super::records::PptRecord;
 use super::super::text_extensions::{
@@ -703,6 +704,33 @@ impl<'a> EscherRecord<'a> {
         Ok(None)
     }
 
+    /// Extract click and mouse-over actions from this shape's ClientData.
+    pub fn extract_interactions(&self) -> Result<Vec<PowerPointInteraction>> {
+        let Some(client_data) = (self.record_type == EscherRecordType::ClientData)
+            .then_some(self)
+            .or_else(|| self.find_child(EscherRecordType::ClientData))
+        else {
+            return Ok(Vec::new());
+        };
+        let mut interactions = Vec::new();
+        for record in parse_ppt_record_sequence(&client_data.data, "shape ClientData")? {
+            if record.record_type != crate::consts::PptRecordType::InteractiveInfo {
+                continue;
+            }
+            let interaction = PowerPointInteraction::parse(&record)?;
+            if interactions
+                .iter()
+                .any(|existing: &PowerPointInteraction| existing.trigger == interaction.trigger)
+            {
+                return Err(PptError::Corrupted(
+                    "Shape contains duplicate interactive triggers".to_string(),
+                ));
+            }
+            interactions.push(interaction);
+        }
+        Ok(interactions)
+    }
+
     /// Extract text content from this record.
     /// This follows POI's text extraction logic for Escher text records.
     pub fn extract_text(&self) -> Result<String> {
@@ -1082,6 +1110,38 @@ mod tests {
         let shape = shape_with_versioned_extension("___PPT11", 4022, 0, &smart_tag_payload);
         let extension = shape.extract_text_style_extension11().unwrap().unwrap();
         assert_eq!(extension.runs[0].smart_tag_indices, vec![99]);
+    }
+
+    #[test]
+    fn extracts_shape_interactive_information() {
+        let mut atom = [0u8; 16];
+        atom[4..8].copy_from_slice(&9u32.to_le_bytes());
+        atom[8] = 4;
+        atom[11] = 1;
+        atom[12] = 8;
+        let atom = ppt_record(0, 0, 4083, &atom);
+        let interaction = ppt_record(0x0f, 0, 4082, &atom);
+        let client_data = EscherRecord {
+            record_type: EscherRecordType::ClientData,
+            version: 0x0f,
+            instance: 0,
+            data_length: interaction.len() as u32,
+            data: Cow::Owned(interaction),
+            children: Vec::new(),
+            properties: Vec::new(),
+        };
+        let shape = EscherRecord {
+            record_type: EscherRecordType::SpContainer,
+            version: 0x0f,
+            instance: 0,
+            data_length: 0,
+            data: Cow::Borrowed(&[]),
+            children: vec![client_data],
+            properties: Vec::new(),
+        };
+        let interactions = shape.extract_interactions().unwrap();
+        assert_eq!(interactions.len(), 1);
+        assert_eq!(interactions[0].hyperlink_id, 9);
     }
 
     #[test]

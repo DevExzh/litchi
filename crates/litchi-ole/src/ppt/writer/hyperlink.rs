@@ -120,7 +120,7 @@ impl InteractiveInfoAtom {
             action: HyperlinkAction::Hyperlink as u8, // ACTION_HYPERLINK = 4
             ole_verb: 0,
             jump: JumpAction::None as u8, // JUMP_NONE = 0
-            flags: 0x04,                  // fAnimated
+            flags: 0x01,                  // fAnimated
             hyperlink_type: 0x08,         // LINK_Url
             reserved: [0; 3],
         }
@@ -134,7 +134,7 @@ impl InteractiveInfoAtom {
             action: HyperlinkAction::Hyperlink as u8, // ACTION_HYPERLINK for specific slide
             ole_verb: 0,
             jump: JumpAction::None as u8,
-            flags: 0x04,
+            flags: 0x01,
             hyperlink_type: 0x07, // LINK_SlideNumber
             reserved: [0; 3],
         }
@@ -148,7 +148,7 @@ impl InteractiveInfoAtom {
             action: HyperlinkAction::Jump as u8, // ACTION_JUMP
             ole_verb: 0,
             jump: JumpAction::NextSlide as u8, // JUMP_NEXTSLIDE
-            flags: 0x04,
+            flags: 0x01,
             hyperlink_type: 0x00, // LINK_NextSlide
             reserved: [0; 3],
         }
@@ -162,7 +162,7 @@ impl InteractiveInfoAtom {
             action: HyperlinkAction::Jump as u8, // ACTION_JUMP
             ole_verb: 0,
             jump: JumpAction::PreviousSlide as u8, // JUMP_PREVIOUSSLIDE
-            flags: 0x04,
+            flags: 0x01,
             hyperlink_type: 0x01, // LINK_PreviousSlide
             reserved: [0; 3],
         }
@@ -176,7 +176,7 @@ impl InteractiveInfoAtom {
             action: HyperlinkAction::Jump as u8,
             ole_verb: 0,
             jump: JumpAction::FirstSlide as u8,
-            flags: 0x04,
+            flags: 0x01,
             hyperlink_type: 0x02, // LINK_FirstSlide
             reserved: [0; 3],
         }
@@ -190,7 +190,7 @@ impl InteractiveInfoAtom {
             action: HyperlinkAction::Jump as u8,
             ole_verb: 0,
             jump: JumpAction::LastSlide as u8,
-            flags: 0x04,
+            flags: 0x01,
             hyperlink_type: 0x03, // LINK_LastSlide
             reserved: [0; 3],
         }
@@ -204,7 +204,7 @@ impl InteractiveInfoAtom {
             action: HyperlinkAction::Jump as u8,
             ole_verb: 0,
             jump: JumpAction::EndShow as u8,
-            flags: 0x04,
+            flags: 0x01,
             hyperlink_type: 0xFF, // LINK_NULL for end show
             reserved: [0; 3],
         }
@@ -682,6 +682,21 @@ mod tests {
         assert_eq!(id1, 1);
         assert_eq!(id2, 2);
         assert_eq!(collection.len(), 2);
+    }
+
+    #[test]
+    fn interactive_info_uses_spec_link_targets_and_flag_bits() {
+        let url = InteractiveInfoAtom::url_link(4);
+        assert_eq!(url.flags, 0x01);
+        assert_eq!(url.hyperlink_type, 0x08);
+
+        let slide = InteractiveInfoAtom::slide_link(5);
+        assert_eq!(slide.flags, 0x01);
+        assert_eq!(slide.hyperlink_type, 0x07);
+
+        let next = InteractiveInfoAtom::next_slide();
+        assert_eq!(next.hyperlink_type, 0x00);
+        assert_eq!(next.jump, JumpAction::NextSlide as u8);
     }
 
     #[test]
