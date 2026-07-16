@@ -61,6 +61,9 @@ mod border_fill;
 /// BIFF8 worksheet row heights and column widths/formatting.
 mod layout;
 
+/// BIFF8 worksheet default dimensions and outline workspace metadata.
+mod sheet_layout;
+
 /// BIFF8 worksheet window, zoom, pane, and selection state.
 mod view;
 
@@ -130,6 +133,7 @@ pub use border_fill::{
     XlsBorderSide, XlsBorderStyle, XlsCellBorders, XlsCellFill, XlsFillPattern,
 };
 pub use layout::{XlsColumnLayout, XlsRowLayout};
+pub use sheet_layout::XlsWorksheetLayout;
 pub use view::{XlsPane, XlsPaneType, XlsSelection, XlsSelectionRange, XlsWorksheetView};
 pub use page_setup::{
     XlsPageBreak, XlsPageSetup, XlsPrintComments, XlsPrintErrors, XlsPrintOrder, XlsPrintOrientation,

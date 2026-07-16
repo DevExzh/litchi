@@ -15,6 +15,8 @@ use std::path::Path;
 pub struct RtfDocument<'a> {
     /// Font table
     font_table: FontTable<'a>,
+    /// Optional external-file metadata table.
+    file_table: Option<crate::FileTable<'a>>,
     /// Color table
     color_table: ColorTable,
     /// Style blocks
@@ -235,6 +237,7 @@ impl<'a> RtfDocument<'a> {
         // Convert all borrowed data to owned
         Ok(RtfDocument {
             font_table: owned_font_table,
+            file_table: parsed.file_table.map(crate::FileTable::into_owned),
             color_table: parsed.color_table,
             blocks: owned_blocks,
             tables: owned_tables,
@@ -508,6 +511,23 @@ impl<'a> RtfDocument<'a> {
     /// Get the font table.
     pub fn font_table(&self) -> &FontTable<'_> {
         &self.font_table
+    }
+
+    /// Get the external-file metadata table, if present.
+    pub fn file_table(&self) -> Option<&crate::FileTable<'_>> {
+        self.file_table.as_ref()
+    }
+
+    /// Replace the external-file metadata table after validating it.
+    pub fn set_file_table(&mut self, table: crate::FileTable<'a>) -> RtfResult<()> {
+        table.validate()?;
+        self.file_table = Some(table);
+        Ok(())
+    }
+
+    /// Remove the external-file metadata table.
+    pub fn clear_file_table(&mut self) {
+        self.file_table = None;
     }
 
     /// Get the color table.

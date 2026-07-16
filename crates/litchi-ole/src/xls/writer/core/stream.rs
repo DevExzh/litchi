@@ -395,6 +395,10 @@ pub(crate) fn generate_workbook_stream(
 
         biff::write_calculation_settings(&mut stream, &calculation_settings)?;
 
+        if worksheet.pivot_tables.is_empty() {
+            biff::write_worksheet_layout(&mut stream, &worksheet.sheet_layout)?;
+        }
+
         if let Some(page_setup) = &worksheet.page_setup {
             biff::write_page_settings(
                 &mut stream,
@@ -409,6 +413,10 @@ pub(crate) fn generate_workbook_stream(
         }
 
         if worksheet.pivot_tables.is_empty() {
+            biff::write_def_col_width(
+                &mut stream,
+                worksheet.sheet_layout.default_column_width_chars,
+            )?;
             biff::write_dimensions(
                 &mut stream,
                 worksheet.first_row,
@@ -417,7 +425,7 @@ pub(crate) fn generate_workbook_stream(
                 worksheet.last_col,
             )?;
         } else {
-            biff::write_pivot_sheet_preamble(&mut stream)?;
+            biff::write_pivot_sheet_preamble(&mut stream, &worksheet.sheet_layout)?;
         }
 
         // Required sheet records for worksheet substream per MS-XLS.
@@ -426,9 +434,6 @@ pub(crate) fn generate_workbook_stream(
         // immediately afterwards when freeze panes are configured. We
         // mirror that ordering here to avoid Excel interpreting the
         // pane as a generic split window.
-        if worksheet.pivot_tables.is_empty() {
-            biff::write_wsbool(&mut stream)?;
-        }
         let has_freeze_panes = worksheet.freeze_panes.is_some();
         if worksheet.pivot_tables.is_empty() {
             biff::write_window2(&mut stream, has_freeze_panes)?;
@@ -502,7 +507,10 @@ pub(crate) fn generate_workbook_stream(
         // Column width / hidden state via COLINFO records.
         let pivot_def_col_width_pos = if !worksheet.pivot_tables.is_empty() {
             let pos = stream.len() as u32;
-            biff::write_def_col_width(&mut stream, 8)?;
+            biff::write_def_col_width(
+                &mut stream,
+                worksheet.sheet_layout.default_column_width_chars,
+            )?;
             Some(pos)
         } else {
             None

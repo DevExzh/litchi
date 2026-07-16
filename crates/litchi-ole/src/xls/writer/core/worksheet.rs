@@ -112,6 +112,7 @@ pub(super) struct WritableWorksheet {
     /// Optional non-default worksheet zoom as an SCL numerator and denominator.
     pub zoom: Option<(u16, u16)>,
     pub sheet_protection: Option<XlsSheetProtection>,
+    pub sheet_layout: super::XlsWorksheetLayoutOptions,
     pub page_setup: Option<XlsPageSetupOptions>,
     pub horizontal_page_breaks: Vec<(u16, u16, u16)>,
     pub vertical_page_breaks: Vec<(u16, u16, u16)>,
@@ -172,6 +173,7 @@ impl WritableWorksheet {
             freeze_panes: None,
             zoom: None,
             sheet_protection: None,
+            sheet_layout: super::XlsWorksheetLayoutOptions::default(),
             page_setup: None,
             horizontal_page_breaks: Vec::new(),
             vertical_page_breaks: Vec::new(),

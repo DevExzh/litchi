@@ -32,6 +32,7 @@ pub mod auto_filter;
 pub mod calculation_properties;
 pub mod calculation_chain;
 pub mod query_table;
+pub mod volatile_dependencies;
 pub mod chart;
 mod comments;
 pub mod conditional_formatting;

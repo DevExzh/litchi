@@ -532,6 +532,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         let mut comment_collector = comments::CommentCollector::new();
         let mut hyperlink_collector = hyperlinks::HyperlinkCollector::new();
         let mut layout_collector = layout::LayoutCollector::new();
+        let mut sheet_layout_collector = crate::xls::sheet_layout::SheetLayoutCollector::new();
         let mut view_collector = view::ViewCollector::new();
         let mut page_setup_collector = page_setup::PageSetupCollector::new();
         let mut protection_collector = protection::SheetProtectionCollector::new();
@@ -546,6 +547,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
 
         for record_result in record_iter.by_ref() {
             let record = record_result?;
+            sheet_layout_collector.feed_record(record.header.record_type, &record.data)?;
             comment_collector.feed_record(record.header.record_type, &record.data)?;
             hyperlink_collector.feed_record(record.header.record_type, &record.data)?;
             layout_collector.feed_record(record.header.record_type, &record.data, &formatting)?;
@@ -828,6 +830,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         worksheet.set_hyperlinks(hyperlink_collector.finish());
         let (row_layouts, column_layouts) = layout_collector.finish();
         worksheet.set_layouts(row_layouts, column_layouts);
+        worksheet.set_sheet_layout(sheet_layout_collector.finish());
         worksheet.set_worksheet_views(view_collector.finish()?);
         worksheet.set_page_setup(page_setup_collector.finish()?);
         worksheet.set_conditional_formattings(conditional_format_collector.finish()?);

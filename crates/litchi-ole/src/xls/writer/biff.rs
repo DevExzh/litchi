@@ -297,16 +297,18 @@ pub fn write_recalc_id<W: Write>(writer: &mut W, engine_id: u32) -> XlsResult<()
     workbook::write_recalc_id(writer, engine_id)
 }
 
-/// Write WSBOOL record (Additional Workspace Information)
-///
-/// Record type: 0x0081, Length: 2
-/// Writes default flags indicating a normal worksheet (not dialog sheet).
-pub fn write_wsbool<W: Write>(writer: &mut W) -> XlsResult<()> {
-    worksheet::write_wsbool(writer)
+pub fn write_worksheet_layout<W: Write>(
+    writer: &mut W,
+    options: &crate::xls::writer::core::XlsWorksheetLayoutOptions,
+) -> XlsResult<()> {
+    worksheet::write_worksheet_layout(writer, options)
 }
 
-pub fn write_pivot_sheet_preamble<W: Write>(writer: &mut W) -> XlsResult<()> {
-    worksheet::write_pivot_sheet_preamble(writer)
+pub fn write_pivot_sheet_preamble<W: Write>(
+    writer: &mut W,
+    options: &crate::xls::writer::core::XlsWorksheetLayoutOptions,
+) -> XlsResult<()> {
+    worksheet::write_pivot_sheet_preamble(writer, options)
 }
 
 pub fn write_pivot_colinfo<W: Write>(
@@ -902,15 +904,6 @@ mod tests {
         assert_eq!(&buf[0..2], &[0x55, 0x00]); // Record type 0x0055
         assert_eq!(&buf[2..4], &[2, 0]); // Length = 2
         assert_eq!(u16::from_le_bytes([buf[4], buf[5]]), 8);
-    }
-
-    #[test]
-    fn test_write_wsbool() {
-        let mut buf = Vec::new();
-        write_wsbool(&mut buf).unwrap();
-
-        assert_eq!(&buf[0..2], &[0x81, 0x00]); // Record type 0x0081
-        assert_eq!(&buf[2..4], &[2, 0]); // Length = 2
     }
 
     #[test]

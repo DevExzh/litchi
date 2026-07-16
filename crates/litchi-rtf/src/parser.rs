@@ -266,6 +266,7 @@ pub struct Parser<'a> {
     /// Font table
     font_table: RefCell<FontTable<'a>>,
     saw_font_table: bool,
+    file_table: Option<crate::FileTable<'a>>,
     unicode_alternate_depth: usize,
     /// Color table
     color_table: RefCell<ColorTable>,
@@ -424,6 +425,7 @@ impl<'a> Parser<'a> {
             states: vec![State::default()],
             font_table: RefCell::new(FontTable::new()),
             saw_font_table: false,
+            file_table: None,
             unicode_alternate_depth: 0,
             color_table: RefCell::new(ColorTable::new()),
             blocks: Vec::new(),
@@ -553,6 +555,7 @@ impl<'a> Parser<'a> {
 
         Ok(ParsedDocument {
             font_table: self.font_table.into_inner(),
+            file_table: self.file_table,
             color_table: self.color_table.into_inner(),
             blocks: self.blocks,
             tables: self.tables,
@@ -646,6 +649,11 @@ impl<'a> Parser<'a> {
         // Check if this is a special group (header, destination, etc.)
         if self.pos < self.tokens.len() {
             match &self.tokens[self.pos] {
+                Token::Control(ControlWord::FileTable | ControlWord::FileEntry) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF file-table destinations are misplaced or not starred".to_string(),
+                    ));
+                },
                 Token::Control(ControlWord::UnicodeAlternate) => {
                     self.parse_unicode_alternate_group()?;
                     self.states.pop();
@@ -713,6 +721,16 @@ impl<'a> Parser<'a> {
                         return Ok(());
                     }
                     match self.tokens.get(self.pos + 1) {
+                        Some(Token::Control(ControlWord::FileTable)) => {
+                            if self.file_table.is_some() {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF contains multiple filetbl destinations".to_string(),
+                                ));
+                            }
+                            self.file_table = Some(self.parse_file_table()?);
+                            self.states.pop();
+                            return Ok(());
+                        },
                         Some(Token::Control(control @ (
                             ControlWord::FootnoteSeparator
                             | ControlWord::FootnoteContinuationSeparator
@@ -5327,6 +5345,138 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn parse_file_table(&mut self) -> RtfResult<crate::FileTable<'a>> {
+        if self.states.len() != 3
+            || self.blocks.iter().any(|block| !block.text.trim().is_empty())
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF filetbl must occur at document scope before body text".to_string(),
+            ));
+        }
+        self.pos += 1; // ignorable-destination marker
+        if !matches!(self.tokens.get(self.pos), Some(Token::Control(ControlWord::FileTable))) {
+            return Err(RtfError::MalformedDocument("invalid RTF filetbl destination".to_string()));
+        }
+        self.pos += 1;
+        let mut table = crate::FileTable::new();
+        while self.pos < self.tokens.len() {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    table.validate()?;
+                    return Ok(table);
+                },
+                Some(Token::OpenBrace)
+                    if matches!(self.tokens.get(self.pos + 1), Some(Token::Control(ControlWord::FileEntry))) =>
+                {
+                    let entry = self.parse_file_table_entry()?;
+                    table.add(entry)?;
+                    continue;
+                },
+                Some(Token::Text(text)) if text.trim().is_empty() => {},
+                Some(Token::OpenBrace) => return Err(RtfError::MalformedDocument(
+                    "RTF filetbl cannot contain fields, objects, or unknown destinations".to_string(),
+                )),
+                Some(_) => return Err(RtfError::MalformedDocument("invalid content in RTF filetbl".to_string())),
+                None => return Err(RtfError::UnexpectedEof),
+            }
+            self.pos += 1;
+        }
+        Err(RtfError::UnexpectedEof)
+    }
+
+    fn parse_file_table_entry(&mut self) -> RtfResult<crate::FileTableEntry<'a>> {
+        self.pos += 2; // opening brace and file
+        let mut id = None;
+        let mut relative = None;
+        let mut operating_system = None;
+        let mut valid_on = crate::FileSystemValidity::default();
+        let mut location = crate::FileLocation::Local;
+        let mut name = String::new();
+        let mut unicode_skip = self.current_state()?.unicode_skip.max(0);
+        let mut seen = std::collections::HashSet::new();
+        while self.pos < self.tokens.len() {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    let trimmed = name.trim_end_matches(['\r', '\n', ' ']);
+                    let name = trimmed.strip_suffix(';').ok_or_else(|| {
+                        RtfError::MalformedDocument("RTF file-table name lacks its semicolon terminator".to_string())
+                    })?.trim();
+                    let mut entry = crate::FileTableEntry::new(
+                        id.ok_or_else(|| RtfError::MalformedDocument("RTF file entry lacks fid".to_string()))?,
+                        Cow::Owned(name.to_string()),
+                    );
+                    entry.relative_path_level = relative;
+                    entry.operating_system = operating_system;
+                    entry.valid_on = valid_on;
+                    entry.location = location;
+                    entry.validate()?;
+                    return Ok(entry);
+                },
+                Some(Token::OpenBrace) | Some(Token::Binary(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF file entry cannot contain fields, objects, nested destinations, or binary data".to_string(),
+                    ));
+                },
+                Some(Token::Text(text)) => name.push_str(&self.decode_transport_text(text)?),
+                Some(Token::Control(ControlWord::Unicode(first))) => {
+                    name.push_str(&self.parse_style_unicode(*first, unicode_skip)?);
+                    continue;
+                },
+                Some(Token::Control(ControlWord::UnicodeSkip(value))) => unicode_skip = (*value).max(0),
+                Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
+                    name.push_str(control_symbol_text(control).unwrap_or_default())
+                },
+                Some(Token::Control(control)) => match control {
+                    ControlWord::FileId(value) => {
+                        if !seen.insert("fid") { return Err(RtfError::MalformedDocument("duplicate RTF fid".to_string())); }
+                        id = Some(u32::try_from(*value).map_err(|_| RtfError::MalformedDocument("invalid RTF fid".to_string()))?);
+                    },
+                    ControlWord::FileRelative(value) => {
+                        if !seen.insert("frelative") { return Err(RtfError::MalformedDocument("duplicate RTF frelative".to_string())); }
+                        relative = Some(u8::try_from(*value).map_err(|_| RtfError::MalformedDocument("invalid RTF frelative".to_string()))?);
+                    },
+                    ControlWord::FileOperatingSystem(value) => {
+                        if !seen.insert("fosnum") { return Err(RtfError::MalformedDocument("duplicate RTF fosnum".to_string())); }
+                        operating_system = Some(u8::try_from(*value).map_err(|_| RtfError::MalformedDocument("invalid RTF fosnum".to_string()))?);
+                    },
+                    ControlWord::FileValidMac => {
+                        if !seen.insert("fvalidmac") { return Err(RtfError::MalformedDocument("duplicate RTF fvalidmac".to_string())); }
+                        valid_on.mac = true;
+                    },
+                    ControlWord::FileValidDos => {
+                        if !seen.insert("fvaliddos") { return Err(RtfError::MalformedDocument("duplicate RTF fvaliddos".to_string())); }
+                        valid_on.dos = true;
+                    },
+                    ControlWord::FileValidNtfs => {
+                        if !seen.insert("fvalidntfs") { return Err(RtfError::MalformedDocument("duplicate RTF fvalidntfs".to_string())); }
+                        valid_on.ntfs = true;
+                    },
+                    ControlWord::FileValidHpfs => {
+                        if !seen.insert("fvalidhpfs") { return Err(RtfError::MalformedDocument("duplicate RTF fvalidhpfs".to_string())); }
+                        valid_on.hpfs = true;
+                    },
+                    ControlWord::FileNetwork => {
+                        if !seen.insert("location") { return Err(RtfError::MalformedDocument("conflicting RTF file locations".to_string())); }
+                        location = crate::FileLocation::Network;
+                    },
+                    ControlWord::FileNonFileSystem => {
+                        if !seen.insert("location") { return Err(RtfError::MalformedDocument("conflicting RTF file locations".to_string())); }
+                        location = crate::FileLocation::NonFileSystem;
+                    },
+                    _ => return Err(RtfError::MalformedDocument("unsupported control in RTF file entry".to_string())),
+                },
+                None => return Err(RtfError::UnexpectedEof),
+            }
+            self.pos += 1;
+            if name.len() > crate::file_table::MAX_FILE_NAME_BYTES {
+                return Err(RtfError::MalformedDocument("RTF file-table name exceeds the safety limit".to_string()));
+            }
+        }
+        Err(RtfError::UnexpectedEof)
+    }
+
     /// Parse font table.
     fn parse_font_table(&mut self) -> RtfResult<()> {
         self.pos += 1; // Skip \fonttbl
@@ -8361,6 +8511,7 @@ impl<'a> Parser<'a> {
 pub struct ParsedDocument<'a> {
     /// Font table
     pub font_table: FontTable<'a>,
+    pub file_table: Option<crate::FileTable<'a>>,
     /// Color table
     pub color_table: ColorTable,
     /// Style blocks

@@ -132,6 +132,9 @@ impl<W: Write> RtfWriter<W> {
         // Write font table
         self.write_font_table()?;
 
+        // Write inert external-file metadata without resolving any names.
+        self.write_file_table(doc.file_table())?;
+
         // Write color table
         self.write_color_table()?;
 
@@ -333,6 +336,54 @@ impl<W: Write> RtfWriter<W> {
             self.write_str("}")?;
         }
 
+        self.write_str("}")?;
+        Ok(())
+    }
+
+    /// Write the optional external-file metadata table.
+    pub fn write_file_table(&mut self, table: Option<&crate::FileTable<'_>>) -> io::Result<()> {
+        let Some(table) = table else {
+            return Ok(());
+        };
+        table
+            .validate()
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+
+        self.write_str("{\\*")?;
+        self.write_control_word("filetbl", None)?;
+        for entry in table.entries() {
+            self.write_str("{")?;
+            self.write_control_word("file", None)?;
+            self.write_control_word("fid", Some(entry.id as i32))?;
+            if let Some(level) = entry.relative_path_level {
+                self.write_control_word("frelative", Some(i32::from(level)))?;
+            }
+            if let Some(os) = entry.operating_system {
+                self.write_control_word("fosnum", Some(i32::from(os)))?;
+            }
+            if entry.valid_on.mac {
+                self.write_control_word("fvalidmac", None)?;
+            }
+            if entry.valid_on.dos {
+                self.write_control_word("fvaliddos", None)?;
+            }
+            if entry.valid_on.ntfs {
+                self.write_control_word("fvalidntfs", None)?;
+            }
+            if entry.valid_on.hpfs {
+                self.write_control_word("fvalidhpfs", None)?;
+            }
+            match entry.location {
+                crate::FileLocation::Local => {},
+                crate::FileLocation::Network => self.write_control_word("fnetwork", None)?,
+                crate::FileLocation::NonFileSystem => {
+                    self.write_control_word("fnonfilesys", None)?;
+                },
+            }
+            self.write_str(" ")?;
+            self.write_text(entry.name.as_ref())?;
+            self.write_str(";}")?;
+        }
         self.write_str("}")?;
         Ok(())
     }

@@ -4,7 +4,7 @@ use crate::xls::{XlsError, XlsResult};
 use crate::xls::page_setup::{
     XlsPrintComments, XlsPrintErrors, XlsPrintOrder, XlsPrintOrientation,
 };
-use crate::xls::writer::core::XlsPageSetupOptions;
+use crate::xls::writer::core::{XlsPageSetupOptions, XlsWorksheetLayoutOptions};
 use std::io::Write;
 
 use super::write_record_header;
@@ -157,6 +157,11 @@ pub fn write_page_settings<W: Write>(
 ///
 /// Record type: 0x0055, Length: 2
 pub fn write_def_col_width<W: Write>(writer: &mut W, width_chars: u16) -> XlsResult<()> {
+    if width_chars > 255 {
+        return Err(XlsError::InvalidData(
+            "default column width exceeds 255 characters".to_string(),
+        ));
+    }
     write_record_header(writer, 0x0055, 2)?;
     writer.write_all(&width_chars.to_le_bytes())?;
     Ok(())
@@ -209,27 +214,47 @@ pub fn write_dbcell<W: Write>(
     Ok(())
 }
 
-/// Write DEFAULTROWHEIGHT record.
-///
-/// Record type: 0x0225, Length: 4
-pub fn write_default_row_height<W: Write>(writer: &mut W) -> XlsResult<()> {
-    write_record_header(writer, 0x0225, 4)?;
-    writer.write_all(&0x0000u16.to_le_bytes())?;
-    writer.write_all(&0x0116u16.to_le_bytes())?;
-    Ok(())
-}
+/// Write GUTS, DEFAULTROWHEIGHT, and WSBOOL from typed worksheet settings.
+pub fn write_worksheet_layout<W: Write>(
+    writer: &mut W,
+    options: &XlsWorksheetLayoutOptions,
+) -> XlsResult<()> {
+    options.validate()?;
+    write_record_header(writer, 0x0080, 8)?;
+    writer.write_all(&options.row_gutter_width.to_le_bytes())?;
+    writer.write_all(&options.column_gutter_height.to_le_bytes())?;
+    let row_level = if options.max_row_outline_level == 0 {
+        0
+    } else {
+        u16::from(options.max_row_outline_level) + 1
+    };
+    let column_level = if options.max_column_outline_level == 0 {
+        0
+    } else {
+        u16::from(options.max_column_outline_level) + 1
+    };
+    writer.write_all(&row_level.to_le_bytes())?;
+    writer.write_all(&column_level.to_le_bytes())?;
 
-/// Write WSBOOL record (Additional Workspace Information)
-///
-/// Record type: 0x0081, Length: 2
-/// Writes default flags indicating a normal worksheet (not dialog sheet).
-pub fn write_wsbool<W: Write>(writer: &mut W) -> XlsResult<()> {
+    let row_flags = u16::from(options.default_row_height_unsynced)
+        | (u16::from(options.empty_rows_hidden) << 1)
+        | (u16::from(options.thick_top_border) << 2)
+        | (u16::from(options.thick_bottom_border) << 3);
+    write_record_header(writer, 0x0225, 4)?;
+    writer.write_all(&row_flags.to_le_bytes())?;
+    writer.write_all(&options.default_row_height_twips.to_le_bytes())?;
+
+    let wsbool = u16::from(options.show_automatic_page_breaks)
+        | (u16::from(options.apply_styles_to_outlines) << 5)
+        | (u16::from(options.summary_rows_below) << 6)
+        | (u16::from(options.summary_columns_right) << 7)
+        | (u16::from(options.fit_to_page) << 8)
+        | (u16::from(options.synchronize_horizontal_scrolling) << 12)
+        | (u16::from(options.synchronize_vertical_scrolling) << 13)
+        | (u16::from(options.alternate_expression_evaluation) << 14)
+        | (u16::from(options.alternate_formula_entry) << 15);
     write_record_header(writer, 0x0081, 2)?;
-    // Match Apache POI's InternalSheet.createWSBool():
-    //   WSBool1 = 0x04, WSBool2 = 0xC1
-    // POI serializes as [WSBool2, WSBool1], so the on-disk u16 (little-endian)
-    // is 0x04C1.
-    writer.write_all(&0x04C1u16.to_le_bytes())?;
+    writer.write_all(&wsbool.to_le_bytes())?;
     Ok(())
 }
 
@@ -273,7 +298,10 @@ pub fn write_calculation_settings<W: Write>(
     Ok(())
 }
 
-pub fn write_pivot_sheet_preamble<W: Write>(writer: &mut W) -> XlsResult<()> {
+pub fn write_pivot_sheet_preamble<W: Write>(
+    writer: &mut W,
+    options: &XlsWorksheetLayoutOptions,
+) -> XlsResult<()> {
     const MARGIN_BYTES: [u8; 8] = [0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0xE6, 0x3F];
     const TOP_BOTTOM_MARGIN_BYTES: [u8; 8] = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xE8, 0x3F];
     const PRINT_SETUP_BYTES: [u8; 34] = [
@@ -293,10 +321,7 @@ pub fn write_pivot_sheet_preamble<W: Write>(writer: &mut W) -> XlsResult<()> {
     writer.write_all(&0x0000u16.to_le_bytes())?;
     write_record_header(writer, 0x0082, 2)?;
     writer.write_all(&0x0001u16.to_le_bytes())?;
-    write_record_header(writer, 0x0080, 8)?;
-    writer.write_all(&0u64.to_le_bytes())?;
-    write_default_row_height(writer)?;
-    write_wsbool(writer)?;
+    write_worksheet_layout(writer, options)?;
     write_record_header(writer, 0x0014, 0)?;
     write_record_header(writer, 0x0015, 0)?;
     write_record_header(writer, 0x0083, 2)?;

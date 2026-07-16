@@ -53,6 +53,7 @@ pub struct XlsWorksheet {
     data_validations: Vec<XlsDataValidationRule>,
     row_layouts: BTreeMap<u16, XlsRowLayout>,
     column_layouts: Vec<XlsColumnLayout>,
+    sheet_layout: crate::xls::sheet_layout::XlsWorksheetLayout,
     worksheet_views: Vec<XlsWorksheetView>,
     page_setup: Option<XlsPageSetup>,
     calculation: crate::xls::calculation::XlsWorksheetCalculation,
@@ -83,6 +84,7 @@ impl XlsWorksheet {
             data_validations: Vec::new(),
             row_layouts: BTreeMap::new(),
             column_layouts: Vec::new(),
+            sheet_layout: crate::xls::sheet_layout::XlsWorksheetLayout::default(),
             worksheet_views: Vec::new(),
             page_setup: None,
             calculation: crate::xls::calculation::XlsWorksheetCalculation::default(),
@@ -113,6 +115,7 @@ impl XlsWorksheet {
             data_validations: Vec::new(),
             row_layouts: BTreeMap::new(),
             column_layouts: Vec::new(),
+            sheet_layout: crate::xls::sheet_layout::XlsWorksheetLayout::default(),
             worksheet_views: Vec::new(),
             page_setup: None,
             calculation: crate::xls::calculation::XlsWorksheetCalculation::default(),
@@ -336,6 +339,18 @@ impl XlsWorksheet {
     ) {
         self.row_layouts = rows;
         self.column_layouts = columns;
+    }
+
+    /// Default dimensions and outline workspace state for this worksheet.
+    pub fn sheet_layout(&self) -> &crate::xls::sheet_layout::XlsWorksheetLayout {
+        &self.sheet_layout
+    }
+
+    pub(crate) fn set_sheet_layout(
+        &mut self,
+        sheet_layout: crate::xls::sheet_layout::XlsWorksheetLayout,
+    ) {
+        self.sheet_layout = sheet_layout;
     }
 
     /// The first display window associated with this worksheet.

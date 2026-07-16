@@ -287,6 +287,79 @@ impl Default for XlsPageSetupOptions {
         }
     }
 }
+
+/// BIFF8 worksheet default dimensions and outline workspace settings.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct XlsWorksheetLayoutOptions {
+    pub default_row_height_twips: u16,
+    pub empty_rows_hidden: bool,
+    pub default_row_height_unsynced: bool,
+    pub thick_top_border: bool,
+    pub thick_bottom_border: bool,
+    pub default_column_width_chars: u16,
+    pub max_row_outline_level: u8,
+    pub max_column_outline_level: u8,
+    pub row_gutter_width: u16,
+    pub column_gutter_height: u16,
+    pub show_automatic_page_breaks: bool,
+    pub apply_styles_to_outlines: bool,
+    pub summary_rows_below: bool,
+    pub summary_columns_right: bool,
+    pub fit_to_page: bool,
+    pub synchronize_horizontal_scrolling: bool,
+    pub synchronize_vertical_scrolling: bool,
+    pub alternate_expression_evaluation: bool,
+    pub alternate_formula_entry: bool,
+}
+
+impl Default for XlsWorksheetLayoutOptions {
+    fn default() -> Self {
+        Self {
+            default_row_height_twips: 255,
+            empty_rows_hidden: false,
+            default_row_height_unsynced: false,
+            thick_top_border: false,
+            thick_bottom_border: false,
+            default_column_width_chars: 8,
+            max_row_outline_level: 0,
+            max_column_outline_level: 0,
+            row_gutter_width: 0,
+            column_gutter_height: 0,
+            show_automatic_page_breaks: true,
+            apply_styles_to_outlines: false,
+            summary_rows_below: true,
+            summary_columns_right: true,
+            fit_to_page: false,
+            synchronize_horizontal_scrolling: false,
+            synchronize_vertical_scrolling: false,
+            alternate_expression_evaluation: false,
+            alternate_formula_entry: false,
+        }
+    }
+}
+
+impl XlsWorksheetLayoutOptions {
+    pub(super) fn validate(self) -> XlsResult<()> {
+        if self.default_row_height_twips > 8179
+            || (!self.empty_rows_hidden && self.default_row_height_twips == 0)
+        {
+            return Err(XlsError::InvalidData(
+                "default row height must be 1..=8179, or 0..=8179 for hidden empty rows".to_string(),
+            ));
+        }
+        if self.default_column_width_chars > 255 {
+            return Err(XlsError::InvalidData(
+                "default column width must be at most 255 characters".to_string(),
+            ));
+        }
+        if self.max_row_outline_level > 7 || self.max_column_outline_level > 7 {
+            return Err(XlsError::InvalidData(
+                "worksheet outline levels must be 0..=7".to_string(),
+            ));
+        }
+        Ok(())
+    }
+}
 #[derive(Debug, Clone, Copy, Default)]
 struct XlsWorkbookProtection {
     protect_structure: bool,
@@ -1797,6 +1870,21 @@ impl XlsWriter {
         let worksheet = self.worksheets.get_mut(sheet)
             .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
         worksheet.vba_code_name = code_name.map(str::to_string);
+        Ok(())
+    }
+
+    /// Configure the complete primary worksheet print/page settings block.
+    pub fn set_worksheet_layout(
+        &mut self,
+        sheet: usize,
+        options: XlsWorksheetLayoutOptions,
+    ) -> XlsResult<()> {
+        options.validate()?;
+        let worksheet = self
+            .worksheets
+            .get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+        worksheet.sheet_layout = options;
         Ok(())
     }
 
