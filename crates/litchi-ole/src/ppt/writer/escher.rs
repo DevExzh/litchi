@@ -47,11 +47,11 @@ pub mod prop_id {
     pub const FILL_BACK_COLOR: u16 = 0x0183;
     pub const FILL_BACK_OPACITY: u16 = 0x0184;
     pub const FILL_BLIP: u16 = 0x4186;
-    pub const FILL_WIDTH: u16 = 0x0187; // fillWidth for pattern fills
-    pub const FILL_HEIGHT: u16 = 0x0188; // fillHeight for pattern fills
-    pub const FILL_ANGLE: u16 = 0x0189; // fillAngle for gradients (degrees * 65536)
-    pub const FILL_FOCUS: u16 = 0x018A; // fillFocus for gradients (-100 to 100)
-    pub const FILL_SHADE_TYPE: u16 = 0x018C; // fillShadeType (0=linear, 1=gamma, etc.)
+    pub const FILL_WIDTH: u16 = 0x0189; // fillWidth for pattern fills
+    pub const FILL_HEIGHT: u16 = 0x018A; // fillHeight for pattern fills
+    pub const FILL_ANGLE: u16 = 0x018B; // fillAngle for gradients (degrees * 65536)
+    pub const FILL_FOCUS: u16 = 0x018C; // fillFocus for gradients (-100 to 100)
+    pub const FILL_SHADE_TYPE: u16 = 0x019C; // fillShadeType (0=linear, 1=gamma, etc.)
     pub const FILL_RECT_RIGHT: u16 = 0x0193; // fillRectRight per MS-ODRAW
     pub const FILL_RECT_BOTTOM: u16 = 0x0194; // fillRectBottom per MS-ODRAW
     pub const NO_FILL_HIT_TEST: u16 = 0x01BF;
@@ -1591,8 +1591,10 @@ mod tests {
         // Should have fill type and back color
         let has_fill_type = props.iter().any(|p| p.prop_id == prop_id::FILL_TYPE);
         let has_back_color = props.iter().any(|p| p.prop_id == prop_id::FILL_BACK_COLOR);
+        let has_fill_angle = props.iter().any(|p| p.prop_id == 0x018B && p.value == 0);
         assert!(has_fill_type);
         assert!(has_back_color);
+        assert!(has_fill_angle);
     }
 
     #[test]

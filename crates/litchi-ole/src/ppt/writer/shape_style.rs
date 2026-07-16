@@ -28,15 +28,15 @@ pub mod fill_prop {
     /// Fill BLIP reference (for picture/texture fills)
     pub const FILL_BLIP: u16 = 0x4186;
     /// Fill width (for pattern fills)
-    pub const FILL_WIDTH: u16 = 0x0187;
+    pub const FILL_WIDTH: u16 = 0x0189;
     /// Fill height (for pattern fills)
-    pub const FILL_HEIGHT: u16 = 0x0188;
+    pub const FILL_HEIGHT: u16 = 0x018A;
     /// Fill angle (for gradient fills, in degrees * 65536)
-    pub const FILL_ANGLE: u16 = 0x0189;
+    pub const FILL_ANGLE: u16 = 0x018B;
     /// Fill focus (for gradient fills, -100 to 100)
-    pub const FILL_FOCUS: u16 = 0x018A;
+    pub const FILL_FOCUS: u16 = 0x018C;
     /// Fill shade type
-    pub const FILL_SHADE_TYPE: u16 = 0x018C;
+    pub const FILL_SHADE_TYPE: u16 = 0x019C;
     /// Fill rectangle right
     pub const FILL_RECT_RIGHT: u16 = 0x0193;
     /// Fill rectangle bottom
@@ -902,6 +902,15 @@ mod tests {
         let props = fill.build_properties();
         assert!(!props.is_empty());
         assert!(props.iter().any(|(id, _)| *id == fill_prop::FILL_COLOR));
+    }
+
+    #[test]
+    fn test_gradient_uses_officeart_fill_angle_property() {
+        let fill = FillStyle::gradient(ShapeColor::RED, ShapeColor::BLUE, 45);
+        let props = fill.build_properties();
+
+        assert!(props.contains(&(0x018B, 45 * 65_536)));
+        assert!(!props.iter().any(|(id, _)| *id == 0x0189));
     }
 
     #[test]

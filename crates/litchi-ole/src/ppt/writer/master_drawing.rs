@@ -51,12 +51,12 @@ pub mod escher_prop {
     pub const ANCHOR_TEXT: u16 = 0x0087;
     pub const FILL_COLOR: u16 = 0x0181;
     pub const FILL_BACK_COLOR: u16 = 0x0183;
-    pub const FILL_RECT_RIGHT: u16 = 0x0188;
-    pub const FILL_RECT_BOTTOM: u16 = 0x0189;
+    pub const FILL_RECT_RIGHT: u16 = 0x0193;
+    pub const FILL_RECT_BOTTOM: u16 = 0x0194;
     pub const NO_FILL_HIT_TEST: u16 = 0x01BF;
     pub const LINE_COLOR: u16 = 0x01C0;
     pub const LINE_NO_DRAW_DASH: u16 = 0x01FF; // lineStyleBooleanProperties
-    pub const SHAPE_BOOL: u16 = 0x01FF;
+    pub const LINE_STYLE_BOOL: u16 = 0x01FF;
     pub const SHADOW_COLOR: u16 = 0x0201;
     pub const BW_MODE: u16 = 0x0304; // blackAndWhiteMode
     pub const BACKGROUND_SHAPE: u16 = 0x017F; // fBackground
@@ -373,7 +373,7 @@ impl MasterPPDrawingBuilder {
             (escher_prop::FILL_BACK_COLOR, 0x08000000),
             (escher_prop::NO_FILL_HIT_TEST, 0x00110001),
             (escher_prop::LINE_COLOR, 0x08000001),
-            (escher_prop::SHAPE_BOOL, 0x00090001),
+            (escher_prop::LINE_STYLE_BOOL, 0x00090001),
             (escher_prop::SHADOW_COLOR, 0x08000002),
         ];
 
@@ -395,7 +395,7 @@ impl MasterPPDrawingBuilder {
             (escher_prop::FILL_BACK_COLOR, 0x08000000),
             (escher_prop::NO_FILL_HIT_TEST, 0x00110001),
             (escher_prop::LINE_COLOR, 0x08000001),
-            (escher_prop::SHAPE_BOOL, 0x00090001),
+            (escher_prop::LINE_STYLE_BOOL, 0x00090001),
             (escher_prop::SHADOW_COLOR, 0x08000002),
         ];
 
@@ -417,7 +417,7 @@ impl MasterPPDrawingBuilder {
             (escher_prop::FILL_BACK_COLOR, 0x08000000),
             (escher_prop::NO_FILL_HIT_TEST, 0x00110001),
             (escher_prop::LINE_COLOR, 0x08000001),
-            (escher_prop::SHAPE_BOOL, 0x00090001),
+            (escher_prop::LINE_STYLE_BOOL, 0x00090001),
             (escher_prop::SHADOW_COLOR, 0x08000002),
         ];
 
@@ -485,6 +485,8 @@ mod tests {
 
     #[test]
     fn test_master_ppdrawing_structure() {
+        assert_eq!(escher_prop::FILL_RECT_RIGHT, 0x0193);
+        assert_eq!(escher_prop::FILL_RECT_BOTTOM, 0x0194);
         let built = build_master_ppdrawing();
         // Verify structure starts correctly
         assert!(built.len() > 100, "Built PPDrawing should be substantial");
