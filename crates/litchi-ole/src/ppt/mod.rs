@@ -78,6 +78,7 @@ pub mod escher_textbox;
 pub mod font;
 pub mod hyperlink;
 pub mod kinsoku;
+pub mod main_master;
 pub mod master_style;
 pub mod picture_bullets;
 pub mod slide_extension;
@@ -125,6 +126,10 @@ pub use kinsoku::{
     BaseKinsokuSettings, KinsokuLanguage, KinsokuLevel, PowerPoint9KinsokuSettings,
     PowerPointKinsoku,
 };
+pub use main_master::{
+    PowerPoint12MainMasterMetadata, PowerPointContentMasterInfo, PowerPointMainMasterTextStyles,
+    PowerPointMainMasterTextStylesSource,
+};
 pub use master_style::{TextMasterStyle, TextMasterStyleLevel};
 pub use picture_bullets::{PictureBullet, PictureBulletCollection, PictureBulletType};
 pub use slide_extension::{
@@ -135,7 +140,8 @@ pub use slide_extension::{
 pub use slide_round_trip::{
     PowerPoint12SlideRoundTripMetadata, PowerPointAnimationPackage, PowerPointColorMapping,
     PowerPointColorMappingKind, PowerPointColorMappingValues, PowerPointColorSchemeIndex,
-    PowerPointContentMasterReference, PowerPointThemeKind, PowerPointThemePackage,
+    PowerPointContentMasterReference, PowerPointEmbeddedXmlPackage, PowerPointThemeKind,
+    PowerPointThemePackage,
 };
 pub use slide_sync::{PowerPointSlideSyncInfo, PowerPointSystemTime};
 pub use smart_tags::{

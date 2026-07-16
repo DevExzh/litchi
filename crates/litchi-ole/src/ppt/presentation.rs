@@ -1,4 +1,5 @@
 use super::super::OleFile;
+use super::main_master::PowerPoint12MainMasterMetadata;
 /// High-performance Presentation API with zero-copy slide parsing.
 use super::package::{PptError, Result};
 use super::parsers::PptRecordParser;
@@ -129,6 +130,20 @@ impl Presentation {
     pub fn slide_count(&self) -> usize {
         let factory = SlideFactory::new(&self.powerpoint_document, &self.persist_mapping);
         factory.slide_ids().len()
+    }
+
+    /// Parse PowerPoint 12 round-trip metadata for every main master slide.
+    ///
+    /// The returned values follow the main-master order in the PowerPoint document stream.
+    /// Embedded ECMA-376 packages are validated but remain inert; no external resources or
+    /// executable content are activated.
+    pub fn powerpoint12_main_master_metadata(&self) -> Result<Vec<PowerPoint12MainMasterMetadata>> {
+        self.parser
+            .find_records_ref()
+            .into_iter()
+            .filter(|record| record.record_type == PptRecordType::MainMaster)
+            .map(PowerPoint12MainMasterMetadata::parse)
+            .collect()
     }
 
     /// Extract all text from the presentation.

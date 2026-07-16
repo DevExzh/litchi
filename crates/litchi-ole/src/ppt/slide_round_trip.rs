@@ -52,6 +52,17 @@ pub struct PowerPointThemePackage {
     pub kind: PowerPointThemeKind,
 }
 
+/// Validated embedded ECMA-376 package containing one expected XML part.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PowerPointEmbeddedXmlPackage {
+    /// Original package bytes retained without modification for lossless round trips.
+    pub data: Vec<u8>,
+    /// Number of parts in the embedded OPC package.
+    pub part_count: usize,
+    /// Package part name of the format-specific XML part.
+    pub xml_part_name: String,
+}
+
 /// XML form stored by a PowerPoint 12 color-mapping atom.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PowerPointColorMappingKind {
@@ -253,7 +264,7 @@ impl PowerPoint12SlideRoundTripMetadata {
     }
 }
 
-fn validate_variable_atom(record: &PptRecord, name: &str) -> Result<()> {
+pub(crate) fn validate_variable_atom(record: &PptRecord, name: &str) -> Result<()> {
     if record.version != 0
         || record.instance != 0
         || record.data_length as usize != record.data.len()
@@ -265,7 +276,58 @@ fn validate_variable_atom(record: &PptRecord, name: &str) -> Result<()> {
     Ok(())
 }
 
-fn parse_theme_package(data: &[u8]) -> Result<PowerPointThemePackage> {
+pub(crate) fn parse_embedded_xml_package(
+    data: &[u8],
+    record_name: &str,
+    expected_content_type: &str,
+    expected_namespace: &[u8],
+    expected_root: &[u8],
+) -> Result<PowerPointEmbeddedXmlPackage> {
+    let package = OpcPackage::from_bytes(data).map_err(|error| {
+        PptError::Corrupted(format!(
+            "{record_name} contains an invalid ECMA-376 package: {error}"
+        ))
+    })?;
+    let mut xml_part_name = None;
+    for part in package.iter_parts() {
+        if part.content_type() == expected_content_type {
+            if xml_part_name.is_some() {
+                return Err(PptError::Corrupted(format!(
+                    "{record_name} package has multiple expected XML parts"
+                )));
+            }
+            if !xml_has_root(part.blob(), expected_namespace, expected_root).map_err(|error| {
+                PptError::Corrupted(format!(
+                    "{record_name} XML part {} is invalid: {error}",
+                    part.partname()
+                ))
+            })? {
+                return Err(PptError::Corrupted(format!(
+                    "{record_name} part {} has an invalid root element",
+                    part.partname()
+                )));
+            }
+            xml_part_name = Some(part.partname().to_string());
+        } else if is_xml_content_type(part.content_type()) {
+            validate_xml_with(part.blob(), |_, _, _, _| Ok(())).map_err(|error| {
+                PptError::Corrupted(format!(
+                    "{record_name} XML part {} is invalid: {error}",
+                    part.partname()
+                ))
+            })?;
+        }
+    }
+    let xml_part_name = xml_part_name.ok_or_else(|| {
+        PptError::Corrupted(format!("{record_name} package has no expected XML part"))
+    })?;
+    Ok(PowerPointEmbeddedXmlPackage {
+        data: data.to_vec(),
+        part_count: package.part_count(),
+        xml_part_name,
+    })
+}
+
+pub(crate) fn parse_theme_package(data: &[u8]) -> Result<PowerPointThemePackage> {
     let package = OpcPackage::from_bytes(data).map_err(|error| {
         PptError::Corrupted(format!(
             "RoundTripThemeAtom contains an invalid ECMA-376 package: {error}"
@@ -321,7 +383,7 @@ fn parse_theme_package(data: &[u8]) -> Result<PowerPointThemePackage> {
     })
 }
 
-fn parse_color_mapping(data: &[u8]) -> Result<PowerPointColorMapping> {
+pub(crate) fn parse_color_mapping(data: &[u8]) -> Result<PowerPointColorMapping> {
     #[derive(Clone, Copy)]
     enum RootKind {
         Direct,
@@ -472,7 +534,7 @@ fn parse_color_scheme_index(
     }
 }
 
-fn parse_animation_package(data: &[u8]) -> Result<PowerPointAnimationPackage> {
+pub(crate) fn parse_animation_package(data: &[u8]) -> Result<PowerPointAnimationPackage> {
     let package = OpcPackage::from_bytes(data).map_err(|error| {
         PptError::Corrupted(format!(
             "RoundTripAnimationAtom contains an invalid ECMA-376 package: {error}"
