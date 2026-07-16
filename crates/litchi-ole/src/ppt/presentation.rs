@@ -1,4 +1,5 @@
 use super::super::OleFile;
+use super::document_properties::PowerPoint12DocumentProperties;
 use super::main_master::PowerPoint12MainMasterMetadata;
 /// High-performance Presentation API with zero-copy slide parsing.
 use super::package::{PptError, Result};
@@ -144,6 +145,24 @@ impl Presentation {
             .filter(|record| record.record_type == PptRecordType::MainMaster)
             .map(PowerPoint12MainMasterMetadata::parse)
             .collect()
+    }
+
+    /// Parse document-level PowerPoint 12 settings and round-trip metadata.
+    pub fn powerpoint12_document_properties(&self) -> Result<PowerPoint12DocumentProperties> {
+        let mut documents = self
+            .parser
+            .find_records_ref()
+            .into_iter()
+            .filter(|record| record.record_type == PptRecordType::Document);
+        let document = documents.next().ok_or_else(|| {
+            PptError::Corrupted("PowerPoint document has no Document container".to_string())
+        })?;
+        if documents.next().is_some() {
+            return Err(PptError::Corrupted(
+                "PowerPoint document has multiple Document containers".to_string(),
+            ));
+        }
+        PowerPoint12DocumentProperties::parse(document)
     }
 
     /// Extract all text from the presentation.

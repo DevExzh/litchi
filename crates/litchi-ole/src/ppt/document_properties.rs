@@ -2,7 +2,11 @@
 
 use super::package::{PptError, Result};
 use super::records::PptRecord;
+use super::slide_round_trip::{PowerPointEmbeddedXmlPackage, parse_embedded_xml_package};
 use crate::consts::PptRecordType;
+use litchi_opc::constants::content_type;
+
+const DRAWINGML_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/drawingml/2006/main";
 
 /// Square-grid spacing stored by a PowerPoint 10 document extension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -79,6 +83,17 @@ pub struct PowerPoint12DocumentProperties {
     ///
     /// `None` means that the optional `RoundTripDocFlags12Atom` is absent.
     pub compress_pictures_on_save: Option<bool>,
+    /// Validated embedded custom table styles.
+    pub custom_table_styles: Option<PowerPointCustomTableStyles>,
+}
+
+/// PowerPoint 12 custom table styles stored directly in the Document container.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PowerPointCustomTableStyles {
+    /// Record version retained because MS-PPT recommends, but does not require, version zero.
+    pub record_version: u16,
+    /// Validated package containing the DrawingML `tblStyleLst` part.
+    pub package: PowerPointEmbeddedXmlPackage,
 }
 
 impl PowerPoint10DocumentProperties {
@@ -158,6 +173,33 @@ impl PowerPoint12DocumentProperties {
     /// Discover and parse document properties from every `___PPT12` programmable tag below `root`.
     pub fn parse(root: &PptRecord) -> Result<Self> {
         let mut properties = Self::default();
+        for record in &root.children {
+            if record.record_type != PptRecordType::RoundTripCustomTableStyles12Atom {
+                continue;
+            }
+            if properties.custom_table_styles.is_some() {
+                return Err(PptError::Corrupted(
+                    "Document contains duplicate RoundTripCustomTableStyles12Atom records"
+                        .to_string(),
+                ));
+            }
+            if record.instance != 0 || record.data_length as usize != record.data.len() {
+                return Err(PptError::Corrupted(
+                    "RoundTripCustomTableStyles12Atom has an invalid record header or size"
+                        .to_string(),
+                ));
+            }
+            properties.custom_table_styles = Some(PowerPointCustomTableStyles {
+                record_version: record.version,
+                package: parse_embedded_xml_package(
+                    &record.data,
+                    "RoundTripCustomTableStyles12Atom",
+                    content_type::PML_TABLE_STYLES,
+                    DRAWINGML_NAMESPACE,
+                    b"tblStyleLst",
+                )?,
+            });
+        }
         for record in root.versioned_binary_tag_records(12)? {
             if record.record_type != PptRecordType::RoundTripDocFlags12Atom {
                 continue;
@@ -311,6 +353,9 @@ fn parse_photo_album(record: &PptRecord) -> Result<PowerPointPhotoAlbumSettings>
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ppt::Package;
+    use litchi_opc::{OpcPackage, PackURI, XmlPart};
+    use std::io::Cursor;
 
     fn record_bytes(version: u16, instance: u16, kind: u16, payload: &[u8]) -> Vec<u8> {
         let mut data = Vec::new();
@@ -352,6 +397,44 @@ mod tests {
             data_length: 0,
             data: Vec::new(),
             children,
+        }
+    }
+
+    fn table_styles_package(content_type: &str, xml: &[u8]) -> Vec<u8> {
+        let mut package = OpcPackage::new();
+        package.add_part(Box::new(XmlPart::new(
+            PackURI::new("/tableStyles.xml").unwrap(),
+            content_type.to_string(),
+            xml.to_vec(),
+        )));
+        package.rels_mut().add_relationship(
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/tableStyles"
+                .to_string(),
+            "tableStyles.xml".to_string(),
+            "rId1".to_string(),
+            false,
+        );
+        let mut output = Cursor::new(Vec::new());
+        package.to_stream(&mut output).unwrap();
+        output.into_inner()
+    }
+
+    fn valid_table_styles_package() -> Vec<u8> {
+        table_styles_package(
+            content_type::PML_TABLE_STYLES,
+            br#"<a:tblStyleLst xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" def="{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}"/>"#,
+        )
+    }
+
+    fn table_styles_record(version: u16, instance: u16, data: &[u8]) -> PptRecord {
+        PptRecord {
+            record_type: PptRecordType::RoundTripCustomTableStyles12Atom,
+            record_type_raw: PptRecordType::RoundTripCustomTableStyles12Atom.as_u16(),
+            version,
+            instance,
+            data_length: data.len() as u32,
+            data: data.to_vec(),
+            children: Vec::new(),
         }
     }
 
@@ -497,5 +580,86 @@ mod tests {
         duplicate.extend_from_slice(&flags);
         let document = root(vec![prog_tags_record(12, &duplicate)]);
         assert!(PowerPoint12DocumentProperties::parse(&document).is_err());
+    }
+
+    #[test]
+    fn parses_custom_table_styles_and_retains_recommended_version_deviations() {
+        let package = valid_table_styles_package();
+        for version in [0, 0x0f] {
+            let parsed = PowerPoint12DocumentProperties::parse(&root(vec![table_styles_record(
+                version, 0, &package,
+            )]))
+            .unwrap();
+            let styles = parsed.custom_table_styles.unwrap();
+            assert_eq!(styles.record_version, version);
+            assert_eq!(styles.package.data, package);
+            assert_eq!(styles.package.part_count, 1);
+            assert_eq!(styles.package.xml_part_name, "/tableStyles.xml");
+            assert_eq!(parsed.compress_pictures_on_save, None);
+        }
+    }
+
+    #[test]
+    fn rejects_duplicate_or_malformed_custom_table_styles() {
+        let package = valid_table_styles_package();
+        for malformed in [
+            table_styles_record(0, 1, &package),
+            table_styles_record(0, 0, b"not a package"),
+            table_styles_record(
+                0,
+                0,
+                &table_styles_package(
+                    "application/xml",
+                    br#"<a:tblStyleLst xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"/>"#,
+                ),
+            ),
+            table_styles_record(
+                0,
+                0,
+                &table_styles_package(
+                    content_type::PML_TABLE_STYLES,
+                    br#"<a:tblStyle xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"/>"#,
+                ),
+            ),
+        ] {
+            assert!(PowerPoint12DocumentProperties::parse(&root(vec![malformed])).is_err());
+        }
+        let mut wrong_declared = table_styles_record(0, 0, &package);
+        wrong_declared.data_length -= 1;
+        assert!(PowerPoint12DocumentProperties::parse(&root(vec![wrong_declared])).is_err());
+
+        let end_document = PptRecord {
+            record_type: PptRecordType::EndDocument,
+            record_type_raw: PptRecordType::EndDocument.as_u16(),
+            version: 0,
+            instance: 0,
+            data_length: 0,
+            data: Vec::new(),
+            children: Vec::new(),
+        };
+        assert!(
+            PowerPoint12DocumentProperties::parse(&root(vec![
+                table_styles_record(0, 0, &package),
+                end_document,
+                table_styles_record(0x0f, 0, &package),
+            ]))
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn presentation_exposes_real_custom_table_style_version_variants() {
+        for (name, expected_version) in [("SampleShow.ppt", 0), ("text-margins.ppt", 0x0f)] {
+            let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../test-data/ole/ppt")
+                .join(name);
+            let mut package = Package::open(path).unwrap();
+            let presentation = package.presentation().unwrap();
+            let properties = presentation.powerpoint12_document_properties().unwrap();
+            assert_eq!(
+                properties.custom_table_styles.unwrap().record_version,
+                expected_version
+            );
+        }
     }
 }

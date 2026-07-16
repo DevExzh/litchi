@@ -85,6 +85,8 @@ pub enum PptRecordType {
     RoundTripDocFlags12Atom = 0x0425,
     /// PowerPoint 12 custom-layout shape and text checksum atom
     RoundTripShapeCheckSumForCustomLayouts12Atom = 0x0426,
+    /// PowerPoint 12 embedded custom table-styles package atom
+    RoundTripCustomTableStyles12Atom = 0x0428,
     /// OE placeholder atom record (placeholder data)
     OEPlaceholderAtom = 3011,
     /// PowerPoint 12 new placeholder identity atom
@@ -349,6 +351,7 @@ impl From<u16> for PptRecordType {
             0x0424 => PptRecordType::RoundTripHeaderFooterDefaults12Atom,
             0x0425 => PptRecordType::RoundTripDocFlags12Atom,
             0x0426 => PptRecordType::RoundTripShapeCheckSumForCustomLayouts12Atom,
+            0x0428 => PptRecordType::RoundTripCustomTableStyles12Atom,
             3011 => PptRecordType::OEPlaceholderAtom,
             0x0BDD => PptRecordType::RoundTripNewPlaceholderId12Atom,
             0x2B0B => PptRecordType::RoundTripAnimation12Atom,

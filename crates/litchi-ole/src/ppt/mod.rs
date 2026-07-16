@@ -109,8 +109,9 @@ pub use shapes::{AutoShape, Placeholder, PlaceholderSize, PlaceholderType, Shape
 pub use comments::{PowerPointCommentAuthor, PowerPointCommentAuthors};
 pub use current_user::CurrentUser;
 pub use document_properties::{
-    PowerPoint10DocumentProperties, PowerPoint12DocumentProperties, PowerPointGridSpacing,
-    PowerPointPhotoAlbumFrameShape, PowerPointPhotoAlbumLayout, PowerPointPhotoAlbumSettings,
+    PowerPoint10DocumentProperties, PowerPoint12DocumentProperties, PowerPointCustomTableStyles,
+    PowerPointGridSpacing, PowerPointPhotoAlbumFrameShape, PowerPointPhotoAlbumLayout,
+    PowerPointPhotoAlbumSettings,
 };
 pub use escher_textbox::EscherTextboxWrapper;
 pub use font::{
