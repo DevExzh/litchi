@@ -111,7 +111,7 @@ impl NumbersEditor {
         fill: ShapeFill,
     ) -> Result<NumbersSheetShapeInfo> {
         let created = self.add_sheet_shape(sheet_id, text, position, size, preset)?;
-        self.set_sheet_shape_fill(sheet_id, created.drawable_object_id, fill)?;
+        self.set_sheet_shape_fill(sheet_id, created.drawable_object_id, &fill)?;
         Ok(shape_graph(self, sheet_id, created.drawable_object_id)?.info)
     }
 
@@ -401,13 +401,13 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        fill: ShapeFill,
+        fill: &ShapeFill,
     ) -> Result<()> {
         let source = shape_graph(self, sheet_id, drawable_object_id)?;
         let mut staged = self.package.clone();
         set_shape_fill(&mut staged, &source.archive_name, drawable_object_id, fill)?;
         let verified = Self::from_package(staged)?;
-        if verified.sheet_shape_fill(sheet_id, drawable_object_id)? != fill {
+        if &verified.sheet_shape_fill(sheet_id, drawable_object_id)? != fill {
             return Err(Error::InvalidFormat(
                 "Numbers shape fill update failed validation".to_owned(),
             ));
@@ -1008,7 +1008,8 @@ mod tests {
     use super::*;
     use crate::numbers::NumbersDocumentBuilder;
     use crate::shapes::{
-        LineEndpoint, RgbColorSpace, RgbaColor, ShapeCornerRadius, StrokePattern, StrokeWidth,
+        LineEndpoint, RgbColorSpace, RgbaColor, ShapeCornerRadius, ShapeGradient,
+        ShapeGradientAngle, StrokePattern, StrokeWidth,
     };
 
     const POSITION: DrawablePoint = DrawablePoint { x: 420.0, y: 300.0 };
@@ -1217,8 +1218,11 @@ mod tests {
             .build()
             .unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
-        let fill =
-            ShapeFill::Solid(RgbaColor::new(0.1, 0.55, 0.85, 1.0, RgbColorSpace::Srgb).unwrap());
+        let fill = ShapeFill::Gradient(ShapeGradient::linear(
+            RgbaColor::new(0.1, 0.55, 0.85, 1.0, RgbColorSpace::Srgb).unwrap(),
+            RgbaColor::new(0.05, 0.15, 0.5, 1.0, RgbColorSpace::Srgb).unwrap(),
+            ShapeGradientAngle::from_degrees(0.0).unwrap(),
+        ));
         let created = editor
             .add_sheet_shape(sheet_id, "Filled", POSITION, SIZE, ShapePreset::Rectangle)
             .unwrap();
@@ -1226,7 +1230,7 @@ mod tests {
             .sheet_shape_fill(sheet_id, created.drawable_object_id)
             .unwrap();
         editor
-            .set_sheet_shape_fill(sheet_id, created.drawable_object_id, fill)
+            .set_sheet_shape_fill(sheet_id, created.drawable_object_id, &fill)
             .unwrap();
         let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(

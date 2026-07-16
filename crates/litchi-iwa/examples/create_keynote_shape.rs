@@ -4,7 +4,9 @@ use std::env;
 
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::shapes::{
-    DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeFill, ShapePreset,
+    DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeFill, ShapeGradient,
+    ShapeGradientAngle, ShapeGradientKind, ShapeGradientOpacity, ShapeGradientStop,
+    ShapeGradientStopMidpoint, ShapeGradientStopPosition, ShapePreset,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -32,12 +34,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             height: 240.0,
         },
         ShapePreset::RightArrow,
-        ShapeFill::Solid(RgbaColor::new(
-            0.96,
-            0.48,
-            0.06,
-            1.0,
-            RgbColorSpace::DisplayP3,
+        ShapeFill::Gradient(ShapeGradient::advanced(
+            ShapeGradientKind::Radial,
+            vec![
+                ShapeGradientStop::new(
+                    RgbaColor::new(0.98, 0.62, 0.08, 1.0, RgbColorSpace::DisplayP3)?,
+                    ShapeGradientStopPosition::START,
+                    ShapeGradientStopMidpoint::new(0.4)?,
+                ),
+                ShapeGradientStop::new(
+                    RgbaColor::new(0.72, 0.08, 0.38, 1.0, RgbColorSpace::DisplayP3)?,
+                    ShapeGradientStopPosition::END,
+                    ShapeGradientStopMidpoint::CENTER,
+                ),
+            ],
+            ShapeGradientOpacity::OPAQUE,
+            ShapeGradientAngle::from_degrees(315.0)?,
         )?),
     )?;
     editor.save(output)?;

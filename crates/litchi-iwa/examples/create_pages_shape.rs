@@ -4,7 +4,8 @@ use std::env;
 
 use litchi_iwa::pages::PagesEditor;
 use litchi_iwa::shapes::{
-    DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeFill, ShapePreset,
+    DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeFill, ShapeGradient,
+    ShapeGradientAngle, ShapePreset,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -30,13 +31,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             height: 150.0,
         },
         ShapePreset::RightArrow,
-        ShapeFill::Solid(RgbaColor::new(
-            0.88,
-            0.18,
-            0.12,
-            1.0,
-            RgbColorSpace::DisplayP3,
-        )?),
+        ShapeFill::Gradient(ShapeGradient::linear(
+            RgbaColor::new(0.88, 0.18, 0.12, 1.0, RgbColorSpace::DisplayP3)?,
+            RgbaColor::new(0.98, 0.65, 0.08, 1.0, RgbColorSpace::DisplayP3)?,
+            ShapeGradientAngle::from_degrees(45.0)?,
+        )),
     )?;
     editor.save(output)?;
     println!(

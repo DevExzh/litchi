@@ -10,8 +10,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .ok_or("usage: inspect_pages_shapes <input.pages>")?;
     let editor = PagesEditor::open(input)?;
     for (index, shape) in editor.body_shapes()?.iter().enumerate() {
+        let fill = editor.body_shape_fill(shape.drawable_object_id)?;
+        let stroke = editor.body_shape_stroke(shape.drawable_object_id)?;
         println!(
-            "shape[{index}] drawable={} storage={} anchor={} kind={:?} preset={:?} line={:?} endpoints={:?} text={:?} geometry={:?} properties={:?}",
+            "shape[{index}] drawable={} storage={} anchor={} kind={:?} preset={:?} line={:?} endpoints={:?} fill={fill:?} stroke={stroke:?} text={:?} geometry={:?} properties={:?}",
             shape.drawable_object_id,
             shape.storage.object_id,
             shape.anchor_character_index,

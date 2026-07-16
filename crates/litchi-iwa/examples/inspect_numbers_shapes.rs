@@ -15,8 +15,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .into_iter()
             .enumerate()
         {
+            let fill = editor.sheet_shape_fill(sheet.object_id, shape.drawable_object_id)?;
+            let stroke = editor.sheet_shape_stroke(sheet.object_id, shape.drawable_object_id)?;
             println!(
-                "sheet={} shape_index={shape_index} drawable={} kind={:?} preset={:?} line={:?} endpoints={:?} storage={} text={:?} geometry={:?} properties={:?}",
+                "sheet={} shape_index={shape_index} drawable={} kind={:?} preset={:?} line={:?} endpoints={:?} fill={fill:?} stroke={stroke:?} storage={} text={:?} geometry={:?} properties={:?}",
                 sheet.object_id,
                 shape.drawable_object_id,
                 shape.kind,

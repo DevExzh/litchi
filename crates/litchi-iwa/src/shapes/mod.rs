@@ -18,7 +18,10 @@ mod stroke;
 pub mod text_extractor;
 
 pub use color::{RgbColorSpace, RgbaColor};
-pub use fill::ShapeFill;
+pub use fill::{
+    ShapeFill, ShapeGradient, ShapeGradientAngle, ShapeGradientKind, ShapeGradientOpacity,
+    ShapeGradientStop, ShapeGradientStopMidpoint, ShapeGradientStopPosition,
+};
 pub(crate) use fill::{reset_shape_fill, set_shape_fill, shape_fill};
 pub use geometry::{DrawableGeometry, DrawablePoint, DrawableSize};
 pub(crate) use geometry::{

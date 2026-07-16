@@ -4,7 +4,8 @@ use std::env;
 
 use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::shapes::{
-    DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeFill, ShapePreset,
+    DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeFill, ShapeGradient,
+    ShapeGradientAngle, ShapePreset,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -33,7 +34,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             height: 150.0,
         },
         ShapePreset::RightArrow,
-        ShapeFill::Solid(RgbaColor::new(0.08, 0.42, 0.9, 1.0, RgbColorSpace::Srgb)?),
+        ShapeFill::Gradient(ShapeGradient::linear(
+            RgbaColor::new(0.08, 0.42, 0.9, 1.0, RgbColorSpace::Srgb)?,
+            RgbaColor::new(0.1, 0.85, 0.78, 1.0, RgbColorSpace::Srgb)?,
+            ShapeGradientAngle::from_degrees(0.0)?,
+        )),
     )?;
     editor.save(output)?;
     println!(

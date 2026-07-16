@@ -41,9 +41,9 @@ pub(crate) fn set_shape_fill(
     package: &mut IWorkPackage,
     archive_name: &str,
     drawable_id: u64,
-    fill: ShapeFill,
+    fill: &ShapeFill,
 ) -> Result<()> {
-    if shape_fill(package, archive_name, drawable_id)? == fill {
+    if &shape_fill(package, archive_name, drawable_id)? == fill {
         return Ok(());
     }
     let shape = shape_payload(package, archive_name, drawable_id)?;
@@ -147,14 +147,14 @@ pub(crate) fn reset_shape_fill(
                 shape_style_variation_object(old_style_id, parent_style_id, stylesheet_id, direct)?;
             replace_style_variation(&mut staged, &style_archive_name, old_style_id, replacement)?;
         }
-        validate_fill(&staged, archive_name, drawable_id, inherited)?;
+        validate_fill(&staged, archive_name, drawable_id, &inherited)?;
         *package = staged;
         return Ok(true);
     }
 
     // A shared variation cannot be removed for just one drawable. Override it
     // with the parent's effective value in a private child instead.
-    let reset_native = fill_to_native(inherited);
+    let reset_native = fill_to_native(&inherited);
     insert_fill_variation(
         package,
         archive_name,
@@ -166,7 +166,7 @@ pub(crate) fn reset_shape_fill(
             fill: Some(reset_native),
             ..Default::default()
         },
-        inherited,
+        &inherited,
     )?;
     Ok(true)
 }
@@ -179,7 +179,7 @@ fn insert_fill_variation(
     stylesheet_id: u64,
     parent_style_id: u64,
     overrides: ShapeStyleOverrides,
-    expected: ShapeFill,
+    expected: &ShapeFill,
 ) -> Result<()> {
     let new_style_id = next_object_identifier(package)?;
     let new_style =
@@ -224,9 +224,9 @@ fn validate_fill(
     package: &IWorkPackage,
     archive_name: &str,
     drawable_id: u64,
-    expected: ShapeFill,
+    expected: &ShapeFill,
 ) -> Result<()> {
-    if shape_fill(package, archive_name, drawable_id)? != expected {
+    if &shape_fill(package, archive_name, drawable_id)? != expected {
         return Err(Error::InvalidFormat(
             "iWork shape fill update failed validation".to_owned(),
         ));

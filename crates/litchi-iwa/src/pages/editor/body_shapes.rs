@@ -112,7 +112,7 @@ impl PagesEditor {
         fill: ShapeFill,
     ) -> Result<PagesBodyShapeInfo> {
         let created = self.add_body_shape(anchor_character_index, text, position, size, preset)?;
-        self.set_body_shape_fill(created.drawable_object_id, fill)?;
+        self.set_body_shape_fill(created.drawable_object_id, &fill)?;
         Ok(body_shape_graph(self, created.drawable_object_id)?.info)
     }
 
@@ -386,12 +386,12 @@ impl PagesEditor {
     }
 
     /// Replace one shape's fill transactionally, using copy-on-write for shared styles.
-    pub fn set_body_shape_fill(&mut self, drawable_object_id: u64, fill: ShapeFill) -> Result<()> {
+    pub fn set_body_shape_fill(&mut self, drawable_object_id: u64, fill: &ShapeFill) -> Result<()> {
         let source = body_shape_graph(self, drawable_object_id)?;
         let mut staged = self.package().clone();
         set_shape_fill(&mut staged, &source.archive_name, drawable_object_id, fill)?;
         let verified = Self::from_package(staged)?;
-        if verified.body_shape_fill(drawable_object_id)? != fill {
+        if &verified.body_shape_fill(drawable_object_id)? != fill {
             return Err(Error::InvalidFormat(
                 "Pages shape fill update failed validation".to_owned(),
             ));
@@ -625,7 +625,8 @@ impl PagesEditor {
 mod tests {
     use super::*;
     use crate::shapes::{
-        LineEndpoint, RgbColorSpace, RgbaColor, ShapeCornerRadius, StrokePattern, StrokeWidth,
+        LineEndpoint, RgbColorSpace, RgbaColor, ShapeCornerRadius, ShapeGradient,
+        ShapeGradientAngle, StrokePattern, StrokeWidth,
     };
 
     const POSITION: DrawablePoint = DrawablePoint { x: 180.0, y: 240.0 };
@@ -910,7 +911,7 @@ mod tests {
             .unwrap();
         let inherited_fill = editor.body_shape_fill(created.drawable_object_id).unwrap();
         editor
-            .set_body_shape_fill(created.drawable_object_id, fill)
+            .set_body_shape_fill(created.drawable_object_id, &fill)
             .unwrap();
         assert_eq!(
             editor.body_shape_fill(created.drawable_object_id).unwrap(),
@@ -930,10 +931,13 @@ mod tests {
             .iwa_entry_names()
             .map(|name| editor.package().archive(name).unwrap().objects.len())
             .sum::<usize>();
-        let replacement =
-            ShapeFill::Solid(RgbaColor::new(0.1, 0.45, 0.9, 1.0, RgbColorSpace::Srgb).unwrap());
+        let replacement = ShapeFill::Gradient(ShapeGradient::linear(
+            RgbaColor::new(0.1, 0.45, 0.9, 1.0, RgbColorSpace::Srgb).unwrap(),
+            RgbaColor::new(0.8, 0.15, 0.55, 1.0, RgbColorSpace::DisplayP3).unwrap(),
+            ShapeGradientAngle::from_degrees(45.0).unwrap(),
+        ));
         editor
-            .set_body_shape_fill(created.drawable_object_id, replacement)
+            .set_body_shape_fill(created.drawable_object_id, &replacement)
             .unwrap();
         assert_eq!(
             editor

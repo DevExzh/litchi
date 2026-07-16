@@ -11,8 +11,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let editor = KeynoteEditor::open(input)?;
     for slide in editor.slides()? {
         for (shape_index, shape) in editor.slide_shapes(slide.index)?.into_iter().enumerate() {
+            let fill = editor.slide_shape_fill(slide.index, shape.drawable_object_id)?;
+            let stroke = editor.slide_shape_stroke(slide.index, shape.drawable_object_id)?;
             println!(
-                "slide={} shape_index={shape_index} drawable={} kind={:?} preset={:?} line={:?} endpoints={:?} storage={} text={:?} geometry={:?} properties={:?}",
+                "slide={} shape_index={shape_index} drawable={} kind={:?} preset={:?} line={:?} endpoints={:?} fill={fill:?} stroke={stroke:?} storage={} text={:?} geometry={:?} properties={:?}",
                 slide.index,
                 shape.drawable_object_id,
                 shape.kind,

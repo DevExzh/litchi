@@ -116,7 +116,7 @@ impl KeynoteEditor {
         fill: ShapeFill,
     ) -> Result<KeynoteSlideShapeInfo> {
         let created = self.add_slide_shape(slide_index, text, position, size, preset)?;
-        self.set_slide_shape_fill(slide_index, created.drawable_object_id, fill)?;
+        self.set_slide_shape_fill(slide_index, created.drawable_object_id, &fill)?;
         Ok(shape_graph(self, slide_index, created.drawable_object_id)?.info)
     }
 
@@ -403,13 +403,13 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        fill: ShapeFill,
+        fill: &ShapeFill,
     ) -> Result<()> {
         let source = shape_graph(self, slide_index, drawable_object_id)?;
         let mut staged = self.package().clone();
         set_shape_fill(&mut staged, &source.archive_name, drawable_object_id, fill)?;
         let verified = Self::from_package(staged)?;
-        if verified.slide_shape_fill(slide_index, drawable_object_id)? != fill {
+        if &verified.slide_shape_fill(slide_index, drawable_object_id)? != fill {
             return Err(Error::InvalidFormat(
                 "Keynote shape fill update failed validation".to_owned(),
             ));
@@ -953,7 +953,9 @@ mod tests {
     use super::*;
     use crate::keynote::KeynoteDocumentBuilder;
     use crate::shapes::{
-        LineEndpoint, RgbColorSpace, RgbaColor, ShapeCornerRadius, ShapePolygonSides,
+        LineEndpoint, RgbColorSpace, RgbaColor, ShapeCornerRadius, ShapeGradient,
+        ShapeGradientAngle, ShapeGradientKind, ShapeGradientOpacity, ShapeGradientStop,
+        ShapeGradientStopMidpoint, ShapeGradientStopPosition, ShapePolygonSides,
         ShapeStarInnerRatio, ShapeStarPoints, StrokePattern, StrokeWidth,
     };
 
@@ -1166,8 +1168,27 @@ mod tests {
             .subtitle("Typed native style")
             .build()
             .unwrap();
-        let fill = ShapeFill::Solid(
-            RgbaColor::new(0.95, 0.45, 0.05, 0.85, RgbColorSpace::DisplayP3).unwrap(),
+        let orange = RgbaColor::new(0.95, 0.45, 0.05, 1.0, RgbColorSpace::DisplayP3).unwrap();
+        let purple = RgbaColor::new(0.45, 0.1, 0.8, 1.0, RgbColorSpace::DisplayP3).unwrap();
+        let fill = ShapeFill::Gradient(
+            ShapeGradient::advanced(
+                ShapeGradientKind::Radial,
+                vec![
+                    ShapeGradientStop::new(
+                        orange,
+                        ShapeGradientStopPosition::START,
+                        ShapeGradientStopMidpoint::new(0.35).unwrap(),
+                    ),
+                    ShapeGradientStop::new(
+                        purple,
+                        ShapeGradientStopPosition::END,
+                        ShapeGradientStopMidpoint::CENTER,
+                    ),
+                ],
+                ShapeGradientOpacity::new(0.85).unwrap(),
+                ShapeGradientAngle::from_degrees(315.0).unwrap(),
+            )
+            .unwrap(),
         );
         let created = editor
             .add_slide_shape(0, "Filled", POSITION, SIZE, ShapePreset::Rectangle)
@@ -1176,7 +1197,7 @@ mod tests {
             .slide_shape_fill(0, created.drawable_object_id)
             .unwrap();
         editor
-            .set_slide_shape_fill(0, created.drawable_object_id, fill)
+            .set_slide_shape_fill(0, created.drawable_object_id, &fill)
             .unwrap();
         let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
