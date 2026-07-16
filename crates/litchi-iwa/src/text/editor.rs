@@ -18,9 +18,10 @@ use crate::wire::{
 use crate::{Error, IWorkPackage, Result};
 
 use super::paragraph_alignment::{
-    paragraph_alignment, reset_paragraph_alignment, set_paragraph_alignment,
+    paragraph_alignment, paragraph_line_spacing, reset_paragraph_alignment,
+    reset_paragraph_line_spacing, set_paragraph_alignment, set_paragraph_line_spacing,
 };
-use super::style::TextAlignment;
+use super::style::{ParagraphLineSpacing, TextAlignment};
 
 const STORAGE_MESSAGE_TYPES: &[u32] = &[2001, 2022];
 
@@ -173,6 +174,42 @@ impl IWorkTextEditor {
     pub fn reset_paragraph_alignment(&mut self, object_id: u64) -> Result<bool> {
         let mut staged = self.package.clone();
         let changed = reset_paragraph_alignment(&mut staged, object_id)?;
+        if changed {
+            let bytes = staged.to_bytes()?;
+            IWorkPackage::from_bytes(&bytes)?;
+            self.package = staged;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective uniform line spacing of a text storage.
+    pub fn paragraph_line_spacing(&self, object_id: u64) -> Result<ParagraphLineSpacing> {
+        paragraph_line_spacing(&self.package, object_id)
+    }
+
+    /// Set one typed line-spacing mode across a uniformly styled text storage.
+    pub fn set_paragraph_line_spacing(
+        &mut self,
+        object_id: u64,
+        spacing: ParagraphLineSpacing,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        set_paragraph_line_spacing(&mut staged, object_id, spacing)?;
+        let bytes = staged.to_bytes()?;
+        let verified = IWorkPackage::from_bytes(&bytes)?;
+        if paragraph_line_spacing(&verified, object_id)? != spacing {
+            return Err(Error::InvalidFormat(
+                "iWork paragraph line-spacing update failed round-trip validation".to_owned(),
+            ));
+        }
+        self.package = staged;
+        Ok(())
+    }
+
+    /// Remove a private line-spacing override while preserving sibling overrides.
+    pub fn reset_paragraph_line_spacing(&mut self, object_id: u64) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = reset_paragraph_line_spacing(&mut staged, object_id)?;
         if changed {
             let bytes = staged.to_bytes()?;
             IWorkPackage::from_bytes(&bytes)?;

@@ -18,4 +18,7 @@ pub use editor::{IWorkTextEditor, TextStorageInfo};
 
 pub use extractor::TextExtractor;
 pub use storage::{TextFragment, TextRun, TextStorage};
-pub use style::{ParagraphStyle, TextAlignment, TextStyle};
+pub use style::{
+    ParagraphLineSpacing, ParagraphLineSpacingMultiple, ParagraphLineSpacingPoints, ParagraphStyle,
+    TextAlignment, TextStyle,
+};

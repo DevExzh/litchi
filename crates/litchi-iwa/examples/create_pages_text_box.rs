@@ -7,7 +7,10 @@ use litchi_iwa::shapes::{
     DrawablePoint, DrawableSize, ShapeTextAutoSize, ShapeTextInset, ShapeTextInsets,
     ShapeTextLayout, ShapeTextVerticalAlignment,
 };
-use litchi_iwa::text::{TextAlignment, TextColumnCount, TextColumnGap, TextColumns};
+use litchi_iwa::text::{
+    ParagraphLineSpacing, ParagraphLineSpacingMultiple, TextAlignment, TextColumnCount,
+    TextColumnGap, TextColumns,
+};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -48,6 +51,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ),
     )?;
     editor.set_text_box_paragraph_alignment(created.drawable_object_id, TextAlignment::Center)?;
+    editor.set_text_box_paragraph_line_spacing(
+        created.drawable_object_id,
+        ParagraphLineSpacing::Relative(ParagraphLineSpacingMultiple::ONE_POINT_FIVE),
+    )?;
     editor.save(output)?;
     println!(
         "created two-column Pages text box {} with storage {}",

@@ -39,23 +39,13 @@ impl TextStyle {
     }
 }
 
-/// Paragraph style properties
-#[derive(Debug, Clone, Default)]
+/// Uniform paragraph properties currently supported by the shared text editor.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct ParagraphStyle {
     /// Native paragraph alignment.
     pub alignment: TextAlignment,
-    /// First line indent (in points)
-    pub first_line_indent: f32,
-    /// Left indent (in points)
-    pub left_indent: f32,
-    /// Right indent (in points)  
-    pub right_indent: f32,
-    /// Space before paragraph (in points)
-    pub space_before: f32,
-    /// Space after paragraph (in points)
-    pub space_after: f32,
-    /// Line spacing multiplier
-    pub line_spacing: f32,
+    /// Native line-spacing mode and amount.
+    pub line_spacing: ParagraphLineSpacing,
 }
 
 impl ParagraphStyle {
@@ -63,13 +53,82 @@ impl ParagraphStyle {
     pub fn new() -> Self {
         Self {
             alignment: TextAlignment::Natural,
-            first_line_indent: 0.0,
-            left_indent: 0.0,
-            right_indent: 0.0,
-            space_before: 0.0,
-            space_after: 0.0,
-            line_spacing: 1.0,
+            line_spacing: ParagraphLineSpacing::default(),
         }
+    }
+}
+
+/// Positive multiplier used by relative paragraph line spacing.
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+pub struct ParagraphLineSpacingMultiple(f32);
+
+impl ParagraphLineSpacingMultiple {
+    pub const SINGLE: Self = Self(1.0);
+    pub const ONE_POINT_TWO: Self = Self(1.2);
+    pub const ONE_POINT_FIVE: Self = Self(1.5);
+    pub const DOUBLE: Self = Self(2.0);
+
+    /// Construct a finite multiplier greater than zero.
+    pub fn new(value: f32) -> crate::Result<Self> {
+        if !value.is_finite() || value <= 0.0 {
+            return Err(crate::Error::InvalidFormat(
+                "paragraph line-spacing multiplier must be finite and greater than zero".to_owned(),
+            ));
+        }
+        Ok(Self(value))
+    }
+
+    /// Return the multiplier represented by this value.
+    pub const fn get(self) -> f32 {
+        self.0
+    }
+}
+
+impl Default for ParagraphLineSpacingMultiple {
+    fn default() -> Self {
+        Self::SINGLE
+    }
+}
+
+/// Positive line-spacing distance in typographic points.
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+pub struct ParagraphLineSpacingPoints(f32);
+
+impl ParagraphLineSpacingPoints {
+    /// Construct a finite point distance greater than zero.
+    pub fn from_points(points: f32) -> crate::Result<Self> {
+        if !points.is_finite() || points <= 0.0 {
+            return Err(crate::Error::InvalidFormat(
+                "paragraph line-spacing distance must be finite and greater than zero".to_owned(),
+            ));
+        }
+        Ok(Self(points))
+    }
+
+    /// Return the distance in typographic points.
+    pub const fn points(self) -> f32 {
+        self.0
+    }
+}
+
+/// Native iWork line-spacing modes.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ParagraphLineSpacing {
+    /// Scale the font's natural line height by a positive multiplier.
+    Relative(ParagraphLineSpacingMultiple),
+    /// Use at least the specified point distance.
+    AtLeast(ParagraphLineSpacingPoints),
+    /// Use exactly the specified point distance.
+    Exactly(ParagraphLineSpacingPoints),
+    /// Cap the line distance at the specified point distance.
+    Maximum(ParagraphLineSpacingPoints),
+    /// Add the specified point distance between adjacent lines.
+    Between(ParagraphLineSpacingPoints),
+}
+
+impl Default for ParagraphLineSpacing {
+    fn default() -> Self {
+        Self::Relative(ParagraphLineSpacingMultiple::SINGLE)
     }
 }
 
@@ -131,7 +190,10 @@ mod tests {
     fn test_paragraph_style() {
         let para = ParagraphStyle::new();
         assert_eq!(para.alignment, TextAlignment::Natural);
-        assert_eq!(para.line_spacing, 1.0);
+        assert_eq!(
+            para.line_spacing,
+            ParagraphLineSpacing::Relative(ParagraphLineSpacingMultiple::SINGLE)
+        );
     }
 
     #[test]
@@ -157,5 +219,17 @@ mod tests {
             TextAlignment::Left
         );
         assert!(TextAlignment::from_native_value(999).is_err());
+    }
+
+    #[test]
+    fn line_spacing_scalars_are_strict() {
+        assert_eq!(
+            ParagraphLineSpacingMultiple::new(1.5).unwrap(),
+            ParagraphLineSpacingMultiple::ONE_POINT_FIVE
+        );
+        assert!(ParagraphLineSpacingMultiple::new(0.0).is_err());
+        assert!(ParagraphLineSpacingMultiple::new(f32::NAN).is_err());
+        assert!(ParagraphLineSpacingPoints::from_points(0.0).is_err());
+        assert!(ParagraphLineSpacingPoints::from_points(f32::INFINITY).is_err());
     }
 }

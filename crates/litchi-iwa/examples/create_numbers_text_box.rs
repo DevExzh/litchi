@@ -7,7 +7,10 @@ use litchi_iwa::shapes::{
     DrawablePoint, DrawableSize, ShapeTextAutoSize, ShapeTextInset, ShapeTextInsets,
     ShapeTextLayout, ShapeTextVerticalAlignment,
 };
-use litchi_iwa::text::{TextAlignment, TextColumnCount, TextColumnGap, TextColumns};
+use litchi_iwa::text::{
+    ParagraphLineSpacing, ParagraphLineSpacingPoints, TextAlignment, TextColumnCount,
+    TextColumnGap, TextColumns,
+};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -56,6 +59,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         sheet_id,
         created.drawable_object_id,
         TextAlignment::Right,
+    )?;
+    editor.set_sheet_text_box_paragraph_line_spacing(
+        sheet_id,
+        created.drawable_object_id,
+        ParagraphLineSpacing::Exactly(ParagraphLineSpacingPoints::from_points(24.0)?),
     )?;
     editor.save(output)?;
     println!(

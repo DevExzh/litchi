@@ -28,7 +28,9 @@ use crate::shapes::{
     set_shape_geometry, set_shape_properties, set_shape_text_columns, set_shape_text_layout,
     shape_geometry, shape_properties, shape_text_columns, shape_text_layout,
 };
-use crate::text::{IWorkTextEditor, TextAlignment, TextColumns, TextStorageInfo};
+use crate::text::{
+    IWorkTextEditor, ParagraphLineSpacing, TextAlignment, TextColumns, TextStorageInfo,
+};
 use crate::wire::{
     append_repeated_length_delimited_field, patch_fixed32_field, patch_length_delimited_field,
     patch_nested_fixed32_field, patch_nested_varint_field, patch_varint_field,
@@ -383,6 +385,48 @@ impl PagesEditor {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
         let changed = staged.reset_paragraph_alignment(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective line spacing of a reachable ordinary text box.
+    pub fn text_box_paragraph_line_spacing(
+        &self,
+        drawable_object_id: u64,
+    ) -> Result<ParagraphLineSpacing> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        self.text.paragraph_line_spacing(graph.storage_id)
+    }
+
+    /// Set one typed line-spacing mode across a reachable ordinary text box.
+    pub fn set_text_box_paragraph_line_spacing(
+        &mut self,
+        drawable_object_id: u64,
+        spacing: ParagraphLineSpacing,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_paragraph_line_spacing(graph.storage_id, spacing)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified.text_box_paragraph_line_spacing(drawable_object_id)? != spacing {
+            return Err(Error::InvalidFormat(
+                "Pages text-box paragraph line-spacing update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore inherited line spacing while preserving sibling paragraph overrides.
+    pub fn reset_text_box_paragraph_line_spacing(
+        &mut self,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_paragraph_line_spacing(graph.storage_id)?;
         if changed {
             *self = Self::from_package(staged.into_package())?;
         }
