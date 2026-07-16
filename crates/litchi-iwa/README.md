@@ -102,10 +102,10 @@ pages.save("created-with-text-box.pages")?;
 ```
 
 Ordinary text-bearing shapes have independent CRUD. Rectangle, rounded
-rectangle, ellipse, regular-polygon, and star paths are constructed from typed,
-validated presets together with their storage, stand-ins, body attachment,
-z-order, style relationship, and UUIDs. No source drawable or package is
-copied:
+rectangle, ellipse, left-arrow, right-arrow, double-arrow, regular-polygon, and
+star paths are constructed from typed, validated presets together with their
+storage, stand-ins, body attachment, z-order, style relationship, and UUIDs. No
+source drawable or package is copied:
 
 ```rust
 use litchi_iwa::pages::PagesEditor;
@@ -118,10 +118,10 @@ let shape = pages.add_body_shape(
     "A fully editable shape",
     DrawablePoint { x: 180.0, y: 240.0 },
     DrawableSize { width: 300.0, height: 150.0 },
-    ShapePreset::ROUNDED_RECTANGLE,
+    ShapePreset::RightArrow,
 )?;
 pages.set_body_shape_text(shape.drawable_object_id, "Updated")?;
-pages.set_body_shape_preset(shape.drawable_object_id, ShapePreset::STAR)?;
+pages.set_body_shape_preset(shape.drawable_object_id, ShapePreset::DoubleArrow)?;
 pages.save("created-with-shape.pages")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
@@ -233,9 +233,10 @@ numbers.save("created-with-text-box.numbers")?;
 ```
 
 Ordinary text-bearing shapes have independent CRUD. Rectangle, rounded
-rectangle, ellipse, regular-polygon, and star paths are constructed from typed,
-validated presets together with their storage, stand-ins, style relationship,
-ownership, and UUIDs. No source drawable or package is copied:
+rectangle, ellipse, left-arrow, right-arrow, double-arrow, regular-polygon, and
+star paths are constructed from typed, validated presets together with their
+storage, stand-ins, style relationship, ownership, and UUIDs. No source
+drawable or package is copied:
 
 ```rust
 use litchi_iwa::numbers::NumbersDocumentBuilder;
@@ -248,10 +249,10 @@ let shape = numbers.add_sheet_shape(
     "A fully editable shape",
     DrawablePoint { x: 420.0, y: 300.0 },
     DrawableSize { width: 300.0, height: 150.0 },
-    ShapePreset::ROUNDED_RECTANGLE,
+    ShapePreset::RightArrow,
 )?;
 numbers.set_sheet_shape_text(sheet_id, shape.drawable_object_id, "Updated")?;
-numbers.set_sheet_shape_preset(sheet_id, shape.drawable_object_id, ShapePreset::STAR)?;
+numbers.set_sheet_shape_preset(sheet_id, shape.drawable_object_id, ShapePreset::DoubleArrow)?;
 numbers.save("created-with-shape.numbers")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
@@ -361,9 +362,10 @@ keynote.save("created-with-text-box.key")?;
 ```
 
 Ordinary text-bearing shapes have independent CRUD. Rectangle, rounded
-rectangle, ellipse, regular-polygon, and star paths are constructed from typed,
-validated presets together with their storage, stand-ins, style relationship,
-ownership, z-order, and UUIDs. No source drawable or package is copied:
+rectangle, ellipse, left-arrow, right-arrow, double-arrow, regular-polygon, and
+star paths are constructed from typed, validated presets together with their
+storage, stand-ins, style relationship, ownership, z-order, and UUIDs. No source
+drawable or package is copied:
 
 ```rust
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
@@ -375,10 +377,10 @@ let shape = keynote.add_slide_shape(
     "A fully editable shape",
     DrawablePoint { x: 720.0, y: 660.0 },
     DrawableSize { width: 480.0, height: 240.0 },
-    ShapePreset::ROUNDED_RECTANGLE,
+    ShapePreset::RightArrow,
 )?;
 keynote.set_slide_shape_text(0, shape.drawable_object_id, "Updated")?;
-keynote.set_slide_shape_preset(0, shape.drawable_object_id, ShapePreset::STAR)?;
+keynote.set_slide_shape_preset(0, shape.drawable_object_id, ShapePreset::DoubleArrow)?;
 keynote.save("created-with-shape.key")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```

@@ -798,6 +798,9 @@ mod tests {
 
         for (preset, kind) in [
             (ShapePreset::Ellipse, NumbersSheetShapeKind::Ellipse),
+            (ShapePreset::LeftArrow, NumbersSheetShapeKind::LeftArrow),
+            (ShapePreset::RightArrow, NumbersSheetShapeKind::RightArrow),
+            (ShapePreset::DoubleArrow, NumbersSheetShapeKind::DoubleArrow),
             (ShapePreset::PENTAGON, NumbersSheetShapeKind::RegularPolygon),
             (ShapePreset::STAR, NumbersSheetShapeKind::Star),
         ] {

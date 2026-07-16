@@ -455,6 +455,9 @@ mod tests {
 
         for (preset, kind) in [
             (ShapePreset::Ellipse, PagesBodyShapeKind::Ellipse),
+            (ShapePreset::LeftArrow, PagesBodyShapeKind::LeftArrow),
+            (ShapePreset::RightArrow, PagesBodyShapeKind::RightArrow),
+            (ShapePreset::DoubleArrow, PagesBodyShapeKind::DoubleArrow),
             (ShapePreset::PENTAGON, PagesBodyShapeKind::RegularPolygon),
             (ShapePreset::STAR, PagesBodyShapeKind::Star),
         ] {

@@ -30,7 +30,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             width: 300.0,
             height: 150.0,
         },
-        ShapePreset::ROUNDED_RECTANGLE,
+        ShapePreset::RightArrow,
     )?;
     editor.save(output)?;
     println!(

@@ -743,6 +743,9 @@ mod tests {
 
         for (preset, kind) in [
             (ShapePreset::Ellipse, KeynoteSlideShapeKind::Ellipse),
+            (ShapePreset::LeftArrow, KeynoteSlideShapeKind::LeftArrow),
+            (ShapePreset::RightArrow, KeynoteSlideShapeKind::RightArrow),
+            (ShapePreset::DoubleArrow, KeynoteSlideShapeKind::DoubleArrow),
             (ShapePreset::PENTAGON, KeynoteSlideShapeKind::RegularPolygon),
             (ShapePreset::STAR, KeynoteSlideShapeKind::Star),
         ] {

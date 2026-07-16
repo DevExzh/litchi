@@ -17,6 +17,9 @@ const PATH_COMPARISON_EPSILON: f32 = 0.000_1;
 const NATIVE_ELLIPSE_DIAGONAL: f32 = 0.353_553_4;
 const NATIVE_ELLIPSE_OUTER_CONTROL: f32 = 0.548_815_55;
 const NATIVE_ELLIPSE_INNER_CONTROL: f32 = 0.158_291_24;
+const NATIVE_SINGLE_ARROW_HEAD_START_RATIO: f32 = 0.64;
+const NATIVE_DOUBLE_ARROW_HEAD_END_RATIO: f32 = 0.40;
+const NATIVE_ARROW_SHAFT_RATIO: f32 = 0.34;
 const SHAPE_INFO_MESSAGE_TYPE: u32 = 2_011;
 
 /// Corner radius in the path's natural coordinate system.
@@ -126,6 +129,12 @@ pub enum ShapePreset {
     RoundedRectangle { corner_radius: ShapeCornerRadius },
     /// Four-segment cubic Bézier ellipse.
     Ellipse,
+    /// Native left-facing single arrow with standard head and shaft proportions.
+    LeftArrow,
+    /// Native right-facing single arrow with standard head and shaft proportions.
+    RightArrow,
+    /// Native bidirectional arrow with standard head and shaft proportions.
+    DoubleArrow,
     /// Native regular polygon with a configurable side count.
     RegularPolygon { sides: ShapePolygonSides },
     /// Native star with configurable point count and inner radius.
@@ -261,24 +270,7 @@ pub(crate) fn shape_preset(shape: &tswp::ShapeInfoArchive) -> Result<Option<Shap
         };
     }
     if let Some(point) = &path.point_path_source {
-        use tsd::point_path_source_archive::PointPathSourceType;
-        if point
-            .r#type
-            .and_then(|value| PointPathSourceType::try_from(value).ok())
-            == Some(PointPathSourceType::KTsdStar)
-        {
-            let control = point
-                .point
-                .as_ref()
-                .ok_or_else(|| Error::InvalidFormat("star path has no point control".to_owned()))?;
-            let points = integral_u8(control.x).ok_or_else(|| {
-                Error::InvalidFormat("star point count is not an unsigned integer".to_owned())
-            })?;
-            return Ok(Some(ShapePreset::Star {
-                points: ShapeStarPoints::new(points)?,
-                inner_radius: ShapeStarInnerRatio::new(control.y)?,
-            }));
-        }
+        return point_shape_preset(point);
     }
     Ok(None)
 }
@@ -329,6 +321,30 @@ pub(crate) fn shape_path_source(
                 path: Some(ellipse_path(natural_size)),
                 ..Default::default()
             });
+        },
+        ShapePreset::LeftArrow => {
+            source.point_path_source = Some(arrow_path_source(
+                tsd::point_path_source_archive::PointPathSourceType::KTsdLeftSingleArrow,
+                NATIVE_SINGLE_ARROW_HEAD_START_RATIO,
+                natural_size,
+                size,
+            ));
+        },
+        ShapePreset::RightArrow => {
+            source.point_path_source = Some(arrow_path_source(
+                tsd::point_path_source_archive::PointPathSourceType::KTsdRightSingleArrow,
+                NATIVE_SINGLE_ARROW_HEAD_START_RATIO,
+                natural_size,
+                size,
+            ));
+        },
+        ShapePreset::DoubleArrow => {
+            source.point_path_source = Some(arrow_path_source(
+                tsd::point_path_source_archive::PointPathSourceType::KTsdDoubleArrow,
+                NATIVE_DOUBLE_ARROW_HEAD_END_RATIO,
+                natural_size,
+                size,
+            ));
         },
         ShapePreset::RegularPolygon { sides } => {
             source.scalar_path_source = Some(tsd::ScalarPathSourceArchive {
@@ -445,6 +461,80 @@ fn point_path_kind(point: &tsd::PointPathSourceArchive) -> ShapePathKind {
         Some(PointPathSourceType::KTsdStar) => ShapePathKind::Star,
         Some(PointPathSourceType::KTsdPlus) => ShapePathKind::Plus,
         None => ShapePathKind::PointPath,
+    }
+}
+
+fn point_shape_preset(point: &tsd::PointPathSourceArchive) -> Result<Option<ShapePreset>> {
+    use tsd::point_path_source_archive::PointPathSourceType;
+
+    let Some(kind) = point
+        .r#type
+        .and_then(|value| PointPathSourceType::try_from(value).ok())
+    else {
+        return Ok(None);
+    };
+    let control = point
+        .point
+        .as_ref()
+        .ok_or_else(|| Error::InvalidFormat(format!("{kind:?} path has no point control")))?;
+    match kind {
+        PointPathSourceType::KTsdLeftSingleArrow
+        | PointPathSourceType::KTsdRightSingleArrow
+        | PointPathSourceType::KTsdDoubleArrow => {
+            let size = point.natural_size.as_ref().ok_or_else(|| {
+                Error::InvalidFormat(format!("{kind:?} path has no natural size"))
+            })?;
+            if !size.width.is_finite() || size.width <= 0.0 {
+                return Err(Error::InvalidFormat(format!(
+                    "{kind:?} path has invalid natural width {}",
+                    size.width
+                )));
+            }
+            let horizontal_ratio = control.x / size.width;
+            let expected_horizontal_ratio = match kind {
+                PointPathSourceType::KTsdDoubleArrow => NATIVE_DOUBLE_ARROW_HEAD_END_RATIO,
+                PointPathSourceType::KTsdLeftSingleArrow
+                | PointPathSourceType::KTsdRightSingleArrow => NATIVE_SINGLE_ARROW_HEAD_START_RATIO,
+                _ => unreachable!("matched arrow variants"),
+            };
+            if !nearly_equal(horizontal_ratio, expected_horizontal_ratio, 1.0)
+                || !nearly_equal(control.y, NATIVE_ARROW_SHAFT_RATIO, 1.0)
+            {
+                return Ok(None);
+            }
+            Ok(Some(match kind {
+                PointPathSourceType::KTsdLeftSingleArrow => ShapePreset::LeftArrow,
+                PointPathSourceType::KTsdRightSingleArrow => ShapePreset::RightArrow,
+                PointPathSourceType::KTsdDoubleArrow => ShapePreset::DoubleArrow,
+                _ => unreachable!("matched arrow variants"),
+            }))
+        },
+        PointPathSourceType::KTsdStar => {
+            let points = integral_u8(control.x).ok_or_else(|| {
+                Error::InvalidFormat("star point count is not an unsigned integer".to_owned())
+            })?;
+            Ok(Some(ShapePreset::Star {
+                points: ShapeStarPoints::new(points)?,
+                inner_radius: ShapeStarInnerRatio::new(control.y)?,
+            }))
+        },
+        PointPathSourceType::KTsdPlus => Ok(None),
+    }
+}
+
+fn arrow_path_source(
+    kind: tsd::point_path_source_archive::PointPathSourceType,
+    horizontal_ratio: f32,
+    natural_size: DrawableSize,
+    size: tsp::Size,
+) -> tsd::PointPathSourceArchive {
+    tsd::PointPathSourceArchive {
+        r#type: Some(kind as i32),
+        point: Some(tsp::Point {
+            x: natural_size.width * horizontal_ratio,
+            y: NATIVE_ARROW_SHAFT_RATIO,
+        }),
+        natural_size: Some(size),
     }
 }
 
@@ -767,6 +857,9 @@ mod tests {
                 ShapePathKind::RoundedRectangle,
             ),
             (ShapePreset::Ellipse, ShapePathKind::Ellipse),
+            (ShapePreset::LeftArrow, ShapePathKind::LeftArrow),
+            (ShapePreset::RightArrow, ShapePathKind::RightArrow),
+            (ShapePreset::DoubleArrow, ShapePathKind::DoubleArrow),
             (ShapePreset::PENTAGON, ShapePathKind::RegularPolygon),
             (ShapePreset::STAR, ShapePathKind::Star),
             (
@@ -788,6 +881,55 @@ mod tests {
             assert_eq!(shape_path_kind(&shape).unwrap(), kind);
             assert_eq!(shape_preset(&shape).unwrap(), Some(preset));
         }
+    }
+
+    #[test]
+    fn recognizes_only_native_default_arrow_controls() {
+        use tsd::point_path_source_archive::PointPathSourceType;
+
+        let arrow = |kind, width, control_x| {
+            let mut shape = tswp::ShapeInfoArchive::default();
+            shape.super_.pathsource = Some(tsd::PathSourceArchive {
+                point_path_source: Some(tsd::PointPathSourceArchive {
+                    r#type: Some(kind as i32),
+                    point: Some(tsp::Point {
+                        x: control_x,
+                        y: NATIVE_ARROW_SHAFT_RATIO,
+                    }),
+                    natural_size: Some(tsp::Size {
+                        width,
+                        height: 100.0,
+                    }),
+                }),
+                ..Default::default()
+            });
+            shape
+        };
+        let right = arrow(PointPathSourceType::KTsdRightSingleArrow, 100.0, 64.0);
+        assert_eq!(shape_preset(&right).unwrap(), Some(ShapePreset::RightArrow));
+        let left = arrow(PointPathSourceType::KTsdLeftSingleArrow, 100.0, 64.0);
+        assert_eq!(shape_preset(&left).unwrap(), Some(ShapePreset::LeftArrow));
+        let double = arrow(PointPathSourceType::KTsdDoubleArrow, 110.0, 44.0);
+        assert_eq!(
+            shape_preset(&double).unwrap(),
+            Some(ShapePreset::DoubleArrow)
+        );
+
+        let custom = arrow(PointPathSourceType::KTsdRightSingleArrow, 100.0, 63.0);
+        assert_eq!(shape_path_kind(&custom).unwrap(), ShapePathKind::RightArrow);
+        assert_eq!(shape_preset(&custom).unwrap(), None);
+
+        let mut missing_control = right;
+        missing_control
+            .super_
+            .pathsource
+            .as_mut()
+            .unwrap()
+            .point_path_source
+            .as_mut()
+            .unwrap()
+            .point = None;
+        assert!(shape_preset(&missing_control).is_err());
     }
 
     #[test]

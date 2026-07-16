@@ -8,7 +8,7 @@ use litchi_iwa::shapes::ShapePreset;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
     let input = arguments.next().ok_or(
-        "usage: edit_keynote_shape_preset <input.key> <output.key> <slide-index> <shape-index> <rectangle|rounded-rectangle|ellipse|pentagon|star>",
+        "usage: edit_keynote_shape_preset <input.key> <output.key> <slide-index> <shape-index> <rectangle|rounded-rectangle|ellipse|left-arrow|right-arrow|double-arrow|pentagon|star>",
     )?;
     let output = arguments.next().ok_or("missing output path")?;
     let slide_index: usize = arguments.next().ok_or("missing slide index")?.parse()?;
@@ -17,6 +17,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some("rectangle") => ShapePreset::Rectangle,
         Some("rounded-rectangle") => ShapePreset::ROUNDED_RECTANGLE,
         Some("ellipse") => ShapePreset::Ellipse,
+        Some("left-arrow") => ShapePreset::LeftArrow,
+        Some("right-arrow") => ShapePreset::RightArrow,
+        Some("double-arrow") => ShapePreset::DoubleArrow,
         Some("pentagon") => ShapePreset::PENTAGON,
         Some("star") => ShapePreset::STAR,
         Some(other) => return Err(format!("unsupported shape preset {other:?}").into()),
