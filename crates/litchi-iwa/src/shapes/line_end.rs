@@ -16,12 +16,12 @@ use crate::protobuf::{tsd, tsp, tswp};
 use crate::{Error, IWorkPackage, Result};
 
 use super::shape_line_segment;
-#[cfg(test)]
 use native::endpoint_archive;
-use registry::{
-    LineEndVariationLocation, collapse_line_end_variation, endpoint_from_archive,
-    insert_style_variation, is_collapsible_line_end_variation, line_style_is_exclusive,
-    line_style_object, patch_shape_style_reference, replace_style_variation,
+pub(crate) use registry::{
+    ShapeStyleOverrides, ShapeStyleVariationLocation, collapse_line_end_variation,
+    collapse_style_variation, direct_shape_style_overrides, endpoint_from_archive,
+    insert_style_variation, patch_shape_style_reference, replace_style_variation,
+    shape_style_is_exclusive, shape_style_variation_object,
 };
 
 const MAX_STYLE_INHERITANCE_DEPTH: usize = 64;
@@ -165,8 +165,8 @@ pub(crate) fn set_shape_line_endpoints(
     {
         std::mem::swap(&mut stored.start, &mut stored.end);
     }
-    let disposable = is_collapsible_line_end_variation(&old_style, &old_style_message.data)?
-        && line_style_is_exclusive(package, old_style_id)?;
+    let direct_overrides = direct_shape_style_overrides(&old_style, &old_style_message.data)?;
+    let disposable = direct_overrides.is_some() && shape_style_is_exclusive(package, old_style_id)?;
     let parent_style_id = old_style
         .super_
         .super_
@@ -174,6 +174,7 @@ pub(crate) fn set_shape_line_endpoints(
         .as_ref()
         .map(|reference| reference.identifier);
 
+    let mut remove_direct_endpoints = false;
     if disposable && endpoints == LineEndpoints::default() {
         let parent_style_id = parent_style_id.ok_or_else(|| {
             Error::InvalidFormat(format!(
@@ -186,17 +187,7 @@ pub(crate) fn set_shape_line_endpoints(
             end: endpoint_from_archive(inherited.0.as_ref())?,
         };
         if inherited == LineEndpoints::default() {
-            return collapse_line_end_variation(
-                package,
-                LineEndVariationLocation {
-                    drawable_archive_name: archive_name,
-                    style_archive_name: &style_archive_name,
-                    drawable_id,
-                    stylesheet_id,
-                    style_id: old_style_id,
-                    parent_style_id,
-                },
-            );
+            remove_direct_endpoints = true;
         }
     }
 
@@ -206,7 +197,33 @@ pub(crate) fn set_shape_line_endpoints(
                 "iWork endpoint variation {old_style_id} has no parent style"
             ))
         })?;
-        let replacement = line_style_object(old_style_id, parent_style_id, stylesheet_id, stored)?;
+        let mut overrides = direct_overrides.ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "iWork endpoint variation {old_style_id} lost its direct overrides"
+            ))
+        })?;
+        if remove_direct_endpoints {
+            overrides.head_line_end = None;
+            overrides.tail_line_end = None;
+            if overrides.is_empty() {
+                return collapse_line_end_variation(
+                    package,
+                    ShapeStyleVariationLocation {
+                        drawable_archive_name: archive_name,
+                        style_archive_name: &style_archive_name,
+                        drawable_id,
+                        stylesheet_id,
+                        style_id: old_style_id,
+                        parent_style_id,
+                    },
+                );
+            }
+        } else {
+            overrides.head_line_end = Some(endpoint_archive(stored.end));
+            overrides.tail_line_end = Some(endpoint_archive(stored.start));
+        }
+        let replacement =
+            shape_style_variation_object(old_style_id, parent_style_id, stylesheet_id, overrides)?;
         let mut staged = package.clone();
         replace_style_variation(&mut staged, &style_archive_name, old_style_id, replacement)?;
         if shape_line_endpoints(&staged, archive_name, drawable_id)? != endpoints {
@@ -219,7 +236,16 @@ pub(crate) fn set_shape_line_endpoints(
     }
 
     let new_style_id = next_object_identifier(package)?;
-    let new_style = line_style_object(new_style_id, old_style_id, stylesheet_id, stored)?;
+    let new_style = shape_style_variation_object(
+        new_style_id,
+        old_style_id,
+        stylesheet_id,
+        ShapeStyleOverrides {
+            head_line_end: Some(endpoint_archive(stored.end)),
+            tail_line_end: Some(endpoint_archive(stored.start)),
+            ..Default::default()
+        },
+    )?;
 
     let mut staged = package.clone();
     patch_shape_style_reference(
@@ -260,7 +286,7 @@ pub(crate) fn set_shape_line_endpoints(
     Ok(())
 }
 
-fn shape_payload(
+pub(super) fn shape_payload(
     package: &IWorkPackage,
     archive_name: &str,
     drawable_id: u64,
@@ -282,7 +308,7 @@ fn shape_payload(
     Ok(tswp::ShapeInfoArchive::decode(message.data.as_slice())?)
 }
 
-fn shape_style(
+pub(super) fn shape_style(
     package: &IWorkPackage,
     archive_name: &str,
     style_id: u64,
@@ -294,7 +320,7 @@ fn shape_style(
     )?)
 }
 
-fn shape_style_message(
+pub(super) fn shape_style_message(
     package: &IWorkPackage,
     archive_name: &str,
     style_id: u64,
@@ -353,7 +379,7 @@ fn inherited_line_ends(
     )))
 }
 
-fn object_archive_name(package: &IWorkPackage, identifier: u64) -> Result<String> {
+pub(super) fn object_archive_name(package: &IWorkPackage, identifier: u64) -> Result<String> {
     let mut found = None;
     for name in package.iwa_entry_names() {
         if package.archive(name)?.object(identifier).is_some()

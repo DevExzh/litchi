@@ -3,7 +3,10 @@
 use std::env;
 
 use litchi_iwa::pages::PagesEditor;
-use litchi_iwa::shapes::{DrawablePoint, LineEndpoint, LineEndpoints};
+use litchi_iwa::shapes::{
+    DrawablePoint, LineEndpoint, LineEndpoints, LineStyle, RgbColorSpace, RgbaColor, ShapeStroke,
+    StrokePattern, StrokeWidth,
+};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -16,11 +19,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let body = "Pages line created entirely by litchi-iwa";
     let mut editor = PagesEditor::create_with_text(body)?;
-    let created = editor.add_body_line_with_endpoints(
+    let stroke = ShapeStroke::new(
+        RgbaColor::new(0.85, 0.12, 0.2, 1.0, RgbColorSpace::Srgb)?,
+        StrokeWidth::new(3.5)?,
+        StrokePattern::MediumDash,
+    );
+    let created = editor.add_body_line_with_style(
         body.encode_utf16().count(),
         DrawablePoint { x: 180.0, y: 240.0 },
         DrawablePoint { x: 480.0, y: 390.0 },
-        LineEndpoints::new(LineEndpoint::OpenCircle, LineEndpoint::FilledArrow),
+        LineStyle::new(stroke).with_endpoints(LineEndpoints::new(
+            LineEndpoint::OpenCircle,
+            LineEndpoint::FilledArrow,
+        )),
     )?;
     editor.set_body_line_segment(
         created.drawable_object_id,
@@ -29,9 +40,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     let segment = editor.body_line_segment(created.drawable_object_id)?;
     let endpoints = editor.body_line_endpoints(created.drawable_object_id)?;
+    let stroke = editor.body_shape_stroke(created.drawable_object_id)?;
     editor.save(output)?;
     println!(
-        "created Pages line {} from {:?} to {:?}, endpoints {endpoints:?}, at UTF-16 anchor {}",
+        "created Pages line {} from {:?} to {:?}, stroke {stroke:?}, endpoints {endpoints:?}, at UTF-16 anchor {}",
         created.drawable_object_id,
         segment.start(),
         segment.end(),

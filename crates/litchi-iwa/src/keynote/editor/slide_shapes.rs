@@ -6,9 +6,10 @@ use std::ops::Range;
 use super::*;
 use crate::shapes::{
     DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, LineEndpoints, LineSegment,
-    ShapePathKind, ShapePreset, line_geometry, line_path_source, line_segments_match,
-    set_shape_geometry, set_shape_line_endpoints, set_shape_line_segment, set_shape_preset,
-    shape_line_endpoints, shape_line_segment, shape_path_kind, shape_path_source, shape_preset,
+    LineStyle, ShapePathKind, ShapePreset, ShapeStroke, line_geometry, line_path_source,
+    line_segments_match, reset_shape_stroke, set_shape_geometry, set_shape_line_endpoints,
+    set_shape_line_segment, set_shape_preset, set_shape_stroke, shape_line_endpoints,
+    shape_line_segment, shape_path_kind, shape_path_source, shape_preset, shape_stroke,
 };
 use crate::text::TextStorageInfo;
 
@@ -135,6 +136,20 @@ impl KeynoteEditor {
     ) -> Result<KeynoteSlideShapeInfo> {
         let created = self.add_slide_line(slide_index, start, end)?;
         self.set_slide_line_endpoints(slide_index, created.drawable_object_id, endpoints)?;
+        Ok(shape_graph(self, slide_index, created.drawable_object_id)?.info)
+    }
+
+    /// Add a native straight line with a typed stroke and endpoint appearance.
+    pub fn add_slide_line_with_style(
+        &mut self,
+        slide_index: usize,
+        start: DrawablePoint,
+        end: DrawablePoint,
+        style: LineStyle,
+    ) -> Result<KeynoteSlideShapeInfo> {
+        let created = self.add_slide_line(slide_index, start, end)?;
+        self.set_slide_shape_stroke(slide_index, created.drawable_object_id, style.stroke)?;
+        self.set_slide_line_endpoints(slide_index, created.drawable_object_id, style.endpoints)?;
         Ok(shape_graph(self, slide_index, created.drawable_object_id)?.info)
     }
 
@@ -305,6 +320,56 @@ impl KeynoteEditor {
         }
         self.set_slide_line_endpoints(slide_index, drawable_object_id, LineEndpoints::default())?;
         Ok(true)
+    }
+
+    /// Read the effective standard stroke of one ordinary slide shape.
+    pub fn slide_shape_stroke(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<Option<ShapeStroke>> {
+        let source = shape_graph(self, slide_index, drawable_object_id)?;
+        shape_stroke(self.package(), &source.archive_name, drawable_object_id)
+    }
+
+    /// Replace one shape's stroke transactionally, using copy-on-write for shared styles.
+    pub fn set_slide_shape_stroke(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        stroke: ShapeStroke,
+    ) -> Result<()> {
+        let source = shape_graph(self, slide_index, drawable_object_id)?;
+        let mut staged = self.package().clone();
+        set_shape_stroke(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            stroke,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.slide_shape_stroke(slide_index, drawable_object_id)? != Some(stroke) {
+            return Err(Error::InvalidFormat(
+                "Keynote shape stroke update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove a direct stroke override and restore the inherited appearance.
+    pub fn reset_slide_shape_stroke(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let source = shape_graph(self, slide_index, drawable_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = reset_shape_stroke(&mut staged, &source.archive_name, drawable_object_id)?;
+        if changed {
+            *self = Self::from_package(staged)?;
+        }
+        Ok(changed)
     }
 
     /// Move or resize one native straight line by replacing its endpoints.
@@ -827,7 +892,8 @@ mod tests {
     use super::*;
     use crate::keynote::KeynoteDocumentBuilder;
     use crate::shapes::{
-        ShapeCornerRadius, ShapePolygonSides, ShapeStarInnerRatio, ShapeStarPoints,
+        LineEndpoint, RgbColorSpace, RgbaColor, ShapeCornerRadius, ShapePolygonSides,
+        ShapeStarInnerRatio, ShapeStarPoints, StrokePattern, StrokeWidth,
     };
 
     const POSITION: DrawablePoint = DrawablePoint { x: 320.0, y: 240.0 };
@@ -980,9 +1046,60 @@ mod tests {
     }
 
     #[test]
-    fn scratch_presentation_supports_typed_line_endpoint_crud() {
-        use crate::shapes::{LineEndpoint, LineEndpoints};
+    fn scratch_presentation_supports_typed_shape_stroke_crud() {
+        let mut editor = KeynoteDocumentBuilder::new()
+            .title("Stroke")
+            .subtitle("Typed native style")
+            .build()
+            .unwrap();
+        let stroke = ShapeStroke::new(
+            RgbaColor::new(0.95, 0.45, 0.05, 0.85, RgbColorSpace::DisplayP3).unwrap(),
+            StrokeWidth::new(5.0).unwrap(),
+            StrokePattern::ShortDash,
+        );
+        let endpoints = LineEndpoints::new(LineEndpoint::FilledDiamond, LineEndpoint::SimpleArrow);
+        let created = editor
+            .add_slide_line_with_style(
+                0,
+                LINE_START,
+                LINE_END,
+                LineStyle::new(stroke).with_endpoints(endpoints),
+            )
+            .unwrap();
+        let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .slide_shape_stroke(0, created.drawable_object_id)
+                .unwrap(),
+            Some(stroke)
+        );
+        assert_eq!(
+            reopened
+                .slide_line_endpoints(0, created.drawable_object_id)
+                .unwrap(),
+            endpoints
+        );
+        assert!(
+            reopened
+                .reset_slide_shape_stroke(0, created.drawable_object_id)
+                .unwrap()
+        );
+        assert_eq!(
+            reopened
+                .slide_shape_stroke(0, created.drawable_object_id)
+                .unwrap(),
+            None
+        );
+        assert_eq!(
+            reopened
+                .slide_line_endpoints(0, created.drawable_object_id)
+                .unwrap(),
+            endpoints
+        );
+    }
 
+    #[test]
+    fn scratch_presentation_supports_typed_line_endpoint_crud() {
         let mut editor = KeynoteDocumentBuilder::new()
             .title("Endpoint styles")
             .subtitle("Built from native line-end paths")

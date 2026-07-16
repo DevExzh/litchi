@@ -3,7 +3,10 @@
 use std::env;
 
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
-use litchi_iwa::shapes::{DrawablePoint, LineEndpoint, LineEndpoints};
+use litchi_iwa::shapes::{
+    DrawablePoint, LineEndpoint, LineEndpoints, LineStyle, RgbColorSpace, RgbaColor, ShapeStroke,
+    StrokePattern, StrokeWidth,
+};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -18,14 +21,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .title("Created from scratch")
         .subtitle("Line built from typed IWA objects")
         .build()?;
-    let created = editor.add_slide_line_with_endpoints(
+    let stroke = ShapeStroke::new(
+        RgbaColor::new(0.95, 0.45, 0.05, 1.0, RgbColorSpace::DisplayP3)?,
+        StrokeWidth::new(5.0)?,
+        StrokePattern::LongDash,
+    );
+    let created = editor.add_slide_line_with_style(
         0,
         DrawablePoint { x: 720.0, y: 660.0 },
         DrawablePoint {
             x: 1_200.0,
             y: 900.0,
         },
-        LineEndpoints::new(LineEndpoint::OpenSquare, LineEndpoint::FilledDiamond),
+        LineStyle::new(stroke).with_endpoints(LineEndpoints::new(
+            LineEndpoint::OpenSquare,
+            LineEndpoint::FilledDiamond,
+        )),
     )?;
     editor.set_slide_line_segment(
         0,
@@ -35,9 +46,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     let segment = editor.slide_line_segment(0, created.drawable_object_id)?;
     let endpoints = editor.slide_line_endpoints(0, created.drawable_object_id)?;
+    let stroke = editor.slide_shape_stroke(0, created.drawable_object_id)?;
     editor.save(output)?;
     println!(
-        "created Keynote line {} from {:?} to {:?}, endpoints {endpoints:?}",
+        "created Keynote line {} from {:?} to {:?}, stroke {stroke:?}, endpoints {endpoints:?}",
         created.drawable_object_id,
         segment.start(),
         segment.end()

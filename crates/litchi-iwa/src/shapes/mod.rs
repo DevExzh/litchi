@@ -12,6 +12,7 @@ mod line;
 mod line_end;
 mod path;
 mod properties;
+mod stroke;
 pub mod text_extractor;
 
 pub use geometry::{DrawableGeometry, DrawablePoint, DrawableSize};
@@ -32,4 +33,9 @@ pub use path::{
 pub(crate) use path::{set_shape_preset, shape_path_kind, shape_path_source, shape_preset};
 pub use properties::DrawableProperties;
 pub(crate) use properties::{set_shape_properties, shape_properties};
+pub use stroke::{
+    LineStyle, RgbColorSpace, RgbaColor, ShapeStroke, StrokeCap, StrokeJoin, StrokeMiterLimit,
+    StrokePattern, StrokeWidth,
+};
+pub(crate) use stroke::{reset_shape_stroke, set_shape_stroke, shape_stroke};
 pub use text_extractor::ShapeTextExtractor;

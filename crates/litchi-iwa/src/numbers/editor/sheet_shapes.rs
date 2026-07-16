@@ -6,9 +6,10 @@ use std::ops::Range;
 use super::*;
 use crate::shapes::{
     DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, LineEndpoints, LineSegment,
-    ShapePathKind, ShapePreset, line_geometry, line_path_source, line_segments_match,
-    set_shape_geometry, set_shape_line_endpoints, set_shape_line_segment, set_shape_preset,
-    shape_line_endpoints, shape_line_segment, shape_path_kind, shape_path_source, shape_preset,
+    LineStyle, ShapePathKind, ShapePreset, ShapeStroke, line_geometry, line_path_source,
+    line_segments_match, reset_shape_stroke, set_shape_geometry, set_shape_line_endpoints,
+    set_shape_line_segment, set_shape_preset, set_shape_stroke, shape_line_endpoints,
+    shape_line_segment, shape_path_kind, shape_path_source, shape_preset, shape_stroke,
 };
 
 use super::text_box_create::{
@@ -130,6 +131,20 @@ impl NumbersEditor {
     ) -> Result<NumbersSheetShapeInfo> {
         let created = self.add_sheet_line(sheet_id, start, end)?;
         self.set_sheet_line_endpoints(sheet_id, created.drawable_object_id, endpoints)?;
+        Ok(shape_graph(self, sheet_id, created.drawable_object_id)?.info)
+    }
+
+    /// Add a native straight line with a typed stroke and endpoint appearance.
+    pub fn add_sheet_line_with_style(
+        &mut self,
+        sheet_id: u64,
+        start: DrawablePoint,
+        end: DrawablePoint,
+        style: LineStyle,
+    ) -> Result<NumbersSheetShapeInfo> {
+        let created = self.add_sheet_line(sheet_id, start, end)?;
+        self.set_sheet_shape_stroke(sheet_id, created.drawable_object_id, style.stroke)?;
+        self.set_sheet_line_endpoints(sheet_id, created.drawable_object_id, style.endpoints)?;
         Ok(shape_graph(self, sheet_id, created.drawable_object_id)?.info)
     }
 
@@ -307,6 +322,56 @@ impl NumbersEditor {
         }
         self.set_sheet_line_endpoints(sheet_id, drawable_object_id, LineEndpoints::default())?;
         Ok(true)
+    }
+
+    /// Read the effective standard stroke of one ordinary sheet shape.
+    pub fn sheet_shape_stroke(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<Option<ShapeStroke>> {
+        let source = shape_graph(self, sheet_id, drawable_object_id)?;
+        shape_stroke(&self.package, &source.archive_name, drawable_object_id)
+    }
+
+    /// Replace one shape's stroke transactionally, using copy-on-write for shared styles.
+    pub fn set_sheet_shape_stroke(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        stroke: ShapeStroke,
+    ) -> Result<()> {
+        let source = shape_graph(self, sheet_id, drawable_object_id)?;
+        let mut staged = self.package.clone();
+        set_shape_stroke(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            stroke,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.sheet_shape_stroke(sheet_id, drawable_object_id)? != Some(stroke) {
+            return Err(Error::InvalidFormat(
+                "Numbers shape stroke update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove a direct stroke override and restore the inherited appearance.
+    pub fn reset_sheet_shape_stroke(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let source = shape_graph(self, sheet_id, drawable_object_id)?;
+        let mut staged = self.package.clone();
+        let changed = reset_shape_stroke(&mut staged, &source.archive_name, drawable_object_id)?;
+        if changed {
+            *self = Self::from_package(staged)?;
+        }
+        Ok(changed)
     }
 
     /// Move or resize one native straight line by replacing its endpoints.
@@ -885,7 +950,9 @@ fn shape_info(
 mod tests {
     use super::*;
     use crate::numbers::NumbersDocumentBuilder;
-    use crate::shapes::ShapeCornerRadius;
+    use crate::shapes::{
+        LineEndpoint, RgbColorSpace, RgbaColor, ShapeCornerRadius, StrokePattern, StrokeWidth,
+    };
 
     const POSITION: DrawablePoint = DrawablePoint { x: 420.0, y: 300.0 };
     const SIZE: DrawableSize = DrawableSize {
@@ -1029,6 +1096,60 @@ mod tests {
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), before_cross_type);
+    }
+
+    #[test]
+    fn scratch_spreadsheet_supports_typed_shape_stroke_crud() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .sheet_name("Stroke")
+            .table_name("Data")
+            .build()
+            .unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let stroke = ShapeStroke::new(
+            RgbaColor::new(0.15, 0.55, 0.85, 1.0, RgbColorSpace::Srgb).unwrap(),
+            StrokeWidth::new(4.0).unwrap(),
+            StrokePattern::RoundedDash,
+        );
+        let endpoints = LineEndpoints::new(LineEndpoint::FilledCircle, LineEndpoint::OpenArrow);
+        let created = editor
+            .add_sheet_line_with_style(
+                sheet_id,
+                LINE_START,
+                LINE_END,
+                LineStyle::new(stroke).with_endpoints(endpoints),
+            )
+            .unwrap();
+        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .sheet_shape_stroke(sheet_id, created.drawable_object_id)
+                .unwrap(),
+            Some(stroke)
+        );
+        assert_eq!(
+            reopened
+                .sheet_line_endpoints(sheet_id, created.drawable_object_id)
+                .unwrap(),
+            endpoints
+        );
+        assert!(
+            reopened
+                .reset_sheet_shape_stroke(sheet_id, created.drawable_object_id)
+                .unwrap()
+        );
+        assert_eq!(
+            reopened
+                .sheet_shape_stroke(sheet_id, created.drawable_object_id)
+                .unwrap(),
+            None
+        );
+        assert_eq!(
+            reopened
+                .sheet_line_endpoints(sheet_id, created.drawable_object_id)
+                .unwrap(),
+            endpoints
+        );
     }
 
     #[test]

@@ -9,9 +9,10 @@ use crate::package_metadata::{
 };
 use crate::shapes::{
     DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, LineEndpoints, LineSegment,
-    ShapePathKind, ShapePreset, line_geometry, line_path_source, line_segments_match,
-    set_shape_geometry, set_shape_line_endpoints, set_shape_line_segment, set_shape_preset,
-    shape_line_endpoints, shape_path_source,
+    LineStyle, ShapePathKind, ShapePreset, ShapeStroke, line_geometry, line_path_source,
+    line_segments_match, reset_shape_stroke, set_shape_geometry, set_shape_line_endpoints,
+    set_shape_line_segment, set_shape_preset, set_shape_stroke, shape_line_endpoints,
+    shape_path_source, shape_stroke,
 };
 
 use super::text_box_create::{
@@ -132,6 +133,20 @@ impl PagesEditor {
     ) -> Result<PagesBodyShapeInfo> {
         let created = self.add_body_line(anchor_character_index, start, end)?;
         self.set_body_line_endpoints(created.drawable_object_id, endpoints)?;
+        Ok(body_shape_graph(self, created.drawable_object_id)?.info)
+    }
+
+    /// Add a native straight line with a typed stroke and endpoint appearance.
+    pub fn add_body_line_with_style(
+        &mut self,
+        anchor_character_index: usize,
+        start: DrawablePoint,
+        end: DrawablePoint,
+        style: LineStyle,
+    ) -> Result<PagesBodyShapeInfo> {
+        let created = self.add_body_line(anchor_character_index, start, end)?;
+        self.set_body_shape_stroke(created.drawable_object_id, style.stroke)?;
+        self.set_body_line_endpoints(created.drawable_object_id, style.endpoints)?;
         Ok(body_shape_graph(self, created.drawable_object_id)?.info)
     }
 
@@ -306,6 +321,47 @@ impl PagesEditor {
         }
         self.set_body_line_endpoints(drawable_object_id, LineEndpoints::default())?;
         Ok(true)
+    }
+
+    /// Read the effective standard stroke of one ordinary body shape.
+    pub fn body_shape_stroke(&self, drawable_object_id: u64) -> Result<Option<ShapeStroke>> {
+        let source = body_shape_graph(self, drawable_object_id)?;
+        shape_stroke(self.package(), &source.archive_name, drawable_object_id)
+    }
+
+    /// Replace one shape's stroke transactionally, using copy-on-write for shared styles.
+    pub fn set_body_shape_stroke(
+        &mut self,
+        drawable_object_id: u64,
+        stroke: ShapeStroke,
+    ) -> Result<()> {
+        let source = body_shape_graph(self, drawable_object_id)?;
+        let mut staged = self.package().clone();
+        set_shape_stroke(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            stroke,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.body_shape_stroke(drawable_object_id)? != Some(stroke) {
+            return Err(Error::InvalidFormat(
+                "Pages shape stroke update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove a direct stroke override and restore the inherited appearance.
+    pub fn reset_body_shape_stroke(&mut self, drawable_object_id: u64) -> Result<bool> {
+        let source = body_shape_graph(self, drawable_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = reset_shape_stroke(&mut staged, &source.archive_name, drawable_object_id)?;
+        if changed {
+            *self = Self::from_package(staged)?;
+        }
+        Ok(changed)
     }
 
     /// Move or resize one native straight line by replacing its endpoints.
@@ -521,7 +577,9 @@ impl PagesEditor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::shapes::ShapeCornerRadius;
+    use crate::shapes::{
+        LineEndpoint, RgbColorSpace, RgbaColor, ShapeCornerRadius, StrokePattern, StrokeWidth,
+    };
 
     const POSITION: DrawablePoint = DrawablePoint { x: 180.0, y: 240.0 };
     const SIZE: DrawableSize = DrawableSize {
@@ -569,12 +627,31 @@ mod tests {
         editor
             .set_body_shape_properties(created.drawable_object_id, properties.clone())
             .unwrap();
+        let rectangle_stroke = ShapeStroke::new(
+            RgbaColor::new(0.2, 0.7, 0.3, 1.0, RgbColorSpace::Srgb).unwrap(),
+            StrokeWidth::new(2.0).unwrap(),
+            StrokePattern::Solid,
+        );
+        editor
+            .set_body_shape_stroke(created.drawable_object_id, rectangle_stroke)
+            .unwrap();
 
         let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         let shape = &reopened.body_shapes().unwrap()[0];
         assert_eq!(shape.storage.text, "Made from typed objects");
         assert_eq!(shape.geometry, geometry);
         assert_eq!(shape.properties, properties);
+        assert_eq!(
+            reopened
+                .body_shape_stroke(created.drawable_object_id)
+                .unwrap(),
+            Some(rectangle_stroke)
+        );
+        assert!(
+            editor
+                .reset_body_shape_stroke(created.drawable_object_id)
+                .unwrap()
+        );
 
         let mut package = editor.into_package();
         let root = root_document(&package).unwrap();
@@ -667,9 +744,116 @@ mod tests {
     }
 
     #[test]
-    fn scratch_document_supports_typed_line_endpoint_crud() {
-        use crate::shapes::{LineEndpoint, LineEndpoints};
+    fn scratch_document_supports_typed_shape_stroke_crud() {
+        let mut editor = PagesEditor::create_with_text("Body").unwrap();
+        let stroke = ShapeStroke::new(
+            RgbaColor::new(0.8, 0.1, 0.2, 0.9, RgbColorSpace::DisplayP3).unwrap(),
+            StrokeWidth::new(3.5).unwrap(),
+            StrokePattern::MediumDash,
+        );
+        let endpoints = LineEndpoints::new(LineEndpoint::OpenCircle, LineEndpoint::FilledArrow);
+        let created = editor
+            .add_body_line_with_style(
+                4,
+                LINE_START,
+                LINE_END,
+                LineStyle::new(stroke).with_endpoints(endpoints),
+            )
+            .unwrap();
+        assert_eq!(
+            editor
+                .body_shape_stroke(created.drawable_object_id)
+                .unwrap(),
+            Some(stroke)
+        );
+        assert_eq!(
+            editor
+                .body_line_endpoints(created.drawable_object_id)
+                .unwrap(),
+            endpoints
+        );
+        let object_count = editor
+            .package()
+            .iwa_entry_names()
+            .map(|name| editor.package().archive(name).unwrap().objects.len())
+            .sum::<usize>();
 
+        let replacement = ShapeStroke::new(
+            RgbaColor::new(0.1, 0.3, 0.9, 1.0, RgbColorSpace::Srgb).unwrap(),
+            StrokeWidth::new(2.25).unwrap(),
+            StrokePattern::LongDash,
+        );
+        editor
+            .set_body_shape_stroke(created.drawable_object_id, replacement)
+            .unwrap();
+        assert_eq!(
+            editor
+                .body_shape_stroke(created.drawable_object_id)
+                .unwrap(),
+            Some(replacement)
+        );
+        assert_eq!(
+            editor
+                .body_line_endpoints(created.drawable_object_id)
+                .unwrap(),
+            endpoints
+        );
+        assert_eq!(
+            editor
+                .package()
+                .iwa_entry_names()
+                .map(|name| editor.package().archive(name).unwrap().objects.len())
+                .sum::<usize>(),
+            object_count
+        );
+        assert!(
+            editor
+                .reset_body_line_endpoints(created.drawable_object_id)
+                .unwrap()
+        );
+        assert_eq!(
+            editor
+                .body_shape_stroke(created.drawable_object_id)
+                .unwrap(),
+            Some(replacement)
+        );
+        editor
+            .set_body_line_endpoints(created.drawable_object_id, endpoints)
+            .unwrap();
+
+        let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .body_shape_stroke(created.drawable_object_id)
+                .unwrap(),
+            Some(replacement)
+        );
+        assert!(
+            reopened
+                .reset_body_shape_stroke(created.drawable_object_id)
+                .unwrap()
+        );
+        assert_eq!(
+            reopened
+                .body_shape_stroke(created.drawable_object_id)
+                .unwrap(),
+            None
+        );
+        assert_eq!(
+            reopened
+                .body_line_endpoints(created.drawable_object_id)
+                .unwrap(),
+            endpoints
+        );
+        assert!(
+            !reopened
+                .reset_body_shape_stroke(created.drawable_object_id)
+                .unwrap()
+        );
+    }
+
+    #[test]
+    fn scratch_document_supports_typed_line_endpoint_crud() {
         let mut editor = PagesEditor::create_with_text("Body").unwrap();
         let created = editor
             .add_body_line_with_endpoints(

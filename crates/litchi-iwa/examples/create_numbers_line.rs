@@ -3,7 +3,10 @@
 use std::env;
 
 use litchi_iwa::numbers::NumbersDocumentBuilder;
-use litchi_iwa::shapes::{DrawablePoint, LineEndpoint, LineEndpoints};
+use litchi_iwa::shapes::{
+    DrawablePoint, LineEndpoint, LineEndpoints, LineStyle, RgbColorSpace, RgbaColor, ShapeStroke,
+    StrokePattern, StrokeWidth,
+};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -19,11 +22,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .table_name("Source Data")
         .build()?;
     let sheet_id = editor.sheets()?[0].object_id;
-    let created = editor.add_sheet_line_with_endpoints(
+    let stroke = ShapeStroke::new(
+        RgbaColor::new(0.1, 0.45, 0.9, 1.0, RgbColorSpace::Srgb)?,
+        StrokeWidth::new(4.0)?,
+        StrokePattern::RoundedDash,
+    );
+    let created = editor.add_sheet_line_with_style(
         sheet_id,
         DrawablePoint { x: 420.0, y: 300.0 },
         DrawablePoint { x: 720.0, y: 450.0 },
-        LineEndpoints::new(LineEndpoint::FilledCircle, LineEndpoint::SimpleArrow),
+        LineStyle::new(stroke).with_endpoints(LineEndpoints::new(
+            LineEndpoint::FilledCircle,
+            LineEndpoint::SimpleArrow,
+        )),
     )?;
     editor.set_sheet_line_segment(
         sheet_id,
@@ -33,9 +44,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     let segment = editor.sheet_line_segment(sheet_id, created.drawable_object_id)?;
     let endpoints = editor.sheet_line_endpoints(sheet_id, created.drawable_object_id)?;
+    let stroke = editor.sheet_shape_stroke(sheet_id, created.drawable_object_id)?;
     editor.save(output)?;
     println!(
-        "created Numbers line {} from {:?} to {:?}, endpoints {endpoints:?}, on sheet {}",
+        "created Numbers line {} from {:?} to {:?}, stroke {stroke:?}, endpoints {endpoints:?}, on sheet {}",
         created.drawable_object_id,
         segment.start(),
         segment.end(),

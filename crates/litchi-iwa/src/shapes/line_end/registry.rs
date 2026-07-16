@@ -16,7 +16,6 @@ use crate::wire::{
 };
 use crate::{Error, IWorkPackage, Result};
 
-use super::native::endpoint_archive;
 use super::{
     LineEndpoint, LineEndpoints, SHAPE_INFO_MESSAGE_TYPE, SHAPE_STYLE_MESSAGE_TYPE, reference,
     shape_line_endpoints,
@@ -24,13 +23,13 @@ use super::{
 
 const STYLESHEET_MESSAGE_TYPE: u32 = 401;
 const STANDARD_MESSAGE_VERSION: [u32; 3] = [1, 0, 5];
-const LINE_END_OVERRIDE_COUNT: u32 = 2;
 const STYLE_SUPER_FIELD: u32 = 1;
 const STYLE_OVERRIDE_COUNT_FIELD: u32 = 10;
 const STYLE_PROPERTIES_FIELD: u32 = 11;
 const TSS_STYLE_PARENT_FIELD: u32 = 3;
 const TSS_STYLE_VARIATION_FIELD: u32 = 4;
 const TSS_STYLE_STYLESHEET_FIELD: u32 = 5;
+const TSD_STROKE_FIELD: u32 = 2;
 const TSD_HEAD_LINE_END_FIELD: u32 = 6;
 const TSD_TAIL_LINE_END_FIELD: u32 = 7;
 const SHAPE_INFO_SUPER_FIELD: u32 = 1;
@@ -40,33 +39,64 @@ const STYLESHEET_STYLES_FIELD: u32 = 1;
 const STYLESHEET_PARENT_CHILDREN_FIELD: u32 = 5;
 const STYLE_CHILDREN_FIELD: u32 = 2;
 
-pub(super) fn is_collapsible_line_end_variation(
+#[derive(Debug, Clone, Default)]
+pub(crate) struct ShapeStyleOverrides {
+    pub(crate) stroke: Option<tsd::StrokeArchive>,
+    pub(crate) head_line_end: Option<tsd::LineEndArchive>,
+    pub(crate) tail_line_end: Option<tsd::LineEndArchive>,
+}
+
+impl ShapeStyleOverrides {
+    fn override_count(&self) -> u32 {
+        u32::from(self.stroke.is_some())
+            + u32::from(self.head_line_end.is_some())
+            + u32::from(self.tail_line_end.is_some())
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.override_count() == 0
+    }
+}
+
+/// Return the direct overrides when this is a minimal variation owned by us.
+///
+/// Exact protobuf-field checks deliberately reject richer native styles so a
+/// copy-on-write update can never discard properties that this crate does not
+/// understand yet.
+pub(crate) fn direct_shape_style_overrides(
     style: &tswp::ShapeStyleArchive,
     raw: &[u8],
-) -> Result<bool> {
+) -> Result<Option<ShapeStyleOverrides>> {
     let Some(properties) = style.super_.shape_properties.as_ref() else {
-        return Ok(false);
+        return Ok(None);
     };
-    let semantic = style.override_count == Some(LINE_END_OVERRIDE_COUNT)
+    let overrides = ShapeStyleOverrides {
+        stroke: properties.stroke.clone(),
+        head_line_end: properties.head_line_end.clone(),
+        tail_line_end: properties.tail_line_end.clone(),
+    };
+    let override_count = overrides.override_count();
+    let endpoints_are_paired =
+        overrides.head_line_end.is_some() == overrides.tail_line_end.is_some();
+    let semantic = override_count > 0
+        && endpoints_are_paired
+        && style.override_count == Some(override_count)
         && style
             .shape_properties
             .as_ref()
             .is_some_and(|properties| properties == &Default::default())
-        && style.super_.override_count == Some(LINE_END_OVERRIDE_COUNT)
+        && style.super_.override_count == Some(override_count)
         && properties.fill.is_none()
-        && properties.stroke.is_none()
         && properties.opacity.is_none()
         && properties.shadow.is_none()
         && properties.reflection.is_none()
-        && properties.head_line_end.is_some()
-        && properties.tail_line_end.is_some()
         && style.super_.super_.name.is_none()
         && style.super_.super_.style_identifier.is_none()
         && style.super_.super_.parent.is_some()
         && style.super_.super_.is_variation == Some(true)
         && style.super_.super_.stylesheet.is_some();
     if !semantic {
-        return Ok(false);
+        return Ok(None);
     }
 
     let tsd_raw = required_length_delimited_payload(raw, STYLE_SUPER_FIELD, "iWork shape style")?;
@@ -82,7 +112,17 @@ pub(super) fn is_collapsible_line_end_variation(
         STYLE_PROPERTIES_FIELD,
         "iWork text shape properties",
     )?;
-    Ok(has_exact_fields(
+    let mut property_fields = Vec::with_capacity(3);
+    if overrides.stroke.is_some() {
+        property_fields.push(TSD_STROKE_FIELD);
+    }
+    if overrides.head_line_end.is_some() {
+        property_fields.push(TSD_HEAD_LINE_END_FIELD);
+    }
+    if overrides.tail_line_end.is_some() {
+        property_fields.push(TSD_TAIL_LINE_END_FIELD);
+    }
+    let exact = has_exact_fields(
         raw,
         &[
             STYLE_SUPER_FIELD,
@@ -103,10 +143,9 @@ pub(super) fn is_collapsible_line_end_variation(
             TSS_STYLE_VARIATION_FIELD,
             TSS_STYLE_STYLESHEET_FIELD,
         ],
-    )? && has_exact_fields(
-        tsd_properties,
-        &[TSD_HEAD_LINE_END_FIELD, TSD_TAIL_LINE_END_FIELD],
-    )? && has_exact_fields(tswp_properties, &[])?)
+    )? && has_exact_fields(tsd_properties, &property_fields)?
+        && has_exact_fields(tswp_properties, &[])?;
+    Ok(exact.then_some(overrides))
 }
 
 fn has_exact_fields(data: &[u8], expected: &[u32]) -> Result<bool> {
@@ -134,7 +173,7 @@ fn required_length_delimited_payload<'a>(
     Ok(payload)
 }
 
-pub(super) fn line_style_is_exclusive(package: &IWorkPackage, style_id: u64) -> Result<bool> {
+pub(crate) fn shape_style_is_exclusive(package: &IWorkPackage, style_id: u64) -> Result<bool> {
     let mut shape_count = 0usize;
     for archive_name in package.iwa_entry_names() {
         for object in package.archive(archive_name)?.objects {
@@ -171,7 +210,7 @@ pub(super) fn line_style_is_exclusive(package: &IWorkPackage, style_id: u64) -> 
     Ok(shape_count == 1)
 }
 
-pub(super) fn endpoint_from_archive(
+pub(crate) fn endpoint_from_archive(
     endpoint: Option<&tsd::LineEndArchive>,
 ) -> Result<LineEndpoint> {
     let Some(endpoint) = endpoint else {
@@ -195,12 +234,18 @@ pub(super) fn endpoint_from_archive(
     }
 }
 
-pub(super) fn line_style_object(
+pub(crate) fn shape_style_variation_object(
     identifier: u64,
     parent_style_id: u64,
     stylesheet_id: u64,
-    endpoints: LineEndpoints,
+    overrides: ShapeStyleOverrides,
 ) -> Result<ArchiveObject> {
+    let override_count = overrides.override_count();
+    if override_count == 0 {
+        return Err(Error::InvalidFormat(
+            "an iWork shape-style variation must contain at least one override".to_owned(),
+        ));
+    }
     let data = tswp::ShapeStyleArchive {
         super_: tsd::ShapeStyleArchive {
             super_: tss::StyleArchive {
@@ -209,14 +254,15 @@ pub(super) fn line_style_object(
                 stylesheet: Some(reference(stylesheet_id)),
                 ..Default::default()
             },
-            override_count: Some(LINE_END_OVERRIDE_COUNT),
+            override_count: Some(override_count),
             shape_properties: Some(tsd::ShapeStylePropertiesArchive {
-                head_line_end: Some(endpoint_archive(endpoints.end)),
-                tail_line_end: Some(endpoint_archive(endpoints.start)),
+                stroke: overrides.stroke,
+                head_line_end: overrides.head_line_end,
+                tail_line_end: overrides.tail_line_end,
                 ..Default::default()
             }),
         },
-        override_count: Some(LINE_END_OVERRIDE_COUNT),
+        override_count: Some(override_count),
         shape_properties: Some(tswp::ShapeStylePropertiesArchive::default()),
     }
     .encode_to_vec();
@@ -235,7 +281,7 @@ pub(super) fn line_style_object(
     Ok(object)
 }
 
-pub(super) fn patch_shape_style_reference(
+pub(crate) fn patch_shape_style_reference(
     package: &mut IWorkPackage,
     archive_name: &str,
     drawable_id: u64,
@@ -302,7 +348,7 @@ pub(super) fn patch_shape_style_reference(
     })
 }
 
-pub(super) fn insert_style_variation(
+pub(crate) fn insert_style_variation(
     package: &mut IWorkPackage,
     archive_name: &str,
     stylesheet_id: u64,
@@ -347,7 +393,7 @@ pub(super) fn insert_style_variation(
     })
 }
 
-pub(super) fn replace_style_variation(
+pub(crate) fn replace_style_variation(
     package: &mut IWorkPackage,
     archive_name: &str,
     style_id: u64,
@@ -383,20 +429,39 @@ pub(super) fn replace_style_variation(
     })
 }
 
-pub(super) struct LineEndVariationLocation<'a> {
-    pub(super) drawable_archive_name: &'a str,
-    pub(super) style_archive_name: &'a str,
-    pub(super) drawable_id: u64,
-    pub(super) stylesheet_id: u64,
-    pub(super) style_id: u64,
-    pub(super) parent_style_id: u64,
+pub(crate) struct ShapeStyleVariationLocation<'a> {
+    pub(crate) drawable_archive_name: &'a str,
+    pub(crate) style_archive_name: &'a str,
+    pub(crate) drawable_id: u64,
+    pub(crate) stylesheet_id: u64,
+    pub(crate) style_id: u64,
+    pub(crate) parent_style_id: u64,
 }
 
-pub(super) fn collapse_line_end_variation(
+pub(crate) fn collapse_line_end_variation(
     package: &mut IWorkPackage,
-    location: LineEndVariationLocation<'_>,
+    location: ShapeStyleVariationLocation<'_>,
 ) -> Result<()> {
-    let LineEndVariationLocation {
+    let drawable_archive_name = location.drawable_archive_name.to_owned();
+    let drawable_id = location.drawable_id;
+    let mut staged = package.clone();
+    collapse_style_variation(&mut staged, location)?;
+    if shape_line_endpoints(&staged, &drawable_archive_name, drawable_id)?
+        != LineEndpoints::default()
+    {
+        return Err(Error::InvalidFormat(
+            "iWork line endpoint-style reset failed validation".to_owned(),
+        ));
+    }
+    *package = staged;
+    Ok(())
+}
+
+pub(crate) fn collapse_style_variation(
+    package: &mut IWorkPackage,
+    location: ShapeStyleVariationLocation<'_>,
+) -> Result<()> {
+    let ShapeStyleVariationLocation {
         drawable_archive_name,
         style_archive_name,
         drawable_id,
@@ -435,13 +500,6 @@ pub(super) fn collapse_line_end_variation(
         }
     }
     release_package_identifier_suffix(&mut staged, &[style_id])?;
-    if shape_line_endpoints(&staged, drawable_archive_name, drawable_id)?
-        != LineEndpoints::default()
-    {
-        return Err(Error::InvalidFormat(
-            "iWork line endpoint-style reset failed validation".to_owned(),
-        ));
-    }
     *package = staged;
     Ok(())
 }
