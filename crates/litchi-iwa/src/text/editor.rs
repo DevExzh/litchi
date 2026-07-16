@@ -17,6 +17,10 @@ use crate::wire::{
 };
 use crate::{Error, IWorkPackage, Result};
 
+use super::drop_cap::{
+    ParagraphDropCap, ParagraphDropCapPlacement, ParagraphStart, paragraph_drop_cap,
+    paragraph_drop_caps, remove_paragraph_drop_cap, set_paragraph_drop_cap,
+};
 use super::paragraph_alignment::{
     paragraph_alignment, paragraph_indents, paragraph_line_spacing, paragraph_spacing,
     paragraph_tab_stops, reset_paragraph_alignment, reset_paragraph_indents,
@@ -325,6 +329,61 @@ impl IWorkTextEditor {
         if changed {
             let bytes = staged.to_bytes()?;
             IWorkPackage::from_bytes(&bytes)?;
+            self.package = staged;
+        }
+        Ok(changed)
+    }
+
+    /// List plain-text Drop Caps in paragraph-start order.
+    pub fn paragraph_drop_caps(&self, object_id: u64) -> Result<Vec<ParagraphDropCapPlacement>> {
+        paragraph_drop_caps(&self.package, object_id)
+    }
+
+    /// Read the Drop Cap attached to one typed paragraph start.
+    pub fn paragraph_drop_cap(
+        &self,
+        object_id: u64,
+        paragraph_start: ParagraphStart,
+    ) -> Result<Option<ParagraphDropCap>> {
+        paragraph_drop_cap(&self.package, object_id, paragraph_start)
+    }
+
+    /// Atomically create or replace a plain-text Drop Cap.
+    pub fn set_paragraph_drop_cap(
+        &mut self,
+        object_id: u64,
+        paragraph_start: ParagraphStart,
+        drop_cap: ParagraphDropCap,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        set_paragraph_drop_cap(&mut staged, object_id, paragraph_start, drop_cap)?;
+        let bytes = staged.to_bytes()?;
+        let verified = IWorkPackage::from_bytes(&bytes)?;
+        if paragraph_drop_cap(&verified, object_id, paragraph_start)? != Some(drop_cap) {
+            return Err(Error::InvalidFormat(
+                "iWork Drop Cap update failed round-trip validation".to_owned(),
+            ));
+        }
+        self.package = staged;
+        Ok(())
+    }
+
+    /// Atomically remove a Drop Cap while retaining its paragraph boundary.
+    pub fn remove_paragraph_drop_cap(
+        &mut self,
+        object_id: u64,
+        paragraph_start: ParagraphStart,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = remove_paragraph_drop_cap(&mut staged, object_id, paragraph_start)?;
+        if changed {
+            let bytes = staged.to_bytes()?;
+            let verified = IWorkPackage::from_bytes(&bytes)?;
+            if paragraph_drop_cap(&verified, object_id, paragraph_start)?.is_some() {
+                return Err(Error::InvalidFormat(
+                    "iWork Drop Cap removal failed round-trip validation".to_owned(),
+                ));
+            }
             self.package = staged;
         }
         Ok(changed)

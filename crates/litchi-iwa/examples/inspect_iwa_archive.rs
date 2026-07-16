@@ -18,8 +18,8 @@ use litchi_iwa::protobuf::tss::StylesheetArchive;
 use litchi_iwa::protobuf::tst::TableDataList;
 use litchi_iwa::protobuf::tst::{TableInfoArchive, TableModelArchive};
 use litchi_iwa::protobuf::tswp::{
-    CharacterStyleArchive, ColumnStyleArchive, ListStyleArchive, ParagraphStyleArchive,
-    ShapeInfoArchive, ShapeStyleArchive, StorageArchive,
+    CharacterStyleArchive, ColumnStyleArchive, DropCapStyleArchive, ListStyleArchive,
+    ParagraphStyleArchive, ShapeInfoArchive, ShapeStyleArchive, StorageArchive,
 };
 use prost::Message;
 
@@ -272,6 +272,11 @@ fn print_archive(archive: litchi_iwa::archive::Archive, object_id: Option<u64>) 
                 && let Ok(style) = ShapeStyleArchive::decode(message.data.as_slice())
             {
                 println!("  shape_style={style:#?}");
+            }
+            if message.type_ == 10_024
+                && let Ok(style) = DropCapStyleArchive::decode(message.data.as_slice())
+            {
+                println!("  drop_cap_style={style:#?}");
             }
             if matches!(message.type_, 2_001 | 2_022)
                 && let Ok(storage) = StorageArchive::decode(message.data.as_slice())

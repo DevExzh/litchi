@@ -8,10 +8,11 @@ use litchi_iwa::shapes::{
     ShapeTextLayout, ShapeTextVerticalAlignment,
 };
 use litchi_iwa::text::{
-    ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingPoints,
-    ParagraphSpacing, ParagraphSpacingPoints, ParagraphTabAlignment, ParagraphTabLeader,
-    ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops, TextAlignment, TextColumnCount,
-    TextColumns,
+    DropCapCharacterCount, DropCapLineCount, DropCapOutdent, DropCapPadding, DropCapRaisedLines,
+    DropCapWrap, ParagraphDropCap, ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing,
+    ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, ParagraphStart,
+    ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
+    ParagraphTabStops, TextAlignment, TextColumnCount, TextColumns,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -90,6 +91,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             )
             .with_leader(ParagraphTabLeader::new(".")?),
         ])?,
+    )?;
+    editor.set_slide_text_box_paragraph_drop_cap(
+        0,
+        created.drawable_object_id,
+        ParagraphStart::ZERO,
+        ParagraphDropCap::new(DropCapLineCount::new(6)?, DropCapCharacterCount::new(2)?)
+            .with_raised_lines(DropCapRaisedLines::new(3)?)
+            .with_wrap(DropCapWrap::Contour)
+            .with_padding(DropCapPadding::from_points(8.0)?)
+            .with_outdent(DropCapOutdent::from_ratio(0.40)?),
     )?;
     editor.save(output)?;
     println!(

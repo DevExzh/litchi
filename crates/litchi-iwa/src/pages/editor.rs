@@ -29,8 +29,9 @@ use crate::shapes::{
     shape_geometry, shape_properties, shape_text_columns, shape_text_layout,
 };
 use crate::text::{
-    IWorkTextEditor, ParagraphIndents, ParagraphLineSpacing, ParagraphSpacing, ParagraphTabStops,
-    TextAlignment, TextColumns, TextStorageInfo,
+    IWorkTextEditor, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphIndents,
+    ParagraphLineSpacing, ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment,
+    TextColumns, TextStorageInfo,
 };
 use crate::wire::{
     append_repeated_length_delimited_field, patch_fixed32_field, patch_length_delimited_field,
@@ -540,6 +541,63 @@ impl PagesEditor {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
         let changed = staged.reset_paragraph_tab_stops(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// List every Drop Cap in an ordinary text box.
+    pub fn text_box_paragraph_drop_caps(
+        &self,
+        drawable_object_id: u64,
+    ) -> Result<Vec<ParagraphDropCapPlacement>> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        self.text.paragraph_drop_caps(graph.storage_id)
+    }
+
+    /// Read the Drop Cap attached to one text-box paragraph.
+    pub fn text_box_paragraph_drop_cap(
+        &self,
+        drawable_object_id: u64,
+        paragraph_start: ParagraphStart,
+    ) -> Result<Option<ParagraphDropCap>> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        self.text
+            .paragraph_drop_cap(graph.storage_id, paragraph_start)
+    }
+
+    /// Atomically create or replace a text-box Drop Cap.
+    pub fn set_text_box_paragraph_drop_cap(
+        &mut self,
+        drawable_object_id: u64,
+        paragraph_start: ParagraphStart,
+        drop_cap: ParagraphDropCap,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_paragraph_drop_cap(graph.storage_id, paragraph_start, drop_cap)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified.text_box_paragraph_drop_cap(drawable_object_id, paragraph_start)?
+            != Some(drop_cap)
+        {
+            return Err(Error::InvalidFormat(
+                "Pages text-box Drop Cap update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Atomically remove a text-box Drop Cap.
+    pub fn remove_text_box_paragraph_drop_cap(
+        &mut self,
+        drawable_object_id: u64,
+        paragraph_start: ParagraphStart,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.remove_paragraph_drop_cap(graph.storage_id, paragraph_start)?;
         if changed {
             *self = Self::from_package(staged.into_package())?;
         }

@@ -38,8 +38,9 @@ use crate::shapes::{
     set_shape_text_layout, shape_geometry, shape_properties, shape_text_columns, shape_text_layout,
 };
 use crate::text::{
-    IWorkTextEditor, ParagraphIndents, ParagraphLineSpacing, ParagraphSpacing, ParagraphTabStops,
-    TextAlignment, TextColumns, TextStorageInfo,
+    IWorkTextEditor, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphIndents,
+    ParagraphLineSpacing, ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment,
+    TextColumns, TextStorageInfo,
 };
 use crate::wire::{
     patch_length_delimited_field, patch_nested_fixed32_field, patch_nested_length_delimited_field,
@@ -803,6 +804,70 @@ impl NumbersEditor {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
         let changed = text.reset_paragraph_tab_stops(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(text.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// List every Drop Cap in a sheet-owned text box.
+    pub fn sheet_text_box_paragraph_drop_caps(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<Vec<ParagraphDropCapPlacement>> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        IWorkTextEditor::from_package(self.package.clone()).paragraph_drop_caps(graph.storage_id)
+    }
+
+    /// Read the Drop Cap attached to one text-box paragraph.
+    pub fn sheet_text_box_paragraph_drop_cap(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        paragraph_start: ParagraphStart,
+    ) -> Result<Option<ParagraphDropCap>> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        IWorkTextEditor::from_package(self.package.clone())
+            .paragraph_drop_cap(graph.storage_id, paragraph_start)
+    }
+
+    /// Atomically create or replace a text-box Drop Cap.
+    pub fn set_sheet_text_box_paragraph_drop_cap(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        paragraph_start: ParagraphStart,
+        drop_cap: ParagraphDropCap,
+    ) -> Result<()> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        text.set_paragraph_drop_cap(graph.storage_id, paragraph_start, drop_cap)?;
+        let verified = Self::from_package(text.into_package())?;
+        if verified.sheet_text_box_paragraph_drop_cap(
+            sheet_id,
+            drawable_object_id,
+            paragraph_start,
+        )? != Some(drop_cap)
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers text-box Drop Cap update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Atomically remove a text-box Drop Cap.
+    pub fn remove_sheet_text_box_paragraph_drop_cap(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        paragraph_start: ParagraphStart,
+    ) -> Result<bool> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let changed = text.remove_paragraph_drop_cap(graph.storage_id, paragraph_start)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
         }

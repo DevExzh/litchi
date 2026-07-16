@@ -49,7 +49,6 @@ pub(super) struct TextBoxThemeStyles {
     stylesheet: tsp::Reference,
     paragraph: Option<tsp::Reference>,
     list: Option<tsp::Reference>,
-    drop_cap: Option<tsp::Reference>,
 }
 
 impl TextBoxObjectIds {
@@ -226,7 +225,6 @@ pub(super) fn text_box_theme_styles(
         stylesheet: reference(stylesheet_id),
         paragraph: text.paragraph_style_presets.into_iter().next(),
         list: text.list_style_presets.into_iter().next(),
-        drop_cap: text.dropcap_style_presets.into_iter().next(),
     })
 }
 
@@ -259,9 +257,8 @@ pub(super) fn text_box_storage(
     let list_style = base
         .and_then(|storage| first_object_attribute(&storage.table_list_style))
         .or(styles.list);
-    let drop_cap_style = base
-        .and_then(|storage| first_object_attribute(&storage.table_drop_cap_style))
-        .or(styles.drop_cap);
+    let drop_cap_style =
+        base.and_then(|storage| first_object_attribute(&storage.table_drop_cap_style));
     let language = base
         .and_then(|storage| storage.table_language.as_ref())
         .and_then(|table| {

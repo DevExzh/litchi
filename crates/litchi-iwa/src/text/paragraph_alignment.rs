@@ -6,10 +6,7 @@ mod storage;
 use std::borrow::Cow;
 
 use crate::package_metadata::{
-    add_component_external_reference, add_component_object_uuids, component_identifier_for_entry,
-    next_object_identifier, release_package_identifier_suffix,
-    remove_component_external_references_to_object, remove_component_object_uuids,
-    set_package_last_object_identifier,
+    next_object_identifier, release_package_identifier_suffix, set_package_last_object_identifier,
 };
 use crate::shapes::{insert_style_variation, remove_style_variation};
 use crate::{Error, IWorkPackage, Result};
@@ -17,6 +14,9 @@ use crate::{Error, IWorkPackage, Result};
 use self::native::ParagraphStyleOverrides;
 use super::paragraph_tabs::ParagraphTabStops;
 use super::style::{ParagraphIndents, ParagraphLineSpacing, ParagraphSpacing, TextAlignment};
+use super::style_registry::{
+    object_archive_name, register_private_style, unregister_private_style,
+};
 
 #[derive(Debug, Clone)]
 enum ParagraphProperty<'a> {
@@ -172,7 +172,7 @@ fn set_property(
     let storage = storage::locate(package, storage_id)?;
     let style = native::locate_style(package, storage.style_id)?;
     let stylesheet_id = native::stylesheet_id(&style.style, storage.style_id)?;
-    let stylesheet_archive_name = native::object_archive_name(package, stylesheet_id)?;
+    let stylesheet_archive_name = object_archive_name(package, stylesheet_id)?;
     if stylesheet_archive_name != style.archive_name {
         return Err(Error::InvalidFormat(format!(
             "iWork paragraph style {} is not stored with stylesheet {stylesheet_id}",
@@ -220,7 +220,7 @@ fn set_property(
         new_style_id,
         new_style,
     )?;
-    register_new_style(
+    register_private_style(
         &mut staged,
         &storage.archive_name,
         &style.archive_name,
@@ -265,12 +265,12 @@ fn reset_property(
             parent_style_id,
             storage.style_id,
         )?;
-        unregister_removed_style(
+        unregister_private_style(
             &mut staged,
             &storage.archive_name,
             &style.archive_name,
             storage.style_id,
-            parent_style_id,
+            Some(parent_style_id),
         )?;
         release_package_identifier_suffix(&mut staged, &[storage.style_id])?;
     } else {
@@ -399,49 +399,6 @@ fn validate_expected_property(
             "iWork paragraph-style property does not match its expected value".to_owned(),
         ))
     }
-}
-
-fn register_new_style(
-    package: &mut IWorkPackage,
-    storage_archive_name: &str,
-    style_archive_name: &str,
-    style_id: u64,
-) -> Result<()> {
-    let Some(style_component) = component_identifier_for_entry(package, style_archive_name)? else {
-        return Ok(());
-    };
-    add_component_object_uuids(package, style_component, &[style_id])?;
-    if let Some(storage_component) = component_identifier_for_entry(package, storage_archive_name)?
-        && storage_component != style_component
-    {
-        add_component_external_reference(package, storage_component, style_component, style_id)?;
-    }
-    Ok(())
-}
-
-fn unregister_removed_style(
-    package: &mut IWorkPackage,
-    storage_archive_name: &str,
-    style_archive_name: &str,
-    style_id: u64,
-    parent_style_id: u64,
-) -> Result<()> {
-    let Some(style_component) = component_identifier_for_entry(package, style_archive_name)? else {
-        return Ok(());
-    };
-    remove_component_object_uuids(package, style_component, &[style_id])?;
-    remove_component_external_references_to_object(package, style_component, style_id)?;
-    if let Some(storage_component) = component_identifier_for_entry(package, storage_archive_name)?
-        && storage_component != style_component
-    {
-        add_component_external_reference(
-            package,
-            storage_component,
-            style_component,
-            parent_style_id,
-        )?;
-    }
-    Ok(())
 }
 
 #[cfg(test)]

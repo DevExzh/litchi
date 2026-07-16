@@ -15,6 +15,7 @@ use super::super::style::{
     ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingMultiple,
     ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, TextAlignment,
 };
+use super::super::style_registry::object_archive_name;
 
 const STORAGE_MESSAGE_TYPES: &[u32] = &[2_001, 2_022];
 const PARAGRAPH_STYLE_MESSAGE_TYPE: u32 = 2_022;
@@ -439,20 +440,6 @@ pub(super) fn stylesheet_id(style: &tswp::ParagraphStyleArchive, style_id: u64) 
                 "iWork paragraph style {style_id} has no stylesheet"
             ))
         })
-}
-
-pub(super) fn object_archive_name(package: &IWorkPackage, identifier: u64) -> Result<String> {
-    let mut found = None;
-    for name in package.iwa_entry_names() {
-        if package.archive(name)?.object(identifier).is_some()
-            && found.replace(name.to_owned()).is_some()
-        {
-            return Err(Error::InvalidFormat(format!(
-                "iWork object {identifier} occurs in multiple archives"
-            )));
-        }
-    }
-    found.ok_or_else(|| Error::InvalidFormat(format!("iWork object {identifier} is missing")))
 }
 
 fn line_spacing_archive(spacing: ParagraphLineSpacing) -> tswp::LineSpacingArchive {

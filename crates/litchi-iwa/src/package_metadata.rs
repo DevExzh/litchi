@@ -670,6 +670,84 @@ pub(crate) fn remove_component_external_references_to_object(
     })
 }
 
+pub(crate) fn remove_component_external_reference(
+    package: &mut IWorkPackage,
+    source_component_identifier: u64,
+    target_component_identifier: u64,
+    object_identifier: u64,
+) -> Result<()> {
+    if !package.contains_entry(PACKAGE_METADATA_ENTRY) {
+        return Ok(());
+    }
+    package.update_archive(PACKAGE_METADATA_ENTRY, |archive| {
+        let (object_index, message_index) = package_metadata_location(archive)?;
+        let object = &mut archive.objects[object_index];
+        let original = &object.messages[message_index];
+        let mut source_count = 0usize;
+        let mut match_count = 0usize;
+        let data = transform_length_delimited_fields_at_path(
+            original.data.as_slice(),
+            &[3],
+            |component_data| {
+                let component = crate::protobuf::tsp::ComponentInfo::decode(component_data)?;
+                if component.identifier != source_component_identifier {
+                    return Ok(component_data.to_vec());
+                }
+                source_count += 1;
+                let matches = component
+                    .external_references
+                    .iter()
+                    .filter(|reference| {
+                        reference.component_identifier == target_component_identifier
+                            && reference.object_identifier == Some(object_identifier)
+                    })
+                    .count();
+                match_count += matches;
+                if matches > 1 {
+                    return Err(Error::InvalidFormat(format!(
+                        "component {source_component_identifier} duplicates its external reference to object {object_identifier}"
+                    )));
+                }
+                remove_repeated_length_delimited_field_where(component_data, 6, |payload| {
+                    let reference =
+                        crate::protobuf::tsp::ComponentExternalReference::decode(payload)?;
+                    Ok(reference.component_identifier == target_component_identifier
+                        && reference.object_identifier == Some(object_identifier))
+                })
+            },
+        )?;
+        if source_count != 1 || match_count > 1 {
+            return Err(Error::InvalidFormat(format!(
+                "component {source_component_identifier} must exist once and contain at most one matching external reference"
+            )));
+        }
+        let verified = crate::protobuf::tsp::PackageMetadata::decode(data.as_slice())?;
+        if verified
+            .components
+            .iter()
+            .find(|component| component.identifier == source_component_identifier)
+            .is_none_or(|component| {
+                component.external_references.iter().any(|reference| {
+                    reference.component_identifier == target_component_identifier
+                        && reference.object_identifier == Some(object_identifier)
+                })
+            })
+        {
+            return Err(Error::InvalidFormat(
+                "component external-reference removal failed validation".to_owned(),
+            ));
+        }
+        object.replace_message(
+            message_index,
+            RawMessage {
+                type_: PACKAGE_METADATA_MESSAGE_TYPE,
+                data,
+            },
+        )?;
+        Ok(())
+    })
+}
+
 pub(crate) fn component_uuid_identifiers(
     package: &IWorkPackage,
     component_identifier: u64,
