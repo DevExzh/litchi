@@ -137,6 +137,8 @@ impl<W: Write> RtfWriter<W> {
 
         self.write_revision_save_metadata(doc.revision_save_metadata())?;
 
+        self.write_xml_namespace_table(doc.xml_namespaces())?;
+
         // Producer provenance is inert header metadata.
         self.write_generator(doc.generator())?;
 
@@ -544,6 +546,55 @@ impl<W: Write> RtfWriter<W> {
             self.write_control_word("rsidroot", Some(root as i32))?;
         }
         Ok(())
+    }
+
+    pub fn write_xml_namespace_table(
+        &mut self,
+        namespaces: Option<&[crate::XmlNamespace<'_>]>,
+    ) -> io::Result<()> {
+        let Some(namespaces) = namespaces else {
+            return Ok(());
+        };
+        if namespaces.len() > crate::xml_namespace::MAX_XML_NAMESPACES {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "RTF XML namespace count exceeds the safety limit",
+            ));
+        }
+        let mut total = 0usize;
+        self.write_str("{\\*\\xmlnstbl ")?;
+        for (index, namespace) in namespaces.iter().enumerate() {
+            namespace
+                .validate()
+                .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+            if namespaces[..index]
+                .iter()
+                .any(|existing| existing.id == namespace.id)
+            {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF XML namespace IDs must be unique",
+                ));
+            }
+            total = total.checked_add(namespace.namespace.len()).ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF XML namespace aggregate size overflow",
+                )
+            })?;
+            if total > crate::xml_namespace::MAX_XML_NAMESPACE_TOTAL_BYTES {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF XML namespace aggregate text exceeds the safety limit",
+                ));
+            }
+            self.write_str("{")?;
+            self.write_control_word("xmlns", Some(namespace.id as i32))?;
+            self.write_str(" ")?;
+            self.write_destination_text(namespace.namespace.as_ref())?;
+            self.write_str("}")?;
+        }
+        self.write_str("}")
     }
 
     /// Write an RTF stylesheet destination.

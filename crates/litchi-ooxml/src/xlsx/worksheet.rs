@@ -38,6 +38,7 @@ use super::sheet_protection::{
     parse_worksheet_protection,
 };
 use super::named_sheet_view::{NamedSheetViews, discover_named_sheet_views};
+use super::page_margins::{WorksheetPageMargins, parse_worksheet_page_margins};
 use super::table::{Table, parse_table_xml};
 use super::views::SheetView;
 use super::writer::sheet::Image;
@@ -252,6 +253,8 @@ pub struct Worksheet<'a> {
     protection_metadata: WorksheetProtectionMetadata,
     /// Static worksheet header/footer settings.
     header_footer: Option<WorksheetHeaderFooter>,
+    /// Static worksheet page margins.
+    page_margins: Option<WorksheetPageMargins>,
     /// Manual row page breaks
     row_breaks: Vec<PageBreak>,
     /// Manual column page breaks
@@ -289,6 +292,7 @@ impl<'a> Worksheet<'a> {
             named_sheet_views: None,
             protection_metadata: WorksheetProtectionMetadata::default(),
             header_footer: None,
+            page_margins: None,
             row_breaks: Vec::new(),
             col_breaks: Vec::new(),
             rich_text_cells: HashMap::new(),
@@ -395,6 +399,7 @@ impl<'a> Worksheet<'a> {
         let sheet_view_collection = parse_worksheet_views(sheet_data.as_bytes())?;
         let protection_metadata = parse_worksheet_protection(sheet_data.as_bytes())?;
         let header_footer = parse_worksheet_header_footer(sheet_data.as_bytes())?;
+        let page_margins = parse_worksheet_page_margins(sheet_data.as_bytes())?;
         self.cells = parsed.cells;
         self.cell_styles = parsed.cell_styles;
         self.rows = parsed.rows;
@@ -417,6 +422,7 @@ impl<'a> Worksheet<'a> {
         self.sheet_view_collection = sheet_view_collection;
         self.protection_metadata = protection_metadata;
         self.header_footer = header_footer;
+        self.page_margins = page_margins;
         self.dimensions = parsed.dimensions;
         Ok((
             parsed.hyperlinks,
@@ -1875,6 +1881,13 @@ impl<'a> Worksheet<'a> {
     /// * `row` - Row number (1-based)
     pub fn get_row_info(&self, row: u32) -> Option<&RowInfo> {
         self.rows.get(&row)
+    }
+
+    // ===== Page Margins =====
+
+    /// Complete immutable worksheet page margins, when explicitly present.
+    pub fn page_margins(&self) -> Option<&WorksheetPageMargins> {
+        self.page_margins.as_ref()
     }
 
     // ===== Header and Footer =====

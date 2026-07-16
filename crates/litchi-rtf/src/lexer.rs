@@ -116,6 +116,8 @@ pub enum ControlWord<'a> {
     RevisionSaveTable,
     RevisionSaveId(i32),
     RevisionSaveRoot(i32),
+    XmlNamespaceTable,
+    XmlNamespace(i32),
 
     // Index and table-of-contents source marks
     IndexEntry,
@@ -727,6 +729,8 @@ impl<'a> Lexer<'a> {
             "rsidtbl" => ControlWord::RevisionSaveTable,
             "rsid" => ControlWord::RevisionSaveId(param_value),
             "rsidroot" => ControlWord::RevisionSaveRoot(param_value),
+            "xmlnstbl" => ControlWord::XmlNamespaceTable,
+            "xmlns" => ControlWord::XmlNamespace(param_value),
 
             // Index and table-of-contents source marks
             "xe" => ControlWord::IndexEntry,

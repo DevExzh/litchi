@@ -37,6 +37,7 @@ mod field;
 mod form_field;
 mod generator;
 mod revision_save;
+mod xml_namespace;
 mod info;
 mod lexer;
 mod list;
@@ -69,6 +70,7 @@ pub use field::{
 pub use form_field::{FormField, FormFieldType, FormTextType};
 pub use generator::DocumentGenerator;
 pub use revision_save::RevisionSaveMetadata;
+pub use xml_namespace::XmlNamespace;
 pub use info::{DocumentInfo, DocumentProtection, ProtectionType};
 pub use lexer::CharacterSet;
 pub use user_property::{UserProperty, UserPropertyValue};

@@ -31,6 +31,8 @@ pub struct RtfDocument<'a> {
     generator: Option<crate::DocumentGenerator<'a>>,
     /// Ordered revision-save/session provenance.
     revision_save: Option<crate::RevisionSaveMetadata>,
+    /// Ordered inert XML namespace table; `Some([])` preserves an empty table.
+    xml_namespaces: Option<Vec<crate::XmlNamespace<'a>>>,
     /// Embedded and linked objects
     objects: Vec<super::object::EmbeddedObject<'a>>,
     /// Ordered inert document-variable metadata
@@ -236,6 +238,13 @@ impl<'a> RtfDocument<'a> {
                 .generator
                 .map(crate::DocumentGenerator::into_owned),
             revision_save: parsed.revision_save,
+            xml_namespaces: parsed.saw_xml_namespace_table.then(|| {
+                parsed
+                    .xml_namespaces
+                    .into_iter()
+                    .map(crate::XmlNamespace::into_owned)
+                    .collect()
+            }),
             objects: owned_objects,
             document_variables: parsed
                 .document_variables
@@ -570,6 +579,72 @@ impl<'a> RtfDocument<'a> {
     /// Remove revision-save/session provenance.
     pub fn clear_revision_save_metadata(&mut self) {
         self.revision_save = None;
+    }
+
+    /// Return the ordered inert XML namespace table, preserving empty-table presence.
+    pub fn xml_namespaces(&self) -> Option<&[crate::XmlNamespace<'_>]> {
+        self.xml_namespaces.as_deref()
+    }
+
+    /// Replace the XML namespace table after full validation.
+    pub fn set_xml_namespaces(
+        &mut self,
+        namespaces: Vec<crate::XmlNamespace<'a>>,
+    ) -> RtfResult<()> {
+        Self::validate_xml_namespaces(&namespaces)?;
+        self.xml_namespaces = Some(namespaces);
+        Ok(())
+    }
+
+    /// Append one inert XML namespace entry, creating the table if absent.
+    pub fn push_xml_namespace(&mut self, namespace: crate::XmlNamespace<'a>) -> RtfResult<()> {
+        namespace.validate()?;
+        let was_present = self.xml_namespaces.is_some();
+        let mut namespaces = self.xml_namespaces.take().unwrap_or_default();
+        namespaces.push(namespace);
+        if let Err(error) = Self::validate_xml_namespaces(&namespaces) {
+            namespaces.pop();
+            self.xml_namespaces = was_present.then_some(namespaces);
+            return Err(error);
+        }
+        self.xml_namespaces = Some(namespaces);
+        Ok(())
+    }
+
+    /// Remove the XML namespace table entirely.
+    pub fn clear_xml_namespaces(&mut self) {
+        self.xml_namespaces = None;
+    }
+
+    fn validate_xml_namespaces(namespaces: &[crate::XmlNamespace<'_>]) -> RtfResult<()> {
+        if namespaces.len() > crate::xml_namespace::MAX_XML_NAMESPACES {
+            return Err(RtfError::MalformedDocument(
+                "RTF XML namespace count exceeds the safety limit".to_string(),
+            ));
+        }
+        let mut total = 0usize;
+        for (index, namespace) in namespaces.iter().enumerate() {
+            namespace.validate()?;
+            if namespaces[..index]
+                .iter()
+                .any(|existing| existing.id == namespace.id)
+            {
+                return Err(RtfError::MalformedDocument(
+                    "RTF XML namespace IDs must be unique".to_string(),
+                ));
+            }
+            total = total.checked_add(namespace.namespace.len()).ok_or_else(|| {
+                RtfError::MalformedDocument(
+                    "RTF XML namespace aggregate size overflow".to_string(),
+                )
+            })?;
+            if total > crate::xml_namespace::MAX_XML_NAMESPACE_TOTAL_BYTES {
+                return Err(RtfError::MalformedDocument(
+                    "RTF XML namespace aggregate text exceeds the safety limit".to_string(),
+                ));
+            }
+        }
+        Ok(())
     }
 
     /// Append inert form-field metadata at a valid visible body range.

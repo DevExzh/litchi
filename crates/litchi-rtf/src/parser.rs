@@ -301,6 +301,9 @@ pub struct Parser<'a> {
     saw_revision_save_table: bool,
     revision_save_root: Option<u32>,
     saw_revision_save_root: bool,
+    xml_namespaces: Vec<crate::XmlNamespace<'a>>,
+    saw_xml_namespace_table: bool,
+    xml_namespace_text_bytes: usize,
     /// Embedded and linked objects
     objects: Vec<super::object::EmbeddedObject<'a>>,
     /// Ordered inert document variables
@@ -417,6 +420,9 @@ impl<'a> Parser<'a> {
             saw_revision_save_table: false,
             revision_save_root: None,
             saw_revision_save_root: false,
+            xml_namespaces: Vec::new(),
+            saw_xml_namespace_table: false,
+            xml_namespace_text_bytes: 0,
             objects: Vec::new(),
             document_variables: Vec::new(),
             document_variable_text_bytes: 0,
@@ -500,6 +506,8 @@ impl<'a> Parser<'a> {
             form_fields: self.form_fields,
             generator: self.generator,
             revision_save,
+            xml_namespaces: self.xml_namespaces,
+            saw_xml_namespace_table: self.saw_xml_namespace_table,
             objects: self.objects,
             document_variables: self.document_variables,
             user_properties: self.user_properties,
@@ -658,6 +666,12 @@ impl<'a> Parser<'a> {
                             self.states.pop();
                             return Ok(());
                         },
+                        Some(Token::Control(ControlWord::XmlNamespaceTable)) => {
+                            self.pos += 1;
+                            self.parse_xml_namespace_table()?;
+                            self.states.pop();
+                            return Ok(());
+                        },
                         Some(Token::Control(ControlWord::DocumentVariable)) => {
                             self.parse_document_variable_destination()?;
                             self.states.pop();
@@ -763,6 +777,11 @@ impl<'a> Parser<'a> {
                 Token::Control(ControlWord::RevisionSaveTable) => {
                     return Err(RtfError::MalformedDocument(
                         "RTF revision-save table must be starred".to_string(),
+                    ));
+                },
+                Token::Control(ControlWord::XmlNamespaceTable) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF XML namespace table must be starred".to_string(),
                     ));
                 },
                 Token::Control(ControlWord::Info) => {
@@ -2007,6 +2026,11 @@ impl<'a> Parser<'a> {
                     "orphan RTF rsid control outside rsidtbl".to_string(),
                 ));
             },
+            ControlWord::XmlNamespace(_) => {
+                return Err(RtfError::MalformedDocument(
+                    "orphan RTF xmlns control outside xmlnstbl".to_string(),
+                ));
+            },
             _ => {},
         }
         if self.apply_section_control(control)? {
@@ -2503,6 +2527,135 @@ impl<'a> Parser<'a> {
             }
         }
         Err(RtfError::UnexpectedEof)
+    }
+
+    fn parse_xml_namespace_table(&mut self) -> RtfResult<()> {
+        if self.saw_xml_namespace_table {
+            return Err(RtfError::MalformedDocument(
+                "RTF contains multiple XML namespace tables".to_string(),
+            ));
+        }
+        self.saw_xml_namespace_table = true;
+        self.pos += 1; // xmlnstbl
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    return Ok(());
+                },
+                Some(Token::OpenBrace) => self.parse_xml_namespace_entry()?,
+                Some(Token::Text(text)) if self.decode_transport_text(text)?.trim().is_empty() => {
+                    self.pos += 1;
+                },
+                Some(Token::Binary(_))
+                | Some(Token::Control(_))
+                | Some(Token::Text(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF XML namespace table contains ungrouped, active, or binary data"
+                            .to_string(),
+                    ));
+                },
+                None => return Err(RtfError::UnexpectedEof),
+            }
+        }
+    }
+
+    fn parse_xml_namespace_entry(&mut self) -> RtfResult<()> {
+        if self.xml_namespaces.len() >= crate::xml_namespace::MAX_XML_NAMESPACES {
+            return Err(RtfError::MalformedDocument(
+                "RTF XML namespace count exceeds the safety limit".to_string(),
+            ));
+        }
+        self.expect_token(Token::OpenBrace)?;
+        let id = match self.tokens.get(self.pos) {
+            Some(Token::Control(ControlWord::XmlNamespace(value))) => {
+                let value = u32::try_from(*value).map_err(|_| {
+                    RtfError::MalformedDocument(
+                        "RTF XML namespace ID must be a positive signed integer".to_string(),
+                    )
+                })?;
+                if value == 0 {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF XML namespace ID must be a positive signed integer".to_string(),
+                    ));
+                }
+                value
+            },
+            _ => {
+                return Err(RtfError::MalformedDocument(
+                    "RTF XML namespace entry is missing xmlnsN".to_string(),
+                ));
+            },
+        };
+        if self.xml_namespaces.iter().any(|entry| entry.id == id) {
+            return Err(RtfError::MalformedDocument(
+                "RTF XML namespace IDs must be unique".to_string(),
+            ));
+        }
+        self.pos += 1;
+        let mut namespace = String::new();
+        let mut unicode_skip = self.current_state()?.unicode_skip.max(0);
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    let namespace = namespace.trim();
+                    let entry = crate::XmlNamespace::new(
+                        id,
+                        Cow::Borrowed(self.arena.alloc_str(namespace)),
+                    )?;
+                    self.xml_namespace_text_bytes = self
+                        .xml_namespace_text_bytes
+                        .checked_add(entry.namespace.len())
+                        .ok_or_else(|| {
+                            RtfError::MalformedDocument(
+                                "RTF XML namespace aggregate size overflow".to_string(),
+                            )
+                        })?;
+                    if self.xml_namespace_text_bytes
+                        > crate::xml_namespace::MAX_XML_NAMESPACE_TOTAL_BYTES
+                    {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF XML namespace aggregate text exceeds the safety limit"
+                                .to_string(),
+                        ));
+                    }
+                    self.xml_namespaces.push(entry);
+                    return Ok(());
+                },
+                Some(Token::Text(text)) => {
+                    namespace.extend(
+                        self.decode_transport_text(text)?
+                            .chars()
+                            .filter(|character| !matches!(character, '\r' | '\n')),
+                    );
+                    self.pos += 1;
+                },
+                Some(Token::Control(ControlWord::Unicode(first))) => {
+                    namespace.push_str(&self.parse_style_unicode(*first, unicode_skip)?);
+                },
+                Some(Token::Control(ControlWord::UnicodeSkip(value))) => {
+                    unicode_skip = (*value).max(0);
+                    self.pos += 1;
+                },
+                Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
+                    namespace.push_str(control_symbol_text(control).unwrap_or_default());
+                    self.pos += 1;
+                },
+                Some(Token::OpenBrace | Token::Binary(_)) | Some(Token::Control(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF XML namespace entry contains active, nested, or binary data"
+                            .to_string(),
+                    ));
+                },
+                None => return Err(RtfError::UnexpectedEof),
+            }
+            if namespace.len() > crate::xml_namespace::MAX_XML_NAMESPACE_BYTES {
+                return Err(RtfError::MalformedDocument(
+                    "RTF XML namespace identifier exceeds the safety limit".to_string(),
+                ));
+            }
+        }
     }
 
     fn parse_generator_destination(&mut self) -> RtfResult<crate::DocumentGenerator<'a>> {
@@ -6096,6 +6249,8 @@ pub struct ParsedDocument<'a> {
     pub form_fields: Vec<super::form_field::FormField<'a>>,
     pub generator: Option<crate::DocumentGenerator<'a>>,
     pub revision_save: Option<crate::RevisionSaveMetadata>,
+    pub xml_namespaces: Vec<crate::XmlNamespace<'a>>,
+    pub saw_xml_namespace_table: bool,
     /// Embedded and linked objects
     pub objects: Vec<super::object::EmbeddedObject<'a>>,
     /// Ordered inert document-variable metadata

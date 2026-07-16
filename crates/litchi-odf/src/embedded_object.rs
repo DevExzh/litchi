@@ -22,6 +22,7 @@ const XML_NAMESPACE: &[u8] = b"http://www.w3.org/XML/1998/namespace";
 
 const MAX_OBJECT_DEPTH: usize = 4_096;
 const MAX_OBJECTS: usize = 100_000;
+const MAX_OBJECT_PARAMETERS: usize = 65_536;
 const MAX_ATTRIBUTE_BYTES: usize = 64 * 1024;
 const MAX_INLINE_XML_BYTES: usize = 16 * 1024 * 1024;
 const MAX_TOTAL_INLINE_XML_BYTES: usize = 64 * 1024 * 1024;
@@ -46,6 +47,16 @@ pub enum OdfEmbeddedObjectPart {
 pub enum OdfEmbeddedObjectKind {
     Object,
     ObjectOle,
+    Applet,
+    Plugin,
+    FloatingFrame,
+}
+
+/// One ordered, inert applet or plugin parameter.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct OdfEmbeddedObjectParameter {
+    pub name: String,
+    pub value: String,
 }
 
 /// Root kind of an inline XML object payload.
@@ -101,6 +112,15 @@ pub struct OdfEmbeddedObject {
     pub link_type: Option<String>,
     pub show: Option<String>,
     pub actuate: Option<String>,
+    pub code: Option<String>,
+    pub object_name: Option<String>,
+    pub archive: Option<String>,
+    /// Stored applet scripting intent. No script or applet is ever started.
+    pub may_script: Option<bool>,
+    pub applet_name: Option<String>,
+    pub mime_type: Option<String>,
+    pub frame_name: Option<String>,
+    pub parameters: Vec<OdfEmbeddedObjectParameter>,
 }
 
 #[derive(Clone, Copy)]
@@ -149,6 +169,14 @@ struct ObjectBuilder {
     link_type: Option<String>,
     show: Option<String>,
     actuate: Option<String>,
+    code: Option<String>,
+    object_name: Option<String>,
+    archive: Option<String>,
+    may_script: Option<bool>,
+    applet_name: Option<String>,
+    mime_type: Option<String>,
+    frame_name: Option<String>,
+    parameters: Vec<OdfEmbeddedObjectParameter>,
     inline_xml: Option<(OdfInlineObjectRoot, String)>,
     binary_present: bool,
     binary_depth: Option<usize>,
@@ -301,14 +329,17 @@ fn scan_xml(
                 }
 
                 if let Some(object) = active.as_mut() {
-                    if bound_to(&namespace, DRAW_NAMESPACE)
-                        && matches!(element.local_name().as_ref(), b"object" | b"object-ole")
-                    {
+                    if object_kind(&namespace, &element).is_some() {
                         return Err(Error::InvalidFormat(
                             "nested embedded-object elements are not allowed".to_string(),
                         ));
                     }
                     if depth == object.depth + 1
+                        && bound_to(&namespace, DRAW_NAMESPACE)
+                        && element.local_name().as_ref() == b"param"
+                    {
+                        push_parameter(&reader, &element, object)?;
+                    } else if depth == object.depth + 1
                         && let Some(root) = inline_root(&namespace, &element)
                     {
                         if object.kind != OdfEmbeddedObjectKind::Object {
@@ -405,6 +436,11 @@ fn scan_xml(
                 }
                 if let Some(object) = active.as_mut() {
                     if depth == object.depth
+                        && bound_to(&namespace, DRAW_NAMESPACE)
+                        && element.local_name().as_ref() == b"param"
+                    {
+                        push_parameter(&reader, &element, object)?;
+                    } else if depth == object.depth
                         && let Some(root) = inline_root(&namespace, &element)
                     {
                         if object.kind != OdfEmbeddedObjectKind::Object
@@ -433,9 +469,7 @@ fn scan_xml(
                             ));
                         }
                         object.binary_present = true;
-                    } else if bound_to(&namespace, DRAW_NAMESPACE)
-                        && matches!(element.local_name().as_ref(), b"object" | b"object-ole")
-                    {
+                    } else if object_kind(&namespace, &element).is_some() {
                         return Err(Error::InvalidFormat(
                             "nested embedded-object elements are not allowed".to_string(),
                         ));
@@ -613,8 +647,44 @@ fn object_kind(
     match element.local_name().as_ref() {
         b"object" => Some(OdfEmbeddedObjectKind::Object),
         b"object-ole" => Some(OdfEmbeddedObjectKind::ObjectOle),
+        b"applet" => Some(OdfEmbeddedObjectKind::Applet),
+        b"plugin" => Some(OdfEmbeddedObjectKind::Plugin),
+        b"floating-frame" => Some(OdfEmbeddedObjectKind::FloatingFrame),
         _ => None,
     }
+}
+
+fn push_parameter(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    object: &mut ObjectBuilder,
+) -> Result<()> {
+    if !matches!(
+        object.kind,
+        OdfEmbeddedObjectKind::Applet | OdfEmbeddedObjectKind::Plugin
+    ) {
+        return Err(Error::InvalidFormat(
+            "draw:param is allowed only in draw:applet or draw:plugin".to_string(),
+        ));
+    }
+    if object.parameters.len() >= MAX_OBJECT_PARAMETERS {
+        return Err(Error::InvalidFormat(format!(
+            "embedded object exceeds {MAX_OBJECT_PARAMETERS} parameters"
+        )));
+    }
+    let name = limited_attribute(reader, element, DRAW_NAMESPACE, b"name")?
+        .ok_or_else(|| Error::InvalidFormat("draw:param requires draw:name".to_string()))?;
+    let value = limited_attribute(reader, element, DRAW_NAMESPACE, b"value")?
+        .ok_or_else(|| Error::InvalidFormat("draw:param requires draw:value".to_string()))?;
+    if name.is_empty() {
+        return Err(Error::InvalidFormat(
+            "draw:param name must not be empty".to_string(),
+        ));
+    }
+    object
+        .parameters
+        .push(OdfEmbeddedObjectParameter { name, value });
+    Ok(())
 }
 
 fn inline_root(
@@ -664,6 +734,16 @@ fn start_object(
         link_type: limited_attribute(reader, element, XLINK_NAMESPACE, b"type")?,
         show: limited_attribute(reader, element, XLINK_NAMESPACE, b"show")?,
         actuate: limited_attribute(reader, element, XLINK_NAMESPACE, b"actuate")?,
+        code: limited_attribute(reader, element, DRAW_NAMESPACE, b"code")?,
+        object_name: limited_attribute(reader, element, DRAW_NAMESPACE, b"object")?,
+        archive: limited_attribute(reader, element, DRAW_NAMESPACE, b"archive")?,
+        may_script: limited_attribute(reader, element, DRAW_NAMESPACE, b"may-script")?
+            .map(|value| parse_object_bool("draw:may-script", &value))
+            .transpose()?,
+        applet_name: limited_attribute(reader, element, DRAW_NAMESPACE, b"applet-name")?,
+        mime_type: limited_attribute(reader, element, DRAW_NAMESPACE, b"mime-type")?,
+        frame_name: limited_attribute(reader, element, DRAW_NAMESPACE, b"frame-name")?,
+        parameters: Vec::new(),
         inline_xml: None,
         binary_present: false,
         binary_depth: None,
@@ -717,6 +797,14 @@ fn finish_object(
             ignored_href: object.href.clone(),
         }
     } else if let Some(href) = object.href.clone().filter(|href| !href.is_empty()) {
+        if matches!(
+            object.kind,
+            OdfEmbeddedObjectKind::Applet
+                | OdfEmbeddedObjectKind::Plugin
+                | OdfEmbeddedObjectKind::FloatingFrame
+        ) {
+            OdfEmbeddedObjectSource::Linked { href }
+        } else {
         match package {
             None => OdfEmbeddedObjectSource::Linked { href },
             Some(_) if is_linked_href(&href) => OdfEmbeddedObjectSource::Linked { href },
@@ -748,6 +836,7 @@ fn finish_object(
                 }
             },
         }
+        }
     } else {
         OdfEmbeddedObjectSource::Missing
     };
@@ -763,7 +852,25 @@ fn finish_object(
         link_type: object.link_type,
         show: object.show,
         actuate: object.actuate,
+        code: object.code,
+        object_name: object.object_name,
+        archive: object.archive,
+        may_script: object.may_script,
+        applet_name: object.applet_name,
+        mime_type: object.mime_type,
+        frame_name: object.frame_name,
+        parameters: object.parameters,
     })
+}
+
+fn parse_object_bool(name: &str, value: &str) -> Result<bool> {
+    match value {
+        "true" | "1" => Ok(true),
+        "false" | "0" => Ok(false),
+        _ => Err(Error::InvalidFormat(format!(
+            "{name} is not an XML Schema boolean"
+        ))),
+    }
 }
 
 fn write_inline_event(capture: &mut InlineXmlCapture, event: Event<'_>) -> Result<()> {
@@ -977,4 +1084,43 @@ fn attribute(
 
 fn bound_to(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool {
     matches!(namespace, ResolveResult::Bound(Namespace(namespace)) if *namespace == expected)
+}
+
+#[cfg(test)]
+mod active_object_tests {
+    use super::*;
+
+    const PREFIX: &str = r#"<o:document xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:x="http://www.w3.org/1999/xlink" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0"><o:body><o:drawing>"#;
+    const SUFFIX: &str = "</o:drawing></o:body></o:document>";
+
+    #[test]
+    fn retains_applets_plugins_and_floating_frames_inertly() {
+        let xml = format!(
+            r#"{PREFIX}<d:frame d:name="Applet"><d:applet x:href="https://example.invalid/app" d:code="Main" d:archive="app.jar" d:may-script="true"><d:param d:name="theme" d:value="dark"/></d:applet></d:frame><d:frame><d:plugin x:href="media.bin" d:mime-type="application/x-example"><d:param d:name="quality" d:value="high"></d:param></d:plugin></d:frame><d:frame><d:floating-frame x:href="https://example.invalid/frame" d:frame-name="preview"/></d:frame>{SUFFIX}"#
+        );
+        let objects = scan_flat_objects(&xml).unwrap();
+        assert_eq!(objects.len(), 3);
+        assert_eq!(objects[0].kind, OdfEmbeddedObjectKind::Applet);
+        assert_eq!(objects[0].code.as_deref(), Some("Main"));
+        assert_eq!(objects[0].may_script, Some(true));
+        assert_eq!(objects[0].parameters[0].name, "theme");
+        assert!(matches!(objects[0].source, OdfEmbeddedObjectSource::Linked { .. }));
+        assert_eq!(objects[1].kind, OdfEmbeddedObjectKind::Plugin);
+        assert_eq!(objects[1].mime_type.as_deref(), Some("application/x-example"));
+        assert_eq!(objects[2].kind, OdfEmbeddedObjectKind::FloatingFrame);
+        assert_eq!(objects[2].frame_name.as_deref(), Some("preview"));
+    }
+
+    #[test]
+    fn rejects_invalid_active_object_metadata_and_nesting() {
+        for body in [
+            r#"<d:applet d:may-script="yes"/>"#,
+            r#"<d:plugin><d:param d:value="x"/></d:plugin>"#,
+            r#"<d:floating-frame><d:param d:name="x" d:value="y"/></d:floating-frame>"#,
+            r#"<d:plugin><d:applet/></d:plugin>"#,
+        ] {
+            let xml = format!("{PREFIX}{body}{SUFFIX}");
+            assert!(scan_flat_objects(&xml).is_err(), "accepted {body}");
+        }
+    }
 }

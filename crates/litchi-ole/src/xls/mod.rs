@@ -41,6 +41,9 @@ mod layout;
 /// BIFF8 worksheet window, zoom, pane, and selection state.
 mod view;
 
+/// BIFF8 worksheet print and page setup.
+mod page_setup;
+
 /// Shape extraction
 pub mod shapes;
 
@@ -83,6 +86,10 @@ pub use number_format::{
 };
 pub use layout::{XlsColumnLayout, XlsRowLayout};
 pub use view::{XlsPane, XlsPaneType, XlsSelection, XlsSelectionRange, XlsWorksheetView};
+pub use page_setup::{
+    XlsPageSetup, XlsPrintComments, XlsPrintErrors, XlsPrintOrder, XlsPrintOrientation,
+    XlsPrintSetup,
+};
 pub use records::{
     PhoneticAlignment, PhoneticRun, PhoneticString, PhoneticType, SharedStringFormatRun,
     SharedStringProperties,

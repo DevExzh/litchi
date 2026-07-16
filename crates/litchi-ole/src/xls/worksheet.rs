@@ -7,6 +7,7 @@ use crate::xls::error::XlsError;
 use crate::xls::hyperlinks::XlsHyperlink;
 use crate::xls::layout::{XlsColumnLayout, XlsRowLayout};
 use crate::xls::view::XlsWorksheetView;
+use crate::xls::page_setup::XlsPageSetup;
 use crate::xls::merged_cells::MergedCellRange;
 use crate::xls::number_format::{XlsExtendedFormat, XlsFormatting, XlsNumberFormat};
 use crate::xls::pivot_table::PivotTable;
@@ -49,6 +50,7 @@ pub struct XlsWorksheet {
     row_layouts: BTreeMap<u16, XlsRowLayout>,
     column_layouts: Vec<XlsColumnLayout>,
     worksheet_views: Vec<XlsWorksheetView>,
+    page_setup: Option<XlsPageSetup>,
 }
 
 impl XlsWorksheet {
@@ -73,6 +75,7 @@ impl XlsWorksheet {
             row_layouts: BTreeMap::new(),
             column_layouts: Vec::new(),
             worksheet_views: Vec::new(),
+            page_setup: None,
         }
     }
 
@@ -97,6 +100,7 @@ impl XlsWorksheet {
             row_layouts: BTreeMap::new(),
             column_layouts: Vec::new(),
             worksheet_views: Vec::new(),
+            page_setup: None,
         }
     }
 
@@ -297,6 +301,15 @@ impl XlsWorksheet {
 
     pub(crate) fn set_worksheet_views(&mut self, views: Vec<XlsWorksheetView>) {
         self.worksheet_views = views;
+    }
+
+    /// Print and page setup for this worksheet.
+    pub fn page_setup(&self) -> Option<&XlsPageSetup> {
+        self.page_setup.as_ref()
+    }
+
+    pub(crate) fn set_page_setup(&mut self, page_setup: Option<XlsPageSetup>) {
+        self.page_setup = page_setup;
     }
 
     pub fn format_for_cell(&self, row: u32, col: u32) -> Option<&XlsExtendedFormat> {
