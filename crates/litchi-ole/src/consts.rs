@@ -61,6 +61,10 @@ pub enum PptRecordType {
     TextBytesAtom = 4008,
     /// Text special info atom record
     TextSpecInfoAtom = 4010,
+    /// Default text ruler atom record
+    DefaultRulerAtom = 4011,
+    /// PowerPoint 9 additional text properties atom record
+    StyleTextProp9Atom = 4012,
     /// Style text prop atom record
     StyleTextPropAtom = 4001,
     /// Master text prop atom record
@@ -237,6 +241,8 @@ impl From<u16> for PptRecordType {
             4000 => PptRecordType::TextCharsAtom,
             4008 => PptRecordType::TextBytesAtom,
             4010 => PptRecordType::TextSpecInfoAtom,
+            4011 => PptRecordType::DefaultRulerAtom,
+            4012 => PptRecordType::StyleTextProp9Atom,
             4001 => PptRecordType::StyleTextPropAtom,
             4002 => PptRecordType::MasterTextPropAtom,
             4003 => PptRecordType::TxMasterStyleAtom,

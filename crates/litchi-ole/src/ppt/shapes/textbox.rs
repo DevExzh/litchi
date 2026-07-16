@@ -3,8 +3,8 @@
 /// Text boxes are shapes that contain text content and are commonly used
 /// for titles, bullet points, and other text elements in PowerPoint slides.
 use super::shape::{Shape, ShapeContainer, ShapeProperties};
-use crate::ppt::TextRuler;
 use crate::ppt::text_run::{ParagraphRun, ParagraphRunFormatting, TextRun, TextRunFormatting};
+use crate::ppt::{TextRuler, TextStyleExtension9};
 
 /// Type alias for text formatting tuple to reduce complexity.
 type TextFormattingResult = (Option<u16>, Option<u32>, bool, bool, bool);
@@ -25,6 +25,8 @@ pub struct TextBox<'a> {
     paragraph_runs: Vec<ParagraphRun>,
     /// Textbox-specific ruler overrides
     text_ruler: Option<TextRuler>,
+    /// PowerPoint 9 picture-bullet and automatic-numbering extensions
+    text_style_extension9: Option<TextStyleExtension9>,
     /// Font size in points
     font_size: Option<u16>,
     /// Font color (RGB)
@@ -46,6 +48,7 @@ impl<'a> TextBox<'a> {
             runs: Vec::new(),
             paragraph_runs: Vec::new(),
             text_ruler: None,
+            text_style_extension9: None,
             font_size: None,
             font_color: None,
             bold: false,
@@ -75,6 +78,7 @@ impl<'a> TextBox<'a> {
             (String::new(), Vec::new(), Vec::new(), None)
         };
         let (font_size, font_color, bold, italic, underline) = Self::formatting_from_runs(&runs);
+        let text_style_extension9 = record.extract_text_style_extension9()?;
 
         // Extract additional properties from Escher records with zero-copy
         let mut container = ShapeContainer::new_borrowed(properties, &record.data);
@@ -88,6 +92,7 @@ impl<'a> TextBox<'a> {
             runs,
             paragraph_runs,
             text_ruler,
+            text_style_extension9,
             font_size,
             font_color,
             bold,
@@ -121,6 +126,7 @@ impl<'a> TextBox<'a> {
             runs,
             paragraph_runs,
             text_ruler: None,
+            text_style_extension9: None,
             font_size: None,
             font_color: None,
             bold: false,
@@ -363,6 +369,11 @@ impl<'a> TextBox<'a> {
     /// Get textbox-specific tab, margin, and indent overrides.
     pub fn text_ruler(&self) -> Option<&TextRuler> {
         self.text_ruler.as_ref()
+    }
+
+    /// Get PowerPoint 9 picture-bullet and automatic-numbering extensions.
+    pub fn text_style_extension9(&self) -> Option<&TextStyleExtension9> {
+        self.text_style_extension9.as_ref()
     }
 
     /// Set the text content of the text box.

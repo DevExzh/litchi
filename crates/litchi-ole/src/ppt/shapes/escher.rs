@@ -1,4 +1,6 @@
 use super::super::package::{PptError, Result};
+use super::super::records::PptRecord;
+use super::super::text_extensions::TextStyleExtension9;
 /// Escher record parsing for PowerPoint shapes.
 ///
 /// This module provides functionality to parse Escher binary records
@@ -709,6 +711,70 @@ impl<'a> EscherRecord<'a> {
         }
     }
 
+    /// Extract the PowerPoint 9 text-style extension stored beside a textbox.
+    ///
+    /// MS-PPT stores `StyleTextProp9Atom` in the shape's `ClientData`, under
+    /// the `___PPT9` programmable binary tag, rather than in `ClientTextbox`.
+    pub fn extract_text_style_extension9(&self) -> Result<Option<TextStyleExtension9>> {
+        let Some(client_data) = (self.record_type == EscherRecordType::ClientData)
+            .then_some(self)
+            .or_else(|| self.find_child(EscherRecordType::ClientData))
+        else {
+            return Ok(None);
+        };
+
+        let mut result = None;
+        for record in parse_ppt_record_sequence(&client_data.data, "shape ClientData")? {
+            if record.record_type != crate::consts::PptRecordType::ProgTags {
+                continue;
+            }
+            for tag in parse_ppt_record_sequence(&record.data, "PPT9 ProgTags")? {
+                if tag.record_type != crate::consts::PptRecordType::ProgBinaryTag {
+                    continue;
+                }
+                let tag_children = parse_ppt_record_sequence(&tag.data, "PPT9 ProgBinaryTag")?;
+                let Some(name) = tag_children
+                    .iter()
+                    .find(|child| child.record_type == crate::consts::PptRecordType::CString)
+                else {
+                    continue;
+                };
+                if !is_ppt9_tag_name(name) {
+                    continue;
+                }
+                let blob = tag_children
+                    .iter()
+                    .find(|child| child.record_type == crate::consts::PptRecordType::BinaryTagData)
+                    .ok_or_else(|| {
+                        PptError::Corrupted(
+                            "___PPT9 programmable tag is missing BinaryTagData".to_string(),
+                        )
+                    })?;
+                for extension_record in
+                    parse_ppt_record_sequence(&blob.data, "___PPT9 BinaryTagData")?
+                {
+                    if extension_record.record_type
+                        != crate::consts::PptRecordType::StyleTextProp9Atom
+                    {
+                        continue;
+                    }
+                    if extension_record.version != 0 || extension_record.instance != 0 {
+                        return Err(PptError::Corrupted(
+                            "StyleTextProp9Atom has an invalid record header".to_string(),
+                        ));
+                    }
+                    if result.is_some() {
+                        return Err(PptError::Corrupted(
+                            "Shape contains multiple StyleTextProp9Atom records".to_string(),
+                        ));
+                    }
+                    result = Some(TextStyleExtension9::parse(&extension_record.data)?);
+                }
+            }
+        }
+        Ok(result)
+    }
+
     /// Parse text record data according to MS-ODRAW text record format.
     /// Based on POI's EscherTextboxWrapper and related text parsing.
     ///
@@ -734,6 +800,58 @@ impl<'a> EscherRecord<'a> {
         let (record, _) = Self::parse(data, 0)?;
         record.extract_shape_properties()
     }
+}
+
+fn parse_ppt_record_sequence(data: &[u8], context: &str) -> Result<Vec<PptRecord>> {
+    let mut records = Vec::new();
+    let mut offset = 0usize;
+    while offset < data.len() {
+        let header_end = offset.checked_add(8).ok_or_else(|| {
+            PptError::Corrupted(format!("{context} record header offset overflow"))
+        })?;
+        if header_end > data.len() {
+            return Err(PptError::Corrupted(format!(
+                "Truncated record header in {context}"
+            )));
+        }
+        let length = u32::from_le_bytes([
+            data[offset + 4],
+            data[offset + 5],
+            data[offset + 6],
+            data[offset + 7],
+        ]);
+        let length = usize::try_from(length)
+            .map_err(|_| PptError::Corrupted(format!("{context} record size overflow")))?;
+        let record_end = header_end
+            .checked_add(length)
+            .ok_or_else(|| PptError::Corrupted(format!("{context} record size overflow")))?;
+        if record_end > data.len() {
+            return Err(PptError::Corrupted(format!(
+                "Record extends beyond {context}"
+            )));
+        }
+        let (record, consumed) = PptRecord::parse(&data[offset..record_end], 0)?;
+        if consumed != record_end - offset {
+            return Err(PptError::Corrupted(format!(
+                "Record in {context} was only partially parsed"
+            )));
+        }
+        records.push(record);
+        offset = record_end;
+    }
+    Ok(records)
+}
+
+fn is_ppt9_tag_name(record: &PptRecord) -> bool {
+    const PPT9: [u16; 7] = [0x5f, 0x5f, 0x5f, 0x50, 0x50, 0x54, 0x39];
+    record.version == 0
+        && record.instance == 0
+        && record.data.len() == PPT9.len() * 2
+        && record
+            .data
+            .chunks_exact(2)
+            .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
+            .eq(PPT9)
 }
 
 /// Parser for Escher-based shape data with zero-copy optimization.
@@ -850,6 +968,57 @@ mod tests {
         data.extend_from_slice(&(payload.len() as u32).to_le_bytes());
         data.extend_from_slice(payload);
         data
+    }
+
+    fn ppt_record(version: u16, instance: u16, record_type: u16, payload: &[u8]) -> Vec<u8> {
+        let mut data = Vec::with_capacity(8 + payload.len());
+        data.extend_from_slice(&((instance << 4) | version).to_le_bytes());
+        data.extend_from_slice(&record_type.to_le_bytes());
+        data.extend_from_slice(&(payload.len() as u32).to_le_bytes());
+        data.extend_from_slice(payload);
+        data
+    }
+
+    fn shape_with_ppt9_extension(style_version: u16) -> EscherRecord<'static> {
+        let style = ppt_record(style_version, 0, 4012, &[0; 12]);
+        let blob = ppt_record(0, 0, 0x138b, &style);
+        let tag_name: Vec<u8> = "___PPT9"
+            .encode_utf16()
+            .flat_map(u16::to_le_bytes)
+            .collect();
+        let mut tag_payload = ppt_record(0, 0, 4026, &tag_name);
+        tag_payload.extend_from_slice(&blob);
+        let tag = ppt_record(0x0f, 0, 0x138a, &tag_payload);
+        let prog_tags = ppt_record(0x0f, 0, 0x1388, &tag);
+        let client_data = EscherRecord {
+            record_type: EscherRecordType::ClientData,
+            version: 0x0f,
+            instance: 0,
+            data_length: prog_tags.len() as u32,
+            data: Cow::Owned(prog_tags),
+            children: Vec::new(),
+            properties: Vec::new(),
+        };
+        EscherRecord {
+            record_type: EscherRecordType::SpContainer,
+            version: 0x0f,
+            instance: 0,
+            data_length: 0,
+            data: Cow::Borrowed(&[]),
+            children: vec![client_data],
+            properties: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn extracts_style_text_prop9_from_shape_client_data() {
+        let shape = shape_with_ppt9_extension(0);
+        let extension = shape.extract_text_style_extension9().unwrap().unwrap();
+        assert_eq!(extension.runs.len(), 1);
+        assert_eq!(extension.runs[0].paragraph.mask, 0);
+
+        let malformed = shape_with_ppt9_extension(1);
+        assert!(malformed.extract_text_style_extension9().is_err());
     }
 
     #[test]

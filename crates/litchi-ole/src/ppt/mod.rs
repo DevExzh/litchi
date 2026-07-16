@@ -74,6 +74,7 @@ pub mod escher;
 pub mod current_user;
 pub mod escher_textbox;
 pub mod master_style;
+pub mod text_extensions;
 pub mod text_prop;
 pub mod text_ruler;
 pub mod text_run;
@@ -97,6 +98,10 @@ pub use shapes::{AutoShape, Placeholder, PlaceholderSize, PlaceholderType, Shape
 pub use current_user::CurrentUser;
 pub use escher_textbox::EscherTextboxWrapper;
 pub use master_style::{TextMasterStyle, TextMasterStyleLevel};
+pub use text_extensions::{
+    TextCharacterExtension9, TextParagraphExtension9, TextSpecialInfoExtension9,
+    TextStyleExtension9, TextStyleExtension9Run,
+};
 pub use text_prop::{TextProp, TextPropCollection, TextPropType, TextTabStop};
 pub use text_ruler::{TextRuler, TextRulerLevel};
 pub use text_run::{
