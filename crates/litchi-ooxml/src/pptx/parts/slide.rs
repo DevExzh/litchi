@@ -11,6 +11,9 @@ use crate::pptx::shapes::textframe::extract_drawingml_text;
 use litchi_opc::part::Part;
 use quick_xml::events::Event;
 use quick_xml::reader::NsReader;
+use std::sync::Arc;
+
+fn processed(part:&dyn Part)->Result<Arc<Vec<u8>>>{Ok(match crate::common::mce::process_ooxml(part.blob())?{std::borrow::Cow::Borrowed(_)=>part.blob_arc(),std::borrow::Cow::Owned(v)=>Arc::new(v)})}
 
 /// A slide part.
 ///
@@ -18,18 +21,19 @@ use quick_xml::reader::NsReader;
 pub struct SlidePart<'a> {
     /// The underlying OPC part
     part: &'a dyn Part,
+    xml: Arc<Vec<u8>>,
 }
 
 impl<'a> SlidePart<'a> {
     /// Create a SlidePart from an OPC Part.
     pub fn from_part(part: &'a dyn Part) -> Result<Self> {
-        Ok(Self { part })
+        let xml=processed(part)?;Ok(Self { part, xml })
     }
 
     /// Get the XML bytes of the slide.
     #[inline]
     fn xml_bytes(&self) -> &[u8] {
-        self.part.blob()
+        self.xml.as_slice()
     }
 
     /// Get the slide name.
@@ -111,18 +115,19 @@ impl<'a> SlidePart<'a> {
 pub struct SlideLayoutPart<'a> {
     /// The underlying OPC part
     part: &'a dyn Part,
+    xml: Arc<Vec<u8>>,
 }
 
 impl<'a> SlideLayoutPart<'a> {
     /// Create a SlideLayoutPart from an OPC Part.
     pub fn from_part(part: &'a dyn Part) -> Result<Self> {
-        Ok(Self { part })
+        let xml=processed(part)?;Ok(Self { part, xml })
     }
 
     /// Get the XML bytes of the layout.
     #[inline]
     fn xml_bytes(&self) -> &[u8] {
-        self.part.blob()
+        self.xml.as_slice()
     }
 
     /// Get the layout name.
@@ -143,18 +148,19 @@ impl<'a> SlideLayoutPart<'a> {
 pub struct SlideMasterPart<'a> {
     /// The underlying OPC part
     part: &'a dyn Part,
+    xml: Arc<Vec<u8>>,
 }
 
 impl<'a> SlideMasterPart<'a> {
     /// Create a SlideMasterPart from an OPC Part.
     pub fn from_part(part: &'a dyn Part) -> Result<Self> {
-        Ok(Self { part })
+        let xml=processed(part)?;Ok(Self { part, xml })
     }
 
     /// Get the XML bytes of the master.
     #[inline]
     fn xml_bytes(&self) -> &[u8] {
-        self.part.blob()
+        self.xml.as_slice()
     }
 
     /// Get the master name.

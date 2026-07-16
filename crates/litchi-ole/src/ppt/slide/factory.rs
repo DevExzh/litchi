@@ -5,6 +5,9 @@ use crate::consts::PptRecordType;
 use crate::ppt::package::{PptError, Result};
 use crate::ppt::persist::PersistMapping;
 use crate::ppt::records::PptRecord;
+use super::directory::{SlideDirectory, SlideDirectoryEntry};
+use super::notes::{NoteDescriptor, NotesIndex};
+use once_cell::unsync::OnceCell;
 
 /// Factory for creating slides from document data using persist mapping.
 ///
@@ -18,42 +21,32 @@ pub struct SlideFactory<'doc> {
     doc_data: &'doc [u8],
     /// Persist ID to byte offset mapping
     persist_mapping: &'doc PersistMapping,
+    notes_index: OnceCell<NotesIndex>,
+    slide_directory: &'doc SlideDirectory,
 }
 
 impl<'doc> SlideFactory<'doc> {
     /// Create a new slide factory.
     #[inline]
-    pub fn new(doc_data: &'doc [u8], persist_mapping: &'doc PersistMapping) -> Self {
+    pub fn new(
+        doc_data: &'doc [u8],
+        persist_mapping: &'doc PersistMapping,
+        slide_directory: &'doc SlideDirectory,
+    ) -> Self {
         Self {
             doc_data,
             persist_mapping,
+            notes_index: OnceCell::new(),
+            slide_directory,
         }
     }
 
     /// Get all slide persist IDs in sorted order (filtered to only Slide records).
     pub fn slide_ids(&self) -> Vec<u32> {
-        // Filter to only actual Slide records (not Notes, Masters, etc.)
-        let all_ids = self.persist_mapping.get_persist_ids();
-        all_ids
-            .into_iter()
-            .filter(|&persist_id| {
-                if let Some(offset) = self.persist_mapping.get_offset(persist_id) {
-                    let offset = offset as usize;
-                    if offset + 4 < self.doc_data.len() {
-                        // Check record type at this offset (bytes 2-3)
-                        let record_type = u16::from_le_bytes([
-                            self.doc_data[offset + 2],
-                            self.doc_data[offset + 3],
-                        ]);
-                        // 1006 = Slide record type
-                        record_type == 1006
-                    } else {
-                        false
-                    }
-                } else {
-                    false
-                }
-            })
+        self.slide_directory
+            .entries()
+            .iter()
+            .map(|entry| entry.persist_id())
             .collect()
     }
 
@@ -69,11 +62,23 @@ impl<'doc> SlideFactory<'doc> {
             PptError::InvalidFormat(format!("No offset found for persist_id {}", persist_id))
         })?;
 
-        self.parse_slide_at_offset(offset, persist_id)
+        let entry = self
+            .slide_directory
+            .get_by_persist_id(persist_id)
+            .ok_or_else(|| {
+                PptError::InvalidFormat(format!(
+                    "persist ID {persist_id} is not a logical presentation slide"
+                ))
+            })?;
+        self.parse_slide_at_offset(offset, entry)
     }
 
     /// Parse slide record at specific byte offset.
-    fn parse_slide_at_offset(&self, offset: u32, persist_id: u32) -> Result<SlideData<'doc>> {
+    fn parse_slide_at_offset(
+        &self,
+        offset: u32,
+        entry: &SlideDirectoryEntry,
+    ) -> Result<SlideData<'doc>> {
         let offset = offset as usize;
 
         if offset + 8 > self.doc_data.len() {
@@ -93,11 +98,19 @@ impl<'doc> SlideFactory<'doc> {
             )));
         }
 
+        let note_descriptor = self
+            .notes_index
+            .get_or_init(|| NotesIndex::build(self.doc_data, self.slide_directory))
+            .descriptor(&record, entry.persist_id(), self.persist_mapping);
+
         Ok(SlideData {
-            persist_id,
+            persist_id: entry.persist_id(),
+            slide_id: entry.slide_id(),
+            slide_list_text: entry.list_text().to_string(),
             offset,
             record,
             doc_data: self.doc_data,
+            note_descriptor,
         })
     }
 
@@ -124,12 +137,17 @@ impl<'doc> SlideFactory<'doc> {
 pub struct SlideData<'doc> {
     /// Persist ID for this slide
     pub persist_id: u32,
+    /// Stable SlideId from SlidePersistAtom.
+    pub slide_id: u32,
+    /// Text records associated with this slide in SlideListWithText.
+    pub(crate) slide_list_text: String,
     /// Byte offset in document stream
     pub offset: usize,
     /// Parsed Slide record
     pub record: PptRecord,
     /// Reference to complete document data (for lazy shape parsing)
     doc_data: &'doc [u8],
+    pub(crate) note_descriptor: std::result::Result<Option<NoteDescriptor>, String>,
 }
 
 impl<'doc> SlideData<'doc> {
@@ -171,9 +189,12 @@ impl<'doc> SlideData<'doc> {
     ) -> Self {
         Self {
             persist_id,
+            slide_id: persist_id,
+            slide_list_text: String::new(),
             offset,
             record,
             doc_data,
+            note_descriptor: Ok(None),
         }
     }
 }
@@ -187,7 +208,8 @@ mod tests {
         let doc_data = vec![0u8; 1024];
         let mapping = PersistMapping::new();
 
-        let factory = SlideFactory::new(&doc_data, &mapping);
+        let directory = SlideDirectory::new_for_test(0);
+        let factory = SlideFactory::new(&doc_data, &mapping, &directory);
         assert_eq!(factory.slide_ids().len(), 0);
     }
 }

@@ -22,6 +22,8 @@ fn is_spreadsheetml_name(spreadsheet_namespace: bool, name: QName<'_>, local_nam
 
 /// Parse styles from `xl/styles.xml` XML content.
 pub fn parse_styles(content: &str) -> Result<Styles> {
+    let processed=crate::common::mce::process_ooxml(content.as_bytes())?;
+    let content=std::str::from_utf8(processed.as_ref()).map_err(|e|OoxmlError::Xml(e.to_string()))?;
     let mut reader = NsReader::from_reader(content.as_bytes());
     let mut styles = Styles::new();
     let mut seen_root = false;

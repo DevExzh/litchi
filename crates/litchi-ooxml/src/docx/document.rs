@@ -1,5 +1,8 @@
 /// Document - the main API for working with Word document content.
 use crate::docx::bookmark::Bookmark;
+use crate::docx::alt_chunk::{
+    AltChunk, AlternativeFormatPart, is_alternative_format_relationship,
+};
 use crate::docx::comment::Comment;
 use crate::docx::content_control::ContentControl;
 use crate::docx::custom_xml::CustomXmlPart;
@@ -236,6 +239,56 @@ impl<'a> Document<'a> {
     /// calling `paragraphs()` and `tables()` separately.
     pub fn elements(&self) -> Result<Vec<crate::docx::DocxElement>> {
         self.part.elements()
+    }
+
+    /// Return paragraphs, tables, and alternative-format anchors in document order.
+    pub fn blocks(&self) -> Result<Vec<crate::docx::DocumentBlock>> {
+        self.part.blocks()
+    }
+
+    /// Return all alternative-format import anchors in XML order.
+    pub fn alt_chunks(&self) -> Result<Vec<AltChunk>> {
+        self.part.alt_chunks()
+    }
+
+    /// Resolve an alternative-format anchor to its borrowed opaque OPC payload.
+    ///
+    /// This validates the relationship type and internal target but never parses,
+    /// imports, executes, or fetches the foreign content.
+    pub fn resolve_alt_chunk<'b>(
+        &'b self,
+        chunk: &AltChunk,
+    ) -> Result<AlternativeFormatPart<'b>> {
+        let relationship = self
+            .part
+            .part()
+            .rels()
+            .get(chunk.relationship_id())
+            .ok_or_else(|| {
+                OoxmlError::InvalidFormat(format!(
+                    "altChunk relationship '{}' is missing",
+                    chunk.relationship_id()
+                ))
+            })?;
+        if relationship.is_external() {
+            return Err(OoxmlError::InvalidFormat(
+                "altChunk relationship must have an internal target".into(),
+            ));
+        }
+        if !is_alternative_format_relationship(relationship.reltype()) {
+            return Err(OoxmlError::InvalidFormat(format!(
+                "altChunk relationship '{}' has invalid type '{}'",
+                chunk.relationship_id(),
+                relationship.reltype()
+            )));
+        }
+        let target = relationship.target_partname().map_err(|error| {
+            OoxmlError::InvalidFormat(format!("invalid altChunk target: {error}"))
+        })?;
+        let part = self.opc.get_part(&target).map_err(|error| {
+            OoxmlError::PartNotFound(format!("altChunk target '{}': {error}", target.as_str()))
+        })?;
+        Ok(AlternativeFormatPart::new(part))
     }
 
     /// Get all sections in the document.

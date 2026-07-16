@@ -5,6 +5,17 @@ use std::fmt;
 /// Result type alias for XLS operations
 pub type XlsResult<T> = Result<T, XlsError>;
 
+/// Password-to-open encryption families identified in a BIFF `FILEPASS` record.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum XlsEncryptionKind {
+    /// Legacy BIFF8 binary RC4.
+    BinaryRc4,
+    /// CryptoAPI encryption.
+    CryptoApi,
+    /// An unknown `wEncryptionType` value.
+    Unknown(u16),
+}
+
 /// Errors that can occur during XLS file parsing
 #[derive(Debug)]
 pub enum XlsError {
@@ -23,6 +34,14 @@ pub enum XlsError {
     UnsupportedBiffVersion(u16),
     /// Password protected workbook
     PasswordProtected,
+    /// A password-to-open encrypted workbook was opened without a password.
+    PasswordRequired,
+    /// The supplied password did not match the `FILEPASS` verifier.
+    InvalidPassword,
+    /// The encryption family is recognized but not implemented.
+    UnsupportedEncryption(XlsEncryptionKind),
+    /// The `FILEPASS` record is structurally invalid.
+    MalformedFilePass(String),
     /// Invalid data length
     InvalidLength {
         /// Expected length
@@ -73,6 +92,14 @@ impl fmt::Display for XlsError {
             },
             XlsError::PasswordProtected => {
                 write!(f, "Workbook is password protected")
+            },
+            XlsError::PasswordRequired => write!(f, "Workbook password is required"),
+            XlsError::InvalidPassword => write!(f, "Invalid workbook password"),
+            XlsError::UnsupportedEncryption(kind) => {
+                write!(f, "Unsupported workbook encryption: {kind:?}")
+            },
+            XlsError::MalformedFilePass(message) => {
+                write!(f, "Malformed FILEPASS record: {message}")
             },
             XlsError::InvalidLength { expected, found } => {
                 write!(f, "Invalid length: expected {}, found {}", expected, found)

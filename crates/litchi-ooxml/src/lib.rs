@@ -40,6 +40,7 @@ pub mod common;
 pub mod custom_properties;
 pub mod docx;
 pub mod drawings;
+pub mod embedded_object;
 pub mod error;
 pub mod metadata;
 // OPC implementation lives in the litchi-opc crate. Re-export the public
@@ -63,10 +64,15 @@ pub mod fonts;
 pub use opc::{OpcPackage, PackURI};
 
 // Re-export common utilities
-pub use common::DocumentProperties;
+pub use common::{DocumentProperties,ExpandedName,MceCapabilities,MceError,MceLimits,MceOutput,MceReport,process_markup_compatibility};
 
 // Re-export custom properties
 pub use custom_properties::{CustomProperties, PropertyValue};
 
 // Re-export error types
 pub use error::{OoxmlError, Result};
+
+pub use embedded_object::{
+    EmbeddedPart, EmbeddedPartKind, EmbeddedPayload, EmbeddedTarget,
+    MAX_EMBEDDED_RELATIONSHIPS,
+};

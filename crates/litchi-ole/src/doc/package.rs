@@ -5,6 +5,29 @@ use std::fs::File;
 use std::io::{self, Read, Seek};
 use std::path::Path;
 
+/// Options controlling how a legacy Word document is opened.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct DocOpenOptions<'a> {
+    /// Password used for password-to-open encryption.
+    pub password: Option<&'a str>,
+}
+
+/// Password-to-open encryption schemes identified in a DOC file.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DocEncryptionKind {
+    /// Legacy Word XOR obfuscation.
+    XorObfuscation,
+    /// Office CryptoAPI encryption.
+    CryptoApi,
+    /// An encryption version not recognized by this implementation.
+    Unknown {
+        /// Encryption header major version.
+        major: u16,
+        /// Encryption header minor version.
+        minor: u16,
+    },
+}
+
 /// Error types for DOC file parsing.
 #[derive(Debug)]
 pub enum DocError {
@@ -18,6 +41,14 @@ pub enum DocError {
     StreamNotFound(String),
     /// Corrupted file
     Corrupted(String),
+    /// The document is encrypted and no password was supplied.
+    PasswordRequired,
+    /// The supplied password did not validate.
+    InvalidPassword,
+    /// The document uses a recognized but unsupported encryption scheme.
+    UnsupportedEncryption(DocEncryptionKind),
+    /// The clear encryption header is malformed.
+    MalformedEncryptionHeader(String),
 }
 
 impl From<io::Error> for DocError {
@@ -40,6 +71,14 @@ impl std::fmt::Display for DocError {
             DocError::InvalidFormat(s) => write!(f, "Invalid format: {}", s),
             DocError::StreamNotFound(s) => write!(f, "Stream not found: {}", s),
             DocError::Corrupted(s) => write!(f, "Corrupted file: {}", s),
+            DocError::PasswordRequired => write!(f, "a password is required to open this document"),
+            DocError::InvalidPassword => write!(f, "the document password is invalid"),
+            DocError::UnsupportedEncryption(kind) => {
+                write!(f, "unsupported DOC encryption: {kind:?}")
+            },
+            DocError::MalformedEncryptionHeader(s) => {
+                write!(f, "malformed DOC encryption header: {s}")
+            },
         }
     }
 }
@@ -175,6 +214,14 @@ impl<R: Read + Seek> Package<R> {
         Document::from_ole(&mut self.ole)
     }
 
+    /// Get the main document using explicit password-to-open options.
+    pub fn document_with_options(
+        &mut self,
+        options: DocOpenOptions<'_>,
+    ) -> Result<Document> {
+        Document::from_ole_with_options(&mut self.ole, options)
+    }
+
     /// Get the underlying OLE file.
     ///
     /// This provides access to lower-level OLE operations and streams.
@@ -195,6 +242,16 @@ impl From<DocError> for litchi_core::Error {
             DocError::InvalidFormat(s) => litchi_core::Error::InvalidFormat(s),
             DocError::StreamNotFound(s) => litchi_core::Error::ComponentNotFound(s),
             DocError::Corrupted(s) => litchi_core::Error::CorruptedFile(s),
+            DocError::PasswordRequired => {
+                litchi_core::Error::InvalidFormat("DOC password required".to_string())
+            },
+            DocError::InvalidPassword => {
+                litchi_core::Error::InvalidFormat("invalid DOC password".to_string())
+            },
+            DocError::UnsupportedEncryption(kind) => litchi_core::Error::InvalidFormat(format!(
+                "unsupported DOC encryption: {kind:?}"
+            )),
+            DocError::MalformedEncryptionHeader(s) => litchi_core::Error::CorruptedFile(s),
         }
     }
 }
@@ -218,5 +275,62 @@ mod tests {
         let result = Package::open("test_invalid.tmp");
         assert!(result.is_err());
         std::fs::remove_file("test_invalid.tmp").ok();
+    }
+
+    fn poi_fixture(name: &str) -> std::path::PathBuf {
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../3rdparty/poi/test-data/document")
+            .join(name)
+    }
+
+    #[test]
+    fn opens_apache_poi_binary_rc4_document() {
+        let path = poi_fixture("password_tika_binaryrc4.doc");
+
+        let mut package = Package::open(&path).unwrap();
+        assert!(matches!(
+            package.document(),
+            Err(DocError::PasswordRequired)
+        ));
+
+        let mut package = Package::open(&path).unwrap();
+        assert!(matches!(
+            package.document_with_options(DocOpenOptions {
+                password: Some("wrong"),
+            }),
+            Err(DocError::InvalidPassword)
+        ));
+
+        let mut package = Package::open(path).unwrap();
+        let document = package
+            .document_with_options(DocOpenOptions {
+                password: Some("tika"),
+            })
+            .unwrap();
+        assert!(!document.text().unwrap().trim().is_empty());
+    }
+
+    #[test]
+    fn opens_apache_poi_cryptoapi_document() {
+        let path = poi_fixture("password_password_cryptoapi.doc");
+
+        let mut package = Package::open(&path).unwrap();
+        assert!(matches!(package.document(), Err(DocError::PasswordRequired)));
+
+        let mut package = Package::open(&path).unwrap();
+        assert!(matches!(
+            package.document_with_options(DocOpenOptions {
+                password: Some("wrong"),
+            }),
+            Err(DocError::InvalidPassword)
+        ));
+
+        let mut package = Package::open(path).unwrap();
+        let document = package
+            .document_with_options(DocOpenOptions {
+                password: Some("password"),
+            })
+            .unwrap();
+        assert!(!document.text().unwrap().trim().is_empty());
     }
 }

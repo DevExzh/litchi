@@ -8,6 +8,9 @@
 /// Error types for XLS parsing
 mod error;
 
+/// BIFF8 password-to-open encryption support
+mod encryption;
+
 /// BIFF record parsing utilities
 pub mod records;
 
@@ -51,12 +54,12 @@ pub mod protection;
 pub mod writer;
 
 pub use cell::XlsCell;
-pub use error::{XlsError, XlsResult};
+pub use error::{XlsEncryptionKind, XlsError, XlsResult};
 pub use records::{
     PhoneticAlignment, PhoneticRun, PhoneticString, PhoneticType, SharedStringFormatRun,
     SharedStringProperties,
 };
 pub use shapes::XlsShape;
-pub use workbook::XlsWorkbook;
+pub use workbook::{XlsOpenOptions, XlsWorkbook};
 pub use worksheet::XlsWorksheet;
 pub use writer::XlsWriter;

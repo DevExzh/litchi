@@ -47,6 +47,12 @@ pub struct HeaderFooter {
 }
 
 impl HeaderFooter {
+    fn semantic_xml(&self) -> Result<Arc<Vec<u8>>> {
+        Ok(match crate::common::mce::process_ooxml(self.xml_bytes.as_slice())? {
+            std::borrow::Cow::Borrowed(_) => Arc::clone(&self.xml_bytes),
+            std::borrow::Cow::Owned(xml) => Arc::new(xml),
+        })
+    }
     /// Create a new HeaderFooter from a Part.
     ///
     /// # Arguments
@@ -106,7 +112,8 @@ impl HeaderFooter {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn text(&self) -> Result<String> {
-        extract_word_text(self.xml_bytes.as_slice())
+        let xml = self.semantic_xml()?;
+        extract_word_text(xml.as_slice())
     }
 
     /// Get all paragraphs in this header/footer.
@@ -131,13 +138,14 @@ impl HeaderFooter {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn paragraphs(&self) -> Result<Vec<Paragraph>> {
+        let xml = self.semantic_xml()?;
         let mut paragraphs = Vec::new();
         scan_word_element_ranges(
-            self.xml_bytes.as_slice(),
+            xml.as_slice(),
             &[b"p".as_slice()],
             |_, start, length| {
                 paragraphs.push(Paragraph::from_arc_range(
-                    Arc::clone(&self.xml_bytes),
+                    Arc::clone(&xml),
                     start,
                     length,
                 ));
@@ -169,13 +177,14 @@ impl HeaderFooter {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn tables(&self) -> Result<Vec<Table>> {
+        let xml = self.semantic_xml()?;
         let mut tables = Vec::new();
         scan_word_element_ranges(
-            self.xml_bytes.as_slice(),
+            xml.as_slice(),
             &[b"tbl".as_slice()],
             |_, start, length| {
                 tables.push(Table::from_arc_range(
-                    Arc::clone(&self.xml_bytes),
+                    Arc::clone(&xml),
                     start,
                     length,
                 ));
@@ -187,8 +196,9 @@ impl HeaderFooter {
 
     /// Get the number of paragraphs in this header/footer.
     pub fn paragraph_count(&self) -> Result<usize> {
+        let xml = self.semantic_xml()?;
         let mut count = 0;
-        scan_word_element_ranges(self.xml_bytes.as_slice(), &[b"p".as_slice()], |_, _, _| {
+        scan_word_element_ranges(xml.as_slice(), &[b"p".as_slice()], |_, _, _| {
             count += 1;
             Ok(())
         })?;
@@ -197,9 +207,10 @@ impl HeaderFooter {
 
     /// Get the number of tables in this header/footer.
     pub fn table_count(&self) -> Result<usize> {
+        let xml = self.semantic_xml()?;
         let mut count = 0;
         scan_word_element_ranges(
-            self.xml_bytes.as_slice(),
+            xml.as_slice(),
             &[b"tbl".as_slice()],
             |_, _, _| {
                 count += 1;
@@ -215,7 +226,8 @@ impl HeaderFooter {
     /// canonical Word watermark identifier or centered background-watermark
     /// shape contract.
     pub fn watermarks(&self) -> Result<Vec<Watermark>> {
-        Watermark::from_header_xml(self.xml_bytes.as_slice())
+        let xml = self.semantic_xml()?;
+        Watermark::from_header_xml(xml.as_slice())
     }
 }
 

@@ -80,8 +80,8 @@ impl DocumentVariables {
     ///
     /// Variables are stored in the `<w:docVars>` section of settings.
     pub(crate) fn extract_from_settings_part(part: &dyn Part) -> Result<Self> {
-        let xml_bytes = part.blob();
-        let mut reader = Reader::from_reader(xml_bytes);
+        let xml_bytes = crate::common::mce::process_part(part)?;
+        let mut reader = Reader::from_reader(xml_bytes.as_ref());
         reader.config_mut().trim_text(true);
 
         let mut variables = HashMap::new();

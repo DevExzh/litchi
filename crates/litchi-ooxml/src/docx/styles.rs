@@ -115,8 +115,8 @@ impl<'a> Styles<'a> {
             return Ok(());
         }
 
-        let xml_bytes = self.part.blob();
-        let mut reader = Reader::from_reader(xml_bytes);
+        let xml_bytes = crate::common::mce::process_part(self.part)?;
+        let mut reader = Reader::from_reader(xml_bytes.as_ref());
         reader.config_mut().trim_text(true);
 
         let mut styles = SmallVec::new();

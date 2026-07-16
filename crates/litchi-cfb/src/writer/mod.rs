@@ -19,6 +19,8 @@ mod difat;
 
 /// Directory tree generation
 mod directory;
+#[cfg(test)]
+pub(crate) use directory::DirectoryBuilder;
 
 /// OLE2 header generation
 mod header;

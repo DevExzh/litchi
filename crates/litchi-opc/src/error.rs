@@ -12,14 +12,53 @@ pub enum OpcError {
     #[error("Part not found: {0}")]
     PartNotFound(String),
 
+    #[error("Duplicate OPC part name: {0}")]
+    DuplicatePartName(String),
+
+    #[error("ASCII-case-equivalent OPC part names coexist: '{existing}' and '{candidate}'")]
+    EquivalentPartNames { existing: String, candidate: String },
+
+    #[error("Derived OPC part names coexist: '{existing}' and '{candidate}'")]
+    DerivedPartNames { existing: String, candidate: String },
+
     #[error("Relationship not found: {0}")]
     RelationshipNotFound(String),
 
     #[error("Content type not found for partname: {0}")]
     ContentTypeNotFound(String),
 
+    #[error("Invalid content type '{value}': {reason}")]
+    InvalidContentType { value: String, reason: String },
+
+    #[error("Invalid [Content_Types].xml manifest: {0}")]
+    InvalidContentTypesManifest(String),
+
+    #[error("Duplicate default content type mapping for extension: {0}")]
+    DuplicateContentTypeDefault(String),
+
+    #[error("Duplicate or ASCII-case-equivalent content type overrides: '{existing}' and '{candidate}'")]
+    DuplicateContentTypeOverride { existing: String, candidate: String },
+
+    #[error("Invalid content type extension: {0}")]
+    InvalidContentTypeExtension(String),
+
     #[error("Invalid relationship: {0}")]
     InvalidRelationship(String),
+
+    #[error("Invalid relationships manifest: {0}")]
+    InvalidRelationshipsManifest(String),
+
+    #[error("Duplicate relationship ID: {0}")]
+    DuplicateRelationshipId(String),
+
+    #[error("Invalid relationship TargetMode: {0}")]
+    InvalidRelationshipTargetMode(String),
+
+    #[error("A relationships part cannot be a relationship source: {0}")]
+    RelationshipPartCannotBeSource(String),
+
+    #[error("A package cannot contain more than one core-properties relationship")]
+    MultipleCorePropertiesRelationships,
 
     #[error("XML parsing error: {0}")]
     XmlError(String),

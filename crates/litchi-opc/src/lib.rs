@@ -18,6 +18,7 @@
 //! - Uses hash maps for O(1) lookups
 
 pub mod constants;
+pub mod content_type;
 pub mod error;
 pub mod package;
 pub mod packuri;
@@ -26,11 +27,16 @@ pub mod phys_pkg;
 pub mod pkgreader;
 pub mod pkgwriter;
 pub mod rel;
+pub mod signature;
 
 // Re-export commonly used types
 pub use error::{OpcError, Result};
+pub use content_type::ContentType;
 pub use package::OpcPackage;
 pub use packuri::PackURI;
 pub use part::{BlobPart, Part, XmlPart};
 pub use pkgwriter::PackageWriter;
-pub use rel::{Relationship, Relationships};
+pub use rel::{Relationship, Relationships, TargetMode};
+pub use signature::{CertificateTrust, DigitalSignatureError, DigitalSignatureVerification,
+    EmbeddedCertificate, ReferenceVerification, Sha1Policy, SignatureVerificationPolicy,
+    VerificationStatus};

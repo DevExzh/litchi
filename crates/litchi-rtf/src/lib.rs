@@ -31,6 +31,7 @@ mod bookmark;
 mod border;
 mod compressed;
 mod document;
+mod document_variable;
 mod error;
 mod field;
 mod info;
@@ -54,8 +55,12 @@ pub use border::{
 };
 pub use compressed::{compress, decompress, is_compressed_rtf};
 pub use document::RtfDocument;
+pub use document_variable::DocumentVariable;
 pub use error::{RtfError, RtfResult};
-pub use field::{Field, FieldType};
+pub use field::{
+    Field, FieldCodeError, FieldCodeToken, FieldSwitch, FieldType, HyperlinkCode, ParsedFieldCode,
+    ReferenceCode, parse_field_code,
+};
 pub use info::{DocumentInfo, DocumentProtection, ProtectionType};
 pub use lexer::CharacterSet;
 pub use list::{

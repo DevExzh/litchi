@@ -228,7 +228,8 @@ impl AnimationSequence {
     /// Parse timing XML from a slide.
     pub fn parse_timing_xml(xml: &str) -> Result<Self> {
         let mut sequence = Self::new();
-        let mut reader = Reader::from_str(xml);
+        let xml = crate::common::mce::process_str(xml)?;
+        let mut reader = Reader::from_str(xml.as_ref());
         reader.config_mut().trim_text(true);
 
         let mut current_shape_id: Option<u32> = None;

@@ -9,6 +9,7 @@ use quick_xml::encoding::Decoder;
 use quick_xml::events::BytesStart;
 use quick_xml::events::Event;
 use quick_xml::reader::NsReader;
+use std::sync::Arc;
 
 /// The main presentation part.
 ///
@@ -24,6 +25,7 @@ use quick_xml::reader::NsReader;
 pub struct PresentationPart<'a> {
     /// The underlying OPC part
     part: &'a dyn Part,
+    xml: Arc<Vec<u8>>,
 }
 
 impl<'a> PresentationPart<'a> {
@@ -39,13 +41,14 @@ impl<'a> PresentationPart<'a> {
     /// let pres_part = PresentationPart::from_part(opc_part)?;
     /// ```
     pub fn from_part(part: &'a dyn Part) -> Result<Self> {
-        Ok(Self { part })
+        let xml=match crate::common::mce::process_ooxml(part.blob())?{std::borrow::Cow::Borrowed(_)=>part.blob_arc(),std::borrow::Cow::Owned(v)=>Arc::new(v)};
+        Ok(Self { part, xml })
     }
 
     /// Get the XML bytes of the presentation.
     #[inline]
     fn xml_bytes(&self) -> &[u8] {
-        self.part.blob()
+        self.xml.as_slice()
     }
 
     /// Get the number of slides in the presentation.

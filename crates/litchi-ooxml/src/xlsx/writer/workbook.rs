@@ -632,10 +632,11 @@ impl MutableWorkbookData {
     ///
     /// # Arguments
     /// * `worksheet_rel_ids` - Vector of relationship IDs for worksheets (e.g., ["rId1", "rId2", ...])
-    pub(crate) fn generate_workbook_xml_with_rels(
+    pub(crate) fn generate_workbook_xml_with_external_rels(
         &self,
         worksheet_rel_ids: &[String],
         pivot_cache_rel_ids: &[(u32, String)],
+        external_reference_ids: &[String],
     ) -> SheetResult<String> {
         let mut xml = String::with_capacity(2048);
 
@@ -701,6 +702,15 @@ impl MutableWorkbookData {
             .map_err(|e| format!("XML write error: {}", e))?;
         }
         xml.push_str("</sheets>");
+
+        if !external_reference_ids.is_empty() {
+            xml.push_str("<externalReferences>");
+            for relationship_id in external_reference_ids {
+                write!(xml, r#"<externalReference r:id="{}"/>"#, escape_xml(relationship_id))
+                    .map_err(|e| format!("XML write error: {}", e))?;
+            }
+            xml.push_str("</externalReferences>");
+        }
 
         // Write defined names (named ranges)
         if !self.named_ranges.is_empty() {
@@ -1684,7 +1694,9 @@ mod tests {
     fn test_generate_workbook_xml_basic() {
         let wb = MutableWorkbookData::new();
         let rel_ids = vec!["rId1".to_string()];
-        let xml = wb.generate_workbook_xml_with_rels(&rel_ids, &[]).unwrap();
+        let xml = wb
+            .generate_workbook_xml_with_external_rels(&rel_ids, &[], &[])
+            .unwrap();
 
         assert!(xml.contains(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#));
         assert!(xml.contains(
@@ -1705,7 +1717,7 @@ mod tests {
         });
 
         let xml = wb
-            .generate_workbook_xml_with_rels(&["rId1".to_string()], &[])
+            .generate_workbook_xml_with_external_rels(&["rId1".to_string()], &[], &[])
             .unwrap();
 
         assert!(xml.contains(
@@ -1721,7 +1733,7 @@ mod tests {
         wb.define_name_local("LocalRange", "A1:C5", 1);
 
         let xml = wb
-            .generate_workbook_xml_with_rels(&["rId1".to_string()], &[])
+            .generate_workbook_xml_with_external_rels(&["rId1".to_string()], &[], &[])
             .unwrap();
 
         assert!(xml.contains(r#"<definedNames>"#));

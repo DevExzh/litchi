@@ -76,8 +76,8 @@ impl Theme {
 
     /// Extract theme from a theme part.
     pub(crate) fn extract_from_part(part: &dyn Part) -> Result<Self> {
-        let xml_bytes = part.blob();
-        let mut reader = NsReader::from_reader(xml_bytes);
+        let xml_bytes = crate::common::mce::process_part(part)?;
+        let mut reader = NsReader::from_reader(xml_bytes.as_ref());
 
         let mut theme = Self::new();
         let mut in_major_font = false;

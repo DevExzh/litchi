@@ -5,6 +5,22 @@ use std::fs::File;
 use std::io::{self, Read, Seek};
 use std::path::Path;
 
+/// Options controlling how a legacy PowerPoint presentation is opened.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct PptOpenOptions<'a> {
+    /// Password used for password-to-open encryption.
+    pub password: Option<&'a str>,
+}
+
+/// Password-to-open encryption schemes identified in a PPT file.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PptEncryptionKind {
+    /// Office Binary Document RC4 CryptoAPI encryption.
+    CryptoApi,
+    /// An encryption version not recognized by this implementation.
+    Unknown { major: u16, minor: u16 },
+}
+
 /// Error types for PPT file parsing.
 #[derive(Debug)]
 pub enum PptError {
@@ -18,6 +34,14 @@ pub enum PptError {
     StreamNotFound(String),
     /// Corrupted file
     Corrupted(String),
+    /// The presentation is encrypted and no password was supplied.
+    PasswordRequired,
+    /// The supplied password did not validate.
+    InvalidPassword,
+    /// The presentation uses a recognized but unsupported encryption scheme.
+    UnsupportedEncryption(PptEncryptionKind),
+    /// The clear encryption bootstrap or header is malformed.
+    MalformedEncryptionHeader(String),
 }
 
 impl From<io::Error> for PptError {
@@ -40,6 +64,16 @@ impl std::fmt::Display for PptError {
             PptError::InvalidFormat(s) => write!(f, "Invalid format: {}", s),
             PptError::StreamNotFound(s) => write!(f, "Stream not found: {}", s),
             PptError::Corrupted(s) => write!(f, "Corrupted file: {}", s),
+            PptError::PasswordRequired => {
+                write!(f, "a password is required to open this presentation")
+            },
+            PptError::InvalidPassword => write!(f, "the presentation password is invalid"),
+            PptError::UnsupportedEncryption(kind) => {
+                write!(f, "unsupported PPT encryption: {kind:?}")
+            },
+            PptError::MalformedEncryptionHeader(s) => {
+                write!(f, "malformed PPT encryption header: {s}")
+            },
         }
     }
 }
@@ -175,6 +209,14 @@ impl<R: Read + Seek> Package<R> {
         Presentation::from_ole(&mut self.ole)
     }
 
+    /// Get the main presentation using explicit password-to-open options.
+    pub fn presentation_with_options(
+        &mut self,
+        options: PptOpenOptions<'_>,
+    ) -> Result<Presentation> {
+        Presentation::from_ole_with_options(&mut self.ole, options)
+    }
+
     /// Get the underlying OLE file.
     ///
     /// This provides access to lower-level OLE operations and streams.
@@ -195,6 +237,16 @@ impl From<PptError> for litchi_core::Error {
             PptError::InvalidFormat(s) => litchi_core::Error::InvalidFormat(s),
             PptError::StreamNotFound(s) => litchi_core::Error::ComponentNotFound(s),
             PptError::Corrupted(s) => litchi_core::Error::CorruptedFile(s),
+            PptError::PasswordRequired => {
+                litchi_core::Error::InvalidFormat("presentation password is required".to_string())
+            },
+            PptError::InvalidPassword => {
+                litchi_core::Error::InvalidFormat("invalid presentation password".to_string())
+            },
+            PptError::UnsupportedEncryption(kind) => litchi_core::Error::InvalidFormat(format!(
+                "unsupported PPT encryption: {kind:?}"
+            )),
+            PptError::MalformedEncryptionHeader(s) => litchi_core::Error::CorruptedFile(s),
         }
     }
 }

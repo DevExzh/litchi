@@ -134,6 +134,9 @@ impl<W: Write> RtfWriter<W> {
         // Write document properties before body content.
         self.write_document_info(doc.info())?;
 
+        // Document variables are header-level inert metadata.
+        self.write_document_variables(doc.document_variables())?;
+
         // Headers and footers belong to the section definition before body text.
         for section in doc.sections() {
             self.write_section(section)?;
@@ -667,6 +670,64 @@ impl<W: Write> RtfWriter<W> {
     fn write_optional_i32(&mut self, control: &str, value: Option<i32>) -> io::Result<()> {
         if let Some(value) = value {
             self.write_control_word(control, Some(value))?;
+        }
+        Ok(())
+    }
+
+    /// Write ordered standard RTF document-variable destinations.
+    pub fn write_document_variables(
+        &mut self,
+        variables: &[crate::DocumentVariable<'_>],
+    ) -> io::Result<()> {
+        if variables.len() > crate::document_variable::MAX_DOCUMENT_VARIABLES {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "RTF document-variable count limit exceeded",
+            ));
+        }
+        let mut aggregate = 0usize;
+        for variable in variables {
+            variable
+                .validate()
+                .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error))?;
+            aggregate = aggregate
+                .checked_add(variable.name.len())
+                .and_then(|size| size.checked_add(variable.value.len()))
+                .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "document-variable size overflow"))?;
+            if aggregate > crate::document_variable::MAX_DOCUMENT_VARIABLE_TEXT_BYTES {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF document-variable aggregate text limit exceeded",
+                ));
+            }
+            self.write_str("{\\*")?;
+            self.write_control_word("docvar", None)?;
+            self.write_str(" {")?;
+            self.write_destination_text(variable.name.as_ref())?;
+            self.write_str("}{")?;
+            self.write_destination_text(variable.value.as_ref())?;
+            self.write_str("}}")?;
+        }
+        Ok(())
+    }
+
+    fn write_destination_text(&mut self, text: &str) -> io::Result<()> {
+        for character in text.chars() {
+            match character {
+                '\\' => self.write_str("\\\\")?,
+                '{' => self.write_str("\\{")?,
+                '}' => self.write_str("\\}")?,
+                character if character.is_ascii_control() => {
+                    write!(self.writer, "\\'{:02x}", character as u8)?;
+                },
+                character if character.is_ascii() => write!(self.writer, "{character}")?,
+                character => {
+                    for unit in character.encode_utf16(&mut [0; 2]).iter().copied() {
+                        self.write_control_word("u", Some(i32::from(unit as i16)))?;
+                        self.write_str("?")?;
+                    }
+                },
+            }
         }
         Ok(())
     }
@@ -1453,12 +1514,37 @@ impl<W: Write> RtfWriter<W> {
 
     /// Write a hyperlink field
     pub fn write_hyperlink(&mut self, url: &str, display_text: &str) -> io::Result<()> {
+        let instruction = format!(
+            "HYPERLINK {}",
+            crate::field::quoted_field_operand(url)
+        );
+        self.write_hyperlink_instruction(&instruction, display_text)
+    }
+
+    /// Write an internal bookmark hyperlink without exposing raw field syntax.
+    pub fn write_internal_hyperlink(
+        &mut self,
+        bookmark: &str,
+        display_text: &str,
+    ) -> io::Result<()> {
+        let instruction = format!(
+            "HYPERLINK \\l {}",
+            crate::field::quoted_field_operand(bookmark)
+        );
+        self.write_hyperlink_instruction(&instruction, display_text)
+    }
+
+    fn write_hyperlink_instruction(
+        &mut self,
+        instruction: &str,
+        display_text: &str,
+    ) -> io::Result<()> {
         self.write_str("{\\field")?;
 
         // Field instruction
-        self.write_str("{\\*\\fldinst{HYPERLINK \"")?;
-        self.write_text(url)?;
-        self.write_str("\"}}")?;
+        self.write_str("{\\*\\fldinst{")?;
+        self.write_text(instruction)?;
+        self.write_str("}}")?;
 
         // Field result (display text)
         self.write_str("{\\fldrslt{")?;

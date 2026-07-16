@@ -121,7 +121,8 @@ impl Numbering {
     ///
     /// A Numbering object
     pub(crate) fn extract_from_part(part: &dyn Part) -> Result<Self> {
-        let mut reader = NsReader::from_reader(part.blob());
+        let xml = crate::common::mce::process_part(part)?;
+        let mut reader = NsReader::from_reader(xml.as_ref());
         let mut abstract_nums = Vec::new();
         let mut nums = Vec::new();
         let mut pending_abstract: Option<PendingAbstract> = None;

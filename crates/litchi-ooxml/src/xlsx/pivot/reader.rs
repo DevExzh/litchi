@@ -108,7 +108,8 @@ pub fn read_pivot_tables(package: &OpcPackage) -> SheetResult<Vec<PivotTable>> {
             let cache = pivot_caches
                 .get(expected_cache_id)
                 .ok_or("resolved pivot cache is missing")?;
-            let xml = std::str::from_utf8(table_part.blob())?;
+            let bytes = crate::common::mce::process_part(table_part)?;
+            let xml = std::str::from_utf8(bytes.as_ref())?;
 
             let mut table = parse_pivot_table_definition_with_cache(
                 xml,
@@ -180,7 +181,8 @@ fn resolve_workbook_pivot_caches(
             cache_part.content_type(),
             ct::SML_PIVOT_CACHE_DEFINITION,
         )?;
-        let xml = std::str::from_utf8(cache_part.blob())?;
+        let bytes = crate::common::mce::process_part(cache_part)?;
+        let xml = std::str::from_utf8(bytes.as_ref())?;
         let mut definition = read_pivot_cache_definition(xml)?.ok_or_else(|| {
             format!("pivot-cache part '{cache_uri}' has no pivotCacheDefinition root")
         })?;
@@ -240,7 +242,8 @@ fn validate_pivot_cache_relationships(
             records_part.content_type(),
             ct::SML_PIVOT_CACHE_RECORDS,
         )?;
-        let records_xml = std::str::from_utf8(records_part.blob())?;
+        let bytes = crate::common::mce::process_part(records_part)?;
+        let records_xml = std::str::from_utf8(bytes.as_ref())?;
         validate_pivot_cache_records(
             records_xml,
             &definition.cache_fields,
@@ -1744,11 +1747,12 @@ mod tests {
     #[test]
     fn rejects_external_and_wrong_content_type_pivot_parts() {
         let (mut package, worksheet_uri) = package_with_pivot_table();
-        package
+        let relationships = package
             .get_part_mut(&worksheet_uri)
             .unwrap()
-            .rels_mut()
-            .add_relationship(
+            .rels_mut();
+        relationships.remove("rId1").unwrap();
+        relationships.add_relationship(
                 rt::STRICT_PIVOT_TABLE.to_string(),
                 "https://example.com/pivot.xml".to_string(),
                 "rId1".to_string(),
@@ -1773,11 +1777,12 @@ mod tests {
         let records_uri = PackURI::new("/custom/cache/records.xml").unwrap();
 
         let (mut package, _) = package_with_pivot_table();
-        package
+        let relationships = package
             .get_part_mut(&workbook_uri)
             .unwrap()
-            .rels_mut()
-            .add_relationship(
+            .rels_mut();
+        relationships.remove("rId3").unwrap();
+        relationships.add_relationship(
                 rt::STRICT_PIVOT_CACHE_DEFINITION.to_string(),
                 "https://example.com/cache.xml".to_string(),
                 "rId3".to_string(),
@@ -1826,11 +1831,12 @@ mod tests {
         assert!(read_pivot_tables(&package).is_err());
 
         let (mut package, _) = package_with_pivot_table();
-        package
+        let relationships = package
             .get_part_mut(&cache_uri)
             .unwrap()
-            .rels_mut()
-            .add_relationship(
+            .rels_mut();
+        relationships.remove("rId2").unwrap();
+        relationships.add_relationship(
                 rt::STRICT_WORKSHEET.to_string(),
                 "https://example.com/source.xml".to_string(),
                 "rId2".to_string(),

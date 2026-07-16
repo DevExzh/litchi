@@ -43,6 +43,15 @@ impl PptRecord {
     ///
     /// Tuple of (parsed_record, bytes_consumed)
     pub fn parse(data: &[u8], offset: usize) -> Result<(Self, usize)> {
+        Self::parse_impl(data, offset, false)
+    }
+
+    /// Parse a record without truncation recovery or byte resynchronization.
+    pub(crate) fn parse_strict(data: &[u8], offset: usize) -> Result<(Self, usize)> {
+        Self::parse_impl(data, offset, true)
+    }
+
+    fn parse_impl(data: &[u8], offset: usize, strict: bool) -> Result<(Self, usize)> {
         if offset + 8 > data.len() {
             return Err(PptError::Corrupted(
                 "Not enough data for PPT record header".to_string(),
@@ -80,6 +89,11 @@ impl PptRecord {
         // Check if record data extends beyond available data
         let available_data_size = data.len().saturating_sub(offset + 8);
         if data_length as usize > available_data_size {
+            if strict {
+                return Err(PptError::Corrupted(format!(
+                    "PPT record at offset {offset} extends beyond its containing data"
+                )));
+            }
             // If this is a container record and we have at least some data, try to parse partially
             if Self::is_container_record(record_type_enum) && available_data_size > 0 {
                 // For container records, we can still parse what we have
@@ -106,8 +120,12 @@ impl PptRecord {
 
         // Parse children if this is a container record
         if Self::is_container_record(record_type_enum) && actual_data_size > 0 {
-            record.children =
-                Self::parse_container_children(&data[offset + 8..offset + 8 + actual_data_size])?;
+            let children_data = &data[offset + 8..offset + 8 + actual_data_size];
+            record.children = if strict {
+                Self::parse_container_children_strict(children_data)?
+            } else {
+                Self::parse_container_children(children_data)?
+            };
         }
 
         Ok((record, 8 + actual_data_size))
@@ -117,9 +135,10 @@ impl PptRecord {
     fn is_container_record(record_type: PptRecordType) -> bool {
         matches!(
             record_type,
-            PptRecordType::Document
+                PptRecordType::Document
                 | PptRecordType::Slide
                 | PptRecordType::Notes
+                | PptRecordType::Handout
                 | PptRecordType::MainMaster
                 | PptRecordType::HeadersFooters
                 | PptRecordType::ExObjList
@@ -190,6 +209,27 @@ impl PptRecord {
             }
         }
 
+        Ok(children)
+    }
+
+    fn parse_container_children_strict(data: &[u8]) -> Result<Vec<PptRecord>> {
+        let mut children = Vec::new();
+        let mut offset = 0usize;
+        while offset < data.len() {
+            if data.len() - offset < 8 {
+                return Err(PptError::Corrupted(
+                    "container ends with a truncated record header".to_string(),
+                ));
+            }
+            let (child, consumed) = Self::parse_impl(data, offset, true)?;
+            if consumed == 0 {
+                return Err(PptError::Corrupted(
+                    "zero-length progress while parsing a PPT container".to_string(),
+                ));
+            }
+            children.push(child);
+            offset += consumed;
+        }
         Ok(children)
     }
 
@@ -370,6 +410,18 @@ impl PptRecord {
                 .map(|v| v.get() as usize)
                 .unwrap_or(0);
         }
+        if record.data.len() >= 28 {
+            info.notes_master_persist_id_ref =
+                U32::<LittleEndian>::read_from_bytes(&record.data[24..28])
+                    .map(|v| v.get())
+                    .unwrap_or(0);
+        }
+        if record.data.len() >= 32 {
+            info.handout_master_persist_id_ref =
+                U32::<LittleEndian>::read_from_bytes(&record.data[28..32])
+                    .map(|v| v.get())
+                    .unwrap_or(0);
+        }
 
         info
     }
@@ -390,9 +442,7 @@ impl PptRecord {
             info.has_drawing = true;
         }
 
-        if self.find_child(PptRecordType::Notes).is_some() {
-            info.has_notes = true;
-        }
+        info.has_notes = info.notes_id != 0;
 
         Some(info)
     }
@@ -401,14 +451,14 @@ impl PptRecord {
     fn parse_slide_atom(record: &PptRecord) -> SlideInfo {
         let mut info = SlideInfo::default();
 
-        if record.data.len() >= 12 {
+        if record.data.len() >= 20 {
             info.layout_id = U32::<LittleEndian>::read_from_bytes(&record.data[0..4])
                 .map(|v| v.get())
                 .unwrap_or(0);
-            info.master_id = U32::<LittleEndian>::read_from_bytes(&record.data[4..8])
+            info.master_id = U32::<LittleEndian>::read_from_bytes(&record.data[12..16])
                 .map(|v| v.get())
                 .unwrap_or(0);
-            info.notes_id = U32::<LittleEndian>::read_from_bytes(&record.data[8..12])
+            info.notes_id = U32::<LittleEndian>::read_from_bytes(&record.data[16..20])
                 .map(|v| v.get())
                 .unwrap_or(0);
         }

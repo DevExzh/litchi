@@ -61,6 +61,19 @@ impl PptRecordParser {
         Ok(())
     }
 
+    /// Parse only the validated live persist objects of an encrypted document.
+    pub(crate) fn parse_document_at_offsets(
+        &mut self,
+        data: &[u8],
+        offsets: &[usize],
+    ) -> Result<()> {
+        for &offset in offsets {
+            let (record, _) = PptRecord::parse_strict(data, offset)?;
+            self.records.push(record);
+        }
+        self.extract_slide_text_from_document()
+    }
+
     /// Extract slide text from the document.
     /// Based on POI's QuickButCruddyTextExtractor approach.
     fn extract_slide_text_from_document(&mut self) -> Result<()> {

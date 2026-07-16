@@ -3,6 +3,7 @@
 //! This module provides functionality to serialize and write OPC packages to disk,
 //! including writing the [Content_Types].xml, relationships, and all parts.
 use crate::constants::content_type as ct;
+use crate::content_type::ContentType;
 use crate::error::Result;
 use crate::package::OpcPackage;
 use crate::packuri::{CONTENT_TYPES_URI, PACKAGE_URI, PackURI};
@@ -81,7 +82,7 @@ impl PackageWriter {
     ///
     /// This file maps file extensions and part names to content types.
     fn write_content_types(phys_writer: &mut PhysPkgWriter, package: &OpcPackage) -> Result<()> {
-        let cti = ContentTypesItem::from_package(package);
+        let cti = ContentTypesItem::from_package(package)?;
         let blob = cti.to_xml();
 
         let content_types_uri =
@@ -131,53 +132,53 @@ impl PackageWriter {
 /// Manages Default and Override elements for content type mapping.
 struct ContentTypesItem {
     /// Default content types by extension
-    defaults: HashMap<String, String>,
+    defaults: HashMap<String, ContentType>,
 
     /// Override content types by partname
-    overrides: HashMap<String, String>,
+    overrides: HashMap<String, ContentType>,
 }
 
 impl ContentTypesItem {
     /// Create a new ContentTypesItem.
-    fn new() -> Self {
+    fn new() -> Result<Self> {
         let mut defaults = HashMap::new();
 
         // Add standard defaults
-        defaults.insert("rels".to_string(), ct::OPC_RELATIONSHIPS.to_string());
-        defaults.insert("xml".to_string(), ct::XML.to_string());
+        defaults.insert("rels".to_string(), ContentType::new(ct::OPC_RELATIONSHIPS)?);
+        defaults.insert("xml".to_string(), ContentType::new(ct::XML)?);
 
-        Self {
+        Ok(Self {
             defaults,
             overrides: HashMap::new(),
-        }
+        })
     }
 
     /// Build ContentTypesItem from an OPC package.
-    fn from_package(package: &OpcPackage) -> Self {
-        let mut cti = Self::new();
+    fn from_package(package: &OpcPackage) -> Result<Self> {
+        let mut cti = Self::new()?;
 
         for part in package.iter_parts() {
-            cti.add_content_type(part.partname(), part.content_type());
+            cti.add_content_type(part.partname(), part.content_type())?;
         }
 
-        cti
+        Ok(cti)
     }
 
     /// Add a content type for a part.
     ///
     /// Uses a default mapping if the extension matches a well-known type,
     /// otherwise uses an override for the specific partname.
-    fn add_content_type(&mut self, partname: &PackURI, content_type: &str) {
-        let ext = partname.ext();
+    fn add_content_type(&mut self, partname: &PackURI, content_type: &str) -> Result<()> {
+        let ext = partname.ext().to_ascii_lowercase();
+        let content_type = ContentType::new(content_type)?;
 
         // Check if this is a standard default mapping
-        if Self::is_default_content_type(ext, content_type) {
-            self.defaults
-                .insert(ext.to_string(), content_type.to_string());
+        if Self::is_default_content_type(&ext, content_type.as_str()) {
+            self.defaults.insert(ext, content_type);
         } else {
-            self.overrides
-                .insert(partname.to_string(), content_type.to_string());
+            self.overrides.insert(partname.to_string(), content_type);
         }
+        Ok(())
     }
 
     /// Check if an extension/content-type pair is a standard default.
@@ -217,7 +218,7 @@ impl ContentTypesItem {
             xml.push_str(&format!(
                 r#"<Default Extension="{}" ContentType="{}"/>"#,
                 escape_xml(ext),
-                escape_xml(content_type)
+                escape_xml(content_type.as_str())
             ));
         }
 
@@ -229,7 +230,7 @@ impl ContentTypesItem {
             xml.push_str(&format!(
                 r#"<Override PartName="{}" ContentType="{}"/>"#,
                 escape_xml(partname),
-                escape_xml(content_type)
+                escape_xml(content_type.as_str())
             ));
         }
 
@@ -245,17 +246,31 @@ mod tests {
 
     #[test]
     fn test_content_types_xml() {
-        let mut cti = ContentTypesItem::new();
+        let mut cti = ContentTypesItem::new().unwrap();
         cti.defaults
-            .insert("png".to_string(), "image/png".to_string());
+            .insert("png".to_string(), ContentType::new("image/png").unwrap());
         cti.overrides.insert(
             "/word/document.xml".to_string(),
-            ct::WML_DOCUMENT_MAIN.to_string(),
+            ContentType::new(ct::WML_DOCUMENT_MAIN).unwrap(),
         );
 
         let xml = cti.to_xml();
 
         assert!(xml.contains(r#"<Default Extension="png" ContentType="image/png"/>"#));
         assert!(xml.contains(r#"<Override PartName="/word/document.xml""#));
+    }
+
+    #[test]
+    fn rejects_invalid_part_content_type_before_writing() {
+        let mut package = OpcPackage::new();
+        package.add_part(Box::new(crate::BlobPart::new(
+            PackURI::new("/custom/data.bin").unwrap(),
+            "application/octet-stream (comment)".to_string(),
+            Vec::new(),
+        )));
+        assert!(matches!(
+            PackageWriter::to_bytes(&package),
+            Err(crate::OpcError::InvalidContentType { .. })
+        ));
     }
 }

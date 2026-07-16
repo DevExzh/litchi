@@ -1,0 +1,980 @@
+//! Inert semantic discovery of embedded ODF and OLE objects.
+
+use crate::elements::xml::namespaced_attribute;
+use crate::media::{is_linked_href, resolve_package_path};
+use crate::OdfImageFrame;
+use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+use litchi_core::{Error, Result};
+use quick_xml::events::{BytesRef, BytesStart, Event};
+use quick_xml::name::{Namespace, ResolveResult};
+use quick_xml::reader::NsReader;
+use quick_xml::{Writer, XmlVersion};
+
+const DRAW_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
+const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
+const SVG_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0";
+const TABLE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:table:1.0";
+const TEXT_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:text:1.0";
+const MATH_NAMESPACE: &[u8] = b"http://www.w3.org/1998/Math/MathML";
+const XLINK_NAMESPACE: &[u8] = b"http://www.w3.org/1999/xlink";
+const XML_NAMESPACE: &[u8] = b"http://www.w3.org/XML/1998/namespace";
+
+const MAX_OBJECT_DEPTH: usize = 4_096;
+const MAX_OBJECTS: usize = 100_000;
+const MAX_ATTRIBUTE_BYTES: usize = 64 * 1024;
+const MAX_INLINE_XML_BYTES: usize = 16 * 1024 * 1024;
+const MAX_TOTAL_INLINE_XML_BYTES: usize = 64 * 1024 * 1024;
+const MAX_INLINE_ENCODED_BYTES: usize = 24 * 1024 * 1024;
+const MAX_INLINE_BINARY_BYTES: usize = 16 * 1024 * 1024;
+const MAX_TOTAL_INLINE_BINARY_BYTES: usize = 64 * 1024 * 1024;
+const MAX_ACCESSIBILITY_TEXT_BYTES: usize = 64 * 1024;
+const MAX_TOTAL_ACCESSIBILITY_TEXT_BYTES: usize = 8 * 1024 * 1024;
+
+/// XML part containing an embedded-object occurrence.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum OdfEmbeddedObjectPart {
+    Content,
+    Styles,
+    FlatDocument,
+}
+
+/// Normative embedded-object element kind.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum OdfEmbeddedObjectKind {
+    Object,
+    ObjectOle,
+}
+
+/// Root kind of an inline XML object payload.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum OdfInlineObjectRoot {
+    OpenDocument,
+    MathMl,
+}
+
+/// Inert storage classification for an embedded object.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum OdfEmbeddedObjectSource {
+    InlineXml {
+        root: OdfInlineObjectRoot,
+        xml: String,
+        ignored_href: Option<String>,
+    },
+    InlineBinary {
+        bytes: Vec<u8>,
+        ignored_href: Option<String>,
+    },
+    PackageFile {
+        href: String,
+        path: String,
+        manifest_media_type: Option<String>,
+    },
+    PackageSubdocument {
+        href: String,
+        root_path: String,
+        content_path: String,
+        manifest_media_type: Option<String>,
+    },
+    MissingPackagePart {
+        href: String,
+        resolved_path: String,
+    },
+    Linked { href: String },
+    Missing,
+}
+
+/// One inert `draw:object` or `draw:object-ole` occurrence.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct OdfEmbeddedObject {
+    pub part: OdfEmbeddedObjectPart,
+    pub kind: OdfEmbeddedObjectKind,
+    pub source: OdfEmbeddedObjectSource,
+    pub frame: Option<OdfImageFrame>,
+    pub xml_id: Option<String>,
+    pub class_id: Option<String>,
+    pub notify_on_update_of_ranges: Option<String>,
+    pub link_type: Option<String>,
+    pub show: Option<String>,
+    pub actuate: Option<String>,
+}
+
+#[derive(Clone, Copy)]
+struct PackageLookup<'a> {
+    has_file: &'a dyn Fn(&str) -> bool,
+    media_type: &'a dyn Fn(&str) -> Option<String>,
+}
+
+struct NamedContext {
+    depth: usize,
+    name: Option<String>,
+}
+
+struct FrameState {
+    depth: usize,
+    frame: OdfImageFrame,
+    object_indices: Vec<usize>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum AccessibilityKind {
+    Title,
+    Description,
+}
+
+struct AccessibilityText {
+    depth: usize,
+    kind: AccessibilityKind,
+    value: String,
+}
+
+struct InlineXmlCapture {
+    depth: usize,
+    root: OdfInlineObjectRoot,
+    writer: Writer<Vec<u8>>,
+}
+
+struct ObjectBuilder {
+    depth: usize,
+    kind: OdfEmbeddedObjectKind,
+    href: Option<String>,
+    frame: Option<OdfImageFrame>,
+    xml_id: Option<String>,
+    class_id: Option<String>,
+    notify_on_update_of_ranges: Option<String>,
+    link_type: Option<String>,
+    show: Option<String>,
+    actuate: Option<String>,
+    inline_xml: Option<(OdfInlineObjectRoot, String)>,
+    binary_present: bool,
+    binary_depth: Option<usize>,
+    binary_encoded: String,
+}
+
+pub(crate) fn scan_packaged_objects(
+    content_xml: &str,
+    styles_xml: Option<&str>,
+    has_file: impl Fn(&str) -> bool,
+    media_type: impl Fn(&str) -> Option<String>,
+) -> Result<Vec<OdfEmbeddedObject>> {
+    let lookup = PackageLookup {
+        has_file: &has_file,
+        media_type: &media_type,
+    };
+    let mut objects = Vec::new();
+    let mut total_xml = 0usize;
+    let mut total_binary = 0usize;
+    let mut total_accessibility = 0usize;
+    scan_xml(
+        content_xml,
+        OdfEmbeddedObjectPart::Content,
+        Some(lookup),
+        &mut objects,
+        &mut total_xml,
+        &mut total_binary,
+        &mut total_accessibility,
+    )?;
+    if let Some(styles_xml) = styles_xml {
+        scan_xml(
+            styles_xml,
+            OdfEmbeddedObjectPart::Styles,
+            Some(lookup),
+            &mut objects,
+            &mut total_xml,
+            &mut total_binary,
+            &mut total_accessibility,
+        )?;
+    }
+    Ok(objects)
+}
+
+pub(crate) fn scan_flat_objects(xml: &str) -> Result<Vec<OdfEmbeddedObject>> {
+    let mut objects = Vec::new();
+    let mut total_xml = 0usize;
+    let mut total_binary = 0usize;
+    let mut total_accessibility = 0usize;
+    scan_xml(
+        xml,
+        OdfEmbeddedObjectPart::FlatDocument,
+        None,
+        &mut objects,
+        &mut total_xml,
+        &mut total_binary,
+        &mut total_accessibility,
+    )?;
+    Ok(objects)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn scan_xml(
+    xml: &str,
+    part: OdfEmbeddedObjectPart,
+    package: Option<PackageLookup<'_>>,
+    objects: &mut Vec<OdfEmbeddedObject>,
+    total_xml_bytes: &mut usize,
+    total_binary_bytes: &mut usize,
+    total_accessibility_bytes: &mut usize,
+) -> Result<()> {
+    let mut reader = NsReader::from_str(xml);
+    let mut buffer = Vec::new();
+    let mut depth = 0usize;
+    let mut frames = Vec::<FrameState>::new();
+    let mut pages = Vec::<NamedContext>::new();
+    let mut sheets = Vec::<NamedContext>::new();
+    let mut active: Option<ObjectBuilder> = None;
+    let mut inline_capture: Option<InlineXmlCapture> = None;
+    let mut accessibility: Option<AccessibilityText> = None;
+
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| Error::InvalidFormat(format!("invalid embedded-object XML: {error}")))?;
+
+        if matches!(&event, Event::DocType(_)) {
+            return Err(Error::InvalidFormat(
+                "DTDs are not allowed while scanning embedded objects".to_string(),
+            ));
+        }
+
+        if inline_capture.is_some() {
+            match event {
+                Event::Start(element) => {
+                    depth = checked_depth(depth)?;
+                    write_inline_event(
+                        inline_capture.as_mut().expect("active inline XML"),
+                        Event::Start(element),
+                    )?;
+                },
+                Event::Empty(element) => write_inline_event(
+                    inline_capture.as_mut().expect("active inline XML"),
+                    Event::Empty(element),
+                )?,
+                Event::End(element) => {
+                    let closing_root = inline_capture
+                        .as_ref()
+                        .is_some_and(|capture| capture.depth == depth);
+                    write_inline_event(
+                        inline_capture.as_mut().expect("active inline XML"),
+                        Event::End(element),
+                    )?;
+                    if closing_root {
+                        finish_inline_xml(
+                            inline_capture.take().expect("closing inline XML"),
+                            active.as_mut().expect("inline XML object"),
+                            total_xml_bytes,
+                        )?;
+                    }
+                    depth = depth.checked_sub(1).ok_or_else(|| {
+                        Error::InvalidFormat("embedded-object XML stack underflow".to_string())
+                    })?;
+                },
+                Event::Eof => {
+                    return Err(Error::InvalidFormat(
+                        "unterminated inline embedded-object XML".to_string(),
+                    ));
+                },
+                event => write_inline_event(
+                    inline_capture.as_mut().expect("active inline XML"),
+                    event,
+                )?,
+            }
+            buffer.clear();
+            continue;
+        }
+
+        match event {
+            Event::Start(element) => {
+                depth = checked_depth(depth)?;
+                if active.as_ref().and_then(|object| object.binary_depth).is_some() {
+                    return Err(Error::InvalidFormat(
+                        "office:binary-data must not contain elements".to_string(),
+                    ));
+                }
+                if accessibility.is_some() {
+                    return Err(Error::InvalidFormat(
+                        "svg:title and svg:desc must not contain elements".to_string(),
+                    ));
+                }
+
+                if let Some(object) = active.as_mut() {
+                    if bound_to(&namespace, DRAW_NAMESPACE)
+                        && matches!(element.local_name().as_ref(), b"object" | b"object-ole")
+                    {
+                        return Err(Error::InvalidFormat(
+                            "nested embedded-object elements are not allowed".to_string(),
+                        ));
+                    }
+                    if depth == object.depth + 1
+                        && let Some(root) = inline_root(&namespace, &element)
+                    {
+                        if object.kind != OdfEmbeddedObjectKind::Object {
+                            return Err(Error::InvalidFormat(
+                                "draw:object-ole must not contain inline XML objects".to_string(),
+                            ));
+                        }
+                        if object.inline_xml.is_some() {
+                            return Err(Error::InvalidFormat(
+                                "draw:object contains multiple inline payloads".to_string(),
+                            ));
+                        }
+                        let mut capture = InlineXmlCapture {
+                            depth,
+                            root,
+                            writer: Writer::new(Vec::new()),
+                        };
+                        write_inline_event(&mut capture, Event::Start(element))?;
+                        inline_capture = Some(capture);
+                    } else if depth == object.depth + 1
+                        && bound_to(&namespace, OFFICE_NAMESPACE)
+                        && element.local_name().as_ref() == b"binary-data"
+                    {
+                        if object.kind != OdfEmbeddedObjectKind::ObjectOle {
+                            return Err(Error::InvalidFormat(
+                                "draw:object must not contain office:binary-data".to_string(),
+                            ));
+                        }
+                        if object.binary_present {
+                            return Err(Error::InvalidFormat(
+                                "draw:object-ole contains multiple office:binary-data elements"
+                                    .to_string(),
+                            ));
+                        }
+                        object.binary_present = true;
+                        object.binary_depth = Some(depth);
+                    }
+                } else if frames
+                    .last()
+                    .is_some_and(|frame| depth == frame.depth + 1)
+                    && let Some(kind) =
+                        accessibility_kind(&namespace, element.local_name().as_ref())
+                {
+                    begin_accessibility(
+                        frames.last_mut().expect("direct frame child"),
+                        kind,
+                        depth,
+                        &mut accessibility,
+                    )?;
+                } else if bound_to(&namespace, DRAW_NAMESPACE)
+                    && element.local_name().as_ref() == b"page"
+                {
+                    pages.push(NamedContext {
+                        depth,
+                        name: attribute(&reader, &element, DRAW_NAMESPACE, b"name")?,
+                    });
+                } else if bound_to(&namespace, TABLE_NAMESPACE)
+                    && element.local_name().as_ref() == b"table"
+                {
+                    sheets.push(NamedContext {
+                        depth,
+                        name: attribute(&reader, &element, TABLE_NAMESPACE, b"name")?,
+                    });
+                } else if bound_to(&namespace, DRAW_NAMESPACE)
+                    && element.local_name().as_ref() == b"frame"
+                {
+                    frames.push(FrameState {
+                        depth,
+                        frame: parse_frame(&reader, &element, &pages, &sheets)?,
+                        object_indices: Vec::new(),
+                    });
+                } else if let Some(kind) = object_kind(&namespace, &element) {
+                    ensure_object_capacity(objects.len())?;
+                    active = Some(start_object(
+                        &reader,
+                        &element,
+                        depth,
+                        kind,
+                        objects.len(),
+                        frames.last_mut(),
+                    )?);
+                }
+            },
+            Event::Empty(element) => {
+                if active.as_ref().and_then(|object| object.binary_depth).is_some() {
+                    return Err(Error::InvalidFormat(
+                        "office:binary-data must not contain elements".to_string(),
+                    ));
+                }
+                if accessibility.is_some() {
+                    return Err(Error::InvalidFormat(
+                        "svg:title and svg:desc must not contain elements".to_string(),
+                    ));
+                }
+                if let Some(object) = active.as_mut() {
+                    if depth == object.depth
+                        && let Some(root) = inline_root(&namespace, &element)
+                    {
+                        if object.kind != OdfEmbeddedObjectKind::Object
+                            || object.inline_xml.is_some()
+                        {
+                            return Err(Error::InvalidFormat(
+                                "invalid duplicate inline embedded-object payload".to_string(),
+                            ));
+                        }
+                        let mut capture = InlineXmlCapture {
+                            depth: depth + 1,
+                            root,
+                            writer: Writer::new(Vec::new()),
+                        };
+                        write_inline_event(&mut capture, Event::Empty(element))?;
+                        finish_inline_xml(capture, object, total_xml_bytes)?;
+                    } else if depth == object.depth
+                        && bound_to(&namespace, OFFICE_NAMESPACE)
+                        && element.local_name().as_ref() == b"binary-data"
+                    {
+                        if object.kind != OdfEmbeddedObjectKind::ObjectOle
+                            || object.binary_present
+                        {
+                            return Err(Error::InvalidFormat(
+                                "invalid duplicate inline OLE payload".to_string(),
+                            ));
+                        }
+                        object.binary_present = true;
+                    } else if bound_to(&namespace, DRAW_NAMESPACE)
+                        && matches!(element.local_name().as_ref(), b"object" | b"object-ole")
+                    {
+                        return Err(Error::InvalidFormat(
+                            "nested embedded-object elements are not allowed".to_string(),
+                        ));
+                    }
+                } else if frames.last().is_some_and(|frame| depth == frame.depth)
+                    && let Some(kind) =
+                        accessibility_kind(&namespace, element.local_name().as_ref())
+                {
+                    set_empty_accessibility(
+                        frames.last_mut().expect("direct frame child"),
+                        kind,
+                    )?;
+                } else if let Some(kind) = object_kind(&namespace, &element) {
+                    ensure_object_capacity(objects.len())?;
+                    let object = start_object(
+                        &reader,
+                        &element,
+                        depth + 1,
+                        kind,
+                        objects.len(),
+                        frames.last_mut(),
+                    )?;
+                    objects.push(finish_object(object, part, package, total_binary_bytes)?);
+                }
+            },
+            Event::Text(value) if active.as_ref().and_then(|object| object.binary_depth).is_some() => {
+                let value = value.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
+                    Error::InvalidFormat(format!("invalid inline OLE text: {error}"))
+                })?;
+                append_binary(active.as_mut().expect("active OLE object"), &value)?;
+            },
+            Event::CData(value) if active.as_ref().and_then(|object| object.binary_depth).is_some() => {
+                let value = value.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
+                    Error::InvalidFormat(format!("invalid inline OLE CDATA: {error}"))
+                })?;
+                append_binary(active.as_mut().expect("active OLE object"), &value)?;
+            },
+            Event::GeneralRef(_) if active.as_ref().and_then(|object| object.binary_depth).is_some() => {
+                return Err(Error::InvalidFormat(
+                    "XML references are not allowed in office:binary-data".to_string(),
+                ));
+            },
+            Event::Text(value) if accessibility.is_some() => {
+                let value = value.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
+                    Error::InvalidFormat(format!("invalid object accessibility text: {error}"))
+                })?;
+                append_accessibility(
+                    accessibility.as_mut().expect("active accessibility text"),
+                    &value,
+                    total_accessibility_bytes,
+                )?;
+            },
+            Event::CData(value) if accessibility.is_some() => {
+                let value = value.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
+                    Error::InvalidFormat(format!("invalid object accessibility CDATA: {error}"))
+                })?;
+                append_accessibility(
+                    accessibility.as_mut().expect("active accessibility text"),
+                    &value,
+                    total_accessibility_bytes,
+                )?;
+            },
+            Event::GeneralRef(value) if accessibility.is_some() => {
+                let value = decode_reference(&value)?;
+                append_accessibility(
+                    accessibility.as_mut().expect("active accessibility text"),
+                    &value,
+                    total_accessibility_bytes,
+                )?;
+            },
+            Event::End(element) => {
+                if accessibility.as_ref().map(|text| text.depth) == Some(depth) {
+                    let text = accessibility.take().expect("active accessibility text");
+                    if accessibility_kind(&namespace, element.local_name().as_ref())
+                        != Some(text.kind)
+                    {
+                        return Err(Error::InvalidFormat(
+                            "malformed object accessibility element".to_string(),
+                        ));
+                    }
+                    finish_accessibility(
+                        frames.last_mut().ok_or_else(|| {
+                            Error::InvalidFormat(
+                                "object accessibility text has no enclosing frame".to_string(),
+                            )
+                        })?,
+                        text,
+                    )?;
+                } else if let Some(object) = active.as_mut()
+                    && object.binary_depth == Some(depth)
+                {
+                    if !bound_to(&namespace, OFFICE_NAMESPACE)
+                        || element.local_name().as_ref() != b"binary-data"
+                    {
+                        return Err(Error::InvalidFormat(
+                            "malformed office:binary-data element".to_string(),
+                        ));
+                    }
+                    object.binary_depth = None;
+                } else if active.as_ref().map(|object| object.depth) == Some(depth) {
+                    let object = active.take().expect("closing embedded object");
+                    objects.push(finish_object(object, part, package, total_binary_bytes)?);
+                }
+
+                if frames.last().map(|frame| frame.depth) == Some(depth) {
+                    let frame = frames.pop().expect("closing frame");
+                    for object_index in frame.object_indices {
+                        let object = objects.get_mut(object_index).ok_or_else(|| {
+                            Error::InvalidFormat(
+                                "embedded-object frame occurrence index is invalid".to_string(),
+                            )
+                        })?;
+                        object.frame = Some(frame.frame.clone());
+                    }
+                }
+                if pages.last().map(|page| page.depth) == Some(depth) {
+                    pages.pop();
+                }
+                if sheets.last().map(|sheet| sheet.depth) == Some(depth) {
+                    sheets.pop();
+                }
+                depth = depth.checked_sub(1).ok_or_else(|| {
+                    Error::InvalidFormat("embedded-object XML stack underflow".to_string())
+                })?;
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+        buffer.clear();
+    }
+
+    if depth != 0
+        || active.is_some()
+        || inline_capture.is_some()
+        || accessibility.is_some()
+        || !frames.is_empty()
+        || !pages.is_empty()
+        || !sheets.is_empty()
+    {
+        return Err(Error::InvalidFormat(
+            "unterminated embedded-object XML".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn checked_depth(depth: usize) -> Result<usize> {
+    let depth = depth
+        .checked_add(1)
+        .ok_or_else(|| Error::InvalidFormat("embedded-object nesting overflow".to_string()))?;
+    if depth > MAX_OBJECT_DEPTH {
+        return Err(Error::InvalidFormat(format!(
+            "embedded-object nesting exceeds {MAX_OBJECT_DEPTH}"
+        )));
+    }
+    Ok(depth)
+}
+
+fn ensure_object_capacity(current: usize) -> Result<()> {
+    if current >= MAX_OBJECTS {
+        return Err(Error::InvalidFormat(format!(
+            "embedded-object count exceeds {MAX_OBJECTS}"
+        )));
+    }
+    Ok(())
+}
+
+fn object_kind(
+    namespace: &ResolveResult<'_>,
+    element: &BytesStart<'_>,
+) -> Option<OdfEmbeddedObjectKind> {
+    if !bound_to(namespace, DRAW_NAMESPACE) {
+        return None;
+    }
+    match element.local_name().as_ref() {
+        b"object" => Some(OdfEmbeddedObjectKind::Object),
+        b"object-ole" => Some(OdfEmbeddedObjectKind::ObjectOle),
+        _ => None,
+    }
+}
+
+fn inline_root(
+    namespace: &ResolveResult<'_>,
+    element: &BytesStart<'_>,
+) -> Option<OdfInlineObjectRoot> {
+    if bound_to(namespace, OFFICE_NAMESPACE) && element.local_name().as_ref() == b"document" {
+        Some(OdfInlineObjectRoot::OpenDocument)
+    } else if bound_to(namespace, MATH_NAMESPACE) && element.local_name().as_ref() == b"math" {
+        Some(OdfInlineObjectRoot::MathMl)
+    } else {
+        None
+    }
+}
+
+fn start_object(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    depth: usize,
+    kind: OdfEmbeddedObjectKind,
+    object_index: usize,
+    frame: Option<&mut FrameState>,
+) -> Result<ObjectBuilder> {
+    let href = limited_attribute(reader, element, XLINK_NAMESPACE, b"href")?;
+    let class_id = limited_attribute(reader, element, DRAW_NAMESPACE, b"class-id")?;
+    let notify_on_update_of_ranges = limited_attribute(
+        reader,
+        element,
+        DRAW_NAMESPACE,
+        b"notify-on-update-of-ranges",
+    )?;
+    let frame_context = match frame {
+        Some(frame) => {
+            frame.object_indices.push(object_index);
+            Some(frame.frame.clone())
+        },
+        None => None,
+    };
+    Ok(ObjectBuilder {
+        depth,
+        kind,
+        href,
+        frame: frame_context,
+        xml_id: attribute(reader, element, XML_NAMESPACE, b"id")?,
+        class_id,
+        notify_on_update_of_ranges,
+        link_type: limited_attribute(reader, element, XLINK_NAMESPACE, b"type")?,
+        show: limited_attribute(reader, element, XLINK_NAMESPACE, b"show")?,
+        actuate: limited_attribute(reader, element, XLINK_NAMESPACE, b"actuate")?,
+        inline_xml: None,
+        binary_present: false,
+        binary_depth: None,
+        binary_encoded: String::new(),
+    })
+}
+
+fn finish_object(
+    object: ObjectBuilder,
+    part: OdfEmbeddedObjectPart,
+    package: Option<PackageLookup<'_>>,
+    total_binary_bytes: &mut usize,
+) -> Result<OdfEmbeddedObject> {
+    let source = if let Some((root, xml)) = object.inline_xml {
+        OdfEmbeddedObjectSource::InlineXml {
+            root,
+            xml,
+            ignored_href: object.href.clone(),
+        }
+    } else if object.binary_present {
+        let mut compact = Vec::with_capacity(object.binary_encoded.len());
+        for byte in object.binary_encoded.bytes() {
+            if matches!(byte, b' ' | b'\t' | b'\r' | b'\n') {
+                continue;
+            }
+            if !byte.is_ascii() {
+                return Err(Error::InvalidFormat(
+                    "non-ASCII data in office:binary-data".to_string(),
+                ));
+            }
+            compact.push(byte);
+        }
+        let bytes = BASE64_STANDARD.decode(&compact).map_err(|error| {
+            Error::InvalidFormat(format!("invalid embedded OLE base64: {error}"))
+        })?;
+        if bytes.len() > MAX_INLINE_BINARY_BYTES {
+            return Err(Error::InvalidFormat(format!(
+                "inline OLE exceeds {MAX_INLINE_BINARY_BYTES} decoded bytes"
+            )));
+        }
+        *total_binary_bytes = total_binary_bytes.checked_add(bytes.len()).ok_or_else(|| {
+            Error::InvalidFormat("total inline OLE size overflow".to_string())
+        })?;
+        if *total_binary_bytes > MAX_TOTAL_INLINE_BINARY_BYTES {
+            return Err(Error::InvalidFormat(format!(
+                "total inline OLE data exceeds {MAX_TOTAL_INLINE_BINARY_BYTES} bytes"
+            )));
+        }
+        OdfEmbeddedObjectSource::InlineBinary {
+            bytes,
+            ignored_href: object.href.clone(),
+        }
+    } else if let Some(href) = object.href.clone().filter(|href| !href.is_empty()) {
+        match package {
+            None => OdfEmbeddedObjectSource::Linked { href },
+            Some(_) if is_linked_href(&href) => OdfEmbeddedObjectSource::Linked { href },
+            Some(package) => {
+                let path = resolve_package_path(&href)?;
+                if (package.has_file)(&path) {
+                    OdfEmbeddedObjectSource::PackageFile {
+                        href,
+                        manifest_media_type: (package.media_type)(&path),
+                        path,
+                    }
+                } else {
+                    let content_path = format!("{path}/content.xml");
+                    if (package.has_file)(&content_path) {
+                        let root_path = format!("{path}/");
+                        OdfEmbeddedObjectSource::PackageSubdocument {
+                            href,
+                            manifest_media_type: (package.media_type)(&root_path)
+                                .or_else(|| (package.media_type)(&path)),
+                            root_path,
+                            content_path,
+                        }
+                    } else {
+                        OdfEmbeddedObjectSource::MissingPackagePart {
+                            href,
+                            resolved_path: path,
+                        }
+                    }
+                }
+            },
+        }
+    } else {
+        OdfEmbeddedObjectSource::Missing
+    };
+
+    Ok(OdfEmbeddedObject {
+        part,
+        kind: object.kind,
+        source,
+        frame: object.frame,
+        xml_id: object.xml_id,
+        class_id: object.class_id,
+        notify_on_update_of_ranges: object.notify_on_update_of_ranges,
+        link_type: object.link_type,
+        show: object.show,
+        actuate: object.actuate,
+    })
+}
+
+fn write_inline_event(capture: &mut InlineXmlCapture, event: Event<'_>) -> Result<()> {
+    capture.writer.write_event(event).map_err(|error| {
+        Error::InvalidFormat(format!("cannot retain inline embedded-object XML: {error}"))
+    })?;
+    if capture.writer.get_ref().len() > MAX_INLINE_XML_BYTES {
+        return Err(Error::InvalidFormat(format!(
+            "inline embedded-object XML exceeds {MAX_INLINE_XML_BYTES} bytes"
+        )));
+    }
+    Ok(())
+}
+
+fn finish_inline_xml(
+    capture: InlineXmlCapture,
+    object: &mut ObjectBuilder,
+    total_xml_bytes: &mut usize,
+) -> Result<()> {
+    if object.inline_xml.is_some() {
+        return Err(Error::InvalidFormat(
+            "draw:object contains multiple inline payloads".to_string(),
+        ));
+    }
+    let bytes = capture.writer.into_inner();
+    *total_xml_bytes = total_xml_bytes.checked_add(bytes.len()).ok_or_else(|| {
+        Error::InvalidFormat("total inline embedded-object XML size overflow".to_string())
+    })?;
+    if *total_xml_bytes > MAX_TOTAL_INLINE_XML_BYTES {
+        return Err(Error::InvalidFormat(format!(
+            "total inline embedded-object XML exceeds {MAX_TOTAL_INLINE_XML_BYTES} bytes"
+        )));
+    }
+    let xml = String::from_utf8(bytes).map_err(|_| {
+        Error::InvalidFormat("inline embedded-object XML is not valid UTF-8".to_string())
+    })?;
+    object.inline_xml = Some((capture.root, xml));
+    Ok(())
+}
+
+fn append_binary(object: &mut ObjectBuilder, value: &str) -> Result<()> {
+    let new_len = object
+        .binary_encoded
+        .len()
+        .checked_add(value.len())
+        .ok_or_else(|| Error::InvalidFormat("inline OLE size overflow".to_string()))?;
+    if new_len > MAX_INLINE_ENCODED_BYTES {
+        return Err(Error::InvalidFormat(format!(
+            "inline OLE encoding exceeds {MAX_INLINE_ENCODED_BYTES} bytes"
+        )));
+    }
+    object.binary_encoded.push_str(value);
+    Ok(())
+}
+
+fn parse_frame(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    pages: &[NamedContext],
+    sheets: &[NamedContext],
+) -> Result<OdfImageFrame> {
+    Ok(OdfImageFrame {
+        name: attribute(reader, element, DRAW_NAMESPACE, b"name")?,
+        xml_id: attribute(reader, element, XML_NAMESPACE, b"id")?,
+        title: None,
+        description: None,
+        anchor_type: attribute(reader, element, TEXT_NAMESPACE, b"anchor-type")?,
+        x: attribute(reader, element, SVG_NAMESPACE, b"x")?,
+        y: attribute(reader, element, SVG_NAMESPACE, b"y")?,
+        width: attribute(reader, element, SVG_NAMESPACE, b"width")?,
+        height: attribute(reader, element, SVG_NAMESPACE, b"height")?,
+        page_name: pages.last().and_then(|page| page.name.clone()),
+        sheet_name: sheets.last().and_then(|sheet| sheet.name.clone()),
+    })
+}
+
+fn accessibility_kind(
+    namespace: &ResolveResult<'_>,
+    local_name: &[u8],
+) -> Option<AccessibilityKind> {
+    if !bound_to(namespace, SVG_NAMESPACE) {
+        return None;
+    }
+    match local_name {
+        b"title" => Some(AccessibilityKind::Title),
+        b"desc" => Some(AccessibilityKind::Description),
+        _ => None,
+    }
+}
+
+fn begin_accessibility(
+    frame: &mut FrameState,
+    kind: AccessibilityKind,
+    depth: usize,
+    active: &mut Option<AccessibilityText>,
+) -> Result<()> {
+    ensure_accessibility_absent(frame, kind)?;
+    *active = Some(AccessibilityText {
+        depth,
+        kind,
+        value: String::new(),
+    });
+    Ok(())
+}
+
+fn set_empty_accessibility(frame: &mut FrameState, kind: AccessibilityKind) -> Result<()> {
+    ensure_accessibility_absent(frame, kind)?;
+    match kind {
+        AccessibilityKind::Title => frame.frame.title = Some(String::new()),
+        AccessibilityKind::Description => frame.frame.description = Some(String::new()),
+    }
+    Ok(())
+}
+
+fn finish_accessibility(frame: &mut FrameState, text: AccessibilityText) -> Result<()> {
+    ensure_accessibility_absent(frame, text.kind)?;
+    match text.kind {
+        AccessibilityKind::Title => frame.frame.title = Some(text.value),
+        AccessibilityKind::Description => frame.frame.description = Some(text.value),
+    }
+    Ok(())
+}
+
+fn ensure_accessibility_absent(frame: &FrameState, kind: AccessibilityKind) -> Result<()> {
+    let duplicate = match kind {
+        AccessibilityKind::Title => frame.frame.title.is_some(),
+        AccessibilityKind::Description => frame.frame.description.is_some(),
+    };
+    if duplicate {
+        return Err(Error::InvalidFormat(
+            "draw:frame contains duplicate accessibility metadata".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn append_accessibility(
+    active: &mut AccessibilityText,
+    value: &str,
+    total_accessibility_bytes: &mut usize,
+) -> Result<()> {
+    let field_len = active
+        .value
+        .len()
+        .checked_add(value.len())
+        .ok_or_else(|| Error::InvalidFormat("object accessibility size overflow".to_string()))?;
+    if field_len > MAX_ACCESSIBILITY_TEXT_BYTES {
+        return Err(Error::InvalidFormat(format!(
+            "object accessibility text exceeds {MAX_ACCESSIBILITY_TEXT_BYTES} bytes"
+        )));
+    }
+    *total_accessibility_bytes = total_accessibility_bytes
+        .checked_add(value.len())
+        .ok_or_else(|| {
+            Error::InvalidFormat("total object accessibility size overflow".to_string())
+        })?;
+    if *total_accessibility_bytes > MAX_TOTAL_ACCESSIBILITY_TEXT_BYTES {
+        return Err(Error::InvalidFormat(format!(
+            "total object accessibility text exceeds {MAX_TOTAL_ACCESSIBILITY_TEXT_BYTES} bytes"
+        )));
+    }
+    active.value.push_str(value);
+    Ok(())
+}
+
+fn decode_reference(value: &BytesRef<'_>) -> Result<String> {
+    if let Some(character) = value.resolve_char_ref().map_err(|error| {
+        Error::InvalidFormat(format!("invalid object accessibility reference: {error}"))
+    })? {
+        return Ok(character.to_string());
+    }
+    let entity_name: &[u8] = value.as_ref();
+    let character = match entity_name {
+        b"amp" => '&',
+        b"lt" => '<',
+        b"gt" => '>',
+        b"apos" => '\'',
+        b"quot" => '"',
+        _ => {
+            return Err(Error::InvalidFormat(
+                "unsupported entity in object accessibility text".to_string(),
+            ));
+        },
+    };
+    Ok(character.to_string())
+}
+
+fn limited_attribute(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    namespace: &[u8],
+    local_name: &[u8],
+) -> Result<Option<String>> {
+    let value = attribute(reader, element, namespace, local_name)?;
+    if value.as_ref().is_some_and(|value| value.len() > MAX_ATTRIBUTE_BYTES) {
+        return Err(Error::InvalidFormat(format!(
+            "embedded-object attribute exceeds {MAX_ATTRIBUTE_BYTES} bytes"
+        )));
+    }
+    Ok(value)
+}
+
+fn attribute(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    namespace: &[u8],
+    local_name: &[u8],
+) -> Result<Option<String>> {
+    namespaced_attribute(reader, element, namespace, local_name, "embedded object")
+}
+
+fn bound_to(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool {
+    matches!(namespace, ResolveResult::Bound(Namespace(namespace)) if *namespace == expected)
+}

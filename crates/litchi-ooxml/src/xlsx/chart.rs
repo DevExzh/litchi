@@ -692,7 +692,8 @@ pub(crate) fn chart_user_shapes_relationship_ids(xml: &[u8]) -> Result<HashSet<S
     const STRICT_RELATIONSHIPS_NAMESPACE: &[u8] =
         b"http://purl.oclc.org/ooxml/officeDocument/relationships";
 
-    let mut reader = NsReader::from_reader(xml);
+    let xml = crate::common::mce::process_ooxml(xml)?;
+    let mut reader = NsReader::from_reader(xml.as_ref());
     let mut buffer = Vec::new();
     let mut depth = 0usize;
     let mut saw_root = false;

@@ -8,6 +8,7 @@
 use litchi_core::{Error, Result};
 use soapberry_zip::office::ArchiveReader;
 use std::io::Read;
+use zeroize::Zeroizing;
 
 /// An ODF package (ZIP file containing XML documents)
 ///
@@ -17,11 +18,13 @@ pub struct Package<'data> {
     #[allow(dead_code)]
     manifest: super::manifest::Manifest,
     mimetype: String,
+    password: Option<&'data str>,
 }
 
 /// Owned version of Package that owns the data buffer.
 pub struct OwnedPackage {
     data: Vec<u8>,
+    password: Option<Zeroizing<String>>,
 }
 
 #[allow(dead_code)]
@@ -35,7 +38,10 @@ impl OwnedPackage {
         let _ = ArchiveReader::new(&data)
             .map_err(|_| Error::InvalidFormat("Invalid ZIP archive".to_string()))?;
 
-        Ok(Self { data })
+        Ok(Self {
+            data,
+            password: None,
+        })
     }
 
     /// Create an ODF package from bytes
@@ -44,12 +50,38 @@ impl OwnedPackage {
         let _ = ArchiveReader::new(&data)
             .map_err(|_| Error::InvalidFormat("Invalid ZIP archive".to_string()))?;
 
-        Ok(Self { data })
+        Ok(Self {
+            data,
+            password: None,
+        })
+    }
+
+    /// Open an ODF package and retain a password for lazy entry decryption.
+    pub fn from_reader_with_password<R: Read>(
+        mut reader: R,
+        password: impl Into<String>,
+    ) -> Result<Self> {
+        let mut data = Vec::new();
+        reader.read_to_end(&mut data)?;
+        Self::from_bytes_with_password(data, password)
+    }
+
+    /// Open ODF bytes and retain a password for lazy entry decryption.
+    pub fn from_bytes_with_password(data: Vec<u8>, password: impl Into<String>) -> Result<Self> {
+        let _ = ArchiveReader::new(&data)
+            .map_err(|_| Error::InvalidFormat("Invalid ZIP archive".to_string()))?;
+        Ok(Self {
+            data,
+            password: Some(Zeroizing::new(password.into())),
+        })
     }
 
     /// Get a borrowed Package for accessing archive contents
     pub fn package(&self) -> Result<Package<'_>> {
-        Package::new(&self.data)
+        Package::new_with_password(
+            &self.data,
+            self.password.as_ref().map(|password| password.as_str()),
+        )
     }
 
     /// Get the underlying data
@@ -97,7 +129,12 @@ impl OwnedPackage {
 
 impl<'data> Package<'data> {
     /// Create a new Package from a byte slice
+    #[allow(dead_code)]
     pub fn new(data: &'data [u8]) -> Result<Self> {
+        Self::new_with_password(data, None)
+    }
+
+    fn new_with_password(data: &'data [u8], password: Option<&'data str>) -> Result<Self> {
         let archive = ArchiveReader::new(data)
             .map_err(|_| Error::InvalidFormat("Invalid ZIP archive".to_string()))?;
 
@@ -115,6 +152,7 @@ impl<'data> Package<'data> {
             archive,
             manifest,
             mimetype,
+            password,
         })
     }
 
@@ -125,9 +163,34 @@ impl<'data> Package<'data> {
 
     /// Get a file from the package by path
     pub fn get_file(&self, path: &str) -> Result<Vec<u8>> {
-        self.archive
+        let bytes = self
+            .archive
             .read(path)
-            .map_err(|_| Error::InvalidFormat(format!("File not found: {}", path)))
+            .map_err(|_| Error::InvalidFormat(format!("File not found: {}", path)))?;
+        let Some(entry) = self.manifest.get_entry(path) else {
+            return Ok(bytes);
+        };
+        let Some(encryption) = &entry.encryption else {
+            return Ok(bytes);
+        };
+        if !self.archive.is_stored(path).map_err(|_| {
+            Error::InvalidFormat(format!("Unable to inspect encrypted ODF entry '{path}'"))
+        })? {
+            return Err(Error::InvalidFormat(format!(
+                "Encrypted ODF entry '{path}' must use ZIP Store"
+            )));
+        }
+        let password = self.password.ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Password required for encrypted ODF entry '{path}'"
+            ))
+        })?;
+        let size = entry.size.ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Encrypted ODF entry '{path}' has no plaintext size"
+            ))
+        })?;
+        super::encryption::decrypt_entry(&bytes, password, encryption, size)
     }
 
     /// Check if a file exists in the package

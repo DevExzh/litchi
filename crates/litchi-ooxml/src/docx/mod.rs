@@ -50,6 +50,7 @@
 //! ```
 
 pub mod bookmark;
+pub mod alt_chunk;
 pub mod comment;
 pub mod content_control;
 pub mod custom_xml;
@@ -81,6 +82,7 @@ pub mod web_settings;
 pub mod writer;
 
 pub use bookmark::Bookmark;
+pub use alt_chunk::{AltChunk, AlternativeFormatKind, AlternativeFormatPart};
 pub use comment::Comment;
 pub use content_control::ContentControl;
 pub use custom_xml::CustomXmlPart;
@@ -136,4 +138,15 @@ pub enum DocxElement {
     Paragraph(Box<Paragraph>),
     /// A table element.
     Table(Box<Table>),
+}
+
+/// Ordered main-document block, including opaque alternative-format anchors.
+///
+/// This is separate from [`DocxElement`] so existing format-agnostic callers
+/// that exhaustively match paragraphs and tables remain source-compatible.
+#[derive(Debug, Clone)]
+pub enum DocumentBlock {
+    Paragraph(Box<Paragraph>),
+    Table(Box<Table>),
+    AltChunk(Box<AltChunk>),
 }

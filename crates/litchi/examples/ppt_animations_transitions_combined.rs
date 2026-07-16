@@ -346,7 +346,7 @@ fn save_animation_sample(
     filename: &str,
     animation: &AnimationInfo,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let (data, _) = write_animation_info(animation);
+    let (data, _) = write_animation_info(animation)?;
     let mut file = File::create(filename)?;
     file.write_all(&data)?;
     Ok(())

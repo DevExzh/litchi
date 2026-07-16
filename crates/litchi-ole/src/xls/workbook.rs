@@ -2,6 +2,7 @@
 
 use crate::xls::cell::XlsCell;
 use crate::xls::error::{XlsError, XlsResult};
+use crate::xls::encryption::prepare_workbook_stream;
 use crate::xls::formula::{FormulaContext, ptg_exp_anchor, render_formula, render_shared_formula};
 use crate::xls::pivot_table::PivotTable;
 use crate::xls::records::{
@@ -123,9 +124,21 @@ pub struct XlsWorkbook<R: Read + Seek> {
     formula_context: FormulaContext,
 }
 
+/// Options for opening a legacy XLS workbook.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct XlsOpenOptions<'a> {
+    /// Password used for BIFF8 password-to-open encryption.
+    pub password: Option<&'a str>,
+}
+
 impl<R: Read + Seek> XlsWorkbook<R> {
     /// Open an XLS workbook from a reader
     pub fn new(reader: R) -> XlsResult<Self> {
+        Self::new_with_options(reader, XlsOpenOptions::default())
+    }
+
+    /// Open an XLS workbook with an explicit password contract.
+    pub fn new_with_options(reader: R, options: XlsOpenOptions<'_>) -> XlsResult<Self> {
         let ole_file = OleFile::open(reader)?;
 
         let mut workbook = XlsWorkbook {
@@ -140,7 +153,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             formula_context: FormulaContext::default(),
         };
 
-        workbook.parse_workbook()?;
+        workbook.parse_workbook(options.password)?;
         Ok(workbook)
     }
 
@@ -153,6 +166,14 @@ impl<R: Read + Seek> XlsWorkbook<R> {
     ///
     /// * `ole_file` - An already-parsed OLE file
     pub fn from_ole_file(ole_file: OleFile<R>) -> XlsResult<Self> {
+        Self::from_ole_file_with_options(ole_file, XlsOpenOptions::default())
+    }
+
+    /// Create a workbook from a parsed OLE file with explicit open options.
+    pub fn from_ole_file_with_options(
+        ole_file: OleFile<R>,
+        options: XlsOpenOptions<'_>,
+    ) -> XlsResult<Self> {
         let mut workbook = XlsWorkbook {
             ole_file,
             worksheets: Vec::new(),
@@ -165,17 +186,18 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             formula_context: FormulaContext::default(),
         };
 
-        workbook.parse_workbook()?;
+        workbook.parse_workbook(options.password)?;
         Ok(workbook)
     }
 
     /// Parse the workbook stream
-    fn parse_workbook(&mut self) -> XlsResult<()> {
+    fn parse_workbook(&mut self, password: Option<&str>) -> XlsResult<()> {
         // Find and read the Workbook stream
         let workbook_data = self
             .ole_file
             .open_stream(&["Workbook"])
             .or_else(|_| self.ole_file.open_stream(&["Book"]))?;
+        let workbook_data = prepare_workbook_stream(workbook_data, password)?;
 
         let mut record_iter = RecordIter::new(std::io::Cursor::new(&workbook_data))?;
         let mut encoding = XlsEncoding::from_codepage(1252)?; // Default codepage

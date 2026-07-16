@@ -30,6 +30,8 @@ pub enum OoxmlError {
     /// Invalid format
     #[error("Invalid format: {0}")]
     InvalidFormat(String),
+    #[error("markup compatibility error: {0}")]
+    MarkupCompatibility(#[from] crate::common::mce::MceError),
 
     /// IO error
     #[error("IO error: {0}")]
@@ -75,6 +77,7 @@ impl From<OoxmlError> for litchi_core::Error {
             },
             OoxmlError::InvalidRelationship(s) => litchi_core::Error::Other(s),
             OoxmlError::InvalidFormat(s) => litchi_core::Error::InvalidFormat(s),
+            OoxmlError::MarkupCompatibility(e) => litchi_core::Error::InvalidFormat(e.to_string()),
             OoxmlError::Opc(e) => litchi_core::Error::from(e),
             OoxmlError::IoError(e) => litchi_core::Error::Io(e),
             OoxmlError::InvalidUri(s) => litchi_core::Error::Other(s),

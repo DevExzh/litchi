@@ -511,7 +511,9 @@ impl SharedStrings {
 
     /// Parse shared strings from `xl/sharedStrings.xml`.
     pub fn parse(content: &str) -> SheetResult<Self> {
-        SharedStringParser::parse(content)
+        let content = crate::common::mce::process_str(content)
+            .map_err(|error| Box::new(error) as Box<dyn std::error::Error + Send + Sync>)?;
+        SharedStringParser::parse(content.as_ref())
             .map_err(|error| Box::new(error) as Box<dyn std::error::Error + Send + Sync>)
     }
 

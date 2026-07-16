@@ -1,11 +1,14 @@
 use super::super::OleFile;
 use super::document_properties::PowerPoint12DocumentProperties;
+#[cfg(feature = "imgconv")]
+use super::encryption::decrypt_pictures;
+use super::encryption::decrypt_powerpoint_document;
 use super::main_master::PowerPoint12MainMasterMetadata;
 /// High-performance Presentation API with zero-copy slide parsing.
-use super::package::{PptError, Result};
+use super::package::{PptError, PptOpenOptions, Result};
 use super::parsers::PptRecordParser;
 use super::persist::PersistMapping;
-use super::slide::{Slide, SlideFactory};
+use super::slide::{Slide, SlideDirectory, SlideFactory};
 use crate::consts::PptRecordType;
 #[cfg(feature = "imgconv")]
 use crate::extractor::{ExtractedImage, ImageExtractor};
@@ -44,6 +47,7 @@ pub struct Presentation {
     pub(crate) parser: PptRecordParser,
     /// Persist ID to offset mapping
     pub(crate) persist_mapping: PersistMapping,
+    slide_directory: SlideDirectory,
     /// Pictures stream data (for image extraction)
     #[cfg(feature = "imgconv")]
     pictures_data: Option<Vec<u8>>,
@@ -55,21 +59,59 @@ pub struct Presentation {
 impl Presentation {
     /// Create a new Presentation from an OLE file.
     pub(crate) fn from_ole<R: Read + Seek>(ole: &mut OleFile<R>) -> Result<Self> {
+        Self::from_ole_with_options(ole, PptOpenOptions::default())
+    }
+
+    /// Create a new Presentation from an OLE file with password-to-open options.
+    pub(crate) fn from_ole_with_options<R: Read + Seek>(
+        ole: &mut OleFile<R>,
+        options: PptOpenOptions<'_>,
+    ) -> Result<Self> {
         // Read the PowerPoint Document stream
-        let powerpoint_document = Self::read_powerpoint_document(ole)?;
+        let mut powerpoint_document = Self::read_powerpoint_document(ole)?;
+        let current_user_data = ole
+            .open_stream(&["Current User"])
+            .or_else(|_| ole.open_stream(&["PP97_DUALSTORAGE", "Current User"]))
+            .ok();
+        let encrypted = decrypt_powerpoint_document(
+            &mut powerpoint_document,
+            current_user_data.as_deref(),
+            options.password,
+        )?;
 
         // Parse document structure
         let mut parser = PptRecordParser::new();
-        parser.parse_document(&powerpoint_document)?;
+        if let Some(encrypted) = &encrypted {
+            parser.parse_document_at_offsets(&powerpoint_document, &encrypted.live_offsets)?;
+        } else {
+            parser.parse_document(&powerpoint_document)?;
+        }
 
         // Build persist mapping for slide lookup (collect all records recursively)
         // Use zero-copy reference collection to avoid cloning all record data
         let all_records_ref = parser.find_records_ref();
-        let persist_mapping = PersistMapping::build_from_records_ref(&all_records_ref);
+        let mut persist_mapping = PersistMapping::build_from_records_ref(&all_records_ref);
+        if let Some(encrypted) = &encrypted {
+            persist_mapping = PersistMapping::new();
+            for &(persist_id, offset) in &encrypted.mappings {
+                persist_mapping.add_mapping(persist_id, offset);
+            }
+        }
+        let current_user_data = current_user_data
+            .as_deref()
+            .ok_or_else(|| PptError::StreamNotFound("Current User".to_string()))?;
+        let slide_directory = SlideDirectory::build(
+            &powerpoint_document,
+            current_user_data,
+            &persist_mapping,
+        )?;
 
         // Try to read Pictures stream for image extraction
         #[cfg(feature = "imgconv")]
-        let (pictures_data, blip_store) = if let Ok(pictures) = ole.open_stream(&["Pictures"]) {
+        let (pictures_data, blip_store) = if let Ok(mut pictures) = ole.open_stream(&["Pictures"]) {
+            if let Some(encrypted) = &encrypted {
+                decrypt_pictures(&mut pictures, &encrypted.crypto)?;
+            }
             // Extract BLIP store from pictures data
             let store = ImageExtractor::extract_blip_store(&pictures)
                 .ok()
@@ -83,6 +125,7 @@ impl Presentation {
             powerpoint_document,
             parser,
             persist_mapping,
+            slide_directory,
             #[cfg(feature = "imgconv")]
             pictures_data,
             #[cfg(feature = "imgconv")]
@@ -115,7 +158,11 @@ impl Presentation {
     /// - Zero-copy: slides borrow from document data
     /// - Each slide lazily loads its shapes
     pub fn slides(&self) -> Result<Vec<Slide<'_>>> {
-        let factory = SlideFactory::new(&self.powerpoint_document, &self.persist_mapping);
+        let factory = SlideFactory::new(
+            &self.powerpoint_document,
+            &self.persist_mapping,
+            &self.slide_directory,
+        );
 
         factory
             .slides()
@@ -129,8 +176,12 @@ impl Presentation {
     /// Get the number of slides (actual Slide records only).
     #[inline]
     pub fn slide_count(&self) -> usize {
-        let factory = SlideFactory::new(&self.powerpoint_document, &self.persist_mapping);
-        factory.slide_ids().len()
+        self.slide_directory.len()
+    }
+
+    /// Return the validated logical slide directory.
+    pub fn slide_directory(&self) -> &SlideDirectory {
+        &self.slide_directory
     }
 
     /// Parse PowerPoint 12 round-trip metadata for every main master slide.
@@ -203,9 +254,13 @@ impl Presentation {
     ///
     /// Vector of (slide_number, text) tuples for each slide
     pub fn extract_text_fast(&self) -> Result<Vec<(usize, String)>> {
-        let factory = SlideFactory::new(&self.powerpoint_document, &self.persist_mapping);
+        let factory = SlideFactory::new(
+            &self.powerpoint_document,
+            &self.persist_mapping,
+            &self.slide_directory,
+        );
 
-        let mut results = Vec::with_capacity(factory.slide_ids().len());
+        let mut results = Vec::with_capacity(self.slide_directory.len());
 
         for (idx, slide_result) in factory.slides().enumerate() {
             let slide_data = slide_result?;
@@ -234,6 +289,10 @@ impl Presentation {
                     }
                     text.push_str(trimmed);
                 }
+            }
+
+            if text.is_empty() {
+                text.push_str(&slide_data.slide_list_text);
             }
 
             results.push((idx + 1, text));

@@ -51,6 +51,8 @@
 //! - ODF Toolkit: ODFDOM package classes
 //! - ZIP format: PKZIP Application Note
 
+/// ODF package-entry decryption.
+mod encryption;
 /// ODF manifest parsing
 mod manifest;
 /// ODF metadata parsing
@@ -65,7 +67,10 @@ mod xml;
 // Re-export main types for convenience
 // Manifest is internal to the package system
 #[allow(unused_imports)]
-pub use manifest::Manifest;
+pub use manifest::{
+    Manifest, ManifestChecksum, ManifestChecksumAlgorithm, ManifestEncryption,
+    ManifestEncryptionAlgorithm, ManifestEntry, ManifestKeyDerivation, ManifestStartKeyGeneration,
+};
 pub use metadata::{
     AutoReloadMetadata, DocumentStatistics, HyperlinkBehaviourMetadata, OdfMetadata,
     TemplateMetadata, UserDefinedMetadata, UserDefinedValueType,

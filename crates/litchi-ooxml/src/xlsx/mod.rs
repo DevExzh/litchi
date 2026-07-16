@@ -31,11 +31,13 @@ pub mod cell;
 pub mod chart;
 mod comments;
 mod drawing;
+pub mod external_links;
 pub mod format;
 mod namespace;
 pub mod parsers;
 pub mod pivot;
 pub mod shared_strings;
+mod shared_formula;
 pub mod sort;
 pub mod sparkline;
 pub mod styles;
@@ -53,6 +55,10 @@ pub use chart::{
     ChartAnchor, ChartExternalDataPart, ChartExternalDataTarget, ChartRelationship,
     ChartRelationshipTarget, ChartUserShapesPart, ChartUserShapesRelationship,
     ChartUserShapesRelationshipTarget, WorksheetChart,
+};
+pub use external_links::{
+    ExternalCell, ExternalCellType, ExternalDefinedName, ExternalLinkEntry, ExternalLinkKind,
+    ExternalRow, ExternalSheetData, ExternalWorkbookLink, ExternalWorkbookTarget,
 };
 // Re-export shared formatting types
 pub use format::{

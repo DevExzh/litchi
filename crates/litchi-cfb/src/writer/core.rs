@@ -424,23 +424,23 @@ impl OleWriter {
 
         // Pre-create storages declared explicitly by user
         for storage_path in self.storages.keys() {
-            directory.add_storage_path(storage_path);
+            directory.add_storage_path(storage_path)?;
         }
 
         // Add large streams to directory using full path
         for (start_sector, data, path) in &large_stream_data {
             let full: Vec<String> = path.clone();
-            let _sid = directory.add_stream_path(&full, *start_sector, data.len() as u64);
+            let _sid = directory.add_stream_path(&full, *start_sector, data.len() as u64)?;
         }
 
         // Add small streams to directory (using MiniFAT) with full path
         for (path, data, start_mini_sector) in &small_stream_sectors {
             let full: Vec<String> = path.clone();
-            let _sid = directory.add_stream_path(&full, *start_mini_sector, data.len() as u64);
+            let _sid = directory.add_stream_path(&full, *start_mini_sector, data.len() as u64)?;
         }
 
         // Generate directory stream
-        let dir_stream = directory.generate_directory_stream();
+        let dir_stream = directory.generate_directory_stream()?;
         let dir_sector_count = (dir_stream.len().div_ceil(self.sector_size)) as u32;
         let dir_start_sector = fat.allocate_chain(dir_stream.len());
 

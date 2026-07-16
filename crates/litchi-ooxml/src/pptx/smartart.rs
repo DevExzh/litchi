@@ -141,7 +141,8 @@ impl SmartArt {
 
     /// Parse SmartArt data XML (dgm:data).
     pub fn parse_data_xml(xml: &str) -> Result<Vec<DiagramNode>> {
-        let mut reader = Reader::from_str(xml);
+        let xml = crate::common::mce::process_str(xml)?;
+        let mut reader = Reader::from_str(xml.as_ref());
         reader.config_mut().trim_text(true);
 
         let mut nodes = Vec::new();

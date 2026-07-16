@@ -74,6 +74,7 @@ pub mod escher;
 pub mod comments;
 pub mod current_user;
 pub mod document_properties;
+mod encryption;
 pub mod escher_textbox;
 pub mod font;
 pub mod hyperlink;
@@ -91,9 +92,11 @@ pub mod text_ruler;
 pub mod text_run;
 
 // Re-export main types for convenience
-pub use package::Package;
+pub use package::{Package, PptEncryptionKind, PptError, PptOpenOptions};
 pub use presentation::Presentation;
-pub use slide::{Slide, SlideData, SlideFactory};
+pub use slide::{
+    Slide, SlideData, SlideDirectory, SlideDirectoryEntry, SlideFactory, SpeakerNotes,
+};
 
 // Re-export record types
 pub use parsers::PptRecordParser;

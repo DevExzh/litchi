@@ -13,7 +13,7 @@ use super::{
     label_range::parse_label_ranges,
     parser::OdsParser,
     protection::parse_protection,
-    style_protection::{CellStyleProtection, CellStyleRegistry},
+    style_protection::{ConditionalCellStyle, CellStyleProtection, CellStyleRegistry},
 };
 use crate::core::{Content, Meta, OwnedPackage, Styles};
 use litchi_core::{Error, Metadata, Result};
@@ -104,6 +104,15 @@ impl Spreadsheet {
         Self::from_bytes(bytes)
     }
 
+    /// Open a password-encrypted ODS spreadsheet.
+    pub fn open_with_password<P: AsRef<Path>>(
+        path: P,
+        password: impl Into<String>,
+    ) -> Result<Self> {
+        let bytes = std::fs::read(path.as_ref())?;
+        Self::from_bytes_with_password(bytes, password)
+    }
+
     /// Create a Spreadsheet from a byte buffer.
     ///
     /// # Arguments
@@ -127,6 +136,15 @@ impl Spreadsheet {
     /// ```
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         let owned_package = OwnedPackage::from_bytes(bytes)?;
+        Self::from_owned_package(owned_package)
+    }
+
+    /// Create a spreadsheet from password-encrypted ODS bytes.
+    pub fn from_bytes_with_password(bytes: Vec<u8>, password: impl Into<String>) -> Result<Self> {
+        Self::from_owned_package(OwnedPackage::from_bytes_with_password(bytes, password)?)
+    }
+
+    fn from_owned_package(owned_package: OwnedPackage) -> Result<Self> {
         let package = owned_package.package()?;
 
         // Verify this is a spreadsheet
@@ -216,6 +234,49 @@ impl Spreadsheet {
         Self::from_bytes(bytes)
     }
 
+    /// Discover referenced, inline, missing, and inert linked images.
+    pub fn images(&self) -> Result<Vec<crate::OdfImage>> {
+        let package = self.package.package()?;
+        crate::media::scan_packaged_images(
+            self.content.xml_content(),
+            self.styles.as_ref().map(Styles::xml_content),
+            |path| package.has_file(path),
+            |path| package.manifest().get_media_type(path).map(str::to_string),
+        )
+    }
+
+    /// Inspect classic forms without executing bindings, events, or external resources.
+    pub fn forms(&self) -> Result<crate::OdfForms> {
+        let mut parts = vec![(self.content.xml_content(), crate::OdfFormPart::Content)];
+        if let Some(styles) = self.styles.as_ref().map(Styles::xml_content) {
+            parts.push((styles, crate::OdfFormPart::Styles));
+        }
+        crate::form::parse_form_parts(&parts)
+    }
+
+    /// Discover package, inline, missing, and inert linked embedded objects.
+    pub fn embedded_objects(&self) -> Result<Vec<crate::OdfEmbeddedObject>> {
+        let package = self.package.package()?;
+        crate::embedded_object::scan_packaged_objects(
+            self.content.xml_content(),
+            self.styles.as_ref().map(Styles::xml_content),
+            |path| package.has_file(path),
+            |path| package.manifest().get_media_type(path).map(str::to_string),
+        )
+    }
+
+    /// Return bytes only for inline or verified package-contained images.
+    /// Linked images remain inert and are never fetched.
+    pub fn image_bytes(&self, image: &crate::OdfImage) -> Result<Option<Vec<u8>>> {
+        match &image.source {
+            crate::OdfImageSource::Inline { bytes, .. } => Ok(Some(bytes.clone())),
+            crate::OdfImageSource::PackagePart { path, .. } => {
+                self.package.get_file(path).map(Some)
+            },
+            _ => Ok(None),
+        }
+    }
+
     /// Get the number of sheets in the spreadsheet.
     pub fn sheet_count(&mut self) -> Result<usize> {
         let sheets = self.sheets()?;
@@ -294,6 +355,18 @@ impl Spreadsheet {
     /// Resolve the inherited `style:cell-protect` value for a cell.
     pub fn cell_style_protection(&self, cell: &super::Cell) -> Result<Option<CellStyleProtection>> {
         self.cell_styles.resolve(cell.style_name())
+    }
+
+    /// Standard ODF conditional table-cell styles in effective document order.
+    ///
+    /// Conditions are returned as inert text and are never evaluated.
+    pub fn conditional_cell_styles(&self) -> &[ConditionalCellStyle] {
+        self.cell_styles.conditional_styles()
+    }
+
+    /// Find a standard ODF conditional table-cell style by style name.
+    pub fn conditional_cell_style(&self, style_name: &str) -> Option<&ConditionalCellStyle> {
+        self.cell_styles.conditional_style(style_name)
     }
 
     /// Return all named ranges, including global and sheet-local ranges.

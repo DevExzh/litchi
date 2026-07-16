@@ -11,6 +11,7 @@ use crate::xlsx::writer::workbook::{
 };
 use crate::xlsx::writer::{MutableWorkbookData, MutableWorksheet};
 use crate::xlsx::{Cell, SharedStrings, Styles};
+use crate::xlsx::external_links::{ExternalLinkEntry, load_external_link};
 use litchi_core::sheet::{
     Result as SheetResult, WorkbookTrait, Worksheet as WorksheetTrait, WorksheetIterator,
 };
@@ -43,9 +44,15 @@ pub struct Workbook {
     properties: DocumentProperties,
     /// Whether the workbook uses the 1904 date system
     is_1904_date_system: bool,
+    external_links: Vec<ExternalLinkEntry>,
 }
 
 impl Workbook {
+    /// Discover inert embedded-object and embedded-package relationships.
+    pub fn embedded_parts(&self) -> crate::error::Result<Vec<crate::EmbeddedPart<'_>>> {
+        crate::embedded_object::discover_embedded_parts(&self.package)
+    }
+
     /// Create a new empty workbook.
     ///
     /// Creates a minimal valid Excel workbook with one default worksheet.
@@ -188,9 +195,11 @@ impl Workbook {
             mutable_data: None,
             properties: DocumentProperties::new(),
             is_1904_date_system: false,
+            external_links: Vec::new(),
         };
 
         workbook.load_workbook_info()?;
+        workbook.load_external_links()?;
         workbook.load_shared_strings()?;
         workbook.load_styles()?;
 
@@ -215,6 +224,37 @@ impl Workbook {
         self.is_1904_date_system = details.uses_1904_date_system;
 
         Ok(())
+    }
+
+    fn load_external_links(&mut self) -> SheetResult<()> {
+        use litchi_opc::constants::{content_type as ct, relationship_type as rt};
+        let workbook_part = self.package.get_part(&self.workbook_uri)?;
+        let content = std::str::from_utf8(workbook_part.blob())?;
+        let details = workbook_parser::parse_workbook_details(content)?;
+        let mut links = Vec::with_capacity(details.external_reference_ids.len());
+        for (offset, relationship_id) in details.external_reference_ids.into_iter().enumerate() {
+            let relationship = workbook_part.rels().get(&relationship_id).ok_or_else(|| format!("workbook external reference '{relationship_id}' has no relationship"))?;
+            if relationship.is_external() || !matches!(relationship.reltype(), rt::EXTERNAL_LINK | rt::STRICT_EXTERNAL_LINK) {
+                return Err(format!("workbook external reference '{relationship_id}' has an invalid relationship").into());
+            }
+            let uri = relationship.target_partname()?;
+            let part = self.package.get_part(&uri)?;
+            if part.content_type() != ct::SML_EXTERNAL_LINK {
+                return Err(format!("external-link part '{uri}' has invalid content type '{}', expected '{}'", part.content_type(), ct::SML_EXTERNAL_LINK).into());
+            }
+            let index = u32::try_from(offset + 1).map_err(|_| "external-link index overflow")?;
+            links.push(load_external_link(part, relationship_id, index)?);
+        }
+        self.external_links = links;
+        Ok(())
+    }
+
+    pub fn external_links(&self) -> &[ExternalLinkEntry] {
+        &self.external_links
+    }
+
+    pub fn external_link(&self, one_based_index: u32) -> Option<&ExternalLinkEntry> {
+        one_based_index.checked_sub(1).and_then(|index| self.external_links.get(index as usize))
     }
 
     /// Load shared strings from xl/sharedStrings.xml
@@ -926,6 +966,14 @@ impl Workbook {
 
         validate_workbook_tables(data)?;
 
+        let preserved_external_relationships = {
+            let workbook_part = self.package.get_part(&self.workbook_uri)?;
+            self.external_links.iter().map(|link| {
+                let relationship = workbook_part.rels().get(&link.relationship_id).ok_or_else(|| format!("missing preserved external-link relationship '{}'", link.relationship_id))?;
+                Ok((relationship.reltype().to_string(), relationship.target_ref().to_string(), relationship.r_id().to_string(), relationship.is_external()))
+            }).collect::<SheetResult<Vec<_>>>()?
+        };
+
         let workbook_uri = PackURI::new("/xl/workbook.xml")?;
 
         // Create temporary workbook part to manage relationships
@@ -934,6 +982,9 @@ impl Workbook {
             ct::SML_SHEET_MAIN.to_string(),
             Vec::new(),
         );
+        for (relationship_type, target, relationship_id, external) in preserved_external_relationships {
+            temp_wb_part.rels_mut().add_relationship(relationship_type, target, relationship_id, external);
+        }
 
         // Build styles from all worksheets FIRST
         let (styles_builder, worksheet_style_indices) = data.build_styles()?;
@@ -1689,8 +1740,12 @@ impl Workbook {
         data.sync_print_settings_to_defined_names();
 
         // Now generate workbook XML with actual relationship IDs
-        let workbook_xml =
-            data.generate_workbook_xml_with_rels(&worksheet_rel_ids, &pivot_cache_rel_ids)?;
+        let external_reference_ids: Vec<String> = self.external_links.iter().map(|link| link.relationship_id.clone()).collect();
+        let workbook_xml = data.generate_workbook_xml_with_external_rels(
+            &worksheet_rel_ids,
+            &pivot_cache_rel_ids,
+            &external_reference_ids,
+        )?;
         temp_wb_part.set_blob(workbook_xml.into_bytes());
 
         // Add the workbook part to the package
@@ -3218,11 +3273,12 @@ mod tests {
 
     fn replace_hyperlink_relationship(package: &mut OpcPackage, reltype: &str, external: bool) {
         let worksheet_uri = PackURI::new("/xl/custom/sales-data.xml").unwrap();
-        package
+        let relationships = package
             .get_part_mut(&worksheet_uri)
             .unwrap()
-            .rels_mut()
-            .add_relationship(
+            .rels_mut();
+        relationships.remove("rId1").unwrap();
+        relationships.add_relationship(
                 reltype.to_string(),
                 "https://example.com/replaced".to_string(),
                 "rId1".to_string(),
@@ -3369,11 +3425,12 @@ mod tests {
     fn rejects_external_comments_relationship() {
         let mut package = package_with_worksheet_relationship(rt::WORKSHEET, false);
         let worksheet_uri = PackURI::new("/xl/custom/sales-data.xml").unwrap();
-        package
+        let relationships = package
             .get_part_mut(&worksheet_uri)
             .unwrap()
-            .rels_mut()
-            .add_relationship(
+            .rels_mut();
+        relationships.remove("rId2").unwrap();
+        relationships.add_relationship(
                 rt::COMMENTS.to_string(),
                 "https://example.com/comments.xml".to_string(),
                 "rId2".to_string(),

@@ -15,6 +15,10 @@ pub struct DocumentInfo {
     pub notes_count: usize,
     /// Number of master slides
     pub master_count: usize,
+    /// Persist reference for notes master
+    pub notes_master_persist_id_ref: u32,
+    /// Persist reference for handout master
+    pub handout_master_persist_id_ref: u32,
     /// Whether the document has an Environment record
     pub has_environment: bool,
     /// Whether the document has a PPDrawingGroup record

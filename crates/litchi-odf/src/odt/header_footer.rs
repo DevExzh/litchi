@@ -8,13 +8,17 @@ use quick_xml::{
     reader::NsReader,
 };
 
+use super::header_footer_content::{
+    HeaderFooterBlock, MAX_EXPANDED_SPACES, parse_header_footer_blocks,
+};
+
 const STYLE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:style:1.0";
 const TEXT_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:text:1.0";
 const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const DRAW_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
 
 /// One of the six header/footer regions supported by an ODF master page.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum HeaderFooterKind {
     Header,
     HeaderFirst,
@@ -25,7 +29,7 @@ pub enum HeaderFooterKind {
 }
 
 impl HeaderFooterKind {
-    fn parse(local_name: &[u8]) -> Option<Self> {
+    pub(super) fn parse(local_name: &[u8]) -> Option<Self> {
         match local_name {
             b"header" => Some(Self::Header),
             b"header-first" => Some(Self::HeaderFirst),
@@ -68,6 +72,8 @@ pub struct HeaderFooter {
     pub xml: String,
     /// Best-effort visible literal text. Dynamic field values remain represented in `xml`.
     pub text: String,
+    /// Ordered paragraphs/headings with explicit inline text, whitespace, and fields.
+    pub blocks: Vec<HeaderFooterBlock>,
 }
 
 /// An ODF master page and all of its header/footer regions.
@@ -101,6 +107,7 @@ struct RegionBuilder {
     start: usize,
     depth: usize,
     text: String,
+    expanded_spaces: usize,
 }
 
 pub(crate) fn parse_master_pages(xml: &str) -> Result<Vec<MasterPage>> {
@@ -160,6 +167,7 @@ pub(crate) fn parse_master_pages(xml: &str) -> Result<Vec<MasterPage>> {
                         start: event_start,
                         depth: 1,
                         text: String::new(),
+                        expanded_spaces: 0,
                     });
                 } else if let Some(region) = region.as_mut() {
                     region.depth += 1;
@@ -183,10 +191,17 @@ pub(crate) fn parse_master_pages(xml: &str) -> Result<Vec<MasterPage>> {
                     kind,
                     xml: xml[event_start..event_end].to_string(),
                     text: String::new(),
+                    blocks: Vec::new(),
                 });
             },
             Event::Empty(element) if region.is_some() && text_element => {
-                append_empty_text_element(&reader, &element, &mut region.as_mut().unwrap().text)?;
+                let region = region.as_mut().expect("checked region");
+                append_empty_text_element(
+                    &reader,
+                    &element,
+                    &mut region.text,
+                    &mut region.expanded_spaces,
+                )?;
             },
             Event::Text(value) if region.is_some() => {
                 let decoded = value
@@ -226,6 +241,7 @@ pub(crate) fn parse_master_pages(xml: &str) -> Result<Vec<MasterPage>> {
                             kind: active.kind,
                             xml: xml[active.start..event_end].to_string(),
                             text: active.text.trim_end_matches('\n').to_string(),
+                            blocks: Vec::new(),
                         });
                     }
                 }
@@ -244,6 +260,11 @@ pub(crate) fn parse_master_pages(xml: &str) -> Result<Vec<MasterPage>> {
                     pages.push(finished.page);
                 }
             },
+            Event::DocType(_) => {
+                return Err(Error::InvalidFormat(
+                    "DTD is not allowed in ODF styles.xml".to_string(),
+                ));
+            },
             Event::Eof => break,
             _ => {},
         }
@@ -253,6 +274,14 @@ pub(crate) fn parse_master_pages(xml: &str) -> Result<Vec<MasterPage>> {
         return Err(Error::InvalidFormat(
             "unterminated master-page header/footer".to_string(),
         ));
+    }
+    let mut structured = parse_header_footer_blocks(xml)?;
+    for page in &mut pages {
+        for region in &mut page.regions {
+            region.blocks = structured
+                .remove(&(page.name.clone(), region.kind))
+                .unwrap_or_default();
+        }
     }
     Ok(pages)
 }
@@ -669,11 +698,15 @@ fn append_empty_text_element(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
     output: &mut String,
+    expanded_spaces: &mut usize,
 ) -> Result<()> {
     match element.local_name().as_ref() {
         b"s" => {
             let count = style_independent_text_count(reader, element)?.unwrap_or(1);
-            if count > 1_000_000 {
+            *expanded_spaces = expanded_spaces.checked_add(count).ok_or_else(|| {
+                Error::InvalidFormat("header text:s count exceeds safety limit".to_string())
+            })?;
+            if *expanded_spaces > MAX_EXPANDED_SPACES {
                 return Err(Error::InvalidFormat(
                     "header text:s count exceeds safety limit".to_string(),
                 ));
@@ -843,5 +876,32 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn opens_libreoffice_first_left_right_header_footer_fixture() {
+        let document = crate::Document::open(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../3rdparty/libreoffice-core/sw/qa/core/header_footer/data/first-header-footer.odt"
+        ))
+        .unwrap();
+        let pages = document.master_pages().unwrap();
+        assert_eq!(pages.len(), 2);
+        for kind in [
+            HeaderFooterKind::Header,
+            HeaderFooterKind::HeaderFirst,
+            HeaderFooterKind::HeaderLeft,
+            HeaderFooterKind::Footer,
+            HeaderFooterKind::FooterFirst,
+            HeaderFooterKind::FooterLeft,
+        ] {
+            let matching: Vec<_> = pages
+                .iter()
+                .filter_map(|page| page.region(kind))
+                .collect();
+            assert_eq!(matching.len(), 2, "missing {kind:?} regions");
+            assert!(matching.iter().all(|region| !region.text.is_empty()));
+            assert!(matching.iter().all(|region| region.blocks.len() == 1));
+        }
     }
 }

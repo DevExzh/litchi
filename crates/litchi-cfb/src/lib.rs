@@ -9,10 +9,18 @@
 #![allow(missing_docs)]
 
 pub mod consts;
+mod directory_name;
 mod file;
 mod metadata;
 pub mod writer;
 
 pub use file::{DirectoryEntry, OleError, OleFile, is_ole_file};
-pub use metadata::{OleMetadata, PropertyValue};
+pub use metadata::{
+    OleMetadata, PropertySet, PropertySetGuid, PropertySetStream, PropertyValue,
+};
 pub use writer::OleWriter;
+
+#[cfg(test)]
+mod allocation_validation_tests;
+#[cfg(test)]
+mod directory_validation_tests;

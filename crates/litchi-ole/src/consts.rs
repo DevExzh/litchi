@@ -25,6 +25,8 @@ pub enum PptRecordType {
     SlideAtom = 1007,
     /// Notes record
     Notes = 1008,
+    /// Handout record
+    Handout = 0x0FC9,
     /// Notes atom record
     NotesAtom = 1009,
     /// Environment record
@@ -45,6 +47,8 @@ pub enum PptRecordType {
     SlideListWithText = 4080,
     /// Persist pointer holder record
     PersistPtrHolder = 6001,
+    /// PowerPoint 10 cryptographic session container
+    CryptSession10Container = 12052,
     /// Slide show slide info atom
     SSSlideInfoAtom = 1017,
     /// VBA info record
@@ -65,6 +69,8 @@ pub enum PptRecordType {
     RoundTripTheme12Atom = 0x040E,
     /// PowerPoint 12 DrawingML color mapping XML atom
     RoundTripColorMapping12Atom = 0x040F,
+    /// PowerPoint 12 notes-master text styles atom
+    RoundTripNotesMasterTextStyles12Atom = 0x01C5,
     /// PowerPoint 12 original main-master identifier atom
     RoundTripOriginalMainMasterId12Atom = 0x041C,
     /// PowerPoint 12 composite master identifier atom
@@ -332,6 +338,7 @@ impl From<u16> for PptRecordType {
             1017 => PptRecordType::SSSlideInfoAtom,
             4080 => PptRecordType::SlideListWithText,
             6001 | 6002 => PptRecordType::PersistPtrHolder, // Both values are used
+            12052 => PptRecordType::CryptSession10Container,
             1023 => PptRecordType::VBAInfo,
             1024 => PptRecordType::VBAInfoAtom,
             1033 => PptRecordType::ExObjList,
@@ -339,6 +346,8 @@ impl From<u16> for PptRecordType {
             1035 => PptRecordType::PPDrawingGroup,
             1036 => PptRecordType::PPDrawing,
             1037 => PptRecordType::GridSpacing10Atom,
+            0x0FC9 => PptRecordType::Handout,
+            0x01C5 => PptRecordType::RoundTripNotesMasterTextStyles12Atom,
             0x040E => PptRecordType::RoundTripTheme12Atom,
             0x040F => PptRecordType::RoundTripColorMapping12Atom,
             0x041C => PptRecordType::RoundTripOriginalMainMasterId12Atom,

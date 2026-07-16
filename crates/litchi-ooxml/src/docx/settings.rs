@@ -168,7 +168,8 @@ impl DocumentSettings {
     ///
     /// A DocumentSettings object
     pub(crate) fn extract_from_part(part: &dyn Part) -> Result<Self> {
-        Self::extract_from_xml(part.blob())
+        let xml = crate::common::mce::process_part(part)?;
+        Self::extract_from_xml(xml.as_ref())
     }
 
     fn extract_from_xml(xml_bytes: &[u8]) -> Result<Self> {

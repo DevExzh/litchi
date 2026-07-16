@@ -117,7 +117,8 @@ impl CustomShowList {
     /// Parse custom shows from presentation XML.
     pub fn parse_xml(xml: &str) -> Result<Self> {
         let mut list = Self::new();
-        let mut reader = Reader::from_str(xml);
+        let xml = crate::common::mce::process_str(xml)?;
+        let mut reader = Reader::from_str(xml.as_ref());
         reader.config_mut().trim_text(true);
 
         let mut current_show: Option<CustomShow> = None;

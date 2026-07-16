@@ -97,6 +97,8 @@ pub mod content_type {
         "application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml";
     pub const SML_SHARED_STRINGS: &str =
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml";
+    pub const SML_EXTERNAL_LINK: &str =
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.externalLink+xml";
     pub const SML_PIVOT_CACHE_DEFINITION: &str =
         "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheDefinition+xml";
     pub const SML_PIVOT_CACHE_RECORDS: &str =
@@ -239,8 +241,22 @@ pub mod relationship_type {
     /// ISO/IEC 29500 Strict shared-strings relationship type.
     pub const STRICT_SHARED_STRINGS: &str =
         "http://purl.oclc.org/ooxml/officeDocument/relationships/sharedStrings";
+    pub const EXTERNAL_LINK: &str =
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/externalLink";
+    pub const STRICT_EXTERNAL_LINK: &str =
+        "http://purl.oclc.org/ooxml/officeDocument/relationships/externalLink";
+    pub const EXTERNAL_LINK_PATH: &str =
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/externalLinkPath";
+    pub const STRICT_EXTERNAL_LINK_PATH: &str =
+        "http://purl.oclc.org/ooxml/officeDocument/relationships/externalLinkPath";
     pub const WEB_SETTINGS: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/webSettings";
+    /// ISO/IEC 29500 alternative-format import relationship type.
+    pub const ALTERNATIVE_FORMAT_IMPORT: &str =
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/afChunk";
+    /// Case-sensitive relationship type emitted by Microsoft Word.
+    pub const MS_ALTERNATIVE_FORMAT_IMPORT: &str =
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/aFChunk";
     pub const PIVOT_CACHE_DEFINITION: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition";
     /// ISO/IEC 29500 Strict pivot-cache-definition relationship type.
@@ -316,8 +332,14 @@ pub mod relationship_type {
         "http://purl.oclc.org/ooxml/officeDocument/relationships/hyperlink";
     pub const OLE_OBJECT: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject";
+    /// ISO/IEC 29500 Strict embedded-object relationship type.
+    pub const STRICT_OLE_OBJECT: &str =
+        "http://purl.oclc.org/ooxml/officeDocument/relationships/oleObject";
     pub const PACKAGE: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/package";
+    /// ISO/IEC 29500 Strict embedded-package relationship type.
+    pub const STRICT_PACKAGE: &str =
+        "http://purl.oclc.org/ooxml/officeDocument/relationships/package";
 
     // PresentationML relationships
     pub const SLIDE: &str =

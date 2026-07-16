@@ -1,10 +1,14 @@
 /// Constants for OLE file format
 pub mod consts;
 
+/// Shared password-to-open primitives for legacy Office binary formats.
+mod office_crypto;
+
 // CFB substrate types re-exported so callers can reach them through the
 // `litchi::ole` namespace as well as `litchi_cfb` directly.
 pub use litchi_cfb::{
-    DirectoryEntry, OleError, OleFile, OleMetadata, OleWriter, PropertyValue, is_ole_file,
+    DirectoryEntry, OleError, OleFile, OleMetadata, OleWriter, PropertySet, PropertySetGuid,
+    PropertySetStream, PropertyValue, is_ole_file,
 };
 
 pub use litchi_cfb::writer;

@@ -21,18 +21,28 @@ pub struct DocumentProperties {
     pub keywords: Option<String>,
     /// Document description
     pub description: Option<String>,
+    /// Stable document identifier
+    pub identifier: Option<String>,
     /// Last modified by
     pub last_modified_by: Option<String>,
     /// Document category
     pub category: Option<String>,
     /// Content status (e.g., "Draft", "Final")
     pub content_status: Option<String>,
+    /// Core-properties content type descriptor
+    pub content_type: Option<String>,
+    /// Revision number
+    pub revision: Option<u32>,
+    /// Document version
+    pub version: Option<String>,
     /// Document language
     pub language: Option<String>,
     /// Creation date
     pub created: Option<DateTime<Utc>>,
     /// Last modification date
     pub modified: Option<DateTime<Utc>>,
+    /// Last printed date
+    pub last_printed: Option<DateTime<Utc>>,
 }
 
 impl DocumentProperties {
@@ -71,6 +81,12 @@ impl DocumentProperties {
         self
     }
 
+    /// Set the stable document identifier.
+    pub fn identifier(mut self, identifier: &str) -> Self {
+        self.identifier = Some(identifier.to_string());
+        self
+    }
+
     /// Set who last modified the document.
     pub fn last_modified_by(mut self, name: &str) -> Self {
         self.last_modified_by = Some(name.to_string());
@@ -86,6 +102,24 @@ impl DocumentProperties {
     /// Set the content status.
     pub fn content_status(mut self, status: &str) -> Self {
         self.content_status = Some(status.to_string());
+        self
+    }
+
+    /// Set the core content type descriptor.
+    pub fn content_type(mut self, content_type: &str) -> Self {
+        self.content_type = Some(content_type.to_string());
+        self
+    }
+
+    /// Set the revision number.
+    pub fn revision(mut self, revision: u32) -> Self {
+        self.revision = Some(revision);
+        self
+    }
+
+    /// Set the document version.
+    pub fn version(mut self, version: &str) -> Self {
+        self.version = Some(version.to_string());
         self
     }
 
@@ -136,6 +170,12 @@ impl DocumentProperties {
             xml.push_str("</dc:description>");
         }
 
+        if let Some(ref identifier) = self.identifier {
+            xml.push_str("<dc:identifier>");
+            xml.push_str(&escape_xml(identifier));
+            xml.push_str("</dc:identifier>");
+        }
+
         // Last modified by
         if let Some(ref last_modified_by) = self.last_modified_by {
             xml.push_str("<cp:lastModifiedBy>");
@@ -157,6 +197,24 @@ impl DocumentProperties {
             xml.push_str("</cp:contentStatus>");
         }
 
+        if let Some(ref content_type) = self.content_type {
+            xml.push_str("<cp:contentType>");
+            xml.push_str(&escape_xml(content_type));
+            xml.push_str("</cp:contentType>");
+        }
+
+        if let Some(revision) = self.revision {
+            xml.push_str("<cp:revision>");
+            xml.push_str(&revision.to_string());
+            xml.push_str("</cp:revision>");
+        }
+
+        if let Some(ref version) = self.version {
+            xml.push_str("<cp:version>");
+            xml.push_str(&escape_xml(version));
+            xml.push_str("</cp:version>");
+        }
+
         // Language
         if let Some(ref language) = self.language {
             xml.push_str("<dc:language>");
@@ -176,6 +234,13 @@ impl DocumentProperties {
             xml.push_str("<dcterms:modified xsi:type=\"dcterms:W3CDTF\">");
             xml.push_str(&modified.to_rfc3339());
             xml.push_str("</dcterms:modified>");
+        }
+
+
+        if let Some(ref last_printed) = self.last_printed {
+            xml.push_str("<cp:lastPrinted>");
+            xml.push_str(&last_printed.to_rfc3339());
+            xml.push_str("</cp:lastPrinted>");
         }
 
         xml.push_str("</cp:coreProperties>");

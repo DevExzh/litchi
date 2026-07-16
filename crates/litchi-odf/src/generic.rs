@@ -142,6 +142,21 @@ impl FlatOpenDocument {
         Meta::from_bytes(self.xml.as_bytes())?.odf_metadata()
     }
 
+    /// Discover inline and inert linked images in the flat document.
+    pub fn images(&self) -> Result<Vec<crate::OdfImage>> {
+        crate::media::scan_flat_images(&self.xml)
+    }
+
+    /// Inspect classic forms without executing bindings, events, or external resources.
+    pub fn forms(&self) -> Result<crate::OdfForms> {
+        crate::form::parse_form_parts(&[(self.xml(), crate::OdfFormPart::Flat)])
+    }
+
+    /// Discover inert inline and linked embedded objects.
+    pub fn embedded_objects(&self) -> Result<Vec<crate::OdfEmbeddedObject>> {
+        crate::embedded_object::scan_flat_objects(&self.xml)
+    }
+
     /// Return the exact original bytes.
     pub fn as_bytes(&self) -> &[u8] {
         self.xml.as_bytes()
@@ -275,16 +290,35 @@ impl OpenDocumentPackage {
         Self::from_reader(file)
     }
 
+    /// Open and validate a password-encrypted packaged OpenDocument file.
+    pub fn open_with_password(path: impl AsRef<Path>, password: impl Into<String>) -> Result<Self> {
+        let file = std::fs::File::open(path)?;
+        Self::from_reader_with_password(file, password)
+    }
+
     /// Read and validate a packaged OpenDocument file.
     pub fn from_reader(reader: impl Read) -> Result<Self> {
         let package = OwnedPackage::from_reader(reader)?;
         Self::from_owned(package)
     }
 
+    /// Read and validate a password-encrypted packaged OpenDocument file.
+    pub fn from_reader_with_password(
+        reader: impl Read,
+        password: impl Into<String>,
+    ) -> Result<Self> {
+        Self::from_owned(OwnedPackage::from_reader_with_password(reader, password)?)
+    }
+
     /// Validate a packaged OpenDocument file from owned bytes.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         let package = OwnedPackage::from_bytes(bytes)?;
         Self::from_owned(package)
+    }
+
+    /// Validate password-encrypted packaged OpenDocument bytes.
+    pub fn from_bytes_with_password(bytes: Vec<u8>, password: impl Into<String>) -> Result<Self> {
+        Self::from_owned(OwnedPackage::from_bytes_with_password(bytes, password)?)
     }
 
     fn from_owned(package: OwnedPackage) -> Result<Self> {
@@ -321,6 +355,11 @@ impl OpenDocumentPackage {
     /// Whether this package uses a template MIME type.
     pub fn is_template(&self) -> bool {
         self.template
+    }
+
+    /// Whether the package manifest contains password-encrypted entries.
+    pub fn is_encrypted(&self) -> Result<bool> {
+        Ok(self.package.package()?.manifest().has_encrypted_entries())
     }
 
     /// Return the exact package MIME type.
@@ -390,6 +429,55 @@ impl OpenDocumentPackage {
     /// List package paths that appear to contain embedded media.
     pub fn media_files(&self) -> Result<Vec<String>> {
         self.package.media_files()
+    }
+
+    /// Discover referenced, inline, missing, and inert linked images.
+    pub fn images(&self) -> Result<Vec<crate::OdfImage>> {
+        let content = self.content_xml()?;
+        let styles = self.styles_xml()?;
+        let package = self.package.package()?;
+        crate::media::scan_packaged_images(
+            &content,
+            styles.as_deref(),
+            |path| package.has_file(path),
+            |path| package.manifest().get_media_type(path).map(str::to_string),
+        )
+    }
+
+    /// Inspect classic forms in content and styles without executing behavior.
+    pub fn forms(&self) -> Result<crate::OdfForms> {
+        let content = self.content_xml()?;
+        let styles = self.styles_xml()?;
+        let mut parts = vec![(content.as_str(), crate::OdfFormPart::Content)];
+        if let Some(styles) = styles.as_deref() {
+            parts.push((styles, crate::OdfFormPart::Styles));
+        }
+        crate::form::parse_form_parts(&parts)
+    }
+
+    /// Discover package, inline, missing, and inert linked embedded objects.
+    pub fn embedded_objects(&self) -> Result<Vec<crate::OdfEmbeddedObject>> {
+        let content = self.content_xml()?;
+        let styles = self.styles_xml()?;
+        let package = self.package.package()?;
+        crate::embedded_object::scan_packaged_objects(
+            &content,
+            styles.as_deref(),
+            |path| package.has_file(path),
+            |path| package.manifest().get_media_type(path).map(str::to_string),
+        )
+    }
+
+    /// Return bytes only for inline or verified package-contained images.
+    /// Linked images remain inert and are never fetched.
+    pub fn image_bytes(&self, image: &crate::OdfImage) -> Result<Option<Vec<u8>>> {
+        match &image.source {
+            crate::OdfImageSource::Inline { bytes, .. } => Ok(Some(bytes.clone())),
+            crate::OdfImageSource::PackagePart { path, .. } => {
+                self.package.get_file(path).map(Some)
+            },
+            _ => Ok(None),
+        }
     }
 
     /// Return the original package bytes.

@@ -696,7 +696,8 @@ impl TableParser {
 }
 
 pub fn parse_table_xml(xml: &str) -> SheetResult<Option<Table>> {
-    TableParser::parse(xml)
+    let xml = crate::common::mce::process_str(xml)?;
+    TableParser::parse(xml.as_ref())
 }
 
 fn parse_sort_state(element: &BytesStart<'_>, decoder: Decoder) -> SheetResult<SortState> {

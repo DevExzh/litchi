@@ -108,7 +108,7 @@ impl BlobPart {
     /// * `content_type` - The content type of this part
     /// * `blob` - The binary content of this part
     pub fn new(partname: PackURI, content_type: String, blob: Vec<u8>) -> Self {
-        let rels = Relationships::new(partname.base_uri().to_string());
+        let rels = Relationships::for_source(&partname);
         Self {
             partname,
             content_type,
@@ -186,7 +186,7 @@ impl XmlPart {
     /// * `content_type` - The content type of this part
     /// * `xml_bytes` - The XML content as raw bytes
     pub fn new(partname: PackURI, content_type: String, xml_bytes: Vec<u8>) -> Self {
-        let rels = Relationships::new(partname.base_uri().to_string());
+        let rels = Relationships::for_source(&partname);
         Self {
             partname,
             content_type,

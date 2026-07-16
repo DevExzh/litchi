@@ -29,6 +29,8 @@ pub struct FileInformationBlock {
     nfib: u16,
     /// Flags including encryption, table stream selection, etc.
     flags: u16,
+    /// XOR password verifier or size of the clear table-stream encryption header.
+    l_key: u32,
     /// Whether to use 1Table (true) or 0Table (false)
     which_table_stream: bool,
     /// Language ID
@@ -67,6 +69,9 @@ impl FileInformationBlock {
         let flags = U16::<LE>::read_from_bytes(&word_document[10..12])
             .map(|v| v.get())
             .unwrap_or(0);
+        let l_key = U32::<LE>::read_from_bytes(&word_document[14..18])
+            .map(|v| v.get())
+            .unwrap_or(0);
 
         // Validate magic number
         if magic != 0xA5EC && magic != 0xA5DC {
@@ -87,6 +92,7 @@ impl FileInformationBlock {
         Ok(Self {
             nfib,
             flags,
+            l_key,
             which_table_stream,
             lid,
             data,
@@ -144,6 +150,25 @@ impl FileInformationBlock {
     pub fn is_encrypted(&self) -> bool {
         // fEncrypted flag is bit 8 at offset 0x0A
         (self.flags & 0x0100) != 0
+    }
+
+    /// Check whether the encrypted document uses legacy XOR obfuscation.
+    #[inline]
+    pub(crate) fn is_obfuscated(&self) -> bool {
+        // fObfuscated is bit 15 of the FibBase flags field.
+        (self.flags & 0x8000) != 0
+    }
+
+    /// Get the size of the clear encryption header at the start of the table stream.
+    #[inline]
+    pub(crate) fn encryption_header_size(&self) -> u32 {
+        self.l_key
+    }
+
+    /// Get the 32-bit password verifier used by legacy XOR obfuscation.
+    #[inline]
+    pub(crate) fn xor_obfuscation_verifier(&self) -> u32 {
+        self.l_key
     }
 
     /// Get the language ID.

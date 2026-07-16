@@ -292,8 +292,14 @@ pub mod datatype;
 pub mod elements;
 /// OpenDocument formula (.odf/.otf) support.
 mod formula;
+/// Inert semantic discovery of classic ODF forms and control shapes.
+mod form;
 /// Format-neutral package access for every OpenDocument family.
 mod generic;
+/// Shared semantic discovery of images in OpenDocument XML and packages.
+mod media;
+/// Inert semantic discovery of embedded OpenDocument and OLE objects.
+mod embedded_object;
 /// OpenDocument database front-end (.odb) support.
 mod odb;
 /// OpenDocument standalone chart (.odc/.otc) support.
@@ -316,11 +322,23 @@ mod oth;
 // Re-export common utilities for convenience
 // These are used across all Office formats, not ODF-specific
 pub use core::{
-    AutoReloadMetadata, DocumentStatistics, HyperlinkBehaviourMetadata, OdfMetadata,
-    TemplateMetadata, UserDefinedMetadata, UserDefinedValueType,
+    AutoReloadMetadata, DocumentStatistics, HyperlinkBehaviourMetadata, Manifest, ManifestChecksum,
+    ManifestChecksumAlgorithm, ManifestEncryption, ManifestEncryptionAlgorithm, ManifestEntry,
+    ManifestKeyDerivation, ManifestStartKeyGeneration, OdfMetadata, TemplateMetadata,
+    UserDefinedMetadata, UserDefinedValueType,
 };
 pub use formula::{FormulaDocument, MathAttribute, MathContent, MathElement, MathElementKind};
+pub use form::{
+    OdfControlRef, OdfControlShape, OdfForm, OdfFormAttribute, OdfFormControl,
+    OdfFormControlKind, OdfFormGroup, OdfFormNode, OdfFormPart, OdfFormProperty,
+    OdfFormPropertyValue, OdfFormScalarValue, OdfFormScope, OdfForms,
+};
 pub use generic::{FlatOpenDocument, OpenDocumentFamily, OpenDocumentPackage};
+pub use media::{OdfImage, OdfImageFrame, OdfImagePart, OdfImageSource};
+pub use embedded_object::{
+    OdfEmbeddedObject, OdfEmbeddedObjectKind, OdfEmbeddedObjectPart,
+    OdfEmbeddedObjectSource, OdfInlineObjectRoot,
+};
 pub use litchi_core::RGBColor as Color;
 pub use litchi_core::unit::{Length, LengthUnit};
 pub use odb::{
@@ -348,7 +366,8 @@ pub use odp::{
 pub use ods::{
     AnnotationElement, AnnotationNode, CalculationIteration, CalculationNullDate,
     CalculationSettings, Cell as SCell, CellAnnotation, CellDetective, CellMatrixSpan, CellMerge,
-    CellRangeSource, CellStyleProtection, CellValue, Column as SColumn, Consolidation,
+    CellRangeSource, CellStyleProtection, CellValue, Column as SColumn, ConditionalCellStyle,
+    ConditionalCellStyleRule, Consolidation,
     ConsolidationUseLabels, ContentValidation, DataPilotDisplayInfo, DataPilotDisplayMemberMode,
     DataPilotField, DataPilotFieldReference, DataPilotGrandTotal, DataPilotGroup,
     DataPilotGroupBoundary, DataPilotGroupBy, DataPilotGroups, DataPilotLayoutInfo,

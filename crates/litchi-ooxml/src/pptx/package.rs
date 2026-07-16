@@ -535,6 +535,11 @@ impl Package {
         &self.opc
     }
 
+    /// Discover inert embedded-object and embedded-package relationships.
+    pub fn embedded_parts(&self) -> Result<Vec<crate::EmbeddedPart<'_>>> {
+        crate::embedded_object::discover_embedded_parts(&self.opc)
+    }
+
     /// Get mutable access to the underlying OPC package.
     ///
     /// This provides access to lower-level package operations for modification.

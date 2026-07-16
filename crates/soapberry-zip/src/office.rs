@@ -220,6 +220,19 @@ impl<'data> ArchiveReader<'data> {
         self.index.keys().map(|s| s.as_str())
     }
 
+    /// Whether an archive entry uses the ZIP Store method.
+    ///
+    /// ODF encryption is applied to an already-deflated byte stream, so the
+    /// enclosing ZIP entry must not perform another compression transform.
+    pub fn is_stored(&self, name: &str) -> Result<bool, Error> {
+        let normalized = name.strip_prefix('/').unwrap_or(name);
+        let info = self
+            .index
+            .get(normalized)
+            .ok_or_else(|| Error::from(ErrorKind::FileNotFound(normalized.to_string())))?;
+        Ok(info.compression_method == CompressionMethod::Store)
+    }
+
     /// Read and decompress a file from the archive.
     ///
     /// Returns the decompressed contents of the file. Supports both stored

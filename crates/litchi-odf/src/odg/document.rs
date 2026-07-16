@@ -271,6 +271,17 @@ impl DrawingDocument {
         self.package.metadata()
     }
 
+    /// Inspect classic forms without executing bindings, events, or external resources.
+    pub fn forms(&self) -> Result<crate::OdfForms> {
+        let content = self.package.content_xml()?;
+        let styles = self.package.styles_xml()?;
+        let mut parts = vec![(content.as_str(), crate::OdfFormPart::Content)];
+        if let Some(styles) = styles.as_deref() {
+            parts.push((styles, crate::OdfFormPart::Styles));
+        }
+        crate::form::parse_form_parts(&parts)
+    }
+
     /// Extract the complete format-specific OpenDocument metadata model.
     pub fn odf_metadata(&self) -> Result<Option<OdfMetadata>> {
         self.package.odf_metadata()

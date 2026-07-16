@@ -204,7 +204,8 @@ impl<'a> CommentsPart<'a> {
     /// }
     /// ```
     pub fn comments(&self) -> Result<Vec<Comment>> {
-        let mut reader = NsReader::from_reader(self.xml_bytes());
+        let xml = crate::common::mce::process_ooxml(self.xml_bytes())?;
+        let mut reader = NsReader::from_reader(xml.as_ref());
         let mut comments = Vec::new();
         let mut pending: Option<PendingComment> = None;
         let mut depth = 0usize;
@@ -493,7 +494,8 @@ impl<'a> CommentAuthorsPart<'a> {
     /// }
     /// ```
     pub fn authors(&self) -> Result<Vec<CommentAuthor>> {
-        let mut reader = NsReader::from_reader(self.xml_bytes());
+        let xml = crate::common::mce::process_ooxml(self.xml_bytes())?;
+        let mut reader = NsReader::from_reader(xml.as_ref());
         let mut authors = Vec::new();
         let mut depth = 0usize;
 

@@ -31,6 +31,12 @@ pub struct Metadata {
     /// Document description/comments
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    /// Stable document identifier
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub identifier: Option<String>,
+    /// Document language tag
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub language: Option<String>,
     /// Template used to create the document
     #[serde(skip_serializing_if = "Option::is_none")]
     pub template: Option<String>,
@@ -70,6 +76,12 @@ pub struct Metadata {
     /// Content status (draft, final, etc.)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub content_status: Option<String>,
+    /// Core-properties content type descriptor
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content_type: Option<String>,
+    /// Document format or content version
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
     /// Last printed time
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_printed_time: Option<DateTime<Utc>>,
@@ -91,6 +103,8 @@ impl Metadata {
             || self.author.is_some()
             || self.keywords.is_some()
             || self.description.is_some()
+            || self.identifier.is_some()
+            || self.language.is_some()
             || self.template.is_some()
             || self.last_modified_by.is_some()
             || self.revision.is_some()
@@ -103,6 +117,10 @@ impl Metadata {
             || self.category.is_some()
             || self.company.is_some()
             || self.manager.is_some()
+            || self.content_status.is_some()
+            || self.content_type.is_some()
+            || self.version.is_some()
+            || self.last_printed_time.is_some()
             || self.security.is_some()
             || self.codepage.is_some()
     }

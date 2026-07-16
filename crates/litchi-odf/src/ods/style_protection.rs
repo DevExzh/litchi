@@ -1,15 +1,46 @@
 //! Resolution of ODF table-cell protection styles.
 
+use super::FormulaNamespace;
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::{
     XmlVersion,
     events::{BytesStart, Event},
-    name::{Namespace, NamespaceResolver, ResolveResult},
+    name::{Namespace, NamespaceResolver, QName, ResolveResult},
     reader::NsReader,
 };
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 const STYLE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:style:1.0";
+const MAX_CONDITIONAL_STYLES: usize = 65_536;
+const MAX_RULES_PER_STYLE: usize = 1_024;
+const MAX_CONDITIONAL_RULES: usize = 262_144;
+const MAX_CONDITIONAL_ATTRIBUTE_BYTES: usize = 64 * 1024;
+const MAX_CONDITIONAL_TEXT_BYTES: usize = 16 * 1024 * 1024;
+const MAX_STYLE_DEPTH: usize = 64;
+
+/// One standard ODF conditional table-cell style.
+///
+/// Rules are retained in document order. Litchi does not evaluate their
+/// conditions or compute an effective style.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ConditionalCellStyle {
+    pub style_name: String,
+    pub parent_style_name: Option<String>,
+    pub rules: Vec<ConditionalCellStyleRule>,
+}
+
+/// One inert `style:map` rule belonging to a table-cell style.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ConditionalCellStyleRule {
+    /// The decoded condition text. It is never evaluated by litchi.
+    pub condition: String,
+    /// Namespace bound to a condition prefix, when the condition is qualified.
+    pub formula_namespace: Option<FormulaNamespace>,
+    /// Name of the common table-cell style referenced by the rule.
+    pub apply_style_name: String,
+    /// Optional lexical base cell address for relative formula references.
+    pub base_cell_address: Option<String>,
+}
 
 /// The effective value of the ODF `style:cell-protect` property.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -60,6 +91,13 @@ impl CellStyleProtection {
 pub(crate) struct CellStyleRegistry {
     styles: HashMap<String, CellStyleDefinition>,
     default: Option<CellStyleProtection>,
+    common_table_cell_styles: HashSet<String>,
+    style_order: Vec<String>,
+    conditional_styles: Vec<ConditionalCellStyle>,
+    conditional_style_index: HashMap<String, usize>,
+    parsed_conditional_styles: usize,
+    parsed_conditional_rules: usize,
+    conditional_text_bytes: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -210,6 +248,7 @@ fn collect_namespaces(
 struct CellStyleDefinition {
     parent: Option<String>,
     protection: Option<CellStyleProtection>,
+    conditional_rules: Vec<ConditionalCellStyleRule>,
 }
 
 impl CellStyleRegistry {
@@ -221,7 +260,18 @@ impl CellStyleRegistry {
         // Automatic styles are the closest scope and intentionally replace a
         // same-named definition from styles.xml.
         registry.parse_part(content)?;
+        registry.finish_conditional_styles()?;
         Ok(registry)
+    }
+
+    pub(crate) fn conditional_styles(&self) -> &[ConditionalCellStyle] {
+        &self.conditional_styles
+    }
+
+    pub(crate) fn conditional_style(&self, name: &str) -> Option<&ConditionalCellStyle> {
+        self.conditional_style_index
+            .get(name)
+            .and_then(|index| self.conditional_styles.get(*index))
     }
 
     pub(crate) fn resolve(&self, style_name: Option<&str>) -> Result<Option<CellStyleProtection>> {
@@ -253,18 +303,41 @@ impl CellStyleRegistry {
         let mut buffer = Vec::new();
         let mut current: Option<StyleBuilder> = None;
         let mut depth = 0usize;
+        let mut open_map = false;
+        let mut in_common_styles = false;
         loop {
             let (namespace, event) = reader
                 .read_resolved_event_into(&mut buffer)
                 .map_err(|error| Error::InvalidFormat(format!("XML parsing error: {error}")))?;
             match event {
+                Event::DocType(_) => {
+                    return Err(Error::InvalidFormat(
+                        "DOCTYPE is not allowed in ODF style XML".to_string(),
+                    ));
+                },
+                Event::Start(element)
+                    if current.is_none()
+                        && is_namespace(&namespace, OFFICE_NAMESPACE)
+                        && element.local_name().as_ref() == b"styles" =>
+                {
+                    in_common_styles = true;
+                },
+                Event::End(element)
+                    if current.is_none()
+                        && is_namespace(&namespace, OFFICE_NAMESPACE)
+                        && element.local_name().as_ref() == b"styles" =>
+                {
+                    in_common_styles = false;
+                },
                 Event::Start(element)
                     if is_namespace(&namespace, STYLE_NAMESPACE)
                         && matches!(element.local_name().as_ref(), b"style" | b"default-style") =>
                 {
                     if current.is_some() {
-                        depth += 1;
-                    } else if let Some(builder) = StyleBuilder::new(&reader, &element)? {
+                        increment_style_depth(&mut depth)?;
+                    } else if let Some(builder) =
+                        StyleBuilder::new(&reader, &element, in_common_styles)?
+                    {
                         current = Some(builder);
                     }
                 },
@@ -273,10 +346,55 @@ impl CellStyleRegistry {
                         && matches!(element.local_name().as_ref(), b"style" | b"default-style") =>
                 {
                     if current.is_none()
-                        && let Some(builder) = StyleBuilder::new(&reader, &element)?
+                        && let Some(builder) =
+                            StyleBuilder::new(&reader, &element, in_common_styles)?
                     {
                         self.finish(builder)?;
                     }
+                },
+                Event::Start(element)
+                    if current.is_some()
+                        && depth == 0
+                        && is_namespace(&namespace, STYLE_NAMESPACE)
+                        && element.local_name().as_ref() == b"map" =>
+                {
+                    if current.as_ref().is_some_and(|builder| builder.is_default) {
+                        return Err(Error::InvalidFormat(
+                            "style:map is not allowed on a default table-cell style".to_string(),
+                        ));
+                    }
+                    let rule = parse_conditional_rule(&reader, &element)?;
+                    self.record_conditional_rule(&rule)?;
+                    let builder = current.as_mut().expect("checked style");
+                    if builder.conditional_rules.len() >= MAX_RULES_PER_STYLE {
+                        return Err(Error::InvalidFormat(format!(
+                            "table-cell style exceeds the {MAX_RULES_PER_STYLE} conditional rule limit"
+                        )));
+                    }
+                    builder.conditional_rules.push(rule);
+                    increment_style_depth(&mut depth)?;
+                    open_map = true;
+                },
+                Event::Empty(element)
+                    if current.is_some()
+                        && depth == 0
+                        && is_namespace(&namespace, STYLE_NAMESPACE)
+                        && element.local_name().as_ref() == b"map" =>
+                {
+                    if current.as_ref().is_some_and(|builder| builder.is_default) {
+                        return Err(Error::InvalidFormat(
+                            "style:map is not allowed on a default table-cell style".to_string(),
+                        ));
+                    }
+                    let rule = parse_conditional_rule(&reader, &element)?;
+                    self.record_conditional_rule(&rule)?;
+                    let builder = current.as_mut().expect("checked style");
+                    if builder.conditional_rules.len() >= MAX_RULES_PER_STYLE {
+                        return Err(Error::InvalidFormat(format!(
+                            "table-cell style exceeds the {MAX_RULES_PER_STYLE} conditional rule limit"
+                        )));
+                    }
+                    builder.conditional_rules.push(rule);
                 },
                 Event::Start(element) | Event::Empty(element)
                     if current.is_some()
@@ -302,7 +420,47 @@ impl CellStyleRegistry {
                         builder.protection = protection;
                     }
                 },
-                Event::Start(_) if current.is_some() => depth += 1,
+                Event::Start(_) if open_map => {
+                    return Err(Error::InvalidFormat(
+                        "style:map must not contain child elements".to_string(),
+                    ));
+                },
+                Event::Text(text) if open_map => {
+                    let value = text
+                        .decode()
+                        .map_err(|error| Error::InvalidFormat(format!("invalid style:map text: {error}")))?;
+                    if !value.trim().is_empty() {
+                        return Err(Error::InvalidFormat(
+                            "style:map must be empty".to_string(),
+                        ));
+                    }
+                },
+                Event::CData(text) if open_map => {
+                    let value = text
+                        .decode()
+                        .map_err(|error| Error::InvalidFormat(format!("invalid style:map CDATA: {error}")))?;
+                    if !value.trim().is_empty() {
+                        return Err(Error::InvalidFormat(
+                            "style:map must be empty".to_string(),
+                        ));
+                    }
+                },
+                Event::End(element)
+                    if open_map
+                        && is_namespace(&namespace, STYLE_NAMESPACE)
+                        && element.local_name().as_ref() == b"map" =>
+                {
+                    open_map = false;
+                    depth = depth.checked_sub(1).ok_or_else(|| {
+                        Error::InvalidFormat("invalid style:map depth".to_string())
+                    })?;
+                },
+                Event::End(_) if open_map => {
+                    return Err(Error::InvalidFormat(
+                        "malformed style:map element".to_string(),
+                    ));
+                },
+                Event::Start(_) if current.is_some() => increment_style_depth(&mut depth)?,
                 Event::End(element)
                     if current.is_some()
                         && is_namespace(&namespace, STYLE_NAMESPACE)
@@ -328,6 +486,71 @@ impl CellStyleRegistry {
         Ok(())
     }
 
+    fn record_conditional_rule(&mut self, rule: &ConditionalCellStyleRule) -> Result<()> {
+        if self.parsed_conditional_rules >= MAX_CONDITIONAL_RULES {
+            return Err(Error::InvalidFormat(format!(
+                "document exceeds the {MAX_CONDITIONAL_RULES} conditional rule limit"
+            )));
+        }
+        self.parsed_conditional_rules += 1;
+        let bytes = rule
+            .condition
+            .len()
+            .checked_add(rule.apply_style_name.len())
+            .and_then(|size| {
+                size.checked_add(
+                    rule
+                        .base_cell_address
+                        .as_deref()
+                        .map_or(0, str::len),
+                )
+            })
+            .ok_or_else(|| Error::InvalidFormat("conditional style text size overflow".to_string()))?;
+        self.conditional_text_bytes = self
+            .conditional_text_bytes
+            .checked_add(bytes)
+            .ok_or_else(|| Error::InvalidFormat("conditional style text size overflow".to_string()))?;
+        if self.conditional_text_bytes > MAX_CONDITIONAL_TEXT_BYTES {
+            return Err(Error::InvalidFormat(format!(
+                "conditional style text exceeds the {MAX_CONDITIONAL_TEXT_BYTES} byte limit"
+            )));
+        }
+        Ok(())
+    }
+
+    fn finish_conditional_styles(&mut self) -> Result<()> {
+        let mut last_position = HashMap::new();
+        for (index, name) in self.style_order.iter().enumerate() {
+            last_position.insert(name.as_str(), index);
+        }
+        for (index, name) in self.style_order.iter().enumerate() {
+            if last_position.get(name.as_str()) != Some(&index) {
+                continue;
+            }
+            let definition = self.styles.get(name).expect("style order references registry");
+            if definition.conditional_rules.is_empty() {
+                continue;
+            }
+            for rule in &definition.conditional_rules {
+                if !self.common_table_cell_styles.contains(&rule.apply_style_name) {
+                    return Err(Error::InvalidFormat(format!(
+                        "conditional style '{}' references missing, automatic, or non-table-cell common style '{}'",
+                        name, rule.apply_style_name
+                    )));
+                }
+            }
+            let conditional = ConditionalCellStyle {
+                style_name: name.clone(),
+                parent_style_name: definition.parent.clone(),
+                rules: definition.conditional_rules.clone(),
+            };
+            self.conditional_style_index
+                .insert(name.clone(), self.conditional_styles.len());
+            self.conditional_styles.push(conditional);
+        }
+        Ok(())
+    }
+
     fn finish(&mut self, builder: StyleBuilder) -> Result<()> {
         if builder.is_default {
             if self.default.is_some() && builder.protection.is_some() {
@@ -343,11 +566,24 @@ impl CellStyleRegistry {
         let name = builder.name.ok_or_else(|| {
             Error::InvalidFormat("table-cell style is missing style:name".to_string())
         })?;
+        if !builder.conditional_rules.is_empty() {
+            if self.parsed_conditional_styles >= MAX_CONDITIONAL_STYLES {
+                return Err(Error::InvalidFormat(format!(
+                    "document exceeds the {MAX_CONDITIONAL_STYLES} conditional style limit"
+                )));
+            }
+            self.parsed_conditional_styles += 1;
+        }
+        if builder.is_common {
+            self.common_table_cell_styles.insert(name.clone());
+        }
+        self.style_order.push(name.clone());
         self.styles.insert(
             name,
             CellStyleDefinition {
                 parent: builder.parent,
                 protection: builder.protection,
+                conditional_rules: builder.conditional_rules,
             },
         );
         Ok(())
@@ -358,11 +594,17 @@ struct StyleBuilder {
     name: Option<String>,
     parent: Option<String>,
     protection: Option<CellStyleProtection>,
+    conditional_rules: Vec<ConditionalCellStyleRule>,
     is_default: bool,
+    is_common: bool,
 }
 
 impl StyleBuilder {
-    fn new(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Option<Self>> {
+    fn new(
+        reader: &NsReader<&[u8]>,
+        element: &BytesStart<'_>,
+        is_common: bool,
+    ) -> Result<Option<Self>> {
         if optional_attribute(reader.resolver(), reader.decoder(), element, b"family")?.as_deref()
             != Some("table-cell")
         {
@@ -377,9 +619,119 @@ impl StyleBuilder {
                 b"parent-style-name",
             )?,
             protection: None,
+            conditional_rules: Vec::new(),
             is_default: element.local_name().as_ref() == b"default-style",
+            is_common,
         }))
     }
+}
+
+fn increment_style_depth(depth: &mut usize) -> Result<()> {
+    *depth = depth
+        .checked_add(1)
+        .ok_or_else(|| Error::InvalidFormat("table-cell style depth overflow".to_string()))?;
+    if *depth > MAX_STYLE_DEPTH {
+        return Err(Error::InvalidFormat(format!(
+            "table-cell style exceeds the {MAX_STYLE_DEPTH} level nesting limit"
+        )));
+    }
+    Ok(())
+}
+
+fn parse_conditional_rule(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+) -> Result<ConditionalCellStyleRule> {
+    let condition = required_conditional_attribute(reader, element, b"condition")?;
+    let apply_style_name =
+        required_conditional_attribute(reader, element, b"apply-style-name")?;
+    let base_cell_address = optional_attribute(
+        reader.resolver(),
+        reader.decoder(),
+        element,
+        b"base-cell-address",
+    )?;
+    if let Some(value) = &base_cell_address {
+        check_conditional_attribute_size("style:base-cell-address", value)?;
+        if value.is_empty() {
+            return Err(Error::InvalidFormat(
+                "style:base-cell-address must not be empty".to_string(),
+            ));
+        }
+    }
+    let formula_namespace = condition_formula_namespace(reader.resolver(), &condition)?;
+    Ok(ConditionalCellStyleRule {
+        condition,
+        formula_namespace,
+        apply_style_name,
+        base_cell_address,
+    })
+}
+
+fn required_conditional_attribute(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    local_name: &[u8],
+) -> Result<String> {
+    let qualified_name = format!("style:{}", String::from_utf8_lossy(local_name));
+    let value = optional_attribute(
+        reader.resolver(),
+        reader.decoder(),
+        element,
+        local_name,
+    )?
+    .ok_or_else(|| Error::InvalidFormat(format!("style:map is missing {qualified_name}")))?;
+    check_conditional_attribute_size(&qualified_name, &value)?;
+    if value.is_empty() {
+        return Err(Error::InvalidFormat(format!(
+            "{qualified_name} must not be empty"
+        )));
+    }
+    Ok(value)
+}
+
+fn check_conditional_attribute_size(name: &str, value: &str) -> Result<()> {
+    if value.len() > MAX_CONDITIONAL_ATTRIBUTE_BYTES {
+        return Err(Error::InvalidFormat(format!(
+            "{name} exceeds the {MAX_CONDITIONAL_ATTRIBUTE_BYTES} byte limit"
+        )));
+    }
+    Ok(())
+}
+
+fn condition_formula_namespace(
+    resolver: &NamespaceResolver,
+    condition: &str,
+) -> Result<Option<FormulaNamespace>> {
+    let Some((prefix, _)) = condition.split_once(':') else {
+        return Ok(None);
+    };
+    let mut characters = prefix.chars();
+    if !characters
+        .next()
+        .is_some_and(|character| character == '_' || character.is_alphabetic())
+        || !characters.all(|character| {
+            character == '_'
+                || character == '-'
+                || character == '.'
+                || character.is_alphanumeric()
+        })
+    {
+        return Ok(None);
+    }
+    let (namespace, _) = resolver.resolve_attribute(QName(condition.as_bytes()));
+    let ResolveResult::Bound(Namespace(uri)) = namespace else {
+        return Err(Error::InvalidFormat(format!(
+            "conditional style condition uses unbound namespace prefix '{prefix}'"
+        )));
+    };
+    let uri = String::from_utf8(uri.to_vec()).map_err(|_| {
+        Error::InvalidFormat("conditional style namespace URI is not valid UTF-8".to_string())
+    })?;
+    Ok(Some(FormulaNamespace {
+        prefix: prefix.to_string(),
+        uri,
+    }))
 }
 
 fn optional_attribute(
@@ -388,18 +740,27 @@ fn optional_attribute(
     element: &BytesStart<'_>,
     local_name: &[u8],
 ) -> Result<Option<String>> {
+    let mut found = None;
     for attribute in element.attributes() {
         let attribute = attribute
             .map_err(|error| Error::InvalidFormat(format!("invalid XML attribute: {error}")))?;
         let (namespace, local) = resolver.resolve_attribute(attribute.key);
         if is_namespace(&namespace, STYLE_NAMESPACE) && local.as_ref() == local_name {
-            return attribute
+            if found.is_some() {
+                return Err(Error::InvalidFormat(format!(
+                    "duplicate style:{} attribute",
+                    String::from_utf8_lossy(local_name)
+                )));
+            }
+            found = Some(
+                attribute
                 .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
-                .map(|value| Some(value.into_owned()))
-                .map_err(|error| Error::InvalidFormat(format!("invalid XML attribute: {error}")));
+                .map(|value| value.into_owned())
+                .map_err(|error| Error::InvalidFormat(format!("invalid XML attribute: {error}")))?,
+            );
         }
     }
-    Ok(None)
+    Ok(found)
 }
 
 fn is_namespace(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool {
@@ -453,5 +814,75 @@ mod tests {
         assert!(declarations.contains("xmlns:f="));
         let font_faces = extract_font_face_decls(xml).unwrap().unwrap();
         assert!(font_faces.xml.starts_with("<o:font-face-decls"));
+    }
+
+    #[test]
+    fn parses_ordered_inert_conditional_cell_styles_and_overrides() {
+        let named = r#"<o:document-styles xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:f="urn:example:formula"><o:styles><s:style s:name="Red" s:family="table-cell"/><s:style s:name="Blue" s:family="table-cell"/></o:styles></o:document-styles>"#;
+        let content = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:f="urn:example:formula"><o:automatic-styles><s:style s:name="ce1" s:family="table-cell" s:parent-style-name="Default"><s:map s:condition="cell-content()&lt;1" s:apply-style-name="Red" s:base-cell-address="Sheet1.A1"/><s:map s:condition="f:is-true-formula([.A1]&gt;0)" s:apply-style-name="Blue"></s:map></s:style></o:automatic-styles></o:document-content>"#;
+        let registry = CellStyleRegistry::parse(Some(named), content).unwrap();
+        let style = registry.conditional_style("ce1").unwrap();
+        assert_eq!(style.parent_style_name.as_deref(), Some("Default"));
+        assert_eq!(style.rules.len(), 2);
+        assert_eq!(style.rules[0].condition, "cell-content()<1");
+        assert_eq!(style.rules[0].apply_style_name, "Red");
+        assert_eq!(style.rules[0].base_cell_address.as_deref(), Some("Sheet1.A1"));
+        assert_eq!(
+            style.rules[1].formula_namespace,
+            Some(FormulaNamespace {
+                prefix: "f".to_string(),
+                uri: "urn:example:formula".to_string(),
+            })
+        );
+        assert_eq!(registry.conditional_styles(), [style.clone()]);
+
+        let override_content = format!(
+            "{content}<o:automatic-styles xmlns:o=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" xmlns:s=\"urn:oasis:names:tc:opendocument:xmlns:style:1.0\"><s:style s:name=\"ce1\" s:family=\"table-cell\"><s:map s:condition=\"cell-content()=2\" s:apply-style-name=\"Blue\"/></s:style></o:automatic-styles>"
+        );
+        let overridden = CellStyleRegistry::parse(Some(named), &override_content).unwrap();
+        assert_eq!(
+            overridden.conditional_style("ce1").unwrap().rules[0].condition,
+            "cell-content()=2"
+        );
+    }
+
+    #[test]
+    fn rejects_malformed_or_active_conditional_style_inputs() {
+        let common = r#"<o:styles xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0"><s:style s:name="Target" s:family="table-cell"/></o:styles>"#;
+        let missing_target = r#"<s:style xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" s:name="ce1" s:family="table-cell"><s:map s:condition="cell-content()=1" s:apply-style-name="Missing"/></s:style>"#;
+        assert!(CellStyleRegistry::parse(Some(common), missing_target).is_err());
+
+        let non_empty_map = r#"<s:style xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" s:name="ce1" s:family="table-cell"><s:map s:condition="cell-content()=1" s:apply-style-name="Target">run</s:map></s:style>"#;
+        assert!(CellStyleRegistry::parse(Some(common), non_empty_map).is_err());
+
+        let dtd = r#"<!DOCTYPE x [<!ENTITY run SYSTEM "file:///etc/passwd">]><s:style xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" s:name="ce1" s:family="table-cell"/>"#;
+        assert!(CellStyleRegistry::parse(Some(common), dtd).is_err());
+
+        let oversized = "x".repeat(MAX_CONDITIONAL_ATTRIBUTE_BYTES + 1);
+        let oversized = format!(
+            "<s:style xmlns:s=\"urn:oasis:names:tc:opendocument:xmlns:style:1.0\" s:name=\"ce1\" s:family=\"table-cell\"><s:map s:condition=\"{oversized}\" s:apply-style-name=\"Target\"/></s:style>"
+        );
+        assert!(CellStyleRegistry::parse(Some(common), &oversized).is_err());
+
+        let extension_only = r#"<s:style xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:c="urn:org:documentfoundation:names:experimental:calc:xmlns:calcext:1.0" s:name="ce1" s:family="table-cell"><c:conditional-formats><c:condition c:value="1"/></c:conditional-formats></s:style>"#;
+        let registry = CellStyleRegistry::parse(Some(common), extension_only).unwrap();
+        assert!(registry.conditional_styles().is_empty());
+    }
+
+    #[test]
+    fn parses_libreoffice_flat_conditional_style_fixture_when_available() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
+            "../../3rdparty/libreoffice-core/sc/qa/unit/data/functions/financial/fods/couppcd.fods",
+        );
+        if !path.exists() {
+            return;
+        }
+        let xml = std::fs::read_to_string(path).unwrap();
+        let registry = CellStyleRegistry::parse(None, &xml).unwrap();
+        let ce6 = registry.conditional_style("ce6").unwrap();
+        assert_eq!(ce6.rules.len(), 3);
+        assert_eq!(ce6.rules[0].condition, "cell-content()=\"\"");
+        assert_eq!(ce6.rules[1].apply_style_name, "Untitled1");
+        assert_eq!(ce6.rules[2].base_cell_address.as_deref(), Some("Sheet1.B3"));
     }
 }

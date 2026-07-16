@@ -144,7 +144,7 @@ pub use structure::{
     Column, SheetPrintSettings, SheetStyle, SheetStyleUsage, TableGroup, TableRange,
     TableStructure, TableVisibility,
 };
-pub use style_protection::CellStyleProtection;
+pub use style_protection::{ConditionalCellStyle, ConditionalCellStyleRule, CellStyleProtection};
 
 // Re-export formula types for public API
 #[allow(unused_imports)] // Public API exports

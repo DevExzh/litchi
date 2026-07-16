@@ -57,15 +57,29 @@ impl PersistPtrHolder {
             let entry_count = (info >> 20) & 0x0FFF;
 
             // Read offset entries for this group
+            if entry_count == 0 {
+                return Err(PptError::Corrupted(
+                    "PersistDirectoryEntry has a zero entry count".to_string(),
+                ));
+            }
             for i in 0..entry_count {
-                if let Some(offset_bytes) = chunks.next() {
-                    let offset = u32::from_le_bytes(offset_bytes.try_into().unwrap());
-                    slide_locations.insert(base_persist_id + i, offset);
-                } else {
-                    // Truncated data - stop parsing
-                    break;
+                let offset_bytes = chunks.next().ok_or_else(|| {
+                    PptError::Corrupted("truncated PersistDirectoryEntry".to_string())
+                })?;
+                let offset = u32::from_le_bytes(offset_bytes.try_into().unwrap());
+                if slide_locations.insert(base_persist_id + i, offset).is_some() {
+                    return Err(PptError::Corrupted(format!(
+                        "duplicate persist identifier {}",
+                        base_persist_id + i
+                    )));
                 }
             }
+        }
+
+        if !chunks.remainder().is_empty() {
+            return Err(PptError::Corrupted(
+                "persist directory is not aligned to 4 bytes".to_string(),
+            ));
         }
 
         Ok(Self { slide_locations })

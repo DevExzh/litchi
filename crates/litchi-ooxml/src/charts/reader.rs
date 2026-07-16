@@ -40,7 +40,7 @@ use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::{Config, NsReader};
 use quick_xml::writer::Writer;
-use std::io::BufRead;
+use std::io::{BufRead, Read};
 
 const IGNORED_NAMESPACE_ELEMENT: &str = "ignoredNamespaceElement";
 const INVALID_COLOR_MAPPING_ELEMENT: &str = "invalidColorMappingElement";
@@ -375,7 +375,24 @@ fn is_drawing_color_map_choice(local_name: &[u8]) -> bool {
 
 /// Parse a chart XML document.
 pub fn parse_chart<R: BufRead>(reader: R) -> Result<Chart> {
-    let mut xml_reader = ChartXmlReader::from_reader(reader);
+    let limits = crate::common::mce::MceLimits::default();
+    let mut input = Vec::new();
+    reader
+        .take((limits.max_input_bytes as u64).saturating_add(1))
+        .read_to_end(&mut input)?;
+    if input.len() > limits.max_input_bytes {
+        return Err(OoxmlError::MarkupCompatibility(
+            crate::common::mce::MceError::LimitExceeded("input bytes".into()),
+        ));
+    }
+    let xml = crate::common::mce::process_markup_compatibility(
+        &input,
+        &crate::common::mce::MceCapabilities::default(),
+        &limits,
+    )?
+    .xml
+    .into_owned();
+    let mut xml_reader = ChartXmlReader::from_reader(std::io::Cursor::new(xml));
     xml_reader.config_mut().trim_text(false);
 
     let mut chart = Chart::new();

@@ -18,15 +18,21 @@ bitflags        = { workspace = true }
 bumpalo         = { workspace = true }
 bytes           = { workspace = true }
 chrono          = { workspace = true }
+encoding_rs     = { workspace = true }
 litchi-cfb      = { workspace = true }
 litchi-core     = { workspace = true, features = ["ole"] }
 litchi-formula  = { workspace = true, optional = true }
 litchi-imgconv  = { workspace = true, optional = true }
 litchi-opc      = { workspace = true }
+md-5            = { workspace = true }
 once_cell       = { workspace = true }
 quick-xml       = { workspace = true }
+rc4             = { workspace = true }
+sha1            = { workspace = true }
 smallvec        = { workspace = true }
+subtle          = { workspace = true }
 thiserror       = { workspace = true }
 url             = { workspace = true }
 zerocopy        = { workspace = true }
 zerocopy-derive = { workspace = true }
+zeroize         = { workspace = true }

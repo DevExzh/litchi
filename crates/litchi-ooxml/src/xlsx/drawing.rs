@@ -377,7 +377,8 @@ impl Parser {
 }
 
 pub(crate) fn parse_drawing_xml(xml: &str) -> Result<Option<ParsedDrawing>> {
-    Parser::parse(xml)
+    let xml = crate::common::mce::process_str(xml)?;
+    Parser::parse(xml.as_ref())
 }
 
 fn is_spreadsheet_drawing_name(

@@ -196,6 +196,10 @@ const MAX_OBJECTS: usize = 65_536;
 const MAX_OBJECT_TEXT_BYTES: usize = 1_048_576;
 const MAX_OBJECT_DATA_BYTES: usize = 256 * 1_048_576;
 const MAX_PICTURE_DATA_BYTES: usize = 256 * 1_048_576;
+use super::document_variable::{
+    DocumentVariable, MAX_DOCUMENT_VARIABLES, MAX_DOCUMENT_VARIABLE_NAME_BYTES,
+    MAX_DOCUMENT_VARIABLE_TEXT_BYTES, MAX_DOCUMENT_VARIABLE_VALUE_BYTES,
+};
 
 struct OpenBookmark {
     name: String,
@@ -283,6 +287,10 @@ pub struct Parser<'a> {
     fields: Vec<super::field::Field<'a>>,
     /// Embedded and linked objects
     objects: Vec<super::object::EmbeddedObject<'a>>,
+    /// Ordered inert document variables
+    document_variables: Vec<DocumentVariable<'a>>,
+    /// Aggregate decoded document-variable text size
+    document_variable_text_bytes: usize,
     /// List table
     list_table: super::list::ListTable<'a>,
     /// List override table
@@ -350,6 +358,8 @@ impl<'a> Parser<'a> {
             pictures: Vec::new(),
             fields: Vec::new(),
             objects: Vec::new(),
+            document_variables: Vec::new(),
+            document_variable_text_bytes: 0,
             list_table: super::list::ListTable::new(),
             list_override_table: super::list::ListOverrideTable::new(),
             sections: Vec::new(),
@@ -407,6 +417,7 @@ impl<'a> Parser<'a> {
             pictures: self.pictures,
             fields: self.fields,
             objects: self.objects,
+            document_variables: self.document_variables,
             list_table: self.list_table,
             list_override_table: self.list_override_table,
             sections: self.sections,
@@ -482,6 +493,11 @@ impl<'a> Parser<'a> {
                         Some(Token::Control(ControlWord::RevisionTable)) => {
                             self.pos += 1;
                             self.parse_revision_table()?;
+                            self.states.pop();
+                            return Ok(());
+                        },
+                        Some(Token::Control(ControlWord::DocumentVariable)) => {
+                            self.parse_document_variable_destination()?;
                             self.states.pop();
                             return Ok(());
                         },
@@ -733,6 +749,157 @@ impl<'a> Parser<'a> {
         self.states.pop();
 
         Ok(())
+    }
+
+    fn parse_document_variable_destination(&mut self) -> RtfResult<()> {
+        if self.document_variables.len() >= MAX_DOCUMENT_VARIABLES {
+            return Err(RtfError::MalformedDocument(format!(
+                "RTF document exceeds {MAX_DOCUMENT_VARIABLES} document variables"
+            )));
+        }
+        self.pos += 2; // \* and \docvar
+        let name = self.parse_document_variable_text_group(MAX_DOCUMENT_VARIABLE_NAME_BYTES)?;
+        let value = self.parse_document_variable_text_group(MAX_DOCUMENT_VARIABLE_VALUE_BYTES)?;
+        if !matches!(self.tokens.get(self.pos), Some(Token::CloseBrace)) {
+            return Err(RtfError::MalformedDocument(
+                "RTF document variable must contain exactly two immediate text groups".to_string(),
+            ));
+        }
+        self.pos += 1;
+        let variable = DocumentVariable::new(Cow::Owned(name), Cow::Owned(value))?;
+        let added = variable
+            .name
+            .len()
+            .checked_add(variable.value.len())
+            .ok_or_else(|| RtfError::MalformedDocument("document-variable size overflow".to_string()))?;
+        self.document_variable_text_bytes = self
+            .document_variable_text_bytes
+            .checked_add(added)
+            .ok_or_else(|| RtfError::MalformedDocument("document-variable size overflow".to_string()))?;
+        if self.document_variable_text_bytes > MAX_DOCUMENT_VARIABLE_TEXT_BYTES {
+            return Err(RtfError::MalformedDocument(format!(
+                "RTF document-variable text exceeds {MAX_DOCUMENT_VARIABLE_TEXT_BYTES} bytes"
+            )));
+        }
+        self.document_variables.push(variable);
+        Ok(())
+    }
+
+    fn parse_document_variable_text_group(&mut self, limit: usize) -> RtfResult<String> {
+        self.expect_token(Token::OpenBrace)?;
+        let mut bytes = SmallVec::<[u8; 128]>::new();
+        let mut output = String::new();
+        let mut unicode_skip = self.states.last().map_or(1, |state| state.unicode_skip);
+        let mut skip_fallback = 0i32;
+        let mut pending_high_surrogate = None;
+        loop {
+            let token = self.tokens.get(self.pos).ok_or_else(|| {
+                RtfError::MalformedDocument("unterminated RTF document-variable text group".to_string())
+            })?;
+            match token {
+                Token::CloseBrace => {
+                    self.pos += 1;
+                    break;
+                },
+                Token::OpenBrace => {
+                    return Err(RtfError::MalformedDocument(
+                        "nested groups are not allowed in RTF document-variable text".to_string(),
+                    ));
+                },
+                Token::Binary(_) => {
+                    return Err(RtfError::MalformedDocument(
+                        "binary data is not allowed in RTF document-variable text".to_string(),
+                    ));
+                },
+                Token::Text(text) => {
+                    let mut transport = SmallVec::<[u8; 128]>::new();
+                    append_transport_bytes(&mut transport, text)?;
+                    let skip = usize::try_from(skip_fallback.max(0)).unwrap_or(usize::MAX);
+                    let skipped = skip.min(transport.len());
+                    skip_fallback -= i32::try_from(skipped).unwrap_or(i32::MAX);
+                    bytes.extend_from_slice(&transport[skipped..]);
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::UnicodeSkip(value)) => {
+                    unicode_skip = *value;
+                    self.pos += 1;
+                },
+                Token::Control(ControlWord::Unicode(value)) => {
+                    if !bytes.is_empty() {
+                        let decoded = self
+                            .states
+                            .last()
+                            .map_or(RtfEncoding::Standard(encoding_rs::WINDOWS_1252), |state| state.encoding)
+                            .decode(&bytes);
+                        output.push_str(&decoded);
+                        bytes.clear();
+                    }
+                    let unit = *value as i16 as u16;
+                    if (0xD800..=0xDBFF).contains(&unit) {
+                        if pending_high_surrogate.replace(unit).is_some() {
+                            output.push('\u{FFFD}');
+                        }
+                    } else if let Some(high) = pending_high_surrogate.take() {
+                        output.push(
+                            char::decode_utf16([high, unit])
+                                .next()
+                                .expect("two UTF-16 units")
+                                .unwrap_or('\u{FFFD}'),
+                        );
+                    } else {
+                        output.push(
+                            char::decode_utf16([unit])
+                                .next()
+                                .expect("one UTF-16 unit")
+                                .unwrap_or('\u{FFFD}'),
+                        );
+                    }
+                    skip_fallback = unicode_skip.max(0);
+                    self.pos += 1;
+                },
+                Token::Control(control) => {
+                    if let Some(text) = control_symbol_text(control) {
+                        if !bytes.is_empty() {
+                            let decoded = self
+                                .states
+                                .last()
+                                .map_or(RtfEncoding::Standard(encoding_rs::WINDOWS_1252), |state| state.encoding)
+                                .decode(&bytes);
+                            output.push_str(&decoded);
+                            bytes.clear();
+                        }
+                        output.push_str(text);
+                        self.pos += 1;
+                    } else {
+                        return Err(RtfError::MalformedDocument(
+                            "active controls are not allowed in RTF document-variable text".to_string(),
+                        ));
+                    }
+                },
+            }
+            if output.len().saturating_add(bytes.len()) > limit {
+                return Err(RtfError::MalformedDocument(format!(
+                    "RTF document-variable text group exceeds {limit} bytes"
+                )));
+            }
+        }
+        if !bytes.is_empty() {
+            let decoded = self
+                .states
+                .last()
+                .map_or(RtfEncoding::Standard(encoding_rs::WINDOWS_1252), |state| state.encoding)
+                .decode(&bytes);
+            output.push_str(&decoded);
+        }
+        if pending_high_surrogate.is_some() {
+            output.push('\u{FFFD}');
+        }
+        if output.len() > limit {
+            return Err(RtfError::MalformedDocument(format!(
+                "RTF document-variable text group exceeds {limit} bytes"
+            )));
+        }
+        Ok(output)
     }
 
     /// Parse group content (text and control words).
@@ -3929,12 +4096,19 @@ impl<'a> Parser<'a> {
                             continue;
                         }
 
-                        // Collect text until closing brace
+                        // Collect text until the destination's closing brace. Producers often
+                        // wrap or split field instructions in formatting groups; those groups
+                        // do not change the field-code text and must not discard it.
+                        let mut nested_depth = 0usize;
                         while self.pos < self.tokens.len() {
                             match &self.tokens[self.pos] {
-                                Token::CloseBrace => {
+                                Token::CloseBrace if nested_depth == 0 => {
                                     self.pos += 1;
                                     break;
+                                },
+                                Token::CloseBrace => {
+                                    nested_depth -= 1;
+                                    self.pos += 1;
                                 },
                                 Token::Text(text) => {
                                     let decoded = self.decode_transport_text(text)?;
@@ -3956,9 +4130,23 @@ impl<'a> Parser<'a> {
                                     }
                                     self.pos += 1;
                                 },
+                                Token::OpenBrace
+                                    if matches!(
+                                        self.tokens.get(self.pos + 1),
+                                        Some(Token::Control(ControlWord::Field))
+                                    ) =>
+                                {
+                                    self.pos += 1;
+                                    self.parse_field()?;
+                                    self.skip_until_close_brace()?;
+                                },
                                 Token::OpenBrace => {
-                                    // Skip nested groups
-                                    self.skip_group()?;
+                                    nested_depth = nested_depth.checked_add(1).ok_or_else(|| {
+                                        RtfError::MalformedDocument(
+                                            "field instruction nesting depth overflow".to_string(),
+                                        )
+                                    })?;
+                                    self.pos += 1;
                                 },
                                 _ => {
                                     self.pos += 1;
@@ -4225,6 +4413,8 @@ pub struct ParsedDocument<'a> {
     pub fields: Vec<super::field::Field<'a>>,
     /// Embedded and linked objects
     pub objects: Vec<super::object::EmbeddedObject<'a>>,
+    /// Ordered inert document-variable metadata
+    pub document_variables: Vec<DocumentVariable<'a>>,
     /// List table
     pub list_table: super::list::ListTable<'a>,
     /// List override table

@@ -112,7 +112,8 @@ impl SectionList {
     ///
     /// Looks for the `<p14:sectionLst>` element in the presentation XML.
     pub fn from_xml(xml: &[u8]) -> Result<Self> {
-        let mut reader = Reader::from_reader(xml);
+        let xml = crate::common::mce::process_ooxml(xml)?;
+        let mut reader = Reader::from_reader(xml.as_ref());
         reader.config_mut().trim_text(true);
 
         let mut sections = Vec::new();

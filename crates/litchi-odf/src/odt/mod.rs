@@ -57,6 +57,7 @@
 mod builder;
 mod document;
 mod header_footer;
+mod header_footer_content;
 mod index;
 mod index_mark;
 mod mutable;
@@ -69,6 +70,10 @@ mod ruby;
 pub use builder::DocumentBuilder;
 pub use document::Document;
 pub use header_footer::{HeaderFooter, HeaderFooterKind, MasterPage};
+#[allow(unused_imports)] // Library public API
+pub use header_footer_content::{
+    HeaderFooterBlock, HeaderFooterField, HeaderFooterFieldKind, HeaderFooterInline,
+};
 pub use index::{TextIndex, TextIndexAttribute, TextIndexContent, TextIndexElement, TextIndexKind};
 pub use index_mark::{TextIndexMark, TextIndexMarkKind};
 pub use mutable::MutableDocument;

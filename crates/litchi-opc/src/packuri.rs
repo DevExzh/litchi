@@ -13,6 +13,13 @@ pub struct PackURI {
     uri: String,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum PartNameConflict {
+    Duplicate,
+    Equivalent,
+    Derived,
+}
+
 impl PackURI {
     /// Create a new PackURI from a string.
     ///
@@ -28,6 +35,9 @@ impl PackURI {
             return Err(format!("PackURI must begin with slash, got '{}'", uri));
         }
         if uri == "/" {
+            return Ok(PackURI { uri });
+        }
+        if uri == CONTENT_TYPES_URI {
             return Ok(PackURI { uri });
         }
         if uri.ends_with('/') {
@@ -64,6 +74,18 @@ impl PackURI {
             ));
         }
         Self::validate_percent_encoding(&uri)?;
+        for segment in uri.split('/').skip(1) {
+            if segment.ends_with('.') {
+                return Err(format!(
+                    "PackURI segments must not end with a dot, got '{uri}'"
+                ));
+            }
+            if !segment.as_bytes().iter().any(|byte| *byte != b'.') {
+                return Err(format!(
+                    "PackURI segments must contain a non-dot character, got '{uri}'"
+                ));
+            }
+        }
         Ok(PackURI { uri })
     }
 
@@ -258,6 +280,24 @@ impl PackURI {
         &self.uri
     }
 
+    /// Whether two part names are equivalent under OPC's ASCII case-insensitive rule.
+    pub fn is_equivalent_to(&self, other: &Self) -> bool {
+        self.uri.eq_ignore_ascii_case(&other.uri)
+    }
+
+    pub(crate) fn conflict_with(&self, other: &Self) -> Option<PartNameConflict> {
+        if self.uri == other.uri {
+            return Some(PartNameConflict::Duplicate);
+        }
+        if self.is_equivalent_to(other) {
+            return Some(PartNameConflict::Equivalent);
+        }
+        if is_derived_name(&self.uri, &other.uri) || is_derived_name(&other.uri, &self.uri) {
+            return Some(PartNameConflict::Derived);
+        }
+        None
+    }
+
     /// Helper function to join two paths using forward slashes
     fn join_paths(base: &str, rel: &str) -> String {
         if base.ends_with('/') {
@@ -308,7 +348,16 @@ impl PackURI {
         let bytes = uri.as_bytes();
         let mut index = 0usize;
         while index < bytes.len() {
+            if bytes[index] == b'/' {
+                index += 1;
+                continue;
+            }
             if bytes[index] != b'%' {
+                if !is_pchar(bytes[index]) {
+                    return Err(format!(
+                        "PackURI contains a character outside RFC 3986 pchar, got '{uri}'"
+                    ));
+                }
                 index += 1;
                 continue;
             }
@@ -326,10 +375,35 @@ impl PackURI {
                     "PackURI must not percent-encode path separators, got '{uri}'"
                 ));
             }
+            if is_unreserved(decoded) {
+                return Err(format!(
+                    "PackURI must not percent-encode unreserved characters, got '{uri}'"
+                ));
+            }
             index += 3;
         }
         Ok(())
     }
+}
+
+fn is_unreserved(byte: u8) -> bool {
+    byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~')
+}
+
+fn is_pchar(byte: u8) -> bool {
+    is_unreserved(byte)
+        || matches!(
+            byte,
+            b'!' | b'$' | b'&' | b'\'' | b'(' | b')' | b'*' | b'+' | b',' | b';' | b'=' | b':' | b'@'
+        )
+}
+
+fn is_derived_name(candidate: &str, base: &str) -> bool {
+    candidate.len() > base.len()
+        && candidate
+            .get(..base.len())
+            .is_some_and(|prefix| prefix.eq_ignore_ascii_case(base))
+        && candidate.as_bytes().get(base.len()) == Some(&b'/')
 }
 
 fn hex_value(byte: u8) -> u8 {
@@ -383,11 +457,34 @@ mod tests {
             "/word/%document.xml",
             "/word/%2Fdocument.xml",
             "/word/%5cdocument.xml",
+            "/word/%64ocument.xml",
+            "/word/document.",
+            "/word/.../document.xml",
+            "/word/doc[1].xml",
+            "/word/doc^1.xml",
+            "/word/café.xml",
         ] {
             assert!(PackURI::new(invalid).is_err(), "accepted {invalid}");
         }
         assert!(PackURI::new("/word/my%20document.xml").is_ok());
+        assert!(PackURI::new("/word/a!$&'()*+,;=:@.xml").is_ok());
         assert!(PackURI::new("/").is_ok());
+    }
+
+    #[test]
+    fn detects_equivalent_and_derived_part_names() {
+        let document = PackURI::new("/word/document.xml").unwrap();
+        let equivalent = PackURI::new("/WORD/DOCUMENT.XML").unwrap();
+        let derived = PackURI::new("/word/document.xml/image.gif").unwrap();
+        assert!(document.is_equivalent_to(&equivalent));
+        assert_eq!(
+            document.conflict_with(&equivalent),
+            Some(PartNameConflict::Equivalent)
+        );
+        assert_eq!(
+            document.conflict_with(&derived),
+            Some(PartNameConflict::Derived)
+        );
     }
 
     #[test]

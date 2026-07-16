@@ -94,9 +94,9 @@ pub mod notes_flags {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NotesPlaceholderType {
     /// Slide image placeholder
-    SlideImage = 0x05,
+    SlideImage = 0x0B,
     /// Notes body placeholder
-    NotesBody = 0x06,
+    NotesBody = 0x0C,
     /// Header placeholder
     Header = 0x0A,
     /// Footer placeholder
@@ -270,7 +270,7 @@ impl NotesContainerBuilder {
 
         write_record_header(
             &mut record,
-            0x02,
+            0x01,
             0,
             record_type::NOTES_ATOM,
             NotesAtom::SIZE as u32,

@@ -27,6 +27,8 @@ pub struct RtfDocument<'a> {
     fields: Vec<super::field::Field<'a>>,
     /// Embedded and linked objects
     objects: Vec<super::object::EmbeddedObject<'a>>,
+    /// Ordered inert document-variable metadata
+    document_variables: Vec<super::document_variable::DocumentVariable<'a>>,
     /// List table
     list_table: super::list::ListTable<'a>,
     /// List override table
@@ -214,6 +216,11 @@ impl<'a> RtfDocument<'a> {
             pictures: owned_pictures,
             fields: owned_fields,
             objects: owned_objects,
+            document_variables: parsed
+                .document_variables
+                .into_iter()
+                .map(super::document_variable::DocumentVariable::into_owned)
+                .collect(),
             list_table: Self::convert_list_table_to_owned(parsed.list_table),
             list_override_table: parsed.list_override_table,
             sections: Self::convert_sections_to_owned(parsed.sections),
@@ -490,6 +497,47 @@ impl<'a> RtfDocument<'a> {
     /// Return embedded and linked object records without activating their content.
     pub fn objects(&self) -> &[super::object::EmbeddedObject<'_>] {
         &self.objects
+    }
+
+    /// Return ordered inert RTF document-variable name/value pairs.
+    pub fn document_variables(&self) -> &[super::document_variable::DocumentVariable<'_>] {
+        &self.document_variables
+    }
+
+    /// Append a document variable without evaluating or resolving it.
+    pub fn push_document_variable(
+        &mut self,
+        variable: super::document_variable::DocumentVariable<'a>,
+    ) -> RtfResult<()> {
+        variable.validate()?;
+        if self.document_variables.len()
+            >= super::document_variable::MAX_DOCUMENT_VARIABLES
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF document-variable count limit exceeded".to_string(),
+            ));
+        }
+        let aggregate = self.document_variables.iter().try_fold(
+            variable.name.len() + variable.value.len(),
+            |size, existing| {
+                size.checked_add(existing.name.len())
+                    .and_then(|size| size.checked_add(existing.value.len()))
+            },
+        );
+        if aggregate.is_none_or(|size| {
+            size > super::document_variable::MAX_DOCUMENT_VARIABLE_TEXT_BYTES
+        }) {
+            return Err(RtfError::MalformedDocument(
+                "RTF document-variable aggregate text limit exceeded".to_string(),
+            ));
+        }
+        self.document_variables.push(variable);
+        Ok(())
+    }
+
+    /// Remove all document variables.
+    pub fn clear_document_variables(&mut self) {
+        self.document_variables.clear();
     }
 
     /// Get the list table.

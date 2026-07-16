@@ -3,6 +3,8 @@
 use std::collections::{HashMap, HashSet};
 
 use litchi_core::sheet::{CellValue, Result as SheetResult};
+
+use crate::xlsx::shared_formula::{SharedFormulaCell, resolve_shared_formulas};
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{NamespaceResolver, ResolveResult};
@@ -31,6 +33,7 @@ const MAX_SORT_CONDITIONS: usize = 64;
 #[derive(Default)]
 pub(crate) struct ParsedWorksheetData {
     pub(crate) cells: HashMap<u32, HashMap<u32, CellValue>>,
+    shared_formula_cells: Vec<SharedFormulaCell>,
     pub(crate) cell_styles: HashMap<u32, HashMap<u32, u32>>,
     pub(crate) rows: HashMap<u32, RowInfo>,
     pub(crate) rich_text_cells: HashMap<(u32, u32), Vec<RichTextRun>>,
@@ -113,6 +116,8 @@ struct PendingCell {
     materialized_formula: bool,
     is_array_formula: bool,
     array_range: Option<String>,
+    shared_formula_index: Option<u32>,
+    shared_formula_reference: Option<String>,
     saw_inline_string: bool,
     inline_text: String,
     inline_runs: Vec<RichTextRun>,
@@ -241,6 +246,8 @@ impl Parser {
     }
 
     fn parse(content: &str) -> Result<ParsedWorksheetData> {
+        let processed=crate::common::mce::process_ooxml(content.as_bytes())?;
+        let content=std::str::from_utf8(processed.as_ref()).map_err(|e|OoxmlError::Xml(e.to_string()))?;
         let mut reader = NsReader::from_reader(content.as_bytes());
         let mut parser = Self::new();
         let mut stack = Vec::new();
@@ -1763,6 +1770,8 @@ impl Parser {
             materialized_formula: false,
             is_array_formula: false,
             array_range: None,
+            shared_formula_index: None,
+            shared_formula_reference: None,
             saw_inline_string: false,
             inline_text: String::new(),
             inline_runs: Vec::new(),
@@ -1797,11 +1806,27 @@ impl Parser {
             )));
         }
         cell.is_array_formula = formula_type == "array";
-        cell.array_range = unqualified_attribute_value(element, b"ref", decoder)?;
-        if let Some(range) = cell.array_range.as_deref() {
+        let formula_reference = unqualified_attribute_value(element, b"ref", decoder)?;
+        if let Some(range) = formula_reference.as_deref() {
             validate_range(range, "worksheet formula range")?;
         }
-        cell.materialized_formula = materialized;
+        let shared_formula_index = optional_u32(
+            element,
+            b"si",
+            decoder,
+            "worksheet shared formula index",
+        )?;
+        if formula_type == "shared" {
+            cell.shared_formula_index = Some(shared_formula_index.ok_or_else(|| {
+                invalid("worksheet shared formula is missing required si")
+            })?);
+            cell.shared_formula_reference = formula_reference;
+        } else if formula_type == "array" {
+            cell.array_range = formula_reference;
+        }
+        // Empty shared-formula followers still represent formula cells; their
+        // expression is materialized from the worksheet-local master later.
+        cell.materialized_formula = materialized || formula_type == "shared";
         Ok(())
     }
 
@@ -2069,6 +2094,17 @@ impl Parser {
                 cell.saw_value.then_some(&cell.value),
             )?
         };
+        if cell.materialized_formula
+            && let Some(index) = cell.shared_formula_index
+        {
+            self.data.shared_formula_cells.push(SharedFormulaCell {
+                row: cell.row,
+                column: cell.column,
+                index,
+                reference: cell.shared_formula_reference.clone(),
+                formula: cell.formula.clone(),
+            });
+        }
         let value = if cell.materialized_formula {
             let cached_value = (!matches!(base, CellValue::Empty)).then_some(Box::new(base));
             CellValue::Formula {
@@ -2126,6 +2162,12 @@ pub fn parse_worksheet_xml(content: &str) -> SheetResult<HashMap<u32, HashMap<u3
 }
 
 pub(crate) fn parse_worksheet_data(content: &str) -> SheetResult<ParsedWorksheetData> {
+    let mut data = parse_worksheet_data_raw(content)?;
+    resolve_shared_formulas(&mut data.cells, &data.shared_formula_cells)?;
+    Ok(data)
+}
+
+fn parse_worksheet_data_raw(content: &str) -> SheetResult<ParsedWorksheetData> {
     Parser::parse(content)
         .map_err(|error| Box::new(error) as Box<dyn std::error::Error + Send + Sync>)
 }

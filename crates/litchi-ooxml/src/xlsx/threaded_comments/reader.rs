@@ -26,7 +26,8 @@ pub fn read_persons(package: &OpcPackage) -> SheetResult<Option<PersonList>> {
     };
     let persons_part = package.get_part(&persons_uri)?;
     require_content_type(&persons_uri, persons_part.content_type(), ct::SML_PERSONS)?;
-    let xml = std::str::from_utf8(persons_part.blob())?;
+    let bytes = crate::common::mce::process_part(persons_part)?;
+    let xml = std::str::from_utf8(bytes.as_ref())?;
     Ok(Some(parse_person_list(xml)?))
 }
 
@@ -50,7 +51,8 @@ pub fn read_threaded_comments(
         comments_part.content_type(),
         ct::SML_THREADED_COMMENTS,
     )?;
-    let xml = std::str::from_utf8(comments_part.blob())?;
+    let bytes = crate::common::mce::process_part(comments_part)?;
+    let xml = std::str::from_utf8(bytes.as_ref())?;
     Ok(Some(parse_threaded_comments(xml)?))
 }
 
@@ -712,11 +714,12 @@ mod tests {
     #[test]
     fn rejects_external_duplicate_and_wrong_content_type_relationships() {
         let (mut package, worksheet_uri) = package_with_threaded_parts();
-        package
+        let relationships = package
             .get_part_mut(&worksheet_uri)
             .unwrap()
-            .rels_mut()
-            .add_relationship(
+            .rels_mut();
+        relationships.remove("rId1").unwrap();
+        relationships.add_relationship(
                 rt::THREADED_COMMENTS.to_string(),
                 "https://example.com/thread.xml".to_string(),
                 "rId1".to_string(),

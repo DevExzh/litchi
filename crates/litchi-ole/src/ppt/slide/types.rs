@@ -3,6 +3,7 @@ use super::super::package::{PptError, Result};
 use super::super::records::PptRecord;
 use super::super::shapes::ShapeEnum;
 use super::factory::SlideData;
+use super::notes::{NoteDescriptor, SpeakerNotes};
 use crate::consts::PptRecordType;
 use crate::ppt::animation::{ShapeAnimation, SlideAnimationExtension};
 use crate::ppt::slide_extension::PowerPoint12SlideExtension;
@@ -20,6 +21,9 @@ use once_cell::unsync::OnceCell;
 pub struct Slide<'doc> {
     /// Slide persist ID
     persist_id: u32,
+    /// Stable SlideId from the live SlidePersistAtom.
+    slide_id: u32,
+    slide_list_text: String,
     /// Slide number (1-based for display)
     slide_number: usize,
     /// Slide record
@@ -41,6 +45,8 @@ pub struct Slide<'doc> {
     sync_info: OnceCell<Option<PowerPointSlideSyncInfo>>,
     /// Lazily parsed direct PowerPoint 12 slide round-trip metadata.
     round_trip_metadata: OnceCell<PowerPoint12SlideRoundTripMetadata>,
+    notes_descriptor: std::result::Result<Option<NoteDescriptor>, String>,
+    speaker_notes: OnceCell<Option<SpeakerNotes>>,
 }
 
 impl<'doc> Slide<'doc> {
@@ -49,6 +55,8 @@ impl<'doc> Slide<'doc> {
         let doc_data_ref = data.doc_data();
         Self {
             persist_id: data.persist_id,
+            slide_id: data.slide_id,
+            slide_list_text: data.slide_list_text,
             slide_number,
             doc_data: doc_data_ref,
             record: data.record,
@@ -59,6 +67,8 @@ impl<'doc> Slide<'doc> {
             powerpoint12_extension: OnceCell::new(),
             sync_info: OnceCell::new(),
             round_trip_metadata: OnceCell::new(),
+            notes_descriptor: data.note_descriptor,
+            speaker_notes: OnceCell::new(),
         }
     }
 
@@ -72,6 +82,12 @@ impl<'doc> Slide<'doc> {
     #[inline]
     pub fn persist_id(&self) -> u32 {
         self.persist_id
+    }
+
+    /// Get the stable presentation SlideId.
+    #[inline]
+    pub fn slide_id(&self) -> u32 {
+        self.slide_id
     }
 
     /// Get shapes on this slide (lazy-loaded).
@@ -90,6 +106,17 @@ impl<'doc> Slide<'doc> {
     /// Get the number of shapes (triggers parsing if not yet loaded).
     pub fn shape_count(&self) -> Result<usize> {
         Ok(self.shapes()?.len())
+    }
+
+    /// Return this slide's speaker-notes page, if one exists.
+    pub fn speaker_notes(&self) -> Result<Option<&SpeakerNotes>> {
+        self.speaker_notes
+            .get_or_try_init(|| match &self.notes_descriptor {
+                Ok(None) => Ok(None),
+                Ok(Some(descriptor)) => SpeakerNotes::parse(*descriptor, self.doc_data).map(Some),
+                Err(error) => Err(PptError::Corrupted(error.clone())),
+            })
+            .map(Option::as_ref)
     }
 
     /// Return inert PowerPoint 97 animation metadata keyed by shape ID.
@@ -199,7 +226,14 @@ impl<'doc> Slide<'doc> {
     ///   * Shapes (via PPDrawing/Escher)
     pub fn text(&self) -> Result<&str> {
         self.text_cache
-            .get_or_try_init(|| self.extract_all_text())
+            .get_or_try_init(|| {
+                let text = self.extract_all_text()?;
+                if text.is_empty() {
+                    Ok(self.slide_list_text.clone())
+                } else {
+                    Ok(text)
+                }
+            })
             .map(|s| s.as_str())
     }
 
@@ -244,7 +278,7 @@ impl<'doc> Slide<'doc> {
     ///
     /// - Direct property access (no allocations)
     /// - Pattern matching for type dispatch
-    fn convert_escher_to_shape_enum(
+    pub(crate) fn convert_escher_to_shape_enum(
         escher_shape: &super::super::escher::EscherShape<'_>,
     ) -> Result<Option<ShapeEnum<'static>>> {
         use super::super::escher::EscherShapeType;

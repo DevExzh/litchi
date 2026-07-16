@@ -3,9 +3,10 @@ use super::bookmark::Bookmark;
 /// Document - the main API for working with Word document content.
 use super::comment::Comment;
 use super::footnote::Footnote;
+use super::encryption::decrypt_document_streams;
 use super::header_footer::HeaderFooter;
 use super::hyperlink::Hyperlink;
-use super::package::{DocError, Result};
+use super::package::{DocError, DocOpenOptions, Result};
 use super::paragraph::{Paragraph, Run};
 use super::parts::bookmarks::BookmarksTable;
 use super::parts::chp_bin_table::ChpBinTable;
@@ -126,13 +127,21 @@ impl Document {
     ///
     /// This is typically called internally by `Package::document()`.
     pub(crate) fn from_ole<R: Read + Seek>(ole: &mut OleFile<R>) -> Result<Self> {
+        Self::from_ole_with_options(ole, DocOpenOptions::default())
+    }
+
+    /// Create a new Document from an OLE file with password-to-open options.
+    pub(crate) fn from_ole_with_options<R: Read + Seek>(
+        ole: &mut OleFile<R>,
+        options: DocOpenOptions<'_>,
+    ) -> Result<Self> {
         // Read the WordDocument stream (main document stream)
-        let word_document = ole
+        let mut word_document = ole
             .open_stream(&["WordDocument"])
             .map_err(|_| DocError::StreamNotFound("WordDocument".to_string()))?;
 
         // Parse the File Information Block (FIB) from the start of WordDocument
-        let fib = FileInformationBlock::parse(&word_document)?;
+        let mut fib = FileInformationBlock::parse(&word_document)?;
 
         // Determine which table stream to use (0Table or 1Table)
         let table_stream_name = if fib.which_table_stream() {
@@ -142,13 +151,26 @@ impl Document {
         };
 
         // Read the table stream
-        let table_stream = ole
+        let mut table_stream = ole
             .open_stream(&[table_stream_name])
             .map_err(|_| DocError::StreamNotFound(table_stream_name.to_string()))?;
 
         // Read the Data stream (optional - contains embedded pictures and objects)
         // According to Apache POI, pictures are stored in Data stream, not WordDocument stream
-        let data_stream = ole.open_stream(&["Data"]).ok();
+        let mut data_stream = ole.open_stream(&["Data"]).ok();
+
+        if fib.is_encrypted() {
+            decrypt_document_streams(
+                &fib,
+                &mut word_document,
+                &mut table_stream,
+                data_stream.as_deref_mut(),
+                options.password,
+            )?;
+            // FibBase is clear, but the rest of the FIB was encrypted and must be
+            // reparsed before any offsets or character counts are consulted.
+            fib = FileInformationBlock::parse(&word_document)?;
+        }
 
         // Create text extractor
         let text_extractor = TextExtractor::new(&fib, &word_document, &table_stream)?;

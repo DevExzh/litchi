@@ -6,7 +6,7 @@
 
 use crate::constants::relationship_type;
 use crate::error::{OpcError, Result};
-use crate::packuri::{PACKAGE_URI, PackURI};
+use crate::packuri::{PACKAGE_URI, PackURI, PartNameConflict};
 use crate::part::{Part, PartFactory};
 use crate::phys_pkg::{OwnedPhysPkgReader, PhysPkgReader};
 use crate::pkgreader::PackageReader;
@@ -149,13 +149,12 @@ impl OpcPackage {
 
             // Load part relationships
             for srel in spart.srels {
-                let is_external = srel.is_external(); // Evaluate before move
-                part.rels_mut().add_relationship(
+                part.rels_mut().try_add_relationship(
                     srel.reltype,    // Move
                     srel.target_ref, // Move
                     srel.r_id,       // Move
-                    is_external,
-                );
+                    srel.target_mode,
+                )?;
             }
 
             parts_map.insert(partname, part);
@@ -163,13 +162,12 @@ impl OpcPackage {
 
         // Load package relationships - move instead of clone
         for srel in pkg_srels {
-            let is_external = srel.is_external(); // Evaluate before move
-            package.rels.add_relationship(
+            package.rels.try_add_relationship(
                 srel.reltype,    // Move
                 srel.target_ref, // Move
                 srel.r_id,       // Move
-                is_external,
-            );
+                srel.target_mode,
+            )?;
         }
 
         package.parts = parts_map;
@@ -243,6 +241,18 @@ impl OpcPackage {
         self.parts.insert(partname, part);
     }
 
+    /// Try to add a part without replacing an existing or ambiguous part name.
+    pub fn try_add_part(&mut self, part: Box<dyn Part + Send + Sync>) -> Result<()> {
+        let partname = part.partname().clone();
+        for existing in self.parts.keys() {
+            if let Some(conflict) = existing.conflict_with(&partname) {
+                return Err(part_name_conflict_error(existing, &partname, conflict));
+            }
+        }
+        self.parts.insert(partname, part);
+        Ok(())
+    }
+
     /// Get an iterator over all parts in the package.
     pub fn iter_parts(&self) -> impl Iterator<Item = &dyn Part> {
         self.parts.values().map(|b| &**b as &dyn Part)
@@ -261,6 +271,14 @@ impl OpcPackage {
     /// Get a mutable reference to the package-level relationships.
     pub fn rels_mut(&mut self) -> &mut Relationships {
         &mut self.rels
+    }
+
+    /// Discover and verify OPC digital signatures without evaluating certificate trust.
+    pub fn verify_digital_signatures(
+        &self,
+        policy: &crate::signature::SignatureVerificationPolicy,
+    ) -> crate::signature::Result<Vec<crate::signature::DigitalSignatureVerification>> {
+        crate::signature::verify_package(self, policy)
     }
 
     /// Relate the package to a part.
@@ -398,6 +416,24 @@ impl OpcPackage {
     }
 }
 
+fn part_name_conflict_error(
+    existing: &PackURI,
+    candidate: &PackURI,
+    conflict: PartNameConflict,
+) -> OpcError {
+    match conflict {
+        PartNameConflict::Duplicate => OpcError::DuplicatePartName(candidate.to_string()),
+        PartNameConflict::Equivalent => OpcError::EquivalentPartNames {
+            existing: existing.to_string(),
+            candidate: candidate.to_string(),
+        },
+        PartNameConflict::Derived => OpcError::DerivedPartNames {
+            existing: existing.to_string(),
+            candidate: candidate.to_string(),
+        },
+    }
+}
+
 impl Default for OpcPackage {
     fn default() -> Self {
         Self::new()
@@ -489,5 +525,49 @@ mod tests {
 
         package.relate_to("other.xml", relationship_type::OFFICE_DOCUMENT);
         assert!(package.main_document_part().is_err());
+    }
+
+    #[test]
+    fn try_add_part_rejects_conflicts_without_replacing_the_original() {
+        let mut package = OpcPackage::new();
+        let original_uri = PackURI::new("/word/document.xml").unwrap();
+        package
+            .try_add_part(Box::new(BlobPart::new(
+                original_uri.clone(),
+                "application/xml".to_string(),
+                b"original".to_vec(),
+            )))
+            .unwrap();
+
+        for (candidate, expected) in [
+            ("/word/document.xml", PartNameConflict::Duplicate),
+            ("/WORD/DOCUMENT.XML", PartNameConflict::Equivalent),
+            (
+                "/word/document.xml/image.gif",
+                PartNameConflict::Derived,
+            ),
+        ] {
+            let error = package
+                .try_add_part(Box::new(BlobPart::new(
+                    PackURI::new(candidate).unwrap(),
+                    "application/octet-stream".to_string(),
+                    b"replacement".to_vec(),
+                )))
+                .unwrap_err();
+            assert!(matches!(
+                (expected, error),
+                (PartNameConflict::Duplicate, OpcError::DuplicatePartName(_))
+                    | (
+                        PartNameConflict::Equivalent,
+                        OpcError::EquivalentPartNames { .. }
+                    )
+                    | (
+                        PartNameConflict::Derived,
+                        OpcError::DerivedPartNames { .. }
+                    )
+            ));
+            assert_eq!(package.part_count(), 1);
+            assert_eq!(package.get_part(&original_uri).unwrap().blob(), b"original");
+        }
     }
 }

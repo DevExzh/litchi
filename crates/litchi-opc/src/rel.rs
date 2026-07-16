@@ -8,6 +8,33 @@ use crate::packuri::PackURI;
 use litchi_core::xml::escape_xml;
 use std::collections::HashMap;
 
+/// Whether a relationship target is inside or outside the OPC package.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum TargetMode {
+    /// A target resolved relative to the relationship source part.
+    Internal,
+    /// An external URI reference preserved without package resolution.
+    External,
+}
+
+impl TargetMode {
+    pub(crate) fn parse(value: &str) -> Result<Self> {
+        match value {
+            "Internal" => Ok(Self::Internal),
+            "External" => Ok(Self::External),
+            _ => Err(OpcError::InvalidRelationshipTargetMode(value.to_string())),
+        }
+    }
+
+    #[inline]
+    fn as_xml_value(self) -> &'static str {
+        match self {
+            Self::Internal => "Internal",
+            Self::External => "External",
+        }
+    }
+}
+
 /// A single relationship from a source part to a target.
 ///
 /// Represents a connection between parts in an OPC package, identified by an rId
@@ -27,8 +54,11 @@ pub struct Relationship {
     /// Base URI for resolving relative references
     base_uri: String,
 
-    /// Whether this is an external relationship
-    is_external: bool,
+    /// Full source part URI, when known.
+    source_uri: Option<String>,
+
+    /// Typed target mode.
+    target_mode: TargetMode,
 }
 
 impl Relationship {
@@ -47,12 +77,46 @@ impl Relationship {
         base_uri: String,
         is_external: bool,
     ) -> Self {
+        Self::new_with_source(
+            r_id,
+            reltype,
+            target_ref,
+            base_uri,
+            None,
+            if is_external {
+                TargetMode::External
+            } else {
+                TargetMode::Internal
+            },
+        )
+    }
+
+    /// Create a relationship with an explicit target mode.
+    pub fn new_with_mode(
+        r_id: String,
+        reltype: String,
+        target_ref: String,
+        base_uri: String,
+        target_mode: TargetMode,
+    ) -> Self {
+        Self::new_with_source(r_id, reltype, target_ref, base_uri, None, target_mode)
+    }
+
+    fn new_with_source(
+        r_id: String,
+        reltype: String,
+        target_ref: String,
+        base_uri: String,
+        source_uri: Option<String>,
+        target_mode: TargetMode,
+    ) -> Self {
         Self {
             r_id,
             reltype,
             target_ref,
             base_uri,
-            is_external,
+            source_uri,
+            target_mode,
         }
     }
 
@@ -77,23 +141,67 @@ impl Relationship {
         &self.target_ref
     }
 
+    /// Return the path component of the original target URI reference.
+    pub fn target_path(&self) -> &str {
+        relationship_target_components(&self.target_ref).0
+    }
+
+    /// Return the query component without the leading `?`.
+    pub fn target_query(&self) -> Option<&str> {
+        relationship_target_components(&self.target_ref).1
+    }
+
+    /// Return the fragment component without the leading `#`.
+    pub fn target_fragment(&self) -> Option<&str> {
+        relationship_target_components(&self.target_ref).2
+    }
+
+    /// Return the typed target mode.
+    #[inline]
+    pub fn target_mode(&self) -> TargetMode {
+        self.target_mode
+    }
+
     /// Check if this is an external relationship.
     #[inline]
     pub fn is_external(&self) -> bool {
-        self.is_external
+        self.target_mode == TargetMode::External
     }
 
     /// Get the absolute target partname for internal relationships.
     ///
     /// Returns an error if this is an external relationship.
     pub fn target_partname(&self) -> Result<PackURI> {
-        if self.is_external {
+        if self.is_external() {
             return Err(OpcError::InvalidRelationship(
                 "Cannot get target_partname for external relationship".to_string(),
             ));
         }
-        PackURI::from_rel_ref(&self.base_uri, &self.target_ref).map_err(OpcError::InvalidPackUri)
+        let path = self.target_path();
+        if path.is_empty() {
+            return self
+                .source_uri
+                .as_deref()
+                .filter(|source| *source != "/")
+                .ok_or_else(|| {
+                    OpcError::InvalidRelationship(
+                        "Internal relationship target has no part path".to_string(),
+                    )
+                })
+                .and_then(|source| PackURI::new(source).map_err(OpcError::InvalidPackUri));
+        }
+        PackURI::from_rel_ref(&self.base_uri, path).map_err(OpcError::InvalidPackUri)
     }
+}
+
+pub(crate) fn relationship_target_components(reference: &str) -> (&str, Option<&str>, Option<&str>) {
+    let (before_fragment, fragment) = reference
+        .split_once('#')
+        .map_or((reference, None), |(before, fragment)| (before, Some(fragment)));
+    let (path, query) = before_fragment
+        .split_once('?')
+        .map_or((before_fragment, None), |(path, query)| (path, Some(query)));
+    (path, query, fragment)
 }
 
 /// Collection of relationships from a single source.
@@ -104,6 +212,9 @@ impl Relationship {
 pub struct Relationships {
     /// Base URI for resolving relative references
     base_uri: String,
+
+    /// Full source part URI, when this collection belongs to a concrete part.
+    source_uri: Option<String>,
 
     /// Map of relationship ID to Relationship
     rels: HashMap<String, Relationship>,
@@ -117,6 +228,16 @@ impl Relationships {
     pub fn new(base_uri: String) -> Self {
         Self {
             base_uri,
+            source_uri: None,
+            rels: HashMap::new(),
+        }
+    }
+
+    /// Create a relationship collection owned by a concrete source part.
+    pub(crate) fn for_source(source: &PackURI) -> Self {
+        Self {
+            base_uri: source.base_uri().to_string(),
+            source_uri: Some(source.as_str().to_string()),
             rels: HashMap::new(),
         }
     }
@@ -138,16 +259,55 @@ impl Relationships {
         r_id: String,
         is_external: bool,
     ) -> &Relationship {
-        let rel = Relationship::new(
+        // Preserve compatibility for existing writer call sites without ever
+        // replacing an established relationship. New code that needs duplicate
+        // diagnostics should use `try_add_relationship`.
+        if self.rels.contains_key(&r_id) {
+            return self
+                .rels
+                .get(&r_id)
+                .expect("relationship existence was checked");
+        }
+        let rel = Relationship::new_with_source(
             r_id.clone(),
             reltype,
             target_ref,
             self.base_uri.clone(),
-            is_external,
+            self.source_uri.clone(),
+            if is_external {
+                TargetMode::External
+            } else {
+                TargetMode::Internal
+            },
         );
         self.rels.insert(r_id.clone(), rel);
         // Safe to unwrap since we just inserted it
         self.rels.get(r_id.as_str()).unwrap()
+    }
+
+    /// Add a relationship without replacing an existing ID.
+    pub fn try_add_relationship(
+        &mut self,
+        reltype: String,
+        target_ref: String,
+        r_id: String,
+        target_mode: TargetMode,
+    ) -> Result<&Relationship> {
+        if self.rels.contains_key(&r_id) {
+            return Err(OpcError::DuplicateRelationshipId(r_id));
+        }
+        let relationship = Relationship::new_with_source(
+            r_id.clone(),
+            reltype,
+            target_ref,
+            self.base_uri.clone(),
+            self.source_uri.clone(),
+            target_mode,
+        );
+        self.rels.insert(r_id.clone(), relationship);
+        self.rels.get(&r_id).ok_or_else(|| {
+            OpcError::InvalidRelationship("relationship insertion failed".to_string())
+        })
     }
 
     /// Get a relationship by its ID.
@@ -304,10 +464,12 @@ impl Relationships {
         rels.sort_by_key(|rel| rel.r_id());
 
         for rel in rels {
-            let target_mode = if rel.is_external() {
-                r#" TargetMode="External""#
-            } else {
-                ""
+            let target_mode = match rel.target_mode() {
+                TargetMode::Internal => "",
+                mode => match mode.as_xml_value() {
+                    "External" => r#" TargetMode="External""#,
+                    _ => "",
+                },
             };
 
             xml.push_str(&format!(
@@ -382,5 +544,50 @@ mod tests {
         // Different target should create new relationship
         let rel3 = rels.get_or_add("type1", "target2");
         assert_eq!(rel3.r_id(), "rId2");
+    }
+
+    #[test]
+    fn target_components_are_preserved_while_the_path_resolves() {
+        let relationship = Relationship::new_with_mode(
+            "rId1".to_string(),
+            "urn:test".to_string(),
+            "../media/image.png?variant=2#preview".to_string(),
+            "/word/document".to_string(),
+            TargetMode::Internal,
+        );
+        assert_eq!(relationship.target_path(), "../media/image.png");
+        assert_eq!(relationship.target_query(), Some("variant=2"));
+        assert_eq!(relationship.target_fragment(), Some("preview"));
+        assert_eq!(
+            relationship.target_partname().unwrap().as_str(),
+            "/word/media/image.png"
+        );
+        assert_eq!(
+            relationship.target_ref(),
+            "../media/image.png?variant=2#preview"
+        );
+    }
+
+    #[test]
+    fn fallible_insertion_never_replaces_a_duplicate_id() {
+        let mut relationships = Relationships::new("/word".to_string());
+        relationships
+            .try_add_relationship(
+                "urn:first".to_string(),
+                "first.xml".to_string(),
+                "rId1".to_string(),
+                TargetMode::Internal,
+            )
+            .unwrap();
+        assert!(matches!(
+            relationships.try_add_relationship(
+                "urn:second".to_string(),
+                "second.xml".to_string(),
+                "rId1".to_string(),
+                TargetMode::Internal,
+            ),
+            Err(OpcError::DuplicateRelationshipId(id)) if id == "rId1"
+        ));
+        assert_eq!(relationships.get("rId1").unwrap().target_ref(), "first.xml");
     }
 }

@@ -26,6 +26,7 @@ enum WorkbookContext {
     BookViews,
     DefinedNames,
     DefinedName,
+    ExternalReferences,
     PivotCaches,
     Other,
 }
@@ -49,6 +50,7 @@ pub(crate) struct WorkbookParseResult {
     pub(crate) uses_1904_date_system: bool,
     pub(crate) defined_names: Vec<DefinedName>,
     pub(crate) pivot_caches: Vec<PivotCacheInfo>,
+    pub(crate) external_reference_ids: Vec<String>,
 }
 
 struct WorkbookInfo {
@@ -60,6 +62,7 @@ struct WorkbookInfo {
     seen_book_views: bool,
     seen_defined_names: bool,
     seen_pivot_caches: bool,
+    seen_external_references: bool,
     seen_workbook_view: bool,
     sheet_ids: HashSet<u32>,
     relationship_ids: HashSet<String>,
@@ -69,6 +72,8 @@ struct WorkbookInfo {
     pivot_cache_ids: HashSet<u32>,
     pivot_cache_relationship_ids: HashSet<String>,
     pivot_caches: Vec<PivotCacheInfo>,
+    external_reference_ids: Vec<String>,
+    external_reference_id_set: HashSet<String>,
 }
 
 impl WorkbookInfo {
@@ -82,6 +87,7 @@ impl WorkbookInfo {
             seen_book_views: false,
             seen_defined_names: false,
             seen_pivot_caches: false,
+            seen_external_references: false,
             seen_workbook_view: false,
             sheet_ids: HashSet::new(),
             relationship_ids: HashSet::new(),
@@ -91,10 +97,14 @@ impl WorkbookInfo {
             pivot_cache_ids: HashSet::new(),
             pivot_cache_relationship_ids: HashSet::new(),
             pivot_caches: Vec::new(),
+            external_reference_ids: Vec::new(),
+            external_reference_id_set: HashSet::new(),
         }
     }
 
     fn parse(content: &str) -> Result<Self> {
+        let processed=crate::common::mce::process_ooxml(content.as_bytes())?;
+        let content=std::str::from_utf8(processed.as_ref()).map_err(|e|OoxmlError::Xml(e.to_string()))?;
         let mut reader = NsReader::from_reader(content.as_bytes());
         let mut info = Self::new();
         let mut stack = Vec::new();
@@ -204,6 +214,9 @@ impl WorkbookInfo {
                 )));
             }
         }
+        if info.seen_external_references && info.external_reference_ids.is_empty() {
+            return Err(invalid("workbook externalReferences cannot be empty"));
+        }
         Ok(info)
     }
 
@@ -300,6 +313,23 @@ impl WorkbookInfo {
                 cache_id,
                 relationship_id,
             });
+        } else if parent == WorkbookContext::ExternalReferences
+            && is_spreadsheetml_name(namespace, element.name(), b"externalReference")
+        {
+            if self.external_reference_ids.len() >= 4096 {
+                return Err(invalid("workbook external-reference limit exceeded"));
+            }
+            let relationship_id = relationship_attribute_value(element, b"id", decoder, resolver)?
+                .ok_or_else(|| invalid("workbook external reference is missing relationship ID"))?;
+            if relationship_id.is_empty() {
+                return Err(invalid("workbook external-reference relationship ID cannot be empty"));
+            }
+            if !self.external_reference_id_set.insert(relationship_id.clone()) {
+                return Err(invalid(format!(
+                    "duplicate workbook external-reference relationship ID '{relationship_id}'"
+                )));
+            }
+            self.external_reference_ids.push(relationship_id);
         }
         Ok(())
     }
@@ -330,6 +360,12 @@ impl WorkbookInfo {
         } else if is_spreadsheetml_name(namespace, element.name(), b"pivotCaches") {
             mark_once(&mut self.seen_pivot_caches, "pivotCaches element")?;
             Ok(WorkbookContext::PivotCaches)
+        } else if is_spreadsheetml_name(namespace, element.name(), b"externalReferences") {
+            mark_once(
+                &mut self.seen_external_references,
+                "externalReferences element",
+            )?;
+            Ok(WorkbookContext::ExternalReferences)
         } else {
             Ok(WorkbookContext::Other)
         }
@@ -357,6 +393,14 @@ impl WorkbookInfo {
             && is_spreadsheetml_name(namespace, element.name(), b"pivotCaches")
         {
             mark_once(&mut self.seen_pivot_caches, "pivotCaches element")?;
+        } else if parent == WorkbookContext::Workbook
+            && is_spreadsheetml_name(namespace, element.name(), b"externalReferences")
+        {
+            mark_once(
+                &mut self.seen_external_references,
+                "externalReferences element",
+            )?;
+            return Err(invalid("workbook externalReferences cannot be empty"));
         } else if parent == WorkbookContext::DefinedNames
             && is_spreadsheetml_name(namespace, element.name(), b"definedName")
         {
@@ -402,6 +446,7 @@ pub(crate) fn parse_workbook_details(content: &str) -> SheetResult<WorkbookParse
             uses_1904_date_system: info.uses_1904_date_system,
             defined_names: info.defined_names,
             pivot_caches: info.pivot_caches,
+            external_reference_ids: info.external_reference_ids,
         })
         .map_err(|error| Box::new(error) as Box<dyn std::error::Error + Send + Sync>)
 }

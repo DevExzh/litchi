@@ -379,7 +379,8 @@ fn required_u32(
 }
 
 pub(crate) fn parse_comments_xml(content: &str) -> SheetResult<HashMap<String, Comment>> {
-    CommentParser::parse(content)
+    let content = crate::common::mce::process_str(content)?;
+    CommentParser::parse(content.as_ref())
 }
 
 #[cfg(test)]
