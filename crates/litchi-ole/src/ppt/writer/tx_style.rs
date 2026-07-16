@@ -508,7 +508,7 @@ pub const TITLE_PF_MASK: u32 = 0x003F_FDFF;
 pub const TITLE_CF_MASK: u16 = 0x0007;
 
 /// Build title text master style (instance=0)
-pub fn build_tx_master_style_title() -> Vec<u8> {
+pub fn legacy_build_tx_master_style_title() -> Vec<u8> {
     let mut data = Vec::with_capacity(64);
 
     // Level count = 1
@@ -559,7 +559,7 @@ pub mod body_bullet {
 }
 
 /// Build body text master style (instance=1)
-pub fn build_tx_master_style_body() -> Vec<u8> {
+pub fn legacy_build_tx_master_style_body() -> Vec<u8> {
     let mut data = Vec::with_capacity(128);
 
     // 5 levels
@@ -620,7 +620,7 @@ pub fn build_tx_master_style_body() -> Vec<u8> {
 pub const INDENT_ONLY_PF_MASK: u32 = pf_mask::LEFT_MARGIN | pf_mask::INDENT;
 
 /// Build notes text master style (instance=2)
-pub fn build_tx_master_style_notes() -> Vec<u8> {
+pub fn legacy_build_tx_master_style_notes() -> Vec<u8> {
     let mut data = Vec::with_capacity(112);
 
     // 5 levels
@@ -664,7 +664,7 @@ pub fn build_tx_master_style_notes() -> Vec<u8> {
 }
 
 /// Build other text master style (instance=4)
-pub fn build_tx_master_style_other() -> Vec<u8> {
+pub fn legacy_build_tx_master_style_other() -> Vec<u8> {
     let mut data = Vec::with_capacity(112);
 
     // 5 levels
@@ -711,7 +711,7 @@ pub fn build_tx_master_style_other() -> Vec<u8> {
 pub const CENTER_BODY_PF_MASK: u16 = 0x0901; // align center + bullet
 
 /// Build center body text master style (instance=5)
-pub fn build_tx_master_style_center_body() -> Vec<u8> {
+pub fn legacy_build_tx_master_style_center_body() -> Vec<u8> {
     let mut data = Vec::with_capacity(84);
     data.extend_from_slice(&5u16.to_le_bytes());
 
@@ -738,7 +738,7 @@ pub fn build_tx_master_style_center_body() -> Vec<u8> {
 }
 
 /// Build center title text master style (instance=6)
-pub fn build_tx_master_style_center_title() -> Vec<u8> {
+pub fn legacy_build_tx_master_style_center_title() -> Vec<u8> {
     let mut data = Vec::with_capacity(12);
     data.extend_from_slice(&1u16.to_le_bytes()); // 1 level
     // Minimal formatting: empty PF and CF
@@ -767,7 +767,7 @@ pub const QUARTER_BODY_FONT_SIZES: [u16; 5] = [
 ];
 
 /// Build half body text master style (instance=7)
-pub fn build_tx_master_style_half_body() -> Vec<u8> {
+pub fn legacy_build_tx_master_style_half_body() -> Vec<u8> {
     let mut data = Vec::with_capacity(64);
     data.extend_from_slice(&5u16.to_le_bytes());
 
@@ -789,7 +789,7 @@ pub fn build_tx_master_style_half_body() -> Vec<u8> {
 }
 
 /// Build quarter body text master style (instance=8)
-pub fn build_tx_master_style_quarter_body() -> Vec<u8> {
+pub fn legacy_build_tx_master_style_quarter_body() -> Vec<u8> {
     let mut data = Vec::with_capacity(64);
     data.extend_from_slice(&5u16.to_le_bytes());
 
@@ -808,6 +808,100 @@ pub fn build_tx_master_style_quarter_body() -> Vec<u8> {
     }
 
     data
+}
+
+fn build_spec_master_style(
+    text_type: u16,
+    font_sizes: &[u16],
+    alignment: u16,
+    bullets: bool,
+) -> Vec<u8> {
+    let mut builder = TxMasterStyleBuilder::for_text_type(text_type, font_sizes.len() as u16);
+    for (level, &font_size) in font_sizes.iter().enumerate() {
+        let margin = (level as u16).saturating_mul(indent::LEVEL_1);
+        let bullet_mask = if bullets {
+            pf_mask::HAS_BULLET
+                | pf_mask::BULLET_HAS_FONT
+                | pf_mask::BULLET_HAS_COLOR
+                | pf_mask::BULLET_HAS_SIZE
+                | pf_mask::BULLET_CHAR
+                | pf_mask::BULLET_FONT
+                | pf_mask::BULLET_SIZE
+                | pf_mask::BULLET_COLOR
+        } else {
+            0
+        };
+        builder.add_full_level(&FullStyleLevel {
+            pf_mask: bullet_mask
+                | pf_mask::ALIGN
+                | pf_mask::LEFT_MARGIN
+                | pf_mask::INDENT
+                | pf_mask::DEFAULT_TAB_SIZE,
+            bullet_flags: if bullets { 0x000F } else { 0 },
+            bullet_char: 0x2022,
+            bullet_font: 0,
+            bullet_size: 100,
+            bullet_color: 0xFF00_0000,
+            align: alignment,
+            line_spacing: 0,
+            space_before: 0,
+            space_after: 0,
+            left_margin: margin,
+            indent: margin,
+            default_tab_size: tab::DEFAULT_SIZE,
+            cf_mask: 0,
+            cf_flags: 0,
+            font_index: 0,
+            font_size,
+            font_color: 0xFF00_0000,
+            position: 0,
+            has_font_size: true,
+            has_font_color: true,
+            has_position: false,
+            has_font_index: true,
+        });
+    }
+    builder.build()
+}
+
+/// Build a spec-conformant title text master style (instance 0).
+pub fn build_tx_master_style_title() -> Vec<u8> {
+    build_spec_master_style(0, &[44], align::LEFT, false)
+}
+
+/// Build a spec-conformant body text master style (instance 1).
+pub fn build_tx_master_style_body() -> Vec<u8> {
+    build_spec_master_style(1, &[32, 28, 24, 20, 18], align::LEFT, true)
+}
+
+/// Build a spec-conformant notes text master style (instance 2).
+pub fn build_tx_master_style_notes() -> Vec<u8> {
+    build_spec_master_style(2, &[12, 12, 12, 12, 12], align::LEFT, false)
+}
+
+/// Build a spec-conformant other-text master style (instance 4).
+pub fn build_tx_master_style_other() -> Vec<u8> {
+    build_spec_master_style(4, &[18, 18, 18, 18, 18], align::LEFT, false)
+}
+
+/// Build a spec-conformant centered-body master style (instance 5).
+pub fn build_tx_master_style_center_body() -> Vec<u8> {
+    build_spec_master_style(5, &[32, 28, 24, 20, 18], align::CENTER, true)
+}
+
+/// Build a spec-conformant centered-title master style (instance 6).
+pub fn build_tx_master_style_center_title() -> Vec<u8> {
+    build_spec_master_style(6, &[44], align::CENTER, false)
+}
+
+/// Build a spec-conformant half-body master style (instance 7).
+pub fn build_tx_master_style_half_body() -> Vec<u8> {
+    build_spec_master_style(7, &[28, 24, 20, 18, 18], align::LEFT, true)
+}
+
+/// Build a spec-conformant quarter-body master style (instance 8).
+pub fn build_tx_master_style_quarter_body() -> Vec<u8> {
+    build_spec_master_style(8, &[24, 20, 18, 16, 16], align::LEFT, true)
 }
 
 // =============================================================================
@@ -1211,6 +1305,23 @@ mod tests {
         assert_eq!(style.levels[0].character.get_value("font.size"), Some(24));
     }
 
+    #[test]
+    fn prebuilt_master_styles_parse_strictly() {
+        for (text_type, data) in [
+            (0, build_tx_master_style_title()),
+            (1, build_tx_master_style_body()),
+            (2, build_tx_master_style_notes()),
+            (4, build_tx_master_style_other()),
+            (5, build_tx_master_style_center_body()),
+            (6, build_tx_master_style_center_title()),
+            (7, build_tx_master_style_half_body()),
+            (8, build_tx_master_style_quarter_body()),
+        ] {
+            crate::ppt::TextMasterStyle::parse(&data, text_type)
+                .unwrap_or_else(|error| panic!("text type {text_type}: {error}"));
+        }
+    }
+
     // =============================================================================
     // Body Bullet Tests
     // =============================================================================
@@ -1416,15 +1527,21 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "Build function has extra padding bytes - needs investigation"]
     fn test_build_tx_master_style_title() {
         let built = build_tx_master_style_title();
-        assert_eq!(built.as_slice(), &TX_MASTER_STYLE_TITLE);
+        let style = crate::ppt::TextMasterStyle::parse(&built, 0).unwrap();
+        assert_eq!(style.levels.len(), 1);
+        assert_eq!(style.levels[0].paragraph.get_value("alignment"), Some(0));
+        assert_eq!(style.levels[0].character.get_value("font.size"), Some(44));
     }
 
     #[test]
     fn test_build_tx_master_style_center_title() {
         let built = build_tx_master_style_center_title();
-        assert_eq!(built.as_slice(), &TX_MASTER_STYLE_CENTER_TITLE);
+        let style = crate::ppt::TextMasterStyle::parse(&built, 6).unwrap();
+        assert_eq!(style.levels.len(), 1);
+        assert_eq!(style.levels[0].explicit_level, Some(0));
+        assert_eq!(style.levels[0].paragraph.get_value("alignment"), Some(1));
+        assert_eq!(style.levels[0].character.get_value("font.size"), Some(44));
     }
 }

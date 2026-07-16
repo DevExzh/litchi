@@ -19,9 +19,10 @@ use super::spec::{
     SlideLayoutType, color_schemes,
 };
 use super::tx_style::{
-    TX_MASTER_STYLE_BODY, TX_MASTER_STYLE_CENTER_BODY, TX_MASTER_STYLE_CENTER_TITLE,
-    TX_MASTER_STYLE_HALF_BODY, TX_MASTER_STYLE_NOTES, TX_MASTER_STYLE_OTHER,
-    TX_MASTER_STYLE_QUARTER_BODY, TX_MASTER_STYLE_TITLE, tx_style_instance,
+    build_tx_master_style_body, build_tx_master_style_center_body,
+    build_tx_master_style_center_title, build_tx_master_style_half_body,
+    build_tx_master_style_notes, build_tx_master_style_other, build_tx_master_style_quarter_body,
+    build_tx_master_style_title, tx_style_instance,
 };
 
 use litchi_core::unit::emu_u32_to_ppt_master_u32;
@@ -230,7 +231,7 @@ pub fn create_main_master_container(ppdrawing: &[u8]) -> Result<Vec<u8>, PptErro
             tx_style_instance::TITLE,
             record_type::TX_MASTER_STYLE_ATOM,
         );
-        tx.write_data(&TX_MASTER_STYLE_TITLE);
+        tx.write_data(&build_tx_master_style_title());
         builder.write_child(&tx.build()?);
     }
 
@@ -241,7 +242,7 @@ pub fn create_main_master_container(ppdrawing: &[u8]) -> Result<Vec<u8>, PptErro
             tx_style_instance::BODY,
             record_type::TX_MASTER_STYLE_ATOM,
         );
-        tx.write_data(&TX_MASTER_STYLE_BODY);
+        tx.write_data(&build_tx_master_style_body());
         builder.write_child(&tx.build()?);
     }
 
@@ -252,7 +253,7 @@ pub fn create_main_master_container(ppdrawing: &[u8]) -> Result<Vec<u8>, PptErro
             tx_style_instance::NOTES,
             record_type::TX_MASTER_STYLE_ATOM,
         );
-        tx.write_data(&TX_MASTER_STYLE_NOTES);
+        tx.write_data(&build_tx_master_style_notes());
         builder.write_child(&tx.build()?);
     }
 
@@ -263,7 +264,7 @@ pub fn create_main_master_container(ppdrawing: &[u8]) -> Result<Vec<u8>, PptErro
             tx_style_instance::CENTER_BODY,
             record_type::TX_MASTER_STYLE_ATOM,
         );
-        tx.write_data(&TX_MASTER_STYLE_CENTER_BODY);
+        tx.write_data(&build_tx_master_style_center_body());
         builder.write_child(&tx.build()?);
     }
 
@@ -274,7 +275,7 @@ pub fn create_main_master_container(ppdrawing: &[u8]) -> Result<Vec<u8>, PptErro
             tx_style_instance::CENTER_TITLE,
             record_type::TX_MASTER_STYLE_ATOM,
         );
-        tx.write_data(&TX_MASTER_STYLE_CENTER_TITLE);
+        tx.write_data(&build_tx_master_style_center_title());
         builder.write_child(&tx.build()?);
     }
 
@@ -285,7 +286,7 @@ pub fn create_main_master_container(ppdrawing: &[u8]) -> Result<Vec<u8>, PptErro
             tx_style_instance::HALF_BODY,
             record_type::TX_MASTER_STYLE_ATOM,
         );
-        tx.write_data(&TX_MASTER_STYLE_HALF_BODY);
+        tx.write_data(&build_tx_master_style_half_body());
         builder.write_child(&tx.build()?);
     }
 
@@ -296,7 +297,7 @@ pub fn create_main_master_container(ppdrawing: &[u8]) -> Result<Vec<u8>, PptErro
             tx_style_instance::QUARTER_BODY,
             record_type::TX_MASTER_STYLE_ATOM,
         );
-        tx.write_data(&TX_MASTER_STYLE_QUARTER_BODY);
+        tx.write_data(&build_tx_master_style_quarter_body());
         builder.write_child(&tx.build()?);
     }
 
@@ -488,7 +489,7 @@ pub fn create_environment_minimal() -> Result<Vec<u8>, PptError> {
         tx_style_instance::OTHER,
         record_type::TX_MASTER_STYLE_ATOM,
     );
-    tx.write_data(&TX_MASTER_STYLE_OTHER);
+    tx.write_data(&build_tx_master_style_other());
     env.write_child(&tx.build()?);
 
     env.build()
