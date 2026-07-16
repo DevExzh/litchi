@@ -1,4 +1,5 @@
 use super::super::consts::PptRecordType;
+use super::TextRuler;
 use super::package::{PptError, Result};
 /// EscherTextboxWrapper implementation.
 ///
@@ -22,6 +23,8 @@ pub struct EscherTextboxWrapper {
     runs: Vec<TextRun>,
     /// Text split into paragraph-formatting runs
     paragraph_runs: Vec<ParagraphRun>,
+    /// Text ruler carried by the textbox, when present
+    text_ruler: Option<TextRuler>,
 }
 
 impl EscherTextboxWrapper {
@@ -38,6 +41,18 @@ impl EscherTextboxWrapper {
         let text = extractor.text().to_string();
         let runs = extractor.runs().to_vec();
         let paragraph_runs = extractor.paragraph_runs().to_vec();
+        let mut ruler_records = child_records
+            .iter()
+            .filter(|record| record.record_type == PptRecordType::TextRulerAtom);
+        let text_ruler = ruler_records
+            .next()
+            .map(|record| TextRuler::parse(&record.data))
+            .transpose()?;
+        if ruler_records.next().is_some() {
+            return Err(PptError::Corrupted(
+                "ClientTextbox contains multiple TextRulerAtom records".to_string(),
+            ));
+        }
 
         Ok(Self {
             data,
@@ -45,6 +60,7 @@ impl EscherTextboxWrapper {
             text,
             runs,
             paragraph_runs,
+            text_ruler,
         })
     }
 
@@ -116,6 +132,11 @@ impl EscherTextboxWrapper {
         &self.paragraph_runs
     }
 
+    /// Get the textbox-specific ruler, when present.
+    pub fn text_ruler(&self) -> Option<&TextRuler> {
+        self.text_ruler.as_ref()
+    }
+
     /// Find a StyleTextPropAtom record.
     pub fn find_style_text_prop_atom(&self) -> Option<&PptRecord> {
         self.child_records
@@ -181,5 +202,19 @@ mod tests {
         let wrapper = EscherTextboxWrapper::new(data).unwrap();
         assert_eq!(wrapper.text(), "");
         assert!(wrapper.runs().is_empty());
+    }
+
+    #[test]
+    fn rejects_multiple_text_rulers() {
+        let mut data = Vec::new();
+        for _ in 0..2 {
+            data.extend_from_slice(&0u16.to_le_bytes());
+            data.extend_from_slice(&4006u16.to_le_bytes());
+            data.extend_from_slice(&4u32.to_le_bytes());
+            data.extend_from_slice(&0u32.to_le_bytes());
+        }
+
+        let error = EscherTextboxWrapper::new(data).unwrap_err();
+        assert!(error.to_string().contains("multiple TextRulerAtom"));
     }
 }

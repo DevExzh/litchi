@@ -74,6 +74,7 @@ pub mod escher;
 pub mod current_user;
 pub mod escher_textbox;
 pub mod text_prop;
+pub mod text_ruler;
 pub mod text_run;
 
 // Re-export main types for convenience
@@ -95,6 +96,7 @@ pub use shapes::{AutoShape, Placeholder, PlaceholderSize, PlaceholderType, Shape
 pub use current_user::CurrentUser;
 pub use escher_textbox::EscherTextboxWrapper;
 pub use text_prop::{TextProp, TextPropCollection, TextPropType, TextTabStop};
+pub use text_ruler::{TextRuler, TextRulerLevel};
 pub use text_run::{
     ParagraphAlignment, ParagraphFontAlignment, ParagraphRun, ParagraphRunFormatting,
     ParagraphTabAlignment, ParagraphTabStop, ParagraphTextDirection, TextRun, TextRunExtractor,

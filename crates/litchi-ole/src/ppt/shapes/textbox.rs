@@ -3,6 +3,7 @@
 /// Text boxes are shapes that contain text content and are commonly used
 /// for titles, bullet points, and other text elements in PowerPoint slides.
 use super::shape::{Shape, ShapeContainer, ShapeProperties};
+use crate::ppt::TextRuler;
 use crate::ppt::text_run::{ParagraphRun, ParagraphRunFormatting, TextRun, TextRunFormatting};
 
 /// Type alias for text formatting tuple to reduce complexity.
@@ -22,6 +23,8 @@ pub struct TextBox<'a> {
     runs: Vec<TextRun>,
     /// Paragraph-formatting runs from the embedded `StyleTextPropAtom`
     paragraph_runs: Vec<ParagraphRun>,
+    /// Textbox-specific ruler overrides
+    text_ruler: Option<TextRuler>,
     /// Font size in points
     font_size: Option<u16>,
     /// Font color (RGB)
@@ -42,6 +45,7 @@ impl<'a> TextBox<'a> {
             text: String::new(),
             runs: Vec::new(),
             paragraph_runs: Vec::new(),
+            text_ruler: None,
             font_size: None,
             font_color: None,
             bold: false,
@@ -57,7 +61,7 @@ impl<'a> TextBox<'a> {
         // Extract basic shape properties
         let properties = record.extract_shape_properties()?;
 
-        let (text, runs, paragraph_runs) = if let Some(textbox_record) =
+        let (text, runs, paragraph_runs, text_ruler) = if let Some(textbox_record) =
             Self::find_descendant(record, super::escher::EscherRecordType::ClientTextbox)
         {
             let wrapper = crate::ppt::EscherTextboxWrapper::new(textbox_record.data.to_vec())?;
@@ -65,9 +69,10 @@ impl<'a> TextBox<'a> {
                 wrapper.text().to_string(),
                 wrapper.runs().to_vec(),
                 wrapper.paragraph_runs().to_vec(),
+                wrapper.text_ruler().cloned(),
             )
         } else {
-            (String::new(), Vec::new(), Vec::new())
+            (String::new(), Vec::new(), Vec::new(), None)
         };
         let (font_size, font_color, bold, italic, underline) = Self::formatting_from_runs(&runs);
 
@@ -82,6 +87,7 @@ impl<'a> TextBox<'a> {
             text,
             runs,
             paragraph_runs,
+            text_ruler,
             font_size,
             font_color,
             bold,
@@ -114,6 +120,7 @@ impl<'a> TextBox<'a> {
             text,
             runs,
             paragraph_runs,
+            text_ruler: None,
             font_size: None,
             font_color: None,
             bold: false,
@@ -351,6 +358,11 @@ impl<'a> TextBox<'a> {
     /// Get the paragraph-formatting runs in document order.
     pub fn paragraph_runs(&self) -> &[ParagraphRun] {
         &self.paragraph_runs
+    }
+
+    /// Get textbox-specific tab, margin, and indent overrides.
+    pub fn text_ruler(&self) -> Option<&TextRuler> {
+        self.text_ruler.as_ref()
     }
 
     /// Set the text content of the text box.
@@ -629,6 +641,16 @@ mod tests {
         let mut ppt_records = Vec::new();
         push_record(&mut ppt_records, 0, 0, 3999, &4u32.to_le_bytes());
         push_record(&mut ppt_records, 0, 0, 4008, b"abcd");
+        let mut ruler = Vec::new();
+        ruler.extend_from_slice(&0x010Fu32.to_le_bytes());
+        ruler.extend_from_slice(&1i16.to_le_bytes());
+        ruler.extend_from_slice(&144i16.to_le_bytes());
+        ruler.extend_from_slice(&1u16.to_le_bytes());
+        ruler.extend_from_slice(&720i16.to_le_bytes());
+        ruler.extend_from_slice(&2u16.to_le_bytes());
+        ruler.extend_from_slice(&100i16.to_le_bytes());
+        ruler.extend_from_slice(&(-50i16).to_le_bytes());
+        push_record(&mut ppt_records, 0, 0, 4006, &ruler);
 
         let mut style = Vec::new();
         style.extend_from_slice(&5u32.to_le_bytes());
@@ -756,6 +778,13 @@ mod tests {
         assert_eq!(textbox.paragraph_runs().len(), 1);
         assert_eq!(textbox.paragraph_runs()[0].text, "abcd");
         assert_eq!(textbox.paragraph_runs()[0].formatting.property_mask, 0);
+        let ruler = textbox.text_ruler().unwrap();
+        assert_eq!(ruler.level_count, Some(1));
+        assert_eq!(ruler.default_tab_size, Some(144));
+        assert_eq!(ruler.tab_stops[0].position, 720);
+        assert_eq!(ruler.tab_stops[0].alignment, 2);
+        assert_eq!(ruler.levels[0].left_margin, Some(100));
+        assert_eq!(ruler.levels[0].indent, Some(-50));
         assert_eq!(textbox.runs()[0].text, "ab");
         assert_eq!(textbox.runs()[0].formatting.font_size, Some(18));
         assert_eq!(textbox.runs()[0].formatting.font_color, Some(0x0011_2233));
