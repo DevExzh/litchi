@@ -7,7 +7,7 @@
 //! - Enum-based shape type dispatch (no trait objects)
 
 use super::container::EscherContainer;
-use super::properties::{EscherProperties, ShapeAnchor};
+use super::properties::{EscherProperties, EscherPropertyId, ShapeAnchor};
 use super::types::EscherRecordType;
 
 /// Escher shape type enumeration.
@@ -169,6 +169,8 @@ impl<'data> EscherShape<'data> {
             EscherShapeType::TextBox
                 | EscherShapeType::Placeholder
                 | EscherShapeType::Rectangle
+                | EscherShapeType::Ellipse
+                | EscherShapeType::Polygon
                 | EscherShapeType::AutoShape
         )
     }
@@ -269,7 +271,15 @@ impl<'data> EscherShape<'data> {
                 1 => EscherShapeType::Rectangle,
                 3 => EscherShapeType::Ellipse,
                 20 => EscherShapeType::Line,
-                0 => EscherShapeType::Group,
+                // MSOSPT 0 is a non-primitive shape. POI treats one with
+                // explicit vertices as a freeform and other instances as an
+                // auto shape. Groups are identified by their SpgrContainer.
+                0 if EscherProperties::from_container(container)
+                    .has(EscherPropertyId::Vertices) =>
+                {
+                    EscherShapeType::Polygon
+                },
+                0 => EscherShapeType::AutoShape,
                 _ if shape_type_id < 203 => EscherShapeType::AutoShape,
                 _ => EscherShapeType::Unknown,
             };

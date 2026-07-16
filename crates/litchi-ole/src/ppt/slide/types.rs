@@ -394,7 +394,10 @@ impl<'doc> Slide<'doc> {
                 Some(ShapeEnum::Table(table))
             },
 
-            EscherShapeType::Rectangle | EscherShapeType::Ellipse | EscherShapeType::AutoShape => {
+            EscherShapeType::Rectangle
+            | EscherShapeType::Ellipse
+            | EscherShapeType::Polygon
+            | EscherShapeType::AutoShape => {
                 // Create AutoShape
                 let mut properties = shape::ShapeProperties {
                     id: shape_id,
@@ -792,6 +795,40 @@ mod tests {
         )
         .unwrap();
 
+        let mut drawing = Vec::new();
+        write_container(&mut drawing, 0, record_type::DG_CONTAINER, &shape_container).unwrap();
+        drawing
+    }
+
+    fn create_freeform_escher_drawing() -> Vec<u8> {
+        use crate::escher::writer::{
+            PropertyBuilder, ShapeBuilder, record_type, write_client_anchor, write_container,
+        };
+
+        let mut shape_children = Vec::new();
+        ShapeBuilder::new(0, 45).write(&mut shape_children).unwrap();
+
+        let mut vertices = Vec::new();
+        vertices.extend_from_slice(&2u16.to_le_bytes());
+        vertices.extend_from_slice(&2u16.to_le_bytes());
+        vertices.extend_from_slice(&8u16.to_le_bytes());
+        for (x, y) in [(0i32, 0i32), (21600, 21600)] {
+            vertices.extend_from_slice(&x.to_le_bytes());
+            vertices.extend_from_slice(&y.to_le_bytes());
+        }
+        let mut properties = PropertyBuilder::new();
+        properties.add_complex(0x0145, &vertices);
+        properties.write(&mut shape_children).unwrap();
+        write_client_anchor(&mut shape_children, 5, 6, 105, 206).unwrap();
+
+        let mut shape_container = Vec::new();
+        write_container(
+            &mut shape_container,
+            0,
+            record_type::SP_CONTAINER,
+            &shape_children,
+        )
+        .unwrap();
         let mut drawing = Vec::new();
         write_container(&mut drawing, 0, record_type::DG_CONTAINER, &shape_container).unwrap();
         drawing
@@ -1337,6 +1374,27 @@ mod tests {
         assert_eq!(autoshape.text(), "Arrow label");
         assert!(autoshape.has_text());
         assert_eq!(Shape::text(autoshape).unwrap(), "Arrow label");
+    }
+
+    #[test]
+    fn non_primitive_shape_with_vertices_is_exposed_as_freeform_autoshape() {
+        use crate::ppt::shapes::{Shape, autoshape::AutoShapeType};
+
+        let doc_data = vec![0u8; 32];
+        let ppdrawing = create_test_record(
+            PptRecordType::PPDrawing,
+            create_freeform_escher_drawing(),
+            Vec::new(),
+        );
+        let record = create_test_record(PptRecordType::Slide, Vec::new(), vec![ppdrawing]);
+        let slide = Slide::from_slide_data(create_slide_data(record, 256, &doc_data), 1);
+
+        let shapes = slide.shapes().unwrap();
+        assert_eq!(shapes.len(), 1);
+        let freeform = shapes[0].as_autoshape().expect("freeform auto shape");
+        assert_eq!(freeform.auto_shape_type(), AutoShapeType::Custom(0));
+        assert_eq!(freeform.properties().id, 45);
+        assert_eq!(freeform.bounds(), (5, 6, 100, 200));
     }
 
     #[test]
