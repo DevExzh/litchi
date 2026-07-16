@@ -49,12 +49,64 @@ pub enum XlsExtendedFormatKind {
     Style,
 }
 
+/// Local-application versus parent-inheritance semantics for the six XF property families.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct XlsExtendedFormatApplications {
+    number_format: bool,
+    font: bool,
+    alignment: bool,
+    border: bool,
+    fill: bool,
+    protection: bool,
+}
+
+impl XlsExtendedFormatApplications {
+    pub fn applies_number_format(&self) -> bool { self.number_format }
+    pub fn applies_font(&self) -> bool { self.font }
+    pub fn applies_alignment(&self) -> bool { self.alignment }
+    pub fn applies_border(&self) -> bool { self.border }
+    pub fn applies_fill(&self) -> bool { self.fill }
+    pub fn applies_protection(&self) -> bool { self.protection }
+    pub fn inherits_number_format(&self) -> bool { !self.number_format }
+    pub fn inherits_font(&self) -> bool { !self.font }
+    pub fn inherits_alignment(&self) -> bool { !self.alignment }
+    pub fn inherits_border(&self) -> bool { !self.border }
+    pub fn inherits_fill(&self) -> bool { !self.fill }
+    pub fn inherits_protection(&self) -> bool { !self.protection }
+
+    fn all_local() -> Self {
+        Self {
+            number_format: true,
+            font: true,
+            alignment: true,
+            border: true,
+            fill: true,
+            protection: true,
+        }
+    }
+
+    fn from_cell_bits(bits: u8) -> Self {
+        Self {
+            number_format: bits & 0x01 != 0,
+            font: bits & 0x02 != 0,
+            alignment: bits & 0x04 != 0,
+            border: bits & 0x08 != 0,
+            fill: bits & 0x10 != 0,
+            protection: bits & 0x20 != 0,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct XlsExtendedFormat {
     index: u16,
     font_index: u16,
     number_format_id: u16,
     kind: XlsExtendedFormatKind,
+    applications: XlsExtendedFormatApplications,
+    quote_prefix: bool,
+    pivot_button: bool,
+    has_xf_extension: bool,
     locked: bool,
     hidden: bool,
     alignment: crate::xls::alignment::XlsCellAlignment,
@@ -79,6 +131,21 @@ impl XlsExtendedFormat {
     pub fn kind(&self) -> XlsExtendedFormatKind {
         self.kind
     }
+
+    pub fn parent_style_xf_index(&self) -> Option<u16> {
+        match self.kind {
+            XlsExtendedFormatKind::Cell { parent_style_xf } => Some(parent_style_xf),
+            XlsExtendedFormatKind::Style => None,
+        }
+    }
+
+    pub fn applications(&self) -> XlsExtendedFormatApplications {
+        self.applications
+    }
+
+    pub fn quote_prefix(&self) -> bool { self.quote_prefix }
+    pub fn pivot_button(&self) -> bool { self.pivot_button }
+    pub fn has_xf_extension(&self) -> bool { self.has_xf_extension }
 
     pub fn is_cell_format(&self) -> bool {
         matches!(self.kind, XlsExtendedFormatKind::Cell { .. })
@@ -105,6 +172,58 @@ impl XlsExtendedFormat {
     pub fn fill(&self) -> &crate::xls::border_fill::XlsCellFill {
         &self.fill
     }
+}
+
+/// Borrowed effective formatting after applying a CellXF's parent StyleXF.
+#[derive(Debug, Clone, Copy)]
+pub struct XlsEffectiveExtendedFormat<'a> {
+    direct: &'a XlsExtendedFormat,
+    parent: Option<&'a XlsExtendedFormat>,
+}
+
+impl<'a> XlsEffectiveExtendedFormat<'a> {
+    pub fn direct(&self) -> &'a XlsExtendedFormat { self.direct }
+    pub fn parent_style(&self) -> Option<&'a XlsExtendedFormat> { self.parent }
+
+    fn source(&self, local: bool) -> &'a XlsExtendedFormat {
+        if local { self.direct } else { self.parent.unwrap_or(self.direct) }
+    }
+
+    pub fn number_format_source(&self) -> &'a XlsExtendedFormat {
+        self.source(self.direct.applications.applies_number_format())
+    }
+    pub fn font_source(&self) -> &'a XlsExtendedFormat {
+        self.source(self.direct.applications.applies_font())
+    }
+    pub fn alignment_source(&self) -> &'a XlsExtendedFormat {
+        self.source(self.direct.applications.applies_alignment())
+    }
+    pub fn border_source(&self) -> &'a XlsExtendedFormat {
+        self.source(self.direct.applications.applies_border())
+    }
+    pub fn fill_source(&self) -> &'a XlsExtendedFormat {
+        self.source(self.direct.applications.applies_fill())
+    }
+    pub fn protection_source(&self) -> &'a XlsExtendedFormat {
+        self.source(self.direct.applications.applies_protection())
+    }
+
+    pub fn number_format_id(&self) -> u16 { self.number_format_source().number_format_id }
+    pub fn font_index(&self) -> u16 { self.font_source().font_index }
+    pub fn alignment(&self) -> &'a crate::xls::alignment::XlsCellAlignment {
+        &self.alignment_source().alignment
+    }
+    pub fn borders(&self) -> &'a crate::xls::border_fill::XlsCellBorders {
+        &self.border_source().borders
+    }
+    pub fn fill(&self) -> &'a crate::xls::border_fill::XlsCellFill {
+        &self.fill_source().fill
+    }
+    pub fn locked(&self) -> bool { self.protection_source().locked }
+    pub fn hidden(&self) -> bool { self.protection_source().hidden }
+    pub fn quote_prefix(&self) -> bool { self.direct.quote_prefix }
+    pub fn pivot_button(&self) -> bool { self.direct.pivot_button }
+    pub fn has_xf_extension(&self) -> bool { self.direct.has_xf_extension }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -138,6 +257,14 @@ impl XlsFormatting {
 
     pub fn extended_format(&self, index: u16) -> Option<&XlsExtendedFormat> {
         self.extended_formats.get(index as usize)
+    }
+
+    pub fn effective_extended_format(&self, index: u16) -> Option<XlsEffectiveExtendedFormat<'_>> {
+        let direct = self.extended_format(index)?;
+        let parent = direct
+            .parent_style_xf_index()
+            .and_then(|parent| self.extended_format(parent));
+        Some(XlsEffectiveExtendedFormat { direct, parent })
     }
 
     pub fn is_date_time_format(&self, id: u16) -> bool {
@@ -427,10 +554,6 @@ fn parse_xf(data: &[u8], index: u16) -> XlsResult<XlsExtendedFormat> {
     if style && prefix {
         return Err(invalid(XF_RECORD, "style XF has the f123Prefix bit set"));
     }
-    let alignment = u16::from_le_bytes([data[8], data[9]]);
-    if alignment & 0x0320 != 0 {
-        return Err(invalid(XF_RECORD, "XF alignment reserved bits are nonzero"));
-    }
     let rotation = data[7];
     if rotation > 180 && rotation != 255 {
         return Err(invalid(
@@ -447,6 +570,16 @@ fn parse_xf(data: &[u8], index: u16) -> XlsResult<XlsExtendedFormat> {
     };
     let font_index = u16::from_le_bytes([data[0], data[1]]);
     crate::xls::font::validate_font_index(font_index)?;
+    let applications = if style {
+        XlsExtendedFormatApplications::all_local()
+    } else {
+        XlsExtendedFormatApplications::from_cell_bits(data[9] >> 2)
+    };
+    let border2 = u32::from_le_bytes([data[14], data[15], data[16], data[17]]);
+    let area = u16::from_le_bytes([data[18], data[19]]);
+    let quote_prefix = !style && prefix;
+    let has_xf_extension = !style && border2 & (1 << 25) != 0;
+    let pivot_button = !style && area & (1 << 14) != 0;
     let alignment = crate::xls::alignment::XlsCellAlignment::parse(data[6], data[7], data[8])?;
     let (borders, fill) = crate::xls::border_fill::parse_xf_border_fill(data, style)?;
 
@@ -455,6 +588,10 @@ fn parse_xf(data: &[u8], index: u16) -> XlsResult<XlsExtendedFormat> {
         font_index,
         number_format_id,
         kind,
+        applications,
+        quote_prefix,
+        pivot_button,
+        has_xf_extension,
         locked,
         hidden,
         alignment,
@@ -544,6 +681,83 @@ fn invalid(record_type: u16, message: impl Into<String>) -> XlsError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn semantic_xf(style: bool, parent: u16, application_bits: u8) -> [u8; 20] {
+        let mut data = [0; 20];
+        let flags = (parent << 4) | if style { 0x0004 } else { 0 };
+        data[4..6].copy_from_slice(&flags.to_le_bytes());
+        data[9] = application_bits << 2;
+        data
+    }
+
+    #[test]
+    fn decodes_cell_apply_polarity_and_style_local_semantics() {
+        let cell = parse_xf(&semantic_xf(false, 0, 0b10_1010), 1).unwrap();
+        let apply = cell.applications();
+        assert!(apply.inherits_number_format());
+        assert!(apply.applies_font());
+        assert!(apply.inherits_alignment());
+        assert!(apply.applies_border());
+        assert!(apply.inherits_fill());
+        assert!(apply.applies_protection());
+
+        let style = parse_xf(&semantic_xf(true, 0x0fff, 0), 0).unwrap();
+        let apply = style.applications();
+        assert!(apply.applies_number_format());
+        assert!(apply.applies_font());
+        assert!(apply.applies_alignment());
+        assert!(apply.applies_border());
+        assert!(apply.applies_fill());
+        assert!(apply.applies_protection());
+    }
+
+    #[test]
+    fn decodes_cell_special_flags_and_ignores_style_reserved_overlays() {
+        let mut cell_data = semantic_xf(false, 0, 0);
+        cell_data[4] |= 0x08;
+        let mut border2 = 1u32 << 25;
+        cell_data[14..18].copy_from_slice(&border2.to_le_bytes());
+        cell_data[18..20].copy_from_slice(&(1u16 << 14).to_le_bytes());
+        let cell = parse_xf(&cell_data, 1).unwrap();
+        assert!(cell.quote_prefix());
+        assert!(cell.has_xf_extension());
+        assert!(cell.pivot_button());
+
+        let mut style_data = semantic_xf(true, 0x0fff, 0x3f);
+        border2 |= 1 << 25;
+        style_data[14..18].copy_from_slice(&border2.to_le_bytes());
+        style_data[18..20].copy_from_slice(&(3u16 << 14).to_le_bytes());
+        let style = parse_xf(&style_data, 0).unwrap();
+        assert!(!style.has_xf_extension());
+        assert!(!style.pivot_button());
+        assert!(style.applications().applies_fill());
+    }
+
+    #[test]
+    fn resolves_effective_components_by_borrowing_parent_or_cell() {
+        let mut style_data = semantic_xf(true, 0x0fff, 0);
+        style_data[2..4].copy_from_slice(&14u16.to_le_bytes());
+        let style = parse_xf(&style_data, 0).unwrap();
+        let mut cell_data = semantic_xf(false, 0, 0b00_0010);
+        cell_data[0..2].copy_from_slice(&1u16.to_le_bytes());
+        cell_data[2..4].copy_from_slice(&1u16.to_le_bytes());
+        let cell = parse_xf(&cell_data, 1).unwrap();
+        let formatting = XlsFormatting {
+            extended_formats: vec![style, cell],
+            ..XlsFormatting::default()
+        };
+
+        let effective = formatting.effective_extended_format(1).unwrap();
+        assert_eq!(effective.parent_style().unwrap().index(), 0);
+        assert_eq!(effective.number_format_id(), 14);
+        assert_eq!(effective.number_format_source().index(), 0);
+        assert_eq!(effective.font_index(), 1);
+        assert_eq!(effective.font_source().index(), 1);
+        assert!(std::ptr::eq(
+            effective.alignment(),
+            formatting.extended_formats()[0].alignment(),
+        ));
+    }
     use crate::xls::cell::XlsCell;
     use crate::xls::records::{CellRecord, RecordHeader};
     use crate::xls::workbook::XlsWorkbook;

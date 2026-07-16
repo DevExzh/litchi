@@ -869,6 +869,14 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         self.formatting.extended_formats()
     }
 
+    /// Resolves an XF's effective property families through its parent StyleXF.
+    pub fn effective_extended_format(
+        &self,
+        index: u16,
+    ) -> Option<crate::xls::number_format::XlsEffectiveExtendedFormat<'_>> {
+        self.formatting.effective_extended_format(index)
+    }
+
     /// Workbook color palette, using BIFF8 defaults when no `Palette` record exists.
     pub fn palette(&self) -> &crate::xls::palette::XlsPalette {
         &self.palette

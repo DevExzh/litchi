@@ -1,4 +1,4 @@
-use litchi_rtf::{RtfDocument, RtfWriter, UserPropertyValue};
+use litchi_rtf::{RtfDocument, RtfWriter, UserPropertyType, UserPropertyValue};
 
 #[test]
 fn parses_all_typed_values_in_normative_order() {
@@ -10,11 +10,12 @@ fn parses_all_typed_values_in_normative_order() {
         r#"{\propname Boolean}\proptype11{\staticval 1}"#,
         r#"{\propname Date}\proptype64{\staticval 2016. 01. 30.}"#,
         r#"{\propname Future}\proptype999{\staticval opaque}"#,
+        r#"{\propname Caf\'e9}\proptype30{\staticval na\'efve}"#,
         r#"}Body}"#,
     ))
     .unwrap();
     let properties = document.user_properties();
-    assert_eq!(properties.len(), 6);
+    assert_eq!(properties.len(), 7);
     assert_eq!(properties[0].name, "Text");
     assert_eq!(
         properties[0].link_value.as_deref(),
@@ -32,10 +33,22 @@ fn parses_all_typed_values_in_normative_order() {
         &properties[3].value,
         UserPropertyValue::Boolean { value: true, lexical } if lexical == "1"
     ));
-    assert!(matches!(&properties[4].value, UserPropertyValue::Date { .. }));
+    assert!(matches!(
+        &properties[4].value,
+        UserPropertyValue::Date { value, lexical }
+            if value.year == 2016 && value.month == 1 && value.day == 30
+                && value.hour.is_none() && lexical == "2016. 01. 30."
+    ));
+    assert_eq!(properties[4].value.property_type(), UserPropertyType::DateTime);
     assert!(matches!(
         &properties[5].value,
         UserPropertyValue::Unknown { type_code: 999, lexical } if lexical == "opaque"
+    ));
+    assert_eq!(properties[5].value.property_type(), UserPropertyType::Unknown(999));
+    assert_eq!(properties[6].name, "Caf\u{e9}");
+    assert!(matches!(
+        &properties[6].value,
+        UserPropertyValue::Text { value } if value == "na\u{ef}ve"
     ));
     assert_eq!(document.text(), "Body");
 }
@@ -66,6 +79,21 @@ fn parses_libreoffice_user_property_fixtures_when_available() {
     let document = RtfDocument::parse(&source).unwrap();
     assert!(!document.user_properties().is_empty());
     assert!(!document.document_variables().is_empty());
+
+    let source = std::fs::read_to_string(root.join("rtfexport/data/custom-doc-props.rtf")).unwrap();
+    let document = RtfDocument::parse(&source).unwrap();
+    let date = document.user_properties().iter().find(|property| property.name == "d").unwrap();
+    assert!(matches!(
+        &date.value,
+        UserPropertyValue::Date { value, .. }
+            if (value.year, value.month, value.day) == (2016, 1, 30)
+    ));
+    let owned = date.clone().into_owned();
+    assert_eq!(owned, *date);
+    let mut output = Vec::new();
+    RtfWriter::new(&mut output).write_document(&document).unwrap();
+    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    assert_eq!(reparsed.user_properties(), document.user_properties());
 }
 
 #[test]
@@ -75,6 +103,7 @@ fn rejects_noncanonical_malformed_and_active_properties() {
         r#"{\rtf1{\*\userprops{\propname A}{\staticval x}\proptype30}}"#,
         r#"{\rtf1{\*\userprops{\propname A}\proptype{\staticval x}}}"#,
         r#"{\rtf1{\*\userprops{\propname A}\proptype11{\staticval true}}}"#,
+        r#"{\rtf1{\*\userprops{\propname A}\proptype64{\staticval 2023. 02. 29.}}}"#,
         r#"{\rtf1{\*\userprops{\propname A}\proptype30{\staticval x}{\propname A}\proptype30{\staticval y}}}"#,
         r#"{\rtf1{\*\userprops{\propname A}\proptype30{\staticval {nested}}}}"#,
         r#"{\rtf1{\*\userprops{\propname A}\proptype30{\staticval \bin4 abcd}}}"#,

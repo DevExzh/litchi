@@ -1,6 +1,6 @@
 //! ODF table-style templates stored in common or automatic style collections.
 
-use litchi_core::{Error, Result};
+use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::{
     XmlVersion,
     events::{BytesStart, Event},
@@ -55,6 +55,171 @@ pub struct TableTemplate {
     pub even_columns: Option<TableTemplateStyle>,
     pub odd_columns: Option<TableTemplateStyle>,
     pub background: Option<TableTemplateStyle>,
+}
+
+impl TableTemplate {
+    /// Validate the template's required band structure and style references.
+    pub fn validate(&self) -> Result<()> {
+        validate_template_value(&self.name, "table template name")?;
+        if self.even_rows.is_some() != self.odd_rows.is_some() {
+            return Err(Error::InvalidFormat(
+                "table template requires both even-rows and odd-rows".to_string(),
+            ));
+        }
+        if self.even_columns.is_some() != self.odd_columns.is_some() {
+            return Err(Error::InvalidFormat(
+                "table template requires both even-columns and odd-columns".to_string(),
+            ));
+        }
+        if self.body.is_none() && self.even_rows.is_none() && self.even_columns.is_none() {
+            return Err(Error::InvalidFormat(
+                "table template requires body or a complete row/column band pair".to_string(),
+            ));
+        }
+        for (name, style) in [
+            ("first-row", self.first_row.as_ref()),
+            ("last-row", self.last_row.as_ref()),
+            ("first-column", self.first_column.as_ref()),
+            ("last-column", self.last_column.as_ref()),
+            ("body", self.body.as_ref()),
+            ("even-rows", self.even_rows.as_ref()),
+            ("odd-rows", self.odd_rows.as_ref()),
+            ("even-columns", self.even_columns.as_ref()),
+            ("odd-columns", self.odd_columns.as_ref()),
+            ("background", self.background.as_ref()),
+        ] {
+            let Some(style) = style else { continue };
+            validate_template_value(&style.style_name, &format!("{name} style name"))?;
+            if let Some(paragraph) = &style.paragraph_style_name {
+                if name == "background" {
+                    return Err(Error::InvalidFormat(
+                        "table:background cannot have a paragraph style".to_string(),
+                    ));
+                }
+                validate_template_value(paragraph, &format!("{name} paragraph style name"))?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Append deterministic ODF XML for this template to an existing buffer.
+    pub fn write_xml(&self, output: &mut String) -> Result<()> {
+        self.validate()?;
+        output.push_str("<table:table-template table:name=\"");
+        output.push_str(&escape_xml(&self.name));
+        output.push('"');
+        write_axis_attribute(
+            output,
+            "first-row-start-column",
+            self.first_row_start_column,
+        );
+        write_axis_attribute(
+            output,
+            "first-row-end-column",
+            self.first_row_end_column,
+        );
+        write_axis_attribute(
+            output,
+            "last-row-start-column",
+            self.last_row_start_column,
+        );
+        write_axis_attribute(
+            output,
+            "last-row-end-column",
+            self.last_row_end_column,
+        );
+        write_bool_attribute(output, "use-first-row-styles", self.use_first_row_styles);
+        write_bool_attribute(output, "use-last-row-styles", self.use_last_row_styles);
+        write_bool_attribute(
+            output,
+            "use-first-column-styles",
+            self.use_first_column_styles,
+        );
+        write_bool_attribute(
+            output,
+            "use-last-column-styles",
+            self.use_last_column_styles,
+        );
+        write_bool_attribute(
+            output,
+            "use-banding-rows-styles",
+            self.use_banding_rows_styles,
+        );
+        write_bool_attribute(
+            output,
+            "use-banding-columns-styles",
+            self.use_banding_columns_styles,
+        );
+        output.push('>');
+        for (name, style) in [
+            ("first-row", self.first_row.as_ref()),
+            ("last-row", self.last_row.as_ref()),
+            ("first-column", self.first_column.as_ref()),
+            ("last-column", self.last_column.as_ref()),
+            ("body", self.body.as_ref()),
+            ("even-rows", self.even_rows.as_ref()),
+            ("odd-rows", self.odd_rows.as_ref()),
+            ("even-columns", self.even_columns.as_ref()),
+            ("odd-columns", self.odd_columns.as_ref()),
+            ("background", self.background.as_ref()),
+        ] {
+            if let Some(style) = style {
+                write_region(output, name, style);
+            }
+        }
+        output.push_str("</table:table-template>");
+        Ok(())
+    }
+
+    /// Serialize this template as a standalone ODF XML fragment.
+    pub fn to_xml(&self) -> Result<String> {
+        let mut output = String::new();
+        self.write_xml(&mut output)?;
+        Ok(output)
+    }
+}
+
+fn validate_template_value(value: &str, name: &str) -> Result<()> {
+    if value.is_empty() {
+        return Err(Error::InvalidFormat(format!("{name} must not be empty")));
+    }
+    if value.len() > MAX_VALUE_BYTES {
+        return Err(Error::InvalidFormat(format!("{name} exceeds 64 KiB")));
+    }
+    Ok(())
+}
+
+fn write_axis_attribute(output: &mut String, name: &str, value: Option<TableTemplateAxis>) {
+    let Some(value) = value else { return };
+    output.push_str(" table:");
+    output.push_str(name);
+    output.push_str("=\"");
+    output.push_str(match value {
+        TableTemplateAxis::Row => "row",
+        TableTemplateAxis::Column => "column",
+    });
+    output.push('"');
+}
+
+fn write_bool_attribute(output: &mut String, name: &str, value: Option<bool>) {
+    let Some(value) = value else { return };
+    output.push_str(" table:");
+    output.push_str(name);
+    output.push_str(if value { "=\"true\"" } else { "=\"false\"" });
+}
+
+fn write_region(output: &mut String, name: &str, style: &TableTemplateStyle) {
+    output.push_str("<table:");
+    output.push_str(name);
+    output.push_str(" table:style-name=\"");
+    output.push_str(&escape_xml(&style.style_name));
+    output.push('"');
+    if let Some(paragraph) = &style.paragraph_style_name {
+        output.push_str(" table:paragraph-style-name=\"");
+        output.push_str(&escape_xml(paragraph));
+        output.push('"');
+    }
+    output.push_str("/>");
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -752,5 +917,24 @@ mod tests {
             .unwrap();
         assert_eq!(default.body.as_ref().unwrap().style_name, "Default-Style.body");
         assert!(default.background.is_some());
+    }
+
+    #[test]
+    fn validates_and_round_trips_deterministic_template_xml() {
+        let mut template = parse(
+            r#"<table:table-template table:name="A &amp; B" table:use-banding-columns-styles="false"><table:first-row table:style-name="Head&amp;" table:paragraph-style-name="P&amp;"/><table:even-columns table:style-name="Even"/><table:odd-columns table:style-name="Odd"/></table:table-template>"#,
+        )
+        .unwrap()
+        .remove(0);
+        let xml = template.to_xml().unwrap();
+        assert!(xml.contains(r#"table:name="A &amp; B""#));
+        assert!(xml.contains(r#"table:style-name="Head&amp;""#));
+        let reparsed = parse(&xml).unwrap().remove(0);
+        assert_eq!(reparsed, template);
+
+        template.odd_columns = None;
+        let mut untouched = String::from("prefix");
+        assert!(template.write_xml(&mut untouched).is_err());
+        assert_eq!(untouched, "prefix");
     }
 }

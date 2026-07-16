@@ -81,7 +81,9 @@ pub use latent_style::{LatentStyleException, LatentStyles};
 pub use data_store::DocumentDataStore;
 pub use info::{DocumentInfo, DocumentProtection, ProtectionType, RtfTimestamp};
 pub use lexer::CharacterSet;
-pub use user_property::{UserProperty, UserPropertyValue};
+pub use user_property::{
+    UserProperty, UserPropertyDateTime, UserPropertyType, UserPropertyValue,
+};
 pub use list::{
     List, ListFollow, ListJustification, ListLevel, ListLevelType, ListOverride, ListOverrideTable,
     ListTable,

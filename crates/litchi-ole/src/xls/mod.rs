@@ -99,7 +99,8 @@ pub use defined_names::{
     XlsBuiltInName, XlsDefinedName, XlsDefinedNameKind, XlsNameScope,
 };
 pub use number_format::{
-    XlsDateSystem, XlsExtendedFormat, XlsExtendedFormatKind, XlsFormatting, XlsNumberFormat,
+    XlsDateSystem, XlsEffectiveExtendedFormat, XlsExtendedFormat,
+    XlsExtendedFormatApplications, XlsExtendedFormatKind, XlsFormatting, XlsNumberFormat,
 };
 pub use palette::{XlsColor, XlsPalette};
 pub use font::{XlsFont, XlsFontCharset, XlsFontEscapement, XlsFontFamily, XlsFontUnderline};
