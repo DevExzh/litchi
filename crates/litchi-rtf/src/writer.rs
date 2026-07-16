@@ -134,6 +134,9 @@ impl<W: Write> RtfWriter<W> {
         // Write document properties before body content.
         self.write_document_info(doc.info())?;
 
+        // User-defined properties are header-level inert metadata.
+        self.write_user_properties(doc.user_properties())?;
+
         // Document variables are header-level inert metadata.
         self.write_document_variables(doc.document_variables())?;
 
@@ -672,6 +675,72 @@ impl<W: Write> RtfWriter<W> {
             self.write_control_word(control, Some(value))?;
         }
         Ok(())
+    }
+
+    /// Write the canonical starred RTF user-properties destination.
+    pub fn write_user_properties(
+        &mut self,
+        properties: &[crate::UserProperty<'_>],
+    ) -> io::Result<()> {
+        if properties.is_empty() {
+            return Ok(());
+        }
+        if properties.len() > crate::user_property::MAX_USER_PROPERTIES {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "RTF user-property count limit exceeded",
+            ));
+        }
+        let mut names = std::collections::HashSet::with_capacity(properties.len());
+        let mut aggregate = 0usize;
+        for property in properties {
+            property
+                .validate()
+                .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error))?;
+            if !names.insert(property.name.as_ref()) {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "duplicate RTF user-property name",
+                ));
+            }
+            aggregate = aggregate
+                .checked_add(property.text_bytes().ok_or_else(|| {
+                    io::Error::new(io::ErrorKind::InvalidInput, "user-property size overflow")
+                })?)
+                .ok_or_else(|| {
+                    io::Error::new(io::ErrorKind::InvalidInput, "user-property size overflow")
+                })?;
+            if aggregate > crate::user_property::MAX_USER_PROPERTY_TEXT_BYTES {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF user-property aggregate text limit exceeded",
+                ));
+            }
+        }
+
+        self.write_str("{\\*")?;
+        self.write_control_word("userprops", None)?;
+        for property in properties {
+            self.write_str("{")?;
+            self.write_control_word("propname", None)?;
+            self.write_str(" ")?;
+            self.write_destination_text(property.name.as_ref())?;
+            self.write_str("}")?;
+            self.write_control_word("proptype", Some(property.value.type_code()))?;
+            self.write_str("{")?;
+            self.write_control_word("staticval", None)?;
+            self.write_str(" ")?;
+            self.write_destination_text(property.value.lexical())?;
+            self.write_str("}")?;
+            if let Some(link) = &property.link_value {
+                self.write_str("{")?;
+                self.write_control_word("linkval", None)?;
+                self.write_str(" ")?;
+                self.write_destination_text(link.as_ref())?;
+                self.write_str("}")?;
+            }
+        }
+        self.write_str("}")
     }
 
     /// Write ordered standard RTF document-variable destinations.

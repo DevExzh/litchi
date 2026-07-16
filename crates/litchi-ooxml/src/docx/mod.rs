@@ -65,6 +65,7 @@ pub mod hyperlink;
 pub mod image;
 mod namespace;
 pub mod numbering;
+pub mod list;
 pub mod package;
 pub mod paragraph;
 pub mod parts;

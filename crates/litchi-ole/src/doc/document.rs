@@ -21,7 +21,7 @@ use super::parts::pap_bin_table::PapBinTable;
 use super::parts::paragraph_extractor::{ExtractedParagraph, ParagraphExtractor};
 use super::parts::piece_table::PieceTable;
 use super::parts::revisions::RevisionAuthorTable;
-use super::parts::sections::SectionRevisionsTable;
+use super::parts::sections::SectionsTable;
 use super::parts::styles::StyleSheet;
 use super::parts::text::TextExtractor;
 use super::table::Table;
@@ -92,8 +92,8 @@ pub struct Document {
     bookmarks_table: BookmarksTable,
     /// Revision-mark authors
     revision_authors: RevisionAuthorTable,
-    /// Section property revision marks
-    section_revisions: SectionRevisionsTable,
+    /// Section ranges, layout, and property revision marks
+    sections: SectionsTable,
     /// Hyperlinks table
     hyperlinks_table: Option<HyperlinksTable>,
     /// List/numbering tables
@@ -187,8 +187,8 @@ impl Document {
         let comments_table = CommentsTable::parse(&fib, &table_stream)?;
         let bookmarks_table = BookmarksTable::parse(&fib, &table_stream)?;
         let revision_authors = RevisionAuthorTable::parse(&fib, &table_stream)?;
-        let section_revisions =
-            SectionRevisionsTable::parse(&fib, &table_stream, &word_document, &revision_authors)?;
+        let sections =
+            SectionsTable::parse(&fib, &table_stream, &word_document, &revision_authors)?;
 
         // Parse hyperlinks from fields table
         let hyperlinks_table = fields_table.as_ref().and_then(|ft| {
@@ -254,7 +254,7 @@ impl Document {
             comments_table,
             bookmarks_table,
             revision_authors,
-            section_revisions,
+            sections,
             hyperlinks_table,
             list_tables,
             stylesheet,
@@ -706,7 +706,17 @@ impl Document {
 
     /// Get section property revision marks in document order.
     pub fn section_revisions(&self) -> &[super::revision::SectionRevisionMark] {
-        self.section_revisions.revisions()
+        self.sections.revisions()
+    }
+
+    /// Get sections in main-document character-position order.
+    pub fn sections(&self) -> &[super::section::DocSection] {
+        self.sections.sections()
+    }
+
+    /// Find the section containing `cp` using half-open section ranges.
+    pub fn section_at_cp(&self, cp: u32) -> Option<&super::section::DocSection> {
+        self.sections.section_at_cp(cp)
     }
 
     // ──────────────────────────────────────────────────────────────────

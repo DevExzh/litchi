@@ -1,10 +1,12 @@
 /// Styles - document styles and formatting definitions.
 use crate::docx::enums::WdStyleType;
+use crate::docx::numbering::ParagraphNumbering;
 use crate::error::{OoxmlError, Result};
 use litchi_opc::part::Part;
 use quick_xml::events::Event;
 use quick_xml::{Reader, XmlVersion};
 use smallvec::SmallVec;
+use std::collections::HashSet;
 
 /// A collection of styles defined in a Word document.
 ///
@@ -109,6 +111,34 @@ impl<'a> Styles<'a> {
         }))
     }
 
+    /// Resolve inherited paragraph numbering with a bounded, cycle-checked `basedOn` walk.
+    pub fn resolved_numbering(&mut self, style_id: &str) -> Result<Option<ParagraphNumbering>> {
+        self.ensure_styles_loaded()?;
+        let styles = self.style_list.as_ref().expect("styles loaded");
+        let mut current = style_id;
+        let mut visited = HashSet::new();
+        loop {
+            if !visited.insert(current.to_owned()) {
+                return Err(OoxmlError::InvalidFormat(format!(
+                    "style basedOn cycle at '{current}'"
+                )));
+            }
+            if visited.len() > styles.len().saturating_add(1) {
+                return Err(OoxmlError::InvalidFormat(
+                    "style inheritance exceeds the style table".to_owned(),
+                ));
+            }
+            let Some(style) = styles.iter().find(|style| style.style_id == current) else {
+                return Ok(None);
+            };
+            if let Some(numbering) = style.numbering {
+                return Ok(Some(numbering));
+            }
+            let Some(parent) = style.based_on.as_deref() else { return Ok(None); };
+            current = parent;
+        }
+    }
+
     /// Ensure styles are loaded from XML.
     fn ensure_styles_loaded(&mut self) -> Result<()> {
         if self.style_list.is_some() {
@@ -121,6 +151,10 @@ impl<'a> Styles<'a> {
 
         let mut styles = SmallVec::new();
         let mut current_style: Option<StyleBuilder> = None;
+        let mut in_ppr = false;
+        let mut in_num_pr = false;
+        let mut pending_num_id = None;
+        let mut pending_level = None;
 
         loop {
             match reader.read_event() {
@@ -170,9 +204,42 @@ impl<'a> Styles<'a> {
 
                     current_style = Some(builder);
                 },
+                Ok(Event::Start(e)) if current_style.is_some()
+                    && e.local_name().as_ref() == b"pPr" => in_ppr = true,
+                Ok(Event::Start(e)) if current_style.is_some() && in_ppr
+                    && e.local_name().as_ref() == b"numPr" => {
+                    if in_num_pr {
+                        return Err(OoxmlError::InvalidFormat(
+                            "style has nested numPr".to_owned()));
+                    }
+                    in_num_pr = true;
+                    pending_num_id = None;
+                    pending_level = None;
+                },
                 Ok(Event::Empty(e)) if current_style.is_some() => {
                     let builder = current_style.as_mut().unwrap();
                     match e.local_name().as_ref() {
+                        b"numId" if in_num_pr => {
+                            if pending_num_id.is_some() {
+                                return Err(OoxmlError::InvalidFormat(
+                                    "style has duplicate numId".to_owned()));
+                            }
+                            let raw = required_style_value(&e, reader.decoder())?;
+                            pending_num_id = Some(raw.parse::<u32>().map_err(|_| {
+                                OoxmlError::InvalidFormat(format!("invalid style numId '{raw}'"))
+                            })?);
+                        },
+                        b"ilvl" if in_num_pr => {
+                            if pending_level.is_some() {
+                                return Err(OoxmlError::InvalidFormat(
+                                    "style has duplicate ilvl".to_owned()));
+                            }
+                            let raw = required_style_value(&e, reader.decoder())?;
+                            pending_level = Some(raw.parse::<u8>().ok()
+                                .filter(|value| *value <= 8).ok_or_else(|| {
+                                    OoxmlError::InvalidFormat(format!("invalid style ilvl '{raw}'"))
+                                })?);
+                        },
                         b"name" => {
                             // Parse name attribute
                             for attr in e.attributes().flatten() {
@@ -225,6 +292,21 @@ impl<'a> Styles<'a> {
                         _ => {},
                     }
                 },
+                Ok(Event::End(e)) if e.local_name().as_ref() == b"numPr" && in_num_pr => {
+                    let num_id = pending_num_id.take().ok_or_else(|| {
+                        OoxmlError::InvalidFormat("style numPr is missing numId".to_owned())
+                    })?;
+                    current_style.as_mut().expect("style checked").numbering = Some(
+                        ParagraphNumbering { num_id, level: pending_level.take().unwrap_or(0) });
+                    in_num_pr = false;
+                },
+                Ok(Event::End(e)) if e.local_name().as_ref() == b"pPr" && in_ppr => {
+                    if in_num_pr {
+                        return Err(OoxmlError::InvalidFormat(
+                            "unterminated style numPr".to_owned()));
+                    }
+                    in_ppr = false;
+                },
                 Ok(Event::End(e)) if e.local_name().as_ref() == b"style" => {
                     // Finish current style
                     if let Some(builder) = current_style.take()
@@ -237,6 +319,7 @@ impl<'a> Styles<'a> {
                             is_default: builder.is_default,
                             is_custom: builder.is_custom,
                             based_on: builder.based_on,
+                            numbering: builder.numbering,
                             priority: builder.priority,
                             is_quick_style: builder.is_quick_style,
                             is_hidden: builder.is_hidden,
@@ -264,6 +347,7 @@ struct StyleBuilder {
     is_default: bool,
     is_custom: bool,
     based_on: Option<String>,
+    numbering: Option<ParagraphNumbering>,
     priority: Option<i32>,
     is_quick_style: bool,
     is_hidden: bool,
@@ -288,6 +372,7 @@ pub struct Style {
     is_custom: bool,
     /// ID of the style this is based on
     based_on: Option<String>,
+    numbering: Option<ParagraphNumbering>,
     /// UI priority for display ordering
     priority: Option<i32>,
     /// Whether to show in quick style gallery
@@ -345,6 +430,12 @@ impl Style {
         self.based_on.as_deref()
     }
 
+    /// Direct paragraph numbering declared by this style.
+    #[inline]
+    pub fn numbering(&self) -> Option<ParagraphNumbering> {
+        self.numbering
+    }
+
     /// Get the UI priority for this style.
     ///
     /// Lower values appear first in style lists.
@@ -374,13 +465,55 @@ impl Style {
     }
 }
 
+fn required_style_value(element: &quick_xml::events::BytesStart<'_>,
+    decoder: quick_xml::encoding::Decoder) -> Result<String> {
+    for attribute in element.attributes().with_checks(false) {
+        let attribute = attribute.map_err(|error| OoxmlError::Xml(error.to_string()))?;
+        if attribute.key.local_name().as_ref() == b"val" {
+            return attribute.decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
+                .map(|value| value.into_owned())
+                .map_err(|error| OoxmlError::Xml(error.to_string()));
+        }
+    }
+    Err(OoxmlError::InvalidFormat(
+        "style numbering property is missing val".to_owned(),
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use litchi_opc::PackURI;
+    use litchi_opc::part::BlobPart;
 
     #[test]
     fn test_style_type_default() {
         let style_type = WdStyleType::default();
         assert_eq!(style_type, WdStyleType::Paragraph);
+    }
+
+    fn styles(xml: &[u8]) -> Styles<'static> {
+        let part = Box::leak(Box::new(BlobPart::new(
+            PackURI::new("/word/styles.xml").unwrap(),
+            "application/xml".to_owned(), xml.to_vec(),
+        )));
+        Styles::from_part(part)
+    }
+
+    #[test]
+    fn resolves_inherited_numbering_and_retains_cancellation() {
+        let mut value = styles(br#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:styleId="Base"><w:pPr><w:numPr><w:ilvl w:val="2"/><w:numId w:val="7"/></w:numPr></w:pPr></w:style><w:style w:type="paragraph" w:styleId="Child"><w:basedOn w:val="Base"/></w:style><w:style w:type="paragraph" w:styleId="Cancel"><w:pPr><w:numPr><w:numId w:val="0"/></w:numPr></w:pPr></w:style></w:styles>"#);
+        assert_eq!(value.resolved_numbering("Child").unwrap(),
+            Some(ParagraphNumbering { num_id: 7, level: 2 }));
+        assert_eq!(value.resolved_numbering("Cancel").unwrap(),
+            Some(ParagraphNumbering { num_id: 0, level: 0 }));
+    }
+
+    #[test]
+    fn rejects_based_on_cycles_and_malformed_num_pr() {
+        let mut cycle = styles(br#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:styleId="A"><w:basedOn w:val="B"/></w:style><w:style w:type="paragraph" w:styleId="B"><w:basedOn w:val="A"/></w:style></w:styles>"#);
+        assert!(cycle.resolved_numbering("A").is_err());
+        let mut malformed = styles(br#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:styleId="A"><w:pPr><w:numPr><w:ilvl w:val="9"/></w:numPr></w:pPr></w:style></w:styles>"#);
+        assert!(malformed.len().is_err());
     }
 }

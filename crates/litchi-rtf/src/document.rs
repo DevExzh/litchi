@@ -29,6 +29,8 @@ pub struct RtfDocument<'a> {
     objects: Vec<super::object::EmbeddedObject<'a>>,
     /// Ordered inert document-variable metadata
     document_variables: Vec<super::document_variable::DocumentVariable<'a>>,
+    /// Ordered inert user-defined document properties
+    user_properties: Vec<super::user_property::UserProperty<'a>>,
     /// List table
     list_table: super::list::ListTable<'a>,
     /// List override table
@@ -220,6 +222,11 @@ impl<'a> RtfDocument<'a> {
                 .document_variables
                 .into_iter()
                 .map(super::document_variable::DocumentVariable::into_owned)
+                .collect(),
+            user_properties: parsed
+                .user_properties
+                .into_iter()
+                .map(super::user_property::UserProperty::into_owned)
                 .collect(),
             list_table: Self::convert_list_table_to_owned(parsed.list_table),
             list_override_table: parsed.list_override_table,
@@ -538,6 +545,53 @@ impl<'a> RtfDocument<'a> {
     /// Remove all document variables.
     pub fn clear_document_variables(&mut self) {
         self.document_variables.clear();
+    }
+
+    /// Return ordered, inert RTF user-defined document properties.
+    pub fn user_properties(&self) -> &[super::user_property::UserProperty<'_>] {
+        &self.user_properties
+    }
+
+    /// Append a unique user-defined property without evaluating its value or link.
+    pub fn push_user_property(
+        &mut self,
+        property: super::user_property::UserProperty<'a>,
+    ) -> RtfResult<()> {
+        property.validate()?;
+        if self.user_properties.len() >= super::user_property::MAX_USER_PROPERTIES {
+            return Err(RtfError::MalformedDocument(
+                "RTF user-property count limit exceeded".to_string(),
+            ));
+        }
+        if self
+            .user_properties
+            .iter()
+            .any(|existing| existing.name == property.name)
+        {
+            return Err(RtfError::MalformedDocument(format!(
+                "duplicate RTF user-property name: {}",
+                property.name
+            )));
+        }
+        let aggregate = property.text_bytes().and_then(|initial| {
+            self.user_properties.iter().try_fold(initial, |size, existing| {
+                size.checked_add(existing.text_bytes()?)
+            })
+        });
+        if aggregate.is_none_or(|size| {
+            size > super::user_property::MAX_USER_PROPERTY_TEXT_BYTES
+        }) {
+            return Err(RtfError::MalformedDocument(
+                "RTF user-property aggregate text limit exceeded".to_string(),
+            ));
+        }
+        self.user_properties.push(property);
+        Ok(())
+    }
+
+    /// Remove all user-defined properties.
+    pub fn clear_user_properties(&mut self) {
+        self.user_properties.clear();
     }
 
     /// Get the list table.

@@ -61,6 +61,7 @@ pub mod package;
 pub mod paragraph;
 pub mod parts;
 pub mod revision;
+pub mod section;
 pub mod shapes;
 pub mod table;
 
@@ -87,6 +88,10 @@ pub use parts::tap::TableStyleCondition;
 pub use revision::{
     DisplayFieldRevisionMark, NumberingRevisionMark, RevisionKind, RevisionMark, RevisionReason,
     SectionRevisionMark,
+};
+pub use section::{
+    DocSection, PageOrientation, SectionBreakKind, SectionColumn, SectionColumnLayout,
+    SectionMargins, SectionPageLayout, VerticalMargin,
 };
 pub use shapes::DocShape;
 pub use table::{Cell, Row, Table};

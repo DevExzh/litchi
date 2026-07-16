@@ -200,6 +200,10 @@ use super::document_variable::{
     DocumentVariable, MAX_DOCUMENT_VARIABLES, MAX_DOCUMENT_VARIABLE_NAME_BYTES,
     MAX_DOCUMENT_VARIABLE_TEXT_BYTES, MAX_DOCUMENT_VARIABLE_VALUE_BYTES,
 };
+use super::user_property::{
+    MAX_USER_PROPERTIES, MAX_USER_PROPERTY_NAME_BYTES, MAX_USER_PROPERTY_TEXT_BYTES,
+    MAX_USER_PROPERTY_VALUE_BYTES, UserProperty, UserPropertyValue,
+};
 
 struct OpenBookmark {
     name: String,
@@ -291,6 +295,12 @@ pub struct Parser<'a> {
     document_variables: Vec<DocumentVariable<'a>>,
     /// Aggregate decoded document-variable text size
     document_variable_text_bytes: usize,
+    /// Ordered inert user-defined properties
+    user_properties: Vec<UserProperty<'a>>,
+    /// Aggregate decoded user-property text size
+    user_property_text_bytes: usize,
+    /// Whether the unique user-properties destination has been seen
+    saw_user_properties: bool,
     /// List table
     list_table: super::list::ListTable<'a>,
     /// List override table
@@ -360,6 +370,9 @@ impl<'a> Parser<'a> {
             objects: Vec::new(),
             document_variables: Vec::new(),
             document_variable_text_bytes: 0,
+            user_properties: Vec::new(),
+            user_property_text_bytes: 0,
+            saw_user_properties: false,
             list_table: super::list::ListTable::new(),
             list_override_table: super::list::ListOverrideTable::new(),
             sections: Vec::new(),
@@ -418,6 +431,7 @@ impl<'a> Parser<'a> {
             fields: self.fields,
             objects: self.objects,
             document_variables: self.document_variables,
+            user_properties: self.user_properties,
             list_table: self.list_table,
             list_override_table: self.list_override_table,
             sections: self.sections,
@@ -466,6 +480,11 @@ impl<'a> Parser<'a> {
                     self.states.pop();
                     return Ok(());
                 },
+                Token::Control(ControlWord::UserProperties) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF userprops destination must be starred".to_string(),
+                    ));
+                },
                 Token::Control(ControlWord::IgnorableDestination) => {
                     if matches!(
                         self.tokens.get(self.pos + 1),
@@ -498,6 +517,11 @@ impl<'a> Parser<'a> {
                         },
                         Some(Token::Control(ControlWord::DocumentVariable)) => {
                             self.parse_document_variable_destination()?;
+                            self.states.pop();
+                            return Ok(());
+                        },
+                        Some(Token::Control(ControlWord::UserProperties)) => {
+                            self.parse_user_properties_destination()?;
                             self.states.pop();
                             return Ok(());
                         },
@@ -785,8 +809,129 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
+    fn parse_user_properties_destination(&mut self) -> RtfResult<()> {
+        if self.saw_user_properties {
+            return Err(RtfError::MalformedDocument(
+                "RTF document contains multiple userprops destinations".to_string(),
+            ));
+        }
+        self.saw_user_properties = true;
+        self.pos += 2; // \* and \userprops
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    return Ok(());
+                },
+                Some(Token::OpenBrace) => self.parse_user_property()?,
+                Some(Token::Text(text)) if text.as_bytes().iter().all(u8::is_ascii_whitespace) => {
+                    self.pos += 1;
+                },
+                Some(_) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF userprops may contain only immediate propinfo groups".to_string(),
+                    ));
+                },
+                None => {
+                    return Err(RtfError::MalformedDocument(
+                        "unterminated RTF userprops destination".to_string(),
+                    ));
+                },
+            }
+        }
+    }
+
+    fn parse_user_property(&mut self) -> RtfResult<()> {
+        if self.user_properties.len() >= MAX_USER_PROPERTIES {
+            return Err(RtfError::MalformedDocument(format!(
+                "RTF document exceeds {MAX_USER_PROPERTIES} user properties"
+            )));
+        }
+        let name = self.parse_user_property_text_group(
+            ControlWord::PropertyName,
+            MAX_USER_PROPERTY_NAME_BYTES,
+        )?;
+        self.skip_user_property_whitespace();
+        let type_code = match self.tokens.get(self.pos) {
+            Some(Token::Control(ControlWord::PropertyType(Some(type_code)))) => *type_code,
+            _ => {
+                return Err(RtfError::MalformedDocument(
+                    "RTF propinfo requires an immediate proptype parameter".to_string(),
+                ));
+            },
+        };
+        self.pos += 1;
+        self.skip_user_property_whitespace();
+        let lexical = self.parse_user_property_text_group(
+            ControlWord::StaticValue,
+            MAX_USER_PROPERTY_VALUE_BYTES,
+        )?;
+        self.skip_user_property_whitespace();
+        let link_value = if matches!(
+            self.tokens.get(self.pos..self.pos + 2),
+            Some([Token::OpenBrace, Token::Control(ControlWord::LinkValue)])
+        ) {
+            Some(self.parse_user_property_text_group(
+                ControlWord::LinkValue,
+                MAX_USER_PROPERTY_VALUE_BYTES,
+            )?)
+        } else {
+            None
+        };
+        if self.user_properties.iter().any(|property| property.name == name) {
+            return Err(RtfError::MalformedDocument(format!(
+                "duplicate RTF user-property name: {name}"
+            )));
+        }
+        let property = UserProperty::new(
+            Cow::Owned(name),
+            UserPropertyValue::from_lexical(type_code, Cow::Owned(lexical))?,
+            link_value.map(Cow::Owned),
+        )?;
+        self.user_property_text_bytes = self
+            .user_property_text_bytes
+            .checked_add(property.text_bytes().ok_or_else(|| {
+                RtfError::MalformedDocument("user-property size overflow".to_string())
+            })?)
+            .ok_or_else(|| RtfError::MalformedDocument("user-property size overflow".to_string()))?;
+        if self.user_property_text_bytes > MAX_USER_PROPERTY_TEXT_BYTES {
+            return Err(RtfError::MalformedDocument(format!(
+                "RTF user-property text exceeds {MAX_USER_PROPERTY_TEXT_BYTES} bytes"
+            )));
+        }
+        self.user_properties.push(property);
+        Ok(())
+    }
+
+    fn skip_user_property_whitespace(&mut self) {
+        while matches!(
+            self.tokens.get(self.pos),
+            Some(Token::Text(text)) if text.as_bytes().iter().all(u8::is_ascii_whitespace)
+        ) {
+            self.pos += 1;
+        }
+    }
+
+    fn parse_user_property_text_group(
+        &mut self,
+        destination: ControlWord<'a>,
+        limit: usize,
+    ) -> RtfResult<String> {
+        self.expect_token(Token::OpenBrace)?;
+        self.expect_token(Token::Control(destination))?;
+        self.parse_inert_text_group_contents(limit, "user-property")
+    }
+
     fn parse_document_variable_text_group(&mut self, limit: usize) -> RtfResult<String> {
         self.expect_token(Token::OpenBrace)?;
+        self.parse_inert_text_group_contents(limit, "document-variable")
+    }
+
+    fn parse_inert_text_group_contents(
+        &mut self,
+        limit: usize,
+        kind: &str,
+    ) -> RtfResult<String> {
         let mut bytes = SmallVec::<[u8; 128]>::new();
         let mut output = String::new();
         let mut unicode_skip = self.states.last().map_or(1, |state| state.unicode_skip);
@@ -794,7 +939,7 @@ impl<'a> Parser<'a> {
         let mut pending_high_surrogate = None;
         loop {
             let token = self.tokens.get(self.pos).ok_or_else(|| {
-                RtfError::MalformedDocument("unterminated RTF document-variable text group".to_string())
+                RtfError::MalformedDocument(format!("unterminated RTF {kind} text group"))
             })?;
             match token {
                 Token::CloseBrace => {
@@ -803,12 +948,12 @@ impl<'a> Parser<'a> {
                 },
                 Token::OpenBrace => {
                     return Err(RtfError::MalformedDocument(
-                        "nested groups are not allowed in RTF document-variable text".to_string(),
+                        format!("nested groups are not allowed in RTF {kind} text"),
                     ));
                 },
                 Token::Binary(_) => {
                     return Err(RtfError::MalformedDocument(
-                        "binary data is not allowed in RTF document-variable text".to_string(),
+                        format!("binary data is not allowed in RTF {kind} text"),
                     ));
                 },
                 Token::Text(text) => {
@@ -872,14 +1017,14 @@ impl<'a> Parser<'a> {
                         self.pos += 1;
                     } else {
                         return Err(RtfError::MalformedDocument(
-                            "active controls are not allowed in RTF document-variable text".to_string(),
+                            format!("active controls are not allowed in RTF {kind} text"),
                         ));
                     }
                 },
             }
             if output.len().saturating_add(bytes.len()) > limit {
                 return Err(RtfError::MalformedDocument(format!(
-                    "RTF document-variable text group exceeds {limit} bytes"
+                    "RTF {kind} text group exceeds {limit} bytes"
                 )));
             }
         }
@@ -896,7 +1041,7 @@ impl<'a> Parser<'a> {
         }
         if output.len() > limit {
             return Err(RtfError::MalformedDocument(format!(
-                "RTF document-variable text group exceeds {limit} bytes"
+                "RTF {kind} text group exceeds {limit} bytes"
             )));
         }
         Ok(output)
@@ -4415,6 +4560,8 @@ pub struct ParsedDocument<'a> {
     pub objects: Vec<super::object::EmbeddedObject<'a>>,
     /// Ordered inert document-variable metadata
     pub document_variables: Vec<DocumentVariable<'a>>,
+    /// Ordered inert user-defined document properties
+    pub user_properties: Vec<UserProperty<'a>>,
     /// List table
     pub list_table: super::list::ListTable<'a>,
     /// List override table

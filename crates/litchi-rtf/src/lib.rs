@@ -45,6 +45,7 @@ mod shape;
 mod stylesheet;
 mod table;
 mod types;
+mod user_property;
 mod writer;
 
 // Re-exports
@@ -63,6 +64,7 @@ pub use field::{
 };
 pub use info::{DocumentInfo, DocumentProtection, ProtectionType};
 pub use lexer::CharacterSet;
+pub use user_property::{UserProperty, UserPropertyValue};
 pub use list::{
     List, ListFollow, ListJustification, ListLevel, ListLevelType, ListOverride, ListOverrideTable,
     ListTable,

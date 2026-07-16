@@ -91,6 +91,112 @@ impl<'a> Document<'a> {
         self.part.extract_text()
     }
 
+    /// Return numbered paragraphs with resolved, typed list markers.
+    ///
+    /// This is separate from [`Self::text`], whose behavior remains unchanged.
+    pub fn list_items(&self) -> Result<Vec<crate::docx::list::ListItem>> {
+        let Some(numbering) = self.numbering()? else { return Ok(Vec::new()); };
+        let paragraphs = self.paragraphs()?;
+        let mut styles = self.styles()?;
+        let mut counters = crate::docx::list::ListCounterState::new();
+        let mut items = Vec::new();
+
+        for (paragraph_index, paragraph) in paragraphs.iter().enumerate() {
+            let direct = paragraph.numbering()?;
+            let style_id = paragraph.style_id()?;
+            let inherited = if direct.is_none() {
+                match style_id.as_deref() {
+                    Some(style_id) => styles.resolved_numbering(style_id)?,
+                    None => None,
+                }
+            } else { None };
+            let associated = if direct.is_none() && inherited.is_none() {
+                style_id.as_deref().and_then(|style_id| {
+                    let mut found = None;
+                    for num in numbering.nums() {
+                        if let Some(abstract_num) = numbering.get_abstract_num(num.abstract_num_id()) {
+                            for level in abstract_num.levels() {
+                                if level.paragraph_style.as_deref() == Some(style_id)
+                                    && found.is_none()
+                                {
+                                    found = Some(crate::docx::numbering::ParagraphNumbering {
+                                        num_id: num.id(), level: level.level,
+                                    });
+                                }
+                            }
+                        }
+                    }
+                    found
+                })
+            } else { None };
+            let Some(mut properties) = direct.or(inherited).or(associated) else { continue; };
+            if properties.num_id == 0 { continue; }
+            let mut linked_num_ids = std::collections::HashSet::new();
+            loop {
+                if !linked_num_ids.insert(properties.num_id) {
+                    return Err(crate::error::OoxmlError::InvalidFormat(format!(
+                        "numbering style-link cycle at numId {}", properties.num_id
+                    )));
+                }
+                let num = numbering.get_num(properties.num_id).ok_or_else(|| {
+                    crate::error::OoxmlError::InvalidFormat(format!(
+                        "paragraph references missing numId {}", properties.num_id
+                    ))
+                })?;
+                let abstract_num = numbering.get_abstract_num(num.abstract_num_id()).ok_or_else(|| {
+                    crate::error::OoxmlError::InvalidFormat(format!(
+                        "numId {} references a missing abstract numbering definition",
+                        properties.num_id
+                    ))
+                })?;
+                let Some(style_link) = abstract_num.num_style_link() else { break; };
+                let linked = styles.resolved_numbering(style_link)?.ok_or_else(|| {
+                    crate::error::OoxmlError::InvalidFormat(format!(
+                        "numbering style link '{style_link}' has no numPr"
+                    ))
+                })?;
+                if linked.num_id == 0 { break; }
+                properties.num_id = linked.num_id;
+            }
+            let (marker, suffix) = counters.advance(&numbering, properties)?;
+            items.push(crate::docx::list::ListItem {
+                paragraph_index,
+                numbering: properties,
+                marker,
+                suffix,
+                text: paragraph.text()?,
+            });
+        }
+        Ok(items)
+    }
+
+    /// Extract paragraph text with resolvable list labels prepended.
+    ///
+    /// Picture bullets and unsupported formats remain available as typed markers
+    /// through [`Self::list_items`] and are not replaced with fabricated text here.
+    pub fn text_with_list_labels(&self) -> Result<String> {
+        let paragraphs = self.paragraphs()?;
+        let items = self.list_items()?;
+        let mut by_paragraph = items.into_iter().peekable();
+        let mut output = String::new();
+        for (index, paragraph) in paragraphs.iter().enumerate() {
+            if index != 0 { output.push('\n'); }
+            if by_paragraph.peek().is_some_and(|item| item.paragraph_index == index) {
+                let item = by_paragraph.next().expect("item checked");
+                if let crate::docx::list::ListMarker::Text(label) = item.marker {
+                    output.push_str(&label);
+                    match item.suffix {
+                        crate::docx::numbering::NumberingSuffix::Tab => output.push('\t'),
+                        crate::docx::numbering::NumberingSuffix::Space => output.push(' '),
+                        crate::docx::numbering::NumberingSuffix::Nothing => {}
+                    }
+                }
+            }
+            output.push_str(&paragraph.text()?);
+        }
+        Ok(output)
+    }
+
     /// Get the number of paragraphs in the document.
     ///
     /// # Examples

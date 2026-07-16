@@ -12,6 +12,7 @@ use crate::docx::revision::{Revision, parse_revisions};
 use crate::docx::smart_tag::SmartTag;
 use crate::docx::{ThemeColor, UnderlineStyle};
 use crate::error::{OoxmlError, Result};
+use crate::docx::numbering::ParagraphNumbering;
 /// Paragraph and Run structures for Word documents.
 use litchi_core::VerticalPosition;
 use litchi_core::XmlSlice;
@@ -46,6 +47,161 @@ fn is_fragment_word_name(
         ResolveResult::Unbound => fragment_prefix == &Some(None),
         ResolveResult::Bound(_) => false,
     }
+}
+
+impl Paragraph {
+    /// Return direct paragraph numbering properties, including `numId=0` cancellation.
+    pub fn numbering(&self) -> Result<Option<ParagraphNumbering>> {
+        Ok(self.list_properties()?.0)
+    }
+
+    /// Return the paragraph style identifier from `<w:pPr>`.
+    pub fn style_id(&self) -> Result<Option<String>> {
+        Ok(self.list_properties()?.1)
+    }
+
+    fn list_properties(&self) -> Result<(Option<ParagraphNumbering>, Option<String>)> {
+        let mut reader = NsReader::from_reader(self.xml_bytes());
+        let mut depth = 0usize;
+        let mut word_prefix: Option<Vec<u8>> = None;
+        let mut ppr_depth = None;
+        let mut numpr_depth = None;
+        let mut saw_numpr = false;
+        let mut num_id = None;
+        let mut level = None;
+        let mut style_id = None;
+
+        loop {
+            let decoder = reader.decoder();
+            let event = reader.read_event()
+                .map_err(|error| OoxmlError::Xml(error.to_string()))?.into_owned();
+            match event {
+                Event::Start(element) => {
+                    depth = depth.checked_add(1).ok_or_else(|| OoxmlError::InvalidFormat(
+                        "paragraph XML nesting is too deep".to_owned()))?;
+                    if depth == 1 && element.local_name().as_ref() == b"p" {
+                        word_prefix = Some(element_prefix(&element));
+                    }
+                    if !same_word_prefix(&element, word_prefix.as_deref()) { continue; }
+                    match element.local_name().as_ref() {
+                        b"pPr" if depth == 2 => ppr_depth = Some(depth),
+                        b"numPr" if ppr_depth.is_some_and(|value| depth == value + 1) => {
+                            if saw_numpr { return Err(OoxmlError::InvalidFormat(
+                                "paragraph has duplicate numPr".to_owned())); }
+                            saw_numpr = true;
+                            numpr_depth = Some(depth);
+                        }
+                        b"pStyle" if ppr_depth.is_some_and(|value| depth == value + 1) => {
+                            set_paragraph_property(&mut style_id,
+                                paragraph_attribute(&element, b"val", decoder)?, "pStyle")?;
+                        }
+                        b"numId" if numpr_depth.is_some_and(|value| depth == value + 1) => {
+                            let raw = paragraph_attribute(&element, b"val", decoder)?;
+                            let parsed = raw.parse::<u32>().map_err(|_| OoxmlError::InvalidFormat(
+                                format!("invalid paragraph numId '{raw}'")))?;
+                            set_paragraph_property(&mut num_id, parsed, "numId")?;
+                        }
+                        b"ilvl" if numpr_depth.is_some_and(|value| depth == value + 1) => {
+                            let raw = paragraph_attribute(&element, b"val", decoder)?;
+                            let parsed = raw.parse::<u8>().ok().filter(|value| *value <= 8)
+                                .ok_or_else(|| OoxmlError::InvalidFormat(
+                                    format!("invalid paragraph ilvl '{raw}'")))?;
+                            set_paragraph_property(&mut level, parsed, "ilvl")?;
+                        }
+                        _ => {}
+                    }
+                }
+                Event::Empty(element) => {
+                    let child_depth = depth.checked_add(1).ok_or_else(|| OoxmlError::InvalidFormat(
+                        "paragraph XML nesting is too deep".to_owned()))?;
+                    if !same_word_prefix(&element, word_prefix.as_deref()) { continue; }
+                    match element.local_name().as_ref() {
+                        b"pStyle" if ppr_depth.is_some_and(|value| child_depth == value + 1) => {
+                            set_paragraph_property(&mut style_id,
+                                paragraph_attribute(&element, b"val", decoder)?, "pStyle")?;
+                        }
+                        b"numPr" if ppr_depth.is_some_and(|value| child_depth == value + 1) => {
+                            return Err(OoxmlError::InvalidFormat(
+                                "paragraph numPr is missing numId".to_owned()));
+                        }
+                        b"numId" if numpr_depth.is_some_and(|value| child_depth == value + 1) => {
+                            let raw = paragraph_attribute(&element, b"val", decoder)?;
+                            let parsed = raw.parse::<u32>().map_err(|_| OoxmlError::InvalidFormat(
+                                format!("invalid paragraph numId '{raw}'")))?;
+                            set_paragraph_property(&mut num_id, parsed, "numId")?;
+                        }
+                        b"ilvl" if numpr_depth.is_some_and(|value| child_depth == value + 1) => {
+                            let raw = paragraph_attribute(&element, b"val", decoder)?;
+                            let parsed = raw.parse::<u8>().ok().filter(|value| *value <= 8)
+                                .ok_or_else(|| OoxmlError::InvalidFormat(
+                                    format!("invalid paragraph ilvl '{raw}'")))?;
+                            set_paragraph_property(&mut level, parsed, "ilvl")?;
+                        }
+                        _ => {}
+                    }
+                }
+                Event::End(element) => {
+                    if same_word_prefix_end(&element, word_prefix.as_deref()) {
+                        match element.local_name().as_ref() {
+                            b"numPr" if numpr_depth == Some(depth) => numpr_depth = None,
+                            b"pPr" if ppr_depth == Some(depth) => ppr_depth = None,
+                            _ => {}
+                        }
+                    }
+                    depth = depth.checked_sub(1).ok_or_else(|| OoxmlError::InvalidFormat(
+                        "invalid paragraph XML nesting".to_owned()))?;
+                }
+                Event::Eof => break,
+                _ => {}
+            }
+        }
+        let numbering = if saw_numpr {
+            Some(ParagraphNumbering { num_id: num_id.ok_or_else(|| OoxmlError::InvalidFormat(
+                "paragraph numPr is missing numId".to_owned()))?, level: level.unwrap_or(0) })
+        } else { None };
+        Ok((numbering, style_id))
+    }
+}
+
+fn element_prefix(element: &BytesStart<'_>) -> Vec<u8> {
+    let name = element.name();
+    let raw = name.as_ref();
+    raw.iter().position(|byte| *byte == b':')
+        .map_or_else(Vec::new, |index| raw[..index].to_vec())
+}
+
+fn same_word_prefix(element: &BytesStart<'_>, prefix: Option<&[u8]>) -> bool {
+    prefix.is_some_and(|prefix| element_prefix(element) == prefix)
+}
+
+fn same_word_prefix_end(element: &quick_xml::events::BytesEnd<'_>, prefix: Option<&[u8]>) -> bool {
+    let name = element.name();
+    let raw = name.as_ref();
+    let end = raw.iter().position(|byte| *byte == b':').unwrap_or(0);
+    prefix.is_some_and(|prefix| if end == 0 { prefix.is_empty() } else { &raw[..end] == prefix })
+}
+
+fn paragraph_attribute(element: &BytesStart<'_>, name: &[u8],
+    decoder: quick_xml::encoding::Decoder) -> Result<String> {
+    for attribute in element.attributes().with_checks(false) {
+        let attribute = attribute.map_err(|error| OoxmlError::Xml(error.to_string()))?;
+        if attribute.key.local_name().as_ref() == name {
+            return attribute.decoded_and_normalized_value(
+                    quick_xml::XmlVersion::Implicit1_0, decoder)
+                .map(|value| value.into_owned())
+                .map_err(|error| OoxmlError::Xml(error.to_string()));
+        }
+    }
+    Err(OoxmlError::InvalidFormat(format!("paragraph property is missing '{}'",
+        String::from_utf8_lossy(name))))
+}
+
+fn set_paragraph_property<T>(slot: &mut Option<T>, value: T, name: &str) -> Result<()> {
+    if slot.is_some() {
+        return Err(OoxmlError::InvalidFormat(format!("paragraph has duplicate {name}")));
+    }
+    *slot = Some(value);
+    Ok(())
 }
 
 pub(crate) fn extract_word_text(xml_bytes: &[u8]) -> Result<String> {
