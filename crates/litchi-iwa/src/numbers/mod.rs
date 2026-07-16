@@ -47,10 +47,11 @@ pub use creation::NumbersDocumentBuilder;
 pub use document::NumbersDocument;
 pub use editor::{
     NumbersCellCommentInfo, NumbersCellCommentReplyInfo, NumbersEditor, NumbersPivotCategoryInfo,
-    NumbersSheetImageInfo, NumbersSheetInfo, NumbersSheetMovieInfo, NumbersSheetMovieOptions,
-    NumbersSheetShapeInfo, NumbersSheetShapeKind, NumbersTableDimension, NumbersTableDimensionSize,
-    NumbersTableHeaderCount, NumbersTableHeaderSettings, NumbersTableInfo, NumbersTablePoints,
-    NumbersTableTitleSettings, NumbersTextBoxInfo, RemovedNumbersSheetImage,
+    NumbersSheetAudioInfo, NumbersSheetAudioOptions, NumbersSheetImageInfo, NumbersSheetInfo,
+    NumbersSheetMovieInfo, NumbersSheetMovieOptions, NumbersSheetShapeInfo, NumbersSheetShapeKind,
+    NumbersTableDimension, NumbersTableDimensionSize, NumbersTableHeaderCount,
+    NumbersTableHeaderSettings, NumbersTableInfo, NumbersTablePoints, NumbersTableTitleSettings,
+    NumbersTextBoxInfo, RemovedNumbersSheetAudio, RemovedNumbersSheetImage,
     RemovedNumbersSheetMovie, RemovedNumbersSheetShape, RemovedNumbersTextBox,
 };
 pub use formula::{

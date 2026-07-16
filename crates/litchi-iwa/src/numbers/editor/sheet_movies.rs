@@ -8,7 +8,7 @@ use crate::data_reference_registry::{
 };
 use crate::shapes::{DrawableGeometry, DrawablePoint, DrawableSize};
 
-mod graph;
+pub(super) mod graph;
 
 use graph::*;
 

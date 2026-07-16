@@ -309,6 +309,33 @@ numbers.save("created-with-movie.numbers")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
 
+Audio-only media controls use the same source-built sheet ownership model. The
+audio asset, playback bounds, zero-size control geometry, stand-ins, media
+style, UUIDs, and component data reference are emitted directly from typed
+objects:
+
+```rust
+use std::fs;
+use std::time::Duration;
+use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersSheetAudioOptions};
+use litchi_iwa::shapes::DrawablePoint;
+
+let audio = fs::read("interview.aiff")?;
+let mut numbers = NumbersDocumentBuilder::new().build()?;
+let sheet_id = numbers.sheets()?[0].object_id;
+numbers.add_sheet_audio(
+    sheet_id,
+    "interview.aiff",
+    &audio,
+    NumbersSheetAudioOptions::new(
+        DrawablePoint { x: 420.0, y: 180.0 },
+        Duration::from_secs(30),
+    ),
+)?;
+numbers.save("created-with-audio.numbers")?;
+# Ok::<(), litchi_iwa::Error>(())
+```
+
 ### Create Keynote presentations from scratch
 
 Scratch-created presentations can add ordinary text boxes directly to any

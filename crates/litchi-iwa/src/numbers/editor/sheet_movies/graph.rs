@@ -37,14 +37,14 @@ enum TextWrapFit {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) struct MovieObjectIds {
-    pub(super) drawable: u64,
-    title: u64,
-    caption: u64,
+pub(in crate::numbers::editor) struct MovieObjectIds {
+    pub(in crate::numbers::editor) drawable: u64,
+    pub(in crate::numbers::editor) title: u64,
+    pub(in crate::numbers::editor) caption: u64,
 }
 
 impl MovieObjectIds {
-    pub(super) fn allocate(first: u64) -> Result<Self> {
+    pub(in crate::numbers::editor) fn allocate(first: u64) -> Result<Self> {
         let identifier = |offset: u64| {
             first
                 .checked_add(offset)
@@ -57,20 +57,20 @@ impl MovieObjectIds {
         })
     }
 
-    pub(super) const fn last(self) -> u64 {
+    pub(in crate::numbers::editor) const fn last(self) -> u64 {
         self.caption
     }
 
-    pub(super) const fn all(self) -> [u64; 3] {
+    pub(in crate::numbers::editor) const fn all(self) -> [u64; 3] {
         [self.drawable, self.title, self.caption]
     }
 }
 
-pub(super) struct MovieCreationContext {
-    pub(super) archive_name: String,
-    pub(super) component_id: u64,
-    pub(super) style_id: u64,
-    pub(super) stylesheet_component_id: u64,
+pub(in crate::numbers::editor) struct MovieCreationContext {
+    pub(in crate::numbers::editor) archive_name: String,
+    pub(in crate::numbers::editor) component_id: u64,
+    pub(in crate::numbers::editor) style_id: u64,
+    pub(in crate::numbers::editor) stylesheet_component_id: u64,
 }
 
 pub(super) struct SheetMovieGraph {
@@ -111,7 +111,7 @@ pub(super) fn movie_creation_values(
     Ok((geometry, duration_seconds as f32))
 }
 
-pub(super) fn movie_creation_context(
+pub(in crate::numbers::editor) fn movie_creation_context(
     editor: &NumbersEditor,
     sheet_id: u64,
 ) -> Result<MovieCreationContext> {
@@ -551,7 +551,7 @@ pub(super) fn movie_objects(
     ])
 }
 
-pub(super) fn set_movie_geometry(
+pub(in crate::numbers::editor) fn set_movie_geometry(
     package: &mut IWorkPackage,
     archive_name: &str,
     movie_id: u64,
