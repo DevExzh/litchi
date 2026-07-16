@@ -23,6 +23,9 @@ mod worksheet;
 /// Cell value parsing and representation
 mod cell;
 
+/// BIFF8 worksheet data-validation records.
+mod data_validation;
+
 /// BIFF formula token rendering
 mod formula;
 
@@ -60,6 +63,11 @@ pub mod protection;
 pub mod writer;
 
 pub use cell::XlsCell;
+pub use data_validation::{
+    XlsDataValidationErrorStyle, XlsDataValidationFormula, XlsDataValidationImeMode,
+    XlsDataValidationKind, XlsDataValidationOperator, XlsDataValidationRange,
+    XlsDataValidationRule, XlsDataValidationSettings,
+};
 pub use error::{XlsEncryptionKind, XlsError, XlsResult};
 pub use defined_names::{
     XlsBuiltInName, XlsDefinedName, XlsDefinedNameKind, XlsNameScope,

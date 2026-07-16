@@ -49,6 +49,8 @@ pub struct MutablePresentation {
     source_package: Option<OwnedPackage>,
     /// Newly embedded package media, keyed by package path.
     media_files: BTreeMap<String, EmbeddedMedia>,
+    /// Inert slide-show settings and custom shows.
+    settings: Option<crate::odp::PresentationSettings>,
 }
 
 impl MutablePresentation {
@@ -74,6 +76,7 @@ impl MutablePresentation {
     pub fn from_presentation(presentation: Presentation) -> Result<Self> {
         let slides = presentation.slides()?;
         let metadata = presentation.metadata()?;
+        let settings = presentation.settings()?;
         let mimetype = "application/vnd.oasis.opendocument.presentation".to_string();
 
         let styles_xml = presentation.styles_xml().map(str::to_owned);
@@ -86,6 +89,7 @@ impl MutablePresentation {
             styles_xml,
             source_package,
             media_files: BTreeMap::new(),
+            settings,
         })
     }
 
@@ -106,7 +110,30 @@ impl MutablePresentation {
             styles_xml: None,
             source_package: None,
             media_files: BTreeMap::new(),
+            settings: None,
         }
+    }
+
+    /// Return the inert slide-show settings.
+    pub fn settings(&self) -> Option<&crate::odp::PresentationSettings> {
+        self.settings.as_ref()
+    }
+
+    /// Mutably access inert slide-show settings.
+    pub fn settings_mut(&mut self) -> Option<&mut crate::odp::PresentationSettings> {
+        self.settings.as_mut()
+    }
+
+    /// Set or clear validated slide-show settings without executing them.
+    pub fn set_settings(
+        &mut self,
+        settings: Option<crate::odp::PresentationSettings>,
+    ) -> Result<()> {
+        if let Some(settings) = &settings {
+            settings.validate()?;
+        }
+        self.settings = settings;
+        Ok(())
     }
 
     /// Get all slides in the presentation.
@@ -530,6 +557,10 @@ impl MutablePresentation {
 
             body.push_str("</draw:page>");
         }
+
+        body.push_str(&super::settings::write_presentation_settings(
+            self.settings.as_ref(),
+        )?);
 
         let transition_styles = super::builder::generate_transition_styles(&self.slides);
         Ok(format!(

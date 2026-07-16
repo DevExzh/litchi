@@ -228,6 +228,11 @@ impl Presentation {
         )
     }
 
+    /// Inspect inert slide-show settings and ordered custom shows.
+    pub fn settings(&self) -> Result<Option<super::PresentationSettings>> {
+        super::parse_presentation_settings(self.content.xml_content())
+    }
+
     /// Get a slide by index.
     ///
     /// Returns `Some(slide)` if a slide exists at the given index, `None` otherwise.

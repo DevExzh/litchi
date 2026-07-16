@@ -840,6 +840,9 @@ impl<W: Write> RtfWriter<W> {
 
     /// Write an annotation range-start destination.
     pub fn write_annotation_start(&mut self, annotation: &Annotation<'_>) -> io::Result<()> {
+        if !annotation.has_reference {
+            return Ok(());
+        }
         self.write_str("{\\*")?;
         self.write_control_word("atrfstart", None)?;
         self.write_str(" ")?;
@@ -855,33 +858,40 @@ impl<W: Write> RtfWriter<W> {
                 "only comment annotations use the RTF annotation destination",
             ));
         }
-        self.write_str("{\\*")?;
-        self.write_control_word("atrfend", None)?;
-        self.write_str(" ")?;
-        write!(self.writer, "{}", annotation.id)?;
-        self.write_str("}")?;
+        annotation
+            .validate()
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error))?;
+        if annotation.has_reference {
+            self.write_str("{\\*")?;
+            self.write_control_word("atrfend", None)?;
+            self.write_str(" ")?;
+            write!(self.writer, "{}", annotation.id)?;
+            self.write_str("}")?;
+        }
         self.write_annotation_value("atnid", Some(annotation.initials.as_ref()))?;
         self.write_annotation_value("atnauthor", Some(annotation.author.as_ref()))?;
         self.write_control_word("chatn", None)?;
         self.write_str("{\\*")?;
         self.write_control_word("annotation", None)?;
-        self.write_annotation_value("atnref", Some(&annotation.id.to_string()))?;
+        self.write_str(" ")?;
+        let reference = annotation.has_reference.then(|| annotation.id.to_string());
+        self.write_annotation_value("atnref", reference.as_deref())?;
         self.write_annotation_value("atndate", annotation.date.as_deref())?;
         self.write_annotation_value("atnparent", annotation.parent_id.as_deref())?;
         self.write_annotation_value("atnicn", annotation.icon.as_deref())?;
         self.write_annotation_value("atntime", annotation.time.as_deref())?;
-        self.write_text(annotation.text.as_ref())?;
+        self.write_destination_text(annotation.text.as_ref())?;
         self.write_str("}")
     }
 
     fn write_annotation_value(&mut self, control: &str, value: Option<&str>) -> io::Result<()> {
-        let Some(value) = value.filter(|value| !value.is_empty()) else {
+        let Some(value) = value else {
             return Ok(());
         };
         self.write_str("{\\*")?;
         self.write_control_word(control, None)?;
         self.write_str(" ")?;
-        self.write_text(value)?;
+        self.write_destination_text(value)?;
         self.write_str("}")
     }
 
@@ -983,6 +993,9 @@ impl<W: Write> RtfWriter<W> {
             });
         }
         for annotation in annotations {
+            annotation
+                .validate()
+                .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error))?;
             if annotation.range_end < annotation.position
                 || body
                     .get(annotation.position..annotation.range_end)

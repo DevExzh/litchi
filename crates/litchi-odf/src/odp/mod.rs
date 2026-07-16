@@ -58,6 +58,7 @@ mod media;
 mod mutable;
 mod parser;
 mod presentation;
+mod settings;
 mod slide;
 mod transition;
 
@@ -76,6 +77,10 @@ pub use legacy_animation::{LegacyAnimationKind, LegacyAnimationNode};
 pub use media::{MediaActuate, MediaParameter, MediaReference, MediaShow};
 pub use mutable::MutablePresentation;
 pub use presentation::Presentation;
+pub use settings::{
+    CustomPresentationShow, PresentationFeatureState, PresentationSettings,
+    parse_presentation_settings,
+};
 pub use slide::{
     DrawingAttribute, DrawingAttributeNamespace, DrawingShapeKind, EnhancedGeometry,
     EnhancedGeometryChild, EnhancedGeometryChildKind, Shape, Slide,

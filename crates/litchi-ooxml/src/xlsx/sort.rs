@@ -7,6 +7,8 @@
 /// Sort method for locale-sensitive ordering.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SortMethod {
+    /// No locale-specific sort method (the schema default).
+    None,
     /// Stroke order (used for some East Asian locales).
     Stroke,
     /// PinYin order.
@@ -17,6 +19,7 @@ impl SortMethod {
     /// Parse a sort method from the OOXML attribute value.
     pub fn parse(value: &str) -> Option<Self> {
         match value {
+            "none" => Some(Self::None),
             "stroke" => Some(Self::Stroke),
             "pinYin" => Some(Self::PinYin),
             _ => None,
@@ -26,6 +29,7 @@ impl SortMethod {
     /// Return the OOXML attribute value for this sort method.
     pub fn as_str(self) -> &'static str {
         match self {
+            Self::None => "none",
             Self::Stroke => "stroke",
             Self::PinYin => "pinYin",
         }

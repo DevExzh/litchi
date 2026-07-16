@@ -28,6 +28,7 @@
 //! ```
 
 pub mod cell;
+pub mod auto_filter;
 pub mod chart;
 mod comments;
 pub mod conditional_formatting;
@@ -53,6 +54,12 @@ pub mod writer;
 
 // Re-export main types for convenience
 pub use cell::Cell;
+pub use auto_filter::{
+    AutoFilterDefinition, CalendarType, ColorFilter, CustomFilter, CustomFilterOperator,
+    CustomFilters, DateGroupItem, DateTimeGrouping, DynamicFilter, DynamicFilterType,
+    FilterColumnDefinition, FilterColumnPayload, FilterIconSet, FilterItem, FilterRange,
+    FilterValues, IconFilter, SortConditionDefinition, SortStateDefinition, Top10Filter,
+};
 pub use chart::{
     ChartAnchor, ChartExternalDataPart, ChartExternalDataTarget, ChartRelationship,
     ChartRelationshipTarget, ChartUserShapesPart, ChartUserShapesRelationship,

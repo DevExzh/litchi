@@ -367,6 +367,7 @@ pub use odp::{
     LegacyAnimationKind, LegacyAnimationNode, MediaActuate, MediaParameter, MediaReference,
     MediaShow, MutablePresentation, Presentation, PresentationAction, PresentationBuilder,
     PresentationEffect, PresentationEffectDirection, PresentationEventListener,
+    PresentationFeatureState, PresentationSettings, CustomPresentationShow,
     ScriptEventListener, ShapeEventListener, SlideTransition, TransitionDirection, TransitionSound,
     TransitionSoundShow, TransitionSpeed, TransitionStyle, TransitionType,
 };

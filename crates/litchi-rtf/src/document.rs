@@ -712,6 +712,54 @@ impl<'a> RtfDocument<'a> {
         &self.annotations
     }
 
+    /// Append an inert comment annotation after validating its body range.
+    pub fn push_annotation(
+        &mut self,
+        annotation: super::annotation::Annotation<'a>,
+    ) -> RtfResult<()> {
+        annotation.validate()?;
+        let body = self.text();
+        if body.get(annotation.position..annotation.range_end).is_none() {
+            return Err(RtfError::MalformedDocument(
+                "RTF annotation range is outside body text or splits a character".to_string(),
+            ));
+        }
+        if self.annotations.len() >= super::annotation::MAX_ANNOTATIONS {
+            return Err(RtfError::MalformedDocument(
+                "RTF annotation count limit exceeded".to_string(),
+            ));
+        }
+        if annotation.has_reference
+            && self
+                .annotations
+                .iter()
+                .any(|existing| existing.has_reference && existing.id == annotation.id)
+        {
+            return Err(RtfError::MalformedDocument(
+                "duplicate RTF annotation reference".to_string(),
+            ));
+        }
+        let aggregate = annotation.text_bytes().and_then(|initial| {
+            self.annotations.iter().try_fold(initial, |size, existing| {
+                size.checked_add(existing.text_bytes()?)
+            })
+        });
+        if aggregate.is_none_or(|size| {
+            size > super::annotation::MAX_ANNOTATION_TEXT_TOTAL_BYTES
+        }) {
+            return Err(RtfError::MalformedDocument(
+                "RTF annotation aggregate text limit exceeded".to_string(),
+            ));
+        }
+        self.annotations.push(annotation);
+        Ok(())
+    }
+
+    /// Remove all comment annotations.
+    pub fn clear_annotations(&mut self) {
+        self.annotations.clear();
+    }
+
     // Helper methods to convert borrowed data to owned
     //
     // These methods are used internally during parsing to convert borrowed data
@@ -947,6 +995,7 @@ impl<'a> RtfDocument<'a> {
             .map(|annotation| super::annotation::Annotation {
                 annotation_type: annotation.annotation_type,
                 id: annotation.id,
+                has_reference: annotation.has_reference,
                 author: Cow::Owned(annotation.author.into_owned()),
                 initials: Cow::Owned(annotation.initials.into_owned()),
                 date: annotation.date.map(|value| Cow::Owned(value.into_owned())),

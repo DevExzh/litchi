@@ -16,6 +16,8 @@ use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use super::data_validation::{XlsDataValidationRule, XlsDataValidationSettings};
+
 /// XLS worksheet implementation
 #[derive(Debug, Clone)]
 pub struct XlsWorksheet {
@@ -40,6 +42,8 @@ pub struct XlsWorksheet {
     /// Sheet protection state (PROTECT/OBJECTPROTECT/SCENPROTECT/PASSWORD)
     protection: SheetProtection,
     formatting: Arc<XlsFormatting>,
+    data_validation_settings: Option<XlsDataValidationSettings>,
+    data_validations: Vec<XlsDataValidationRule>,
 }
 
 impl XlsWorksheet {
@@ -59,6 +63,8 @@ impl XlsWorksheet {
             pivot_tables: Vec::new(),
             protection: SheetProtection::default(),
             formatting: Arc::new(XlsFormatting::default()),
+            data_validation_settings: None,
+            data_validations: Vec::new(),
         }
     }
 
@@ -78,6 +84,8 @@ impl XlsWorksheet {
             pivot_tables: Vec::new(),
             protection: SheetProtection::default(),
             formatting: Arc::new(XlsFormatting::default()),
+            data_validation_settings: None,
+            data_validations: Vec::new(),
         }
     }
 
@@ -221,6 +229,24 @@ impl XlsWorksheet {
 
     pub fn formatting(&self) -> &XlsFormatting {
         &self.formatting
+    }
+
+    /// Worksheet-level BIFF8 data-validation settings, when present.
+    pub fn data_validation_settings(&self) -> Option<&XlsDataValidationSettings> {
+        self.data_validation_settings.as_ref()
+    }
+
+    /// Data-validation rules in worksheet record order.
+    pub fn data_validations(&self) -> &[XlsDataValidationRule] {
+        &self.data_validations
+    }
+
+    pub(crate) fn set_data_validation_settings(&mut self, settings: XlsDataValidationSettings) {
+        self.data_validation_settings = Some(settings);
+    }
+
+    pub(crate) fn add_data_validation(&mut self, rule: XlsDataValidationRule) {
+        self.data_validations.push(rule);
     }
 
     pub fn format_for_cell(&self, row: u32, col: u32) -> Option<&XlsExtendedFormat> {

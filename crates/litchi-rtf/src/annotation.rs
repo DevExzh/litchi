@@ -3,7 +3,13 @@
 //! This module provides support for comments, revisions, and other annotations
 //! in RTF documents.
 
+use crate::{RtfError, RtfResult};
 use std::borrow::Cow;
+
+pub(crate) const MAX_ANNOTATIONS: usize = 65_536;
+pub(crate) const MAX_ANNOTATION_METADATA_BYTES: usize = 65_536;
+pub(crate) const MAX_ANNOTATION_BODY_BYTES: usize = 4 * 1_048_576;
+pub(crate) const MAX_ANNOTATION_TEXT_TOTAL_BYTES: usize = 16 * 1_048_576;
 
 /// Annotation type
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -32,12 +38,15 @@ pub enum RevisionType {
 }
 
 /// Comment or annotation
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Annotation<'a> {
     /// Annotation type
     pub annotation_type: AnnotationType,
     /// Annotation ID
     pub id: i32,
+    /// Whether the source contained `atnref` and corresponding range identity.
+    /// LibreOffice also emits valid point comments without a reference.
+    pub has_reference: bool,
     /// Author name
     pub author: Cow<'a, str>,
     /// Author initials from the `atnid` destination.
@@ -65,6 +74,7 @@ impl<'a> Annotation<'a> {
         Self {
             annotation_type: AnnotationType::Comment,
             id,
+            has_reference: true,
             author,
             initials: Cow::Borrowed(""),
             date: None,
@@ -83,6 +93,7 @@ impl<'a> Annotation<'a> {
         Self {
             annotation_type: AnnotationType::Revision,
             id,
+            has_reference: true,
             author,
             initials: Cow::Borrowed(""),
             date: None,
@@ -92,6 +103,68 @@ impl<'a> Annotation<'a> {
             parent_id: None,
             icon: None,
             time: None,
+        }
+    }
+
+    /// Validate this inert annotation without resolving any reference.
+    pub(crate) fn validate(&self) -> RtfResult<()> {
+        if self.annotation_type != AnnotationType::Comment {
+            return Err(RtfError::MalformedDocument(
+                "only comment annotations use the RTF annotation destination".to_string(),
+            ));
+        }
+        if self.range_end < self.position {
+            return Err(RtfError::MalformedDocument(
+                "RTF annotation range end precedes its start".to_string(),
+            ));
+        }
+        if self.text.len() > MAX_ANNOTATION_BODY_BYTES {
+            return Err(RtfError::MalformedDocument(
+                "RTF annotation body exceeds the safety limit".to_string(),
+            ));
+        }
+        for (kind, value) in [
+            ("author", Some(self.author.as_ref())),
+            ("initials", Some(self.initials.as_ref())),
+            ("date", self.date.as_deref()),
+            ("parent", self.parent_id.as_deref()),
+            ("icon", self.icon.as_deref()),
+            ("time", self.time.as_deref()),
+        ] {
+            if value.is_some_and(|value| value.len() > MAX_ANNOTATION_METADATA_BYTES) {
+                return Err(RtfError::MalformedDocument(format!(
+                    "RTF annotation {kind} exceeds the safety limit"
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    pub(crate) fn text_bytes(&self) -> Option<usize> {
+        self.text
+            .len()
+            .checked_add(self.author.len())?
+            .checked_add(self.initials.len())?
+            .checked_add(self.date.as_ref().map_or(0, |value| value.len()))?
+            .checked_add(self.parent_id.as_ref().map_or(0, |value| value.len()))?
+            .checked_add(self.icon.as_ref().map_or(0, |value| value.len()))?
+            .checked_add(self.time.as_ref().map_or(0, |value| value.len()))
+    }
+
+    pub fn into_owned(self) -> Annotation<'static> {
+        Annotation {
+            annotation_type: self.annotation_type,
+            id: self.id,
+            has_reference: self.has_reference,
+            author: Cow::Owned(self.author.into_owned()),
+            initials: Cow::Owned(self.initials.into_owned()),
+            date: self.date.map(|value| Cow::Owned(value.into_owned())),
+            text: Cow::Owned(self.text.into_owned()),
+            position: self.position,
+            range_end: self.range_end,
+            parent_id: self.parent_id.map(|value| Cow::Owned(value.into_owned())),
+            icon: self.icon.map(|value| Cow::Owned(value.into_owned())),
+            time: self.time.map(|value| Cow::Owned(value.into_owned())),
         }
     }
 }

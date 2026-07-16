@@ -450,9 +450,19 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         let mut txo_collector = comments::TxoCollector::new();
         let mut pending_string_formula: Option<CellRecord> = None;
         let mut shared_formulas = HashMap::<(u16, u16), SharedFormulaTemplate>::new();
+        let mut remaining_data_validations: Option<usize> = None;
 
         for record_result in record_iter.by_ref() {
             let record = record_result?;
+
+            if matches!(remaining_data_validations, Some(1..))
+                && record.header.record_type != super::data_validation::DV_RECORD_TYPE
+            {
+                return Err(XlsError::InvalidRecord {
+                    record_type: record.header.record_type,
+                    message: "DVAL must be followed immediately by its declared DV records".to_string(),
+                });
+            }
 
             if let Some(mut formula) = pending_string_formula.take() {
                 if record.header.record_type != 0x0207 {
@@ -494,6 +504,33 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             match record.header.record_type {
                 0x0809 => { // BOF - Beginning of worksheet
                     // This marks the start of a worksheet
+                }
+                super::data_validation::DVAL_RECORD_TYPE => {
+                    if remaining_data_validations.is_some() {
+                        return Err(XlsError::InvalidRecord {
+                            record_type: super::data_validation::DVAL_RECORD_TYPE,
+                            message: "worksheet contains more than one DVAL record".to_string(),
+                        });
+                    }
+                    let settings = super::data_validation::parse_dval(&record.data)?;
+                    remaining_data_validations = Some(usize::from(settings.declared_rule_count()));
+                    worksheet.set_data_validation_settings(settings);
+                }
+                super::data_validation::DV_RECORD_TYPE => {
+                    let remaining = remaining_data_validations.as_mut().ok_or_else(|| {
+                        XlsError::InvalidRecord {
+                            record_type: super::data_validation::DV_RECORD_TYPE,
+                            message: "DV record appears without a preceding DVAL record".to_string(),
+                        }
+                    })?;
+                    if *remaining == 0 {
+                        return Err(XlsError::InvalidRecord {
+                            record_type: super::data_validation::DV_RECORD_TYPE,
+                            message: "DV record exceeds the count declared by DVAL".to_string(),
+                        });
+                    }
+                    worksheet.add_data_validation(super::data_validation::parse_dv(&record.data)?);
+                    *remaining -= 1;
                 }
                 0x000A => { // EOF - End of worksheet
                     // Flush any in-progress pivot table
@@ -726,6 +763,13 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                     // Skip other records
                 }
             }
+        }
+
+        if matches!(remaining_data_validations, Some(1..)) {
+            return Err(XlsError::InvalidRecord {
+                record_type: super::data_validation::DVAL_RECORD_TYPE,
+                message: "worksheet ended before all DV records declared by DVAL".to_string(),
+            });
         }
 
         // Resolve comment texts from TXO data collected during parsing.
@@ -1012,6 +1056,13 @@ mod tests {
         stream.extend_from_slice(data);
     }
 
+    fn dval_data(rule_count: u32) -> Vec<u8> {
+        let mut data = vec![0; 10];
+        data.extend_from_slice(&(-1i32).to_le_bytes());
+        data.extend_from_slice(&rule_count.to_le_bytes());
+        data
+    }
+
     fn string_formula_data(row: u16, col: u16) -> Vec<u8> {
         let mut data = formula_data(row, col, &[]);
         data[6] = 0;
@@ -1127,6 +1178,66 @@ mod tests {
         );
 
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn worksheet_enforces_dval_dv_ordering() {
+        let mut stream = Vec::new();
+        push_record(&mut stream, super::super::data_validation::DVAL_RECORD_TYPE, &dval_data(0));
+        push_record(&mut stream, 0x000A, &[]);
+        let mut records = RecordIter::new(Cursor::new(stream)).unwrap();
+        let worksheet = XlsWorkbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+            &mut records,
+            &XlsEncoding::Utf16Le,
+            "Sheet1",
+            Arc::new(Vec::new()),
+            None,
+            Arc::new(XlsFormatting::default()),
+        ).unwrap();
+        assert_eq!(worksheet.data_validation_settings().unwrap().declared_rule_count(), 0);
+        assert!(worksheet.data_validations().is_empty());
+
+        let mut stream = Vec::new();
+        push_record(&mut stream, super::super::data_validation::DVAL_RECORD_TYPE, &dval_data(1));
+        push_record(&mut stream, 0x000A, &[]);
+        let mut records = RecordIter::new(Cursor::new(stream)).unwrap();
+        assert!(XlsWorkbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+            &mut records,
+            &XlsEncoding::Utf16Le,
+            "Sheet1",
+            Arc::new(Vec::new()),
+            None,
+            Arc::new(XlsFormatting::default()),
+        ).is_err());
+    }
+
+    #[test]
+    fn reads_data_validation_fixtures() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let empty = XlsWorkbook::new(std::fs::File::open(
+            root.join("3rdparty/poi/test-data/spreadsheet/dvEmpty.xls"),
+        ).unwrap()).unwrap();
+        let sheet = empty.xls_worksheet(0).unwrap();
+        assert_eq!(sheet.data_validation_settings().unwrap().declared_rule_count(), 0);
+        assert!(sheet.data_validations().is_empty());
+
+        let validation = XlsWorkbook::new(std::fs::File::open(
+            root.join("3rdparty/libreoffice-core/sc/qa/unit/data/xls/validation.xls"),
+        ).unwrap()).unwrap();
+        let sheet = validation.xls_worksheet(0).unwrap();
+        assert!(!sheet.data_validations().is_empty());
+        for rule in sheet.data_validations() {
+            assert!(rule.formula1().is_some() || rule.kind() == super::super::data_validation::XlsDataValidationKind::Any);
+            assert!(!rule.ranges().is_empty());
+        }
+        assert!(sheet.data_validations().iter().flat_map(|rule| rule.ranges()).any(|range| {
+            range.first_row() <= 4 && range.last_row() >= 4
+                && range.first_column() <= 3 && range.last_column() >= 3
+        }));
+        assert!(sheet.data_validations().iter().flat_map(|rule| rule.ranges()).any(|range| {
+            range.first_row() <= 8 && range.last_row() >= 8
+                && range.first_column() <= 5 && range.last_column() >= 5
+        }));
     }
 
     #[test]

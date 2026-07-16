@@ -36,6 +36,7 @@ pub struct PresentationBuilder {
     slides: Vec<Slide>,
     metadata: Metadata,
     media_files: BTreeMap<String, EmbeddedMedia>,
+    settings: Option<crate::odp::PresentationSettings>,
 }
 
 fn encode_text_content(text: &str) -> String {
@@ -371,7 +372,25 @@ impl PresentationBuilder {
             slides: Vec::new(),
             metadata: Metadata::default(),
             media_files: BTreeMap::new(),
+            settings: None,
         }
+    }
+
+    /// Return the inert slide-show settings.
+    pub fn settings(&self) -> Option<&crate::odp::PresentationSettings> {
+        self.settings.as_ref()
+    }
+
+    /// Set or clear validated slide-show settings without executing them.
+    pub fn set_settings(
+        &mut self,
+        settings: Option<crate::odp::PresentationSettings>,
+    ) -> Result<&mut Self> {
+        if let Some(settings) = &settings {
+            settings.validate()?;
+        }
+        self.settings = settings;
+        Ok(self)
     }
 
     /// Set document metadata
@@ -971,6 +990,10 @@ impl PresentationBuilder {
 
             body.push_str("</draw:page>");
         }
+
+        body.push_str(&super::settings::write_presentation_settings(
+            self.settings.as_ref(),
+        )?);
 
         Ok(body)
     }

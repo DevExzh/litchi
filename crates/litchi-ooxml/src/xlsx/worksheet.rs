@@ -24,6 +24,7 @@ use super::conditional_formatting::{
     ConditionalFormattingRule as ParsedConditionalFormattingRule, DifferentialFormat,
     DifferentialFormatRef, ExtensionAssociation,
 };
+use super::auto_filter::{AutoFilterDefinition, parse_auto_filter};
 use super::data_validation::{
     DataValidationCollection as ParsedDataValidationCollection,
     ParsedDataValidation, parse_data_validation_collections,
@@ -233,6 +234,7 @@ pub struct Worksheet<'a> {
     page_setup: PageSetup,
     /// Auto-filter
     auto_filter: Option<AutoFilter>,
+    auto_filter_definition: Option<AutoFilterDefinition>,
     /// Sheet view settings for each workbook window.
     sheet_views: Vec<SheetView>,
     /// Manual row page breaks
@@ -266,6 +268,7 @@ impl<'a> Worksheet<'a> {
             conditional_formattings: Vec::new(),
             page_setup: PageSetup::default(),
             auto_filter: None,
+            auto_filter_definition: None,
             sheet_views: Vec::new(),
             row_breaks: Vec::new(),
             col_breaks: Vec::new(),
@@ -367,6 +370,7 @@ impl<'a> Worksheet<'a> {
             self.workbook.styles().differential_format_count(),
         )?;
         let data_validation_collections = parse_data_validation_collections(sheet_data.as_bytes())?;
+        let auto_filter_definition = parse_auto_filter(sheet_data.as_bytes())?;
         self.cells = parsed.cells;
         self.cell_styles = parsed.cell_styles;
         self.rows = parsed.rows;
@@ -384,6 +388,7 @@ impl<'a> Worksheet<'a> {
         self.row_breaks = parsed.row_breaks;
         self.col_breaks = parsed.col_breaks;
         self.auto_filter = parsed.auto_filter;
+        self.auto_filter_definition = auto_filter_definition;
         self.sheet_views = parsed.sheet_views;
         self.dimensions = parsed.dimensions;
         Ok((
@@ -1966,6 +1971,11 @@ impl<'a> Worksheet<'a> {
     /// ```
     pub fn get_auto_filter(&self) -> Option<&AutoFilter> {
         self.auto_filter.as_ref()
+    }
+
+    /// Complete immutable worksheet auto-filter definition.
+    pub fn auto_filter_definition(&self) -> Option<&AutoFilterDefinition> {
+        self.auto_filter_definition.as_ref()
     }
 
     pub fn get_print_area(&self) -> Option<&str> {

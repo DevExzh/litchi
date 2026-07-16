@@ -173,7 +173,7 @@ struct InfoTimestamp {
 const MAX_INFO_TEXT_BYTES: usize = 1_048_576;
 const MAX_BOOKMARKS: usize = 65_536;
 const MAX_BOOKMARK_NAME_BYTES: usize = 65_536;
-const MAX_ANNOTATIONS: usize = 65_536;
+const MAX_ANNOTATIONS: usize = super::annotation::MAX_ANNOTATIONS;
 const MAX_ANNOTATION_TEXT_BYTES: usize = 4 * 1_048_576;
 const MAX_SECTIONS: usize = 4_096;
 const MAX_STYLES: usize = 65_536;
@@ -342,8 +342,11 @@ pub struct Parser<'a> {
     annotation_ranges: HashMap<i32, (usize, Option<usize>)>,
     /// Author metadata immediately preceding an annotation destination.
     pending_annotation_author: String,
+    pending_annotation_author_seen: bool,
     /// Author initials immediately preceding an annotation destination.
     pending_annotation_initials: String,
+    pending_annotation_initials_seen: bool,
+    pending_annotation_mark: bool,
     /// Footnotes and endnotes
     notes: Vec<super::section::Note<'a>>,
     /// Track changes/revisions
@@ -400,7 +403,10 @@ impl<'a> Parser<'a> {
             annotations: Vec::new(),
             annotation_ranges: HashMap::new(),
             pending_annotation_author: String::new(),
+            pending_annotation_author_seen: false,
             pending_annotation_initials: String::new(),
+            pending_annotation_initials_seen: false,
+            pending_annotation_mark: false,
             notes: Vec::new(),
             revisions: Vec::new(),
             revision_authors: Vec::new(),
@@ -432,6 +438,7 @@ impl<'a> Parser<'a> {
         // Finalize any remaining table
         self.finalize_table();
         self.finalize_bookmarks()?;
+        self.finalize_annotations()?;
 
         Ok(ParsedDocument {
             font_table: self.font_table.into_inner(),
@@ -547,14 +554,26 @@ impl<'a> Parser<'a> {
                             return Ok(());
                         },
                         Some(Token::Control(ControlWord::AnnotationAuthor)) => {
+                            if self.pending_annotation_author_seen {
+                                return Err(RtfError::MalformedDocument(
+                                    "duplicate pending RTF annotation author".to_string(),
+                                ));
+                            }
                             self.pending_annotation_author =
                                 self.parse_ignorable_text_destination()?;
+                            self.pending_annotation_author_seen = true;
                             self.states.pop();
                             return Ok(());
                         },
                         Some(Token::Control(ControlWord::AnnotationInitials)) => {
+                            if self.pending_annotation_initials_seen {
+                                return Err(RtfError::MalformedDocument(
+                                    "duplicate pending RTF annotation initials".to_string(),
+                                ));
+                            }
                             self.pending_annotation_initials =
                                 self.parse_ignorable_text_destination()?;
+                            self.pending_annotation_initials_seen = true;
                             self.states.pop();
                             return Ok(());
                         },
@@ -1617,6 +1636,18 @@ impl<'a> Parser<'a> {
                             })?;
                             self.pos += 1;
                             self.append_semantic_text(text)?;
+                        },
+                        ControlWord::AnnotationMark => {
+                            if !text_buffer.is_empty() {
+                                self.flush_text_buffer(&mut text_buffer)?;
+                            }
+                            if self.pending_annotation_mark {
+                                return Err(RtfError::MalformedDocument(
+                                    "duplicate pending RTF annotation marker".to_string(),
+                                ));
+                            }
+                            self.pending_annotation_mark = true;
+                            self.pos += 1;
                         },
                         ControlWord::Revised(_)
                         | ControlWord::Deleted(_)
@@ -3277,9 +3308,11 @@ impl<'a> Parser<'a> {
 
     fn parse_annotation_range_marker(&mut self, is_start: bool) -> RtfResult<()> {
         let value = self.parse_ignorable_text_destination()?;
-        let Ok(reference) = value.trim().parse::<i32>() else {
-            return Ok(());
-        };
+        let reference = value.trim().parse::<i32>().map_err(|_| {
+            RtfError::MalformedDocument(
+                "RTF annotation range reference must be a signed integer".to_string(),
+            )
+        })?;
         if !self.annotation_ranges.contains_key(&reference)
             && self.annotation_ranges.len() >= MAX_ANNOTATIONS
         {
@@ -3288,13 +3321,25 @@ impl<'a> Parser<'a> {
             ));
         }
         if is_start {
+            if self.annotation_ranges.contains_key(&reference) {
+                return Err(RtfError::MalformedDocument(
+                    "duplicate RTF annotation range start".to_string(),
+                ));
+            }
             self.annotation_ranges
                 .insert(reference, (self.body_text_len, None));
         } else {
-            self.annotation_ranges
-                .entry(reference)
-                .and_modify(|range| range.1 = Some(self.body_text_len))
-                .or_insert((self.body_text_len, Some(self.body_text_len)));
+            let range = self.annotation_ranges.get_mut(&reference).ok_or_else(|| {
+                RtfError::MalformedDocument(
+                    "RTF annotation range end has no matching start".to_string(),
+                )
+            })?;
+            if range.1.is_some() {
+                return Err(RtfError::MalformedDocument(
+                    "duplicate RTF annotation range end".to_string(),
+                ));
+            }
+            range.1 = Some(self.body_text_len);
         }
         Ok(())
     }
@@ -3305,6 +3350,12 @@ impl<'a> Parser<'a> {
                 "RTF annotation count exceeds the safety limit".to_string(),
             ));
         }
+        if !self.pending_annotation_mark {
+            return Err(RtfError::MalformedDocument(
+                "RTF annotation destination requires a preceding chatn marker".to_string(),
+            ));
+        }
+        self.pending_annotation_mark = false;
         self.pos += 2; // ignorable marker and annotation destination
         let mut reference = None;
         let mut date = None;
@@ -3313,7 +3364,6 @@ impl<'a> Parser<'a> {
         let mut time = None;
         let mut text = String::new();
         let mut depth = 1usize;
-        let mut unicode_skip = self.current_state()?.unicode_skip.max(0) as usize;
         let mut fallback_skip = 0usize;
         while self.pos < self.tokens.len() && depth > 0 {
             match self.tokens.get(self.pos) {
@@ -3328,20 +3378,57 @@ impl<'a> Parser<'a> {
                         };
                     match nested {
                         Some(ControlWord::AnnotationReference) => {
+                            if reference.is_some() {
+                                return Err(RtfError::MalformedDocument(
+                                    "duplicate RTF annotation reference".to_string(),
+                                ));
+                            }
                             let value = self.parse_nested_annotation_value()?;
-                            reference = value.trim().parse::<i32>().ok();
+                            reference = Some(value.trim().parse::<i32>().map_err(|_| {
+                                RtfError::MalformedDocument(
+                                    "RTF annotation reference must be a signed integer".to_string(),
+                                )
+                            })?);
                         },
                         Some(ControlWord::AnnotationDate) => {
+                            if date.is_some() {
+                                return Err(RtfError::MalformedDocument(
+                                    "duplicate RTF annotation date".to_string(),
+                                ));
+                            }
                             date = Some(self.parse_nested_annotation_value()?);
                         },
                         Some(ControlWord::AnnotationParent) => {
+                            if parent_id.is_some() {
+                                return Err(RtfError::MalformedDocument(
+                                    "duplicate RTF annotation parent".to_string(),
+                                ));
+                            }
                             parent_id = Some(self.parse_nested_annotation_value()?);
                         },
                         Some(ControlWord::AnnotationIcon) => {
+                            if icon.is_some() {
+                                return Err(RtfError::MalformedDocument(
+                                    "duplicate RTF annotation icon".to_string(),
+                                ));
+                            }
                             icon = Some(self.parse_nested_annotation_value()?);
                         },
                         Some(ControlWord::AnnotationTime) => {
+                            if time.is_some() {
+                                return Err(RtfError::MalformedDocument(
+                                    "duplicate RTF annotation time".to_string(),
+                                ));
+                            }
                             time = Some(self.parse_nested_annotation_value()?);
+                        },
+                        Some(control) if Self::forbidden_annotation_control(&control) => {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF annotation body cannot contain active data".to_string(),
+                            ));
+                        },
+                        Some(_) => {
+                            self.skip_group()?;
                         },
                         _ => {
                             depth += 1;
@@ -3358,28 +3445,31 @@ impl<'a> Parser<'a> {
                     text.push_str(&self.decode_transport_text(&remainder)?);
                 },
                 Some(Token::Control(ControlWord::Unicode(_))) => {
-                    let mut utf16 = SmallVec::<[u16; 4]>::new();
-                    while let Some(Token::Control(ControlWord::Unicode(code))) =
-                        self.tokens.get(self.pos)
-                    {
-                        utf16.push(*code as u16);
-                        self.pos += 1;
-                    }
-                    text.push_str(&String::from_utf16(&utf16).map_err(|error| {
-                        RtfError::InvalidUnicode(format!(
-                            "invalid Unicode annotation text: {error}"
-                        ))
-                    })?);
-                    fallback_skip = unicode_skip.saturating_mul(utf16.len());
+                    let code = match self.tokens.get(self.pos) {
+                        Some(Token::Control(ControlWord::Unicode(code))) => *code,
+                        _ => unreachable!(),
+                    };
+                    text.push_str(&self.parse_navigation_unicode_sequence(code)?);
+                    fallback_skip = 0;
                     continue;
                 },
                 Some(Token::Control(ControlWord::UnicodeSkip(count))) => {
-                    unicode_skip = (*count).max(0) as usize;
+                    self.current_state_mut()?.unicode_skip = (*count).max(0);
                 },
                 Some(Token::Control(ControlWord::Par | ControlWord::Line)) => text.push('\n'),
                 Some(Token::Control(ControlWord::Tab)) => text.push('\t'),
                 Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
                     text.push_str(control_symbol_text(control).unwrap_or_default());
+                },
+                Some(Token::Control(control)) if Self::forbidden_annotation_control(control) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF annotation body cannot contain active data".to_string(),
+                    ));
+                },
+                Some(Token::Binary(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF annotation body cannot contain binary data".to_string(),
+                    ));
                 },
                 _ => {},
             }
@@ -3394,15 +3484,36 @@ impl<'a> Parser<'a> {
             return Err(RtfError::UnexpectedEof);
         }
 
+        let has_reference = reference.is_some();
         let id = reference.unwrap_or(0);
-        let (position, range_end) = self
-            .annotation_ranges
-            .get(&id)
-            .map(|(start, end)| (*start, end.unwrap_or(*start)))
-            .unwrap_or((self.body_text_len, self.body_text_len));
-        self.annotations.push(super::annotation::Annotation {
+        if has_reference
+            && self
+                .annotations
+                .iter()
+                .any(|annotation| annotation.has_reference && annotation.id == id)
+        {
+            return Err(RtfError::MalformedDocument(
+                "duplicate RTF annotation reference".to_string(),
+            ));
+        }
+        let (position, range_end) = match self.annotation_ranges.remove(&id) {
+            Some((start, Some(end))) if start <= end => (start, end),
+            Some((_start, None)) => {
+                return Err(RtfError::MalformedDocument(
+                    "RTF annotation range has no matching end".to_string(),
+                ));
+            },
+            Some(_) => {
+                return Err(RtfError::MalformedDocument(
+                    "RTF annotation range end precedes its start".to_string(),
+                ));
+            },
+            None => (self.body_text_len, self.body_text_len),
+        };
+        let annotation = super::annotation::Annotation {
             annotation_type: super::annotation::AnnotationType::Comment,
             id,
+            has_reference,
             author: Cow::Owned(std::mem::take(&mut self.pending_annotation_author)),
             initials: Cow::Owned(std::mem::take(&mut self.pending_annotation_initials)),
             date: date.map(Cow::Owned),
@@ -3412,7 +3523,11 @@ impl<'a> Parser<'a> {
             parent_id: parent_id.map(Cow::Owned),
             icon: icon.map(Cow::Owned),
             time: time.map(Cow::Owned),
-        });
+        };
+        self.pending_annotation_author_seen = false;
+        self.pending_annotation_initials_seen = false;
+        annotation.validate()?;
+        self.annotations.push(annotation);
         Ok(())
     }
 
@@ -3422,13 +3537,29 @@ impl<'a> Parser<'a> {
         let mut depth = 1usize;
         while self.pos < self.tokens.len() && depth > 0 {
             match self.tokens.get(self.pos) {
-                Some(Token::OpenBrace) => depth += 1,
+                Some(Token::OpenBrace) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF annotation metadata cannot contain nested groups".to_string(),
+                    ));
+                },
                 Some(Token::CloseBrace) => depth -= 1,
                 Some(Token::Text(text)) => value.push_str(&self.decode_transport_text(text)?),
+                Some(Token::Control(ControlWord::Unicode(code))) => {
+                    value.push_str(&self.parse_navigation_unicode_sequence(*code)?);
+                    continue;
+                },
+                Some(Token::Control(ControlWord::UnicodeSkip(count))) => {
+                    self.current_state_mut()?.unicode_skip = (*count).max(0);
+                },
                 Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
                     value.push_str(control_symbol_text(control).unwrap_or_default());
                 },
-                _ => {},
+                Some(Token::Binary(_)) | Some(Token::Control(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF annotation metadata contains active or invalid controls".to_string(),
+                    ));
+                },
+                None => break,
             }
             self.pos += 1;
             if value.len() > MAX_BOOKMARK_NAME_BYTES {
@@ -3441,6 +3572,42 @@ impl<'a> Parser<'a> {
             return Err(RtfError::UnexpectedEof);
         }
         Ok(value.trim_end_matches(['\r', '\n']).to_string())
+    }
+
+    fn forbidden_annotation_control(control: &ControlWord<'_>) -> bool {
+        matches!(
+            control,
+            ControlWord::Field
+                | ControlWord::FieldInstruction
+                | ControlWord::FieldResult
+                | ControlWord::Object
+                | ControlWord::Result
+                | ControlWord::Picture
+                | ControlWord::Shape
+                | ControlWord::ShapeGroup
+                | ControlWord::DocumentVariable
+                | ControlWord::UserProperties
+                | ControlWord::Annotation
+                | ControlWord::Footnote
+                | ControlWord::Endnote
+        )
+    }
+
+    fn finalize_annotations(&self) -> RtfResult<()> {
+        if !self.annotation_ranges.is_empty() {
+            return Err(RtfError::MalformedDocument(
+                "RTF document contains an orphan annotation range".to_string(),
+            ));
+        }
+        if self.pending_annotation_author_seen
+            || self.pending_annotation_initials_seen
+            || self.pending_annotation_mark
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF document contains orphan annotation metadata".to_string(),
+            ));
+        }
+        Ok(())
     }
 
     fn parse_info_text(&mut self, field: InfoTextField) -> RtfResult<()> {
