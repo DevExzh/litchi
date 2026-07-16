@@ -12,6 +12,10 @@ use super::text::extractor::{decode_text_bytes, from_utf16le_lossy};
 /// Based on Apache POI's TextPropCollection and CharacterPropertyBags.
 #[derive(Debug, Clone, Default)]
 pub struct TextRunFormatting {
+    /// Original `CFMasks` value.
+    pub property_mask: u32,
+    /// Raw `CFStyle` value, when present.
+    pub font_style_raw: Option<u16>,
     /// Font size in points
     pub font_size: Option<u16>,
     /// Font color (RGB)
@@ -22,14 +26,32 @@ pub struct TextRunFormatting {
     pub font_scheme_color: Option<u8>,
     /// Bold formatting
     pub bold: bool,
+    /// Explicit bold value, or `None` when inherited.
+    pub bold_explicit: Option<bool>,
     /// Italic formatting
     pub italic: bool,
+    /// Explicit italic value, or `None` when inherited.
+    pub italic_explicit: Option<bool>,
     /// Underline formatting
     pub underline: bool,
+    /// Explicit underline value, or `None` when inherited.
+    pub underline_explicit: Option<bool>,
     /// Shadow formatting
     pub shadow: bool,
+    /// Explicit shadow value, or `None` when inherited.
+    pub shadow_explicit: Option<bool>,
+    /// Whether the run originated from double-byte input, when specified.
+    pub fe_hint: Option<bool>,
+    /// Whether Kumimoji formatting is active, when specified.
+    pub kumi: Option<bool>,
+    /// De facto legacy strikethrough value from the MS-PPT `unused3` bit.
+    pub legacy_strikethrough: Option<bool>,
     /// Embossed/relief formatting
     pub embossed: bool,
+    /// Explicit emboss value, or `None` when inherited.
+    pub embossed_explicit: Option<bool>,
+    /// PowerPoint 9 additional-property run grouping identifier.
+    pub pp9_run_id: Option<u8>,
     /// Baseline position as a percentage of line height
     pub baseline_position: Option<i16>,
     /// Font name
@@ -588,6 +610,7 @@ fn formatting_from_style(
         })
         .transpose()?;
     let mut formatting = TextRunFormatting {
+        property_mask: style.property_mask,
         font_size,
         font_color,
         font_color_raw,
@@ -601,12 +624,27 @@ fn formatting_from_style(
     };
 
     if let Some(flags) = style.get_value("char.flags") {
-        let (bold, italic, underline) = super::text_prop::extract_char_flags(flags);
+        let flags = flags as u16;
+        formatting.font_style_raw = Some(flags);
+        let (bold, italic, underline) = super::text_prop::extract_char_flags(i32::from(flags));
         formatting.bold = bold;
         formatting.italic = italic;
         formatting.underline = underline;
         formatting.shadow = flags & 0x0010 != 0;
         formatting.embossed = flags & 0x0200 != 0;
+        let explicit =
+            |mask: u32, bit: u16| (style.property_mask & mask != 0).then_some(flags & bit != 0);
+        formatting.bold_explicit = explicit(0x0001, 0x0001);
+        formatting.italic_explicit = explicit(0x0002, 0x0002);
+        formatting.underline_explicit = explicit(0x0004, 0x0004);
+        formatting.shadow_explicit = explicit(0x0010, 0x0010);
+        formatting.fe_hint = explicit(0x0020, 0x0020);
+        formatting.kumi = explicit(0x0080, 0x0080);
+        formatting.legacy_strikethrough = explicit(0x0100, 0x0100);
+        formatting.embossed_explicit = explicit(0x0200, 0x0200);
+        if style.property_mask & 0x3C00 != 0 {
+            formatting.pp9_run_id = Some(((flags >> 10) & 0x0F) as u8);
+        }
     }
     Ok(formatting)
 }

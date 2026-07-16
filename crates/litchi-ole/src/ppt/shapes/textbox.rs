@@ -439,6 +439,7 @@ impl<'a> TextBox<'a> {
         self.bold = bold;
         for run in &mut self.runs {
             run.formatting.bold = bold;
+            run.formatting.bold_explicit = Some(bold);
         }
     }
 
@@ -452,6 +453,7 @@ impl<'a> TextBox<'a> {
         self.italic = italic;
         for run in &mut self.runs {
             run.formatting.italic = italic;
+            run.formatting.italic_explicit = Some(italic);
         }
     }
 
@@ -465,6 +467,7 @@ impl<'a> TextBox<'a> {
         self.underline = underline;
         for run in &mut self.runs {
             run.formatting.underline = underline;
+            run.formatting.underline_explicit = Some(underline);
         }
     }
 
@@ -556,16 +559,12 @@ impl<'a> TextBox<'a> {
             }),
             font_scheme_color: None,
             bold: self.bold,
+            bold_explicit: Some(self.bold),
             italic: self.italic,
+            italic_explicit: Some(self.italic),
             underline: self.underline,
-            shadow: false,
-            embossed: false,
-            baseline_position: None,
-            font_name: None,
-            font_index: None,
-            asian_font_index: None,
-            ansi_font_index: None,
-            symbol_font_index: None,
+            underline_explicit: Some(self.underline),
+            ..TextRunFormatting::default()
         }
     }
 }

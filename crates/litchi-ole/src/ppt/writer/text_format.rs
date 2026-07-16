@@ -67,8 +67,16 @@ pub mod char_mask {
     pub const UNDERLINE: u32 = 0x0004;
     /// Shadow
     pub const SHADOW: u32 = 0x0010;
+    /// Double-byte input hint
+    pub const FE_HINT: u32 = 0x0020;
+    /// Kumimoji formatting
+    pub const KUMI: u32 = 0x0080;
+    /// De facto legacy strikethrough bit (`unused3` in MS-PPT)
+    pub const LEGACY_STRIKETHROUGH: u32 = 0x0100;
     /// Emboss
     pub const EMBOSS: u32 = 0x0200;
+    /// PowerPoint 9 additional-property run grouping bits
+    pub const PP9_RUN_ID: u32 = 0x3C00;
     /// Font reference present
     pub const FONT_REF: u32 = 0x0001_0000;
     /// Font size present
@@ -178,8 +186,16 @@ pub struct FontStyle {
     pub shadow: bool,
     /// Embossed effect
     pub emboss: bool,
-    /// Strikethrough
+    /// Double-byte input hint
+    pub fe_hint: bool,
+    /// Kumimoji formatting for vertical text
+    pub kumi: bool,
+    /// De facto legacy strikethrough (`unused3` in MS-PPT)
     pub strikethrough: bool,
+    /// PowerPoint 9 additional-property run grouping identifier
+    pub pp9_run_id: Option<u8>,
+    /// Validity bits to emit even when their corresponding value is false
+    pub specified_mask: u16,
 }
 
 impl FontStyle {
@@ -191,7 +207,11 @@ impl FontStyle {
             underline: false,
             shadow: false,
             emboss: false,
+            fe_hint: false,
+            kumi: false,
             strikethrough: false,
+            pp9_run_id: None,
+            specified_mask: char_mask::BOLD as u16,
         }
     }
 
@@ -203,7 +223,11 @@ impl FontStyle {
             underline: false,
             shadow: false,
             emboss: false,
+            fe_hint: false,
+            kumi: false,
             strikethrough: false,
+            pp9_run_id: None,
+            specified_mask: char_mask::ITALIC as u16,
         }
     }
 
@@ -215,13 +239,17 @@ impl FontStyle {
             underline: false,
             shadow: false,
             emboss: false,
+            fe_hint: false,
+            kumi: false,
             strikethrough: false,
+            pp9_run_id: None,
+            specified_mask: (char_mask::BOLD | char_mask::ITALIC) as u16,
         }
     }
 
     /// Convert to mask value for TextCFException
     pub fn to_mask(&self) -> u32 {
-        let mut mask = 0u32;
+        let mut mask = u32::from(self.specified_mask);
         if self.bold {
             mask |= char_mask::BOLD;
         }
@@ -234,8 +262,20 @@ impl FontStyle {
         if self.shadow {
             mask |= char_mask::SHADOW;
         }
+        if self.fe_hint {
+            mask |= char_mask::FE_HINT;
+        }
+        if self.kumi {
+            mask |= char_mask::KUMI;
+        }
+        if self.strikethrough {
+            mask |= char_mask::LEGACY_STRIKETHROUGH;
+        }
         if self.emboss {
             mask |= char_mask::EMBOSS;
+        }
+        if self.pp9_run_id.is_some() {
+            mask |= char_mask::PP9_RUN_ID;
         }
         mask
     }
@@ -255,9 +295,19 @@ impl FontStyle {
         if self.shadow {
             flags |= 0x0010;
         }
+        if self.fe_hint {
+            flags |= 0x0020;
+        }
+        if self.kumi {
+            flags |= 0x0080;
+        }
+        if self.strikethrough {
+            flags |= 0x0100;
+        }
         if self.emboss {
             flags |= 0x0200;
         }
+        flags |= u16::from(self.pp9_run_id.unwrap_or(0) & 0x0F) << 10;
         flags
     }
 }
@@ -382,30 +432,97 @@ impl TextRun {
     /// Set bold
     pub fn bold(mut self) -> Self {
         self.style.bold = true;
+        self.style.specified_mask |= char_mask::BOLD as u16;
+        self
+    }
+
+    /// Explicitly set bold formatting, including false.
+    pub fn bold_value(mut self, enabled: bool) -> Self {
+        self.style.bold = enabled;
+        self.style.specified_mask |= char_mask::BOLD as u16;
         self
     }
 
     /// Set italic
     pub fn italic(mut self) -> Self {
         self.style.italic = true;
+        self.style.specified_mask |= char_mask::ITALIC as u16;
+        self
+    }
+
+    /// Explicitly set italic formatting, including false.
+    pub fn italic_value(mut self, enabled: bool) -> Self {
+        self.style.italic = enabled;
+        self.style.specified_mask |= char_mask::ITALIC as u16;
         self
     }
 
     /// Set underline
     pub fn underline(mut self) -> Self {
         self.style.underline = true;
+        self.style.specified_mask |= char_mask::UNDERLINE as u16;
+        self
+    }
+
+    /// Explicitly set underline formatting, including false.
+    pub fn underline_value(mut self, enabled: bool) -> Self {
+        self.style.underline = enabled;
+        self.style.specified_mask |= char_mask::UNDERLINE as u16;
         self
     }
 
     /// Set shadow formatting.
     pub fn shadow(mut self) -> Self {
         self.style.shadow = true;
+        self.style.specified_mask |= char_mask::SHADOW as u16;
+        self
+    }
+
+    /// Explicitly set shadow formatting, including false.
+    pub fn shadow_value(mut self, enabled: bool) -> Self {
+        self.style.shadow = enabled;
+        self.style.specified_mask |= char_mask::SHADOW as u16;
         self
     }
 
     /// Set embossed/relief formatting.
     pub fn embossed(mut self) -> Self {
         self.style.emboss = true;
+        self.style.specified_mask |= char_mask::EMBOSS as u16;
+        self
+    }
+
+    /// Explicitly set embossed formatting, including false.
+    pub fn embossed_value(mut self, enabled: bool) -> Self {
+        self.style.emboss = enabled;
+        self.style.specified_mask |= char_mask::EMBOSS as u16;
+        self
+    }
+
+    /// Mark the run as originating from double-byte input.
+    pub fn fe_hint(mut self, enabled: bool) -> Self {
+        self.style.fe_hint = enabled;
+        self.style.specified_mask |= char_mask::FE_HINT as u16;
+        self
+    }
+
+    /// Set Kumimoji formatting for vertical text.
+    pub fn kumi(mut self, enabled: bool) -> Self {
+        self.style.kumi = enabled;
+        self.style.specified_mask |= char_mask::KUMI as u16;
+        self
+    }
+
+    /// Set the de facto legacy strikethrough bit used by PowerPoint and POI.
+    pub fn strikethrough(mut self, enabled: bool) -> Self {
+        self.style.strikethrough = enabled;
+        self.style.specified_mask |= char_mask::LEGACY_STRIKETHROUGH as u16;
+        self
+    }
+
+    /// Set the PowerPoint 9 additional-property run grouping identifier.
+    pub fn pp9_run_id(mut self, id: u8) -> Self {
+        self.style.pp9_run_id = Some(id);
         self
     }
 
@@ -1108,6 +1225,18 @@ impl TextPropsBuilder {
                         "PPT baseline position must be between -100 and 100 percent",
                     ));
                 }
+                if run.style.pp9_run_id.is_some_and(|id| id > 0x0F) {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "PPT pp9 run grouping identifier must be between 0 and 15",
+                    ));
+                }
+                if run.style.specified_mask & !0x3FB7 != 0 {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "PPT character style specified mask contains reserved bits",
+                    ));
+                }
                 let is_last_run = run_idx == num_runs - 1;
 
                 // Character count for this run
@@ -1352,6 +1481,71 @@ mod tests {
         let mut invalid_bullet_scheme = TextPropsBuilder::new();
         invalid_bullet_scheme.add_paragraph(Paragraph::new("x").bullet_color_scheme(8));
         assert!(invalid_bullet_scheme.build_style_text_prop().is_err());
+
+        let mut invalid_pp9_run = TextPropsBuilder::new();
+        invalid_pp9_run.add_paragraph(Paragraph::with_runs(vec![TextRun::new("x").pp9_run_id(16)]));
+        assert!(invalid_pp9_run.build_style_text_prop().is_err());
+
+        let mut reserved_style = TextRun::new("x");
+        reserved_style.style.specified_mask = 0x0008;
+        let mut invalid_reserved_style = TextPropsBuilder::new();
+        invalid_reserved_style.add_paragraph(Paragraph::with_runs(vec![reserved_style]));
+        assert!(invalid_reserved_style.build_style_text_prop().is_err());
+    }
+
+    #[test]
+    fn character_flags_preserve_values_and_presence() {
+        let run = TextRun::new("x")
+            .bold_value(false)
+            .italic()
+            .underline_value(false)
+            .shadow()
+            .fe_hint(true)
+            .kumi(false)
+            .strikethrough(true)
+            .embossed_value(false)
+            .pp9_run_id(13);
+        let mut builder = TextPropsBuilder::new();
+        builder.add_paragraph(Paragraph::with_runs(vec![run]));
+        let style = builder.build_style_text_prop().unwrap();
+        let (_, character_styles) =
+            crate::ppt::text_prop::parse_style_text_prop_atom_strict(&style, 1).unwrap();
+        assert_eq!(character_styles[0].property_mask & 0xFFFF, 0x3FB7);
+        assert_eq!(character_styles[0].get_value("char.flags"), Some(0x3532));
+
+        let text_record = crate::ppt::PptRecord {
+            record_type: crate::consts::PptRecordType::TextBytesAtom,
+            record_type_raw: 4008,
+            version: 0,
+            instance: 0,
+            data_length: 1,
+            data: b"x".to_vec(),
+            children: Vec::new(),
+        };
+        let style_record = crate::ppt::PptRecord {
+            record_type: crate::consts::PptRecordType::StyleTextPropAtom,
+            record_type_raw: 4001,
+            version: 0,
+            instance: 0,
+            data_length: style.len() as u32,
+            data: style,
+            children: Vec::new(),
+        };
+        let mut extractor = crate::ppt::TextRunExtractor::new();
+        extractor
+            .extract_from_records(&[text_record, style_record])
+            .unwrap();
+        let formatting = &extractor.runs()[0].formatting;
+        assert_eq!(formatting.font_style_raw, Some(0x3532));
+        assert_eq!(formatting.bold_explicit, Some(false));
+        assert_eq!(formatting.italic_explicit, Some(true));
+        assert_eq!(formatting.underline_explicit, Some(false));
+        assert_eq!(formatting.shadow_explicit, Some(true));
+        assert_eq!(formatting.fe_hint, Some(true));
+        assert_eq!(formatting.kumi, Some(false));
+        assert_eq!(formatting.legacy_strikethrough, Some(true));
+        assert_eq!(formatting.embossed_explicit, Some(false));
+        assert_eq!(formatting.pp9_run_id, Some(13));
     }
 
     #[test]
