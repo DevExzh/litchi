@@ -36,6 +36,7 @@ pub mod data_validation;
 mod drawing;
 pub mod external_links;
 pub mod format;
+pub mod header_footer;
 mod namespace;
 pub mod named_sheet_view;
 pub mod parsers;
@@ -89,6 +90,10 @@ pub use data_validation::{
 pub use format::{
     CellBorder, CellBorderLineStyle, CellBorderSide, CellFill, CellFillPatternType, CellFont,
     CellFormat, DataValidation, DataValidationOperator, DataValidationType,
+};
+pub use header_footer::{
+    HeaderFooterSectionKind, HeaderFooterText, WorksheetHeaderFooter,
+    parse_worksheet_header_footer,
 };
 pub use shared_strings::SharedStrings;
 pub use sheet_protection::{

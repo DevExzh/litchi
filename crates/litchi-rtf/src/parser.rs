@@ -297,6 +297,10 @@ pub struct Parser<'a> {
     form_fields: Vec<super::form_field::FormField<'a>>,
     form_field_text_bytes: usize,
     generator: Option<crate::DocumentGenerator<'a>>,
+    revision_save_ids: Vec<u32>,
+    saw_revision_save_table: bool,
+    revision_save_root: Option<u32>,
+    saw_revision_save_root: bool,
     /// Embedded and linked objects
     objects: Vec<super::object::EmbeddedObject<'a>>,
     /// Ordered inert document variables
@@ -409,6 +413,10 @@ impl<'a> Parser<'a> {
             form_fields: Vec::new(),
             form_field_text_bytes: 0,
             generator: None,
+            revision_save_ids: Vec::new(),
+            saw_revision_save_table: false,
+            revision_save_root: None,
+            saw_revision_save_root: false,
             objects: Vec::new(),
             document_variables: Vec::new(),
             document_variable_text_bytes: 0,
@@ -473,6 +481,15 @@ impl<'a> Parser<'a> {
         self.finalize_bookmarks()?;
         self.finalize_annotations()?;
 
+        let revision_save = if self.saw_revision_save_table || self.saw_revision_save_root {
+            Some(crate::RevisionSaveMetadata::new(
+                self.revision_save_ids,
+                self.revision_save_root,
+            )?)
+        } else {
+            None
+        };
+
         Ok(ParsedDocument {
             font_table: self.font_table.into_inner(),
             color_table: self.color_table.into_inner(),
@@ -482,6 +499,7 @@ impl<'a> Parser<'a> {
             fields: self.fields,
             form_fields: self.form_fields,
             generator: self.generator,
+            revision_save,
             objects: self.objects,
             document_variables: self.document_variables,
             user_properties: self.user_properties,
@@ -634,6 +652,12 @@ impl<'a> Parser<'a> {
                             self.states.pop();
                             return Ok(());
                         },
+                        Some(Token::Control(ControlWord::RevisionSaveTable)) => {
+                            self.pos += 1;
+                            self.parse_revision_save_table()?;
+                            self.states.pop();
+                            return Ok(());
+                        },
                         Some(Token::Control(ControlWord::DocumentVariable)) => {
                             self.parse_document_variable_destination()?;
                             self.states.pop();
@@ -734,6 +758,11 @@ impl<'a> Parser<'a> {
                 Token::Control(ControlWord::Generator) => {
                     return Err(RtfError::MalformedDocument(
                         "RTF generator destination must be starred".to_string(),
+                    ));
+                },
+                Token::Control(ControlWord::RevisionSaveTable) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF revision-save table must be starred".to_string(),
                     ));
                 },
                 Token::Control(ControlWord::Info) => {
@@ -1952,6 +1981,34 @@ impl<'a> Parser<'a> {
 
     /// Apply a control word to the current state.
     fn apply_control_word(&mut self, control: &ControlWord) -> RtfResult<()> {
+        match control {
+            ControlWord::RevisionSaveRoot(value) => {
+                if self.states.len() != 2 || self.saw_revision_save_root {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF rsidroot must occur exactly once at document scope".to_string(),
+                    ));
+                }
+                let value = u32::try_from(*value).map_err(|_| {
+                    RtfError::MalformedDocument(
+                        "RTF revision root must be a positive signed integer".to_string(),
+                    )
+                })?;
+                if value == 0 {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF revision root must be a positive signed integer".to_string(),
+                    ));
+                }
+                self.saw_revision_save_root = true;
+                self.revision_save_root = Some(value);
+                return Ok(());
+            },
+            ControlWord::RevisionSaveId(_) => {
+                return Err(RtfError::MalformedDocument(
+                    "orphan RTF rsid control outside rsidtbl".to_string(),
+                ));
+            },
+            _ => {},
+        }
         if self.apply_section_control(control)? {
             return Ok(());
         }
@@ -2387,6 +2444,63 @@ impl<'a> Parser<'a> {
                 ));
             }
             self.push_direct_revision_authors(&mut direct_text)?;
+        }
+        Err(RtfError::UnexpectedEof)
+    }
+
+    fn parse_revision_save_table(&mut self) -> RtfResult<()> {
+        if self.saw_revision_save_table {
+            return Err(RtfError::MalformedDocument(
+                "RTF contains multiple revision-save tables".to_string(),
+            ));
+        }
+        self.saw_revision_save_table = true;
+        self.pos += 1; // rsidtbl
+        while self.pos < self.tokens.len() {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    return Ok(());
+                },
+                Some(Token::Control(ControlWord::RevisionSaveId(value))) => {
+                    let value = u32::try_from(*value).map_err(|_| {
+                        RtfError::MalformedDocument(
+                            "RTF revision-save IDs must be positive signed integers".to_string(),
+                        )
+                    })?;
+                    if value == 0 {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF revision-save IDs must be positive signed integers".to_string(),
+                        ));
+                    }
+                    if self.revision_save_ids.len()
+                        >= crate::revision_save::MAX_REVISION_SAVE_IDS
+                    {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF revision-save ID count exceeds the safety limit".to_string(),
+                        ));
+                    }
+                    if self.revision_save_ids.contains(&value) {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF revision-save IDs must be unique".to_string(),
+                        ));
+                    }
+                    self.revision_save_ids.push(value);
+                    self.pos += 1;
+                },
+                Some(Token::Text(text)) if self.decode_transport_text(text)?.trim().is_empty() => {
+                    self.pos += 1;
+                },
+                Some(Token::OpenBrace | Token::Binary(_))
+                | Some(Token::Control(_))
+                | Some(Token::Text(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF revision-save table contains text, nesting, binary data, or an unsupported control"
+                            .to_string(),
+                    ));
+                },
+                None => return Err(RtfError::UnexpectedEof),
+            }
         }
         Err(RtfError::UnexpectedEof)
     }
@@ -5981,6 +6095,7 @@ pub struct ParsedDocument<'a> {
     pub fields: Vec<super::field::Field<'a>>,
     pub form_fields: Vec<super::form_field::FormField<'a>>,
     pub generator: Option<crate::DocumentGenerator<'a>>,
+    pub revision_save: Option<crate::RevisionSaveMetadata>,
     /// Embedded and linked objects
     pub objects: Vec<super::object::EmbeddedObject<'a>>,
     /// Ordered inert document-variable metadata

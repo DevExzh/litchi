@@ -29,6 +29,8 @@ pub struct RtfDocument<'a> {
     form_fields: Vec<super::form_field::FormField<'a>>,
     /// Inert producer provenance from the generator destination.
     generator: Option<crate::DocumentGenerator<'a>>,
+    /// Ordered revision-save/session provenance.
+    revision_save: Option<crate::RevisionSaveMetadata>,
     /// Embedded and linked objects
     objects: Vec<super::object::EmbeddedObject<'a>>,
     /// Ordered inert document-variable metadata
@@ -233,6 +235,7 @@ impl<'a> RtfDocument<'a> {
             generator: parsed
                 .generator
                 .map(crate::DocumentGenerator::into_owned),
+            revision_save: parsed.revision_save,
             objects: owned_objects,
             document_variables: parsed
                 .document_variables
@@ -547,6 +550,26 @@ impl<'a> RtfDocument<'a> {
     /// Remove producer provenance metadata.
     pub fn clear_generator(&mut self) {
         self.generator = None;
+    }
+
+    /// Return ordered revision-save/session provenance.
+    pub fn revision_save_metadata(&self) -> Option<&crate::RevisionSaveMetadata> {
+        self.revision_save.as_ref()
+    }
+
+    /// Replace revision-save/session provenance after full validation.
+    pub fn set_revision_save_metadata(
+        &mut self,
+        metadata: crate::RevisionSaveMetadata,
+    ) -> RtfResult<()> {
+        metadata.validate()?;
+        self.revision_save = Some(metadata);
+        Ok(())
+    }
+
+    /// Remove revision-save/session provenance.
+    pub fn clear_revision_save_metadata(&mut self) {
+        self.revision_save = None;
     }
 
     /// Append inert form-field metadata at a valid visible body range.

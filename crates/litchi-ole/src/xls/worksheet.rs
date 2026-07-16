@@ -6,6 +6,7 @@ use crate::xls::comments::XlsComment;
 use crate::xls::error::XlsError;
 use crate::xls::hyperlinks::XlsHyperlink;
 use crate::xls::layout::{XlsColumnLayout, XlsRowLayout};
+use crate::xls::view::XlsWorksheetView;
 use crate::xls::merged_cells::MergedCellRange;
 use crate::xls::number_format::{XlsExtendedFormat, XlsFormatting, XlsNumberFormat};
 use crate::xls::pivot_table::PivotTable;
@@ -47,6 +48,7 @@ pub struct XlsWorksheet {
     data_validations: Vec<XlsDataValidationRule>,
     row_layouts: BTreeMap<u16, XlsRowLayout>,
     column_layouts: Vec<XlsColumnLayout>,
+    worksheet_views: Vec<XlsWorksheetView>,
 }
 
 impl XlsWorksheet {
@@ -70,6 +72,7 @@ impl XlsWorksheet {
             data_validations: Vec::new(),
             row_layouts: BTreeMap::new(),
             column_layouts: Vec::new(),
+            worksheet_views: Vec::new(),
         }
     }
 
@@ -93,6 +96,7 @@ impl XlsWorksheet {
             data_validations: Vec::new(),
             row_layouts: BTreeMap::new(),
             column_layouts: Vec::new(),
+            worksheet_views: Vec::new(),
         }
     }
 
@@ -279,6 +283,20 @@ impl XlsWorksheet {
     ) {
         self.row_layouts = rows;
         self.column_layouts = columns;
+    }
+
+    /// The first display window associated with this worksheet.
+    pub fn worksheet_view(&self) -> Option<&XlsWorksheetView> {
+        self.worksheet_views.first()
+    }
+
+    /// All display windows associated with this worksheet in record order.
+    pub fn worksheet_views(&self) -> &[XlsWorksheetView] {
+        &self.worksheet_views
+    }
+
+    pub(crate) fn set_worksheet_views(&mut self, views: Vec<XlsWorksheetView>) {
+        self.worksheet_views = views;
     }
 
     pub fn format_for_cell(&self, row: u32, col: u32) -> Option<&XlsExtendedFormat> {

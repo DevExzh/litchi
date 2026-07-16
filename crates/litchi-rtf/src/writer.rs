@@ -135,6 +135,8 @@ impl<W: Write> RtfWriter<W> {
         // Revision controls reference this author table by numeric index.
         self.write_revision_table(doc.revision_authors(), doc.revisions())?;
 
+        self.write_revision_save_metadata(doc.revision_save_metadata())?;
+
         // Producer provenance is inert header metadata.
         self.write_generator(doc.generator())?;
 
@@ -521,6 +523,27 @@ impl<W: Write> RtfWriter<W> {
         self.write_str("{\\*\\generator ")?;
         self.write_destination_text(generator.value.as_ref())?;
         self.write_str(";}")
+    }
+
+    pub fn write_revision_save_metadata(
+        &mut self,
+        metadata: Option<&crate::RevisionSaveMetadata>,
+    ) -> io::Result<()> {
+        let Some(metadata) = metadata else {
+            return Ok(());
+        };
+        metadata
+            .validate()
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+        self.write_str("{\\*\\rsidtbl ")?;
+        for id in metadata.ids() {
+            self.write_control_word("rsid", Some(*id as i32))?;
+        }
+        self.write_str("}")?;
+        if let Some(root) = metadata.root() {
+            self.write_control_word("rsidroot", Some(root as i32))?;
+        }
+        Ok(())
     }
 
     /// Write an RTF stylesheet destination.

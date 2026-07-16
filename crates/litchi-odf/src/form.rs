@@ -16,6 +16,8 @@ const STYLE: &str = "urn:oasis:names:tc:opendocument:xmlns:style:1.0";
 const SVG: &str = "urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0";
 const XML: &str = "http://www.w3.org/XML/1998/namespace";
 const XFORMS: &str = "http://www.w3.org/2002/xforms";
+const SCRIPT: &str = "urn:oasis:names:tc:opendocument:xmlns:script:1.0";
+const XLINK: &str = "http://www.w3.org/1999/xlink";
 const MAX_RAW: usize = 64 * 1024 * 1024;
 const MAX_DECODED: usize = 16 * 1024 * 1024;
 const MAX_SCALAR: usize = 64 * 1024;
@@ -55,8 +57,57 @@ pub struct OdfFormAttribute {
 pub struct OdfForms {
     pub groups: Vec<OdfFormGroup>,
     pub control_shapes: Vec<OdfControlShape>,
+    /// Event declarations in document order. They are retained but never executed.
+    pub event_listeners: Vec<OdfEventListener>,
     pub has_xforms: bool,
     pub has_event_listeners: bool,
+}
+
+/// Stable identity snapshot for the element that owns an event declaration.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub enum OdfEventTarget {
+    Forms {
+        part: OdfFormPart,
+        scope: OdfFormScope,
+    },
+    Form {
+        xml_id: Option<String>,
+        form_id: Option<String>,
+        name: Option<String>,
+    },
+    Control {
+        kind: OdfFormControlKind,
+        xml_id: Option<String>,
+        form_id: Option<String>,
+        name: Option<String>,
+    },
+}
+
+/// XLink activation mode retained for an event declaration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OdfEventActuate {
+    OnLoad,
+    OnRequest,
+    Other,
+    None,
+}
+
+/// An inert `script:event-listener` declaration.
+#[derive(Debug, Clone, PartialEq)]
+pub struct OdfEventListener {
+    pub target: OdfEventTarget,
+    /// Required by conforming ODF, but optional here for tolerant producer inspection.
+    pub event_name: Option<String>,
+    /// Required by conforming ODF, but optional here for tolerant producer inspection.
+    pub language: Option<String>,
+    pub macro_name: Option<String>,
+    /// URI retained verbatim; it is never fetched or resolved.
+    pub href: Option<String>,
+    pub actuate: Option<OdfEventActuate>,
+    /// Whether the optional XLink type was explicitly `simple`.
+    pub simple_link: bool,
+    pub attributes: Vec<OdfFormAttribute>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -251,6 +302,13 @@ impl Builder {
 
 struct ScopeFrame(usize, OdfFormScope);
 
+struct EventListenersBuilder {
+    depth: usize,
+    listener_depth: Option<usize>,
+    target: OdfEventTarget,
+    listeners: Vec<OdfEventListener>,
+}
+
 #[derive(Default)]
 struct Limits {
     nodes: usize,
@@ -286,6 +344,7 @@ fn parse_part(
     let mut skip = 0usize;
     let mut scopes = Vec::<ScopeFrame>::new();
     let mut builders = Vec::<Builder>::new();
+    let mut event_listeners: Option<EventListenersBuilder> = None;
     let mut group: Option<(usize, OdfFormGroup)> = None;
     let (mut sheet, mut page, mut notes, mut master) = (0, 0, 0, 0);
     loop {
@@ -302,6 +361,23 @@ fn parse_part(
                 }
                 let namespace = ns(&resolved)?;
                 let local = name(element.local_name().as_ref())?;
+                if let Some(events) = event_listeners.as_mut() {
+                    if events.listener_depth.is_some()
+                        || depth != events.depth + 1
+                        || namespace.as_deref() != Some(SCRIPT)
+                        || local != "event-listener"
+                    {
+                        return Err(err("invalid child in office:event-listeners"));
+                    }
+                    node(limits)?;
+                    events.listeners.push(new_event_listener(
+                        events.target.clone(),
+                        attrs(&reader, element, limits)?,
+                    )?);
+                    events.listener_depth = Some(depth);
+                    buffer.clear();
+                    continue;
+                }
                 if namespace.as_deref() == Some(XFORMS) && local == "model" {
                     mark_xforms(result, group.as_mut());
                     skip = 1;
@@ -313,7 +389,12 @@ fn parse_part(
                     && group.is_some()
                 {
                     mark_events(result, group.as_mut());
-                    skip = 1;
+                    event_listeners = Some(EventListenersBuilder {
+                        depth,
+                        listener_depth: None,
+                        target: event_target(part, current_scope(&scopes), &builders)?,
+                        listeners: Vec::new(),
+                    });
                     buffer.clear();
                     continue;
                 }
@@ -360,6 +441,22 @@ fn parse_part(
                 }
                 let namespace = ns(&resolved)?;
                 let local = name(element.local_name().as_ref())?;
+                if let Some(events) = event_listeners.as_mut() {
+                    if events.listener_depth.is_some()
+                        || depth != events.depth
+                        || namespace.as_deref() != Some(SCRIPT)
+                        || local != "event-listener"
+                    {
+                        return Err(err("invalid child in office:event-listeners"));
+                    }
+                    node(limits)?;
+                    events.listeners.push(new_event_listener(
+                        events.target.clone(),
+                        attrs(&reader, element, limits)?,
+                    )?);
+                    buffer.clear();
+                    continue;
+                }
                 if namespace.as_deref() == Some(XFORMS) && local == "model" {
                     mark_xforms(result, group.as_mut());
                 } else if namespace.as_deref() == Some(OFFICE)
@@ -390,7 +487,31 @@ fn parse_part(
                     push_shape(result, shape, limits)?;
                 }
             },
-            Event::End(_) => {
+            Event::End(ref element) => {
+                if let Some(events) = event_listeners.as_mut() {
+                    let namespace = ns(&resolved)?;
+                    let local = name(element.local_name().as_ref())?;
+                    if events.listener_depth == Some(depth) {
+                        if namespace.as_deref() != Some(SCRIPT) || local != "event-listener" {
+                            return Err(err("invalid script:event-listener end element"));
+                        }
+                        events.listener_depth = None;
+                        depth = depth.checked_sub(1).ok_or_else(|| err("XML depth underflow"))?;
+                        buffer.clear();
+                        continue;
+                    }
+                    if events.depth == depth {
+                        if namespace.as_deref() != Some(OFFICE) || local != "event-listeners" {
+                            return Err(err("invalid office:event-listeners end element"));
+                        }
+                        let completed = event_listeners.take().expect("active event listeners");
+                        result.event_listeners.extend(completed.listeners);
+                        depth = depth.checked_sub(1).ok_or_else(|| err("XML depth underflow"))?;
+                        buffer.clear();
+                        continue;
+                    }
+                    return Err(err("invalid nesting in office:event-listeners"));
+                }
                 if skip != 0 {
                     skip -= 1;
                     depth = depth.checked_sub(1).ok_or_else(|| err("XML depth underflow"))?;
@@ -412,19 +533,41 @@ fn parse_part(
                 depth = depth.checked_sub(1).ok_or_else(|| err("XML depth underflow"))?;
             },
             Event::Text(ref text) if skip == 0 && group.is_some() => {
+                if event_listeners.is_some() {
+                    let bytes: &[u8] = text.as_ref();
+                    if bytes.iter().any(|byte| !byte.is_ascii_whitespace()) {
+                        return Err(err("office:event-listeners cannot contain text"));
+                    }
+                    buffer.clear();
+                    continue;
+                }
                 let value = text
                     .xml_content(XmlVersion::Explicit1_0)
                     .map_err(|e| err(format!("invalid form text: {e}")))?;
                 append_text(&mut builders, &value, limits)?;
             },
             Event::CData(ref text) if skip == 0 && group.is_some() => {
+                if event_listeners.is_some() {
+                    let bytes: &[u8] = text.as_ref();
+                    if bytes.iter().any(|byte| !byte.is_ascii_whitespace()) {
+                        return Err(err("office:event-listeners cannot contain CDATA"));
+                    }
+                    buffer.clear();
+                    continue;
+                }
                 let value = text
                     .xml_content(XmlVersion::Explicit1_0)
                     .map_err(|e| err(format!("invalid form CDATA: {e}")))?;
                 append_text(&mut builders, &value, limits)?;
             },
             Event::GeneralRef(ref value) if skip == 0 && group.is_some() => {
+                if event_listeners.is_some() {
+                    return Err(err("office:event-listeners cannot contain entity references"));
+                }
                 append_text(&mut builders, &reference(value)?, limits)?;
+            },
+            Event::PI(_) if event_listeners.is_some() => {
+                return Err(err("processing instructions are not allowed in event listeners"));
             },
             Event::DocType(_) => return Err(err("DOCTYPE is not allowed in form XML")),
             Event::Eof => break,
@@ -432,10 +575,85 @@ fn parse_part(
         }
         buffer.clear();
     }
-    if depth != 0 || skip != 0 || group.is_some() || !builders.is_empty() || !scopes.is_empty() {
+    if depth != 0
+        || skip != 0
+        || event_listeners.is_some()
+        || group.is_some()
+        || !builders.is_empty()
+        || !scopes.is_empty()
+    {
         return Err(err("incomplete form XML structure"));
     }
     Ok(())
+}
+
+fn event_target(
+    part: OdfFormPart,
+    scope: OdfFormScope,
+    builders: &[Builder],
+) -> Result<OdfEventTarget> {
+    Ok(match builders.last() {
+        Some(Builder::Form(_, form)) => OdfEventTarget::Form {
+            xml_id: form.xml_id.clone(),
+            form_id: form.form_id.clone(),
+            name: form.name.clone(),
+        },
+        Some(Builder::Control(_, control)) => OdfEventTarget::Control {
+            kind: control.kind.clone(),
+            xml_id: control.xml_id.clone(),
+            form_id: control.form_id.clone(),
+            name: control.name.clone(),
+        },
+        Some(Builder::List(..)) => {
+            return Err(err("office:event-listeners cannot be nested in a form property"));
+        },
+        None => OdfEventTarget::Forms { part, scope },
+    })
+}
+
+fn new_event_listener(
+    target: OdfEventTarget,
+    attributes: Vec<OdfFormAttribute>,
+) -> Result<OdfEventListener> {
+    let event_name = owned(&attributes, SCRIPT, "event-name");
+    let language = owned(&attributes, SCRIPT, "language");
+    if event_name.as_deref().is_some_and(str::is_empty)
+        || language.as_deref().is_some_and(str::is_empty)
+    {
+        return Err(err("event listener name and language must not be empty"));
+    }
+    let macro_name = owned(&attributes, SCRIPT, "macro-name");
+    if macro_name.as_deref().is_some_and(str::is_empty) {
+        return Err(err("script:macro-name must not be empty"));
+    }
+    let href = owned(&attributes, XLINK, "href");
+    if href.as_deref().is_some_and(str::is_empty) {
+        return Err(err("xlink:href must not be empty"));
+    }
+    let simple_link = match owned(&attributes, XLINK, "type") {
+        Some(value) if value == "simple" => true,
+        Some(_) => return Err(err("script:event-listener xlink:type must be 'simple'")),
+        None => false,
+    };
+    let actuate = owned(&attributes, XLINK, "actuate")
+        .map(|value| match value.as_str() {
+            "onLoad" => Ok(OdfEventActuate::OnLoad),
+            "onRequest" => Ok(OdfEventActuate::OnRequest),
+            "other" => Ok(OdfEventActuate::Other),
+            "none" => Ok(OdfEventActuate::None),
+            _ => Err(err("invalid xlink:actuate on script:event-listener")),
+        })
+        .transpose()?;
+    Ok(OdfEventListener {
+        target,
+        event_name,
+        language,
+        macro_name,
+        href,
+        actuate,
+        simple_link,
+        attributes,
+    })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1063,4 +1281,58 @@ fn reference(value: &BytesRef<'_>) -> Result<String> {
 
 fn err(message: impl Into<String>) -> Error {
     Error::InvalidFormat(message.into())
+}
+
+#[cfg(test)]
+mod event_listener_tests {
+    use super::*;
+
+    const PREFIX: &str = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:f="urn:oasis:names:tc:opendocument:xmlns:form:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:script:1.0" xmlns:x="http://www.w3.org/1999/xlink"><o:body><o:text><o:forms><f:form f:name="Main"><f:button xml:id="submit" f:name="Submit">"#;
+    const SUFFIX: &str = "</f:button></f:form></o:forms></o:text></o:body></o:document-content>";
+
+    #[test]
+    fn retains_inert_form_event_listener_metadata_and_owner() {
+        let xml = format!(
+            r#"{PREFIX}<o:event-listeners><s:event-listener s:event-name="dom:click" s:language="ooo:script" s:macro-name="vnd.sun.star.script:Module.Run" x:type="simple" x:href="Scripts/Main" x:actuate="onRequest"/></o:event-listeners>{SUFFIX}"#
+        );
+        let forms = parse_form_parts(&[(&xml, OdfFormPart::Content)]).unwrap();
+        assert!(forms.has_event_listeners);
+        assert_eq!(forms.event_listeners.len(), 1);
+        let listener = &forms.event_listeners[0];
+        assert_eq!(listener.event_name.as_deref(), Some("dom:click"));
+        assert_eq!(listener.language.as_deref(), Some("ooo:script"));
+        assert_eq!(listener.href.as_deref(), Some("Scripts/Main"));
+        assert_eq!(listener.actuate, Some(OdfEventActuate::OnRequest));
+        assert!(listener.simple_link);
+        assert!(matches!(
+            &listener.target,
+            OdfEventTarget::Control { name: Some(name), .. } if name == "Submit"
+        ));
+    }
+
+    #[test]
+    fn accepts_expanded_empty_listener_and_rejects_active_or_malformed_content() {
+        let expanded = format!(
+            r#"{PREFIX}<o:event-listeners><s:event-listener s:event-name="change" s:language="none"></s:event-listener></o:event-listeners>{SUFFIX}"#
+        );
+        assert_eq!(
+            parse_form_parts(&[(&expanded, OdfFormPart::Content)])
+                .unwrap()
+                .event_listeners
+                .len(),
+            1
+        );
+        for body in [
+            r#"<o:event-listeners><s:event-listener s:event-name="" s:language="none"/></o:event-listeners>"#,
+            r#"<o:event-listeners><s:event-listener s:event-name="x" s:language="none" x:type="extended"/></o:event-listeners>"#,
+            r#"<o:event-listeners><s:event-listener s:event-name="x" s:language="none"><f:property/></s:event-listener></o:event-listeners>"#,
+            r#"<o:event-listeners>active text</o:event-listeners>"#,
+        ] {
+            let xml = format!("{PREFIX}{body}{SUFFIX}");
+            assert!(
+                parse_form_parts(&[(&xml, OdfFormPart::Content)]).is_err(),
+                "accepted {body}"
+            );
+        }
+    }
 }

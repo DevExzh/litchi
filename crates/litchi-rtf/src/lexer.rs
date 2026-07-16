@@ -113,6 +113,9 @@ pub enum ControlWord<'a> {
     FormFieldTextType(i32),
     FormFieldHasListBox(bool),
     Generator,
+    RevisionSaveTable,
+    RevisionSaveId(i32),
+    RevisionSaveRoot(i32),
 
     // Index and table-of-contents source marks
     IndexEntry,
@@ -721,6 +724,9 @@ impl<'a> Lexer<'a> {
             "fftypetxt" => ControlWord::FormFieldTextType(param_value),
             "ffhaslistbox" => ControlWord::FormFieldHasListBox(param_bool),
             "generator" => ControlWord::Generator,
+            "rsidtbl" => ControlWord::RevisionSaveTable,
+            "rsid" => ControlWord::RevisionSaveId(param_value),
+            "rsidroot" => ControlWord::RevisionSaveRoot(param_value),
 
             // Index and table-of-contents source marks
             "xe" => ControlWord::IndexEntry,

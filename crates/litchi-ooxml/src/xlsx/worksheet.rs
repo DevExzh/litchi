@@ -18,6 +18,7 @@ use super::cell::{Cell, CellIterator as XlsxCellIterator, RowIterator as XlsxRow
 use super::comments::parse_comments_xml;
 use super::drawing::parse_drawing_xml;
 use super::format::{CellBorder, CellFill, CellFont, CellFormat};
+use super::header_footer::{WorksheetHeaderFooter, parse_worksheet_header_footer};
 use super::parsers::worksheet_parser;
 use super::conditional_formatting::{
     parse_conditional_formattings, ConditionalFormatting as ParsedConditionalFormatting,
@@ -249,6 +250,8 @@ pub struct Worksheet<'a> {
     named_sheet_views: Option<NamedSheetViews>,
     /// Static worksheet protection and editable-range metadata.
     protection_metadata: WorksheetProtectionMetadata,
+    /// Static worksheet header/footer settings.
+    header_footer: Option<WorksheetHeaderFooter>,
     /// Manual row page breaks
     row_breaks: Vec<PageBreak>,
     /// Manual column page breaks
@@ -285,6 +288,7 @@ impl<'a> Worksheet<'a> {
             sheet_view_collection: None,
             named_sheet_views: None,
             protection_metadata: WorksheetProtectionMetadata::default(),
+            header_footer: None,
             row_breaks: Vec::new(),
             col_breaks: Vec::new(),
             rich_text_cells: HashMap::new(),
@@ -390,6 +394,7 @@ impl<'a> Worksheet<'a> {
         let auto_filter_definition = parse_auto_filter(sheet_data.as_bytes())?;
         let sheet_view_collection = parse_worksheet_views(sheet_data.as_bytes())?;
         let protection_metadata = parse_worksheet_protection(sheet_data.as_bytes())?;
+        let header_footer = parse_worksheet_header_footer(sheet_data.as_bytes())?;
         self.cells = parsed.cells;
         self.cell_styles = parsed.cell_styles;
         self.rows = parsed.rows;
@@ -411,6 +416,7 @@ impl<'a> Worksheet<'a> {
         self.sheet_views = parsed.sheet_views;
         self.sheet_view_collection = sheet_view_collection;
         self.protection_metadata = protection_metadata;
+        self.header_footer = header_footer;
         self.dimensions = parsed.dimensions;
         Ok((
             parsed.hyperlinks,
@@ -1869,6 +1875,13 @@ impl<'a> Worksheet<'a> {
     /// * `row` - Row number (1-based)
     pub fn get_row_info(&self, row: u32) -> Option<&RowInfo> {
         self.rows.get(&row)
+    }
+
+    // ===== Header and Footer =====
+
+    /// Complete immutable worksheet header/footer settings.
+    pub fn header_footer(&self) -> Option<&WorksheetHeaderFooter> {
+        self.header_footer.as_ref()
     }
 
     // ===== Worksheet Protection =====

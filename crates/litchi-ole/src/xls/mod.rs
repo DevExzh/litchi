@@ -38,6 +38,9 @@ mod number_format;
 /// BIFF8 worksheet row heights and column widths/formatting.
 mod layout;
 
+/// BIFF8 worksheet window, zoom, pane, and selection state.
+mod view;
+
 /// Shape extraction
 pub mod shapes;
 
@@ -79,6 +82,7 @@ pub use number_format::{
     XlsDateSystem, XlsExtendedFormat, XlsExtendedFormatKind, XlsFormatting, XlsNumberFormat,
 };
 pub use layout::{XlsColumnLayout, XlsRowLayout};
+pub use view::{XlsPane, XlsPaneType, XlsSelection, XlsSelectionRange, XlsWorksheetView};
 pub use records::{
     PhoneticAlignment, PhoneticRun, PhoneticString, PhoneticType, SharedStringFormatRun,
     SharedStringProperties,
