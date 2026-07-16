@@ -121,6 +121,8 @@ impl<W: Write> RtfWriter<W> {
 
         self.write_language_defaults(doc.language_defaults())?;
 
+        self.write_document_direction(doc)?;
+
         // Write font table
         self.write_font_table()?;
 
@@ -218,6 +220,22 @@ impl<W: Write> RtfWriter<W> {
         }
         if let Some(language) = defaults.complex_script {
             self.write_control_word("adeflang", Some(language.rtf_value()))?;
+        }
+        Ok(())
+    }
+
+    pub fn write_document_direction(&mut self, doc: &RtfDocument<'_>) -> io::Result<()> {
+        if let Some(direction) = doc.document_direction() {
+            self.write_control_word(
+                match direction {
+                    TextDirection::LeftToRight => "ltrdoc",
+                    TextDirection::RightToLeft => "rtldoc",
+                },
+                None,
+            )?;
+        }
+        if doc.gutter_on_right() {
+            self.write_control_word("rtlgutter", None)?;
         }
         Ok(())
     }
@@ -2059,15 +2077,35 @@ impl<W: Write> RtfWriter<W> {
     /// Write a table
     fn write_table(&mut self, table: &Table) -> io::Result<()> {
         for row in table.rows() {
-            self.write_table_row(row)?;
+            self.write_table_row(row, table.direction())?;
         }
         Ok(())
     }
 
     /// Write a table row
-    fn write_table_row(&mut self, row: &Row) -> io::Result<()> {
+    fn write_table_row(
+        &mut self,
+        row: &Row,
+        table_direction: Option<TextDirection>,
+    ) -> io::Result<()> {
         // Row defaults
         self.write_control_word("trowd", None)?;
+
+        if let Some(direction) = table_direction {
+            self.write_control_word(
+                "taprtl",
+                (direction == TextDirection::LeftToRight).then_some(0),
+            )?;
+        }
+        if let Some(direction) = row.direction() {
+            self.write_control_word(
+                match direction {
+                    TextDirection::LeftToRight => "ltrrow",
+                    TextDirection::RightToLeft => "rtlrow",
+                },
+                None,
+            )?;
+        }
 
         // Cell boundaries
         let cell_width = 2880; // Default cell width (2 inches)
@@ -2080,6 +2118,7 @@ impl<W: Write> RtfWriter<W> {
         for cell in row.cells() {
             self.write_str("{")?;
             self.write_control_word("intbl", None)?;
+            self.write_str(" ")?;
             self.write_text(cell.text())?;
             self.write_control_word("cell", None)?;
             self.write_str("}")?;
@@ -2299,6 +2338,16 @@ impl<W: Write> RtfWriter<W> {
     pub fn write_section(&mut self, section: &Section) -> io::Result<()> {
         // Write section properties
         self.write_control_word("sectd", None)?;
+
+        if let Some(direction) = section.properties.direction {
+            self.write_control_word(
+                match direction {
+                    TextDirection::LeftToRight => "ltrsect",
+                    TextDirection::RightToLeft => "rtlsect",
+                },
+                None,
+            )?;
+        }
 
         match section.properties.break_type {
             SectionBreakType::Continuous => self.write_control_word("sbknone", None)?,

@@ -3,7 +3,7 @@
 use super::{
     CalculationSettings, Consolidation, ContentValidation, DataPilotTable, DatabaseRange, DdeLink,
     LabelRange, NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange, Sheet,
-    SheetProtection, SpreadsheetProtection,
+    SheetProtection, SpreadsheetProtection, SpreadsheetTrackedChanges,
     calculation::parse_calculation_settings,
     consolidation::parse_consolidation,
     data_pilot::parse_data_pilot_tables,
@@ -14,6 +14,7 @@ use super::{
     parser::OdsParser,
     protection::parse_protection,
     style_protection::{ConditionalCellStyle, CellStyleProtection, CellStyleRegistry},
+    tracked_changes::parse_tracked_changes,
 };
 use crate::core::{Content, Meta, OwnedPackage, Styles};
 use litchi_core::{Error, Metadata, Result};
@@ -64,6 +65,7 @@ pub struct Spreadsheet {
     protection: SpreadsheetProtection,
     sheet_protections: Vec<SheetProtection>,
     cell_styles: CellStyleRegistry,
+    tracked_changes: Option<SpreadsheetTrackedChanges>,
 }
 
 impl Spreadsheet {
@@ -168,6 +170,7 @@ impl Spreadsheet {
         let consolidation = parse_consolidation(content.xml_content())?;
         let dde_links = parse_dde_links(content.xml_content())?;
         let (protection, sheet_protections) = parse_protection(content.xml_content())?;
+        let tracked_changes = parse_tracked_changes(content.xml_content())?;
 
         let styles = if package.has_file("styles.xml") {
             let styles_bytes = package.get_file("styles.xml")?;
@@ -203,6 +206,7 @@ impl Spreadsheet {
             protection,
             sheet_protections,
             cell_styles,
+            tracked_changes,
         })
     }
 
@@ -224,6 +228,11 @@ impl Spreadsheet {
     /// Return inert DDE declarations and their document-stored cached tables.
     pub fn dde_links(&self) -> &[DdeLink] {
         &self.dde_links
+    }
+
+    /// Return inert spreadsheet change-tracking metadata in document order.
+    pub fn tracked_changes(&self) -> Option<&SpreadsheetTrackedChanges> {
+        self.tracked_changes.as_ref()
     }
 
     /// Create an ODS spreadsheet from raw bytes (ZIP archive data).

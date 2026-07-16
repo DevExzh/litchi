@@ -57,6 +57,8 @@ pub struct XlsExtendedFormat {
     locked: bool,
     hidden: bool,
     alignment: crate::xls::alignment::XlsCellAlignment,
+    borders: crate::xls::border_fill::XlsCellBorders,
+    fill: crate::xls::border_fill::XlsCellFill,
 }
 
 impl XlsExtendedFormat {
@@ -86,6 +88,16 @@ impl XlsExtendedFormat {
 
     pub fn alignment(&self) -> &crate::xls::alignment::XlsCellAlignment {
         &self.alignment
+    }
+
+    /// Returns the border metadata stored by this XF record.
+    pub fn borders(&self) -> &crate::xls::border_fill::XlsCellBorders {
+        &self.borders
+    }
+
+    /// Returns the fill pattern and colors stored by this XF record.
+    pub fn fill(&self) -> &crate::xls::border_fill::XlsCellFill {
+        &self.fill
     }
 }
 
@@ -428,6 +440,7 @@ fn parse_xf(data: &[u8], index: u16) -> XlsResult<XlsExtendedFormat> {
         }
     };
     let alignment = crate::xls::alignment::XlsCellAlignment::parse(data[6], data[7], data[8])?;
+    let (borders, fill) = crate::xls::border_fill::parse_xf_border_fill(data, style)?;
 
     Ok(XlsExtendedFormat {
         index,
@@ -436,6 +449,8 @@ fn parse_xf(data: &[u8], index: u16) -> XlsResult<XlsExtendedFormat> {
         locked,
         hidden,
         alignment,
+        borders,
+        fill,
     })
 }
 

@@ -3,6 +3,7 @@
 //! This module provides basic table parsing for RTF documents.
 //! RTF tables use a complex row-based model with cell boundaries.
 
+use crate::TextDirection;
 use std::borrow::Cow;
 
 /// A table in an RTF document.
@@ -10,12 +11,17 @@ use std::borrow::Cow;
 pub struct Table<'a> {
     /// Table rows
     rows: Vec<Row<'a>>,
+    /// Explicit table direction from `\taprtl` or `\taprtl0`.
+    direction: Option<TextDirection>,
 }
 
 impl<'a> Table<'a> {
     /// Create a new table.
     pub fn new() -> Self {
-        Self { rows: Vec::new() }
+        Self {
+            rows: Vec::new(),
+            direction: None,
+        }
     }
 
     /// Add a row to the table.
@@ -32,6 +38,16 @@ impl<'a> Table<'a> {
     pub fn rows(&self) -> &[Row<'a>] {
         &self.rows
     }
+
+    /// Return the explicit table direction.
+    pub fn direction(&self) -> Option<TextDirection> {
+        self.direction
+    }
+
+    /// Set or clear the explicit table direction.
+    pub fn set_direction(&mut self, direction: Option<TextDirection>) {
+        self.direction = direction;
+    }
 }
 
 impl<'a> Default for Table<'a> {
@@ -45,12 +61,17 @@ impl<'a> Default for Table<'a> {
 pub struct Row<'a> {
     /// Row cells
     cells: Vec<Cell<'a>>,
+    /// Explicit row direction.
+    direction: Option<TextDirection>,
 }
 
 impl<'a> Row<'a> {
     /// Create a new row.
     pub fn new() -> Self {
-        Self { cells: Vec::new() }
+        Self {
+            cells: Vec::new(),
+            direction: None,
+        }
     }
 
     /// Add a cell to the row.
@@ -66,6 +87,16 @@ impl<'a> Row<'a> {
     /// Get all cells.
     pub fn cells(&self) -> &[Cell<'a>] {
         &self.cells
+    }
+
+    /// Return the explicit row direction.
+    pub fn direction(&self) -> Option<TextDirection> {
+        self.direction
+    }
+
+    /// Set or clear the explicit row direction.
+    pub fn set_direction(&mut self, direction: Option<TextDirection>) {
+        self.direction = direction;
     }
 }
 

@@ -43,6 +43,10 @@ pub struct RtfDocument<'a> {
     math_properties: Option<crate::DocumentMathProperties>,
     /// Default primary, East Asian, and complex-script languages.
     language_defaults: crate::DocumentLanguageDefaults,
+    /// Explicit default bidirectional precedence for document text.
+    document_direction: Option<crate::TextDirection>,
+    /// Whether the document gutter is positioned on the right.
+    gutter_on_right: bool,
     /// Embedded and linked objects
     objects: Vec<super::object::EmbeddedObject<'a>>,
     /// Ordered inert document-variable metadata
@@ -173,8 +177,10 @@ impl<'a> RtfDocument<'a> {
             .into_iter()
             .map(|table| {
                 let mut owned_table = super::table::Table::new();
+                owned_table.set_direction(table.direction());
                 for row in table.rows() {
                     let mut owned_row = super::table::Row::new();
+                    owned_row.set_direction(row.direction());
                     for cell in row.cells() {
                         let owned_cell =
                             super::table::Cell::new(Cow::Owned(cell.text().to_string()));
@@ -260,6 +266,8 @@ impl<'a> RtfDocument<'a> {
             data_store: parsed.data_store.map(crate::DocumentDataStore::into_owned),
             math_properties: parsed.math_properties,
             language_defaults: parsed.language_defaults,
+            document_direction: parsed.document_direction,
+            gutter_on_right: parsed.gutter_on_right,
             objects: owned_objects,
             document_variables: parsed
                 .document_variables
@@ -720,6 +728,31 @@ impl<'a> RtfDocument<'a> {
     /// Remove all document language defaults.
     pub fn clear_language_defaults(&mut self) {
         self.language_defaults = crate::DocumentLanguageDefaults::default();
+    }
+
+    /// Return the explicit document-wide bidirectional precedence.
+    pub fn document_direction(&self) -> Option<crate::TextDirection> {
+        self.document_direction
+    }
+
+    /// Set the explicit document-wide bidirectional precedence.
+    pub fn set_document_direction(&mut self, direction: crate::TextDirection) {
+        self.document_direction = Some(direction);
+    }
+
+    /// Remove the explicit document-wide bidirectional precedence.
+    pub fn clear_document_direction(&mut self) {
+        self.document_direction = None;
+    }
+
+    /// Return whether the document gutter is positioned on the right.
+    pub fn gutter_on_right(&self) -> bool {
+        self.gutter_on_right
+    }
+
+    /// Position the document gutter on the right when `enabled` is true.
+    pub fn set_gutter_on_right(&mut self, enabled: bool) {
+        self.gutter_on_right = enabled;
     }
 
     fn validate_xml_namespaces(namespaces: &[crate::XmlNamespace<'_>]) -> RtfResult<()> {

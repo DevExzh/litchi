@@ -95,6 +95,7 @@ mod source;
 mod spreadsheet;
 mod structure;
 mod style_protection;
+mod tracked_changes;
 
 pub use annotation::{AnnotationElement, AnnotationNode, CellAnnotation};
 pub use builder::SpreadsheetBuilder;
@@ -145,6 +146,13 @@ pub use structure::{
     TableStructure, TableVisibility,
 };
 pub use style_protection::{ConditionalCellStyle, ConditionalCellStyleRule, CellStyleProtection};
+pub use tracked_changes::{
+    SpreadsheetCellContentChange, SpreadsheetChangeAcceptance, SpreadsheetChangeCutOff,
+    SpreadsheetChangeDimension, SpreadsheetChangeInfo, SpreadsheetChangeMetadata,
+    SpreadsheetDeletion, SpreadsheetInsertion, SpreadsheetMovement, SpreadsheetNestedDeletion,
+    SpreadsheetTrackedCell, SpreadsheetTrackedCellAddress, SpreadsheetTrackedCellValue,
+    SpreadsheetTrackedChange, SpreadsheetTrackedChanges, SpreadsheetTrackedRangeAddress,
+};
 
 // Re-export formula types for public API
 #[allow(unused_imports)] // Public API exports

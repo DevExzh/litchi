@@ -37,12 +37,13 @@ use super::sheet_view::{WorksheetViewCollection, parse_worksheet_views};
 use super::sheet_format::{
     WorksheetSheetFormatProperties, parse_worksheet_sheet_format_properties,
 };
+use super::sheet_properties::{WorksheetSheetProperties, parse_worksheet_sheet_properties};
 use super::sheet_protection::{
     WorksheetProtectedRange, WorksheetProtection, WorksheetProtectionMetadata,
     parse_worksheet_protection,
 };
 use super::named_sheet_view::{NamedSheetViews, discover_named_sheet_views};
-use super::outline_properties::{WorksheetOutlineProperties, parse_worksheet_outline_properties};
+use super::outline_properties::WorksheetOutlineProperties;
 use super::page_margins::{WorksheetPageMargins, parse_worksheet_page_margins};
 use super::page_setup::{WorksheetPageSetup, parse_complete_worksheet_page_setup};
 use super::print_options::{WorksheetPrintOptions, parse_worksheet_print_options};
@@ -272,6 +273,8 @@ pub struct Worksheet<'a> {
     ignored_errors: Option<WorksheetIgnoredErrors>,
     /// Effective worksheet outline and summary-placement policy.
     outline_properties: Option<WorksheetOutlineProperties>,
+    /// Complete worksheet-level properties from `sheetPr`.
+    sheet_properties: Option<WorksheetSheetProperties>,
     /// Manual row page breaks
     row_breaks: Vec<PageBreak>,
     /// Manual column page breaks
@@ -315,6 +318,7 @@ impl<'a> Worksheet<'a> {
             sheet_format_properties: None,
             ignored_errors: None,
             outline_properties: None,
+            sheet_properties: None,
             row_breaks: Vec::new(),
             col_breaks: Vec::new(),
             rich_text_cells: HashMap::new(),
@@ -427,7 +431,9 @@ impl<'a> Worksheet<'a> {
         let sheet_format_properties =
             parse_worksheet_sheet_format_properties(sheet_data.as_bytes())?;
         let ignored_errors = parse_worksheet_ignored_errors(sheet_data.as_bytes())?;
-        let outline_properties = parse_worksheet_outline_properties(sheet_data.as_bytes())?;
+        let sheet_properties = parse_worksheet_sheet_properties(sheet_data.as_bytes())?;
+        let outline_properties = sheet_properties.as_ref()
+            .and_then(WorksheetSheetProperties::outline_properties).copied();
         self.cells = parsed.cells;
         self.cell_styles = parsed.cell_styles;
         self.rows = parsed.rows;
@@ -456,6 +462,7 @@ impl<'a> Worksheet<'a> {
         self.sheet_format_properties = sheet_format_properties;
         self.ignored_errors = ignored_errors;
         self.outline_properties = outline_properties;
+        self.sheet_properties = sheet_properties;
         self.dimensions = parsed.dimensions;
         Ok((
             parsed.hyperlinks,
@@ -1942,6 +1949,11 @@ impl<'a> Worksheet<'a> {
     /// Worksheet outline and summary-placement policy, when explicitly present.
     pub fn outline_properties(&self) -> Option<&WorksheetOutlineProperties> {
         self.outline_properties.as_ref()
+    }
+
+    /// Complete immutable worksheet-level properties, when `sheetPr` is present.
+    pub fn sheet_properties(&self) -> Option<&WorksheetSheetProperties> {
+        self.sheet_properties.as_ref()
     }
 
     // ===== Print Options =====

@@ -43,6 +43,8 @@ mod font;
 
 /// BIFF8 XF cell and style alignment metadata.
 mod alignment;
+/// BIFF8 XF border and fill metadata.
+mod border_fill;
 
 /// BIFF8 worksheet row heights and column widths/formatting.
 mod layout;
@@ -104,6 +106,9 @@ pub use font::{XlsFont, XlsFontCharset, XlsFontEscapement, XlsFontFamily, XlsFon
 pub use alignment::{
     XlsCellAlignment, XlsHorizontalAlignment, XlsReadingOrder, XlsTextRotation,
     XlsVerticalAlignment,
+};
+pub use border_fill::{
+    XlsBorderSide, XlsBorderStyle, XlsCellBorders, XlsCellFill, XlsFillPattern,
 };
 pub use layout::{XlsColumnLayout, XlsRowLayout};
 pub use view::{XlsPane, XlsPaneType, XlsSelection, XlsSelectionRange, XlsWorksheetView};

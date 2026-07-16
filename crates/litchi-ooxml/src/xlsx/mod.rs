@@ -49,6 +49,7 @@ pub mod pivot;
 pub mod print_options;
 pub mod shared_strings;
 pub mod sheet_format;
+pub mod sheet_properties;
 pub mod sheet_protection;
 pub mod sheet_view;
 mod shared_formula;
@@ -113,6 +114,10 @@ pub use ignored_errors::{
 pub use shared_strings::SharedStrings;
 pub use sheet_format::{
     WorksheetSheetFormatProperties, parse_worksheet_sheet_format_properties,
+};
+pub use sheet_properties::{
+    WorksheetPageSetupProperties, WorksheetSheetProperties, WorksheetSynchronizationReference,
+    WorksheetTabColor, parse_worksheet_sheet_properties,
 };
 pub use sheet_protection::{
     ProtectedRangeSource, ProtectionPasswordVerifier, ProtectionRangeReference,

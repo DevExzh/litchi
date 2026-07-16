@@ -163,6 +163,14 @@ pub enum ControlWord<'a> {
     RightToLeftCharacter,
     LeftToRightParagraph,
     RightToLeftParagraph,
+    LeftToRightDocument,
+    RightToLeftDocument,
+    LeftToRightSection,
+    RightToLeftSection,
+    LeftToRightRow,
+    RightToLeftRow,
+    TableRightToLeft(bool),
+    RightGutter(bool),
 
     // Index and table-of-contents source marks
     IndexEntry,
@@ -821,6 +829,14 @@ impl<'a> Lexer<'a> {
             "rtlch" => ControlWord::RightToLeftCharacter,
             "ltrpar" => ControlWord::LeftToRightParagraph,
             "rtlpar" => ControlWord::RightToLeftParagraph,
+            "ltrdoc" => ControlWord::LeftToRightDocument,
+            "rtldoc" => ControlWord::RightToLeftDocument,
+            "ltrsect" => ControlWord::LeftToRightSection,
+            "rtlsect" => ControlWord::RightToLeftSection,
+            "ltrrow" => ControlWord::LeftToRightRow,
+            "rtlrow" => ControlWord::RightToLeftRow,
+            "taprtl" => ControlWord::TableRightToLeft(param_bool),
+            "rtlgutter" => ControlWord::RightGutter(param_bool),
 
             // Index and table-of-contents source marks
             "xe" => ControlWord::IndexEntry,

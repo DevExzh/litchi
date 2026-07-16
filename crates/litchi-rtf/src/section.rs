@@ -3,7 +3,7 @@
 //! This module provides support for document sections, headers, footers,
 //! page breaks, and section formatting in RTF documents.
 
-use super::types::{Formatting, Paragraph};
+use super::types::{Formatting, Paragraph, TextDirection};
 use std::borrow::Cow;
 
 /// Section break type
@@ -65,6 +65,8 @@ pub enum VerticalAlignment {
 /// Section properties
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SectionProperties {
+    /// Explicit direction used to thread section columns.
+    pub direction: Option<TextDirection>,
     /// Section break type
     pub break_type: SectionBreakType,
     /// Page width (in twips)
@@ -106,6 +108,7 @@ pub struct SectionProperties {
 impl Default for SectionProperties {
     fn default() -> Self {
         Self {
+            direction: None,
             break_type: SectionBreakType::default(),
             page_width: 12240,  // 8.5 inches at 1440 twips/inch
             page_height: 15840, // 11 inches

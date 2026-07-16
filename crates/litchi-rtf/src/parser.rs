@@ -313,6 +313,8 @@ pub struct Parser<'a> {
     saw_data_store: bool,
     math_properties: Option<crate::DocumentMathProperties>,
     language_defaults: crate::DocumentLanguageDefaults,
+    document_direction: Option<crate::TextDirection>,
+    gutter_on_right: bool,
     /// Embedded and linked objects
     objects: Vec<super::object::EmbeddedObject<'a>>,
     /// Ordered inert document variables
@@ -450,6 +452,8 @@ impl<'a> Parser<'a> {
             saw_data_store: false,
             math_properties: None,
             language_defaults: crate::DocumentLanguageDefaults::default(),
+            document_direction: None,
+            gutter_on_right: false,
             objects: Vec::new(),
             document_variables: Vec::new(),
             document_variable_text_bytes: 0,
@@ -556,6 +560,8 @@ impl<'a> Parser<'a> {
             data_store,
             math_properties: self.math_properties,
             language_defaults: self.language_defaults,
+            document_direction: self.document_direction,
+            gutter_on_right: self.gutter_on_right,
             objects: self.objects,
             document_variables: self.document_variables,
             user_properties: self.user_properties,
@@ -2233,6 +2239,18 @@ impl<'a> Parser<'a> {
                     Some(crate::LanguageId::from_rtf(*value)?);
                 return Ok(());
             },
+            ControlWord::LeftToRightDocument => {
+                self.document_direction = Some(TextDirection::LeftToRight);
+                return Ok(());
+            },
+            ControlWord::RightToLeftDocument => {
+                self.document_direction = Some(TextDirection::RightToLeft);
+                return Ok(());
+            },
+            ControlWord::RightGutter(value) => {
+                self.gutter_on_right = *value;
+                return Ok(());
+            },
             _ => {},
         }
         if self.apply_section_control(control)? {
@@ -2504,6 +2522,31 @@ impl<'a> Parser<'a> {
                 // Start a new row definition
                 state.cell_boundaries.clear();
                 self.start_table_if_needed();
+                if let Some(row) = &mut self.current_row {
+                    row.set_direction(None);
+                }
+            },
+            ControlWord::LeftToRightRow => {
+                self.start_table_if_needed();
+                if let Some(row) = &mut self.current_row {
+                    row.set_direction(Some(TextDirection::LeftToRight));
+                }
+            },
+            ControlWord::RightToLeftRow => {
+                self.start_table_if_needed();
+                if let Some(row) = &mut self.current_row {
+                    row.set_direction(Some(TextDirection::RightToLeft));
+                }
+            },
+            ControlWord::TableRightToLeft(value) => {
+                self.start_table_if_needed();
+                if let Some(table) = &mut self.current_table {
+                    table.set_direction(Some(if *value {
+                        TextDirection::RightToLeft
+                    } else {
+                        TextDirection::LeftToRight
+                    }));
+                }
             },
             ControlWord::CellX(boundary) => {
                 // Cell boundary definition
@@ -2569,6 +2612,8 @@ impl<'a> Parser<'a> {
                 | ControlWord::LineNumbering(_)
                 | ControlWord::LineNumberRestartPage
                 | ControlWord::LineNumberContinuous
+                | ControlWord::LeftToRightSection
+                | ControlWord::RightToLeftSection
         );
         if !is_section_control {
             return Ok(false);
@@ -2590,6 +2635,12 @@ impl<'a> Parser<'a> {
         match control {
             ControlWord::SectionDefault => {
                 *properties = super::section::SectionProperties::default();
+            },
+            ControlWord::LeftToRightSection => {
+                properties.direction = Some(TextDirection::LeftToRight);
+            },
+            ControlWord::RightToLeftSection => {
+                properties.direction = Some(TextDirection::RightToLeft);
             },
             ControlWord::SectionBreak | ControlWord::SectionPage => {
                 properties.break_type = SectionBreakType::Page;
@@ -7132,6 +7183,8 @@ pub struct ParsedDocument<'a> {
     pub data_store: Option<crate::DocumentDataStore<'a>>,
     pub math_properties: Option<crate::DocumentMathProperties>,
     pub language_defaults: crate::DocumentLanguageDefaults,
+    pub document_direction: Option<crate::TextDirection>,
+    pub gutter_on_right: bool,
     /// Embedded and linked objects
     pub objects: Vec<super::object::EmbeddedObject<'a>>,
     /// Ordered inert document-variable metadata

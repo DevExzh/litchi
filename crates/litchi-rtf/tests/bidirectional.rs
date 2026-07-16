@@ -109,3 +109,94 @@ fn parses_bundled_libreoffice_bidirectional_fixtures() {
         );
     }
 }
+
+#[test]
+fn round_trips_document_section_table_and_row_direction() {
+    let document = RtfDocument::parse(concat!(
+        r#"{\rtf1\rtldoc\rtlgutter\sectd\rtlsect "#,
+        r#"\trowd\taprtl\rtlrow\cellx2000\cellx4000\pard\intbl A\cell B\cell\row "#,
+        r#"\trowd\ltrrow\cellx2000\cellx4000\pard\intbl C\cell D\cell\row}"#,
+    ))
+    .unwrap();
+    assert_eq!(document.document_direction(), Some(TextDirection::RightToLeft));
+    assert!(document.gutter_on_right());
+    assert_eq!(
+        document.sections()[0].properties.direction,
+        Some(TextDirection::RightToLeft)
+    );
+    let table = &document.tables()[0];
+    assert_eq!(table.direction(), Some(TextDirection::RightToLeft));
+    assert_eq!(table.rows()[0].direction(), Some(TextDirection::RightToLeft));
+    assert_eq!(table.rows()[1].direction(), Some(TextDirection::LeftToRight));
+
+    let output = write(&document);
+    let serialized = String::from_utf8(output.clone()).unwrap();
+    for control in ["rtldoc", "rtlgutter", "rtlsect", "taprtl", "rtlrow", "ltrrow"] {
+        assert!(serialized.contains(&format!(r#"\{control}"#)));
+    }
+    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    assert!(!reparsed.tables().is_empty(), "writer emitted no reparsable table: {serialized}");
+    assert_eq!(reparsed.document_direction(), document.document_direction());
+    assert_eq!(reparsed.gutter_on_right(), document.gutter_on_right());
+    assert_eq!(
+        reparsed.sections()[0].properties.direction,
+        document.sections()[0].properties.direction
+    );
+    assert_eq!(reparsed.tables()[0].direction(), table.direction());
+    assert_eq!(reparsed.tables()[0].rows()[0].direction(), table.rows()[0].direction());
+    assert_eq!(reparsed.tables()[0].rows()[1].direction(), table.rows()[1].direction());
+}
+
+#[test]
+fn explicit_ltr_and_reset_controls_are_typed() {
+    let document = RtfDocument::parse(concat!(
+        r#"{\rtf1\ltrdoc\sectd\rtlsect\sectd\ltrsect "#,
+        r#"\trowd\taprtl0\rtlrow\cellx1000\pard\intbl A\cell\row "#,
+        r#"\trowd\cellx1000\pard\intbl B\cell\row}"#,
+    ))
+    .unwrap();
+    assert_eq!(document.document_direction(), Some(TextDirection::LeftToRight));
+    assert_eq!(
+        document.sections()[0].properties.direction,
+        Some(TextDirection::LeftToRight)
+    );
+    let table = &document.tables()[0];
+    assert_eq!(table.direction(), Some(TextDirection::LeftToRight));
+    assert_eq!(table.rows()[0].direction(), Some(TextDirection::RightToLeft));
+    assert_eq!(table.rows()[1].direction(), None);
+}
+
+#[test]
+fn parses_bundled_libreoffice_scope_direction_fixtures() {
+    let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../../3rdparty/libreoffice-core/");
+
+    let gutter = RtfDocument::parse_bytes(
+        &fs::read(format!("{root}sw/qa/extras/rtfexport/data/rtl-gutter.rtf")).unwrap(),
+    )
+    .unwrap();
+    assert!(gutter.gutter_on_right());
+
+    let document_ltr = RtfDocument::parse_bytes(
+        &fs::read(format!("{root}sw/qa/extras/rtfexport/data/dplinehollow.rtf")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(document_ltr.document_direction(), Some(TextDirection::LeftToRight));
+
+    let row_rtl = RtfDocument::parse_bytes(
+        &fs::read(format!("{root}sw/qa/extras/rtfexport/data/table-rtl.rtf")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        row_rtl.tables()[0].rows()[0].direction(),
+        Some(TextDirection::RightToLeft)
+    );
+
+    let section_ltr = RtfDocument::parse_bytes(
+        &fs::read(format!("{root}sw/qa/core/data/rtf/pass/tdf116851.rtf")).unwrap(),
+    )
+    .unwrap();
+    assert!(section_ltr
+        .sections()
+        .iter()
+        .any(|section| section.properties.direction == Some(TextDirection::LeftToRight)));
+}
