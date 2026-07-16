@@ -60,7 +60,7 @@ use super::shape_style::{ArrowStyle, FillStyle, LineStyleConfig, ShadowStyle, Sh
 use super::shapes::ShapeKind;
 use super::slide_timing::SlideTiming;
 use super::spec::{BinaryTagData, ColorScheme, Ppt10Tag, SlideLayoutType, slide_flags};
-use super::text_format::{FontEntity, Paragraph};
+use super::text_format::{FontEntity, Paragraph, TextAlign};
 use crate::ppt::animation::AnimationInfo;
 use litchi_cfb::writer::OleWriter;
 use litchi_core::unit::pt_to_emu_i32;
@@ -236,6 +236,17 @@ pub enum TextAlignment {
     Right,
     /// Justified
     Justify,
+}
+
+impl From<TextAlignment> for TextAlign {
+    fn from(value: TextAlignment) -> Self {
+        match value {
+            TextAlignment::Left => Self::Left,
+            TextAlignment::Center => Self::Center,
+            TextAlignment::Right => Self::Right,
+            TextAlignment::Justify => Self::Justify,
+        }
+    }
 }
 
 /// Shape properties (extended with styling support)
@@ -435,7 +446,16 @@ fn convert_shape_to_escher(
             });
 
     // Get text content - prefer paragraphs with formatting
-    let paragraphs = props.paragraphs.clone();
+    let paragraphs = props.paragraphs.clone().or_else(|| {
+        if props.alignment == TextAlignment::Left {
+            None
+        } else {
+            props
+                .text
+                .as_ref()
+                .map(|text| vec![Paragraph::new(text.clone()).align(props.alignment.into())])
+        }
+    });
     let text = if paragraphs.is_some() {
         None // Don't use plain text if paragraphs are available
     } else {
@@ -465,6 +485,7 @@ fn convert_shape_to_escher(
         has_shadow,
         flip_h: props.flip_h,
         flip_v: props.flip_v,
+        rotation: shape_rotation_to_fixed(props.rotation),
         hyperlink_id: props.hyperlink_id,
         hyperlink_action: get_hyperlink_info(props.hyperlink_id, hyperlinks).0,
         hyperlink_jump: get_hyperlink_info(props.hyperlink_id, hyperlinks).1,
@@ -478,6 +499,13 @@ fn convert_shape_to_escher(
         shadow_opacity,
         shadow_type,
     }
+}
+
+fn shape_rotation_to_fixed(degrees: f32) -> Option<i32> {
+    if !degrees.is_finite() || degrees.abs() <= 0.001 {
+        return None;
+    }
+    Some(((f64::from(degrees) % 360.0) * 65536.0).round() as i32)
 }
 
 /// Get hyperlink interactive info values based on hyperlink target
@@ -1067,6 +1095,58 @@ impl PptWriter {
         } else {
             Err(PptWriteError::InvalidData("No shapes on slide".to_string()))
         }
+    }
+
+    /// Set the rotation of the last shape on a slide, in degrees.
+    pub fn set_last_shape_rotation(
+        &mut self,
+        slide: usize,
+        degrees: f32,
+    ) -> Result<(), PptWriteError> {
+        if !degrees.is_finite() {
+            return Err(PptWriteError::InvalidData(
+                "shape rotation must be finite".to_string(),
+            ));
+        }
+        let slide_data = self
+            .slides
+            .get_mut(slide)
+            .ok_or_else(|| PptWriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+        let shape = slide_data
+            .shapes
+            .last_mut()
+            .ok_or_else(|| PptWriteError::InvalidData("No shapes on slide".to_string()))?;
+        shape.properties.rotation = degrees;
+        Ok(())
+    }
+
+    /// Set horizontal alignment for all text in the last shape on a slide.
+    pub fn set_last_shape_text_alignment(
+        &mut self,
+        slide: usize,
+        alignment: TextAlignment,
+    ) -> Result<(), PptWriteError> {
+        let slide_data = self
+            .slides
+            .get_mut(slide)
+            .ok_or_else(|| PptWriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+        let shape = slide_data
+            .shapes
+            .last_mut()
+            .ok_or_else(|| PptWriteError::InvalidData("No shapes on slide".to_string()))?;
+        if shape.properties.text.is_none() && shape.properties.paragraphs.is_none() {
+            return Err(PptWriteError::InvalidData(
+                "Last shape has no text".to_string(),
+            ));
+        }
+        shape.properties.alignment = alignment;
+        if let Some(paragraphs) = &mut shape.properties.paragraphs {
+            let alignment = TextAlign::from(alignment);
+            for paragraph in paragraphs {
+                paragraph.alignment = alignment;
+            }
+        }
+        Ok(())
     }
 
     /// Add a font to the font collection and return its index
@@ -1959,6 +2039,71 @@ mod tests {
         let slide = writer.add_slide().unwrap();
         writer.add_textbox(slide, 10, 10, 100, 50, "Test").unwrap();
         assert_eq!(writer.slides[0].shapes.len(), 1);
+    }
+
+    #[test]
+    fn test_plain_text_alignment_and_rotation_reach_escher_shape() {
+        let mut writer = PptWriter::new();
+        let slide = writer.add_slide().unwrap();
+        writer
+            .add_textbox(slide, 10, 20, 300, 100, "Centered")
+            .unwrap();
+        writer
+            .set_last_shape_text_alignment(slide, TextAlignment::Center)
+            .unwrap();
+        writer.set_last_shape_rotation(slide, 450.5).unwrap();
+
+        let shape = convert_shape_to_escher(&writer.slides[slide].shapes[0], &writer.hyperlinks);
+        assert!(shape.text.is_none());
+        let paragraphs = shape.paragraphs.as_ref().expect("formatted paragraph");
+        assert_eq!(paragraphs.len(), 1);
+        assert_eq!(paragraphs[0].alignment, TextAlign::Center);
+        assert_eq!(shape.rotation, Some((90 * 65536) + 32768));
+    }
+
+    #[test]
+    fn test_alignment_setter_updates_rich_paragraphs() {
+        let mut writer = PptWriter::new();
+        let slide = writer.add_slide().unwrap();
+        writer
+            .add_rich_textbox(
+                slide,
+                0,
+                0,
+                200,
+                100,
+                vec![Paragraph::new("One"), Paragraph::new("Two")],
+            )
+            .unwrap();
+        writer
+            .set_last_shape_text_alignment(slide, TextAlignment::Justify)
+            .unwrap();
+
+        let paragraphs = writer.slides[slide].shapes[0]
+            .properties
+            .paragraphs
+            .as_ref()
+            .unwrap();
+        assert!(
+            paragraphs
+                .iter()
+                .all(|paragraph| paragraph.alignment == TextAlign::Justify)
+        );
+    }
+
+    #[test]
+    fn test_rotation_setter_rejects_non_finite_values() {
+        let mut writer = PptWriter::new();
+        let slide = writer.add_slide().unwrap();
+        writer.add_rectangle(slide, 0, 0, 100, 100).unwrap();
+
+        assert!(writer.set_last_shape_rotation(slide, f32::NAN).is_err());
+        assert_eq!(writer.slides[slide].shapes[0].properties.rotation, 0.0);
+        assert!(
+            writer
+                .set_last_shape_text_alignment(slide, TextAlignment::Center)
+                .is_err()
+        );
     }
 
     #[test]

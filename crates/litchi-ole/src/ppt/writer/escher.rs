@@ -25,6 +25,9 @@ pub use crate::escher::writer::{ShapeFlags, record_type, shape_type};
 
 /// Escher property IDs
 pub mod prop_id {
+    // Transform group
+    pub const ROTATION: u16 = 0x0004;
+
     // Protection group
     pub const LOCK_ROTATION: u16 = 0x0077;
     pub const LOCK_ASPECT_RATIO: u16 = 0x0078;
@@ -860,6 +863,8 @@ pub struct UserShapeData {
     pub flip_h: bool,
     /// Flip vertical
     pub flip_v: bool,
+    /// Shape rotation in signed 16.16 fixed-point degrees.
+    pub rotation: Option<i32>,
     /// Hyperlink ID (reference to ExObjList)
     pub hyperlink_id: Option<u32>,
     /// Hyperlink action type (for InteractiveInfoAtom)
@@ -911,6 +916,7 @@ impl Default for UserShapeData {
             has_shadow: false,
             flip_h: false,
             flip_v: false,
+            rotation: None,
             hyperlink_id: None,
             hyperlink_action: 4, // ACTION_HYPERLINK
             hyperlink_jump: 0,   // JUMP_NONE
@@ -1225,6 +1231,10 @@ fn build_client_data_with_placeholder(placeholder_type: u8) -> Result<Vec<u8>, P
 /// Based on Apache POI HSLFTextBox.createSpContainer() defaults
 fn build_shape_properties(shape: &UserShapeData) -> Vec<EscherProperty> {
     let mut props = Vec::with_capacity(16);
+
+    if let Some(rotation) = shape.rotation {
+        props.push(EscherProperty::new(prop_id::ROTATION, rotation as u32));
+    }
 
     // Picture shapes have special handling - BLIP reference only, no fill/line
     if let Some(picture_index) = shape.picture_index {
@@ -1732,6 +1742,21 @@ mod tests {
         // Should have BLIP property
         let has_blip = props.iter().any(|p| p.prop_id == 0x4104);
         assert!(has_blip);
+    }
+
+    #[test]
+    fn test_picture_shape_preserves_rotation_property() {
+        let shape = UserShapeData {
+            shape_type: 75,
+            picture_index: Some(1),
+            rotation: Some(-90 * 65536),
+            ..Default::default()
+        };
+        let properties = build_shape_properties(&shape);
+
+        assert!(properties.iter().any(|property| {
+            property.prop_id == prop_id::ROTATION && property.value == (-90i32 * 65536) as u32
+        }));
     }
 
     #[test]
