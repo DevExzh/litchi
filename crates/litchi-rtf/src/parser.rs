@@ -287,6 +287,34 @@ fn is_section_control(control: &ControlWord<'_>) -> bool {
     )
 }
 
+fn associated_font_ref(value: Option<i32>) -> RtfResult<FontRef> {
+    let value = value.ok_or_else(|| {
+        RtfError::MalformedDocument("RTF af control requires a numeric parameter".to_string())
+    })?;
+    u16::try_from(value).map_err(|_| {
+        RtfError::MalformedDocument("RTF af value must be in 0..=65535".to_string())
+    })
+}
+
+fn associated_font_size(value: Option<i32>) -> RtfResult<NonZeroU16> {
+    let value = value.ok_or_else(|| {
+        RtfError::MalformedDocument("RTF afs control requires a numeric parameter".to_string())
+    })?;
+    let value = u16::try_from(value).map_err(|_| {
+        RtfError::MalformedDocument("RTF afs value must be in 1..=65535".to_string())
+    })?;
+    NonZeroU16::new(value).ok_or_else(|| {
+        RtfError::MalformedDocument("RTF afs value must be in 1..=65535".to_string())
+    })
+}
+
+fn associated_language(value: Option<i32>) -> RtfResult<crate::LanguageId> {
+    let value = value.ok_or_else(|| {
+        RtfError::MalformedDocument("RTF alang control requires a numeric parameter".to_string())
+    })?;
+    crate::LanguageId::from_rtf(value)
+}
+
 impl Default for State {
     fn default() -> Self {
         Self {
@@ -3171,8 +3199,9 @@ impl<'a> Parser<'a> {
                 return Ok(());
             },
             ControlWord::DefaultLanguageComplexScript(value) => {
-                self.language_defaults.complex_script =
-                    Some(crate::LanguageId::from_rtf(*value)?);
+                let language = crate::LanguageId::from_rtf(*value)?;
+                self.language_defaults.complex_script = Some(language);
+                self.current_state_mut()?.formatting.associated.language = Some(language);
                 return Ok(());
             },
             ControlWord::LeftToRightDocument => {
@@ -3282,6 +3311,21 @@ impl<'a> Parser<'a> {
                     state.formatting.font_size = nz;
                 }
             },
+            ControlWord::AssociatedFontNumber(value) => {
+                state.formatting.associated.font_ref = Some(associated_font_ref(*value)?);
+            },
+            ControlWord::AssociatedFontSize(value) => {
+                state.formatting.associated.font_size = Some(associated_font_size(*value)?);
+            },
+            ControlWord::AssociatedLanguage(value) => {
+                state.formatting.associated.language = Some(associated_language(*value)?);
+            },
+            ControlWord::AssociatedBold(value) => {
+                state.formatting.associated.bold = Some(*value);
+            },
+            ControlWord::AssociatedItalic(value) => {
+                state.formatting.associated.italic = Some(*value);
+            },
             ControlWord::ColorForeground(c) => {
                 state.formatting.color_ref = *c as ColorRef;
             },
@@ -3345,6 +3389,7 @@ impl<'a> Parser<'a> {
                 state.formatting.east_asian_language = language_defaults.east_asian;
                 state.formatting.language_no_proof = language_defaults.primary;
                 state.formatting.east_asian_language_no_proof = language_defaults.east_asian;
+                state.formatting.associated.language = language_defaults.complex_script;
             },
 
             // Paragraph alignment
@@ -5787,7 +5832,7 @@ impl<'a> Parser<'a> {
                     ControlWord::UnicodeSkip(value) => state.unicode_skip = (*value).max(0),
                     _ => {
                         saw_content_before_selector = style_type.is_none();
-                        Self::apply_style_property(&mut state, control);
+                        Self::apply_style_property(&mut state, control)?;
                     },
                 },
                 Some(_) => {},
@@ -5915,13 +5960,28 @@ impl<'a> Parser<'a> {
         Ok(decoded)
     }
 
-    fn apply_style_property(state: &mut State, control: &ControlWord<'_>) {
+    fn apply_style_property(state: &mut State, control: &ControlWord<'_>) -> RtfResult<()> {
         match control {
             ControlWord::FontNumber(value) => state.formatting.font_ref = *value as FontRef,
             ControlWord::FontSize(value) => {
                 if let Some(size) = NonZeroU16::new((*value).clamp(1, i32::from(u16::MAX)) as u16) {
                     state.formatting.font_size = size;
                 }
+            },
+            ControlWord::AssociatedFontNumber(value) => {
+                state.formatting.associated.font_ref = Some(associated_font_ref(*value)?);
+            },
+            ControlWord::AssociatedFontSize(value) => {
+                state.formatting.associated.font_size = Some(associated_font_size(*value)?);
+            },
+            ControlWord::AssociatedLanguage(value) => {
+                state.formatting.associated.language = Some(associated_language(*value)?);
+            },
+            ControlWord::AssociatedBold(value) => {
+                state.formatting.associated.bold = Some(*value);
+            },
+            ControlWord::AssociatedItalic(value) => {
+                state.formatting.associated.italic = Some(*value);
             },
             ControlWord::ColorForeground(value) => {
                 state.formatting.color_ref = *value as ColorRef;
@@ -6018,6 +6078,7 @@ impl<'a> Parser<'a> {
             },
             _ => {},
         }
+        Ok(())
     }
 
     fn parse_file_table(&mut self) -> RtfResult<crate::FileTable<'a>> {

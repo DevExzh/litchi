@@ -944,6 +944,7 @@ fn parse_frame(
         height: attribute(reader, element, SVG_NAMESPACE, b"height")?,
         page_name: pages.last().and_then(|page| page.name.clone()),
         sheet_name: sheets.last().and_then(|sheet| sheet.name.clone()),
+        sheet_shape: false,
     })
 }
 

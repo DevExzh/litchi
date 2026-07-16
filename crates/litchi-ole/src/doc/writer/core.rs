@@ -556,6 +556,42 @@ pub struct DocWriter {
     styles: Vec<super::stylesheet::DocStyleDefinition>,
 }
 
+fn build_plcffld(field_char_cps: &[(u32, u16)], text_length: u32) -> Vec<u8> {
+    let n = field_char_cps.len();
+    let mut plcffld = Vec::with_capacity((n + 1) * 4 + n * 2);
+    for (cp, _) in field_char_cps {
+        plcffld.extend_from_slice(&cp.to_le_bytes());
+    }
+    // The final CP is the PLCF terminal entry and does not describe a marker.
+    plcffld.extend_from_slice(&text_length.to_le_bytes());
+
+    let mut field_stack = Vec::new();
+    for (_, field_character) in field_char_cps {
+        let (fldch, flt_or_flags) = match *field_character {
+            0x13 => {
+                field_stack.push(false);
+                (0x13, 0x58) // fldBegin, flt = HYPERLINK (88)
+            },
+            0x14 => {
+                if let Some(has_separator) = field_stack.last_mut() {
+                    *has_separator = true;
+                }
+                (0x14, 0x00) // fldSep, ignored byte is zero for new output
+            },
+            0x15 => {
+                let has_separator = field_stack.pop().unwrap_or(false);
+                let is_nested = !field_stack.is_empty();
+                let flags = u8::from(has_separator) << 7 | u8::from(is_nested) << 6;
+                (0x15, flags)
+            },
+            _ => (0x00, 0x00),
+        };
+        plcffld.push(fldch);
+        plcffld.push(flt_or_flags);
+    }
+    plcffld
+}
+
 impl DocWriter {
     /// Create a new DOC writer
     pub fn new() -> Self {
@@ -2556,32 +2592,9 @@ impl DocWriter {
             table_offset = table_stream.len() as u32;
         }
 
-        // Write PlcfFldMom (main document field table) if there are field characters
-        // Structure: (n+1) CPs + n FLD descriptors (2 bytes each)
-        // FLD descriptor per MS-DOC 2.8.25:
-        //   fldBegin (0x13): byte0 = 0x13, byte1 = flt (field type: 0x58 = HYPERLINK)
-        //   fldSep   (0x14): byte0 = 0x14, byte1 = flags (0x00)
-        //   fldEnd   (0x15): byte0 = 0x15, byte1 = flags (0x00)
-        // Final CP MUST equal ccpText per MS-DOC spec.
+        // Write PlcfFldMom (main document field table) if there are field characters.
         if !field_char_cps.is_empty() {
-            let n = field_char_cps.len();
-            let mut plcffld = Vec::with_capacity((n + 1) * 4 + n * 2);
-            for (cp, _) in &field_char_cps {
-                plcffld.extend_from_slice(&cp.to_le_bytes());
-            }
-            // Final CP = ccpText (per MS-DOC spec PlcfFld)
-            plcffld.extend_from_slice(&text_length.to_le_bytes());
-            // FLD descriptors
-            for (_, fld_type) in &field_char_cps {
-                let (fldch, flt_or_flags) = match *fld_type {
-                    0x13 => (0x13u8, 0x58u8), // fldBegin, flt = HYPERLINK (88)
-                    0x14 => (0x14u8, 0x00u8), // fldSep, no flags
-                    0x15 => (0x15u8, 0x00u8), // fldEnd, no flags
-                    _ => (0x00, 0x00),
-                };
-                plcffld.push(fldch);
-                plcffld.push(flt_or_flags);
-            }
+            let plcffld = build_plcffld(&field_char_cps, text_length);
             fib.set_plcffld_mom(table_offset, plcffld.len() as u32);
             table_stream.extend_from_slice(&plcffld);
             table_offset = table_stream.len() as u32;
@@ -3134,23 +3147,7 @@ impl DocWriter {
 
         // Write PlcfFldMom if there are field characters
         if !field_char_cps.is_empty() {
-            let n = field_char_cps.len();
-            let mut plcffld = Vec::with_capacity((n + 1) * 4 + n * 2);
-            for (cp, _) in &field_char_cps {
-                plcffld.extend_from_slice(&cp.to_le_bytes());
-            }
-            // Final CP = ccpText (per MS-DOC spec PlcfFld)
-            plcffld.extend_from_slice(&text_length.to_le_bytes());
-            for (_, fld_type) in &field_char_cps {
-                let (fldch, flt_or_flags) = match *fld_type {
-                    0x13 => (0x13u8, 0x58u8), // fldBegin, flt = HYPERLINK (88)
-                    0x14 => (0x14u8, 0x00u8), // fldSep, no flags
-                    0x15 => (0x15u8, 0x00u8), // fldEnd, no flags
-                    _ => (0x00, 0x00),
-                };
-                plcffld.push(fldch);
-                plcffld.push(flt_or_flags);
-            }
+            let plcffld = build_plcffld(&field_char_cps, text_length);
             fib.set_plcffld_mom(table_offset, plcffld.len() as u32);
             table_stream.extend_from_slice(&plcffld);
             table_offset = table_stream.len() as u32;
@@ -5738,6 +5735,30 @@ mod tests {
         ] {
             assert!(build_revision_papx_grpprl(&formatting, None).is_err());
         }
+    }
+
+    #[test]
+    fn plcffld_end_flags_match_their_field_structure() {
+        let top_level = build_plcffld(&[(21, 0x13), (56, 0x14), (61, 0x15)], 63);
+        assert_eq!(&top_level[16..], &[0x13, 0x58, 0x14, 0x00, 0x15, 0x80]);
+
+        let nested = build_plcffld(
+            &[
+                (1, 0x13),
+                (2, 0x13),
+                (3, 0x14),
+                (4, 0x15),
+                (5, 0x14),
+                (6, 0x15),
+            ],
+            7,
+        );
+        assert_eq!(
+            &nested[28..],
+            &[
+                0x13, 0x58, 0x13, 0x58, 0x14, 0x00, 0x15, 0xC0, 0x14, 0x00, 0x15, 0x80,
+            ]
+        );
     }
 
     #[test]

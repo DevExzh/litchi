@@ -136,8 +136,8 @@ pub use shape::{
 pub use stylesheet::{Style, StyleSheet, StyleType};
 pub use table::{Cell, Row, Table};
 pub use types::{
-    Alignment, Color, ColorRef, ColorTable, DocumentElement, Font, FontFamily, FontRef, FontTable,
-    Formatting, FontPitch, Indentation, Paragraph, ParagraphContent, Run, Spacing, StyleBlock, TextDirection,
-    UnderlineStyle,
+    Alignment, AssociatedCharacterFormatting, Color, ColorRef, ColorTable, DocumentElement, Font,
+    FontFamily, FontPitch, FontRef, FontTable, Formatting, Indentation, Paragraph, ParagraphContent,
+    Run, Spacing, StyleBlock, TextDirection, UnderlineStyle,
 };
 pub use writer::{RtfWriter, WriterOptions};

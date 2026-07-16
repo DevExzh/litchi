@@ -2435,6 +2435,22 @@ impl<W: Write> RtfWriter<W> {
             self.write_control_word("noproof", None)?;
         }
 
+        if let Some(font_ref) = fmt.associated.font_ref {
+            self.write_control_word("af", Some(i32::from(font_ref)))?;
+        }
+        if let Some(font_size) = fmt.associated.font_size {
+            self.write_control_word("afs", Some(i32::from(font_size.get())))?;
+        }
+        if let Some(language) = fmt.associated.language {
+            self.write_control_word("alang", Some(language.rtf_value()))?;
+        }
+        if let Some(bold) = fmt.associated.bold {
+            self.write_control_word("ab", Some(i32::from(bold)))?;
+        }
+        if let Some(italic) = fmt.associated.italic {
+            self.write_control_word("ai", Some(i32::from(italic)))?;
+        }
+
         // Font
         if fmt.font_ref != 0 {
             self.write_control_word("f", Some(fmt.font_ref as i32))?;

@@ -359,6 +359,24 @@ pub enum TextDirection {
     RightToLeft,
 }
 
+/// Associated character properties used for complex-script text.
+///
+/// Optional fields preserve the distinction between an omitted property and an
+/// explicit off value such as `\ab0` or `\ai0`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct AssociatedCharacterFormatting {
+    /// Associated font reference from `\afN`.
+    pub font_ref: Option<FontRef>,
+    /// Associated font size in half-points from `\afsN`.
+    pub font_size: Option<NonZeroU16>,
+    /// Associated complex-script language from `\alangN`.
+    pub language: Option<crate::LanguageId>,
+    /// Associated bold override from `\ab` or `\ab0`.
+    pub bold: Option<bool>,
+    /// Associated italic override from `\ai` or `\ai0`.
+    pub italic: Option<bool>,
+}
+
 /// Character formatting properties.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Formatting {
@@ -416,6 +434,8 @@ pub struct Formatting {
     pub no_proof: bool,
     /// Explicit character-run direction; `None` uses left-to-right precedence.
     pub direction: Option<TextDirection>,
+    /// Associated complex-script character properties.
+    pub associated: AssociatedCharacterFormatting,
 }
 
 impl Default for Formatting {
@@ -449,6 +469,7 @@ impl Default for Formatting {
             east_asian_language_no_proof: None,
             no_proof: false,
             direction: None,
+            associated: AssociatedCharacterFormatting::default(),
         }
     }
 }

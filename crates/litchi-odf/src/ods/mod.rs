@@ -90,6 +90,7 @@ mod parser;
 mod protection;
 mod row;
 mod scenario;
+mod sheet_image;
 mod sheet;
 mod source;
 mod spreadsheet;

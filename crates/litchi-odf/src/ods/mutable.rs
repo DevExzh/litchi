@@ -24,6 +24,7 @@ use crate::ods::{
         write_spreadsheet_attributes,
     },
     scenario::{validate_scenario, write_sheet_preamble},
+    sheet_image::{MAX_IMAGES_PER_SHEET, normalize_sheet_image, write_sheet_images},
     source::validate_table_source,
     structure::{
         MAX_EXPANDED_COLUMNS_PER_SHEET, MAX_EXPANDED_ROWS_PER_SHEET, TableStructureAxis,
@@ -552,6 +553,7 @@ impl MutableSpreadsheet {
             description: None,
             table_source: None,
             scenario: None,
+            images: Vec::new(),
             protection: crate::ods::SheetProtection::default(),
         };
         self.sheets.push(sheet);
@@ -1268,6 +1270,38 @@ impl MutableSpreadsheet {
         Ok(())
     }
 
+    /// Add an inert image to a sheet's `table:shapes` container.
+    pub fn add_sheet_image(&mut self, sheet_index: usize, image: crate::OdfImage) -> Result<()> {
+        let sheet = self.sheets.get_mut(sheet_index).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(format!("Sheet index {sheet_index} out of bounds"))
+        })?;
+        if sheet.images.len() >= MAX_IMAGES_PER_SHEET {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "sheet exceeds {MAX_IMAGES_PER_SHEET} images"
+            )));
+        }
+        let image = normalize_sheet_image(image, &sheet.name)?;
+        sheet.images.push(image);
+        Ok(())
+    }
+
+    /// Remove an inert sheet-level image.
+    pub fn remove_sheet_image(
+        &mut self,
+        sheet_index: usize,
+        image_index: usize,
+    ) -> Result<crate::OdfImage> {
+        let sheet = self.sheets.get_mut(sheet_index).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(format!("Sheet index {sheet_index} out of bounds"))
+        })?;
+        if image_index >= sheet.images.len() {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "Sheet image index {image_index} out of bounds"
+            )));
+        }
+        Ok(sheet.images.remove(image_index))
+    }
+
     /// Merge a rectangular cell range in a sheet.
     pub fn merge_cells(
         &mut self,
@@ -1420,6 +1454,8 @@ impl MutableSpreadsheet {
                 },
             )?;
 
+            write_sheet_images(&mut body, &sheet.images)?;
+
             write_named_definitions(
                 &mut body,
                 self.named_definitions.iter().filter(|definition| {
@@ -1454,6 +1490,7 @@ impl MutableSpreadsheet {
         );
         out.push_str(of_ns);
         let has_annotations = self.has_annotations();
+        let has_sheet_images = self.sheets.iter().any(|sheet| !sheet.images.is_empty());
         let has_validation_event_listeners = self.has_validation_event_listeners();
         let has_table_sources = self.sheets.iter().any(|sheet| {
             sheet.table_source.is_some()
@@ -1474,10 +1511,16 @@ impl MutableSpreadsheet {
         if has_annotations {
             out.push_str(r#" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:loext="urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0""#);
         }
+        if has_sheet_images && !has_annotations {
+            out.push_str(r#" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink""#);
+        }
         if has_validation_event_listeners {
             out.push_str(r#" xmlns:script="urn:oasis:names:tc:opendocument:xmlns:script:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0""#);
         }
-        if (has_validation_event_listeners || has_table_sources) && !has_annotations {
+        if (has_validation_event_listeners || has_table_sources)
+            && !has_annotations
+            && !has_sheet_images
+        {
             out.push_str(r#" xmlns:xlink="http://www.w3.org/1999/xlink""#);
         }
         if has_protection_extensions && !has_annotations {
@@ -1491,10 +1534,16 @@ impl MutableSpreadsheet {
             if has_annotations {
                 declared.extend(["dc", "meta", "draw", "svg", "xlink", "fo", "style", "loext"]);
             }
+            if has_sheet_images && !has_annotations {
+                declared.extend(["draw", "svg", "xlink"]);
+            }
             if has_validation_event_listeners {
                 declared.extend(["script", "presentation"]);
             }
-            if (has_validation_event_listeners || has_table_sources) && !has_annotations {
+            if (has_validation_event_listeners || has_table_sources)
+                && !has_annotations
+                && !has_sheet_images
+            {
                 declared.push("xlink");
             }
             if has_protection_extensions && !has_annotations {

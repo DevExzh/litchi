@@ -821,6 +821,35 @@ impl OdsParser {
             buf.clear();
         }
 
+        let images = crate::media::scan_content_images(xml_content)?;
+        let mut sheet_indices = std::collections::HashMap::with_capacity(sheets.len());
+        for (index, sheet) in sheets.iter().enumerate() {
+            if sheet_indices.insert(sheet.name.clone(), index).is_some() {
+                return Err(Error::InvalidFormat(format!(
+                    "duplicate table name '{}' prevents sheet-image association",
+                    sheet.name
+                )));
+            }
+        }
+        for image in images {
+            let Some(frame) = image.frame.as_ref().filter(|frame| frame.sheet_shape) else {
+                continue;
+            };
+            if image.alternative_index != 0 {
+                return Err(Error::InvalidFormat(
+                    "sheet image frames with alternative draw:image children are unsupported"
+                        .to_string(),
+                ));
+            }
+            let sheet_name = frame.sheet_name.as_deref().ok_or_else(|| {
+                Error::InvalidFormat("sheet image has no containing table name".to_string())
+            })?;
+            let index = *sheet_indices.get(sheet_name).ok_or_else(|| {
+                Error::InvalidFormat(format!("sheet image references unknown table '{sheet_name}'"))
+            })?;
+            super::sheet_image::validate_sheet_image(&image)?;
+            sheets[index].images.push(image);
+        }
         Ok(sheets)
     }
 
@@ -2100,6 +2129,7 @@ pub(crate) struct SheetBuilder {
     description: Option<String>,
     table_source: Option<SheetTableSource>,
     scenario: Option<SheetScenario>,
+    images: Vec<crate::OdfImage>,
     cell_count: usize,
 }
 
@@ -2126,6 +2156,7 @@ impl SheetBuilder {
             description: None,
             table_source: None,
             scenario: None,
+            images: Vec::new(),
             cell_count: 0,
         }
     }
@@ -2237,6 +2268,7 @@ impl SheetBuilder {
             description: self.description,
             table_source: self.table_source,
             scenario: self.scenario,
+            images: self.images,
             protection: super::SheetProtection::default(),
         })
     }

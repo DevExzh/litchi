@@ -8,6 +8,7 @@ use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
+use std::collections::HashSet;
 
 const DRAW_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
 const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -77,6 +78,8 @@ pub struct OdfImageFrame {
     pub height: Option<String>,
     pub page_name: Option<String>,
     pub sheet_name: Option<String>,
+    /// Whether this frame is a direct child of a spreadsheet `table:shapes` container.
+    pub sheet_shape: bool,
 }
 
 /// One `draw:image` occurrence and its safely classified source.
@@ -209,6 +212,21 @@ pub(crate) fn scan_flat_images(xml: &str) -> Result<Vec<OdfImage>> {
     Ok(images)
 }
 
+pub(crate) fn scan_content_images(xml: &str) -> Result<Vec<OdfImage>> {
+    let mut images = Vec::new();
+    let mut inline_bytes = 0usize;
+    let mut accessibility_bytes = 0usize;
+    scan_xml(
+        xml,
+        OdfImagePart::Content,
+        None,
+        &mut images,
+        &mut inline_bytes,
+        &mut accessibility_bytes,
+    )?;
+    Ok(images)
+}
+
 fn scan_xml(
     xml: &str,
     part: OdfImagePart,
@@ -223,6 +241,8 @@ fn scan_xml(
     let mut frames = Vec::<FrameState>::new();
     let mut pages = Vec::<NamedContext>::new();
     let mut sheets = Vec::<NamedContext>::new();
+    let mut sheet_shapes = Vec::<usize>::new();
+    let mut sheets_with_shapes = HashSet::<usize>::new();
     let mut active: Option<ImageBuilder> = None;
     let mut accessibility: Option<AccessibilityText> = None;
 
@@ -280,15 +300,55 @@ fn scan_xml(
                         depth,
                         name: attribute(&reader, &element, TABLE_NAMESPACE, b"name")?,
                     });
+                } else if element.local_name().as_ref() == b"shapes"
+                    && sheets.last().is_some_and(|sheet| depth == sheet.depth + 1)
+                    && !bound_to(&namespace, TABLE_NAMESPACE)
+                {
+                    return Err(Error::InvalidFormat(
+                        "spoofed table:shapes namespace".to_string(),
+                    ));
+                } else if bound_to(&namespace, TABLE_NAMESPACE)
+                    && element.local_name().as_ref() == b"shapes"
+                    && sheets.last().is_some_and(|sheet| depth == sheet.depth + 1)
+                {
+                    let sheet_depth = sheets.last().expect("checked sheet").depth;
+                    if !sheets_with_shapes.insert(sheet_depth) {
+                        return Err(Error::InvalidFormat(
+                            "a table must not contain multiple table:shapes elements".to_string(),
+                        ));
+                    }
+                    sheet_shapes.push(depth);
+                } else if element.local_name().as_ref() == b"frame"
+                    && sheet_shapes.last().is_some_and(|shape_depth| depth == *shape_depth + 1)
+                    && !bound_to(&namespace, DRAW_NAMESPACE)
+                {
+                    return Err(Error::InvalidFormat(
+                        "spoofed draw:frame namespace in table:shapes".to_string(),
+                    ));
                 } else if bound_to(&namespace, DRAW_NAMESPACE)
                     && element.local_name().as_ref() == b"frame"
                 {
                     frames.push(FrameState {
                         depth,
-                        frame: parse_frame(&reader, &element, &pages, &sheets)?,
+                        frame: parse_frame(
+                            &reader,
+                            &element,
+                            &pages,
+                            &sheets,
+                            sheet_shapes.last().is_some_and(|shape_depth| depth == *shape_depth + 1),
+                        )?,
                         image_count: 0,
                         image_indices: Vec::new(),
                     });
+                } else if element.local_name().as_ref() == b"image"
+                    && frames.last().is_some_and(|frame| {
+                        frame.frame.sheet_shape && depth == frame.depth + 1
+                    })
+                    && !bound_to(&namespace, DRAW_NAMESPACE)
+                {
+                    return Err(Error::InvalidFormat(
+                        "spoofed draw:image namespace in sheet frame".to_string(),
+                    ));
                 } else if bound_to(&namespace, DRAW_NAMESPACE)
                     && element.local_name().as_ref() == b"image"
                 {
@@ -333,7 +393,24 @@ fn scan_xml(
                         "svg:title and svg:desc must not contain elements".to_string(),
                     ));
                 }
-                if frames.last().is_some_and(|frame| depth == frame.depth)
+                if element.local_name().as_ref() == b"shapes"
+                    && sheets.last().is_some_and(|sheet| depth == sheet.depth)
+                    && !bound_to(&namespace, TABLE_NAMESPACE)
+                {
+                    return Err(Error::InvalidFormat(
+                        "spoofed table:shapes namespace".to_string(),
+                    ));
+                } else if bound_to(&namespace, TABLE_NAMESPACE)
+                    && element.local_name().as_ref() == b"shapes"
+                    && sheets.last().is_some_and(|sheet| depth == sheet.depth)
+                {
+                    let sheet_depth = sheets.last().expect("checked sheet").depth;
+                    if !sheets_with_shapes.insert(sheet_depth) {
+                        return Err(Error::InvalidFormat(
+                            "a table must not contain multiple table:shapes elements".to_string(),
+                        ));
+                    }
+                } else if frames.last().is_some_and(|frame| depth == frame.depth)
                     && let Some(kind) =
                         accessibility_kind(&namespace, element.local_name().as_ref())
                 {
@@ -471,7 +548,11 @@ fn scan_xml(
                     pages.pop();
                 }
                 if sheets.last().map(|sheet| sheet.depth) == Some(depth) {
+                    sheets_with_shapes.remove(&depth);
                     sheets.pop();
+                }
+                if sheet_shapes.last().copied() == Some(depth) {
+                    sheet_shapes.pop();
                 }
                 depth = depth.checked_sub(1).ok_or_else(|| {
                     Error::InvalidFormat("unexpected ODF image closing tag".to_string())
@@ -480,6 +561,12 @@ fn scan_xml(
             Event::DocType(_) => {
                 return Err(Error::InvalidFormat(
                     "DTDs are not allowed while scanning ODF images".to_string(),
+                ));
+            },
+            Event::PI(_) => {
+                return Err(Error::InvalidFormat(
+                    "processing instructions are not allowed while scanning ODF images"
+                        .to_string(),
                 ));
             },
             Event::Eof => break,
@@ -494,6 +581,7 @@ fn scan_xml(
         || !frames.is_empty()
         || !pages.is_empty()
         || !sheets.is_empty()
+        || !sheet_shapes.is_empty()
     {
         return Err(Error::InvalidFormat(
             "unterminated ODF image XML".to_string(),
@@ -516,6 +604,7 @@ fn parse_frame(
     element: &BytesStart<'_>,
     pages: &[NamedContext],
     sheets: &[NamedContext],
+    sheet_shape: bool,
 ) -> Result<OdfImageFrame> {
     Ok(OdfImageFrame {
         name: attribute(reader, element, DRAW_NAMESPACE, b"name")?,
@@ -529,6 +618,7 @@ fn parse_frame(
         height: attribute(reader, element, SVG_NAMESPACE, b"height")?,
         page_name: pages.last().and_then(|page| page.name.clone()),
         sheet_name: sheets.last().and_then(|sheet| sheet.name.clone()),
+        sheet_shape,
     })
 }
 

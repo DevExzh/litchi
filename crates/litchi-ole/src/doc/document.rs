@@ -176,7 +176,7 @@ impl Document {
         let text_extractor = TextExtractor::new(&fib, &word_document, &table_stream)?;
 
         // Parse fields table to identify embedded equations and hyperlinks
-        let fields_table = FieldsTable::parse(&fib, &table_stream).ok();
+        let fields_table = Some(FieldsTable::parse(&fib, &table_stream)?);
 
         // Parse headers/footers table
         let headers_table = HeadersTable::parse(&fib, &table_stream).ok();

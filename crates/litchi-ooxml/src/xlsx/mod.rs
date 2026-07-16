@@ -30,6 +30,7 @@
 pub mod cell;
 pub mod auto_filter;
 pub mod active_x;
+pub mod workbook_metadata;
 pub mod calculation_properties;
 pub mod calculation_chain;
 pub mod query_table;
