@@ -294,6 +294,7 @@ pub mod elements;
 mod formula;
 /// Inert semantic discovery of classic ODF forms and control shapes.
 mod form;
+mod settings;
 /// Format-neutral package access for every OpenDocument family.
 mod generic;
 /// Shared semantic discovery of images in OpenDocument XML and packages.
@@ -333,6 +334,10 @@ pub use form::{
     OdfControlRef, OdfControlShape, OdfForm, OdfFormAttribute, OdfFormControl,
     OdfFormControlKind, OdfFormGroup, OdfFormNode, OdfFormPart, OdfFormProperty,
     OdfFormPropertyValue, OdfFormScalarValue, OdfFormScope, OdfForms,
+};
+pub use settings::{
+    OdfConfigItem, OdfConfigMap, OdfConfigMapEntry, OdfConfigNode, OdfConfigSet,
+    OdfConfigValue, OdfSettings,
 };
 pub use generic::{FlatOpenDocument, OpenDocumentFamily, OpenDocumentPackage};
 pub use media::{OdfImage, OdfImageFrame, OdfImagePart, OdfImageSource};

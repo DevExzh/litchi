@@ -33,6 +33,9 @@ use super::data_validation::{
 use super::sort::SortState;
 use super::sparkline::{SparklineGroup, parse_sparkline_groups_from_worksheet_xml};
 use super::sheet_view::{WorksheetViewCollection, parse_worksheet_views};
+use super::sheet_format::{
+    WorksheetSheetFormatProperties, parse_worksheet_sheet_format_properties,
+};
 use super::sheet_protection::{
     WorksheetProtectedRange, WorksheetProtection, WorksheetProtectionMetadata,
     parse_worksheet_protection,
@@ -261,6 +264,8 @@ pub struct Worksheet<'a> {
     print_options: Option<WorksheetPrintOptions>,
     /// Complete static worksheet page setup.
     complete_page_setup: Option<WorksheetPageSetup>,
+    /// Effective static worksheet row/column defaults and outline metadata.
+    sheet_format_properties: Option<WorksheetSheetFormatProperties>,
     /// Manual row page breaks
     row_breaks: Vec<PageBreak>,
     /// Manual column page breaks
@@ -301,6 +306,7 @@ impl<'a> Worksheet<'a> {
             page_margins: None,
             print_options: None,
             complete_page_setup: None,
+            sheet_format_properties: None,
             row_breaks: Vec::new(),
             col_breaks: Vec::new(),
             rich_text_cells: HashMap::new(),
@@ -410,6 +416,8 @@ impl<'a> Worksheet<'a> {
         let page_margins = parse_worksheet_page_margins(sheet_data.as_bytes())?;
         let print_options = parse_worksheet_print_options(sheet_data.as_bytes())?;
         let complete_page_setup = parse_complete_worksheet_page_setup(sheet_data.as_bytes())?;
+        let sheet_format_properties =
+            parse_worksheet_sheet_format_properties(sheet_data.as_bytes())?;
         self.cells = parsed.cells;
         self.cell_styles = parsed.cell_styles;
         self.rows = parsed.rows;
@@ -435,6 +443,7 @@ impl<'a> Worksheet<'a> {
         self.page_margins = page_margins;
         self.print_options = print_options;
         self.complete_page_setup = complete_page_setup;
+        self.sheet_format_properties = sheet_format_properties;
         self.dimensions = parsed.dimensions;
         Ok((
             parsed.hyperlinks,
@@ -1900,6 +1909,13 @@ impl<'a> Worksheet<'a> {
     /// Complete immutable worksheet page setup, when explicitly present.
     pub fn complete_page_setup(&self) -> Option<&WorksheetPageSetup> {
         self.complete_page_setup.as_ref()
+    }
+
+    // ===== Sheet Format Properties =====
+
+    /// Effective worksheet row/column defaults and outline metadata.
+    pub fn sheet_format_properties(&self) -> Option<&WorksheetSheetFormatProperties> {
+        self.sheet_format_properties.as_ref()
     }
 
     // ===== Print Options =====

@@ -31,6 +31,9 @@ pub struct XlsWorksheet {
     max_col: u32,
     /// Shared string table (Arc for zero-copy sharing across worksheets)
     shared_strings: Option<Arc<Vec<String>>>,
+    /// Rich-text and phonetic metadata parallel to the shared string table.
+    shared_string_properties:
+        Option<Arc<Vec<Option<Box<crate::xls::records::SharedStringProperties>>>>>,
     /// Merged cell ranges (MERGECELLS records)
     merged_cells: Vec<MergedCellRange>,
     /// Hyperlinks (HLINK records)
@@ -64,6 +67,7 @@ impl XlsWorksheet {
             max_row: 0,
             max_col: 0,
             shared_strings: None,
+            shared_string_properties: None,
             merged_cells: Vec::new(),
             hyperlinks: Vec::new(),
             comments: Vec::new(),
@@ -90,6 +94,7 @@ impl XlsWorksheet {
             max_row: 0,
             max_col: 0,
             shared_strings: Some(shared_strings),
+            shared_string_properties: None,
             merged_cells: Vec::new(),
             hyperlinks: Vec::new(),
             comments: Vec::new(),
@@ -132,6 +137,37 @@ impl XlsWorksheet {
     /// Get shared strings reference
     pub fn shared_strings(&self) -> Option<&[String]> {
         self.shared_strings.as_ref().map(|arc| arc.as_slice())
+    }
+
+    pub(crate) fn with_shared_string_properties(
+        name: String,
+        shared_strings: Arc<Vec<String>>,
+        shared_string_properties: Arc<
+            Vec<Option<Box<crate::xls::records::SharedStringProperties>>>,
+        >,
+    ) -> Self {
+        let mut worksheet = Self::with_shared_strings(name, shared_strings);
+        worksheet.shared_string_properties = Some(shared_string_properties);
+        worksheet
+    }
+
+    /// Rich-text and phonetic metadata for a zero-based shared-string index.
+    pub fn shared_string_properties(
+        &self,
+        index: u32,
+    ) -> Option<&crate::xls::records::SharedStringProperties> {
+        self.shared_string_properties
+            .as_ref()?
+            .get(index as usize)?
+            .as_deref()
+    }
+
+    /// Rich-text and phonetic metadata for a `LabelSst` cell.
+    pub fn shared_string_properties_for_cell(
+        &self,
+        cell: &XlsCell,
+    ) -> Option<&crate::xls::records::SharedStringProperties> {
+        self.shared_string_properties(cell.shared_string_index()?)
     }
 
     /// Get cell at position

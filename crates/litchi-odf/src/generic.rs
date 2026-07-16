@@ -61,6 +61,14 @@ pub struct FlatOpenDocument {
 }
 
 impl FlatOpenDocument {
+    /// Parses the optional flat-document `office:settings` inventory.
+    pub fn settings(&self) -> Result<crate::OdfSettings> {
+        crate::settings::parse_settings(
+            self.xml(),
+            crate::settings::SettingsDocumentKind::Flat,
+        )
+    }
+
     /// Open and validate a flat OpenDocument XML file.
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         let file = std::fs::File::open(path)?;
@@ -391,6 +399,18 @@ impl OpenDocumentPackage {
     /// Return the optional `settings.xml` part.
     pub fn settings_xml(&self) -> Result<Option<String>> {
         self.optional_xml_part(constants::ODF_SETTINGS)
+    }
+
+    /// Parses the package settings part without evaluating any stored values.
+    pub fn settings(&self) -> Result<Option<crate::OdfSettings>> {
+        let Some(xml) = self.settings_xml()? else {
+            return Ok(None);
+        };
+        crate::settings::parse_settings(
+            &xml,
+            crate::settings::SettingsDocumentKind::Package,
+        )
+        .map(Some)
     }
 
     /// Extract common document metadata, or an empty value when `meta.xml` is absent.

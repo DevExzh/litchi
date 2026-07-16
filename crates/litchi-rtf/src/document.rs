@@ -37,6 +37,8 @@ pub struct RtfDocument<'a> {
     theme: Option<crate::DocumentTheme<'a>>,
     /// Inert latent-style defaults and ordered exceptions.
     latent_styles: Option<crate::LatentStyles<'a>>,
+    /// Inert custom XML data-store bytes.
+    data_store: Option<crate::DocumentDataStore<'a>>,
     /// Embedded and linked objects
     objects: Vec<super::object::EmbeddedObject<'a>>,
     /// Ordered inert document-variable metadata
@@ -251,6 +253,7 @@ impl<'a> RtfDocument<'a> {
             }),
             theme: parsed.theme.map(crate::DocumentTheme::into_owned),
             latent_styles: parsed.latent_styles.map(crate::LatentStyles::into_owned),
+            data_store: parsed.data_store.map(crate::DocumentDataStore::into_owned),
             objects: owned_objects,
             document_variables: parsed
                 .document_variables
@@ -654,6 +657,23 @@ impl<'a> RtfDocument<'a> {
     /// Remove latent-style metadata.
     pub fn clear_latent_styles(&mut self) {
         self.latent_styles = None;
+    }
+
+    /// Return inert custom XML data-store bytes without interpreting them.
+    pub fn data_store(&self) -> Option<&crate::DocumentDataStore<'_>> {
+        self.data_store.as_ref()
+    }
+
+    /// Replace inert data-store bytes after bounds validation.
+    pub fn set_data_store(&mut self, data_store: crate::DocumentDataStore<'a>) -> RtfResult<()> {
+        data_store.validate()?;
+        self.data_store = Some(data_store);
+        Ok(())
+    }
+
+    /// Remove the custom XML data-store payload.
+    pub fn clear_data_store(&mut self) {
+        self.data_store = None;
     }
 
     fn validate_xml_namespaces(namespaces: &[crate::XmlNamespace<'_>]) -> RtfResult<()> {

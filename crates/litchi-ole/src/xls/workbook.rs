@@ -445,11 +445,16 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             .shared_strings
             .clone()
             .unwrap_or_else(|| Arc::new(Vec::new()));
+        let shared_string_properties = self
+            .shared_string_properties
+            .clone()
+            .unwrap_or_else(|| Arc::new(Vec::new()));
         Self::parse_worksheet_records(
             record_iter,
             encoding,
             &bound_sheet.name,
             shared_strings,
+            shared_string_properties,
             Some(&self.formula_context),
             self.formatting.clone(),
         )
@@ -461,10 +466,17 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         encoding: &XlsEncoding,
         name: &str,
         shared_strings: Arc<Vec<String>>,
+        shared_string_properties: Arc<
+            Vec<Option<Box<crate::xls::records::SharedStringProperties>>>,
+        >,
         formula_context: Option<&FormulaContext>,
         formatting: Arc<XlsFormatting>,
     ) -> XlsResult<XlsWorksheet> {
-        let mut worksheet = XlsWorksheet::with_shared_strings(name.to_string(), shared_strings);
+        let mut worksheet = XlsWorksheet::with_shared_string_properties(
+            name.to_string(),
+            shared_strings,
+            shared_string_properties,
+        );
         worksheet.set_formatting(formatting.clone());
 
         // Accumulator for pivot table records: we collect SX* records in order
@@ -1137,6 +1149,7 @@ mod tests {
             &XlsEncoding::Utf16Le,
             "Sheet1",
             Arc::new(Vec::new()),
+            Arc::new(Vec::new()),
             None,
             Arc::new(XlsFormatting::default()),
         )
@@ -1174,6 +1187,7 @@ mod tests {
             &XlsEncoding::Utf16Le,
             "Sheet1",
             Arc::new(Vec::new()),
+            Arc::new(Vec::new()),
             None,
             Arc::new(XlsFormatting::default()),
         )
@@ -1199,6 +1213,7 @@ mod tests {
             &XlsEncoding::Utf16Le,
             "Sheet1",
             Arc::new(Vec::new()),
+            Arc::new(Vec::new()),
             None,
             Arc::new(XlsFormatting::default()),
         );
@@ -1217,6 +1232,7 @@ mod tests {
             &XlsEncoding::Utf16Le,
             "Sheet1",
             Arc::new(Vec::new()),
+            Arc::new(Vec::new()),
             None,
             Arc::new(XlsFormatting::default()),
         ).unwrap();
@@ -1231,6 +1247,7 @@ mod tests {
             &mut records,
             &XlsEncoding::Utf16Le,
             "Sheet1",
+            Arc::new(Vec::new()),
             Arc::new(Vec::new()),
             None,
             Arc::new(XlsFormatting::default()),
@@ -1291,6 +1308,7 @@ mod tests {
             &XlsEncoding::Utf16Le,
             "Sheet1",
             Arc::new(Vec::new()),
+            Arc::new(Vec::new()),
             None,
             Arc::new(XlsFormatting::default()),
         )
@@ -1327,6 +1345,7 @@ mod tests {
             &mut records,
             &XlsEncoding::Utf16Le,
             "Sheet1",
+            Arc::new(Vec::new()),
             Arc::new(Vec::new()),
             None,
             Arc::new(XlsFormatting::default()),

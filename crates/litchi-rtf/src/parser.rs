@@ -309,6 +309,8 @@ pub struct Parser<'a> {
     color_scheme_mapping: Option<Vec<u8>>,
     saw_color_scheme_mapping: bool,
     latent_styles: Option<crate::LatentStyles<'a>>,
+    data_store: Option<Vec<u8>>,
+    saw_data_store: bool,
     /// Embedded and linked objects
     objects: Vec<super::object::EmbeddedObject<'a>>,
     /// Ordered inert document variables
@@ -442,6 +444,8 @@ impl<'a> Parser<'a> {
             color_scheme_mapping: None,
             saw_color_scheme_mapping: false,
             latent_styles: None,
+            data_store: None,
+            saw_data_store: false,
             objects: Vec::new(),
             document_variables: Vec::new(),
             document_variable_text_bytes: 0,
@@ -526,6 +530,10 @@ impl<'a> Parser<'a> {
             },
             (None, None) => None,
         };
+        let data_store = self
+            .data_store
+            .map(|data| crate::DocumentDataStore::new(Cow::Owned(data)))
+            .transpose()?;
 
         Ok(ParsedDocument {
             font_table: self.font_table.into_inner(),
@@ -541,6 +549,7 @@ impl<'a> Parser<'a> {
             saw_xml_namespace_table: self.saw_xml_namespace_table,
             theme,
             latent_styles: self.latent_styles,
+            data_store,
             objects: self.objects,
             document_variables: self.document_variables,
             user_properties: self.user_properties,
@@ -743,6 +752,17 @@ impl<'a> Parser<'a> {
                             self.states.pop();
                             return Ok(());
                         },
+                        Some(Token::Control(ControlWord::DataStore)) => {
+                            if self.saw_data_store {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF contains multiple datastore destinations".to_string(),
+                                ));
+                            }
+                            self.saw_data_store = true;
+                            self.data_store = Some(self.parse_data_store_destination()?);
+                            self.states.pop();
+                            return Ok(());
+                        },
                         Some(Token::Control(ControlWord::DocumentVariable)) => {
                             self.parse_document_variable_destination()?;
                             self.states.pop();
@@ -863,6 +883,11 @@ impl<'a> Parser<'a> {
                 Token::Control(ControlWord::LatentStyles | ControlWord::LatentStyleExceptions) => {
                     return Err(RtfError::MalformedDocument(
                         "RTF latent-style destinations are misplaced or not starred".to_string(),
+                    ));
+                },
+                Token::Control(ControlWord::DataStore) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF datastore destination must be starred".to_string(),
                     ));
                 },
                 Token::Control(ControlWord::Info) => {
@@ -2134,6 +2159,11 @@ impl<'a> Parser<'a> {
                     "orphan RTF latent-style control".to_string(),
                 ));
             },
+            ControlWord::DataStore => {
+                return Err(RtfError::MalformedDocument(
+                    "orphan RTF datastore destination control".to_string(),
+                ));
+            },
             _ => {},
         }
         if self.apply_section_control(control)? {
@@ -2630,6 +2660,76 @@ impl<'a> Parser<'a> {
             }
         }
         Err(RtfError::UnexpectedEof)
+    }
+
+    fn parse_data_store_destination(&mut self) -> RtfResult<Vec<u8>> {
+        self.pos += 1; // ignorable-destination marker
+        if !matches!(
+            self.tokens.get(self.pos),
+            Some(Token::Control(ControlWord::DataStore))
+        ) {
+            return Err(RtfError::MalformedDocument(
+                "invalid RTF datastore destination".to_string(),
+            ));
+        }
+        self.pos += 1;
+        let mut data = Vec::new();
+        let mut high = None;
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    if high.is_some() {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF data-store payload has an odd hexadecimal digit count"
+                                .to_string(),
+                        ));
+                    }
+                    if data.is_empty() {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF data-store payload cannot be empty".to_string(),
+                        ));
+                    }
+                    return Ok(data);
+                },
+                Some(Token::Text(text)) => {
+                    for byte in text.as_bytes() {
+                        if byte.is_ascii_whitespace() {
+                            continue;
+                        }
+                        let nibble = match byte {
+                            b'0'..=b'9' => byte - b'0',
+                            b'a'..=b'f' => byte - b'a' + 10,
+                            b'A'..=b'F' => byte - b'A' + 10,
+                            _ => {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF data-store payload contains a non-hexadecimal character"
+                                        .to_string(),
+                                ));
+                            },
+                        };
+                        if let Some(first) = high.take() {
+                            data.push(first << 4 | nibble);
+                        } else {
+                            high = Some(nibble);
+                        }
+                    }
+                    self.pos += 1;
+                },
+                Some(Token::OpenBrace | Token::Binary(_)) | Some(Token::Control(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF datastore cannot contain controls, nesting, or binary data"
+                            .to_string(),
+                    ));
+                },
+                None => return Err(RtfError::UnexpectedEof),
+            }
+            if data.len() > crate::data_store::MAX_DATA_STORE_BYTES {
+                return Err(RtfError::MalformedDocument(
+                    "RTF data-store payload exceeds the safety limit".to_string(),
+                ));
+            }
+        }
     }
 
     fn parse_latent_styles(&mut self) -> RtfResult<crate::LatentStyles<'a>> {
@@ -6763,6 +6863,7 @@ pub struct ParsedDocument<'a> {
     pub saw_xml_namespace_table: bool,
     pub theme: Option<crate::DocumentTheme<'a>>,
     pub latent_styles: Option<crate::LatentStyles<'a>>,
+    pub data_store: Option<crate::DocumentDataStore<'a>>,
     /// Embedded and linked objects
     pub objects: Vec<super::object::EmbeddedObject<'a>>,
     /// Ordered inert document-variable metadata

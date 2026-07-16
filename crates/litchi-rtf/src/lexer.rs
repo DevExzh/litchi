@@ -133,6 +133,7 @@ pub enum ControlWord<'a> {
     LatentStyleUnhideUsed(i32),
     LatentStyleQuickFormat(i32),
     LatentStylePriority(i32),
+    DataStore,
 
     // Index and table-of-contents source marks
     IndexEntry,
@@ -761,6 +762,7 @@ impl<'a> Lexer<'a> {
             "lsdunhideused" => ControlWord::LatentStyleUnhideUsed(param_value),
             "lsdqformat" => ControlWord::LatentStyleQuickFormat(param_value),
             "lsdpriority" => ControlWord::LatentStylePriority(param_value),
+            "datastore" => ControlWord::DataStore,
 
             // Index and table-of-contents source marks
             "xe" => ControlWord::IndexEntry,

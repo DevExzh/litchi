@@ -143,6 +143,8 @@ impl<W: Write> RtfWriter<W> {
 
         self.write_latent_styles(doc.latent_styles())?;
 
+        self.write_data_store(doc.data_store())?;
+
         // Producer provenance is inert header metadata.
         self.write_generator(doc.generator())?;
 
@@ -663,6 +665,19 @@ impl<W: Write> RtfWriter<W> {
             self.write_str("}")?;
         }
         self.write_str("}")
+    }
+
+    pub fn write_data_store(
+        &mut self,
+        data_store: Option<&crate::DocumentDataStore<'_>>,
+    ) -> io::Result<()> {
+        let Some(data_store) = data_store else {
+            return Ok(());
+        };
+        data_store
+            .validate()
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+        self.write_hex_destination("datastore", data_store.data.as_ref())
     }
 
     fn write_optional_bool(&mut self, control: &str, value: Option<bool>) -> io::Result<()> {
