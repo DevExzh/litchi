@@ -60,8 +60,10 @@ pub mod escher_prop {
     pub const SHADOW_COLOR: u16 = 0x0201;
     pub const BW_MODE: u16 = 0x0304; // blackAndWhiteMode
     pub const BACKGROUND_SHAPE: u16 = 0x033F;
-    // Complex property flag
-    pub const COMPLEX_FLAG: u16 = 0x4000;
+    /// Property value is a BLIP identifier (`OfficeArtFOPTEOPID.fBid`).
+    pub const BLIP_ID_FLAG: u16 = 0x4000;
+    /// Property data follows the property table (`OfficeArtFOPTEOPID.fComplex`).
+    pub const COMPLEX_FLAG: u16 = 0x8000;
 }
 
 // =============================================================================
@@ -488,6 +490,8 @@ mod tests {
         assert_eq!(escher_prop::FILL_RECT_RIGHT, 0x0193);
         assert_eq!(escher_prop::FILL_RECT_BOTTOM, 0x0194);
         assert_eq!(escher_prop::BACKGROUND_SHAPE, 0x033F);
+        assert_eq!(escher_prop::BLIP_ID_FLAG, 0x4000);
+        assert_eq!(escher_prop::COMPLEX_FLAG, 0x8000);
         let built = build_master_ppdrawing();
         // Verify structure starts correctly
         assert!(built.len() > 100, "Built PPDrawing should be substantial");

@@ -256,13 +256,13 @@ pub mod escher_prop {
     pub const FILL_COLOR: u16 = 0x0181;
     /// Fill back color property
     pub const FILL_BACK_COLOR: u16 = 0x0183;
-    /// Fill blip property (with fComplex flag)
+    /// Fill BLIP property (with the `fBid` flag)
     pub const FILL_BLIP: u16 = 0x4186;
     /// Fill style boolean properties
     pub const FILL_STYLE_BOOL: u16 = 0x01BF;
     /// Line color property
     pub const LINE_COLOR: u16 = 0x01C0;
-    /// Line blip property (with fComplex flag)
+    /// Line BLIP property (with the `fBid` flag)
     pub const LINE_BLIP: u16 = 0x41C5;
     /// Line style boolean properties
     pub const LINE_STYLE_BOOL: u16 = 0x01FF;

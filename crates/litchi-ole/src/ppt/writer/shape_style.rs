@@ -25,7 +25,7 @@ pub mod fill_prop {
     pub const FILL_BACK_COLOR: u16 = 0x0183;
     /// Fill background opacity
     pub const FILL_BACK_OPACITY: u16 = 0x0184;
-    /// Fill BLIP reference (for picture/texture fills)
+    /// Fill BLIP reference (for picture/texture fills), with the `fBid` flag
     pub const FILL_BLIP: u16 = 0x4186;
     /// Fill width (for pattern fills)
     pub const FILL_WIDTH: u16 = 0x0189;

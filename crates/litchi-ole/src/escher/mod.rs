@@ -43,7 +43,8 @@ pub use shape_factory::EscherShapeFactory;
 pub use text::extract_text_from_escher;
 pub use types::EscherRecordType;
 pub use writer::{
-    EscherProperty, EscherRecordHeader, EscherSpData, PropertyBuilder, ShapeBuilder, ShapeFlags,
-    prop_value, record_type, shape_type, write_child_anchor, write_client_anchor, write_container,
-    write_dg, write_record_header, write_spgr,
+    EscherProperty, EscherRecordHeader, EscherSpData, PROPERTY_FLAG_BLIP_ID, PROPERTY_FLAG_COMPLEX,
+    PropertyBuilder, ShapeBuilder, ShapeFlags, prop_value, record_type, shape_type,
+    write_child_anchor, write_client_anchor, write_container, write_dg, write_record_header,
+    write_spgr,
 };

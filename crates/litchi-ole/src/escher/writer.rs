@@ -8,6 +8,11 @@ use std::io::{self, Write};
 use zerocopy::IntoBytes;
 use zerocopy_derive::*;
 
+/// OfficeArtFOPTEOPID `fBid`: the property value is a BLIP identifier.
+pub const PROPERTY_FLAG_BLIP_ID: u16 = 0x4000;
+/// OfficeArtFOPTEOPID `fComplex`: the property value is stored after the table.
+pub const PROPERTY_FLAG_COMPLEX: u16 = 0x8000;
+
 // =============================================================================
 // Shape Flags (MS-ODRAW 2.2.40)
 // =============================================================================
@@ -222,9 +227,15 @@ impl PropertyBuilder {
         self.properties.push((property_id, value));
     }
 
+    /// Add a simple property whose value identifies an entry in the BLIP store.
+    pub fn add_blip_id(&mut self, property_id: u16, blip_id: i32) {
+        self.properties
+            .push((property_id | PROPERTY_FLAG_BLIP_ID, blip_id));
+    }
+
     /// Add a complex property.
     pub fn add_complex(&mut self, property_id: u16, data: &[u8]) {
-        let property_id_with_flag = property_id | 0x8000;
+        let property_id_with_flag = property_id | PROPERTY_FLAG_COMPLEX;
         self.properties
             .push((property_id_with_flag, data.len() as i32));
         self.complex_data.extend_from_slice(data);
@@ -343,4 +354,26 @@ pub fn write_dg<W: Write>(writer: &mut W, num_shapes: u32, last_shape_id: u32) -
     writer.write_all(&num_shapes.to_le_bytes())?;
     writer.write_all(&last_shape_id.to_le_bytes())?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn property_builder_distinguishes_blip_and_complex_flags() {
+        let mut builder = PropertyBuilder::new();
+        builder.add_blip_id(0x0104, 7);
+        builder.add_complex(0x0145, &[1, 2, 3, 4]);
+
+        let mut bytes = Vec::new();
+        builder.write(&mut bytes).unwrap();
+
+        assert_eq!(builder.size(), 24);
+        assert_eq!(u16::from_le_bytes([bytes[8], bytes[9]]), 0x4104);
+        assert_eq!(i32::from_le_bytes(bytes[10..14].try_into().unwrap()), 7);
+        assert_eq!(u16::from_le_bytes([bytes[14], bytes[15]]), 0x8145);
+        assert_eq!(i32::from_le_bytes(bytes[16..20].try_into().unwrap()), 4);
+        assert_eq!(&bytes[20..], &[1, 2, 3, 4]);
+    }
 }
