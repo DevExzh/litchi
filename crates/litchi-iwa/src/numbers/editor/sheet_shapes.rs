@@ -6,10 +6,11 @@ use std::ops::Range;
 use super::*;
 use crate::shapes::{
     DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, LineEndpoints, LineSegment,
-    LineStyle, ShapePathKind, ShapePreset, ShapeStroke, line_geometry, line_path_source,
-    line_segments_match, reset_shape_stroke, set_shape_geometry, set_shape_line_endpoints,
-    set_shape_line_segment, set_shape_preset, set_shape_stroke, shape_line_endpoints,
-    shape_line_segment, shape_path_kind, shape_path_source, shape_preset, shape_stroke,
+    LineStyle, ShapeFill, ShapePathKind, ShapePreset, ShapeStroke, line_geometry, line_path_source,
+    line_segments_match, reset_shape_fill, reset_shape_stroke, set_shape_fill, set_shape_geometry,
+    set_shape_line_endpoints, set_shape_line_segment, set_shape_preset, set_shape_stroke,
+    shape_fill, shape_line_endpoints, shape_line_segment, shape_path_kind, shape_path_source,
+    shape_preset, shape_stroke,
 };
 
 use super::text_box_create::{
@@ -97,6 +98,21 @@ impl NumbersEditor {
             Some(preset),
             None,
         )
+    }
+
+    /// Add a typed preset shape with an explicit standard fill.
+    pub fn add_sheet_shape_with_fill(
+        &mut self,
+        sheet_id: u64,
+        text: &str,
+        position: DrawablePoint,
+        size: DrawableSize,
+        preset: ShapePreset,
+        fill: ShapeFill,
+    ) -> Result<NumbersSheetShapeInfo> {
+        let created = self.add_sheet_shape(sheet_id, text, position, size, preset)?;
+        self.set_sheet_shape_fill(sheet_id, created.drawable_object_id, fill)?;
+        Ok(shape_graph(self, sheet_id, created.drawable_object_id)?.info)
     }
 
     /// Add a native straight line between two sheet-space points.
@@ -368,6 +384,47 @@ impl NumbersEditor {
         let source = shape_graph(self, sheet_id, drawable_object_id)?;
         let mut staged = self.package.clone();
         let changed = reset_shape_stroke(&mut staged, &source.archive_name, drawable_object_id)?;
+        if changed {
+            *self = Self::from_package(staged)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective standard fill of one ordinary sheet shape.
+    pub fn sheet_shape_fill(&self, sheet_id: u64, drawable_object_id: u64) -> Result<ShapeFill> {
+        let source = shape_graph(self, sheet_id, drawable_object_id)?;
+        shape_fill(&self.package, &source.archive_name, drawable_object_id)
+    }
+
+    /// Replace one shape's fill transactionally, using copy-on-write for shared styles.
+    pub fn set_sheet_shape_fill(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        fill: ShapeFill,
+    ) -> Result<()> {
+        let source = shape_graph(self, sheet_id, drawable_object_id)?;
+        let mut staged = self.package.clone();
+        set_shape_fill(&mut staged, &source.archive_name, drawable_object_id, fill)?;
+        let verified = Self::from_package(staged)?;
+        if verified.sheet_shape_fill(sheet_id, drawable_object_id)? != fill {
+            return Err(Error::InvalidFormat(
+                "Numbers shape fill update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove a direct fill override and restore the inherited appearance.
+    pub fn reset_sheet_shape_fill(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let source = shape_graph(self, sheet_id, drawable_object_id)?;
+        let mut staged = self.package.clone();
+        let changed = reset_shape_fill(&mut staged, &source.archive_name, drawable_object_id)?;
         if changed {
             *self = Self::from_package(staged)?;
         }
@@ -1149,6 +1206,45 @@ mod tests {
                 .sheet_line_endpoints(sheet_id, created.drawable_object_id)
                 .unwrap(),
             endpoints
+        );
+    }
+
+    #[test]
+    fn scratch_spreadsheet_supports_typed_shape_fill_crud() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .sheet_name("Fill")
+            .table_name("Data")
+            .build()
+            .unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let fill =
+            ShapeFill::Solid(RgbaColor::new(0.1, 0.55, 0.85, 1.0, RgbColorSpace::Srgb).unwrap());
+        let created = editor
+            .add_sheet_shape(sheet_id, "Filled", POSITION, SIZE, ShapePreset::Rectangle)
+            .unwrap();
+        let inherited_fill = editor
+            .sheet_shape_fill(sheet_id, created.drawable_object_id)
+            .unwrap();
+        editor
+            .set_sheet_shape_fill(sheet_id, created.drawable_object_id, fill)
+            .unwrap();
+        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .sheet_shape_fill(sheet_id, created.drawable_object_id)
+                .unwrap(),
+            fill
+        );
+        assert!(
+            reopened
+                .reset_sheet_shape_fill(sheet_id, created.drawable_object_id)
+                .unwrap()
+        );
+        assert_eq!(
+            reopened
+                .sheet_shape_fill(sheet_id, created.drawable_object_id)
+                .unwrap(),
+            inherited_fill
         );
     }
 

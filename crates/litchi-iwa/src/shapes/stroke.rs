@@ -3,6 +3,9 @@
 use crate::{Error, Result};
 
 use super::LineEndpoints;
+#[cfg(test)]
+use super::color::RgbColorSpace;
+use super::color::RgbaColor;
 const DEFAULT_MITER_LIMIT: f32 = 4.0;
 
 mod native;
@@ -11,85 +14,6 @@ mod style;
 #[cfg(test)]
 use native::{pattern_to_native, stroke_from_native, stroke_to_native};
 pub(crate) use style::{reset_shape_stroke, set_shape_stroke, shape_stroke};
-
-/// RGB color space used by native iWork drawing colors.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-pub enum RgbColorSpace {
-    #[default]
-    Srgb,
-    DisplayP3,
-}
-
-/// Validated normalized red, green, blue, and alpha channels.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct RgbaColor {
-    red: f32,
-    green: f32,
-    blue: f32,
-    alpha: f32,
-    color_space: RgbColorSpace,
-}
-
-impl RgbaColor {
-    /// Construct a color whose channels are finite and in the inclusive range 0–1.
-    pub fn new(
-        red: f32,
-        green: f32,
-        blue: f32,
-        alpha: f32,
-        color_space: RgbColorSpace,
-    ) -> Result<Self> {
-        for (name, value) in [
-            ("red", red),
-            ("green", green),
-            ("blue", blue),
-            ("alpha", alpha),
-        ] {
-            if !value.is_finite() || !(0.0..=1.0).contains(&value) {
-                return Err(Error::ParseError(format!(
-                    "iWork stroke {name} channel must be finite and between 0 and 1"
-                )));
-            }
-        }
-        Ok(Self {
-            red,
-            green,
-            blue,
-            alpha,
-            color_space,
-        })
-    }
-
-    pub fn red(self) -> f32 {
-        self.red
-    }
-
-    pub fn green(self) -> f32 {
-        self.green
-    }
-
-    pub fn blue(self) -> f32 {
-        self.blue
-    }
-
-    pub fn alpha(self) -> f32 {
-        self.alpha
-    }
-
-    pub fn color_space(self) -> RgbColorSpace {
-        self.color_space
-    }
-
-    pub fn black() -> Self {
-        Self {
-            red: 0.0,
-            green: 0.0,
-            blue: 0.0,
-            alpha: 1.0,
-            color_space: RgbColorSpace::Srgb,
-        }
-    }
-}
 
 /// A finite, positive stroke width measured in points.
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]

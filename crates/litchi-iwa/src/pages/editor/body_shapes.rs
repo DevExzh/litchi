@@ -9,10 +9,10 @@ use crate::package_metadata::{
 };
 use crate::shapes::{
     DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, LineEndpoints, LineSegment,
-    LineStyle, ShapePathKind, ShapePreset, ShapeStroke, line_geometry, line_path_source,
-    line_segments_match, reset_shape_stroke, set_shape_geometry, set_shape_line_endpoints,
-    set_shape_line_segment, set_shape_preset, set_shape_stroke, shape_line_endpoints,
-    shape_path_source, shape_stroke,
+    LineStyle, ShapeFill, ShapePathKind, ShapePreset, ShapeStroke, line_geometry, line_path_source,
+    line_segments_match, reset_shape_fill, reset_shape_stroke, set_shape_fill, set_shape_geometry,
+    set_shape_line_endpoints, set_shape_line_segment, set_shape_preset, set_shape_stroke,
+    shape_fill, shape_line_endpoints, shape_path_source, shape_stroke,
 };
 
 use super::text_box_create::{
@@ -99,6 +99,21 @@ impl PagesEditor {
             Some(preset),
             None,
         )
+    }
+
+    /// Add a typed preset shape with an explicit standard fill.
+    pub fn add_body_shape_with_fill(
+        &mut self,
+        anchor_character_index: usize,
+        text: &str,
+        position: DrawablePoint,
+        size: DrawableSize,
+        preset: ShapePreset,
+        fill: ShapeFill,
+    ) -> Result<PagesBodyShapeInfo> {
+        let created = self.add_body_shape(anchor_character_index, text, position, size, preset)?;
+        self.set_body_shape_fill(created.drawable_object_id, fill)?;
+        Ok(body_shape_graph(self, created.drawable_object_id)?.info)
     }
 
     /// Add a native straight line between two body-document points.
@@ -358,6 +373,38 @@ impl PagesEditor {
         let source = body_shape_graph(self, drawable_object_id)?;
         let mut staged = self.package().clone();
         let changed = reset_shape_stroke(&mut staged, &source.archive_name, drawable_object_id)?;
+        if changed {
+            *self = Self::from_package(staged)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective standard fill of one ordinary body shape.
+    pub fn body_shape_fill(&self, drawable_object_id: u64) -> Result<ShapeFill> {
+        let source = body_shape_graph(self, drawable_object_id)?;
+        shape_fill(self.package(), &source.archive_name, drawable_object_id)
+    }
+
+    /// Replace one shape's fill transactionally, using copy-on-write for shared styles.
+    pub fn set_body_shape_fill(&mut self, drawable_object_id: u64, fill: ShapeFill) -> Result<()> {
+        let source = body_shape_graph(self, drawable_object_id)?;
+        let mut staged = self.package().clone();
+        set_shape_fill(&mut staged, &source.archive_name, drawable_object_id, fill)?;
+        let verified = Self::from_package(staged)?;
+        if verified.body_shape_fill(drawable_object_id)? != fill {
+            return Err(Error::InvalidFormat(
+                "Pages shape fill update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove a direct fill override and restore the inherited appearance.
+    pub fn reset_body_shape_fill(&mut self, drawable_object_id: u64) -> Result<bool> {
+        let source = body_shape_graph(self, drawable_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = reset_shape_fill(&mut staged, &source.archive_name, drawable_object_id)?;
         if changed {
             *self = Self::from_package(staged)?;
         }
@@ -848,6 +895,88 @@ mod tests {
         assert!(
             !reopened
                 .reset_body_shape_stroke(created.drawable_object_id)
+                .unwrap()
+        );
+    }
+
+    #[test]
+    fn scratch_document_supports_composable_shape_fill_crud() {
+        let mut editor = PagesEditor::create_with_text("Body").unwrap();
+        let fill = ShapeFill::Solid(
+            RgbaColor::new(0.85, 0.2, 0.15, 0.9, RgbColorSpace::DisplayP3).unwrap(),
+        );
+        let created = editor
+            .add_body_shape(4, "Filled", POSITION, SIZE, ShapePreset::Rectangle)
+            .unwrap();
+        let inherited_fill = editor.body_shape_fill(created.drawable_object_id).unwrap();
+        editor
+            .set_body_shape_fill(created.drawable_object_id, fill)
+            .unwrap();
+        assert_eq!(
+            editor.body_shape_fill(created.drawable_object_id).unwrap(),
+            fill
+        );
+
+        let stroke = ShapeStroke::new(
+            RgbaColor::black(),
+            StrokeWidth::new(2.0).unwrap(),
+            StrokePattern::Solid,
+        );
+        editor
+            .set_body_shape_stroke(created.drawable_object_id, stroke)
+            .unwrap();
+        let object_count = editor
+            .package()
+            .iwa_entry_names()
+            .map(|name| editor.package().archive(name).unwrap().objects.len())
+            .sum::<usize>();
+        let replacement =
+            ShapeFill::Solid(RgbaColor::new(0.1, 0.45, 0.9, 1.0, RgbColorSpace::Srgb).unwrap());
+        editor
+            .set_body_shape_fill(created.drawable_object_id, replacement)
+            .unwrap();
+        assert_eq!(
+            editor
+                .body_shape_stroke(created.drawable_object_id)
+                .unwrap(),
+            Some(stroke)
+        );
+        assert_eq!(
+            editor
+                .package()
+                .iwa_entry_names()
+                .map(|name| editor.package().archive(name).unwrap().objects.len())
+                .sum::<usize>(),
+            object_count
+        );
+
+        let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .body_shape_fill(created.drawable_object_id)
+                .unwrap(),
+            replacement
+        );
+        assert!(
+            reopened
+                .reset_body_shape_fill(created.drawable_object_id)
+                .unwrap()
+        );
+        assert_eq!(
+            reopened
+                .body_shape_fill(created.drawable_object_id)
+                .unwrap(),
+            inherited_fill
+        );
+        assert_eq!(
+            reopened
+                .body_shape_stroke(created.drawable_object_id)
+                .unwrap(),
+            Some(stroke)
+        );
+        assert!(
+            !reopened
+                .reset_body_shape_fill(created.drawable_object_id)
                 .unwrap()
         );
     }

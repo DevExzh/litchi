@@ -6,10 +6,11 @@ use std::ops::Range;
 use super::*;
 use crate::shapes::{
     DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, LineEndpoints, LineSegment,
-    LineStyle, ShapePathKind, ShapePreset, ShapeStroke, line_geometry, line_path_source,
-    line_segments_match, reset_shape_stroke, set_shape_geometry, set_shape_line_endpoints,
-    set_shape_line_segment, set_shape_preset, set_shape_stroke, shape_line_endpoints,
-    shape_line_segment, shape_path_kind, shape_path_source, shape_preset, shape_stroke,
+    LineStyle, ShapeFill, ShapePathKind, ShapePreset, ShapeStroke, line_geometry, line_path_source,
+    line_segments_match, reset_shape_fill, reset_shape_stroke, set_shape_fill, set_shape_geometry,
+    set_shape_line_endpoints, set_shape_line_segment, set_shape_preset, set_shape_stroke,
+    shape_fill, shape_line_endpoints, shape_line_segment, shape_path_kind, shape_path_source,
+    shape_preset, shape_stroke,
 };
 use crate::text::TextStorageInfo;
 
@@ -102,6 +103,21 @@ impl KeynoteEditor {
             Some(preset),
             None,
         )
+    }
+
+    /// Add a typed preset shape with an explicit standard fill.
+    pub fn add_slide_shape_with_fill(
+        &mut self,
+        slide_index: usize,
+        text: &str,
+        position: DrawablePoint,
+        size: DrawableSize,
+        preset: ShapePreset,
+        fill: ShapeFill,
+    ) -> Result<KeynoteSlideShapeInfo> {
+        let created = self.add_slide_shape(slide_index, text, position, size, preset)?;
+        self.set_slide_shape_fill(slide_index, created.drawable_object_id, fill)?;
+        Ok(shape_graph(self, slide_index, created.drawable_object_id)?.info)
     }
 
     /// Add a native straight line between two slide-space points.
@@ -366,6 +382,51 @@ impl KeynoteEditor {
         let source = shape_graph(self, slide_index, drawable_object_id)?;
         let mut staged = self.package().clone();
         let changed = reset_shape_stroke(&mut staged, &source.archive_name, drawable_object_id)?;
+        if changed {
+            *self = Self::from_package(staged)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective standard fill of one ordinary slide shape.
+    pub fn slide_shape_fill(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<ShapeFill> {
+        let source = shape_graph(self, slide_index, drawable_object_id)?;
+        shape_fill(self.package(), &source.archive_name, drawable_object_id)
+    }
+
+    /// Replace one shape's fill transactionally, using copy-on-write for shared styles.
+    pub fn set_slide_shape_fill(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        fill: ShapeFill,
+    ) -> Result<()> {
+        let source = shape_graph(self, slide_index, drawable_object_id)?;
+        let mut staged = self.package().clone();
+        set_shape_fill(&mut staged, &source.archive_name, drawable_object_id, fill)?;
+        let verified = Self::from_package(staged)?;
+        if verified.slide_shape_fill(slide_index, drawable_object_id)? != fill {
+            return Err(Error::InvalidFormat(
+                "Keynote shape fill update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove a direct fill override and restore the inherited appearance.
+    pub fn reset_slide_shape_fill(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let source = shape_graph(self, slide_index, drawable_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = reset_shape_fill(&mut staged, &source.archive_name, drawable_object_id)?;
         if changed {
             *self = Self::from_package(staged)?;
         }
@@ -1095,6 +1156,45 @@ mod tests {
                 .slide_line_endpoints(0, created.drawable_object_id)
                 .unwrap(),
             endpoints
+        );
+    }
+
+    #[test]
+    fn scratch_presentation_supports_typed_shape_fill_crud() {
+        let mut editor = KeynoteDocumentBuilder::new()
+            .title("Fill")
+            .subtitle("Typed native style")
+            .build()
+            .unwrap();
+        let fill = ShapeFill::Solid(
+            RgbaColor::new(0.95, 0.45, 0.05, 0.85, RgbColorSpace::DisplayP3).unwrap(),
+        );
+        let created = editor
+            .add_slide_shape(0, "Filled", POSITION, SIZE, ShapePreset::Rectangle)
+            .unwrap();
+        let inherited_fill = editor
+            .slide_shape_fill(0, created.drawable_object_id)
+            .unwrap();
+        editor
+            .set_slide_shape_fill(0, created.drawable_object_id, fill)
+            .unwrap();
+        let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .slide_shape_fill(0, created.drawable_object_id)
+                .unwrap(),
+            fill
+        );
+        assert!(
+            reopened
+                .reset_slide_shape_fill(0, created.drawable_object_id)
+                .unwrap()
+        );
+        assert_eq!(
+            reopened
+                .slide_shape_fill(0, created.drawable_object_id)
+                .unwrap(),
+            inherited_fill
         );
     }
 

@@ -29,6 +29,7 @@ const STYLE_PROPERTIES_FIELD: u32 = 11;
 const TSS_STYLE_PARENT_FIELD: u32 = 3;
 const TSS_STYLE_VARIATION_FIELD: u32 = 4;
 const TSS_STYLE_STYLESHEET_FIELD: u32 = 5;
+const TSD_FILL_FIELD: u32 = 1;
 const TSD_STROKE_FIELD: u32 = 2;
 const TSD_HEAD_LINE_END_FIELD: u32 = 6;
 const TSD_TAIL_LINE_END_FIELD: u32 = 7;
@@ -41,6 +42,7 @@ const STYLE_CHILDREN_FIELD: u32 = 2;
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct ShapeStyleOverrides {
+    pub(crate) fill: Option<tsd::FillArchive>,
     pub(crate) stroke: Option<tsd::StrokeArchive>,
     pub(crate) head_line_end: Option<tsd::LineEndArchive>,
     pub(crate) tail_line_end: Option<tsd::LineEndArchive>,
@@ -48,7 +50,8 @@ pub(crate) struct ShapeStyleOverrides {
 
 impl ShapeStyleOverrides {
     fn override_count(&self) -> u32 {
-        u32::from(self.stroke.is_some())
+        u32::from(self.fill.is_some())
+            + u32::from(self.stroke.is_some())
             + u32::from(self.head_line_end.is_some())
             + u32::from(self.tail_line_end.is_some())
     }
@@ -71,6 +74,7 @@ pub(crate) fn direct_shape_style_overrides(
         return Ok(None);
     };
     let overrides = ShapeStyleOverrides {
+        fill: properties.fill.clone(),
         stroke: properties.stroke.clone(),
         head_line_end: properties.head_line_end.clone(),
         tail_line_end: properties.tail_line_end.clone(),
@@ -86,7 +90,6 @@ pub(crate) fn direct_shape_style_overrides(
             .as_ref()
             .is_some_and(|properties| properties == &Default::default())
         && style.super_.override_count == Some(override_count)
-        && properties.fill.is_none()
         && properties.opacity.is_none()
         && properties.shadow.is_none()
         && properties.reflection.is_none()
@@ -112,7 +115,10 @@ pub(crate) fn direct_shape_style_overrides(
         STYLE_PROPERTIES_FIELD,
         "iWork text shape properties",
     )?;
-    let mut property_fields = Vec::with_capacity(3);
+    let mut property_fields = Vec::with_capacity(4);
+    if overrides.fill.is_some() {
+        property_fields.push(TSD_FILL_FIELD);
+    }
     if overrides.stroke.is_some() {
         property_fields.push(TSD_STROKE_FIELD);
     }
@@ -256,6 +262,7 @@ pub(crate) fn shape_style_variation_object(
             },
             override_count: Some(override_count),
             shape_properties: Some(tsd::ShapeStylePropertiesArchive {
+                fill: overrides.fill,
                 stroke: overrides.stroke,
                 head_line_end: overrides.head_line_end,
                 tail_line_end: overrides.tail_line_end,

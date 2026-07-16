@@ -3,7 +3,9 @@
 use std::env;
 
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
-use litchi_iwa::shapes::{DrawablePoint, DrawableSize, ShapePreset};
+use litchi_iwa::shapes::{
+    DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeFill, ShapePreset,
+};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -21,7 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .title("Created from scratch")
         .subtitle("Shape built from typed IWA objects")
         .build()?;
-    let created = editor.add_slide_shape(
+    let created = editor.add_slide_shape_with_fill(
         0,
         &text,
         DrawablePoint { x: 720.0, y: 660.0 },
@@ -30,6 +32,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             height: 240.0,
         },
         ShapePreset::RightArrow,
+        ShapeFill::Solid(RgbaColor::new(
+            0.96,
+            0.48,
+            0.06,
+            1.0,
+            RgbColorSpace::DisplayP3,
+        )?),
     )?;
     editor.save(output)?;
     println!(

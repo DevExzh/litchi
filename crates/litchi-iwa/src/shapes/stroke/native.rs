@@ -1,11 +1,11 @@
 //! Native protobuf conversion for standard iWork strokes.
 
-use crate::protobuf::{tsd, tsp};
+use crate::protobuf::tsd;
 use crate::{Error, Result};
 
+use super::super::color::{color_from_native, color_to_native};
 use super::{
-    RgbColorSpace, RgbaColor, ShapeStroke, StrokeCap, StrokeJoin, StrokeMiterLimit, StrokePattern,
-    StrokeWidth,
+    RgbaColor, ShapeStroke, StrokeCap, StrokeJoin, StrokeMiterLimit, StrokePattern, StrokeWidth,
 };
 
 const DEFAULT_MITER_LIMIT: f32 = 4.0;
@@ -177,59 +177,5 @@ pub(super) fn pattern_to_native(pattern: StrokePattern) -> tsd::StrokePatternArc
         phase: Some(0.0),
         count: Some(count),
         pattern: values,
-    }
-}
-
-fn color_from_native(color: &tsp::Color) -> Result<RgbaColor> {
-    if color.model != tsp::color::ColorModel::Rgb as i32
-        || color.c.is_some()
-        || color.m.is_some()
-        || color.y.is_some()
-        || color.k.is_some()
-        || color.w.is_some()
-    {
-        return Err(Error::InvalidFormat(
-            "native iWork stroke color is not RGB".to_owned(),
-        ));
-    }
-    let color_space =
-        match tsp::color::RgbColorSpace::try_from(color.rgbspace.ok_or_else(|| {
-            Error::InvalidFormat("native iWork stroke color has no RGB color space".to_owned())
-        })?) {
-            Ok(tsp::color::RgbColorSpace::Srgb) => RgbColorSpace::Srgb,
-            Ok(tsp::color::RgbColorSpace::P3) => RgbColorSpace::DisplayP3,
-            Err(_) => {
-                return Err(Error::InvalidFormat(
-                    "native iWork stroke uses an unknown RGB color space".to_owned(),
-                ));
-            },
-        };
-    RgbaColor::new(
-        color
-            .r
-            .ok_or_else(|| Error::InvalidFormat("stroke color has no red channel".to_owned()))?,
-        color
-            .g
-            .ok_or_else(|| Error::InvalidFormat("stroke color has no green channel".to_owned()))?,
-        color
-            .b
-            .ok_or_else(|| Error::InvalidFormat("stroke color has no blue channel".to_owned()))?,
-        color.a.unwrap_or(1.0),
-        color_space,
-    )
-}
-
-fn color_to_native(color: RgbaColor) -> tsp::Color {
-    tsp::Color {
-        model: tsp::color::ColorModel::Rgb as i32,
-        r: Some(color.red()),
-        g: Some(color.green()),
-        b: Some(color.blue()),
-        rgbspace: Some(match color.color_space() {
-            RgbColorSpace::Srgb => tsp::color::RgbColorSpace::Srgb as i32,
-            RgbColorSpace::DisplayP3 => tsp::color::RgbColorSpace::P3 as i32,
-        }),
-        a: Some(color.alpha()),
-        ..Default::default()
     }
 }

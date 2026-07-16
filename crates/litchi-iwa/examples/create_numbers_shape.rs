@@ -3,7 +3,9 @@
 use std::env;
 
 use litchi_iwa::numbers::NumbersDocumentBuilder;
-use litchi_iwa::shapes::{DrawablePoint, DrawableSize, ShapePreset};
+use litchi_iwa::shapes::{
+    DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeFill, ShapePreset,
+};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -22,7 +24,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .table_name("Scratch Table")
         .build()?;
     let sheet_id = editor.sheets()?[0].object_id;
-    let created = editor.add_sheet_shape(
+    let created = editor.add_sheet_shape_with_fill(
         sheet_id,
         &text,
         DrawablePoint { x: 420.0, y: 300.0 },
@@ -31,6 +33,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             height: 150.0,
         },
         ShapePreset::RightArrow,
+        ShapeFill::Solid(RgbaColor::new(0.08, 0.42, 0.9, 1.0, RgbColorSpace::Srgb)?),
     )?;
     editor.save(output)?;
     println!(
