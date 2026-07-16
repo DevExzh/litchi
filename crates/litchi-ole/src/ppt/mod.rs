@@ -72,6 +72,7 @@ pub mod escher;
 
 // Legacy compatibility modules
 pub mod current_user;
+pub mod document_properties;
 pub mod escher_textbox;
 pub mod font;
 pub mod hyperlink;
@@ -100,6 +101,7 @@ pub use shapes::{AutoShape, Placeholder, PlaceholderSize, PlaceholderType, Shape
 
 // Re-export legacy types
 pub use current_user::CurrentUser;
+pub use document_properties::PowerPoint10DocumentProperties;
 pub use escher_textbox::EscherTextboxWrapper;
 pub use font::{
     EmbeddedPowerPointFont, PowerPointFont, PowerPointFontCollection, PowerPointFontCollections,
