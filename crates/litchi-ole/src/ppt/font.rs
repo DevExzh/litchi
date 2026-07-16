@@ -51,6 +51,17 @@ pub struct PowerPointFontCollection {
     pub fonts: Vec<PowerPointFont>,
 }
 
+/// PowerPoint 10 document-wide font embedding settings.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PowerPointFontEmbeddingFlags {
+    /// Raw flags word. Only bits 0 and 1 are defined by MS-PPT.
+    pub raw: u32,
+    /// Whether embedded fonts contain only the characters used by the presentation.
+    pub subset: bool,
+    /// Whether the user confirmed the subset choice in the user interface.
+    pub subset_option_confirmed: bool,
+}
+
 /// Base and international font collections resolved from a PPT record tree.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct PowerPointFontCollections {
@@ -58,6 +69,8 @@ pub struct PowerPointFontCollections {
     pub base: Option<PowerPointFontCollection>,
     /// PowerPoint 10 international font collection from `___PPT10`.
     pub international: Option<PowerPointFontCollection>,
+    /// PowerPoint 10 document-wide font embedding settings from `___PPT10`.
+    pub embedding_flags: Option<PowerPointFontEmbeddingFlags>,
 }
 
 impl PowerPointFontCollections {
@@ -76,22 +89,33 @@ impl PowerPointFontCollections {
             .transpose()?;
 
         let mut international = None;
+        let mut embedding_flags = None;
         for record in root.versioned_binary_tag_records(10)? {
-            if record.record_type != PptRecordType::FontCollection10 {
-                continue;
-            }
-            if international
-                .replace(PowerPointFontCollection::parse(&record)?)
-                .is_some()
-            {
-                return Err(PptError::Corrupted(
-                    "Record tree contains multiple international font collections".to_string(),
-                ));
+            match record.record_type {
+                PptRecordType::FontCollection10 if international.is_some() => {
+                    return Err(PptError::Corrupted(
+                        "Record tree contains multiple international font collections".to_string(),
+                    ));
+                },
+                PptRecordType::FontCollection10 => {
+                    international = Some(PowerPointFontCollection::parse(&record)?);
+                },
+                PptRecordType::FontEmbedFlags10Atom if embedding_flags.is_some() => {
+                    return Err(PptError::Corrupted(
+                        "Record tree contains multiple PowerPoint 10 font embedding flags"
+                            .to_string(),
+                    ));
+                },
+                PptRecordType::FontEmbedFlags10Atom => {
+                    embedding_flags = Some(PowerPointFontEmbeddingFlags::parse(&record)?);
+                },
+                _ => {},
             }
         }
         Ok(Self {
             base,
             international,
+            embedding_flags,
         })
     }
 
@@ -103,6 +127,29 @@ impl PowerPointFontCollections {
     /// Resolve a PowerPoint 10 international-font reference.
     pub fn get_international(&self, index: u16) -> Option<&PowerPointFont> {
         self.international.as_ref()?.get(index)
+    }
+}
+
+impl PowerPointFontEmbeddingFlags {
+    /// Parse a `FontEmbedFlags10Atom` record.
+    pub fn parse(record: &PptRecord) -> Result<Self> {
+        if record.record_type != PptRecordType::FontEmbedFlags10Atom
+            || record.version != 0
+            || record.instance != 0
+            || record.data.len() != 4
+        {
+            return Err(PptError::Corrupted(
+                "FontEmbedFlags10Atom has an invalid record header or size".to_string(),
+            ));
+        }
+        let raw = u32::from_le_bytes(record.data[..4].try_into().map_err(|_| {
+            PptError::Corrupted("FontEmbedFlags10Atom payload is truncated".to_string())
+        })?);
+        Ok(Self {
+            raw,
+            subset: raw & 0x01 != 0,
+            subset_option_confirmed: raw & 0x02 != 0,
+        })
     }
 }
 
@@ -361,6 +408,9 @@ mod tests {
         );
         let international_bytes = record_bytes(0, 9, 4023, &entity);
         let international = record_bytes(0x0f, 0, 2006, &international_bytes);
+        let embedding_flags = record_bytes(0, 0, 0x32c8, &0xffff_ffffu32.to_le_bytes());
+        let mut extension = international;
+        extension.extend_from_slice(&embedding_flags);
         let root = PptRecord {
             record_type: PptRecordType::Document,
             record_type_raw: 1000,
@@ -368,11 +418,46 @@ mod tests {
             instance: 0,
             data_length: 0,
             data: Vec::new(),
-            children: vec![base, prog_tags_record(10, &international)],
+            children: vec![base, prog_tags_record(10, &extension)],
         };
 
         let fonts = PowerPointFontCollections::parse(&root).unwrap();
         assert_eq!(fonts.get_base(0).unwrap().name, "A");
         assert_eq!(fonts.get_international(9).unwrap().name, "A");
+        let flags = fonts.embedding_flags.unwrap();
+        assert_eq!(flags.raw, 0xffff_ffff);
+        assert!(flags.subset);
+        assert!(flags.subset_option_confirmed);
+    }
+
+    #[test]
+    fn rejects_malformed_or_duplicate_font_embedding_flags() {
+        let malformed_header = record_bytes(1, 0, 0x32c8, &0u32.to_le_bytes());
+        let root = PptRecord {
+            record_type: PptRecordType::Document,
+            record_type_raw: 1000,
+            version: 0x0f,
+            instance: 0,
+            data_length: 0,
+            data: Vec::new(),
+            children: vec![prog_tags_record(10, &malformed_header)],
+        };
+        assert!(PowerPointFontCollections::parse(&root).is_err());
+
+        let malformed_size = record_bytes(0, 0, 0x32c8, &[0, 0, 0]);
+        let mut duplicate = record_bytes(0, 0, 0x32c8, &0u32.to_le_bytes());
+        duplicate.extend_from_slice(&record_bytes(0, 0, 0x32c8, &1u32.to_le_bytes()));
+        for payload in [&malformed_size[..], &duplicate[..]] {
+            let root = PptRecord {
+                record_type: PptRecordType::Document,
+                record_type_raw: 1000,
+                version: 0x0f,
+                instance: 0,
+                data_length: 0,
+                data: Vec::new(),
+                children: vec![prog_tags_record(10, payload)],
+            };
+            assert!(PowerPointFontCollections::parse(&root).is_err());
+        }
     }
 }

@@ -103,6 +103,7 @@ pub use current_user::CurrentUser;
 pub use escher_textbox::EscherTextboxWrapper;
 pub use font::{
     EmbeddedPowerPointFont, PowerPointFont, PowerPointFontCollection, PowerPointFontCollections,
+    PowerPointFontEmbeddingFlags,
 };
 pub use hyperlink::{
     InteractionAction, InteractionJump, InteractionLinkTarget, InteractionTrigger,

@@ -109,6 +109,8 @@ pub enum PptRecordType {
     FontEntityAtom = 4023,
     /// Embedded font data atom record
     FontEmbeddedData = 4024,
+    /// PowerPoint 10 font embedding flags atom
+    FontEmbedFlags10Atom = 0x32C8,
     /// CString record
     CString = 4026,
     /// East Asian line-breaking settings container
@@ -307,6 +309,7 @@ impl From<u16> for PptRecordType {
             4006 => PptRecordType::TextRulerAtom,
             4023 => PptRecordType::FontEntityAtom,
             4024 => PptRecordType::FontEmbeddedData,
+            0x32C8 => PptRecordType::FontEmbedFlags10Atom,
             4026 => PptRecordType::CString,
             4040 => PptRecordType::Kinsoku,
             4050 => PptRecordType::KinsokuAtom,
