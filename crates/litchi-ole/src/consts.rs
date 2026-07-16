@@ -61,6 +61,10 @@ pub enum PptRecordType {
     PPDrawing = 1036,
     /// PowerPoint 10 square-grid spacing atom
     GridSpacing10Atom = 1037,
+    /// PowerPoint 12 embedded DrawingML theme package atom
+    RoundTripTheme12Atom = 0x040E,
+    /// PowerPoint 12 DrawingML color mapping XML atom
+    RoundTripColorMapping12Atom = 0x040F,
     /// PowerPoint 12 composite master identifier atom
     RoundTripCompositeMasterId12Atom = 0x041D,
     /// PowerPoint 12 round-trip shape identifier atom
@@ -327,6 +331,8 @@ impl From<u16> for PptRecordType {
             1035 => PptRecordType::PPDrawingGroup,
             1036 => PptRecordType::PPDrawing,
             1037 => PptRecordType::GridSpacing10Atom,
+            0x040E => PptRecordType::RoundTripTheme12Atom,
+            0x040F => PptRecordType::RoundTripColorMapping12Atom,
             0x041D => PptRecordType::RoundTripCompositeMasterId12Atom,
             0x041F => PptRecordType::RoundTripShapeId12Atom,
             0x0420 => PptRecordType::RoundTripHFPlaceholder12Atom,

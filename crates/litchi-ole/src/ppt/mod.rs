@@ -133,8 +133,9 @@ pub use slide_extension::{
     PowerPointShapeChecksums,
 };
 pub use slide_round_trip::{
-    PowerPoint12SlideRoundTripMetadata, PowerPointAnimationPackage,
-    PowerPointContentMasterReference,
+    PowerPoint12SlideRoundTripMetadata, PowerPointAnimationPackage, PowerPointColorMapping,
+    PowerPointColorMappingKind, PowerPointColorMappingValues, PowerPointColorSchemeIndex,
+    PowerPointContentMasterReference, PowerPointThemeKind, PowerPointThemePackage,
 };
 pub use slide_sync::{PowerPointSlideSyncInfo, PowerPointSystemTime};
 pub use smart_tags::{
