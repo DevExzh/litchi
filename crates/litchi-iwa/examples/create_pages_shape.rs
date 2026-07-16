@@ -4,9 +4,10 @@ use std::{env, fs, path::Path};
 
 use litchi_iwa::pages::PagesEditor;
 use litchi_iwa::shapes::{
-    DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeEffects, ShapeFill, ShapeGradient,
-    ShapeGradientAngle, ShapeImageFillTechnique, ShapeOpacity, ShapePreset, ShapeReflection,
-    ShapeReflectionOpacity,
+    DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeDropShadow, ShapeEffects,
+    ShapeFill, ShapeGradient, ShapeGradientAngle, ShapeImageFillTechnique, ShapeOpacity,
+    ShapePreset, ShapeReflection, ShapeReflectionOpacity, ShapeShadow, ShapeShadowAngle,
+    ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowOffset, ShapeShadowOpacity,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -55,6 +56,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ShapeOpacity::new(0.72)?,
             ShapeReflection::Enabled(ShapeReflectionOpacity::new(0.35)?),
         ),
+    )?;
+    editor.set_body_shape_shadow(
+        created.drawable_object_id,
+        ShapeShadow::Drop(ShapeDropShadow::new(
+            ShapeShadowAppearance::new(
+                RgbaColor::black(),
+                ShapeShadowBlurRadius::from_points(7)?,
+                ShapeShadowOffset::from_points(11.0)?,
+                ShapeShadowOpacity::new(0.42)?,
+            ),
+            ShapeShadowAngle::from_degrees(135.0)?,
+        )),
     )?;
     editor.save(output)?;
     println!(

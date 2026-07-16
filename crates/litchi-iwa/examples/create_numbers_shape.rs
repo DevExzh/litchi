@@ -4,9 +4,10 @@ use std::{env, fs, path::Path};
 
 use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::shapes::{
-    DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeEffects, ShapeFill, ShapeGradient,
-    ShapeGradientAngle, ShapeImageFillTechnique, ShapeOpacity, ShapePreset, ShapeReflection,
-    ShapeReflectionOpacity,
+    DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeContactShadow, ShapeEffects,
+    ShapeFill, ShapeGradient, ShapeGradientAngle, ShapeImageFillTechnique, ShapeOpacity,
+    ShapePreset, ShapeReflection, ShapeReflectionOpacity, ShapeShadow, ShapeShadowAppearance,
+    ShapeShadowBlurRadius, ShapeShadowOffset, ShapeShadowOpacity, ShapeShadowPerspective,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -60,6 +61,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ShapeOpacity::new(0.84)?,
             ShapeReflection::Enabled(ShapeReflectionOpacity::new(0.65)?),
         ),
+    )?;
+    editor.set_sheet_shape_shadow(
+        sheet_id,
+        created.drawable_object_id,
+        ShapeShadow::Contact(ShapeContactShadow::new(
+            ShapeShadowAppearance::new(
+                RgbaColor::black(),
+                ShapeShadowBlurRadius::from_points(18)?,
+                ShapeShadowOffset::from_points(6.0)?,
+                ShapeShadowOpacity::new(0.58)?,
+            ),
+            ShapeShadowPerspective::from_degrees(23.0)?,
+        )),
     )?;
     editor.save(output)?;
     println!(

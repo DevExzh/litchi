@@ -13,8 +13,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let fill = editor.body_shape_fill(shape.drawable_object_id)?;
         let stroke = editor.body_shape_stroke(shape.drawable_object_id)?;
         let effects = editor.body_shape_effects(shape.drawable_object_id)?;
+        let shadow = editor.body_shape_shadow(shape.drawable_object_id)?;
         println!(
-            "shape[{index}] drawable={} storage={} anchor={} kind={:?} preset={:?} line={:?} endpoints={:?} fill={fill:?} stroke={stroke:?} effects={effects:?} text={:?} geometry={:?} properties={:?}",
+            "shape[{index}] drawable={} storage={} anchor={} kind={:?} preset={:?} line={:?} endpoints={:?} fill={fill:?} stroke={stroke:?} effects={effects:?} shadow={shadow:?} text={:?} geometry={:?} properties={:?}",
             shape.drawable_object_id,
             shape.storage.object_id,
             shape.anchor_character_index,

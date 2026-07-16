@@ -15,6 +15,7 @@ mod line;
 mod line_end;
 mod path;
 mod properties;
+mod shadow;
 mod stroke;
 pub mod text_extractor;
 
@@ -45,6 +46,12 @@ pub use path::{
 pub(crate) use path::{set_shape_preset, shape_path_kind, shape_path_source, shape_preset};
 pub use properties::DrawableProperties;
 pub(crate) use properties::{set_shape_properties, shape_properties};
+pub use shadow::{
+    ShapeContactShadow, ShapeCurvedShadow, ShapeDropShadow, ShapeShadow, ShapeShadowAngle,
+    ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowCurve, ShapeShadowOffset,
+    ShapeShadowOpacity, ShapeShadowPerspective,
+};
+pub(crate) use shadow::{reset_shape_shadow, set_shape_shadow, shape_shadow};
 pub use stroke::{
     LineStyle, ShapeStroke, StrokeCap, StrokeJoin, StrokeMiterLimit, StrokePattern, StrokeWidth,
 };

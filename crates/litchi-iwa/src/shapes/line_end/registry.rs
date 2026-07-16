@@ -32,6 +32,7 @@ const TSS_STYLE_STYLESHEET_FIELD: u32 = 5;
 const TSD_FILL_FIELD: u32 = 1;
 const TSD_STROKE_FIELD: u32 = 2;
 const TSD_OPACITY_FIELD: u32 = 3;
+const TSD_SHADOW_FIELD: u32 = 4;
 const TSD_REFLECTION_FIELD: u32 = 5;
 const TSD_HEAD_LINE_END_FIELD: u32 = 6;
 const TSD_TAIL_LINE_END_FIELD: u32 = 7;
@@ -47,6 +48,7 @@ pub(crate) struct ShapeStyleOverrides {
     pub(crate) fill: Option<tsd::FillArchive>,
     pub(crate) stroke: Option<tsd::StrokeArchive>,
     pub(crate) opacity: Option<f32>,
+    pub(crate) shadow: Option<tsd::ShadowArchive>,
     pub(crate) reflection: Option<tsd::ReflectionArchive>,
     pub(crate) head_line_end: Option<tsd::LineEndArchive>,
     pub(crate) tail_line_end: Option<tsd::LineEndArchive>,
@@ -57,6 +59,7 @@ impl ShapeStyleOverrides {
         u32::from(self.fill.is_some())
             + u32::from(self.stroke.is_some())
             + u32::from(self.opacity.is_some())
+            + u32::from(self.shadow.is_some())
             + u32::from(self.reflection.is_some())
             + u32::from(self.head_line_end.is_some())
             + u32::from(self.tail_line_end.is_some())
@@ -83,6 +86,7 @@ pub(crate) fn direct_shape_style_overrides(
         fill: properties.fill.clone(),
         stroke: properties.stroke.clone(),
         opacity: properties.opacity,
+        shadow: properties.shadow,
         reflection: properties.reflection,
         head_line_end: properties.head_line_end.clone(),
         tail_line_end: properties.tail_line_end.clone(),
@@ -98,7 +102,6 @@ pub(crate) fn direct_shape_style_overrides(
             .as_ref()
             .is_some_and(|properties| properties == &Default::default())
         && style.super_.override_count == Some(override_count)
-        && properties.shadow.is_none()
         && style.super_.super_.name.is_none()
         && style.super_.super_.style_identifier.is_none()
         && style.super_.super_.parent.is_some()
@@ -121,7 +124,7 @@ pub(crate) fn direct_shape_style_overrides(
         STYLE_PROPERTIES_FIELD,
         "iWork text shape properties",
     )?;
-    let mut property_fields = Vec::with_capacity(6);
+    let mut property_fields = Vec::with_capacity(7);
     if overrides.fill.is_some() {
         property_fields.push(TSD_FILL_FIELD);
     }
@@ -130,6 +133,9 @@ pub(crate) fn direct_shape_style_overrides(
     }
     if overrides.opacity.is_some() {
         property_fields.push(TSD_OPACITY_FIELD);
+    }
+    if overrides.shadow.is_some() {
+        property_fields.push(TSD_SHADOW_FIELD);
     }
     if overrides.reflection.is_some() {
         property_fields.push(TSD_REFLECTION_FIELD);
@@ -284,10 +290,10 @@ pub(crate) fn shape_style_variation_object(
                 fill: overrides.fill,
                 stroke: overrides.stroke,
                 opacity: overrides.opacity,
+                shadow: overrides.shadow,
                 reflection: overrides.reflection,
                 head_line_end: overrides.head_line_end,
                 tail_line_end: overrides.tail_line_end,
-                ..Default::default()
             }),
         },
         override_count: Some(override_count),

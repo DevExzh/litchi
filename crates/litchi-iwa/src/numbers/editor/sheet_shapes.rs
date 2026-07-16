@@ -7,11 +7,12 @@ use super::*;
 use crate::shapes::{
     DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, LineEndpoints, LineSegment,
     LineStyle, RgbaColor, ShapeEffects, ShapeFill, ShapeImageFill, ShapeImageFillTechnique,
-    ShapePathKind, ShapePreset, ShapeStroke, line_geometry, line_path_source, line_segments_match,
-    reset_shape_effects, reset_shape_fill, reset_shape_stroke, set_shape_effects, set_shape_fill,
-    set_shape_geometry, set_shape_image_fill_data, set_shape_line_endpoints,
-    set_shape_line_segment, set_shape_preset, set_shape_stroke, shape_effects, shape_fill,
-    shape_line_endpoints, shape_line_segment, shape_path_kind, shape_path_source, shape_preset,
+    ShapePathKind, ShapePreset, ShapeShadow, ShapeStroke, line_geometry, line_path_source,
+    line_segments_match, reset_shape_effects, reset_shape_fill, reset_shape_shadow,
+    reset_shape_stroke, set_shape_effects, set_shape_fill, set_shape_geometry,
+    set_shape_image_fill_data, set_shape_line_endpoints, set_shape_line_segment, set_shape_preset,
+    set_shape_shadow, set_shape_stroke, shape_effects, shape_fill, shape_line_endpoints,
+    shape_line_segment, shape_path_kind, shape_path_source, shape_preset, shape_shadow,
     shape_stroke,
 };
 
@@ -516,6 +517,58 @@ impl NumbersEditor {
         let source = shape_graph(self, sheet_id, drawable_object_id)?;
         let mut staged = self.package.clone();
         let changed = reset_shape_effects(&mut staged, &source.archive_name, drawable_object_id)?;
+        if changed {
+            *self = Self::from_package(staged)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective drop, contact, curved, or disabled shadow state.
+    pub fn sheet_shape_shadow(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<ShapeShadow> {
+        let source = shape_graph(self, sheet_id, drawable_object_id)?;
+        shape_shadow(&self.package, &source.archive_name, drawable_object_id)
+    }
+
+    /// Replace the shadow while preserving all other shape style properties.
+    pub fn set_sheet_shape_shadow(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        shadow: ShapeShadow,
+    ) -> Result<()> {
+        let source = shape_graph(self, sheet_id, drawable_object_id)?;
+        let staged = set_shape_shadow(
+            self.package.clone(),
+            &source.archive_name,
+            drawable_object_id,
+            shadow,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.sheet_shape_shadow(sheet_id, drawable_object_id)? != shadow {
+            return Err(Error::InvalidFormat(
+                "Numbers shape shadow update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove a direct shadow override and restore inherited shadow state.
+    pub fn reset_sheet_shape_shadow(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let source = shape_graph(self, sheet_id, drawable_object_id)?;
+        let (staged, changed) = reset_shape_shadow(
+            self.package.clone(),
+            &source.archive_name,
+            drawable_object_id,
+        )?;
         if changed {
             *self = Self::from_package(staged)?;
         }
@@ -1101,9 +1154,10 @@ mod tests {
     use super::*;
     use crate::numbers::NumbersDocumentBuilder;
     use crate::shapes::{
-        LineEndpoint, RgbColorSpace, RgbaColor, ShapeCornerRadius, ShapeGradient,
-        ShapeGradientAngle, ShapeOpacity, ShapeReflection, ShapeReflectionOpacity, StrokePattern,
-        StrokeWidth,
+        LineEndpoint, RgbColorSpace, RgbaColor, ShapeContactShadow, ShapeCornerRadius,
+        ShapeGradient, ShapeGradientAngle, ShapeOpacity, ShapeReflection, ShapeReflectionOpacity,
+        ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowOffset, ShapeShadowOpacity,
+        ShapeShadowPerspective, StrokePattern, StrokeWidth,
     };
 
     const POSITION: DrawablePoint = DrawablePoint { x: 420.0, y: 300.0 };
@@ -1441,6 +1495,53 @@ mod tests {
         assert_eq!(
             reopened
                 .sheet_shape_effects(sheet_id, created.drawable_object_id)
+                .unwrap(),
+            inherited
+        );
+    }
+
+    #[test]
+    fn scratch_spreadsheet_supports_contact_shadow_crud() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .sheet_name("Shadows")
+            .table_name("Data")
+            .build()
+            .unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let created = editor
+            .add_sheet_shape(sheet_id, "Shadow", POSITION, SIZE, ShapePreset::Rectangle)
+            .unwrap();
+        let inherited = editor
+            .sheet_shape_shadow(sheet_id, created.drawable_object_id)
+            .unwrap();
+        let shadow = ShapeShadow::Contact(ShapeContactShadow::new(
+            ShapeShadowAppearance::new(
+                RgbaColor::black(),
+                ShapeShadowBlurRadius::from_points(18).unwrap(),
+                ShapeShadowOffset::from_points(6.0).unwrap(),
+                ShapeShadowOpacity::new(0.58).unwrap(),
+            ),
+            ShapeShadowPerspective::from_degrees(23.0).unwrap(),
+        ));
+        editor
+            .set_sheet_shape_shadow(sheet_id, created.drawable_object_id, shadow)
+            .unwrap();
+
+        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .sheet_shape_shadow(sheet_id, created.drawable_object_id)
+                .unwrap(),
+            shadow
+        );
+        assert!(
+            reopened
+                .reset_sheet_shape_shadow(sheet_id, created.drawable_object_id)
+                .unwrap()
+        );
+        assert_eq!(
+            reopened
+                .sheet_shape_shadow(sheet_id, created.drawable_object_id)
                 .unwrap(),
             inherited
         );

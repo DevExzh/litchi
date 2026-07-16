@@ -10,11 +10,12 @@ use crate::package_metadata::{
 use crate::shapes::{
     DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, LineEndpoints, LineSegment,
     LineStyle, RgbaColor, ShapeEffects, ShapeFill, ShapeImageFill, ShapeImageFillTechnique,
-    ShapePathKind, ShapePreset, ShapeStroke, line_geometry, line_path_source, line_segments_match,
-    reset_shape_effects, reset_shape_fill, reset_shape_stroke, set_shape_effects, set_shape_fill,
-    set_shape_geometry, set_shape_image_fill_data, set_shape_line_endpoints,
-    set_shape_line_segment, set_shape_preset, set_shape_stroke, shape_effects, shape_fill,
-    shape_line_endpoints, shape_path_source, shape_stroke,
+    ShapePathKind, ShapePreset, ShapeShadow, ShapeStroke, line_geometry, line_path_source,
+    line_segments_match, reset_shape_effects, reset_shape_fill, reset_shape_shadow,
+    reset_shape_stroke, set_shape_effects, set_shape_fill, set_shape_geometry,
+    set_shape_image_fill_data, set_shape_line_endpoints, set_shape_line_segment, set_shape_preset,
+    set_shape_shadow, set_shape_stroke, shape_effects, shape_fill, shape_line_endpoints,
+    shape_path_source, shape_shadow, shape_stroke,
 };
 
 use super::text_box_create::{
@@ -490,6 +491,49 @@ impl PagesEditor {
         Ok(changed)
     }
 
+    /// Read the effective drop, contact, curved, or disabled shadow state.
+    pub fn body_shape_shadow(&self, drawable_object_id: u64) -> Result<ShapeShadow> {
+        let source = body_shape_graph(self, drawable_object_id)?;
+        shape_shadow(self.package(), &source.archive_name, drawable_object_id)
+    }
+
+    /// Replace the shadow while preserving fill, stroke, opacity, and reflection.
+    pub fn set_body_shape_shadow(
+        &mut self,
+        drawable_object_id: u64,
+        shadow: ShapeShadow,
+    ) -> Result<()> {
+        let source = body_shape_graph(self, drawable_object_id)?;
+        let staged = set_shape_shadow(
+            self.package().clone(),
+            &source.archive_name,
+            drawable_object_id,
+            shadow,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.body_shape_shadow(drawable_object_id)? != shadow {
+            return Err(Error::InvalidFormat(
+                "Pages shape shadow update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove a direct shadow override and restore inherited shadow state.
+    pub fn reset_body_shape_shadow(&mut self, drawable_object_id: u64) -> Result<bool> {
+        let source = body_shape_graph(self, drawable_object_id)?;
+        let (staged, changed) = reset_shape_shadow(
+            self.package().clone(),
+            &source.archive_name,
+            drawable_object_id,
+        )?;
+        if changed {
+            *self = Self::from_package(staged)?;
+        }
+        Ok(changed)
+    }
+
     /// Move or resize one native straight line by replacing its endpoints.
     pub fn set_body_line_segment(
         &mut self,
@@ -706,9 +750,10 @@ mod tests {
 
     use super::*;
     use crate::shapes::{
-        LineEndpoint, RgbColorSpace, RgbaColor, ShapeCornerRadius, ShapeGradient,
-        ShapeGradientAngle, ShapeOpacity, ShapeReflection, ShapeReflectionOpacity, StrokePattern,
-        StrokeWidth,
+        LineEndpoint, RgbColorSpace, RgbaColor, ShapeCornerRadius, ShapeDropShadow, ShapeGradient,
+        ShapeGradientAngle, ShapeOpacity, ShapeReflection, ShapeReflectionOpacity,
+        ShapeShadowAngle, ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowOffset,
+        ShapeShadowOpacity, StrokePattern, StrokeWidth,
     };
 
     const POSITION: DrawablePoint = DrawablePoint { x: 180.0, y: 240.0 };
@@ -1194,6 +1239,71 @@ mod tests {
         assert!(
             !reopened
                 .reset_body_shape_effects(created.drawable_object_id)
+                .unwrap()
+        );
+    }
+
+    #[test]
+    fn scratch_document_supports_drop_shadow_crud() {
+        let mut editor = PagesEditor::create_with_text("Body").unwrap();
+        let created = editor
+            .add_body_shape(4, "Shadow", POSITION, SIZE, ShapePreset::Rectangle)
+            .unwrap();
+        let inherited = editor
+            .body_shape_shadow(created.drawable_object_id)
+            .unwrap();
+        let effects = editor
+            .body_shape_effects(created.drawable_object_id)
+            .unwrap();
+        let shadow = ShapeShadow::Drop(ShapeDropShadow::new(
+            ShapeShadowAppearance::new(
+                RgbaColor::black(),
+                ShapeShadowBlurRadius::from_points(7).unwrap(),
+                ShapeShadowOffset::from_points(11.0).unwrap(),
+                ShapeShadowOpacity::new(0.42).unwrap(),
+            ),
+            ShapeShadowAngle::from_degrees(135.0).unwrap(),
+        ));
+        editor
+            .set_body_shape_shadow(created.drawable_object_id, shadow)
+            .unwrap();
+
+        let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .body_shape_shadow(created.drawable_object_id)
+                .unwrap(),
+            shadow
+        );
+        assert_eq!(
+            reopened
+                .body_shape_effects(created.drawable_object_id)
+                .unwrap(),
+            effects
+        );
+        reopened
+            .set_body_shape_shadow(created.drawable_object_id, ShapeShadow::Disabled)
+            .unwrap();
+        assert_eq!(
+            reopened
+                .body_shape_shadow(created.drawable_object_id)
+                .unwrap(),
+            ShapeShadow::Disabled
+        );
+        assert!(
+            reopened
+                .reset_body_shape_shadow(created.drawable_object_id)
+                .unwrap()
+        );
+        assert_eq!(
+            reopened
+                .body_shape_shadow(created.drawable_object_id)
+                .unwrap(),
+            inherited
+        );
+        assert!(
+            !reopened
+                .reset_body_shape_shadow(created.drawable_object_id)
                 .unwrap()
         );
     }

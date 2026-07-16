@@ -18,8 +18,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let fill = editor.sheet_shape_fill(sheet.object_id, shape.drawable_object_id)?;
             let stroke = editor.sheet_shape_stroke(sheet.object_id, shape.drawable_object_id)?;
             let effects = editor.sheet_shape_effects(sheet.object_id, shape.drawable_object_id)?;
+            let shadow = editor.sheet_shape_shadow(sheet.object_id, shape.drawable_object_id)?;
             println!(
-                "sheet={} shape_index={shape_index} drawable={} kind={:?} preset={:?} line={:?} endpoints={:?} fill={fill:?} stroke={stroke:?} effects={effects:?} storage={} text={:?} geometry={:?} properties={:?}",
+                "sheet={} shape_index={shape_index} drawable={} kind={:?} preset={:?} line={:?} endpoints={:?} fill={fill:?} stroke={stroke:?} effects={effects:?} shadow={shadow:?} storage={} text={:?} geometry={:?} properties={:?}",
                 sheet.object_id,
                 shape.drawable_object_id,
                 shape.kind,

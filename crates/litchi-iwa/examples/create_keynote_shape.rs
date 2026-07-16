@@ -4,10 +4,12 @@ use std::{env, fs, path::Path};
 
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::shapes::{
-    DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeEffects, ShapeFill, ShapeGradient,
-    ShapeGradientAngle, ShapeGradientKind, ShapeGradientOpacity, ShapeGradientStop,
-    ShapeGradientStopMidpoint, ShapeGradientStopPosition, ShapeImageFillTechnique, ShapeOpacity,
-    ShapePreset, ShapeReflection, ShapeReflectionOpacity,
+    DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeCurvedShadow, ShapeEffects,
+    ShapeFill, ShapeGradient, ShapeGradientAngle, ShapeGradientKind, ShapeGradientOpacity,
+    ShapeGradientStop, ShapeGradientStopMidpoint, ShapeGradientStopPosition,
+    ShapeImageFillTechnique, ShapeOpacity, ShapePreset, ShapeReflection, ShapeReflectionOpacity,
+    ShapeShadow, ShapeShadowAngle, ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowCurve,
+    ShapeShadowOffset, ShapeShadowOpacity,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -72,6 +74,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ShapeOpacity::new(0.61)?,
             ShapeReflection::Enabled(ShapeReflectionOpacity::new(0.2)?),
         ),
+    )?;
+    editor.set_slide_shape_shadow(
+        0,
+        created.drawable_object_id,
+        ShapeShadow::Curved(ShapeCurvedShadow::new(
+            ShapeShadowAppearance::new(
+                RgbaColor::black(),
+                ShapeShadowBlurRadius::from_points(15)?,
+                ShapeShadowOffset::from_points(4.0)?,
+                ShapeShadowOpacity::new(0.73)?,
+            ),
+            ShapeShadowAngle::from_degrees(310.0)?,
+            ShapeShadowCurve::new(0.2)?,
+        )),
     )?;
     editor.save(output)?;
     println!(
