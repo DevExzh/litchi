@@ -99,7 +99,7 @@ impl NumbersEditor {
             styles.shape,
             geometry,
             storage,
-            ShapePreset::Rectangle,
+            shape_path_source(ShapePreset::Rectangle, size)?,
             true,
         )?;
 
@@ -278,7 +278,7 @@ pub(super) fn text_box_objects(
     style_id: u64,
     geometry: DrawableGeometry,
     storage: tswp::StorageArchive,
-    preset: ShapePreset,
+    path_source: tsd::PathSourceArchive,
     is_text_box: bool,
 ) -> Result<[ArchiveObject; 4]> {
     let position = geometry.position.ok_or_else(|| {
@@ -321,7 +321,7 @@ pub(super) fn text_box_objects(
                 ..Default::default()
             },
             style: Some(reference(style_id)),
-            pathsource: Some(shape_path_source(preset, size)?),
+            pathsource: Some(path_source),
             stroke_pattern_offset_distance: Some(0.0),
             ..Default::default()
         },

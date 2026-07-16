@@ -146,7 +146,7 @@ impl PagesEditor {
             geometry,
             storage,
             root.left_margin.unwrap_or_default(),
-            ShapePreset::Rectangle,
+            shape_path_source(ShapePreset::Rectangle, size)?,
             BodyTextShapeRole::TextBox,
         )?;
         staged.update_archive(&archive_name, |archive| {
@@ -319,7 +319,7 @@ pub(super) fn body_text_shape_objects(
     geometry: DrawableGeometry,
     storage: StorageArchive,
     left_margin: f32,
-    preset: ShapePreset,
+    path_source: tsd::PathSourceArchive,
     role: BodyTextShapeRole,
 ) -> Result<[ArchiveObject; 5]> {
     let position = geometry.position.ok_or_else(|| {
@@ -362,7 +362,7 @@ pub(super) fn body_text_shape_objects(
                 ..Default::default()
             },
             style: Some(reference(style_id)),
-            pathsource: Some(shape_path_source(preset, size)?),
+            pathsource: Some(path_source),
             stroke_pattern_offset_distance: Some(0.0),
             ..Default::default()
         },

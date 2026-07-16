@@ -8,8 +8,9 @@ use crate::package_metadata::{
     remove_component_external_references_to_object,
 };
 use crate::shapes::{
-    DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, ShapePathKind, ShapePreset,
-    set_shape_preset,
+    DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, LineSegment, ShapePathKind,
+    ShapePreset, line_geometry, line_path_source, line_segments_match, set_shape_geometry,
+    set_shape_line_segment, set_shape_preset, shape_path_source,
 };
 
 use super::text_box_create::{
@@ -32,6 +33,8 @@ pub struct PagesBodyShapeInfo {
     pub kind: PagesBodyShapeKind,
     /// Source-buildable preset and its native controls, when recognized.
     pub preset: Option<ShapePreset>,
+    /// Document-space endpoints when this shape is a native straight line.
+    pub line_segment: Option<LineSegment>,
     pub storage: TextStorageInfo,
     pub geometry: DrawableGeometry,
     pub properties: DrawableProperties,
@@ -84,6 +87,47 @@ impl PagesEditor {
         preset: ShapePreset,
     ) -> Result<PagesBodyShapeInfo> {
         let geometry = new_shape_geometry(position, size)?;
+        self.add_body_shape_path(
+            anchor_character_index,
+            text,
+            geometry,
+            shape_path_source(preset, size)?,
+            Some(preset),
+            None,
+        )
+    }
+
+    /// Add a native straight line between two body-document points.
+    ///
+    /// The line path, empty writable storage, stand-ins, body attachment,
+    /// z-order, UUIDs, and style relationship are constructed directly from
+    /// typed values. No source drawable or package template is copied.
+    pub fn add_body_line(
+        &mut self,
+        anchor_character_index: usize,
+        start: DrawablePoint,
+        end: DrawablePoint,
+    ) -> Result<PagesBodyShapeInfo> {
+        let segment = LineSegment::new(start, end)?;
+        self.add_body_shape_path(
+            anchor_character_index,
+            "",
+            line_geometry(segment),
+            line_path_source(segment),
+            None,
+            Some(segment),
+        )
+    }
+
+    fn add_body_shape_path(
+        &mut self,
+        anchor_character_index: usize,
+        text: &str,
+        geometry: DrawableGeometry,
+        path_source: tsd::PathSourceArchive,
+        expected_preset: Option<ShapePreset>,
+        expected_line: Option<LineSegment>,
+    ) -> Result<PagesBodyShapeInfo> {
         let root = root_document(self.package())?;
         let body: StorageArchive = decode_typed_package_object(
             self.package(),
@@ -111,7 +155,7 @@ impl PagesEditor {
             geometry,
             storage,
             root.left_margin.unwrap_or_default(),
-            preset,
+            path_source,
             BodyTextShapeRole::Shape,
         )?;
 
@@ -164,8 +208,14 @@ impl PagesEditor {
         let created_graph = body_shape_graph(&verified, ids.drawable)?;
         let expected_anchor = u32::try_from(anchor_character_index)
             .map_err(|_| Error::ParseError("Pages body attachment index exceeds u32".to_owned()))?;
+        let line_matches = match (created.line_segment, expected_line) {
+            (Some(actual), Some(expected)) => line_segments_match(actual, expected),
+            (None, None) => true,
+            _ => false,
+        };
         if created.anchor_character_index != expected_anchor
-            || created.preset != Some(preset)
+            || created.preset != expected_preset
+            || !line_matches
             || created.storage.object_id != ids.storage
             || created.storage.text != text
             || created.geometry != geometry
@@ -177,6 +227,50 @@ impl PagesEditor {
         }
         *self = verified;
         Ok(created)
+    }
+
+    /// Read the document-space endpoints of one native straight line.
+    pub fn body_line_segment(&self, drawable_object_id: u64) -> Result<LineSegment> {
+        body_shape_graph(self, drawable_object_id)?
+            .info
+            .line_segment
+            .ok_or_else(|| {
+                Error::ParseError(format!(
+                    "Pages drawable {drawable_object_id} is not a native straight line"
+                ))
+            })
+    }
+
+    /// Move or resize one native straight line by replacing its endpoints.
+    pub fn set_body_line_segment(
+        &mut self,
+        drawable_object_id: u64,
+        start: DrawablePoint,
+        end: DrawablePoint,
+    ) -> Result<()> {
+        let source = body_shape_graph(self, drawable_object_id)?;
+        if source.info.line_segment.is_none() {
+            return Err(Error::ParseError(format!(
+                "Pages drawable {drawable_object_id} is not a native straight line"
+            )));
+        }
+        let replacement = LineSegment::new(start, end)?;
+        let mut staged = self.package().clone();
+        set_shape_line_segment(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            replacement,
+        )?;
+        let verified = Self::from_package(staged)?;
+        let actual = verified.body_line_segment(drawable_object_id)?;
+        if !line_segments_match(actual, replacement) {
+            return Err(Error::InvalidFormat(
+                "Pages line endpoint update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
     }
 
     /// Read the recognized preset and native controls for one body shape.
@@ -367,6 +461,10 @@ mod tests {
         width: 300.0,
         height: 150.0,
     };
+    const LINE_START: DrawablePoint = DrawablePoint { x: 180.0, y: 240.0 };
+    const LINE_END: DrawablePoint = DrawablePoint { x: 480.0, y: 390.0 };
+    const UPDATED_LINE_START: DrawablePoint = DrawablePoint { x: 96.0, y: 180.0 };
+    const UPDATED_LINE_END: DrawablePoint = DrawablePoint { x: 456.0, y: 180.0 };
 
     #[test]
     fn scratch_document_supports_rectangle_crud_without_a_source_drawable() {
@@ -431,6 +529,72 @@ mod tests {
             .remove_body_shape(created.drawable_object_id)
             .unwrap();
         assert_eq!(removed.shape.drawable_object_id, created.drawable_object_id);
+        assert_eq!(editor.body_text().unwrap(), baseline_body);
+        assert!(editor.body_shapes().unwrap().is_empty());
+
+        let rectangle = editor
+            .add_body_rectangle(4, "Not a line", POSITION, SIZE)
+            .unwrap();
+        let before_cross_type = editor.to_bytes().unwrap();
+        assert!(
+            editor
+                .set_body_line_segment(rectangle.drawable_object_id, LINE_START, LINE_END)
+                .is_err()
+        );
+        assert_eq!(editor.to_bytes().unwrap(), before_cross_type);
+    }
+
+    #[test]
+    fn scratch_document_supports_straight_line_crud() {
+        let mut editor = PagesEditor::create_with_text("Body").unwrap();
+        let baseline_body = editor.body_text().unwrap();
+        let created = editor.add_body_line(4, LINE_START, LINE_END).unwrap();
+        assert_eq!(created.kind, PagesBodyShapeKind::Line);
+        assert_eq!(created.preset, None);
+        assert_eq!(created.storage.text, "");
+        assert!(line_segments_match(
+            created.line_segment.unwrap(),
+            LineSegment::new(LINE_START, LINE_END).unwrap()
+        ));
+
+        let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert!(line_segments_match(
+            reopened
+                .body_line_segment(created.drawable_object_id)
+                .unwrap(),
+            LineSegment::new(LINE_START, LINE_END).unwrap()
+        ));
+
+        editor
+            .set_body_line_segment(
+                created.drawable_object_id,
+                UPDATED_LINE_START,
+                UPDATED_LINE_END,
+            )
+            .unwrap();
+        assert!(line_segments_match(
+            editor
+                .body_line_segment(created.drawable_object_id)
+                .unwrap(),
+            LineSegment::new(UPDATED_LINE_START, UPDATED_LINE_END).unwrap()
+        ));
+
+        let before_invalid = editor.to_bytes().unwrap();
+        assert!(
+            editor
+                .set_body_line_segment(
+                    created.drawable_object_id,
+                    UPDATED_LINE_START,
+                    UPDATED_LINE_START,
+                )
+                .is_err()
+        );
+        assert_eq!(editor.to_bytes().unwrap(), before_invalid);
+
+        let removed = editor
+            .remove_body_shape(created.drawable_object_id)
+            .unwrap();
+        assert_eq!(removed.shape.kind, PagesBodyShapeKind::Line);
         assert_eq!(editor.body_text().unwrap(), baseline_body);
         assert!(editor.body_shapes().unwrap().is_empty());
     }

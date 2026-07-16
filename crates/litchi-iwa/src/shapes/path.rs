@@ -3,6 +3,7 @@
 use prost::Message;
 
 use super::geometry::DrawableSize;
+use super::line::is_straight_line_bezier;
 use crate::IWorkPackage;
 use crate::archive::RawMessage;
 use crate::protobuf::{tsd, tsp, tswp};
@@ -166,6 +167,8 @@ impl ShapePreset {
 /// source-built shapes can round-trip without relying on localized names.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ShapePathKind {
+    /// Native two-point straight line.
+    Line,
     Rectangle,
     RoundedRectangle,
     Ellipse,
@@ -205,7 +208,9 @@ pub(crate) fn shape_path_kind(shape: &tswp::ShapeInfoArchive) -> Result<ShapePat
         )));
     }
     if let Some(bezier) = &path.bezier_path_source {
-        return Ok(if is_rectangle_path(bezier) {
+        return Ok(if is_straight_line_bezier(bezier) {
+            ShapePathKind::Line
+        } else if is_rectangle_path(bezier) {
             ShapePathKind::Rectangle
         } else if is_ellipse_path(bezier) {
             ShapePathKind::Ellipse

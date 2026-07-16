@@ -8,6 +8,7 @@
 //! from these elements.
 
 mod geometry;
+mod line;
 mod path;
 mod properties;
 pub mod text_extractor;
@@ -15,6 +16,11 @@ pub mod text_extractor;
 pub use geometry::{DrawableGeometry, DrawablePoint, DrawableSize};
 pub(crate) use geometry::{
     geometry_from_drawable, patch_drawable_geometry, set_shape_geometry, shape_geometry,
+};
+pub use line::LineSegment;
+pub(crate) use line::{
+    line_geometry, line_path_source, line_segments_match, set_shape_line_segment,
+    shape_line_segment,
 };
 pub use path::{
     ShapeCornerRadius, ShapePathKind, ShapePolygonSides, ShapePreset, ShapeStarInnerRatio,

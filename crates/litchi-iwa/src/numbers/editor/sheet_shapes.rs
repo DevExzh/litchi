@@ -5,8 +5,10 @@ use std::ops::Range;
 
 use super::*;
 use crate::shapes::{
-    DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, ShapePathKind, ShapePreset,
-    set_shape_preset, shape_path_kind, shape_preset,
+    DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, LineSegment, ShapePathKind,
+    ShapePreset, line_geometry, line_path_source, line_segments_match, set_shape_geometry,
+    set_shape_line_segment, set_shape_preset, shape_line_segment, shape_path_kind,
+    shape_path_source, shape_preset,
 };
 
 use super::text_box_create::{
@@ -27,6 +29,8 @@ pub struct NumbersSheetShapeInfo {
     pub kind: NumbersSheetShapeKind,
     /// Source-buildable preset and its native controls, when recognized.
     pub preset: Option<ShapePreset>,
+    /// Sheet-space endpoints when this shape is a native straight line.
+    pub line_segment: Option<LineSegment>,
     pub storage: TextStorageInfo,
     pub geometry: DrawableGeometry,
     pub properties: DrawableProperties,
@@ -82,6 +86,47 @@ impl NumbersEditor {
         preset: ShapePreset,
     ) -> Result<NumbersSheetShapeInfo> {
         let geometry = new_shape_geometry(position, size)?;
+        self.add_sheet_shape_path(
+            sheet_id,
+            text,
+            geometry,
+            shape_path_source(preset, size)?,
+            Some(preset),
+            None,
+        )
+    }
+
+    /// Add a native straight line between two sheet-space points.
+    ///
+    /// The line path, empty writable storage, stand-ins, ownership, UUIDs,
+    /// style relationship, and package high-water mark are built directly
+    /// from typed values. No source drawable or package template is copied.
+    pub fn add_sheet_line(
+        &mut self,
+        sheet_id: u64,
+        start: DrawablePoint,
+        end: DrawablePoint,
+    ) -> Result<NumbersSheetShapeInfo> {
+        let segment = LineSegment::new(start, end)?;
+        self.add_sheet_shape_path(
+            sheet_id,
+            "",
+            line_geometry(segment),
+            line_path_source(segment),
+            None,
+            Some(segment),
+        )
+    }
+
+    fn add_sheet_shape_path(
+        &mut self,
+        sheet_id: u64,
+        text: &str,
+        geometry: DrawableGeometry,
+        path_source: tsd::PathSourceArchive,
+        expected_preset: Option<ShapePreset>,
+        expected_line: Option<LineSegment>,
+    ) -> Result<NumbersSheetShapeInfo> {
         let (archive_name, _, _) = numbers_sheet(&self.package, sheet_id)?;
         let document = numbers_document(&self.package)?;
         let styles = text_box_theme_styles(
@@ -97,7 +142,7 @@ impl NumbersEditor {
             styles.shape,
             geometry,
             storage,
-            preset,
+            path_source,
             false,
         )?;
         let component_id = component_identifier_for_entry(&self.package, &archive_name)?
@@ -153,7 +198,13 @@ impl NumbersEditor {
                 Error::InvalidFormat("Numbers shape creation failed validation".to_owned())
             })?;
         let created_graph = shape_graph(&verified, sheet_id, ids.drawable)?;
-        if created.preset != Some(preset)
+        let line_matches = match (created.line_segment, expected_line) {
+            (Some(actual), Some(expected)) => line_segments_match(actual, expected),
+            (None, None) => true,
+            _ => false,
+        };
+        if created.preset != expected_preset
+            || !line_matches
             || created.storage.object_id != ids.storage
             || created.storage.text != text
             || created.geometry != geometry
@@ -165,6 +216,55 @@ impl NumbersEditor {
         }
         *self = verified;
         Ok(created)
+    }
+
+    /// Read the sheet-space endpoints of one native straight line.
+    pub fn sheet_line_segment(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<LineSegment> {
+        shape_graph(self, sheet_id, drawable_object_id)?
+            .info
+            .line_segment
+            .ok_or_else(|| {
+                Error::ParseError(format!(
+                    "Numbers drawable {drawable_object_id} is not a native straight line"
+                ))
+            })
+    }
+
+    /// Move or resize one native straight line by replacing its endpoints.
+    pub fn set_sheet_line_segment(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        start: DrawablePoint,
+        end: DrawablePoint,
+    ) -> Result<()> {
+        let source = shape_graph(self, sheet_id, drawable_object_id)?;
+        if source.info.line_segment.is_none() {
+            return Err(Error::ParseError(format!(
+                "Numbers drawable {drawable_object_id} is not a native straight line"
+            )));
+        }
+        let replacement = LineSegment::new(start, end)?;
+        let mut staged = self.package.clone();
+        set_shape_line_segment(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            replacement,
+        )?;
+        let verified = Self::from_package(staged)?;
+        let actual = verified.sheet_line_segment(sheet_id, drawable_object_id)?;
+        if !line_segments_match(actual, replacement) {
+            return Err(Error::InvalidFormat(
+                "Numbers line endpoint update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
     }
 
     /// Read the recognized preset and native controls for one sheet shape.
@@ -694,6 +794,7 @@ fn shape_info(
         drawable_object_id,
         kind: shape_path_kind(shape)?,
         preset: shape_preset(shape)?,
+        line_segment: shape_line_segment(shape)?,
         storage: text.storage(storage_id)?,
         geometry: shape_geometry(editor.package(), archive_name, drawable_object_id)?,
         properties: shape_properties(editor.package(), archive_name, drawable_object_id)?,
@@ -711,6 +812,10 @@ mod tests {
         width: 300.0,
         height: 150.0,
     };
+    const LINE_START: DrawablePoint = DrawablePoint { x: 420.0, y: 300.0 };
+    const LINE_END: DrawablePoint = DrawablePoint { x: 720.0, y: 450.0 };
+    const UPDATED_LINE_START: DrawablePoint = DrawablePoint { x: 72.0, y: 180.0 };
+    const UPDATED_LINE_END: DrawablePoint = DrawablePoint { x: 432.0, y: 180.0 };
 
     #[test]
     fn scratch_spreadsheet_supports_rectangle_crud_without_a_source_drawable() {
@@ -765,6 +870,85 @@ mod tests {
             .unwrap();
         assert_eq!(removed.shape.drawable_object_id, created.drawable_object_id);
         assert_eq!(editor.to_bytes().unwrap(), baseline);
+    }
+
+    #[test]
+    fn scratch_spreadsheet_supports_straight_line_crud() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .sheet_name("Scratch Line")
+            .table_name("Source Data")
+            .build()
+            .unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let baseline = editor.to_bytes().unwrap();
+        let created = editor
+            .add_sheet_line(sheet_id, LINE_START, LINE_END)
+            .unwrap();
+        assert_eq!(created.kind, NumbersSheetShapeKind::Line);
+        assert_eq!(created.preset, None);
+        assert_eq!(created.storage.text, "");
+        assert!(line_segments_match(
+            created.line_segment.unwrap(),
+            LineSegment::new(LINE_START, LINE_END).unwrap()
+        ));
+
+        let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert!(line_segments_match(
+            reopened
+                .sheet_line_segment(sheet_id, created.drawable_object_id)
+                .unwrap(),
+            LineSegment::new(LINE_START, LINE_END).unwrap()
+        ));
+
+        editor
+            .set_sheet_line_segment(
+                sheet_id,
+                created.drawable_object_id,
+                UPDATED_LINE_START,
+                UPDATED_LINE_END,
+            )
+            .unwrap();
+        assert!(line_segments_match(
+            editor
+                .sheet_line_segment(sheet_id, created.drawable_object_id)
+                .unwrap(),
+            LineSegment::new(UPDATED_LINE_START, UPDATED_LINE_END).unwrap()
+        ));
+
+        let before_invalid = editor.to_bytes().unwrap();
+        assert!(
+            editor
+                .set_sheet_line_segment(
+                    sheet_id,
+                    created.drawable_object_id,
+                    UPDATED_LINE_START,
+                    UPDATED_LINE_START,
+                )
+                .is_err()
+        );
+        assert_eq!(editor.to_bytes().unwrap(), before_invalid);
+
+        let removed = editor
+            .remove_sheet_shape(sheet_id, created.drawable_object_id)
+            .unwrap();
+        assert_eq!(removed.shape.kind, NumbersSheetShapeKind::Line);
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+        let rectangle = editor
+            .add_sheet_rectangle(sheet_id, "Not a line", POSITION, SIZE)
+            .unwrap();
+        let before_cross_type = editor.to_bytes().unwrap();
+        assert!(
+            editor
+                .set_sheet_line_segment(
+                    sheet_id,
+                    rectangle.drawable_object_id,
+                    LINE_START,
+                    LINE_END,
+                )
+                .is_err()
+        );
+        assert_eq!(editor.to_bytes().unwrap(), before_cross_type);
     }
 
     #[test]

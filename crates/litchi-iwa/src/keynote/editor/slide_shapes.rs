@@ -5,8 +5,10 @@ use std::ops::Range;
 
 use super::*;
 use crate::shapes::{
-    DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, ShapePathKind, ShapePreset,
-    set_shape_preset, shape_path_kind, shape_preset,
+    DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, LineSegment, ShapePathKind,
+    ShapePreset, line_geometry, line_path_source, line_segments_match, set_shape_geometry,
+    set_shape_line_segment, set_shape_preset, shape_line_segment, shape_path_kind,
+    shape_path_source, shape_preset,
 };
 use crate::text::TextStorageInfo;
 
@@ -32,6 +34,8 @@ pub struct KeynoteSlideShapeInfo {
     pub kind: KeynoteSlideShapeKind,
     /// Source-buildable preset and its native controls, when recognized.
     pub preset: Option<ShapePreset>,
+    /// Slide-space endpoints when this shape is a native straight line.
+    pub line_segment: Option<LineSegment>,
     pub storage: TextStorageInfo,
     pub geometry: DrawableGeometry,
     pub properties: DrawableProperties,
@@ -87,6 +91,47 @@ impl KeynoteEditor {
         preset: ShapePreset,
     ) -> Result<KeynoteSlideShapeInfo> {
         let geometry = new_shape_geometry(position, size)?;
+        self.add_slide_shape_path(
+            slide_index,
+            text,
+            geometry,
+            shape_path_source(preset, size)?,
+            Some(preset),
+            None,
+        )
+    }
+
+    /// Add a native straight line between two slide-space points.
+    ///
+    /// The line path, empty writable storage, stand-ins, ownership, z-order,
+    /// UUID metadata, and style relationship are built directly from typed
+    /// values. No source drawable or package template is copied.
+    pub fn add_slide_line(
+        &mut self,
+        slide_index: usize,
+        start: DrawablePoint,
+        end: DrawablePoint,
+    ) -> Result<KeynoteSlideShapeInfo> {
+        let segment = LineSegment::new(start, end)?;
+        self.add_slide_shape_path(
+            slide_index,
+            "",
+            line_geometry(segment),
+            line_path_source(segment),
+            None,
+            Some(segment),
+        )
+    }
+
+    fn add_slide_shape_path(
+        &mut self,
+        slide_index: usize,
+        text: &str,
+        geometry: DrawableGeometry,
+        path_source: tsd::PathSourceArchive,
+        expected_preset: Option<ShapePreset>,
+        expected_line: Option<LineSegment>,
+    ) -> Result<KeynoteSlideShapeInfo> {
         let graph = ObjectGraph::read(self.package())?;
         let context = text_box_context(&graph, slide_index)?;
         let styles = text_box_theme_styles(&graph, context.theme_id, context.stylesheet_id)?;
@@ -115,7 +160,7 @@ impl KeynoteEditor {
             styles.shape,
             geometry,
             storage,
-            preset,
+            path_source,
             false,
         )?;
 
@@ -151,7 +196,13 @@ impl KeynoteEditor {
                 Error::InvalidFormat("Keynote shape creation failed validation".to_owned())
             })?;
         let created_graph = shape_graph(&verified, slide_index, ids.drawable)?;
-        if created.preset != Some(preset)
+        let line_matches = match (created.line_segment, expected_line) {
+            (Some(actual), Some(expected)) => line_segments_match(actual, expected),
+            (None, None) => true,
+            _ => false,
+        };
+        if created.preset != expected_preset
+            || !line_matches
             || created.storage.object_id != ids.storage
             || created.storage.text != text
             || created.geometry != geometry
@@ -163,6 +214,55 @@ impl KeynoteEditor {
         }
         *self = verified;
         Ok(created)
+    }
+
+    /// Read the slide-space endpoints of one native straight line.
+    pub fn slide_line_segment(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<LineSegment> {
+        shape_graph(self, slide_index, drawable_object_id)?
+            .info
+            .line_segment
+            .ok_or_else(|| {
+                Error::ParseError(format!(
+                    "Keynote drawable {drawable_object_id} is not a native straight line"
+                ))
+            })
+    }
+
+    /// Move or resize one native straight line by replacing its endpoints.
+    pub fn set_slide_line_segment(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        start: DrawablePoint,
+        end: DrawablePoint,
+    ) -> Result<()> {
+        let source = shape_graph(self, slide_index, drawable_object_id)?;
+        if source.info.line_segment.is_none() {
+            return Err(Error::ParseError(format!(
+                "Keynote drawable {drawable_object_id} is not a native straight line"
+            )));
+        }
+        let replacement = LineSegment::new(start, end)?;
+        let mut staged = self.package().clone();
+        set_shape_line_segment(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            replacement,
+        )?;
+        let verified = Self::from_package(staged)?;
+        let actual = verified.slide_line_segment(slide_index, drawable_object_id)?;
+        if !line_segments_match(actual, replacement) {
+            return Err(Error::InvalidFormat(
+                "Keynote line endpoint update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
     }
 
     /// Read the recognized preset and native controls for one slide shape.
@@ -537,6 +637,7 @@ fn shape_info(
         drawable_object_id,
         kind: shape_path_kind(shape)?,
         preset: shape_preset(shape)?,
+        line_segment: shape_line_segment(shape)?,
         storage: editor.text.storage(storage_id)?,
         geometry: shape_geometry(
             editor.package(),
@@ -653,6 +754,13 @@ mod tests {
         width: 480.0,
         height: 240.0,
     };
+    const LINE_START: DrawablePoint = DrawablePoint { x: 720.0, y: 660.0 };
+    const LINE_END: DrawablePoint = DrawablePoint {
+        x: 1_200.0,
+        y: 900.0,
+    };
+    const UPDATED_LINE_START: DrawablePoint = DrawablePoint { x: 96.0, y: 108.0 };
+    const UPDATED_LINE_END: DrawablePoint = DrawablePoint { x: 456.0, y: 108.0 };
 
     #[test]
     fn scratch_presentation_supports_rectangle_crud_without_a_source_drawable() {
@@ -717,6 +825,77 @@ mod tests {
             .unwrap();
         assert_eq!(removed.shape.drawable_object_id, created.drawable_object_id);
         assert_eq!(editor.to_bytes().unwrap(), baseline);
+    }
+
+    #[test]
+    fn scratch_presentation_supports_straight_line_crud() {
+        let mut editor = KeynoteDocumentBuilder::new()
+            .title("Scratch line")
+            .subtitle("No embedded package")
+            .build()
+            .unwrap();
+        let baseline = editor.to_bytes().unwrap();
+        let created = editor.add_slide_line(0, LINE_START, LINE_END).unwrap();
+        assert_eq!(created.kind, KeynoteSlideShapeKind::Line);
+        assert_eq!(created.preset, None);
+        assert_eq!(created.storage.text, "");
+        assert!(line_segments_match(
+            created.line_segment.unwrap(),
+            LineSegment::new(LINE_START, LINE_END).unwrap()
+        ));
+
+        let reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert!(line_segments_match(
+            reopened
+                .slide_line_segment(0, created.drawable_object_id)
+                .unwrap(),
+            LineSegment::new(LINE_START, LINE_END).unwrap()
+        ));
+
+        editor
+            .set_slide_line_segment(
+                0,
+                created.drawable_object_id,
+                UPDATED_LINE_START,
+                UPDATED_LINE_END,
+            )
+            .unwrap();
+        assert!(line_segments_match(
+            editor
+                .slide_line_segment(0, created.drawable_object_id)
+                .unwrap(),
+            LineSegment::new(UPDATED_LINE_START, UPDATED_LINE_END).unwrap()
+        ));
+
+        let before_invalid = editor.to_bytes().unwrap();
+        assert!(
+            editor
+                .set_slide_line_segment(
+                    0,
+                    created.drawable_object_id,
+                    UPDATED_LINE_START,
+                    UPDATED_LINE_START,
+                )
+                .is_err()
+        );
+        assert_eq!(editor.to_bytes().unwrap(), before_invalid);
+
+        let removed = editor
+            .remove_slide_shape(0, created.drawable_object_id)
+            .unwrap();
+        assert_eq!(removed.shape.kind, KeynoteSlideShapeKind::Line);
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+        let rectangle = editor
+            .add_slide_rectangle(0, "Not a line", POSITION, SIZE)
+            .unwrap();
+        let before_cross_type = editor.to_bytes().unwrap();
+        assert!(
+            editor
+                .set_slide_line_segment(0, rectangle.drawable_object_id, LINE_START, LINE_END,)
+                .is_err()
+        );
+        assert_eq!(editor.to_bytes().unwrap(), before_cross_type);
     }
 
     #[test]

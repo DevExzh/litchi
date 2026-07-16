@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::IWorkThemeArchive;
-use crate::shapes::{shape_path_kind, shape_preset};
+use crate::shapes::{shape_line_segment, shape_path_kind, shape_preset};
 
 const THEME_MESSAGE_TYPE: u32 = 10_001;
 const DRAWABLE_Z_ORDER_MESSAGE_TYPE: u32 = 10_015;
@@ -327,6 +327,7 @@ fn body_shape_graph_from_text(
             anchor_character_index: *anchor_character_index,
             kind,
             preset,
+            line_segment: shape_line_segment(&shape)?,
             storage: text.storage,
             geometry,
             properties,

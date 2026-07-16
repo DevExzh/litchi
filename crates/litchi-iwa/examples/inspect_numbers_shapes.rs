@@ -16,11 +16,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .enumerate()
         {
             println!(
-                "sheet={} shape_index={shape_index} drawable={} kind={:?} preset={:?} storage={} text={:?} geometry={:?} properties={:?}",
+                "sheet={} shape_index={shape_index} drawable={} kind={:?} preset={:?} line={:?} storage={} text={:?} geometry={:?} properties={:?}",
                 sheet.object_id,
                 shape.drawable_object_id,
                 shape.kind,
                 shape.preset,
+                shape.line_segment,
                 shape.storage.object_id,
                 shape.storage.text,
                 shape.geometry,
