@@ -1401,10 +1401,11 @@ fn build_shape_properties(shape: &UserShapeData) -> Vec<EscherProperty> {
 
     // Shadow properties
     if shape.has_shadow {
-        // Shadow type
-        if let Some(shadow_type) = shape.shadow_type {
-            props.push(EscherProperty::new(prop_id::SHADOW_TYPE, shadow_type));
-        }
+        // Offset shadow is the specified default and is required for the offsets below.
+        props.push(EscherProperty::new(
+            prop_id::SHADOW_TYPE,
+            shape.shadow_type.unwrap_or(0),
+        ));
 
         // Shadow color
         let shadow_color = shape.shadow_color.unwrap_or(0x0800_0002); // default: scheme shadow
@@ -1422,10 +1423,17 @@ fn build_shape_properties(shape: &UserShapeData) -> Vec<EscherProperty> {
         }
 
         // Enable shadow boolean
-        props.push(EscherProperty::new(prop_id::SHADOW_BOOL, 0x0003_0003)); // shadow on
+        props.push(EscherProperty::new(
+            prop_id::SHADOW_BOOL,
+            ppt_prop_value::SHADOW_STYLE_ENABLED,
+        ));
     } else {
         // No shadow - still set scheme color for consistency
         props.push(EscherProperty::new(prop_id::SHADOW_COLOR, 0x0800_0002));
+        props.push(EscherProperty::new(
+            prop_id::SHADOW_BOOL,
+            ppt_prop_value::SHADOW_STYLE_DISABLED,
+        ));
     }
 
     props
@@ -1819,9 +1827,28 @@ mod tests {
             ..Default::default()
         };
         let props = build_shape_properties(&shape);
-        // Should have shadow properties
-        let has_shadow_prop = props.iter().any(|p| p.prop_id == prop_id::SHADOW_BOOL);
-        assert!(has_shadow_prop);
+        assert!(
+            props.iter().any(|property| {
+                property.prop_id == prop_id::SHADOW_TYPE && property.value == 0
+            })
+        );
+        assert!(props.iter().any(|property| {
+            property.prop_id == prop_id::SHADOW_BOOL
+                && property.value == ppt_prop_value::SHADOW_STYLE_ENABLED
+        }));
+    }
+
+    #[test]
+    fn test_build_shape_properties_without_shadow_disables_inheritance() {
+        let props = build_shape_properties(&UserShapeData {
+            shape_type: shape_type::RECTANGLE,
+            ..Default::default()
+        });
+
+        assert!(props.iter().any(|property| {
+            property.prop_id == prop_id::SHADOW_BOOL
+                && property.value == ppt_prop_value::SHADOW_STYLE_DISABLED
+        }));
     }
 
     #[test]

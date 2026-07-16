@@ -243,11 +243,13 @@ pub struct PropertyValues {
     pub line_dash_style: Option<u16>,
 
     // Shadow properties
-    pub shadow_type: Option<u16>,
+    pub shadow_type: Option<u32>,
     pub shadow_color: Option<u32>,
-    pub shadow_opacity: Option<u16>,
+    pub shadow_opacity: Option<u32>,
     pub shadow_offset_x: Option<i32>,
     pub shadow_offset_y: Option<i32>,
+    pub shadow_enabled: Option<bool>,
+    pub shadow_obscured: Option<bool>,
 
     // Text properties
     pub text_left_margin: Option<i32>,
@@ -550,11 +552,20 @@ impl<'a> EscherRecord<'a> {
                 0x0144 => values.line_dash_style = Some(property.data as u16),
 
                 // Shadow properties
-                0x0180 => values.shadow_type = Some(property.data as u16),
-                0x0181 => values.shadow_color = Some(property.data),
-                0x0182 => values.shadow_opacity = Some((property.data & 0xFFFF) as u16),
-                0x0183 => values.shadow_offset_x = Some(property.data as i16 as i32),
-                0x0184 => values.shadow_offset_y = Some(property.data as i16 as i32),
+                0x0200 => values.shadow_type = Some(property.data),
+                0x0201 => values.shadow_color = Some(property.data),
+                0x0204 => values.shadow_opacity = Some(property.data),
+                0x0205 => values.shadow_offset_x = Some(property.data as i32),
+                0x0206 => values.shadow_offset_y = Some(property.data as i32),
+                0x023F => {
+                    let use_bits = property.data >> 16;
+                    if use_bits & 0x0002 != 0 {
+                        values.shadow_enabled = Some(property.data & 0x0002 != 0);
+                    }
+                    if use_bits & 0x0001 != 0 {
+                        values.shadow_obscured = Some(property.data & 0x0001 != 0);
+                    }
+                },
 
                 // Text properties
                 0x01C0 => values.text_left_margin = Some(property.data as i32),
@@ -1012,6 +1023,35 @@ mod tests {
         assert_eq!(EscherRecordType::from(0xF010), EscherRecordType::Transform);
         assert_eq!(EscherRecordType::from(0xF011), EscherRecordType::Text);
         assert_eq!(EscherRecordType::from(999), EscherRecordType::Container);
+    }
+
+    #[test]
+    fn extracts_shadow_properties_with_spec_ids_and_full_width_values() {
+        let record = EscherRecord {
+            record_type: EscherRecordType::Options,
+            version: 3,
+            instance: 6,
+            data_length: 0,
+            data: Cow::Borrowed(&[]),
+            children: Vec::new(),
+            properties: vec![
+                EscherProperty::new(0x0200, 0),
+                EscherProperty::new(0x0201, 0x0080_8080),
+                EscherProperty::new(0x0204, 0x0000_8000),
+                EscherProperty::new(0x0205, (-25_400_i32) as u32),
+                EscherProperty::new(0x0206, 25_400),
+                EscherProperty::new(0x023F, 0x0002_0002),
+            ],
+        };
+
+        let values = record.extract_property_values();
+        assert_eq!(values.shadow_type, Some(0));
+        assert_eq!(values.shadow_color, Some(0x0080_8080));
+        assert_eq!(values.shadow_opacity, Some(0x0000_8000));
+        assert_eq!(values.shadow_offset_x, Some(-25_400));
+        assert_eq!(values.shadow_offset_y, Some(25_400));
+        assert_eq!(values.shadow_enabled, Some(true));
+        assert_eq!(values.shadow_obscured, None);
     }
 
     #[test]

@@ -1050,6 +1050,7 @@ mod tests {
         assert_eq!(properties.get_bool(EscherPropertyId::AnyLine), Some(true));
         assert!(properties.has_line());
         assert_eq!(properties.get_bool(EscherPropertyId::Shadow), Some(true));
+        assert_eq!(properties.get_bool(EscherPropertyId::ShadowObscured), None);
         assert!(properties.has_shadow());
         assert_eq!(
             properties.get_bool(EscherPropertyId::GeoTextBoldFont),
@@ -1069,11 +1070,14 @@ mod tests {
     fn decodes_explicit_false_boolean_group_bits() {
         let mut data = Vec::new();
         push_property(&mut data, 0x01FF, 0x0008_0000);
+        push_property(&mut data, 0x023F, 0x0002_0000);
 
-        let properties = EscherProperties::from_opt_record(&opt_record(&data, 1));
+        let properties = EscherProperties::from_opt_record(&opt_record(&data, 2));
 
         assert_eq!(properties.get_bool(EscherPropertyId::AnyLine), Some(false));
         assert!(!properties.has_line());
+        assert_eq!(properties.get_bool(EscherPropertyId::Shadow), Some(false));
+        assert!(!properties.has_shadow());
     }
 
     #[test]

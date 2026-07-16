@@ -708,15 +708,19 @@ impl Default for LineStyleConfig {
 #[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ShadowType {
-    /// No shadow
-    #[default]
-    None = 0,
     /// Offset shadow
-    Offset = 1,
+    #[default]
+    Offset = 0,
     /// Double shadow
-    Double = 2,
-    /// Emboss shadow
-    Emboss = 3,
+    Double = 1,
+    /// Offset shadow skewed relative to the drawing
+    Rich = 2,
+    /// Offset shadow skewed relative to the shape
+    Shape = 3,
+    /// Shadow cast onto a drawing plane
+    Drawing = 4,
+    /// Double shadow producing an embossed or engraved appearance
+    EmbossOrEngrave = 5,
 }
 
 /// Shadow style configuration
@@ -740,7 +744,7 @@ impl ShadowStyle {
     /// No shadow
     pub fn none() -> Self {
         Self {
-            shadow_type: ShadowType::None,
+            shadow_type: ShadowType::Offset,
             color: ShapeColor::GRAY,
             offset_x: 0,
             offset_y: 0,
@@ -778,7 +782,10 @@ impl ShadowStyle {
         let mut props = Vec::new();
 
         if !self.enabled {
-            props.push((shadow_prop::SHADOW_STYLE_BOOL, 0x0002_0000)); // fShadow = false
+            props.push((
+                shadow_prop::SHADOW_STYLE_BOOL,
+                crate::escher::writer::prop_value::SHADOW_STYLE_DISABLED,
+            ));
             return props;
         }
 
@@ -797,7 +804,10 @@ impl ShadowStyle {
         props.push((shadow_prop::SHADOW_OPACITY, opacity_value));
 
         // Boolean properties (shadow enabled)
-        props.push((shadow_prop::SHADOW_STYLE_BOOL, 0x0002_0002)); // fShadow = true
+        props.push((
+            shadow_prop::SHADOW_STYLE_BOOL,
+            crate::escher::writer::prop_value::SHADOW_STYLE_ENABLED,
+        ));
 
         props
     }
@@ -938,6 +948,32 @@ mod tests {
         assert_eq!(line.width, 25400); // 2pt in EMUs
         let props = line.build_properties();
         assert!(props.iter().any(|(id, _)| *id == line_prop::LINE_WIDTH));
+    }
+
+    #[test]
+    fn test_shadow_style() {
+        assert_eq!(ShadowType::Offset as u32, 0);
+        assert_eq!(ShadowType::Double as u32, 1);
+        assert_eq!(ShadowType::Rich as u32, 2);
+        assert_eq!(ShadowType::Shape as u32, 3);
+        assert_eq!(ShadowType::Drawing as u32, 4);
+        assert_eq!(ShadowType::EmbossOrEngrave as u32, 5);
+
+        let shadow = ShadowStyle::drop_shadow().build_properties();
+        assert!(shadow.contains(&(shadow_prop::SHADOW_TYPE, ShadowType::Offset as u32)));
+        assert!(shadow.contains(&(
+            shadow_prop::SHADOW_STYLE_BOOL,
+            crate::escher::writer::prop_value::SHADOW_STYLE_ENABLED,
+        )));
+
+        let no_shadow = ShadowStyle::none().build_properties();
+        assert_eq!(
+            no_shadow,
+            [(
+                shadow_prop::SHADOW_STYLE_BOOL,
+                crate::escher::writer::prop_value::SHADOW_STYLE_DISABLED,
+            )]
+        );
     }
 
     #[test]
