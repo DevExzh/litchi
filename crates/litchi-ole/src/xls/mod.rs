@@ -41,6 +41,9 @@ mod palette;
 /// BIFF8 workbook font table.
 mod font;
 
+/// BIFF8 XF cell and style alignment metadata.
+mod alignment;
+
 /// BIFF8 worksheet row heights and column widths/formatting.
 mod layout;
 
@@ -98,6 +101,10 @@ pub use number_format::{
 };
 pub use palette::{XlsColor, XlsPalette};
 pub use font::{XlsFont, XlsFontCharset, XlsFontEscapement, XlsFontFamily, XlsFontUnderline};
+pub use alignment::{
+    XlsCellAlignment, XlsHorizontalAlignment, XlsReadingOrder, XlsTextRotation,
+    XlsVerticalAlignment,
+};
 pub use layout::{XlsColumnLayout, XlsRowLayout};
 pub use view::{XlsPane, XlsPaneType, XlsSelection, XlsSelectionRange, XlsWorksheetView};
 pub use page_setup::{

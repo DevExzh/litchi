@@ -159,6 +159,10 @@ pub enum ControlWord<'a> {
     LanguageNoProof(i32),
     LanguageEastAsianNoProof(i32),
     NoProof(bool),
+    LeftToRightCharacter,
+    RightToLeftCharacter,
+    LeftToRightParagraph,
+    RightToLeftParagraph,
 
     // Index and table-of-contents source marks
     IndexEntry,
@@ -813,6 +817,10 @@ impl<'a> Lexer<'a> {
             "langnp" => ControlWord::LanguageNoProof(param_value),
             "langfenp" => ControlWord::LanguageEastAsianNoProof(param_value),
             "noproof" => ControlWord::NoProof(param_bool),
+            "ltrch" => ControlWord::LeftToRightCharacter,
+            "rtlch" => ControlWord::RightToLeftCharacter,
+            "ltrpar" => ControlWord::LeftToRightParagraph,
+            "rtlpar" => ControlWord::RightToLeftParagraph,
 
             // Index and table-of-contents source marks
             "xe" => ControlWord::IndexEntry,

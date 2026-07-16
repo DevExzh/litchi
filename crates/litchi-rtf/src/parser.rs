@@ -2262,6 +2262,12 @@ impl<'a> Parser<'a> {
                     Some(crate::LanguageId::from_rtf(*value)?);
             },
             ControlWord::NoProof(value) => state.formatting.no_proof = *value,
+            ControlWord::LeftToRightCharacter => {
+                state.formatting.direction = Some(TextDirection::LeftToRight);
+            },
+            ControlWord::RightToLeftCharacter => {
+                state.formatting.direction = Some(TextDirection::RightToLeft);
+            },
             ControlWord::FontSize(size) => {
                 if let Some(nz) = NonZeroU16::new((*size).max(0) as u16) {
                     state.formatting.font_size = nz;
@@ -2337,6 +2343,12 @@ impl<'a> Parser<'a> {
             ControlWord::RightAlign => state.paragraph.alignment = Alignment::Right,
             ControlWord::Center => state.paragraph.alignment = Alignment::Center,
             ControlWord::Justify => state.paragraph.alignment = Alignment::Justify,
+            ControlWord::LeftToRightParagraph => {
+                state.paragraph.direction = Some(TextDirection::LeftToRight);
+            },
+            ControlWord::RightToLeftParagraph => {
+                state.paragraph.direction = Some(TextDirection::RightToLeft);
+            },
             ControlWord::Pard => {
                 // Reset to default paragraph properties
                 state.paragraph = Paragraph::default();
@@ -4288,11 +4300,23 @@ impl<'a> Parser<'a> {
                     crate::LanguageId::from_rtf(*value).ok();
             },
             ControlWord::NoProof(value) => state.formatting.no_proof = *value,
+            ControlWord::LeftToRightCharacter => {
+                state.formatting.direction = Some(TextDirection::LeftToRight);
+            },
+            ControlWord::RightToLeftCharacter => {
+                state.formatting.direction = Some(TextDirection::RightToLeft);
+            },
             ControlWord::Plain => state.formatting = Formatting::default(),
             ControlWord::LeftAlign => state.paragraph.alignment = Alignment::Left,
             ControlWord::RightAlign => state.paragraph.alignment = Alignment::Right,
             ControlWord::Center => state.paragraph.alignment = Alignment::Center,
             ControlWord::Justify => state.paragraph.alignment = Alignment::Justify,
+            ControlWord::LeftToRightParagraph => {
+                state.paragraph.direction = Some(TextDirection::LeftToRight);
+            },
+            ControlWord::RightToLeftParagraph => {
+                state.paragraph.direction = Some(TextDirection::RightToLeft);
+            },
             ControlWord::Pard => state.paragraph = Paragraph::default(),
             ControlWord::SpaceBefore(value) => state.paragraph.spacing.before = *value,
             ControlWord::SpaceAfter(value) => state.paragraph.spacing.after = *value,

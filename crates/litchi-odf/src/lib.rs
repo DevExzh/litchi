@@ -290,6 +290,10 @@ mod core;
 pub mod datatype;
 /// ODF XML element classes
 pub mod elements;
+pub use elements::field::{
+    OdfDatabaseConnectionResource, OdfDatabaseField, OdfDatabaseFieldKind, OdfDatabaseSource,
+    OdfDatabaseTableType,
+};
 /// OpenDocument formula (.odf/.otf) support.
 mod formula;
 /// Inert semantic discovery of classic ODF forms and control shapes.

@@ -56,6 +56,7 @@ pub struct XlsExtendedFormat {
     kind: XlsExtendedFormatKind,
     locked: bool,
     hidden: bool,
+    alignment: crate::xls::alignment::XlsCellAlignment,
 }
 
 impl XlsExtendedFormat {
@@ -81,6 +82,10 @@ impl XlsExtendedFormat {
 
     pub fn hidden(&self) -> bool {
         self.hidden
+    }
+
+    pub fn alignment(&self) -> &crate::xls::alignment::XlsCellAlignment {
+        &self.alignment
     }
 }
 
@@ -422,12 +427,15 @@ fn parse_xf(data: &[u8], index: u16) -> XlsResult<XlsExtendedFormat> {
             parent_style_xf: parent,
         }
     };
+    let alignment = crate::xls::alignment::XlsCellAlignment::parse(data[6], data[7], data[8])?;
+
     Ok(XlsExtendedFormat {
         index,
         number_format_id,
         kind,
         locked,
         hidden,
+        alignment,
     })
 }
 

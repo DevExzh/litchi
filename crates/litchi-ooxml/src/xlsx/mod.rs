@@ -41,6 +41,7 @@ pub mod header_footer;
 pub mod ignored_errors;
 mod namespace;
 pub mod named_sheet_view;
+pub mod outline_properties;
 pub mod page_margins;
 pub mod page_setup;
 pub mod parsers;
@@ -131,6 +132,7 @@ pub use named_sheet_view::{
     NamedSheetViewSortCondition, NamedSheetViewSortConditionKind, NamedSheetViewSortRule,
     NamedSheetViewSortRules, NamedSheetViews, parse_named_sheet_views,
 };
+pub use outline_properties::{WorksheetOutlineProperties, parse_worksheet_outline_properties};
 pub use page_margins::{PageMargin, WorksheetPageMargins, parse_worksheet_page_margins};
 pub use page_setup::{
     PageSetupCellComments, PageSetupOrder, PageSetupOrientation, PageSetupPrintErrors,

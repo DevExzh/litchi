@@ -1663,6 +1663,16 @@ impl<W: Write> RtfWriter<W> {
 
     /// Write character formatting
     fn write_formatting(&mut self, fmt: &Formatting) -> io::Result<()> {
+        if let Some(direction) = fmt.direction {
+            self.write_control_word(
+                match direction {
+                    TextDirection::LeftToRight => "ltrch",
+                    TextDirection::RightToLeft => "rtlch",
+                },
+                None,
+            )?;
+        }
+
         if let Some(language) = fmt.language {
             self.write_control_word("lang", Some(language.rtf_value()))?;
         }
@@ -1796,6 +1806,16 @@ impl<W: Write> RtfWriter<W> {
 
     /// Write paragraph properties
     fn write_paragraph_properties(&mut self, para: &Paragraph) -> io::Result<()> {
+        if let Some(direction) = para.direction {
+            self.write_control_word(
+                match direction {
+                    TextDirection::LeftToRight => "ltrpar",
+                    TextDirection::RightToLeft => "rtlpar",
+                },
+                None,
+            )?;
+        }
+
         // Alignment
         match para.alignment {
             Alignment::Left => self.write_control_word("ql", None)?,

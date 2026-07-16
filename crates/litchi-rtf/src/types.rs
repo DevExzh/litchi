@@ -210,6 +210,8 @@ pub struct Indentation {
 /// Paragraph properties.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Paragraph {
+    /// Explicit paragraph direction; `None` uses left-to-right precedence.
+    pub direction: Option<TextDirection>,
     /// Text alignment
     pub alignment: Alignment,
     /// Spacing
@@ -258,6 +260,13 @@ pub enum UnderlineStyle {
     Thick,
     /// Wave underline
     Wave,
+}
+
+/// Explicit bidirectional precedence for a character run or paragraph.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TextDirection {
+    LeftToRight,
+    RightToLeft,
 }
 
 /// Character formatting properties.
@@ -315,6 +324,8 @@ pub struct Formatting {
     pub east_asian_language_no_proof: Option<crate::LanguageId>,
     /// Whether spelling and grammar proofing is disabled for this run.
     pub no_proof: bool,
+    /// Explicit character-run direction; `None` uses left-to-right precedence.
+    pub direction: Option<TextDirection>,
 }
 
 impl Default for Formatting {
@@ -347,6 +358,7 @@ impl Default for Formatting {
             language_no_proof: None,
             east_asian_language_no_proof: None,
             no_proof: false,
+            direction: None,
         }
     }
 }
