@@ -86,4 +86,7 @@ pub use shape_style::{FillStyle, LineStyleConfig, ShadowStyle, ShapeColor, Shape
 pub use shapes::{Shape, ShapeCollection, ShapeKind};
 pub use slide_timing::SlideTiming;
 pub use sound_collection::build_sound_collection;
-pub use text_format::{FontEntity, FontStyle, Paragraph, TextAlign, TextColor, TextRun};
+pub use text_format::{
+    FontEntity, FontStyle, Paragraph, TabAlign, TabStop, TextAlign, TextColor, TextDirection,
+    TextFontAlign, TextRun,
+};

@@ -43,6 +43,18 @@ pub mod para_mask {
     pub const INDENT: u32 = 0x0400;
     /// Default tab size present
     pub const DEFAULT_TAB_SIZE: u32 = 0x8000;
+    /// Font alignment present
+    pub const FONT_ALIGNMENT: u32 = 0x0001_0000;
+    /// East Asian character wrapping present
+    pub const CHARACTER_WRAP: u32 = 0x0002_0000;
+    /// Word wrapping present
+    pub const WORD_WRAP: u32 = 0x0004_0000;
+    /// Hanging punctuation present
+    pub const OVERFLOW: u32 = 0x0008_0000;
+    /// Explicit tab-stop array present
+    pub const TAB_STOPS: u32 = 0x0010_0000;
+    /// Paragraph direction present
+    pub const TEXT_DIRECTION: u32 = 0x0020_0000;
 }
 
 /// Character property mask flags (MS-PPT 2.9.21 TextCFException)
@@ -90,6 +102,63 @@ pub enum TextAlign {
     ThaiDistributed = 0x0005,
     /// Justify low
     JustifyLow = 0x0006,
+}
+
+/// Font alignment within a paragraph line.
+#[repr(u16)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TextFontAlign {
+    /// Place characters on the font baseline.
+    Roman = 0,
+    /// Hang characters from the top of the line.
+    Hanging = 1,
+    /// Center characters within the line height.
+    Center = 2,
+    /// Anchor characters to the bottom of the line.
+    UpholdFixed = 3,
+}
+
+/// Paragraph text direction.
+#[repr(u16)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TextDirection {
+    /// Left-to-right text.
+    LeftToRight = 0,
+    /// Right-to-left text.
+    RightToLeft = 1,
+}
+
+/// Alignment at a paragraph tab stop.
+#[repr(u16)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TabAlign {
+    /// Left-aligned tab stop.
+    Left = 0,
+    /// Center-aligned tab stop.
+    Center = 1,
+    /// Right-aligned tab stop.
+    Right = 2,
+    /// Decimal-point-aligned tab stop.
+    Decimal = 3,
+}
+
+/// A paragraph tab stop in PowerPoint master units.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TabStop {
+    /// Signed position in master units.
+    pub position: i16,
+    /// Text alignment at the stop.
+    pub alignment: TabAlign,
+}
+
+impl TabStop {
+    /// Create a tab stop.
+    pub const fn new(position: i16, alignment: TabAlign) -> Self {
+        Self {
+            position,
+            alignment,
+        }
+    }
 }
 
 // =============================================================================
@@ -403,10 +472,40 @@ pub struct Paragraph {
     pub left_margin: i16,
     /// First line indent (in master units)
     pub indent: i16,
+    /// Paragraph indent level (`0..=4`)
+    pub indent_level: u16,
     /// Bullet character (if any)
     pub bullet_char: Option<char>,
+    /// Explicit bullet-presence flag
+    pub bullet_enabled: Option<bool>,
+    /// Bullet font reference
+    pub bullet_font_index: Option<u16>,
+    /// Explicit bullet-font validity flag
+    pub bullet_font_enabled: Option<bool>,
+    /// Raw bullet size (percentage when positive, points when negative)
+    pub bullet_size: Option<i16>,
+    /// Explicit bullet-size validity flag
+    pub bullet_size_enabled: Option<bool>,
     /// Bullet color
     pub bullet_color: Option<TextColor>,
+    /// Explicit bullet-color validity flag
+    pub bullet_color_enabled: Option<bool>,
+    /// Default tab size in master units
+    pub default_tab_size: Option<i16>,
+    /// Explicit tab stops; `Some(empty)` writes an empty array
+    pub tab_stops: Option<Vec<TabStop>>,
+    /// Font alignment within the line
+    pub font_alignment: Option<TextFontAlign>,
+    /// East Asian character-wrapping override
+    pub character_wrap: Option<bool>,
+    /// Word-wrapping override
+    pub word_wrap: Option<bool>,
+    /// Hanging-punctuation override
+    pub overflow: Option<bool>,
+    /// Paragraph text direction
+    pub text_direction: Option<TextDirection>,
+    /// Properties explicitly requested even when their values equal defaults
+    explicit_mask: u32,
 }
 
 impl Paragraph {
@@ -420,8 +519,23 @@ impl Paragraph {
             space_after: 0,
             left_margin: 0,
             indent: 0,
+            indent_level: 0,
             bullet_char: None,
+            bullet_enabled: None,
+            bullet_font_index: None,
+            bullet_font_enabled: None,
+            bullet_size: None,
+            bullet_size_enabled: None,
             bullet_color: None,
+            bullet_color_enabled: None,
+            default_tab_size: None,
+            tab_stops: None,
+            font_alignment: None,
+            character_wrap: None,
+            word_wrap: None,
+            overflow: None,
+            text_direction: None,
+            explicit_mask: 0,
         }
     }
 
@@ -435,62 +549,186 @@ impl Paragraph {
             space_after: 0,
             left_margin: 0,
             indent: 0,
+            indent_level: 0,
             bullet_char: None,
+            bullet_enabled: None,
+            bullet_font_index: None,
+            bullet_font_enabled: None,
+            bullet_size: None,
+            bullet_size_enabled: None,
             bullet_color: None,
+            bullet_color_enabled: None,
+            default_tab_size: None,
+            tab_stops: None,
+            font_alignment: None,
+            character_wrap: None,
+            word_wrap: None,
+            overflow: None,
+            text_direction: None,
+            explicit_mask: 0,
         }
     }
 
     /// Set alignment
     pub fn align(mut self, alignment: TextAlign) -> Self {
         self.alignment = alignment;
+        self.explicit_mask |= para_mask::ALIGNMENT;
         self
     }
 
     /// Center align
     pub fn center(mut self) -> Self {
         self.alignment = TextAlign::Center;
+        self.explicit_mask |= para_mask::ALIGNMENT;
         self
     }
 
     /// Right align
     pub fn right(mut self) -> Self {
         self.alignment = TextAlign::Right;
+        self.explicit_mask |= para_mask::ALIGNMENT;
         self
     }
 
     /// Set line spacing (percent)
     pub fn line_spacing(mut self, percent: i16) -> Self {
         self.line_spacing = percent;
+        self.explicit_mask |= para_mask::LINE_SPACING;
         self
     }
 
     /// Set space before
     pub fn space_before(mut self, units: i16) -> Self {
         self.space_before = units;
+        self.explicit_mask |= para_mask::SPACE_BEFORE;
         self
     }
 
     /// Set space after
     pub fn space_after(mut self, units: i16) -> Self {
         self.space_after = units;
+        self.explicit_mask |= para_mask::SPACE_AFTER;
+        self
+    }
+
+    /// Set the left margin in master units, including an explicit zero.
+    pub fn left_margin(mut self, units: i16) -> Self {
+        self.left_margin = units;
+        self.explicit_mask |= para_mask::LEFT_MARGIN;
+        self
+    }
+
+    /// Set the first-line indent in master units, including an explicit zero.
+    pub fn first_line_indent(mut self, units: i16) -> Self {
+        self.indent = units;
+        self.explicit_mask |= para_mask::INDENT;
         self
     }
 
     /// Add bullet
     pub fn with_bullet(mut self, ch: char) -> Self {
         self.bullet_char = Some(ch);
+        self.bullet_enabled = Some(true);
+        self
+    }
+
+    /// Explicitly enable or disable paragraph bullets.
+    pub fn bullet_enabled(mut self, enabled: bool) -> Self {
+        self.bullet_enabled = Some(enabled);
+        self
+    }
+
+    /// Set the bullet font reference and mark it active.
+    pub fn bullet_font(mut self, index: u16) -> Self {
+        self.bullet_font_index = Some(index);
+        self.bullet_font_enabled = Some(true);
+        self
+    }
+
+    /// Explicitly enable or disable the bullet font override.
+    pub fn bullet_font_enabled(mut self, enabled: bool) -> Self {
+        self.bullet_font_enabled = Some(enabled);
+        self
+    }
+
+    /// Set the raw `BulletSize` value and mark it active.
+    pub fn bullet_size(mut self, size: i16) -> Self {
+        self.bullet_size = Some(size);
+        self.bullet_size_enabled = Some(true);
+        self
+    }
+
+    /// Explicitly enable or disable the bullet size override.
+    pub fn bullet_size_enabled(mut self, enabled: bool) -> Self {
+        self.bullet_size_enabled = Some(enabled);
         self
     }
 
     /// Set a direct sRGB bullet color.
     pub fn bullet_color_rgb(mut self, r: u8, g: u8, b: u8) -> Self {
         self.bullet_color = Some(TextColor::rgb(r, g, b));
+        self.bullet_color_enabled = Some(true);
         self
     }
 
     /// Set a color-scheme index for the bullet.
     pub fn bullet_color_scheme(mut self, index: u8) -> Self {
         self.bullet_color = Some(TextColor::scheme(index));
+        self.bullet_color_enabled = Some(true);
+        self
+    }
+
+    /// Explicitly enable or disable the bullet color override.
+    pub fn bullet_color_enabled(mut self, enabled: bool) -> Self {
+        self.bullet_color_enabled = Some(enabled);
+        self
+    }
+
+    /// Set the paragraph indent level.
+    pub fn indent_level(mut self, level: u16) -> Self {
+        self.indent_level = level;
+        self
+    }
+
+    /// Set the default tab size in master units.
+    pub fn default_tab_size(mut self, size: i16) -> Self {
+        self.default_tab_size = Some(size);
+        self
+    }
+
+    /// Set explicit paragraph tab stops.
+    pub fn tab_stops(mut self, stops: Vec<TabStop>) -> Self {
+        self.tab_stops = Some(stops);
+        self
+    }
+
+    /// Set font alignment within the line.
+    pub fn font_alignment(mut self, alignment: TextFontAlign) -> Self {
+        self.font_alignment = Some(alignment);
+        self
+    }
+
+    /// Set the East Asian character-wrapping override.
+    pub fn character_wrap(mut self, enabled: bool) -> Self {
+        self.character_wrap = Some(enabled);
+        self
+    }
+
+    /// Set the word-wrapping override.
+    pub fn word_wrap(mut self, enabled: bool) -> Self {
+        self.word_wrap = Some(enabled);
+        self
+    }
+
+    /// Set the hanging-punctuation override.
+    pub fn overflow(mut self, enabled: bool) -> Self {
+        self.overflow = Some(enabled);
+        self
+    }
+
+    /// Set paragraph text direction.
+    pub fn text_direction(mut self, direction: TextDirection) -> Self {
+        self.text_direction = Some(direction);
         self
     }
 
@@ -633,11 +871,16 @@ impl TextPropsBuilder {
             })?;
             data.extend_from_slice(&char_count.to_le_bytes());
 
-            // Indent level (0 for top-level)
-            data.extend_from_slice(&0u16.to_le_bytes());
+            if para.indent_level > 4 {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "PPT paragraph indent level must be between 0 and 4",
+                ));
+            }
+            data.extend_from_slice(&para.indent_level.to_le_bytes());
 
             // Build mask based on what properties are set
-            let mut mask = 0u32;
+            let mut mask = para.explicit_mask;
             if para.alignment != TextAlign::Left {
                 mask |= para_mask::ALIGNMENT;
             }
@@ -656,11 +899,50 @@ impl TextPropsBuilder {
             if para.indent != 0 {
                 mask |= para_mask::INDENT;
             }
+            if para.bullet_enabled.is_some() || para.bullet_char.is_some() {
+                mask |= para_mask::HAS_BULLET;
+            }
             if para.bullet_char.is_some() {
-                mask |= para_mask::HAS_BULLET | para_mask::BULLET_CHAR;
+                mask |= para_mask::BULLET_CHAR;
+            }
+            if para.bullet_font_enabled.is_some() || para.bullet_font_index.is_some() {
+                mask |= para_mask::BULLET_HAS_FONT;
+            }
+            if para.bullet_font_index.is_some() {
+                mask |= para_mask::BULLET_FONT;
+            }
+            if para.bullet_size_enabled.is_some() || para.bullet_size.is_some() {
+                mask |= para_mask::BULLET_HAS_SIZE;
+            }
+            if para.bullet_size.is_some() {
+                mask |= para_mask::BULLET_SIZE;
+            }
+            if para.bullet_color_enabled.is_some() || para.bullet_color.is_some() {
+                mask |= para_mask::BULLET_HAS_COLOR;
             }
             if para.bullet_color.is_some() {
-                mask |= para_mask::BULLET_HAS_COLOR | para_mask::BULLET_COLOR;
+                mask |= para_mask::BULLET_COLOR;
+            }
+            if para.default_tab_size.is_some() {
+                mask |= para_mask::DEFAULT_TAB_SIZE;
+            }
+            if para.tab_stops.is_some() {
+                mask |= para_mask::TAB_STOPS;
+            }
+            if para.font_alignment.is_some() {
+                mask |= para_mask::FONT_ALIGNMENT;
+            }
+            if para.character_wrap.is_some() {
+                mask |= para_mask::CHARACTER_WRAP;
+            }
+            if para.word_wrap.is_some() {
+                mask |= para_mask::WORD_WRAP;
+            }
+            if para.overflow.is_some() {
+                mask |= para_mask::OVERFLOW;
+            }
+            if para.text_direction.is_some() {
+                mask |= para_mask::TEXT_DIRECTION;
             }
 
             data.extend_from_slice(&mask.to_le_bytes());
@@ -674,11 +956,26 @@ impl TextPropsBuilder {
                 != 0
             {
                 let mut flags = 0u16;
-                if mask & para_mask::HAS_BULLET != 0 {
+                if para.bullet_enabled.unwrap_or(para.bullet_char.is_some()) {
                     flags |= 0x0001;
                 }
-                if mask & para_mask::BULLET_HAS_COLOR != 0 {
+                if para
+                    .bullet_font_enabled
+                    .unwrap_or(para.bullet_font_index.is_some())
+                {
+                    flags |= 0x0002;
+                }
+                if para
+                    .bullet_color_enabled
+                    .unwrap_or(para.bullet_color.is_some())
+                {
                     flags |= 0x0004;
+                }
+                if para
+                    .bullet_size_enabled
+                    .unwrap_or(para.bullet_size.is_some())
+                {
+                    flags |= 0x0008;
                 }
                 data.extend_from_slice(&flags.to_le_bytes());
             }
@@ -691,6 +988,19 @@ impl TextPropsBuilder {
                     )
                 })?;
                 data.extend_from_slice(&ch.to_le_bytes());
+            }
+            if mask & para_mask::BULLET_FONT != 0 {
+                data.extend_from_slice(&para.bullet_font_index.unwrap_or(0).to_le_bytes());
+            }
+            if mask & para_mask::BULLET_SIZE != 0 {
+                let size = para.bullet_size.unwrap_or(100);
+                if !((25..=400).contains(&size) || (-4000..=-1).contains(&size)) {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "PPT bullet size must be 25..=400 percent or -4000..=-1 points",
+                    ));
+                }
+                data.extend_from_slice(&size.to_le_bytes());
             }
             if mask & para_mask::BULLET_COLOR != 0 {
                 let color = para.bullet_color.unwrap_or(TextColor::BLACK);
@@ -719,6 +1029,48 @@ impl TextPropsBuilder {
             }
             if mask & para_mask::INDENT != 0 {
                 data.extend_from_slice(&para.indent.to_le_bytes());
+            }
+            if mask & para_mask::DEFAULT_TAB_SIZE != 0 {
+                data.extend_from_slice(&para.default_tab_size.unwrap_or(0).to_le_bytes());
+            }
+            if mask & para_mask::TAB_STOPS != 0 {
+                let tab_stops = para.tab_stops.as_deref().unwrap_or_default();
+                let count = u16::try_from(tab_stops.len()).map_err(|_| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "PPT paragraph has more than 65535 tab stops",
+                    )
+                })?;
+                data.extend_from_slice(&count.to_le_bytes());
+                for tab_stop in tab_stops {
+                    data.extend_from_slice(&tab_stop.position.to_le_bytes());
+                    data.extend_from_slice(&(tab_stop.alignment as u16).to_le_bytes());
+                }
+            }
+            if mask & para_mask::FONT_ALIGNMENT != 0 {
+                data.extend_from_slice(
+                    &(para.font_alignment.unwrap_or(TextFontAlign::Roman) as u16).to_le_bytes(),
+                );
+            }
+            if mask & (para_mask::CHARACTER_WRAP | para_mask::WORD_WRAP | para_mask::OVERFLOW) != 0
+            {
+                let mut flags = 0u16;
+                if para.character_wrap.unwrap_or(false) {
+                    flags |= 0x0001;
+                }
+                if para.word_wrap.unwrap_or(false) {
+                    flags |= 0x0002;
+                }
+                if para.overflow.unwrap_or(false) {
+                    flags |= 0x0004;
+                }
+                data.extend_from_slice(&flags.to_le_bytes());
+            }
+            if mask & para_mask::TEXT_DIRECTION != 0 {
+                data.extend_from_slice(
+                    &(para.text_direction.unwrap_or(TextDirection::LeftToRight) as u16)
+                        .to_le_bytes(),
+                );
             }
         }
 
@@ -988,38 +1340,115 @@ mod tests {
             TextRun::new("x").baseline_position(101),
         ]));
         assert!(invalid_position.build_style_text_prop().is_err());
+
+        let mut invalid_indent = TextPropsBuilder::new();
+        invalid_indent.add_paragraph(Paragraph::new("x").indent_level(5));
+        assert!(invalid_indent.build_style_text_prop().is_err());
+
+        let mut invalid_bullet_size = TextPropsBuilder::new();
+        invalid_bullet_size.add_paragraph(Paragraph::new("x").bullet_size(0));
+        assert!(invalid_bullet_size.build_style_text_prop().is_err());
+
+        let mut invalid_bullet_scheme = TextPropsBuilder::new();
+        invalid_bullet_scheme.add_paragraph(Paragraph::new("x").bullet_color_scheme(8));
+        assert!(invalid_bullet_scheme.build_style_text_prop().is_err());
     }
 
     #[test]
     fn paragraph_properties_round_trip_in_spec_order() {
         let mut paragraph = Paragraph::new("x")
             .with_bullet('•')
+            .bullet_font(65_535)
+            .bullet_size(-24)
             .bullet_color_rgb(1, 2, 3)
-            .center()
+            .align(TextAlign::Distributed)
             .line_spacing(120)
             .space_before(-10)
-            .space_after(20);
+            .space_after(20)
+            .indent_level(2)
+            .default_tab_size(144)
+            .tab_stops(vec![
+                TabStop::new(-20, TabAlign::Center),
+                TabStop::new(720, TabAlign::Decimal),
+            ])
+            .font_alignment(TextFontAlign::UpholdFixed)
+            .character_wrap(true)
+            .word_wrap(false)
+            .overflow(true)
+            .text_direction(TextDirection::RightToLeft);
         paragraph.left_margin = 720;
         paragraph.indent = -360;
         let mut builder = TextPropsBuilder::new();
         builder.add_paragraph(paragraph);
 
         let style = builder.build_style_text_prop().unwrap();
-        let (paragraphs, _) = crate::ppt::text_prop::parse_style_text_prop_atom(&style, 1);
+        let (paragraphs, _) =
+            crate::ppt::text_prop::parse_style_text_prop_atom_strict(&style, 1).unwrap();
         let properties = &paragraphs[0];
 
-        assert_eq!(properties.get_value("paragraph.flags"), Some(0x0005));
+        assert_eq!(properties.indent_level, 2);
+        assert_eq!(properties.get_value("paragraph.flags"), Some(0x000F));
         assert_eq!(properties.get_value("bullet.char"), Some(0x2022));
+        assert_eq!(properties.get_value("bullet.font"), Some(65_535));
+        assert_eq!(properties.get_value("bullet.size"), Some(-24));
         assert_eq!(
             properties.get_value("bullet.color"),
             Some(0xFE03_0201u32 as i32)
         );
-        assert_eq!(properties.get_value("alignment"), Some(1));
+        assert_eq!(properties.get_value("alignment"), Some(4));
         assert_eq!(properties.get_value("linespacing"), Some(120));
         assert_eq!(properties.get_value("spacebefore"), Some(-10));
         assert_eq!(properties.get_value("spaceafter"), Some(20));
         assert_eq!(properties.get_value("text.offset"), Some(720));
         assert_eq!(properties.get_value("bullet.offset"), Some(-360));
+        assert_eq!(properties.get_value("defaultTabSize"), Some(144));
+        assert_eq!(properties.get_value("tabStops"), Some(2));
+        assert_eq!(properties.tab_stops[0].position, -20);
+        assert_eq!(properties.tab_stops[0].alignment, 1);
+        assert_eq!(properties.tab_stops[1].position, 720);
+        assert_eq!(properties.tab_stops[1].alignment, 3);
+        assert_eq!(properties.get_value("fontAlignment"), Some(3));
+        assert_eq!(properties.get_value("wrapFlags"), Some(5));
+        assert_eq!(properties.get_value("textDirection"), Some(1));
+    }
+
+    #[test]
+    fn paragraph_writer_preserves_explicit_false_and_default_values() {
+        let paragraph = Paragraph::new("x")
+            .bullet_enabled(false)
+            .bullet_font_enabled(false)
+            .bullet_color_enabled(false)
+            .bullet_size_enabled(false)
+            .align(TextAlign::Left)
+            .line_spacing(100)
+            .space_before(0)
+            .space_after(0)
+            .left_margin(0)
+            .first_line_indent(0)
+            .tab_stops(Vec::new())
+            .character_wrap(false)
+            .word_wrap(false)
+            .overflow(false)
+            .text_direction(TextDirection::LeftToRight);
+        let mut builder = TextPropsBuilder::new();
+        builder.add_paragraph(paragraph);
+
+        let style = builder.build_style_text_prop().unwrap();
+        let (paragraphs, _) =
+            crate::ppt::text_prop::parse_style_text_prop_atom_strict(&style, 1).unwrap();
+        let properties = &paragraphs[0];
+
+        assert_eq!(properties.get_value("paragraph.flags"), Some(0));
+        assert_eq!(properties.get_value("alignment"), Some(0));
+        assert_eq!(properties.get_value("linespacing"), Some(100));
+        assert_eq!(properties.get_value("spacebefore"), Some(0));
+        assert_eq!(properties.get_value("spaceafter"), Some(0));
+        assert_eq!(properties.get_value("text.offset"), Some(0));
+        assert_eq!(properties.get_value("bullet.offset"), Some(0));
+        assert_eq!(properties.get_value("tabStops"), Some(0));
+        assert!(properties.tab_stops.is_empty());
+        assert_eq!(properties.get_value("wrapFlags"), Some(0));
+        assert_eq!(properties.get_value("textDirection"), Some(0));
     }
 
     #[test]

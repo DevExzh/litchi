@@ -104,7 +104,7 @@ pub use text_run::{
 // Re-export writer types
 pub use writer::{
     FreeformGeometry, GeometryRect, PptWriteError, PptWriter, ShapePathType, ShapeProperties,
-    ShapeType, TextAlignment,
+    ShapeType, TabAlign, TabStop, TextAlignment, TextDirection, TextFontAlign,
 };
 
 // Animation and transition support
