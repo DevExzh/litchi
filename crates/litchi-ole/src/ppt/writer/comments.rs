@@ -12,14 +12,14 @@
 //! ├── CString (instance=2): author initials (UTF-16LE)
 //! └── Comment2000Atom (type=12001, 28 bytes)
 //!     ├── index (i32): 1-based comment index
-//!     ├── year (i16)
+//!     ├── year (u16)
 //!     ├── month (u16)
 //!     ├── day_of_week (u16): day of week (unused, set to day)
 //!     ├── day (u16)
 //!     ├── hour (u16)
 //!     ├── minute (u16)
 //!     ├── second (u16)
-//!     ├── millisecond (i16)
+//!     ├── millisecond (u16)
 //!     ├── x (i32): position in master units (576/inch)
 //!     └── y (i32): position in master units
 //! ```
@@ -47,7 +47,7 @@ pub struct SlideComment {
 #[derive(Debug, Clone, Default)]
 pub struct CommentDateTime {
     /// Year (e.g. 2025).
-    pub year: i16,
+    pub year: u16,
     /// Month (1-12).
     pub month: u16,
     /// Day of month (1-31).
@@ -59,7 +59,7 @@ pub struct CommentDateTime {
     /// Second (0-59).
     pub second: u16,
     /// Millisecond (0-999).
-    pub millisecond: i16,
+    pub millisecond: u16,
 }
 
 impl SlideComment {
@@ -116,6 +116,31 @@ fn pt_to_master(pt: i32) -> i32 {
 /// Write a CString record with the given instance and UTF-16LE text.
 fn write_cstring(instance: u16, text: &str) -> Result<Vec<u8>, PptError> {
     let utf16: Vec<u16> = text.encode_utf16().collect();
+    let (max_len, allow_tab_cr_lf) = match instance {
+        0 | 2 => (104, false),
+        1 => (64_000, true),
+        _ => {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "invalid comment CString instance",
+            ));
+        },
+    };
+    if utf16.len().saturating_mul(2) > max_len
+        || utf16.iter().copied().any(|unit| {
+            unit == 0
+                || if allow_tab_cr_lf {
+                    matches!(unit, 0x0001..=0x0008 | 0x000b..=0x000c | 0x000e..=0x001f | 0x007f..=0x009f)
+                } else {
+                    matches!(unit, 0x0001..=0x001f | 0x007f..=0x009f)
+                }
+        })
+    {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "comment string exceeds its binary limit or contains a forbidden character",
+        ));
+    }
     let mut data = Vec::with_capacity(utf16.len() * 2);
     for ch in &utf16 {
         data.extend_from_slice(&ch.to_le_bytes());
@@ -152,14 +177,14 @@ fn build_comment_container(comment: &SlideComment, index: i32) -> Result<Vec<u8>
     // Comment2000Atom (28 bytes)
     let mut atom_data = Vec::with_capacity(28);
     atom_data.extend_from_slice(&index.to_le_bytes()); // index (i32)
-    atom_data.extend_from_slice(&comment.date.year.to_le_bytes()); // year (i16)
+    atom_data.extend_from_slice(&comment.date.year.to_le_bytes()); // year (u16)
     atom_data.extend_from_slice(&comment.date.month.to_le_bytes()); // month (u16)
     atom_data.extend_from_slice(&comment.date.day.to_le_bytes()); // day of week (u16, set to day)
     atom_data.extend_from_slice(&comment.date.day.to_le_bytes()); // day (u16)
     atom_data.extend_from_slice(&comment.date.hour.to_le_bytes()); // hour (u16)
     atom_data.extend_from_slice(&comment.date.minute.to_le_bytes()); // minute (u16)
     atom_data.extend_from_slice(&comment.date.second.to_le_bytes()); // second (u16)
-    atom_data.extend_from_slice(&comment.date.millisecond.to_le_bytes()); // millisecond (i16)
+    atom_data.extend_from_slice(&comment.date.millisecond.to_le_bytes()); // millisecond (u16)
     atom_data.extend_from_slice(&pt_to_master(comment.x).to_le_bytes()); // x (i32)
     atom_data.extend_from_slice(&pt_to_master(comment.y).to_le_bytes()); // y (i32)
 
@@ -439,5 +464,17 @@ mod tests {
         let comments = vec![SlideComment::new("Author", "Text", -100, -200)];
         let data = build_slide_comments(&comments).unwrap();
         assert!(!data.is_empty());
+    }
+
+    #[test]
+    fn rejects_comment_strings_outside_binary_limits() {
+        let overlong_author = SlideComment::new(&"A".repeat(53), "Text", 0, 0);
+        assert!(build_slide_comments(&[overlong_author]).is_err());
+
+        let forbidden_author = SlideComment::new("Author\nName", "Text", 0, 0);
+        assert!(build_slide_comments(&[forbidden_author]).is_err());
+
+        let valid_multiline = SlideComment::new("Author", "First\tline\r\nSecond", 0, 0);
+        assert!(build_slide_comments(&[valid_multiline]).is_ok());
     }
 }

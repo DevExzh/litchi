@@ -261,6 +261,10 @@ pub enum PptRecordType {
     Comment2000 = 12000,
     /// Comment 2000 atom record
     Comment2000Atom = 12001,
+    /// PowerPoint 10 comment author container
+    CommentIndex10 = 12004,
+    /// PowerPoint 10 comment author index atom
+    CommentIndex10Atom = 12005,
 }
 
 impl From<u16> for PptRecordType {
@@ -387,6 +391,8 @@ impl From<u16> for PptRecordType {
             1042 => PptRecordType::NamedShowSlides,
             12000 => PptRecordType::Comment2000,
             12001 => PptRecordType::Comment2000Atom,
+            12004 => PptRecordType::CommentIndex10,
+            12005 => PptRecordType::CommentIndex10Atom,
             _ => PptRecordType::Unknown,
         }
     }

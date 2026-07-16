@@ -141,6 +141,7 @@ impl PptRecord {
                 | PptRecordType::OutlineTextProps10
                 | PptRecordType::OutlineTextProps11
                 | PptRecordType::Comment2000
+                | PptRecordType::CommentIndex10
                 | PptRecordType::BuildList
                 | PptRecordType::ChartBuild
                 | PptRecordType::DiagramBuild

@@ -484,131 +484,12 @@ impl<'doc> Slide<'doc> {
     ///
     /// A vector of parsed comments (author, text, initials, position, date).
     /// Returns an empty vector if no comments are found.
-    pub fn comments(&self) -> Vec<ParsedComment> {
-        let mut comments = Vec::new();
-
-        // Navigate: Slide -> ProgTags -> ProgBinaryTag -> BinaryTagData
-        // Comment2000 records are children of BinaryTagData
-        for child in &self.record.children {
-            if child.record_type == PptRecordType::ProgTags {
-                // PROG_TAGS
-                for prog_bin in &child.children {
-                    if prog_bin.record_type == PptRecordType::ProgBinaryTag {
-                        if !prog_bin
-                            .find_child(PptRecordType::CString)
-                            .is_some_and(Self::is_ppt10_tag_name)
-                        {
-                            continue;
-                        }
-                        // PROG_BINARY_TAG
-                        for bin_tag in &prog_bin.children {
-                            if bin_tag.record_type == PptRecordType::BinaryTagData {
-                                // BINARY_TAG_DATA
-                                // Parse Comment2000 containers from the data
-                                Self::parse_comments_from_data(&bin_tag.data, &mut comments);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        comments
-    }
-
-    /// Parse Comment2000 containers from raw BinaryTagData bytes.
-    fn parse_comments_from_data(data: &[u8], comments: &mut Vec<ParsedComment>) {
-        let mut offset = 0;
-        while data.len().saturating_sub(offset) >= 8 {
-            let ver_inst = u16::from_le_bytes([data[offset], data[offset + 1]]);
-            let version = ver_inst & 0x000F;
-            let rtype = u16::from_le_bytes([data[offset + 2], data[offset + 3]]);
-            let rlen = u32::from_le_bytes([
-                data[offset + 4],
-                data[offset + 5],
-                data[offset + 6],
-                data[offset + 7],
-            ]) as usize;
-            let Some(record_end) = offset
-                .checked_add(8)
-                .and_then(|start| start.checked_add(rlen))
-            else {
-                break;
-            };
-            if record_end > data.len() {
-                break;
-            }
-
-            if rtype == 12000 && version == 0x0F {
-                // Comment2000 container — parse its children
-                let container_end = record_end;
-                let mut comment = ParsedComment::default();
-                let mut has_atom = false;
-                let mut child_off = offset + 8;
-
-                while container_end.saturating_sub(child_off) >= 8 {
-                    let c_ver_inst = u16::from_le_bytes([data[child_off], data[child_off + 1]]);
-                    let c_instance = (c_ver_inst >> 4) & 0x0FFF;
-                    let c_type = u16::from_le_bytes([data[child_off + 2], data[child_off + 3]]);
-                    let c_len = u32::from_le_bytes([
-                        data[child_off + 4],
-                        data[child_off + 5],
-                        data[child_off + 6],
-                        data[child_off + 7],
-                    ]) as usize;
-
-                    let c_data_start = child_off + 8;
-                    let Some(c_data_end) = c_data_start.checked_add(c_len) else {
-                        break;
-                    };
-                    if c_data_end > container_end {
-                        break;
-                    }
-
-                    if c_type == 4026 {
-                        // CString (UTF-16LE)
-                        let text = Self::decode_utf16le(&data[c_data_start..c_data_end]);
-                        match c_instance {
-                            0 => comment.author = text,
-                            1 => comment.text = text,
-                            2 => comment.initials = text,
-                            _ => {},
-                        }
-                    } else if c_type == 12001 && c_len == 28 {
-                        // Comment2000Atom (28 bytes)
-                        let d = &data[c_data_start..c_data_end];
-                        comment.index = i32::from_le_bytes([d[0], d[1], d[2], d[3]]);
-                        comment.year = i16::from_le_bytes([d[4], d[5]]);
-                        comment.month = u16::from_le_bytes([d[6], d[7]]);
-                        // d[8..10] = day of week (skip)
-                        comment.day = u16::from_le_bytes([d[10], d[11]]);
-                        comment.hour = u16::from_le_bytes([d[12], d[13]]);
-                        comment.minute = u16::from_le_bytes([d[14], d[15]]);
-                        comment.second = u16::from_le_bytes([d[16], d[17]]);
-                        comment.millisecond = i16::from_le_bytes([d[18], d[19]]);
-                        comment.x = i32::from_le_bytes([d[20], d[21], d[22], d[23]]);
-                        comment.y = i32::from_le_bytes([d[24], d[25], d[26], d[27]]);
-                        has_atom = true;
-                    }
-
-                    child_off = c_data_end;
-                }
-
-                if has_atom {
-                    comments.push(comment);
-                }
-            }
-            offset = record_end;
-        }
-    }
-
-    /// Decode UTF-16LE bytes into a String.
-    fn decode_utf16le(data: &[u8]) -> String {
-        let chars: Vec<u16> = data
-            .chunks_exact(2)
-            .map(|c| u16::from_le_bytes([c[0], c[1]]))
-            .collect();
-        String::from_utf16_lossy(&chars)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the PowerPoint 10 programmable tag or a comment record is malformed.
+    pub fn comments(&self) -> Result<Vec<ParsedComment>> {
+        crate::ppt::comments::parse_slide_comments(&self.record)
     }
 
     /// Get the slide timing from the SSSlideInfoAtom record.
@@ -640,9 +521,9 @@ impl<'doc> Slide<'doc> {
 }
 
 /// A parsed comment from a PPT slide.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ParsedComment {
-    /// Comment index (1-based).
+    /// Nonnegative comment index.
     pub index: i32,
     /// Author name.
     pub author: String,
@@ -651,9 +532,11 @@ pub struct ParsedComment {
     /// Author initials.
     pub initials: String,
     /// Year.
-    pub year: i16,
+    pub year: u16,
     /// Month (1-12).
     pub month: u16,
+    /// Day of week (`0` is Sunday).
+    pub day_of_week: u16,
     /// Day (1-31).
     pub day: u16,
     /// Hour (0-23).
@@ -663,7 +546,7 @@ pub struct ParsedComment {
     /// Second (0-59).
     pub second: u16,
     /// Millisecond (0-999).
-    pub millisecond: i16,
+    pub millisecond: u16,
     /// X position in master units (576/inch).
     pub x: i32,
     /// Y position in master units.
@@ -1041,6 +924,28 @@ mod tests {
             data,
             children,
         }
+    }
+
+    fn record_bytes(version: u16, instance: u16, kind: u16, payload: &[u8]) -> Vec<u8> {
+        let mut data = Vec::new();
+        data.extend_from_slice(&((instance << 4) | version).to_le_bytes());
+        data.extend_from_slice(&kind.to_le_bytes());
+        data.extend_from_slice(&(payload.len() as u32).to_le_bytes());
+        data.extend_from_slice(payload);
+        data
+    }
+
+    fn prog_tags_record(version: u8, blob_payload: &[u8]) -> PptRecord {
+        let tag_name: Vec<u8> = format!("___PPT{version}")
+            .encode_utf16()
+            .flat_map(u16::to_le_bytes)
+            .collect();
+        let name = record_bytes(0, 0, 4026, &tag_name);
+        let blob = record_bytes(0, 0, 0x138b, blob_payload);
+        let mut tag_payload = name;
+        tag_payload.extend_from_slice(&blob);
+        let tag = record_bytes(0x0f, 0, 0x138a, &tag_payload);
+        create_test_record(PptRecordType::ProgTags, tag, Vec::new())
     }
 
     // Helper function to create a basic slide record without children
@@ -1771,7 +1676,7 @@ mod tests {
         let extension = slide.animation_extension().unwrap().unwrap();
         assert_eq!(extension.time_node, Some(timing));
         assert_eq!(extension.build_list, Some(BuildList::new()));
-        let comments = slide.comments();
+        let comments = slide.comments().unwrap();
         assert_eq!(comments.len(), 1);
         assert_eq!(comments[0].author, "Ada Lovelace");
         assert_eq!(comments[0].text, "Animate this");
@@ -1779,7 +1684,7 @@ mod tests {
     }
 
     #[test]
-    fn truncated_comment_atoms_are_ignored_without_panicking() {
+    fn truncated_comment_atoms_are_rejected_without_panicking() {
         let mut child = Vec::new();
         child.extend(0u16.to_le_bytes());
         child.extend(PptRecordType::Comment2000Atom.as_u16().to_le_bytes());
@@ -1792,9 +1697,9 @@ mod tests {
         data.extend(u32::try_from(child.len()).unwrap().to_le_bytes());
         data.extend(child);
 
-        let mut comments = Vec::new();
-        Slide::<'static>::parse_comments_from_data(&data, &mut comments);
-        assert!(comments.is_empty());
+        let extension = prog_tags_record(10, &data);
+        let slide = create_test_record(PptRecordType::Slide, Vec::new(), vec![extension]);
+        assert!(crate::ppt::comments::parse_slide_comments(&slide).is_err());
     }
 
     #[test]
