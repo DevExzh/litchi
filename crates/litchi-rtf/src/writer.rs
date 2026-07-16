@@ -145,6 +145,8 @@ impl<W: Write> RtfWriter<W> {
 
         self.write_data_store(doc.data_store())?;
 
+        self.write_math_properties(doc.math_properties())?;
+
         // Producer provenance is inert header metadata.
         self.write_generator(doc.generator())?;
 
@@ -678,6 +680,68 @@ impl<W: Write> RtfWriter<W> {
             .validate()
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
         self.write_hex_destination("datastore", data_store.data.as_ref())
+    }
+
+    pub fn write_math_properties(
+        &mut self,
+        properties: Option<&crate::DocumentMathProperties>,
+    ) -> io::Result<()> {
+        let Some(properties) = properties else {
+            return Ok(());
+        };
+        properties
+            .validate()
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+        self.write_str("{\\*\\mmathPr")?;
+        if let Some(value) = properties.binary_operator_break {
+            self.write_control_word("mbrkBin", Some(value.rtf_value()))?;
+        }
+        if let Some(value) = properties.binary_subtraction_break {
+            self.write_control_word("mbrkBinSub", Some(value.rtf_value()))?;
+        }
+        if let Some(value) = properties.default_justification {
+            self.write_control_word("mdefJc", Some(value.rtf_value()))?;
+        }
+        if let Some(value) = properties.display_defaults {
+            self.write_control_word("mdispDef", Some(value.rtf_value()))?;
+        }
+        if let Some(value) = properties.inter_equation_spacing {
+            self.write_control_word("minterSp", Some(value))?;
+        }
+        if let Some(value) = properties.integral_limit_placement {
+            self.write_control_word("mintLim", Some(value.rtf_value()))?;
+        }
+        if let Some(value) = properties.intra_equation_spacing {
+            self.write_control_word("mintraSp", Some(value))?;
+        }
+        if let Some(value) = properties.left_margin {
+            self.write_control_word("mlMargin", Some(value))?;
+        }
+        if let Some(value) = properties.math_font {
+            self.write_control_word("mmathFont", Some(value as i32))?;
+        }
+        if let Some(value) = properties.nary_limit_placement {
+            self.write_control_word("mnaryLim", Some(value.rtf_value()))?;
+        }
+        if let Some(value) = properties.post_spacing {
+            self.write_control_word("mpostSp", Some(value))?;
+        }
+        if let Some(value) = properties.pre_spacing {
+            self.write_control_word("mpreSp", Some(value))?;
+        }
+        if let Some(value) = properties.right_margin {
+            self.write_control_word("mrMargin", Some(value))?;
+        }
+        if let Some(value) = properties.small_fractions {
+            self.write_control_word("msmallFrac", Some(value.rtf_value()))?;
+        }
+        if let Some(value) = properties.wrap_indent {
+            self.write_control_word("mwrapIndent", Some(value))?;
+        }
+        if let Some(value) = properties.wrap_right {
+            self.write_control_word("mwrapRight", Some(value.rtf_value()))?;
+        }
+        self.write_str("}")
     }
 
     fn write_optional_bool(&mut self, control: &str, value: Option<bool>) -> io::Result<()> {

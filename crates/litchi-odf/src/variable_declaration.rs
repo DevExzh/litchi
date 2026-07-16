@@ -190,6 +190,10 @@ pub struct OdfVariableDeclarationGroup {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct OdfVariableDeclarations {
     pub groups: Vec<OdfVariableDeclarationGroup>,
+    /// Inert DDE source declarations in document order.
+    pub dde_connections: Vec<crate::OdfDdeConnectionDeclaration>,
+    /// Validated references to DDE declarations in document order.
+    pub dde_connection_uses: Vec<crate::OdfDdeConnectionUse>,
 }
 
 impl OdfVariableDeclarations {
@@ -204,6 +208,12 @@ impl OdfVariableDeclarations {
     ) -> Option<&OdfVariableDeclaration> {
         self.declarations()
             .find(|declaration| declaration.kind() == kind && declaration.name() == name)
+    }
+
+    pub fn find_dde_connection(&self, name: &str) -> Option<&crate::OdfDdeConnectionDeclaration> {
+        self.dde_connections
+            .iter()
+            .find(|connection| connection.name == name)
     }
 }
 
@@ -270,6 +280,9 @@ pub(crate) fn parse_variable_declaration_parts(
             )));
         }
     }
+    let dde = crate::dde_connection::parse_dde_connection_parts(parts)?;
+    result.dde_connections = dde.declarations;
+    result.dde_connection_uses = dde.uses;
     Ok(result)
 }
 

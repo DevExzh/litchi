@@ -44,6 +44,7 @@ mod data_store;
 mod info;
 mod lexer;
 mod list;
+mod math_properties;
 mod navigation_entry;
 mod object;
 mod parser;
@@ -83,6 +84,10 @@ pub use user_property::{UserProperty, UserPropertyValue};
 pub use list::{
     List, ListFollow, ListJustification, ListLevel, ListLevelType, ListOverride, ListOverrideTable,
     ListTable,
+};
+pub use math_properties::{
+    DocumentMathProperties, MathBinaryOperatorBreak, MathBinarySubtractionBreak, MathFlag,
+    MathJustification, MathLimitPlacement,
 };
 pub use navigation_entry::{
     IndexEntry, IndexPageReference, NavigationEntry, TableOfContentsEntry,

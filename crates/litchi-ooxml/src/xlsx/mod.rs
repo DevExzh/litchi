@@ -29,6 +29,7 @@
 
 pub mod cell;
 pub mod auto_filter;
+pub mod calculation_properties;
 pub mod chart;
 mod comments;
 pub mod conditional_formatting;
@@ -62,6 +63,10 @@ pub mod writer;
 
 // Re-export main types for convenience
 pub use cell::Cell;
+pub use calculation_properties::{
+    WorkbookCalculationMode, WorkbookCalculationProperties, WorkbookReferenceMode,
+    parse_workbook_calculation_properties,
+};
 pub use auto_filter::{
     AutoFilterDefinition, CalendarType, ColorFilter, CustomFilter, CustomFilterOperator,
     CustomFilters, DateGroupItem, DateTimeGrouping, DynamicFilter, DynamicFilterType,

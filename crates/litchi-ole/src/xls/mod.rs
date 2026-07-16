@@ -35,6 +35,9 @@ mod defined_names;
 /// BIFF8 number formats, XF slots, and workbook date system.
 mod number_format;
 
+/// BIFF8 workbook custom and default color palettes.
+mod palette;
+
 /// BIFF8 worksheet row heights and column widths/formatting.
 mod layout;
 
@@ -90,6 +93,7 @@ pub use defined_names::{
 pub use number_format::{
     XlsDateSystem, XlsExtendedFormat, XlsExtendedFormatKind, XlsFormatting, XlsNumberFormat,
 };
+pub use palette::{XlsColor, XlsPalette};
 pub use layout::{XlsColumnLayout, XlsRowLayout};
 pub use view::{XlsPane, XlsPaneType, XlsSelection, XlsSelectionRange, XlsWorksheetView};
 pub use page_setup::{

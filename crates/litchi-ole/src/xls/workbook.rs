@@ -138,6 +138,7 @@ pub struct XlsWorkbook<R: Read + Seek> {
     /// Sparse rich-text and phonetic properties parallel to `shared_strings`.
     shared_string_properties: Option<Arc<Vec<Option<Box<SharedStringProperties>>>>>,
     shared_string_reference_count: u32,
+    palette: crate::xls::palette::XlsPalette,
     biff_version: BiffVersion,
     is_1904_date_system: bool,
     formula_context: FormulaContext,
@@ -170,6 +171,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             shared_strings: None,
             shared_string_properties: None,
             shared_string_reference_count: 0,
+            palette: crate::xls::palette::XlsPalette::default(),
             biff_version: BiffVersion::Biff8,
             is_1904_date_system: false,
             formula_context: FormulaContext::default(),
@@ -206,6 +208,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             shared_strings: None,
             shared_string_properties: None,
             shared_string_reference_count: 0,
+            palette: crate::xls::palette::XlsPalette::default(),
             biff_version: BiffVersion::Biff8,
             is_1904_date_system: false,
             formula_context: FormulaContext::default(),
@@ -323,11 +326,18 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         self.formatting = Arc::new(XlsFormatting::parse_globals(&records)?);
         self.is_1904_date_system = self.formatting.date_system() == XlsDateSystem::Excel1904;
 
+        let mut palette_seen = false;
         let mut i = 0;
         while i < records.len() {
             let record = &records[i];
 
             match record.header.record_type {
+                0x0092 => {
+                    self.palette = crate::xls::palette::XlsPalette::parse_unique_record(
+                        &record.data,
+                        &mut palette_seen,
+                    )?;
+                },
                 0x0809 => {
                     // BOF
                     let bof = BofRecord::parse(&record.data)?;
@@ -846,6 +856,11 @@ impl<R: Read + Seek> XlsWorkbook<R> {
 
     pub fn extended_formats(&self) -> &[XlsExtendedFormat] {
         self.formatting.extended_formats()
+    }
+
+    /// Workbook color palette, using BIFF8 defaults when no `Palette` record exists.
+    pub fn palette(&self) -> &crate::xls::palette::XlsPalette {
+        &self.palette
     }
 
     /// Rich-text and phonetic properties for a shared-string index.

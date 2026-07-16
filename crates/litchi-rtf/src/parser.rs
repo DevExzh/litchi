@@ -311,6 +311,7 @@ pub struct Parser<'a> {
     latent_styles: Option<crate::LatentStyles<'a>>,
     data_store: Option<Vec<u8>>,
     saw_data_store: bool,
+    math_properties: Option<crate::DocumentMathProperties>,
     /// Embedded and linked objects
     objects: Vec<super::object::EmbeddedObject<'a>>,
     /// Ordered inert document variables
@@ -446,6 +447,7 @@ impl<'a> Parser<'a> {
             latent_styles: None,
             data_store: None,
             saw_data_store: false,
+            math_properties: None,
             objects: Vec::new(),
             document_variables: Vec::new(),
             document_variable_text_bytes: 0,
@@ -550,6 +552,7 @@ impl<'a> Parser<'a> {
             theme,
             latent_styles: self.latent_styles,
             data_store,
+            math_properties: self.math_properties,
             objects: self.objects,
             document_variables: self.document_variables,
             user_properties: self.user_properties,
@@ -763,6 +766,17 @@ impl<'a> Parser<'a> {
                             self.states.pop();
                             return Ok(());
                         },
+                        Some(Token::Control(ControlWord::MathProperties)) => {
+                            if self.math_properties.is_some() {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF contains multiple math-properties destinations"
+                                        .to_string(),
+                                ));
+                            }
+                            self.math_properties = Some(self.parse_math_properties_destination()?);
+                            self.states.pop();
+                            return Ok(());
+                        },
                         Some(Token::Control(ControlWord::DocumentVariable)) => {
                             self.parse_document_variable_destination()?;
                             self.states.pop();
@@ -889,6 +903,16 @@ impl<'a> Parser<'a> {
                     return Err(RtfError::MalformedDocument(
                         "RTF datastore destination must be starred".to_string(),
                     ));
+                },
+                Token::Control(ControlWord::MathProperties) => {
+                    if self.math_properties.is_some() {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF contains multiple math-properties destinations".to_string(),
+                        ));
+                    }
+                    self.math_properties = Some(self.parse_math_properties_destination()?);
+                    self.states.pop();
+                    return Ok(());
                 },
                 Token::Control(ControlWord::Info) => {
                     // Parse document metadata without adding it to body text.
@@ -2164,6 +2188,27 @@ impl<'a> Parser<'a> {
                     "orphan RTF datastore destination control".to_string(),
                 ));
             },
+            ControlWord::MathProperties
+            | ControlWord::MathBreakBinary(_)
+            | ControlWord::MathBreakBinarySubtraction(_)
+            | ControlWord::MathDefaultJustification(_)
+            | ControlWord::MathDisplayDefaults(_)
+            | ControlWord::MathInterEquationSpacing(_)
+            | ControlWord::MathIntegralLimitPlacement(_)
+            | ControlWord::MathIntraEquationSpacing(_)
+            | ControlWord::MathLeftMargin(_)
+            | ControlWord::MathFont(_)
+            | ControlWord::MathNaryLimitPlacement(_)
+            | ControlWord::MathPostSpacing(_)
+            | ControlWord::MathPreSpacing(_)
+            | ControlWord::MathRightMargin(_)
+            | ControlWord::MathSmallFractions(_)
+            | ControlWord::MathWrapIndent(_)
+            | ControlWord::MathWrapRight(_) => {
+                return Err(RtfError::MalformedDocument(
+                    "orphan RTF document math-properties control".to_string(),
+                ));
+            },
             _ => {},
         }
         if self.apply_section_control(control)? {
@@ -2728,6 +2773,144 @@ impl<'a> Parser<'a> {
                 return Err(RtfError::MalformedDocument(
                     "RTF data-store payload exceeds the safety limit".to_string(),
                 ));
+            }
+        }
+    }
+
+    fn parse_math_properties_destination(
+        &mut self,
+    ) -> RtfResult<crate::DocumentMathProperties> {
+        if matches!(
+            self.tokens.get(self.pos),
+            Some(Token::Control(ControlWord::IgnorableDestination))
+        ) {
+            self.pos += 1;
+        }
+        if !matches!(
+            self.tokens.get(self.pos),
+            Some(Token::Control(ControlWord::MathProperties))
+        ) {
+            return Err(RtfError::MalformedDocument(
+                "invalid RTF math-properties destination".to_string(),
+            ));
+        }
+        self.pos += 1;
+        let mut properties = crate::DocumentMathProperties::default();
+
+        macro_rules! set_once {
+            ($field:ident, $value:expr, $name:literal) => {{
+                if properties.$field.is_some() {
+                    return Err(RtfError::MalformedDocument(concat!(
+                        "duplicate RTF math property ",
+                        $name
+                    )
+                    .to_string()));
+                }
+                properties.$field = Some($value);
+            }};
+        }
+
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    properties.validate()?;
+                    return Ok(properties);
+                },
+                Some(Token::Text(text)) if self.decode_transport_text(text)?.trim().is_empty() => {
+                    self.pos += 1;
+                },
+                Some(Token::Control(control)) => {
+                    match *control {
+                        ControlWord::MathBreakBinary(value) => set_once!(
+                            binary_operator_break,
+                            crate::MathBinaryOperatorBreak::from_rtf(value),
+                            "mbrkBin"
+                        ),
+                        ControlWord::MathBreakBinarySubtraction(value) => set_once!(
+                            binary_subtraction_break,
+                            crate::MathBinarySubtractionBreak::from_rtf(value),
+                            "mbrkBinSub"
+                        ),
+                        ControlWord::MathDefaultJustification(value) => set_once!(
+                            default_justification,
+                            crate::MathJustification::from_rtf(value),
+                            "mdefJc"
+                        ),
+                        ControlWord::MathDisplayDefaults(value) => set_once!(
+                            display_defaults,
+                            crate::MathFlag::from_rtf(value),
+                            "mdispDef"
+                        ),
+                        ControlWord::MathInterEquationSpacing(value) => set_once!(
+                            inter_equation_spacing,
+                            value,
+                            "minterSp"
+                        ),
+                        ControlWord::MathIntegralLimitPlacement(value) => set_once!(
+                            integral_limit_placement,
+                            crate::MathLimitPlacement::from_rtf(value),
+                            "mintLim"
+                        ),
+                        ControlWord::MathIntraEquationSpacing(value) => set_once!(
+                            intra_equation_spacing,
+                            value,
+                            "mintraSp"
+                        ),
+                        ControlWord::MathLeftMargin(value) => {
+                            set_once!(left_margin, value, "mlMargin")
+                        },
+                        ControlWord::MathFont(value) => {
+                            let value = u32::try_from(value).map_err(|_| {
+                                RtfError::MalformedDocument(
+                                    "RTF math font index cannot be negative".to_string(),
+                                )
+                            })?;
+                            set_once!(math_font, value, "mmathFont");
+                        },
+                        ControlWord::MathNaryLimitPlacement(value) => set_once!(
+                            nary_limit_placement,
+                            crate::MathLimitPlacement::from_rtf(value),
+                            "mnaryLim"
+                        ),
+                        ControlWord::MathPostSpacing(value) => {
+                            set_once!(post_spacing, value, "mpostSp")
+                        },
+                        ControlWord::MathPreSpacing(value) => {
+                            set_once!(pre_spacing, value, "mpreSp")
+                        },
+                        ControlWord::MathRightMargin(value) => {
+                            set_once!(right_margin, value, "mrMargin")
+                        },
+                        ControlWord::MathSmallFractions(value) => set_once!(
+                            small_fractions,
+                            crate::MathFlag::from_rtf(value),
+                            "msmallFrac"
+                        ),
+                        ControlWord::MathWrapIndent(value) => {
+                            set_once!(wrap_indent, value, "mwrapIndent")
+                        },
+                        ControlWord::MathWrapRight(value) => set_once!(
+                            wrap_right,
+                            crate::MathFlag::from_rtf(value),
+                            "mwrapRight"
+                        ),
+                        _ => {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF math-properties destination contains an unsupported control"
+                                    .to_string(),
+                            ));
+                        },
+                    }
+                    self.pos += 1;
+                },
+                Some(Token::OpenBrace | Token::Binary(_)) | Some(Token::Text(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF math-properties destination contains active, nested, or binary data"
+                            .to_string(),
+                    ));
+                },
+                None => return Err(RtfError::UnexpectedEof),
             }
         }
     }
@@ -6864,6 +7047,7 @@ pub struct ParsedDocument<'a> {
     pub theme: Option<crate::DocumentTheme<'a>>,
     pub latent_styles: Option<crate::LatentStyles<'a>>,
     pub data_store: Option<crate::DocumentDataStore<'a>>,
+    pub math_properties: Option<crate::DocumentMathProperties>,
     /// Embedded and linked objects
     pub objects: Vec<super::object::EmbeddedObject<'a>>,
     /// Ordered inert document-variable metadata

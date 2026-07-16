@@ -12,6 +12,9 @@ use crate::xlsx::writer::workbook::{
 use crate::xlsx::writer::{MutableWorkbookData, MutableWorksheet};
 use crate::xlsx::{Cell, SharedStrings, Styles};
 use crate::xlsx::external_links::{ExternalLinkEntry, load_external_link};
+use crate::xlsx::calculation_properties::{
+    WorkbookCalculationProperties, parse_workbook_calculation_properties,
+};
 use litchi_core::sheet::{
     Result as SheetResult, WorkbookTrait, Worksheet as WorksheetTrait, WorksheetIterator,
 };
@@ -44,6 +47,8 @@ pub struct Workbook {
     properties: DocumentProperties,
     /// Whether the workbook uses the 1904 date system
     is_1904_date_system: bool,
+    /// Effective workbook formula calculation policy.
+    calculation_properties: Option<WorkbookCalculationProperties>,
     external_links: Vec<ExternalLinkEntry>,
 }
 
@@ -195,6 +200,7 @@ impl Workbook {
             mutable_data: None,
             properties: DocumentProperties::new(),
             is_1904_date_system: false,
+            calculation_properties: None,
             external_links: Vec::new(),
         };
 
@@ -215,6 +221,7 @@ impl Workbook {
 
         // Extract sheets from workbook.xml
         let mut details = workbook_parser::parse_workbook_details(content)?;
+        let calculation_properties = parse_workbook_calculation_properties(content.as_bytes())?;
         Self::apply_defined_name_print_settings(&details.defined_names, &mut details.sheets);
 
         // Cache worksheet names for zero-copy returns
@@ -222,6 +229,7 @@ impl Workbook {
         self.worksheets = details.sheets;
         self.active_sheet_index = details.active_sheet_index;
         self.is_1904_date_system = details.uses_1904_date_system;
+        self.calculation_properties = calculation_properties;
 
         Ok(())
     }
@@ -251,6 +259,11 @@ impl Workbook {
 
     pub fn external_links(&self) -> &[ExternalLinkEntry] {
         &self.external_links
+    }
+
+    /// Effective workbook formula calculation policy, when `calcPr` is present.
+    pub fn calculation_properties(&self) -> Option<&WorkbookCalculationProperties> {
+        self.calculation_properties.as_ref()
     }
 
     pub fn external_link(&self, one_based_index: u32) -> Option<&ExternalLinkEntry> {

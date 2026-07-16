@@ -39,6 +39,8 @@ pub struct RtfDocument<'a> {
     latent_styles: Option<crate::LatentStyles<'a>>,
     /// Inert custom XML data-store bytes.
     data_store: Option<crate::DocumentDataStore<'a>>,
+    /// Document-level defaults for mathematical layout.
+    math_properties: Option<crate::DocumentMathProperties>,
     /// Embedded and linked objects
     objects: Vec<super::object::EmbeddedObject<'a>>,
     /// Ordered inert document-variable metadata
@@ -254,6 +256,7 @@ impl<'a> RtfDocument<'a> {
             theme: parsed.theme.map(crate::DocumentTheme::into_owned),
             latent_styles: parsed.latent_styles.map(crate::LatentStyles::into_owned),
             data_store: parsed.data_store.map(crate::DocumentDataStore::into_owned),
+            math_properties: parsed.math_properties,
             objects: owned_objects,
             document_variables: parsed
                 .document_variables
@@ -674,6 +677,26 @@ impl<'a> RtfDocument<'a> {
     /// Remove the custom XML data-store payload.
     pub fn clear_data_store(&mut self) {
         self.data_store = None;
+    }
+
+    /// Return document-level mathematical layout defaults.
+    pub fn math_properties(&self) -> Option<&crate::DocumentMathProperties> {
+        self.math_properties.as_ref()
+    }
+
+    /// Replace document-level mathematical layout defaults after validation.
+    pub fn set_math_properties(
+        &mut self,
+        properties: crate::DocumentMathProperties,
+    ) -> RtfResult<()> {
+        properties.validate()?;
+        self.math_properties = Some(properties);
+        Ok(())
+    }
+
+    /// Remove document-level mathematical layout defaults.
+    pub fn clear_math_properties(&mut self) {
+        self.math_properties = None;
     }
 
     fn validate_xml_namespaces(namespaces: &[crate::XmlNamespace<'_>]) -> RtfResult<()> {

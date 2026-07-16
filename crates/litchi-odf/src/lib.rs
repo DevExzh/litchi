@@ -300,6 +300,8 @@ mod generic;
 /// Shared semantic discovery of images in OpenDocument XML and packages.
 mod media;
 mod variable_declaration;
+mod dde_connection;
+pub use dde_connection::{OdfDdeConnectionDeclaration, OdfDdeConnectionUse};
 /// Inert semantic discovery of embedded OpenDocument and OLE objects.
 mod embedded_object;
 /// OpenDocument database front-end (.odb) support.
