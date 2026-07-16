@@ -8,8 +8,8 @@ use litchi_iwa::shapes::{
     ShapeTextLayout, ShapeTextVerticalAlignment,
 };
 use litchi_iwa::text::{
-    ParagraphLineSpacing, ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints,
-    TextAlignment, TextColumnCount, TextColumns,
+    ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingPoints,
+    ParagraphSpacing, ParagraphSpacingPoints, TextAlignment, TextColumnCount, TextColumns,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -67,6 +67,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ParagraphSpacing::new(
             ParagraphSpacingPoints::from_points(13.0)?,
             ParagraphSpacingPoints::from_points(19.0)?,
+        ),
+    )?;
+    editor.set_slide_text_box_paragraph_indents(
+        0,
+        created.drawable_object_id,
+        ParagraphIndents::new(
+            ParagraphIndentPoints::from_points(23.0)?,
+            ParagraphIndentPoints::from_points(13.0)?,
+            ParagraphIndentPoints::from_points(10.5)?,
         ),
     )?;
     editor.save(output)?;

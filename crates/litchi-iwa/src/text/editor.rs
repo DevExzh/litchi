@@ -18,11 +18,12 @@ use crate::wire::{
 use crate::{Error, IWorkPackage, Result};
 
 use super::paragraph_alignment::{
-    paragraph_alignment, paragraph_line_spacing, paragraph_spacing, reset_paragraph_alignment,
-    reset_paragraph_line_spacing, reset_paragraph_spacing, set_paragraph_alignment,
+    paragraph_alignment, paragraph_indents, paragraph_line_spacing, paragraph_spacing,
+    reset_paragraph_alignment, reset_paragraph_indents, reset_paragraph_line_spacing,
+    reset_paragraph_spacing, set_paragraph_alignment, set_paragraph_indents,
     set_paragraph_line_spacing, set_paragraph_spacing,
 };
-use super::style::{ParagraphLineSpacing, ParagraphSpacing, TextAlignment};
+use super::style::{ParagraphIndents, ParagraphLineSpacing, ParagraphSpacing, TextAlignment};
 
 const STORAGE_MESSAGE_TYPES: &[u32] = &[2001, 2022];
 
@@ -247,6 +248,42 @@ impl IWorkTextEditor {
     pub fn reset_paragraph_spacing(&mut self, object_id: u64) -> Result<bool> {
         let mut staged = self.package.clone();
         let changed = reset_paragraph_spacing(&mut staged, object_id)?;
+        if changed {
+            let bytes = staged.to_bytes()?;
+            IWorkPackage::from_bytes(&bytes)?;
+            self.package = staged;
+        }
+        Ok(changed)
+    }
+
+    /// Read effective first-line, left, and right indentation of a uniform storage.
+    pub fn paragraph_indents(&self, object_id: u64) -> Result<ParagraphIndents> {
+        paragraph_indents(&self.package, object_id)
+    }
+
+    /// Atomically set first-line, left, and right paragraph indentation.
+    pub fn set_paragraph_indents(
+        &mut self,
+        object_id: u64,
+        indents: ParagraphIndents,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        set_paragraph_indents(&mut staged, object_id, indents)?;
+        let bytes = staged.to_bytes()?;
+        let verified = IWorkPackage::from_bytes(&bytes)?;
+        if paragraph_indents(&verified, object_id)? != indents {
+            return Err(Error::InvalidFormat(
+                "iWork paragraph indentation update failed round-trip validation".to_owned(),
+            ));
+        }
+        self.package = staged;
+        Ok(())
+    }
+
+    /// Restore inherited indentation while preserving sibling paragraph overrides.
+    pub fn reset_paragraph_indents(&mut self, object_id: u64) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = reset_paragraph_indents(&mut staged, object_id)?;
         if changed {
             let bytes = staged.to_bytes()?;
             IWorkPackage::from_bytes(&bytes)?;

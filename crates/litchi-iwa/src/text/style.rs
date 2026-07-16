@@ -48,6 +48,8 @@ pub struct ParagraphStyle {
     pub line_spacing: ParagraphLineSpacing,
     /// Space inserted before and after the paragraph.
     pub spacing: ParagraphSpacing,
+    /// First-line, left, and right paragraph indentation.
+    pub indents: ParagraphIndents,
 }
 
 impl ParagraphStyle {
@@ -57,6 +59,65 @@ impl ParagraphStyle {
             alignment: TextAlignment::Natural,
             line_spacing: ParagraphLineSpacing::default(),
             spacing: ParagraphSpacing::default(),
+            indents: ParagraphIndents::default(),
+        }
+    }
+}
+
+/// Nonnegative paragraph indentation in typographic points.
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
+pub struct ParagraphIndentPoints(f32);
+
+impl ParagraphIndentPoints {
+    pub const ZERO: Self = Self(0.0);
+
+    /// Construct a finite, nonnegative paragraph indentation distance.
+    pub fn from_points(points: f32) -> crate::Result<Self> {
+        if !points.is_finite() || points < 0.0 {
+            return Err(crate::Error::InvalidFormat(
+                "paragraph indentation must be finite and nonnegative".to_owned(),
+            ));
+        }
+        Ok(if points == 0.0 {
+            Self::ZERO
+        } else {
+            Self(points)
+        })
+    }
+
+    /// Return the distance in typographic points.
+    pub const fn points(self) -> f32 {
+        self.0
+    }
+}
+
+/// Native first-line, left, and right paragraph indentation.
+///
+/// `first_line` and `left` are both absolute distances from the left text
+/// boundary. A hanging indent therefore has `first_line < left`.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct ParagraphIndents {
+    pub first_line: ParagraphIndentPoints,
+    pub left: ParagraphIndentPoints,
+    pub right: ParagraphIndentPoints,
+}
+
+impl ParagraphIndents {
+    pub const NONE: Self = Self {
+        first_line: ParagraphIndentPoints::ZERO,
+        left: ParagraphIndentPoints::ZERO,
+        right: ParagraphIndentPoints::ZERO,
+    };
+
+    pub const fn new(
+        first_line: ParagraphIndentPoints,
+        left: ParagraphIndentPoints,
+        right: ParagraphIndentPoints,
+    ) -> Self {
+        Self {
+            first_line,
+            left,
+            right,
         }
     }
 }
@@ -245,6 +306,7 @@ mod tests {
             ParagraphLineSpacing::Relative(ParagraphLineSpacingMultiple::SINGLE)
         );
         assert_eq!(para.spacing, ParagraphSpacing::NONE);
+        assert_eq!(para.indents, ParagraphIndents::NONE);
     }
 
     #[test]
@@ -304,5 +366,25 @@ mod tests {
         assert!(ParagraphSpacingPoints::from_points(-0.1).is_err());
         assert!(ParagraphSpacingPoints::from_points(f32::NAN).is_err());
         assert!(ParagraphSpacingPoints::from_points(f32::INFINITY).is_err());
+    }
+
+    #[test]
+    fn paragraph_indent_points_are_strict_and_allow_hanging_indents() {
+        let hanging = ParagraphIndents::new(
+            ParagraphIndentPoints::from_points(8.0).unwrap(),
+            ParagraphIndentPoints::from_points(24.0).unwrap(),
+            ParagraphIndentPoints::from_points(12.0).unwrap(),
+        );
+        assert!(hanging.first_line < hanging.left);
+        assert_eq!(
+            ParagraphIndentPoints::from_points(-0.0)
+                .unwrap()
+                .points()
+                .to_bits(),
+            0.0_f32.to_bits()
+        );
+        assert!(ParagraphIndentPoints::from_points(-0.1).is_err());
+        assert!(ParagraphIndentPoints::from_points(f32::NAN).is_err());
+        assert!(ParagraphIndentPoints::from_points(f32::INFINITY).is_err());
     }
 }

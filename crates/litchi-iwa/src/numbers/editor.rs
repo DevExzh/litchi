@@ -38,8 +38,8 @@ use crate::shapes::{
     set_shape_text_layout, shape_geometry, shape_properties, shape_text_columns, shape_text_layout,
 };
 use crate::text::{
-    IWorkTextEditor, ParagraphLineSpacing, ParagraphSpacing, TextAlignment, TextColumns,
-    TextStorageInfo,
+    IWorkTextEditor, ParagraphIndents, ParagraphLineSpacing, ParagraphSpacing, TextAlignment,
+    TextColumns, TextStorageInfo,
 };
 use crate::wire::{
     patch_length_delimited_field, patch_nested_fixed32_field, patch_nested_length_delimited_field,
@@ -712,6 +712,51 @@ impl NumbersEditor {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
         let changed = text.reset_paragraph_spacing(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(text.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read effective first-line, left, and right indentation of a sheet text box.
+    pub fn sheet_text_box_paragraph_indents(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<ParagraphIndents> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        IWorkTextEditor::from_package(self.package.clone()).paragraph_indents(graph.storage_id)
+    }
+
+    /// Atomically set paragraph indentation across a sheet-owned text box.
+    pub fn set_sheet_text_box_paragraph_indents(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        indents: ParagraphIndents,
+    ) -> Result<()> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        text.set_paragraph_indents(graph.storage_id, indents)?;
+        let verified = Self::from_package(text.into_package())?;
+        if verified.sheet_text_box_paragraph_indents(sheet_id, drawable_object_id)? != indents {
+            return Err(Error::InvalidFormat(
+                "Numbers text-box paragraph indentation update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore inherited indentation while preserving sibling paragraph overrides.
+    pub fn reset_sheet_text_box_paragraph_indents(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let changed = text.reset_paragraph_indents(graph.storage_id)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
         }

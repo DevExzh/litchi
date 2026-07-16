@@ -29,8 +29,8 @@ use crate::shapes::{
     shape_geometry, shape_properties, shape_text_columns, shape_text_layout,
 };
 use crate::text::{
-    IWorkTextEditor, ParagraphLineSpacing, ParagraphSpacing, TextAlignment, TextColumns,
-    TextStorageInfo,
+    IWorkTextEditor, ParagraphIndents, ParagraphLineSpacing, ParagraphSpacing, TextAlignment,
+    TextColumns, TextStorageInfo,
 };
 use crate::wire::{
     append_repeated_length_delimited_field, patch_fixed32_field, patch_length_delimited_field,
@@ -464,6 +464,42 @@ impl PagesEditor {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
         let changed = staged.reset_paragraph_spacing(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read effective first-line, left, and right indentation of an ordinary text box.
+    pub fn text_box_paragraph_indents(&self, drawable_object_id: u64) -> Result<ParagraphIndents> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        self.text.paragraph_indents(graph.storage_id)
+    }
+
+    /// Atomically set paragraph indentation across an ordinary text box.
+    pub fn set_text_box_paragraph_indents(
+        &mut self,
+        drawable_object_id: u64,
+        indents: ParagraphIndents,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_paragraph_indents(graph.storage_id, indents)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified.text_box_paragraph_indents(drawable_object_id)? != indents {
+            return Err(Error::InvalidFormat(
+                "Pages text-box paragraph indentation update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore inherited indentation while preserving sibling paragraph overrides.
+    pub fn reset_text_box_paragraph_indents(&mut self, drawable_object_id: u64) -> Result<bool> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_paragraph_indents(graph.storage_id)?;
         if changed {
             *self = Self::from_package(staged.into_package())?;
         }

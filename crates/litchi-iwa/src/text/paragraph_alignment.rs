@@ -13,13 +13,14 @@ use crate::shapes::{insert_style_variation, remove_style_variation};
 use crate::{Error, IWorkPackage, Result};
 
 use self::native::ParagraphStyleOverrides;
-use super::style::{ParagraphLineSpacing, ParagraphSpacing, TextAlignment};
+use super::style::{ParagraphIndents, ParagraphLineSpacing, ParagraphSpacing, TextAlignment};
 
 #[derive(Debug, Clone, Copy)]
 enum ParagraphProperty {
     Alignment(TextAlignment),
     LineSpacing(ParagraphLineSpacing),
     Spacing(ParagraphSpacing),
+    Indents(ParagraphIndents),
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -27,6 +28,7 @@ enum ParagraphPropertyKind {
     Alignment,
     LineSpacing,
     Spacing,
+    Indents,
 }
 
 pub(super) fn paragraph_alignment(
@@ -102,6 +104,29 @@ pub(super) fn set_paragraph_spacing(
 
 pub(super) fn reset_paragraph_spacing(package: &mut IWorkPackage, storage_id: u64) -> Result<bool> {
     reset_property(package, storage_id, ParagraphPropertyKind::Spacing)
+}
+
+pub(super) fn paragraph_indents(
+    package: &IWorkPackage,
+    storage_id: u64,
+) -> Result<ParagraphIndents> {
+    let storage = storage::locate(package, storage_id)?;
+    native::inherited_indents(package, storage.style_id)
+}
+
+pub(super) fn set_paragraph_indents(
+    package: &mut IWorkPackage,
+    storage_id: u64,
+    indents: ParagraphIndents,
+) -> Result<()> {
+    if paragraph_indents(package, storage_id)? == indents {
+        return Ok(());
+    }
+    set_property(package, storage_id, ParagraphProperty::Indents(indents))
+}
+
+pub(super) fn reset_paragraph_indents(package: &mut IWorkPackage, storage_id: u64) -> Result<bool> {
+    reset_property(package, storage_id, ParagraphPropertyKind::Indents)
 }
 
 fn set_property(
@@ -236,6 +261,11 @@ fn apply_property(overrides: &mut ParagraphStyleOverrides, property: ParagraphPr
             overrides.space_before = Some(spacing.before);
             overrides.space_after = Some(spacing.after);
         },
+        ParagraphProperty::Indents(indents) => {
+            overrides.first_line_indent = Some(indents.first_line);
+            overrides.left_indent = Some(indents.left);
+            overrides.right_indent = Some(indents.right);
+        },
     }
 }
 
@@ -245,6 +275,11 @@ fn has_property(overrides: ParagraphStyleOverrides, kind: ParagraphPropertyKind)
         ParagraphPropertyKind::LineSpacing => overrides.line_spacing.is_some(),
         ParagraphPropertyKind::Spacing => {
             overrides.space_before.is_some() || overrides.space_after.is_some()
+        },
+        ParagraphPropertyKind::Indents => {
+            overrides.first_line_indent.is_some()
+                || overrides.left_indent.is_some()
+                || overrides.right_indent.is_some()
         },
     }
 }
@@ -256,6 +291,11 @@ fn clear_property(overrides: &mut ParagraphStyleOverrides, kind: ParagraphProper
         ParagraphPropertyKind::Spacing => {
             overrides.space_before = None;
             overrides.space_after = None;
+        },
+        ParagraphPropertyKind::Indents => {
+            overrides.first_line_indent = None;
+            overrides.left_indent = None;
+            overrides.right_indent = None;
         },
     }
 }
@@ -274,6 +314,9 @@ fn inherited_property(
         )),
         ParagraphPropertyKind::Spacing => Ok(ParagraphProperty::Spacing(
             native::inherited_spacing(package, style_id)?,
+        )),
+        ParagraphPropertyKind::Indents => Ok(ParagraphProperty::Indents(
+            native::inherited_indents(package, style_id)?,
         )),
     }
 }
@@ -301,6 +344,7 @@ fn validate_expected_property(
             paragraph_line_spacing(package, storage_id)? == spacing
         },
         ParagraphProperty::Spacing(spacing) => paragraph_spacing(package, storage_id)? == spacing,
+        ParagraphProperty::Indents(indents) => paragraph_indents(package, storage_id)? == indents,
     };
     if matches {
         Ok(())

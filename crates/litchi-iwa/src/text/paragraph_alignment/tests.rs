@@ -8,8 +8,9 @@ use crate::pages::PagesEditor;
 use crate::protobuf::tswp;
 use crate::shapes::{DrawablePoint, DrawableSize};
 use crate::text::{
-    IWorkTextEditor, ParagraphLineSpacingMultiple, ParagraphLineSpacingPoints, ParagraphSpacing,
-    ParagraphSpacingPoints, TextColumnCount, TextColumns,
+    IWorkTextEditor, ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacingMultiple,
+    ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, TextColumnCount,
+    TextColumns,
 };
 
 const STORAGE_MESSAGE_TYPES: &[u32] = &[2_001, 2_022];
@@ -66,6 +67,11 @@ fn pages_paragraph_overrides_compose_and_reset_independently() {
         ParagraphSpacingPoints::from_points(9.0).unwrap(),
         ParagraphSpacingPoints::from_points(15.0).unwrap(),
     );
+    let indents = ParagraphIndents::new(
+        ParagraphIndentPoints::from_points(26.0).unwrap(),
+        ParagraphIndentPoints::from_points(12.5).unwrap(),
+        ParagraphIndentPoints::from_points(12.0).unwrap(),
+    );
 
     editor
         .set_text_box_paragraph_alignment(first.drawable_object_id, TextAlignment::Center)
@@ -75,6 +81,9 @@ fn pages_paragraph_overrides_compose_and_reset_independently() {
         .unwrap();
     editor
         .set_text_box_paragraph_spacing(first.drawable_object_id, paragraph_spacing)
+        .unwrap();
+    editor
+        .set_text_box_paragraph_indents(first.drawable_object_id, indents)
         .unwrap();
     assert_eq!(
         editor
@@ -93,6 +102,12 @@ fn pages_paragraph_overrides_compose_and_reset_independently() {
             .text_box_paragraph_spacing(second.drawable_object_id)
             .unwrap(),
         ParagraphSpacing::NONE
+    );
+    assert_eq!(
+        editor
+            .text_box_paragraph_indents(second.drawable_object_id)
+            .unwrap(),
+        ParagraphIndents::NONE
     );
 
     let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -115,6 +130,12 @@ fn pages_paragraph_overrides_compose_and_reset_independently() {
         paragraph_spacing
     );
     assert_eq!(
+        reopened
+            .text_box_paragraph_indents(first.drawable_object_id)
+            .unwrap(),
+        indents
+    );
+    assert_eq!(
         reopened.text_box_columns(first.drawable_object_id).unwrap(),
         columns
     );
@@ -134,6 +155,12 @@ fn pages_paragraph_overrides_compose_and_reset_independently() {
             .text_box_paragraph_spacing(first.drawable_object_id)
             .unwrap(),
         paragraph_spacing
+    );
+    assert_eq!(
+        reopened
+            .text_box_paragraph_indents(first.drawable_object_id)
+            .unwrap(),
+        indents
     );
     assert!(
         reopened
@@ -156,6 +183,23 @@ fn pages_paragraph_overrides_compose_and_reset_independently() {
             .text_box_paragraph_spacing(first.drawable_object_id)
             .unwrap(),
         ParagraphSpacing::NONE
+    );
+    assert_eq!(
+        reopened
+            .text_box_paragraph_indents(first.drawable_object_id)
+            .unwrap(),
+        indents
+    );
+    assert!(
+        reopened
+            .reset_text_box_paragraph_indents(first.drawable_object_id)
+            .unwrap()
+    );
+    assert_eq!(
+        reopened
+            .text_box_paragraph_indents(first.drawable_object_id)
+            .unwrap(),
+        ParagraphIndents::NONE
     );
     assert!(
         !reopened
@@ -184,12 +228,20 @@ fn every_native_line_spacing_mode_round_trips_in_numbers() {
         ParagraphSpacingPoints::from_points(11.0).unwrap(),
         ParagraphSpacingPoints::from_points(17.0).unwrap(),
     );
+    let indents = ParagraphIndents::new(
+        ParagraphIndentPoints::from_points(23.0).unwrap(),
+        ParagraphIndentPoints::from_points(13.0).unwrap(),
+        ParagraphIndentPoints::from_points(2.833_333_3).unwrap(),
+    );
     editor
         .set_sheet_text_box_paragraph_spacing(
             sheet_id,
             created.drawable_object_id,
             paragraph_spacing,
         )
+        .unwrap();
+    editor
+        .set_sheet_text_box_paragraph_indents(sheet_id, created.drawable_object_id, indents)
         .unwrap();
     for spacing in [
         ParagraphLineSpacing::AtLeast(twelve),
@@ -219,6 +271,12 @@ fn every_native_line_spacing_mode_round_trips_in_numbers() {
                 .unwrap(),
             paragraph_spacing
         );
+        assert_eq!(
+            reopened
+                .sheet_text_box_paragraph_indents(sheet_id, created.drawable_object_id)
+                .unwrap(),
+            indents
+        );
     }
     assert!(
         editor
@@ -228,6 +286,11 @@ fn every_native_line_spacing_mode_round_trips_in_numbers() {
     assert!(
         editor
             .reset_sheet_text_box_paragraph_spacing(sheet_id, created.drawable_object_id)
+            .unwrap()
+    );
+    assert!(
+        editor
+            .reset_sheet_text_box_paragraph_indents(sheet_id, created.drawable_object_id)
             .unwrap()
     );
 }
@@ -252,6 +315,11 @@ fn keynote_spacing_reset_preserves_alignment() {
         ParagraphSpacingPoints::from_points(13.0).unwrap(),
         ParagraphSpacingPoints::from_points(19.0).unwrap(),
     );
+    let indents = ParagraphIndents::new(
+        ParagraphIndentPoints::from_points(23.0).unwrap(),
+        ParagraphIndentPoints::from_points(13.0).unwrap(),
+        ParagraphIndentPoints::from_points(10.5).unwrap(),
+    );
     editor
         .set_slide_text_box_paragraph_alignment(
             0,
@@ -265,6 +333,9 @@ fn keynote_spacing_reset_preserves_alignment() {
     editor
         .set_slide_text_box_paragraph_spacing(0, created.drawable_object_id, paragraph_spacing)
         .unwrap();
+    editor
+        .set_slide_text_box_paragraph_indents(0, created.drawable_object_id, indents)
+        .unwrap();
     let mut reopened =
         crate::keynote::KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
@@ -272,6 +343,23 @@ fn keynote_spacing_reset_preserves_alignment() {
             .slide_text_box_paragraph_line_spacing(0, created.drawable_object_id)
             .unwrap(),
         spacing
+    );
+    assert_eq!(
+        reopened
+            .slide_text_box_paragraph_spacing(0, created.drawable_object_id)
+            .unwrap(),
+        paragraph_spacing
+    );
+    assert_eq!(
+        reopened
+            .slide_text_box_paragraph_indents(0, created.drawable_object_id)
+            .unwrap(),
+        indents
+    );
+    assert!(
+        reopened
+            .reset_slide_text_box_paragraph_indents(0, created.drawable_object_id)
+            .unwrap()
     );
     assert_eq!(
         reopened
@@ -376,6 +464,18 @@ fn multiple_paragraph_boundaries_are_rejected_transactionally() {
                 ParagraphSpacing::new(
                     ParagraphSpacingPoints::from_points(8.0).unwrap(),
                     ParagraphSpacingPoints::from_points(12.0).unwrap(),
+                ),
+            )
+            .is_err()
+    );
+    assert!(
+        editor
+            .set_paragraph_indents(
+                storage_id,
+                ParagraphIndents::new(
+                    ParagraphIndentPoints::from_points(18.0).unwrap(),
+                    ParagraphIndentPoints::from_points(24.0).unwrap(),
+                    ParagraphIndentPoints::from_points(12.0).unwrap(),
                 ),
             )
             .is_err()
