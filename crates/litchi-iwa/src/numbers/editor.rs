@@ -40,7 +40,8 @@ use crate::shapes::{
 use crate::text::{
     IWorkTextEditor, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphIndents,
     ParagraphLineSpacing, ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment,
-    TextCapitalization, TextColumns, TextDecorations, TextScript, TextStorageInfo, TextStyle,
+    TextBaselineShift, TextCapitalization, TextColumns, TextDecorations, TextScript,
+    TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     patch_length_delimited_field, patch_nested_fixed32_field, patch_nested_length_delimited_field,
@@ -804,6 +805,51 @@ impl NumbersEditor {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
         let changed = text.reset_text_script(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(text.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective custom baseline displacement of a sheet-owned text box.
+    pub fn sheet_text_box_text_baseline_shift(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<TextBaselineShift> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        IWorkTextEditor::from_package(self.package.clone()).text_baseline_shift(graph.storage_id)
+    }
+
+    /// Atomically set a signed custom baseline displacement.
+    pub fn set_sheet_text_box_text_baseline_shift(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        shift: TextBaselineShift,
+    ) -> Result<()> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        text.set_text_baseline_shift(graph.storage_id, shift)?;
+        let verified = Self::from_package(text.into_package())?;
+        if verified.sheet_text_box_text_baseline_shift(sheet_id, drawable_object_id)? != shift {
+            return Err(Error::InvalidFormat(
+                "Numbers text-box baseline-shift update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore the inherited baseline displacement while preserving sibling overrides.
+    pub fn reset_sheet_text_box_text_baseline_shift(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let changed = text.reset_text_baseline_shift(graph.storage_id)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
         }

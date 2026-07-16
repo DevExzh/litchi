@@ -14,8 +14,8 @@ use crate::{Error, IWorkPackage, Result};
 use self::native::ParagraphStyleOverrides;
 use super::paragraph_tabs::ParagraphTabStops;
 use super::style::{
-    ParagraphIndents, ParagraphLineSpacing, ParagraphSpacing, TextAlignment, TextCapitalization,
-    TextDecorations, TextScript, TextStyle,
+    ParagraphIndents, ParagraphLineSpacing, ParagraphSpacing, TextAlignment, TextBaselineShift,
+    TextCapitalization, TextDecorations, TextScript, TextStyle,
 };
 use super::style_registry::{
     object_archive_name, register_private_style, unregister_private_style,
@@ -28,6 +28,7 @@ enum ParagraphProperty<'a> {
     TextColor(RgbaColor),
     TextCapitalization(TextCapitalization),
     TextScript(TextScript),
+    TextBaselineShift(TextBaselineShift),
     Alignment(TextAlignment),
     LineSpacing(ParagraphLineSpacing),
     Spacing(ParagraphSpacing),
@@ -42,6 +43,7 @@ enum ParagraphPropertyKind {
     TextColor,
     TextCapitalization,
     TextScript,
+    TextBaselineShift,
     Alignment,
     LineSpacing,
     Spacing,
@@ -57,6 +59,7 @@ enum InheritedCharacterProperty {
     TextColor(RgbaColor),
     TextCapitalization(TextCapitalization),
     TextScript(TextScript),
+    TextBaselineShift(TextBaselineShift),
 }
 
 pub(super) fn text_style(package: &IWorkPackage, storage_id: u64) -> Result<TextStyle> {
@@ -175,6 +178,40 @@ pub(super) fn set_text_script(
 
 pub(super) fn reset_text_script(package: &mut IWorkPackage, storage_id: u64) -> Result<bool> {
     reset_property(package, storage_id, ParagraphPropertyKind::TextScript)
+}
+
+pub(super) fn text_baseline_shift(
+    package: &IWorkPackage,
+    storage_id: u64,
+) -> Result<TextBaselineShift> {
+    let storage = storage::locate(package, storage_id)?;
+    native::inherited_text_baseline_shift(package, storage.style_id)
+}
+
+pub(super) fn set_text_baseline_shift(
+    package: &mut IWorkPackage,
+    storage_id: u64,
+    shift: TextBaselineShift,
+) -> Result<()> {
+    if text_baseline_shift(package, storage_id)? == shift {
+        return Ok(());
+    }
+    set_property(
+        package,
+        storage_id,
+        ParagraphProperty::TextBaselineShift(shift),
+    )
+}
+
+pub(super) fn reset_text_baseline_shift(
+    package: &mut IWorkPackage,
+    storage_id: u64,
+) -> Result<bool> {
+    reset_property(
+        package,
+        storage_id,
+        ParagraphPropertyKind::TextBaselineShift,
+    )
 }
 
 pub(super) fn paragraph_alignment(
@@ -479,6 +516,10 @@ fn inherited_character_property(
         },
         ParagraphProperty::TextScript(_) => native::inherited_text_script(package, parent_style_id)
             .map(InheritedCharacterProperty::TextScript),
+        ParagraphProperty::TextBaselineShift(_) => {
+            native::inherited_text_baseline_shift(package, parent_style_id)
+                .map(InheritedCharacterProperty::TextBaselineShift)
+        },
         _ => Ok(InheritedCharacterProperty::None),
     }
 }
@@ -535,6 +576,14 @@ fn apply_property(
             };
             overrides.script = (*script != inherited).then_some(*script);
         },
+        ParagraphProperty::TextBaselineShift(shift) => {
+            let InheritedCharacterProperty::TextBaselineShift(inherited) = inherited else {
+                return Err(Error::InvalidFormat(
+                    "text baseline-shift mutation has no inherited character formatting".to_owned(),
+                ));
+            };
+            overrides.baseline_shift = (*shift != inherited).then_some(*shift);
+        },
         ParagraphProperty::Alignment(alignment) => overrides.alignment = Some(*alignment),
         ParagraphProperty::LineSpacing(spacing) => overrides.line_spacing = Some(*spacing),
         ParagraphProperty::Spacing(spacing) => {
@@ -564,6 +613,7 @@ fn has_property(overrides: &ParagraphStyleOverrides, kind: ParagraphPropertyKind
         ParagraphPropertyKind::TextColor => overrides.font_color.is_some(),
         ParagraphPropertyKind::TextCapitalization => overrides.capitalization.is_some(),
         ParagraphPropertyKind::TextScript => overrides.script.is_some(),
+        ParagraphPropertyKind::TextBaselineShift => overrides.baseline_shift.is_some(),
         ParagraphPropertyKind::Alignment => overrides.alignment.is_some(),
         ParagraphPropertyKind::LineSpacing => overrides.line_spacing.is_some(),
         ParagraphPropertyKind::Spacing => {
@@ -592,6 +642,7 @@ fn clear_property(overrides: &mut ParagraphStyleOverrides, kind: ParagraphProper
         ParagraphPropertyKind::TextColor => overrides.font_color = None,
         ParagraphPropertyKind::TextCapitalization => overrides.capitalization = None,
         ParagraphPropertyKind::TextScript => overrides.script = None,
+        ParagraphPropertyKind::TextBaselineShift => overrides.baseline_shift = None,
         ParagraphPropertyKind::Alignment => overrides.alignment = None,
         ParagraphPropertyKind::LineSpacing => overrides.line_spacing = None,
         ParagraphPropertyKind::Spacing => {
@@ -627,6 +678,9 @@ fn inherited_property(
         )),
         ParagraphPropertyKind::TextScript => Ok(ParagraphProperty::TextScript(
             native::inherited_text_script(package, style_id)?,
+        )),
+        ParagraphPropertyKind::TextBaselineShift => Ok(ParagraphProperty::TextBaselineShift(
+            native::inherited_text_baseline_shift(package, style_id)?,
         )),
         ParagraphPropertyKind::Alignment => Ok(ParagraphProperty::Alignment(
             native::inherited_alignment(package, style_id)?,
@@ -671,6 +725,9 @@ fn validate_expected_property(
             text_capitalization(package, storage_id)? == capitalization
         },
         ParagraphProperty::TextScript(script) => text_script(package, storage_id)? == script,
+        ParagraphProperty::TextBaselineShift(shift) => {
+            text_baseline_shift(package, storage_id)? == shift
+        },
         ParagraphProperty::Alignment(alignment) => {
             paragraph_alignment(package, storage_id)? == alignment
         },

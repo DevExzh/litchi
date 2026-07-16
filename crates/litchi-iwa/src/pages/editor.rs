@@ -31,7 +31,8 @@ use crate::shapes::{
 use crate::text::{
     IWorkTextEditor, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphIndents,
     ParagraphLineSpacing, ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment,
-    TextCapitalization, TextColumns, TextDecorations, TextScript, TextStorageInfo, TextStyle,
+    TextBaselineShift, TextCapitalization, TextColumns, TextDecorations, TextScript,
+    TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     append_repeated_length_delimited_field, patch_fixed32_field, patch_length_delimited_field,
@@ -534,6 +535,45 @@ impl PagesEditor {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
         let changed = staged.reset_text_script(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective custom baseline displacement of a reachable ordinary text box.
+    pub fn text_box_text_baseline_shift(
+        &self,
+        drawable_object_id: u64,
+    ) -> Result<TextBaselineShift> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        self.text.text_baseline_shift(graph.storage_id)
+    }
+
+    /// Atomically set a signed custom baseline displacement.
+    pub fn set_text_box_text_baseline_shift(
+        &mut self,
+        drawable_object_id: u64,
+        shift: TextBaselineShift,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_text_baseline_shift(graph.storage_id, shift)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified.text_box_text_baseline_shift(drawable_object_id)? != shift {
+            return Err(Error::InvalidFormat(
+                "Pages text-box baseline-shift update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore the inherited baseline displacement while preserving sibling overrides.
+    pub fn reset_text_box_text_baseline_shift(&mut self, drawable_object_id: u64) -> Result<bool> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_text_baseline_shift(graph.storage_id)?;
         if changed {
             *self = Self::from_package(staged.into_package())?;
         }

@@ -7,8 +7,8 @@ use crate::shapes::RgbaColor;
 use crate::text::paragraph_tabs::ParagraphTabStops;
 use crate::text::style::{
     ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing, ParagraphSpacing,
-    ParagraphSpacingPoints, TextAlignment, TextCapitalization, TextDecorations, TextPointSize,
-    TextScript, TextStrikethrough, TextStyle, TextUnderline,
+    ParagraphSpacingPoints, TextAlignment, TextBaselineShift, TextCapitalization, TextDecorations,
+    TextPointSize, TextScript, TextStrikethrough, TextStyle, TextUnderline,
 };
 use crate::{Error, IWorkPackage, Result};
 
@@ -136,6 +136,24 @@ pub(super) fn text_script(package: &IWorkPackage, first_style_id: u64) -> Result
             return Ok(InheritanceControl::Continue);
         };
         *value = Some(TextScript::from_native_value(script)?);
+        Ok(InheritanceControl::Complete)
+    })?;
+    Ok(value.unwrap_or_default())
+}
+
+pub(super) fn text_baseline_shift(
+    package: &IWorkPackage,
+    first_style_id: u64,
+) -> Result<TextBaselineShift> {
+    let value = walk(package, first_style_id, None, |value, style| {
+        let Some(shift) = style
+            .char_properties
+            .as_ref()
+            .and_then(|properties| properties.baseline_shift)
+        else {
+            return Ok(InheritanceControl::Continue);
+        };
+        *value = Some(TextBaselineShift::from_points(shift)?);
         Ok(InheritanceControl::Complete)
     })?;
     Ok(value.unwrap_or_default())

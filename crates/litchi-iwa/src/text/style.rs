@@ -258,6 +258,41 @@ impl TextScript {
     }
 }
 
+/// Uniform vertical displacement from the text baseline in typographic points.
+///
+/// This is independent of [`TextScript`]: iWork can apply a custom baseline
+/// shift while retaining normal, superscript, or subscript formatting.
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+pub struct TextBaselineShift(f32);
+
+impl TextBaselineShift {
+    /// No custom displacement from the inherited text baseline.
+    pub const ZERO: Self = Self(0.0);
+
+    /// Construct a finite baseline shift.
+    ///
+    /// Positive values raise text and negative values lower it.
+    pub fn from_points(points: f32) -> crate::Result<Self> {
+        if !points.is_finite() {
+            return Err(crate::Error::InvalidFormat(
+                "text baseline shift must be finite".to_owned(),
+            ));
+        }
+        Ok(Self(points))
+    }
+
+    /// Return the signed displacement in typographic points.
+    pub const fn points(self) -> f32 {
+        self.0
+    }
+}
+
+impl Default for TextBaselineShift {
+    fn default() -> Self {
+        Self::ZERO
+    }
+}
+
 /// Uniform paragraph properties currently supported by the shared text editor.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ParagraphStyle {
