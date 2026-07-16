@@ -322,6 +322,10 @@ pub struct Parser<'a> {
     navigation_entries: Vec<NavigationEntry<'a>>,
     /// Aggregate decoded source-mark text.
     navigation_entry_text_bytes: usize,
+    /// Ordered inert generated list markers.
+    generated_list_markers: Vec<crate::GeneratedListMarker<'a>>,
+    /// Aggregate decoded generated-marker text.
+    generated_list_marker_text_bytes: usize,
     /// Whether the unique user-properties destination has been seen
     saw_user_properties: bool,
     /// List table
@@ -471,6 +475,8 @@ impl<'a> Parser<'a> {
             user_property_text_bytes: 0,
             navigation_entries: Vec::new(),
             navigation_entry_text_bytes: 0,
+            generated_list_markers: Vec::new(),
+            generated_list_marker_text_bytes: 0,
             saw_user_properties: false,
             list_table: super::list::ListTable::new(),
             saw_list_table: false,
@@ -583,6 +589,7 @@ impl<'a> Parser<'a> {
             document_variables: self.document_variables,
             user_properties: self.user_properties,
             navigation_entries: self.navigation_entries,
+            generated_list_markers: self.generated_list_markers,
             list_table: self.list_table,
             list_override_table: self.list_override_table,
             legacy_section_numbering: self.legacy_section_numbering,
@@ -661,6 +668,16 @@ impl<'a> Parser<'a> {
                     return Err(RtfError::MalformedDocument(
                         "RTF file-table destinations are misplaced or not starred".to_string(),
                     ));
+                },
+                Token::Control(ControlWord::GeneratedListText) => {
+                    self.parse_generated_list_marker(crate::GeneratedListMarkerKind::Modern)?;
+                    self.states.pop();
+                    return Ok(());
+                },
+                Token::Control(ControlWord::LegacyGeneratedListText) => {
+                    self.parse_generated_list_marker(crate::GeneratedListMarkerKind::Legacy)?;
+                    self.states.pop();
+                    return Ok(());
                 },
                 Token::Control(ControlWord::UnicodeAlternate) => {
                     self.parse_unicode_alternate_group()?;
@@ -742,6 +759,15 @@ impl<'a> Parser<'a> {
                         Some(Token::Control(ControlWord::BlipUid)) => {
                             return Err(RtfError::MalformedDocument(
                                 "RTF blipuid destination may occur only inside pict".to_string(),
+                            ));
+                        },
+                        Some(Token::Control(
+                            ControlWord::GeneratedListText
+                            | ControlWord::LegacyGeneratedListText,
+                        )) => {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF generated list-marker destinations must not be starred"
+                                    .to_string(),
                             ));
                         },
                         Some(Token::Control(control @ (
@@ -1446,6 +1472,148 @@ impl<'a> Parser<'a> {
         }
         self.navigation_entries.push(entry);
         Ok(())
+    }
+
+    fn parse_generated_list_marker(
+        &mut self,
+        kind: crate::GeneratedListMarkerKind,
+    ) -> RtfResult<()> {
+        if self.current_state()?.destination != Destination::DocumentBody {
+            return Err(RtfError::MalformedDocument(
+                "RTF generated list marker may occur only in the visible document body"
+                    .to_string(),
+            ));
+        }
+        if self.generated_list_markers.len()
+            >= crate::generated_list_marker::MAX_GENERATED_LIST_MARKERS
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF generated list-marker count exceeds the safety limit".to_string(),
+            ));
+        }
+
+        self.pos += 1;
+        let mut depth = 0usize;
+        let mut unicode_skip = self.current_state()?.unicode_skip.max(0);
+        let mut text = String::new();
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) if depth == 0 => {
+                    self.pos += 1;
+                    let marker = crate::GeneratedListMarker {
+                        kind,
+                        text: Cow::Borrowed(self.arena.alloc_str(&text) as &str),
+                        position: self.body_text_len,
+                    };
+                    marker.validate()?;
+                    if self.generated_list_markers.last().is_some_and(|previous| {
+                        previous.position == marker.position && previous.kind == marker.kind
+                    }) {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF contains duplicate generated list markers at one body position"
+                                .to_string(),
+                        ));
+                    }
+                    self.generated_list_marker_text_bytes = self
+                        .generated_list_marker_text_bytes
+                        .checked_add(marker.text.len())
+                        .ok_or_else(|| {
+                            RtfError::MalformedDocument(
+                                "RTF generated list-marker text size overflow".to_string(),
+                            )
+                        })?;
+                    if self.generated_list_marker_text_bytes
+                        > crate::generated_list_marker::MAX_GENERATED_LIST_MARKER_TOTAL_BYTES
+                    {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF generated list-marker text exceeds the aggregate safety limit"
+                                .to_string(),
+                        ));
+                    }
+                    self.generated_list_markers.push(marker);
+                    return Ok(());
+                },
+                Some(Token::CloseBrace) => {
+                    depth -= 1;
+                    self.pos += 1;
+                },
+                Some(Token::OpenBrace) => {
+                    if matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::IgnorableDestination))
+                    ) || matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(
+                            ControlWord::Field
+                                | ControlWord::Object
+                                | ControlWord::Picture
+                                | ControlWord::Shape
+                                | ControlWord::ShapeGroup
+                                | ControlWord::FormField
+                                | ControlWord::DataField
+                        ))
+                    ) {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF generated list marker contains an active nested destination"
+                                .to_string(),
+                        ));
+                    }
+                    depth = depth.checked_add(1).ok_or_else(|| {
+                        RtfError::MalformedDocument(
+                            "RTF generated list-marker nesting depth overflow".to_string(),
+                        )
+                    })?;
+                    self.pos += 1;
+                },
+                Some(Token::Control(ControlWord::Unicode(code))) => {
+                    text.push_str(&self.parse_style_unicode(*code, unicode_skip)?);
+                },
+                Some(Token::Control(ControlWord::UnicodeSkip(value))) => {
+                    unicode_skip = (*value).max(0);
+                    self.pos += 1;
+                },
+                Some(Token::Control(ControlWord::Tab)) => {
+                    text.push('\t');
+                    self.pos += 1;
+                },
+                Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
+                    text.push_str(control_symbol_text(control).unwrap_or_default());
+                    self.pos += 1;
+                },
+                Some(Token::Control(
+                    ControlWord::Field
+                    | ControlWord::Object
+                    | ControlWord::Picture
+                    | ControlWord::Shape
+                    | ControlWord::ShapeGroup
+                    | ControlWord::FormField
+                    | ControlWord::DataField
+                    | ControlWord::Par
+                    | ControlWord::Line,
+                )) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF generated list marker contains active or structural content"
+                            .to_string(),
+                    ));
+                },
+                Some(Token::Control(_)) => self.pos += 1,
+                Some(Token::Text(value)) => {
+                    text.push_str(&self.decode_transport_text(value)?);
+                    self.pos += 1;
+                },
+                Some(Token::Binary(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF generated list marker cannot contain binary data".to_string(),
+                    ));
+                },
+                None => return Err(RtfError::UnexpectedEof),
+            }
+            if text.len() > crate::generated_list_marker::MAX_GENERATED_LIST_MARKER_BYTES {
+                return Err(RtfError::MalformedDocument(
+                    "RTF generated list marker exceeds the safety limit".to_string(),
+                ));
+            }
+        }
     }
 
     fn parse_index_entry(&mut self) -> RtfResult<NavigationEntry<'a>> {
@@ -2486,6 +2654,11 @@ impl<'a> Parser<'a> {
             ControlWord::BlipTag(_) | ControlWord::BlipUnitsPerInch(_) => {
                 return Err(RtfError::MalformedDocument(
                     "orphan RTF picture identity control outside pict".to_string(),
+                ));
+            },
+            ControlWord::GeneratedListText | ControlWord::LegacyGeneratedListText => {
+                return Err(RtfError::MalformedDocument(
+                    "RTF generated list marker must be a grouped body destination".to_string(),
                 ));
             },
             ControlWord::XmlNamespace(_) => {
@@ -8740,6 +8913,8 @@ pub struct ParsedDocument<'a> {
     pub user_properties: Vec<UserProperty<'a>>,
     /// Ordered inert index and table-of-contents source marks.
     pub navigation_entries: Vec<NavigationEntry<'a>>,
+    /// Ordered inert generated list markers.
+    pub generated_list_markers: Vec<crate::GeneratedListMarker<'a>>,
     /// List table
     pub list_table: super::list::ListTable<'a>,
     /// List override table

@@ -53,6 +53,7 @@ pub struct RtfWriter<W: Write> {
 
 #[derive(Clone, Copy)]
 enum BodyEventKind<'b, 'a> {
+    GeneratedListMarker(&'b crate::GeneratedListMarker<'a>),
     NavigationEntry(&'b crate::NavigationEntry<'a>),
     BookmarkStart(&'b Bookmark<'a>),
     BookmarkEnd(&'b Bookmark<'a>),
@@ -190,6 +191,7 @@ impl<W: Write> RtfWriter<W> {
             doc.annotations(),
             doc.revisions(),
             doc.navigation_entries(),
+            doc.generated_list_markers(),
             doc.form_fields(),
         )?;
 
@@ -1591,12 +1593,14 @@ impl<W: Write> RtfWriter<W> {
         annotations: &[Annotation<'_>],
         revisions: &[Revision<'_>],
         navigation_entries: &[crate::NavigationEntry<'_>],
+        generated_list_markers: &[crate::GeneratedListMarker<'_>],
         form_fields: &[crate::FormField<'_>],
     ) -> io::Result<()> {
         if bookmarks.bookmarks().is_empty()
             && annotations.is_empty()
             && revisions.is_empty()
             && navigation_entries.is_empty()
+            && generated_list_markers.is_empty()
             && form_fields.is_empty()
         {
             for block in blocks {
@@ -1681,6 +1685,59 @@ impl<W: Write> RtfWriter<W> {
                 kind: BodyEventKind::FormFieldEnd,
             });
         }
+        if generated_list_markers.len()
+            > crate::generated_list_marker::MAX_GENERATED_LIST_MARKERS
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "RTF generated list-marker count exceeds the safety limit",
+            ));
+        }
+        let mut generated_marker_bytes = 0usize;
+        let mut previous_generated_marker: Option<&crate::GeneratedListMarker<'_>> = None;
+        for marker in generated_list_markers {
+            marker
+                .validate()
+                .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+            if body.get(marker.position..marker.position).is_none() {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF generated list-marker position is not a UTF-8 body boundary",
+                ));
+            }
+            if previous_generated_marker.is_some_and(|previous| {
+                previous.position > marker.position
+                    || (previous.position == marker.position && previous.kind == marker.kind)
+            }) {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF generated list markers are duplicated or out of body order",
+                ));
+            }
+            generated_marker_bytes = generated_marker_bytes
+                .checked_add(marker.text.len())
+                .ok_or_else(|| {
+                    io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        "RTF generated list-marker text size overflow",
+                    )
+                })?;
+            if generated_marker_bytes
+                > crate::generated_list_marker::MAX_GENERATED_LIST_MARKER_TOTAL_BYTES
+            {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF generated list-marker text exceeds the aggregate safety limit",
+                ));
+            }
+            events.push(BodyEvent {
+                offset: marker.position,
+                order: 1,
+                kind: BodyEventKind::GeneratedListMarker(marker),
+            });
+            previous_generated_marker = Some(marker);
+        }
+
         if navigation_entries.len() > crate::navigation_entry::MAX_NAVIGATION_ENTRIES {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
@@ -1875,6 +1932,9 @@ impl<W: Write> RtfWriter<W> {
 
     fn write_body_event(&mut self, event: BodyEvent<'_, '_>) -> io::Result<()> {
         match event.kind {
+            BodyEventKind::GeneratedListMarker(marker) => {
+                self.write_generated_list_marker(marker)
+            },
             BodyEventKind::NavigationEntry(entry) => self.write_navigation_entry(entry),
             BodyEventKind::BookmarkStart(bookmark) => self.write_bookmark_start(bookmark),
             BodyEventKind::BookmarkEnd(bookmark) => self.write_bookmark_end(bookmark.name.as_ref()),
@@ -1886,6 +1946,33 @@ impl<W: Write> RtfWriter<W> {
             BodyEventKind::FormFieldStart(field) => self.write_form_field_start(field),
             BodyEventKind::FormFieldEnd => self.write_str("}}"),
         }
+    }
+
+    /// Write one inert generated list-marker destination.
+    pub fn write_generated_list_marker(
+        &mut self,
+        marker: &crate::GeneratedListMarker<'_>,
+    ) -> io::Result<()> {
+        marker
+            .validate()
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+        self.write_str("{")?;
+        self.write_control_word(
+            match marker.kind {
+                crate::GeneratedListMarkerKind::Modern => "listtext",
+                crate::GeneratedListMarkerKind::Legacy => "pntext",
+            },
+            None,
+        )?;
+        self.write_str(" ")?;
+        let mut segments = marker.text.split('\t').peekable();
+        while let Some(segment) = segments.next() {
+            self.write_destination_text(segment)?;
+            if segments.peek().is_some() {
+                self.write_control_word("tab", None)?;
+            }
+        }
+        self.write_str("}")
     }
 
     fn write_form_field_start(&mut self, field: &crate::FormField<'_>) -> io::Result<()> {

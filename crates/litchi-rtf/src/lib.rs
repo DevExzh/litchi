@@ -36,6 +36,7 @@ mod error;
 mod field;
 mod form_field;
 mod generator;
+mod generated_list_marker;
 mod revision_save;
 mod xml_namespace;
 mod theme;
@@ -78,6 +79,7 @@ pub use field::{
 };
 pub use form_field::{FormField, FormFieldType, FormTextType};
 pub use generator::DocumentGenerator;
+pub use generated_list_marker::{GeneratedListMarker, GeneratedListMarkerKind};
 pub use revision_save::RevisionSaveMetadata;
 pub use xml_namespace::XmlNamespace;
 pub use theme::DocumentTheme;

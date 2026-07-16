@@ -575,43 +575,119 @@ pub fn write_supbook_internal<W: Write>(writer: &mut W, sheet_count: u16) -> Xls
 /// or a single workbook-wide XTI spanning all sheets. The workbook-wide
 /// form matches Excel's pivot-only output, while the per-sheet form keeps
 /// `PtgArea3d.ixti == target_sheet` valid for defined names.
-pub fn write_externsheet_internal<W: Write>(
+fn write_unicode_string<W: Write>(writer: &mut W, value: &str, include_count: bool) -> XlsResult<()> {
+    let units = value.encode_utf16().collect::<Vec<_>>();
+    let compressed = units.iter().all(|unit| *unit <= 0x00ff);
+    if include_count {
+        writer.write_all(&(units.len() as u16).to_le_bytes())?;
+    }
+    writer.write_all(&[u8::from(!compressed)])?;
+    for unit in units {
+        if compressed { writer.write_all(&[unit as u8])?; }
+        else { writer.write_all(&unit.to_le_bytes())?; }
+    }
+    Ok(())
+}
+
+fn write_external_supbook<W: Write>(
     writer: &mut W,
-    sheet_count: u16,
-    mode: ExternSheetMode,
+    book: &crate::xls::writer::core::XlsExternalWorkbookOptions,
 ) -> XlsResult<()> {
-    if sheet_count == 0 {
-        return Ok(());
+    book.validate()?;
+    let path_units = book.encoded_virtual_path.encode_utf16().count();
+    let mut data = Vec::new();
+    data.extend_from_slice(&(book.sheets.len() as u16).to_le_bytes());
+    data.extend_from_slice(&(path_units as u16).to_le_bytes());
+    write_unicode_string(&mut data, &book.encoded_virtual_path, false)?;
+    for sheet in &book.sheets { write_unicode_string(&mut data, &sheet.name, true)?; }
+    if data.len() > 8224 {
+        return Err(XlsError::InvalidData("external SupBook exceeds BIFF8 record size".to_string()));
     }
+    write_record_header(writer, 0x01ae, data.len() as u16)?;
+    writer.write_all(&data)?;
+    for (sheet_index, sheet) in book.sheets.iter().enumerate() {
+        if sheet.cache_rows.is_empty() { continue; }
+        write_record_header(writer, 0x0059, 4)?;
+        writer.write_all(&(sheet.cache_rows.len() as i16).to_le_bytes())?;
+        writer.write_all(&(sheet_index as u16).to_le_bytes())?;
+        for row in &sheet.cache_rows { write_crn(writer, row)?; }
+    }
+    Ok(())
+}
 
-    let cxti = match mode {
-        ExternSheetMode::PerSheet => sheet_count,
+fn write_crn<W: Write>(
+    writer: &mut W,
+    row: &crate::xls::writer::core::XlsExternalCacheRowOptions,
+) -> XlsResult<()> {
+    let mut data = Vec::new();
+    data.push(row.first_column + row.values.len() as u8 - 1);
+    data.push(row.first_column);
+    data.extend_from_slice(&row.row.to_le_bytes());
+    for value in &row.values {
+        match value {
+            crate::xls::XlsExternalCachedValue::Blank => data.extend_from_slice(&[0; 9]),
+            crate::xls::XlsExternalCachedValue::Number(value) => {
+                data.push(0x01); data.extend_from_slice(&value.to_le_bytes());
+            },
+            crate::xls::XlsExternalCachedValue::Text(value) => {
+                data.push(0x02); write_unicode_string(&mut data, value, true)?;
+            },
+            crate::xls::XlsExternalCachedValue::Boolean(value) => {
+                data.extend_from_slice(&[0x04, u8::from(*value), 0, 0, 0, 0, 0, 0, 0]);
+            },
+            crate::xls::XlsExternalCachedValue::Error(error) => {
+                data.extend_from_slice(&[0x10, error.code(), 0, 0, 0, 0, 0, 0, 0]);
+            },
+        }
+    }
+    write_record_header(writer, 0x005a, data.len() as u16)?;
+    writer.write_all(&data)?;
+    Ok(())
+}
+
+pub fn write_external_link_table<W: Write>(
+    writer: &mut W,
+    internal: Option<(u16, ExternSheetMode)>,
+    external: &[crate::xls::writer::core::XlsExternalWorkbookOptions],
+) -> XlsResult<()> {
+    if let Some((sheet_count, _)) = internal { write_supbook_internal(writer, sheet_count)?; }
+    for book in external { write_external_supbook(writer, book)?; }
+
+    let internal_count = internal.map_or(0usize, |(sheet_count, mode)| match mode {
+        ExternSheetMode::PerSheet => usize::from(sheet_count),
         ExternSheetMode::WorkbookWide => 1,
-    };
-    // cXTI (2 bytes) + cXTI * sizeof(XTI)
-    let data_len = 2u16.saturating_add(cxti.saturating_mul(6));
-    write_record_header(writer, 0x0017, data_len)?;
-
-    // cXTI
-    writer.write_all(&cxti.to_le_bytes())?;
-
-    // XTI entries: (ixSupBook, itabFirst, itabLast)
-    // ixSupBook is 0 for the first SUPBOOK; sheet indices are 0-based.
-    match mode {
-        ExternSheetMode::PerSheet => {
-            for sheet_idx in 0..sheet_count {
-                writer.write_all(&0u16.to_le_bytes())?;
-                writer.write_all(&sheet_idx.to_le_bytes())?;
-                writer.write_all(&sheet_idx.to_le_bytes())?;
-            }
-        },
-        ExternSheetMode::WorkbookWide => {
-            writer.write_all(&0u16.to_le_bytes())?;
-            writer.write_all(&0u16.to_le_bytes())?;
-            writer.write_all(&sheet_count.saturating_sub(1).to_le_bytes())?;
-        },
+    });
+    let external_count = external.iter().map(|book| book.sheets.len()).sum::<usize>();
+    let count = internal_count + external_count;
+    if count > 1370 {
+        return Err(XlsError::InvalidData("ExternSheet reference count exceeds BIFF8 record bound".to_string()));
     }
-
+    write_record_header(writer, 0x0017, (2 + count * 6) as u16)?;
+    writer.write_all(&(count as u16).to_le_bytes())?;
+    if let Some((sheet_count, mode)) = internal {
+        match mode {
+            ExternSheetMode::PerSheet => for sheet in 0..sheet_count {
+                writer.write_all(&0u16.to_le_bytes())?;
+                writer.write_all(&(sheet as i16).to_le_bytes())?;
+                writer.write_all(&(sheet as i16).to_le_bytes())?;
+            },
+            ExternSheetMode::WorkbookWide => {
+                writer.write_all(&0u16.to_le_bytes())?;
+                writer.write_all(&0i16.to_le_bytes())?;
+                writer.write_all(&(sheet_count as i16 - 1).to_le_bytes())?;
+            },
+        }
+    }
+    let first_external_book = usize::from(internal.is_some());
+    for (book_offset, book) in external.iter().enumerate() {
+        let book_index = u16::try_from(first_external_book + book_offset)
+            .map_err(|_| XlsError::InvalidData("supporting-book index exceeds u16".to_string()))?;
+        for sheet in 0..book.sheets.len() {
+            writer.write_all(&book_index.to_le_bytes())?;
+            writer.write_all(&(sheet as i16).to_le_bytes())?;
+            writer.write_all(&(sheet as i16).to_le_bytes())?;
+        }
+    }
     Ok(())
 }
 

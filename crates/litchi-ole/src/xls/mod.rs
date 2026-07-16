@@ -44,6 +44,9 @@ mod workbook_view;
 /// BIFF8 built-in and user-defined function categories.
 mod function_group;
 
+/// Inert BIFF8 supporting-book links and external cell caches.
+mod external_link;
+
 /// BIFF formula token rendering
 mod formula;
 
@@ -118,6 +121,10 @@ pub use vba::XlsVbaMetadata;
 pub use environment::{XlsLinkUpdateMode, XlsObjectDisplayMode, XlsWorkbookEnvironment};
 pub use workbook_view::{XlsWorkbookView, XlsWorkbookWindow};
 pub use function_group::{XlsBuiltInFunctionCategories, XlsFunctionGroups};
+pub use external_link::{
+    XlsExternalCacheRow, XlsExternalCachedError, XlsExternalCachedValue, XlsExternalLinks,
+    XlsExternalSheet, XlsExternalSheetReference, XlsExternalWorkbook, XlsSupportingBook,
+};
 pub use data_validation::{
     XlsDataValidationErrorStyle, XlsDataValidationFormula, XlsDataValidationImeMode,
     XlsDataValidationKind, XlsDataValidationOperator, XlsDataValidationRange,

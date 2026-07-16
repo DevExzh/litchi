@@ -57,6 +57,8 @@ pub struct RtfDocument<'a> {
     user_properties: Vec<super::user_property::UserProperty<'a>>,
     /// Ordered inert index and table-of-contents source marks
     navigation_entries: Vec<super::navigation_entry::NavigationEntry<'a>>,
+    /// Ordered inert generated list-marker destinations.
+    generated_list_markers: Vec<crate::GeneratedListMarker<'a>>,
     /// List table
     list_table: super::list::ListTable<'a>,
     /// List override table
@@ -272,6 +274,11 @@ impl<'a> RtfDocument<'a> {
                 .navigation_entries
                 .into_iter()
                 .map(super::navigation_entry::NavigationEntry::into_owned)
+                .collect(),
+            generated_list_markers: parsed
+                .generated_list_markers
+                .into_iter()
+                .map(crate::GeneratedListMarker::into_owned)
                 .collect(),
             list_table: Self::convert_list_table_to_owned(parsed.list_table),
             list_override_table: parsed.list_override_table,
@@ -949,6 +956,60 @@ impl<'a> RtfDocument<'a> {
     /// Return ordered, inert index and table-of-contents source marks.
     pub fn navigation_entries(&self) -> &[super::navigation_entry::NavigationEntry<'_>] {
         &self.navigation_entries
+    }
+
+    /// Return ordered inert generated list markers.
+    pub fn generated_list_markers(&self) -> &[crate::GeneratedListMarker<'_>] {
+        &self.generated_list_markers
+    }
+
+    /// Append a generated list marker at a valid UTF-8 body position.
+    pub fn push_generated_list_marker(
+        &mut self,
+        marker: crate::GeneratedListMarker<'a>,
+    ) -> RtfResult<()> {
+        marker.validate()?;
+        if self.generated_list_markers.len()
+            >= crate::generated_list_marker::MAX_GENERATED_LIST_MARKERS
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF generated list-marker count exceeds the safety limit".to_string(),
+            ));
+        }
+        let body = self.text();
+        if body.get(marker.position..marker.position).is_none() {
+            return Err(RtfError::MalformedDocument(
+                "RTF generated list-marker position is not a UTF-8 body boundary".to_string(),
+            ));
+        }
+        if self.generated_list_markers.last().is_some_and(|previous| {
+            previous.position > marker.position
+                || (previous.position == marker.position && previous.kind == marker.kind)
+        }) {
+            return Err(RtfError::MalformedDocument(
+                "RTF generated list markers are duplicated or out of body order".to_string(),
+            ));
+        }
+        let total = self
+            .generated_list_markers
+            .iter()
+            .try_fold(marker.text.len(), |total, entry| total.checked_add(entry.text.len()))
+            .ok_or_else(|| {
+                RtfError::MalformedDocument(
+                    "RTF generated list-marker text size overflow".to_string(),
+                )
+            })?;
+        if total > crate::generated_list_marker::MAX_GENERATED_LIST_MARKER_TOTAL_BYTES {
+            return Err(RtfError::MalformedDocument(
+                "RTF generated list-marker text exceeds the aggregate safety limit".to_string(),
+            ));
+        }
+        self.generated_list_markers.push(marker);
+        Ok(())
+    }
+
+    pub fn clear_generated_list_markers(&mut self) {
+        self.generated_list_markers.clear();
     }
 
     /// Append an inert source mark at a valid UTF-8 body position.

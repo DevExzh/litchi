@@ -437,6 +437,83 @@ pub struct XlsFunctionGroupOptions {
     pub custom_categories: Vec<String>,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct XlsExternalCacheRowOptions {
+    pub row: u16,
+    pub first_column: u8,
+    pub values: Vec<crate::xls::XlsExternalCachedValue>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct XlsExternalSheetOptions {
+    pub name: String,
+    pub cache_rows: Vec<XlsExternalCacheRowOptions>,
+}
+
+/// An inert external-workbook directory/cache. The encoded path is serialized but never opened.
+#[derive(Debug, Clone, PartialEq)]
+pub struct XlsExternalWorkbookOptions {
+    pub encoded_virtual_path: String,
+    pub sheets: Vec<XlsExternalSheetOptions>,
+}
+
+impl XlsExternalWorkbookOptions {
+    pub(super) fn validate(&self) -> XlsResult<()> {
+        let path_len = self.encoded_virtual_path.encode_utf16().count();
+        if !(1..=255).contains(&path_len) {
+            return Err(XlsError::InvalidData("external virtual path must be 1..=255 UTF-16 code units".to_string()));
+        }
+        if self.sheets.is_empty() || self.sheets.len() > 256 {
+            return Err(XlsError::InvalidData("external workbook must contain 1..=256 sheets".to_string()));
+        }
+        let invalid_sheet_char = |value: char| matches!(value, '\\' | '/' | '?' | '*' | '[' | ']' | ':');
+        for sheet in &self.sheets {
+            let name_len = sheet.name.encode_utf16().count();
+            if !(1..=31).contains(&name_len)
+                || sheet.name.chars().any(invalid_sheet_char)
+                || sheet.name.starts_with('\'')
+                || sheet.name.ends_with('\'')
+            {
+                return Err(XlsError::InvalidData("invalid external sheet name".to_string()));
+            }
+            if sheet.cache_rows.len() > i16::MAX as usize {
+                return Err(XlsError::InvalidData("external sheet cache has too many CRN rows".to_string()));
+            }
+            let mut previous_end = None;
+            for row in &sheet.cache_rows {
+                if row.values.is_empty()
+                    || usize::from(row.first_column) + row.values.len() > 256
+                {
+                    return Err(XlsError::InvalidData("external CRN column range is invalid".to_string()));
+                }
+                if previous_end.is_some_and(|(previous_row, previous_column)| {
+                    row.row < previous_row
+                        || (row.row == previous_row
+                            && usize::from(row.first_column) <= previous_column)
+                }) {
+                    return Err(XlsError::InvalidData("external CRN rows overlap or are out of order".to_string()));
+                }
+                previous_end = Some((
+                    row.row,
+                    usize::from(row.first_column) + row.values.len() - 1,
+                ));
+                for value in &row.values {
+                    match value {
+                        crate::xls::XlsExternalCachedValue::Number(number) if !number.is_finite() => {
+                            return Err(XlsError::InvalidData("external cached number must be finite".to_string()));
+                        },
+                        crate::xls::XlsExternalCachedValue::Text(text) if text.encode_utf16().count() > 255 => {
+                            return Err(XlsError::InvalidData("external cached string exceeds 255 UTF-16 code units".to_string()));
+                        },
+                        _ => {},
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
 impl Default for XlsFunctionGroupOptions {
     fn default() -> Self {
         Self {
@@ -581,6 +658,7 @@ pub struct XlsWriter {
     environment_options: XlsWorkbookEnvironmentOptions,
     workbook_window_options: XlsWorkbookWindowOptions,
     function_group_options: XlsFunctionGroupOptions,
+    external_workbooks: Vec<XlsExternalWorkbookOptions>,
 }
 
 impl XlsWriter {
@@ -601,6 +679,7 @@ impl XlsWriter {
             environment_options: XlsWorkbookEnvironmentOptions::default(),
             workbook_window_options: XlsWorkbookWindowOptions::default(),
             function_group_options: XlsFunctionGroupOptions::default(),
+            external_workbooks: Vec::new(),
         }
     }
 
@@ -1919,6 +1998,19 @@ impl XlsWriter {
         Ok(())
     }
 
+    pub fn add_external_workbook_link(
+        &mut self,
+        options: XlsExternalWorkbookOptions,
+    ) -> XlsResult<usize> {
+        options.validate()?;
+        if self.external_workbooks.len() >= 1024 {
+            return Err(XlsError::InvalidData("external supporting-book count exceeds resource bound".to_string()));
+        }
+        let index = self.external_workbooks.len();
+        self.external_workbooks.push(options);
+        Ok(index)
+    }
+
     pub fn set_calculation_settings(&mut self, settings: XlsCalculationSettings) -> XlsResult<()> {
         if !(1..=32_767).contains(&settings.maximum_iterations) {
             return Err(XlsError::InvalidData(
@@ -2342,6 +2434,7 @@ impl XlsWriter {
             self.environment_options,
             self.workbook_window_options,
             &self.function_group_options,
+            &self.external_workbooks,
             &self.fmt,
             &self.defined_names,
             &self.shared_strings,

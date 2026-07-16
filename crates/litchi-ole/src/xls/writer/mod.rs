@@ -24,6 +24,7 @@ pub use core::{
     XlsDataValidationOptions, XlsDataValidationRange, XlsDataValidationTableOptions,
     XlsDataValidationType,
     XlsFunctionGroupOptions,
+    XlsExternalCacheRowOptions, XlsExternalSheetOptions, XlsExternalWorkbookOptions,
     XlsDefinedName, XlsPivotDataItemConfig, XlsPivotFieldConfig, XlsPivotItemConfig,
     XlsPageSetupOptions, XlsPivotTableConfig, XlsWorkbookEnvironmentOptions,
     XlsWorkbookWindowOptions,

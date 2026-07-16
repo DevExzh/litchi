@@ -214,6 +214,14 @@ pub fn write_protect<W: Write>(writer: &mut W, protect: bool) -> XlsResult<()> {
 
 pub use workbook::ExternSheetMode;
 
+pub fn write_external_link_table<W: Write>(
+    writer: &mut W,
+    internal: Option<(u16, ExternSheetMode)>,
+    external: &[crate::xls::writer::core::XlsExternalWorkbookOptions],
+) -> XlsResult<()> {
+    workbook::write_external_link_table(writer, internal, external)
+}
+
 pub fn write_password<W: Write>(writer: &mut W, password_hash: u16) -> XlsResult<()> {
     workbook::write_password(writer, password_hash)
 }
@@ -464,19 +472,6 @@ pub fn write_window1<W: Write>(
 
 /// Write internal SUPBOOK record used for 3D references within this
 /// workbook.
-pub fn write_supbook_internal<W: Write>(writer: &mut W, sheet_count: u16) -> XlsResult<()> {
-    workbook::write_supbook_internal(writer, sheet_count)
-}
-
-/// Write EXTERNSHEET record for internal workbook references.
-pub fn write_externsheet_internal<W: Write>(
-    writer: &mut W,
-    sheet_count: u16,
-    mode: ExternSheetMode,
-) -> XlsResult<()> {
-    workbook::write_externsheet_internal(writer, sheet_count, mode)
-}
-
 /// Write BOUNDSHEET8 record (worksheet metadata)
 ///
 /// Record type: 0x0085

@@ -151,6 +151,7 @@ pub struct XlsWorkbook<R: Read + Seek> {
     environment: crate::xls::environment::XlsWorkbookEnvironment,
     workbook_view: crate::xls::workbook_view::XlsWorkbookView,
     function_groups: Option<crate::xls::function_group::XlsFunctionGroups>,
+    external_links: crate::xls::external_link::XlsExternalLinks,
 }
 
 /// Options for opening a legacy XLS workbook.
@@ -183,6 +184,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             biff_version: BiffVersion::Biff8,
             is_1904_date_system: false,
             formula_context: FormulaContext::default(),
+            external_links: crate::xls::XlsExternalLinks::default(),
             defined_names: Vec::new(),
             formatting: Arc::new(XlsFormatting::default()),
             protection: protection::WorkbookProtection::default(),
@@ -227,6 +229,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             biff_version: BiffVersion::Biff8,
             is_1904_date_system: false,
             formula_context: FormulaContext::default(),
+            external_links: crate::xls::XlsExternalLinks::default(),
             defined_names: Vec::new(),
             formatting: Arc::new(XlsFormatting::default()),
             protection: protection::WorkbookProtection::default(),
@@ -355,6 +358,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         let mut environment_collector = crate::xls::environment::EnvironmentCollector::new();
         let mut workbook_view_collector = crate::xls::workbook_view::WorkbookViewCollector::new();
         let mut function_group_collector = crate::xls::function_group::FunctionGroupCollector::new();
+        let mut external_link_collector = crate::xls::external_link::ExternalLinkCollector::new();
         let mut i = 0;
         while i < records.len() {
             let record = &records[i];
@@ -364,6 +368,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             environment_collector.feed_record(record.header.record_type, &record.data)?;
             workbook_view_collector.feed_record(record.header.record_type, &record.data)?;
             function_group_collector.feed_record(record.header.record_type, &record.data)?;
+            external_link_collector.feed_record(record.header.record_type, &record.data)?;
 
             match record.header.record_type {
                 0x0031 => {
@@ -462,6 +467,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                     self.environment = environment_collector.finish()?;
                     self.workbook_view = workbook_view_collector.finish(bound_sheets.len())?;
                     self.function_groups = function_group_collector.finish()?;
+                    self.external_links = external_link_collector.finish(bound_sheets.len())?;
                     break;
                 },
                 _ => {
@@ -861,6 +867,11 @@ impl<R: Read + Seek> XlsWorkbook<R> {
     /// Built-in and custom function categories, when the FNGROUPS collection exists.
     pub fn function_groups(&self) -> Option<&crate::xls::function_group::XlsFunctionGroups> {
         self.function_groups.as_ref()
+    }
+
+    /// Inert supporting-book links and cached external cell values.
+    pub fn external_links(&self) -> &crate::xls::external_link::XlsExternalLinks {
+        &self.external_links
     }
 
     /// Access the typed `XlsWorksheet` at the given index.

@@ -7,7 +7,7 @@ use crate::xls::{XlsError, XlsResult};
 
 use super::named_range::XlsDefinedName as InternalDefinedName;
 use super::worksheet::WritableWorksheet;
-use super::{XlsCalculationSettings, XlsCellValue, XlsFileSharing, XlsFunctionGroupOptions, XlsVbaWriteMetadata, XlsWorkbookEnvironmentOptions, XlsWorkbookProtection, XlsWorkbookWindowOptions};
+use super::{XlsCalculationSettings, XlsCellValue, XlsExternalWorkbookOptions, XlsFileSharing, XlsFunctionGroupOptions, XlsVbaWriteMetadata, XlsWorkbookEnvironmentOptions, XlsWorkbookProtection, XlsWorkbookWindowOptions};
 
 const DEFAULT_WRITE_ACCESS_USER: &str = "litchi";
 
@@ -29,6 +29,7 @@ pub(crate) fn generate_workbook_stream(
     environment: XlsWorkbookEnvironmentOptions,
     workbook_window: XlsWorkbookWindowOptions,
     function_groups: &XlsFunctionGroupOptions,
+    external_workbooks: &[XlsExternalWorkbookOptions],
     fmt: &FormattingManager,
     defined_names: &[InternalDefinedName],
     shared_strings: &[String],
@@ -140,14 +141,18 @@ pub(crate) fn generate_workbook_stream(
 
     // Internal SUPBOOK / EXTERNSHEET records are required for 3D
     // references used by defined names (NameParsedFormula) and pivot caches.
-    if (!defined_names.is_empty() || has_pivot_tables) && !worksheets.is_empty() {
+    let internal_links = (!defined_names.is_empty() || has_pivot_tables) && !worksheets.is_empty();
+    if internal_links || !external_workbooks.is_empty() {
         let externsheet_mode = if defined_names.is_empty() {
             biff::ExternSheetMode::WorkbookWide
         } else {
             biff::ExternSheetMode::PerSheet
         };
-        biff::write_supbook_internal(&mut stream, sheet_count)?;
-        biff::write_externsheet_internal(&mut stream, sheet_count, externsheet_mode)?;
+        biff::write_external_link_table(
+            &mut stream,
+            internal_links.then_some((sheet_count, externsheet_mode)),
+            external_workbooks,
+        )?;
     }
 
     // NAME (Lbl) records for workbook- and sheet-scoped defined names.
