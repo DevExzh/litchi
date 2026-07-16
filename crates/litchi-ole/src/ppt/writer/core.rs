@@ -42,7 +42,7 @@ use super::blip::{BlipStoreBuilder, BlipType};
 use super::comments::SlideComment;
 use super::custom_shows::CustomShow;
 use super::escher::{
-    UserShapeData, create_dg_container_with_shapes, create_dgg_container,
+    FreeformGeometry, UserShapeData, create_dg_container_with_shapes, create_dgg_container,
     shape_type as escher_shape_type,
 };
 use super::hyperlink::{Hyperlink, HyperlinkCollection};
@@ -221,6 +221,8 @@ pub enum ShapeType {
     Heart,
     /// Picture frame
     Picture,
+    /// Custom/freeform shape with explicit OfficeArt geometry
+    Freeform,
 }
 
 /// Text alignment
@@ -269,6 +271,8 @@ pub struct ShapeProperties {
     pub flip_v: bool,
     /// Picture BLIP index (for Picture type)
     pub picture_index: Option<u32>,
+    /// Explicit geometry for a custom/freeform shape.
+    pub freeform_geometry: Option<FreeformGeometry>,
     /// Hyperlink attached to shape
     pub hyperlink_id: Option<u32>,
 }
@@ -300,6 +304,7 @@ impl Default for ShapeProperties {
             flip_h: false,
             flip_v: false,
             picture_index: None,
+            freeform_geometry: None,
             hyperlink_id: None,
         }
     }
@@ -335,6 +340,7 @@ fn shape_type_to_escher(shape_type: ShapeType) -> u16 {
         ShapeType::Star => 12,    // STAR
         ShapeType::Heart => 74,   // HEART
         ShapeType::Picture => 75, // FRAME (PictureFrame) per POI HSLFPictureShape
+        ShapeType::Freeform => escher_shape_type::NOT_PRIMITIVE,
     }
 }
 
@@ -464,6 +470,7 @@ fn convert_shape_to_escher(
         hyperlink_jump: get_hyperlink_info(props.hyperlink_id, hyperlinks).1,
         hyperlink_type: get_hyperlink_info(props.hyperlink_id, hyperlinks).2,
         picture_index: props.picture_index,
+        freeform_geometry: props.freeform_geometry.clone(),
         animation_info: shape.animation_info.clone(),
         shadow_color,
         shadow_offset_x,
@@ -729,6 +736,59 @@ impl PptWriter {
         self.add_shape(slide, ShapeType::Ellipse, x, y, width, height)
     }
 
+    /// Add a custom/freeform shape to a slide.
+    ///
+    /// The anchor is specified in points. Geometry vertices and segment words
+    /// use the internal coordinate space declared by `geometry`.
+    #[allow(clippy::too_many_arguments)]
+    pub fn add_freeform(
+        &mut self,
+        slide: usize,
+        x: i32,
+        y: i32,
+        width: i32,
+        height: i32,
+        geometry: FreeformGeometry,
+    ) -> Result<(), PptWriteError> {
+        self.add_styled_freeform(slide, x, y, width, height, geometry, ShapeStyle::default())
+    }
+
+    /// Add a styled custom/freeform shape to a slide.
+    #[allow(clippy::too_many_arguments)]
+    pub fn add_styled_freeform(
+        &mut self,
+        slide: usize,
+        x: i32,
+        y: i32,
+        width: i32,
+        height: i32,
+        geometry: FreeformGeometry,
+        style: ShapeStyle,
+    ) -> Result<(), PptWriteError> {
+        geometry.validate()?;
+        let slide_data = self
+            .slides
+            .get_mut(slide)
+            .ok_or_else(|| PptWriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+
+        slide_data.shapes.push(WritableShape {
+            properties: ShapeProperties {
+                shape_type: ShapeType::Freeform,
+                x: pt_to_emu_i32(x),
+                y: pt_to_emu_i32(y),
+                width: pt_to_emu_i32(width),
+                height: pt_to_emu_i32(height),
+                freeform_geometry: Some(geometry),
+                fill: Some(style.fill),
+                line: Some(style.line),
+                shadow: Some(style.shadow),
+                ..Default::default()
+            },
+            animation_info: None,
+        });
+        Ok(())
+    }
+
     /// Add a line to a slide
     ///
     /// # Arguments
@@ -873,6 +933,11 @@ impl PptWriter {
         height: i32,
         style: ShapeStyle,
     ) -> Result<(), PptWriteError> {
+        if shape_type == ShapeType::Freeform {
+            return Err(PptWriteError::InvalidData(
+                "freeform shapes require explicit geometry; use add_styled_freeform".to_string(),
+            ));
+        }
         let slide_data = self
             .slides
             .get_mut(slide)
@@ -1786,6 +1851,7 @@ impl Default for PptWriter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ppt::shapes::geometry::{GeometryRect, ShapePathType};
     use crate::ppt::writer::shape_style::ShapeColor;
     use std::io::Cursor;
 
@@ -1822,6 +1888,69 @@ mod tests {
         assert_eq!(idx2, 1);
         assert_eq!(idx3, 2);
         assert_eq!(writer.slide_count(), 3);
+    }
+
+    #[test]
+    fn test_add_and_write_freeform_shape() {
+        let mut writer = PptWriter::new();
+        let slide = writer.add_slide().unwrap();
+        let geometry = FreeformGeometry::new(
+            GeometryRect::new(0, 0, 21600, 21600),
+            ShapePathType::Complex,
+            vec![(0, 0), (10800, 21600), (21600, 0)],
+            vec![0x4000, 0x0001, 0x0001, 0x8000],
+        );
+
+        writer
+            .add_freeform(slide, 10, 20, 300, 200, geometry)
+            .unwrap();
+        assert_eq!(writer.slides[slide].shapes.len(), 1);
+        assert_eq!(
+            writer.slides[slide].shapes[0].properties.shape_type,
+            ShapeType::Freeform
+        );
+
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).unwrap();
+        assert!(!output.into_inner().is_empty());
+    }
+
+    #[test]
+    fn test_rejects_empty_freeform_geometry() {
+        let mut writer = PptWriter::new();
+        let slide = writer.add_slide().unwrap();
+        let geometry = FreeformGeometry::new(
+            GeometryRect::new(0, 0, 21600, 21600),
+            ShapePathType::Complex,
+            Vec::new(),
+            vec![0x8000],
+        );
+
+        assert!(
+            writer
+                .add_freeform(slide, 0, 0, 100, 100, geometry)
+                .is_err()
+        );
+        assert!(writer.slides[slide].shapes.is_empty());
+    }
+
+    #[test]
+    fn test_generic_styled_shape_rejects_geometryless_freeform() {
+        let mut writer = PptWriter::new();
+        let slide = writer.add_slide().unwrap();
+
+        let result = writer.add_styled_shape(
+            slide,
+            ShapeType::Freeform,
+            0,
+            0,
+            100,
+            100,
+            ShapeStyle::default(),
+        );
+
+        assert!(result.is_err());
+        assert!(writer.slides[slide].shapes.is_empty());
     }
 
     #[test]
@@ -1993,6 +2122,7 @@ mod tests {
             flip_v: false,
             hyperlink_id: None,
             picture_index: None,
+            freeform_geometry: None,
         };
         assert_eq!(props.x, 100);
         assert_eq!(props.y, 200);

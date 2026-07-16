@@ -8,11 +8,15 @@ use zerocopy_derive::*;
 
 use litchi_core::unit::emu_i32_to_ppt_master_i16_round;
 
+use crate::ppt::shapes::geometry::{GeometryRect, ShapePathType};
+
 /// Error type for PPT operations
 pub type PptError = std::io::Error;
 
 // Re-export shared Escher writer functionality
-pub use crate::escher::writer::{EscherProperty, EscherRecordHeader, EscherSpData};
+pub use crate::escher::writer::{
+    EscherProperty, EscherRecordHeader, EscherSpData, PROPERTY_FLAG_COMPLEX,
+};
 pub use crate::escher::writer::{ShapeFlags, record_type, shape_type};
 
 // =============================================================================
@@ -37,6 +41,13 @@ pub mod prop_id {
     pub const TEXT_LEFT: u16 = 0x0081;
 
     // Geometry group
+    pub const GEOM_LEFT: u16 = 0x0140;
+    pub const GEOM_TOP: u16 = 0x0141;
+    pub const GEOM_RIGHT: u16 = 0x0142;
+    pub const GEOM_BOTTOM: u16 = 0x0143;
+    pub const SHAPE_PATH: u16 = 0x0144;
+    pub const VERTICES: u16 = 0x0145;
+    pub const SEGMENT_INFO: u16 = 0x0146;
     pub const ADJUST_VALUE: u16 = 0x0147;
     pub const ADJUST2_VALUE: u16 = 0x0148;
 
@@ -702,6 +713,109 @@ pub struct ChildAnchor {
 // User Shape Building
 // =============================================================================
 
+/// Owned custom/freeform OfficeArt geometry.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FreeformGeometry {
+    coordinate_space: GeometryRect,
+    path_type: ShapePathType,
+    vertices: Vec<(i32, i32)>,
+    segment_info: Vec<u16>,
+}
+
+impl FreeformGeometry {
+    /// Create freeform geometry in its internal OfficeArt coordinate space.
+    pub fn new(
+        coordinate_space: GeometryRect,
+        path_type: ShapePathType,
+        vertices: Vec<(i32, i32)>,
+        segment_info: Vec<u16>,
+    ) -> Self {
+        Self {
+            coordinate_space,
+            path_type,
+            vertices,
+            segment_info,
+        }
+    }
+
+    /// Return the internal geometry coordinate space.
+    pub const fn coordinate_space(&self) -> GeometryRect {
+        self.coordinate_space
+    }
+
+    /// Return how the vertices and segment array define the path.
+    pub const fn path_type(&self) -> ShapePathType {
+        self.path_type
+    }
+
+    /// Return the freeform vertices.
+    pub fn vertices(&self) -> &[(i32, i32)] {
+        &self.vertices
+    }
+
+    /// Return raw MSOPATHINFO words.
+    pub fn segment_info(&self) -> &[u16] {
+        &self.segment_info
+    }
+
+    pub(crate) fn validate(&self) -> Result<(u16, u16), PptError> {
+        if self.vertices.is_empty() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "freeform geometry requires at least one vertex",
+            ));
+        }
+        if self.segment_info.is_empty() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "freeform geometry requires segment information",
+            ));
+        }
+        if self.path_type == ShapePathType::Unknown {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "freeform geometry requires a known shape path type",
+            ));
+        }
+        let vertex_count = u16::try_from(self.vertices.len()).map_err(|_| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "freeform geometry exceeds 65535 vertices",
+            )
+        })?;
+        let segment_count = u16::try_from(self.segment_info.len()).map_err(|_| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "freeform geometry exceeds 65535 segment entries",
+            )
+        })?;
+        Ok((vertex_count, segment_count))
+    }
+
+    fn encode_arrays(&self) -> Result<(Vec<u8>, Vec<u8>), PptError> {
+        let (vertex_count, segment_count) = self.validate()?;
+
+        let mut vertices = Vec::with_capacity(6 + self.vertices.len() * 8);
+        vertices.extend_from_slice(&vertex_count.to_le_bytes());
+        vertices.extend_from_slice(&vertex_count.to_le_bytes());
+        vertices.extend_from_slice(&8u16.to_le_bytes());
+        for &(x, y) in &self.vertices {
+            vertices.extend_from_slice(&x.to_le_bytes());
+            vertices.extend_from_slice(&y.to_le_bytes());
+        }
+
+        let mut segments = Vec::with_capacity(6 + self.segment_info.len() * 2);
+        segments.extend_from_slice(&segment_count.to_le_bytes());
+        segments.extend_from_slice(&segment_count.to_le_bytes());
+        segments.extend_from_slice(&2u16.to_le_bytes());
+        for &segment in &self.segment_info {
+            segments.extend_from_slice(&segment.to_le_bytes());
+        }
+
+        Ok((vertices, segments))
+    }
+}
+
 /// Shape data for building user shapes
 #[derive(Debug, Clone)]
 pub struct UserShapeData {
@@ -756,6 +870,8 @@ pub struct UserShapeData {
     pub hyperlink_type: u8,
     /// Picture BLIP index (for picture frames)
     pub picture_index: Option<u32>,
+    /// Explicit custom/freeform geometry.
+    pub freeform_geometry: Option<FreeformGeometry>,
     /// Animation info for this shape
     pub animation_info: Option<crate::ppt::animation::AnimationInfo>,
     /// Shadow color (RGB format)
@@ -800,6 +916,7 @@ impl Default for UserShapeData {
             hyperlink_jump: 0,   // JUMP_NONE
             hyperlink_type: 8,   // LINK_Url
             picture_index: None,
+            freeform_geometry: None,
             animation_info: None,
             shadow_color: None,
             shadow_offset_x: None,
@@ -907,15 +1024,63 @@ fn create_user_shape_container(shape_id: u32, shape: &UserShapeData) -> Result<V
 
     // OPT record with shape properties (sorted by property number, not full ID)
     // Per POI: sort by getPropertyNumber() which masks out flags (id & 0x3FFF)
-    let mut properties = build_shape_properties(shape);
-    properties.sort_by_key(|p| p.prop_id & 0x3FFF);
+    let mut properties: Vec<(EscherProperty, Option<Vec<u8>>)> = build_shape_properties(shape)
+        .into_iter()
+        .map(|property| (property, None))
+        .collect();
+    if let Some(geometry) = &shape.freeform_geometry {
+        let rect = geometry.coordinate_space();
+        let (vertices, segments) = geometry.encode_arrays()?;
+        properties.extend([
+            (
+                EscherProperty::new(prop_id::GEOM_LEFT, rect.left as u32),
+                None,
+            ),
+            (
+                EscherProperty::new(prop_id::GEOM_TOP, rect.top as u32),
+                None,
+            ),
+            (
+                EscherProperty::new(prop_id::GEOM_RIGHT, rect.right as u32),
+                None,
+            ),
+            (
+                EscherProperty::new(prop_id::GEOM_BOTTOM, rect.bottom as u32),
+                None,
+            ),
+            (
+                EscherProperty::new(prop_id::SHAPE_PATH, geometry.path_type() as u32),
+                None,
+            ),
+            (
+                EscherProperty::new(
+                    prop_id::VERTICES | PROPERTY_FLAG_COMPLEX,
+                    vertices.len() as u32,
+                ),
+                Some(vertices),
+            ),
+            (
+                EscherProperty::new(
+                    prop_id::SEGMENT_INFO | PROPERTY_FLAG_COMPLEX,
+                    segments.len() as u32,
+                ),
+                Some(segments),
+            ),
+        ]);
+    }
+    properties.sort_by_key(|(property, _)| ({ property.prop_id }) & 0x3FFF);
     let mut opt = EscherBuilder::new(
         header_version::OPT,
         properties.len() as u16,
         record_type::OPT,
     );
-    for prop in &properties {
-        opt.add_data(prop.as_bytes());
+    for (property, _) in &properties {
+        opt.add_data(property.as_bytes());
+    }
+    for (_, complex_data) in &properties {
+        if let Some(data) = complex_data {
+            opt.add_data(data);
+        }
     }
     container.add_data(&opt.build()?);
 
@@ -1261,6 +1426,10 @@ fn build_client_textbox_formatted(
 mod tests {
     use super::super::shapes::shape_type;
     use super::*;
+    use crate::escher::{EscherParser, EscherProperties, EscherRecordType};
+    use crate::ppt::shapes::geometry::{
+        extract_geometry_rect, extract_segment_info, extract_shape_path, extract_vertices,
+    };
     use crate::ppt::writer::text_format::{Paragraph, TextRun};
 
     #[test]
@@ -1789,6 +1958,51 @@ mod tests {
         };
         let container = create_dg_container_with_shapes(1, &[shape]);
         assert!(container.is_ok());
+    }
+
+    #[test]
+    fn test_freeform_geometry_round_trips_through_opt_record() {
+        let geometry = FreeformGeometry::new(
+            GeometryRect::new(0, 0, 21600, 21600),
+            ShapePathType::Complex,
+            vec![(0, 0), (10800, 21600), (21600, 0)],
+            vec![0x4000, 0x0001, 0x0001, 0x8000],
+        );
+        let shape = UserShapeData {
+            shape_type: shape_type::NOT_PRIMITIVE,
+            freeform_geometry: Some(geometry),
+            ..Default::default()
+        };
+
+        let bytes = create_user_shape_container(45, &shape).unwrap();
+        let root = EscherParser::new(&bytes)
+            .root_container()
+            .expect("shape container")
+            .unwrap();
+        let opt = root.find_child(EscherRecordType::Opt).expect("OPT record");
+        let properties = EscherProperties::from_opt_record(&opt);
+
+        assert_eq!(
+            extract_geometry_rect(&properties),
+            Some(GeometryRect::new(0, 0, 21600, 21600))
+        );
+        assert_eq!(
+            extract_shape_path(&properties),
+            Some(ShapePathType::Complex)
+        );
+        assert_eq!(
+            extract_vertices(&properties)
+                .expect("vertex array")
+                .iter()
+                .collect::<Vec<_>>(),
+            [(0, 0), (10800, 21600), (21600, 0)]
+        );
+        let segment_words: Vec<u16> = extract_segment_info(&properties)
+            .expect("segment array")
+            .chunks_exact(2)
+            .map(|word| u16::from_le_bytes([word[0], word[1]]))
+            .collect();
+        assert_eq!(segment_words, [0x4000, 0x0001, 0x0001, 0x8000]);
     }
 
     #[test]

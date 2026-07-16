@@ -98,7 +98,10 @@ pub use text_prop::{TextProp, TextPropCollection, TextPropType};
 pub use text_run::{TextRun, TextRunExtractor, TextRunFormatting};
 
 // Re-export writer types
-pub use writer::{PptWriteError, PptWriter, ShapeProperties, ShapeType, TextAlignment};
+pub use writer::{
+    FreeformGeometry, GeometryRect, PptWriteError, PptWriter, ShapePathType, ShapeProperties,
+    ShapeType, TextAlignment,
+};
 
 // Animation and transition support
 pub mod animation;

@@ -73,10 +73,11 @@ pub mod slide_timing;
 pub use core::{PptWriteError, PptWriter, ShapeProperties, ShapeType, TextAlignment};
 
 // Re-export commonly used types from submodules
+pub use crate::ppt::shapes::geometry::{GeometryRect, ShapePathType};
 pub use blip::{BlipStoreBuilder, BlipType, PictureData};
 pub use comments::{CommentDateTime, SlideComment};
 pub use custom_shows::CustomShow;
-pub use escher::{EscherBuilder, create_dgg_container, create_shape_container};
+pub use escher::{EscherBuilder, FreeformGeometry, create_dgg_container, create_shape_container};
 pub use hyperlink::{Hyperlink, HyperlinkCollection, HyperlinkTarget};
 pub use notes::{NotesCollection, NotesPage};
 pub use persist::{PersistPtrBuilder, UserEditAtom};
