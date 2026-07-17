@@ -9,6 +9,7 @@ pub mod editor;
 pub mod extractor;
 mod font;
 mod paragraph_alignment;
+mod paragraph_list;
 mod paragraph_tabs;
 pub mod storage;
 pub mod style;
@@ -25,6 +26,7 @@ pub use drop_cap::{
 };
 pub use editor::{IWorkTextEditor, TextStorageInfo};
 pub use font::{TextFont, TextFontName};
+pub use paragraph_list::ParagraphList;
 pub use paragraph_tabs::{
     ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
     ParagraphTabStops,

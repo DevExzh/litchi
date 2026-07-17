@@ -38,6 +38,9 @@ use super::paragraph_alignment::{
     text_character_spacing, text_color, text_decorations, text_font, text_ligatures, text_outline,
     text_script, text_shadow, text_style,
 };
+use super::paragraph_list::{
+    ParagraphList, paragraph_list, reset_paragraph_list, set_paragraph_list,
+};
 use super::paragraph_tabs::ParagraphTabStops;
 use super::style::{
     ParagraphIndents, ParagraphLineSpacing, ParagraphSpacing, TextAlignment, TextBackground,
@@ -230,6 +233,46 @@ impl IWorkTextEditor {
         if changed {
             let bytes = staged.to_bytes()?;
             IWorkPackage::from_bytes(&bytes)?;
+            self.package = staged;
+        }
+        Ok(changed)
+    }
+
+    /// Read the canonical list preset applied uniformly to a text storage.
+    pub fn paragraph_list(&self, object_id: u64) -> Result<ParagraphList> {
+        paragraph_list(&self.package, object_id)
+    }
+
+    /// Atomically apply a canonical nine-level list preset to a text storage.
+    ///
+    /// Storages with multiple list-style boundaries are rejected so the
+    /// operation cannot flatten independently formatted paragraphs.
+    pub fn set_paragraph_list(&mut self, object_id: u64, list: ParagraphList) -> Result<()> {
+        let mut staged = self.package.clone();
+        set_paragraph_list(&mut staged, object_id, list)?;
+        let bytes = staged.to_bytes()?;
+        let verified = IWorkPackage::from_bytes(&bytes)?;
+        if paragraph_list(&verified, object_id)? != list {
+            return Err(Error::InvalidFormat(
+                "iWork paragraph-list update failed round-trip validation".to_owned(),
+            ));
+        }
+        self.package = staged;
+        Ok(())
+    }
+
+    /// Remove uniform list formatting by applying the canonical None preset.
+    pub fn reset_paragraph_list(&mut self, object_id: u64) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = reset_paragraph_list(&mut staged, object_id)?;
+        if changed {
+            let bytes = staged.to_bytes()?;
+            let verified = IWorkPackage::from_bytes(&bytes)?;
+            if paragraph_list(&verified, object_id)? != ParagraphList::None {
+                return Err(Error::InvalidFormat(
+                    "iWork paragraph-list reset failed round-trip validation".to_owned(),
+                ));
+            }
             self.package = staged;
         }
         Ok(changed)

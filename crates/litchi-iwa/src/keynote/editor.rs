@@ -27,10 +27,10 @@ use crate::shapes::{
 };
 use crate::text::{
     IWorkTextEditor, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphIndents,
-    ParagraphLineSpacing, ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment,
-    TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumns,
-    TextDecorations, TextFont, TextLigatures, TextOutline, TextScript, TextShadow, TextStorageInfo,
-    TextStyle,
+    ParagraphLineSpacing, ParagraphList, ParagraphSpacing, ParagraphStart, ParagraphTabStops,
+    TextAlignment, TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing,
+    TextColumns, TextDecorations, TextFont, TextLigatures, TextOutline, TextScript, TextShadow,
+    TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     append_repeated_length_delimited_field, parse_wire_fields, patch_fixed32_field,
@@ -1330,6 +1330,45 @@ impl KeynoteEditor {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();
         let changed = staged.reset_text_font(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the canonical list preset of an ordinary slide text box.
+    pub fn slide_text_box_paragraph_list(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<ParagraphList> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text.paragraph_list(graph.storage_id)
+    }
+
+    /// Atomically apply a canonical list preset to an ordinary slide text box.
+    pub fn set_slide_text_box_paragraph_list(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        list: ParagraphList,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_paragraph_list(graph.storage_id, list)?;
+        *self = Self::from_package(staged.into_package())?;
+        Ok(())
+    }
+
+    /// Remove list formatting from an ordinary slide text box.
+    pub fn reset_slide_text_box_paragraph_list(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_paragraph_list(graph.storage_id)?;
         if changed {
             *self = Self::from_package(staged.into_package())?;
         }

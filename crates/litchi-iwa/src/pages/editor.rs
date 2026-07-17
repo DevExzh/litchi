@@ -30,10 +30,10 @@ use crate::shapes::{
 };
 use crate::text::{
     IWorkTextEditor, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphIndents,
-    ParagraphLineSpacing, ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment,
-    TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumns,
-    TextDecorations, TextFont, TextLigatures, TextOutline, TextScript, TextShadow, TextStorageInfo,
-    TextStyle,
+    ParagraphLineSpacing, ParagraphList, ParagraphSpacing, ParagraphStart, ParagraphTabStops,
+    TextAlignment, TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing,
+    TextColumns, TextDecorations, TextFont, TextLigatures, TextOutline, TextScript, TextShadow,
+    TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     append_repeated_length_delimited_field, patch_fixed32_field, patch_length_delimited_field,
@@ -419,6 +419,36 @@ impl PagesEditor {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
         let changed = staged.reset_text_font(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the canonical list preset of an ordinary text box.
+    pub fn text_box_paragraph_list(&self, drawable_object_id: u64) -> Result<ParagraphList> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        self.text.paragraph_list(graph.storage_id)
+    }
+
+    /// Atomically apply a canonical list preset to an ordinary text box.
+    pub fn set_text_box_paragraph_list(
+        &mut self,
+        drawable_object_id: u64,
+        list: ParagraphList,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_paragraph_list(graph.storage_id, list)?;
+        *self = Self::from_package(staged.into_package())?;
+        Ok(())
+    }
+
+    /// Remove list formatting from an ordinary text box.
+    pub fn reset_text_box_paragraph_list(&mut self, drawable_object_id: u64) -> Result<bool> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_paragraph_list(graph.storage_id)?;
         if changed {
             *self = Self::from_package(staged.into_package())?;
         }

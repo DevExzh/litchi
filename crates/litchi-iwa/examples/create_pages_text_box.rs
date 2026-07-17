@@ -10,12 +10,12 @@ use litchi_iwa::shapes::{
 use litchi_iwa::text::{
     DropCapCharacterCount, DropCapLineCount, DropCapOutdent, DropCapPadding, DropCapRaisedLines,
     DropCapWrap, ParagraphDropCap, ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing,
-    ParagraphLineSpacingMultiple, ParagraphSpacing, ParagraphSpacingPoints, ParagraphStart,
-    ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
-    ParagraphTabStops, TextAlignment, TextBackground, TextBaselineShift, TextCapitalization,
-    TextCharacterSpacing, TextColumnCount, TextColumnGap, TextColumns, TextDecorations, TextFont,
-    TextLigatures, TextOutline, TextPointSize, TextScript, TextShadow, TextStrikethrough,
-    TextStyle, TextUnderline,
+    ParagraphLineSpacingMultiple, ParagraphList, ParagraphSpacing, ParagraphSpacingPoints,
+    ParagraphStart, ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition,
+    ParagraphTabStop, ParagraphTabStops, TextAlignment, TextBackground, TextBaselineShift,
+    TextCapitalization, TextCharacterSpacing, TextColumnCount, TextColumnGap, TextColumns,
+    TextDecorations, TextFont, TextLigatures, TextOutline, TextPointSize, TextScript, TextShadow,
+    TextStrikethrough, TextStyle, TextUnderline,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -123,6 +123,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .with_leader(ParagraphTabLeader::new(".")?),
         ])?,
     )?;
+    editor.set_text_box_paragraph_list(created.drawable_object_id, ParagraphList::Bullet)?;
     editor.set_text_box_paragraph_drop_cap(
         created.drawable_object_id,
         ParagraphStart::ZERO,

@@ -39,10 +39,10 @@ use crate::shapes::{
 };
 use crate::text::{
     IWorkTextEditor, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphIndents,
-    ParagraphLineSpacing, ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment,
-    TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumns,
-    TextDecorations, TextFont, TextLigatures, TextOutline, TextScript, TextShadow, TextStorageInfo,
-    TextStyle,
+    ParagraphLineSpacing, ParagraphList, ParagraphSpacing, ParagraphStart, ParagraphTabStops,
+    TextAlignment, TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing,
+    TextColumns, TextDecorations, TextFont, TextLigatures, TextOutline, TextScript, TextShadow,
+    TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     patch_length_delimited_field, patch_nested_fixed32_field, patch_nested_length_delimited_field,
@@ -663,6 +663,45 @@ impl NumbersEditor {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
         let changed = text.reset_text_font(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(text.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the canonical list preset of a sheet-owned text box.
+    pub fn sheet_text_box_paragraph_list(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<ParagraphList> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        IWorkTextEditor::from_package(self.package.clone()).paragraph_list(graph.storage_id)
+    }
+
+    /// Atomically apply a canonical list preset to a sheet-owned text box.
+    pub fn set_sheet_text_box_paragraph_list(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        list: ParagraphList,
+    ) -> Result<()> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        text.set_paragraph_list(graph.storage_id, list)?;
+        *self = Self::from_package(text.into_package())?;
+        Ok(())
+    }
+
+    /// Remove list formatting from a sheet-owned text box.
+    pub fn reset_sheet_text_box_paragraph_list(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let changed = text.reset_paragraph_list(graph.storage_id)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
         }

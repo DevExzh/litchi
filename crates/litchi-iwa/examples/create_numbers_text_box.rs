@@ -10,12 +10,12 @@ use litchi_iwa::shapes::{
 use litchi_iwa::text::{
     DropCapCharacterCount, DropCapLineCount, DropCapOutdent, DropCapPadding, DropCapRaisedLines,
     ParagraphDropCap, ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing,
-    ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, ParagraphStart,
-    ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
-    ParagraphTabStops, TextAlignment, TextBackground, TextBaselineShift, TextCapitalization,
-    TextCharacterSpacing, TextColumnCount, TextColumnGap, TextColumns, TextDecorations, TextFont,
-    TextLigatures, TextOutline, TextPointSize, TextScript, TextShadow, TextStrikethrough,
-    TextStyle, TextUnderline,
+    ParagraphLineSpacingPoints, ParagraphList, ParagraphSpacing, ParagraphSpacingPoints,
+    ParagraphStart, ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition,
+    ParagraphTabStop, ParagraphTabStops, TextAlignment, TextBackground, TextBaselineShift,
+    TextCapitalization, TextCharacterSpacing, TextColumnCount, TextColumnGap, TextColumns,
+    TextDecorations, TextFont, TextLigatures, TextOutline, TextPointSize, TextScript, TextShadow,
+    TextStrikethrough, TextStyle, TextUnderline,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -158,6 +158,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             )
             .with_leader(ParagraphTabLeader::new("-")?),
         ])?,
+    )?;
+    editor.set_sheet_text_box_paragraph_list(
+        sheet_id,
+        created.drawable_object_id,
+        ParagraphList::Numbered,
     )?;
     editor.set_sheet_text_box_paragraph_drop_cap(
         sheet_id,
