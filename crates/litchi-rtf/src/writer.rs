@@ -3155,8 +3155,24 @@ impl<W: Write> RtfWriter<W> {
         if section.properties.orientation == PageOrientation::Landscape {
             self.write_control_word("lndscpsxn", None)?;
         }
-        self.write_control_word("cols", Some(i32::from(section.properties.columns)))?;
-        self.write_control_word("colsx", Some(section.properties.column_space))?;
+        section.properties.columns.validate().map_err(|error| {
+            io::Error::new(io::ErrorKind::InvalidInput, error.to_string())
+        })?;
+        self.write_control_word("cols", Some(i32::from(section.properties.columns.count)))?;
+        if section.properties.columns.separator {
+            self.write_control_word("linebetcol", None)?;
+        }
+        self.write_control_word(
+            "colsx",
+            Some(section.properties.columns.default_spacing),
+        )?;
+        for (index, column) in section.properties.columns.explicit.iter().enumerate() {
+            self.write_control_word("colno", Some((index + 1) as i32))?;
+            self.write_control_word("colw", Some(column.width))?;
+            if let Some(space) = column.space_after {
+                self.write_control_word("colsr", Some(space))?;
+            }
+        }
         self.write_control_word("pgnstarts", Some(section.properties.page_number_start))?;
         self.write_control_word(
             match section.properties.page_number_format {

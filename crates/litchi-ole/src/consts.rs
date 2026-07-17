@@ -311,6 +311,10 @@ pub enum PptRecordType {
     ViewInfoAtom = 1021,
     /// Slide view editing-preferences atom
     SlideViewInfoAtom = 1022,
+    /// Outline editing-view information container
+    OutlineViewInfo = 1031,
+    /// Slide-sorter editing-view information container
+    SorterViewInfo = 1032,
     /// Document information list container
     DocInfoList = 2000,
     /// Comment 2000 record
@@ -480,6 +484,8 @@ impl From<u16> for PptRecordType {
             1019 => PptRecordType::GuideAtom,
             1021 => PptRecordType::ViewInfoAtom,
             1022 => PptRecordType::SlideViewInfoAtom,
+            1031 => PptRecordType::OutlineViewInfo,
+            1032 => PptRecordType::SorterViewInfo,
             2000 => PptRecordType::DocInfoList,
             12000 => PptRecordType::Comment2000,
             12001 => PptRecordType::Comment2000Atom,

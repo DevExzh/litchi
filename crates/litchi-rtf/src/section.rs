@@ -6,6 +6,135 @@
 use super::types::{Formatting, Paragraph, TextDirection};
 use std::borrow::Cow;
 
+/// Maximum number of columns retained for one RTF section.
+pub const MAX_SECTION_COLUMNS: u16 = 64;
+
+/// Maximum accepted column width or inter-column spacing, in twips.
+pub const MAX_SECTION_COLUMN_TWIPS: i32 = 31_680;
+
+/// One explicitly sized section column.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SectionColumn {
+    /// Column width in twips (`colw`).
+    pub width: i32,
+    /// Space to the right in twips (`colsr`).
+    pub space_after: Option<i32>,
+}
+
+impl SectionColumn {
+    /// Construct an explicitly sized column.
+    pub fn new(width: i32, space_after: Option<i32>) -> crate::RtfResult<Self> {
+        let column = Self { width, space_after };
+        column.validate()?;
+        Ok(column)
+    }
+
+    /// Validate this column against the implementation safety bounds.
+    pub fn validate(&self) -> crate::RtfResult<()> {
+        if !(1..=MAX_SECTION_COLUMN_TWIPS).contains(&self.width) {
+            return Err(crate::RtfError::MalformedDocument(
+                "RTF section-column width must be in 1..=31680 twips".to_string(),
+            ));
+        }
+        if self
+            .space_after
+            .is_some_and(|value| !(0..=MAX_SECTION_COLUMN_TWIPS).contains(&value))
+        {
+            return Err(crate::RtfError::MalformedDocument(
+                "RTF section-column spacing must be in 0..=31680 twips".to_string(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// Equal- or variable-width column layout for an RTF section.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SectionColumns {
+    /// Number of columns (`cols`), bounded by [`MAX_SECTION_COLUMNS`].
+    pub count: u16,
+    /// Default spacing for equal-width columns (`colsx`), in twips.
+    pub default_spacing: i32,
+    /// Whether RTF requests a rule between columns (`linebetcol`).
+    pub separator: bool,
+    /// Ordered explicit column geometry. Empty means equal-width columns.
+    pub explicit: Vec<SectionColumn>,
+}
+
+impl SectionColumns {
+    /// Construct an equal-width column layout.
+    pub fn equal(count: u16, spacing: i32, separator: bool) -> crate::RtfResult<Self> {
+        let columns = Self {
+            count,
+            default_spacing: spacing,
+            separator,
+            explicit: Vec::new(),
+        };
+        columns.validate()?;
+        Ok(columns)
+    }
+
+    /// Construct a variable-width column layout.
+    pub fn variable(
+        columns: Vec<SectionColumn>,
+        default_spacing: i32,
+        separator: bool,
+    ) -> crate::RtfResult<Self> {
+        let count = u16::try_from(columns.len()).map_err(|_| {
+            crate::RtfError::MalformedDocument(
+                "RTF section-column count exceeds the safety limit".to_string(),
+            )
+        })?;
+        let layout = Self {
+            count,
+            default_spacing,
+            separator,
+            explicit: columns,
+        };
+        layout.validate()?;
+        Ok(layout)
+    }
+
+    /// Whether the layout contains explicit variable-width geometry.
+    pub fn is_variable(&self) -> bool {
+        !self.explicit.is_empty()
+    }
+
+    /// Validate cardinality and numeric safety bounds.
+    pub fn validate(&self) -> crate::RtfResult<()> {
+        if !(1..=MAX_SECTION_COLUMNS).contains(&self.count) {
+            return Err(crate::RtfError::MalformedDocument(format!(
+                "RTF section-column count must be in 1..={MAX_SECTION_COLUMNS}"
+            )));
+        }
+        if !(0..=MAX_SECTION_COLUMN_TWIPS).contains(&self.default_spacing) {
+            return Err(crate::RtfError::MalformedDocument(
+                "RTF section-column default spacing must be in 0..=31680 twips".to_string(),
+            ));
+        }
+        if !self.explicit.is_empty() && self.explicit.len() != usize::from(self.count) {
+            return Err(crate::RtfError::MalformedDocument(
+                "RTF explicit section-column count does not match cols".to_string(),
+            ));
+        }
+        for column in &self.explicit {
+            column.validate()?;
+        }
+        Ok(())
+    }
+}
+
+impl Default for SectionColumns {
+    fn default() -> Self {
+        Self {
+            count: 1,
+            default_spacing: 720,
+            separator: false,
+            explicit: Vec::new(),
+        }
+    }
+}
+
 /// Section break type
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SectionBreakType {
@@ -99,7 +228,7 @@ impl SectionNoteOptions {
 }
 
 /// Section properties
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SectionProperties {
     /// Explicit direction used to thread section columns.
     pub direction: Option<TextDirection>,
@@ -125,10 +254,8 @@ pub struct SectionProperties {
     pub footer_distance: i32,
     /// Page orientation
     pub orientation: PageOrientation,
-    /// Number of columns
-    pub columns: u16,
-    /// Space between columns (in twips)
-    pub column_space: i32,
+    /// Equal- or variable-width section column layout.
+    pub columns: SectionColumns,
     /// Page number start
     pub page_number_start: i32,
     /// Page number format
@@ -160,8 +287,7 @@ impl Default for SectionProperties {
             header_distance: 720, // 0.5 inches
             footer_distance: 720,
             orientation: PageOrientation::default(),
-            columns: 1,
-            column_space: 720,
+            columns: SectionColumns::default(),
             page_number_start: 1,
             page_number_format: PageNumberFormat::default(),
             vertical_alignment: VerticalAlignment::default(),

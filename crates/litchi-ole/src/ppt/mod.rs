@@ -55,6 +55,7 @@ pub mod package;
 pub mod presentation;
 pub mod sound_collection;
 pub mod view_info;
+pub mod non_zoom_view;
 
 /// PPT file writing
 pub mod writer;
@@ -98,6 +99,10 @@ pub mod text_run;
 pub use package::{Package, PptEncryptionKind, PptError, PptOpenOptions};
 pub use presentation::Presentation;
 pub use sound_collection::{EmbeddedPowerPointSound, PowerPointSoundCollection};
+pub use non_zoom_view::{
+    PowerPointNoZoomViewInfo, PowerPointNonZoomViewKind,
+    PowerPointOutlineSorterViewInfo, PowerPointOutlineSorterViewInformation,
+};
 pub use view_info::{
     PowerPointGuide, PowerPointGuideOrientation, PowerPointRatio, PowerPointSlideViewInfo,
     PowerPointSlideViewInformation, PowerPointSlideViewPreferences, PowerPointViewKind,

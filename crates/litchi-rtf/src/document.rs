@@ -2319,8 +2319,8 @@ mod tests {
             section.properties.orientation,
             crate::PageOrientation::Landscape
         );
-        assert_eq!(section.properties.columns, 2);
-        assert_eq!(section.properties.column_space, 360);
+        assert_eq!(section.properties.columns.count, 2);
+        assert_eq!(section.properties.columns.default_spacing, 360);
         assert_eq!(section.properties.page_number_start, 5);
         assert_eq!(
             section.properties.page_number_format,

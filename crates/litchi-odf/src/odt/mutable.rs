@@ -205,6 +205,36 @@ impl MutableDocument {
         Ok(())
     }
 
+    /// Create or replace the typed footnote separator in one existing page layout.
+    pub fn set_page_layout_footnote_separator(
+        &mut self,
+        page_layout_name: &str,
+        separator: &crate::StyleFootnoteSeparator,
+    ) -> Result<()> {
+        let styles = self.styles_xml.as_deref().ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(
+                "document has no styles.xml page layout to modify".to_string(),
+            )
+        })?;
+        let layouts = parse_page_layouts(styles)?;
+        let layout = layouts
+            .iter()
+            .find(|layout| layout.name == page_layout_name)
+            .ok_or_else(|| {
+                litchi_core::Error::InvalidFormat(format!(
+                    "page layout '{page_layout_name}' does not exist"
+                ))
+            })?;
+        let replacement =
+            crate::footnote_separator::replace_page_layout_footnote_separator(layout, separator)?;
+        self.styles_xml = Some(set_page_layout_xml(
+            styles,
+            page_layout_name,
+            &replacement,
+        )?);
+        Ok(())
+    }
+
     /// Add an empty master page and its referenced page layout.
     ///
     /// A minimal page layout is created in `office:automatic-styles` when a

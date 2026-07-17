@@ -14,6 +14,7 @@ use super::parsers::PptRecordParser;
 use super::persist::PersistMapping;
 use super::slide::{Slide, SlideDirectory, SlideFactory};
 use super::sound_collection::PowerPointSoundCollection;
+use super::non_zoom_view::PowerPointOutlineSorterViewInformation;
 use super::view_info::PowerPointSlideViewInformation;
 use crate::consts::PptRecordType;
 #[cfg(feature = "imgconv")]
@@ -494,6 +495,12 @@ impl Presentation {
     pub fn slide_view_information(&self) -> Result<PowerPointSlideViewInformation> {
         let records = self.parser.find_records_ref();
         PowerPointSlideViewInformation::parse_records(&records)
+    }
+
+    /// Strictly parse outline and slide-sorter editing-view information.
+    pub fn outline_sorter_view_information(&self) -> Result<PowerPointOutlineSorterViewInformation> {
+        let records = self.parser.find_records_ref();
+        PowerPointOutlineSorterViewInformation::parse_records(&records)
     }
 
     /// Parse custom slide shows (named shows) from the Document container.

@@ -299,6 +299,7 @@ pub mod named_expression;
 pub mod content_validation;
 mod paragraph_tab_stop;
 mod style_columns;
+mod footnote_separator;
 /// ODF XML element classes
 pub mod elements;
 pub use elements::field::{
@@ -364,6 +365,10 @@ pub use style_columns::{
     MAX_STYLE_COLUMNS, StyleColumn, StyleColumnLength, StyleColumnSeparator,
     StyleColumnSeparatorAlignment, StyleColumnSeparatorStyle, StyleColumns,
     parse_style_columns,
+};
+pub use footnote_separator::{
+    FootnoteSeparatorAdjustment, FootnoteSeparatorLength, FootnoteSeparatorLineStyle,
+    FootnoteSeparatorPercent, StyleFootnoteSeparator, parse_style_footnote_separators,
 };
 pub use formula::{FormulaDocument, MathAttribute, MathContent, MathElement, MathElementKind};
 pub use form::{

@@ -384,7 +384,7 @@ fn replace_first_columns(xml: &str, replacement: &str) -> Result<String> {
         buffer.clear();
     }
 }
-fn scoped_property_xml(xml: &str) -> Result<(String, usize, usize)> {
+pub(crate) fn scoped_property_xml(xml: &str) -> Result<(String, usize, usize)> {
     let prefixes = inferred_prefixes(xml)?;
     let default_style = ["page-layout-properties", "columns", "column", "column-sep"]
         .iter()
@@ -403,7 +403,7 @@ fn inferred_prefixes(xml: &str) -> Result<std::collections::BTreeMap<String, &'s
     let mut prefixes = std::collections::BTreeMap::<String, &'static str>::new();
     prefixes.insert("style".to_owned(), "urn:oasis:names:tc:opendocument:xmlns:style:1.0");
     prefixes.insert("fo".to_owned(), "urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0");
-    for local in ["page-layout", "page-layout-properties", "columns", "column", "column-sep", "rel-width", "width", "height", "style", "vertical-align", "color"] {
+    for local in ["page-layout", "page-layout-properties", "columns", "column", "column-sep", "footnote-sep", "rel-width", "width", "height", "style", "line-style", "adjustment", "distance-before-sep", "distance-after-sep", "vertical-align", "color"] {
         infer_prefixes(xml, local, "urn:oasis:names:tc:opendocument:xmlns:style:1.0", &mut prefixes)?;
     }
     for local in ["column-count", "column-gap", "start-indent", "end-indent", "space-before", "space-after"] {
@@ -411,7 +411,7 @@ fn inferred_prefixes(xml: &str) -> Result<std::collections::BTreeMap<String, &'s
     }
     Ok(prefixes)
 }
-fn self_contained_layout(xml: &str) -> Result<String> {
+pub(crate) fn self_contained_layout(xml: &str) -> Result<String> {
     let prefixes = inferred_prefixes(xml)?;
     let trimmed = xml.trim_start();
     let leading = xml.len() - trimmed.len();
@@ -442,7 +442,7 @@ fn infer_prefixes(xml: &str, local: &str, uri: &'static str, prefixes: &mut std:
     Ok(())
 }
 fn splice_scoped(xml: &str, start: usize, end: usize, replacement: &str, prefix: usize, suffix: usize) -> Result<String> { let mut output = String::with_capacity(xml.len() - (end - start) + replacement.len()); output.push_str(&xml[..start]); output.push_str(replacement); output.push_str(&xml[end..]); Ok(output[prefix..output.len() - suffix].to_owned()) }
-fn insert_before_end(xml: &str, fragment: &str, expected: &str) -> Result<String> {
+pub(crate) fn insert_before_end(xml: &str, fragment: &str, expected: &str) -> Result<String> {
     if let Some(index) = xml.rfind("/>") {
         if !xml[index + 2..].trim().is_empty() { return invalid(format!("malformed {expected}")); }
         let trimmed = xml.trim_start();

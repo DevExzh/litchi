@@ -238,6 +238,8 @@ struct State {
     destination: Destination,
     /// Whether this body-flow group is an explicit section-format snapshot.
     visible_section_format: bool,
+    /// One-based explicit section column selected by `colno` in this group.
+    section_column_number: Option<u16>,
     /// Current text encoding
     encoding: RtfEncoding,
     /// Active tracked-change kind for text emitted in this state
@@ -270,6 +272,10 @@ fn is_section_control(control: &ControlWord<'_>) -> bool {
             | ControlWord::Landscape
             | ControlWord::Columns(_)
             | ControlWord::ColumnSpace(_)
+            | ControlWord::ColumnNumber(_)
+            | ControlWord::ColumnWidth(_)
+            | ControlWord::ColumnSpaceRight(_)
+            | ControlWord::ColumnSeparator(_)
             | ControlWord::PageNumberStart(_)
             | ControlWord::PageNumberDecimal
             | ControlWord::PageNumberUpperRoman
@@ -345,6 +351,7 @@ impl Default for State {
             cell_boundaries: SmallVec::new(),
             destination: Destination::DocumentBody,
             visible_section_format: false,
+            section_column_number: None,
             encoding: RtfEncoding::Standard(encoding_rs::WINDOWS_1252),
             revision_type: None,
             revision_author_id: None,
@@ -893,6 +900,10 @@ impl<'a> Parser<'a> {
             .data_store
             .map(|data| crate::DocumentDataStore::new(Cow::Owned(data)))
             .transpose()?;
+
+        for section in &self.sections {
+            section.properties.columns.validate()?;
+        }
 
         Ok(ParsedDocument {
             font_table: self.font_table.into_inner(),
@@ -3668,6 +3679,7 @@ impl<'a> Parser<'a> {
         }
 
         if matches!(control, ControlWord::Section) {
+            self.current_state_mut()?.section_column_number = None;
             self.section_properties_active = false;
             self.section_note_options_closed = false;
             self.root_section_format_run = false;
@@ -3727,7 +3739,7 @@ impl<'a> Parser<'a> {
             let inherited = self
                 .sections
                 .last()
-                .map(|section| section.properties)
+                .map(|section| section.properties.clone())
                 .unwrap_or_default();
             let mut section = super::section::Section::new();
             section.properties = inherited;
@@ -3741,6 +3753,9 @@ impl<'a> Parser<'a> {
         match control {
             ControlWord::SectionDefault => {
                 *properties = super::section::SectionProperties::default();
+                self.states.last_mut().ok_or_else(|| {
+                    RtfError::ParserError("missing RTF parser state".to_string())
+                })?.section_column_number = None;
             },
             ControlWord::PageBorderOptions(value) => {
                 let value = value.ok_or_else(|| RtfError::MalformedDocument("RTF pgbrdropt requires a numeric parameter".to_string()))?;
@@ -3806,9 +3821,110 @@ impl<'a> Parser<'a> {
             ControlWord::FooterDistance(value) => properties.footer_distance = *value,
             ControlWord::Landscape => properties.orientation = PageOrientation::Landscape,
             ControlWord::Columns(value) => {
-                properties.columns = (*value).clamp(1, i32::from(u16::MAX)) as u16;
+                let value = value.unwrap_or(1);
+                let count = u16::try_from(value).map_err(|_| {
+                    RtfError::MalformedDocument(format!(
+                        "RTF section-column count must be in 1..={}",
+                        super::section::MAX_SECTION_COLUMNS
+                    ))
+                })?;
+                if !(1..=super::section::MAX_SECTION_COLUMNS).contains(&count) {
+                    return Err(RtfError::MalformedDocument(format!(
+                        "RTF section-column count must be in 1..={}",
+                        super::section::MAX_SECTION_COLUMNS
+                    )));
+                }
+                properties.columns.count = count;
+                properties.columns.explicit.clear();
+                self.states.last_mut().ok_or_else(|| {
+                    RtfError::ParserError("missing RTF parser state".to_string())
+                })?.section_column_number = None;
             },
-            ControlWord::ColumnSpace(value) => properties.column_space = *value,
+            ControlWord::ColumnSpace(value) => {
+                let value = value.unwrap_or(720);
+                if !(0..=super::section::MAX_SECTION_COLUMN_TWIPS).contains(&value) {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF section-column default spacing must be in 0..=31680 twips".to_string(),
+                    ));
+                }
+                properties.columns.default_spacing = value;
+            },
+            ControlWord::ColumnSeparator(value) => properties.columns.separator = *value,
+            ControlWord::ColumnNumber(value) => {
+                let value = value.ok_or_else(|| RtfError::MalformedDocument(
+                    "RTF colno requires a numeric parameter".to_string(),
+                ))?;
+                let number = u16::try_from(value).map_err(|_| RtfError::MalformedDocument(
+                    "RTF colno must select an existing one-based section column".to_string(),
+                ))?;
+                let expected = u16::try_from(properties.columns.explicit.len() + 1)
+                    .unwrap_or(u16::MAX);
+                if number != expected || number > properties.columns.count {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF explicit section columns must use sequential one-based colno values"
+                            .to_string(),
+                    ));
+                }
+                properties.columns.explicit.push(super::section::SectionColumn {
+                    width: 0,
+                    space_after: None,
+                });
+                self.states.last_mut().ok_or_else(|| {
+                    RtfError::ParserError("missing RTF parser state".to_string())
+                })?.section_column_number = Some(number);
+            },
+            ControlWord::ColumnWidth(value) => {
+                let value = value.ok_or_else(|| RtfError::MalformedDocument(
+                    "RTF colw requires a numeric parameter".to_string(),
+                ))?;
+                if !(1..=super::section::MAX_SECTION_COLUMN_TWIPS).contains(&value) {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF section-column width must be in 1..=31680 twips".to_string(),
+                    ));
+                }
+                let number = self.states.last().and_then(|state| state.section_column_number)
+                    .ok_or_else(|| RtfError::MalformedDocument(
+                        "RTF colw requires a preceding colno in the active group".to_string(),
+                    ))?;
+                let column = properties.columns.explicit.get_mut(usize::from(number - 1))
+                    .ok_or_else(|| RtfError::MalformedDocument(
+                        "RTF colw refers to an undefined section column".to_string(),
+                    ))?;
+                if column.width != 0 {
+                    return Err(RtfError::MalformedDocument(
+                        "duplicate RTF colw for one section column".to_string(),
+                    ));
+                }
+                column.width = value;
+            },
+            ControlWord::ColumnSpaceRight(value) => {
+                let value = value.ok_or_else(|| RtfError::MalformedDocument(
+                    "RTF colsr requires a numeric parameter".to_string(),
+                ))?;
+                if !(0..=super::section::MAX_SECTION_COLUMN_TWIPS).contains(&value) {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF section-column spacing must be in 0..=31680 twips".to_string(),
+                    ));
+                }
+                let number = self.states.last().and_then(|state| state.section_column_number)
+                    .ok_or_else(|| RtfError::MalformedDocument(
+                        "RTF colsr requires a preceding colno in the active group".to_string(),
+                    ))?;
+                let column = properties.columns.explicit.get_mut(usize::from(number - 1))
+                    .ok_or_else(|| RtfError::MalformedDocument(
+                        "RTF colsr refers to an undefined section column".to_string(),
+                    ))?;
+                if column.width == 0 {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF colsr must follow colw for its section column".to_string(),
+                    ));
+                }
+                if column.space_after.replace(value).is_some() {
+                    return Err(RtfError::MalformedDocument(
+                        "duplicate RTF colsr for one section column".to_string(),
+                    ));
+                }
+            },
             ControlWord::PageNumberStart(value) => properties.page_number_start = *value,
             ControlWord::PageNumberDecimal => {
                 properties.page_number_format = PageNumberFormat::Decimal;

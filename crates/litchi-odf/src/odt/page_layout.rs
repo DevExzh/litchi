@@ -87,6 +87,8 @@ pub struct PageLayoutProperties {
     attributes: Vec<PageLayoutAttribute>,
     /// Typed multi-column layout, if present.
     pub columns: Option<crate::StyleColumns>,
+    /// Typed footnote separator, if present.
+    pub footnote_separator: Option<crate::StyleFootnoteSeparator>,
     /// The exact `style:page-layout-properties` element, including background,
     /// columns, and footnote-separator children.
     pub xml: String,
@@ -481,9 +483,17 @@ fn store_child(
                     "page-layout-properties has multiple style:columns children".to_string(),
                 ));
             }
+            let mut separators =
+                crate::footnote_separator::parse_page_layout_property_footnote_separators(&xml)?;
+            if separators.len() > 1 {
+                return Err(Error::InvalidFormat(
+                    "page-layout-properties has multiple style:footnote-sep children".to_string(),
+                ));
+            }
             layout.properties = Some(PageLayoutProperties {
                 attributes,
                 columns: parsed.pop(),
+                footnote_separator: separators.pop(),
                 xml,
             });
         },

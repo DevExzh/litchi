@@ -59,6 +59,7 @@
 pub mod animations;
 pub mod backgrounds;
 pub mod customshow;
+pub mod comments;
 pub mod format;
 pub mod handout;
 pub mod hyperlinks;
@@ -84,6 +85,12 @@ pub use animations::{
 };
 pub use backgrounds::{GradientStop, GradientType, PatternType, PictureStyle, SlideBackground};
 pub use customshow::{CustomShow, CustomShowList};
+pub use comments::{
+    PresentationComment, PresentationCommentAuthor, PresentationCommentConformance,
+    PresentationComments, SlideCommentList, load_presentation_comments,
+    parse_comment_authors, parse_slide_comments, store_presentation_comments,
+    write_comment_authors, write_slide_comments,
+};
 pub use format::{ImageFormat, TextFormat};
 pub use handout::{HandoutHeaderFooter, HandoutLayout, HandoutMaster};
 pub use hyperlinks::Hyperlink;

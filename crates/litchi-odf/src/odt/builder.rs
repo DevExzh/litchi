@@ -40,6 +40,7 @@ pub struct DocumentBuilder {
     metadata: Metadata,
     paragraph_tab_styles: Vec<crate::ParagraphStyleTabStops>,
     page_layout_columns: Vec<(String, crate::StyleColumns)>,
+    page_layout_footnote_separators: Vec<(String, crate::StyleFootnoteSeparator)>,
 }
 
 impl Default for DocumentBuilder {
@@ -64,6 +65,7 @@ impl DocumentBuilder {
             metadata: Metadata::default(),
             paragraph_tab_styles: Vec::new(),
             page_layout_columns: Vec::new(),
+            page_layout_footnote_separators: Vec::new(),
         }
     }
 
@@ -108,6 +110,38 @@ impl DocumentBuilder {
             )));
         }
         self.page_layout_columns.push((name, columns));
+        Ok(self)
+    }
+
+    /// Add a typed footnote separator to a named automatic page layout.
+    pub fn add_page_layout_footnote_separator(
+        &mut self,
+        page_layout_name: impl Into<String>,
+        separator: crate::StyleFootnoteSeparator,
+    ) -> Result<&mut Self> {
+        let name = page_layout_name.into();
+        separator.to_page_layout_fragment(&name)?;
+        if self
+            .page_layout_footnote_separators
+            .iter()
+            .any(|(existing, _)| existing == &name)
+        {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "duplicate footnote separator page layout '{name}'"
+            )));
+        }
+        let shares_column_layout = self
+            .page_layout_columns
+            .iter()
+            .any(|(existing, _)| existing == &name);
+        if !shares_column_layout
+            && self.page_layout_columns.len() + self.page_layout_footnote_separators.len() >= 4_096
+        {
+            return Err(litchi_core::Error::InvalidFormat(
+                "document builder exceeds 4096 page layouts".to_owned(),
+            ));
+        }
+        self.page_layout_footnote_separators.push((name, separator));
         Ok(self)
     }
 
@@ -498,16 +532,39 @@ impl DocumentBuilder {
                 .collect::<String>();
             xml.insert_str(insertion, &fragments);
         }
-        if !self.page_layout_columns.is_empty() {
-            let fragments = self
+        if !self.page_layout_columns.is_empty() || !self.page_layout_footnote_separators.is_empty() {
+            let mut fragments = self
                 .page_layout_columns
                 .iter()
                 .map(|(name, columns)| {
-                    columns
+                    let mut fragment = columns
                         .to_page_layout_fragment(name)
-                        .expect("validated column page layout")
+                        .expect("validated column page layout");
+                    if let Some((_, separator)) = self
+                        .page_layout_footnote_separators
+                        .iter()
+                        .find(|(separator_name, _)| separator_name == name)
+                    {
+                        let insertion = fragment
+                            .find("</style:page-layout-properties>")
+                            .expect("static column page layout fragment");
+                        fragment.insert_str(
+                            insertion,
+                            &separator.to_xml_fragment().expect("validated footnote separator"),
+                        );
+                    }
+                    fragment
                 })
                 .collect::<String>();
+            for (name, separator) in &self.page_layout_footnote_separators {
+                if !self.page_layout_columns.iter().any(|(column_name, _)| column_name == name) {
+                    fragments.push_str(
+                        &separator
+                            .to_page_layout_fragment(name)
+                            .expect("validated footnote separator page layout"),
+                    );
+                }
+            }
             xml = xml.replacen(
                 "<office:automatic-styles/>",
                 &format!(
