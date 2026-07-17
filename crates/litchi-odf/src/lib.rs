@@ -301,6 +301,7 @@ mod paragraph_tab_stop;
 mod paragraph_drop_cap;
 mod list_label_alignment;
 mod paragraph_flow;
+mod table_row_properties;
 mod style_columns;
 mod footnote_separator;
 /// ODF XML element classes
@@ -372,6 +373,7 @@ pub use list_label_alignment::{LabelFollowedBy, ListLabelLength, ListLevelLabelA
     ListLevelLabelAlignmentSet, ListStyleKind, ListStyleLevelLabelAlignment,
     parse_list_level_label_alignments};
 pub use paragraph_flow::{HyphenationKeep,HyphenationLadder,Keep,LineBreak,ParagraphFlowProperties,ParagraphStyleFlow,ParagraphStyleFlowSet,PunctuationWrap,parse_paragraph_style_flows};
+pub use table_row_properties::{HorizontalBackgroundPosition,TableRowBackgroundColor,TableRowBackgroundImage,TableRowBackgroundPosition,TableRowBackgroundRepeat,TableRowBackgroundSource,TableRowBreak,TableRowKeepTogether,TableRowLength,TableRowOpacity,TableRowProperties,TableRowStyleProperties,TableRowStylePropertiesSet,VerticalBackgroundPosition,parse_table_row_style_properties,set_table_row_style_properties_xml};
 pub use style_columns::{
     MAX_STYLE_COLUMNS, StyleColumn, StyleColumnLength, StyleColumnSeparator,
     StyleColumnSeparatorAlignment, StyleColumnSeparatorStyle, StyleColumns,

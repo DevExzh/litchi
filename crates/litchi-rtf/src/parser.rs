@@ -278,6 +278,7 @@ struct State {
     cell_boundaries: SmallVec<[i32; 8]>,
     table_row_padding: crate::TableEdgeDistances,
     table_row_spacing: crate::TableEdgeDistances,
+    table_row_positioning: crate::FloatingTablePosition,
     pending_cell_padding: crate::TableEdgeDistances,
     pending_cell_spacing: crate::TableEdgeDistances,
     cell_distances: SmallVec<[(crate::TableEdgeDistances, crate::TableEdgeDistances); 8]>,
@@ -365,6 +366,10 @@ fn apply_table_distance(state:&mut State,target:crate::TableDistanceTarget,param
     let side=distances.side_mut(target.edge);if unit{side.unit=Some(match value{0=>crate::TableDistanceUnit::Null,3=>crate::TableDistanceUnit::Twips,_=>return Err(RtfError::MalformedDocument("RTF table distance unit must be 0 or 3".to_string()))});}else{if !(0..=crate::MAX_TABLE_DISTANCE_TWIPS).contains(&value){return Err(RtfError::MalformedDocument("RTF table distance value is out of range".to_string()))}side.value=Some(value as u16);}Ok(())
 }
 
+fn require_parameterless(parameter:Option<i32>,name:&str)->RtfResult<()>{if parameter.is_some(){return Err(RtfError::MalformedDocument(format!("RTF {name} does not accept a parameter")))}Ok(())}
+fn floating_table_offset(parameter:Option<i32>,negative:bool,axis:&str)->RtfResult<i32>{let value=parameter.ok_or_else(||RtfError::MalformedDocument(format!("RTF floating-table {axis} offset requires a parameter")))?;let valid=if negative{(-crate::MAX_FLOATING_TABLE_DISTANCE_TWIPS..=-1).contains(&value)}else{(0..=crate::MAX_FLOATING_TABLE_DISTANCE_TWIPS).contains(&value)};if !valid{return Err(RtfError::MalformedDocument(format!("RTF floating-table {axis} offset is out of range")))}Ok(value)}
+fn floating_table_wrap_distance(parameter:Option<i32>)->RtfResult<u16>{let value=parameter.ok_or_else(||RtfError::MalformedDocument("RTF floating-table wrap distance requires a parameter".to_string()))?;if !(0..=crate::MAX_FLOATING_TABLE_DISTANCE_TWIPS).contains(&value){return Err(RtfError::MalformedDocument("RTF floating-table wrap distance is out of range".to_string()))}Ok(value as u16)}
+
 fn associated_font_ref(value: Option<i32>) -> RtfResult<FontRef> {
     let value = value.ok_or_else(|| {
         RtfError::MalformedDocument("RTF af control requires a numeric parameter".to_string())
@@ -405,7 +410,7 @@ impl Default for State {
             unicode_skip: 1,
             in_table: false,
             cell_boundaries: SmallVec::new(),
-            table_row_padding: Default::default(), table_row_spacing: Default::default(),
+            table_row_padding: Default::default(), table_row_spacing: Default::default(), table_row_positioning: Default::default(),
             pending_cell_padding: Default::default(), pending_cell_spacing: Default::default(), cell_distances: SmallVec::new(),
             destination: Destination::DocumentBody,
             visible_section_format: false,
@@ -3685,7 +3690,7 @@ impl<'a> Parser<'a> {
             ControlWord::TableRowDefaults => {
                 // Start a new row definition
                 state.cell_boundaries.clear();
-                state.table_row_padding=Default::default();state.table_row_spacing=Default::default();state.pending_cell_padding=Default::default();state.pending_cell_spacing=Default::default();state.cell_distances.clear();
+                state.table_row_padding=Default::default();state.table_row_spacing=Default::default();state.table_row_positioning=Default::default();state.pending_cell_padding=Default::default();state.pending_cell_spacing=Default::default();state.cell_distances.clear();
                 self.start_table_if_needed();
                 if let Some(row) = &mut self.current_row {
                     row.set_direction(None);
@@ -3720,13 +3725,21 @@ impl<'a> Parser<'a> {
             },
             ControlWord::TableDistanceValue(target,value)=>apply_table_distance(state,*target,*value,false)?,
             ControlWord::TableDistanceUnit(target,value)=>apply_table_distance(state,*target,*value,true)?,
+            ControlWord::TableHorizontalReference(value,param)=>if state.destination==Destination::DocumentBody{require_parameterless(*param,"floating-table horizontal reference")?;state.table_row_positioning.horizontal_reference=Some(*value)},
+            ControlWord::TableVerticalReference(value,param)=>if state.destination==Destination::DocumentBody{require_parameterless(*param,"floating-table vertical reference")?;state.table_row_positioning.vertical_reference=Some(*value)},
+            ControlWord::TableHorizontalPosition(value,param)=>if state.destination==Destination::DocumentBody{require_parameterless(*param,"floating-table horizontal position")?;state.table_row_positioning.horizontal_position=Some(*value)},
+            ControlWord::TableVerticalPosition(value,param)=>if state.destination==Destination::DocumentBody{require_parameterless(*param,"floating-table vertical position")?;state.table_row_positioning.vertical_position=Some(*value)},
+            ControlWord::TableHorizontalOffset(negative,param)=>if state.destination==Destination::DocumentBody{let value=floating_table_offset(*param,*negative,"horizontal")?;state.table_row_positioning.horizontal_position=Some(if *negative{crate::TableHorizontalPosition::NegativeOffset(value)}else{crate::TableHorizontalPosition::Offset(value)})},
+            ControlWord::TableVerticalOffset(negative,param)=>if state.destination==Destination::DocumentBody{let value=floating_table_offset(*param,*negative,"vertical")?;state.table_row_positioning.vertical_position=Some(if *negative{crate::TableVerticalPosition::NegativeOffset(value)}else{crate::TableVerticalPosition::Offset(value)})},
+            ControlWord::TableWrapDistance(edge,param)=>if state.destination==Destination::DocumentBody{*state.table_row_positioning.wrap_distances.side_mut(*edge)=Some(floating_table_wrap_distance(*param)?)},
+            ControlWord::TableNoOverlap(param)=>if state.destination==Destination::DocumentBody{state.table_row_positioning.no_overlap=match *param{None|Some(1)=>true,Some(0)=>false,Some(_)=>return Err(RtfError::MalformedDocument("RTF tabsnoovrlp accepts only 0 or 1".to_string()))}},
             ControlWord::TableCell => {
                 // Cell break - finalize current cell
                 self.finalize_cell();
             },
             ControlWord::TableRow => {
                 // Row break - finalize current row
-                let row_padding=state.table_row_padding.clone();let row_spacing=state.table_row_spacing.clone();if let Some(row)=&mut self.current_row{row.set_padding(row_padding);row.set_spacing(row_spacing);}
+                let row_padding=state.table_row_padding.clone();let row_spacing=state.table_row_spacing.clone();let row_positioning=state.table_row_positioning.clone();if let Some(row)=&mut self.current_row{row.set_padding(row_padding);row.set_spacing(row_spacing);row.set_positioning(row_positioning);}
                 self.finalize_row();
             },
 

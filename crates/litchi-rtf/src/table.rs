@@ -7,6 +7,33 @@ use crate::TextDirection;
 use std::borrow::Cow;
 
 pub const MAX_TABLE_DISTANCE_TWIPS: i32 = 31_680;
+pub const MAX_FLOATING_TABLE_DISTANCE_TWIPS: i32 = 31_680;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TableHorizontalReference { Column, Margin, Page }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TableVerticalReference { Margin, Paragraph, Page }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TableHorizontalPosition { Offset(i32), NegativeOffset(i32), Center, Inside, Left, Outside, Right }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TableVerticalPosition { Offset(i32), NegativeOffset(i32), Bottom, Center, Inline, Inside, Outside, Top }
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct TableWrapDistances { pub left:Option<u16>, pub right:Option<u16>, pub top:Option<u16>, pub bottom:Option<u16> }
+impl TableWrapDistances {
+    pub(crate) fn side_mut(&mut self,edge:TableEdge)->&mut Option<u16>{match edge{TableEdge::Left=>&mut self.left,TableEdge::Right=>&mut self.right,TableEdge::Top=>&mut self.top,TableEdge::Bottom=>&mut self.bottom}}
+    pub fn validate(&self)->crate::RtfResult<()>{if [self.left,self.right,self.top,self.bottom].into_iter().flatten().any(|value|i32::from(value)>MAX_FLOATING_TABLE_DISTANCE_TWIPS){return Err(crate::RtfError::MalformedDocument("RTF floating-table wrap distance is out of range".to_string()))}Ok(())}
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct FloatingTablePosition { pub horizontal_reference:Option<TableHorizontalReference>, pub horizontal_position:Option<TableHorizontalPosition>, pub vertical_reference:Option<TableVerticalReference>, pub vertical_position:Option<TableVerticalPosition>, pub no_overlap:bool, pub wrap_distances:TableWrapDistances }
+impl FloatingTablePosition {
+    pub fn is_empty(&self)->bool{self.horizontal_reference.is_none()&&self.horizontal_position.is_none()&&self.vertical_reference.is_none()&&self.vertical_position.is_none()&&!self.no_overlap&&self.wrap_distances==TableWrapDistances::default()}
+    pub fn validate(&self)->crate::RtfResult<()>{let offset=|value|(0..=MAX_FLOATING_TABLE_DISTANCE_TWIPS).contains(&value);let negative=|value|(-MAX_FLOATING_TABLE_DISTANCE_TWIPS..=-1).contains(&value);if matches!(self.horizontal_position,Some(TableHorizontalPosition::Offset(value))if !offset(value))||matches!(self.vertical_position,Some(TableVerticalPosition::Offset(value))if !offset(value))||matches!(self.horizontal_position,Some(TableHorizontalPosition::NegativeOffset(value))if !negative(value))||matches!(self.vertical_position,Some(TableVerticalPosition::NegativeOffset(value))if !negative(value)){return Err(crate::RtfError::MalformedDocument("RTF floating-table position is out of range".to_string()))}self.wrap_distances.validate()}
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableDistanceUnit { Null, Twips }
@@ -89,6 +116,7 @@ pub struct Row<'a> {
     direction: Option<TextDirection>,
     padding: TableEdgeDistances,
     spacing: TableEdgeDistances,
+    positioning: FloatingTablePosition,
 }
 
 impl<'a> Row<'a> {
@@ -99,6 +127,7 @@ impl<'a> Row<'a> {
             direction: None,
             padding: TableEdgeDistances::default(),
             spacing: TableEdgeDistances::default(),
+            positioning: FloatingTablePosition::default(),
         }
     }
 
@@ -130,6 +159,8 @@ impl<'a> Row<'a> {
     pub fn spacing(&self)->&TableEdgeDistances{&self.spacing}
     pub fn set_padding(&mut self,value:TableEdgeDistances){self.padding=value}
     pub fn set_spacing(&mut self,value:TableEdgeDistances){self.spacing=value}
+    pub fn positioning(&self)->&FloatingTablePosition{&self.positioning}
+    pub fn set_positioning(&mut self,value:FloatingTablePosition){self.positioning=value}
 }
 
 impl<'a> Default for Row<'a> {

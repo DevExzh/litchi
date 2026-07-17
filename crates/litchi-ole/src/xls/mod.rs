@@ -47,6 +47,9 @@ mod table_styles;
 /// BIFF8 extended shared-string table lookup index.
 mod shared_string_index;
 
+/// BIFF8 worksheet INDEX and DBCELL row-block lookup metadata.
+mod row_block_index;
+
 /// BIFF8 formula error-checking shared features.
 mod formula_errors;
 
@@ -137,6 +140,10 @@ pub use environment::{XlsLinkUpdateMode, XlsObjectDisplayMode, XlsWorkbookEnviro
 pub use access::{XlsWriteAccess, XlsWriteAccessEncoding};
 pub use table_styles::XlsTableStyles;
 pub use shared_string_index::{XlsSharedStringBucket, XlsSharedStringIndex};
+pub use row_block_index::{
+    XlsDbCellRecord, XlsIndexedRow, XlsRowBlock, XlsRowBlockIndex,
+    XlsWorksheetIndexRecord,
+};
 pub use formula_errors::{
     XlsFormulaErrorChecks, XlsFormulaErrorFeature, XlsFormulaErrorHeader,
     XlsFormulaErrorRange,

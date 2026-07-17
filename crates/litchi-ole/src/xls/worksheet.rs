@@ -62,6 +62,10 @@ pub struct XlsWorksheet {
     conditional_formattings: Vec<XlsConditionalFormatting>,
     consolidation: Option<crate::xls::consolidation::XlsConsolidation>,
     formula_error_features: Vec<crate::xls::formula_errors::XlsFormulaErrorFeature>,
+    row_block_index: std::result::Result<
+        Option<crate::xls::row_block_index::XlsRowBlockIndex>,
+        String,
+    >,
 }
 
 impl XlsWorksheet {
@@ -95,6 +99,7 @@ impl XlsWorksheet {
             conditional_formattings: Vec::new(),
             consolidation: None,
             formula_error_features: Vec::new(),
+            row_block_index: Ok(None),
         }
     }
 
@@ -128,6 +133,7 @@ impl XlsWorksheet {
             conditional_formattings: Vec::new(),
             consolidation: None,
             formula_error_features: Vec::new(),
+            row_block_index: Ok(None),
         }
     }
 
@@ -289,6 +295,28 @@ impl XlsWorksheet {
         features: Vec<crate::xls::formula_errors::XlsFormulaErrorFeature>,
     ) {
         self.formula_error_features = features;
+    }
+
+    /// Optional worksheet `INDEX`/`DBCELL` accelerator.
+    ///
+    /// Corrupt optional metadata is reported here without preventing cell parsing.
+    pub fn row_block_index(
+        &self,
+    ) -> std::result::Result<
+        Option<&crate::xls::row_block_index::XlsRowBlockIndex>,
+        &str,
+    > {
+        match &self.row_block_index {
+            Ok(value) => Ok(value.as_ref()),
+            Err(error) => Err(error.as_str()),
+        }
+    }
+
+    pub(crate) fn set_row_block_index(
+        &mut self,
+        value: crate::xls::XlsResult<Option<crate::xls::row_block_index::XlsRowBlockIndex>>,
+    ) {
+        self.row_block_index = value.map_err(|error| error.to_string());
     }
 
     // -- Sheet Protection --

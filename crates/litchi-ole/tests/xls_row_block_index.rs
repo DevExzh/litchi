@@ -1,0 +1,32 @@
+use std::fs::File;
+
+use litchi_ole::xls::XlsWorkbook;
+
+#[test]
+fn parses_poi_simple_and_multirow_indexes() {
+    let simple_path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../3rdparty/poi/test-data/spreadsheet/Simple.xls"
+    );
+    let workbook = XlsWorkbook::new(File::open(simple_path).unwrap()).unwrap();
+    let index = workbook.xls_worksheet(0).unwrap().row_block_index().unwrap().unwrap();
+    assert_eq!((index.index_record().first_data_row(), index.index_record().last_data_row_exclusive()), (0, 1));
+    assert_eq!(index.index_record().default_column_width_position(), 1_638);
+    assert_eq!(index.blocks().len(), 1);
+    assert_eq!(index.blocks()[0].dbcell().record_position(), 1_696);
+    assert_eq!(index.first_cell_position(0), Some(1_682));
+
+    let multi_path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../3rdparty/poi/test-data/spreadsheet/48968.xls"
+    );
+    let workbook = XlsWorkbook::new(File::open(multi_path).unwrap()).unwrap();
+    let index = workbook.xls_worksheet(0).unwrap().row_block_index().unwrap().unwrap();
+    assert_eq!((index.index_record().first_data_row(), index.index_record().last_data_row_exclusive()), (0, 29));
+    assert_eq!(index.blocks().len(), 1);
+    assert_eq!(index.blocks()[0].indexed_rows().len(), 24);
+    assert_eq!(index.blocks()[0].dbcell().record_position(), 17_918);
+    assert_eq!(index.first_cell_position(0), Some(16_491));
+    assert_eq!(index.first_cell_position(8), None);
+    assert_eq!(index.first_cell_position(28), Some(17_856));
+}

@@ -188,7 +188,7 @@ impl<'a> RtfDocument<'a> {
                         let owned_cell = super::table::Cell::with_distances(Cow::Owned(cell.text().to_string()),cell.padding().clone(),cell.spacing().clone());
                         owned_row.add_cell(owned_cell);
                     }
-                    owned_row.set_padding(row.padding().clone());owned_row.set_spacing(row.spacing().clone());owned_table.add_row(owned_row);
+                    owned_row.set_padding(row.padding().clone());owned_row.set_spacing(row.spacing().clone());owned_row.set_positioning(row.positioning().clone());owned_table.add_row(owned_row);
                 }
                 owned_table
             })

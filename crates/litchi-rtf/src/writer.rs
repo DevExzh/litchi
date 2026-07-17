@@ -2930,6 +2930,7 @@ impl<W: Write> RtfWriter<W> {
         }
         self.write_table_distances("trpadd","trpaddf",row.padding())?;
         self.write_table_distances("trspd","trspdf",row.spacing())?;
+        self.write_floating_table_position(row.positioning())?;
 
         // Cell boundaries
         let cell_width = 2880; // Default cell width (2 inches)
@@ -2959,6 +2960,16 @@ impl<W: Write> RtfWriter<W> {
 
     fn write_table_distances(&mut self,value_prefix:&str,unit_prefix:&str,distances:&TableEdgeDistances)->io::Result<()> {
         distances.validate().map_err(|error|io::Error::new(io::ErrorKind::InvalidInput,error.to_string()))?;for (suffix,side) in [("l",distances.left),("r",distances.right),("t",distances.top),("b",distances.bottom)]{if let Some(value)=side.value{self.write_control_word(&format!("{value_prefix}{suffix}"),Some(i32::from(value)))?;}if let Some(unit)=side.unit{self.write_control_word(&format!("{unit_prefix}{suffix}"),Some(match unit{TableDistanceUnit::Null=>0,TableDistanceUnit::Twips=>3}))?;}}Ok(())
+    }
+
+    fn write_floating_table_position(&mut self,position:&crate::FloatingTablePosition)->io::Result<()>{
+        position.validate().map_err(|error|io::Error::new(io::ErrorKind::InvalidInput,error.to_string()))?;
+        if let Some(reference)=position.horizontal_reference{self.write_control_word(match reference{crate::TableHorizontalReference::Column=>"tphcol",crate::TableHorizontalReference::Margin=>"tphmrg",crate::TableHorizontalReference::Page=>"tphpg"},None)?}
+        if let Some(value)=position.horizontal_position{let (word,param)=match value{crate::TableHorizontalPosition::Offset(value)=>("tposx",Some(value)),crate::TableHorizontalPosition::NegativeOffset(value)=>("tposnegx",Some(value)),crate::TableHorizontalPosition::Center=>("tposxc",None),crate::TableHorizontalPosition::Inside=>("tposxi",None),crate::TableHorizontalPosition::Left=>("tposxl",None),crate::TableHorizontalPosition::Outside=>("tposxo",None),crate::TableHorizontalPosition::Right=>("tposxr",None)};self.write_control_word(word,param)?}
+        if let Some(reference)=position.vertical_reference{self.write_control_word(match reference{crate::TableVerticalReference::Margin=>"tpvmrg",crate::TableVerticalReference::Paragraph=>"tpvpara",crate::TableVerticalReference::Page=>"tpvpg"},None)?}
+        if let Some(value)=position.vertical_position{let (word,param)=match value{crate::TableVerticalPosition::Offset(value)=>("tposy",Some(value)),crate::TableVerticalPosition::NegativeOffset(value)=>("tposnegy",Some(value)),crate::TableVerticalPosition::Bottom=>("tposyb",None),crate::TableVerticalPosition::Center=>("tposyc",None),crate::TableVerticalPosition::Inline=>("tposyil",None),crate::TableVerticalPosition::Inside=>("tposyin",None),crate::TableVerticalPosition::Outside=>("tposyout",None),crate::TableVerticalPosition::Top=>("tposyt",None)};self.write_control_word(word,param)?}
+        for (word,value) in [("tdfrmtxtLeft",position.wrap_distances.left),("tdfrmtxtRight",position.wrap_distances.right),("tdfrmtxtTop",position.wrap_distances.top),("tdfrmtxtBottom",position.wrap_distances.bottom)]{if let Some(value)=value{self.write_control_word(word,Some(i32::from(value)))?}}
+        if position.no_overlap{self.write_control_word("tabsnoovrlp",None)?}Ok(())
     }
 
     /// Write a control word

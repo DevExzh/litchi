@@ -583,11 +583,16 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             crate::xls::consolidation::ConsolidationCollector::new();
         let mut formula_error_collector =
             crate::xls::formula_errors::FormulaErrorCollector::new();
+        let mut row_block_index_collector =
+            crate::xls::row_block_index::RowBlockIndexCollector::new(
+                record_iter.stream_len(),
+                record_iter.current_position(),
+            );
         let mut pending_string_formula: Option<CellRecord> = None;
         let mut shared_formulas = HashMap::<(u16, u16), SharedFormulaTemplate>::new();
         let mut remaining_data_validations: Option<usize> = None;
 
-        for record_result in record_iter.by_ref() {
+        while let Some((record_position, record_result)) = record_iter.next_positioned() {
             let record = record_result?;
             sheet_layout_collector.feed_record(record.header.record_type, &record.data)?;
             comment_collector.feed_record(record.header.record_type, &record.data)?;
@@ -602,6 +607,11 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             vba_collector.feed_record(record.header.record_type, &record.data)?;
             consolidation_collector.feed_record(record.header.record_type, &record.data)?;
             formula_error_collector.feed_record(record.header.record_type, &record.data)?;
+            row_block_index_collector.feed_record(
+                record_position,
+                record.header.record_type,
+                &record.data,
+            );
 
             if matches!(remaining_data_validations, Some(1..))
                 && record.header.record_type != super::data_validation::DV_RECORD_TYPE
@@ -883,6 +893,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         worksheet.set_vba_code_name(vba_collector.finish());
         worksheet.set_consolidation(consolidation_collector.finish());
         worksheet.set_formula_error_features(formula_error_collector.finish()?);
+        worksheet.set_row_block_index(row_block_index_collector.finish());
 
         Ok(worksheet)
     }

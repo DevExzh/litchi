@@ -31,6 +31,7 @@ const MAX_NODES: usize = 500_000;
 const MAX_DEPTH: usize = 256;
 const MAX_STRING_BYTES: usize = 4 * 1024 * 1024;
 const MAX_VIEWS: usize = 256;
+const MAX_CUSTOM_VIEWS: usize = 1024;
 const MAX_CHARTS: usize = 256;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -83,6 +84,16 @@ pub struct ChartSheetProtection {
     pub objects: Option<bool>,
 }
 
+/// One saved chartsheet view from `CT_CustomChartsheetView`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChartSheetCustomView {
+    /// Braced UUID lexical form required by SpreadsheetML `ST_Guid`.
+    pub guid: String,
+    pub scale: Option<u32>,
+    pub state: Option<ChartSheetState>,
+    pub zoom_to_fit: Option<bool>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ChartSheetMargins {
     pub left: f64, pub right: f64, pub top: f64, pub bottom: f64, pub header: f64, pub footer: f64,
@@ -118,6 +129,8 @@ pub struct ChartSheet {
     pub properties: Option<ChartSheetProperties>,
     pub views: Vec<ChartSheetView>,
     pub protection: Option<ChartSheetProtection>,
+    /// `None` preserves absence; a present collection must be non-empty.
+    pub custom_views: Option<Vec<ChartSheetCustomView>>,
     pub margins: Option<ChartSheetMargins>,
     pub page_setup: Option<ChartSheetPageSetup>,
     pub header_footer: Option<ChartSheetHeaderFooter>,
@@ -172,19 +185,20 @@ pub fn parse_chartsheet(xml: &[u8]) -> Result<(ChartSheetConformance, ChartSheet
     let properties = one_child(&root, conformance.sml(), "sheetPr")?.map(|node| parse_properties(node)).transpose()?;
     let views = parse_views(required_child(&root, conformance.sml(), "sheetViews")?)?;
     let protection = one_child(&root, conformance.sml(), "sheetProtection")?.map(parse_protection).transpose()?;
+    let custom_views = one_child(&root, conformance.sml(), "customSheetViews")?.map(|node| parse_custom_views(node, conformance)).transpose()?;
     let margins = one_child(&root, conformance.sml(), "pageMargins")?.map(parse_margins).transpose()?;
     let page_setup = one_child(&root, conformance.sml(), "pageSetup")?.map(parse_page_setup).transpose()?;
     let header_footer = one_child(&root, conformance.sml(), "headerFooter")?.map(parse_header_footer).transpose()?;
     let drawing = required_child(&root, conformance.sml(), "drawing")?; leaf(drawing, "chartsheet drawing")?;
     let drawing_relationship_id = required(drawing, conformance.rel(), "id")?.to_owned(); no_attributes(drawing, &[(conformance.rel(), "id")])?;
-    let value = ChartSheet { properties, views, protection, margins, page_setup, header_footer, drawing_relationship_id };
+    let value = ChartSheet { properties, views, protection, custom_views, margins, page_setup, header_footer, drawing_relationship_id };
     validate_chartsheet(&value)?; Ok((conformance, value))
 }
 
 fn validate_root_order(root: &Node) -> Result<()> {
     let mut last = 0u8;
     for child in &root.children {
-        let order = match child.name.as_str() { "sheetPr" => 1, "sheetViews" => 2, "sheetProtection" => 3, "pageMargins" => 4, "pageSetup" => 5, "headerFooter" => 6, "drawing" => 7, name => return Err(invalid(format!("unsupported chartsheet child '{name}'"))) };
+        let order = match child.name.as_str() { "sheetPr" => 1, "sheetViews" => 2, "sheetProtection" => 3, "customSheetViews" => 4, "pageMargins" => 5, "pageSetup" => 6, "headerFooter" => 7, "drawing" => 8, name => return Err(invalid(format!("unsupported chartsheet child '{name}'"))) };
         if order <= last { return Err(invalid("chartsheet children are duplicated or out of schema order")); } last = order;
     }
     Ok(())
@@ -220,6 +234,25 @@ fn parse_protection(node: &Node) -> Result<ChartSheetProtection> {
     Ok(ChartSheetProtection { password_hash: optional(node, "", "password").map(str::to_owned), content: bool_optional(node, "content")?, objects: bool_optional(node, "objects")? })
 }
 
+fn parse_custom_views(node: &Node, conformance: ChartSheetConformance) -> Result<Vec<ChartSheetCustomView>> {
+    whitespace(node)?; no_attributes(node, &[])?;
+    if node.children.is_empty() { return Err(invalid("customSheetViews requires at least one customSheetView")); }
+    if node.children.len() > MAX_CUSTOM_VIEWS { return Err(limit("custom view count")); }
+    let mut values = Vec::with_capacity(node.children.len());
+    for child in &node.children {
+        if child.namespace != conformance.sml() || child.name != "customSheetView" { return Err(invalid("customSheetViews contains an unsupported child")); }
+        leaf(child, "custom chartsheet view")?;
+        no_attributes(child, &[("", "guid"), ("", "scale"), ("", "state"), ("", "zoomToFit")])?;
+        values.push(ChartSheetCustomView {
+            guid: required(child, "", "guid")?.to_owned(),
+            scale: u32_optional(child, "scale")?,
+            state: optional(child, "", "state").map(parse_state).transpose()?,
+            zoom_to_fit: bool_optional(child, "zoomToFit")?,
+        });
+    }
+    Ok(values)
+}
+
 fn parse_margins(node: &Node) -> Result<ChartSheetMargins> {
     leaf(node, "chartsheet margins")?; no_attributes(node, &[("", "left"), ("", "right"), ("", "top"), ("", "bottom"), ("", "header"), ("", "footer")])?;
     let number = |name| required(node, "", name)?.parse().map_err(|_| invalid(format!("invalid {name} page margin")));
@@ -250,6 +283,7 @@ pub fn write_chartsheet(value: &ChartSheet, conformance: ChartSheetConformance) 
     if let Some(properties) = &value.properties { out.extend_from_slice(b"<x:sheetPr"); bool_attr_opt(&mut out, "published", properties.published); attr_opt(&mut out, "codeName", properties.code_name.as_deref()); if let Some(color) = &properties.tab_color { out.push(b'>'); out.extend_from_slice(b"<x:tabColor"); bool_attr_opt(&mut out, "auto", color.automatic); u32_attr_opt(&mut out, "indexed", color.indexed); attr_opt(&mut out, "rgb", color.rgb.as_deref()); u32_attr_opt(&mut out, "theme", color.theme); if let Some(v) = color.tint { attr(&mut out, "tint", &v.to_string()); } out.extend_from_slice(b"/></x:sheetPr>"); } else { out.extend_from_slice(b"/>"); } }
     out.extend_from_slice(b"<x:sheetViews>"); for view in &value.views { out.extend_from_slice(b"<x:sheetView"); bool_attr_opt(&mut out, "tabSelected", view.tab_selected); u32_attr_opt(&mut out, "zoomScale", view.zoom_scale); attr(&mut out, "workbookViewId", &view.workbook_view_id.to_string()); bool_attr_opt(&mut out, "zoomToFit", view.zoom_to_fit); out.extend_from_slice(b"/>"); } out.extend_from_slice(b"</x:sheetViews>");
     if let Some(protection) = &value.protection { out.extend_from_slice(b"<x:sheetProtection"); attr_opt(&mut out, "password", protection.password_hash.as_deref()); bool_attr_opt(&mut out, "content", protection.content); bool_attr_opt(&mut out, "objects", protection.objects); out.extend_from_slice(b"/>"); }
+    if let Some(custom_views) = &value.custom_views { out.extend_from_slice(b"<x:customSheetViews>"); for view in custom_views { out.extend_from_slice(b"<x:customSheetView"); attr(&mut out, "guid", &view.guid); u32_attr_opt(&mut out, "scale", view.scale); if let Some(state) = view.state { attr(&mut out, "state", match state { ChartSheetState::Visible => "visible", ChartSheetState::Hidden => "hidden", ChartSheetState::VeryHidden => "veryHidden" }); } bool_attr_opt(&mut out, "zoomToFit", view.zoom_to_fit); out.extend_from_slice(b"/>"); } out.extend_from_slice(b"</x:customSheetViews>"); }
     if let Some(m) = value.margins { out.extend_from_slice(b"<x:pageMargins"); for (name, value) in [("left", m.left), ("right", m.right), ("top", m.top), ("bottom", m.bottom), ("header", m.header), ("footer", m.footer)] { attr(&mut out, name, &value.to_string()); } out.extend_from_slice(b"/>"); }
     if let Some(setup) = &value.page_setup { out.extend_from_slice(b"<x:pageSetup"); u32_attr_opt(&mut out, "paperSize", setup.paper_size); u32_attr_opt(&mut out, "firstPageNumber", setup.first_page_number); if let Some(v) = setup.orientation { attr(&mut out, "orientation", match v { PageOrientation::Default => "default", PageOrientation::Portrait => "portrait", PageOrientation::Landscape => "landscape" }); } bool_attr_opt(&mut out, "usePrinterDefaults", setup.use_printer_defaults); bool_attr_opt(&mut out, "blackAndWhite", setup.black_and_white); bool_attr_opt(&mut out, "draft", setup.draft); bool_attr_opt(&mut out, "useFirstPageNumber", setup.use_first_page_number); u32_attr_opt(&mut out, "horizontalDpi", setup.horizontal_dpi); u32_attr_opt(&mut out, "verticalDpi", setup.vertical_dpi); u32_attr_opt(&mut out, "copies", setup.copies); out.extend_from_slice(b"/>"); }
     if let Some(hf) = &value.header_footer { out.extend_from_slice(b"<x:headerFooter"); bool_attr_opt(&mut out, "differentOddEven", hf.different_odd_even); bool_attr_opt(&mut out, "differentFirst", hf.different_first); bool_attr_opt(&mut out, "scaleWithDoc", hf.scale_with_document); bool_attr_opt(&mut out, "alignWithMargins", hf.align_with_margins); let children = [("oddHeader", &hf.odd_header), ("oddFooter", &hf.odd_footer), ("evenHeader", &hf.even_header), ("evenFooter", &hf.even_footer), ("firstHeader", &hf.first_header), ("firstFooter", &hf.first_footer)]; if children.iter().all(|(_, value)| value.is_none()) { out.extend_from_slice(b"/>"); } else { out.push(b'>'); for (name, value) in children { if let Some(value) = value { out.extend_from_slice(b"<x:"); out.extend_from_slice(name.as_bytes()); out.push(b'>'); escape_text(&mut out, value); out.extend_from_slice(b"</x:"); out.extend_from_slice(name.as_bytes()); out.push(b'>'); } } out.extend_from_slice(b"</x:headerFooter>"); } }
@@ -308,6 +342,16 @@ fn validate_chartsheet(value: &ChartSheet) -> Result<()> {
     let mut view_ids = HashSet::new(); for view in &value.views { if view.zoom_scale.is_some_and(|v| !(10..=400).contains(&v)) { return Err(invalid("chartsheet zoomScale must be between 10 and 400")); } if !view_ids.insert(view.workbook_view_id) { return Err(invalid("duplicate chartsheet workbookViewId")); } }
     if let Some(properties) = &value.properties { if let Some(name) = &properties.code_name { bounded(name)?; } if let Some(color) = &properties.tab_color { let bases = usize::from(color.automatic.is_some()) + usize::from(color.indexed.is_some()) + usize::from(color.rgb.is_some()) + usize::from(color.theme.is_some()); if bases > 1 { return Err(invalid("tab color has multiple base color selectors")); } if let Some(rgb) = &color.rgb { if rgb.len() != 8 || !rgb.bytes().all(|b| b.is_ascii_hexdigit()) { return Err(invalid("tab color rgb must contain eight hex digits")); } } if color.tint.is_some_and(|v| !v.is_finite() || !(-1.0..=1.0).contains(&v)) { return Err(invalid("tab color tint is outside [-1, 1]")); } } }
     if let Some(protection) = &value.protection { if let Some(password) = &protection.password_hash { if password.len() != 4 || !password.bytes().all(|b| b.is_ascii_hexdigit()) { return Err(invalid("chartsheet password hash must contain four hex digits")); } } }
+    if let Some(custom_views) = &value.custom_views {
+        if custom_views.is_empty() { return Err(invalid("customSheetViews requires at least one customSheetView")); }
+        if custom_views.len() > MAX_CUSTOM_VIEWS { return Err(limit("custom view count")); }
+        let mut guids = HashSet::new();
+        for view in custom_views {
+            validate_guid(&view.guid)?;
+            if !guids.insert(view.guid.to_ascii_lowercase()) { return Err(invalid(format!("duplicate custom chartsheet view GUID '{}'", view.guid))); }
+            if view.scale.is_some_and(|scale| !(10..=400).contains(&scale)) { return Err(invalid("custom chartsheet view scale must be between 10 and 400")); }
+        }
+    }
     if let Some(m) = value.margins { for margin in [m.left, m.right, m.top, m.bottom, m.header, m.footer] { if !margin.is_finite() || !(0.0..49.0).contains(&margin) { return Err(invalid("chartsheet margin is outside Office's [0, 49) range")); } } }
     if let Some(setup) = &value.page_setup { if setup.first_page_number.is_some_and(|v| v > 65_534) { return Err(invalid("firstPageNumber exceeds Excel's limit")); } if setup.copies.is_some_and(|v| !(1..=32_767).contains(&v)) { return Err(invalid("copies is outside Excel's supported range")); } if setup.horizontal_dpi == Some(0) || setup.vertical_dpi == Some(0) { return Err(invalid("page setup DPI must be positive")); } }
     if let Some(hf) = &value.header_footer { for text in [&hf.odd_header, &hf.odd_footer, &hf.even_header, &hf.even_footer, &hf.first_header, &hf.first_footer].into_iter().flatten() { bounded(text)?; } }
@@ -372,6 +416,7 @@ fn u32_optional(node: &Node, name: &str) -> Result<Option<u32>> { optional(node,
 fn parse_bool(value: &str, name: &str) -> Result<bool> { match value { "1" | "true" => Ok(true), "0" | "false" => Ok(false), _ => Err(invalid(format!("invalid boolean '{value}' for {name}"))) } }
 fn parse_orientation(value: &str) -> Result<PageOrientation> { match value { "default" => Ok(PageOrientation::Default), "portrait" => Ok(PageOrientation::Portrait), "landscape" => Ok(PageOrientation::Landscape), _ => Err(invalid("invalid chartsheet page orientation")) } }
 fn parse_state(value: &str) -> Result<ChartSheetState> { match value { "visible" => Ok(ChartSheetState::Visible), "hidden" => Ok(ChartSheetState::Hidden), "veryHidden" => Ok(ChartSheetState::VeryHidden), _ => Err(invalid("invalid workbook sheet state")) } }
+fn validate_guid(value: &str) -> Result<()> { let bytes = value.as_bytes(); if bytes.len() != 38 || bytes[0] != b'{' || bytes[37] != b'}' || ![9, 14, 19, 24].iter().all(|index| bytes[*index] == b'-') || bytes[1..37].iter().enumerate().any(|(index, byte)| !matches!(index + 1, 9 | 14 | 19 | 24) && !byte.is_ascii_hexdigit()) { return Err(invalid(format!("invalid custom chartsheet view GUID '{value}'"))); } Ok(()) }
 fn is_core(value: &str) -> bool { matches!(value, SML | STRICT_SML) }
 fn validate_id(value: &str) -> Result<()> { let mut bytes = value.bytes(); let Some(first) = bytes.next() else { return Err(invalid("relationship ID cannot be empty")); }; if !(first.is_ascii_alphabetic() || first == b'_') || !bytes.all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'-' | b'.')) { Err(invalid(format!("invalid relationship ID '{value}'"))) } else { Ok(()) } }
 fn bounded(value: &str) -> Result<()> { if value.len() <= MAX_STRING_BYTES { Ok(()) } else { Err(limit("string bytes")) } }
@@ -397,15 +442,17 @@ mod tests {
     use super::*;
     const POI_ONE: &[u8] = include_bytes!("../../../../3rdparty/poi/test-data/spreadsheet/WithChartSheet.xlsx");
     const POI_TWO: &[u8] = include_bytes!("../../../../3rdparty/poi/test-data/spreadsheet/chart_sheet.xlsx");
-    fn sheet() -> ChartSheet { ChartSheet { properties: Some(ChartSheetProperties { published: Some(true), code_name: Some("ChartCode".into()), tab_color: Some(ChartSheetColor { automatic: None, indexed: None, rgb: Some("FF336699".into()), theme: None, tint: Some(0.25) }) }), views: vec![ChartSheetView { tab_selected: Some(true), zoom_scale: Some(125), workbook_view_id: 0, zoom_to_fit: Some(false) }], protection: Some(ChartSheetProtection { password_hash: Some("ABCD".into()), content: Some(true), objects: Some(false) }), margins: Some(ChartSheetMargins { left: 0.7, right: 0.7, top: 0.75, bottom: 0.75, header: 0.3, footer: 0.3 }), page_setup: Some(ChartSheetPageSetup { paper_size: Some(1), first_page_number: Some(1), orientation: Some(PageOrientation::Landscape), use_printer_defaults: Some(true), black_and_white: Some(false), draft: Some(false), use_first_page_number: Some(true), horizontal_dpi: Some(600), vertical_dpi: Some(600), copies: Some(1) }), header_footer: Some(ChartSheetHeaderFooter { align_with_margins: Some(false), odd_header: Some("&CChart & Report".into()), ..Default::default() }), drawing_relationship_id: "rIdDrawing".into() } }
+    fn sheet() -> ChartSheet { ChartSheet { properties: Some(ChartSheetProperties { published: Some(true), code_name: Some("ChartCode".into()), tab_color: Some(ChartSheetColor { automatic: None, indexed: None, rgb: Some("FF336699".into()), theme: None, tint: Some(0.25) }) }), views: vec![ChartSheetView { tab_selected: Some(true), zoom_scale: Some(125), workbook_view_id: 0, zoom_to_fit: Some(false) }], protection: Some(ChartSheetProtection { password_hash: Some("ABCD".into()), content: Some(true), objects: Some(false) }), custom_views: Some(vec![ChartSheetCustomView { guid: "{00112233-4455-6677-8899-AABBCCDDEEFF}".into(), scale: Some(175), state: Some(ChartSheetState::Hidden), zoom_to_fit: Some(true) }, ChartSheetCustomView { guid: "{10213243-5465-7687-98A9-BACBDCEDFE0F}".into(), scale: None, state: None, zoom_to_fit: Some(false) }]), margins: Some(ChartSheetMargins { left: 0.7, right: 0.7, top: 0.75, bottom: 0.75, header: 0.3, footer: 0.3 }), page_setup: Some(ChartSheetPageSetup { paper_size: Some(1), first_page_number: Some(1), orientation: Some(PageOrientation::Landscape), use_printer_defaults: Some(true), black_and_white: Some(false), draft: Some(false), use_first_page_number: Some(true), horizontal_dpi: Some(600), vertical_dpi: Some(600), copies: Some(1) }), header_footer: Some(ChartSheetHeaderFooter { align_with_margins: Some(false), odd_header: Some("&CChart & Report".into()), ..Default::default() }), drawing_relationship_id: "rIdDrawing".into() } }
     fn drawing(conformance: ChartSheetConformance) -> Vec<u8> { format!("<xdr:wsDr xmlns:xdr=\"{}\" xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\"><xdr:absoluteAnchor><a:graphic><a:graphicData><c:chart xmlns:c=\"{}\" xmlns:r=\"{}\" r:id=\"rIdChart\"/></a:graphicData></a:graphic></xdr:absoluteAnchor></xdr:wsDr>", conformance.xdr(), conformance.chart(), conformance.rel()).into_bytes() }
     fn chart(conformance: ChartSheetConformance) -> Vec<u8> { format!("<c:chartSpace xmlns:c=\"{}\"><c:chart/></c:chartSpace>", conformance.chart()).into_bytes() }
     fn value(conformance: ChartSheetConformance) -> ChartSheetPackage { ChartSheetPackage { entry: ChartSheetEntry { name: "Chart 1".into(), sheet_id: 2, state: ChartSheetState::Visible, workbook_relationship_id: "rIdChartSheet".into(), part_name: "/xl/chartsheets/sheet1.xml".into() }, chartsheet: sheet(), drawing: ChartSheetDrawingResource { part_name: "/xl/drawings/drawing1.xml".into(), content_type: DRAWING_CT.into(), data: drawing(conformance), charts: vec![ChartSheetChartResource { relationship_id: "rIdChart".into(), part_name: "/xl/charts/chart1.xml".into(), content_type: CHART_CT.into(), data: chart(conformance) }] } } }
     fn package(conformance: ChartSheetConformance) -> (OpcPackage, PackURI) { let mut package = OpcPackage::new(); let uri = PackURI::new("/xl/workbook.xml").unwrap(); let xml = format!("<x:workbook xmlns:x=\"{}\" xmlns:r=\"{}\"><x:sheets><x:sheet name=\"Data\" sheetId=\"1\" r:id=\"rIdData\"/></x:sheets></x:workbook>", conformance.sml(), conformance.rel()); package.add_part(Box::new(BlobPart::new(uri.clone(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml".into(), xml.into_bytes()))); (package, uri) }
 
     #[test] fn strict_typed_xml_round_trip() { let expected = sheet(); let xml = write_chartsheet(&expected, ChartSheetConformance::Strict).unwrap(); let (kind, parsed) = parse_chartsheet(&xml).unwrap(); assert_eq!(kind, ChartSheetConformance::Strict); assert_eq!(parsed, expected); }
+    #[test] fn transitional_custom_view_reference_round_trip() { let xml = format!("<x:chartsheet xmlns:x=\"{SML}\" xmlns:r=\"{REL}\"><x:sheetViews><x:sheetView workbookViewId=\"0\"/></x:sheetViews><x:customSheetViews><x:customSheetView guid=\"{{00112233-4455-6677-8899-AABBCCDDEEFF}}\" scale=\"10\" state=\"veryHidden\" zoomToFit=\"1\"/><x:customSheetView guid=\"{{10213243-5465-7687-98A9-BACBDCEDFE0F}}\"/></x:customSheetViews><x:drawing r:id=\"rId1\"/></x:chartsheet>"); let (_, parsed) = parse_chartsheet(xml.as_bytes()).unwrap(); let views = parsed.custom_views.as_ref().unwrap(); assert_eq!(views.len(), 2); assert_eq!(views[0].state, Some(ChartSheetState::VeryHidden)); assert_eq!(views[0].scale, Some(10)); let written = write_chartsheet(&parsed, ChartSheetConformance::Transitional).unwrap(); assert_eq!(parse_chartsheet(&written).unwrap().1, parsed); }
     #[test] fn mce_fallback_selects_chartsheet_views() { let xml = format!("<x:chartsheet xmlns:x=\"{SML}\" xmlns:r=\"{REL}\" xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\" xmlns:u=\"urn:unsupported\"><mc:AlternateContent><mc:Choice Requires=\"u\"><u:views/></mc:Choice><mc:Fallback><x:sheetViews><x:sheetView workbookViewId=\"0\"/></x:sheetViews></mc:Fallback></mc:AlternateContent><x:drawing r:id=\"rId1\"/></x:chartsheet>"); assert_eq!(parse_chartsheet(xml.as_bytes()).unwrap().1.views.len(), 1); }
+    #[test] fn mce_fallback_selects_custom_chartsheet_views() { let xml = format!("<x:chartsheet xmlns:x=\"{SML}\" xmlns:r=\"{REL}\" xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\" xmlns:u=\"urn:unsupported\"><x:sheetViews><x:sheetView workbookViewId=\"0\"/></x:sheetViews><mc:AlternateContent><mc:Choice Requires=\"u\"><u:customViews/></mc:Choice><mc:Fallback><x:customSheetViews><x:customSheetView guid=\"{{00112233-4455-6677-8899-AABBCCDDEEFF}}\" scale=\"200\"/></x:customSheetViews></mc:Fallback></mc:AlternateContent><x:drawing r:id=\"rId1\"/></x:chartsheet>"); let parsed = parse_chartsheet(xml.as_bytes()).unwrap().1; assert_eq!(parsed.custom_views.unwrap()[0].scale, Some(200)); }
     #[test] fn loads_both_poi_chartsheet_graphs() { for (bytes, name, zoom) in [(POI_ONE, "Chart2", 131), (POI_TWO, "Chart1", 84)] { let package = OpcPackage::from_bytes(bytes).unwrap(); let workbook = PackURI::new("/xl/workbook.xml").unwrap(); let workbook_part = package.get_part(&workbook).unwrap(); let id = workbook_part.rels().iter().find(|rel| rel.reltype() == CHARTSHEET_REL).unwrap().r_id().to_owned(); let loaded = load_chartsheet(&package, &workbook, &id).unwrap(); assert_eq!(loaded.entry.name, name); assert_eq!(loaded.chartsheet.views[0].zoom_scale, Some(zoom)); assert_eq!(loaded.drawing.charts.len(), 1); assert!(loaded.drawing.charts[0].data.starts_with(b"<?xml")); } }
     #[test] fn strict_package_writer_round_trips_complete_leaf_graph() { let conformance = ChartSheetConformance::Strict; let (mut package, workbook) = package(conformance); let expected = value(conformance); store_chartsheet(&mut package, &workbook, &expected, conformance).unwrap(); assert_eq!(load_chartsheet(&package, &workbook, "rIdChartSheet").unwrap(), expected); }
-    #[test] fn rejects_malformed_caps_and_graphs() { assert!(parse_chartsheet(b"<!DOCTYPE x><chartsheet/>").is_err()); assert!(parse_chartsheet(format!("<chartsheet xmlns=\"{SML}\"><sheetViews><sheetView workbookViewId=\"0\" zoomScale=\"401\"/></sheetViews><drawing xmlns:r=\"{REL}\" r:id=\"rId1\"/></chartsheet>").as_bytes()).is_err()); assert!(parse_chartsheet(&vec![b' '; MAX_XML_BYTES + 1]).is_err()); let (mut package, workbook) = package(ChartSheetConformance::Transitional); let expected = value(ChartSheetConformance::Transitional); store_chartsheet(&mut package, &workbook, &expected, ChartSheetConformance::Transitional).unwrap(); package.get_part_mut(&PackURI::new("/xl/drawings/drawing1.xml").unwrap()).unwrap().rels_mut().add_relationship(rt::IMAGE.into(), "../media/x.png".into(), "rIdBad".into(), false); assert!(load_chartsheet(&package, &workbook, "rIdChartSheet").is_err()); }
+    #[test] fn rejects_malformed_caps_and_graphs() { assert!(parse_chartsheet(b"<!DOCTYPE x><chartsheet/>").is_err()); assert!(parse_chartsheet(format!("<chartsheet xmlns=\"{SML}\"><sheetViews><sheetView workbookViewId=\"0\" zoomScale=\"401\"/></sheetViews><drawing xmlns:r=\"{REL}\" r:id=\"rId1\"/></chartsheet>").as_bytes()).is_err()); for custom in ["<customSheetViews/>", "<customSheetViews><customSheetView guid=\"bad\"/></customSheetViews>", "<customSheetViews><customSheetView guid=\"{00112233-4455-6677-8899-AABBCCDDEEFF}\" scale=\"401\"/></customSheetViews>", "<customSheetViews><customSheetView guid=\"{00112233-4455-6677-8899-AABBCCDDEEFF}\"/><customSheetView guid=\"{00112233-4455-6677-8899-aabbccddeeff}\"/></customSheetViews>"] { let xml = format!("<chartsheet xmlns=\"{SML}\" xmlns:r=\"{REL}\"><sheetViews><sheetView workbookViewId=\"0\"/></sheetViews>{custom}<drawing r:id=\"rId1\"/></chartsheet>"); assert!(parse_chartsheet(xml.as_bytes()).is_err(), "{custom}"); } assert!(parse_chartsheet(&vec![b' '; MAX_XML_BYTES + 1]).is_err()); let (mut package, workbook) = package(ChartSheetConformance::Transitional); let expected = value(ChartSheetConformance::Transitional); store_chartsheet(&mut package, &workbook, &expected, ChartSheetConformance::Transitional).unwrap(); package.get_part_mut(&PackURI::new("/xl/drawings/drawing1.xml").unwrap()).unwrap().rels_mut().add_relationship(rt::IMAGE.into(), "../media/x.png".into(), "rIdBad".into(), false); assert!(load_chartsheet(&package, &workbook, "rIdChartSheet").is_err()); }
 }

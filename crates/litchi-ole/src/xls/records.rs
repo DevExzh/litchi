@@ -62,6 +62,15 @@ impl<R: Read + Seek> RecordIter<R> {
         self.current_pos = pos;
         Ok(())
     }
+
+    pub(crate) fn stream_len(&self) -> u64 { self.stream_len }
+
+    pub(crate) fn current_position(&self) -> u64 { self.current_pos }
+
+    pub(crate) fn next_positioned(&mut self) -> Option<(u64, XlsResult<Record>)> {
+        let position = self.current_pos;
+        self.next().map(|record| (position, record))
+    }
 }
 
 impl<R: Read + Seek> Iterator for RecordIter<R> {
