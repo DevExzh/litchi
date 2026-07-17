@@ -13,11 +13,11 @@ const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const STRICT_SML: &str = "http://purl.oclc.org/ooxml/spreadsheetml/main";
 const REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 const STRICT_REL: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships";
-const PRINTER_REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/printerSettings";
-const STRICT_PRINTER_REL: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships/printerSettings";
-const PRINTER_CT: &str = "application/vnd.openxmlformats-officedocument.spreadsheetml.printerSettings";
+pub(crate) const PRINTER_REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/printerSettings";
+pub(crate) const STRICT_PRINTER_REL: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships/printerSettings";
+pub(crate) const PRINTER_CT: &str = "application/vnd.openxmlformats-officedocument.spreadsheetml.printerSettings";
 const MAX_XML_BYTES: usize = 32 * 1024 * 1024;
-const MAX_SETTINGS_BYTES: usize = 16 * 1024 * 1024;
+pub(crate) const MAX_SETTINGS_BYTES: usize = 16 * 1024 * 1024;
 const MAX_RELATIONSHIP_ID_BYTES: usize = 4096;
 const MAX_DEPTH: usize = 256;
 
@@ -84,7 +84,7 @@ pub fn load_worksheet_printer_settings(package: &OpcPackage, worksheet_name: &Pa
             if relationship.r_id() != reference.relationship_id { return Err(invalid(format!("pageSetup references '{}', but Printer Settings relationship is '{}'", reference.relationship_id, relationship.r_id()))); }
             if relationship.is_external() { return Err(invalid("Printer Settings relationship must be internal")); }
             let target = relationship.target_partname()?;
-            if !target.as_str().starts_with("/xl/printerSettings/") { return Err(invalid(format!("Printer Settings part '{target}' is outside /xl/printerSettings"))); }
+            validate_printer_settings_uri(&target)?;
             let part = package.get_part(&target)?;
             if part.content_type() != PRINTER_CT { return Err(invalid(format!("Printer Settings part '{target}' has invalid content type '{}'", part.content_type()))); }
             if !part.rels().is_empty() { return Err(invalid(format!("Printer Settings part '{target}' has forbidden outbound relationships"))); }
@@ -99,7 +99,7 @@ pub fn store_worksheet_printer_settings(package: &mut OpcPackage, worksheet_name
     validate_id(&value.reference.relationship_id)?;
     validate_settings_bytes(&value.resource.data)?;
     let resource_uri = PackURI::new(&value.resource.part_name).map_err(OoxmlError::InvalidUri)?;
-    if !resource_uri.as_str().starts_with("/xl/printerSettings/") { return Err(invalid(format!("Printer Settings part '{resource_uri}' is outside /xl/printerSettings"))); }
+    validate_printer_settings_uri(&resource_uri)?;
     if load_worksheet_printer_settings(package, worksheet_name)?.is_some() { return Err(invalid("worksheet already has Printer Settings")); }
     let worksheet = package.get_part(worksheet_name)?;
     require_worksheet(worksheet)?;
@@ -178,9 +178,10 @@ fn worksheet_conformance(xml: &[u8]) -> Result<PrinterSettingsConformance> {
 }
 
 fn require_worksheet(part: &dyn Part) -> Result<()> { if part.content_type() == ct::SML_WORKSHEET { Ok(()) } else { Err(invalid(format!("part '{}' is not a worksheet", part.partname()))) } }
-fn validate_settings_bytes(data: &[u8]) -> Result<()> { if data.is_empty() { Err(invalid("Printer Settings DEVMODE bytes cannot be empty")) } else if data.len() > MAX_SETTINGS_BYTES { Err(limit("DEVMODE bytes")) } else { Ok(()) } }
+pub(crate) fn validate_settings_bytes(data: &[u8]) -> Result<()> { if data.is_empty() { Err(invalid("Printer Settings DEVMODE bytes cannot be empty")) } else if data.len() > MAX_SETTINGS_BYTES { Err(limit("DEVMODE bytes")) } else { Ok(()) } }
+pub(crate) fn validate_printer_settings_uri(uri:&PackURI)->Result<()>{let Some(name)=uri.as_str().strip_prefix("/xl/printerSettings/")else{return Err(invalid(format!("Printer Settings part '{uri}' is outside /xl/printerSettings")))};if name.is_empty()||name.contains('/')||!name.ends_with(".bin"){return Err(invalid(format!("Printer Settings part '{uri}' must be a direct .bin child of /xl/printerSettings")))}Ok(())}
 fn validate_id(id: &str) -> Result<()> { if id.is_empty() || id.len() > MAX_RELATIONSHIP_ID_BYTES { return Err(invalid("invalid Printer Settings relationship ID length")); } let mut bytes = id.bytes(); let first = bytes.next().unwrap(); if !(first.is_ascii_alphabetic() || first == b'_') || !bytes.all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-' | b'.')) { Err(invalid(format!("invalid Printer Settings relationship ID '{id}'"))) } else { Ok(()) } }
-fn is_printer_relationship(value: &str) -> bool { matches!(value, PRINTER_REL | STRICT_PRINTER_REL) }
+pub(crate) fn is_printer_relationship(value: &str) -> bool { matches!(value, PRINTER_REL | STRICT_PRINTER_REL) }
 fn exact(namespace: &ResolveResult<'_>, value: &str) -> bool { matches!(namespace, ResolveResult::Bound(Namespace(namespace)) if { let bytes: &[u8] = namespace.as_ref(); bytes == value.as_bytes() }) }
 fn escape(output: &mut Vec<u8>, value: &str) { for character in value.chars() { match character { '&' => output.extend_from_slice(b"&amp;"), '<' => output.extend_from_slice(b"&lt;"), '"' => output.extend_from_slice(b"&quot;"), '\t' => output.extend_from_slice(b"&#x9;"), '\n' => output.extend_from_slice(b"&#xA;"), '\r' => output.extend_from_slice(b"&#xD;"), _ => { let mut bytes = [0; 4]; output.extend_from_slice(character.encode_utf8(&mut bytes).as_bytes()); } } } }
 fn xml_error(error: impl std::fmt::Display) -> OoxmlError { OoxmlError::Xml(error.to_string()) }

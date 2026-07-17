@@ -457,6 +457,120 @@ pub struct XlsExternalWorkbookOptions {
     pub sheets: Vec<XlsExternalSheetOptions>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct XlsExternalDefinedNameOptions {
+    pub name: String,
+    pub sheet_index: Option<u16>,
+    pub built_in: bool,
+    pub formula_bytes: Vec<u8>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct XlsAddInFunctionOptions {
+    pub name: String,
+    pub unused_data: Vec<u8>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct XlsDdeOrOleItemOptions {
+    pub name: String,
+    pub automatic: bool,
+    pub picture: bool,
+    pub standard_document_name: bool,
+    pub ole_link: bool,
+    pub clipboard_format: i16,
+    pub displayed_as_icon: bool,
+    pub storage_id: u32,
+    pub opaque_data: Vec<u8>,
+    pub continuation_chunks: Vec<Vec<u8>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct XlsDdeOrOleLinkOptions {
+    pub encoded_virtual_path: String,
+    pub items: Vec<XlsDdeOrOleItemOptions>,
+}
+
+fn validate_short_external_name(name: &str) -> XlsResult<()> {
+    if name.encode_utf16().count() > u8::MAX as usize {
+        return Err(XlsError::InvalidData("external name exceeds 255 UTF-16 code units".to_string()));
+    }
+    Ok(())
+}
+
+impl XlsExternalDefinedNameOptions {
+    pub(super) fn validate(&self, sheet_count: usize) -> XlsResult<()> {
+        validate_short_external_name(&self.name)?;
+        if self.sheet_index.is_some_and(|index| usize::from(index) >= sheet_count) {
+            return Err(XlsError::InvalidData("external name sheet scope is out of range".to_string()));
+        }
+        if self.formula_bytes.len() > u16::MAX as usize
+            || self.formula_bytes.first().is_some_and(|token| !matches!(token, 0x1c | 0x3a | 0x3b | 0x3c | 0x3d))
+        {
+            return Err(XlsError::InvalidData("invalid opaque external-name formula bytes".to_string()));
+        }
+        Ok(())
+    }
+}
+
+impl XlsAddInFunctionOptions {
+    pub(super) fn validate(&self) -> XlsResult<()> {
+        validate_short_external_name(&self.name)?;
+        if self.unused_data.len() > u16::MAX as usize {
+            return Err(XlsError::InvalidData("add-in unused data exceeds u16".to_string()));
+        }
+        Ok(())
+    }
+}
+
+impl XlsDdeOrOleLinkOptions {
+    pub(super) fn validate(&self) -> XlsResult<()> {
+        let path_len = self.encoded_virtual_path.encode_utf16().count();
+        let path_characters = self.encoded_virtual_path.chars().collect::<Vec<_>>();
+        let has_ole_separator = path_characters
+            .get(1..path_characters.len().saturating_sub(1))
+            .is_some_and(|middle| middle.contains(&'\u{3}'));
+        if !(3..=255).contains(&path_len)
+            || !has_ole_separator
+        {
+            return Err(XlsError::InvalidData("DDE/OLE virtual path must be a bounded encoded OLE-link".to_string()));
+        }
+        if self.items.is_empty() || self.items.len() > 4096 {
+            return Err(XlsError::InvalidData("DDE/OLE source must contain 1..=4096 items".to_string()));
+        }
+        for item in &self.items {
+            validate_short_external_name(&item.name)?;
+            if !matches!(item.clipboard_format, -1 | 0 | 2 | 5 | 6 | 7 | 8 | 9 | 16 | 20 | 30 | 36 | 44 | 63) {
+                return Err(XlsError::InvalidData("invalid DDE/OLE clipboard format".to_string()));
+            }
+            if item.standard_document_name {
+                if item.ole_link
+                    || item.displayed_as_icon
+                    || item.storage_id != 0
+                    || item.name != "StdDocumentName"
+                    || !item.opaque_data.is_empty()
+                    || !item.continuation_chunks.is_empty()
+                {
+                    return Err(XlsError::InvalidData("invalid standard-document DDE item".to_string()));
+                }
+            }
+            let mut opaque_size = item.opaque_data.len();
+            for chunk in &item.continuation_chunks {
+                if chunk.is_empty() || chunk.len() > 8224 {
+                    return Err(XlsError::InvalidData("DDE/OLE continuation must be 1..=8224 bytes".to_string()));
+                }
+                opaque_size = opaque_size.checked_add(chunk.len()).ok_or_else(|| {
+                    XlsError::InvalidData("DDE/OLE opaque data size overflows".to_string())
+                })?;
+            }
+            if opaque_size > 1_048_576 {
+                return Err(XlsError::InvalidData("DDE/OLE opaque data exceeds resource bound".to_string()));
+            }
+        }
+        Ok(())
+    }
+}
+
 impl XlsExternalWorkbookOptions {
     pub(super) fn validate(&self) -> XlsResult<()> {
         let path_len = self.encoded_virtual_path.encode_utf16().count();
@@ -664,6 +778,9 @@ pub struct XlsWriter {
     workbook_window_options: XlsWorkbookWindowOptions,
     function_group_options: XlsFunctionGroupOptions,
     external_workbooks: Vec<XlsExternalWorkbookOptions>,
+    external_names: Vec<Vec<XlsExternalDefinedNameOptions>>,
+    add_in_functions: Vec<XlsAddInFunctionOptions>,
+    dde_or_ole_links: Vec<XlsDdeOrOleLinkOptions>,
 }
 
 impl XlsWriter {
@@ -685,6 +802,9 @@ impl XlsWriter {
             workbook_window_options: XlsWorkbookWindowOptions::default(),
             function_group_options: XlsFunctionGroupOptions::default(),
             external_workbooks: Vec::new(),
+            external_names: Vec::new(),
+            add_in_functions: Vec::new(),
+            dde_or_ole_links: Vec::new(),
         }
     }
 
@@ -2072,11 +2192,63 @@ impl XlsWriter {
         options: XlsExternalWorkbookOptions,
     ) -> XlsResult<usize> {
         options.validate()?;
-        if self.external_workbooks.len() >= 1024 {
+        if self.external_workbooks.len() + self.dde_or_ole_links.len() + usize::from(!self.add_in_functions.is_empty()) >= 1024 {
             return Err(XlsError::InvalidData("external supporting-book count exceeds resource bound".to_string()));
         }
         let index = self.external_workbooks.len();
         self.external_workbooks.push(options);
+        self.external_names.push(Vec::new());
+        Ok(index)
+    }
+
+    fn external_name_count(&self) -> usize {
+        self.external_names.iter().map(Vec::len).sum::<usize>()
+            + self.add_in_functions.len()
+            + self.dde_or_ole_links.iter().map(|link| link.items.len()).sum::<usize>()
+    }
+
+    pub fn add_external_defined_name(
+        &mut self,
+        external_workbook: usize,
+        options: XlsExternalDefinedNameOptions,
+    ) -> XlsResult<usize> {
+        let book = self.external_workbooks.get(external_workbook)
+            .ok_or_else(|| XlsError::InvalidData("external workbook index is out of range".to_string()))?;
+        options.validate(book.sheets.len())?;
+        if self.external_name_count() >= 4096 {
+            return Err(XlsError::InvalidData("external name count exceeds resource bound".to_string()));
+        }
+        let names = &mut self.external_names[external_workbook];
+        let index = names.len();
+        names.push(options);
+        Ok(index)
+    }
+
+    pub fn add_add_in_function(&mut self, options: XlsAddInFunctionOptions) -> XlsResult<usize> {
+        options.validate()?;
+        if self.add_in_functions.is_empty()
+            && self.external_workbooks.len() + self.dde_or_ole_links.len() >= 1024
+        {
+            return Err(XlsError::InvalidData("supporting-book count exceeds resource bound".to_string()));
+        }
+        if self.external_name_count() >= 4096 {
+            return Err(XlsError::InvalidData("add-in function count exceeds resource bound".to_string()));
+        }
+        let index = self.add_in_functions.len();
+        self.add_in_functions.push(options);
+        Ok(index)
+    }
+
+    pub fn add_dde_or_ole_link(&mut self, options: XlsDdeOrOleLinkOptions) -> XlsResult<usize> {
+        options.validate()?;
+        if self.external_workbooks.len() + self.dde_or_ole_links.len() + usize::from(!self.add_in_functions.is_empty()) >= 1024 {
+            return Err(XlsError::InvalidData("supporting-book count exceeds resource bound".to_string()));
+        }
+        if self.external_name_count().checked_add(options.items.len()).is_none_or(|count| count > 4096) {
+            return Err(XlsError::InvalidData("external name count exceeds resource bound".to_string()));
+        }
+        let index = self.dde_or_ole_links.len();
+        self.dde_or_ole_links.push(options);
         Ok(index)
     }
 
@@ -2524,6 +2696,9 @@ impl XlsWriter {
             self.workbook_window_options,
             &self.function_group_options,
             &self.external_workbooks,
+            &self.external_names,
+            &self.add_in_functions,
+            &self.dde_or_ole_links,
             &self.fmt,
             &self.defined_names,
             &self.shared_strings,

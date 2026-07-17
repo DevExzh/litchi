@@ -134,10 +134,18 @@ pub enum BorderStyle {
     None,
     /// Single line border
     Single,
+    /// Thick line border
+    Thick,
     /// Dotted border
     Dotted,
     /// Dashed border
     Dashed,
+    /// Dashed border with a small gap
+    DashSmallGap,
+    /// Alternating dot and dash
+    DotDash,
+    /// Alternating two dots and a dash
+    DotDotDash,
     /// Double line border
     Double,
     /// Triple line border
@@ -174,6 +182,23 @@ pub enum BorderStyle {
     Outset,
     /// Inset border (3D)
     Inset,
+}
+
+impl BorderStyle {
+    pub(crate) const fn control_word(self) -> &'static str {
+        match self {
+            Self::None => "brdrnone", Self::Single => "brdrs", Self::Thick => "brdrth",
+            Self::Dotted => "brdrdot", Self::Dashed => "brdrdash", Self::DashSmallGap => "brdrdashsm",
+            Self::DotDash => "brdrdashd", Self::DotDotDash => "brdrdashdd", Self::Double => "brdrdb",
+            Self::Triple => "brdrtriple", Self::ThickThinSmall => "brdrthtnsg", Self::ThinThickSmall => "brdrtnthsg",
+            Self::ThinThickThinSmall => "brdrtnthtnsg", Self::ThickThinMedium => "brdrthtnmg",
+            Self::ThinThickMedium => "brdrtnthmg", Self::ThinThickThinMedium => "brdrtnthtnmg",
+            Self::ThickThinLarge => "brdrthtnlg", Self::ThinThickLarge => "brdrtnthlg",
+            Self::ThinThickThinLarge => "brdrtnthtnlg", Self::Wavy => "brdrwavy",
+            Self::WavyDouble => "brdrwavydb", Self::Striped => "brdrdashdotstr", Self::Embossed => "brdremboss",
+            Self::Engraved => "brdrengrave", Self::Outset => "brdroutset", Self::Inset => "brdrinset",
+        }
+    }
 }
 
 /// Border definition
@@ -220,6 +245,16 @@ impl Border {
     #[inline]
     pub fn is_visible(&self) -> bool {
         self.style != BorderStyle::None && self.width > 0
+    }
+
+    pub fn validate_table(&self) -> crate::RtfResult<()> {
+        if !(0..=75).contains(&self.width) {
+            return Err(crate::RtfError::MalformedDocument("RTF table-border width must be in 0..=75 twips".to_string()));
+        }
+        if !(0..=crate::MAX_TABLE_DISTANCE_TWIPS).contains(&self.space) {
+            return Err(crate::RtfError::MalformedDocument("RTF table-border spacing is out of range".to_string()));
+        }
+        Ok(())
     }
 }
 

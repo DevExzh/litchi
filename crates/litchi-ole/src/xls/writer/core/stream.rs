@@ -30,6 +30,9 @@ pub(crate) fn generate_workbook_stream(
     workbook_window: XlsWorkbookWindowOptions,
     function_groups: &XlsFunctionGroupOptions,
     external_workbooks: &[XlsExternalWorkbookOptions],
+    external_names: &[Vec<super::XlsExternalDefinedNameOptions>],
+    add_in_functions: &[super::XlsAddInFunctionOptions],
+    dde_or_ole_links: &[super::XlsDdeOrOleLinkOptions],
     fmt: &FormattingManager,
     defined_names: &[InternalDefinedName],
     shared_strings: &[String],
@@ -156,7 +159,11 @@ pub(crate) fn generate_workbook_stream(
     // Internal SUPBOOK / EXTERNSHEET records are required for 3D
     // references used by defined names (NameParsedFormula) and pivot caches.
     let internal_links = (!defined_names.is_empty() || has_pivot_tables) && !worksheets.is_empty();
-    if internal_links || !external_workbooks.is_empty() {
+    if internal_links
+        || !external_workbooks.is_empty()
+        || !add_in_functions.is_empty()
+        || !dde_or_ole_links.is_empty()
+    {
         let externsheet_mode = if defined_names.is_empty() {
             biff::ExternSheetMode::WorkbookWide
         } else {
@@ -166,6 +173,9 @@ pub(crate) fn generate_workbook_stream(
             &mut stream,
             internal_links.then_some((sheet_count, externsheet_mode)),
             external_workbooks,
+            external_names,
+            add_in_functions,
+            dde_or_ole_links,
         )?;
     }
 

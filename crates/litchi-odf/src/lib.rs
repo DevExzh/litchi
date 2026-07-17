@@ -323,6 +323,7 @@ mod media;
 mod variable_declaration;
 mod document_scripts;
 mod chart_properties;
+mod graphic_properties;
 mod drawing_page_properties;
 mod font_face;
 mod line_numbering;
@@ -417,6 +418,12 @@ pub use chart_properties::{
     ChartSeriesSource, ChartSolidType, ChartStyleProperties, ChartStylePropertiesSet,
     ChartStyleRecord, ChartSymbolImage, ChartSymbolName, ChartSymbolType, ChartTickMarkPosition,
     parse_chart_style_properties, set_chart_style_properties_xml,
+};
+pub use graphic_properties::{
+    GraphicProperty, GraphicPropertyChild, GraphicPropertyChildKind, GraphicPropertyKind,
+    GraphicPropertyNamespace, GraphicPropertyValue, GraphicStyleProperties,
+    GraphicStylePropertiesSet, GraphicStyleRecord, parse_graphic_style_properties,
+    set_graphic_style_properties_xml,
 };
 pub use drawing_page_properties::{
     DrawingPageBackgroundSize, DrawingPageColor, DrawingPageDuration, DrawingPageFill,

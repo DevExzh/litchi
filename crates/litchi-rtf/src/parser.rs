@@ -284,11 +284,20 @@ struct State {
     table_row_positioning: crate::FloatingTablePosition,
     table_row_direction: Option<TextDirection>,
     table_row_layout: crate::TableRowLayout,
+    table_row_borders: crate::TableRowBorders,
+    table_row_shading: crate::TableShading,
     pending_cell_padding: crate::TableEdgeDistances,
     pending_cell_spacing: crate::TableEdgeDistances,
     pending_cell_layout: crate::TableCellLayout,
+    pending_cell_borders: crate::TableCellBorders,
+    pending_cell_shading: crate::TableShading,
+    table_row_shading_seen: u8,
+    pending_cell_shading_seen: u8,
+    active_table_border: Option<crate::table::TableBorderTarget>,
+    active_table_border_seen: u8,
     cell_distances: SmallVec<[(crate::TableEdgeDistances, crate::TableEdgeDistances); 8]>,
     cell_layouts: SmallVec<[crate::TableCellLayout; 8]>,
+    cell_decorations: SmallVec<[(crate::TableCellBorders, crate::TableShading); 8]>,
     /// Current destination (for skipping non-document content)
     destination: Destination,
     /// Whether this body-flow group is an explicit section-format snapshot.
@@ -374,6 +383,8 @@ fn apply_table_distance(state:&mut State,target:crate::TableDistanceTarget,param
 }
 
 fn require_parameterless(parameter:Option<i32>,name:&str)->RtfResult<()>{if parameter.is_some(){return Err(RtfError::MalformedDocument(format!("RTF {name} does not accept a parameter")))}Ok(())}
+
+fn required_table_value(value:Option<i32>,name:&str,maximum:u16)->RtfResult<u16>{let value=value.ok_or_else(||RtfError::MalformedDocument(format!("RTF {name} requires a numeric parameter")))?;let value=u16::try_from(value).map_err(|_|RtfError::MalformedDocument(format!("RTF {name} value must be in 0..={maximum}")))?;if value>maximum{return Err(RtfError::MalformedDocument(format!("RTF {name} value must be in 0..={maximum}")))}Ok(value)}
 fn floating_table_offset(parameter:Option<i32>,negative:bool,axis:&str)->RtfResult<i32>{let value=parameter.ok_or_else(||RtfError::MalformedDocument(format!("RTF floating-table {axis} offset requires a parameter")))?;let valid=if negative{(-crate::MAX_FLOATING_TABLE_DISTANCE_TWIPS..=-1).contains(&value)}else{(0..=crate::MAX_FLOATING_TABLE_DISTANCE_TWIPS).contains(&value)};if !valid{return Err(RtfError::MalformedDocument(format!("RTF floating-table {axis} offset is out of range")))}Ok(value)}
 fn floating_table_wrap_distance(parameter:Option<i32>)->RtfResult<u16>{let value=parameter.ok_or_else(||RtfError::MalformedDocument("RTF floating-table wrap distance requires a parameter".to_string()))?;if !(0..=crate::MAX_FLOATING_TABLE_DISTANCE_TWIPS).contains(&value){return Err(RtfError::MalformedDocument("RTF floating-table wrap distance is out of range".to_string()))}Ok(value as u16)}
 const MAX_LOGICAL_TABLES:usize=4096;
@@ -423,8 +434,8 @@ impl Default for State {
             in_table: false,
             table_nesting_level: 0,
             cell_boundaries: SmallVec::new(),
-            table_row_padding: Default::default(), table_row_spacing: Default::default(), table_row_positioning: Default::default(), table_row_direction:None, table_row_layout:Default::default(),
-            pending_cell_padding: Default::default(), pending_cell_spacing: Default::default(), pending_cell_layout:Default::default(), cell_distances: SmallVec::new(), cell_layouts:SmallVec::new(),
+            table_row_padding: Default::default(), table_row_spacing: Default::default(), table_row_positioning: Default::default(), table_row_direction:None, table_row_layout:Default::default(), table_row_borders:Default::default(), table_row_shading:Default::default(),
+            pending_cell_padding: Default::default(), pending_cell_spacing: Default::default(), pending_cell_layout:Default::default(), pending_cell_borders:Default::default(), pending_cell_shading:Default::default(), table_row_shading_seen:0, pending_cell_shading_seen:0, active_table_border:None, active_table_border_seen:0, cell_distances: SmallVec::new(), cell_layouts:SmallVec::new(), cell_decorations:SmallVec::new(),
             destination: Destination::DocumentBody,
             visible_section_format: false,
             section_column_number: None,
@@ -3414,6 +3425,10 @@ impl<'a> Parser<'a> {
             return Ok(());
         }
 
+        if Self::apply_table_decoration_control(state, control)? {
+            return Ok(());
+        }
+
         if Self::apply_character_decoration_control(state, control)? {
             return Ok(());
         }
@@ -3726,7 +3741,7 @@ impl<'a> Parser<'a> {
             ControlWord::TableRowDefaults => {
                 // Start a new row definition
                 state.cell_boundaries.clear();
-                state.table_row_padding=Default::default();state.table_row_spacing=Default::default();state.table_row_positioning=Default::default();state.table_row_direction=None;state.table_row_layout=Default::default();state.pending_cell_padding=Default::default();state.pending_cell_spacing=Default::default();state.pending_cell_layout=Default::default();state.cell_distances.clear();state.cell_layouts.clear();
+                state.table_row_padding=Default::default();state.table_row_spacing=Default::default();state.table_row_positioning=Default::default();state.table_row_direction=None;state.table_row_layout=Default::default();state.table_row_borders=Default::default();state.table_row_shading=Default::default();state.pending_cell_padding=Default::default();state.pending_cell_spacing=Default::default();state.pending_cell_layout=Default::default();state.pending_cell_borders=Default::default();state.pending_cell_shading=Default::default();state.table_row_shading_seen=0;state.pending_cell_shading_seen=0;state.active_table_border=None;state.active_table_border_seen=0;state.cell_distances.clear();state.cell_layouts.clear();state.cell_decorations.clear();
                 let destination=state.destination;let level=state.table_nesting_level;let _=state;if destination==Destination::NestedTableProperties{if level<2{return Err(RtfError::MalformedDocument("RTF nesttableprops lacks itap level 2 or greater".to_string()))}let row=&mut self.ensure_nested_builder(level)?.row;row.set_direction(None);row.set_layout(Default::default());}else{self.drain_nested_to(1)?;self.start_table_if_needed();if let Some(row)=&mut self.current_row{row.set_direction(None);row.set_layout(Default::default());}}
             },
             ControlWord::LeftToRightRow(param) => {require_parameterless(*param,"ltrrow")?;state.table_row_direction=Some(TextDirection::LeftToRight)},
@@ -3746,7 +3761,7 @@ impl<'a> Parser<'a> {
             ControlWord::CellX(boundary) => {
                 // Cell boundary definition
                 state.cell_boundaries.push(*boundary);
-                if state.cell_distances.len()>=crate::MAX_TABLE_CELLS_PER_ROW{return Err(RtfError::MalformedDocument("RTF row exceeds 4096 cell definitions".to_string()))}state.cell_distances.push((std::mem::take(&mut state.pending_cell_padding),std::mem::take(&mut state.pending_cell_spacing)));state.cell_layouts.push(std::mem::take(&mut state.pending_cell_layout));
+                if state.cell_distances.len()>=crate::MAX_TABLE_CELLS_PER_ROW{return Err(RtfError::MalformedDocument("RTF row exceeds 4096 cell definitions".to_string()))}state.cell_distances.push((std::mem::take(&mut state.pending_cell_padding),std::mem::take(&mut state.pending_cell_spacing)));state.cell_layouts.push(std::mem::take(&mut state.pending_cell_layout));state.cell_decorations.push((std::mem::take(&mut state.pending_cell_borders),std::mem::take(&mut state.pending_cell_shading)));state.pending_cell_shading_seen=0;state.active_table_border=None;state.active_table_border_seen=0;
             },
             ControlWord::TableDistanceValue(target,value)=>apply_table_distance(state,*target,*value,false)?,
             ControlWord::TableDistanceUnit(target,value)=>apply_table_distance(state,*target,*value,true)?,
@@ -3768,7 +3783,7 @@ impl<'a> Parser<'a> {
             },
             ControlWord::TableRow => {
                 // Row break - finalize current row
-                let row_padding=state.table_row_padding.clone();let row_spacing=state.table_row_spacing.clone();let row_positioning=state.table_row_positioning.clone();let row_direction=state.table_row_direction;let row_layout=state.table_row_layout;let boundaries=state.cell_boundaries.len();let cell_distances=state.cell_distances.clone();let cell_layouts=state.cell_layouts.clone();let _=state;self.drain_nested_to(1)?;self.finalize_cell(false)?;if let Some(row)=&mut self.current_row{if boundaries!=0&&boundaries!=row.cell_count(){return Err(RtfError::MalformedDocument("RTF row cell boundaries do not match cell count".to_string()))}for(index,cell)in row.cells_mut().iter_mut().enumerate(){if let Some((padding,spacing))=cell_distances.get(index){cell.set_padding(padding.clone());cell.set_spacing(spacing.clone());}if let Some(layout)=cell_layouts.get(index){cell.set_layout(*layout);}}row.set_direction(row_direction);row.set_layout(row_layout);row.set_padding(row_padding);row.set_spacing(row_spacing);row.set_positioning(row_positioning);}
+                let row_padding=state.table_row_padding.clone();let row_spacing=state.table_row_spacing.clone();let row_positioning=state.table_row_positioning.clone();let row_direction=state.table_row_direction;let row_layout=state.table_row_layout;let row_borders=state.table_row_borders.clone();let row_shading=state.table_row_shading;let boundaries=state.cell_boundaries.len();let cell_distances=state.cell_distances.clone();let cell_layouts=state.cell_layouts.clone();let cell_decorations=state.cell_decorations.clone();let _=state;self.drain_nested_to(1)?;self.finalize_cell(false)?;if let Some(row)=&mut self.current_row{if boundaries!=0&&boundaries!=row.cell_count(){return Err(RtfError::MalformedDocument("RTF row cell boundaries do not match cell count".to_string()))}for(index,cell)in row.cells_mut().iter_mut().enumerate(){if let Some((padding,spacing))=cell_distances.get(index){cell.set_padding(padding.clone());cell.set_spacing(spacing.clone());}if let Some(layout)=cell_layouts.get(index){cell.set_layout(*layout);}if let Some((borders,shading))=cell_decorations.get(index){cell.set_borders(borders.clone());cell.set_shading(*shading);}}row.set_direction(row_direction);row.set_layout(row_layout);row.set_padding(row_padding);row.set_spacing(row_spacing);row.set_positioning(row_positioning);row.set_borders(row_borders);row.set_shading(row_shading);}
                 self.finalize_row()?;
             },
 
@@ -6440,6 +6455,16 @@ impl<'a> Parser<'a> {
         Ok(value)
     }
 
+    fn table_border_style(control:&ControlWord<'_>)->Option<crate::BorderStyle>{use crate::BorderStyle as Style;Some(match control{ControlWord::BorderNone=>Style::None,ControlWord::BorderSingle=>Style::Single,ControlWord::BorderThick=>Style::Thick,ControlWord::BorderDotted=>Style::Dotted,ControlWord::BorderDashed=>Style::Dashed,ControlWord::BorderDashSmall=>Style::DashSmallGap,ControlWord::BorderDotDash=>Style::DotDash,ControlWord::BorderDotDotDash=>Style::DotDotDash,ControlWord::BorderDouble=>Style::Double,ControlWord::BorderTriple=>Style::Triple,ControlWord::BorderThinThickSmall=>Style::ThinThickSmall,ControlWord::BorderThickThinSmall=>Style::ThickThinSmall,ControlWord::BorderThinThickThinSmall=>Style::ThinThickThinSmall,ControlWord::BorderThinThickMedium=>Style::ThinThickMedium,ControlWord::BorderThickThinMedium=>Style::ThickThinMedium,ControlWord::BorderThinThickThinMedium=>Style::ThinThickThinMedium,ControlWord::BorderThinThickLarge=>Style::ThinThickLarge,ControlWord::BorderThickThinLarge=>Style::ThickThinLarge,ControlWord::BorderThinThickThinLarge=>Style::ThinThickThinLarge,ControlWord::BorderWave=>Style::Wavy,ControlWord::BorderWavyDouble=>Style::WavyDouble,ControlWord::BorderStriped=>Style::Striped,ControlWord::BorderEmbossed=>Style::Embossed,ControlWord::BorderEngraved=>Style::Engraved,ControlWord::BorderOutset=>Style::Outset,ControlWord::BorderInset=>Style::Inset,_=>return None})}
+
+    fn apply_table_decoration_control(state:&mut State,control:&ControlWord<'_>)->RtfResult<bool>{
+        const STYLE:u8=1;const WIDTH:u8=2;const COLOR:u8=4;const SPACE:u8=8;const SHADOW:u8=16;const FRAME:u8=32;
+        if let ControlWord::TableBorder(target,param)=control{require_parameterless(*param,"table border selector")?;state.active_table_border=Some(*target);state.active_table_border_seen=0;let slot=match target{crate::table::TableBorderTarget::Row(side)=>state.table_row_borders.side_mut(*side),crate::table::TableBorderTarget::Cell(side)=>state.pending_cell_borders.side_mut(*side)};*slot=Some(crate::Border::default());return Ok(true)}
+        let shading_control=matches!(control,ControlWord::TableShadingAmount(..)|ControlWord::TableShadingForeground(..)|ControlWord::TableShadingBackground(..)|ControlWord::TableShadingPattern(..)|ControlWord::TableRowShadingPatternIndex(..));
+        if shading_control{state.active_table_border=None;state.active_table_border_seen=0;let scope=match control{ControlWord::TableShadingAmount(scope,_)|ControlWord::TableShadingForeground(scope,_)|ControlWord::TableShadingBackground(scope,_)|ControlWord::TableShadingPattern(scope,_,_)=>*scope,ControlWord::TableRowShadingPatternIndex(_)=>crate::TableDistanceScope::Row,_=>unreachable!()};let(shading,seen)=match scope{crate::TableDistanceScope::Row=>(&mut state.table_row_shading,&mut state.table_row_shading_seen),crate::TableDistanceScope::Cell=>(&mut state.pending_cell_shading,&mut state.pending_cell_shading_seen)};let bit=match control{ControlWord::TableShadingAmount(..)=>1,ControlWord::TableShadingForeground(..)=>2,ControlWord::TableShadingBackground(..)=>4,ControlWord::TableShadingPattern(..)|ControlWord::TableRowShadingPatternIndex(..)=>8,_=>unreachable!()};if *seen&bit!=0{return Err(RtfError::MalformedDocument("duplicate RTF table shading component".to_string()))}*seen|=bit;match control{ControlWord::TableShadingAmount(_,value)=>shading.amount=Some(required_table_value(*value,"table shading",10_000)?),ControlWord::TableShadingForeground(_,value)=>shading.foreground_color=Some(required_table_value(*value,"table shading foreground color",u16::MAX)?),ControlWord::TableShadingBackground(_,value)=>shading.background_color=Some(required_table_value(*value,"table shading background color",u16::MAX)?),ControlWord::TableShadingPattern(_,pattern,param)=>{require_parameterless(*param,"table shading pattern")?;shading.pattern=Some(*pattern)},ControlWord::TableRowShadingPatternIndex(value)=>shading.pattern_index=Some(required_table_value(*value,"trpat",u16::MAX)?),_=>unreachable!()}return Ok(true)}
+        let Some(target)=state.active_table_border else{return Ok(false)};let(component,name)=if Self::table_border_style(control).is_some(){(STYLE,"style")}else{match control{ControlWord::BorderWidth(_)=>(WIDTH,"width"),ControlWord::BorderColor(_)=>(COLOR,"color"),ControlWord::BorderSpace(_)=>(SPACE,"spacing"),ControlWord::BorderShadow=>(SHADOW,"shadow"),ControlWord::BorderFrame=>(FRAME,"frame"),_=>{state.active_table_border=None;state.active_table_border_seen=0;return Ok(false)}}};if state.active_table_border_seen&component!=0{return Err(RtfError::MalformedDocument(format!("duplicate RTF table-border {name}")))}if component!=STYLE&&state.active_table_border_seen&STYLE==0{return Err(RtfError::MalformedDocument(format!("RTF table-border {name} precedes its style")))}state.active_table_border_seen|=component;let border=match target{crate::table::TableBorderTarget::Row(side)=>state.table_row_borders.side_mut(side),crate::table::TableBorderTarget::Cell(side)=>state.pending_cell_borders.side_mut(side)}.as_mut().expect("active table border");if let Some(style)=Self::table_border_style(control){border.style=style}else{match control{ControlWord::BorderWidth(value)=>border.width=i32::from(required_table_value(*value,"brdrw",75)?),ControlWord::BorderColor(value)=>border.color_ref=required_table_value(*value,"brdrcf",u16::MAX)?,ControlWord::BorderSpace(value)=>border.space=i32::from(required_table_value(*value,"brsp",crate::MAX_TABLE_DISTANCE_TWIPS as u16)?),ControlWord::BorderShadow=>border.shadow=true,ControlWord::BorderFrame=>border.frame=true,_=>unreachable!()}}Ok(true)
+    }
+
     fn character_border_style(
         control: &ControlWord<'_>,
     ) -> Option<crate::CharacterBorderStyle> {
@@ -8282,7 +8307,7 @@ impl<'a> Parser<'a> {
 
     fn finalize_nested_cell(&mut self,level:u8)->RtfResult<()>{self.drain_nested_to(level)?;let arena=self.arena;let builder=self.ensure_nested_builder(level)?;if builder.row.cell_count()>=crate::MAX_TABLE_CELLS_PER_ROW{return Err(RtfError::MalformedDocument("RTF table row exceeds 4096 cells".to_string()))}let text=std::str::from_utf8(&builder.cell_text).map_err(|_|RtfError::MalformedDocument("invalid UTF-8 in nested table cell".to_string()))?;let mut cell=crate::Cell::new(Cow::Borrowed(arena.alloc_str(text)));cell.nested_tables_mut().append(&mut builder.cell_nested);builder.row.add_cell(cell);builder.cell_text.clear();Ok(())}
 
-    fn finalize_nested_row(&mut self,level:u8)->RtfResult<()>{self.drain_nested_to(level)?;let state=self.current_state()?.clone();let builder=self.ensure_nested_builder(level)?;if !builder.cell_text.is_empty()||!builder.cell_nested.is_empty(){return Err(RtfError::MalformedDocument("RTF nestrow encountered an unterminated nested cell".to_string()))}if builder.row.cell_count()==0{return Err(RtfError::MalformedDocument("RTF nestrow has no nestcell".to_string()))}if !state.cell_boundaries.is_empty()&&state.cell_boundaries.len()!=builder.row.cell_count(){return Err(RtfError::MalformedDocument("RTF nested row cell boundaries do not match nestcell count".to_string()))}for(index,cell)in builder.row.cells_mut().iter_mut().enumerate(){if let Some((padding,spacing))=state.cell_distances.get(index){cell.set_padding(padding.clone());cell.set_spacing(spacing.clone());}if let Some(layout)=state.cell_layouts.get(index){cell.set_layout(*layout);}}builder.row.set_direction(state.table_row_direction);builder.row.set_layout(state.table_row_layout);builder.row.set_padding(state.table_row_padding.clone());builder.row.set_spacing(state.table_row_spacing.clone());builder.row.set_positioning(state.table_row_positioning.clone());if builder.table.row_count()>=MAX_LOGICAL_TABLE_ROWS{return Err(RtfError::MalformedDocument("RTF logical table exceeds 65536 rows".to_string()))}if builder.table.rows().first().is_some_and(|first|first.positioning()!=builder.row.positioning()){return Err(RtfError::MalformedDocument("RTF positioned-table properties must be identical for all rows in one logical table".to_string()))}builder.table.add_row(std::mem::take(&mut builder.row));Ok(())}
+    fn finalize_nested_row(&mut self,level:u8)->RtfResult<()>{self.drain_nested_to(level)?;let state=self.current_state()?.clone();let builder=self.ensure_nested_builder(level)?;if !builder.cell_text.is_empty()||!builder.cell_nested.is_empty(){return Err(RtfError::MalformedDocument("RTF nestrow encountered an unterminated nested cell".to_string()))}if builder.row.cell_count()==0{return Err(RtfError::MalformedDocument("RTF nestrow has no nestcell".to_string()))}if !state.cell_boundaries.is_empty()&&state.cell_boundaries.len()!=builder.row.cell_count(){return Err(RtfError::MalformedDocument("RTF nested row cell boundaries do not match nestcell count".to_string()))}for(index,cell)in builder.row.cells_mut().iter_mut().enumerate(){if let Some((padding,spacing))=state.cell_distances.get(index){cell.set_padding(padding.clone());cell.set_spacing(spacing.clone());}if let Some(layout)=state.cell_layouts.get(index){cell.set_layout(*layout);}if let Some((borders,shading))=state.cell_decorations.get(index){cell.set_borders(borders.clone());cell.set_shading(*shading);}}builder.row.set_direction(state.table_row_direction);builder.row.set_layout(state.table_row_layout);builder.row.set_padding(state.table_row_padding.clone());builder.row.set_spacing(state.table_row_spacing.clone());builder.row.set_positioning(state.table_row_positioning.clone());builder.row.set_borders(state.table_row_borders.clone());builder.row.set_shading(state.table_row_shading);if builder.table.row_count()>=MAX_LOGICAL_TABLE_ROWS{return Err(RtfError::MalformedDocument("RTF logical table exceeds 65536 rows".to_string()))}if builder.table.rows().first().is_some_and(|first|first.positioning()!=builder.row.positioning()){return Err(RtfError::MalformedDocument("RTF positioned-table properties must be identical for all rows in one logical table".to_string()))}builder.table.add_row(std::mem::take(&mut builder.row));Ok(())}
 
     /// Finalize the current cell and add it to the current row.
     fn finalize_cell(&mut self, explicit:bool)->RtfResult<()> {
@@ -8295,7 +8320,7 @@ impl<'a> Parser<'a> {
             // Convert cell text to string
             if let Ok(text_str) = std::str::from_utf8(&self.current_cell_text) {
                 let allocated = self.arena.alloc_str(text_str);
-                let index=self.current_row.as_ref().map_or(0,|row|row.cell_count());let (padding,spacing)=self.current_state().ok().and_then(|state|state.cell_distances.get(index)).cloned().unwrap_or_default();let layout=self.current_state().ok().and_then(|state|state.cell_layouts.get(index)).copied().unwrap_or_default();let mut cell = super::table::Cell::with_distances(Cow::Borrowed(allocated),padding,spacing);cell.set_layout(layout);cell.nested_tables_mut().append(&mut self.current_cell_nested);
+                let index=self.current_row.as_ref().map_or(0,|row|row.cell_count());let (padding,spacing)=self.current_state().ok().and_then(|state|state.cell_distances.get(index)).cloned().unwrap_or_default();let layout=self.current_state().ok().and_then(|state|state.cell_layouts.get(index)).copied().unwrap_or_default();let(borders,shading)=self.current_state().ok().and_then(|state|state.cell_decorations.get(index)).cloned().unwrap_or_default();let mut cell = super::table::Cell::with_distances(Cow::Borrowed(allocated),padding,spacing);cell.set_layout(layout);cell.set_borders(borders);cell.set_shading(shading);cell.nested_tables_mut().append(&mut self.current_cell_nested);
 
                 // Add cell to current row
                 if let Some(row) = &mut self.current_row {

@@ -8,11 +8,59 @@ pub(crate) const EXTERN_SHEET_RECORD_TYPE: u16 = 0x0017;
 pub(crate) const XCT_RECORD_TYPE: u16 = 0x0059;
 pub(crate) const CRN_RECORD_TYPE: u16 = 0x005a;
 pub(crate) const SUP_BOOK_RECORD_TYPE: u16 = 0x01ae;
-const EXTERN_NAME_RECORD_TYPE: u16 = 0x0023;
+pub(crate) const EXTERN_NAME_RECORD_TYPE: u16 = 0x0023;
+const CONTINUE_RECORD_TYPE: u16 = 0x003c;
 const MAX_SUPPORTING_BOOKS: usize = 1024;
 const MAX_EXTERNAL_SHEETS: usize = 256;
 const MAX_EXTERNAL_REFERENCES: usize = 1370;
 const MAX_CACHED_CELLS: usize = 65_536;
+const MAX_EXTERNAL_NAMES: usize = 4096;
+const MAX_EXTERNAL_NAME_BYTES: usize = 1_048_576;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum XlsExternalNameBody {
+    ExternalDefinedName {
+        sheet_index: Option<u16>,
+        name: String,
+        formula_bytes: Vec<u8>,
+    },
+    AddInFunction {
+        name: String,
+        unused_data: Vec<u8>,
+    },
+    DdeOrOle {
+        storage_id: u32,
+        name: String,
+        opaque_data: Vec<u8>,
+        continuation_chunks: Vec<Vec<u8>>,
+    },
+    DdeStandardDocumentName { name: String },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct XlsExternalName {
+    supporting_book_index: u16,
+    built_in: bool,
+    automatic: bool,
+    picture: bool,
+    standard_document_name: bool,
+    ole_link: bool,
+    clipboard_format: i16,
+    displayed_as_icon: bool,
+    body: XlsExternalNameBody,
+}
+
+impl XlsExternalName {
+    pub fn supporting_book_index(&self) -> u16 { self.supporting_book_index }
+    pub fn built_in(&self) -> bool { self.built_in }
+    pub fn automatic(&self) -> bool { self.automatic }
+    pub fn picture(&self) -> bool { self.picture }
+    pub fn standard_document_name(&self) -> bool { self.standard_document_name }
+    pub fn ole_link(&self) -> bool { self.ole_link }
+    pub fn clipboard_format(&self) -> i16 { self.clipboard_format }
+    pub fn displayed_as_icon(&self) -> bool { self.displayed_as_icon }
+    pub fn body(&self) -> &XlsExternalNameBody { &self.body }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum XlsExternalCachedError {
@@ -129,11 +177,13 @@ impl XlsExternalSheetReference {
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct XlsExternalLinks {
     supporting_books: Vec<XlsSupportingBook>,
+    external_names: Vec<XlsExternalName>,
     sheet_references: Vec<XlsExternalSheetReference>,
 }
 
 impl XlsExternalLinks {
     pub fn supporting_books(&self) -> &[XlsSupportingBook] { &self.supporting_books }
+    pub fn external_names(&self) -> &[XlsExternalName] { &self.external_names }
     pub fn sheet_references(&self) -> &[XlsExternalSheetReference] { &self.sheet_references }
     pub fn external_workbooks(&self) -> impl Iterator<Item = &XlsExternalWorkbook> {
         self.supporting_books.iter().filter_map(|book| match book {
@@ -153,10 +203,14 @@ struct PendingCache {
 pub(crate) struct ExternalLinkCollector {
     books: Vec<XlsSupportingBook>,
     references: Vec<XlsExternalSheetReference>,
+    external_names: Vec<XlsExternalName>,
     pending: Option<PendingCache>,
+    continuable_name: Option<usize>,
+    names_allowed: bool,
     extern_sheet_seen: bool,
     closed: bool,
     cached_cells: usize,
+    external_name_bytes: usize,
 }
 
 impl ExternalLinkCollector {
@@ -169,12 +223,45 @@ impl ExternalLinkCollector {
             return invalid(XCT_RECORD_TYPE, "XCT must be followed immediately by its declared CRN records");
         }
 
+        if record_type == CONTINUE_RECORD_TYPE {
+            if let Some(index) = self.continuable_name {
+                if data.is_empty() || data.len() > 8224 {
+                    return invalid(CONTINUE_RECORD_TYPE, "ExternName Continue payload must be 1..=8224 bytes");
+                }
+                self.external_name_bytes = self.external_name_bytes.checked_add(data.len()).ok_or_else(|| {
+                    XlsError::InvalidRecord {
+                        record_type: CONTINUE_RECORD_TYPE,
+                        message: "ExternName continuation size overflows".to_string(),
+                    }
+                })?;
+                if self.external_name_bytes > MAX_EXTERNAL_NAME_BYTES {
+                    return invalid(CONTINUE_RECORD_TYPE, "ExternName opaque data exceeds resource bound");
+                }
+                let XlsExternalNameBody::DdeOrOle { continuation_chunks, .. } =
+                    &mut self.external_names[index].body
+                else {
+                    unreachable!()
+                };
+                continuation_chunks.push(data.to_vec());
+                return Ok(());
+            }
+            if !self.books.is_empty() && !self.closed {
+                return invalid(CONTINUE_RECORD_TYPE, "Continue is not associated with a DDE/OLE ExternName");
+            }
+            return Ok(());
+        }
+        self.continuable_name = None;
+
         let target = matches!(
             record_type,
-            SUP_BOOK_RECORD_TYPE | XCT_RECORD_TYPE | CRN_RECORD_TYPE | EXTERN_SHEET_RECORD_TYPE
+            SUP_BOOK_RECORD_TYPE
+                | EXTERN_NAME_RECORD_TYPE
+                | XCT_RECORD_TYPE
+                | CRN_RECORD_TYPE
+                | EXTERN_SHEET_RECORD_TYPE
         );
         if !target {
-            if record_type != EXTERN_NAME_RECORD_TYPE && !self.books.is_empty() {
+            if !self.books.is_empty() {
                 self.closed = true;
             }
             return Ok(());
@@ -192,10 +279,40 @@ impl ExternalLinkCollector {
                     return invalid(record_type, "supporting-book count exceeds resource bound");
                 }
                 self.books.push(parse_sup_book(data)?);
+                self.names_allowed = true;
             },
-            XCT_RECORD_TYPE => self.parse_xct(data)?,
+            EXTERN_NAME_RECORD_TYPE => {
+                if !self.names_allowed {
+                    return invalid(record_type, "ExternName must directly follow its active SupBook name collection");
+                }
+                if self.external_names.len() >= MAX_EXTERNAL_NAMES {
+                    return invalid(record_type, "external name count exceeds resource bound");
+                }
+                let book_index = self.books.len().checked_sub(1).ok_or_else(|| XlsError::InvalidRecord {
+                    record_type,
+                    message: "ExternName appears without a preceding SupBook".to_string(),
+                })?;
+                let name = parse_external_name(data, book_index, &self.books[book_index])?;
+                self.external_name_bytes = self.external_name_bytes.checked_add(data.len()).ok_or_else(|| {
+                    XlsError::InvalidRecord {
+                        record_type,
+                        message: "external name size overflows".to_string(),
+                    }
+                })?;
+                if self.external_name_bytes > MAX_EXTERNAL_NAME_BYTES {
+                    return invalid(record_type, "external name data exceeds resource bound");
+                }
+                let continuable = matches!(name.body, XlsExternalNameBody::DdeOrOle { .. });
+                self.external_names.push(name);
+                if continuable { self.continuable_name = Some(self.external_names.len() - 1); }
+            },
+            XCT_RECORD_TYPE => {
+                self.names_allowed = false;
+                self.parse_xct(data)?;
+            },
             CRN_RECORD_TYPE => self.parse_crn(data)?,
             EXTERN_SHEET_RECORD_TYPE => {
+                self.names_allowed = false;
                 self.extern_sheet_seen = true;
                 let mut references = parse_extern_sheet(data)?;
                 if self.references.len() + references.len() > MAX_EXTERNAL_REFERENCES {
@@ -286,8 +403,149 @@ impl ExternalLinkCollector {
                 }
             }
         }
-        Ok(XlsExternalLinks { supporting_books: self.books, sheet_references: self.references })
+        Ok(XlsExternalLinks {
+            supporting_books: self.books,
+            external_names: self.external_names,
+            sheet_references: self.references,
+        })
     }
+}
+
+fn parse_external_name(
+    data: &[u8],
+    book_index: usize,
+    book: &XlsSupportingBook,
+) -> XlsResult<XlsExternalName> {
+    if data.len() < 8 || data.len() > 8224 {
+        return invalid(EXTERN_NAME_RECORD_TYPE, "ExternName payload length must be 8..=8224 bytes");
+    }
+    let flags = read_u16(data, 0);
+    let built_in = flags & 0x0001 != 0;
+    let automatic = flags & 0x0002 != 0;
+    let picture = flags & 0x0004 != 0;
+    let standard_document_name = flags & 0x0008 != 0;
+    let ole_link = flags & 0x0010 != 0;
+    if standard_document_name && ole_link {
+        return invalid(EXTERN_NAME_RECORD_TYPE, "ExternName fOle and fOleLink are mutually exclusive");
+    }
+    let clipboard_bits = (flags >> 5) & 0x03ff;
+    let clipboard_format = if clipboard_bits & 0x0200 != 0 {
+        clipboard_bits as i16 - 1024
+    } else {
+        clipboard_bits as i16
+    };
+    if !matches!(clipboard_format, -1 | 0 | 2 | 5 | 6 | 7 | 8 | 9 | 16 | 20 | 30 | 36 | 44 | 63) {
+        return invalid(EXTERN_NAME_RECORD_TYPE, "ExternName clipboard format is invalid");
+    }
+    let displayed_as_icon = flags & 0x8000 != 0;
+    let (name, offset) = parse_short_unicode_string(data, 6, EXTERN_NAME_RECORD_TYPE)?;
+
+    let body = match book {
+        XlsSupportingBook::ExternalWorkbook(book) => {
+            if flags & !0x0001 != 0 {
+                return invalid(EXTERN_NAME_RECORD_TYPE, "external defined name has non-name flags");
+            }
+            if read_u16(data, 4) != 0 {
+                return invalid(EXTERN_NAME_RECORD_TYPE, "ExternDocName reserved field must be zero");
+            }
+            let ixals = read_u16(data, 2);
+            if usize::from(ixals) > book.sheets.len() {
+                return invalid(EXTERN_NAME_RECORD_TYPE, "ExternDocName sheet scope exceeds SupBook sheet count");
+            }
+            let formula_len = usize::from(*data.get(offset).ok_or_else(|| XlsError::InvalidRecord {
+                record_type: EXTERN_NAME_RECORD_TYPE,
+                message: "ExtNameParsedFormula length is missing".to_string(),
+            })?) | (usize::from(*data.get(offset + 1).ok_or_else(|| XlsError::InvalidRecord {
+                record_type: EXTERN_NAME_RECORD_TYPE,
+                message: "ExtNameParsedFormula length is truncated".to_string(),
+            })?) << 8);
+            let formula_start = offset + 2;
+            if formula_start.checked_add(formula_len) != Some(data.len()) {
+                return invalid(EXTERN_NAME_RECORD_TYPE, "ExtNameParsedFormula length does not consume ExternName");
+            }
+            let formula_bytes = data[formula_start..].to_vec();
+            if formula_bytes.first().is_some_and(|token| !matches!(token, 0x1c | 0x3a | 0x3b | 0x3c | 0x3d)) {
+                return invalid(EXTERN_NAME_RECORD_TYPE, "ExtNameParsedFormula token kind is invalid");
+            }
+            XlsExternalNameBody::ExternalDefinedName {
+                sheet_index: ixals.checked_sub(1),
+                name,
+                formula_bytes,
+            }
+        },
+        XlsSupportingBook::AddIn => {
+            if flags != 0 || read_u16(data, 2) != 0 || read_u16(data, 4) != 0 {
+                return invalid(EXTERN_NAME_RECORD_TYPE, "AddinUdf flags and reserved fields must be zero");
+            }
+            let unused_len = usize::from(read_u16_checked(data, offset, EXTERN_NAME_RECORD_TYPE)?);
+            let unused_start = offset + 2;
+            if unused_start.checked_add(unused_len) != Some(data.len()) {
+                return invalid(EXTERN_NAME_RECORD_TYPE, "AddinUdf unused byte count does not consume ExternName");
+            }
+            XlsExternalNameBody::AddInFunction {
+                name,
+                unused_data: data[unused_start..].to_vec(),
+            }
+        },
+        XlsSupportingBook::DdeOrOle { .. } => {
+            let storage_id = u32::from_le_bytes(data[2..6].try_into().unwrap());
+            if built_in {
+                return invalid(EXTERN_NAME_RECORD_TYPE, "DDE/OLE ExternName has incompatible flags");
+            }
+            if standard_document_name {
+                if displayed_as_icon
+                    || storage_id != 0
+                    || name != "StdDocumentName"
+                    || offset != data.len()
+                {
+                    return invalid(EXTERN_NAME_RECORD_TYPE, "ExternDdeLinkNoOper body is invalid");
+                }
+                XlsExternalNameBody::DdeStandardDocumentName { name }
+            } else {
+                XlsExternalNameBody::DdeOrOle {
+                    storage_id,
+                    name,
+                    opaque_data: data[offset..].to_vec(),
+                    continuation_chunks: Vec::new(),
+                }
+            }
+        },
+        _ => return invalid(EXTERN_NAME_RECORD_TYPE, "SupBook variant cannot own ExternName records"),
+    };
+    Ok(XlsExternalName {
+        supporting_book_index: u16::try_from(book_index).map_err(|_| XlsError::InvalidRecord {
+            record_type: EXTERN_NAME_RECORD_TYPE,
+            message: "supporting-book index exceeds u16".to_string(),
+        })?,
+        built_in,
+        automatic,
+        picture,
+        standard_document_name,
+        ole_link,
+        clipboard_format,
+        displayed_as_icon,
+        body,
+    })
+}
+
+fn parse_short_unicode_string(
+    data: &[u8],
+    offset: usize,
+    record_type: u16,
+) -> XlsResult<(String, usize)> {
+    let count = usize::from(*data.get(offset).ok_or_else(|| XlsError::InvalidRecord {
+        record_type,
+        message: "short Unicode string length is missing".to_string(),
+    })?);
+    parse_unicode_no_cch(data, offset + 1, count, record_type)
+}
+
+fn read_u16_checked(data: &[u8], offset: usize, record_type: u16) -> XlsResult<u16> {
+    let bytes = data.get(offset..offset + 2).ok_or_else(|| XlsError::InvalidRecord {
+        record_type,
+        message: "two-byte field is truncated".to_string(),
+    })?;
+    Ok(u16::from_le_bytes([bytes[0], bytes[1]]))
 }
 
 fn parse_sup_book(data: &[u8]) -> XlsResult<XlsSupportingBook> {
@@ -582,5 +840,28 @@ mod tests {
         collector.feed_record(SUP_BOOK_RECORD_TYPE, &external).unwrap();
         collector.feed_record(EXTERN_SHEET_RECORD_TYPE, &[1, 0, 1, 0, 0, 0, 0, 0]).unwrap();
         assert!(collector.finish(1).is_err());
+    }
+
+    #[test]
+    fn extern_names_are_contextual_bounded_and_continuable_only_for_links() {
+        let addin = [1, 0, 1, 0x3a];
+        let addin_name = [0, 0, 0, 0, 0, 0, 1, 0, b'F', 2, 0, 0x1c, 0x17];
+        let mut collector = ExternalLinkCollector::new();
+        assert!(collector.feed_record(EXTERN_NAME_RECORD_TYPE, &addin_name).is_err());
+        collector.feed_record(SUP_BOOK_RECORD_TYPE, &addin).unwrap();
+        collector.feed_record(EXTERN_NAME_RECORD_TYPE, &addin_name).unwrap();
+        assert!(collector.feed_record(CONTINUE_RECORD_TYPE, &[0]).is_err());
+
+        let dde = [0, 0, 3, 0, 0, b'A', 3, b'B'];
+        let dde_name = [2, 0, 0, 0, 0, 0, 1, 0, b'X', 0, 0, 0];
+        let mut collector = ExternalLinkCollector::new();
+        collector.feed_record(SUP_BOOK_RECORD_TYPE, &dde).unwrap();
+        collector.feed_record(EXTERN_NAME_RECORD_TYPE, &dde_name).unwrap();
+        collector.feed_record(CONTINUE_RECORD_TYPE, &[0; 9]).unwrap();
+        let links = collector.finish(1).unwrap();
+        let XlsExternalNameBody::DdeOrOle { continuation_chunks, .. } = links.external_names()[0].body() else {
+            panic!("expected DDE/OLE body")
+        };
+        assert_eq!(continuation_chunks, &[vec![0; 9]]);
     }
 }

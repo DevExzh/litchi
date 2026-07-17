@@ -46,6 +46,33 @@ pub enum TableDistanceScope { Row, Cell }
 pub enum TableDistanceKind { Padding, Spacing }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableEdge { Left, Right, Top, Bottom }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TableRowBorderSide { Top, Left, Bottom, Right, Horizontal, Vertical }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TableCellBorderSide { Top, Left, Bottom, Right, UpperLeftToLowerRight, UpperRightToLowerLeft }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum TableBorderTarget { Row(TableRowBorderSide), Cell(TableCellBorderSide) }
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct TableRowBorders { pub top:Option<crate::Border>, pub left:Option<crate::Border>, pub bottom:Option<crate::Border>, pub right:Option<crate::Border>, pub horizontal:Option<crate::Border>, pub vertical:Option<crate::Border> }
+impl TableRowBorders {
+    pub(crate) fn side_mut(&mut self,side:TableRowBorderSide)->&mut Option<crate::Border>{match side{TableRowBorderSide::Top=>&mut self.top,TableRowBorderSide::Left=>&mut self.left,TableRowBorderSide::Bottom=>&mut self.bottom,TableRowBorderSide::Right=>&mut self.right,TableRowBorderSide::Horizontal=>&mut self.horizontal,TableRowBorderSide::Vertical=>&mut self.vertical}}
+    pub fn validate(&self)->crate::RtfResult<()>{for border in [self.top,self.left,self.bottom,self.right,self.horizontal,self.vertical].into_iter().flatten(){border.validate_table()?;}Ok(())}
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct TableCellBorders { pub top:Option<crate::Border>, pub left:Option<crate::Border>, pub bottom:Option<crate::Border>, pub right:Option<crate::Border>, pub upper_left_to_lower_right:Option<crate::Border>, pub upper_right_to_lower_left:Option<crate::Border> }
+impl TableCellBorders {
+    pub(crate) fn side_mut(&mut self,side:TableCellBorderSide)->&mut Option<crate::Border>{match side{TableCellBorderSide::Top=>&mut self.top,TableCellBorderSide::Left=>&mut self.left,TableCellBorderSide::Bottom=>&mut self.bottom,TableCellBorderSide::Right=>&mut self.right,TableCellBorderSide::UpperLeftToLowerRight=>&mut self.upper_left_to_lower_right,TableCellBorderSide::UpperRightToLowerLeft=>&mut self.upper_right_to_lower_left}}
+    pub fn validate(&self)->crate::RtfResult<()>{for border in [self.top,self.left,self.bottom,self.right,self.upper_left_to_lower_right,self.upper_right_to_lower_left].into_iter().flatten(){border.validate_table()?;}Ok(())}
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct TableShading { pub amount:Option<u16>, pub foreground_color:Option<crate::ColorRef>, pub background_color:Option<crate::ColorRef>, pub pattern:Option<crate::ShadingPattern>, pub pattern_index:Option<u16> }
+impl TableShading { pub fn validate(&self)->crate::RtfResult<()>{if self.amount.is_some_and(|value|value>10_000){return Err(crate::RtfError::MalformedDocument("RTF table shading must be in 0..=10000".to_string()))}if self.pattern.is_some()&&self.pattern_index.is_some(){return Err(crate::RtfError::MalformedDocument("RTF table shading has conflicting pattern controls".to_string()))}Ok(())} }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TableDistanceTarget { pub scope: TableDistanceScope, pub kind: TableDistanceKind, pub edge: TableEdge }
 
@@ -135,6 +162,8 @@ pub struct Row<'a> {
     padding: TableEdgeDistances,
     spacing: TableEdgeDistances,
     positioning: FloatingTablePosition,
+    borders: TableRowBorders,
+    shading: TableShading,
 }
 
 impl<'a> Row<'a> {
@@ -147,6 +176,7 @@ impl<'a> Row<'a> {
             padding: TableEdgeDistances::default(),
             spacing: TableEdgeDistances::default(),
             positioning: FloatingTablePosition::default(),
+            borders: Default::default(), shading: Default::default(),
         }
     }
 
@@ -182,6 +212,10 @@ impl<'a> Row<'a> {
     pub fn set_spacing(&mut self,value:TableEdgeDistances){self.spacing=value}
     pub fn positioning(&self)->&FloatingTablePosition{&self.positioning}
     pub fn set_positioning(&mut self,value:FloatingTablePosition){self.positioning=value}
+    pub fn borders(&self)->&TableRowBorders{&self.borders}
+    pub fn shading(&self)->TableShading{self.shading}
+    pub fn set_borders(&mut self,value:TableRowBorders){self.borders=value}
+    pub fn set_shading(&mut self,value:TableShading){self.shading=value}
 }
 
 impl<'a> Default for Row<'a> {
@@ -198,6 +232,8 @@ pub struct Cell<'a> {
     padding: TableEdgeDistances,
     spacing: TableEdgeDistances,
     layout: TableCellLayout,
+    borders: TableCellBorders,
+    shading: TableShading,
     nested_tables: Vec<CellNestedTable<'a>>,
 }
 
@@ -208,9 +244,9 @@ pub struct CellNestedTable<'a> { pub text_offset: usize, pub table: Table<'a> }
 impl<'a> Cell<'a> {
     /// Create a new cell.
     pub fn new(text: Cow<'a, str>) -> Self {
-        Self { text, padding:TableEdgeDistances::default(), spacing:TableEdgeDistances::default(), layout:TableCellLayout::default(), nested_tables:Vec::new() }
+        Self { text, padding:TableEdgeDistances::default(), spacing:TableEdgeDistances::default(), layout:TableCellLayout::default(), borders:Default::default(), shading:Default::default(), nested_tables:Vec::new() }
     }
-    pub fn with_distances(text:Cow<'a,str>,padding:TableEdgeDistances,spacing:TableEdgeDistances)->Self{Self{text,padding,spacing,layout:TableCellLayout::default(),nested_tables:Vec::new()}}
+    pub fn with_distances(text:Cow<'a,str>,padding:TableEdgeDistances,spacing:TableEdgeDistances)->Self{Self{text,padding,spacing,layout:TableCellLayout::default(),borders:Default::default(),shading:Default::default(),nested_tables:Vec::new()}}
 
     /// Get the cell text.
     pub fn text(&self) -> &str {
@@ -222,6 +258,10 @@ impl<'a> Cell<'a> {
     pub fn set_spacing(&mut self,value:TableEdgeDistances){self.spacing=value}
     pub fn layout(&self)->&TableCellLayout{&self.layout}
     pub fn set_layout(&mut self,value:TableCellLayout){self.layout=value}
+    pub fn borders(&self)->&TableCellBorders{&self.borders}
+    pub fn shading(&self)->TableShading{self.shading}
+    pub fn set_borders(&mut self,value:TableCellBorders){self.borders=value}
+    pub fn set_shading(&mut self,value:TableShading){self.shading=value}
     pub fn nested_tables(&self)->&[CellNestedTable<'a>]{&self.nested_tables}
     pub fn add_nested_table(&mut self,text_offset:usize,table:Table<'a>)->crate::RtfResult<()>{if text_offset>self.text.len()||!self.text.is_char_boundary(text_offset)||self.nested_tables.last().is_some_and(|entry|entry.text_offset>text_offset){return Err(crate::RtfError::MalformedDocument("invalid nested-table text insertion offset".to_string()))}self.nested_tables.push(CellNestedTable{text_offset,table});Ok(())}
     pub(crate) fn nested_tables_mut(&mut self)->&mut Vec<CellNestedTable<'a>>{&mut self.nested_tables}

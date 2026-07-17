@@ -152,7 +152,8 @@ pub use workbook_view::{XlsWorkbookView, XlsWorkbookWindow};
 pub use function_group::{XlsBuiltInFunctionCategories, XlsFunctionGroups};
 pub use external_link::{
     XlsExternalCacheRow, XlsExternalCachedError, XlsExternalCachedValue, XlsExternalLinks,
-    XlsExternalSheet, XlsExternalSheetReference, XlsExternalWorkbook, XlsSupportingBook,
+    XlsExternalName, XlsExternalNameBody, XlsExternalSheet, XlsExternalSheetReference,
+    XlsExternalWorkbook, XlsSupportingBook,
 };
 pub use consolidation::{
     XlsConsolidation, XlsConsolidationBuiltInName, XlsConsolidationFile,

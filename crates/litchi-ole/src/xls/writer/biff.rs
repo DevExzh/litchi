@@ -218,8 +218,18 @@ pub fn write_external_link_table<W: Write>(
     writer: &mut W,
     internal: Option<(u16, ExternSheetMode)>,
     external: &[crate::xls::writer::core::XlsExternalWorkbookOptions],
+    external_names: &[Vec<crate::xls::writer::core::XlsExternalDefinedNameOptions>],
+    add_in_functions: &[crate::xls::writer::core::XlsAddInFunctionOptions],
+    dde_or_ole_links: &[crate::xls::writer::core::XlsDdeOrOleLinkOptions],
 ) -> XlsResult<()> {
-    workbook::write_external_link_table(writer, internal, external)
+    workbook::write_external_link_table(
+        writer,
+        internal,
+        external,
+        external_names,
+        add_in_functions,
+        dde_or_ole_links,
+    )
 }
 
 pub fn write_password<W: Write>(writer: &mut W, password_hash: u16) -> XlsResult<()> {

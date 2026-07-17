@@ -563,6 +563,7 @@ fn write_unicode_string<W: Write>(writer: &mut W, value: &str, include_count: bo
 fn write_external_supbook<W: Write>(
     writer: &mut W,
     book: &crate::xls::writer::core::XlsExternalWorkbookOptions,
+    names: &[crate::xls::writer::core::XlsExternalDefinedNameOptions],
 ) -> XlsResult<()> {
     book.validate()?;
     let path_units = book.encoded_virtual_path.encode_utf16().count();
@@ -576,12 +577,97 @@ fn write_external_supbook<W: Write>(
     }
     write_record_header(writer, 0x01ae, data.len() as u16)?;
     writer.write_all(&data)?;
+    for name in names { write_external_defined_name(writer, name)?; }
     for (sheet_index, sheet) in book.sheets.iter().enumerate() {
         if sheet.cache_rows.is_empty() { continue; }
         write_record_header(writer, 0x0059, 4)?;
         writer.write_all(&(sheet.cache_rows.len() as i16).to_le_bytes())?;
         writer.write_all(&(sheet_index as u16).to_le_bytes())?;
         for row in &sheet.cache_rows { write_crn(writer, row)?; }
+    }
+    Ok(())
+}
+
+fn write_short_unicode_string<W: Write>(writer: &mut W, value: &str) -> XlsResult<()> {
+    let units = value.encode_utf16().collect::<Vec<_>>();
+    writer.write_all(&[units.len() as u8])?;
+    write_unicode_string(writer, value, false)
+}
+
+fn write_external_defined_name<W: Write>(
+    writer: &mut W,
+    name: &crate::xls::writer::core::XlsExternalDefinedNameOptions,
+) -> XlsResult<()> {
+    let mut data = Vec::new();
+    data.extend_from_slice(&u16::from(name.built_in).to_le_bytes());
+    data.extend_from_slice(&name.sheet_index.map_or(0, |index| index + 1).to_le_bytes());
+    data.extend_from_slice(&0u16.to_le_bytes());
+    write_short_unicode_string(&mut data, &name.name)?;
+    data.extend_from_slice(&(name.formula_bytes.len() as u16).to_le_bytes());
+    data.extend_from_slice(&name.formula_bytes);
+    if data.len() > 8224 {
+        return Err(XlsError::InvalidData("external defined name exceeds BIFF8 record size".to_string()));
+    }
+    write_record_header(writer, 0x0023, data.len() as u16)?;
+    writer.write_all(&data)?;
+    Ok(())
+}
+
+fn write_add_in_supbook<W: Write>(
+    writer: &mut W,
+    functions: &[crate::xls::writer::core::XlsAddInFunctionOptions],
+) -> XlsResult<()> {
+    write_record_header(writer, 0x01ae, 4)?;
+    writer.write_all(&1u16.to_le_bytes())?;
+    writer.write_all(&0x3a01u16.to_le_bytes())?;
+    for function in functions {
+        let mut data = vec![0; 6];
+        write_short_unicode_string(&mut data, &function.name)?;
+        data.extend_from_slice(&(function.unused_data.len() as u16).to_le_bytes());
+        data.extend_from_slice(&function.unused_data);
+        if data.len() > 8224 {
+            return Err(XlsError::InvalidData("add-in ExternName exceeds BIFF8 record size".to_string()));
+        }
+        write_record_header(writer, 0x0023, data.len() as u16)?;
+        writer.write_all(&data)?;
+    }
+    Ok(())
+}
+
+fn encode_clipboard_format(value: i16) -> u16 { (value as u16) & 0x03ff }
+
+fn write_dde_or_ole_supbook<W: Write>(
+    writer: &mut W,
+    link: &crate::xls::writer::core::XlsDdeOrOleLinkOptions,
+) -> XlsResult<()> {
+    let mut supbook = Vec::new();
+    supbook.extend_from_slice(&0u16.to_le_bytes());
+    supbook.extend_from_slice(&(link.encoded_virtual_path.encode_utf16().count() as u16).to_le_bytes());
+    write_unicode_string(&mut supbook, &link.encoded_virtual_path, false)?;
+    write_record_header(writer, 0x01ae, supbook.len() as u16)?;
+    writer.write_all(&supbook)?;
+    for item in &link.items {
+        let mut flags = (encode_clipboard_format(item.clipboard_format) << 5)
+            | u16::from(item.automatic) << 1
+            | u16::from(item.picture) << 2
+            | u16::from(item.standard_document_name) << 3
+            | u16::from(item.ole_link) << 4
+            | u16::from(item.displayed_as_icon) << 15;
+        flags &= 0xffff;
+        let mut data = Vec::new();
+        data.extend_from_slice(&flags.to_le_bytes());
+        data.extend_from_slice(&item.storage_id.to_le_bytes());
+        write_short_unicode_string(&mut data, &item.name)?;
+        data.extend_from_slice(&item.opaque_data);
+        if data.len() > 8224 {
+            return Err(XlsError::InvalidData("DDE/OLE ExternName exceeds BIFF8 record size".to_string()));
+        }
+        write_record_header(writer, 0x0023, data.len() as u16)?;
+        writer.write_all(&data)?;
+        for chunk in &item.continuation_chunks {
+            write_record_header(writer, 0x003c, chunk.len() as u16)?;
+            writer.write_all(chunk)?;
+        }
     }
     Ok(())
 }
@@ -620,16 +706,27 @@ pub fn write_external_link_table<W: Write>(
     writer: &mut W,
     internal: Option<(u16, ExternSheetMode)>,
     external: &[crate::xls::writer::core::XlsExternalWorkbookOptions],
+    external_names: &[Vec<crate::xls::writer::core::XlsExternalDefinedNameOptions>],
+    add_in_functions: &[crate::xls::writer::core::XlsAddInFunctionOptions],
+    dde_or_ole_links: &[crate::xls::writer::core::XlsDdeOrOleLinkOptions],
 ) -> XlsResult<()> {
     if let Some((sheet_count, _)) = internal { write_supbook_internal(writer, sheet_count)?; }
-    for book in external { write_external_supbook(writer, book)?; }
+    if external.len() != external_names.len() {
+        return Err(XlsError::InvalidData("external workbook/name table cardinality mismatch".to_string()));
+    }
+    for (book, names) in external.iter().zip(external_names) {
+        write_external_supbook(writer, book, names)?;
+    }
+    if !add_in_functions.is_empty() { write_add_in_supbook(writer, add_in_functions)?; }
+    for link in dde_or_ole_links { write_dde_or_ole_supbook(writer, link)?; }
 
     let internal_count = internal.map_or(0usize, |(sheet_count, mode)| match mode {
         ExternSheetMode::PerSheet => usize::from(sheet_count),
         ExternSheetMode::WorkbookWide => 1,
     });
     let external_count = external.iter().map(|book| book.sheets.len()).sum::<usize>();
-    let count = internal_count + external_count;
+    let add_in_count = usize::from(!add_in_functions.is_empty());
+    let count = internal_count + external_count + add_in_count + dde_or_ole_links.len();
     if count > 1370 {
         return Err(XlsError::InvalidData("ExternSheet reference count exceeds BIFF8 record bound".to_string()));
     }
@@ -658,6 +755,20 @@ pub fn write_external_link_table<W: Write>(
             writer.write_all(&(sheet as i16).to_le_bytes())?;
             writer.write_all(&(sheet as i16).to_le_bytes())?;
         }
+    }
+    let add_in_book = first_external_book + external.len();
+    if !add_in_functions.is_empty() {
+        writer.write_all(&(add_in_book as u16).to_le_bytes())?;
+        writer.write_all(&(-2i16).to_le_bytes())?;
+        writer.write_all(&(-2i16).to_le_bytes())?;
+    }
+    let first_dde_book = add_in_book + add_in_count;
+    for offset in 0..dde_or_ole_links.len() {
+        writer.write_all(&u16::try_from(first_dde_book + offset)
+            .map_err(|_| XlsError::InvalidData("supporting-book index exceeds u16".to_string()))?
+            .to_le_bytes())?;
+        writer.write_all(&(-2i16).to_le_bytes())?;
+        writer.write_all(&(-2i16).to_le_bytes())?;
     }
     Ok(())
 }
