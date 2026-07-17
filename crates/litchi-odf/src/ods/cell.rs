@@ -1,6 +1,6 @@
 //! Cell data structures for ODS spreadsheets.
 
-use super::{CellAnnotation, CellDetective, CellRangeSource, Row};
+use super::{CellAnnotation, CellDetective, CellHyperlink, CellRangeSource, Row};
 use litchi_core::{Result, xml::escape_xml};
 use std::num::NonZeroUsize;
 
@@ -86,6 +86,9 @@ pub struct Cell {
     pub formula: Option<String>,
     /// The optional ODF annotation (comment/note) attached to the cell.
     pub annotation: Option<CellAnnotation>,
+    /// Hyperlinks (`text:a`) contained in the cell's text content, in
+    /// document order.
+    pub hyperlinks: Vec<CellHyperlink>,
     /// Optional inert metadata for an externally imported rectangular range.
     pub range_source: Option<CellRangeSource>,
     /// Optional inert formula-auditing highlights and operations.
@@ -116,6 +119,7 @@ impl Cell {
             text: text.into(),
             formula: None,
             annotation: None,
+            hyperlinks: Vec::new(),
             range_source: None,
             detective: None,
             validation_name: None,
@@ -188,6 +192,21 @@ impl Cell {
     /// Check whether this cell has an annotation.
     pub fn has_annotation(&self) -> bool {
         self.annotation.is_some()
+    }
+
+    /// Return all hyperlinks in the cell's text content, in document order.
+    pub fn hyperlinks(&self) -> &[CellHyperlink] {
+        &self.hyperlinks
+    }
+
+    /// Return the first hyperlink in the cell's text content, if any.
+    pub fn hyperlink(&self) -> Option<&CellHyperlink> {
+        self.hyperlinks.first()
+    }
+
+    /// Check whether this cell contains at least one hyperlink.
+    pub fn has_hyperlinks(&self) -> bool {
+        !self.hyperlinks.is_empty()
     }
 
     /// Return inert external-range metadata without accessing its URI.
@@ -550,6 +569,7 @@ pub(crate) fn merge_cell_range(
                 text: String::new(),
                 formula: None,
                 annotation: None,
+                hyperlinks: Vec::new(),
                 range_source: None,
                 detective: None,
                 validation_name: None,
@@ -832,6 +852,7 @@ mod tests {
             text: String::new(),
             formula: None,
             annotation: None,
+            hyperlinks: Vec::new(),
             range_source: None,
             detective: None,
             validation_name: None,
@@ -855,6 +876,7 @@ mod tests {
             text: "anchor".to_string(),
             formula: None,
             annotation: None,
+            hyperlinks: Vec::new(),
             range_source: None,
             detective: None,
             validation_name: None,
@@ -916,6 +938,7 @@ mod tests {
             text: "Hello".to_string(),
             formula: None,
             annotation: None,
+            hyperlinks: Vec::new(),
             range_source: None,
             detective: None,
             validation_name: None,
@@ -937,6 +960,7 @@ mod tests {
             text: "42".to_string(),
             formula: None,
             annotation: None,
+            hyperlinks: Vec::new(),
             range_source: None,
             detective: None,
             validation_name: None,
@@ -961,6 +985,7 @@ mod tests {
             text: "42".to_string(),
             formula: None,
             annotation: None,
+            hyperlinks: Vec::new(),
             range_source: None,
             detective: None,
             validation_name: None,
@@ -979,6 +1004,7 @@ mod tests {
             text: "$100".to_string(),
             formula: None,
             annotation: None,
+            hyperlinks: Vec::new(),
             range_source: None,
             detective: None,
             validation_name: None,
@@ -997,6 +1023,7 @@ mod tests {
             text: "50%".to_string(),
             formula: None,
             annotation: None,
+            hyperlinks: Vec::new(),
             range_source: None,
             detective: None,
             validation_name: None,
@@ -1015,6 +1042,7 @@ mod tests {
             text: "Hello".to_string(),
             formula: None,
             annotation: None,
+            hyperlinks: Vec::new(),
             range_source: None,
             detective: None,
             validation_name: None,
@@ -1036,6 +1064,7 @@ mod tests {
             text: "42".to_string(),
             formula: Some("=A1+B1".to_string()),
             annotation: None,
+            hyperlinks: Vec::new(),
             range_source: None,
             detective: None,
             validation_name: None,
@@ -1057,6 +1086,7 @@ mod tests {
             text: "Hello".to_string(),
             formula: None,
             annotation: None,
+            hyperlinks: Vec::new(),
             range_source: None,
             detective: None,
             validation_name: None,
@@ -1078,6 +1108,7 @@ mod tests {
             text: "42".to_string(),
             formula: Some("=A1".to_string()),
             annotation: None,
+            hyperlinks: Vec::new(),
             range_source: None,
             detective: None,
             validation_name: None,
@@ -1096,6 +1127,7 @@ mod tests {
             text: "Hello".to_string(),
             formula: None,
             annotation: None,
+            hyperlinks: Vec::new(),
             range_source: None,
             detective: None,
             validation_name: None,
@@ -1117,6 +1149,7 @@ mod tests {
             text: String::new(),
             formula: None,
             annotation: None,
+            hyperlinks: Vec::new(),
             range_source: None,
             detective: None,
             validation_name: None,
@@ -1138,6 +1171,7 @@ mod tests {
             text: String::new(),
             formula: None,
             annotation: None,
+            hyperlinks: Vec::new(),
             range_source: None,
             detective: None,
             validation_name: None,
@@ -1156,6 +1190,7 @@ mod tests {
             text: "Hello".to_string(),
             formula: None,
             annotation: None,
+            hyperlinks: Vec::new(),
             range_source: None,
             detective: None,
             validation_name: None,

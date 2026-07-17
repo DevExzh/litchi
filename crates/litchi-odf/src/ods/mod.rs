@@ -83,6 +83,7 @@ mod dde;
 mod detective;
 /// OpenFormula parsing and support
 pub mod formula;
+mod hyperlink;
 mod label_range;
 mod mutable;
 mod named_expression;
@@ -90,8 +91,8 @@ mod parser;
 mod protection;
 mod row;
 mod scenario;
-mod sheet_image;
 mod sheet;
+mod sheet_image;
 mod source;
 mod spreadsheet;
 mod structure;
@@ -129,6 +130,7 @@ pub use detective::{
     CellDetective, DetectiveDirection, DetectiveHighlightedRange, DetectiveOperation,
     DetectiveOperationKind,
 };
+pub use hyperlink::CellHyperlink;
 pub use label_range::{LabelRange, LabelRangeOrientation};
 pub use mutable::MutableSpreadsheet;
 pub use named_expression::{
@@ -147,7 +149,7 @@ pub use structure::{
     Column, SheetPrintSettings, SheetStyle, SheetStyleUsage, TableGroup, TableRange,
     TableStructure, TableVisibility,
 };
-pub use style_protection::{ConditionalCellStyle, ConditionalCellStyleRule, CellStyleProtection};
+pub use style_protection::{CellStyleProtection, ConditionalCellStyle, ConditionalCellStyleRule};
 pub use table_template::{TableTemplate, TableTemplateAxis, TableTemplateStyle};
 pub use tracked_changes::{
     SpreadsheetCellContentChange, SpreadsheetChangeAcceptance, SpreadsheetChangeCutOff,

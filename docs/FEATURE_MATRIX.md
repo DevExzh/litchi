@@ -482,12 +482,12 @@ This document tracks the implementation status of features across all supported 
 | Data validation | ❌ | ❌ | ❌ | Validity constraints |
 | Charts | ❌ | ❌ | ❌ | Embedded chart objects |
 | Images/Drawing objects | ❌ | ❌ | ❌ | Shapes, images, frames |
-| Comments/Annotations | ❌ | ❌ | ❌ | Cell comments |
-| Hyperlinks | ❌ | ❌ | ❌ | Cell/range hyperlinks |
-| Auto-filter/Sort | ❌ | ❌ | ❌ | Filtering and sorting state |
-| Named ranges | ❌ | ❌ | ❌ | Defined expressions/ranges |
+| Comments/Annotations | ✅ | ✅ | ❌ | Rich-text cell annotations with creator/date and geometry |
+| Hyperlinks | ✅ | ✅ | ❌ | Cell hyperlinks (`text:a`) with metadata |
+| Auto-filter/Sort | ✅ | ✅ | ❌ | Database ranges with filters, sort keys, subtotals |
+| Named ranges | ✅ | ✅ | ❌ | Global and sheet-local named ranges/expressions |
 | Pivot tables (DataPilot) | ❌ | ❌ | ❌ | DataPilot structures |
-| Sheet protection | ❌ | ❌ | ❌ | Sheet/table protection |
+| Sheet protection | ✅ | ✅ | ❌ | Sheet/spreadsheet protection keys and options |
 | Encryption / password-protected ODS | ❌ | ❌ | ❌ | ODF encryption |
 | Macros | ❌ | ❌ | ❌ | OpenDocument scripting |
 

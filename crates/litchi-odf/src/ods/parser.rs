@@ -1,11 +1,11 @@
 //! ODS-specific parsing utilities.
 
 use super::{
-    Cell, CellDetective, CellMatrixSpan, CellMerge, CellRangeSource, CellValue, Column,
-    DetectiveDirection, DetectiveHighlightedRange, DetectiveOperation, DetectiveOperationKind,
-    NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange, NamedRangeUsage, Row,
-    Sheet, SheetPrintSettings, SheetScenario, SheetStyle, SheetTableSource, TableGroup, TableRange,
-    TableSourceMode, TableStructure, TableVisibility,
+    Cell, CellDetective, CellHyperlink, CellMatrixSpan, CellMerge, CellRangeSource, CellValue,
+    Column, DetectiveDirection, DetectiveHighlightedRange, DetectiveOperation,
+    DetectiveOperationKind, NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange,
+    NamedRangeUsage, Row, Sheet, SheetPrintSettings, SheetScenario, SheetStyle, SheetTableSource,
+    TableGroup, TableRange, TableSourceMode, TableStructure, TableVisibility,
     annotation::{AnnotationBuilder, decode_reference},
     dde::parse_source as parse_dde_source,
     scenario::validate_scenario,
@@ -33,6 +33,16 @@ const TEXT_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
 const XLINK_NAMESPACE: &str = "http://www.w3.org/1999/xlink";
 const MAX_EXPANDED_CELLS_PER_ROW: usize = 1_048_576;
 const MAX_EXPANDED_CELLS_PER_SHEET: usize = 4_194_304;
+
+/// A `text:a` hyperlink whose text content is still being collected.
+struct PendingHyperlink {
+    /// The hyperlink parsed from the element's attributes.
+    link: CellHyperlink,
+    /// Byte offset into the cell text where the link text begins.
+    text_start: usize,
+    /// The `text_element_depth` value assigned to the `text:a` element.
+    depth: usize,
+}
 
 /// Parser for ODS-specific structures.
 ///
@@ -70,6 +80,7 @@ impl OdsParser {
         let mut text_content = String::new();
         let mut annotation_builder: Option<AnnotationBuilder> = None;
         let mut annotation_depth = 0usize;
+        let mut pending_hyperlink: Option<PendingHyperlink> = None;
         let mut detective_builder: Option<CellDetective> = None;
         let mut detective_child_open = false;
         let mut sheet_text_field = None;
@@ -103,8 +114,7 @@ impl OdsParser {
                         ));
                     } else if current_sheet.is_some()
                         && current_row.is_none()
-                        && current_sheet_depth
-                            .is_some_and(|depth| element_depth == depth + 1)
+                        && current_sheet_depth.is_some_and(|depth| element_depth == depth + 1)
                         && e.local_name().as_ref() == b"dde-source"
                     {
                         if !Self::element_name_is(
@@ -117,11 +127,7 @@ impl OdsParser {
                                 "spoofed office:dde-source namespace".to_string(),
                             ));
                         }
-                        let source = parse_dde_source(
-                            e,
-                            reader.decoder(),
-                            &document_namespaces,
-                        )?;
+                        let source = parse_dde_source(e, reader.decoder(), &document_namespaces)?;
                         current_sheet
                             .as_mut()
                             .expect("checked current sheet")
@@ -152,6 +158,27 @@ impl OdsParser {
                             document_namespaces.clone(),
                         )?);
                     } else if text_element_depth > 0 {
+                        if Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            TEXT_NAMESPACE,
+                            "a",
+                        ) {
+                            if pending_hyperlink.is_some() {
+                                return Err(Error::InvalidFormat(
+                                    "text:a hyperlinks must not be nested".to_string(),
+                                ));
+                            }
+                            pending_hyperlink = Some(PendingHyperlink {
+                                link: Self::parse_hyperlink(
+                                    e,
+                                    reader.decoder(),
+                                    &document_namespaces,
+                                )?,
+                                text_start: text_content.len(),
+                                depth: text_element_depth + 1,
+                            });
+                        }
                         text_element_depth += 1;
                     } else if Self::element_name_is(
                         e.name().as_ref(),
@@ -396,8 +423,7 @@ impl OdsParser {
                     }
                     if current_sheet.is_some()
                         && current_row.is_none()
-                        && current_sheet_depth
-                            .is_some_and(|depth| element_depth == depth)
+                        && current_sheet_depth.is_some_and(|depth| element_depth == depth)
                         && e.local_name().as_ref() == b"dde-source"
                     {
                         if !Self::element_name_is(
@@ -410,11 +436,7 @@ impl OdsParser {
                                 "spoofed office:dde-source namespace".to_string(),
                             ));
                         }
-                        let source = parse_dde_source(
-                            e,
-                            reader.decoder(),
-                            &document_namespaces,
-                        )?;
+                        let source = parse_dde_source(e, reader.decoder(), &document_namespaces)?;
                         current_sheet
                             .as_mut()
                             .expect("checked current sheet")
@@ -468,12 +490,30 @@ impl OdsParser {
                             cell.annotation = Some(annotation);
                         }
                     } else if text_element_depth > 0 {
-                        Self::push_text_empty_element(
-                            e,
-                            reader.decoder(),
+                        if Self::element_name_is(
+                            e.name().as_ref(),
                             &document_namespaces,
-                            &mut text_content,
-                        )?;
+                            TEXT_NAMESPACE,
+                            "a",
+                        ) {
+                            if pending_hyperlink.is_some() {
+                                return Err(Error::InvalidFormat(
+                                    "text:a hyperlinks must not be nested".to_string(),
+                                ));
+                            }
+                            let link =
+                                Self::parse_hyperlink(e, reader.decoder(), &document_namespaces)?;
+                            if let Some(cell) = current_cell.as_mut() {
+                                cell.hyperlinks.push(link);
+                            }
+                        } else {
+                            Self::push_text_empty_element(
+                                e,
+                                reader.decoder(),
+                                &document_namespaces,
+                                &mut text_content,
+                            )?;
+                        }
                     } else if let Some(cell) = current_cell.as_mut()
                         && Self::element_name_is(
                             e.name().as_ref(),
@@ -746,10 +786,7 @@ impl OdsParser {
                     element_depth = element_depth.saturating_sub(1);
                     if closes_sheet_dde_source {
                         sheet_dde_source_depth = None;
-                        Self::pop_namespace_scope(
-                            &mut document_namespaces,
-                            namespace_scopes.pop(),
-                        );
+                        Self::pop_namespace_scope(&mut document_namespaces, namespace_scopes.pop());
                         buf.clear();
                         continue;
                     }
@@ -804,6 +841,22 @@ impl OdsParser {
                     }
 
                     if text_element_depth > 0 {
+                        if pending_hyperlink
+                            .as_ref()
+                            .is_some_and(|pending| pending.depth == text_element_depth)
+                        {
+                            let pending = pending_hyperlink
+                                .take()
+                                .expect("pending hyperlink was checked");
+                            let mut link = pending.link;
+                            link.text = text_content
+                                .get(pending.text_start..)
+                                .unwrap_or_default()
+                                .to_string();
+                            if let Some(cell) = current_cell.as_mut() {
+                                cell.hyperlinks.push(link);
+                            }
+                        }
                         text_element_depth -= 1;
                         Self::pop_namespace_scope(&mut document_namespaces, namespace_scopes.pop());
                         buf.clear();
@@ -940,7 +993,9 @@ impl OdsParser {
                 Error::InvalidFormat("sheet image has no containing table name".to_string())
             })?;
             let index = *sheet_indices.get(sheet_name).ok_or_else(|| {
-                Error::InvalidFormat(format!("sheet image references unknown table '{sheet_name}'"))
+                Error::InvalidFormat(format!(
+                    "sheet image references unknown table '{sheet_name}'"
+                ))
             })?;
             super::sheet_image::validate_sheet_image(&image)?;
             sheets[index].images.push(image);
@@ -1548,6 +1603,91 @@ impl OdsParser {
         Ok(scenario)
     }
 
+    /// Parse the attributes of a `text:a` hyperlink inside cell content.
+    ///
+    /// The visible link text is collected separately while the element's
+    /// subtree is read, so the returned hyperlink has empty text.
+    fn parse_hyperlink(
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+        namespaces: &BTreeMap<String, String>,
+    ) -> Result<CellHyperlink> {
+        let mut href = None;
+        let mut name = None;
+        let mut title = None;
+        let mut target_frame_name = None;
+        let mut style_name = None;
+        let mut visited_style_name = None;
+        for attribute in element.attributes() {
+            let attribute = attribute
+                .map_err(|error| Error::InvalidFormat(format!("invalid XML attribute: {error}")))?;
+            let decode = |name| Self::decode_attribute(&attribute, decoder, name);
+            if Self::attribute_name_is(attribute.key.as_ref(), namespaces, XLINK_NAMESPACE, "href")
+            {
+                href = Some(decode("xlink:href")?);
+            } else if Self::attribute_name_is(
+                attribute.key.as_ref(),
+                namespaces,
+                XLINK_NAMESPACE,
+                "type",
+            ) {
+                let value = decode("xlink:type")?;
+                if value != "simple" {
+                    return Err(Error::InvalidFormat(format!(
+                        "invalid hyperlink xlink:type '{value}'"
+                    )));
+                }
+            } else if Self::attribute_name_is(
+                attribute.key.as_ref(),
+                namespaces,
+                OFFICE_NAMESPACE,
+                "name",
+            ) {
+                name = Some(decode("office:name")?);
+            } else if Self::attribute_name_is(
+                attribute.key.as_ref(),
+                namespaces,
+                OFFICE_NAMESPACE,
+                "title",
+            ) {
+                title = Some(decode("office:title")?);
+            } else if Self::attribute_name_is(
+                attribute.key.as_ref(),
+                namespaces,
+                OFFICE_NAMESPACE,
+                "target-frame-name",
+            ) {
+                target_frame_name = Some(decode("office:target-frame-name")?);
+            } else if Self::attribute_name_is(
+                attribute.key.as_ref(),
+                namespaces,
+                TEXT_NAMESPACE,
+                "style-name",
+            ) {
+                style_name = Some(decode("text:style-name")?);
+            } else if Self::attribute_name_is(
+                attribute.key.as_ref(),
+                namespaces,
+                TEXT_NAMESPACE,
+                "visited-style-name",
+            ) {
+                visited_style_name = Some(decode("text:visited-style-name")?);
+            }
+        }
+        let href = href.ok_or_else(|| {
+            Error::InvalidFormat("text:a hyperlink requires xlink:href".to_string())
+        })?;
+        Ok(CellHyperlink {
+            href,
+            text: String::new(),
+            name,
+            title,
+            target_frame_name,
+            style_name,
+            visited_style_name,
+        })
+    }
+
     fn parse_table_source(
         element: &BytesStart<'_>,
         decoder: Decoder,
@@ -2037,6 +2177,7 @@ impl OdsParser {
                 }
             },
             annotation: None,
+            hyperlinks: Vec::new(),
             range_source: None,
             detective: None,
         })
@@ -2284,8 +2425,7 @@ impl SheetBuilder {
     fn set_table_source(&mut self, source: SheetTableSource) -> Result<()> {
         if self.dde_source.is_some() || self.scenario.is_some() {
             return Err(Error::InvalidFormat(
-                "table:table-source must precede office:dde-source and table:scenario"
-                    .to_string(),
+                "table:table-source must precede office:dde-source and table:scenario".to_string(),
             ));
         }
         if self.table_source.replace(source).is_some() {
@@ -2486,6 +2626,7 @@ pub(crate) struct CellBuilder {
     repeated: usize,
     merge: CellMerge,
     annotation: Option<super::CellAnnotation>,
+    hyperlinks: Vec<CellHyperlink>,
     range_source: Option<CellRangeSource>,
     detective: Option<CellDetective>,
 }
@@ -2500,6 +2641,7 @@ impl CellBuilder {
             // Clone necessary: formula may be reused for repeated cells
             formula: self.formula.clone(),
             annotation: self.annotation.clone(),
+            hyperlinks: self.hyperlinks.clone(),
             range_source: self.range_source.clone(),
             detective: self.detective.clone(),
             validation_name: self.validation_name.clone(),
@@ -3283,6 +3425,7 @@ mod tests {
                 text: "A1".to_string(),
                 formula: None,
                 annotation: None,
+                hyperlinks: Vec::new(),
                 range_source: None,
                 detective: None,
                 validation_name: None,
@@ -3317,6 +3460,7 @@ mod tests {
             text: "A".to_string(),
             formula: None,
             annotation: None,
+            hyperlinks: Vec::new(),
             range_source: None,
             detective: None,
             validation_name: None,
@@ -3335,6 +3479,7 @@ mod tests {
             text: "42".to_string(),
             formula: None,
             annotation: None,
+            hyperlinks: Vec::new(),
             range_source: None,
             detective: None,
             validation_name: None,
@@ -3363,6 +3508,7 @@ mod tests {
             currency: None,
             formula: None,
             annotation: None,
+            hyperlinks: Vec::new(),
             range_source: None,
             detective: None,
             validation_name: None,
@@ -3386,6 +3532,7 @@ mod tests {
             currency: None,
             formula: None,
             annotation: None,
+            hyperlinks: Vec::new(),
             range_source: None,
             detective: None,
             validation_name: None,
@@ -3409,6 +3556,7 @@ mod tests {
             currency: None,
             formula: None,
             annotation: None,
+            hyperlinks: Vec::new(),
             range_source: None,
             detective: None,
             validation_name: None,
@@ -3434,6 +3582,7 @@ mod tests {
             currency: None,
             formula: None,
             annotation: None,
+            hyperlinks: Vec::new(),
             range_source: None,
             detective: None,
             validation_name: None,
@@ -3460,6 +3609,7 @@ mod tests {
             currency: None,
             formula: None,
             annotation: None,
+            hyperlinks: Vec::new(),
             range_source: None,
             detective: None,
             validation_name: None,
@@ -3483,6 +3633,7 @@ mod tests {
             currency: None,
             formula: None,
             annotation: None,
+            hyperlinks: Vec::new(),
             range_source: None,
             detective: None,
             validation_name: None,
@@ -3508,6 +3659,7 @@ mod tests {
             currency: None,
             formula: None,
             annotation: None,
+            hyperlinks: Vec::new(),
             range_source: None,
             detective: None,
             validation_name: None,
@@ -3533,6 +3685,7 @@ mod tests {
             currency: None, // No currency specified
             formula: None,
             annotation: None,
+            hyperlinks: Vec::new(),
             range_source: None,
             detective: None,
             validation_name: None,
@@ -3659,5 +3812,173 @@ mod tests {
         assert_eq!(sheets.len(), 2);
         assert_eq!(sheets[0].name, "Visible");
         assert_eq!(sheets[1].name, "Empty");
+    }
+
+    const HYPERLINK_DOCUMENT_PREFIX: &str = r#"<office:document-content
+        xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+        xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"
+        xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+        xmlns:xlink="http://www.w3.org/1999/xlink">
+      <office:body><office:spreadsheet>
+        <table:table table:name="Links"><table:table-row>"#;
+    const HYPERLINK_DOCUMENT_SUFFIX: &str = "</table:table-row></table:table></office:spreadsheet></office:body></office:document-content>";
+
+    fn hyperlink_document(cells: &str) -> String {
+        format!("{HYPERLINK_DOCUMENT_PREFIX}{cells}{HYPERLINK_DOCUMENT_SUFFIX}")
+    }
+
+    #[test]
+    fn parses_cell_hyperlinks_with_metadata_and_document_order() {
+        let attributes = concat!(
+            r#"xlink:href="https://example.com/" xlink:type="simple" "#,
+            r#"office:name="Example" office:title="Example site" "#,
+            r#"office:target-frame-name="_blank" text:style-name="Internet_20_link" "#,
+            r#"text:visited-style-name="Visited_20_Internet_20_Link""#,
+        );
+        let xml = hyperlink_document(&format!(
+            concat!(
+                r#"<table:table-cell office:value-type="string">"#,
+                "<text:p>See <text:a {attributes}>the ",
+                "<text:span>example</text:span> site</text:a> and ",
+                r##"<text:a xlink:href="#Sheet2.B10">an internal target</text:a>.</text:p>"##,
+                "</table:table-cell>",
+            ),
+            attributes = attributes,
+        ));
+
+        let sheets = OdsParser::parse_sheets(&xml).unwrap();
+        let cell = &sheets[0].rows[0].cells[0];
+        assert_eq!(cell.text, "See the example site and an internal target.");
+        assert_eq!(cell.hyperlinks().len(), 2);
+
+        let first = cell.hyperlink().unwrap();
+        assert_eq!(first.href(), "https://example.com/");
+        assert_eq!(first.text(), "the example site");
+        assert_eq!(first.name.as_deref(), Some("Example"));
+        assert_eq!(first.title.as_deref(), Some("Example site"));
+        assert_eq!(first.target_frame_name.as_deref(), Some("_blank"));
+        assert_eq!(first.style_name.as_deref(), Some("Internet_20_link"));
+        assert_eq!(
+            first.visited_style_name.as_deref(),
+            Some("Visited_20_Internet_20_Link")
+        );
+
+        let second = &cell.hyperlinks()[1];
+        assert_eq!(second.href, "#Sheet2.B10");
+        assert_eq!(second.text, "an internal target");
+        assert!(second.name.is_none());
+        assert!(second.target_frame_name.is_none());
+    }
+
+    #[test]
+    fn parses_hyperlinks_with_namespace_aliases_and_repeated_cells() {
+        let xml = r#"<o:document-content
+            xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+            xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"
+            xmlns:tx="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+            xmlns:x="http://www.w3.org/1999/xlink">
+          <o:body><o:spreadsheet><t:table t:name="Links"><t:table-row>
+            <t:table-cell t:number-columns-repeated="2" o:value-type="string">
+              <tx:p><tx:a x:href="mailto:someone@example.com">mail</tx:a></tx:p>
+            </t:table-cell>
+          </t:table-row></t:table></o:spreadsheet></o:body></o:document-content>"#;
+
+        let sheets = OdsParser::parse_sheets(xml).unwrap();
+        let row = &sheets[0].rows[0];
+        assert_eq!(row.cells.len(), 2);
+        for cell in &row.cells {
+            assert!(cell.has_hyperlinks());
+            let link = cell.hyperlink().unwrap();
+            assert_eq!(link.href(), "mailto:someone@example.com");
+            assert_eq!(link.text(), "mail");
+        }
+    }
+
+    #[test]
+    fn parses_self_closing_hyperlink_with_empty_text() {
+        let xml = hyperlink_document(
+            r#"<table:table-cell office:value-type="string">
+              <text:p>before <text:a xlink:href="https://example.com/"/> after</text:p>
+            </table:table-cell>"#,
+        );
+
+        let sheets = OdsParser::parse_sheets(&xml).unwrap();
+        let cell = &sheets[0].rows[0].cells[0];
+        assert_eq!(cell.text, "before  after");
+        assert_eq!(cell.hyperlinks().len(), 1);
+        assert_eq!(cell.hyperlinks()[0].href, "https://example.com/");
+        assert_eq!(cell.hyperlinks()[0].text, "");
+    }
+
+    #[test]
+    fn hyperlink_text_includes_whitespace_and_break_elements() {
+        let xml = hyperlink_document(
+            r#"<table:table-cell office:value-type="string">
+              <text:p><text:a xlink:href="https://example.com/">a<text:s text:c="2"/>b<text:line-break/>c</text:a></text:p>
+            </table:table-cell>"#,
+        );
+
+        let sheets = OdsParser::parse_sheets(&xml).unwrap();
+        let cell = &sheets[0].rows[0].cells[0];
+        assert_eq!(cell.hyperlinks()[0].text, "a  b\nc");
+    }
+
+    #[test]
+    fn rejects_hyperlink_without_href() {
+        let xml = hyperlink_document(
+            r#"<table:table-cell office:value-type="string">
+              <text:p><text:a office:name="broken">no target</text:a></text:p>
+            </table:table-cell>"#,
+        );
+
+        let error = OdsParser::parse_sheets(&xml)
+            .err()
+            .expect("parse must fail");
+        assert!(error.to_string().contains("xlink:href"));
+    }
+
+    #[test]
+    fn rejects_nested_hyperlinks() {
+        let xml = hyperlink_document(
+            r#"<table:table-cell office:value-type="string">
+              <text:p><text:a xlink:href="https://a.example/">outer
+                <text:a xlink:href="https://b.example/">inner</text:a></text:a></text:p>
+            </table:table-cell>"#,
+        );
+
+        let error = OdsParser::parse_sheets(&xml)
+            .err()
+            .expect("parse must fail");
+        assert!(error.to_string().contains("nested"));
+    }
+
+    #[test]
+    fn rejects_hyperlink_with_invalid_xlink_type() {
+        let xml = hyperlink_document(
+            r#"<table:table-cell office:value-type="string">
+              <text:p><text:a xlink:href="https://example.com/" xlink:type="extended">x</text:a></text:p>
+            </table:table-cell>"#,
+        );
+
+        let error = OdsParser::parse_sheets(&xml)
+            .err()
+            .expect("parse must fail");
+        assert!(error.to_string().contains("xlink:type"));
+    }
+
+    #[test]
+    fn annotation_hyperlinks_are_not_reported_as_cell_hyperlinks() {
+        let xml = hyperlink_document(
+            r#"<table:table-cell office:value-type="string">
+              <office:annotation><text:p><text:a xlink:href="https://note.example/">note link</text:a></text:p></office:annotation>
+              <text:p>plain</text:p>
+            </table:table-cell>"#,
+        );
+
+        let sheets = OdsParser::parse_sheets(&xml).unwrap();
+        let cell = &sheets[0].rows[0].cells[0];
+        assert!(cell.annotation().is_some());
+        assert!(!cell.has_hyperlinks());
+        assert_eq!(cell.text, "plain");
     }
 }
