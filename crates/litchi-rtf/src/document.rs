@@ -6,6 +6,8 @@ use super::parser::Parser;
 use super::types::{ColorTable, FontTable, Paragraph as RtfParagraph, Run, StyleBlock};
 use bumpalo::Bump;
 use std::borrow::Cow;
+
+fn owned_table(table:&super::table::Table<'_>)->super::table::Table<'static>{let mut output=super::table::Table::new();output.set_direction(table.direction());for row in table.rows(){let mut owned_row=super::table::Row::new();owned_row.set_direction(row.direction());for cell in row.cells(){let mut owned_cell=super::table::Cell::with_distances(Cow::Owned(cell.text().to_string()),cell.padding().clone(),cell.spacing().clone());for nested in cell.nested_tables(){owned_cell.add_nested_table(nested.text_offset,owned_table(&nested.table)).expect("validated nested-table offset");}owned_row.add_cell(owned_cell);}owned_row.set_padding(row.padding().clone());owned_row.set_spacing(row.spacing().clone());owned_row.set_positioning(row.positioning().clone());output.add_row(owned_row);}output}
 use std::path::Path;
 
 /// RTF Document.
@@ -178,20 +180,7 @@ impl<'a> RtfDocument<'a> {
         let owned_tables: Vec<super::table::Table<'static>> = parsed
             .tables
             .into_iter()
-            .map(|table| {
-                let mut owned_table = super::table::Table::new();
-                owned_table.set_direction(table.direction());
-                for row in table.rows() {
-                    let mut owned_row = super::table::Row::new();
-                    owned_row.set_direction(row.direction());
-                    for cell in row.cells() {
-                        let owned_cell = super::table::Cell::with_distances(Cow::Owned(cell.text().to_string()),cell.padding().clone(),cell.spacing().clone());
-                        owned_row.add_cell(owned_cell);
-                    }
-                    owned_row.set_padding(row.padding().clone());owned_row.set_spacing(row.spacing().clone());owned_row.set_positioning(row.positioning().clone());owned_table.add_row(owned_row);
-                }
-                owned_table
-            })
+            .map(|table|owned_table(&table))
             .collect();
 
         // Convert pictures to owned

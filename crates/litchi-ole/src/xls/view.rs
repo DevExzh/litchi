@@ -38,6 +38,15 @@ impl XlsPaneType {
             _ => Err(invalid(record_type, "pane type must be between 0 and 3")),
         }
     }
+
+    pub(crate) fn code(self) -> u8 {
+        match self {
+            Self::LowerRight => 0,
+            Self::UpperRight => 1,
+            Self::LowerLeft => 2,
+            Self::UpperLeft => 3,
+        }
+    }
 }
 
 /// Inclusive selected cell range.
@@ -50,6 +59,10 @@ pub struct XlsSelectionRange {
 }
 
 impl XlsSelectionRange {
+    pub fn new(first_row: u16, last_row: u16, first_column: u8, last_column: u8) -> Self {
+        Self { first_row, last_row, first_column, last_column }
+    }
+
     pub fn first_row(&self) -> u16 { self.first_row }
     pub fn last_row(&self) -> u16 { self.last_row }
     pub fn first_column(&self) -> u8 { self.first_column }
@@ -232,8 +245,15 @@ fn parse_scl(data: &[u8]) -> XlsResult<(u16, u16)> {
     }
     let numerator = read_u16(data, 0);
     let denominator = read_u16(data, 2);
-    if numerator == 0 || denominator == 0 {
-        return Err(invalid(SCL_RECORD_TYPE, "SCL numerator and denominator must be positive"));
+    if numerator == 0
+        || denominator == 0
+        || numerator > i16::MAX as u16
+        || denominator > i16::MAX as u16
+    {
+        return Err(invalid(
+            SCL_RECORD_TYPE,
+            "SCL numerator and denominator must be signed positive integers",
+        ));
     }
     let numerator = u32::from(numerator);
     let denominator = u32::from(denominator);
@@ -337,6 +357,27 @@ impl ViewCollector {
     fn finish_current(&mut self) -> XlsResult<()> {
         if let Some(view) = self.current.take() {
             view.validate_selection_groups()?;
+            if let Some(pane) = view.pane.as_ref() {
+                if pane.horizontal_split == 0 && pane.vertical_split == 0 {
+                    return Err(invalid(PANE_RECORD_TYPE, "PANE does not split either axis"));
+                }
+                if !crate::xls::writer::view::pane_exists(
+                    pane.horizontal_split,
+                    pane.vertical_split,
+                    pane.active_pane,
+                ) {
+                    return Err(invalid(PANE_RECORD_TYPE, "PANE active pane does not exist"));
+                }
+                if view.selections.iter().any(|selection| {
+                    !crate::xls::writer::view::pane_exists(
+                        pane.horizontal_split,
+                        pane.vertical_split,
+                        selection.pane,
+                    )
+                }) {
+                    return Err(invalid(SELECTION_RECORD_TYPE, "SELECTION references a pane that does not exist"));
+                }
+            }
             self.views.push(view);
         }
         self.phase = ViewPhase::Start;
@@ -471,6 +512,18 @@ mod tests {
         let mut collector = ViewCollector::new();
         collector.feed_record(WINDOW2_RECORD_TYPE, &window2(0x002e)).unwrap();
         collector.feed_record(SELECTION_RECORD_TYPE, &invalid).unwrap();
+        assert!(collector.finish().is_err());
+    }
+
+    #[test]
+    fn rejects_cross_record_view_inconsistencies() {
+        assert!(parse_scl(&[0x00, 0x80, 1, 0]).is_err());
+
+        let mut bad_active_pane = pane();
+        bad_active_pane[0..2].copy_from_slice(&0u16.to_le_bytes());
+        let mut collector = ViewCollector::new();
+        collector.feed_record(WINDOW2_RECORD_TYPE, &window2(0x0026)).unwrap();
+        collector.feed_record(PANE_RECORD_TYPE, &bad_active_pane).unwrap();
         assert!(collector.finish().is_err());
     }
 

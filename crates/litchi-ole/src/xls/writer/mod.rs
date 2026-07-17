@@ -15,6 +15,9 @@ pub mod formatting;
 /// Formula tokenization
 pub mod formula;
 
+/// Typed worksheet view-state writing options
+pub mod view;
+
 /// Checked BIFF8 INDEX/DBCELL worksheet layout generation
 pub mod row_blocks;
 
@@ -42,3 +45,7 @@ pub use formatting::{
     HorizontalAlignment, VerticalAlignment,
 };
 pub use formula::{FormulaTokenizer, Ptg};
+pub use view::{
+    XlsPaneMode, XlsViewScale, XlsWorksheetPaneOptions, XlsWorksheetSelectionOptions,
+    XlsWorksheetViewOptions,
+};

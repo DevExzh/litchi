@@ -174,6 +174,8 @@ enum Destination {
     Footnote,
     /// Endnote content
     Endnote,
+    /// End-defined row properties for a nested table.
+    NestedTableProperties,
     /// Revision/track changes
     #[allow(dead_code)]
     Revision,
@@ -274,6 +276,7 @@ struct State {
     unicode_skip: i32,
     /// Whether we're inside a table
     in_table: bool,
+    table_nesting_level: u8,
     /// Cell boundaries for current row (in twips)
     cell_boundaries: SmallVec<[i32; 8]>,
     table_row_padding: crate::TableEdgeDistances,
@@ -372,6 +375,9 @@ fn floating_table_wrap_distance(parameter:Option<i32>)->RtfResult<u16>{let value
 const MAX_LOGICAL_TABLES:usize=4096;
 const MAX_LOGICAL_TABLE_ROWS:usize=65_536;
 
+struct NestedTableBuilder<'a>{level:u8,table:super::table::Table<'a>,row:super::table::Row<'a>,cell_text:SmallVec<[u8;128]>,cell_nested:Vec<crate::CellNestedTable<'a>>}
+impl<'a> NestedTableBuilder<'a>{fn new(level:u8)->Self{Self{level,table:super::table::Table::new(),row:super::table::Row::new(),cell_text:SmallVec::new(),cell_nested:Vec::new()}}}
+
 fn associated_font_ref(value: Option<i32>) -> RtfResult<FontRef> {
     let value = value.ok_or_else(|| {
         RtfError::MalformedDocument("RTF af control requires a numeric parameter".to_string())
@@ -411,6 +417,7 @@ impl Default for State {
             pending_tab_leader: None,
             unicode_skip: 1,
             in_table: false,
+            table_nesting_level: 0,
             cell_boundaries: SmallVec::new(),
             table_row_padding: Default::default(), table_row_spacing: Default::default(), table_row_positioning: Default::default(),
             pending_cell_padding: Default::default(), pending_cell_spacing: Default::default(), cell_distances: SmallVec::new(),
@@ -452,6 +459,9 @@ pub struct Parser<'a> {
     current_row: Option<super::table::Row<'a>>,
     /// Current cell text buffer
     current_cell_text: SmallVec<[u8; 128]>,
+    current_cell_nested: Vec<crate::CellNestedTable<'a>>,
+    nested_table_builders: Vec<NestedTableBuilder<'a>>,
+    logical_table_count: usize,
     /// Extracted pictures
     pictures: Vec<super::picture::Picture<'a>>,
     /// Extracted fields
@@ -638,6 +648,9 @@ impl<'a> Parser<'a> {
             current_table: None,
             current_row: None,
             current_cell_text: SmallVec::new(),
+            current_cell_nested: Vec::new(),
+            nested_table_builders: Vec::new(),
+            logical_table_count: 0,
             pictures: Vec::new(),
             fields: Vec::new(),
             form_fields: Vec::new(),
@@ -1039,6 +1052,19 @@ impl<'a> Parser<'a> {
         }
         if starts_visible_section_format {
             self.current_state_mut()?.visible_section_format = true;
+        }
+
+        let nested_destination=match (self.tokens.get(self.pos),self.tokens.get(self.pos+1)){
+            (Some(Token::Control(ControlWord::NestedTableProperties(param))),_)=>Some((true,*param,1)),
+            (Some(Token::Control(ControlWord::NoNestedTables(param))),_)=>Some((false,*param,1)),
+            (Some(Token::Control(ControlWord::IgnorableDestination)),Some(Token::Control(ControlWord::NestedTableProperties(param))))=>Some((true,*param,2)),
+            (Some(Token::Control(ControlWord::IgnorableDestination)),Some(Token::Control(ControlWord::NoNestedTables(param))))=>Some((false,*param,2)),
+            _=>None,
+        };
+        if let Some((properties,param,consumed))=nested_destination{
+            require_parameterless(param,if properties{"nesttableprops"}else{"nonesttables"})?;self.pos+=consumed;
+            if properties{self.current_state_mut()?.destination=Destination::NestedTableProperties;self.parse_content()?;}else{self.current_state_mut()?.destination=Destination::Other;self.skip_until_close_brace()?;}
+            self.states.pop();return Ok(());
         }
 
         if self.current_state()?.revision_type.is_some()
@@ -2936,13 +2962,12 @@ impl<'a> Parser<'a> {
                         self.root_section_format_run = false;
                     }
                     // Check if we're in a table
-                    if self.current_state().map(|s| s.in_table).unwrap_or(false) {
-                        let encoding = self.current_state()?.encoding;
+                    if self.current_state().is_ok_and(|s|s.destination==Destination::DocumentBody&&(s.in_table||s.table_nesting_level>=2)) {
+                        let state=self.current_state()?.clone();let encoding = state.encoding;
                         let mut bytes = SmallVec::<[u8; 64]>::new();
                         append_transport_bytes(&mut bytes, text)?;
-                        self.current_cell_text
-                            .extend_from_slice(encoding.decode(&bytes).as_bytes());
-                    } else {
+                        self.append_table_text(encoding.decode(&bytes).as_bytes(),state.table_nesting_level)?;
+                    } else if self.current_state().is_ok_and(|s|s.destination==Destination::DocumentBody) {
                         append_transport_bytes(&mut text_buffer, text)?;
                     }
                 },
@@ -3002,11 +3027,9 @@ impl<'a> Parser<'a> {
     fn append_semantic_text(&mut self, text: &str) -> RtfResult<()> {
         self.finalize_table_before_non_table_body_content(!text.is_empty())?;
         let state = self.current_state()?.clone();
-        if state.in_table {
-            self.current_cell_text.extend_from_slice(text.as_bytes());
-            return Ok(());
-        }
-        if state.destination != Destination::DocumentBody {
+        if state.destination != Destination::DocumentBody { return Ok(()); }
+        if state.in_table||state.table_nesting_level>=2 {
+            self.append_table_text(text.as_bytes(),state.table_nesting_level)?;
             return Ok(());
         }
         let text = self.arena.alloc_str(text);
@@ -3104,6 +3127,7 @@ impl<'a> Parser<'a> {
 
     /// Apply a control word to the current state.
     fn apply_control_word(&mut self, control: &ControlWord) -> RtfResult<()> {
+        if let ControlWord::TableNestingLevel(parameter)=control{let value=parameter.ok_or_else(||RtfError::MalformedDocument("RTF itap requires a numeric parameter".to_string()))?;let level=u8::try_from(value).map_err(|_|RtfError::MalformedDocument("RTF itap is outside 0..=32".to_string()))?;if usize::from(level)>crate::MAX_TABLE_NESTING_DEPTH{return Err(RtfError::MalformedDocument("RTF itap is outside 0..=32".to_string()))}let previous=self.current_state()?.table_nesting_level;self.current_state_mut()?.table_nesting_level=level;let previous=if previous>=2{previous}else{1};let effective=if level>=2{level}else{1};if effective<previous{self.drain_nested_to(effective)?;}return Ok(())}
         match control {
             ControlWord::RevisionSaveRoot(value) => {
                 if self.states.len() != 2 || self.saw_revision_save_root {
@@ -3699,32 +3723,16 @@ impl<'a> Parser<'a> {
                 // Start a new row definition
                 state.cell_boundaries.clear();
                 state.table_row_padding=Default::default();state.table_row_spacing=Default::default();state.table_row_positioning=Default::default();state.pending_cell_padding=Default::default();state.pending_cell_spacing=Default::default();state.cell_distances.clear();
-                self.start_table_if_needed();
-                if let Some(row) = &mut self.current_row {
-                    row.set_direction(None);
-                }
+                let destination=state.destination;let level=state.table_nesting_level;let _=state;if destination==Destination::NestedTableProperties{if level<2{return Err(RtfError::MalformedDocument("RTF nesttableprops lacks itap level 2 or greater".to_string()))}self.ensure_nested_builder(level)?.row.set_direction(None);}else{self.drain_nested_to(1)?;self.start_table_if_needed();if let Some(row)=&mut self.current_row{row.set_direction(None);}}
             },
             ControlWord::LeftToRightRow => {
-                self.start_table_if_needed();
-                if let Some(row) = &mut self.current_row {
-                    row.set_direction(Some(TextDirection::LeftToRight));
-                }
+                let destination=state.destination;let level=state.table_nesting_level;let _=state;if destination==Destination::NestedTableProperties{self.ensure_nested_builder(level)?.row.set_direction(Some(TextDirection::LeftToRight));}else{self.start_table_if_needed();if let Some(row)=&mut self.current_row{row.set_direction(Some(TextDirection::LeftToRight));}}
             },
             ControlWord::RightToLeftRow => {
-                self.start_table_if_needed();
-                if let Some(row) = &mut self.current_row {
-                    row.set_direction(Some(TextDirection::RightToLeft));
-                }
+                let destination=state.destination;let level=state.table_nesting_level;let _=state;if destination==Destination::NestedTableProperties{self.ensure_nested_builder(level)?.row.set_direction(Some(TextDirection::RightToLeft));}else{self.start_table_if_needed();if let Some(row)=&mut self.current_row{row.set_direction(Some(TextDirection::RightToLeft));}}
             },
             ControlWord::TableRightToLeft(value) => {
-                self.start_table_if_needed();
-                if let Some(table) = &mut self.current_table {
-                    table.set_direction(Some(if *value {
-                        TextDirection::RightToLeft
-                    } else {
-                        TextDirection::LeftToRight
-                    }));
-                }
+                let direction=Some(if *value{TextDirection::RightToLeft}else{TextDirection::LeftToRight});let destination=state.destination;let level=state.table_nesting_level;let _=state;if destination==Destination::NestedTableProperties{self.ensure_nested_builder(level)?.table.set_direction(direction);}else{self.start_table_if_needed();if let Some(table)=&mut self.current_table{table.set_direction(direction);}}
             },
             ControlWord::CellX(boundary) => {
                 // Cell boundary definition
@@ -3733,22 +3741,25 @@ impl<'a> Parser<'a> {
             },
             ControlWord::TableDistanceValue(target,value)=>apply_table_distance(state,*target,*value,false)?,
             ControlWord::TableDistanceUnit(target,value)=>apply_table_distance(state,*target,*value,true)?,
-            ControlWord::TableHorizontalReference(value,param)=>if state.destination==Destination::DocumentBody{require_parameterless(*param,"floating-table horizontal reference")?;state.table_row_positioning.horizontal_reference=Some(*value)},
-            ControlWord::TableVerticalReference(value,param)=>if state.destination==Destination::DocumentBody{require_parameterless(*param,"floating-table vertical reference")?;state.table_row_positioning.vertical_reference=Some(*value)},
-            ControlWord::TableHorizontalPosition(value,param)=>if state.destination==Destination::DocumentBody{require_parameterless(*param,"floating-table horizontal position")?;state.table_row_positioning.horizontal_position=Some(*value)},
-            ControlWord::TableVerticalPosition(value,param)=>if state.destination==Destination::DocumentBody{require_parameterless(*param,"floating-table vertical position")?;state.table_row_positioning.vertical_position=Some(*value)},
-            ControlWord::TableHorizontalOffset(negative,param)=>if state.destination==Destination::DocumentBody{let value=floating_table_offset(*param,*negative,"horizontal")?;state.table_row_positioning.horizontal_position=Some(if *negative{crate::TableHorizontalPosition::NegativeOffset(value)}else{crate::TableHorizontalPosition::Offset(value)})},
-            ControlWord::TableVerticalOffset(negative,param)=>if state.destination==Destination::DocumentBody{let value=floating_table_offset(*param,*negative,"vertical")?;state.table_row_positioning.vertical_position=Some(if *negative{crate::TableVerticalPosition::NegativeOffset(value)}else{crate::TableVerticalPosition::Offset(value)})},
-            ControlWord::TableWrapDistance(edge,param)=>if state.destination==Destination::DocumentBody{*state.table_row_positioning.wrap_distances.side_mut(*edge)=Some(floating_table_wrap_distance(*param)?)},
-            ControlWord::TableNoOverlap(param)=>if state.destination==Destination::DocumentBody{state.table_row_positioning.no_overlap=match *param{None|Some(1)=>true,Some(0)=>false,Some(_)=>return Err(RtfError::MalformedDocument("RTF tabsnoovrlp accepts only 0 or 1".to_string()))}},
+            ControlWord::TableHorizontalReference(value,param)=>if matches!(state.destination,Destination::DocumentBody|Destination::NestedTableProperties){require_parameterless(*param,"floating-table horizontal reference")?;state.table_row_positioning.horizontal_reference=Some(*value)},
+            ControlWord::TableVerticalReference(value,param)=>if matches!(state.destination,Destination::DocumentBody|Destination::NestedTableProperties){require_parameterless(*param,"floating-table vertical reference")?;state.table_row_positioning.vertical_reference=Some(*value)},
+            ControlWord::TableHorizontalPosition(value,param)=>if matches!(state.destination,Destination::DocumentBody|Destination::NestedTableProperties){require_parameterless(*param,"floating-table horizontal position")?;state.table_row_positioning.horizontal_position=Some(*value)},
+            ControlWord::TableVerticalPosition(value,param)=>if matches!(state.destination,Destination::DocumentBody|Destination::NestedTableProperties){require_parameterless(*param,"floating-table vertical position")?;state.table_row_positioning.vertical_position=Some(*value)},
+            ControlWord::TableHorizontalOffset(negative,param)=>if matches!(state.destination,Destination::DocumentBody|Destination::NestedTableProperties){let value=floating_table_offset(*param,*negative,"horizontal")?;state.table_row_positioning.horizontal_position=Some(if *negative{crate::TableHorizontalPosition::NegativeOffset(value)}else{crate::TableHorizontalPosition::Offset(value)})},
+            ControlWord::TableVerticalOffset(negative,param)=>if matches!(state.destination,Destination::DocumentBody|Destination::NestedTableProperties){let value=floating_table_offset(*param,*negative,"vertical")?;state.table_row_positioning.vertical_position=Some(if *negative{crate::TableVerticalPosition::NegativeOffset(value)}else{crate::TableVerticalPosition::Offset(value)})},
+            ControlWord::TableWrapDistance(edge,param)=>if matches!(state.destination,Destination::DocumentBody|Destination::NestedTableProperties){*state.table_row_positioning.wrap_distances.side_mut(*edge)=Some(floating_table_wrap_distance(*param)?)},
+            ControlWord::TableNoOverlap(param)=>if matches!(state.destination,Destination::DocumentBody|Destination::NestedTableProperties){state.table_row_positioning.no_overlap=match *param{None|Some(1)=>true,Some(0)=>false,Some(_)=>return Err(RtfError::MalformedDocument("RTF tabsnoovrlp accepts only 0 or 1".to_string()))}},
+            ControlWord::NestedTableCell(param)=>{require_parameterless(*param,"nestcell")?;let destination=state.destination;let level=state.table_nesting_level;let _=state;if destination!=Destination::DocumentBody||level<2{return Err(RtfError::MalformedDocument("RTF nestcell requires visible nested-table text and itap 2 or greater".to_string()))}self.finalize_nested_cell(level)?;},
+            ControlWord::NestedTableRow(param)=>{require_parameterless(*param,"nestrow")?;let destination=state.destination;let level=state.table_nesting_level;let _=state;if destination!=Destination::NestedTableProperties||level<2{return Err(RtfError::MalformedDocument("RTF nestrow requires a nesttableprops destination and itap 2 or greater".to_string()))}self.finalize_nested_row(level)?;},
+            ControlWord::NestedTableProperties(_)|ControlWord::NoNestedTables(_)=>return Err(RtfError::MalformedDocument("RTF nested-table destination control is misplaced".to_string())),
             ControlWord::TableCell => {
                 // Cell break - finalize current cell
                 self.start_table_if_needed();
-                self.finalize_cell(true);
+                self.finalize_cell(true)?;
             },
             ControlWord::TableRow => {
                 // Row break - finalize current row
-                let row_padding=state.table_row_padding.clone();let row_spacing=state.table_row_spacing.clone();let row_positioning=state.table_row_positioning.clone();if let Some(row)=&mut self.current_row{row.set_padding(row_padding);row.set_spacing(row_spacing);row.set_positioning(row_positioning);}
+                let row_padding=state.table_row_padding.clone();let row_spacing=state.table_row_spacing.clone();let row_positioning=state.table_row_positioning.clone();let boundaries=state.cell_boundaries.len();let cell_distances=state.cell_distances.clone();let _=state;self.drain_nested_to(1)?;self.finalize_cell(false)?;if let Some(row)=&mut self.current_row{if boundaries!=0&&boundaries!=row.cell_count(){return Err(RtfError::MalformedDocument("RTF row cell boundaries do not match cell count".to_string()))}for(index,cell)in row.cells_mut().iter_mut().enumerate(){if let Some((padding,spacing))=cell_distances.get(index){cell.set_padding(padding.clone());cell.set_spacing(spacing.clone());}}row.set_padding(row_padding);row.set_spacing(row_spacing);row.set_positioning(row_positioning);}
                 self.finalize_row()?;
             },
 
@@ -4619,7 +4630,7 @@ impl<'a> Parser<'a> {
                     },
                     ControlWord::TableNestingLevel(value) => {
                         if !seen.insert("itap") { return Err(RtfError::MalformedDocument("duplicate RTF pgp itap".to_string())); }
-                        nesting = Some(*value);
+                        nesting = Some(value.ok_or_else(||RtfError::MalformedDocument("RTF pgp itap requires a numeric parameter".to_string()))?);
                     },
                     ControlWord::LeftIndent(value) => {
                         if !seen.insert("li") { return Err(RtfError::MalformedDocument("duplicate RTF pgp li".to_string())); }
@@ -8203,14 +8214,12 @@ impl<'a> Parser<'a> {
             .map_err(|e| RtfError::InvalidUnicode(format!("Invalid Unicode sequence: {}", e)))?;
 
         let state = self.current_state()?.clone();
-        if state.in_table {
-            self.current_cell_text
-                .extend_from_slice(unicode_str.as_bytes());
+        if state.destination==Destination::DocumentBody&&(state.in_table||state.table_nesting_level>=2) {
+            self.append_table_text(unicode_str.as_bytes(),state.table_nesting_level)?;
             if let Some(remainder) = fallback_remainder {
-                self.current_cell_text
-                    .extend_from_slice(remainder.as_bytes());
+                self.append_table_text(remainder.as_bytes(),state.table_nesting_level)?;
             }
-        } else {
+        } else if state.destination==Destination::DocumentBody {
             // Add the Unicode sequence to the document as its own formatted block.
             let allocated = self.arena.alloc_str(&unicode_str);
             let start = self.body_text_len;
@@ -8251,13 +8260,33 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn ensure_nested_builder(&mut self,level:u8)->RtfResult<&mut NestedTableBuilder<'a>>{
+        if !(2..=crate::MAX_TABLE_NESTING_DEPTH as u8).contains(&level){return Err(RtfError::MalformedDocument("RTF nested-table level is outside 2..=32".to_string()))}
+        let index=usize::from(level-2);if self.nested_table_builders.len()<index{return Err(RtfError::MalformedDocument("RTF nested-table level transition skips a parent level".to_string()))}
+        if self.nested_table_builders.len()==index{if level==2{self.start_table_if_needed();}self.nested_table_builders.push(NestedTableBuilder::new(level));}
+        Ok(&mut self.nested_table_builders[index])
+    }
+
+    fn append_table_text(&mut self,text:&[u8],raw_level:u8)->RtfResult<()>{let level=if raw_level>=2{raw_level}else{1};self.drain_nested_to(level)?;if level==1{self.current_cell_text.extend_from_slice(text);}else{self.ensure_nested_builder(level)?.cell_text.extend_from_slice(text);}Ok(())}
+
+    fn drain_nested_to(&mut self,parent_level:u8)->RtfResult<()>{while self.nested_table_builders.last().is_some_and(|builder|builder.level>parent_level){let builder=self.nested_table_builders.pop().unwrap();if !builder.cell_text.is_empty()||!builder.cell_nested.is_empty()||builder.row.cell_count()>0{return Err(RtfError::MalformedDocument("RTF nested-table level ended before nestcell/nestrow".to_string()))}if builder.table.row_count()==0{return Err(RtfError::MalformedDocument("RTF nested table has no completed rows".to_string()))}if self.logical_table_count>=MAX_LOGICAL_TABLES{return Err(RtfError::MalformedDocument("RTF document exceeds 4096 logical tables".to_string()))}self.logical_table_count+=1;let entry=crate::CellNestedTable{text_offset:if parent_level==1{self.current_cell_text.len()}else{self.nested_table_builders.last().map_or(0,|parent|parent.cell_text.len())},table:builder.table};if parent_level==1{self.current_cell_nested.push(entry);}else{let parent=self.nested_table_builders.last_mut().ok_or_else(||RtfError::MalformedDocument("RTF nested table lacks a parent table".to_string()))?;if parent.level!=parent_level{return Err(RtfError::MalformedDocument("RTF nested-table parent level mismatch".to_string()))}parent.cell_nested.push(entry);}}Ok(())}
+
+    fn finalize_nested_cell(&mut self,level:u8)->RtfResult<()>{self.drain_nested_to(level)?;let arena=self.arena;let builder=self.ensure_nested_builder(level)?;if builder.row.cell_count()>=crate::MAX_TABLE_CELLS_PER_ROW{return Err(RtfError::MalformedDocument("RTF table row exceeds 4096 cells".to_string()))}let text=std::str::from_utf8(&builder.cell_text).map_err(|_|RtfError::MalformedDocument("invalid UTF-8 in nested table cell".to_string()))?;let mut cell=crate::Cell::new(Cow::Borrowed(arena.alloc_str(text)));cell.nested_tables_mut().append(&mut builder.cell_nested);builder.row.add_cell(cell);builder.cell_text.clear();Ok(())}
+
+    fn finalize_nested_row(&mut self,level:u8)->RtfResult<()>{self.drain_nested_to(level)?;let state=self.current_state()?.clone();let builder=self.ensure_nested_builder(level)?;if !builder.cell_text.is_empty()||!builder.cell_nested.is_empty(){return Err(RtfError::MalformedDocument("RTF nestrow encountered an unterminated nested cell".to_string()))}if builder.row.cell_count()==0{return Err(RtfError::MalformedDocument("RTF nestrow has no nestcell".to_string()))}if !state.cell_boundaries.is_empty()&&state.cell_boundaries.len()!=builder.row.cell_count(){return Err(RtfError::MalformedDocument("RTF nested row cell boundaries do not match nestcell count".to_string()))}for(index,cell)in builder.row.cells_mut().iter_mut().enumerate(){if let Some((padding,spacing))=state.cell_distances.get(index){cell.set_padding(padding.clone());cell.set_spacing(spacing.clone());}}builder.row.set_padding(state.table_row_padding.clone());builder.row.set_spacing(state.table_row_spacing.clone());builder.row.set_positioning(state.table_row_positioning.clone());if builder.table.row_count()>=MAX_LOGICAL_TABLE_ROWS{return Err(RtfError::MalformedDocument("RTF logical table exceeds 65536 rows".to_string()))}if builder.table.rows().first().is_some_and(|first|first.positioning()!=builder.row.positioning()){return Err(RtfError::MalformedDocument("RTF positioned-table properties must be identical for all rows in one logical table".to_string()))}builder.table.add_row(std::mem::take(&mut builder.row));Ok(())}
+
     /// Finalize the current cell and add it to the current row.
-    fn finalize_cell(&mut self, explicit:bool) {
-        if explicit || !self.current_cell_text.is_empty() {
+    fn finalize_cell(&mut self, explicit:bool)->RtfResult<()> {
+        self.drain_nested_to(1)?;
+        if explicit
+            || !self.current_cell_text.is_empty()
+            || !self.current_cell_nested.is_empty()
+        {
+            if self.current_row.as_ref().map_or(0,|row|row.cell_count())>=crate::MAX_TABLE_CELLS_PER_ROW{return Err(RtfError::MalformedDocument("RTF table row exceeds 4096 cells".to_string()))}
             // Convert cell text to string
             if let Ok(text_str) = std::str::from_utf8(&self.current_cell_text) {
                 let allocated = self.arena.alloc_str(text_str);
-                let index=self.current_row.as_ref().map_or(0,|row|row.cell_count());let (padding,spacing)=self.current_state().ok().and_then(|state|state.cell_distances.get(index)).cloned().unwrap_or_default();let cell = super::table::Cell::with_distances(Cow::Borrowed(allocated),padding,spacing);
+                let index=self.current_row.as_ref().map_or(0,|row|row.cell_count());let (padding,spacing)=self.current_state().ok().and_then(|state|state.cell_distances.get(index)).cloned().unwrap_or_default();let mut cell = super::table::Cell::with_distances(Cow::Borrowed(allocated),padding,spacing);cell.nested_tables_mut().append(&mut self.current_cell_nested);
 
                 // Add cell to current row
                 if let Some(row) = &mut self.current_row {
@@ -8267,12 +8296,13 @@ impl<'a> Parser<'a> {
 
         }
         self.current_cell_text.clear();
+        Ok(())
     }
 
     /// Finalize the current row and add it to the current table.
     fn finalize_row(&mut self) -> RtfResult<()> {
         // Finalize any pending cell
-        self.finalize_cell(false);
+        self.finalize_cell(false)?;
 
         // Add row to table
         if let (Some(table), Some(row)) = (&mut self.current_table, self.current_row.take())
@@ -8294,6 +8324,7 @@ impl<'a> Parser<'a> {
 
     /// Finalize the current table and add it to the tables list.
     fn finalize_table(&mut self) -> RtfResult<()> {
+        self.drain_nested_to(1)?;
         // Finalize any pending row
         if self.current_row.is_some() {
             self.finalize_row()?;
@@ -8303,10 +8334,10 @@ impl<'a> Parser<'a> {
         if let Some(table) = self.current_table.take()
             && table.row_count() > 0
         {
-            if self.tables.len() >= MAX_LOGICAL_TABLES {
+            if self.logical_table_count >= MAX_LOGICAL_TABLES {
                 return Err(RtfError::MalformedDocument("RTF document exceeds 4096 logical tables".to_string()));
             }
-            self.tables.push(table);
+            self.logical_table_count+=1;self.tables.push(table);
         }
         Ok(())
     }

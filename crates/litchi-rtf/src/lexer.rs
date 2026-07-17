@@ -49,7 +49,7 @@ pub enum ControlWord<'a> {
     ParagraphGroupTable,
     ParagraphGroup,
     ParagraphGroupParent(i32),
-    TableNestingLevel(i32),
+    TableNestingLevel(Option<i32>),
 
     // Stylesheet entries and metadata
     ParagraphStyle(i32),
@@ -360,6 +360,10 @@ pub enum ControlWord<'a> {
     TableVerticalOffset(bool, Option<i32>),
     TableWrapDistance(crate::TableEdge, Option<i32>),
     TableNoOverlap(Option<i32>),
+    NestedTableCell(Option<i32>),
+    NestedTableRow(Option<i32>),
+    NestedTableProperties(Option<i32>),
+    NoNestedTables(Option<i32>),
 
     // Borders
     BorderTop,
@@ -904,7 +908,7 @@ impl<'a> Lexer<'a> {
             "pgptbl" => ControlWord::ParagraphGroupTable,
             "pgp" => ControlWord::ParagraphGroup,
             "ipgp" => ControlWord::ParagraphGroupParent(param_value),
-            "itap" => ControlWord::TableNestingLevel(param_value),
+            "itap" => ControlWord::TableNestingLevel(param),
 
             // Stylesheet entries and metadata
             "s" => ControlWord::ParagraphStyle(param_value),
@@ -1269,6 +1273,10 @@ impl<'a> Lexer<'a> {
             "tdfrmtxtTop" => ControlWord::TableWrapDistance(crate::TableEdge::Top,param),
             "tdfrmtxtBottom" => ControlWord::TableWrapDistance(crate::TableEdge::Bottom,param),
             "tabsnoovrlp" => ControlWord::TableNoOverlap(param),
+            "nestcell" => ControlWord::NestedTableCell(param),
+            "nestrow" => ControlWord::NestedTableRow(param),
+            "nesttableprops" => ControlWord::NestedTableProperties(param),
+            "nonesttables" => ControlWord::NoNestedTables(param),
 
             // Borders
             "brdrt" => ControlWord::BorderTop,

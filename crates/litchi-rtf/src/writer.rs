@@ -199,6 +199,7 @@ impl<W: Write> RtfWriter<W> {
         )?;
 
         // Write tables
+        let mut logical_tables=0usize;for table in doc.tables(){Self::validate_table_tree(table,1,&mut logical_tables)?;}
         for (index, table) in doc.tables().iter().enumerate() {
             if index > 0 {
                 self.write_control_word("pard", None)?;
@@ -2914,6 +2915,8 @@ impl<W: Write> RtfWriter<W> {
         Ok(())
     }
 
+    fn validate_table_tree(table:&Table,depth:usize,count:&mut usize)->io::Result<()>{if depth>crate::MAX_TABLE_NESTING_DEPTH{return Err(io::Error::new(io::ErrorKind::InvalidInput,"RTF table nesting exceeds 32 levels"))}*count=count.checked_add(1).ok_or_else(||io::Error::new(io::ErrorKind::InvalidInput,"RTF logical table count overflow"))?;if *count>4096{return Err(io::Error::new(io::ErrorKind::InvalidInput,"RTF document exceeds 4096 logical tables"))}if table.row_count()>65_536{return Err(io::Error::new(io::ErrorKind::InvalidInput,"RTF logical table exceeds 65536 rows"))}if let Some(first)=table.rows().first()&&table.rows().iter().skip(1).any(|row|row.positioning()!=first.positioning()){return Err(io::Error::new(io::ErrorKind::InvalidInput,"RTF positioned-table properties must be identical for all rows in one logical table"))}for row in table.rows(){if row.cell_count()>crate::MAX_TABLE_CELLS_PER_ROW{return Err(io::Error::new(io::ErrorKind::InvalidInput,"RTF table row exceeds 4096 cells"))}for cell in row.cells(){let mut previous=0;for nested in cell.nested_tables(){if nested.text_offset<previous||nested.text_offset>cell.text().len()||!cell.text().is_char_boundary(nested.text_offset){return Err(io::Error::new(io::ErrorKind::InvalidInput,"invalid nested-table text insertion offset"))}previous=nested.text_offset;Self::validate_table_tree(&nested.table,depth+1,count)?;}}}Ok(())}
+
     /// Write a table row
     fn write_table_row(
         &mut self,
@@ -2956,7 +2959,7 @@ impl<W: Write> RtfWriter<W> {
             self.write_str("{")?;
             self.write_control_word("intbl", None)?;
             self.write_str(" ")?;
-            self.write_text(cell.text())?;
+            self.write_cell_content(cell,1)?;
             self.write_control_word("cell", None)?;
             self.write_str("}")?;
         }
@@ -2967,6 +2970,10 @@ impl<W: Write> RtfWriter<W> {
 
         Ok(())
     }
+
+    fn write_cell_content(&mut self,cell:&crate::Cell<'_>,depth:usize)->io::Result<()>{let mut offset=0;for nested in cell.nested_tables(){self.write_text(&cell.text()[offset..nested.text_offset])?;self.write_nested_table(&nested.table,depth+1)?;offset=nested.text_offset;}self.write_text(&cell.text()[offset..])}
+
+    fn write_nested_table(&mut self,table:&Table,depth:usize)->io::Result<()>{for row in table.rows(){for cell in row.cells(){self.write_str("{")?;self.write_control_word("intbl",None)?;self.write_control_word("itap",Some(depth as i32))?;self.write_str(" ")?;self.write_cell_content(cell,depth)?;self.write_control_word("nestcell",None)?;self.write_str("}")?;}self.write_str("{\\*")?;self.write_control_word("nesttableprops",None)?;self.write_control_word("itap",Some(depth as i32))?;self.write_control_word("trowd",None)?;if let Some(direction)=table.direction(){self.write_control_word("taprtl",(direction==TextDirection::LeftToRight).then_some(0))?;}if let Some(direction)=row.direction(){self.write_control_word(match direction{TextDirection::LeftToRight=>"ltrrow",TextDirection::RightToLeft=>"rtlrow"},None)?;}self.write_table_distances("trpadd","trpaddf",row.padding())?;self.write_table_distances("trspd","trspdf",row.spacing())?;self.write_floating_table_position(row.positioning())?;for(index,cell)in row.cells().iter().enumerate(){self.write_table_distances("clpad","clpadf",cell.padding())?;self.write_table_distances("clspd","clspdf",cell.spacing())?;self.write_control_word("cellx",Some(2880*((index+1)as i32)))?;}self.write_control_word("nestrow",None)?;self.write_str("}")?;self.write_str("{")?;self.write_control_word("nonesttables",None)?;self.write_control_word("par",None)?;self.write_str("}")?;}Ok(())}
 
     fn write_table_distances(&mut self,value_prefix:&str,unit_prefix:&str,distances:&TableEdgeDistances)->io::Result<()> {
         distances.validate().map_err(|error|io::Error::new(io::ErrorKind::InvalidInput,error.to_string()))?;for (suffix,side) in [("l",distances.left),("r",distances.right),("t",distances.top),("b",distances.bottom)]{if let Some(value)=side.value{self.write_control_word(&format!("{value_prefix}{suffix}"),Some(i32::from(value)))?;}if let Some(unit)=side.unit{self.write_control_word(&format!("{unit_prefix}{suffix}"),Some(match unit{TableDistanceUnit::Null=>0,TableDistanceUnit::Twips=>3}))?;}}Ok(())

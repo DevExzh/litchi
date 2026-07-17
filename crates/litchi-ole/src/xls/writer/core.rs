@@ -1694,6 +1694,11 @@ impl XlsWriter {
                 "freeze_panes: freeze_rows must be <= 65535".to_string(),
             ));
         }
+        if freeze_cols > u8::MAX as u16 {
+            return Err(XlsError::InvalidData(
+                "freeze_panes: freeze_cols must be <= 255".to_string(),
+            ));
+        }
 
         worksheet.set_freeze_panes(freeze_rows, freeze_cols);
         Ok(())
@@ -1713,6 +1718,8 @@ impl XlsWriter {
     pub fn set_zoom(&mut self, sheet: usize, numerator: u16, denominator: u16) -> XlsResult<()> {
         if numerator == 0
             || denominator == 0
+            || numerator > i16::MAX as u16
+            || denominator > i16::MAX as u16
             || u32::from(numerator) * 10 < u32::from(denominator)
             || u32::from(numerator) > u32::from(denominator) * 4
         {
@@ -1726,6 +1733,47 @@ impl XlsWriter {
             .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
         worksheet.set_zoom(numerator, denominator);
         Ok(())
+    }
+
+    pub fn set_worksheet_view(
+        &mut self,
+        sheet: usize,
+        options: crate::xls::writer::view::XlsWorksheetViewOptions,
+    ) -> XlsResult<()> {
+        options.validate()?;
+        let worksheet = self.worksheets.get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+        worksheet.view = options;
+        Ok(())
+    }
+
+    pub fn split_panes(
+        &mut self,
+        sheet: usize,
+        horizontal_twips: u16,
+        vertical_twips: u16,
+        bottom_pane_top_row: u16,
+        right_pane_left_column: u8,
+        active_pane: crate::xls::XlsPaneType,
+    ) -> XlsResult<()> {
+        let pane = crate::xls::writer::view::XlsWorksheetPaneOptions::split(
+            horizontal_twips,
+            vertical_twips,
+            bottom_pane_top_row,
+            right_pane_left_column,
+            active_pane,
+        )?;
+        let worksheet = self.worksheets.get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+        worksheet.view.pane = Some(pane);
+        worksheet.view.selections = vec![
+            crate::xls::writer::view::XlsWorksheetSelectionOptions::single_cell(
+                active_pane,
+                bottom_pane_top_row,
+                right_pane_left_column,
+            ),
+        ];
+        worksheet.view.validate()
     }
 
     /// Set the height of a row in points.
@@ -2825,12 +2873,11 @@ mod tests {
     #[test]
     fn test_writableworksheet_freeze_panes() {
         let mut ws = WritableWorksheet::new("Sheet1".to_string());
-        assert!(ws.freeze_panes.is_none());
+        assert!(ws.view.pane.is_none());
         ws.set_freeze_panes(1, 2);
-        assert!(ws.freeze_panes.is_some());
-        let fp = ws.freeze_panes.unwrap();
-        assert_eq!(fp.freeze_rows, 1);
-        assert_eq!(fp.freeze_cols, 2);
+        let pane = ws.view.pane.unwrap();
+        assert_eq!(pane.vertical_split, 1);
+        assert_eq!(pane.horizontal_split, 2);
     }
 
     #[test]

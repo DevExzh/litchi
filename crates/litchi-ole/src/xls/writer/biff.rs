@@ -337,6 +337,7 @@ pub fn write_pivot_colinfo<W: Write>(
 ///
 /// The `has_freeze_panes` flag controls whether the FREEZE_PANES and
 /// FREEZE_PANES_NO_SPLIT bits are set in the options field.
+#[allow(dead_code)]
 pub fn write_window2<W: Write>(writer: &mut W, has_freeze_panes: bool) -> XlsResult<()> {
     worksheet::write_window2(writer, has_freeze_panes)
 }
@@ -345,6 +346,28 @@ pub fn write_scl<W: Write>(writer: &mut W, numerator: u16, denominator: u16) -> 
     worksheet::write_scl(writer, numerator, denominator)
 }
 
+pub fn write_window2_options<W: Write>(
+    writer: &mut W,
+    options: &crate::xls::writer::view::XlsWorksheetViewOptions,
+) -> XlsResult<()> {
+    worksheet::write_window2_options(writer, options)
+}
+
+pub fn write_pane_options<W: Write>(
+    writer: &mut W,
+    pane: &crate::xls::writer::view::XlsWorksheetPaneOptions,
+) -> XlsResult<()> {
+    worksheet::write_pane_options(writer, pane)
+}
+
+pub fn write_selection_options<W: Write>(
+    writer: &mut W,
+    selection: &crate::xls::writer::view::XlsWorksheetSelectionOptions,
+) -> XlsResult<()> {
+    worksheet::write_selection_options(writer, selection)
+}
+
+#[allow(dead_code)]
 pub fn write_default_selection<W: Write>(
     writer: &mut W,
     freeze_rows: u16,
@@ -376,6 +399,7 @@ pub fn write_sheet_ext<W: Write>(writer: &mut W) -> XlsResult<()> {
 /// Write PANE record (freeze panes configuration)
 ///
 /// Record type: 0x0041, Length: 10
+#[allow(dead_code)]
 pub fn write_pane<W: Write>(writer: &mut W, freeze_rows: u32, freeze_cols: u16) -> XlsResult<()> {
     worksheet::write_pane(writer, freeze_rows, freeze_cols)
 }

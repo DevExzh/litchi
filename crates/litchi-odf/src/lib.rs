@@ -322,6 +322,7 @@ mod generic;
 mod media;
 mod variable_declaration;
 mod document_scripts;
+mod drawing_page_properties;
 mod font_face;
 mod line_numbering;
 mod notes_configuration;
@@ -406,6 +407,16 @@ pub use variable_declaration::{
 pub use document_scripts::{
     OdfDocumentEventListener, OdfDocumentScripts, OdfEmbeddedScript, OdfScriptBinding,
     OdfScriptEventListener, parse_document_scripts,
+};
+pub use drawing_page_properties::{
+    DrawingPageBackgroundSize, DrawingPageColor, DrawingPageDuration, DrawingPageFill,
+    DrawingPageFillRule, DrawingPageImageRefPoint, DrawingPageLengthOrPercent,
+    DrawingPageNonNegativeInteger, DrawingPagePercent, DrawingPageRepeat, DrawingPageSound,
+    DrawingPageSoundShow, DrawingPageStyle, DrawingPageStyleNameRef, DrawingPageStyleProperties,
+    DrawingPageStyleSet, DrawingPageTileDirection, DrawingPageTileRepeatOffset,
+    DrawingPageTransitionDirection, DrawingPageTransitionSpeed, DrawingPageTransitionStyle,
+    DrawingPageTransitionType, DrawingPageVisibility, parse_drawing_page_style_properties,
+    set_drawing_page_style_properties_xml,
 };
 pub use font_face::{
     OdfFontFace, OdfFontFaceDeclarations, OdfFontFaceLink, OdfFontFaceSource, OdfFontMetric,

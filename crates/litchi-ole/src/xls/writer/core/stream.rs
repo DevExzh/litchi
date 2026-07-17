@@ -425,23 +425,19 @@ pub(crate) fn generate_workbook_stream(
         // immediately afterwards when freeze panes are configured. We
         // mirror that ordering here to avoid Excel interpreting the
         // pane as a generic split window.
-        let has_freeze_panes = worksheet.freeze_panes.is_some();
         if worksheet.pivot_tables.is_empty() {
-            biff::write_window2(&mut stream, has_freeze_panes)?;
-            if let Some((numerator, denominator)) = worksheet.zoom {
-                biff::write_scl(&mut stream, numerator, denominator)?;
+            biff::write_window2_options(&mut stream, &worksheet.view)?;
+            if let Some(scale) = worksheet.view.scale
+                && scale.numerator != scale.denominator
+            {
+                biff::write_scl(&mut stream, scale.numerator, scale.denominator)?;
             }
-        }
-
-        if let Some(panes) = worksheet.freeze_panes {
-            biff::write_pane(&mut stream, panes.freeze_rows, panes.freeze_cols)?;
-            biff::write_default_selection(
-                &mut stream,
-                panes.freeze_rows as u16,
-                panes.freeze_cols,
-            )?;
-        } else if worksheet.pivot_tables.is_empty() {
-            biff::write_default_selection(&mut stream, 0, 0)?;
+            if let Some(pane) = worksheet.view.pane.as_ref() {
+                biff::write_pane_options(&mut stream, pane)?;
+            }
+            for selection in &worksheet.view.selections {
+                biff::write_selection_options(&mut stream, selection)?;
+            }
         }
 
         // MsoDrawing (0x00EC) for non-pivot sheets. Window view records must remain contiguous.

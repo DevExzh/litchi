@@ -34,15 +34,6 @@ pub(super) struct MergedRange {
     pub last_col: u16,
 }
 
-/// Freeze panes configuration for a worksheet.
-#[derive(Debug, Clone, Copy)]
-pub(super) struct FreezePanes {
-    /// Number of frozen rows from the top (0-based, inclusive index of last frozen row).
-    pub freeze_rows: u32,
-    /// Number of frozen columns from the left (0-based, inclusive index of last frozen column).
-    pub freeze_cols: u16,
-}
-
 #[derive(Debug, Clone, Copy)]
 pub(super) struct AutoFilterRange {
     pub first_row: u32,
@@ -107,10 +98,7 @@ pub(super) struct WritableWorksheet {
     pub data_validations: Vec<WritableDataValidation>,
     pub data_validation_table_options: XlsDataValidationTableOptions,
     pub conditional_formats: Vec<XlsConditionalFormat>,
-    /// Optional freeze panes configuration.
-    pub freeze_panes: Option<FreezePanes>,
-    /// Optional non-default worksheet zoom as an SCL numerator and denominator.
-    pub zoom: Option<(u16, u16)>,
+    pub view: crate::xls::writer::view::XlsWorksheetViewOptions,
     pub sheet_protection: Option<XlsSheetProtection>,
     pub sheet_layout: super::XlsWorksheetLayoutOptions,
     pub page_setup: Option<XlsPageSetupOptions>,
@@ -171,8 +159,7 @@ impl WritableWorksheet {
             data_validations: Vec::new(),
             data_validation_table_options: XlsDataValidationTableOptions::default(),
             conditional_formats: Vec::new(),
-            freeze_panes: None,
-            zoom: None,
+            view: crate::xls::writer::view::XlsWorksheetViewOptions::default(),
             sheet_protection: None,
             sheet_layout: super::XlsWorksheetLayoutOptions::default(),
             page_setup: None,
@@ -225,18 +212,19 @@ impl WritableWorksheet {
     }
 
     pub(super) fn set_freeze_panes(&mut self, freeze_rows: u32, freeze_cols: u16) {
-        self.freeze_panes = Some(FreezePanes {
-            freeze_rows,
-            freeze_cols,
-        });
+        self.view
+            .set_frozen(freeze_rows as u16, freeze_cols as u8)
+            .expect("freeze pane bounds validated by public API");
     }
 
     pub(super) fn clear_freeze_panes(&mut self) {
-        self.freeze_panes = None;
+        self.view.clear_pane();
     }
 
     pub(super) fn set_zoom(&mut self, numerator: u16, denominator: u16) {
-        self.zoom = (numerator != denominator).then_some((numerator, denominator));
+        self.view.scale = (numerator != denominator).then_some(
+            crate::xls::writer::view::XlsViewScale { numerator, denominator },
+        );
     }
 
     pub(super) fn set_column_width(&mut self, col: u16, width: u16) {

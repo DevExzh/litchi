@@ -8,6 +8,8 @@ use std::borrow::Cow;
 
 pub const MAX_TABLE_DISTANCE_TWIPS: i32 = 31_680;
 pub const MAX_FLOATING_TABLE_DISTANCE_TWIPS: i32 = 31_680;
+pub const MAX_TABLE_NESTING_DEPTH: usize = 32;
+pub const MAX_TABLE_CELLS_PER_ROW: usize = 4_096;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableHorizontalReference { Column, Margin, Page }
@@ -176,14 +178,19 @@ pub struct Cell<'a> {
     text: Cow<'a, str>,
     padding: TableEdgeDistances,
     spacing: TableEdgeDistances,
+    nested_tables: Vec<CellNestedTable<'a>>,
 }
+
+/// A nested table inserted between UTF-8 text bytes in its containing cell.
+#[derive(Debug, Clone)]
+pub struct CellNestedTable<'a> { pub text_offset: usize, pub table: Table<'a> }
 
 impl<'a> Cell<'a> {
     /// Create a new cell.
     pub fn new(text: Cow<'a, str>) -> Self {
-        Self { text, padding:TableEdgeDistances::default(), spacing:TableEdgeDistances::default() }
+        Self { text, padding:TableEdgeDistances::default(), spacing:TableEdgeDistances::default(), nested_tables:Vec::new() }
     }
-    pub fn with_distances(text:Cow<'a,str>,padding:TableEdgeDistances,spacing:TableEdgeDistances)->Self{Self{text,padding,spacing}}
+    pub fn with_distances(text:Cow<'a,str>,padding:TableEdgeDistances,spacing:TableEdgeDistances)->Self{Self{text,padding,spacing,nested_tables:Vec::new()}}
 
     /// Get the cell text.
     pub fn text(&self) -> &str {
@@ -193,4 +200,9 @@ impl<'a> Cell<'a> {
     pub fn spacing(&self)->&TableEdgeDistances{&self.spacing}
     pub fn set_padding(&mut self,value:TableEdgeDistances){self.padding=value}
     pub fn set_spacing(&mut self,value:TableEdgeDistances){self.spacing=value}
+    pub fn nested_tables(&self)->&[CellNestedTable<'a>]{&self.nested_tables}
+    pub fn add_nested_table(&mut self,text_offset:usize,table:Table<'a>)->crate::RtfResult<()>{if text_offset>self.text.len()||!self.text.is_char_boundary(text_offset)||self.nested_tables.last().is_some_and(|entry|entry.text_offset>text_offset){return Err(crate::RtfError::MalformedDocument("invalid nested-table text insertion offset".to_string()))}self.nested_tables.push(CellNestedTable{text_offset,table});Ok(())}
+    pub(crate) fn nested_tables_mut(&mut self)->&mut Vec<CellNestedTable<'a>>{&mut self.nested_tables}
 }
+
+impl<'a> Row<'a>{pub(crate) fn cells_mut(&mut self)->&mut [Cell<'a>]{&mut self.cells}}
