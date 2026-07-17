@@ -3,9 +3,41 @@
 use std::ops::Range;
 
 use super::PagesEditor;
+use crate::text::{TextBookmark, TextBookmarkId, TextBookmarkSettings, TextRange};
 use crate::{Error, Result};
 
 impl PagesEditor {
+    /// Read every native ranged bookmark in the main body.
+    pub fn body_bookmarks(&self) -> Result<Vec<TextBookmark>> {
+        self.text.text_bookmarks(self.body_storage_id)
+    }
+
+    /// Create a native body bookmark over a nonempty UTF-16 range.
+    pub fn add_body_bookmark(
+        &mut self,
+        range: TextRange,
+        settings: TextBookmarkSettings,
+    ) -> Result<TextBookmark> {
+        self.text
+            .add_text_bookmark(self.body_storage_id, range, settings)
+    }
+
+    /// Atomically update a body bookmark's range and settings.
+    pub fn update_body_bookmark(
+        &mut self,
+        id: TextBookmarkId,
+        range: TextRange,
+        settings: TextBookmarkSettings,
+    ) -> Result<TextBookmark> {
+        self.text
+            .update_text_bookmark(self.body_storage_id, id, range, settings)
+    }
+
+    /// Delete one native body bookmark and reclaim its owned field object.
+    pub fn remove_body_bookmark(&mut self, id: TextBookmarkId) -> Result<TextBookmark> {
+        self.text.remove_text_bookmark(self.body_storage_id, id)
+    }
+
     /// Replace a UTF-16 range in the body without creating or deleting section boundaries.
     ///
     /// Ranges may edit content on either side of a boundary, but cannot consume the native

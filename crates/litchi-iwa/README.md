@@ -49,6 +49,8 @@ println!("{}", structured.summary());
   including automatic-language sentinels and lossless boundary deletion
 - Native cross-suite text-hyperlink CRUD with typed nonempty UTF-16 ranges,
   lossless web, mail, and Keynote navigation targets, and owned-object cleanup
+- Native Pages body-bookmark CRUD with typed names, lossless visibility values,
+  strict UTF-16 ranges, and owned bookmark-field cleanup
 - Native cross-suite plain-text highlight CRUD with typed nonempty UTF-16 ranges,
   lossless table mutation and owned annotation cleanup
 - Native cross-suite ranged text-comment and ordered direct-reply CRUD with
@@ -90,6 +92,18 @@ let mut pages = PagesEditor::builder()
     .locale("en_US")
     .build()?;
 pages.set_body_text("Created and then updated through the same typed API")?;
+let bookmark = pages.add_body_bookmark(
+    litchi_iwa::text::TextRange::from_utf16_indexes(0, 7)?,
+    litchi_iwa::text::TextBookmarkSettings::new().with_name(
+        litchi_iwa::text::TextBookmarkName::new("Created")?,
+    ),
+)?;
+pages.update_body_bookmark(
+    bookmark.id,
+    litchi_iwa::text::TextRange::from_utf16_indexes(8, 11)?,
+    litchi_iwa::text::TextBookmarkSettings::new(),
+)?;
+pages.remove_body_bookmark(bookmark.id)?;
 pages.save("created.pages")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
@@ -1123,6 +1137,12 @@ and hyperlink payload survive edits. Web URLs, `mailto:` links, and Keynote
 targets such as `?slide=next` are represented losslessly. The Pages, Numbers,
 and Keynote text-box editors provide ownership-checked wrappers; see
 `edit_iwork_text_hyperlink` and `inspect_iwork_text_styles`.
+Pages body text additionally exposes native ranged bookmarks as `TextBookmark`
+values. `TextBookmarkSettings` carries an optional validated name and a lossless
+visible/hidden value; create and update reject empty, overlapping, out-of-bounds,
+or surrogate-splitting ranges. Deletion and text replacement reclaim the owned
+`TSWP.BookmarkFieldArchive`, while unknown bookmark and boundary fields survive
+updates. See `create_pages_bookmark` and `inspect_pages_bookmarks`.
 Native plain highlights use `TextHighlight`, `TextHighlightId`, and the same
 strict `TextRange` boundaries. Creation builds the complete native annotation
 graph with author, timestamp, and UUID metadata; range updates retain object

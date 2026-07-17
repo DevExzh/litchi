@@ -1,4 +1,4 @@
-//! Transactional native hyperlink CRUD for TSWP text-storage objects.
+//! Transactional native ranged-bookmark CRUD for TSWP text storage.
 
 use std::collections::HashSet;
 
@@ -9,159 +9,153 @@ use crate::package_metadata::{
 };
 use crate::{Error, IWorkPackage, Result};
 
-use super::hyperlink_object::{
-    ensure_no_metadata_reference, new_hyperlink_object, patch_hyperlink_target,
-    require_exclusive_storage_reference, validate_hyperlink_object,
+use super::bookmark_object::{
+    new_bookmark_object, patch_bookmark_settings, validate_bookmark_object,
 };
+use super::bookmark_types::{TextBookmark, TextBookmarkId, TextBookmarkSettings};
+use super::hyperlink_object::{ensure_no_metadata_reference, require_exclusive_storage_reference};
 use super::hyperlink_storage::{
     Boundary, RangedObjectTable, add_range, decoded_boundaries, encode_table,
     ensure_range_available, locate_storage, patch_ranged_object_table, raw_boundaries,
     remove_range, validate_range,
 };
-use super::hyperlink_types::{TextHyperlink, TextHyperlinkId, TextHyperlinkTarget};
 use super::position::{TextPosition, TextRange};
 use super::storage_wire::{StorageLocation, text_utf16_len};
 
-/// Read every native hyperlink in a storage, ordered by text position.
-pub(crate) fn text_hyperlinks(
-    package: &IWorkPackage,
-    storage_id: u64,
-) -> Result<Vec<TextHyperlink>> {
-    let location = locate_storage(package, storage_id, RangedObjectTable::SmartField)?;
-    let boundaries = decoded_boundaries(storage_id, &location, RangedObjectTable::SmartField)?;
-    collect_hyperlinks(package, storage_id, &location, &boundaries)
+const BOOKMARK_TABLE: RangedObjectTable = RangedObjectTable::Bookmark;
+
+pub(crate) fn text_bookmarks(package: &IWorkPackage, storage_id: u64) -> Result<Vec<TextBookmark>> {
+    let location = locate_storage(package, storage_id, BOOKMARK_TABLE)?;
+    let boundaries = decoded_boundaries(storage_id, &location, BOOKMARK_TABLE)?;
+    collect_bookmarks(package, storage_id, &location, &boundaries)
 }
 
-/// Create a hyperlink over a currently unoccupied smart-field range.
-pub(crate) fn add_text_hyperlink(
+pub(crate) fn add_text_bookmark(
     package: &mut IWorkPackage,
     storage_id: u64,
     range: TextRange,
-    target: &TextHyperlinkTarget,
-) -> Result<TextHyperlink> {
-    let location = locate_storage(package, storage_id, RangedObjectTable::SmartField)?;
+    settings: &TextBookmarkSettings,
+) -> Result<TextBookmark> {
+    let location = locate_storage(package, storage_id, BOOKMARK_TABLE)?;
     validate_range(storage_id, range, &location.storage.text)?;
-    let boundaries = decoded_boundaries(storage_id, &location, RangedObjectTable::SmartField)?;
+    let boundaries = decoded_boundaries(storage_id, &location, BOOKMARK_TABLE)?;
     ensure_range_available(
         storage_id,
         range,
         &boundaries,
         None,
         &location.storage.text,
-        RangedObjectTable::SmartField,
+        BOOKMARK_TABLE,
     )?;
 
     let identifier = next_object_identifier(package)?;
-    let id = TextHyperlinkId::from_native(identifier);
-    let hyperlink_object = new_hyperlink_object(identifier, target)?;
+    let id = TextBookmarkId::from_native(identifier);
+    let bookmark_object = new_bookmark_object(identifier, settings)?;
     let mut staged = package.clone();
     patch_ranged_object_table(
         &mut staged,
         &location.archive_name,
         storage_id,
-        RangedObjectTable::SmartField,
+        BOOKMARK_TABLE,
         |table, storage| {
-            let mut boundaries =
-                raw_boundaries(storage_id, table, storage, RangedObjectTable::SmartField)?;
+            let mut boundaries = raw_boundaries(storage_id, table, storage, BOOKMARK_TABLE)?;
             ensure_range_available(
                 storage_id,
                 range,
                 &boundaries,
                 None,
                 &storage.text,
-                RangedObjectTable::SmartField,
+                BOOKMARK_TABLE,
             )?;
             add_range(&mut boundaries, range, identifier)?;
             encode_table(table, boundaries).map(|table| (Some(table), Some(identifier), None))
         },
     )?;
     staged.update_archive(&location.archive_name, |archive| {
-        archive.insert_object(hyperlink_object)
+        archive.insert_object(bookmark_object)
     })?;
     set_package_last_object_identifier(&mut staged, identifier)?;
     let verified = roundtrip(&staged)?;
-    let created = hyperlink_by_id(&verified, storage_id, id)?;
-    if created.range != range || created.target != *target {
+    let created = bookmark_by_id(&verified, storage_id, id)?;
+    if created.range != range || created.settings != *settings {
         return Err(Error::InvalidFormat(
-            "iWork hyperlink creation failed validation".to_owned(),
+            "iWork bookmark creation failed validation".to_owned(),
         ));
     }
     *package = staged;
     Ok(created)
 }
 
-/// Atomically change a hyperlink's range and target without changing its ID.
-pub(crate) fn update_text_hyperlink(
+pub(crate) fn update_text_bookmark(
     package: &mut IWorkPackage,
     storage_id: u64,
-    id: TextHyperlinkId,
+    id: TextBookmarkId,
     range: TextRange,
-    target: &TextHyperlinkTarget,
-) -> Result<TextHyperlink> {
-    let current = hyperlink_by_id(package, storage_id, id)?;
-    if current.range == range && current.target == *target {
+    settings: &TextBookmarkSettings,
+) -> Result<TextBookmark> {
+    let current = bookmark_by_id(package, storage_id, id)?;
+    if current.range == range && current.settings == *settings {
         return Ok(current);
     }
-    let location = locate_storage(package, storage_id, RangedObjectTable::SmartField)?;
+    let location = locate_storage(package, storage_id, BOOKMARK_TABLE)?;
     validate_range(storage_id, range, &location.storage.text)?;
-    let boundaries = decoded_boundaries(storage_id, &location, RangedObjectTable::SmartField)?;
+    let boundaries = decoded_boundaries(storage_id, &location, BOOKMARK_TABLE)?;
     ensure_range_available(
         storage_id,
         range,
         &boundaries,
         Some(id.object_id()),
         &location.storage.text,
-        RangedObjectTable::SmartField,
+        BOOKMARK_TABLE,
     )?;
-    require_exclusive_storage_reference(package, storage_id, id.object_id(), "hyperlink")?;
+    require_exclusive_storage_reference(package, storage_id, id.object_id(), "bookmark")?;
 
     let mut staged = package.clone();
     patch_ranged_object_table(
         &mut staged,
         &location.archive_name,
         storage_id,
-        RangedObjectTable::SmartField,
+        BOOKMARK_TABLE,
         |table, storage| {
-            let mut boundaries =
-                raw_boundaries(storage_id, table, storage, RangedObjectTable::SmartField)?;
-            remove_range(
-                &mut boundaries,
-                id.object_id(),
-                RangedObjectTable::SmartField,
-            )?;
+            let mut boundaries = raw_boundaries(storage_id, table, storage, BOOKMARK_TABLE)?;
+            remove_range(&mut boundaries, id.object_id(), BOOKMARK_TABLE)?;
             ensure_range_available(
                 storage_id,
                 range,
                 &boundaries,
                 None,
                 &storage.text,
-                RangedObjectTable::SmartField,
+                BOOKMARK_TABLE,
             )?;
             add_range(&mut boundaries, range, id.object_id())?;
             encode_table(table, boundaries).map(|table| (Some(table), None, None))
         },
     )?;
-    patch_hyperlink_target(&mut staged, &location.archive_name, id.object_id(), target)?;
+    patch_bookmark_settings(
+        &mut staged,
+        &location.archive_name,
+        id.object_id(),
+        settings,
+    )?;
     let verified = roundtrip(&staged)?;
-    let updated = hyperlink_by_id(&verified, storage_id, id)?;
-    if updated.range != range || updated.target != *target {
+    let updated = bookmark_by_id(&verified, storage_id, id)?;
+    if updated.range != range || updated.settings != *settings {
         return Err(Error::InvalidFormat(
-            "iWork hyperlink update failed validation".to_owned(),
+            "iWork bookmark update failed validation".to_owned(),
         ));
     }
     *package = staged;
     Ok(updated)
 }
 
-/// Delete one hyperlink and reclaim its owned smart-field object.
-pub(crate) fn remove_text_hyperlink(
+pub(crate) fn remove_text_bookmark(
     package: &mut IWorkPackage,
     storage_id: u64,
-    id: TextHyperlinkId,
-) -> Result<TextHyperlink> {
-    let removed = hyperlink_by_id(package, storage_id, id)?;
-    let location = locate_storage(package, storage_id, RangedObjectTable::SmartField)?;
-    require_exclusive_storage_reference(package, storage_id, id.object_id(), "hyperlink")?;
+    id: TextBookmarkId,
+) -> Result<TextBookmark> {
+    let removed = bookmark_by_id(package, storage_id, id)?;
+    let location = locate_storage(package, storage_id, BOOKMARK_TABLE)?;
+    require_exclusive_storage_reference(package, storage_id, id.object_id(), "bookmark")?;
     let registered_component = component_identifier_for_object_uuid(package, id.object_id())?;
     let owning_component = component_identifier_for_entry(package, &location.archive_name)?;
 
@@ -170,15 +164,10 @@ pub(crate) fn remove_text_hyperlink(
         &mut staged,
         &location.archive_name,
         storage_id,
-        RangedObjectTable::SmartField,
+        BOOKMARK_TABLE,
         |table, storage| {
-            let mut boundaries =
-                raw_boundaries(storage_id, table, storage, RangedObjectTable::SmartField)?;
-            remove_range(
-                &mut boundaries,
-                id.object_id(),
-                RangedObjectTable::SmartField,
-            )?;
+            let mut boundaries = raw_boundaries(storage_id, table, storage, BOOKMARK_TABLE)?;
+            remove_range(&mut boundaries, id.object_id(), BOOKMARK_TABLE)?;
             if boundaries
                 .iter()
                 .any(|boundary| boundary.object_id.is_some())
@@ -190,15 +179,15 @@ pub(crate) fn remove_text_hyperlink(
             }
         },
     )?;
-    ensure_no_metadata_reference(&staged, id.object_id(), "hyperlink")?;
+    ensure_no_metadata_reference(&staged, id.object_id(), "bookmark")?;
     staged.update_archive(&location.archive_name, |archive| {
         let object = archive.remove_object(id.object_id()).ok_or_else(|| {
             Error::InvalidFormat(format!(
-                "iWork hyperlink object {} disappeared during deletion",
+                "iWork bookmark object {} disappeared during deletion",
                 id.object_id()
             ))
         })?;
-        validate_hyperlink_object(id.object_id(), &object).map(|_| ())
+        validate_bookmark_object(id.object_id(), &object).map(|_| ())
     })?;
     if let Some(component) = owning_component {
         remove_component_external_references_to_object(&mut staged, component, id.object_id())?;
@@ -208,20 +197,19 @@ pub(crate) fn remove_text_hyperlink(
     }
     release_package_identifier_suffix(&mut staged, &[id.object_id()])?;
     let verified = roundtrip(&staged)?;
-    if text_hyperlinks(&verified, storage_id)?
+    if text_bookmarks(&verified, storage_id)?
         .iter()
-        .any(|hyperlink| hyperlink.id == id)
+        .any(|bookmark| bookmark.id == id)
     {
         return Err(Error::InvalidFormat(
-            "iWork hyperlink deletion failed validation".to_owned(),
+            "iWork bookmark deletion failed validation".to_owned(),
         ));
     }
     *package = staged;
     Ok(removed)
 }
 
-/// Reclaim hyperlink objects whose table references disappeared during text replacement.
-pub(crate) fn remove_unreferenced_hyperlink_objects(
+pub(crate) fn remove_unreferenced_bookmark_objects(
     package: &mut IWorkPackage,
     archive_name: &str,
     candidates: &HashSet<u64>,
@@ -238,7 +226,7 @@ pub(crate) fn remove_unreferenced_hyperlink_objects(
                 .map(|object| (*identifier, object))
         })
         .filter_map(
-            |(identifier, object)| match validate_hyperlink_object(identifier, object) {
+            |(identifier, object)| match validate_bookmark_object(identifier, object) {
                 Ok(Some(_)) => Some(Ok(identifier)),
                 Ok(None) => None,
                 Err(error) => Some(Err(error)),
@@ -250,7 +238,7 @@ pub(crate) fn remove_unreferenced_hyperlink_objects(
     }
     identifiers.sort_unstable_by(|left, right| right.cmp(left));
     for identifier in &identifiers {
-        ensure_no_metadata_reference(package, *identifier, "hyperlink")?;
+        ensure_no_metadata_reference(package, *identifier, "bookmark")?;
     }
 
     let owning_component = component_identifier_for_entry(package, archive_name)?;
@@ -265,10 +253,10 @@ pub(crate) fn remove_unreferenced_hyperlink_objects(
         staged.update_archive(archive_name, |archive| {
             let object = archive.remove_object(*identifier).ok_or_else(|| {
                 Error::InvalidFormat(format!(
-                    "iWork hyperlink object {identifier} disappeared during text replacement"
+                    "iWork bookmark object {identifier} disappeared during text replacement"
                 ))
             })?;
-            validate_hyperlink_object(*identifier, &object).map(|_| ())
+            validate_bookmark_object(*identifier, &object).map(|_| ())
         })?;
     }
     release_package_identifier_suffix(&mut staged, &identifiers)?;
@@ -277,38 +265,38 @@ pub(crate) fn remove_unreferenced_hyperlink_objects(
     Ok(())
 }
 
-fn hyperlink_by_id(
+fn bookmark_by_id(
     package: &IWorkPackage,
     storage_id: u64,
-    id: TextHyperlinkId,
-) -> Result<TextHyperlink> {
-    let matches = text_hyperlinks(package, storage_id)?
+    id: TextBookmarkId,
+) -> Result<TextBookmark> {
+    let matches = text_bookmarks(package, storage_id)?
         .into_iter()
-        .filter(|hyperlink| hyperlink.id == id)
+        .filter(|bookmark| bookmark.id == id)
         .collect::<Vec<_>>();
     match matches.as_slice() {
-        [hyperlink] => Ok(hyperlink.clone()),
+        [bookmark] => Ok(bookmark.clone()),
         [] => Err(Error::InvalidFormat(format!(
-            "text storage {storage_id} does not own hyperlink object {}",
+            "text storage {storage_id} does not own bookmark object {}",
             id.object_id()
         ))),
         _ => Err(Error::InvalidFormat(format!(
-            "text storage {storage_id} references hyperlink object {} more than once",
+            "text storage {storage_id} references bookmark object {} more than once",
             id.object_id()
         ))),
     }
 }
 
-fn collect_hyperlinks(
+fn collect_bookmarks(
     package: &IWorkPackage,
     storage_id: u64,
     location: &StorageLocation,
     boundaries: &[Boundary],
-) -> Result<Vec<TextHyperlink>> {
+) -> Result<Vec<TextBookmark>> {
     let text_len = text_utf16_len(&location.storage.text)?;
     let archive = package.archive(&location.archive_name)?;
     let mut seen = HashSet::new();
-    let mut hyperlinks = Vec::new();
+    let mut bookmarks = Vec::new();
     for (position, boundary) in boundaries.iter().enumerate() {
         let Some(identifier) = boundary.object_id else {
             continue;
@@ -318,27 +306,27 @@ fn collect_hyperlinks(
             .map_or(text_len, |next| next.index);
         let object = archive.object(identifier).ok_or_else(|| {
             Error::InvalidFormat(format!(
-                "iWork text storage {storage_id} references missing smart-field object {identifier}"
+                "iWork text storage {storage_id} references missing bookmark object {identifier}"
             ))
         })?;
-        let Some(target) = validate_hyperlink_object(identifier, object)? else {
+        let Some(settings) = validate_bookmark_object(identifier, object)? else {
             continue;
         };
         if !seen.insert(identifier) {
             return Err(Error::InvalidFormat(format!(
-                "iWork text storage {storage_id} references hyperlink object {identifier} more than once"
+                "iWork text storage {storage_id} references bookmark object {identifier} more than once"
             )));
         }
-        hyperlinks.push(TextHyperlink::new(
-            TextHyperlinkId::from_native(identifier),
+        bookmarks.push(TextBookmark::new(
+            TextBookmarkId::from_native(identifier),
             TextRange::new(
                 TextPosition::from_native(boundary.index),
                 TextPosition::from_native(end),
             )?,
-            target,
+            settings,
         ));
     }
-    Ok(hyperlinks)
+    Ok(bookmarks)
 }
 
 fn roundtrip(package: &IWorkPackage) -> Result<IWorkPackage> {
@@ -346,5 +334,5 @@ fn roundtrip(package: &IWorkPackage) -> Result<IWorkPackage> {
 }
 
 #[cfg(test)]
-#[path = "hyperlink_internal_tests.rs"]
+#[path = "bookmark_internal_tests.rs"]
 mod tests;

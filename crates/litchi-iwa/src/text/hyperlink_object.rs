@@ -141,6 +141,7 @@ pub(super) fn require_exclusive_storage_reference(
     package: &IWorkPackage,
     storage_id: u64,
     identifier: u64,
+    label: &str,
 ) -> Result<()> {
     let mut owners = Vec::new();
     for archive_name in package.iwa_entry_names() {
@@ -160,13 +161,17 @@ pub(super) fn require_exclusive_storage_reference(
     }
     if owners != [storage_id] {
         return Err(Error::InvalidFormat(format!(
-            "hyperlink object {identifier} must be referenced only by text storage {storage_id}, found {owners:?}"
+            "{label} object {identifier} must be referenced only by text storage {storage_id}, found {owners:?}"
         )));
     }
     Ok(())
 }
 
-pub(super) fn ensure_no_metadata_reference(package: &IWorkPackage, identifier: u64) -> Result<()> {
+pub(super) fn ensure_no_metadata_reference(
+    package: &IWorkPackage,
+    identifier: u64,
+    label: &str,
+) -> Result<()> {
     for archive_name in package.iwa_entry_names() {
         for object in package.archive(archive_name)?.objects {
             if object.archive_info.message_infos.iter().any(|info| {
@@ -177,7 +182,7 @@ pub(super) fn ensure_no_metadata_reference(package: &IWorkPackage, identifier: u
                         .any(|field| field.object_references.contains(&identifier))
             }) {
                 return Err(Error::InvalidFormat(format!(
-                    "hyperlink object {identifier} retains an indexed reference in {archive_name}"
+                    "{label} object {identifier} retains an indexed reference in {archive_name}"
                 )));
             }
         }

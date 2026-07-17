@@ -18,6 +18,11 @@ use crate::wire::{
 };
 use crate::{Error, IWorkPackage, Result};
 
+use super::bookmark::{
+    add_text_bookmark, remove_text_bookmark, remove_unreferenced_bookmark_objects, text_bookmarks,
+    update_text_bookmark,
+};
+use super::bookmark_types::{TextBookmark, TextBookmarkId, TextBookmarkSettings};
 use super::drop_cap::{
     ParagraphDropCap, ParagraphDropCapPlacement, ParagraphStart, paragraph_drop_cap,
     paragraph_drop_caps, remove_paragraph_drop_cap, set_paragraph_drop_cap,
@@ -368,6 +373,41 @@ impl IWorkTextEditor {
         id: TextHyperlinkId,
     ) -> Result<TextHyperlink> {
         remove_text_hyperlink(&mut self.package, object_id, id)
+    }
+
+    /// Read every native ranged bookmark in a text storage.
+    pub fn text_bookmarks(&self, object_id: u64) -> Result<Vec<TextBookmark>> {
+        text_bookmarks(&self.package, object_id)
+    }
+
+    /// Create a native bookmark over a nonempty, unoccupied UTF-16 range.
+    pub fn add_text_bookmark(
+        &mut self,
+        object_id: u64,
+        range: TextRange,
+        settings: TextBookmarkSettings,
+    ) -> Result<TextBookmark> {
+        add_text_bookmark(&mut self.package, object_id, range, &settings)
+    }
+
+    /// Atomically update a bookmark's range and settings while retaining its ID.
+    pub fn update_text_bookmark(
+        &mut self,
+        object_id: u64,
+        id: TextBookmarkId,
+        range: TextRange,
+        settings: TextBookmarkSettings,
+    ) -> Result<TextBookmark> {
+        update_text_bookmark(&mut self.package, object_id, id, range, &settings)
+    }
+
+    /// Delete one native bookmark and reclaim its owned bookmark-field object.
+    pub fn remove_text_bookmark(
+        &mut self,
+        object_id: u64,
+        id: TextBookmarkId,
+    ) -> Result<TextBookmark> {
+        remove_text_bookmark(&mut self.package, object_id, id)
     }
 
     /// Read every native plain highlight in a text storage.
@@ -1282,6 +1322,7 @@ fn replace_storage_text(
         Ok(())
     })?;
     remove_unreferenced_hyperlink_objects(package, &archive_name, &removed_references)?;
+    remove_unreferenced_bookmark_objects(package, &archive_name, &removed_references)?;
     remove_unreferenced_highlight_objects(package, &archive_name, &removed_references)
 }
 
@@ -1366,6 +1407,7 @@ fn adjust_storage_attributes(
     ] {
         adjust_object_table(table, &range, replacement_units, false)?;
     }
+    normalize_ranged_object_table(&mut storage.table_bookmark);
     adjust_object_table(
         &mut storage.table_smartfield,
         &range,
@@ -1419,12 +1461,12 @@ fn patch_storage_text_wire(
             adjust_index_table_wire(table, range, replacement_units, true)
         })?;
     }
-    for field in [9, 15, 16, 18, 21, 22, 27] {
+    for field in [9, 16, 18, 21, 22, 27] {
         data = transform_optional_table(&data, field, |table| {
             adjust_index_table_wire(table, range, replacement_units, false)
         })?;
     }
-    for field in [11, 23] {
+    for field in [11, 15, 23] {
         let tables = repeated_length_delimited_payloads(&data, field)?;
         if tables.len() > 1 {
             return Err(Error::InvalidFormat(format!(

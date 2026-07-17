@@ -1,4 +1,4 @@
-//! Lossless smart-field table mutation for native text hyperlinks.
+//! Lossless ranged-object table mutation for native hyperlinks and bookmarks.
 
 use prost::Message;
 
@@ -17,6 +17,7 @@ use super::storage_wire::{
 };
 
 pub(super) const SMART_FIELD_TABLE_FIELD: u32 = 11;
+const BOOKMARK_TABLE_FIELD: u32 = 15;
 pub(super) const TABLE_ENTRIES_FIELD: u32 = 1;
 const ENTRY_OBJECT_FIELD: u32 = 2;
 
@@ -27,12 +28,45 @@ pub(super) struct Boundary {
     raw: Vec<u8>,
 }
 
-pub(super) fn locate_storage(package: &IWorkPackage, storage_id: u64) -> Result<StorageLocation> {
-    let location =
-        locate_native_storage(package, storage_id, SMART_FIELD_TABLE_FIELD, "smart-field")?;
-    if location.storage.table_smartfield.is_some() != location.table_present {
+#[derive(Debug, Clone, Copy)]
+pub(super) enum RangedObjectTable {
+    SmartField,
+    Bookmark,
+}
+
+impl RangedObjectTable {
+    const fn field(self) -> u32 {
+        match self {
+            Self::SmartField => SMART_FIELD_TABLE_FIELD,
+            Self::Bookmark => BOOKMARK_TABLE_FIELD,
+        }
+    }
+
+    const fn label(self) -> &'static str {
+        match self {
+            Self::SmartField => "smart-field",
+            Self::Bookmark => "bookmark",
+        }
+    }
+
+    fn decoded(self, storage: &tswp::StorageArchive) -> Option<&tswp::ObjectAttributeTable> {
+        match self {
+            Self::SmartField => storage.table_smartfield.as_ref(),
+            Self::Bookmark => storage.table_bookmark.as_ref(),
+        }
+    }
+}
+
+pub(super) fn locate_storage(
+    package: &IWorkPackage,
+    storage_id: u64,
+    kind: RangedObjectTable,
+) -> Result<StorageLocation> {
+    let location = locate_native_storage(package, storage_id, kind.field(), kind.label())?;
+    if kind.decoded(&location.storage).is_some() != location.table_present {
         return Err(Error::InvalidFormat(format!(
-            "iWork text storage {storage_id} smart-field table wire state is inconsistent"
+            "iWork text storage {storage_id} {} table wire state is inconsistent",
+            kind.label()
         )));
     }
     Ok(location)
@@ -41,14 +75,13 @@ pub(super) fn locate_storage(package: &IWorkPackage, storage_id: u64) -> Result<
 pub(super) fn decoded_boundaries(
     storage_id: u64,
     location: &StorageLocation,
+    kind: RangedObjectTable,
 ) -> Result<Vec<Boundary>> {
-    match (
-        location.table_present,
-        location.storage.table_smartfield.as_ref(),
-    ) {
+    match (location.table_present, kind.decoded(&location.storage)) {
         (false, None) => Ok(Vec::new()),
         (true, Some(table)) if table.entries.is_empty() => Err(Error::InvalidFormat(format!(
-            "iWork text storage {storage_id} has an empty smart-field table"
+            "iWork text storage {storage_id} has an empty {} table",
+            kind.label()
         ))),
         (true, Some(table)) => {
             let boundaries = table
@@ -60,11 +93,12 @@ pub(super) fn decoded_boundaries(
                     raw: Vec::new(),
                 })
                 .collect::<Vec<_>>();
-            validate_boundaries(storage_id, &boundaries, &location.storage.text)?;
+            validate_boundaries(storage_id, &boundaries, &location.storage.text, kind)?;
             Ok(boundaries)
         },
         _ => Err(Error::InvalidFormat(format!(
-            "iWork text storage {storage_id} smart-field table wire state is inconsistent"
+            "iWork text storage {storage_id} {} table wire state is inconsistent",
+            kind.label()
         ))),
     }
 }
@@ -73,11 +107,13 @@ pub(super) fn raw_boundaries(
     storage_id: u64,
     table: Option<&[u8]>,
     storage: &tswp::StorageArchive,
+    kind: RangedObjectTable,
 ) -> Result<Vec<Boundary>> {
     let Some(table) = table else {
-        if storage.table_smartfield.is_some() {
+        if kind.decoded(storage).is_some() {
             return Err(Error::InvalidFormat(format!(
-                "iWork text storage {storage_id} smart-field table wire state is inconsistent"
+                "iWork text storage {storage_id} {} table wire state is inconsistent",
+                kind.label()
             )));
         }
         return Ok(Vec::new());
@@ -85,7 +121,8 @@ pub(super) fn raw_boundaries(
     let entries = repeated_length_delimited_payloads(table, TABLE_ENTRIES_FIELD)?;
     if entries.is_empty() {
         return Err(Error::InvalidFormat(format!(
-            "iWork text storage {storage_id} has an empty smart-field table"
+            "iWork text storage {storage_id} has an empty {} table",
+            kind.label()
         )));
     }
     let boundaries = entries
@@ -99,17 +136,23 @@ pub(super) fn raw_boundaries(
             })
         })
         .collect::<Result<Vec<_>>>()?;
-    validate_boundaries(storage_id, &boundaries, &storage.text)?;
+    validate_boundaries(storage_id, &boundaries, &storage.text, kind)?;
     Ok(boundaries)
 }
 
-fn validate_boundaries(storage_id: u64, boundaries: &[Boundary], text: &[String]) -> Result<()> {
+fn validate_boundaries(
+    storage_id: u64,
+    boundaries: &[Boundary],
+    text: &[String],
+    kind: RangedObjectTable,
+) -> Result<()> {
     if boundaries.is_empty() {
         return Ok(());
     }
     if boundaries[0].index != 0 {
         return Err(Error::InvalidFormat(format!(
-            "iWork text storage {storage_id} smart-field table must begin at UTF-16 index zero"
+            "iWork text storage {storage_id} {} table must begin at UTF-16 index zero",
+            kind.label()
         )));
     }
     let text_len = text_utf16_len(text)?;
@@ -117,17 +160,20 @@ fn validate_boundaries(storage_id: u64, boundaries: &[Boundary], text: &[String]
     for boundary in boundaries {
         if previous.is_some_and(|index| index >= boundary.index) {
             return Err(Error::InvalidFormat(format!(
-                "iWork text storage {storage_id} smart-field boundaries are not strictly increasing"
+                "iWork text storage {storage_id} {} boundaries are not strictly increasing",
+                kind.label()
             )));
         }
         if boundary.object_id == Some(0) {
             return Err(Error::InvalidFormat(format!(
-                "iWork text storage {storage_id} has a zero smart-field object identifier"
+                "iWork text storage {storage_id} has a zero {} object identifier",
+                kind.label()
             )));
         }
         if boundary.object_id.is_some() && boundary.index == text_len {
             return Err(Error::InvalidFormat(format!(
-                "iWork text storage {storage_id} has an empty smart-field range at its end"
+                "iWork text storage {storage_id} has an empty {} range at its end",
+                kind.label()
             )));
         }
         previous = Some(boundary.index);
@@ -153,6 +199,7 @@ pub(super) fn ensure_range_available(
     boundaries: &[Boundary],
     ignored_id: Option<u64>,
     text: &[String],
+    kind: RangedObjectTable,
 ) -> Result<()> {
     let text_len = text_utf16_len(text)?;
     let start = range.start().utf16_index();
@@ -169,7 +216,8 @@ pub(super) fn ensure_range_available(
             .map_or(text_len, |next| next.index);
         if start < occupied_end && boundary.index < end {
             return Err(Error::InvalidFormat(format!(
-                "hyperlink range {start}..{end} overlaps smart-field object {identifier} in text storage {storage_id}"
+                "{} range {start}..{end} overlaps object {identifier} in text storage {storage_id}",
+                kind.label()
             )));
         }
     }
@@ -190,7 +238,11 @@ pub(super) fn add_range(
     Ok(())
 }
 
-pub(super) fn remove_range(boundaries: &mut Vec<Boundary>, identifier: u64) -> Result<()> {
+pub(super) fn remove_range(
+    boundaries: &mut Vec<Boundary>,
+    identifier: u64,
+    kind: RangedObjectTable,
+) -> Result<()> {
     let matches = boundaries
         .iter()
         .enumerate()
@@ -199,7 +251,8 @@ pub(super) fn remove_range(boundaries: &mut Vec<Boundary>, identifier: u64) -> R
         .collect::<Vec<_>>();
     let [position] = matches.as_slice() else {
         return Err(Error::InvalidFormat(format!(
-            "smart-field table must reference hyperlink object {identifier} exactly once"
+            "{} table must reference object {identifier} exactly once",
+            kind.label()
         )));
     };
     let boundary = &mut boundaries[*position];
@@ -289,10 +342,11 @@ pub(super) fn encode_table(original: Option<&[u8]>, boundaries: Vec<Boundary>) -
 
 type TablePatch = (Option<Vec<u8>>, Option<u64>, Option<u64>);
 
-pub(super) fn patch_smart_field_table<F>(
+pub(super) fn patch_ranged_object_table<F>(
     package: &mut IWorkPackage,
     archive_name: &str,
     storage_id: u64,
+    kind: RangedObjectTable,
     transform: F,
 ) -> Result<()>
 where
@@ -316,17 +370,18 @@ where
         };
         let original = &object.messages[*index];
         let storage = tswp::StorageArchive::decode(original.data.as_slice())?;
-        let tables = repeated_length_delimited_payloads(&original.data, SMART_FIELD_TABLE_FIELD)?;
+        let tables = repeated_length_delimited_payloads(&original.data, kind.field())?;
         if tables.len() > 1 {
             return Err(Error::InvalidFormat(format!(
-                "iWork text storage {storage_id} contains {} smart-field tables",
-                tables.len()
+                "iWork text storage {storage_id} contains {} {} tables",
+                tables.len(),
+                kind.label()
             )));
         }
         let (replacement, added, removed) = transform(tables.first().copied(), &storage)?;
         let data = patch_length_delimited_field(
             &original.data,
-            SMART_FIELD_TABLE_FIELD,
+            kind.field(),
             !tables.is_empty(),
             replacement.as_deref(),
         )?;
@@ -341,7 +396,8 @@ where
         if let Some(identifier) = added {
             if info.object_references.contains(&identifier) {
                 return Err(Error::InvalidFormat(format!(
-                    "iWork storage metadata already references new hyperlink object {identifier}"
+                    "iWork storage metadata already references new {} object {identifier}",
+                    kind.label()
                 )));
             }
             info.object_references.push(identifier);
@@ -354,7 +410,8 @@ where
                 .count();
             if count != 1 {
                 return Err(Error::InvalidFormat(format!(
-                    "iWork storage metadata references hyperlink object {identifier} {count} times"
+                    "iWork storage metadata references {} object {identifier} {count} times",
+                    kind.label()
                 )));
             }
             info.object_references

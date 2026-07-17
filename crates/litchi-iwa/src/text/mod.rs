@@ -5,6 +5,9 @@
 
 mod annotation;
 mod annotation_reply;
+mod bookmark;
+mod bookmark_object;
+mod bookmark_types;
 pub(crate) mod columns;
 mod drop_cap;
 pub mod editor;
@@ -32,6 +35,8 @@ mod text_comment;
 mod text_comment_types;
 
 #[cfg(test)]
+mod bookmark_tests;
+#[cfg(test)]
 mod highlight_tests;
 #[cfg(test)]
 mod hyperlink_tests;
@@ -40,6 +45,9 @@ mod language_tests;
 #[cfg(test)]
 mod text_comment_tests;
 
+pub use bookmark_types::{
+    TextBookmark, TextBookmarkId, TextBookmarkName, TextBookmarkSettings, TextBookmarkVisibility,
+};
 pub use columns::{
     EqualTextColumns, FollowingTextColumn, TextColumnCount, TextColumnGap, TextColumnWidth,
     TextColumns, VariableTextColumns,

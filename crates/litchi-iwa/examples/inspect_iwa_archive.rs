@@ -18,9 +18,9 @@ use litchi_iwa::protobuf::tss::StylesheetArchive;
 use litchi_iwa::protobuf::tst::TableDataList;
 use litchi_iwa::protobuf::tst::{TableInfoArchive, TableModelArchive};
 use litchi_iwa::protobuf::tswp::{
-    CharacterStyleArchive, ColumnStyleArchive, DateTimeSmartFieldArchive, DropCapStyleArchive,
-    HighlightArchive, HyperlinkFieldArchive, ListStyleArchive, ParagraphStyleArchive,
-    ShapeInfoArchive, ShapeStyleArchive, StorageArchive,
+    BookmarkFieldArchive, CharacterStyleArchive, ColumnStyleArchive, DateTimeSmartFieldArchive,
+    DropCapStyleArchive, HighlightArchive, HyperlinkFieldArchive, ListStyleArchive,
+    ParagraphStyleArchive, ShapeInfoArchive, ShapeStyleArchive, StorageArchive,
 };
 use prost::Message;
 
@@ -96,6 +96,11 @@ fn print_archive(archive: litchi_iwa::archive::Archive, object_id: Option<u64>) 
                 && let Ok(date_time) = DateTimeSmartFieldArchive::decode(message.data.as_slice())
             {
                 println!("  date_time={date_time:#?}");
+            }
+            if message.type_ == 2_035
+                && let Ok(bookmark) = BookmarkFieldArchive::decode(message.data.as_slice())
+            {
+                println!("  bookmark={bookmark:#?}");
             }
             if message.type_ == 2_013
                 && let Ok(highlight) = HighlightArchive::decode(message.data.as_slice())
