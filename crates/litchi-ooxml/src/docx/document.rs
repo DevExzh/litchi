@@ -1,8 +1,6 @@
+use crate::docx::alt_chunk::{AltChunk, AlternativeFormatPart, is_alternative_format_relationship};
 /// Document - the main API for working with Word document content.
 use crate::docx::bookmark::Bookmark;
-use crate::docx::alt_chunk::{
-    AltChunk, AlternativeFormatPart, is_alternative_format_relationship,
-};
 use crate::docx::comment::Comment;
 use crate::docx::content_control::ContentControl;
 use crate::docx::custom_xml::CustomXmlPart;
@@ -11,12 +9,12 @@ use crate::docx::field::Field;
 use crate::docx::footnote::Note;
 use crate::docx::header_footer::HeaderFooter;
 use crate::docx::hyperlink::Hyperlink;
+use crate::docx::mail_merge::{MailMergeRecipients, is_settings_relationship};
 use crate::docx::numbering::Numbering;
 use crate::docx::paragraph::Paragraph;
 use crate::docx::parts::DocumentPart;
 use crate::docx::section::{Section, Sections};
 use crate::docx::settings::DocumentSettings;
-use crate::docx::mail_merge::{MailMergeRecipients, is_settings_relationship};
 use crate::docx::smart_tag::SmartTag;
 use crate::docx::statistics::{
     DocumentStatistics, count_characters, count_characters_no_spaces, count_words,
@@ -96,7 +94,9 @@ impl<'a> Document<'a> {
     ///
     /// This is separate from [`Self::text`], whose behavior remains unchanged.
     pub fn list_items(&self) -> Result<Vec<crate::docx::list::ListItem>> {
-        let Some(numbering) = self.numbering()? else { return Ok(Vec::new()); };
+        let Some(numbering) = self.numbering()? else {
+            return Ok(Vec::new());
+        };
         let paragraphs = self.paragraphs()?;
         let mut styles = self.styles()?;
         let mut counters = crate::docx::list::ListCounterState::new();
@@ -110,18 +110,23 @@ impl<'a> Document<'a> {
                     Some(style_id) => styles.resolved_numbering(style_id)?,
                     None => None,
                 }
-            } else { None };
+            } else {
+                None
+            };
             let associated = if direct.is_none() && inherited.is_none() {
                 style_id.as_deref().and_then(|style_id| {
                     let mut found = None;
                     for num in numbering.nums() {
-                        if let Some(abstract_num) = numbering.get_abstract_num(num.abstract_num_id()) {
+                        if let Some(abstract_num) =
+                            numbering.get_abstract_num(num.abstract_num_id())
+                        {
                             for level in abstract_num.levels() {
                                 if level.paragraph_style.as_deref() == Some(style_id)
                                     && found.is_none()
                                 {
                                     found = Some(crate::docx::numbering::ParagraphNumbering {
-                                        num_id: num.id(), level: level.level,
+                                        num_id: num.id(),
+                                        level: level.level,
                                     });
                                 }
                             }
@@ -129,34 +134,48 @@ impl<'a> Document<'a> {
                     }
                     found
                 })
-            } else { None };
-            let Some(mut properties) = direct.or(inherited).or(associated) else { continue; };
-            if properties.num_id == 0 { continue; }
+            } else {
+                None
+            };
+            let Some(mut properties) = direct.or(inherited).or(associated) else {
+                continue;
+            };
+            if properties.num_id == 0 {
+                continue;
+            }
             let mut linked_num_ids = std::collections::HashSet::new();
             loop {
                 if !linked_num_ids.insert(properties.num_id) {
                     return Err(crate::error::OoxmlError::InvalidFormat(format!(
-                        "numbering style-link cycle at numId {}", properties.num_id
+                        "numbering style-link cycle at numId {}",
+                        properties.num_id
                     )));
                 }
                 let num = numbering.get_num(properties.num_id).ok_or_else(|| {
                     crate::error::OoxmlError::InvalidFormat(format!(
-                        "paragraph references missing numId {}", properties.num_id
-                    ))
-                })?;
-                let abstract_num = numbering.get_abstract_num(num.abstract_num_id()).ok_or_else(|| {
-                    crate::error::OoxmlError::InvalidFormat(format!(
-                        "numId {} references a missing abstract numbering definition",
+                        "paragraph references missing numId {}",
                         properties.num_id
                     ))
                 })?;
-                let Some(style_link) = abstract_num.num_style_link() else { break; };
+                let abstract_num = numbering
+                    .get_abstract_num(num.abstract_num_id())
+                    .ok_or_else(|| {
+                        crate::error::OoxmlError::InvalidFormat(format!(
+                            "numId {} references a missing abstract numbering definition",
+                            properties.num_id
+                        ))
+                    })?;
+                let Some(style_link) = abstract_num.num_style_link() else {
+                    break;
+                };
                 let linked = styles.resolved_numbering(style_link)?.ok_or_else(|| {
                     crate::error::OoxmlError::InvalidFormat(format!(
                         "numbering style link '{style_link}' has no numPr"
                     ))
                 })?;
-                if linked.num_id == 0 { break; }
+                if linked.num_id == 0 {
+                    break;
+                }
                 properties.num_id = linked.num_id;
             }
             let (marker, suffix) = counters.advance(&numbering, properties)?;
@@ -181,15 +200,20 @@ impl<'a> Document<'a> {
         let mut by_paragraph = items.into_iter().peekable();
         let mut output = String::new();
         for (index, paragraph) in paragraphs.iter().enumerate() {
-            if index != 0 { output.push('\n'); }
-            if by_paragraph.peek().is_some_and(|item| item.paragraph_index == index) {
+            if index != 0 {
+                output.push('\n');
+            }
+            if by_paragraph
+                .peek()
+                .is_some_and(|item| item.paragraph_index == index)
+            {
                 let item = by_paragraph.next().expect("item checked");
                 if let crate::docx::list::ListMarker::Text(label) = item.marker {
                     output.push_str(&label);
                     match item.suffix {
                         crate::docx::numbering::NumberingSuffix::Tab => output.push('\t'),
                         crate::docx::numbering::NumberingSuffix::Space => output.push(' '),
-                        crate::docx::numbering::NumberingSuffix::Nothing => {}
+                        crate::docx::numbering::NumberingSuffix::Nothing => {},
                     }
                 }
             }
@@ -362,10 +386,7 @@ impl<'a> Document<'a> {
     ///
     /// This validates the relationship type and internal target but never parses,
     /// imports, executes, or fetches the foreign content.
-    pub fn resolve_alt_chunk<'b>(
-        &'b self,
-        chunk: &AltChunk,
-    ) -> Result<AlternativeFormatPart<'b>> {
+    pub fn resolve_alt_chunk<'b>(&'b self, chunk: &AltChunk) -> Result<AlternativeFormatPart<'b>> {
         let relationship = self
             .part
             .part()
@@ -1293,10 +1314,23 @@ impl<'a> Document<'a> {
     /// ```
     pub fn settings(&self) -> Result<Option<DocumentSettings>> {
         let main_part = self.opc.main_document_part()?;
-        let mut matches = main_part.rels().iter().filter(|rel| is_settings_relationship(rel.reltype()));
-        let Some(rel) = matches.next() else { return Ok(None); };
-        if matches.next().is_some() { return Err(OoxmlError::InvalidFormat("document has multiple settings relationships".into())); }
-        if rel.is_external() { return Err(OoxmlError::InvalidFormat("settings relationship cannot be external".into())); }
+        let mut matches = main_part
+            .rels()
+            .iter()
+            .filter(|rel| is_settings_relationship(rel.reltype()));
+        let Some(rel) = matches.next() else {
+            return Ok(None);
+        };
+        if matches.next().is_some() {
+            return Err(OoxmlError::InvalidFormat(
+                "document has multiple settings relationships".into(),
+            ));
+        }
+        if rel.is_external() {
+            return Err(OoxmlError::InvalidFormat(
+                "settings relationship cannot be external".into(),
+            ));
+        }
         let target = rel.target_partname()?;
         let settings_part = self.opc.get_part(&target)?;
         Ok(Some(DocumentSettings::extract_from_part(settings_part)?))
@@ -1304,14 +1338,34 @@ impl<'a> Document<'a> {
 
     /// Load the ISO mail-merge recipient-data part referenced by `settings.xml`.
     pub fn mail_merge_recipients(&self) -> Result<Option<MailMergeRecipients>> {
-        let Some(settings) = self.settings()? else { return Ok(None); };
-        let Some(relationship_id) = settings.mail_merge().and_then(|merge| merge.odso()).and_then(|odso| odso.recipient_data_relationship_id()) else { return Ok(None); };
+        let Some(settings) = self.settings()? else {
+            return Ok(None);
+        };
+        let Some(relationship_id) = settings
+            .mail_merge()
+            .and_then(|merge| merge.odso())
+            .and_then(|odso| odso.recipient_data_relationship_id())
+        else {
+            return Ok(None);
+        };
         let main_part = self.opc.main_document_part()?;
-        let settings_relationship = main_part.rels().iter().find(|rel| is_settings_relationship(rel.reltype())).ok_or_else(|| OoxmlError::InvalidFormat("settings relationship is missing".into()))?;
-        let settings_part = self.opc.get_part(&settings_relationship.target_partname()?)?;
-        let relationship = settings_part.rels().get(relationship_id).ok_or_else(|| OoxmlError::InvalidFormat(format!("recipient-data relationship '{relationship_id}' is missing")))?;
+        let settings_relationship = main_part
+            .rels()
+            .iter()
+            .find(|rel| is_settings_relationship(rel.reltype()))
+            .ok_or_else(|| OoxmlError::InvalidFormat("settings relationship is missing".into()))?;
+        let settings_part = self
+            .opc
+            .get_part(&settings_relationship.target_partname()?)?;
+        let relationship = settings_part.rels().get(relationship_id).ok_or_else(|| {
+            OoxmlError::InvalidFormat(format!(
+                "recipient-data relationship '{relationship_id}' is missing"
+            ))
+        })?;
         let recipient_part = self.opc.get_part(&relationship.target_partname()?)?;
-        Ok(Some(MailMergeRecipients::extract_from_part(recipient_part)?))
+        Ok(Some(MailMergeRecipients::extract_from_part(
+            recipient_part,
+        )?))
     }
 
     /// Get the document's web-output settings, if a web-settings part exists.
@@ -1358,6 +1412,16 @@ impl<'a> Document<'a> {
     /// ```
     pub fn is_protected(&self) -> Result<bool> {
         Ok(self.settings()?.is_some_and(|s| s.is_protected()))
+    }
+
+    /// Load the bounded, inert classic-chart graph owned by this document.
+    ///
+    /// Returns every classic DrawingML chart anchored in the main document
+    /// body together with its style, color-style, and embedded-workbook
+    /// companion parts. See [`crate::docx::chart::load_chart_graph`].
+    pub fn chart_graph(&self) -> Result<crate::docx::chart::DocxChartGraph> {
+        let main = self.opc.main_document_part()?.partname().clone();
+        crate::docx::chart::load_chart_graph(self.opc, &main)
     }
 
     /// Get document variables.

@@ -1,8 +1,8 @@
 use crate::common::DocumentProperties;
 use crate::custom_properties::CustomProperties;
 use crate::docx::document::Document;
-use crate::docx::parts::DocumentPart;
 use crate::docx::font_table::{FontTable, is_font_table_relationship};
+use crate::docx::parts::DocumentPart;
 use crate::docx::web_settings::{WebSettings, is_web_settings_relationship};
 use crate::docx::writer::MutableDocument;
 /// Package implementation for Word documents.
@@ -569,14 +569,22 @@ impl Package {
     /// Load typed font metadata and inert embedded-font resources.
     pub fn font_table(&self) -> Result<Option<FontTable>> {
         let main_part = self.opc.main_document_part()?;
-        let mut matches = main_part.rels().iter()
+        let mut matches = main_part
+            .rels()
+            .iter()
             .filter(|relationship| is_font_table_relationship(relationship.reltype()));
-        let Some(relationship) = matches.next() else { return Ok(None); };
+        let Some(relationship) = matches.next() else {
+            return Ok(None);
+        };
         if matches.next().is_some() {
-            return Err(OoxmlError::InvalidFormat("document has multiple font-table relationships".into()));
+            return Err(OoxmlError::InvalidFormat(
+                "document has multiple font-table relationships".into(),
+            ));
         }
         if relationship.is_external() {
-            return Err(OoxmlError::InvalidFormat("font-table relationship cannot be external".into()));
+            return Err(OoxmlError::InvalidFormat(
+                "font-table relationship cannot be external".into(),
+            ));
         }
         let target = relationship.target_partname()?;
         let part = self.opc.get_part(&target)?;
@@ -594,6 +602,18 @@ impl Package {
     /// Discover inert embedded-object and embedded-package relationships.
     pub fn embedded_parts(&self) -> Result<Vec<crate::EmbeddedPart<'_>>> {
         crate::embedded_object::discover_embedded_parts(&self.opc)
+    }
+
+    /// Load the bounded, inert classic-chart graph owned by the main document.
+    pub fn chart_graph(&self) -> Result<crate::docx::chart::DocxChartGraph> {
+        let document = self.opc.main_document_part()?.partname().clone();
+        crate::docx::chart::load_chart_graph(&self.opc, &document)
+    }
+
+    /// Deterministically store an already coherent classic-chart graph.
+    pub fn store_chart_graph(&mut self, graph: &crate::docx::chart::DocxChartGraph) -> Result<()> {
+        let document = self.opc.main_document_part()?.partname().clone();
+        crate::docx::chart::store_chart_graph(&mut self.opc, &document, graph)
     }
 
     /// Get mutable access to the underlying OPC package.

@@ -52,7 +52,7 @@ This document tracks the implementation status of features across all supported 
 | Equations (OMML) | ❌ | ❌ | ❌ | Office Math (`m:oMath`) equations |
 | Embedded objects (OLE) | ❌ | ❌ | ❌ | Embedded files and OLE packages |
 | Embedded files/attachments | ❌ | ❌ | ❌ | Embedded packages and attachments |
-| Charts | ❌ | ❌ | ❌ | Embedded chart parts (`/word/charts/`) |
+| Charts | ✅ | ✅ | ✅ | Classic chart graphs (`/word/charts/`): chart, style, color-style, embedded workbook parts with bounded load/store |
 | SmartArt | ❌ | ❌ | ❌ | Diagram parts (`/word/diagrams/`) |
 | Text boxes (DrawingML) | ❌ | ❌ | ❌ | VML/DrawingML text boxes |
 | WordArt | ❌ | ❌ | ❌ | DrawingML text effects |

@@ -49,8 +49,9 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
-pub mod bookmark;
 pub mod alt_chunk;
+pub mod bookmark;
+pub mod chart;
 pub mod comment;
 pub mod content_control;
 pub mod custom_xml;
@@ -59,17 +60,17 @@ pub mod drawing;
 pub mod enums;
 pub mod field;
 pub mod font_table;
-pub mod glossary;
 pub mod footnote;
 pub mod format;
+pub mod glossary;
 pub mod header_footer;
 pub mod hyperlink;
 pub mod image;
-mod namespace;
-pub mod numbering;
 pub mod list;
 pub mod mail_merge;
 pub mod modern_comments;
+mod namespace;
+pub mod numbering;
 pub mod package;
 pub mod paragraph;
 pub mod parts;
@@ -86,8 +87,13 @@ pub mod variables;
 pub mod web_settings;
 pub mod writer;
 
-pub use bookmark::Bookmark;
 pub use alt_chunk::{AltChunk, AlternativeFormatKind, AlternativeFormatPart};
+pub use bookmark::Bookmark;
+pub use chart::{
+    DocxChartCompanionResource, DocxChartConformance, DocxChartEmbeddedWorkbookContentType,
+    DocxChartEmbeddedWorkbookResource, DocxChartGraph, DocxChartResource, load_chart_graph,
+    store_chart_graph,
+};
 pub use comment::Comment;
 pub use content_control::ContentControl;
 pub use custom_xml::CustomXmlPart;
@@ -103,20 +109,20 @@ pub use font_table::{
 pub use footnote::{Note, NoteType};
 pub use header_footer::HeaderFooter;
 pub use hyperlink::Hyperlink;
+pub use image::InlineImage;
 pub use mail_merge::{
     MailMergeConformance, MailMergeDataSourceObject, MailMergeDataType, MailMergeDestination,
     MailMergeFieldMap, MailMergeFieldMappingType, MailMergeMainDocumentType, MailMergeRecipient,
     MailMergeRecipients, MailMergeSettings,
 };
 pub use modern_comments::{
-    CommentExtension, CommentIdMapping, CommentReaction, CommentReactionInfo,
-    CommentReactionUser, ExtensibleComment, ModernCommentConformance, ModernCommentMetadata,
+    CommentExtension, CommentIdMapping, CommentReaction, CommentReactionInfo, CommentReactionUser,
+    ExtensibleComment, ModernCommentConformance, ModernCommentMetadata,
     ModernCommentRelationshipIds, Person, PresenceInfo, load_modern_comment_metadata,
     parse_comments_extended, parse_comments_extensible, parse_comments_ids, parse_people,
     store_modern_comment_metadata, write_comments_extended, write_comments_extensible,
     write_comments_ids, write_people,
 };
-pub use image::InlineImage;
 pub use numbering::{AbstractNum, Num, Numbering};
 pub use package::Package;
 pub use paragraph::{
