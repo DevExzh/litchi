@@ -17,37 +17,71 @@ pub enum XlsDataValidationOperator {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsDataValidationErrorStyle { Stop, Warning, Information }
+pub enum XlsDataValidationErrorStyle {
+    Stop,
+    Warning,
+    Information,
+}
 
 impl XlsDataValidationErrorStyle {
     pub(crate) fn to_biff_code(self) -> u8 {
-        match self { Self::Stop => 0, Self::Warning => 1, Self::Information => 2 }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsDataValidationImeMode {
-    NoControl, On, Off, Hiragana, WideKatakana, NarrowKatakana,
-    FullWidthAlphanumeric, HalfWidthAlphanumeric, FullWidthHangul, HalfWidthHangul,
-}
-
-impl XlsDataValidationImeMode {
-    pub(crate) fn to_biff_code(self) -> u8 {
         match self {
-            Self::NoControl => 0, Self::On => 1, Self::Off => 2, Self::Hiragana => 4,
-            Self::WideKatakana => 5, Self::NarrowKatakana => 6,
-            Self::FullWidthAlphanumeric => 7, Self::HalfWidthAlphanumeric => 8,
-            Self::FullWidthHangul => 9, Self::HalfWidthHangul => 10,
+            Self::Stop => 0,
+            Self::Warning => 1,
+            Self::Information => 2,
         }
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsDataValidationFormulaKind { Whole, Decimal, Date, Time, TextLength }
+pub enum XlsDataValidationImeMode {
+    NoControl,
+    On,
+    Off,
+    Hiragana,
+    WideKatakana,
+    NarrowKatakana,
+    FullWidthAlphanumeric,
+    HalfWidthAlphanumeric,
+    FullWidthHangul,
+    HalfWidthHangul,
+}
+
+impl XlsDataValidationImeMode {
+    pub(crate) fn to_biff_code(self) -> u8 {
+        match self {
+            Self::NoControl => 0,
+            Self::On => 1,
+            Self::Off => 2,
+            Self::Hiragana => 4,
+            Self::WideKatakana => 5,
+            Self::NarrowKatakana => 6,
+            Self::FullWidthAlphanumeric => 7,
+            Self::HalfWidthAlphanumeric => 8,
+            Self::FullWidthHangul => 9,
+            Self::HalfWidthHangul => 10,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum XlsDataValidationFormulaKind {
+    Whole,
+    Decimal,
+    Date,
+    Time,
+    TextLength,
+}
 
 impl XlsDataValidationFormulaKind {
     pub(crate) fn to_biff_code(self) -> u8 {
-        match self { Self::Whole => 1, Self::Decimal => 2, Self::Date => 4, Self::Time => 5, Self::TextLength => 6 }
+        match self {
+            Self::Whole => 1,
+            Self::Decimal => 2,
+            Self::Date => 4,
+            Self::Time => 5,
+            Self::TextLength => 6,
+        }
     }
 }
 
@@ -69,8 +103,12 @@ pub struct XlsDataValidationOptions {
 
 impl Default for XlsDataValidationOptions {
     fn default() -> Self {
-        Self { error_style: XlsDataValidationErrorStyle::Stop, allow_blank: true,
-            suppress_dropdown: false, ime_mode: XlsDataValidationImeMode::NoControl }
+        Self {
+            error_style: XlsDataValidationErrorStyle::Stop,
+            allow_blank: true,
+            suppress_dropdown: false,
+            ime_mode: XlsDataValidationImeMode::NoControl,
+        }
     }
 }
 
@@ -84,7 +122,12 @@ pub struct XlsDataValidationTableOptions {
 
 impl Default for XlsDataValidationTableOptions {
     fn default() -> Self {
-        Self { window_closed: false, x_left: 0, y_top: 0, dropdown_object_id: None }
+        Self {
+            window_closed: false,
+            x_left: 0,
+            y_top: 0,
+            dropdown_object_id: None,
+        }
     }
 }
 
@@ -118,13 +161,35 @@ pub enum XlsDataValidationType {
         value2: Option<i64>,
     },
     /// Explicit list of allowed string values.
-    List { values: Vec<String> },
-    Decimal { operator: XlsDataValidationOperator, value1: f64, value2: Option<f64> },
-    Date { operator: XlsDataValidationOperator, value1: f64, value2: Option<f64> },
-    Time { operator: XlsDataValidationOperator, value1: f64, value2: Option<f64> },
-    TextLength { operator: XlsDataValidationOperator, value1: i64, value2: Option<i64> },
-    ListFormula { formula_tokens: Vec<u8> },
-    Custom { formula_tokens: Vec<u8> },
+    List {
+        values: Vec<String>,
+    },
+    Decimal {
+        operator: XlsDataValidationOperator,
+        value1: f64,
+        value2: Option<f64>,
+    },
+    Date {
+        operator: XlsDataValidationOperator,
+        value1: f64,
+        value2: Option<f64>,
+    },
+    Time {
+        operator: XlsDataValidationOperator,
+        value1: f64,
+        value2: Option<f64>,
+    },
+    TextLength {
+        operator: XlsDataValidationOperator,
+        value1: i64,
+        value2: Option<i64>,
+    },
+    ListFormula {
+        formula_tokens: Vec<u8>,
+    },
+    Custom {
+        formula_tokens: Vec<u8>,
+    },
     RawFormula {
         kind: XlsDataValidationFormulaKind,
         operator: XlsDataValidationOperator,
@@ -148,8 +213,11 @@ impl XlsDataValidationType {
     pub(crate) fn to_biff_payload(&self) -> XlsResult<XlsDataValidationBiffPayload> {
         match self {
             XlsDataValidationType::Any => Ok(XlsDataValidationBiffPayload {
-                data_type: 0, operator: 0, is_explicit_list: false,
-                formula1: None, formula2: None,
+                data_type: 0,
+                operator: 0,
+                is_explicit_list: false,
+                formula1: None,
+                formula2: None,
             }),
             XlsDataValidationType::Whole {
                 operator,
@@ -221,11 +289,25 @@ impl XlsDataValidationType {
                     formula2: None,
                 })
             },
-            XlsDataValidationType::Decimal { operator, value1, value2 }
-            | XlsDataValidationType::Date { operator, value1, value2 }
-            | XlsDataValidationType::Time { operator, value1, value2 } => {
+            XlsDataValidationType::Decimal {
+                operator,
+                value1,
+                value2,
+            }
+            | XlsDataValidationType::Date {
+                operator,
+                value1,
+                value2,
+            }
+            | XlsDataValidationType::Time {
+                operator,
+                value1,
+                value2,
+            } => {
                 if !value1.is_finite() || value2.is_some_and(|value| !value.is_finite()) {
-                    return Err(XlsError::InvalidData("Data validation value must be finite".to_string()));
+                    return Err(XlsError::InvalidData(
+                        "Data validation value must be finite".to_string(),
+                    ));
                 }
                 let data_type = match self {
                     XlsDataValidationType::Decimal { .. } => 2,
@@ -234,19 +316,42 @@ impl XlsDataValidationType {
                 };
                 numeric_payload(data_type, *operator, *value1, *value2)
             },
-            XlsDataValidationType::TextLength { operator, value1, value2 } => {
-                numeric_payload(6, *operator, *value1 as f64, value2.map(|value| value as f64))
-            },
-            XlsDataValidationType::ListFormula { formula_tokens } => {
-                raw_payload(3, XlsDataValidationOperator::Equal, formula_tokens, None, false)
-            },
-            XlsDataValidationType::Custom { formula_tokens } => {
-                raw_payload(7, XlsDataValidationOperator::Equal, formula_tokens, None, false)
-            },
-            XlsDataValidationType::RawFormula { kind, operator, formula1_tokens, formula2_tokens } => {
-                raw_payload(kind.to_biff_code(), *operator, formula1_tokens,
-                    formula2_tokens.as_deref(), true)
-            },
+            XlsDataValidationType::TextLength {
+                operator,
+                value1,
+                value2,
+            } => numeric_payload(
+                6,
+                *operator,
+                *value1 as f64,
+                value2.map(|value| value as f64),
+            ),
+            XlsDataValidationType::ListFormula { formula_tokens } => raw_payload(
+                3,
+                XlsDataValidationOperator::Equal,
+                formula_tokens,
+                None,
+                false,
+            ),
+            XlsDataValidationType::Custom { formula_tokens } => raw_payload(
+                7,
+                XlsDataValidationOperator::Equal,
+                formula_tokens,
+                None,
+                false,
+            ),
+            XlsDataValidationType::RawFormula {
+                kind,
+                operator,
+                formula1_tokens,
+                formula2_tokens,
+            } => raw_payload(
+                kind.to_biff_code(),
+                *operator,
+                formula1_tokens,
+                formula2_tokens.as_deref(),
+                true,
+            ),
         }
     }
 }
@@ -259,14 +364,22 @@ fn numeric_payload(
 ) -> XlsResult<XlsDataValidationBiffPayload> {
     let formula1 = Some(encode_ptg_tokens(&[Ptg::PtgNum(value1)]));
     let formula2 = value2.map(|value| encode_ptg_tokens(&[Ptg::PtgNum(value)]));
-    let needs_two = matches!(operator, XlsDataValidationOperator::Between | XlsDataValidationOperator::NotBetween);
+    let needs_two = matches!(
+        operator,
+        XlsDataValidationOperator::Between | XlsDataValidationOperator::NotBetween
+    );
     if needs_two != formula2.is_some() {
         return Err(XlsError::InvalidData(
             "Data validation formula count does not match its operator".to_string(),
         ));
     }
-    Ok(XlsDataValidationBiffPayload { data_type, operator: operator.to_biff_code(),
-        is_explicit_list: false, formula1, formula2 })
+    Ok(XlsDataValidationBiffPayload {
+        data_type,
+        operator: operator.to_biff_code(),
+        is_explicit_list: false,
+        formula1,
+        formula2,
+    })
 }
 
 fn raw_payload(
@@ -276,22 +389,36 @@ fn raw_payload(
     formula2: Option<&[u8]>,
     operator_controls_count: bool,
 ) -> XlsResult<XlsDataValidationBiffPayload> {
-    if formula1.is_empty() || formula1.len() > u16::MAX as usize
+    if formula1.is_empty()
+        || formula1.len() > u16::MAX as usize
         || formula2.is_some_and(|tokens| tokens.is_empty() || tokens.len() > u16::MAX as usize)
     {
-        return Err(XlsError::InvalidData("Data validation formula tokens have invalid length".to_string()));
+        return Err(XlsError::InvalidData(
+            "Data validation formula tokens have invalid length".to_string(),
+        ));
     }
     if operator_controls_count {
-        let needs_two = matches!(operator, XlsDataValidationOperator::Between | XlsDataValidationOperator::NotBetween);
+        let needs_two = matches!(
+            operator,
+            XlsDataValidationOperator::Between | XlsDataValidationOperator::NotBetween
+        );
         if needs_two != formula2.is_some() {
-            return Err(XlsError::InvalidData("Data validation formula count does not match its operator".to_string()));
+            return Err(XlsError::InvalidData(
+                "Data validation formula count does not match its operator".to_string(),
+            ));
         }
     } else if formula2.is_some() {
-        return Err(XlsError::InvalidData("This validation type accepts one formula".to_string()));
+        return Err(XlsError::InvalidData(
+            "This validation type accepts one formula".to_string(),
+        ));
     }
-    Ok(XlsDataValidationBiffPayload { data_type, operator: operator.to_biff_code(),
-        is_explicit_list: false, formula1: Some(formula1.to_vec()),
-        formula2: formula2.map(<[u8]>::to_vec) })
+    Ok(XlsDataValidationBiffPayload {
+        data_type,
+        operator: operator.to_biff_code(),
+        is_explicit_list: false,
+        formula1: Some(formula1.to_vec()),
+        formula2: formula2.map(<[u8]>::to_vec),
+    })
 }
 
 /// Data validation rule applied to a rectangular cell range in a worksheet.

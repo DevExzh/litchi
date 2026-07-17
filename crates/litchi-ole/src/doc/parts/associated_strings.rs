@@ -92,22 +92,21 @@ impl DocumentAssociatedStrings {
     }
 
     /// Parse the optional FIB index-32 table range.
-    pub fn parse(
-        fib: &FileInformationBlock,
-        table_stream: &[u8],
-    ) -> Result<Option<Self>> {
+    pub fn parse(fib: &FileInformationBlock, table_stream: &[u8]) -> Result<Option<Self>> {
         let Some((offset, length)) = fib.get_table_pointer(FIB_INDEX) else {
             return Ok(None);
         };
         if length == 0 {
             return Ok(None);
         }
-        let start = usize::try_from(offset)
-            .map_err(|_| corrupted("SttbfAssoc offset is too large"))?;
-        let length = usize::try_from(length)
-            .map_err(|_| corrupted("SttbfAssoc length is too large"))?;
+        let start =
+            usize::try_from(offset).map_err(|_| corrupted("SttbfAssoc offset is too large"))?;
+        let length =
+            usize::try_from(length).map_err(|_| corrupted("SttbfAssoc length is too large"))?;
         if length > MAX_TABLE_BYTES {
-            return Err(corrupted("SttbfAssoc exceeds its specification-derived size cap"));
+            return Err(corrupted(
+                "SttbfAssoc exceeds its specification-derived size cap",
+            ));
         }
         let end = start
             .checked_add(length)
@@ -121,7 +120,9 @@ impl DocumentAssociatedStrings {
     /// Parse one complete `SttbfAssoc` payload.
     pub fn parse_bytes(data: &[u8]) -> Result<Self> {
         if data.len() > MAX_TABLE_BYTES {
-            return Err(corrupted("SttbfAssoc exceeds its specification-derived size cap"));
+            return Err(corrupted(
+                "SttbfAssoc exceeds its specification-derived size cap",
+            ));
         }
         if data.len() < 6
             || read_u16(data, 0, "SttbfAssoc fExtend")? != 0xFFFF
@@ -190,12 +191,24 @@ impl DocumentAssociatedStrings {
     }
 
     /// Associated template path as inert metadata.
-    pub fn template_path(&self) -> &str { self.get(AssociatedStringSlot::TemplatePath) }
-    pub fn title(&self) -> &str { self.get(AssociatedStringSlot::Title) }
-    pub fn subject(&self) -> &str { self.get(AssociatedStringSlot::Subject) }
-    pub fn keywords(&self) -> &str { self.get(AssociatedStringSlot::Keywords) }
-    pub fn author(&self) -> &str { self.get(AssociatedStringSlot::Author) }
-    pub fn last_revised_by(&self) -> &str { self.get(AssociatedStringSlot::LastRevisedBy) }
+    pub fn template_path(&self) -> &str {
+        self.get(AssociatedStringSlot::TemplatePath)
+    }
+    pub fn title(&self) -> &str {
+        self.get(AssociatedStringSlot::Title)
+    }
+    pub fn subject(&self) -> &str {
+        self.get(AssociatedStringSlot::Subject)
+    }
+    pub fn keywords(&self) -> &str {
+        self.get(AssociatedStringSlot::Keywords)
+    }
+    pub fn author(&self) -> &str {
+        self.get(AssociatedStringSlot::Author)
+    }
+    pub fn last_revised_by(&self) -> &str {
+        self.get(AssociatedStringSlot::LastRevisedBy)
+    }
     /// Associated mail-merge data source path as inert metadata.
     pub fn mail_merge_data_source_path(&self) -> &str {
         self.get(AssociatedStringSlot::MailMergeDataSourcePath)
@@ -245,7 +258,9 @@ fn validate_values(values: &[String; STRING_COUNT]) -> Result<usize> {
             .ok_or_else(|| corrupted("SttbfAssoc serialized size overflows"))?;
     }
     if size > MAX_TABLE_BYTES {
-        return Err(corrupted("SttbfAssoc exceeds its specification-derived size cap"));
+        return Err(corrupted(
+            "SttbfAssoc exceeds its specification-derived size cap",
+        ));
     }
     Ok(size)
 }

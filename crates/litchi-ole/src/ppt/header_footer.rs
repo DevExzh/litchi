@@ -44,7 +44,9 @@ impl PowerPointDateTimeFormatId {
     /// Construct a validated format identifier.
     pub fn new(value: u8) -> Result<Self> {
         if value > Self::MAX {
-            return Err(corrupted("header/footer datetime format ID is outside 0..=13"));
+            return Err(corrupted(
+                "header/footer datetime format ID is outside 0..=13",
+            ));
         }
         Ok(Self(value))
     }
@@ -194,15 +196,21 @@ impl PowerPointHeaderFooterOptions {
             || record.data.len() != HEADERS_FOOTERS_ATOM_LENGTH
             || !record.children.is_empty()
         {
-            return Err(corrupted("HeadersFootersAtom must have exactly four data bytes"));
+            return Err(corrupted(
+                "HeadersFootersAtom must have exactly four data bytes",
+            ));
         }
         let format_id = i16::from_le_bytes([record.data[0], record.data[1]]);
         if !(0..=i16::from(PowerPointDateTimeFormatId::MAX)).contains(&format_id) {
-            return Err(corrupted("header/footer datetime format ID is outside 0..=13"));
+            return Err(corrupted(
+                "header/footer datetime format ID is outside 0..=13",
+            ));
         }
         let mask = u16::from_le_bytes([record.data[2], record.data[3]]);
         if mask & !KNOWN_FLAG_MASK != 0 {
-            return Err(corrupted("HeadersFootersAtom has nonzero reserved flag bits"));
+            return Err(corrupted(
+                "HeadersFootersAtom has nonzero reserved flag bits",
+            ));
         }
         Ok(Self {
             datetime_format: PowerPointDateTimeFormatId(format_id as u8),
@@ -271,7 +279,9 @@ impl PowerPointHeaderFooter {
         }
         let children = PptRecord::parse_sequence_strict(&record.data, "HeadersFooters")?;
         let Some(atom) = children.first() else {
-            return Err(corrupted("HeadersFooters container is missing HeadersFootersAtom"));
+            return Err(corrupted(
+                "HeadersFooters container is missing HeadersFootersAtom",
+            ));
         };
         let options = PowerPointHeaderFooterOptions::from_atom(atom)?;
 
@@ -284,23 +294,33 @@ impl PowerPointHeaderFooter {
                 || child.record_type_raw != CSTRING_RECORD_TYPE
                 || child.version != ATOM_VERSION
             {
-                return Err(corrupted("HeadersFooters contains an unexpected child record"));
+                return Err(corrupted(
+                    "HeadersFooters contains an unexpected child record",
+                ));
             }
             if child.data_length as usize != child.data.len() || child.data.len() % 2 != 0 {
-                return Err(corrupted("header/footer CString has an invalid byte length"));
+                return Err(corrupted(
+                    "header/footer CString has an invalid byte length",
+                ));
             }
             if child.data.len() > MAX_TEXT_BYTES {
-                return Err(corrupted("header/footer CString exceeds the resource limit"));
+                return Err(corrupted(
+                    "header/footer CString exceeds the resource limit",
+                ));
             }
             if previous_instance.is_some_and(|previous| child.instance <= previous) {
-                return Err(corrupted("header/footer CString children are duplicated or out of order"));
+                return Err(corrupted(
+                    "header/footer CString children are duplicated or out of order",
+                ));
             }
             previous_instance = Some(child.instance);
             *aggregate = aggregate
                 .checked_add(child.data.len())
                 .ok_or_else(|| corrupted("header/footer aggregate size overflow"))?;
             if *aggregate > MAX_AGGREGATE_TEXT_BYTES {
-                return Err(corrupted("header/footer strings exceed the aggregate resource limit"));
+                return Err(corrupted(
+                    "header/footer strings exceed the aggregate resource limit",
+                ));
             }
             let value = decode_printable_unicode(&child.data)?;
             match child.instance {
@@ -312,7 +332,9 @@ impl PowerPointHeaderFooter {
                 },
                 HEADER_INSTANCE if scope.permits_header_atom() => header = Some(value),
                 HEADER_INSTANCE => {
-                    return Err(corrupted("HeaderAtom is not permitted in this header/footer scope"));
+                    return Err(corrupted(
+                        "HeaderAtom is not permitted in this header/footer scope",
+                    ));
                 },
                 FOOTER_INSTANCE => footer = Some(value),
                 _ => return Err(corrupted("header/footer CString has an invalid instance")),
@@ -400,7 +422,9 @@ impl PowerPointHeaderFooter {
 
     fn validate_for_write(&self) -> Result<()> {
         if self.header.is_some() && !self.scope.permits_header_atom() {
-            return Err(corrupted("HeaderAtom is not permitted in this header/footer scope"));
+            return Err(corrupted(
+                "HeaderAtom is not permitted in this header/footer scope",
+            ));
         }
         let mut aggregate = 0usize;
         for (kind, value) in [
@@ -418,7 +442,9 @@ impl PowerPointHeaderFooter {
                 .ok_or_else(|| corrupted("header/footer aggregate size overflow"))?;
         }
         if aggregate > MAX_AGGREGATE_TEXT_BYTES {
-            return Err(corrupted("header/footer strings exceed the aggregate resource limit"));
+            return Err(corrupted(
+                "header/footer strings exceed the aggregate resource limit",
+            ));
         }
         Ok(())
     }
@@ -475,14 +501,18 @@ impl PowerPointHeaderFooters {
 
     pub(crate) fn parse_record_tree(records: &[&PptRecord]) -> Result<Self> {
         if records.len() > MAX_SCANNED_RECORDS {
-            return Err(corrupted("PowerPoint record tree exceeds the header/footer scan limit"));
+            return Err(corrupted(
+                "PowerPoint record tree exceeds the header/footer scan limit",
+            ));
         }
         let document_count = records
             .iter()
             .filter(|record| record.record_type == PptRecordType::Document)
             .count();
         if document_count != 1 {
-            return Err(corrupted("PowerPoint must contain exactly one Document container"));
+            return Err(corrupted(
+                "PowerPoint must contain exactly one Document container",
+            ));
         }
 
         let total_containers = records
@@ -520,9 +550,15 @@ impl PowerPointHeaderFooters {
                                 PowerPointHeaderFooterScope::NotesAndHandouts
                             },
                             PRESENTATION_SLIDES_INSTANCE | NOTES_AND_HANDOUTS_INSTANCE => {
-                                return Err(corrupted("duplicate document-level header/footer container"));
+                                return Err(corrupted(
+                                    "duplicate document-level header/footer container",
+                                ));
                             },
-                            _ => return Err(corrupted("invalid document-level header/footer instance")),
+                            _ => {
+                                return Err(corrupted(
+                                    "invalid document-level header/footer instance",
+                                ));
+                            },
                         };
                         entries.push(PowerPointHeaderFooter::parse_record_bounded(
                             child,
@@ -557,7 +593,9 @@ impl PowerPointHeaderFooters {
             }
         }
         if located != total_containers {
-            return Err(corrupted("HeadersFooters container has an invalid direct parent"));
+            return Err(corrupted(
+                "HeadersFooters container has an invalid direct parent",
+            ));
         }
         Ok(Self {
             entries,
@@ -635,10 +673,14 @@ fn locate_local(
         return Ok(());
     };
     if containers.next().is_some() {
-        return Err(corrupted("slide or main master has duplicate header/footer containers"));
+        return Err(corrupted(
+            "slide or main master has duplicate header/footer containers",
+        ));
     }
     if container.instance != LOCAL_INSTANCE {
-        return Err(corrupted("local header/footer container has a nonzero instance"));
+        return Err(corrupted(
+            "local header/footer container has a nonzero instance",
+        ));
     }
     *located += 1;
     let scope = PowerPointHeaderFooterScope::Local {
@@ -663,7 +705,9 @@ fn validate_record_header(
         || record.version != expected_version
         || record.instance != expected_instance
     {
-        return Err(corrupted("header/footer record header does not match [MS-PPT]"));
+        return Err(corrupted(
+            "header/footer record header does not match [MS-PPT]",
+        ));
     }
     Ok(())
 }
@@ -675,7 +719,9 @@ fn decode_printable_unicode(data: &[u8]) -> Result<String> {
         let unit = u16::from_le_bytes([bytes[0], bytes[1]]);
         if terminated {
             if unit != 0 {
-                return Err(corrupted("PrintableUnicodeString has data after its terminator"));
+                return Err(corrupted(
+                    "PrintableUnicodeString has data after its terminator",
+                ));
             }
             continue;
         }
@@ -684,7 +730,9 @@ fn decode_printable_unicode(data: &[u8]) -> Result<String> {
             continue;
         }
         if is_forbidden_printable_unit(unit) {
-            return Err(corrupted("PrintableUnicodeString contains a forbidden control character"));
+            return Err(corrupted(
+                "PrintableUnicodeString contains a forbidden control character",
+            ));
         }
         units.push(unit);
     }
@@ -700,7 +748,9 @@ fn validated_encoded_len(value: &str) -> Result<usize> {
     let mut units = 0usize;
     for unit in value.encode_utf16() {
         if is_forbidden_printable_unit(unit) {
-            return Err(corrupted("PrintableUnicodeString contains a forbidden control character"));
+            return Err(corrupted(
+                "PrintableUnicodeString contains a forbidden control character",
+            ));
         }
         units = units
             .checked_add(1)
@@ -710,7 +760,9 @@ fn validated_encoded_len(value: &str) -> Result<usize> {
         .checked_mul(2)
         .ok_or_else(|| corrupted("header/footer string length overflow"))?;
     if bytes > MAX_TEXT_BYTES {
-        return Err(corrupted("header/footer CString exceeds the resource limit"));
+        return Err(corrupted(
+            "header/footer CString exceeds the resource limit",
+        ));
     }
     Ok(bytes)
 }
@@ -756,17 +808,15 @@ mod tests {
     use super::*;
 
     const POI_SLIDE_BYTES: &[u8] = &[
-        0x3F, 0x00, 0xD9, 0x0F, 0x2E, 0, 0, 0, 0, 0, 0xDA, 0x0F, 4, 0, 0, 0, 0, 0,
-        0x23, 0, 0x20, 0, 0xBA, 0x0F, 0x1A, 0, 0, 0, 0x4D, 0, 0x79, 0, 0x20, 0,
-        0x46, 0, 0x6F, 0, 0x6F, 0, 0x74, 0, 0x65, 0, 0x72, 0, 0x20, 0, 0x2D, 0,
-        0x20, 0, 0x31, 0,
+        0x3F, 0x00, 0xD9, 0x0F, 0x2E, 0, 0, 0, 0, 0, 0xDA, 0x0F, 4, 0, 0, 0, 0, 0, 0x23, 0, 0x20,
+        0, 0xBA, 0x0F, 0x1A, 0, 0, 0, 0x4D, 0, 0x79, 0, 0x20, 0, 0x46, 0, 0x6F, 0, 0x6F, 0, 0x74,
+        0, 0x65, 0, 0x72, 0, 0x20, 0, 0x2D, 0, 0x20, 0, 0x31, 0,
     ];
     const POI_NOTES_BYTES: &[u8] = &[
-        0x4F, 0, 0xD9, 0x0F, 0x48, 0, 0, 0, 0, 0, 0xDA, 0x0F, 4, 0, 0, 0, 0, 0,
-        0x3D, 0, 0x10, 0, 0xBA, 0x0F, 0x16, 0, 0, 0, 0x4E, 0, 0x6F, 0, 0x74, 0,
-        0x65, 0, 0x20, 0, 0x48, 0, 0x65, 0, 0x61, 0, 0x64, 0, 0x65, 0, 0x72, 0,
-        0x20, 0, 0xBA, 0x0F, 0x16, 0, 0, 0, 0x4E, 0, 0x6F, 0, 0x74, 0, 0x65, 0,
-        0x20, 0, 0x46, 0, 0x6F, 0, 0x6F, 0, 0x74, 0, 0x65, 0, 0x72, 0,
+        0x4F, 0, 0xD9, 0x0F, 0x48, 0, 0, 0, 0, 0, 0xDA, 0x0F, 4, 0, 0, 0, 0, 0, 0x3D, 0, 0x10, 0,
+        0xBA, 0x0F, 0x16, 0, 0, 0, 0x4E, 0, 0x6F, 0, 0x74, 0, 0x65, 0, 0x20, 0, 0x48, 0, 0x65, 0,
+        0x61, 0, 0x64, 0, 0x65, 0, 0x72, 0, 0x20, 0, 0xBA, 0x0F, 0x16, 0, 0, 0, 0x4E, 0, 0x6F, 0,
+        0x74, 0, 0x65, 0, 0x20, 0, 0x46, 0, 0x6F, 0, 0x6F, 0, 0x74, 0, 0x65, 0, 0x72, 0,
     ];
 
     fn parsed(bytes: &[u8], scope: PowerPointHeaderFooterScope) -> PowerPointHeaderFooter {
@@ -777,11 +827,17 @@ mod tests {
 
     #[test]
     fn poi_record_arrays_are_byte_identical() {
-        let slide = parsed(POI_SLIDE_BYTES, PowerPointHeaderFooterScope::PresentationSlides);
+        let slide = parsed(
+            POI_SLIDE_BYTES,
+            PowerPointHeaderFooterScope::PresentationSlides,
+        );
         assert_eq!(slide.footer.as_deref(), Some("My Footer - 1"));
         assert_eq!(slide.to_record_bytes().unwrap(), POI_SLIDE_BYTES);
 
-        let notes = parsed(POI_NOTES_BYTES, PowerPointHeaderFooterScope::NotesAndHandouts);
+        let notes = parsed(
+            POI_NOTES_BYTES,
+            PowerPointHeaderFooterScope::NotesAndHandouts,
+        );
         assert_eq!(notes.header.as_deref(), Some("Note Header"));
         assert_eq!(notes.footer.as_deref(), Some("Note Footer"));
         assert_eq!(notes.to_record_bytes().unwrap(), POI_NOTES_BYTES);
@@ -896,11 +952,13 @@ mod tests {
         out_of_order.data.clear();
         out_of_order.children = vec![footer.clone(), atom.clone()];
         out_of_order.data_length = 0;
-        assert!(PowerPointHeaderFooter::parse_record(
-            &out_of_order,
-            PowerPointHeaderFooterScope::PresentationSlides,
-        )
-        .is_err());
+        assert!(
+            PowerPointHeaderFooter::parse_record(
+                &out_of_order,
+                PowerPointHeaderFooterScope::PresentationSlides,
+            )
+            .is_err()
+        );
 
         let document = PptRecord {
             record_type: PptRecordType::Document,

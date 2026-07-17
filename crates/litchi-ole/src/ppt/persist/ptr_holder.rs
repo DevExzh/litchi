@@ -67,7 +67,10 @@ impl PersistPtrHolder {
                     PptError::Corrupted("truncated PersistDirectoryEntry".to_string())
                 })?;
                 let offset = u32::from_le_bytes(offset_bytes.try_into().unwrap());
-                if slide_locations.insert(base_persist_id + i, offset).is_some() {
+                if slide_locations
+                    .insert(base_persist_id + i, offset)
+                    .is_some()
+                {
                     return Err(PptError::Corrupted(format!(
                         "duplicate persist identifier {}",
                         base_persist_id + i

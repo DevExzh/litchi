@@ -1,6 +1,4 @@
-use litchi_ole::ppt::{
-    Package, PowerPointHeaderFooterParent, PowerPointHeaderFooterScope,
-};
+use litchi_ole::ppt::{Package, PowerPointHeaderFooterParent, PowerPointHeaderFooterScope};
 use std::path::PathBuf;
 
 fn fixture(name: &str) -> PathBuf {

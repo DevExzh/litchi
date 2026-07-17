@@ -61,18 +61,42 @@ pub struct XlsExtendedFormatApplications {
 }
 
 impl XlsExtendedFormatApplications {
-    pub fn applies_number_format(&self) -> bool { self.number_format }
-    pub fn applies_font(&self) -> bool { self.font }
-    pub fn applies_alignment(&self) -> bool { self.alignment }
-    pub fn applies_border(&self) -> bool { self.border }
-    pub fn applies_fill(&self) -> bool { self.fill }
-    pub fn applies_protection(&self) -> bool { self.protection }
-    pub fn inherits_number_format(&self) -> bool { !self.number_format }
-    pub fn inherits_font(&self) -> bool { !self.font }
-    pub fn inherits_alignment(&self) -> bool { !self.alignment }
-    pub fn inherits_border(&self) -> bool { !self.border }
-    pub fn inherits_fill(&self) -> bool { !self.fill }
-    pub fn inherits_protection(&self) -> bool { !self.protection }
+    pub fn applies_number_format(&self) -> bool {
+        self.number_format
+    }
+    pub fn applies_font(&self) -> bool {
+        self.font
+    }
+    pub fn applies_alignment(&self) -> bool {
+        self.alignment
+    }
+    pub fn applies_border(&self) -> bool {
+        self.border
+    }
+    pub fn applies_fill(&self) -> bool {
+        self.fill
+    }
+    pub fn applies_protection(&self) -> bool {
+        self.protection
+    }
+    pub fn inherits_number_format(&self) -> bool {
+        !self.number_format
+    }
+    pub fn inherits_font(&self) -> bool {
+        !self.font
+    }
+    pub fn inherits_alignment(&self) -> bool {
+        !self.alignment
+    }
+    pub fn inherits_border(&self) -> bool {
+        !self.border
+    }
+    pub fn inherits_fill(&self) -> bool {
+        !self.fill
+    }
+    pub fn inherits_protection(&self) -> bool {
+        !self.protection
+    }
 
     fn all_local() -> Self {
         Self {
@@ -143,9 +167,15 @@ impl XlsExtendedFormat {
         self.applications
     }
 
-    pub fn quote_prefix(&self) -> bool { self.quote_prefix }
-    pub fn pivot_button(&self) -> bool { self.pivot_button }
-    pub fn has_xf_extension(&self) -> bool { self.has_xf_extension }
+    pub fn quote_prefix(&self) -> bool {
+        self.quote_prefix
+    }
+    pub fn pivot_button(&self) -> bool {
+        self.pivot_button
+    }
+    pub fn has_xf_extension(&self) -> bool {
+        self.has_xf_extension
+    }
 
     pub fn is_cell_format(&self) -> bool {
         matches!(self.kind, XlsExtendedFormatKind::Cell { .. })
@@ -182,11 +212,19 @@ pub struct XlsEffectiveExtendedFormat<'a> {
 }
 
 impl<'a> XlsEffectiveExtendedFormat<'a> {
-    pub fn direct(&self) -> &'a XlsExtendedFormat { self.direct }
-    pub fn parent_style(&self) -> Option<&'a XlsExtendedFormat> { self.parent }
+    pub fn direct(&self) -> &'a XlsExtendedFormat {
+        self.direct
+    }
+    pub fn parent_style(&self) -> Option<&'a XlsExtendedFormat> {
+        self.parent
+    }
 
     fn source(&self, local: bool) -> &'a XlsExtendedFormat {
-        if local { self.direct } else { self.parent.unwrap_or(self.direct) }
+        if local {
+            self.direct
+        } else {
+            self.parent.unwrap_or(self.direct)
+        }
     }
 
     pub fn number_format_source(&self) -> &'a XlsExtendedFormat {
@@ -208,8 +246,12 @@ impl<'a> XlsEffectiveExtendedFormat<'a> {
         self.source(self.direct.applications.applies_protection())
     }
 
-    pub fn number_format_id(&self) -> u16 { self.number_format_source().number_format_id }
-    pub fn font_index(&self) -> u16 { self.font_source().font_index }
+    pub fn number_format_id(&self) -> u16 {
+        self.number_format_source().number_format_id
+    }
+    pub fn font_index(&self) -> u16 {
+        self.font_source().font_index
+    }
     pub fn alignment(&self) -> &'a crate::xls::alignment::XlsCellAlignment {
         &self.alignment_source().alignment
     }
@@ -219,11 +261,21 @@ impl<'a> XlsEffectiveExtendedFormat<'a> {
     pub fn fill(&self) -> &'a crate::xls::border_fill::XlsCellFill {
         &self.fill_source().fill
     }
-    pub fn locked(&self) -> bool { self.protection_source().locked }
-    pub fn hidden(&self) -> bool { self.protection_source().hidden }
-    pub fn quote_prefix(&self) -> bool { self.direct.quote_prefix }
-    pub fn pivot_button(&self) -> bool { self.direct.pivot_button }
-    pub fn has_xf_extension(&self) -> bool { self.direct.has_xf_extension }
+    pub fn locked(&self) -> bool {
+        self.protection_source().locked
+    }
+    pub fn hidden(&self) -> bool {
+        self.protection_source().hidden
+    }
+    pub fn quote_prefix(&self) -> bool {
+        self.direct.quote_prefix
+    }
+    pub fn pivot_button(&self) -> bool {
+        self.direct.pivot_button
+    }
+    pub fn has_xf_extension(&self) -> bool {
+        self.direct.has_xf_extension
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -409,12 +461,14 @@ impl XlsFormatting {
                 }
             }
             if let XlsExtendedFormatKind::Cell { parent_style_xf } = format.kind {
-                let parent = extended_formats.get(parent_style_xf as usize).ok_or_else(|| {
-                    invalid(
-                        XF_RECORD,
-                        format!("XF {index} has out-of-range parent {parent_style_xf}"),
-                    )
-                })?;
+                let parent = extended_formats
+                    .get(parent_style_xf as usize)
+                    .ok_or_else(|| {
+                        invalid(
+                            XF_RECORD,
+                            format!("XF {index} has out-of-range parent {parent_style_xf}"),
+                        )
+                    })?;
                 if !matches!(parent.kind, XlsExtendedFormatKind::Style) {
                     return Err(invalid(
                         XF_RECORD,
@@ -608,7 +662,10 @@ fn parse_xfcrc(data: &[u8]) -> XlsResult<u16> {
         ));
     }
     if u16::from_le_bytes([data[0], data[1]]) != XFCRC_RECORD {
-        return Err(invalid(XFCRC_RECORD, "XFCRC FrtHeader has the wrong record type"));
+        return Err(invalid(
+            XFCRC_RECORD,
+            "XFCRC FrtHeader has the wrong record type",
+        ));
     }
     if data[2..14].iter().any(|byte| *byte != 0) {
         return Err(invalid(XFCRC_RECORD, "XFCRC reserved fields are nonzero"));
@@ -655,7 +712,10 @@ fn is_custom_date_time(code: &str) -> bool {
                 if index == chars.len() {
                     return false;
                 }
-                let inner: String = chars[start..index].iter().collect::<String>().to_ascii_lowercase();
+                let inner: String = chars[start..index]
+                    .iter()
+                    .collect::<String>()
+                    .to_ascii_lowercase();
                 if matches!(inner.as_str(), "h" | "hh" | "m" | "mm" | "s" | "ss") {
                     token = true;
                 }
@@ -871,27 +931,15 @@ mod tests {
             value: 12.5,
         };
 
-        let builtin = XlsCell::from_record_with_formula_context(
-            &builtin,
-            None,
-            None,
-            Some(&formatting),
-        )
-        .unwrap();
-        let custom = XlsCell::from_record_with_formula_context(
-            &custom,
-            None,
-            None,
-            Some(&formatting),
-        )
-        .unwrap();
-        let literal = XlsCell::from_record_with_formula_context(
-            &literal,
-            None,
-            None,
-            Some(&formatting),
-        )
-        .unwrap();
+        let builtin =
+            XlsCell::from_record_with_formula_context(&builtin, None, None, Some(&formatting))
+                .unwrap();
+        let custom =
+            XlsCell::from_record_with_formula_context(&custom, None, None, Some(&formatting))
+                .unwrap();
+        let literal =
+            XlsCell::from_record_with_formula_context(&literal, None, None, Some(&formatting))
+                .unwrap();
         assert_eq!(builtin.value(), &CellValue::DateTime(39_304.0));
         assert_eq!(custom.value(), &CellValue::DateTime(45_000.5));
         assert_eq!(literal.value(), &CellValue::Float(12.5));
@@ -901,19 +949,28 @@ mod tests {
     #[test]
     fn opens_poi_date_and_epoch_fixtures() {
         let dates = XlsWorkbook::new(
-            File::open(fixture("3rdparty/poi/test-data/spreadsheet/DateFormats.xls")).unwrap(),
+            File::open(fixture(
+                "3rdparty/poi/test-data/spreadsheet/DateFormats.xls",
+            ))
+            .unwrap(),
         )
         .unwrap();
         let sheet = dates.xls_worksheet(0).unwrap();
         let mut found = false;
         for row in 0..sheet.row_count() as u32 {
             for col in 0..sheet.column_count() as u32 {
-                if matches!(sheet.get_cell(row, col).map(Cell::value), Some(CellValue::DateTime(_))) {
+                if matches!(
+                    sheet.get_cell(row, col).map(Cell::value),
+                    Some(CellValue::DateTime(_))
+                ) {
                     found = true;
                 }
             }
         }
-        assert!(found, "POI DateFormats.xls contains no classified date cells");
+        assert!(
+            found,
+            "POI DateFormats.xls contains no classified date cells"
+        );
 
         for (path, expected) in [
             (
@@ -941,13 +998,9 @@ mod tests {
                 u32::from_le_bytes(bytes[marker_offset..marker_offset + 4].try_into().unwrap()),
                 0xffff_fffe
             );
-            bytes[marker_offset..marker_offset + 4]
-                .copy_from_slice(&0xffff_fffdu32.to_le_bytes());
+            bytes[marker_offset..marker_offset + 4].copy_from_slice(&0xffff_fffdu32.to_le_bytes());
 
-            assert_eq!(
-                u32::from_le_bytes(bytes[0x30..0x34].try_into().unwrap()),
-                0
-            );
+            assert_eq!(u32::from_le_bytes(bytes[0x30..0x34].try_into().unwrap()), 0);
             for sid in 5..=7usize {
                 let entry = sector_size + sid * 128;
                 assert_eq!(bytes[entry + 66], 0);

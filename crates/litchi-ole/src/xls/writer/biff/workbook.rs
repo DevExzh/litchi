@@ -186,7 +186,9 @@ pub fn write_dsf<W: Write>(writer: &mut W, has_biff5_stream: bool) -> XlsResult<
 /// Record type: 0x013D
 pub fn write_tab_id<W: Write>(writer: &mut W, sheet_count: u16) -> XlsResult<()> {
     if sheet_count == 0 || sheet_count > 4112 {
-        return Err(XlsError::InvalidData("RRTabId requires 1..=4112 sheets".to_string()));
+        return Err(XlsError::InvalidData(
+            "RRTabId requires 1..=4112 sheets".to_string(),
+        ));
     }
     write_record_header(writer, 0x013D, sheet_count * 2)?;
     for sheet_idx in 0..sheet_count {
@@ -211,7 +213,9 @@ fn write_function_group_name<W: Write>(
 ) -> XlsResult<()> {
     let units = name.encode_utf16().collect::<Vec<_>>();
     if units.len() > 32 {
-        return Err(XlsError::InvalidData("function category name exceeds 32 UTF-16 code units".to_string()));
+        return Err(XlsError::InvalidData(
+            "function category name exceeds 32 UTF-16 code units".to_string(),
+        ));
     }
     let compressed = units.iter().all(|unit| *unit <= 0x00ff);
     let string_size = 3 + units.len() * if compressed { 1 } else { 2 };
@@ -241,7 +245,10 @@ pub fn write_function_groups<W: Write>(
     options.validate()?;
     let built_in = options.built_in.count();
     write_fn_group_count(writer, built_in)?;
-    let classic_count = options.custom_categories.len().min(32 - usize::from(built_in));
+    let classic_count = options
+        .custom_categories
+        .len()
+        .min(32 - usize::from(built_in));
     for name in &options.custom_categories[..classic_count] {
         write_function_group_name(writer, 0x009a, name)?;
     }
@@ -546,7 +553,11 @@ pub fn write_supbook_internal<W: Write>(writer: &mut W, sheet_count: u16) -> Xls
 /// or a single workbook-wide XTI spanning all sheets. The workbook-wide
 /// form matches Excel's pivot-only output, while the per-sheet form keeps
 /// `PtgArea3d.ixti == target_sheet` valid for defined names.
-fn write_unicode_string<W: Write>(writer: &mut W, value: &str, include_count: bool) -> XlsResult<()> {
+fn write_unicode_string<W: Write>(
+    writer: &mut W,
+    value: &str,
+    include_count: bool,
+) -> XlsResult<()> {
     let units = value.encode_utf16().collect::<Vec<_>>();
     let compressed = units.iter().all(|unit| *unit <= 0x00ff);
     if include_count {
@@ -554,8 +565,11 @@ fn write_unicode_string<W: Write>(writer: &mut W, value: &str, include_count: bo
     }
     writer.write_all(&[u8::from(!compressed)])?;
     for unit in units {
-        if compressed { writer.write_all(&[unit as u8])?; }
-        else { writer.write_all(&unit.to_le_bytes())?; }
+        if compressed {
+            writer.write_all(&[unit as u8])?;
+        } else {
+            writer.write_all(&unit.to_le_bytes())?;
+        }
     }
     Ok(())
 }
@@ -571,19 +585,29 @@ fn write_external_supbook<W: Write>(
     data.extend_from_slice(&(book.sheets.len() as u16).to_le_bytes());
     data.extend_from_slice(&(path_units as u16).to_le_bytes());
     write_unicode_string(&mut data, &book.encoded_virtual_path, false)?;
-    for sheet in &book.sheets { write_unicode_string(&mut data, &sheet.name, true)?; }
+    for sheet in &book.sheets {
+        write_unicode_string(&mut data, &sheet.name, true)?;
+    }
     if data.len() > 8224 {
-        return Err(XlsError::InvalidData("external SupBook exceeds BIFF8 record size".to_string()));
+        return Err(XlsError::InvalidData(
+            "external SupBook exceeds BIFF8 record size".to_string(),
+        ));
     }
     write_record_header(writer, 0x01ae, data.len() as u16)?;
     writer.write_all(&data)?;
-    for name in names { write_external_defined_name(writer, name)?; }
+    for name in names {
+        write_external_defined_name(writer, name)?;
+    }
     for (sheet_index, sheet) in book.sheets.iter().enumerate() {
-        if sheet.cache_rows.is_empty() { continue; }
+        if sheet.cache_rows.is_empty() {
+            continue;
+        }
         write_record_header(writer, 0x0059, 4)?;
         writer.write_all(&(sheet.cache_rows.len() as i16).to_le_bytes())?;
         writer.write_all(&(sheet_index as u16).to_le_bytes())?;
-        for row in &sheet.cache_rows { write_crn(writer, row)?; }
+        for row in &sheet.cache_rows {
+            write_crn(writer, row)?;
+        }
     }
     Ok(())
 }
@@ -606,7 +630,9 @@ fn write_external_defined_name<W: Write>(
     data.extend_from_slice(&(name.formula_bytes.len() as u16).to_le_bytes());
     data.extend_from_slice(&name.formula_bytes);
     if data.len() > 8224 {
-        return Err(XlsError::InvalidData("external defined name exceeds BIFF8 record size".to_string()));
+        return Err(XlsError::InvalidData(
+            "external defined name exceeds BIFF8 record size".to_string(),
+        ));
     }
     write_record_header(writer, 0x0023, data.len() as u16)?;
     writer.write_all(&data)?;
@@ -626,7 +652,9 @@ fn write_add_in_supbook<W: Write>(
         data.extend_from_slice(&(function.unused_data.len() as u16).to_le_bytes());
         data.extend_from_slice(&function.unused_data);
         if data.len() > 8224 {
-            return Err(XlsError::InvalidData("add-in ExternName exceeds BIFF8 record size".to_string()));
+            return Err(XlsError::InvalidData(
+                "add-in ExternName exceeds BIFF8 record size".to_string(),
+            ));
         }
         write_record_header(writer, 0x0023, data.len() as u16)?;
         writer.write_all(&data)?;
@@ -634,7 +662,9 @@ fn write_add_in_supbook<W: Write>(
     Ok(())
 }
 
-fn encode_clipboard_format(value: i16) -> u16 { (value as u16) & 0x03ff }
+fn encode_clipboard_format(value: i16) -> u16 {
+    (value as u16) & 0x03ff
+}
 
 fn write_dde_or_ole_supbook<W: Write>(
     writer: &mut W,
@@ -642,7 +672,9 @@ fn write_dde_or_ole_supbook<W: Write>(
 ) -> XlsResult<()> {
     let mut supbook = Vec::new();
     supbook.extend_from_slice(&0u16.to_le_bytes());
-    supbook.extend_from_slice(&(link.encoded_virtual_path.encode_utf16().count() as u16).to_le_bytes());
+    supbook.extend_from_slice(
+        &(link.encoded_virtual_path.encode_utf16().count() as u16).to_le_bytes(),
+    );
     write_unicode_string(&mut supbook, &link.encoded_virtual_path, false)?;
     write_record_header(writer, 0x01ae, supbook.len() as u16)?;
     writer.write_all(&supbook)?;
@@ -660,7 +692,9 @@ fn write_dde_or_ole_supbook<W: Write>(
         write_short_unicode_string(&mut data, &item.name)?;
         data.extend_from_slice(&item.opaque_data);
         if data.len() > 8224 {
-            return Err(XlsError::InvalidData("DDE/OLE ExternName exceeds BIFF8 record size".to_string()));
+            return Err(XlsError::InvalidData(
+                "DDE/OLE ExternName exceeds BIFF8 record size".to_string(),
+            ));
         }
         write_record_header(writer, 0x0023, data.len() as u16)?;
         writer.write_all(&data)?;
@@ -684,10 +718,12 @@ fn write_crn<W: Write>(
         match value {
             crate::xls::XlsExternalCachedValue::Blank => data.extend_from_slice(&[0; 9]),
             crate::xls::XlsExternalCachedValue::Number(value) => {
-                data.push(0x01); data.extend_from_slice(&value.to_le_bytes());
+                data.push(0x01);
+                data.extend_from_slice(&value.to_le_bytes());
             },
             crate::xls::XlsExternalCachedValue::Text(value) => {
-                data.push(0x02); write_unicode_string(&mut data, value, true)?;
+                data.push(0x02);
+                write_unicode_string(&mut data, value, true)?;
             },
             crate::xls::XlsExternalCachedValue::Boolean(value) => {
                 data.extend_from_slice(&[0x04, u8::from(*value), 0, 0, 0, 0, 0, 0, 0]);
@@ -710,15 +746,23 @@ pub fn write_external_link_table<W: Write>(
     add_in_functions: &[crate::xls::writer::core::XlsAddInFunctionOptions],
     dde_or_ole_links: &[crate::xls::writer::core::XlsDdeOrOleLinkOptions],
 ) -> XlsResult<()> {
-    if let Some((sheet_count, _)) = internal { write_supbook_internal(writer, sheet_count)?; }
+    if let Some((sheet_count, _)) = internal {
+        write_supbook_internal(writer, sheet_count)?;
+    }
     if external.len() != external_names.len() {
-        return Err(XlsError::InvalidData("external workbook/name table cardinality mismatch".to_string()));
+        return Err(XlsError::InvalidData(
+            "external workbook/name table cardinality mismatch".to_string(),
+        ));
     }
     for (book, names) in external.iter().zip(external_names) {
         write_external_supbook(writer, book, names)?;
     }
-    if !add_in_functions.is_empty() { write_add_in_supbook(writer, add_in_functions)?; }
-    for link in dde_or_ole_links { write_dde_or_ole_supbook(writer, link)?; }
+    if !add_in_functions.is_empty() {
+        write_add_in_supbook(writer, add_in_functions)?;
+    }
+    for link in dde_or_ole_links {
+        write_dde_or_ole_supbook(writer, link)?;
+    }
 
     let internal_count = internal.map_or(0usize, |(sheet_count, mode)| match mode {
         ExternSheetMode::PerSheet => usize::from(sheet_count),
@@ -728,16 +772,20 @@ pub fn write_external_link_table<W: Write>(
     let add_in_count = usize::from(!add_in_functions.is_empty());
     let count = internal_count + external_count + add_in_count + dde_or_ole_links.len();
     if count > 1370 {
-        return Err(XlsError::InvalidData("ExternSheet reference count exceeds BIFF8 record bound".to_string()));
+        return Err(XlsError::InvalidData(
+            "ExternSheet reference count exceeds BIFF8 record bound".to_string(),
+        ));
     }
     write_record_header(writer, 0x0017, (2 + count * 6) as u16)?;
     writer.write_all(&(count as u16).to_le_bytes())?;
     if let Some((sheet_count, mode)) = internal {
         match mode {
-            ExternSheetMode::PerSheet => for sheet in 0..sheet_count {
-                writer.write_all(&0u16.to_le_bytes())?;
-                writer.write_all(&(sheet as i16).to_le_bytes())?;
-                writer.write_all(&(sheet as i16).to_le_bytes())?;
+            ExternSheetMode::PerSheet => {
+                for sheet in 0..sheet_count {
+                    writer.write_all(&0u16.to_le_bytes())?;
+                    writer.write_all(&(sheet as i16).to_le_bytes())?;
+                    writer.write_all(&(sheet as i16).to_le_bytes())?;
+                }
             },
             ExternSheetMode::WorkbookWide => {
                 writer.write_all(&0u16.to_le_bytes())?;
@@ -764,9 +812,13 @@ pub fn write_external_link_table<W: Write>(
     }
     let first_dde_book = add_in_book + add_in_count;
     for offset in 0..dde_or_ole_links.len() {
-        writer.write_all(&u16::try_from(first_dde_book + offset)
-            .map_err(|_| XlsError::InvalidData("supporting-book index exceeds u16".to_string()))?
-            .to_le_bytes())?;
+        writer.write_all(
+            &u16::try_from(first_dde_book + offset)
+                .map_err(|_| {
+                    XlsError::InvalidData("supporting-book index exceeds u16".to_string())
+                })?
+                .to_le_bytes(),
+        )?;
         writer.write_all(&(-2i16).to_le_bytes())?;
         writer.write_all(&(-2i16).to_le_bytes())?;
     }

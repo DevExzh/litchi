@@ -76,9 +76,15 @@ pub struct XlsPageBreak {
 
 impl XlsPageBreak {
     /// First row below a horizontal break, or first column right of a vertical break.
-    pub const fn position(&self) -> u16 { self.position }
-    pub const fn range_start(&self) -> u16 { self.range_start }
-    pub const fn range_end(&self) -> u16 { self.range_end }
+    pub const fn position(&self) -> u16 {
+        self.position
+    }
+    pub const fn range_start(&self) -> u16 {
+        self.range_start
+    }
+    pub const fn range_end(&self) -> u16 {
+        self.range_end
+    }
 }
 
 /// Fixed `SETUP` print configuration.
@@ -104,23 +110,57 @@ pub struct XlsPrintSetup {
 }
 
 impl XlsPrintSetup {
-    pub fn printer_settings_available(&self) -> bool { self.printer_settings_available }
-    pub fn paper_size(&self) -> Option<u16> { self.paper_size }
-    pub fn scale_percent(&self) -> Option<u16> { self.scale_percent }
-    pub fn starting_page_number(&self) -> Option<i16> { self.starting_page_number }
-    pub fn fit_width_pages(&self) -> u16 { self.fit_width_pages }
-    pub fn fit_height_pages(&self) -> u16 { self.fit_height_pages }
-    pub fn print_order(&self) -> XlsPrintOrder { self.print_order }
-    pub fn orientation(&self) -> Option<XlsPrintOrientation> { self.orientation }
-    pub fn is_black_and_white(&self) -> bool { self.black_and_white }
-    pub fn is_draft_quality(&self) -> bool { self.draft_quality }
-    pub fn comments(&self) -> XlsPrintComments { self.comments }
-    pub fn errors(&self) -> XlsPrintErrors { self.errors }
-    pub fn horizontal_resolution_dpi(&self) -> Option<u16> { self.horizontal_resolution_dpi }
-    pub fn vertical_resolution_dpi(&self) -> Option<u16> { self.vertical_resolution_dpi }
-    pub fn header_margin_inches(&self) -> f64 { self.header_margin_inches }
-    pub fn footer_margin_inches(&self) -> f64 { self.footer_margin_inches }
-    pub fn copies(&self) -> Option<u16> { self.copies }
+    pub fn printer_settings_available(&self) -> bool {
+        self.printer_settings_available
+    }
+    pub fn paper_size(&self) -> Option<u16> {
+        self.paper_size
+    }
+    pub fn scale_percent(&self) -> Option<u16> {
+        self.scale_percent
+    }
+    pub fn starting_page_number(&self) -> Option<i16> {
+        self.starting_page_number
+    }
+    pub fn fit_width_pages(&self) -> u16 {
+        self.fit_width_pages
+    }
+    pub fn fit_height_pages(&self) -> u16 {
+        self.fit_height_pages
+    }
+    pub fn print_order(&self) -> XlsPrintOrder {
+        self.print_order
+    }
+    pub fn orientation(&self) -> Option<XlsPrintOrientation> {
+        self.orientation
+    }
+    pub fn is_black_and_white(&self) -> bool {
+        self.black_and_white
+    }
+    pub fn is_draft_quality(&self) -> bool {
+        self.draft_quality
+    }
+    pub fn comments(&self) -> XlsPrintComments {
+        self.comments
+    }
+    pub fn errors(&self) -> XlsPrintErrors {
+        self.errors
+    }
+    pub fn horizontal_resolution_dpi(&self) -> Option<u16> {
+        self.horizontal_resolution_dpi
+    }
+    pub fn vertical_resolution_dpi(&self) -> Option<u16> {
+        self.vertical_resolution_dpi
+    }
+    pub fn header_margin_inches(&self) -> f64 {
+        self.header_margin_inches
+    }
+    pub fn footer_margin_inches(&self) -> f64 {
+        self.footer_margin_inches
+    }
+    pub fn copies(&self) -> Option<u16> {
+        self.copies
+    }
 }
 
 impl Default for XlsPrintSetup {
@@ -167,23 +207,51 @@ pub struct XlsPageSetup {
 }
 
 impl XlsPageSetup {
-    pub const fn print_headers(&self) -> bool { self.print_headers }
-    pub const fn print_gridlines(&self) -> bool { self.print_gridlines }
+    pub const fn print_headers(&self) -> bool {
+        self.print_headers
+    }
+    pub const fn print_gridlines(&self) -> bool {
+        self.print_gridlines
+    }
     /// Raw header text, including `&L`, `&C`, `&R`, and formatting commands.
-    pub fn header(&self) -> &str { &self.header }
+    pub fn header(&self) -> &str {
+        &self.header
+    }
     /// Raw footer text, including `&L`, `&C`, `&R`, and formatting commands.
-    pub fn footer(&self) -> &str { &self.footer }
-    pub fn is_horizontally_centered(&self) -> bool { self.horizontally_centered }
-    pub fn is_vertically_centered(&self) -> bool { self.vertically_centered }
-    pub fn left_margin_inches(&self) -> Option<f64> { self.left_margin_inches }
-    pub fn right_margin_inches(&self) -> Option<f64> { self.right_margin_inches }
-    pub fn top_margin_inches(&self) -> Option<f64> { self.top_margin_inches }
-    pub fn bottom_margin_inches(&self) -> Option<f64> { self.bottom_margin_inches }
-    pub fn horizontal_page_breaks(&self) -> &[XlsPageBreak] { &self.horizontal_page_breaks }
-    pub fn vertical_page_breaks(&self) -> &[XlsPageBreak] { &self.vertical_page_breaks }
+    pub fn footer(&self) -> &str {
+        &self.footer
+    }
+    pub fn is_horizontally_centered(&self) -> bool {
+        self.horizontally_centered
+    }
+    pub fn is_vertically_centered(&self) -> bool {
+        self.vertically_centered
+    }
+    pub fn left_margin_inches(&self) -> Option<f64> {
+        self.left_margin_inches
+    }
+    pub fn right_margin_inches(&self) -> Option<f64> {
+        self.right_margin_inches
+    }
+    pub fn top_margin_inches(&self) -> Option<f64> {
+        self.top_margin_inches
+    }
+    pub fn bottom_margin_inches(&self) -> Option<f64> {
+        self.bottom_margin_inches
+    }
+    pub fn horizontal_page_breaks(&self) -> &[XlsPageBreak] {
+        &self.horizontal_page_breaks
+    }
+    pub fn vertical_page_breaks(&self) -> &[XlsPageBreak] {
+        &self.vertical_page_breaks
+    }
     /// Opaque DEVMODE payloads from `PLS`; these bytes are never executed.
-    pub fn printer_driver_data(&self) -> &[Vec<u8>] { &self.printer_driver_data }
-    pub fn print_setup(&self) -> &XlsPrintSetup { &self.print_setup }
+    pub fn printer_driver_data(&self) -> &[Vec<u8>] {
+        &self.printer_driver_data
+    }
+    pub fn print_setup(&self) -> &XlsPrintSetup {
+        &self.print_setup
+    }
 }
 
 fn parse_header_footer(data: &[u8], record_type: u16) -> XlsResult<String> {
@@ -191,22 +259,34 @@ fn parse_header_footer(data: &[u8], record_type: u16) -> XlsResult<String> {
         return Ok(String::new());
     }
     if data.len() < 3 {
-        return Err(invalid(record_type, "header/footer string has a truncated XLUnicodeString header"));
+        return Err(invalid(
+            record_type,
+            "header/footer string has a truncated XLUnicodeString header",
+        ));
     }
     let count = usize::from(read_u16(data, 0));
     let flags = data[2];
     if count > 255 {
-        return Err(invalid(record_type, "header/footer text exceeds 255 UTF-16 code units"));
+        return Err(invalid(
+            record_type,
+            "header/footer text exceeds 255 UTF-16 code units",
+        ));
     }
     if flags & 0xfe != 0 {
-        return Err(invalid(record_type, "header/footer XLUnicodeString has reserved option bits"));
+        return Err(invalid(
+            record_type,
+            "header/footer XLUnicodeString has reserved option bits",
+        ));
     }
     let width = if flags & 1 != 0 { 2 } else { 1 };
     let byte_count = count
         .checked_mul(width)
         .ok_or_else(|| invalid(record_type, "header/footer string length overflow"))?;
     if data.len() != 3 + byte_count {
-        return Err(invalid(record_type, "header/footer character count does not match its payload"));
+        return Err(invalid(
+            record_type,
+            "header/footer character count does not match its payload",
+        ));
     }
     if width == 1 {
         Ok(data[3..].iter().map(|&byte| char::from(byte)).collect())
@@ -222,7 +302,10 @@ fn parse_header_footer(data: &[u8], record_type: u16) -> XlsResult<String> {
 
 fn parse_bool(data: &[u8], record_type: u16) -> XlsResult<bool> {
     if data.len() != 2 {
-        return Err(invalid(record_type, format!("Boolean payload must be 2 bytes, found {}", data.len())));
+        return Err(invalid(
+            record_type,
+            format!("Boolean payload must be 2 bytes, found {}", data.len()),
+        ));
     }
     match read_u16(data, 0) {
         0 => Ok(false),
@@ -233,27 +316,49 @@ fn parse_bool(data: &[u8], record_type: u16) -> XlsResult<bool> {
 
 fn parse_margin(data: &[u8], record_type: u16) -> XlsResult<f64> {
     if data.len() != 8 {
-        return Err(invalid(record_type, format!("margin payload must be 8 bytes, found {}", data.len())));
+        return Err(invalid(
+            record_type,
+            format!("margin payload must be 8 bytes, found {}", data.len()),
+        ));
     }
     let margin = read_f64(data, 0);
     if !margin.is_finite() || !(0.0..=49.0).contains(&margin) {
-        return Err(invalid(record_type, "page margin must be finite and between 0 and 49 inches"));
+        return Err(invalid(
+            record_type,
+            "page margin must be finite and between 0 and 49 inches",
+        ));
     }
     Ok(margin)
 }
 
 fn parse_page_breaks(data: &[u8], record_type: u16) -> XlsResult<Vec<XlsPageBreak>> {
     if data.len() < 2 {
-        return Err(invalid(record_type, "page-break record is missing its count"));
+        return Err(invalid(
+            record_type,
+            "page-break record is missing its count",
+        ));
     }
     let count = usize::from(read_u16(data, 0));
-    let maximum = if record_type == HORIZONTAL_PAGE_BREAKS_RECORD_TYPE { 1026 } else { 255 };
+    let maximum = if record_type == HORIZONTAL_PAGE_BREAKS_RECORD_TYPE {
+        1026
+    } else {
+        255
+    };
     if count > maximum {
-        return Err(invalid(record_type, format!("page-break count exceeds {maximum}")));
+        return Err(invalid(
+            record_type,
+            format!("page-break count exceeds {maximum}"),
+        ));
     }
     let expected = 2 + count * 6;
     if data.len() != expected {
-        return Err(invalid(record_type, format!("page-break count requires {expected} bytes, found {}", data.len())));
+        return Err(invalid(
+            record_type,
+            format!(
+                "page-break count requires {expected} bytes, found {}",
+                data.len()
+            ),
+        ));
     }
     let mut breaks: Vec<XlsPageBreak> = Vec::with_capacity(count);
     for chunk in data[2..].chunks_exact(6) {
@@ -263,13 +368,22 @@ fn parse_page_breaks(data: &[u8], record_type: u16) -> XlsResult<Vec<XlsPageBrea
             range_end: read_u16(chunk, 4),
         };
         if page_break.range_end <= page_break.range_start {
-            return Err(invalid(record_type, "page-break range end must be greater than its start"));
+            return Err(invalid(
+                record_type,
+                "page-break range end must be greater than its start",
+            ));
         }
         if record_type == HORIZONTAL_PAGE_BREAKS_RECORD_TYPE && page_break.range_end > 16383 {
-            return Err(invalid(record_type, "horizontal page-break column exceeds 16383"));
+            return Err(invalid(
+                record_type,
+                "horizontal page-break column exceeds 16383",
+            ));
         }
         if record_type == VERTICAL_PAGE_BREAKS_RECORD_TYPE && page_break.position > 255 {
-            return Err(invalid(record_type, "vertical page-break column exceeds 255"));
+            return Err(invalid(
+                record_type,
+                "vertical page-break column exceeds 255",
+            ));
         }
         if let Some(previous) = breaks.last() {
             if (page_break.position, page_break.range_start)
@@ -290,7 +404,10 @@ fn parse_page_breaks(data: &[u8], record_type: u16) -> XlsResult<Vec<XlsPageBrea
 
 fn parse_pls(data: &[u8]) -> XlsResult<Vec<u8>> {
     if data.len() < 2 {
-        return Err(invalid(PLS_RECORD_TYPE, "PLS is missing its reserved field"));
+        return Err(invalid(
+            PLS_RECORD_TYPE,
+            "PLS is missing its reserved field",
+        ));
     }
     if read_u16(data, 0) != 0 {
         return Err(invalid(PLS_RECORD_TYPE, "PLS reserved field must be zero"));
@@ -300,7 +417,10 @@ fn parse_pls(data: &[u8]) -> XlsResult<Vec<u8>> {
 
 fn parse_setup(data: &[u8]) -> XlsResult<XlsPrintSetup> {
     if data.len() != 34 {
-        return Err(invalid(SETUP_RECORD_TYPE, format!("SETUP payload must be 34 bytes, found {}", data.len())));
+        return Err(invalid(
+            SETUP_RECORD_TYPE,
+            format!("SETUP payload must be 34 bytes, found {}", data.len()),
+        ));
     }
     let paper_size = read_u16(data, 0);
     let flags = read_u16(data, 10);
@@ -308,13 +428,22 @@ fn parse_setup(data: &[u8]) -> XlsResult<XlsPrintSetup> {
     let fit_height_pages = read_u16(data, 8);
     let no_printer_settings = flags & 0x0004 != 0;
     if flags & 0xf000 != 0 {
-        return Err(invalid(SETUP_RECORD_TYPE, "SETUP reserved flag bits must be zero"));
+        return Err(invalid(
+            SETUP_RECORD_TYPE,
+            "SETUP reserved flag bits must be zero",
+        ));
     }
     if fit_width_pages > 32767 || fit_height_pages > 32767 {
-        return Err(invalid(SETUP_RECORD_TYPE, "SETUP fit dimensions must not exceed 32767 pages"));
+        return Err(invalid(
+            SETUP_RECORD_TYPE,
+            "SETUP fit dimensions must not exceed 32767 pages",
+        ));
     }
     if !no_printer_settings && (118..=255).contains(&paper_size) {
-        return Err(invalid(SETUP_RECORD_TYPE, "SETUP paper size uses a reserved identifier"));
+        return Err(invalid(
+            SETUP_RECORD_TYPE,
+            "SETUP paper size uses a reserved identifier",
+        ));
     }
     let header_margin_inches = read_f64(data, 16);
     let footer_margin_inches = read_f64(data, 24);
@@ -323,7 +452,10 @@ fn parse_setup(data: &[u8]) -> XlsResult<XlsPrintSetup> {
         || !footer_margin_inches.is_finite()
         || !(0.0..49.0).contains(&footer_margin_inches)
     {
-        return Err(invalid(SETUP_RECORD_TYPE, "SETUP header/footer margins must be finite and less than 49 inches"));
+        return Err(invalid(
+            SETUP_RECORD_TYPE,
+            "SETUP header/footer margins must be finite and less than 49 inches",
+        ));
     }
     let printer_value = |value| (!no_printer_settings).then_some(value);
     let orientation = if no_printer_settings || flags & 0x0040 != 0 {
@@ -354,7 +486,11 @@ fn parse_setup(data: &[u8]) -> XlsResult<XlsPrintSetup> {
         starting_page_number: (flags & 0x0080 != 0).then_some(read_u16(data, 4) as i16),
         fit_width_pages,
         fit_height_pages,
-        print_order: if flags & 0x0001 != 0 { XlsPrintOrder::OverThenDown } else { XlsPrintOrder::DownThenOver },
+        print_order: if flags & 0x0001 != 0 {
+            XlsPrintOrder::OverThenDown
+        } else {
+            XlsPrintOrder::DownThenOver
+        },
         orientation,
         black_and_white: flags & 0x0008 != 0,
         draft_quality: flags & 0x0010 != 0,
@@ -403,13 +539,20 @@ impl PageSetupCollector {
     }
 
     fn duplicate(record_type: u16) -> XlsError {
-        invalid(record_type, "worksheet contains a duplicate primary page-setup record")
+        invalid(
+            record_type,
+            "worksheet contains a duplicate primary page-setup record",
+        )
     }
 
     pub(crate) fn feed_record(&mut self, record_type: u16, data: &[u8]) -> XlsResult<()> {
         if self.collecting_pls {
             if record_type == CONTINUE_RECORD_TYPE {
-                self.page.printer_driver_data.last_mut().unwrap().extend_from_slice(data);
+                self.page
+                    .printer_driver_data
+                    .last_mut()
+                    .unwrap()
+                    .extend_from_slice(data);
                 return Ok(());
             }
             self.collecting_pls = false;
@@ -427,83 +570,112 @@ impl PageSetupCollector {
         }
         match record_type {
             PRINT_HEADERS_RECORD_TYPE => {
-                if self.page.print_headers.is_some() { return Err(Self::duplicate(record_type)); }
+                if self.page.print_headers.is_some() {
+                    return Err(Self::duplicate(record_type));
+                }
                 self.page.print_headers = Some(parse_bool(data, record_type)?);
-            }
+            },
             PRINT_GRIDLINES_RECORD_TYPE => {
-                if self.page.print_gridlines.is_some() { return Err(Self::duplicate(record_type)); }
+                if self.page.print_gridlines.is_some() {
+                    return Err(Self::duplicate(record_type));
+                }
                 if data.len() != 2 {
-                    return Err(invalid(record_type, "PRINTGRIDLINES payload must be 2 bytes"));
+                    return Err(invalid(
+                        record_type,
+                        "PRINTGRIDLINES payload must be 2 bytes",
+                    ));
                 }
                 self.page.print_gridlines = Some(read_u16(data, 0) & 1 != 0);
-            }
+            },
             HORIZONTAL_PAGE_BREAKS_RECORD_TYPE => {
-                if self.page.horizontal_page_breaks.is_some() { return Err(Self::duplicate(record_type)); }
+                if self.page.horizontal_page_breaks.is_some() {
+                    return Err(Self::duplicate(record_type));
+                }
                 self.page.horizontal_page_breaks = Some(parse_page_breaks(data, record_type)?);
-            }
+            },
             VERTICAL_PAGE_BREAKS_RECORD_TYPE => {
-                if self.page.vertical_page_breaks.is_some() { return Err(Self::duplicate(record_type)); }
+                if self.page.vertical_page_breaks.is_some() {
+                    return Err(Self::duplicate(record_type));
+                }
                 self.page.vertical_page_breaks = Some(parse_page_breaks(data, record_type)?);
-            }
+            },
             HEADER_RECORD_TYPE => {
-                if self.page.header.is_some() { return Err(Self::duplicate(record_type)); }
+                if self.page.header.is_some() {
+                    return Err(Self::duplicate(record_type));
+                }
                 self.page.header = Some(parse_header_footer(data, record_type)?);
-            }
+            },
             FOOTER_RECORD_TYPE => {
-                if self.page.footer.is_some() { return Err(Self::duplicate(record_type)); }
+                if self.page.footer.is_some() {
+                    return Err(Self::duplicate(record_type));
+                }
                 self.page.footer = Some(parse_header_footer(data, record_type)?);
-            }
+            },
             HCENTER_RECORD_TYPE => {
-                if self.page.horizontally_centered.is_some() { return Err(Self::duplicate(record_type)); }
+                if self.page.horizontally_centered.is_some() {
+                    return Err(Self::duplicate(record_type));
+                }
                 self.page.horizontally_centered = Some(parse_bool(data, record_type)?);
-            }
+            },
             VCENTER_RECORD_TYPE => {
-                if self.page.vertically_centered.is_some() { return Err(Self::duplicate(record_type)); }
+                if self.page.vertically_centered.is_some() {
+                    return Err(Self::duplicate(record_type));
+                }
                 self.page.vertically_centered = Some(parse_bool(data, record_type)?);
-            }
+            },
             LEFT_MARGIN_RECORD_TYPE => {
-                if self.page.left_margin_inches.is_some() { return Err(Self::duplicate(record_type)); }
+                if self.page.left_margin_inches.is_some() {
+                    return Err(Self::duplicate(record_type));
+                }
                 self.page.left_margin_inches = Some(parse_margin(data, record_type)?);
-            }
+            },
             RIGHT_MARGIN_RECORD_TYPE => {
-                if self.page.right_margin_inches.is_some() { return Err(Self::duplicate(record_type)); }
+                if self.page.right_margin_inches.is_some() {
+                    return Err(Self::duplicate(record_type));
+                }
                 self.page.right_margin_inches = Some(parse_margin(data, record_type)?);
-            }
+            },
             TOP_MARGIN_RECORD_TYPE => {
-                if self.page.top_margin_inches.is_some() { return Err(Self::duplicate(record_type)); }
+                if self.page.top_margin_inches.is_some() {
+                    return Err(Self::duplicate(record_type));
+                }
                 self.page.top_margin_inches = Some(parse_margin(data, record_type)?);
-            }
+            },
             BOTTOM_MARGIN_RECORD_TYPE => {
-                if self.page.bottom_margin_inches.is_some() { return Err(Self::duplicate(record_type)); }
+                if self.page.bottom_margin_inches.is_some() {
+                    return Err(Self::duplicate(record_type));
+                }
                 self.page.bottom_margin_inches = Some(parse_margin(data, record_type)?);
-            }
+            },
             PLS_RECORD_TYPE => {
                 self.page.printer_driver_data.push(parse_pls(data)?);
                 self.collecting_pls = true;
-            }
+            },
             SETUP_RECORD_TYPE => {
-                if self.page.print_setup.is_some() { return Err(Self::duplicate(record_type)); }
+                if self.page.print_setup.is_some() {
+                    return Err(Self::duplicate(record_type));
+                }
                 self.page.print_setup = Some(parse_setup(data)?);
-            }
-            _ => {}
+            },
+            _ => {},
         }
         Ok(())
     }
 
     pub(crate) fn finish(self) -> XlsResult<Option<XlsPageSetup>> {
         let has_partial = self.page.print_headers.is_some()
-                || self.page.print_gridlines.is_some()
-                || self.page.horizontal_page_breaks.is_some()
-                || self.page.vertical_page_breaks.is_some()
-                || !self.page.printer_driver_data.is_empty()
-                || self.page.header.is_some()
-                || self.page.footer.is_some()
-                || self.page.horizontally_centered.is_some()
-                || self.page.vertically_centered.is_some()
-                || self.page.left_margin_inches.is_some()
-                || self.page.right_margin_inches.is_some()
-                || self.page.top_margin_inches.is_some()
-                || self.page.bottom_margin_inches.is_some();
+            || self.page.print_gridlines.is_some()
+            || self.page.horizontal_page_breaks.is_some()
+            || self.page.vertical_page_breaks.is_some()
+            || !self.page.printer_driver_data.is_empty()
+            || self.page.header.is_some()
+            || self.page.footer.is_some()
+            || self.page.horizontally_centered.is_some()
+            || self.page.vertically_centered.is_some()
+            || self.page.left_margin_inches.is_some()
+            || self.page.right_margin_inches.is_some()
+            || self.page.top_margin_inches.is_some()
+            || self.page.bottom_margin_inches.is_some();
         if !has_partial && self.page.print_setup.is_none() {
             return Ok(None);
         }
@@ -556,16 +728,25 @@ mod tests {
     #[test]
     fn parses_typed_page_setup() {
         let mut collector = PageSetupCollector::new();
-        collector.feed_record(HEADER_RECORD_TYPE, &compressed("&Ctitle")).unwrap();
+        collector
+            .feed_record(HEADER_RECORD_TYPE, &compressed("&Ctitle"))
+            .unwrap();
         collector.feed_record(FOOTER_RECORD_TYPE, &[]).unwrap();
         collector.feed_record(HCENTER_RECORD_TYPE, &[1, 0]).unwrap();
         collector.feed_record(VCENTER_RECORD_TYPE, &[0, 0]).unwrap();
-        collector.feed_record(LEFT_MARGIN_RECORD_TYPE, &0.7f64.to_le_bytes()).unwrap();
-        collector.feed_record(SETUP_RECORD_TYPE, &setup(0x0002)).unwrap();
+        collector
+            .feed_record(LEFT_MARGIN_RECORD_TYPE, &0.7f64.to_le_bytes())
+            .unwrap();
+        collector
+            .feed_record(SETUP_RECORD_TYPE, &setup(0x0002))
+            .unwrap();
         let page = collector.finish().unwrap().unwrap();
         assert_eq!(page.header(), "&Ctitle");
         assert!(page.is_horizontally_centered());
-        assert_eq!(page.print_setup().orientation(), Some(XlsPrintOrientation::Portrait));
+        assert_eq!(
+            page.print_setup().orientation(),
+            Some(XlsPrintOrientation::Portrait)
+        );
         assert_eq!(page.print_setup().horizontal_resolution_dpi(), Some(600));
         assert_eq!(
             parse_header_footer(&compressed("&Cone && two &&&&"), HEADER_RECORD_TYPE).unwrap(),
@@ -584,7 +765,13 @@ mod tests {
         collector.feed_record(HEADER_RECORD_TYPE, &[]).unwrap();
         assert!(collector.feed_record(HEADER_RECORD_TYPE, &[]).is_err());
 
-        assert!(parse_page_breaks(&[1, 0, 4, 0, 2, 0, 2, 0], HORIZONTAL_PAGE_BREAKS_RECORD_TYPE).is_err());
+        assert!(
+            parse_page_breaks(
+                &[1, 0, 4, 0, 2, 0, 2, 0],
+                HORIZONTAL_PAGE_BREAKS_RECORD_TYPE
+            )
+            .is_err()
+        );
         let overlapping = [2, 0, 4, 0, 0, 0, 10, 0, 4, 0, 9, 0, 12, 0];
         assert!(parse_page_breaks(&overlapping, HORIZONTAL_PAGE_BREAKS_RECORD_TYPE).is_err());
         assert!(parse_pls(&[1, 0]).is_err());
@@ -593,7 +780,9 @@ mod tests {
     #[test]
     fn partial_page_block_uses_tolerant_defaults() {
         let mut collector = PageSetupCollector::new();
-        collector.feed_record(PRINT_HEADERS_RECORD_TYPE, &[1, 0]).unwrap();
+        collector
+            .feed_record(PRINT_HEADERS_RECORD_TYPE, &[1, 0])
+            .unwrap();
         let page = collector.finish().unwrap().unwrap();
         assert!(page.print_headers());
         assert!(!page.print_gridlines());
@@ -603,15 +792,27 @@ mod tests {
     #[test]
     fn ignores_custom_view_page_records() {
         let mut collector = PageSetupCollector::new();
-        collector.feed_record(HEADER_RECORD_TYPE, &compressed("primary")).unwrap();
-        collector.feed_record(USER_SVIEW_BEGIN_RECORD_TYPE, &[]).unwrap();
-        collector.feed_record(HEADER_RECORD_TYPE, &compressed("custom")).unwrap();
-        collector.feed_record(USER_SVIEW_END_RECORD_TYPE, &[]).unwrap();
-        collector.feed_record(SETUP_RECORD_TYPE, &setup(0x0002)).unwrap();
+        collector
+            .feed_record(HEADER_RECORD_TYPE, &compressed("primary"))
+            .unwrap();
+        collector
+            .feed_record(USER_SVIEW_BEGIN_RECORD_TYPE, &[])
+            .unwrap();
+        collector
+            .feed_record(HEADER_RECORD_TYPE, &compressed("custom"))
+            .unwrap();
+        collector
+            .feed_record(USER_SVIEW_END_RECORD_TYPE, &[])
+            .unwrap();
+        collector
+            .feed_record(SETUP_RECORD_TYPE, &setup(0x0002))
+            .unwrap();
         assert_eq!(collector.finish().unwrap().unwrap().header(), "primary");
 
         let mut omitted = PageSetupCollector::new();
-        omitted.feed_record(SETUP_RECORD_TYPE, &setup(0x0002)).unwrap();
+        omitted
+            .feed_record(SETUP_RECORD_TYPE, &setup(0x0002))
+            .unwrap();
         let page = omitted.finish().unwrap().unwrap();
         assert_eq!(page.header(), "");
         assert_eq!(page.footer(), "");
@@ -631,20 +832,25 @@ mod tests {
 
         let dbcs = XlsWorkbook::new(File::open(fixture("DBCSHeader.xls")).unwrap()).unwrap();
         let page = dbcs.xls_worksheet(0).unwrap().page_setup().unwrap();
-        assert_eq!(page.header(), "&L\u{090f}\u{0915}&C\u{0939}\u{094b}\u{0917}\u{093e}&R\u{091c}\u{093e}");
-        assert_eq!(page.footer(), "&L\u{091c}\u{093e}&C\u{091c}\u{093e}&R\u{091c}\u{093e}");
-        assert_eq!(page.print_setup().orientation(), Some(XlsPrintOrientation::Portrait));
+        assert_eq!(
+            page.header(),
+            "&L\u{090f}\u{0915}&C\u{0939}\u{094b}\u{0917}\u{093e}&R\u{091c}\u{093e}"
+        );
+        assert_eq!(
+            page.footer(),
+            "&L\u{091c}\u{093e}&C\u{091c}\u{093e}&R\u{091c}\u{093e}"
+        );
+        assert_eq!(
+            page.print_setup().orientation(),
+            Some(XlsPrintOrientation::Portrait)
+        );
         assert_eq!(page.print_setup().paper_size(), Some(1));
 
-        let breaks = XlsWorkbook::new(
-            File::open(fixture("SimpleWithPageBreaks.xls")).unwrap(),
-        )
-        .unwrap();
+        let breaks =
+            XlsWorkbook::new(File::open(fixture("SimpleWithPageBreaks.xls")).unwrap()).unwrap();
         let page = breaks.xls_worksheet(0).unwrap().page_setup().unwrap();
         assert!(
-            !page.horizontal_page_breaks().is_empty()
-                || !page.vertical_page_breaks().is_empty()
+            !page.horizontal_page_breaks().is_empty() || !page.vertical_page_breaks().is_empty()
         );
-
     }
 }

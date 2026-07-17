@@ -97,10 +97,18 @@ impl ProofingStatus {
         Ok(status)
     }
 
-    pub fn state(&self) -> ProofingState { self.state }
-    pub fn is_error(&self) -> bool { self.error }
-    pub fn extend_on_recheck(&self) -> bool { self.extend }
-    pub fn is_typo(&self) -> bool { self.typo }
+    pub fn state(&self) -> ProofingState {
+        self.state
+    }
+    pub fn is_error(&self) -> bool {
+        self.error
+    }
+    pub fn extend_on_recheck(&self) -> bool {
+        self.extend
+    }
+    pub fn is_typo(&self) -> bool {
+        self.typo
+    }
 
     pub fn from_raw(feature: ProofingFeature, raw: u16) -> Result<Self> {
         if raw & 0xFF80 != 0 {
@@ -139,12 +147,12 @@ impl ProofingStatus {
                 if self.extend || self.typo {
                     return Err(corrupted("SpellingSpls fExtend and fTypo must be zero"));
                 }
-            }
+            },
             ProofingFeature::Grammar => {
                 if self.extend && !self.error {
                     return Err(corrupted("GrammarSpls fExtend requires fError"));
                 }
-            }
+            },
         }
         Ok(())
     }
@@ -162,8 +170,12 @@ impl ProofingEntry {
         Self { start_cp, status }
     }
 
-    pub fn start_cp(&self) -> u32 { self.start_cp }
-    pub fn status(&self) -> ProofingStatus { self.status }
+    pub fn start_cp(&self) -> u32 {
+        self.start_cp
+    }
+    pub fn status(&self) -> ProofingStatus {
+        self.status
+    }
 }
 
 /// A resolved proofing range. Zero-length ranges represent insertion/deletion points.
@@ -175,10 +187,18 @@ pub struct ProofingRange {
 }
 
 impl ProofingRange {
-    pub fn start_cp(&self) -> u32 { self.start_cp }
-    pub fn end_cp(&self) -> u32 { self.end_cp }
-    pub fn is_point(&self) -> bool { self.start_cp == self.end_cp }
-    pub fn status(&self) -> ProofingStatus { self.status }
+    pub fn start_cp(&self) -> u32 {
+        self.start_cp
+    }
+    pub fn end_cp(&self) -> u32 {
+        self.end_cp
+    }
+    pub fn is_point(&self) -> bool {
+        self.start_cp == self.end_cp
+    }
+    pub fn status(&self) -> ProofingStatus {
+        self.status
+    }
 }
 
 /// A typed `Plcfspl` or `Plcfgram` table.
@@ -244,11 +264,21 @@ impl ProofingStateTable {
         })
     }
 
-    pub fn feature(&self) -> ProofingFeature { self.feature }
-    pub fn entries(&self) -> &[ProofingEntry] { &self.entries }
-    pub fn terminal_cp(&self) -> u32 { self.terminal_cp }
-    pub fn len(&self) -> usize { self.entries.len() }
-    pub fn is_empty(&self) -> bool { self.entries.is_empty() }
+    pub fn feature(&self) -> ProofingFeature {
+        self.feature
+    }
+    pub fn entries(&self) -> &[ProofingEntry] {
+        &self.entries
+    }
+    pub fn terminal_cp(&self) -> u32 {
+        self.terminal_cp
+    }
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
 
     pub fn range(&self, index: usize) -> Option<ProofingRange> {
         let entry = self.entries.get(index)?;
@@ -302,7 +332,9 @@ fn validate_entries(
     for (index, entry) in entries.iter().enumerate() {
         entry.status.validate(feature)?;
         if entry.start_cp > i32::MAX as u32 {
-            return Err(corrupted(format!("proofing CP {index} exceeds signed CP range")));
+            return Err(corrupted(format!(
+                "proofing CP {index} exceeds signed CP range"
+            )));
         }
         if previous.is_some_and(|value| entry.start_cp < value) {
             return Err(corrupted("proofing PLCF CPs are not nondecreasing"));
@@ -352,8 +384,12 @@ impl ProofingTables {
         })
     }
 
-    pub fn spelling(&self) -> Option<&ProofingStateTable> { self.spelling.as_ref() }
-    pub fn grammar(&self) -> Option<&ProofingStateTable> { self.grammar.as_ref() }
+    pub fn spelling(&self) -> Option<&ProofingStateTable> {
+        self.spelling.as_ref()
+    }
+    pub fn grammar(&self) -> Option<&ProofingStateTable> {
+        self.grammar.as_ref()
+    }
 }
 
 fn parse_fib_table(
@@ -369,10 +405,10 @@ fn parse_fib_table(
     if length == 0 {
         return Ok(None);
     }
-    let start = usize::try_from(offset)
-        .map_err(|_| corrupted("proofing PLCF offset is too large"))?;
-    let length = usize::try_from(length)
-        .map_err(|_| corrupted("proofing PLCF length is too large"))?;
+    let start =
+        usize::try_from(offset).map_err(|_| corrupted("proofing PLCF offset is too large"))?;
+    let length =
+        usize::try_from(length).map_err(|_| corrupted("proofing PLCF length is too large"))?;
     if length > MAX_PROOFING_TABLE_BYTES {
         return Err(corrupted("proofing PLCF exceeds one-million-entry cap"));
     }
@@ -393,29 +429,26 @@ mod tests {
         0, 0, 0, 0, 33, 0, 0, 0, 39, 0, 0, 0, 162, 0, 0, 0, 7, 0, 4, 0, 7, 0,
     ];
     const POI_GRAMMAR: [u8; 34] = [
-        0, 0, 0, 0, 18, 0, 0, 0, 40, 0, 0, 0, 68, 0, 0, 0, 98, 0, 0, 0, 162,
-        0, 0, 0, 7, 0, 4, 0, 7, 0, 51, 0, 7, 0,
+        0, 0, 0, 0, 18, 0, 0, 0, 40, 0, 0, 0, 68, 0, 0, 0, 98, 0, 0, 0, 162, 0, 0, 0, 7, 0, 4, 0,
+        7, 0, 51, 0, 7, 0,
     ];
 
     #[test]
     fn parses_and_round_trips_poi_reference_tables() {
-        let spelling = ProofingStateTable::parse_bytes(
-            ProofingFeature::Spelling,
-            &POI_SPELLING,
-        )
-        .unwrap();
+        let spelling =
+            ProofingStateTable::parse_bytes(ProofingFeature::Spelling, &POI_SPELLING).unwrap();
         assert_eq!(spelling.terminal_cp(), 162);
         assert_eq!(spelling.len(), 3);
         assert_eq!(spelling.range(1).unwrap().start_cp(), 33);
         assert_eq!(spelling.range(1).unwrap().end_cp(), 39);
-        assert_eq!(spelling.range(1).unwrap().status().state(), ProofingState::Edit);
+        assert_eq!(
+            spelling.range(1).unwrap().status().state(),
+            ProofingState::Edit
+        );
         assert_eq!(spelling.to_bytes().unwrap(), POI_SPELLING);
 
-        let grammar = ProofingStateTable::parse_bytes(
-            ProofingFeature::Grammar,
-            &POI_GRAMMAR,
-        )
-        .unwrap();
+        let grammar =
+            ProofingStateTable::parse_bytes(ProofingFeature::Grammar, &POI_GRAMMAR).unwrap();
         let error = grammar.range(3).unwrap();
         assert_eq!((error.start_cp(), error.end_cp()), (68, 98));
         assert_eq!(error.status().state(), ProofingState::Dirty);
@@ -451,11 +484,10 @@ mod tests {
     #[test]
     fn rejects_malformed_plc_shapes_and_positions() {
         assert!(ProofingStateTable::parse_bytes(ProofingFeature::Spelling, &[]).is_err());
-        assert!(ProofingStateTable::parse_bytes(
-            ProofingFeature::Spelling,
-            &POI_SPELLING[..21],
-        )
-        .is_err());
+        assert!(
+            ProofingStateTable::parse_bytes(ProofingFeature::Spelling, &POI_SPELLING[..21],)
+                .is_err()
+        );
         let mut bytes = POI_SPELLING;
         bytes[4..8].copy_from_slice(&40u32.to_le_bytes());
         assert!(ProofingStateTable::parse_bytes(ProofingFeature::Spelling, &bytes).is_err());

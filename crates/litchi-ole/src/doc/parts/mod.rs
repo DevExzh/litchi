@@ -1,5 +1,5 @@
-pub mod bookmarks;
 pub mod associated_strings;
+pub mod bookmarks;
 /// Internal parts for parsing DOC file structures.
 ///
 /// This module contains parsers for the binary structures used in
@@ -19,12 +19,12 @@ pub mod fkp;
 pub mod footnotes;
 pub mod headers;
 pub mod hyperlinks;
+pub mod list_names;
 pub mod numbering;
 pub mod pap;
 pub mod pap_bin_table;
 pub mod paragraph_extractor;
 pub mod piece_table;
-pub mod list_names;
 pub mod proofing;
 pub mod revisions;
 pub mod saved_by;

@@ -61,10 +61,15 @@ impl SlideDirectory {
         persist_mapping: &PersistMapping,
     ) -> Result<Self> {
         let current_user = CurrentUser::parse(current_user_data)?;
-        let user_edit_offset = usize::try_from(current_user.current_edit_offset())
-            .map_err(|_| PptError::Corrupted("current edit offset does not fit usize".to_string()))?;
+        let user_edit_offset =
+            usize::try_from(current_user.current_edit_offset()).map_err(|_| {
+                PptError::Corrupted("current edit offset does not fit usize".to_string())
+            })?;
         let user_edit = read_header(document_data, user_edit_offset, "UserEditAtom")?;
-        if user_edit.version != 0 || user_edit.instance != 0 || user_edit.record_type != USER_EDIT_ATOM {
+        if user_edit.version != 0
+            || user_edit.instance != 0
+            || user_edit.record_type != USER_EDIT_ATOM
+        {
             return Err(PptError::Corrupted(
                 "CurrentUser does not reference a valid UserEditAtom".to_string(),
             ));
@@ -158,8 +163,7 @@ impl SlideDirectory {
                 }
                 let persist_id = read_u32(&child.data, 0, "SlidePersistAtom.persistIdRef")?;
                 let flags = read_u32(&child.data, 4, "SlidePersistAtom flags")?;
-                let text_placeholder_count =
-                    read_u32(&child.data, 8, "SlidePersistAtom.cTexts")?;
+                let text_placeholder_count = read_u32(&child.data, 8, "SlidePersistAtom.cTexts")?;
                 let slide_id = read_u32(&child.data, 12, "SlidePersistAtom.slideId")?;
                 if persist_id == 0 || slide_id == 0 {
                     return Err(PptError::Corrupted(
@@ -233,7 +237,9 @@ impl SlideDirectory {
     }
 
     pub fn get_by_slide_id(&self, slide_id: u32) -> Option<&SlideDirectoryEntry> {
-        self.by_slide_id.get(&slide_id).map(|&index| &self.entries[index])
+        self.by_slide_id
+            .get(&slide_id)
+            .map(|&index| &self.entries[index])
     }
 
     pub fn get_by_persist_id(&self, persist_id: u32) -> Option<&SlideDirectoryEntry> {
@@ -370,13 +376,15 @@ mod tests {
 
     #[test]
     fn preserves_list_order_and_excludes_unreferenced_slides() {
-        let (stream, current_user, mapping) = synthetic_directory(
-            &[(11, 300, 0), (5, 100, 0), (9, 200, 0)],
-            true,
-        );
+        let (stream, current_user, mapping) =
+            synthetic_directory(&[(11, 300, 0), (5, 100, 0), (9, 200, 0)], true);
         let directory = SlideDirectory::build(&stream, &current_user, &mapping).unwrap();
         assert_eq!(
-            directory.entries().iter().map(|entry| entry.persist_id()).collect::<Vec<_>>(),
+            directory
+                .entries()
+                .iter()
+                .map(|entry| entry.persist_id())
+                .collect::<Vec<_>>(),
             [11, 5, 9]
         );
         assert!(directory.get_by_persist_id(99).is_none());
@@ -452,11 +460,17 @@ mod tests {
         let presentation = package.presentation().unwrap();
         let slides = presentation.slides().unwrap();
         assert_eq!(
-            slides.iter().map(|slide| slide.slide_id()).collect::<Vec<_>>(),
+            slides
+                .iter()
+                .map(|slide| slide.slide_id())
+                .collect::<Vec<_>>(),
             [256, 258, 257]
         );
         assert_eq!(
-            slides.iter().map(|slide| slide.persist_id()).collect::<Vec<_>>(),
+            slides
+                .iter()
+                .map(|slide| slide.persist_id())
+                .collect::<Vec<_>>(),
             [3, 5, 4]
         );
         for (slide, title) in slides.iter().zip(["Slide 1", "Slide 2", "Slide 3"]) {
@@ -468,11 +482,17 @@ mod tests {
         let presentation = package.presentation().unwrap();
         let slides = presentation.slides().unwrap();
         assert_eq!(
-            slides.iter().map(|slide| slide.slide_id()).collect::<Vec<_>>(),
+            slides
+                .iter()
+                .map(|slide| slide.slide_id())
+                .collect::<Vec<_>>(),
             [256, 257]
         );
         assert_eq!(
-            slides.iter().map(|slide| slide.persist_id()).collect::<Vec<_>>(),
+            slides
+                .iter()
+                .map(|slide| slide.persist_id())
+                .collect::<Vec<_>>(),
             [4, 6]
         );
         assert_eq!(presentation.slide_count(), 2);

@@ -63,12 +63,14 @@ impl SavedByTable {
         else {
             return Ok(Self::default());
         };
-        let start = usize::try_from(offset)
-            .map_err(|_| corrupted("SttbSavedBy offset is too large"))?;
-        let length = usize::try_from(length)
-            .map_err(|_| corrupted("SttbSavedBy length is too large"))?;
+        let start =
+            usize::try_from(offset).map_err(|_| corrupted("SttbSavedBy offset is too large"))?;
+        let length =
+            usize::try_from(length).map_err(|_| corrupted("SttbSavedBy length is too large"))?;
         if length > MAX_SAVED_BY_BYTES {
-            return Err(corrupted("SttbSavedBy exceeds its specification-derived size cap"));
+            return Err(corrupted(
+                "SttbSavedBy exceeds its specification-derived size cap",
+            ));
         }
         let end = start
             .checked_add(length)
@@ -82,7 +84,9 @@ impl SavedByTable {
     /// Parse one complete `SttbSavedBy` payload.
     pub fn parse_bytes(data: &[u8]) -> Result<Self> {
         if data.len() > MAX_SAVED_BY_BYTES {
-            return Err(corrupted("SttbSavedBy exceeds its specification-derived size cap"));
+            return Err(corrupted(
+                "SttbSavedBy exceeds its specification-derived size cap",
+            ));
         }
         if data.len() < 6
             || read_u16(data, 0, "SttbSavedBy fExtend")? != 0xFFFF
@@ -122,7 +126,9 @@ impl SavedByTable {
                 .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
                 .collect::<Vec<_>>();
             strings.push(String::from_utf16(&units).map_err(|_| {
-                corrupted(format!("SttbSavedBy string {index} contains invalid UTF-16"))
+                corrupted(format!(
+                    "SttbSavedBy string {index} contains invalid UTF-16"
+                ))
             })?);
             offset = end;
         }
@@ -164,14 +170,18 @@ impl SavedByTable {
 
 fn validate_entries(entries: &[SavedByEntry]) -> Result<usize> {
     if entries.len() > MAX_SAVED_BY_STRINGS / 2 {
-        return Err(corrupted("SttbSavedBy contains more than 10 save-history entries"));
+        return Err(corrupted(
+            "SttbSavedBy contains more than 10 save-history entries",
+        ));
     }
     let mut size = 6usize;
     for entry in entries {
         for value in [&entry.author, &entry.location] {
             let units = value.encode_utf16().count();
             if units > usize::from(u16::MAX) {
-                return Err(corrupted("SttbSavedBy string exceeds 65535 UTF-16 code units"));
+                return Err(corrupted(
+                    "SttbSavedBy string exceeds 65535 UTF-16 code units",
+                ));
             }
             size = size
                 .checked_add(2)
@@ -180,7 +190,9 @@ fn validate_entries(entries: &[SavedByEntry]) -> Result<usize> {
         }
     }
     if size > MAX_SAVED_BY_BYTES {
-        return Err(corrupted("SttbSavedBy exceeds its specification-derived size cap"));
+        return Err(corrupted(
+            "SttbSavedBy exceeds its specification-derived size cap",
+        ));
     }
     Ok(size)
 }

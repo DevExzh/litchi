@@ -3,16 +3,132 @@ use std::io::Write;
 
 use super::write_record_header;
 
-#[derive(Debug,Clone)]
-pub(crate) struct Cf12Config<'a>{pub condition_type:u8,pub comparison:u8,pub differential_format:&'a[u8],pub formula1:&'a[u8],pub formula2:&'a[u8],pub active_formula:&'a[u8],pub stop_if_true:bool,pub priority:u16,pub template:u16,pub template_parameters:[u8;16],pub rule_payload:&'a[u8]}
+#[derive(Debug, Clone)]
+pub(crate) struct Cf12Config<'a> {
+    pub condition_type: u8,
+    pub comparison: u8,
+    pub differential_format: &'a [u8],
+    pub formula1: &'a [u8],
+    pub formula2: &'a [u8],
+    pub active_formula: &'a [u8],
+    pub stop_if_true: bool,
+    pub priority: u16,
+    pub template: u16,
+    pub template_parameters: [u8; 16],
+    pub rule_payload: &'a [u8],
+}
 
-fn write_frt<W:Write>(writer:&mut W,record_type:u16,referenced:bool,range:(u16,u16,u16,u16))->XlsResult<()>{writer.write_all(&record_type.to_le_bytes())?;writer.write_all(&u16::from(referenced).to_le_bytes())?;for value in [range.0,range.1,range.2,range.3]{writer.write_all(&value.to_le_bytes())?;}Ok(())}
+fn write_frt<W: Write>(
+    writer: &mut W,
+    record_type: u16,
+    referenced: bool,
+    range: (u16, u16, u16, u16),
+) -> XlsResult<()> {
+    writer.write_all(&record_type.to_le_bytes())?;
+    writer.write_all(&u16::from(referenced).to_le_bytes())?;
+    for value in [range.0, range.1, range.2, range.3] {
+        writer.write_all(&value.to_le_bytes())?;
+    }
+    Ok(())
+}
 
-pub(crate) fn write_condfmt12<W:Write>(writer:&mut W,ranges:&[(u32,u32,u16,u16)],rules:u16,identifier:u16)->XlsResult<()>{let mut legacy=Vec::new();write_cfheader_with_identifier(&mut legacy,ranges,rules,identifier)?;let payload=&legacy[4..];let enclosing=(u16::from_le_bytes([payload[4],payload[5]]),u16::from_le_bytes([payload[6],payload[7]]),u16::from_le_bytes([payload[8],payload[9]]),u16::from_le_bytes([payload[10],payload[11]]));let length=u16::try_from(12+payload.len()).map_err(|_|XlsError::InvalidData("CondFmt12 record is too large".to_string()))?;write_record_header(writer,0x0879,length)?;write_frt(writer,0x0879,true,enclosing)?;writer.write_all(payload)?;Ok(())}
+pub(crate) fn write_condfmt12<W: Write>(
+    writer: &mut W,
+    ranges: &[(u32, u32, u16, u16)],
+    rules: u16,
+    identifier: u16,
+) -> XlsResult<()> {
+    let mut legacy = Vec::new();
+    write_cfheader_with_identifier(&mut legacy, ranges, rules, identifier)?;
+    let payload = &legacy[4..];
+    let enclosing = (
+        u16::from_le_bytes([payload[4], payload[5]]),
+        u16::from_le_bytes([payload[6], payload[7]]),
+        u16::from_le_bytes([payload[8], payload[9]]),
+        u16::from_le_bytes([payload[10], payload[11]]),
+    );
+    let length = u16::try_from(12 + payload.len())
+        .map_err(|_| XlsError::InvalidData("CondFmt12 record is too large".to_string()))?;
+    write_record_header(writer, 0x0879, length)?;
+    write_frt(writer, 0x0879, true, enclosing)?;
+    writer.write_all(payload)?;
+    Ok(())
+}
 
-pub(crate) fn write_cf12<W:Write>(writer:&mut W,cfg:&Cf12Config<'_>)->XlsResult<()>{if !(1..=6).contains(&cfg.condition_type)||cfg.formula1.len()>16409||cfg.formula2.len()>16409||cfg.active_formula.len()>16409||cfg.differential_format.len()<6{return Err(XlsError::InvalidData("CF12 configuration is invalid".to_string()))}let cb=u32::from_le_bytes(cfg.differential_format[0..4].try_into().unwrap())as usize;let expected=if cb==0{6}else{4usize.checked_add(cb).ok_or_else(||XlsError::InvalidData("CF12 DXFN12 length overflows".to_string()))?};if cfg.differential_format.len()!=expected||(cb==0&&cfg.differential_format[4..6]!=[0,0]){return Err(XlsError::InvalidData("CF12 DXFN12 length is invalid".to_string()))}let total=12+6+cfg.differential_format.len()+cfg.formula1.len()+cfg.formula2.len()+2+cfg.active_formula.len()+1+2+2+1+16+cfg.rule_payload.len();if total>8224{return Err(XlsError::InvalidData("CF12 record exceeds maximum BIFF8 record size".to_string()))}write_record_header(writer,0x087a,total as u16)?;write_frt(writer,0x087a,false,(0,0,0,0))?;writer.write_all(&[cfg.condition_type,cfg.comparison])?;writer.write_all(&(cfg.formula1.len()as u16).to_le_bytes())?;writer.write_all(&(cfg.formula2.len()as u16).to_le_bytes())?;writer.write_all(cfg.differential_format)?;writer.write_all(cfg.formula1)?;writer.write_all(cfg.formula2)?;writer.write_all(&(cfg.active_formula.len()as u16).to_le_bytes())?;writer.write_all(cfg.active_formula)?;writer.write_all(&[u8::from(cfg.stop_if_true)<<1])?;writer.write_all(&cfg.priority.to_le_bytes())?;writer.write_all(&cfg.template.to_le_bytes())?;writer.write_all(&[16])?;writer.write_all(&cfg.template_parameters)?;writer.write_all(cfg.rule_payload)?;Ok(())}
+pub(crate) fn write_cf12<W: Write>(writer: &mut W, cfg: &Cf12Config<'_>) -> XlsResult<()> {
+    if !(1..=6).contains(&cfg.condition_type)
+        || cfg.formula1.len() > 16409
+        || cfg.formula2.len() > 16409
+        || cfg.active_formula.len() > 16409
+        || cfg.differential_format.len() < 6
+    {
+        return Err(XlsError::InvalidData(
+            "CF12 configuration is invalid".to_string(),
+        ));
+    }
+    let cb = u32::from_le_bytes(cfg.differential_format[0..4].try_into().unwrap()) as usize;
+    let expected = if cb == 0 {
+        6
+    } else {
+        4usize
+            .checked_add(cb)
+            .ok_or_else(|| XlsError::InvalidData("CF12 DXFN12 length overflows".to_string()))?
+    };
+    if cfg.differential_format.len() != expected
+        || (cb == 0 && cfg.differential_format[4..6] != [0, 0])
+    {
+        return Err(XlsError::InvalidData(
+            "CF12 DXFN12 length is invalid".to_string(),
+        ));
+    }
+    let total = 12
+        + 6
+        + cfg.differential_format.len()
+        + cfg.formula1.len()
+        + cfg.formula2.len()
+        + 2
+        + cfg.active_formula.len()
+        + 1
+        + 2
+        + 2
+        + 1
+        + 16
+        + cfg.rule_payload.len();
+    if total > 8224 {
+        return Err(XlsError::InvalidData(
+            "CF12 record exceeds maximum BIFF8 record size".to_string(),
+        ));
+    }
+    write_record_header(writer, 0x087a, total as u16)?;
+    write_frt(writer, 0x087a, false, (0, 0, 0, 0))?;
+    writer.write_all(&[cfg.condition_type, cfg.comparison])?;
+    writer.write_all(&(cfg.formula1.len() as u16).to_le_bytes())?;
+    writer.write_all(&(cfg.formula2.len() as u16).to_le_bytes())?;
+    writer.write_all(cfg.differential_format)?;
+    writer.write_all(cfg.formula1)?;
+    writer.write_all(cfg.formula2)?;
+    writer.write_all(&(cfg.active_formula.len() as u16).to_le_bytes())?;
+    writer.write_all(cfg.active_formula)?;
+    writer.write_all(&[u8::from(cfg.stop_if_true) << 1])?;
+    writer.write_all(&cfg.priority.to_le_bytes())?;
+    writer.write_all(&cfg.template.to_le_bytes())?;
+    writer.write_all(&[16])?;
+    writer.write_all(&cfg.template_parameters)?;
+    writer.write_all(cfg.rule_payload)?;
+    Ok(())
+}
 
-pub(crate) fn write_cfex12_marker<W:Write>(writer:&mut W,identifier:u16,enclosing:(u16,u16,u16,u16))->XlsResult<()>{write_record_header(writer,0x087b,18)?;write_frt(writer,0x087b,true,enclosing)?;writer.write_all(&1u32.to_le_bytes())?;writer.write_all(&identifier.to_le_bytes())?;Ok(())}
+pub(crate) fn write_cfex12_marker<W: Write>(
+    writer: &mut W,
+    identifier: u16,
+    enclosing: (u16, u16, u16, u16),
+) -> XlsResult<()> {
+    write_record_header(writer, 0x087b, 18)?;
+    write_frt(writer, 0x087b, true, enclosing)?;
+    writer.write_all(&1u32.to_le_bytes())?;
+    writer.write_all(&identifier.to_le_bytes())?;
+    Ok(())
+}
 
 pub fn write_cfheader<W: Write>(
     writer: &mut W,

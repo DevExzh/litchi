@@ -1,8 +1,8 @@
 use std::io::Cursor;
 
 use litchi_ole::xls::writer::{
-    XlsViewScale, XlsWorksheetPaneOptions, XlsWorksheetSelectionOptions,
-    XlsWorksheetViewOptions, XlsWriter,
+    XlsViewScale, XlsWorksheetPaneOptions, XlsWorksheetSelectionOptions, XlsWorksheetViewOptions,
+    XlsWriter,
 };
 use litchi_ole::xls::{XlsPaneType, XlsSelectionRange, XlsWorkbook};
 
@@ -43,7 +43,10 @@ fn writes_and_reads_typed_view_state() {
     assert_eq!(view.normal_zoom_percent(), Some(125));
     assert_eq!(view.zoom_fraction(), Some((5, 4)));
     assert_eq!(view.pane().unwrap().active_pane(), XlsPaneType::LowerRight);
-    assert_eq!(view.selections()[0].ranges()[0], XlsSelectionRange::new(8, 10, 5, 6));
+    assert_eq!(
+        view.selections()[0].ranges()[0],
+        XlsSelectionRange::new(8, 10, 5, 6)
+    );
 }
 
 #[test]

@@ -116,13 +116,27 @@ impl PowerPointNoZoomViewInfo {
         })
     }
 
-    pub fn x_scale(&self) -> PowerPointRatio { self.x_scale }
-    pub fn y_scale(&self) -> PowerPointRatio { self.y_scale }
-    pub fn ignored1(&self) -> &[u8; 24] { &self.ignored1 }
-    pub fn origin(&self) -> PowerPointViewOrigin { self.origin }
-    pub fn ignored2(&self) -> u8 { self.ignored2 }
-    pub fn draft_mode(&self) -> bool { self.draft_mode }
-    pub fn ignored3(&self) -> &[u8; 2] { &self.ignored3 }
+    pub fn x_scale(&self) -> PowerPointRatio {
+        self.x_scale
+    }
+    pub fn y_scale(&self) -> PowerPointRatio {
+        self.y_scale
+    }
+    pub fn ignored1(&self) -> &[u8; 24] {
+        &self.ignored1
+    }
+    pub fn origin(&self) -> PowerPointViewOrigin {
+        self.origin
+    }
+    pub fn ignored2(&self) -> u8 {
+        self.ignored2
+    }
+    pub fn draft_mode(&self) -> bool {
+        self.draft_mode
+    }
+    pub fn ignored3(&self) -> &[u8; 2] {
+        &self.ignored3
+    }
 
     fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != ATOM_DATA_LEN {
@@ -141,8 +155,8 @@ impl PowerPointNoZoomViewInfo {
             value => {
                 return Err(corrupted(format!(
                     "NoZoomViewInfoAtom fDraftMode must be 0 or 1, got {value}"
-                )))
-            }
+                )));
+            },
         };
         Self::new(
             x_scale,
@@ -189,8 +203,12 @@ impl PowerPointOutlineSorterViewInfo {
         Self { kind, view_info }
     }
 
-    pub fn kind(&self) -> PowerPointNonZoomViewKind { self.kind }
-    pub fn view_info(&self) -> Option<&PowerPointNoZoomViewInfo> { self.view_info.as_ref() }
+    pub fn kind(&self) -> PowerPointNonZoomViewKind {
+        self.kind
+    }
+    pub fn view_info(&self) -> Option<&PowerPointNoZoomViewInfo> {
+        self.view_info.as_ref()
+    }
 
     /// Parse a complete container record, including its eight-byte record header.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
@@ -209,7 +227,12 @@ impl PowerPointOutlineSorterViewInfo {
         if total != bytes.len() {
             return Err(corrupted("Outline/sorter view declared length mismatch"));
         }
-        Self::parse_container(version, instance, record_type, &bytes[CONTAINER_HEADER_LEN..])
+        Self::parse_container(
+            version,
+            instance,
+            record_type,
+            &bytes[CONTAINER_HEADER_LEN..],
+        )
     }
 
     pub fn parse_record(record: &PptRecord) -> Result<Self> {
@@ -223,15 +246,15 @@ impl PowerPointOutlineSorterViewInfo {
         if record.record_type != expected_type {
             return Err(corrupted("Outline/sorter view mapped record type mismatch"));
         }
-        Self::parse_container(record.version, record.instance, record.record_type_raw, &record.data)
+        Self::parse_container(
+            record.version,
+            record.instance,
+            record.record_type_raw,
+            &record.data,
+        )
     }
 
-    fn parse_container(
-        version: u16,
-        instance: u16,
-        record_type: u16,
-        data: &[u8],
-    ) -> Result<Self> {
+    fn parse_container(version: u16, instance: u16, record_type: u16, data: &[u8]) -> Result<Self> {
         let kind = PowerPointNonZoomViewKind::from_raw(record_type)?;
         if version != 0xF || instance != 1 {
             return Err(corrupted(
@@ -239,7 +262,9 @@ impl PowerPointOutlineSorterViewInfo {
             ));
         }
         if data.len() > MAX_CONTAINER_DATA {
-            return Err(corrupted("Outline/sorter view container exceeds 60-byte cap"));
+            return Err(corrupted(
+                "Outline/sorter view container exceeds 60-byte cap",
+            ));
         }
         if data.is_empty() {
             return Ok(Self::new(kind, None));
@@ -270,7 +295,11 @@ impl PowerPointOutlineSorterViewInfo {
     /// Serialize a complete container record deterministically.
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         let (_, record_type) = self.kind.record_type();
-        let data_len = if self.view_info.is_some() { ATOM_TOTAL_LEN } else { 0 };
+        let data_len = if self.view_info.is_some() {
+            ATOM_TOTAL_LEN
+        } else {
+            0
+        };
         let mut bytes = Vec::with_capacity(CONTAINER_HEADER_LEN + data_len);
         bytes.extend_from_slice(&0x001Fu16.to_le_bytes());
         bytes.extend_from_slice(&record_type.to_le_bytes());
@@ -290,8 +319,12 @@ pub struct PowerPointOutlineSorterViewInformation {
 }
 
 impl PowerPointOutlineSorterViewInformation {
-    pub fn outline(&self) -> Option<&PowerPointOutlineSorterViewInfo> { self.outline.as_ref() }
-    pub fn sorter(&self) -> Option<&PowerPointOutlineSorterViewInfo> { self.sorter.as_ref() }
+    pub fn outline(&self) -> Option<&PowerPointOutlineSorterViewInfo> {
+        self.outline.as_ref()
+    }
+    pub fn sorter(&self) -> Option<&PowerPointOutlineSorterViewInfo> {
+        self.sorter.as_ref()
+    }
 
     pub(crate) fn parse_records(records: &[&PptRecord]) -> Result<Self> {
         let mut information = Self::default();
@@ -315,22 +348,17 @@ mod tests {
     use super::*;
 
     const POI_OUTLINE: [u8; 68] = [
-        0x1f, 0x00, 0x07, 0x04, 0x3c, 0, 0, 0, 0, 0, 0xfd, 0x03, 0x34, 0, 0, 0,
-        0x21, 0, 0, 0, 0x64, 0, 0, 0, 0x21, 0, 0, 0, 0x64, 0, 0, 0, 0xa3, 0x8b,
-        0x07, 0x30, 0xdc, 0xba, 0x12, 0, 0, 0, 0, 0, 0xfc, 0xe6, 0x29, 0x06, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0x12, 0,
+        0x1f, 0x00, 0x07, 0x04, 0x3c, 0, 0, 0, 0, 0, 0xfd, 0x03, 0x34, 0, 0, 0, 0x21, 0, 0, 0,
+        0x64, 0, 0, 0, 0x21, 0, 0, 0, 0x64, 0, 0, 0, 0xa3, 0x8b, 0x07, 0x30, 0xdc, 0xba, 0x12, 0,
+        0, 0, 0, 0, 0xfc, 0xe6, 0x29, 0x06, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+        0x12, 0,
     ];
 
     const POI_SORTER: [u8; 68] = [
-        0x1f, 0x00, 0x08, 0x04, 0x3c, 0, 0, 0,
-        0, 0, 0xfd, 0x03, 0x34, 0, 0, 0,
-        0x64, 0, 0, 0, 0x64, 0, 0, 0,
-        0x64, 0, 0, 0, 0x64, 0, 0, 0,
-        0x6c, 0x42, 0xbb, 0x04, 0, 0, 0, 0,
-        0xc8, 0xb7, 0x12, 0, 1, 0, 0, 0,
-        0xa6, 0x17, 0, 0, 0x34, 0x0e, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0xff, 0xff,
+        0x1f, 0x00, 0x08, 0x04, 0x3c, 0, 0, 0, 0, 0, 0xfd, 0x03, 0x34, 0, 0, 0, 0x64, 0, 0, 0,
+        0x64, 0, 0, 0, 0x64, 0, 0, 0, 0x64, 0, 0, 0, 0x6c, 0x42, 0xbb, 0x04, 0, 0, 0, 0, 0xc8,
+        0xb7, 0x12, 0, 1, 0, 0, 0, 0xa6, 0x17, 0, 0, 0x34, 0x0e, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0xff, 0xff,
     ];
 
     #[test]
@@ -338,7 +366,10 @@ mod tests {
         let outline = PowerPointOutlineSorterViewInfo::from_bytes(&POI_OUTLINE).unwrap();
         assert_eq!(outline.kind(), PowerPointNonZoomViewKind::Outline);
         let view = outline.view_info().unwrap();
-        assert_eq!((view.x_scale().numerator(), view.x_scale().denominator()), (33, 100));
+        assert_eq!(
+            (view.x_scale().numerator(), view.x_scale().denominator()),
+            (33, 100)
+        );
         assert_eq!(view.x_scale(), view.y_scale());
         assert_eq!(view.origin(), PowerPointViewOrigin::new(0, 0));
         assert!(view.draft_mode());

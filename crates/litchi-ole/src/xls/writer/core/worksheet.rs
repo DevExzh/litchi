@@ -1,10 +1,12 @@
 use std::collections::{HashMap, HashSet};
 
-use super::{
-    XlsCellValue, XlsConditionalFormat, XlsConditionalFormat12Group, XlsConditionalFormatGroup, XlsConditionalFormatRange, XlsConditionalFormatRule, XlsDataValidation, XlsDataValidationOptions,
-    XlsDataValidationRange, XlsDataValidationTableOptions, XlsPageSetupOptions,
-};
 use super::comment::WritableComment;
+use super::{
+    XlsCellValue, XlsConditionalFormat, XlsConditionalFormat12Group, XlsConditionalFormatGroup,
+    XlsConditionalFormatRange, XlsConditionalFormatRule, XlsDataValidation,
+    XlsDataValidationOptions, XlsDataValidationRange, XlsDataValidationTableOptions,
+    XlsPageSetupOptions,
+};
 use crate::xls::writer::biff::AutoFilterConditionWrite;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -209,13 +211,30 @@ impl WritableWorksheet {
         ranges: Vec<XlsDataValidationRange>,
         options: XlsDataValidationOptions,
     ) {
-        self.data_validations.push(WritableDataValidation { validation, ranges, options });
+        self.data_validations.push(WritableDataValidation {
+            validation,
+            ranges,
+            options,
+        });
     }
 
     pub(super) fn add_conditional_format(&mut self, cf: XlsConditionalFormat) {
-        self.conditional_formats.push(XlsConditionalFormatGroup{ranges:vec![XlsConditionalFormatRange{first_row:cf.first_row,last_row:cf.last_row,first_col:cf.first_col,last_col:cf.last_col}],rules:vec![XlsConditionalFormatRule{format_type:cf.format_type,pattern:cf.pattern}]});
+        self.conditional_formats.push(XlsConditionalFormatGroup {
+            ranges: vec![XlsConditionalFormatRange {
+                first_row: cf.first_row,
+                last_row: cf.last_row,
+                first_col: cf.first_col,
+                last_col: cf.last_col,
+            }],
+            rules: vec![XlsConditionalFormatRule {
+                format_type: cf.format_type,
+                pattern: cf.pattern,
+            }],
+        });
     }
-    pub(super) fn add_conditional_format_group(&mut self,group:XlsConditionalFormatGroup){self.conditional_formats.push(group)}
+    pub(super) fn add_conditional_format_group(&mut self, group: XlsConditionalFormatGroup) {
+        self.conditional_formats.push(group)
+    }
     pub(super) fn add_conditional_format12_group(&mut self, group: XlsConditionalFormat12Group) {
         self.conditional_formats12.push(group);
     }
@@ -231,9 +250,11 @@ impl WritableWorksheet {
     }
 
     pub(super) fn set_zoom(&mut self, numerator: u16, denominator: u16) {
-        self.view.scale = (numerator != denominator).then_some(
-            crate::xls::writer::view::XlsViewScale { numerator, denominator },
-        );
+        self.view.scale =
+            (numerator != denominator).then_some(crate::xls::writer::view::XlsViewScale {
+                numerator,
+                denominator,
+            });
     }
 
     pub(super) fn set_column_width(&mut self, col: u16, width: u16) {

@@ -35,24 +35,43 @@ fn write_index<W: Write>(writer: &mut W, index: Option<usize>) -> XlsResult<()> 
     Ok(())
 }
 
-fn write_scenario<W: Write>(writer: &mut W, scenario: &crate::xls::scenario::XlsScenario) -> XlsResult<()> {
+fn write_scenario<W: Write>(
+    writer: &mut W,
+    scenario: &crate::xls::scenario::XlsScenario,
+) -> XlsResult<()> {
     let mut prefix = Vec::new();
     prefix.extend_from_slice(&(scenario.cells.len() as u16).to_le_bytes());
     prefix.push(u8::from(scenario.locked));
     prefix.push(u8::from(scenario.hidden));
     prefix.push(scenario.name.encode_utf16().count() as u8);
-    prefix.push(scenario.comment.as_ref().map_or(0, |value| value.encode_utf16().count() as u8));
-    prefix.push(scenario.creator.as_ref().map_or(0, |value| value.encode_utf16().count() as u8));
+    prefix.push(
+        scenario
+            .comment
+            .as_ref()
+            .map_or(0, |value| value.encode_utf16().count() as u8),
+    );
+    prefix.push(
+        scenario
+            .creator
+            .as_ref()
+            .map_or(0, |value| value.encode_utf16().count() as u8),
+    );
     encode_no_cch(&mut prefix, &scenario.name);
-    if let Some(creator) = &scenario.creator { encode_unicode(&mut prefix, creator)?; }
-    if let Some(comment) = &scenario.comment { encode_unicode(&mut prefix, comment)?; }
+    if let Some(creator) = &scenario.creator {
+        encode_unicode(&mut prefix, creator)?;
+    }
+    if let Some(comment) = &scenario.comment {
+        encode_unicode(&mut prefix, comment)?;
+    }
     for cell in &scenario.cells {
         prefix.extend_from_slice(&cell.row.to_le_bytes());
         let flags = u16::from(cell.column) | if cell.deleted { 0x4000 } else { 0 };
         prefix.extend_from_slice(&flags.to_le_bytes());
     }
     if prefix.len() > MAX_RECORD_DATA {
-        return Err(XlsError::InvalidData("Scenario fixed fields exceed BIFF8 record limit".to_string()));
+        return Err(XlsError::InvalidData(
+            "Scenario fixed fields exceed BIFF8 record limit".to_string(),
+        ));
     }
 
     let mut chunks = vec![prefix];
@@ -63,7 +82,11 @@ fn write_scenario<W: Write>(writer: &mut W, scenario: &crate::xls::scenario::Xls
     }
     push_component(&mut chunks, vec![0; scenario.cells.len() * 2])?;
     for (index, chunk) in chunks.iter().enumerate() {
-        write_record_header(writer, if index == 0 { 0x00AF } else { 0x003C }, chunk.len() as u16)?;
+        write_record_header(
+            writer,
+            if index == 0 { 0x00AF } else { 0x003C },
+            chunk.len() as u16,
+        )?;
         writer.write_all(chunk)?;
     }
     Ok(())
@@ -86,7 +109,9 @@ fn push_component(chunks: &mut Vec<Vec<u8>>, component: Vec<u8>) -> XlsResult<()
 fn encode_unicode(output: &mut Vec<u8>, value: &str) -> XlsResult<()> {
     let count = value.encode_utf16().count();
     if count > u16::MAX as usize {
-        return Err(XlsError::InvalidData("Scenario string exceeds 65535 UTF-16 code units".to_string()));
+        return Err(XlsError::InvalidData(
+            "Scenario string exceeds 65535 UTF-16 code units".to_string(),
+        ));
     }
     output.extend_from_slice(&(count as u16).to_le_bytes());
     encode_no_cch(output, value);
@@ -99,6 +124,8 @@ fn encode_no_cch(output: &mut Vec<u8>, value: &str) {
         output.extend(value.chars().map(|character| character as u8));
     } else {
         output.push(1);
-        for unit in value.encode_utf16() { output.extend_from_slice(&unit.to_le_bytes()); }
+        for unit in value.encode_utf16() {
+            output.extend_from_slice(&unit.to_le_bytes());
+        }
     }
 }

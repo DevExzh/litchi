@@ -12,7 +12,10 @@ pub struct XlsViewScale {
 
 impl XlsViewScale {
     pub fn new(numerator: u16, denominator: u16) -> XlsResult<Self> {
-        let value = Self { numerator, denominator };
+        let value = Self {
+            numerator,
+            denominator,
+        };
         value.validate()?;
         Ok(value)
     }
@@ -85,19 +88,26 @@ impl XlsWorksheetPaneOptions {
 
     pub(crate) fn validate(self) -> XlsResult<()> {
         if self.horizontal_split == 0 && self.vertical_split == 0 {
-            return Err(XlsError::InvalidData("PANE must split at least one axis".to_string()));
+            return Err(XlsError::InvalidData(
+                "PANE must split at least one axis".to_string(),
+            ));
         }
         if self.mode == XlsPaneMode::Split
-            && (self.horizontal_split > i16::MAX as u16
-                || self.vertical_split > i16::MAX as u16)
+            && (self.horizontal_split > i16::MAX as u16 || self.vertical_split > i16::MAX as u16)
         {
-            return Err(XlsError::InvalidData("split positions exceed 32767 twips".to_string()));
+            return Err(XlsError::InvalidData(
+                "split positions exceed 32767 twips".to_string(),
+            ));
         }
         if self.mode == XlsPaneMode::Frozen && self.horizontal_split > 255 {
-            return Err(XlsError::InvalidData("frozen horizontal split exceeds 255 columns".to_string()));
+            return Err(XlsError::InvalidData(
+                "frozen horizontal split exceeds 255 columns".to_string(),
+            ));
         }
         if !pane_exists(self.horizontal_split, self.vertical_split, self.active_pane) {
-            return Err(XlsError::InvalidData("active pane does not exist for the split axes".to_string()));
+            return Err(XlsError::InvalidData(
+                "active pane does not exist for the split axes".to_string(),
+            ));
         }
         Ok(())
     }
@@ -165,7 +175,11 @@ impl Default for XlsWorksheetViewOptions {
             normal_zoom_percent: None,
             scale: None,
             pane: None,
-            selections: vec![XlsWorksheetSelectionOptions::single_cell(XlsPaneType::UpperLeft, 0, 0)],
+            selections: vec![XlsWorksheetSelectionOptions::single_cell(
+                XlsPaneType::UpperLeft,
+                0,
+                0,
+            )],
         }
     }
 }
@@ -173,11 +187,18 @@ impl Default for XlsWorksheetViewOptions {
 impl XlsWorksheetViewOptions {
     pub(crate) fn validate(&self) -> XlsResult<()> {
         if self.gridline_color_index.is_some_and(|value| value > 63) {
-            return Err(XlsError::InvalidData("custom gridline color index must be <= 63".to_string()));
+            return Err(XlsError::InvalidData(
+                "custom gridline color index must be <= 63".to_string(),
+            ));
         }
-        for zoom in [self.page_break_zoom_percent, self.normal_zoom_percent].into_iter().flatten() {
+        for zoom in [self.page_break_zoom_percent, self.normal_zoom_percent]
+            .into_iter()
+            .flatten()
+        {
             if !(10..=400).contains(&zoom) {
-                return Err(XlsError::InvalidData("view zoom percent must be between 10 and 400".to_string()));
+                return Err(XlsError::InvalidData(
+                    "view zoom percent must be between 10 and 400".to_string(),
+                ));
             }
         }
         if let Some(scale) = self.scale {
@@ -188,7 +209,9 @@ impl XlsWorksheetViewOptions {
             if pane.mode == XlsPaneMode::Frozen
                 && (self.first_visible_row == u16::MAX || self.first_visible_column == u8::MAX)
             {
-                return Err(XlsError::InvalidData("frozen view cannot use sentinel origins".to_string()));
+                return Err(XlsError::InvalidData(
+                    "frozen view cannot use sentinel origins".to_string(),
+                ));
             }
         }
         validate_selections(self.pane.as_ref(), &self.selections)
@@ -196,14 +219,22 @@ impl XlsWorksheetViewOptions {
 
     pub(crate) fn set_frozen(&mut self, rows: u16, columns: u8) -> XlsResult<()> {
         let pane = XlsWorksheetPaneOptions::frozen(rows, columns)?;
-        self.selections = vec![XlsWorksheetSelectionOptions::single_cell(pane.active_pane, rows, columns)];
+        self.selections = vec![XlsWorksheetSelectionOptions::single_cell(
+            pane.active_pane,
+            rows,
+            columns,
+        )];
         self.pane = Some(pane);
         Ok(())
     }
 
     pub(crate) fn clear_pane(&mut self) {
         self.pane = None;
-        self.selections = vec![XlsWorksheetSelectionOptions::single_cell(XlsPaneType::UpperLeft, 0, 0)];
+        self.selections = vec![XlsWorksheetSelectionOptions::single_cell(
+            XlsPaneType::UpperLeft,
+            0,
+            0,
+        )];
     }
 }
 
@@ -221,15 +252,21 @@ fn validate_selections(
     while start < selections.len() {
         let first = &selections[start];
         if first.active_range_index & 0x8000 != 0 {
-            return Err(XlsError::InvalidData("active range index must be a signed nonnegative integer".to_string()));
+            return Err(XlsError::InvalidData(
+                "active range index must be a signed nonnegative integer".to_string(),
+            ));
         }
         if seen.contains(&first.pane) {
-            return Err(XlsError::InvalidData("SELECTION pane groups must be contiguous".to_string()));
+            return Err(XlsError::InvalidData(
+                "SELECTION pane groups must be contiguous".to_string(),
+            ));
         }
         if !pane.map_or(first.pane == XlsPaneType::UpperLeft, |value| {
             pane_exists(value.horizontal_split, value.vertical_split, first.pane)
         }) {
-            return Err(XlsError::InvalidData("SELECTION references a nonexistent pane".to_string()));
+            return Err(XlsError::InvalidData(
+                "SELECTION references a nonexistent pane".to_string(),
+            ));
         }
         has_active |= first.pane == active_pane;
         let mut end = start;
@@ -237,17 +274,29 @@ fn validate_selections(
         while end < selections.len() && selections[end].pane == first.pane {
             let current = &selections[end];
             if current.ranges.is_empty() || current.ranges.len() > MAX_SELECTION_RANGES {
-                return Err(XlsError::InvalidData("each SELECTION needs 1..=1369 ranges".to_string()));
+                return Err(XlsError::InvalidData(
+                    "each SELECTION needs 1..=1369 ranges".to_string(),
+                ));
             }
-            if (current.active_row, current.active_column, current.active_range_index)
-                != (first.active_row, first.active_column, first.active_range_index)
-            {
-                return Err(XlsError::InvalidData("contiguous SELECTION records disagree".to_string()));
+            if (
+                current.active_row,
+                current.active_column,
+                current.active_range_index,
+            ) != (
+                first.active_row,
+                first.active_column,
+                first.active_range_index,
+            ) {
+                return Err(XlsError::InvalidData(
+                    "contiguous SELECTION records disagree".to_string(),
+                ));
             }
             if current.ranges.iter().any(|range| {
                 range.first_row() > range.last_row() || range.first_column() > range.last_column()
             }) {
-                return Err(XlsError::InvalidData("SELECTION contains an inverted range".to_string()));
+                return Err(XlsError::InvalidData(
+                    "SELECTION contains an inverted range".to_string(),
+                ));
             }
             count = count.checked_add(current.ranges.len()).ok_or_else(|| {
                 XlsError::InvalidData("SELECTION range count overflow".to_string())
@@ -258,19 +307,25 @@ fn validate_selections(
             .iter()
             .flat_map(|selection| selection.ranges.iter())
             .nth(usize::from(first.active_range_index))
-            .ok_or_else(|| XlsError::InvalidData("active range index is out of bounds".to_string()))?;
+            .ok_or_else(|| {
+                XlsError::InvalidData("active range index is out of bounds".to_string())
+            })?;
         if first.active_row < active.first_row()
             || first.active_row > active.last_row()
             || first.active_column < active.first_column()
             || first.active_column > active.last_column()
         {
-            return Err(XlsError::InvalidData("active range does not contain the active cell".to_string()));
+            return Err(XlsError::InvalidData(
+                "active range does not contain the active cell".to_string(),
+            ));
         }
         seen.push(first.pane);
         start = end;
     }
     if !has_active {
-        return Err(XlsError::InvalidData("active pane has no SELECTION".to_string()));
+        return Err(XlsError::InvalidData(
+            "active pane has no SELECTION".to_string(),
+        ));
     }
     Ok(())
 }
@@ -300,7 +355,8 @@ mod tests {
 
     #[test]
     fn serializes_exact_view_records() {
-        let pane = XlsWorksheetPaneOptions::split(1_200, 800, 7, 4, XlsPaneType::LowerRight).unwrap();
+        let pane =
+            XlsWorksheetPaneOptions::split(1_200, 800, 7, 4, XlsPaneType::LowerRight).unwrap();
         let options = XlsWorksheetViewOptions {
             show_formulas: true,
             show_gridlines: false,
@@ -308,7 +364,11 @@ mod tests {
             first_visible_row: 2,
             first_visible_column: 1,
             pane: Some(pane),
-            selections: vec![XlsWorksheetSelectionOptions::single_cell(XlsPaneType::LowerRight, 7, 4)],
+            selections: vec![XlsWorksheetSelectionOptions::single_cell(
+                XlsPaneType::LowerRight,
+                7,
+                4,
+            )],
             ..XlsWorksheetViewOptions::default()
         };
         let mut window = Vec::new();
@@ -319,10 +379,18 @@ mod tests {
         biff::write_selection_options(&mut selection, &options.selections[0]).unwrap();
         assert_eq!(
             window,
-            vec![0x3e, 0x02, 18, 0, 0x95, 0x06, 2, 0, 1, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+            vec![
+                0x3e, 0x02, 18, 0, 0x95, 0x06, 2, 0, 1, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ]
         );
-        assert_eq!(pane_bytes, vec![0x41, 0, 10, 0, 0xb0, 4, 0x20, 3, 7, 0, 4, 0, 0, 0]);
-        assert_eq!(selection, vec![0x1d, 0, 15, 0, 0, 7, 0, 4, 0, 0, 0, 1, 0, 7, 0, 7, 0, 4, 4]);
+        assert_eq!(
+            pane_bytes,
+            vec![0x41, 0, 10, 0, 0xb0, 4, 0x20, 3, 7, 0, 4, 0, 0, 0]
+        );
+        assert_eq!(
+            selection,
+            vec![0x1d, 0, 15, 0, 0, 7, 0, 4, 0, 0, 0, 1, 0, 7, 0, 7, 0, 4, 4]
+        );
     }
 
     #[test]

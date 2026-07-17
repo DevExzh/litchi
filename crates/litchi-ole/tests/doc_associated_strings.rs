@@ -18,9 +18,15 @@ fn apache_poi_associated_strings_integrate_and_round_trip_exactly() {
     let mut ole = OleFile::open(File::open(path).unwrap()).unwrap();
     let word_document = ole.open_stream(&["WordDocument"]).unwrap();
     let fib = FileInformationBlock::parse(&word_document).unwrap();
-    let table_name = if fib.which_table_stream() { "1Table" } else { "0Table" };
+    let table_name = if fib.which_table_stream() {
+        "1Table"
+    } else {
+        "0Table"
+    };
     let table_stream = ole.open_stream(&[table_name]).unwrap();
-    let parsed = DocumentAssociatedStrings::parse(&fib, &table_stream).unwrap().unwrap();
+    let parsed = DocumentAssociatedStrings::parse(&fib, &table_stream)
+        .unwrap()
+        .unwrap();
     let (offset, length) = fib.get_table_pointer(32).unwrap();
     let start = offset as usize;
     let end = start + length as usize;

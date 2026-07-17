@@ -755,12 +755,18 @@ fn write_escher_client_anchor<W: Write>(
 /// This initializes the Escher drawing container group for the workbook.
 pub fn write_mso_drawing_group<W: Write>(writer: &mut W, clusters: &[(u32, u32)]) -> XlsResult<()> {
     if clusters.is_empty() {
-        return Err(XlsError::InvalidData("MsoDrawingGroup requires at least one drawing cluster".to_string()));
+        return Err(XlsError::InvalidData(
+            "MsoDrawingGroup requires at least one drawing cluster".to_string(),
+        ));
     }
-    let fdgg_length = 16usize.checked_add(clusters.len() * 8).ok_or_else(|| XlsError::InvalidData("drawing group size overflows".to_string()))?;
+    let fdgg_length = 16usize
+        .checked_add(clusters.len() * 8)
+        .ok_or_else(|| XlsError::InvalidData("drawing group size overflows".to_string()))?;
     let container_length = fdgg_length + 66;
     if container_length > 8224 {
-        return Err(XlsError::InvalidData("MsoDrawingGroup exceeds 8224 bytes".to_string()));
+        return Err(XlsError::InvalidData(
+            "MsoDrawingGroup exceeds 8224 bytes".to_string(),
+        ));
     }
     write_record_header(writer, MSO_DRAWING_GROUP_RECORD_ID, container_length as u16)?;
     write_escher_record_header(
@@ -779,10 +785,20 @@ pub fn write_mso_drawing_group<W: Write>(writer: &mut W, clusters: &[(u32, u32)]
             data_size: fdgg_length as u32,
         },
     )?;
-    let spid_max = clusters.iter().map(|(drawing_id, used)| (drawing_id << 10) + used).max().unwrap();
+    let spid_max = clusters
+        .iter()
+        .map(|(drawing_id, used)| (drawing_id << 10) + used)
+        .max()
+        .unwrap();
     writer.write_all(&spid_max.to_le_bytes())?;
     writer.write_all(&(clusters.len() as u32 + 1).to_le_bytes())?;
-    writer.write_all(&clusters.iter().map(|(_, used)| *used).sum::<u32>().to_le_bytes())?;
+    writer.write_all(
+        &clusters
+            .iter()
+            .map(|(_, used)| *used)
+            .sum::<u32>()
+            .to_le_bytes(),
+    )?;
     writer.write_all(&(clusters.len() as u32).to_le_bytes())?;
     for &(drawing_group_id, used_shape_ids) in clusters {
         writer.write_all(&drawing_group_id.to_le_bytes())?;

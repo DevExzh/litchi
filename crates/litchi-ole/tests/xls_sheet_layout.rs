@@ -2,34 +2,39 @@ use std::fs::File;
 use std::io::Cursor;
 use std::path::PathBuf;
 
-use litchi_ole::xls::writer::{XlsWorksheetLayoutOptions, XlsWriter};
 use litchi_ole::xls::XlsWorkbook;
+use litchi_ole::xls::writer::{XlsWorksheetLayoutOptions, XlsWriter};
 
 #[test]
 fn worksheet_layout_round_trip() {
     let mut writer = XlsWriter::new();
     let sheet = writer.add_worksheet("Layout").unwrap();
-    writer.set_worksheet_layout(sheet, XlsWorksheetLayoutOptions {
-        default_row_height_twips: 360,
-        empty_rows_hidden: true,
-        default_row_height_unsynced: true,
-        thick_top_border: true,
-        thick_bottom_border: true,
-        default_column_width_chars: 12,
-        max_row_outline_level: 3,
-        max_column_outline_level: 2,
-        row_gutter_width: 53,
-        column_gutter_height: 41,
-        show_automatic_page_breaks: false,
-        apply_styles_to_outlines: true,
-        summary_rows_below: false,
-        summary_columns_right: false,
-        fit_to_page: true,
-        synchronize_horizontal_scrolling: true,
-        synchronize_vertical_scrolling: true,
-        alternate_expression_evaluation: true,
-        alternate_formula_entry: true,
-    }).unwrap();
+    writer
+        .set_worksheet_layout(
+            sheet,
+            XlsWorksheetLayoutOptions {
+                default_row_height_twips: 360,
+                empty_rows_hidden: true,
+                default_row_height_unsynced: true,
+                thick_top_border: true,
+                thick_bottom_border: true,
+                default_column_width_chars: 12,
+                max_row_outline_level: 3,
+                max_column_outline_level: 2,
+                row_gutter_width: 53,
+                column_gutter_height: 41,
+                show_automatic_page_breaks: false,
+                apply_styles_to_outlines: true,
+                summary_rows_below: false,
+                summary_columns_right: false,
+                fit_to_page: true,
+                synchronize_horizontal_scrolling: true,
+                synchronize_vertical_scrolling: true,
+                alternate_expression_evaluation: true,
+                alternate_formula_entry: true,
+            },
+        )
+        .unwrap();
 
     let mut bytes = Cursor::new(Vec::new());
     writer.write_to(&mut bytes).unwrap();
@@ -75,16 +80,37 @@ fn reads_poi_column_width_fixture_defaults() {
 fn writer_rejects_invalid_layout_bounds() {
     let mut writer = XlsWriter::new();
     let sheet = writer.add_worksheet("Layout").unwrap();
-    assert!(writer.set_worksheet_layout(sheet, XlsWorksheetLayoutOptions {
-        default_row_height_twips: 0,
-        ..XlsWorksheetLayoutOptions::default()
-    }).is_err());
-    assert!(writer.set_worksheet_layout(sheet, XlsWorksheetLayoutOptions {
-        default_column_width_chars: 256,
-        ..XlsWorksheetLayoutOptions::default()
-    }).is_err());
-    assert!(writer.set_worksheet_layout(sheet, XlsWorksheetLayoutOptions {
-        max_row_outline_level: 8,
-        ..XlsWorksheetLayoutOptions::default()
-    }).is_err());
+    assert!(
+        writer
+            .set_worksheet_layout(
+                sheet,
+                XlsWorksheetLayoutOptions {
+                    default_row_height_twips: 0,
+                    ..XlsWorksheetLayoutOptions::default()
+                }
+            )
+            .is_err()
+    );
+    assert!(
+        writer
+            .set_worksheet_layout(
+                sheet,
+                XlsWorksheetLayoutOptions {
+                    default_column_width_chars: 256,
+                    ..XlsWorksheetLayoutOptions::default()
+                }
+            )
+            .is_err()
+    );
+    assert!(
+        writer
+            .set_worksheet_layout(
+                sheet,
+                XlsWorksheetLayoutOptions {
+                    max_row_outline_level: 8,
+                    ..XlsWorksheetLayoutOptions::default()
+                }
+            )
+            .is_err()
+    );
 }

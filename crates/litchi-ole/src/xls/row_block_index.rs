@@ -17,7 +17,10 @@ const MAX_INDEX_PAYLOAD_LEN: usize = INDEX_FIXED_LEN + MAX_ROW_BLOCKS * 4;
 const MAX_DBCELL_PAYLOAD_LEN: usize = 4 + MAX_ROWS_PER_BLOCK * 2;
 
 fn invalid(record_type: u16, message: impl Into<String>) -> XlsError {
-    XlsError::InvalidRecord { record_type, message: message.into() }
+    XlsError::InvalidRecord {
+        record_type,
+        message: message.into(),
+    }
 }
 
 fn read_u16(data: &[u8], offset: usize, record_type: u16, field: &str) -> XlsResult<u16> {
@@ -56,46 +59,81 @@ impl XlsWorksheetIndexRecord {
         if !(INDEX_FIXED_LEN..=MAX_INDEX_PAYLOAD_LEN).contains(&data.len()) {
             return Err(invalid(
                 INDEX_RECORD_TYPE,
-                format!("INDEX payload must be 16..={MAX_INDEX_PAYLOAD_LEN} bytes, got {}", data.len()),
+                format!(
+                    "INDEX payload must be 16..={MAX_INDEX_PAYLOAD_LEN} bytes, got {}",
+                    data.len()
+                ),
             ));
         }
         if (data.len() - INDEX_FIXED_LEN) % 4 != 0 {
-            return Err(invalid(INDEX_RECORD_TYPE, "INDEX has a partial DBCell pointer"));
+            return Err(invalid(
+                INDEX_RECORD_TYPE,
+                "INDEX has a partial DBCell pointer",
+            ));
         }
         if read_u32(data, 0, INDEX_RECORD_TYPE, "INDEX.reserved")? != 0 {
-            return Err(invalid(INDEX_RECORD_TYPE, "INDEX reserved field must be zero"));
+            return Err(invalid(
+                INDEX_RECORD_TYPE,
+                "INDEX reserved field must be zero",
+            ));
         }
         let first_data_row = read_u32(data, 4, INDEX_RECORD_TYPE, "INDEX.rwMic")?;
         let last_data_row_exclusive = read_u32(data, 8, INDEX_RECORD_TYPE, "INDEX.rwMac")?;
         if first_data_row > 65_535 || last_data_row_exclusive > 65_536 {
-            return Err(invalid(INDEX_RECORD_TYPE, "INDEX row bounds exceed BIFF8 limits"));
+            return Err(invalid(
+                INDEX_RECORD_TYPE,
+                "INDEX row bounds exceed BIFF8 limits",
+            ));
         }
         if last_data_row_exclusive == 0 && first_data_row != 0 {
-            return Err(invalid(INDEX_RECORD_TYPE, "empty INDEX row bounds must both be zero"));
+            return Err(invalid(
+                INDEX_RECORD_TYPE,
+                "empty INDEX row bounds must both be zero",
+            ));
         }
         if last_data_row_exclusive != 0 && last_data_row_exclusive <= first_data_row {
-            return Err(invalid(INDEX_RECORD_TYPE, "INDEX.rwMac must be greater than rwMic"));
+            return Err(invalid(
+                INDEX_RECORD_TYPE,
+                "INDEX.rwMac must be greater than rwMic",
+            ));
         }
-        let default_column_width_position =
-            read_u32(data, 12, INDEX_RECORD_TYPE, "INDEX.ibXF")?;
+        let default_column_width_position = read_u32(data, 12, INDEX_RECORD_TYPE, "INDEX.ibXF")?;
         if u64::from(default_column_width_position) >= workbook_stream_len {
-            return Err(invalid(INDEX_RECORD_TYPE, "INDEX.ibXF is outside the workbook stream"));
+            return Err(invalid(
+                INDEX_RECORD_TYPE,
+                "INDEX.ibXF is outside the workbook stream",
+            ));
         }
         let count = (data.len() - INDEX_FIXED_LEN) / 4;
         if count > MAX_ROW_BLOCKS {
-            return Err(invalid(INDEX_RECORD_TYPE, "INDEX contains more than 2048 row blocks"));
+            return Err(invalid(
+                INDEX_RECORD_TYPE,
+                "INDEX contains more than 2048 row blocks",
+            ));
         }
         if last_data_row_exclusive == 0 && count != 0 {
-            return Err(invalid(INDEX_RECORD_TYPE, "empty INDEX must not reference DBCELL records"));
+            return Err(invalid(
+                INDEX_RECORD_TYPE,
+                "empty INDEX must not reference DBCELL records",
+            ));
         }
         let mut dbcell_positions = Vec::with_capacity(count);
         for offset in (INDEX_FIXED_LEN..data.len()).step_by(4) {
             let position = read_u32(data, offset, INDEX_RECORD_TYPE, "INDEX.rgibRw")?;
             if u64::from(position) >= workbook_stream_len {
-                return Err(invalid(INDEX_RECORD_TYPE, "INDEX DBCell pointer is outside the workbook stream"));
+                return Err(invalid(
+                    INDEX_RECORD_TYPE,
+                    "INDEX DBCell pointer is outside the workbook stream",
+                ));
             }
-            if dbcell_positions.last().is_some_and(|previous| position <= *previous) {
-                return Err(invalid(INDEX_RECORD_TYPE, "INDEX DBCell pointers must be strictly increasing"));
+            if dbcell_positions
+                .last()
+                .is_some_and(|previous| position <= *previous)
+            {
+                return Err(invalid(
+                    INDEX_RECORD_TYPE,
+                    "INDEX DBCell pointers must be strictly increasing",
+                ));
             }
             dbcell_positions.push(position);
         }
@@ -107,12 +145,18 @@ impl XlsWorksheetIndexRecord {
         })
     }
 
-    pub fn first_data_row(&self) -> u32 { self.first_data_row }
-    pub fn last_data_row_exclusive(&self) -> u32 { self.last_data_row_exclusive }
+    pub fn first_data_row(&self) -> u32 {
+        self.first_data_row
+    }
+    pub fn last_data_row_exclusive(&self) -> u32 {
+        self.last_data_row_exclusive
+    }
     pub fn default_column_width_position(&self) -> u32 {
         self.default_column_width_position
     }
-    pub fn dbcell_positions(&self) -> &[u32] { &self.dbcell_positions }
+    pub fn dbcell_positions(&self) -> &[u32] {
+        &self.dbcell_positions
+    }
 
     fn to_payload(&self) -> Vec<u8> {
         let mut data = Vec::with_capacity(INDEX_FIXED_LEN + self.dbcell_positions.len() * 4);
@@ -144,47 +188,75 @@ impl XlsDbCellRecord {
         if !(4..=MAX_DBCELL_PAYLOAD_LEN).contains(&data.len()) {
             return Err(invalid(
                 DBCELL_RECORD_TYPE,
-                format!("DBCELL payload must be 4..={MAX_DBCELL_PAYLOAD_LEN} bytes, got {}", data.len()),
+                format!(
+                    "DBCELL payload must be 4..={MAX_DBCELL_PAYLOAD_LEN} bytes, got {}",
+                    data.len()
+                ),
             ));
         }
         if (data.len() - 4) % 2 != 0 {
-            return Err(invalid(DBCELL_RECORD_TYPE, "DBCELL has a partial rgdb offset"));
+            return Err(invalid(
+                DBCELL_RECORD_TYPE,
+                "DBCELL has a partial rgdb offset",
+            ));
         }
         if u64::from(record_position) >= workbook_stream_len {
-            return Err(invalid(DBCELL_RECORD_TYPE, "DBCELL position is outside the workbook stream"));
+            return Err(invalid(
+                DBCELL_RECORD_TYPE,
+                "DBCELL position is outside the workbook stream",
+            ));
         }
         let row_offset = read_u32(data, 0, DBCELL_RECORD_TYPE, "DBCELL.dbRtrw")?;
         let first_row_position = if row_offset == 0 {
             None
         } else {
             Some(record_position.checked_sub(row_offset).ok_or_else(|| {
-                invalid(DBCELL_RECORD_TYPE, "DBCELL.dbRtrw underflows the workbook stream")
+                invalid(
+                    DBCELL_RECORD_TYPE,
+                    "DBCELL.dbRtrw underflows the workbook stream",
+                )
             })?)
         };
         let mut cell_offsets = Vec::with_capacity((data.len() - 4) / 2);
         for offset in (4..data.len()).step_by(2) {
             cell_offsets.push(read_u16(data, offset, DBCELL_RECORD_TYPE, "DBCELL.rgdb")?);
         }
-        Ok(Self { record_position, first_row_position, cell_offsets })
+        Ok(Self {
+            record_position,
+            first_row_position,
+            cell_offsets,
+        })
     }
 
-    pub fn record_position(&self) -> u32 { self.record_position }
-    pub fn first_row_position(&self) -> Option<u32> { self.first_row_position }
-    pub fn cell_offsets(&self) -> &[u16] { &self.cell_offsets }
+    pub fn record_position(&self) -> u32 {
+        self.record_position
+    }
+    pub fn first_row_position(&self) -> Option<u32> {
+        self.first_row_position
+    }
+    pub fn cell_offsets(&self) -> &[u16] {
+        &self.cell_offsets
+    }
 
     /// Resolve the chained `rgdb` offsets from the end of the first ROW record.
     pub fn resolve_cell_positions(&self, first_row_end_position: u32) -> XlsResult<Vec<u32>> {
         if !self.cell_offsets.is_empty() && self.first_row_position.is_none() {
-            return Err(invalid(DBCELL_RECORD_TYPE, "DBCELL has cell offsets but dbRtrw is zero"));
+            return Err(invalid(
+                DBCELL_RECORD_TYPE,
+                "DBCELL has cell offsets but dbRtrw is zero",
+            ));
         }
         let mut positions = Vec::with_capacity(self.cell_offsets.len());
         let mut base = first_row_end_position;
         for offset in &self.cell_offsets {
-            let position = base.checked_add(u32::from(*offset)).ok_or_else(|| {
-                invalid(DBCELL_RECORD_TYPE, "DBCELL cell offset overflows")
-            })?;
+            let position = base
+                .checked_add(u32::from(*offset))
+                .ok_or_else(|| invalid(DBCELL_RECORD_TYPE, "DBCELL cell offset overflows"))?;
             if position >= self.record_position {
-                return Err(invalid(DBCELL_RECORD_TYPE, "DBCELL cell pointer does not precede DBCELL"));
+                return Err(invalid(
+                    DBCELL_RECORD_TYPE,
+                    "DBCELL cell pointer does not precede DBCELL",
+                ));
             }
             positions.push(position);
             base = position;
@@ -193,7 +265,8 @@ impl XlsDbCellRecord {
     }
 
     fn to_payload(&self) -> Vec<u8> {
-        let row_offset = self.first_row_position
+        let row_offset = self
+            .first_row_position
             .map(|position| self.record_position - position)
             .unwrap_or(0);
         let mut data = Vec::with_capacity(4 + self.cell_offsets.len() * 2);
@@ -214,9 +287,15 @@ pub struct XlsIndexedRow {
 }
 
 impl XlsIndexedRow {
-    pub fn row(self) -> u16 { self.row }
-    pub fn row_record_position(self) -> u32 { self.row_record_position }
-    pub fn first_cell_position(self) -> u32 { self.first_cell_position }
+    pub fn row(self) -> u16 {
+        self.row
+    }
+    pub fn row_record_position(self) -> u32 {
+        self.row_record_position
+    }
+    pub fn first_cell_position(self) -> u32 {
+        self.first_cell_position
+    }
 }
 
 /// One validated row block and its `DBCELL` pointer chain.
@@ -229,10 +308,18 @@ pub struct XlsRowBlock {
 }
 
 impl XlsRowBlock {
-    pub fn first_row(&self) -> u16 { self.first_row }
-    pub fn last_row(&self) -> u16 { self.last_row }
-    pub fn dbcell(&self) -> &XlsDbCellRecord { &self.dbcell }
-    pub fn indexed_rows(&self) -> &[XlsIndexedRow] { &self.indexed_rows }
+    pub fn first_row(&self) -> u16 {
+        self.first_row
+    }
+    pub fn last_row(&self) -> u16 {
+        self.last_row
+    }
+    pub fn dbcell(&self) -> &XlsDbCellRecord {
+        &self.dbcell
+    }
+    pub fn indexed_rows(&self) -> &[XlsIndexedRow] {
+        &self.indexed_rows
+    }
 
     /// Reproduce this cross-validated `DBCELL` record at its original position.
     pub fn to_record_bytes(&self) -> XlsResult<Vec<u8>> {
@@ -249,13 +336,21 @@ pub struct XlsRowBlockIndex {
 }
 
 impl XlsRowBlockIndex {
-    pub fn index_record_position(&self) -> u32 { self.index_record_position }
-    pub fn index_record(&self) -> &XlsWorksheetIndexRecord { &self.index }
-    pub fn blocks(&self) -> &[XlsRowBlock] { &self.blocks }
+    pub fn index_record_position(&self) -> u32 {
+        self.index_record_position
+    }
+    pub fn index_record(&self) -> &XlsWorksheetIndexRecord {
+        &self.index
+    }
+    pub fn blocks(&self) -> &[XlsRowBlock] {
+        &self.blocks
+    }
 
     pub fn block_for_row(&self, row: u32) -> Option<&XlsRowBlock> {
         let row = u16::try_from(row).ok()?;
-        self.blocks.iter().find(|block| block.first_row <= row && row <= block.last_row)
+        self.blocks
+            .iter()
+            .find(|block| block.first_row <= row && row <= block.last_row)
     }
 
     pub fn first_cell_position(&self, row: u32) -> Option<u32> {
@@ -305,17 +400,15 @@ impl RowBlockIndexCollector {
             pending_first_cells: BTreeMap::new(),
             blocks: Vec::new(),
             error: start.is_none().then(|| {
-                invalid(INDEX_RECORD_TYPE, "worksheet start exceeds BIFF FilePointer range")
+                invalid(
+                    INDEX_RECORD_TYPE,
+                    "worksheet start exceeds BIFF FilePointer range",
+                )
             }),
         }
     }
 
-    pub(crate) fn feed_record(
-        &mut self,
-        record_position: u64,
-        record_type: u16,
-        data: &[u8],
-    ) {
+    pub(crate) fn feed_record(&mut self, record_position: u64, record_type: u16, data: &[u8]) {
         if self.error.is_some() {
             return;
         }
@@ -331,7 +424,10 @@ impl RowBlockIndexCollector {
         data: &[u8],
     ) -> XlsResult<()> {
         let position = u32::try_from(record_position).map_err(|_| {
-            invalid(record_type, "record position exceeds BIFF FilePointer range")
+            invalid(
+                record_type,
+                "record position exceeds BIFF FilePointer range",
+            )
         })?;
         match record_type {
             BOF_RECORD_TYPE => self.sheet_start = Some(position),
@@ -352,20 +448,38 @@ impl RowBlockIndexCollector {
             DEF_COL_WIDTH_RECORD_TYPE => self.default_column_width_positions.push(position),
             ROW_RECORD_TYPE => {
                 if data.len() != 16 {
-                    return Err(invalid(record_type, "ROW payload must be exactly 16 bytes for index validation"));
+                    return Err(invalid(
+                        record_type,
+                        "ROW payload must be exactly 16 bytes for index validation",
+                    ));
                 }
                 let row = read_u16(data, 0, record_type, "ROW.rw")?;
-                if self.pending_rows.last().is_some_and(|previous| row <= previous.row) {
-                    return Err(invalid(record_type, "ROW records in a row block must be strictly ordered"));
+                if self
+                    .pending_rows
+                    .last()
+                    .is_some_and(|previous| row <= previous.row)
+                {
+                    return Err(invalid(
+                        record_type,
+                        "ROW records in a row block must be strictly ordered",
+                    ));
                 }
-                let end_position = position.checked_add(20)
+                let end_position = position
+                    .checked_add(20)
                     .ok_or_else(|| invalid(record_type, "ROW end position overflows"))?;
-                self.pending_rows.push(ObservedRow { row, position, end_position });
+                self.pending_rows.push(ObservedRow {
+                    row,
+                    position,
+                    end_position,
+                });
             },
             DBCELL_RECORD_TYPE => self.finish_block(position, data)?,
             _ if is_cell_record(record_type) => {
                 if data.len() < 2 {
-                    return Err(invalid(record_type, "cell record is truncated before row index"));
+                    return Err(invalid(
+                        record_type,
+                        "cell record is truncated before row index",
+                    ));
                 }
                 let row = read_u16(data, 0, record_type, "cell row")?;
                 self.pending_first_cells.entry(row).or_insert(position);
@@ -383,10 +497,16 @@ impl RowBlockIndexCollector {
                 || !dbcell.cell_offsets.is_empty()
                 || !self.pending_first_cells.is_empty()
             {
-                return Err(invalid(DBCELL_RECORD_TYPE, "DBCELL has no preceding ROW records"));
+                return Err(invalid(
+                    DBCELL_RECORD_TYPE,
+                    "DBCELL has no preceding ROW records",
+                ));
             }
             let (_, index) = self.index.as_ref().ok_or_else(|| {
-                invalid(DBCELL_RECORD_TYPE, "empty DBCELL block has no worksheet INDEX")
+                invalid(
+                    DBCELL_RECORD_TYPE,
+                    "empty DBCELL block has no worksheet INDEX",
+                )
             })?;
             let block_offset = u32::try_from(self.blocks.len())
                 .ok()
@@ -401,14 +521,23 @@ impl RowBlockIndexCollector {
                 .map(|value| value.min(index.last_data_row_exclusive()))
                 .ok_or_else(|| invalid(DBCELL_RECORD_TYPE, "empty DBCELL block range overflow"))?;
             if first_row >= last_row_exclusive {
-                return Err(invalid(DBCELL_RECORD_TYPE, "empty DBCELL lies outside INDEX row bounds"));
+                return Err(invalid(
+                    DBCELL_RECORD_TYPE,
+                    "empty DBCELL lies outside INDEX row bounds",
+                ));
             }
             self.blocks.push(XlsRowBlock {
                 first_row: u16::try_from(first_row).map_err(|_| {
-                    invalid(DBCELL_RECORD_TYPE, "empty DBCELL first row exceeds BIFF8 limit")
+                    invalid(
+                        DBCELL_RECORD_TYPE,
+                        "empty DBCELL first row exceeds BIFF8 limit",
+                    )
                 })?,
                 last_row: u16::try_from(last_row_exclusive - 1).map_err(|_| {
-                    invalid(DBCELL_RECORD_TYPE, "empty DBCELL last row exceeds BIFF8 limit")
+                    invalid(
+                        DBCELL_RECORD_TYPE,
+                        "empty DBCELL last row exceeds BIFF8 limit",
+                    )
                 })?,
                 dbcell,
                 indexed_rows: Vec::new(),
@@ -416,39 +545,69 @@ impl RowBlockIndexCollector {
             return Ok(());
         }
         if self.pending_rows.len() > MAX_ROWS_PER_BLOCK {
-            return Err(invalid(DBCELL_RECORD_TYPE, "DBCELL row block exceeds 32 rows"));
+            return Err(invalid(
+                DBCELL_RECORD_TYPE,
+                "DBCELL row block exceeds 32 rows",
+            ));
         }
-        let row_positions = self.pending_rows.iter()
+        let row_positions = self
+            .pending_rows
+            .iter()
             .map(|row| (row.row, row.position))
             .collect::<BTreeMap<_, _>>();
         for row in self.pending_first_cells.keys() {
             if !row_positions.contains_key(row) {
-                return Err(invalid(DBCELL_RECORD_TYPE, "DBCELL cell row has no ROW record in its block"));
+                return Err(invalid(
+                    DBCELL_RECORD_TYPE,
+                    "DBCELL cell row has no ROW record in its block",
+                ));
             }
         }
 
-        let expected_cells = self.pending_rows.iter()
-            .filter_map(|row| self.pending_first_cells.get(&row.row).map(|position| (row, *position)))
+        let expected_cells = self
+            .pending_rows
+            .iter()
+            .filter_map(|row| {
+                self.pending_first_cells
+                    .get(&row.row)
+                    .map(|position| (row, *position))
+            })
             .collect::<Vec<_>>();
         if expected_cells.is_empty() {
             if dbcell.first_row_position.is_some() || !dbcell.cell_offsets.is_empty() {
-                return Err(invalid(DBCELL_RECORD_TYPE, "empty DBCELL block must have zero dbRtrw and no rgdb"));
+                return Err(invalid(
+                    DBCELL_RECORD_TYPE,
+                    "empty DBCELL block must have zero dbRtrw and no rgdb",
+                ));
             }
         } else {
             if dbcell.first_row_position != Some(self.pending_rows[0].position) {
-                return Err(invalid(DBCELL_RECORD_TYPE, "DBCELL.dbRtrw does not reference the first ROW record"));
+                return Err(invalid(
+                    DBCELL_RECORD_TYPE,
+                    "DBCELL.dbRtrw does not reference the first ROW record",
+                ));
             }
             if dbcell.cell_offsets.len() != expected_cells.len() {
-                return Err(invalid(DBCELL_RECORD_TYPE, "DBCELL rgdb count does not match rows containing cells"));
+                return Err(invalid(
+                    DBCELL_RECORD_TYPE,
+                    "DBCELL rgdb count does not match rows containing cells",
+                ));
             }
             let resolved = dbcell.resolve_cell_positions(self.pending_rows[0].end_position)?;
-            let expected_positions = expected_cells.iter().map(|(_, position)| *position).collect::<Vec<_>>();
+            let expected_positions = expected_cells
+                .iter()
+                .map(|(_, position)| *position)
+                .collect::<Vec<_>>();
             if resolved != expected_positions {
-                return Err(invalid(DBCELL_RECORD_TYPE, "DBCELL chained cell offsets do not match record boundaries"));
+                return Err(invalid(
+                    DBCELL_RECORD_TYPE,
+                    "DBCELL chained cell offsets do not match record boundaries",
+                ));
             }
         }
 
-        let indexed_rows = expected_cells.iter()
+        let indexed_rows = expected_cells
+            .iter()
             .map(|(row, first_cell_position)| XlsIndexedRow {
                 row: row.row,
                 row_record_position: row.position,
@@ -474,45 +633,84 @@ impl RowBlockIndexCollector {
             if self.blocks.is_empty() {
                 return Ok(None);
             }
-            return Err(invalid(DBCELL_RECORD_TYPE, "DBCELL records exist without worksheet INDEX"));
+            return Err(invalid(
+                DBCELL_RECORD_TYPE,
+                "DBCELL records exist without worksheet INDEX",
+            ));
         };
         if !self.pending_rows.is_empty() || !self.pending_first_cells.is_empty() {
-            return Err(invalid(INDEX_RECORD_TYPE, "INDEX row table ends without a DBCELL record"));
+            return Err(invalid(
+                INDEX_RECORD_TYPE,
+                "INDEX row table ends without a DBCELL record",
+            ));
         }
-        let sheet_start = self.sheet_start
+        let sheet_start = self
+            .sheet_start
             .ok_or_else(|| invalid(INDEX_RECORD_TYPE, "worksheet INDEX has no BOF boundary"))?;
-        let sheet_end = self.sheet_end
+        let sheet_end = self
+            .sheet_end
             .ok_or_else(|| invalid(INDEX_RECORD_TYPE, "worksheet INDEX has no EOF boundary"))?;
         if !(sheet_start..sheet_end).contains(&index_record_position) {
-            return Err(invalid(INDEX_RECORD_TYPE, "INDEX record is outside worksheet bounds"));
+            return Err(invalid(
+                INDEX_RECORD_TYPE,
+                "INDEX record is outside worksheet bounds",
+            ));
         }
-        if !self.default_column_width_positions.contains(&index.default_column_width_position) {
-            return Err(invalid(INDEX_RECORD_TYPE, "INDEX.ibXF does not reference DEFCOLWIDTH"));
+        if !self
+            .default_column_width_positions
+            .contains(&index.default_column_width_position)
+        {
+            return Err(invalid(
+                INDEX_RECORD_TYPE,
+                "INDEX.ibXF does not reference DEFCOLWIDTH",
+            ));
         }
-        let actual_dbcell_positions = self.blocks.iter()
+        let actual_dbcell_positions = self
+            .blocks
+            .iter()
             .map(|block| block.dbcell.record_position)
             .collect::<Vec<_>>();
         if index.dbcell_positions != actual_dbcell_positions {
-            return Err(invalid(INDEX_RECORD_TYPE, "INDEX DBCell pointers do not match observed DBCELL records"));
+            return Err(invalid(
+                INDEX_RECORD_TYPE,
+                "INDEX DBCell pointers do not match observed DBCELL records",
+            ));
         }
-        if actual_dbcell_positions.iter().any(|position| !(*position >= sheet_start && *position < sheet_end)) {
-            return Err(invalid(INDEX_RECORD_TYPE, "INDEX DBCell pointer is outside worksheet bounds"));
+        if actual_dbcell_positions
+            .iter()
+            .any(|position| !(*position >= sheet_start && *position < sheet_end))
+        {
+            return Err(invalid(
+                INDEX_RECORD_TYPE,
+                "INDEX DBCell pointer is outside worksheet bounds",
+            ));
         }
 
-        let first_data_row = self.blocks.iter()
+        let first_data_row = self
+            .blocks
+            .iter()
             .flat_map(|block| block.indexed_rows.iter())
             .map(|row| u32::from(row.row))
             .min();
-        let last_data_row = self.blocks.iter()
+        let last_data_row = self
+            .blocks
+            .iter()
             .flat_map(|block| block.indexed_rows.iter())
             .map(|row| u32::from(row.row))
             .max();
         if let (Some(first), Some(last)) = (first_data_row, last_data_row) {
             if (index.first_data_row, index.last_data_row_exclusive) != (first, last + 1) {
-                return Err(invalid(INDEX_RECORD_TYPE, "INDEX row bounds do not match indexed cell rows"));
+                return Err(invalid(
+                    INDEX_RECORD_TYPE,
+                    "INDEX row bounds do not match indexed cell rows",
+                ));
             }
         }
-        Ok(Some(XlsRowBlockIndex { index_record_position, index, blocks: self.blocks }))
+        Ok(Some(XlsRowBlockIndex {
+            index_record_position,
+            index,
+            blocks: self.blocks,
+        }))
     }
 }
 
@@ -540,9 +738,7 @@ mod tests {
         0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0x66, 0x06, 0, 0, 0xA0, 0x06, 0, 0,
     ];
     const SIMPLE_DBCELL: [u8; 6] = [0x22, 0, 0, 0, 0, 0];
-    const SIMPLE_ROW: [u8; 16] = [
-        0, 0, 0, 0, 1, 0, 0xFF, 0, 0, 0, 0, 0, 0, 1, 0x0F, 0,
-    ];
+    const SIMPLE_ROW: [u8; 16] = [0, 0, 0, 0, 1, 0, 0xFF, 0, 0, 0, 0, 0, 0, 1, 0x0F, 0];
     const SIMPLE_LABEL_SST: [u8; 10] = [0, 0, 0, 0, 0x0F, 0, 0, 0, 0, 0];
 
     fn simple_collector() -> RowBlockIndexCollector {
@@ -560,7 +756,10 @@ mod tests {
     #[test]
     fn parses_resolves_and_round_trips_poi_simple_reference() {
         let index = XlsWorksheetIndexRecord::parse_payload(&SIMPLE_INDEX, 2_500).unwrap();
-        assert_eq!((index.first_data_row(), index.last_data_row_exclusive()), (0, 1));
+        assert_eq!(
+            (index.first_data_row(), index.last_data_row_exclusive()),
+            (0, 1)
+        );
         assert_eq!(index.default_column_width_position(), 1_638);
         assert_eq!(index.dbcell_positions(), &[1_696]);
         let dbcell = XlsDbCellRecord::parse_payload(1_696, 2_500, &SIMPLE_DBCELL).unwrap();
@@ -570,10 +769,23 @@ mod tests {
         let aggregate = simple_collector().finish().unwrap().unwrap();
         assert_eq!(aggregate.index_record_position(), 1_470);
         assert_eq!(aggregate.blocks().len(), 1);
-        assert_eq!(aggregate.block_for_row(0).unwrap().dbcell().record_position(), 1_696);
+        assert_eq!(
+            aggregate
+                .block_for_row(0)
+                .unwrap()
+                .dbcell()
+                .record_position(),
+            1_696
+        );
         assert_eq!(aggregate.first_cell_position(0), Some(1_682));
-        assert_eq!(&aggregate.to_index_record_bytes().unwrap()[4..], &SIMPLE_INDEX);
-        assert_eq!(&aggregate.blocks()[0].to_record_bytes().unwrap()[4..], &SIMPLE_DBCELL);
+        assert_eq!(
+            &aggregate.to_index_record_bytes().unwrap()[4..],
+            &SIMPLE_INDEX
+        );
+        assert_eq!(
+            &aggregate.blocks()[0].to_record_bytes().unwrap()[4..],
+            &SIMPLE_DBCELL
+        );
     }
 
     #[test]
@@ -602,7 +814,12 @@ mod tests {
         collector.index.as_mut().unwrap().1.dbcell_positions[0] = 1_697;
         assert!(collector.finish().is_err());
         let mut collector = simple_collector();
-        collector.index.as_mut().unwrap().1.default_column_width_position = 1_639;
+        collector
+            .index
+            .as_mut()
+            .unwrap()
+            .1
+            .default_column_width_position = 1_639;
         assert!(collector.finish().is_err());
         let mut collector = RowBlockIndexCollector::new(2_500, 1_450);
         collector.feed_record(1_450, BOF_RECORD_TYPE, &[0; 16]);

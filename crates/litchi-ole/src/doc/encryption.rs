@@ -4,9 +4,8 @@ use super::package::{DocEncryptionKind, DocError, Result};
 use super::parts::fib::FileInformationBlock;
 use crate::office_crypto::cryptoapi::{self, CryptoApiContext, CryptoApiError};
 use encoding_rs::{
-    BIG5, EUC_KR, Encoding, GBK, SHIFT_JIS, WINDOWS_874, WINDOWS_1250, WINDOWS_1251,
-    WINDOWS_1252, WINDOWS_1253, WINDOWS_1254, WINDOWS_1255, WINDOWS_1256, WINDOWS_1257,
-    WINDOWS_1258,
+    BIG5, EUC_KR, Encoding, GBK, SHIFT_JIS, WINDOWS_874, WINDOWS_1250, WINDOWS_1251, WINDOWS_1252,
+    WINDOWS_1253, WINDOWS_1254, WINDOWS_1255, WINDOWS_1256, WINDOWS_1257, WINDOWS_1258,
 };
 use md5::{Digest, Md5};
 use rc4::{KeyInit, Rc4, StreamCipher};
@@ -18,13 +17,12 @@ const BINARY_RC4_HEADER_LEN: usize = 52;
 const BINARY_RC4_BLOCK_SIZE: usize = 512;
 
 const XOR_INITIAL_CODE: [u16; 15] = [
-    0xe1f0, 0x1d0f, 0xcc9c, 0x84c0, 0x110c, 0x0e10, 0xf1ce, 0x313e, 0x1872, 0xe139,
-    0xd40f, 0x84f9, 0x280c, 0xa96a, 0x4ec3,
+    0xe1f0, 0x1d0f, 0xcc9c, 0x84c0, 0x110c, 0x0e10, 0xf1ce, 0x313e, 0x1872, 0xe139, 0xd40f, 0x84f9,
+    0x280c, 0xa96a, 0x4ec3,
 ];
 
 const XOR_PAD_ARRAY: [u8; 16] = [
-    0xbb, 0xff, 0xff, 0xba, 0xff, 0xff, 0xb9, 0x80, 0x00, 0xbe, 0x0f, 0x00, 0xbf, 0x0f,
-    0x00, 0x00,
+    0xbb, 0xff, 0xff, 0xba, 0xff, 0xff, 0xb9, 0x80, 0x00, 0xbe, 0x0f, 0x00, 0xbf, 0x0f, 0x00, 0x00,
 ];
 
 const XOR_MATRIX: [[u16; 7]; 15] = [
@@ -70,12 +68,9 @@ pub(super) fn decrypt_document_streams(
             )));
         }
         let password = password.ok_or(DocError::PasswordRequired)?;
-        let context = verify_xor_password(
-            fib.xor_obfuscation_verifier(),
-            password,
-            fib.language_id(),
-        )
-        .ok_or(DocError::InvalidPassword)?;
+        let context =
+            verify_xor_password(fib.xor_obfuscation_verifier(), password, fib.language_id())
+                .ok_or(DocError::InvalidPassword)?;
         apply_xor_stream(&mut word_document[FIB_BASE_LEN..], FIB_BASE_LEN, &context)?;
         apply_xor_stream(table_stream, 0, &context)?;
         if let Some(data_stream) = data_stream {
@@ -213,9 +208,7 @@ fn ansi_encoding_for_lcid(language_id: u16) -> &'static Encoding {
     let primary = language_id & 0x03ff;
     match primary {
         0x01 | 0x20 | 0x29 => WINDOWS_1256,
-        0x02 | 0x19 | 0x22 | 0x23 | 0x28 | 0x2f | 0x3f | 0x40 | 0x44 | 0x50 => {
-            WINDOWS_1251
-        },
+        0x02 | 0x19 | 0x22 | 0x23 | 0x28 | 0x2f | 0x3f | 0x40 | 0x44 | 0x50 => WINDOWS_1251,
         0x04 => match language_id {
             0x0804 | 0x1004 => GBK,
             _ => BIG5,
@@ -293,9 +286,9 @@ fn create_word_xor_array(password: &[u8]) -> [u8; 16] {
 
 fn apply_xor_stream(data: &mut [u8], absolute_offset: usize, context: &XorContext) -> Result<()> {
     for (index, byte) in data.iter_mut().enumerate() {
-        let absolute = absolute_offset.checked_add(index).ok_or_else(|| {
-            DocError::Corrupted("DOC XOR stream offset overflow".to_string())
-        })?;
+        let absolute = absolute_offset
+            .checked_add(index)
+            .ok_or_else(|| DocError::Corrupted("DOC XOR stream offset overflow".to_string()))?;
         let transformed = *byte ^ context.array[absolute & 0x0f];
         if *byte != 0 && transformed != 0 {
             *byte = transformed;
@@ -329,13 +322,8 @@ fn apply_cryptoapi_stream(
         let count = data
             .len()
             .min(BINARY_RC4_BLOCK_SIZE.saturating_sub(block_offset));
-        cryptoapi::apply_block_cipher_at_offset(
-            context,
-            block,
-            block_offset,
-            &mut data[..count],
-        )
-        .map_err(map_crypto_error)?;
+        cryptoapi::apply_block_cipher_at_offset(context, block, block_offset, &mut data[..count])
+            .map_err(map_crypto_error)?;
         absolute_offset += count;
         data = &mut data[count..];
     }
@@ -369,10 +357,7 @@ fn derive_block_key(secret: &[u8; 5], block: u32) -> Zeroizing<[u8; 16]> {
     Zeroizing::new(<[u8; 16]>::from(Md5::digest(input.as_slice())))
 }
 
-fn verify_password(
-    header: &BinaryRc4Header,
-    password: &str,
-) -> Result<Option<Zeroizing<[u8; 5]>>> {
+fn verify_password(header: &BinaryRc4Header, password: &str) -> Result<Option<Zeroizing<[u8; 5]>>> {
     let secret = derive_secret(password, &header.salt);
     let key = derive_block_key(&secret, 0);
     let mut cipher = Rc4::new_from_slice(key.as_ref()).map_err(|_| {
@@ -440,8 +425,8 @@ mod tests {
         assert_eq!(
             create_word_xor_array(&password),
             [
-                0x95, 0x99, 0x94, 0x75, 0xda, 0x57, 0x78, 0x57, 0xda, 0x74, 0x65,
-                0xa8, 0x7a, 0x2f, 0x25, 0x77,
+                0x95, 0x99, 0x94, 0x75, 0xda, 0x57, 0x78, 0x57, 0xda, 0x74, 0x65, 0xa8, 0x7a, 0x2f,
+                0x25, 0x77,
             ]
         );
 
@@ -481,27 +466,15 @@ mod tests {
         assert_eq!(table, encrypted_table);
         assert_eq!(data, encrypted_data);
         assert!(matches!(
-            decrypt_document_streams(
-                &fib,
-                &mut word,
-                &mut table,
-                Some(&mut data),
-                Some("wrong"),
-            ),
+            decrypt_document_streams(&fib, &mut word, &mut table, Some(&mut data), Some("wrong"),),
             Err(DocError::InvalidPassword)
         ));
         assert_eq!(word, encrypted_word);
         assert_eq!(table, encrypted_table);
         assert_eq!(data, encrypted_data);
 
-        decrypt_document_streams(
-            &fib,
-            &mut word,
-            &mut table,
-            Some(&mut data),
-            Some("abc"),
-        )
-        .unwrap();
+        decrypt_document_streams(&fib, &mut word, &mut table, Some(&mut data), Some("abc"))
+            .unwrap();
         assert_eq!(word, original_word);
         assert_eq!(table, original_table);
         assert_eq!(data, original_data);
@@ -510,8 +483,14 @@ mod tests {
 
     #[test]
     fn xor_accepts_lcid_ansi_password_conversion_and_truncates_to_fifteen_bytes() {
-        assert_eq!(xor_password_bytes("abcdefghijklmnop").as_slice(), b"abcdefghijklmno");
-        assert_eq!(ansi_password_bytes("abcdefghijklmnop", 0x0409).as_slice(), b"abcdefghijklmno");
+        assert_eq!(
+            xor_password_bytes("abcdefghijklmnop").as_slice(),
+            b"abcdefghijklmno"
+        );
+        assert_eq!(
+            ansi_password_bytes("abcdefghijklmnop", 0x0409).as_slice(),
+            b"abcdefghijklmno"
+        );
         assert_eq!(xor_password_bytes("€").as_slice(), &[0xac]);
         let ansi = ansi_password_bytes("€", 0x0409);
         assert_eq!(ansi.as_slice(), &[0x80]);
@@ -534,8 +513,8 @@ mod tests {
     #[test]
     fn binary_rc4_secret_matches_apache_poi_vector() {
         let salt = [
-            0x17, 0xf6, 0xd1, 0x6b, 0x09, 0xb1, 0x5f, 0x7b, 0x4c, 0x9d, 0x03, 0xb4,
-            0x81, 0xb5, 0xb4, 0x4a,
+            0x17, 0xf6, 0xd1, 0x6b, 0x09, 0xb1, 0x5f, 0x7b, 0x4c, 0x9d, 0x03, 0xb4, 0x81, 0xb5,
+            0xb4, 0x4a,
         ];
         assert_eq!(
             derive_secret("MoneyForNothing", &salt).as_ref(),

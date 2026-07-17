@@ -33,20 +33,17 @@ impl ListNamesTable {
     }
 
     /// Parse the optional FIB index-91 table range.
-    pub fn parse(
-        fib: &FileInformationBlock,
-        table_stream: &[u8],
-    ) -> Result<Option<Self>> {
+    pub fn parse(fib: &FileInformationBlock, table_stream: &[u8]) -> Result<Option<Self>> {
         let Some((offset, length)) = fib.get_table_pointer(FIB_INDEX) else {
             return Ok(None);
         };
         if length == 0 {
             return Ok(None);
         }
-        let start = usize::try_from(offset)
-            .map_err(|_| corrupted("SttbListNames offset is too large"))?;
-        let length = usize::try_from(length)
-            .map_err(|_| corrupted("SttbListNames length is too large"))?;
+        let start =
+            usize::try_from(offset).map_err(|_| corrupted("SttbListNames offset is too large"))?;
+        let length =
+            usize::try_from(length).map_err(|_| corrupted("SttbListNames length is too large"))?;
         if length > MAX_TABLE_BYTES {
             return Err(corrupted(
                 "SttbListNames exceeds its specification-derived size cap",
@@ -98,9 +95,9 @@ impl ListNamesTable {
             let end = offset
                 .checked_add(byte_count)
                 .ok_or_else(|| corrupted("SttbListNames string range overflows"))?;
-            let bytes = data.get(offset..end).ok_or_else(|| {
-                corrupted(format!("SttbListNames string {index} is truncated"))
-            })?;
+            let bytes = data
+                .get(offset..end)
+                .ok_or_else(|| corrupted(format!("SttbListNames string {index} is truncated")))?;
             let units = bytes
                 .chunks_exact(2)
                 .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
@@ -118,9 +115,15 @@ impl ListNamesTable {
         Self::try_new(names)
     }
 
-    pub fn len(&self) -> usize { self.names.len() }
-    pub fn is_empty(&self) -> bool { self.names.is_empty() }
-    pub fn entries(&self) -> &[String] { &self.names }
+    pub fn len(&self) -> usize {
+        self.names.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.names.is_empty()
+    }
+    pub fn entries(&self) -> &[String] {
+        &self.names
+    }
     pub fn get(&self, index: usize) -> Option<&str> {
         self.names.get(index).map(String::as_str)
     }
@@ -156,9 +159,7 @@ impl ListNamesTable {
 
 fn validate_names(names: &[String]) -> Result<usize> {
     if names.len() > MAX_NAME_COUNT {
-        return Err(corrupted(
-            "SttbListNames contains more than 65535 strings",
-        ));
+        return Err(corrupted("SttbListNames contains more than 65535 strings"));
     }
     let mut unique = HashSet::with_capacity(names.len());
     let mut size = 6usize;
@@ -233,7 +234,10 @@ mod tests {
             "\u{1f4cb}".to_string(),
         ])
         .unwrap();
-        assert_eq!(ListNamesTable::parse_bytes(&table.to_bytes().unwrap()).unwrap(), table);
+        assert_eq!(
+            ListNamesTable::parse_bytes(&table.to_bytes().unwrap()).unwrap(),
+            table
+        );
     }
 
     #[test]

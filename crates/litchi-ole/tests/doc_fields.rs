@@ -77,18 +77,24 @@ fn apache_poi_reference_plcfs_cover_all_seven_story_tables() {
 
     for &(story, cps, descriptors, expected_types) in cases {
         let reference = reference_plcf(cps, descriptors);
-        let table = litchi_ole::doc::FieldStoryTable::parse_plcf(
-            story,
-            *cps.last().unwrap(),
-            &reference,
-        )
-        .unwrap();
+        let table =
+            litchi_ole::doc::FieldStoryTable::parse_plcf(story, *cps.last().unwrap(), &reference)
+                .unwrap();
         assert_eq!(table.terminal_cp(), *cps.last().unwrap());
         assert_eq!(
-            table.fields().iter().map(|field| field.field_type).collect::<Vec<_>>(),
+            table
+                .fields()
+                .iter()
+                .map(|field| field.field_type)
+                .collect::<Vec<_>>(),
             expected_types
         );
-        assert!(table.fields().iter().all(|field| field.end_flags.has_separator));
+        assert!(
+            table
+                .fields()
+                .iter()
+                .all(|field| field.end_flags.has_separator)
+        );
         assert_eq!(table.to_plcf_bytes().unwrap(), reference);
     }
 }

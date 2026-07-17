@@ -3,16 +3,16 @@
 use crate::xls::autofilter::{AutoFilterColumn, AutoFilterInfo, SortInfo};
 use crate::xls::cell::XlsCell;
 use crate::xls::comments::XlsComment;
+use crate::xls::conditional_format::XlsConditionalFormatting;
 use crate::xls::error::XlsError;
 use crate::xls::hyperlinks::XlsHyperlink;
 use crate::xls::layout::{XlsColumnLayout, XlsRowLayout};
-use crate::xls::view::XlsWorksheetView;
-use crate::xls::page_setup::XlsPageSetup;
-use crate::xls::conditional_format::XlsConditionalFormatting;
 use crate::xls::merged_cells::MergedCellRange;
 use crate::xls::number_format::{XlsExtendedFormat, XlsFormatting, XlsNumberFormat};
+use crate::xls::page_setup::XlsPageSetup;
 use crate::xls::pivot_table::PivotTable;
 use crate::xls::protection::SheetProtection;
+use crate::xls::view::XlsWorksheetView;
 use litchi_core::sheet::{
     Cell as SheetCell, CellIterator, CellValue, Result, RowIterator, Worksheet,
 };
@@ -60,14 +60,12 @@ pub struct XlsWorksheet {
     scenario_manager: Option<crate::xls::scenario::XlsScenarioManager>,
     vba_code_name: Option<String>,
     conditional_formattings: Vec<XlsConditionalFormatting>,
-    conditional_formattings12:Vec<crate::xls::conditional_format::XlsConditionalFormatting12>,
-    conditional_format_extensions:Vec<crate::xls::conditional_format::XlsConditionalExtension>,
+    conditional_formattings12: Vec<crate::xls::conditional_format::XlsConditionalFormatting12>,
+    conditional_format_extensions: Vec<crate::xls::conditional_format::XlsConditionalExtension>,
     consolidation: Option<crate::xls::consolidation::XlsConsolidation>,
     formula_error_features: Vec<crate::xls::formula_errors::XlsFormulaErrorFeature>,
-    row_block_index: std::result::Result<
-        Option<crate::xls::row_block_index::XlsRowBlockIndex>,
-        String,
-    >,
+    row_block_index:
+        std::result::Result<Option<crate::xls::row_block_index::XlsRowBlockIndex>, String>,
 }
 
 impl XlsWorksheet {
@@ -98,7 +96,9 @@ impl XlsWorksheet {
             calculation: crate::xls::calculation::XlsWorksheetCalculation::default(),
             scenario_manager: None,
             vba_code_name: None,
-            conditional_formattings: Vec::new(),conditional_formattings12:Vec::new(),conditional_format_extensions:Vec::new(),
+            conditional_formattings: Vec::new(),
+            conditional_formattings12: Vec::new(),
+            conditional_format_extensions: Vec::new(),
             consolidation: None,
             formula_error_features: Vec::new(),
             row_block_index: Ok(None),
@@ -132,7 +132,9 @@ impl XlsWorksheet {
             calculation: crate::xls::calculation::XlsWorksheetCalculation::default(),
             scenario_manager: None,
             vba_code_name: None,
-            conditional_formattings: Vec::new(),conditional_formattings12:Vec::new(),conditional_format_extensions:Vec::new(),
+            conditional_formattings: Vec::new(),
+            conditional_formattings12: Vec::new(),
+            conditional_format_extensions: Vec::new(),
             consolidation: None,
             formula_error_features: Vec::new(),
             row_block_index: Ok(None),
@@ -286,9 +288,7 @@ impl XlsWorksheet {
     }
 
     /// Formula error-checking shared features declared for this worksheet.
-    pub fn formula_error_features(
-        &self,
-    ) -> &[crate::xls::formula_errors::XlsFormulaErrorFeature] {
+    pub fn formula_error_features(&self) -> &[crate::xls::formula_errors::XlsFormulaErrorFeature] {
         &self.formula_error_features
     }
 
@@ -304,10 +304,7 @@ impl XlsWorksheet {
     /// Corrupt optional metadata is reported here without preventing cell parsing.
     pub fn row_block_index(
         &self,
-    ) -> std::result::Result<
-        Option<&crate::xls::row_block_index::XlsRowBlockIndex>,
-        &str,
-    > {
+    ) -> std::result::Result<Option<&crate::xls::row_block_index::XlsRowBlockIndex>, &str> {
         match &self.row_block_index {
             Ok(value) => Ok(value.as_ref()),
             Err(error) => Err(error.as_str()),
@@ -448,7 +445,9 @@ impl XlsWorksheet {
         self.scenario_manager = scenario_manager;
     }
 
-    pub fn vba_code_name(&self) -> Option<&str> { self.vba_code_name.as_deref() }
+    pub fn vba_code_name(&self) -> Option<&str> {
+        self.vba_code_name.as_deref()
+    }
     pub(crate) fn set_vba_code_name(&mut self, code_name: Option<String>) {
         self.vba_code_name = code_name;
     }
@@ -464,10 +463,28 @@ impl XlsWorksheet {
     ) {
         self.conditional_formattings = conditional_formattings;
     }
-    pub fn conditional_formattings12(&self)->&[crate::xls::conditional_format::XlsConditionalFormatting12]{&self.conditional_formattings12}
-    pub fn conditional_format_extensions(&self)->&[crate::xls::conditional_format::XlsConditionalExtension]{&self.conditional_format_extensions}
-    pub(crate) fn set_conditional_formattings12(&mut self,value:Vec<crate::xls::conditional_format::XlsConditionalFormatting12>){self.conditional_formattings12=value}
-    pub(crate) fn set_conditional_format_extensions(&mut self,value:Vec<crate::xls::conditional_format::XlsConditionalExtension>){self.conditional_format_extensions=value}
+    pub fn conditional_formattings12(
+        &self,
+    ) -> &[crate::xls::conditional_format::XlsConditionalFormatting12] {
+        &self.conditional_formattings12
+    }
+    pub fn conditional_format_extensions(
+        &self,
+    ) -> &[crate::xls::conditional_format::XlsConditionalExtension] {
+        &self.conditional_format_extensions
+    }
+    pub(crate) fn set_conditional_formattings12(
+        &mut self,
+        value: Vec<crate::xls::conditional_format::XlsConditionalFormatting12>,
+    ) {
+        self.conditional_formattings12 = value
+    }
+    pub(crate) fn set_conditional_format_extensions(
+        &mut self,
+        value: Vec<crate::xls::conditional_format::XlsConditionalExtension>,
+    ) {
+        self.conditional_format_extensions = value
+    }
 
     /// Data-consolidation settings and inert source directory for this worksheet.
     pub fn consolidation(&self) -> Option<&crate::xls::consolidation::XlsConsolidation> {

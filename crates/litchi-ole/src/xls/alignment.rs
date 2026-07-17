@@ -126,11 +126,7 @@ impl XlsCellAlignment {
             2 => XlsVerticalAlignment::Bottom,
             3 => XlsVerticalAlignment::Justify,
             4 => XlsVerticalAlignment::Distributed,
-            value => {
-                return Err(invalid(format!(
-                    "XF vertical alignment {value} is invalid"
-                )))
-            },
+            value => return Err(invalid(format!("XF vertical alignment {value} is invalid"))),
         };
         let justify_last_line = alignment_options & 0x80 != 0;
         if justify_last_line && horizontal != XlsHorizontalAlignment::Distributed {
@@ -246,9 +242,7 @@ mod tests {
             (255, XlsTextRotation::Vertical),
         ] {
             assert_eq!(
-                XlsCellAlignment::parse(0x20, value, 0)
-                    .unwrap()
-                    .rotation(),
+                XlsCellAlignment::parse(0x20, value, 0).unwrap().rotation(),
                 expected
             );
         }

@@ -1,7 +1,7 @@
 //! BIFF8 worksheet data-validation records.
 
-use super::{XlsError, XlsResult};
 use super::formula::{FormulaContext, render_formula};
+use super::{XlsError, XlsResult};
 
 pub(crate) const DVAL_RECORD_TYPE: u16 = 0x01B2;
 pub(crate) const DV_RECORD_TYPE: u16 = 0x01BE;
@@ -18,38 +18,83 @@ pub struct XlsDataValidationSettings {
 }
 
 impl XlsDataValidationSettings {
-    pub fn window_closed(&self) -> bool { self.window_closed }
-    pub fn x_left(&self) -> u32 { self.x_left }
-    pub fn y_top(&self) -> u32 { self.y_top }
-    pub fn dropdown_object_id(&self) -> Option<u16> { self.dropdown_object_id }
-    pub fn declared_rule_count(&self) -> u16 { self.declared_rule_count }
+    pub fn window_closed(&self) -> bool {
+        self.window_closed
+    }
+    pub fn x_left(&self) -> u32 {
+        self.x_left
+    }
+    pub fn y_top(&self) -> u32 {
+        self.y_top
+    }
+    pub fn dropdown_object_id(&self) -> Option<u16> {
+        self.dropdown_object_id
+    }
+    pub fn declared_rule_count(&self) -> u16 {
+        self.declared_rule_count
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsDataValidationKind { Any, Whole, Decimal, List, Date, Time, TextLength, Custom }
+pub enum XlsDataValidationKind {
+    Any,
+    Whole,
+    Decimal,
+    List,
+    Date,
+    Time,
+    TextLength,
+    Custom,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsDataValidationErrorStyle { Stop, Warning, Information }
+pub enum XlsDataValidationErrorStyle {
+    Stop,
+    Warning,
+    Information,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum XlsDataValidationOperator {
-    Between, NotBetween, Equal, NotEqual, GreaterThan, LessThan, GreaterOrEqual, LessOrEqual,
+    Between,
+    NotBetween,
+    Equal,
+    NotEqual,
+    GreaterThan,
+    LessThan,
+    GreaterOrEqual,
+    LessOrEqual,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum XlsDataValidationImeMode {
-    NoControl, On, Off, Hiragana, WideKatakana, NarrowKatakana,
-    FullWidthAlphanumeric, HalfWidthAlphanumeric, FullWidthHangul, HalfWidthHangul,
+    NoControl,
+    On,
+    Off,
+    Hiragana,
+    WideKatakana,
+    NarrowKatakana,
+    FullWidthAlphanumeric,
+    HalfWidthAlphanumeric,
+    FullWidthHangul,
+    HalfWidthHangul,
 }
 
 /// An unevaluated BIFF formula token stream from a `DV` record.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsDataValidationFormula { tokens: Vec<u8>, rendered: Option<String> }
+pub struct XlsDataValidationFormula {
+    tokens: Vec<u8>,
+    rendered: Option<String>,
+}
 
 impl XlsDataValidationFormula {
-    pub fn tokens(&self) -> &[u8] { &self.tokens }
+    pub fn tokens(&self) -> &[u8] {
+        &self.tokens
+    }
     /// Best-effort inert rendering using the workbook's existing BIFF token renderer.
-    pub fn rendered(&self) -> Option<&str> { self.rendered.as_deref() }
+    pub fn rendered(&self) -> Option<&str> {
+        self.rendered.as_deref()
+    }
 }
 
 /// An inclusive BIFF8 cell range targeted by a validation rule.
@@ -62,10 +107,18 @@ pub struct XlsDataValidationRange {
 }
 
 impl XlsDataValidationRange {
-    pub fn first_row(&self) -> u16 { self.first_row }
-    pub fn last_row(&self) -> u16 { self.last_row }
-    pub fn first_column(&self) -> u8 { self.first_column }
-    pub fn last_column(&self) -> u8 { self.last_column }
+    pub fn first_row(&self) -> u16 {
+        self.first_row
+    }
+    pub fn last_row(&self) -> u16 {
+        self.last_row
+    }
+    pub fn first_column(&self) -> u8 {
+        self.first_column
+    }
+    pub fn last_column(&self) -> u8 {
+        self.last_column
+    }
 }
 
 /// One BIFF8 worksheet data-validation rule.
@@ -90,31 +143,68 @@ pub struct XlsDataValidationRule {
 }
 
 impl XlsDataValidationRule {
-    pub fn kind(&self) -> XlsDataValidationKind { self.kind }
-    pub fn error_style(&self) -> XlsDataValidationErrorStyle { self.error_style }
-    pub fn explicit_list(&self) -> bool { self.explicit_list }
-    pub fn allow_blank(&self) -> bool { self.allow_blank }
-    pub fn suppress_dropdown(&self) -> bool { self.suppress_dropdown }
-    pub fn ime_mode(&self) -> XlsDataValidationImeMode { self.ime_mode }
-    pub fn show_input_message(&self) -> bool { self.show_input_message }
-    pub fn show_error_message(&self) -> bool { self.show_error_message }
-    pub fn operator(&self) -> XlsDataValidationOperator { self.operator }
-    pub fn prompt_title(&self) -> Option<&str> { self.prompt_title.as_deref() }
-    pub fn error_title(&self) -> Option<&str> { self.error_title.as_deref() }
-    pub fn prompt(&self) -> Option<&str> { self.prompt.as_deref() }
-    pub fn error(&self) -> Option<&str> { self.error.as_deref() }
-    pub fn formula1(&self) -> Option<&XlsDataValidationFormula> { self.formula1.as_ref() }
-    pub fn formula2(&self) -> Option<&XlsDataValidationFormula> { self.formula2.as_ref() }
-    pub fn ranges(&self) -> &[XlsDataValidationRange] { &self.ranges }
+    pub fn kind(&self) -> XlsDataValidationKind {
+        self.kind
+    }
+    pub fn error_style(&self) -> XlsDataValidationErrorStyle {
+        self.error_style
+    }
+    pub fn explicit_list(&self) -> bool {
+        self.explicit_list
+    }
+    pub fn allow_blank(&self) -> bool {
+        self.allow_blank
+    }
+    pub fn suppress_dropdown(&self) -> bool {
+        self.suppress_dropdown
+    }
+    pub fn ime_mode(&self) -> XlsDataValidationImeMode {
+        self.ime_mode
+    }
+    pub fn show_input_message(&self) -> bool {
+        self.show_input_message
+    }
+    pub fn show_error_message(&self) -> bool {
+        self.show_error_message
+    }
+    pub fn operator(&self) -> XlsDataValidationOperator {
+        self.operator
+    }
+    pub fn prompt_title(&self) -> Option<&str> {
+        self.prompt_title.as_deref()
+    }
+    pub fn error_title(&self) -> Option<&str> {
+        self.error_title.as_deref()
+    }
+    pub fn prompt(&self) -> Option<&str> {
+        self.prompt.as_deref()
+    }
+    pub fn error(&self) -> Option<&str> {
+        self.error.as_deref()
+    }
+    pub fn formula1(&self) -> Option<&XlsDataValidationFormula> {
+        self.formula1.as_ref()
+    }
+    pub fn formula2(&self) -> Option<&XlsDataValidationFormula> {
+        self.formula2.as_ref()
+    }
+    pub fn ranges(&self) -> &[XlsDataValidationRange] {
+        &self.ranges
+    }
 }
 
 pub(crate) fn parse_dval(data: &[u8]) -> XlsResult<XlsDataValidationSettings> {
     if data.len() != 18 {
-        return invalid(format!("DVAL payload must be exactly 18 bytes, got {}", data.len()));
+        return invalid(format!(
+            "DVAL payload must be exactly 18 bytes, got {}",
+            data.len()
+        ));
     }
     let options = u16::from_le_bytes([data[0], data[1]]);
     if options & !0x0005 != 0 {
-        return invalid(format!("DVAL contains reserved option bits: {options:#06x}"));
+        return invalid(format!(
+            "DVAL contains reserved option bits: {options:#06x}"
+        ));
     }
     let x_left = read_u32(data, 2)?;
     let y_top = read_u32(data, 6)?;
@@ -140,7 +230,10 @@ pub(crate) fn parse_dval(data: &[u8]) -> XlsResult<XlsDataValidationSettings> {
     })
 }
 
-pub(crate) fn parse_dv(data: &[u8], formula_context: Option<&FormulaContext>) -> XlsResult<XlsDataValidationRule> {
+pub(crate) fn parse_dv(
+    data: &[u8],
+    formula_context: Option<&FormulaContext>,
+) -> XlsResult<XlsDataValidationRule> {
     let mut cursor = Cursor::new(data);
     let options = cursor.u32()?;
     if options & 0xFF00_0000 != 0 {
@@ -177,20 +270,25 @@ pub(crate) fn parse_dv(data: &[u8], formula_context: Option<&FormulaContext>) ->
         value => return invalid(format!("invalid DV IME mode: {value}")),
     };
     let raw_operator = (options >> 20) & 0x0F;
-    let operator = if matches!(kind, XlsDataValidationKind::Any | XlsDataValidationKind::List | XlsDataValidationKind::Custom) {
+    let operator = if matches!(
+        kind,
+        XlsDataValidationKind::Any | XlsDataValidationKind::List | XlsDataValidationKind::Custom
+    ) {
         // This field is undefined and MUST be ignored for operator-less validation kinds.
         XlsDataValidationOperator::Between
-    } else { match raw_operator {
-        0 => XlsDataValidationOperator::Between,
-        1 => XlsDataValidationOperator::NotBetween,
-        2 => XlsDataValidationOperator::Equal,
-        3 => XlsDataValidationOperator::NotEqual,
-        4 => XlsDataValidationOperator::GreaterThan,
-        5 => XlsDataValidationOperator::LessThan,
-        6 => XlsDataValidationOperator::GreaterOrEqual,
-        7 => XlsDataValidationOperator::LessOrEqual,
-        value => return invalid(format!("invalid DV operator: {value}")),
-    }};
+    } else {
+        match raw_operator {
+            0 => XlsDataValidationOperator::Between,
+            1 => XlsDataValidationOperator::NotBetween,
+            2 => XlsDataValidationOperator::Equal,
+            3 => XlsDataValidationOperator::NotEqual,
+            4 => XlsDataValidationOperator::GreaterThan,
+            5 => XlsDataValidationOperator::LessThan,
+            6 => XlsDataValidationOperator::GreaterOrEqual,
+            7 => XlsDataValidationOperator::LessOrEqual,
+            value => return invalid(format!("invalid DV operator: {value}")),
+        }
+    };
 
     let prompt_title = cursor.unicode_string(32)?;
     let error_title = cursor.unicode_string(32)?;
@@ -201,27 +299,41 @@ pub(crate) fn parse_dv(data: &[u8], formula_context: Option<&FormulaContext>) ->
     for formula in [&mut formula1, &mut formula2].into_iter().flatten() {
         formula.rendered = render_formula(&formula.tokens, formula_context);
     }
-    let needs_two = !matches!(kind, XlsDataValidationKind::Any | XlsDataValidationKind::List | XlsDataValidationKind::Custom)
-        && matches!(operator, XlsDataValidationOperator::Between | XlsDataValidationOperator::NotBetween);
+    let needs_two = !matches!(
+        kind,
+        XlsDataValidationKind::Any | XlsDataValidationKind::List | XlsDataValidationKind::Custom
+    ) && matches!(
+        operator,
+        XlsDataValidationOperator::Between | XlsDataValidationOperator::NotBetween
+    );
     match kind {
-        XlsDataValidationKind::Any if formula1.is_some() || formula2.is_some() =>
-            return invalid("DV type Any must not contain formulas".to_string()),
-        XlsDataValidationKind::Any => {}
-        _ if needs_two && (formula1.is_none() || formula2.is_none()) =>
-            return invalid("DV Between/NotBetween rule requires two formulas".to_string()),
-        _ if !needs_two && (formula1.is_none() || formula2.is_some()) =>
-            return invalid("DV rule requires exactly one formula".to_string()),
-        _ => {}
+        XlsDataValidationKind::Any if formula1.is_some() || formula2.is_some() => {
+            return invalid("DV type Any must not contain formulas".to_string());
+        },
+        XlsDataValidationKind::Any => {},
+        _ if needs_two && (formula1.is_none() || formula2.is_none()) => {
+            return invalid("DV Between/NotBetween rule requires two formulas".to_string());
+        },
+        _ if !needs_two && (formula1.is_none() || formula2.is_some()) => {
+            return invalid("DV rule requires exactly one formula".to_string());
+        },
+        _ => {},
     }
 
     let range_count = cursor.u16()? as usize;
     if !(1..=MAX_VALIDATION_RANGES).contains(&range_count) {
-        return invalid(format!("DV range count must be 1..={MAX_VALIDATION_RANGES}, got {range_count}"));
+        return invalid(format!(
+            "DV range count must be 1..={MAX_VALIDATION_RANGES}, got {range_count}"
+        ));
     }
-    let bytes_needed = range_count.checked_mul(8)
+    let bytes_needed = range_count
+        .checked_mul(8)
         .ok_or_else(|| XlsError::InvalidData("DV range size overflow".to_string()))?;
     if cursor.remaining() != bytes_needed {
-        return invalid(format!("DV range list length mismatch: expected {bytes_needed} bytes, got {}", cursor.remaining()));
+        return invalid(format!(
+            "DV range list length mismatch: expected {bytes_needed} bytes, got {}",
+            cursor.remaining()
+        ));
     }
     let mut ranges = Vec::with_capacity(range_count);
     for _ in 0..range_count {
@@ -259,23 +371,37 @@ pub(crate) fn parse_dv(data: &[u8], formula_context: Option<&FormulaContext>) ->
     })
 }
 
-fn invalid<T>(message: String) -> XlsResult<T> { Err(XlsError::InvalidData(message)) }
+fn invalid<T>(message: String) -> XlsResult<T> {
+    Err(XlsError::InvalidData(message))
+}
 
 fn read_u32(data: &[u8], offset: usize) -> XlsResult<u32> {
-    let bytes = data.get(offset..offset + 4)
-        .ok_or_else(|| XlsError::InvalidData("truncated BIFF data-validation record".to_string()))?;
+    let bytes = data.get(offset..offset + 4).ok_or_else(|| {
+        XlsError::InvalidData("truncated BIFF data-validation record".to_string())
+    })?;
     Ok(u32::from_le_bytes(bytes.try_into().unwrap()))
 }
 
-struct Cursor<'a> { data: &'a [u8], position: usize }
+struct Cursor<'a> {
+    data: &'a [u8],
+    position: usize,
+}
 
 impl<'a> Cursor<'a> {
-    fn new(data: &'a [u8]) -> Self { Self { data, position: 0 } }
-    fn remaining(&self) -> usize { self.data.len().saturating_sub(self.position) }
+    fn new(data: &'a [u8]) -> Self {
+        Self { data, position: 0 }
+    }
+    fn remaining(&self) -> usize {
+        self.data.len().saturating_sub(self.position)
+    }
     fn take(&mut self, count: usize) -> XlsResult<&'a [u8]> {
-        let end = self.position.checked_add(count)
+        let end = self
+            .position
+            .checked_add(count)
             .ok_or_else(|| XlsError::InvalidData("DV field size overflow".to_string()))?;
-        let bytes = self.data.get(self.position..end)
+        let bytes = self
+            .data
+            .get(self.position..end)
             .ok_or_else(|| XlsError::InvalidData("truncated DV record".to_string()))?;
         self.position = end;
         Ok(bytes)
@@ -295,22 +421,34 @@ impl<'a> Cursor<'a> {
         if flags & !0x0D != 0 {
             return invalid(format!("DV string contains reserved flags: {flags:#04x}"));
         }
-        let rich_runs = if flags & 0x08 != 0 { self.u16()? as usize } else { 0 };
-        let extension_size = if flags & 0x04 != 0 { self.u32()? as usize } else { 0 };
+        let rich_runs = if flags & 0x08 != 0 {
+            self.u16()? as usize
+        } else {
+            0
+        };
+        let extension_size = if flags & 0x04 != 0 {
+            self.u32()? as usize
+        } else {
+            0
+        };
         let wide = flags & 0x01 != 0;
-        let character_bytes = units.checked_mul(if wide { 2 } else { 1 })
+        let character_bytes = units
+            .checked_mul(if wide { 2 } else { 1 })
             .ok_or_else(|| XlsError::InvalidData("DV string size overflow".to_string()))?;
         let characters = self.take(character_bytes)?;
         let value = if wide {
-            let utf16: Vec<u16> = characters.chunks_exact(2)
+            let utf16: Vec<u16> = characters
+                .chunks_exact(2)
                 .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
                 .collect();
-            String::from_utf16(&utf16)
-                .map_err(|_| XlsError::InvalidData("DV string contains invalid UTF-16".to_string()))?
+            String::from_utf16(&utf16).map_err(|_| {
+                XlsError::InvalidData("DV string contains invalid UTF-16".to_string())
+            })?
         } else {
             characters.iter().map(|&byte| char::from(byte)).collect()
         };
-        let formatting_size = rich_runs.checked_mul(4)
+        let formatting_size = rich_runs
+            .checked_mul(4)
             .ok_or_else(|| XlsError::InvalidData("DV rich-text size overflow".to_string()))?;
         self.take(formatting_size)?;
         self.take(extension_size)?;
@@ -320,7 +458,10 @@ impl<'a> Cursor<'a> {
         let size = self.u16()? as usize;
         self.take(2)?;
         let tokens = self.take(size)?;
-        Ok((!tokens.is_empty()).then(|| XlsDataValidationFormula { tokens: tokens.to_vec(), rendered: None }))
+        Ok((!tokens.is_empty()).then(|| XlsDataValidationFormula {
+            tokens: tokens.to_vec(),
+            rendered: None,
+        }))
     }
 }
 
@@ -348,7 +489,9 @@ mod tests {
         formula(&mut data, &[0x1E, 1, 0]);
         formula(&mut data, &[0x1E, 10, 0]);
         data.extend_from_slice(&1u16.to_le_bytes());
-        for value in [2u16, 4, 3, 5] { data.extend_from_slice(&value.to_le_bytes()); }
+        for value in [2u16, 4, 3, 5] {
+            data.extend_from_slice(&value.to_le_bytes());
+        }
         data
     }
 
@@ -395,7 +538,9 @@ mod tests {
         dv[0] = 0;
         assert!(parse_dv(&dv, None).is_err());
         let mut data = 3u32.to_le_bytes().to_vec();
-        for _ in 0..4 { string(&mut data, "\0"); }
+        for _ in 0..4 {
+            string(&mut data, "\0");
+        }
         formula(&mut data, &[0x17, 1, 0, b'A']);
         formula(&mut data, &[]);
         data.extend_from_slice(&0u16.to_le_bytes());
@@ -406,11 +551,15 @@ mod tests {
     fn ignores_undefined_operator_bits_for_list_validations() {
         let options = 3u32 | (15 << 20);
         let mut data = options.to_le_bytes().to_vec();
-        for _ in 0..4 { string(&mut data, "\0"); }
+        for _ in 0..4 {
+            string(&mut data, "\0");
+        }
         formula(&mut data, &[0x17, 1, 0, b'A']);
         formula(&mut data, &[]);
         data.extend_from_slice(&1u16.to_le_bytes());
-        for value in [0u16, 0, 0, 0] { data.extend_from_slice(&value.to_le_bytes()); }
+        for value in [0u16, 0, 0, 0] {
+            data.extend_from_slice(&value.to_le_bytes());
+        }
         let rule = parse_dv(&data, None).unwrap();
         assert_eq!(rule.kind(), XlsDataValidationKind::List);
         assert_eq!(rule.operator(), XlsDataValidationOperator::Between);

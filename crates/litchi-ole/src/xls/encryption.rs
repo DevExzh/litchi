@@ -1,9 +1,7 @@
 //! BIFF8 password-to-open encryption handling.
 
 use super::error::{XlsEncryptionKind, XlsError, XlsResult};
-use crate::office_crypto::cryptoapi::{
-    self, CryptoApiContext, CryptoApiError, CryptoApiHeader,
-};
+use crate::office_crypto::cryptoapi::{self, CryptoApiContext, CryptoApiError, CryptoApiHeader};
 use md5::{Digest, Md5};
 use rc4::{KeyInit, Rc4, StreamCipher};
 use zeroize::Zeroizing;
@@ -14,13 +12,12 @@ const BINARY_RC4_FILEPASS_LEN: usize = 54;
 const BINARY_RC4_BLOCK_SIZE: usize = 1024;
 
 const INITIAL_CODE_ARRAY: [u16; 15] = [
-    0xe1f0, 0x1d0f, 0xcc9c, 0x84c0, 0x110c, 0x0e10, 0xf1ce, 0x313e, 0x1872, 0xe139,
-    0xd40f, 0x84f9, 0x280c, 0xa96a, 0x4ec3,
+    0xe1f0, 0x1d0f, 0xcc9c, 0x84c0, 0x110c, 0x0e10, 0xf1ce, 0x313e, 0x1872, 0xe139, 0xd40f, 0x84f9,
+    0x280c, 0xa96a, 0x4ec3,
 ];
 
 const PAD_ARRAY: [u8; 15] = [
-    0xbb, 0xff, 0xff, 0xba, 0xff, 0xff, 0xb9, 0x80, 0x00, 0xbe, 0x0f, 0x00, 0xbf, 0x0f,
-    0x00,
+    0xbb, 0xff, 0xff, 0xba, 0xff, 0xff, 0xb9, 0x80, 0x00, 0xbe, 0x0f, 0x00, 0xbf, 0x0f, 0x00,
 ];
 
 const ENCRYPTION_MATRIX: [[u16; 7]; 15] = [
@@ -91,8 +88,8 @@ impl FilePassRecord {
                 let major = u16::from_le_bytes([data[2], data[3]]);
                 let minor = u16::from_le_bytes([data[4], data[5]]);
                 if matches!((major, minor), (2..=4, 2)) {
-                    let header = cryptoapi::parse_header(&data[2..])
-                        .map_err(map_cryptoapi_header_error)?;
+                    let header =
+                        cryptoapi::parse_header(&data[2..]).map_err(map_cryptoapi_header_error)?;
                     return Ok(Self::CryptoApi(header));
                 }
                 if (major, minor) != (1, 1) {
@@ -273,16 +270,12 @@ pub(crate) fn prepare_workbook_stream(
                     for index in clear_prefix..data_len {
                         let absolute = header_end + index;
                         let array_index = (record_end + index) & 0x0f;
-                        workbook[absolute] =
-                            workbook[absolute].rotate_left(3) ^ array[array_index];
+                        workbook[absolute] = workbook[absolute].rotate_left(3) ^ array[array_index];
                     }
                 },
                 WorkbookCipher::BinaryRc4(stream) => {
                     let encrypted_start = header_end + clear_prefix;
-                    stream.apply_at(
-                        &mut workbook[encrypted_start..record_end],
-                        encrypted_start,
-                    )?;
+                    stream.apply_at(&mut workbook[encrypted_start..record_end], encrypted_start)?;
                 },
                 WorkbookCipher::CryptoApi(context) => {
                     let encrypted_start = header_end + clear_prefix;
@@ -332,13 +325,8 @@ fn apply_cryptoapi_at(
         let count = data
             .len()
             .min(BINARY_RC4_BLOCK_SIZE.saturating_sub(block_offset));
-        cryptoapi::apply_block_cipher_at_offset(
-            context,
-            block,
-            block_offset,
-            &mut data[..count],
-        )
-        .map_err(map_cryptoapi_runtime_error)?;
+        cryptoapi::apply_block_cipher_at_offset(context, block, block_offset, &mut data[..count])
+            .map_err(map_cryptoapi_runtime_error)?;
         absolute = absolute.checked_add(count).ok_or_else(|| {
             XlsError::InvalidData("Workbook CryptoAPI stream offset overflow".to_string())
         })?;
@@ -457,7 +445,11 @@ fn create_xor_array(password: &str) -> [u8; 16] {
     let bytes = password_bytes(password);
     let mut array = [0u8; 16];
     array[..bytes.len()].copy_from_slice(&bytes);
-    let padding_len = if bytes.is_empty() { 15 } else { 16 - bytes.len() };
+    let padding_len = if bytes.is_empty() {
+        15
+    } else {
+        16 - bytes.len()
+    };
     array[bytes.len()..bytes.len() + padding_len].copy_from_slice(&PAD_ARRAY[..padding_len]);
 
     let key = create_xor_key(password).to_le_bytes();
@@ -532,8 +524,8 @@ mod tests {
         assert_eq!(
             create_xor_array("abc"),
             [
-                0xac, 0xcc, 0xa4, 0xab, 0xd6, 0xba, 0xc3, 0xba, 0xd6, 0xa3, 0x2b, 0x45,
-                0xd3, 0x79, 0x29, 0xbb,
+                0xac, 0xcc, 0xa4, 0xab, 0xd6, 0xba, 0xc3, 0xba, 0xd6, 0xa3, 0x2b, 0x45, 0xd3, 0x79,
+                0x29, 0xbb,
             ]
         );
     }
@@ -581,7 +573,10 @@ mod tests {
 
         let decrypted = prepare_workbook_stream(stream, Some("abc")).unwrap();
         let first_data = 10 + 4;
-        assert_eq!(&decrypted[first_data..first_data + expected.len()], expected);
+        assert_eq!(
+            &decrypted[first_data..first_data + expected.len()],
+            expected
+        );
         let bound_data = first_data + expected.len() + 4;
         assert_eq!(
             &decrypted[bound_data..bound_data + expected_bound_sheet.len()],
@@ -664,8 +659,8 @@ mod tests {
     #[test]
     fn binary_rc4_secret_matches_apache_poi_vector() {
         let salt = [
-            0x17, 0xf6, 0xd1, 0x6b, 0x09, 0xb1, 0x5f, 0x7b, 0x4c, 0x9d, 0x03, 0xb4,
-            0x81, 0xb5, 0xb4, 0x4a,
+            0x17, 0xf6, 0xd1, 0x6b, 0x09, 0xb1, 0x5f, 0x7b, 0x4c, 0x9d, 0x03, 0xb4, 0x81, 0xb5,
+            0xb4, 0x4a,
         ];
         assert_eq!(
             derive_binary_rc4_secret("MoneyForNothing", &salt).as_ref(),
@@ -677,24 +672,28 @@ mod tests {
     fn binary_rc4_verifier_uses_one_continuous_cipher() {
         let filepass = BinaryRc4FilePass {
             salt: [
-                0xdf, 0x35, 0x52, 0x38, 0x0d, 0x75, 0x4a, 0xe6, 0x85, 0xc2, 0xfd, 0x78,
-                0xce, 0x3d, 0xd1, 0xb6,
+                0xdf, 0x35, 0x52, 0x38, 0x0d, 0x75, 0x4a, 0xe6, 0x85, 0xc2, 0xfd, 0x78, 0xce, 0x3d,
+                0xd1, 0xb6,
             ],
             encrypted_verifier: [
-                0xd4, 0x04, 0x43, 0xec, 0xb7, 0xa7, 0x6f, 0x6a, 0xd2, 0x68, 0xc7, 0xdf,
-                0xcf, 0xa8, 0x80, 0x68,
+                0xd4, 0x04, 0x43, 0xec, 0xb7, 0xa7, 0x6f, 0x6a, 0xd2, 0x68, 0xc7, 0xdf, 0xcf, 0xa8,
+                0x80, 0x68,
             ],
             encrypted_verifier_hash: [
-                0x8d, 0xc2, 0x63, 0xcc, 0xe1, 0x1d, 0xe0, 0x05, 0x20, 0x16, 0x96, 0xaf,
-                0x48, 0x59, 0x94, 0x64,
+                0x8d, 0xc2, 0x63, 0xcc, 0xe1, 0x1d, 0xe0, 0x05, 0x20, 0x16, 0x96, 0xaf, 0x48, 0x59,
+                0x94, 0x64,
             ],
         };
-        assert!(verify_binary_rc4_password(&filepass, "5ecret")
-            .unwrap()
-            .is_some());
-        assert!(verify_binary_rc4_password(&filepass, "Secret")
-            .unwrap()
-            .is_none());
+        assert!(
+            verify_binary_rc4_password(&filepass, "5ecret")
+                .unwrap()
+                .is_some()
+        );
+        assert!(
+            verify_binary_rc4_password(&filepass, "Secret")
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[test]
@@ -787,6 +786,9 @@ mod tests {
                 )
             })
         });
-        assert!(found, "expected decrypted ZIP-bomb text in the first worksheet");
+        assert!(
+            found,
+            "expected decrypted ZIP-bomb text in the first worksheet"
+        );
     }
 }

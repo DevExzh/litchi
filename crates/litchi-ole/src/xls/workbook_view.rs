@@ -30,31 +30,70 @@ pub struct XlsWorkbookWindow {
 }
 
 impl XlsWorkbookWindow {
-    pub fn horizontal_position_twips(&self) -> i16 { self.horizontal_position_twips }
-    pub fn vertical_position_twips(&self) -> i16 { self.vertical_position_twips }
-    pub fn width_twips(&self) -> i16 { self.width_twips }
-    pub fn height_twips(&self) -> i16 { self.height_twips }
-    pub fn hidden(&self) -> bool { self.hidden }
-    pub fn minimized(&self) -> bool { self.minimized }
-    pub fn very_hidden(&self) -> bool { self.very_hidden }
-    pub fn shows_horizontal_scrollbar(&self) -> bool { self.shows_horizontal_scrollbar }
-    pub fn shows_vertical_scrollbar(&self) -> bool { self.shows_vertical_scrollbar }
-    pub fn shows_sheet_tabs(&self) -> bool { self.shows_sheet_tabs }
-    pub fn groups_dates_in_autofilter(&self) -> bool { self.groups_dates_in_autofilter }
-    pub fn active_sheet_index(&self) -> u16 { self.active_sheet_index }
-    pub fn first_visible_sheet_index(&self) -> u16 { self.first_visible_sheet_index }
-    pub fn selected_sheet_count(&self) -> u16 { self.selected_sheet_count }
-    pub fn sheet_tab_ratio_per_mille(&self) -> u16 { self.sheet_tab_ratio_per_mille }
+    pub fn horizontal_position_twips(&self) -> i16 {
+        self.horizontal_position_twips
+    }
+    pub fn vertical_position_twips(&self) -> i16 {
+        self.vertical_position_twips
+    }
+    pub fn width_twips(&self) -> i16 {
+        self.width_twips
+    }
+    pub fn height_twips(&self) -> i16 {
+        self.height_twips
+    }
+    pub fn hidden(&self) -> bool {
+        self.hidden
+    }
+    pub fn minimized(&self) -> bool {
+        self.minimized
+    }
+    pub fn very_hidden(&self) -> bool {
+        self.very_hidden
+    }
+    pub fn shows_horizontal_scrollbar(&self) -> bool {
+        self.shows_horizontal_scrollbar
+    }
+    pub fn shows_vertical_scrollbar(&self) -> bool {
+        self.shows_vertical_scrollbar
+    }
+    pub fn shows_sheet_tabs(&self) -> bool {
+        self.shows_sheet_tabs
+    }
+    pub fn groups_dates_in_autofilter(&self) -> bool {
+        self.groups_dates_in_autofilter
+    }
+    pub fn active_sheet_index(&self) -> u16 {
+        self.active_sheet_index
+    }
+    pub fn first_visible_sheet_index(&self) -> u16 {
+        self.first_visible_sheet_index
+    }
+    pub fn selected_sheet_count(&self) -> u16 {
+        self.selected_sheet_count
+    }
+    pub fn sheet_tab_ratio_per_mille(&self) -> u16 {
+        self.sheet_tab_ratio_per_mille
+    }
 
     fn validate_sheet_references(&self, sheet_count: usize) -> XlsResult<()> {
         if usize::from(self.active_sheet_index) >= sheet_count {
-            return invalid(WINDOW1_RECORD_TYPE, "active sheet index is outside BoundSheet8 collection");
+            return invalid(
+                WINDOW1_RECORD_TYPE,
+                "active sheet index is outside BoundSheet8 collection",
+            );
         }
         if usize::from(self.first_visible_sheet_index) >= sheet_count {
-            return invalid(WINDOW1_RECORD_TYPE, "first visible sheet index is outside BoundSheet8 collection");
+            return invalid(
+                WINDOW1_RECORD_TYPE,
+                "first visible sheet index is outside BoundSheet8 collection",
+            );
         }
         if usize::from(self.selected_sheet_count) > sheet_count {
-            return invalid(WINDOW1_RECORD_TYPE, "selected sheet count exceeds BoundSheet8 count");
+            return invalid(
+                WINDOW1_RECORD_TYPE,
+                "selected sheet count exceeds BoundSheet8 count",
+            );
         }
         Ok(())
     }
@@ -69,10 +108,16 @@ pub struct XlsWorkbookView {
 
 impl XlsWorkbookView {
     /// Stable sheet identifiers in `BoundSheet8` order.
-    pub fn sheet_ids(&self) -> &[u16] { &self.sheet_ids }
+    pub fn sheet_ids(&self) -> &[u16] {
+        &self.sheet_ids
+    }
     /// Workbook windows in `Window1` record order.
-    pub fn windows(&self) -> &[XlsWorkbookWindow] { &self.windows }
-    pub fn primary_window(&self) -> Option<&XlsWorkbookWindow> { self.windows.first() }
+    pub fn windows(&self) -> &[XlsWorkbookWindow] {
+        &self.windows
+    }
+    pub fn primary_window(&self) -> Option<&XlsWorkbookWindow> {
+        self.windows.first()
+    }
 
     pub(crate) fn validate_sheet_state(
         &self,
@@ -105,7 +150,9 @@ impl XlsWorkbookView {
             }
         }
 
-        let Some(window) = self.primary_window() else { return Ok(()); };
+        let Some(window) = self.primary_window() else {
+            return Ok(());
+        };
         let active = usize::from(window.active_sheet_index);
         if selected_worksheet_tabs[active] == Some(false) {
             return invalid(
@@ -114,10 +161,15 @@ impl XlsWorkbookView {
             );
         }
 
-        let selected_count = selected_worksheet_tabs.iter().flatten().filter(|selected| **selected).count();
+        let selected_count = selected_worksheet_tabs
+            .iter()
+            .flatten()
+            .filter(|selected| **selected)
+            .count();
         let declared_count = usize::from(window.selected_sheet_count);
         if selected_count > declared_count
-            || (selected_worksheet_tabs.iter().all(Option::is_some) && selected_count != declared_count)
+            || (selected_worksheet_tabs.iter().all(Option::is_some)
+                && selected_count != declared_count)
         {
             return invalid(
                 WINDOW1_RECORD_TYPE,
@@ -138,7 +190,11 @@ pub(crate) struct WorkbookViewCollector {
 
 impl WorkbookViewCollector {
     pub(crate) fn new() -> Self {
-        Self { sheet_ids: None, windows: Vec::new(), boundsheets_started: false }
+        Self {
+            sheet_ids: None,
+            windows: Vec::new(),
+            boundsheets_started: false,
+        }
     }
 
     pub(crate) fn feed_record(&mut self, record_type: u16, data: &[u8]) -> XlsResult<()> {
@@ -154,7 +210,10 @@ impl WorkbookViewCollector {
             },
             WINDOW1_RECORD_TYPE => {
                 if self.boundsheets_started {
-                    return invalid(record_type, "Window1 record must precede BoundSheet8 records");
+                    return invalid(
+                        record_type,
+                        "Window1 record must precede BoundSheet8 records",
+                    );
                 }
                 self.windows.push(parse_window1(data)?);
             },
@@ -175,28 +234,43 @@ impl WorkbookViewCollector {
             })?
         } else {
             if self.sheet_ids.is_some() {
-                return invalid(RR_TAB_ID_RECORD_TYPE, "RRTabId must be absent above 4112 sheets");
+                return invalid(
+                    RR_TAB_ID_RECORD_TYPE,
+                    "RRTabId must be absent above 4112 sheets",
+                );
             }
             (1..=sheet_count)
                 .map(|index| u16::try_from(index).unwrap_or(u16::MAX))
                 .collect()
         };
         if sheet_count <= MAX_RR_TAB_IDS && sheet_ids.len() != sheet_count {
-            return invalid(RR_TAB_ID_RECORD_TYPE, "RRTabId count does not match BoundSheet8 count");
+            return invalid(
+                RR_TAB_ID_RECORD_TYPE,
+                "RRTabId count does not match BoundSheet8 count",
+            );
         }
         if self.windows.is_empty() {
-            return invalid(WINDOW1_RECORD_TYPE, "Globals Substream requires at least one Window1");
+            return invalid(
+                WINDOW1_RECORD_TYPE,
+                "Globals Substream requires at least one Window1",
+            );
         }
         for window in &self.windows {
             window.validate_sheet_references(sheet_count)?;
         }
-        Ok(XlsWorkbookView { sheet_ids, windows: self.windows })
+        Ok(XlsWorkbookView {
+            sheet_ids,
+            windows: self.windows,
+        })
     }
 }
 
 fn parse_rr_tab_id(data: &[u8]) -> XlsResult<Vec<u16>> {
     if data.is_empty() || data.len() % 2 != 0 || data.len() > MAX_RR_TAB_IDS * 2 {
-        return invalid(RR_TAB_ID_RECORD_TYPE, "RRTabId payload must contain 1..=4112 identifiers");
+        return invalid(
+            RR_TAB_ID_RECORD_TYPE,
+            "RRTabId payload must contain 1..=4112 identifiers",
+        );
     }
     let mut ids = Vec::with_capacity(data.len() / 2);
     let mut unique = HashSet::with_capacity(data.len() / 2);
@@ -208,7 +282,10 @@ fn parse_rr_tab_id(data: &[u8]) -> XlsResult<Vec<u16>> {
         // unique identifier while excluding 0xFFFF, the no-sheet sentinel used
         // by sheet-reference structures.
         if id == 0xffff {
-            return invalid(RR_TAB_ID_RECORD_TYPE, "sheet identifier must not be the 0xFFFF no-sheet sentinel");
+            return invalid(
+                RR_TAB_ID_RECORD_TYPE,
+                "sheet identifier must not be the 0xFFFF no-sheet sentinel",
+            );
         }
         if !unique.insert(id) {
             return invalid(RR_TAB_ID_RECORD_TYPE, "sheet identifiers must be unique");
@@ -220,16 +297,25 @@ fn parse_rr_tab_id(data: &[u8]) -> XlsResult<Vec<u16>> {
 
 fn parse_window1(data: &[u8]) -> XlsResult<XlsWorkbookWindow> {
     if data.len() != 18 {
-        return Err(XlsError::InvalidLength { expected: 18, found: data.len() });
+        return Err(XlsError::InvalidLength {
+            expected: 18,
+            found: data.len(),
+        });
     }
     let width_twips = read_i16(data, 4);
     let height_twips = read_i16(data, 6);
     if width_twips < 1 || height_twips < 1 {
-        return invalid(WINDOW1_RECORD_TYPE, "window width and height must be positive");
+        return invalid(
+            WINDOW1_RECORD_TYPE,
+            "window width and height must be positive",
+        );
     }
     let flags = read_u16(data, 8);
     if flags & 0xff80 != 0 {
-        return invalid(WINDOW1_RECORD_TYPE, "Window1 reserved flag bits must be zero");
+        return invalid(
+            WINDOW1_RECORD_TYPE,
+            "Window1 reserved flag bits must be zero",
+        );
     }
     if flags & 0x0004 != 0 && flags & 0x0001 == 0 {
         return invalid(WINDOW1_RECORD_TYPE, "Window1 fVeryHidden requires fHidden");
@@ -266,7 +352,10 @@ fn read_i16(data: &[u8], offset: usize) -> i16 {
 }
 
 fn invalid<T>(record_type: u16, message: impl Into<String>) -> XlsResult<T> {
-    Err(XlsError::InvalidRecord { record_type, message: message.into() })
+    Err(XlsError::InvalidRecord {
+        record_type,
+        message: message.into(),
+    })
 }
 
 #[cfg(test)]
@@ -299,8 +388,14 @@ mod tests {
         assert!(parse_window1(&very_hidden_without_hidden).is_err());
 
         let mut collector = WorkbookViewCollector::new();
-        collector.feed_record(WINDOW1_RECORD_TYPE, &valid_window()).unwrap();
-        assert!(collector.feed_record(RR_TAB_ID_RECORD_TYPE, &[1, 0]).is_err());
+        collector
+            .feed_record(WINDOW1_RECORD_TYPE, &valid_window())
+            .unwrap();
+        assert!(
+            collector
+                .feed_record(RR_TAB_ID_RECORD_TYPE, &[1, 0])
+                .is_err()
+        );
     }
 
     #[test]
@@ -311,22 +406,38 @@ mod tests {
             sheet_ids: vec![1, 2],
             windows: vec![parse_window1(&first_hidden).unwrap()],
         };
-        assert!(view.validate_sheet_state(&[true, false], &[Some(true), Some(false)]).is_err());
+        assert!(
+            view.validate_sheet_state(&[true, false], &[Some(true), Some(false)])
+                .is_err()
+        );
 
         let view = XlsWorkbookView {
             sheet_ids: vec![1, 2],
             windows: vec![parse_window1(&valid_window()).unwrap()],
         };
-        assert!(view.validate_sheet_state(&[true, true], &[Some(false), Some(true)]).is_err());
-        assert!(view.validate_sheet_state(&[true, true], &[Some(true), Some(true)]).is_err());
-        assert!(view.validate_sheet_state(&[true, true], &[Some(true), None]).is_ok());
+        assert!(
+            view.validate_sheet_state(&[true, true], &[Some(false), Some(true)])
+                .is_err()
+        );
+        assert!(
+            view.validate_sheet_state(&[true, true], &[Some(true), Some(true)])
+                .is_err()
+        );
+        assert!(
+            view.validate_sheet_state(&[true, true], &[Some(true), None])
+                .is_ok()
+        );
     }
 
     #[test]
     fn rejects_cardinality_and_boundsheet_mismatch() {
         let mut collector = WorkbookViewCollector::new();
-        collector.feed_record(RR_TAB_ID_RECORD_TYPE, &[1, 0]).unwrap();
-        collector.feed_record(WINDOW1_RECORD_TYPE, &valid_window()).unwrap();
+        collector
+            .feed_record(RR_TAB_ID_RECORD_TYPE, &[1, 0])
+            .unwrap();
+        collector
+            .feed_record(WINDOW1_RECORD_TYPE, &valid_window())
+            .unwrap();
         assert!(collector.finish(2).is_err());
     }
 }

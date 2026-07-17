@@ -76,7 +76,9 @@ impl XlsWriteAccess {
             )));
         }
         if data[2] & 0xFE != 0 {
-            return Err(invalid("WriteAccess userName contains reserved option bits"));
+            return Err(invalid(
+                "WriteAccess userName contains reserved option bits",
+            ));
         }
         let encoding = if data[2] & 1 == 0 {
             XlsWriteAccessEncoding::CompressedUnicode
@@ -96,9 +98,10 @@ impl XlsWriteAccess {
             .get(WRITE_ACCESS_HEADER_LEN..end)
             .ok_or_else(|| invalid("WriteAccess userName is truncated"))?;
         let units = match encoding {
-            XlsWriteAccessEncoding::CompressedUnicode => {
-                bytes.iter().map(|&byte| u16::from(byte)).collect::<Vec<_>>()
-            }
+            XlsWriteAccessEncoding::CompressedUnicode => bytes
+                .iter()
+                .map(|&byte| u16::from(byte))
+                .collect::<Vec<_>>(),
             XlsWriteAccessEncoding::Utf16 => bytes
                 .chunks_exact(2)
                 .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
@@ -109,9 +112,15 @@ impl XlsWriteAccess {
         Self::try_new_with_parts(user_name, encoding, data[end..].to_vec())
     }
 
-    pub fn user_name(&self) -> &str { &self.user_name }
-    pub fn encoding(&self) -> XlsWriteAccessEncoding { self.encoding }
-    pub fn unused_bytes(&self) -> &[u8] { &self.unused }
+    pub fn user_name(&self) -> &str {
+        &self.user_name
+    }
+    pub fn encoding(&self) -> XlsWriteAccessEncoding {
+        self.encoding
+    }
+    pub fn unused_bytes(&self) -> &[u8] {
+        &self.unused
+    }
 
     /// Serialize the fixed-size BIFF8 payload, preserving ignored bytes.
     pub fn to_payload(&self) -> XlsResult<[u8; WRITE_ACCESS_PAYLOAD_LEN]> {
@@ -131,14 +140,14 @@ impl XlsWriteAccess {
                     data[offset] = unit as u8;
                     offset += 1;
                 }
-            }
+            },
             XlsWriteAccessEncoding::Utf16 => {
                 for unit in units {
                     let bytes = unit.to_le_bytes();
                     data[offset..offset + 2].copy_from_slice(&bytes);
                     offset += 2;
                 }
-            }
+            },
         }
         data[offset..].copy_from_slice(&self.unused);
         Ok(data)
@@ -175,10 +184,7 @@ impl XlsWriteAccess {
     }
 }
 
-fn encoded_byte_count(
-    units: &[u16],
-    encoding: XlsWriteAccessEncoding,
-) -> XlsResult<usize> {
+fn encoded_byte_count(units: &[u16], encoding: XlsWriteAccessEncoding) -> XlsResult<usize> {
     if units.len() > WRITE_ACCESS_MAX_CHARACTERS {
         return Err(invalid("WriteAccess userName exceeds 54 characters"));
     }
@@ -190,7 +196,7 @@ fn encoded_byte_count(
                 ));
             }
             Ok(units.len())
-        }
+        },
         XlsWriteAccessEncoding::Utf16 => units
             .len()
             .checked_mul(2)
@@ -223,7 +229,9 @@ impl WriteAccessCollector {
         self.value = XlsWriteAccess::parse_payload(data).map(Some);
     }
 
-    pub(crate) fn finish(self) -> XlsResult<Option<XlsWriteAccess>> { self.value }
+    pub(crate) fn finish(self) -> XlsResult<Option<XlsWriteAccess>> {
+        self.value
+    }
 }
 
 #[cfg(test)]
@@ -297,12 +305,14 @@ mod tests {
         data[3..5].copy_from_slice(&0xD800u16.to_le_bytes());
         assert!(XlsWriteAccess::parse_payload(&data).is_err());
         assert!(XlsWriteAccess::try_new("x".repeat(55)).is_err());
-        assert!(XlsWriteAccess::try_new_with_parts(
-            "\u{6587}",
-            XlsWriteAccessEncoding::CompressedUnicode,
-            vec![b' '; 108],
-        )
-        .is_err());
+        assert!(
+            XlsWriteAccess::try_new_with_parts(
+                "\u{6587}",
+                XlsWriteAccessEncoding::CompressedUnicode,
+                vec![b' '; 108],
+            )
+            .is_err()
+        );
 
         let mut collector = WriteAccessCollector::new();
         let reference = poi_compressed_reference();

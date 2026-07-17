@@ -133,11 +133,19 @@ fn push_no_cch_string(data: &mut Vec<u8>, value: &str) {
     let compressed = units.iter().all(|unit| *unit <= 0xff);
     data.push(u8::from(!compressed));
     for unit in units {
-        if compressed { data.push(unit as u8); } else { data.extend_from_slice(&unit.to_le_bytes()); }
+        if compressed {
+            data.push(unit as u8);
+        } else {
+            data.extend_from_slice(&unit.to_le_bytes());
+        }
     }
 }
 
-fn write_continued_record<W: Write>(writer: &mut W, record_type: u16, data: &[u8]) -> XlsResult<()> {
+fn write_continued_record<W: Write>(
+    writer: &mut W,
+    record_type: u16,
+    data: &[u8],
+) -> XlsResult<()> {
     let mut offset = 0;
     let first = data.len().min(8224);
     write_record_header(writer, record_type, first as u16)?;
@@ -178,18 +186,32 @@ pub(crate) fn write_defined_name_record<W: Write>(
     data.extend_from_slice(&0u16.to_le_bytes());
     let itab = match name.scope {
         XlsNameScope::Workbook => 0,
-        XlsNameScope::Worksheet(index) => u16::try_from(index + 1)
-            .map_err(|_| XlsError::InvalidData("defined name sheet scope exceeds u16".to_string()))?,
+        XlsNameScope::Worksheet(index) => u16::try_from(index + 1).map_err(|_| {
+            XlsError::InvalidData("defined name sheet scope exceeds u16".to_string())
+        })?,
     };
     data.extend_from_slice(&itab.to_le_bytes());
-    for value in [&name.custom_menu, &name.description, &name.help_topic, &name.status_bar] {
+    for value in [
+        &name.custom_menu,
+        &name.description,
+        &name.help_topic,
+        &name.status_bar,
+    ] {
         data.push(value.chars().count() as u8);
     }
-    if let Some(code) = built_in { data.extend_from_slice(&[0, code]); }
-    else { push_no_cch_string(&mut data, &name.name); }
+    if let Some(code) = built_in {
+        data.extend_from_slice(&[0, code]);
+    } else {
+        push_no_cch_string(&mut data, &name.name);
+    }
     data.extend_from_slice(&name.formula_tokens);
     data.extend_from_slice(&name.formula_extra);
-    for value in [&name.custom_menu, &name.description, &name.help_topic, &name.status_bar] {
+    for value in [
+        &name.custom_menu,
+        &name.description,
+        &name.help_topic,
+        &name.status_bar,
+    ] {
         data.extend(value.chars().map(|character| character as u8));
     }
     write_continued_record(writer, 0x0018, &data)?;
@@ -199,11 +221,17 @@ pub(crate) fn write_defined_name_record<W: Write>(
     Ok(())
 }
 
-pub(crate) fn write_name_comment<W: Write>(writer: &mut W, name: &str, comment: &str) -> XlsResult<()> {
+pub(crate) fn write_name_comment<W: Write>(
+    writer: &mut W,
+    name: &str,
+    comment: &str,
+) -> XlsResult<()> {
     let name_len = name.encode_utf16().count();
     let comment_len = comment.encode_utf16().count();
     if name_len > 255 || comment_len > 255 {
-        return Err(XlsError::InvalidData("NameCmt strings exceed 255 UTF-16 units".to_string()));
+        return Err(XlsError::InvalidData(
+            "NameCmt strings exceed 255 UTF-16 units".to_string(),
+        ));
     }
     let mut data = Vec::new();
     data.extend_from_slice(&0x0894u16.to_le_bytes());
@@ -218,9 +246,50 @@ pub(crate) fn write_name_comment<W: Write>(writer: &mut W, name: &str, comment: 
     Ok(())
 }
 
-fn push_frt_header(data:&mut Vec<u8>,record_type:u16){data.extend_from_slice(&record_type.to_le_bytes());data.extend_from_slice(&0u16.to_le_bytes());data.extend_from_slice(&0u64.to_le_bytes());}
-fn push_xl_name_unicode(data:&mut Vec<u8>,value:&str){let units=value.encode_utf16().collect::<Vec<_>>();data.extend_from_slice(&(units.len()as u16).to_le_bytes());let compressed=units.iter().all(|unit|*unit<=0xff);data.push(u8::from(!compressed));for unit in units{if compressed{data.push(unit as u8)}else{data.extend_from_slice(&unit.to_le_bytes())}}}
+fn push_frt_header(data: &mut Vec<u8>, record_type: u16) {
+    data.extend_from_slice(&record_type.to_le_bytes());
+    data.extend_from_slice(&0u16.to_le_bytes());
+    data.extend_from_slice(&0u64.to_le_bytes());
+}
+fn push_xl_name_unicode(data: &mut Vec<u8>, value: &str) {
+    let units = value.encode_utf16().collect::<Vec<_>>();
+    data.extend_from_slice(&(units.len() as u16).to_le_bytes());
+    let compressed = units.iter().all(|unit| *unit <= 0xff);
+    data.push(u8::from(!compressed));
+    for unit in units {
+        if compressed {
+            data.push(unit as u8)
+        } else {
+            data.extend_from_slice(&unit.to_le_bytes())
+        }
+    }
+}
 
-pub(crate) fn write_name_function_group<W:Write>(writer:&mut W,value:&crate::xls::XlsNameFnGrp12)->XlsResult<()>{let mut data=Vec::new();push_frt_header(&mut data,0x0899);let count=value.function_name.encode_utf16().count();data.extend_from_slice(&(count as u16).to_le_bytes());data.extend_from_slice(&u16::from(value.category).to_le_bytes());push_xl_name_unicode(&mut data,&value.function_name);write_record_header(writer,0x0899,data.len()as u16)?;writer.write_all(&data)?;Ok(())}
+pub(crate) fn write_name_function_group<W: Write>(
+    writer: &mut W,
+    value: &crate::xls::XlsNameFnGrp12,
+) -> XlsResult<()> {
+    let mut data = Vec::new();
+    push_frt_header(&mut data, 0x0899);
+    let count = value.function_name.encode_utf16().count();
+    data.extend_from_slice(&(count as u16).to_le_bytes());
+    data.extend_from_slice(&u16::from(value.category).to_le_bytes());
+    push_xl_name_unicode(&mut data, &value.function_name);
+    write_record_header(writer, 0x0899, data.len() as u16)?;
+    writer.write_all(&data)?;
+    Ok(())
+}
 
-pub(crate) fn write_name_publish<W:Write>(writer:&mut W,value:&crate::xls::XlsNamePublish)->XlsResult<()>{let mut data=Vec::new();push_frt_header(&mut data,0x0893);let flags=u16::from(value.published)|(u16::from(value.workbook_parameter)<<1);data.extend_from_slice(&flags.to_le_bytes());push_xl_name_unicode(&mut data,&value.name);write_record_header(writer,0x0893,data.len()as u16)?;writer.write_all(&data)?;Ok(())}
+pub(crate) fn write_name_publish<W: Write>(
+    writer: &mut W,
+    value: &crate::xls::XlsNamePublish,
+) -> XlsResult<()> {
+    let mut data = Vec::new();
+    push_frt_header(&mut data, 0x0893);
+    let flags = u16::from(value.published) | (u16::from(value.workbook_parameter) << 1);
+    data.extend_from_slice(&flags.to_le_bytes());
+    push_xl_name_unicode(&mut data, &value.name);
+    write_record_header(writer, 0x0893, data.len() as u16)?;
+    writer.write_all(&data)?;
+    Ok(())
+}

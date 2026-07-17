@@ -41,19 +41,45 @@ pub struct XlsRowLayout {
 }
 
 impl XlsRowLayout {
-    pub fn row(&self) -> u16 { self.row }
-    pub fn first_cell_column(&self) -> u16 { self.first_cell_column }
-    pub fn last_cell_column_exclusive(&self) -> u16 { self.last_cell_column_exclusive }
-    pub fn height_twips(&self) -> u16 { self.height_twips }
-    pub fn outline_level(&self) -> u8 { self.outline_level }
-    pub fn is_collapsed(&self) -> bool { self.collapsed }
-    pub fn is_hidden(&self) -> bool { self.hidden }
-    pub fn has_custom_height(&self) -> bool { self.custom_height }
-    pub fn is_formatted(&self) -> bool { self.formatted }
-    pub fn format_index(&self) -> Option<u16> { self.format_index }
-    pub fn has_thick_top_border(&self) -> bool { self.thick_top_border }
-    pub fn has_thick_bottom_border(&self) -> bool { self.thick_bottom_border }
-    pub fn has_phonetic_guide(&self) -> bool { self.phonetic }
+    pub fn row(&self) -> u16 {
+        self.row
+    }
+    pub fn first_cell_column(&self) -> u16 {
+        self.first_cell_column
+    }
+    pub fn last_cell_column_exclusive(&self) -> u16 {
+        self.last_cell_column_exclusive
+    }
+    pub fn height_twips(&self) -> u16 {
+        self.height_twips
+    }
+    pub fn outline_level(&self) -> u8 {
+        self.outline_level
+    }
+    pub fn is_collapsed(&self) -> bool {
+        self.collapsed
+    }
+    pub fn is_hidden(&self) -> bool {
+        self.hidden
+    }
+    pub fn has_custom_height(&self) -> bool {
+        self.custom_height
+    }
+    pub fn is_formatted(&self) -> bool {
+        self.formatted
+    }
+    pub fn format_index(&self) -> Option<u16> {
+        self.format_index
+    }
+    pub fn has_thick_top_border(&self) -> bool {
+        self.thick_top_border
+    }
+    pub fn has_thick_bottom_border(&self) -> bool {
+        self.thick_bottom_border
+    }
+    pub fn has_phonetic_guide(&self) -> bool {
+        self.phonetic
+    }
 }
 
 /// Formatting and display metadata for an inclusive worksheet column range.
@@ -72,26 +98,51 @@ pub struct XlsColumnLayout {
 }
 
 impl XlsColumnLayout {
-    pub fn first_column(&self) -> u16 { self.first_column }
-    pub fn last_column(&self) -> u16 { self.last_column }
+    pub fn first_column(&self) -> u16 {
+        self.first_column
+    }
+    pub fn last_column(&self) -> u16 {
+        self.last_column
+    }
     /// Whether this range also defines formatting for newly exposed columns.
     ///
     /// BIFF8 uses column index `0x0100` as the default-column-formatting
     /// sentinel even though visible worksheet columns end at index 255.
-    pub fn includes_default_column_formatting(&self) -> bool { self.last_column == 0x0100 }
-    pub fn width_256ths(&self) -> u16 { self.width_256ths }
-    pub fn format_index(&self) -> u16 { self.format_index }
-    pub fn is_hidden(&self) -> bool { self.hidden }
-    pub fn is_user_set(&self) -> bool { self.user_set }
-    pub fn is_best_fit(&self) -> bool { self.best_fit }
-    pub fn has_phonetic_guide(&self) -> bool { self.phonetic }
-    pub fn outline_level(&self) -> u8 { self.outline_level }
-    pub fn is_collapsed(&self) -> bool { self.collapsed }
+    pub fn includes_default_column_formatting(&self) -> bool {
+        self.last_column == 0x0100
+    }
+    pub fn width_256ths(&self) -> u16 {
+        self.width_256ths
+    }
+    pub fn format_index(&self) -> u16 {
+        self.format_index
+    }
+    pub fn is_hidden(&self) -> bool {
+        self.hidden
+    }
+    pub fn is_user_set(&self) -> bool {
+        self.user_set
+    }
+    pub fn is_best_fit(&self) -> bool {
+        self.best_fit
+    }
+    pub fn has_phonetic_guide(&self) -> bool {
+        self.phonetic
+    }
+    pub fn outline_level(&self) -> u8 {
+        self.outline_level
+    }
+    pub fn is_collapsed(&self) -> bool {
+        self.collapsed
+    }
 }
 
 fn parse_row(data: &[u8]) -> XlsResult<XlsRowLayout> {
     if data.len() != 16 {
-        return Err(invalid(ROW_RECORD_TYPE, format!("ROW payload must be 16 bytes, found {}", data.len())));
+        return Err(invalid(
+            ROW_RECORD_TYPE,
+            format!("ROW payload must be 16 bytes, found {}", data.len()),
+        ));
     }
     let row = read_u16(data, 0);
     let first_cell_column = read_u16(data, 2);
@@ -102,13 +153,22 @@ fn parse_row(data: &[u8]) -> XlsResult<XlsRowLayout> {
     let format_flags = read_u16(data, 14);
 
     if first_cell_column > 255 {
-        return Err(invalid(ROW_RECORD_TYPE, "ROW first cell column exceeds 255"));
+        return Err(invalid(
+            ROW_RECORD_TYPE,
+            "ROW first cell column exceeds 255",
+        ));
     }
     if last_cell_column_exclusive > 256 || last_cell_column_exclusive < first_cell_column {
-        return Err(invalid(ROW_RECORD_TYPE, "ROW last cell column is outside its valid range"));
+        return Err(invalid(
+            ROW_RECORD_TYPE,
+            "ROW last cell column is outside its valid range",
+        ));
     }
     if !(2..=8192).contains(&height_twips) {
-        return Err(invalid(ROW_RECORD_TYPE, "ROW height must be between 2 and 8192 twips"));
+        return Err(invalid(
+            ROW_RECORD_TYPE,
+            "ROW height must be between 2 and 8192 twips",
+        ));
     }
     if reserved1 != 0 {
         return Err(invalid(ROW_RECORD_TYPE, "ROW reserved1 must be zero"));
@@ -140,16 +200,25 @@ fn parse_row(data: &[u8]) -> XlsResult<XlsRowLayout> {
 
 fn parse_col_info(data: &[u8]) -> XlsResult<XlsColumnLayout> {
     if data.len() != 12 {
-        return Err(invalid(COLINFO_RECORD_TYPE, format!("COLINFO payload must be 12 bytes, found {}", data.len())));
+        return Err(invalid(
+            COLINFO_RECORD_TYPE,
+            format!("COLINFO payload must be 12 bytes, found {}", data.len()),
+        ));
     }
     let first_column = read_u16(data, 0);
     let last_column = read_u16(data, 2);
     let flags = read_u16(data, 8);
     if first_column > 0x0100 || last_column > 0x0100 || last_column < first_column {
-        return Err(invalid(COLINFO_RECORD_TYPE, "COLINFO column range is invalid"));
+        return Err(invalid(
+            COLINFO_RECORD_TYPE,
+            "COLINFO column range is invalid",
+        ));
     }
     if flags & 0xe0f0 != 0 {
-        return Err(invalid(COLINFO_RECORD_TYPE, "COLINFO reserved flag bits must be zero"));
+        return Err(invalid(
+            COLINFO_RECORD_TYPE,
+            "COLINFO reserved flag bits must be zero",
+        ));
     }
 
     Ok(XlsColumnLayout {
@@ -201,25 +270,31 @@ impl LayoutCollector {
                     return Err(invalid(record_type, "COLINFO records must be contiguous"));
                 }
                 if self.columns.len() == MAX_COLINFO_RECORDS {
-                    return Err(invalid(record_type, "worksheet contains more than 255 COLINFO records"));
+                    return Err(invalid(
+                        record_type,
+                        "worksheet contains more than 255 COLINFO records",
+                    ));
                 }
                 let column = parse_col_info(data)?;
                 formatting.validate_cell_xf(column.format_index())?;
                 self.columns.push(column);
                 self.saw_columns = true;
-            }
+            },
             ROW_RECORD_TYPE => {
                 let row = parse_row(data)?;
                 if self.last_row.is_some_and(|last| row.row() <= last) {
-                    return Err(invalid(record_type, "ROW records must have strictly increasing row indexes"));
+                    return Err(invalid(
+                        record_type,
+                        "ROW records must have strictly increasing row indexes",
+                    ));
                 }
                 if let Some(index) = row.format_index() {
                     formatting.validate_cell_xf(index)?;
                 }
                 self.last_row = Some(row.row());
                 self.rows.insert(row.row(), row);
-            }
-            _ => {}
+            },
+            _ => {},
         }
         Ok(())
     }
@@ -302,12 +377,24 @@ mod tests {
     fn collector_rejects_noncontiguous_columns_and_unsorted_rows() {
         let formatting = XlsFormatting::default();
         let mut collector = LayoutCollector::new();
-        collector.feed_record(COLINFO_RECORD_TYPE, &col_payload(0, 0, 0), &formatting).unwrap();
+        collector
+            .feed_record(COLINFO_RECORD_TYPE, &col_payload(0, 0, 0), &formatting)
+            .unwrap();
         collector.feed_record(0x0200, &[], &formatting).unwrap();
-        assert!(collector.feed_record(COLINFO_RECORD_TYPE, &col_payload(1, 1, 0), &formatting).is_err());
+        assert!(
+            collector
+                .feed_record(COLINFO_RECORD_TYPE, &col_payload(1, 1, 0), &formatting)
+                .is_err()
+        );
 
         let mut collector = LayoutCollector::new();
-        collector.feed_record(ROW_RECORD_TYPE, &row_payload(2, 0x0100, 0), &formatting).unwrap();
-        assert!(collector.feed_record(ROW_RECORD_TYPE, &row_payload(1, 0x0100, 0), &formatting).is_err());
+        collector
+            .feed_record(ROW_RECORD_TYPE, &row_payload(2, 0x0100, 0), &formatting)
+            .unwrap();
+        assert!(
+            collector
+                .feed_record(ROW_RECORD_TYPE, &row_payload(1, 0x0100, 0), &formatting)
+                .is_err()
+        );
     }
 }

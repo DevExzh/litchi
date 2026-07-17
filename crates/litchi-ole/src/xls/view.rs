@@ -60,13 +60,26 @@ pub struct XlsSelectionRange {
 
 impl XlsSelectionRange {
     pub fn new(first_row: u16, last_row: u16, first_column: u8, last_column: u8) -> Self {
-        Self { first_row, last_row, first_column, last_column }
+        Self {
+            first_row,
+            last_row,
+            first_column,
+            last_column,
+        }
     }
 
-    pub fn first_row(&self) -> u16 { self.first_row }
-    pub fn last_row(&self) -> u16 { self.last_row }
-    pub fn first_column(&self) -> u8 { self.first_column }
-    pub fn last_column(&self) -> u8 { self.last_column }
+    pub fn first_row(&self) -> u16 {
+        self.first_row
+    }
+    pub fn last_row(&self) -> u16 {
+        self.last_row
+    }
+    pub fn first_column(&self) -> u8 {
+        self.first_column
+    }
+    pub fn last_column(&self) -> u8 {
+        self.last_column
+    }
 }
 
 /// One BIFF8 `SELECTION` record in a worksheet window.
@@ -80,11 +93,21 @@ pub struct XlsSelection {
 }
 
 impl XlsSelection {
-    pub fn pane(&self) -> XlsPaneType { self.pane }
-    pub fn active_row(&self) -> u16 { self.active_row }
-    pub fn active_column(&self) -> u8 { self.active_column }
-    pub fn active_range_index(&self) -> u16 { self.active_range_index }
-    pub fn ranges(&self) -> &[XlsSelectionRange] { &self.ranges }
+    pub fn pane(&self) -> XlsPaneType {
+        self.pane
+    }
+    pub fn active_row(&self) -> u16 {
+        self.active_row
+    }
+    pub fn active_column(&self) -> u8 {
+        self.active_column
+    }
+    pub fn active_range_index(&self) -> u16 {
+        self.active_range_index
+    }
+    pub fn ranges(&self) -> &[XlsSelectionRange] {
+        &self.ranges
+    }
 }
 
 /// Frozen or split pane configuration for a worksheet window.
@@ -99,12 +122,22 @@ pub struct XlsPane {
 
 impl XlsPane {
     /// Horizontal split in columns when frozen, otherwise in twips.
-    pub fn horizontal_split(&self) -> u16 { self.horizontal_split }
+    pub fn horizontal_split(&self) -> u16 {
+        self.horizontal_split
+    }
     /// Vertical split in rows when frozen, otherwise in twips.
-    pub fn vertical_split(&self) -> u16 { self.vertical_split }
-    pub fn bottom_pane_top_row(&self) -> u16 { self.bottom_pane_top_row }
-    pub fn right_pane_left_column(&self) -> u8 { self.right_pane_left_column }
-    pub fn active_pane(&self) -> XlsPaneType { self.active_pane }
+    pub fn vertical_split(&self) -> u16 {
+        self.vertical_split
+    }
+    pub fn bottom_pane_top_row(&self) -> u16 {
+        self.bottom_pane_top_row
+    }
+    pub fn right_pane_left_column(&self) -> u8 {
+        self.right_pane_left_column
+    }
+    pub fn active_pane(&self) -> XlsPaneType {
+        self.active_pane
+    }
 }
 
 /// Display and navigation state for one worksheet window.
@@ -122,26 +155,66 @@ pub struct XlsWorksheetView {
 }
 
 impl XlsWorksheetView {
-    pub fn shows_formulas(&self) -> bool { self.flags & 0x0001 != 0 }
-    pub fn shows_gridlines(&self) -> bool { self.flags & 0x0002 != 0 }
-    pub fn shows_row_column_headers(&self) -> bool { self.flags & 0x0004 != 0 }
-    pub fn has_frozen_panes(&self) -> bool { self.flags & 0x0008 != 0 }
-    pub fn shows_zero_values(&self) -> bool { self.flags & 0x0010 != 0 }
-    pub fn uses_default_gridline_color(&self) -> bool { self.flags & 0x0020 != 0 }
-    pub fn is_right_to_left(&self) -> bool { self.flags & 0x0040 != 0 }
-    pub fn shows_outline_symbols(&self) -> bool { self.flags & 0x0080 != 0 }
-    pub fn is_frozen_without_split(&self) -> bool { self.flags & 0x0100 != 0 }
-    pub fn is_selected(&self) -> bool { self.flags & 0x0200 != 0 }
-    pub fn is_displayed(&self) -> bool { self.flags & 0x0400 != 0 }
-    pub fn is_page_break_preview(&self) -> bool { self.flags & 0x0800 != 0 }
-    pub fn first_visible_row(&self) -> u16 { self.first_visible_row }
-    pub fn first_visible_column(&self) -> u8 { self.first_visible_column }
-    pub fn gridline_color_index(&self) -> u16 { self.gridline_color_index }
-    pub fn page_break_zoom_percent(&self) -> Option<u16> { self.page_break_zoom_percent }
-    pub fn normal_zoom_percent(&self) -> Option<u16> { self.normal_zoom_percent }
-    pub fn zoom_fraction(&self) -> Option<(u16, u16)> { self.zoom_fraction }
-    pub fn pane(&self) -> Option<&XlsPane> { self.pane.as_ref() }
-    pub fn selections(&self) -> &[XlsSelection] { &self.selections }
+    pub fn shows_formulas(&self) -> bool {
+        self.flags & 0x0001 != 0
+    }
+    pub fn shows_gridlines(&self) -> bool {
+        self.flags & 0x0002 != 0
+    }
+    pub fn shows_row_column_headers(&self) -> bool {
+        self.flags & 0x0004 != 0
+    }
+    pub fn has_frozen_panes(&self) -> bool {
+        self.flags & 0x0008 != 0
+    }
+    pub fn shows_zero_values(&self) -> bool {
+        self.flags & 0x0010 != 0
+    }
+    pub fn uses_default_gridline_color(&self) -> bool {
+        self.flags & 0x0020 != 0
+    }
+    pub fn is_right_to_left(&self) -> bool {
+        self.flags & 0x0040 != 0
+    }
+    pub fn shows_outline_symbols(&self) -> bool {
+        self.flags & 0x0080 != 0
+    }
+    pub fn is_frozen_without_split(&self) -> bool {
+        self.flags & 0x0100 != 0
+    }
+    pub fn is_selected(&self) -> bool {
+        self.flags & 0x0200 != 0
+    }
+    pub fn is_displayed(&self) -> bool {
+        self.flags & 0x0400 != 0
+    }
+    pub fn is_page_break_preview(&self) -> bool {
+        self.flags & 0x0800 != 0
+    }
+    pub fn first_visible_row(&self) -> u16 {
+        self.first_visible_row
+    }
+    pub fn first_visible_column(&self) -> u8 {
+        self.first_visible_column
+    }
+    pub fn gridline_color_index(&self) -> u16 {
+        self.gridline_color_index
+    }
+    pub fn page_break_zoom_percent(&self) -> Option<u16> {
+        self.page_break_zoom_percent
+    }
+    pub fn normal_zoom_percent(&self) -> Option<u16> {
+        self.normal_zoom_percent
+    }
+    pub fn zoom_fraction(&self) -> Option<(u16, u16)> {
+        self.zoom_fraction
+    }
+    pub fn pane(&self) -> Option<&XlsPane> {
+        self.pane.as_ref()
+    }
+    pub fn selections(&self) -> &[XlsSelection] {
+        &self.selections
+    }
 
     fn validate_selection_groups(&self) -> XlsResult<()> {
         let mut start = 0;
@@ -152,7 +225,12 @@ impl XlsWorksheetView {
             while end < self.selections.len() && self.selections[end].pane == first.pane {
                 range_count = range_count
                     .checked_add(self.selections[end].ranges.len())
-                    .ok_or_else(|| invalid(SELECTION_RECORD_TYPE, "SELECTION range aggregation overflows"))?;
+                    .ok_or_else(|| {
+                        invalid(
+                            SELECTION_RECORD_TYPE,
+                            "SELECTION range aggregation overflows",
+                        )
+                    })?;
                 end += 1;
             }
             let active_index = usize::from(first.active_range_index);
@@ -194,36 +272,60 @@ fn parse_zoom_percent(value: u16, record_type: u16, name: &str) -> XlsResult<Opt
     } else if (10..=400).contains(&value) {
         Ok(Some(value))
     } else {
-        Err(invalid(record_type, format!("{name} must be zero or between 10 and 400")))
+        Err(invalid(
+            record_type,
+            format!("{name} must be zero or between 10 and 400"),
+        ))
     }
 }
 
 fn parse_window2(data: &[u8]) -> XlsResult<XlsWorksheetView> {
     if data.len() != 18 {
-        return Err(invalid(WINDOW2_RECORD_TYPE, format!("WINDOW2 payload must be 18 bytes, found {}", data.len())));
+        return Err(invalid(
+            WINDOW2_RECORD_TYPE,
+            format!("WINDOW2 payload must be 18 bytes, found {}", data.len()),
+        ));
     }
     let flags = read_u16(data, 0);
     let first_visible_row = read_u16(data, 2);
     let first_visible_column = read_u16(data, 4);
     let gridline_color_index = read_u16(data, 6);
     if flags & 0xf000 != 0 {
-        return Err(invalid(WINDOW2_RECORD_TYPE, "WINDOW2 reserved flag bits must be zero"));
+        return Err(invalid(
+            WINDOW2_RECORD_TYPE,
+            "WINDOW2 reserved flag bits must be zero",
+        ));
     }
     if first_visible_column > 255 {
-        return Err(invalid(WINDOW2_RECORD_TYPE, "WINDOW2 first visible column exceeds 255"));
+        return Err(invalid(
+            WINDOW2_RECORD_TYPE,
+            "WINDOW2 first visible column exceeds 255",
+        ));
     }
     if flags & 0x0100 != 0 && flags & 0x0008 == 0 {
-        return Err(invalid(WINDOW2_RECORD_TYPE, "WINDOW2 frozen-without-split requires frozen panes"));
+        return Err(invalid(
+            WINDOW2_RECORD_TYPE,
+            "WINDOW2 frozen-without-split requires frozen panes",
+        ));
     }
     if flags & 0x0008 != 0 && (first_visible_row == u16::MAX || first_visible_column == 255) {
-        return Err(invalid(WINDOW2_RECORD_TYPE, "WINDOW2 sentinel visible origins cannot be frozen"));
+        return Err(invalid(
+            WINDOW2_RECORD_TYPE,
+            "WINDOW2 sentinel visible origins cannot be frozen",
+        ));
     }
     let uses_default_color = flags & 0x0020 != 0;
     if gridline_color_index > 64 || (gridline_color_index == 64) != uses_default_color {
-        return Err(invalid(WINDOW2_RECORD_TYPE, "WINDOW2 gridline color and default-color flag disagree"));
+        return Err(invalid(
+            WINDOW2_RECORD_TYPE,
+            "WINDOW2 gridline color and default-color flag disagree",
+        ));
     }
     if read_u16(data, 8) != 0 || read_u16(data, 16) != 0 {
-        return Err(invalid(WINDOW2_RECORD_TYPE, "WINDOW2 reserved fields must be zero"));
+        return Err(invalid(
+            WINDOW2_RECORD_TYPE,
+            "WINDOW2 reserved fields must be zero",
+        ));
     }
 
     Ok(XlsWorksheetView {
@@ -231,8 +333,16 @@ fn parse_window2(data: &[u8]) -> XlsResult<XlsWorksheetView> {
         first_visible_row,
         first_visible_column: first_visible_column as u8,
         gridline_color_index,
-        page_break_zoom_percent: parse_zoom_percent(read_u16(data, 10), WINDOW2_RECORD_TYPE, "page-break zoom")?,
-        normal_zoom_percent: parse_zoom_percent(read_u16(data, 12), WINDOW2_RECORD_TYPE, "normal zoom")?,
+        page_break_zoom_percent: parse_zoom_percent(
+            read_u16(data, 10),
+            WINDOW2_RECORD_TYPE,
+            "page-break zoom",
+        )?,
+        normal_zoom_percent: parse_zoom_percent(
+            read_u16(data, 12),
+            WINDOW2_RECORD_TYPE,
+            "normal zoom",
+        )?,
         zoom_fraction: None,
         pane: None,
         selections: Vec::new(),
@@ -241,7 +351,10 @@ fn parse_window2(data: &[u8]) -> XlsResult<XlsWorksheetView> {
 
 fn parse_scl(data: &[u8]) -> XlsResult<(u16, u16)> {
     if data.len() != 4 {
-        return Err(invalid(SCL_RECORD_TYPE, format!("SCL payload must be 4 bytes, found {}", data.len())));
+        return Err(invalid(
+            SCL_RECORD_TYPE,
+            format!("SCL payload must be 4 bytes, found {}", data.len()),
+        ));
     }
     let numerator = read_u16(data, 0);
     let denominator = read_u16(data, 2);
@@ -258,14 +371,20 @@ fn parse_scl(data: &[u8]) -> XlsResult<(u16, u16)> {
     let numerator = u32::from(numerator);
     let denominator = u32::from(denominator);
     if numerator * 10 < denominator || numerator > denominator * 4 {
-        return Err(invalid(SCL_RECORD_TYPE, "SCL zoom fraction must be between 1/10 and 4"));
+        return Err(invalid(
+            SCL_RECORD_TYPE,
+            "SCL zoom fraction must be between 1/10 and 4",
+        ));
     }
     Ok((numerator as u16, denominator as u16))
 }
 
 fn parse_pane(data: &[u8], frozen: bool) -> XlsResult<XlsPane> {
     if data.len() != 10 {
-        return Err(invalid(PANE_RECORD_TYPE, format!("PANE payload must be 10 bytes, found {}", data.len())));
+        return Err(invalid(
+            PANE_RECORD_TYPE,
+            format!("PANE payload must be 10 bytes, found {}", data.len()),
+        ));
     }
     let horizontal_split = read_u16(data, 0);
     let vertical_split = read_u16(data, 2);
@@ -273,10 +392,16 @@ fn parse_pane(data: &[u8], frozen: bool) -> XlsResult<XlsPane> {
     if (frozen && horizontal_split > 255)
         || (!frozen && (horizontal_split > 32767 || vertical_split > 32767))
     {
-        return Err(invalid(PANE_RECORD_TYPE, "PANE split position is outside its mode-specific bounds"));
+        return Err(invalid(
+            PANE_RECORD_TYPE,
+            "PANE split position is outside its mode-specific bounds",
+        ));
     }
     if right_pane_left_column > 255 {
-        return Err(invalid(PANE_RECORD_TYPE, "PANE right-pane column exceeds 255"));
+        return Err(invalid(
+            PANE_RECORD_TYPE,
+            "PANE right-pane column exceeds 255",
+        ));
     }
     if data[9] != 0 {
         return Err(invalid(PANE_RECORD_TYPE, "PANE reserved byte must be zero"));
@@ -292,19 +417,31 @@ fn parse_pane(data: &[u8], frozen: bool) -> XlsResult<XlsPane> {
 
 fn parse_selection(data: &[u8]) -> XlsResult<XlsSelection> {
     if data.len() < 9 {
-        return Err(invalid(SELECTION_RECORD_TYPE, "SELECTION payload is shorter than 9 bytes"));
+        return Err(invalid(
+            SELECTION_RECORD_TYPE,
+            "SELECTION payload is shorter than 9 bytes",
+        ));
     }
     let active_column = read_u16(data, 3);
     let active_range_index = read_u16(data, 5);
     let range_count = usize::from(read_u16(data, 7));
     if active_column > 255 {
-        return Err(invalid(SELECTION_RECORD_TYPE, "SELECTION active column exceeds 255"));
+        return Err(invalid(
+            SELECTION_RECORD_TYPE,
+            "SELECTION active column exceeds 255",
+        ));
     }
     if active_range_index & 0x8000 != 0 {
-        return Err(invalid(SELECTION_RECORD_TYPE, "SELECTION active range index must be nonnegative"));
+        return Err(invalid(
+            SELECTION_RECORD_TYPE,
+            "SELECTION active range index must be nonnegative",
+        ));
     }
     if range_count > 1369 || data.len() != 9 + range_count * 6 {
-        return Err(invalid(SELECTION_RECORD_TYPE, "SELECTION range count does not match its payload"));
+        return Err(invalid(
+            SELECTION_RECORD_TYPE,
+            "SELECTION range count does not match its payload",
+        ));
     }
     let mut ranges = Vec::with_capacity(range_count);
     for chunk in data[9..].chunks_exact(6) {
@@ -315,7 +452,10 @@ fn parse_selection(data: &[u8]) -> XlsResult<XlsSelection> {
             last_column: chunk[5],
         };
         if range.first_row > range.last_row || range.first_column > range.last_column {
-            return Err(invalid(SELECTION_RECORD_TYPE, "SELECTION contains an inverted range"));
+            return Err(invalid(
+                SELECTION_RECORD_TYPE,
+                "SELECTION contains an inverted range",
+            ));
         }
         ranges.push(range);
     }
@@ -375,7 +515,10 @@ impl ViewCollector {
                         selection.pane,
                     )
                 }) {
-                    return Err(invalid(SELECTION_RECORD_TYPE, "SELECTION references a pane that does not exist"));
+                    return Err(invalid(
+                        SELECTION_RECORD_TYPE,
+                        "SELECTION references a pane that does not exist",
+                    ));
                 }
             }
             self.views.push(view);
@@ -397,15 +540,15 @@ impl ViewCollector {
         match record_type {
             PLV_RECORD_TYPE if self.phase == ViewPhase::Start && !self.saw_plv => {
                 self.saw_plv = true;
-            }
+            },
             SCL_RECORD_TYPE if self.phase == ViewPhase::Start => {
                 view.zoom_fraction = Some(parse_scl(data)?);
                 self.phase = ViewPhase::Zoom;
-            }
+            },
             PANE_RECORD_TYPE if matches!(self.phase, ViewPhase::Start | ViewPhase::Zoom) => {
                 view.pane = Some(parse_pane(data, view.has_frozen_panes())?);
                 self.phase = ViewPhase::Pane;
-            }
+            },
             SELECTION_RECORD_TYPE => {
                 let selection = parse_selection(data)?;
                 if let Some(previous) = view.selections.last()
@@ -414,14 +557,20 @@ impl ViewCollector {
                         || previous.active_column != selection.active_column
                         || previous.active_range_index != selection.active_range_index)
                 {
-                    return Err(invalid(SELECTION_RECORD_TYPE, "contiguous selections for one pane disagree on the active cell"));
+                    return Err(invalid(
+                        SELECTION_RECORD_TYPE,
+                        "contiguous selections for one pane disagree on the active cell",
+                    ));
                 }
                 view.selections.push(selection);
                 self.phase = ViewPhase::Selections;
-            }
+            },
             PLV_RECORD_TYPE | SCL_RECORD_TYPE | PANE_RECORD_TYPE => {
-                return Err(invalid(record_type, "record is out of order in the WINDOW production"));
-            }
+                return Err(invalid(
+                    record_type,
+                    "record is out of order in the WINDOW production",
+                ));
+            },
             _ => self.finish_current()?,
         }
         Ok(())
@@ -457,10 +606,16 @@ mod tests {
     #[test]
     fn parses_window_zoom_pane_and_selection() {
         let mut collector = ViewCollector::new();
-        collector.feed_record(WINDOW2_RECORD_TYPE, &window2(0x07be)).unwrap();
-        collector.feed_record(SCL_RECORD_TYPE, &[3, 0, 4, 0]).unwrap();
+        collector
+            .feed_record(WINDOW2_RECORD_TYPE, &window2(0x07be))
+            .unwrap();
+        collector
+            .feed_record(SCL_RECORD_TYPE, &[3, 0, 4, 0])
+            .unwrap();
         collector.feed_record(PANE_RECORD_TYPE, &pane()).unwrap();
-        collector.feed_record(SELECTION_RECORD_TYPE, &selection(0)).unwrap();
+        collector
+            .feed_record(SELECTION_RECORD_TYPE, &selection(0))
+            .unwrap();
         let views = collector.finish().unwrap();
         let view = &views[0];
         assert!(view.has_frozen_panes());
@@ -479,18 +634,30 @@ mod tests {
         assert!(parse_selection(&[0; 8]).is_err());
 
         let mut collector = ViewCollector::new();
-        collector.feed_record(WINDOW2_RECORD_TYPE, &window2(0x002e)).unwrap();
+        collector
+            .feed_record(WINDOW2_RECORD_TYPE, &window2(0x002e))
+            .unwrap();
         collector.feed_record(PANE_RECORD_TYPE, &pane()).unwrap();
-        assert!(collector.feed_record(SCL_RECORD_TYPE, &[1, 0, 1, 0]).is_err());
+        assert!(
+            collector
+                .feed_record(SCL_RECORD_TYPE, &[1, 0, 1, 0])
+                .is_err()
+        );
     }
 
     #[test]
     fn ignores_custom_view_selections_after_window_closes() {
         let mut collector = ViewCollector::new();
-        collector.feed_record(WINDOW2_RECORD_TYPE, &window2(0x0026)).unwrap();
-        collector.feed_record(SELECTION_RECORD_TYPE, &selection(3)).unwrap();
+        collector
+            .feed_record(WINDOW2_RECORD_TYPE, &window2(0x0026))
+            .unwrap();
+        collector
+            .feed_record(SELECTION_RECORD_TYPE, &selection(3))
+            .unwrap();
         collector.feed_record(0x01aa, &[]).unwrap();
-        collector.feed_record(SELECTION_RECORD_TYPE, &selection(0)).unwrap();
+        collector
+            .feed_record(SELECTION_RECORD_TYPE, &selection(0))
+            .unwrap();
         let views = collector.finish().unwrap();
         assert_eq!(views[0].selections().len(), 1);
     }
@@ -500,18 +667,28 @@ mod tests {
         let mut first = selection(0);
         first[5..7].copy_from_slice(&1u16.to_le_bytes());
         let mut collector = ViewCollector::new();
-        collector.feed_record(WINDOW2_RECORD_TYPE, &window2(0x002e)).unwrap();
-        collector.feed_record(SELECTION_RECORD_TYPE, &first).unwrap();
+        collector
+            .feed_record(WINDOW2_RECORD_TYPE, &window2(0x002e))
+            .unwrap();
+        collector
+            .feed_record(SELECTION_RECORD_TYPE, &first)
+            .unwrap();
         let mut second = selection(0);
         second[5..7].copy_from_slice(&1u16.to_le_bytes());
-        collector.feed_record(SELECTION_RECORD_TYPE, &second).unwrap();
+        collector
+            .feed_record(SELECTION_RECORD_TYPE, &second)
+            .unwrap();
         assert!(collector.finish().is_ok());
 
         let mut invalid = selection(0);
         invalid[1..3].copy_from_slice(&8u16.to_le_bytes());
         let mut collector = ViewCollector::new();
-        collector.feed_record(WINDOW2_RECORD_TYPE, &window2(0x002e)).unwrap();
-        collector.feed_record(SELECTION_RECORD_TYPE, &invalid).unwrap();
+        collector
+            .feed_record(WINDOW2_RECORD_TYPE, &window2(0x002e))
+            .unwrap();
+        collector
+            .feed_record(SELECTION_RECORD_TYPE, &invalid)
+            .unwrap();
         assert!(collector.finish().is_err());
     }
 
@@ -522,8 +699,12 @@ mod tests {
         let mut bad_active_pane = pane();
         bad_active_pane[0..2].copy_from_slice(&0u16.to_le_bytes());
         let mut collector = ViewCollector::new();
-        collector.feed_record(WINDOW2_RECORD_TYPE, &window2(0x0026)).unwrap();
-        collector.feed_record(PANE_RECORD_TYPE, &bad_active_pane).unwrap();
+        collector
+            .feed_record(WINDOW2_RECORD_TYPE, &window2(0x0026))
+            .unwrap();
+        collector
+            .feed_record(PANE_RECORD_TYPE, &bad_active_pane)
+            .unwrap();
         assert!(collector.finish().is_err());
     }
 
@@ -546,7 +727,10 @@ mod tests {
         assert_eq!(view.selections().len(), 4);
         let pane = view.pane().unwrap();
         assert_eq!((pane.horizontal_split(), pane.vertical_split()), (5, 7));
-        assert_eq!((pane.bottom_pane_top_row(), pane.right_pane_left_column()), (7, 34));
+        assert_eq!(
+            (pane.bottom_pane_top_row(), pane.right_pane_left_column()),
+            (7, 34)
+        );
         assert_eq!(pane.active_pane(), XlsPaneType::LowerRight);
 
         let split = XlsWorkbook::new(File::open(fixture("50939.xls")).unwrap()).unwrap();
@@ -555,6 +739,9 @@ mod tests {
         assert!(!view.is_frozen_without_split());
         let pane = view.pane().unwrap();
         assert_eq!((pane.horizontal_split(), pane.vertical_split()), (8, 4));
-        assert_eq!((pane.bottom_pane_top_row(), pane.right_pane_left_column()), (4, 26));
+        assert_eq!(
+            (pane.bottom_pane_top_row(), pane.right_pane_left_column()),
+            (4, 26)
+        );
     }
 }

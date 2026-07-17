@@ -215,10 +215,7 @@ impl<R: Read + Seek> Package<R> {
     }
 
     /// Get the main document using explicit password-to-open options.
-    pub fn document_with_options(
-        &mut self,
-        options: DocOpenOptions<'_>,
-    ) -> Result<Document> {
+    pub fn document_with_options(&mut self, options: DocOpenOptions<'_>) -> Result<Document> {
         Document::from_ole_with_options(&mut self.ole, options)
     }
 
@@ -248,9 +245,9 @@ impl From<DocError> for litchi_core::Error {
             DocError::InvalidPassword => {
                 litchi_core::Error::InvalidFormat("invalid DOC password".to_string())
             },
-            DocError::UnsupportedEncryption(kind) => litchi_core::Error::InvalidFormat(format!(
-                "unsupported DOC encryption: {kind:?}"
-            )),
+            DocError::UnsupportedEncryption(kind) => {
+                litchi_core::Error::InvalidFormat(format!("unsupported DOC encryption: {kind:?}"))
+            },
             DocError::MalformedEncryptionHeader(s) => litchi_core::Error::CorruptedFile(s),
         }
     }
@@ -315,7 +312,10 @@ mod tests {
         let path = poi_fixture("password_password_cryptoapi.doc");
 
         let mut package = Package::open(&path).unwrap();
-        assert!(matches!(package.document(), Err(DocError::PasswordRequired)));
+        assert!(matches!(
+            package.document(),
+            Err(DocError::PasswordRequired)
+        ));
 
         let mut package = Package::open(&path).unwrap();
         assert!(matches!(

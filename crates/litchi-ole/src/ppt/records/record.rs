@@ -135,7 +135,7 @@ impl PptRecord {
     fn is_container_record(record_type: PptRecordType) -> bool {
         matches!(
             record_type,
-                PptRecordType::Document
+            PptRecordType::Document
                 | PptRecordType::Slide
                 | PptRecordType::Notes
                 | PptRecordType::Handout

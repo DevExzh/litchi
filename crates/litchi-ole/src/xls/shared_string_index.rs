@@ -18,9 +18,8 @@ fn invalid(message: impl Into<String>) -> XlsError {
 
 fn strings_per_bucket(unique_string_count: u32) -> XlsResult<u16> {
     let value = (unique_string_count / 128 + 1).max(8);
-    u16::try_from(value).map_err(|_| {
-        invalid("SST unique-string count is too large for the ExtSST dsst field")
-    })
+    u16::try_from(value)
+        .map_err(|_| invalid("SST unique-string count is too large for the ExtSST dsst field"))
 }
 
 fn required_bucket_count(unique_string_count: u32, bucket_size: u16) -> XlsResult<usize> {
@@ -32,8 +31,8 @@ fn required_bucket_count(unique_string_count: u32, bucket_size: u16) -> XlsResul
     } else {
         (unique_string_count - 1) / u32::from(bucket_size) + 1
     };
-    let count = usize::try_from(count)
-        .map_err(|_| invalid("ExtSST bucket count does not fit usize"))?;
+    let count =
+        usize::try_from(count).map_err(|_| invalid("ExtSST bucket count does not fit usize"))?;
     if count > MAX_BUCKETS {
         return Err(invalid("ExtSST requires more than 128 buckets"));
     }
@@ -52,14 +51,21 @@ impl XlsSharedStringBucket {
         if u32::from(record_offset) >= stream_position {
             return Err(invalid("ISSTInf cbOffset must be less than ib"));
         }
-        Ok(Self { stream_position, record_offset })
+        Ok(Self {
+            stream_position,
+            record_offset,
+        })
     }
 
     /// Absolute zero-based position of the bucket's first string.
-    pub fn stream_position(self) -> u32 { self.stream_position }
+    pub fn stream_position(self) -> u32 {
+        self.stream_position
+    }
 
     /// Offset of the first string within its containing SST or Continue record.
-    pub fn record_offset(self) -> u16 { self.record_offset }
+    pub fn record_offset(self) -> u16 {
+        self.record_offset
+    }
 
     /// Absolute position of the containing SST or Continue record header.
     pub fn record_position(self) -> u32 {
@@ -88,7 +94,11 @@ impl XlsSharedStringIndex {
                 buckets.len()
             )));
         }
-        Ok(Self { unique_string_count, strings_per_bucket, buckets })
+        Ok(Self {
+            unique_string_count,
+            strings_per_bucket,
+            buckets,
+        })
     }
 
     pub fn parse_payload(unique_string_count: u32, data: &[u8]) -> XlsResult<Self> {
@@ -132,9 +142,15 @@ impl XlsSharedStringIndex {
         Self::try_new(unique_string_count, buckets)
     }
 
-    pub fn unique_string_count(&self) -> u32 { self.unique_string_count }
-    pub fn strings_per_bucket(&self) -> u16 { self.strings_per_bucket }
-    pub fn buckets(&self) -> &[XlsSharedStringBucket] { &self.buckets }
+    pub fn unique_string_count(&self) -> u32 {
+        self.unique_string_count
+    }
+    pub fn strings_per_bucket(&self) -> u16 {
+        self.strings_per_bucket
+    }
+    pub fn buckets(&self) -> &[XlsSharedStringBucket] {
+        &self.buckets
+    }
 
     /// Bucket containing the given zero-based shared-string index.
     pub fn bucket_for_string(&self, string_index: u32) -> Option<&XlsSharedStringBucket> {
@@ -188,7 +204,11 @@ pub(crate) struct SharedStringIndexCollector {
 
 impl SharedStringIndexCollector {
     pub(crate) fn new() -> Self {
-        Self { unique_string_count: None, value: Ok(None), ext_sst_seen: false }
+        Self {
+            unique_string_count: None,
+            value: Ok(None),
+            ext_sst_seen: false,
+        }
     }
 
     /// Collect the optional accelerator without making workbook content depend on it.
@@ -207,22 +227,23 @@ impl SharedStringIndexCollector {
                     self.value = Err(invalid("ExtSST appears before SST"));
                     return;
                 };
-                self.value = XlsSharedStringIndex::parse_payload(unique_string_count, data).map(Some);
+                self.value =
+                    XlsSharedStringIndex::parse_payload(unique_string_count, data).map(Some);
             },
             _ => {},
         }
     }
 
-    pub(crate) fn finish(self) -> XlsResult<Option<XlsSharedStringIndex>> { self.value }
+    pub(crate) fn finish(self) -> XlsResult<Option<XlsSharedStringIndex>> {
+        self.value
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    const SIMPLE_REFERENCE: [u8; 10] = [
-        0x08, 0x00, 0x8C, 0x05, 0x00, 0x00, 0x0C, 0x00, 0x00, 0x00,
-    ];
+    const SIMPLE_REFERENCE: [u8; 10] = [0x08, 0x00, 0x8C, 0x05, 0x00, 0x00, 0x0C, 0x00, 0x00, 0x00];
 
     #[test]
     fn parses_and_round_trips_simple_poi_reference() {

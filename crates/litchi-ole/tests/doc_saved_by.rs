@@ -1,6 +1,6 @@
 use litchi_cfb::OleFile;
-use litchi_ole::doc::parts::fib::FileInformationBlock;
 use litchi_ole::doc::SavedByTable;
+use litchi_ole::doc::parts::fib::FileInformationBlock;
 use std::fs::File;
 use std::path::Path;
 
@@ -20,9 +20,18 @@ fn apache_poi_saved_by_table_is_exact_and_round_trips() {
     let saved_by = SavedByTable::parse(&fib, &table_stream).unwrap();
 
     let expected = [
-        ("cic22", "C:\\DOCUME~1\\phamill\\LOCALS~1\\Temp\\AutoRecovery save of Iraq - security.asd"),
-        ("cic22", "C:\\DOCUME~1\\phamill\\LOCALS~1\\Temp\\AutoRecovery save of Iraq - security.asd"),
-        ("cic22", "C:\\DOCUME~1\\phamill\\LOCALS~1\\Temp\\AutoRecovery save of Iraq - security.asd"),
+        (
+            "cic22",
+            "C:\\DOCUME~1\\phamill\\LOCALS~1\\Temp\\AutoRecovery save of Iraq - security.asd",
+        ),
+        (
+            "cic22",
+            "C:\\DOCUME~1\\phamill\\LOCALS~1\\Temp\\AutoRecovery save of Iraq - security.asd",
+        ),
+        (
+            "cic22",
+            "C:\\DOCUME~1\\phamill\\LOCALS~1\\Temp\\AutoRecovery save of Iraq - security.asd",
+        ),
         ("JPratt", "C:\\TEMP\\Iraq - security.doc"),
         ("JPratt", "A:\\Iraq - security.doc"),
         ("ablackshaw", "C:\\ABlackshaw\\Iraq - security.doc"),

@@ -15,11 +15,7 @@ fn worksheet_exposes_rich_shared_string_properties_by_index() {
     let shared_strings = worksheet.shared_strings().unwrap();
 
     let rich_entry_count = (0..shared_strings.len())
-        .filter(|&index| {
-            worksheet
-                .shared_string_properties(index as u32)
-                .is_some()
-        })
+        .filter(|&index| worksheet.shared_string_properties(index as u32).is_some())
         .count();
 
     assert!(rich_entry_count > 0);

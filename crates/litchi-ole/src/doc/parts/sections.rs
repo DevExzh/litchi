@@ -79,7 +79,9 @@ impl SectionsTable {
                 .checked_add(index.checked_mul(12).ok_or_else(|| {
                     DocError::Corrupted("PlcfSed record offset overflows".to_string())
                 })?)
-                .ok_or_else(|| DocError::Corrupted("PlcfSed record offset overflows".to_string()))?;
+                .ok_or_else(|| {
+                    DocError::Corrupted("PlcfSed record offset overflows".to_string())
+                })?;
             let fc_sepx = read_i32(data, record_offset + 2, "Sed.fcSepx")?;
             let mut properties = SectionProperties::default();
             let mut revision = None;
@@ -146,7 +148,9 @@ impl SectionsTable {
 
     /// Find the section containing `cp` using half-open section ranges.
     pub fn section_at_cp(&self, cp: u32) -> Option<&DocSection> {
-        let index = self.sections.partition_point(|section| section.end_cp <= cp);
+        let index = self
+            .sections
+            .partition_point(|section| section.end_cp <= cp);
         self.sections
             .get(index)
             .filter(|section| section.start_cp <= cp && cp < section.end_cp)
@@ -294,7 +298,9 @@ impl SectionProperties {
                     .iter()
                     .any(Option::is_some)
             {
-                return corrupted("unequal-column operand index is outside the section column count");
+                return corrupted(
+                    "unequal-column operand index is outside the section column count",
+                );
             }
             let mut columns = Vec::with_capacity(count);
             for index in 0..count {
@@ -350,9 +356,7 @@ fn parse_revision(
                 DocError::Corrupted("sprmSPropRMark author index is negative".to_string())
             })?;
             let author = authors.get(author_index).ok_or_else(|| {
-                DocError::Corrupted(
-                    "sprmSPropRMark author index is outside SttbfRMark".to_string(),
-                )
+                DocError::Corrupted("sprmSPropRMark author index is outside SttbfRMark".to_string())
             })?;
             let timestamp = u32::from_le_bytes(operand[3..7].try_into().unwrap());
             Ok(Some(SectionRevisionMark {
@@ -515,14 +519,20 @@ mod tests {
         grpprls.push(None);
         let parsed = parse_synthetic(&grpprls).unwrap();
         assert_eq!(parsed.sections().len(), 6);
-        assert_eq!(parsed.sections()[0].break_kind, SectionBreakKind::Continuous);
+        assert_eq!(
+            parsed.sections()[0].break_kind,
+            SectionBreakKind::Continuous
+        );
         assert_eq!(parsed.sections()[1].break_kind, SectionBreakKind::NewColumn);
         assert_eq!(parsed.sections()[2].break_kind, SectionBreakKind::NewPage);
         assert_eq!(parsed.sections()[3].break_kind, SectionBreakKind::EvenPage);
         assert_eq!(parsed.sections()[4].break_kind, SectionBreakKind::OddPage);
         let defaults = &parsed.sections()[5];
         assert_eq!(defaults.break_kind, SectionBreakKind::NewPage);
-        assert_eq!((defaults.page.width_twips, defaults.page.height_twips), (12_240, 15_840));
+        assert_eq!(
+            (defaults.page.width_twips, defaults.page.height_twips),
+            (12_240, 15_840)
+        );
         assert_eq!(defaults.page.orientation, PageOrientation::Portrait);
         assert_eq!(defaults.page.margins.left_twips, 1_800);
         assert_eq!(defaults.columns.count(), 1);
@@ -587,8 +597,20 @@ mod tests {
             panic!("expected unequal columns");
         };
         assert_eq!(columns.len(), 3);
-        assert_eq!(columns[0], SectionColumn { width_twips: 1_000, spacing_after_twips: Some(100) });
-        assert_eq!(columns[2], SectionColumn { width_twips: 1_200, spacing_after_twips: None });
+        assert_eq!(
+            columns[0],
+            SectionColumn {
+                width_twips: 1_000,
+                spacing_after_twips: Some(100)
+            }
+        );
+        assert_eq!(
+            columns[2],
+            SectionColumn {
+                width_twips: 1_200,
+                spacing_after_twips: None
+            }
+        );
     }
 
     #[test]

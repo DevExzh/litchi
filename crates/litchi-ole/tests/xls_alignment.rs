@@ -15,12 +15,16 @@ fn reads_shrink_to_fit_xf_metadata() {
     let workbook = XlsWorkbook::new(File::open(poi_fixture("ShrinkToFit.xls")).unwrap()).unwrap();
     let formats = workbook.extended_formats();
 
-    assert!(formats
-        .iter()
-        .any(|format| format.alignment().shrinks_to_fit()));
-    assert!(formats
-        .iter()
-        .any(|format| !format.alignment().shrinks_to_fit()));
+    assert!(
+        formats
+            .iter()
+            .any(|format| format.alignment().shrinks_to_fit())
+    );
+    assert!(
+        formats
+            .iter()
+            .any(|format| !format.alignment().shrinks_to_fit())
+    );
 }
 
 #[test]

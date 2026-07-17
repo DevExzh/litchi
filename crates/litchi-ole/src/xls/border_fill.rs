@@ -331,11 +331,7 @@ mod tests {
     fn decodes_every_border_style() {
         for (bits, expected) in BORDER_STYLES.into_iter().enumerate() {
             assert_eq!(
-                parse_cell(&xf(bits as u32, 0, 0))
-                    .unwrap()
-                    .0
-                    .left()
-                    .style(),
+                parse_cell(&xf(bits as u32, 0, 0)).unwrap().0.left().style(),
                 expected
             );
         }
@@ -396,8 +392,7 @@ mod tests {
 
     #[test]
     fn resolves_palette_colors() {
-        let (borders, fill) =
-            parse_cell(&xf(8 << 16, 0, 9 | (10 << 7))).unwrap();
+        let (borders, fill) = parse_cell(&xf(8 << 16, 0, 9 | (10 << 7))).unwrap();
         let palette = XlsPalette::default();
         assert!(borders.left().color(&palette).is_some());
         assert!(fill.foreground_color(&palette).is_some());

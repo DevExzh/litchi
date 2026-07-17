@@ -70,7 +70,9 @@ pub fn write_table_styles<W: Write>(writer: &mut W) -> XlsResult<()> {
     )?;
     let payload = styles.to_payload()?;
     let data_len = u16::try_from(payload.len()).map_err(|_| {
-        crate::xls::XlsError::InvalidData("TABLESTYLES payload exceeds BIFF record size".to_string())
+        crate::xls::XlsError::InvalidData(
+            "TABLESTYLES payload exceeds BIFF record size".to_string(),
+        )
     })?;
     write_record_header(writer, TABLE_STYLES_RECORD_ID, data_len)?;
     writer.write_all(&payload)?;

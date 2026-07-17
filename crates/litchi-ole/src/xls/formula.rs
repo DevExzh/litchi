@@ -638,9 +638,7 @@ mod tests {
     fn renders_deleted_internal_3d_references() {
         let mut context = FormulaContext::default();
         context.add_sup_book(&[2, 0, 0x01, 0x04]);
-        context
-            .add_extern_sheet(&[1, 0, 0, 0, 0, 0, 0, 0])
-            .unwrap();
+        context.add_extern_sheet(&[1, 0, 0, 0, 0, 0, 0, 0]).unwrap();
         context.set_sheet_names(vec!["Sheet1".to_string()]);
 
         assert_eq!(
@@ -648,11 +646,7 @@ mod tests {
             Some("='Sheet1'!#REF!")
         );
         assert_eq!(
-            render_formula(
-                &[0x3d, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                Some(&context)
-            )
-            .as_deref(),
+            render_formula(&[0x3d, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], Some(&context)).as_deref(),
             Some("='Sheet1'!#REF!")
         );
     }

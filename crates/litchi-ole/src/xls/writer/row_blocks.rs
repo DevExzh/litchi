@@ -17,12 +17,22 @@ pub struct XlsRowBlockLayoutRow {
 
 impl XlsRowBlockLayoutRow {
     pub fn new(row: u16, row_record: Vec<u8>, cell_records: Vec<u8>) -> Self {
-        Self { row, row_record, cell_records }
+        Self {
+            row,
+            row_record,
+            cell_records,
+        }
     }
 
-    pub fn row(&self) -> u16 { self.row }
-    pub fn row_record(&self) -> &[u8] { &self.row_record }
-    pub fn cell_records(&self) -> &[u8] { &self.cell_records }
+    pub fn row(&self) -> u16 {
+        self.row
+    }
+    pub fn row_record(&self) -> &[u8] {
+        &self.row_record
+    }
+    pub fn cell_records(&self) -> &[u8] {
+        &self.cell_records
+    }
 }
 
 /// A fully checked INDEX/DBCELL layout for one serialized worksheet stream.
@@ -67,7 +77,9 @@ impl XlsRowBlockLayoutPlan {
         rows: Vec<XlsRowBlockLayoutRow>,
     ) -> io::Result<Self> {
         if default_column_width_offset >= records_between_index_and_rows {
-            return Err(invalid("DEFCOLWIDTH is outside the records preceding the row table"));
+            return Err(invalid(
+                "DEFCOLWIDTH is outside the records preceding the row table",
+            ));
         }
         validate_rows(&rows)?;
         let blocks = logical_blocks(&rows)?;
@@ -92,10 +104,8 @@ impl XlsRowBlockLayoutPlan {
             .ok_or_else(overflow)?;
         let index_record_position = checked_u32(index_record_position, "INDEX position")?;
         let row_table_position = checked_u32(row_table_position_u64, "row-table position")?;
-        let default_column_width_position = checked_u32(
-            default_column_width_position_u64,
-            "DEFCOLWIDTH position",
-        )?;
+        let default_column_width_position =
+            checked_u32(default_column_width_position_u64, "DEFCOLWIDTH position")?;
 
         let mut row_table = Vec::new();
         let mut dbcell_positions = Vec::with_capacity(blocks.len());
@@ -130,13 +140,27 @@ impl XlsRowBlockLayoutPlan {
         })
     }
 
-    pub fn index_record_position(&self) -> u32 { self.index_record_position }
-    pub fn row_table_position(&self) -> u32 { self.row_table_position }
-    pub fn default_column_width_position(&self) -> u32 { self.default_column_width_position }
-    pub fn dbcell_positions(&self) -> &[u32] { &self.dbcell_positions }
-    pub fn index_record(&self) -> &[u8] { &self.index_record }
-    pub fn row_table(&self) -> &[u8] { &self.row_table }
-    pub fn into_records(self) -> (Vec<u8>, Vec<u8>) { (self.index_record, self.row_table) }
+    pub fn index_record_position(&self) -> u32 {
+        self.index_record_position
+    }
+    pub fn row_table_position(&self) -> u32 {
+        self.row_table_position
+    }
+    pub fn default_column_width_position(&self) -> u32 {
+        self.default_column_width_position
+    }
+    pub fn dbcell_positions(&self) -> &[u32] {
+        &self.dbcell_positions
+    }
+    pub fn index_record(&self) -> &[u8] {
+        &self.index_record
+    }
+    pub fn row_table(&self) -> &[u8] {
+        &self.row_table
+    }
+    pub fn into_records(self) -> (Vec<u8>, Vec<u8>) {
+        (self.index_record, self.row_table)
+    }
 }
 
 fn decode_staged_rows(bytes: &[u8]) -> io::Result<Vec<XlsRowBlockLayoutRow>> {
@@ -151,7 +175,9 @@ fn decode_staged_rows(bytes: &[u8]) -> io::Result<Vec<XlsRowBlockLayoutRow>> {
         let record_type = u16::from_le_bytes([bytes[offset], bytes[offset + 1]]);
         let payload_len = usize::from(u16::from_le_bytes([bytes[offset + 2], bytes[offset + 3]]));
         if payload_len > BIFF8_MAX_RECORD_PAYLOAD {
-            return Err(invalid("staged row-table record exceeds the BIFF8 record-size limit"));
+            return Err(invalid(
+                "staged row-table record exceeds the BIFF8 record-size limit",
+            ));
         }
         let record_end = header_end.checked_add(payload_len).ok_or_else(overflow)?;
         if record_end > bytes.len() {
@@ -159,7 +185,9 @@ fn decode_staged_rows(bytes: &[u8]) -> io::Result<Vec<XlsRowBlockLayoutRow>> {
         }
         if record_type == ROW_RECORD_TYPE {
             if reached_cells {
-                return Err(invalid("ROW record follows a cell record in the staged row table"));
+                return Err(invalid(
+                    "ROW record follows a cell record in the staged row table",
+                ));
             }
             if payload_len != 16 {
                 return Err(invalid("staged ROW record does not have a 16-byte payload"));
@@ -250,7 +278,9 @@ fn validate_row_record(row: &XlsRowBlockLayoutRow) -> io::Result<()> {
         return Err(invalid("row bytes are not one complete BIFF8 ROW record"));
     }
     if encoded_row != row.row {
-        return Err(invalid("ROW record coordinate does not match its layout row"));
+        return Err(invalid(
+            "ROW record coordinate does not match its layout row",
+        ));
     }
     Ok(())
 }
@@ -262,7 +292,8 @@ fn validate_cell_records(row: &XlsRowBlockLayoutRow) -> io::Result<()> {
         if header_end > row.cell_records.len() {
             return Err(invalid("cell record buffer ends inside a BIFF header"));
         }
-        let record_type = u16::from_le_bytes([row.cell_records[offset], row.cell_records[offset + 1]]);
+        let record_type =
+            u16::from_le_bytes([row.cell_records[offset], row.cell_records[offset + 1]]);
         let payload_len = usize::from(u16::from_le_bytes([
             row.cell_records[offset + 2],
             row.cell_records[offset + 3],
@@ -278,14 +309,18 @@ fn validate_cell_records(row: &XlsRowBlockLayoutRow) -> io::Result<()> {
             return Err(invalid("record is not a supported BIFF8 cell-table record"));
         }
         if payload_len < 2 {
-            return Err(invalid("cell record is too short to contain a row coordinate"));
+            return Err(invalid(
+                "cell record is too short to contain a row coordinate",
+            ));
         }
         let encoded_row = u16::from_le_bytes([
             row.cell_records[header_end],
             row.cell_records[header_end + 1],
         ]);
         if encoded_row != row.row {
-            return Err(invalid("cell record coordinate does not match its layout row"));
+            return Err(invalid(
+                "cell record coordinate does not match its layout row",
+            ));
         }
         offset = record_end;
     }
@@ -299,7 +334,9 @@ fn append_block(
     rows: &[XlsRowBlockLayoutRow],
 ) -> io::Result<()> {
     let block_start = row_table.len();
-    for row in rows { row_table.extend_from_slice(&row.row_record); }
+    for row in rows {
+        row_table.extend_from_slice(&row.row_record);
+    }
     let mut cell_offsets = Vec::with_capacity(rows.len());
     let first_row_end = block_start
         .checked_add(rows.first().map_or(0, |row| row.row_record.len()))
@@ -320,18 +357,26 @@ fn append_block(
         .checked_add(u64::try_from(dbcell_relative).map_err(|_| overflow())?)
         .ok_or_else(overflow)?;
     dbcell_positions.push(checked_u32(dbcell_position, "DBCELL position")?);
-    let block_data_len = row_table.len().checked_sub(block_start).ok_or_else(overflow)?;
+    let block_data_len = row_table
+        .len()
+        .checked_sub(block_start)
+        .ok_or_else(overflow)?;
     let row_offset = if rows.iter().all(|row| row.cell_records.is_empty()) {
         0
     } else {
-        checked_u32(u64::try_from(block_data_len).map_err(|_| overflow())?, "DBCELL row offset")?
+        checked_u32(
+            u64::try_from(block_data_len).map_err(|_| overflow())?,
+            "DBCELL row offset",
+        )?
     };
     let payload_len = 4usize
         .checked_add(cell_offsets.len().checked_mul(2).ok_or_else(overflow)?)
         .ok_or_else(overflow)?;
     push_header(row_table, DBCELL_RECORD_TYPE, payload_len)?;
     row_table.extend_from_slice(&row_offset.to_le_bytes());
-    for offset in cell_offsets { row_table.extend_from_slice(&offset.to_le_bytes()); }
+    for offset in cell_offsets {
+        row_table.extend_from_slice(&offset.to_le_bytes());
+    }
     Ok(())
 }
 
@@ -350,7 +395,9 @@ fn encode_index(
     bytes.extend_from_slice(&first_row.to_le_bytes());
     bytes.extend_from_slice(&last_row_plus_one.to_le_bytes());
     bytes.extend_from_slice(&default_column_width_position.to_le_bytes());
-    for position in dbcell_positions { bytes.extend_from_slice(&position.to_le_bytes()); }
+    for position in dbcell_positions {
+        bytes.extend_from_slice(&position.to_le_bytes());
+    }
     Ok(bytes)
 }
 
@@ -362,7 +409,10 @@ fn push_header(bytes: &mut Vec<u8>, record_type: u16, payload_len: usize) -> io:
 }
 
 fn is_row_addressed_cell_record(record_type: u16) -> bool {
-    matches!(record_type, 0x0006 | 0x0201 | 0x0203 | 0x0204 | 0x0205 | 0x027e | 0x00bd | 0x00be | 0x00d6 | 0x00fd)
+    matches!(
+        record_type,
+        0x0006 | 0x0201 | 0x0203 | 0x0204 | 0x0205 | 0x027e | 0x00bd | 0x00be | 0x00d6 | 0x00fd
+    )
 }
 
 fn checked_u16(value: usize, name: &str) -> io::Result<u16> {
@@ -370,11 +420,16 @@ fn checked_u16(value: usize, name: &str) -> io::Result<u16> {
 }
 
 fn checked_u32(value: u64, name: &str) -> io::Result<u32> {
-    u32::try_from(value).map_err(|_| invalid(&format!("{name} does not fit in a BIFF8 stream pointer")))
+    u32::try_from(value)
+        .map_err(|_| invalid(&format!("{name} does not fit in a BIFF8 stream pointer")))
 }
 
-fn invalid(message: &str) -> io::Error { io::Error::new(ErrorKind::InvalidInput, message) }
-fn overflow() -> io::Error { invalid("BIFF8 worksheet layout arithmetic overflow") }
+fn invalid(message: &str) -> io::Error {
+    io::Error::new(ErrorKind::InvalidInput, message)
+}
+fn overflow() -> io::Error {
+    invalid("BIFF8 worksheet layout arithmetic overflow")
+}
 
 #[cfg(test)]
 mod tests {
@@ -409,9 +464,15 @@ mod tests {
         assert_eq!(plan.dbcell_positions(), &[240]);
         assert_eq!(
             plan.index_record(),
-            &[0x0b, 0x02, 0x14, 0x00, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 132, 0, 0, 0, 240, 0, 0, 0]
+            &[
+                0x0b, 0x02, 0x14, 0x00, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 132, 0, 0, 0, 240, 0,
+                0, 0
+            ]
         );
-        assert_eq!(&plan.row_table()[76..], &[0xd7, 0x00, 0x08, 0x00, 76, 0, 0, 0, 20, 0, 18, 0]);
+        assert_eq!(
+            &plan.row_table()[76..],
+            &[0xd7, 0x00, 0x08, 0x00, 76, 0, 0, 0, 20, 0, 18, 0]
+        );
     }
 
     #[test]
@@ -454,7 +515,11 @@ mod tests {
 
     #[test]
     fn rejects_stream_pointer_overflow() {
-        let rows = vec![XlsRowBlockLayoutRow::new(0, row_record(0), number_record(0, 0))];
+        let rows = vec![XlsRowBlockLayoutRow::new(
+            0,
+            row_record(0),
+            number_record(0, 0),
+        )];
         assert!(XlsRowBlockLayoutPlan::generate(u64::from(u32::MAX), 8, 0, rows).is_err());
     }
 
@@ -462,20 +527,15 @@ mod tests {
     fn regenerates_a_staged_table_into_the_same_checked_layout() {
         let first = XlsRowBlockLayoutRow::new(0, row_record(0), number_record(0, 0));
         let second = XlsRowBlockLayoutRow::new(1, row_record(1), number_record(1, 0));
-        let expected = XlsRowBlockLayoutPlan::generate(
-            100,
-            40,
-            8,
-            vec![first.clone(), second.clone()],
-        )
-        .unwrap();
+        let expected =
+            XlsRowBlockLayoutPlan::generate(100, 40, 8, vec![first.clone(), second.clone()])
+                .unwrap();
         let mut staged = Vec::new();
         staged.extend_from_slice(first.row_record());
         staged.extend_from_slice(second.row_record());
         staged.extend_from_slice(first.cell_records());
         staged.extend_from_slice(second.cell_records());
-        let regenerated =
-            XlsRowBlockLayoutPlan::generate_from_staged(100, 40, 8, &staged).unwrap();
+        let regenerated = XlsRowBlockLayoutPlan::generate_from_staged(100, 40, 8, &staged).unwrap();
         assert_eq!(regenerated, expected);
     }
 

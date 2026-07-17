@@ -41,8 +41,9 @@ pub(crate) fn parse_header(data: &[u8]) -> Result<CryptoApiHeader, CryptoApiErro
         return Err(CryptoApiError::UnsupportedVersion { major, minor });
     }
     validate_flags(le_u32(data, 4)?)?;
-    let header_size = usize::try_from(le_u32(data, 8)?)
-        .map_err(|_| CryptoApiError::Malformed("CryptoAPI header size does not fit in memory".to_string()))?;
+    let header_size = usize::try_from(le_u32(data, 8)?).map_err(|_| {
+        CryptoApiError::Malformed("CryptoAPI header size does not fit in memory".to_string())
+    })?;
     if header_size < 32 {
         return malformed("CryptoAPI encryption header is shorter than 32 bytes");
     }
@@ -65,9 +66,9 @@ pub(crate) fn parse_header(data: &[u8]) -> Result<CryptoApiHeader, CryptoApiErro
     if !csp.is_empty() && (csp.len() % 2 != 0 || !csp.ends_with(&[0, 0])) {
         return malformed("CryptoAPI provider name is not a terminated UTF-16LE string");
     }
-    let verifier_offset = 12usize
-        .checked_add(header_size)
-        .ok_or_else(|| CryptoApiError::Malformed("CryptoAPI verifier offset overflow".to_string()))?;
+    let verifier_offset = 12usize.checked_add(header_size).ok_or_else(|| {
+        CryptoApiError::Malformed("CryptoAPI verifier offset overflow".to_string())
+    })?;
     let verifier = checked_slice(data, verifier_offset, 60, "CryptoAPI verifier")?;
     if verifier_offset + 60 != data.len() || le_u32(verifier, 0)? != 16 {
         return malformed("CryptoAPI verifier has an invalid size");

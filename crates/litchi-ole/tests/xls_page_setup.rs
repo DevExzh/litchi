@@ -1,10 +1,8 @@
 use std::io::Cursor;
 
-use litchi_ole::xls::{
-    XlsPrintComments, XlsPrintErrors, XlsPrintOrder, XlsPrintOrientation,
-};
-use litchi_ole::xls::writer::{XlsPageSetupOptions, XlsWriter};
 use litchi_ole::xls::XlsWorkbook;
+use litchi_ole::xls::writer::{XlsPageSetupOptions, XlsWriter};
+use litchi_ole::xls::{XlsPrintComments, XlsPrintErrors, XlsPrintOrder, XlsPrintOrientation};
 
 #[test]
 fn page_settings_round_trip_with_breaks_and_continued_pls() {
@@ -60,8 +58,14 @@ fn page_settings_round_trip_with_breaks_and_continued_pls() {
     assert_eq!(page.print_setup().paper_size(), Some(9));
     assert_eq!(page.print_setup().scale_percent(), Some(85));
     assert_eq!(page.print_setup().starting_page_number(), Some(3));
-    assert_eq!(page.print_setup().print_order(), XlsPrintOrder::OverThenDown);
-    assert_eq!(page.print_setup().orientation(), Some(XlsPrintOrientation::Landscape));
+    assert_eq!(
+        page.print_setup().print_order(),
+        XlsPrintOrder::OverThenDown
+    );
+    assert_eq!(
+        page.print_setup().orientation(),
+        Some(XlsPrintOrientation::Landscape)
+    );
     assert_eq!(page.print_setup().comments(), XlsPrintComments::AtEnd);
     assert_eq!(page.print_setup().errors(), XlsPrintErrors::Dashes);
 }

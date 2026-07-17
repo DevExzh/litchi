@@ -2,8 +2,8 @@ use std::fs::File;
 use std::io::Cursor;
 use std::path::PathBuf;
 
-use litchi_ole::xls::writer::{XlsWorkbookWindowOptions, XlsWriter};
 use litchi_ole::xls::XlsWorkbook;
+use litchi_ole::xls::writer::{XlsWorkbookWindowOptions, XlsWriter};
 
 #[test]
 fn workbook_window_and_sheet_ids_round_trip() {
@@ -11,23 +11,25 @@ fn workbook_window_and_sheet_ids_round_trip() {
     writer.add_worksheet("One").unwrap();
     writer.add_worksheet("Two").unwrap();
     writer.add_worksheet("Three").unwrap();
-    writer.set_workbook_window(XlsWorkbookWindowOptions {
-        horizontal_position_twips: -120,
-        vertical_position_twips: 240,
-        width_twips: 12000,
-        height_twips: 8000,
-        hidden: true,
-        minimized: true,
-        very_hidden: true,
-        show_horizontal_scrollbar: false,
-        show_vertical_scrollbar: true,
-        show_sheet_tabs: false,
-        group_dates_in_autofilter: false,
-        active_sheet_index: 2,
-        first_visible_sheet_index: 1,
-        selected_sheet_count: 2,
-        sheet_tab_ratio_per_mille: 725,
-    }).unwrap();
+    writer
+        .set_workbook_window(XlsWorkbookWindowOptions {
+            horizontal_position_twips: -120,
+            vertical_position_twips: 240,
+            width_twips: 12000,
+            height_twips: 8000,
+            hidden: true,
+            minimized: true,
+            very_hidden: true,
+            show_horizontal_scrollbar: false,
+            show_vertical_scrollbar: true,
+            show_sheet_tabs: false,
+            group_dates_in_autofilter: false,
+            active_sheet_index: 2,
+            first_visible_sheet_index: 1,
+            selected_sheet_count: 2,
+            sheet_tab_ratio_per_mille: 725,
+        })
+        .unwrap();
 
     let mut bytes = Cursor::new(Vec::new());
     writer.write_to(&mut bytes).unwrap();
@@ -50,9 +52,30 @@ fn workbook_window_and_sheet_ids_round_trip() {
     assert_eq!(window.first_visible_sheet_index(), 1);
     assert_eq!(window.selected_sheet_count(), 2);
     assert_eq!(window.sheet_tab_ratio_per_mille(), 725);
-    assert!(!workbook.xls_worksheet(0).unwrap().worksheet_view().unwrap().is_selected());
-    assert!(workbook.xls_worksheet(1).unwrap().worksheet_view().unwrap().is_selected());
-    assert!(workbook.xls_worksheet(2).unwrap().worksheet_view().unwrap().is_selected());
+    assert!(
+        !workbook
+            .xls_worksheet(0)
+            .unwrap()
+            .worksheet_view()
+            .unwrap()
+            .is_selected()
+    );
+    assert!(
+        workbook
+            .xls_worksheet(1)
+            .unwrap()
+            .worksheet_view()
+            .unwrap()
+            .is_selected()
+    );
+    assert!(
+        workbook
+            .xls_worksheet(2)
+            .unwrap()
+            .worksheet_view()
+            .unwrap()
+            .is_selected()
+    );
 }
 
 #[test]
@@ -74,9 +97,30 @@ fn reads_poi_simple_workbook_window_and_sheet_ids() {
     assert_eq!(window.first_visible_sheet_index(), 0);
     assert_eq!(window.selected_sheet_count(), 1);
     assert_eq!(window.sheet_tab_ratio_per_mille(), 600);
-    assert!(workbook.xls_worksheet(0).unwrap().worksheet_view().unwrap().is_selected());
-    assert!(!workbook.xls_worksheet(1).unwrap().worksheet_view().unwrap().is_selected());
-    assert!(!workbook.xls_worksheet(2).unwrap().worksheet_view().unwrap().is_selected());
+    assert!(
+        workbook
+            .xls_worksheet(0)
+            .unwrap()
+            .worksheet_view()
+            .unwrap()
+            .is_selected()
+    );
+    assert!(
+        !workbook
+            .xls_worksheet(1)
+            .unwrap()
+            .worksheet_view()
+            .unwrap()
+            .is_selected()
+    );
+    assert!(
+        !workbook
+            .xls_worksheet(2)
+            .unwrap()
+            .worksheet_view()
+            .unwrap()
+            .is_selected()
+    );
 }
 
 #[test]
@@ -89,7 +133,10 @@ fn writer_rejects_window1_window2_selection_disagreement() {
     writer
         .set_worksheet_view(
             second,
-            XlsWorksheetViewOptions { selected: true, ..Default::default() },
+            XlsWorksheetViewOptions {
+                selected: true,
+                ..Default::default()
+            },
         )
         .unwrap();
     assert!(writer.write_to(&mut Cursor::new(Vec::new())).is_err());
@@ -107,17 +154,27 @@ fn reads_poi_zero_based_sheet_identifiers() {
 fn writer_rejects_invalid_window_and_tab_references() {
     let mut writer = XlsWriter::new();
     writer.add_worksheet("One").unwrap();
-    assert!(writer.set_workbook_window(XlsWorkbookWindowOptions {
-        width_twips: 0,
-        ..XlsWorkbookWindowOptions::default()
-    }).is_err());
-    assert!(writer.set_workbook_window(XlsWorkbookWindowOptions {
-        sheet_tab_ratio_per_mille: 1001,
-        ..XlsWorkbookWindowOptions::default()
-    }).is_err());
-    writer.set_workbook_window(XlsWorkbookWindowOptions {
-        active_sheet_index: 1,
-        ..XlsWorkbookWindowOptions::default()
-    }).unwrap();
+    assert!(
+        writer
+            .set_workbook_window(XlsWorkbookWindowOptions {
+                width_twips: 0,
+                ..XlsWorkbookWindowOptions::default()
+            })
+            .is_err()
+    );
+    assert!(
+        writer
+            .set_workbook_window(XlsWorkbookWindowOptions {
+                sheet_tab_ratio_per_mille: 1001,
+                ..XlsWorkbookWindowOptions::default()
+            })
+            .is_err()
+    );
+    writer
+        .set_workbook_window(XlsWorkbookWindowOptions {
+            active_sheet_index: 1,
+            ..XlsWorkbookWindowOptions::default()
+        })
+        .unwrap();
     assert!(writer.write_to(&mut Cursor::new(Vec::new())).is_err());
 }

@@ -505,7 +505,8 @@ impl Field {
     }
 
     pub fn result_range(&self) -> Option<(u32, u32)> {
-        self.separator_cp.map(|separator| (separator + 1, self.end_cp))
+        self.separator_cp
+            .map(|separator| (separator + 1, self.end_cp))
     }
 
     pub fn is_embedded_object(&self) -> bool {
@@ -656,7 +657,9 @@ fn build_fields(story: FieldStory, markers: &[FieldMarker]) -> Result<Vec<Field>
                     return Err(corrupted("grffldEnd.fHasSep disagrees with the FieldList"));
                 }
                 if flags.nested != !stack.is_empty() {
-                    return Err(corrupted("grffldEnd.fNested disagrees with field containment"));
+                    return Err(corrupted(
+                        "grffldEnd.fNested disagrees with field containment",
+                    ));
                 }
                 fields.push(Field {
                     story,

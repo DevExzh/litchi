@@ -1,7 +1,7 @@
 //! Read-side speaker-notes support for binary PowerPoint files.
 
-use super::types::Slide;
 use super::directory::SlideDirectory;
+use super::types::Slide;
 use crate::consts::PptRecordType;
 use crate::ppt::package::{PptError, Result};
 use crate::ppt::persist::PersistMapping;
@@ -134,11 +134,9 @@ impl NotesIndex {
         if let Some(error) = &self.error {
             return Err(error.clone());
         }
-        let persist_id = self
-            .notes
-            .get(&notes_id)
-            .copied()
-            .ok_or_else(|| format!("notesIdRef {notes_id:#010x} is not present in the notes list"))?;
+        let persist_id = self.notes.get(&notes_id).copied().ok_or_else(|| {
+            format!("notesIdRef {notes_id:#010x} is not present in the notes list")
+        })?;
         let offset = persist_mapping
             .get_offset(persist_id)
             .ok_or_else(|| format!("notes persist ID {persist_id} has no directory entry"))?;
@@ -177,7 +175,9 @@ impl SpeakerNotes {
             )));
         }
         let (record, _) = PptRecord::parse(document_data, descriptor.offset)?;
-        if record.record_type != PptRecordType::Notes || record.version != 0x0f || record.instance != 0
+        if record.record_type != PptRecordType::Notes
+            || record.version != 0x0f
+            || record.instance != 0
         {
             return Err(PptError::Corrupted(format!(
                 "persist ID {} does not resolve to a valid NotesContainer",
@@ -187,7 +187,9 @@ impl SpeakerNotes {
         let notes_atom = record.find_child(PptRecordType::NotesAtom).ok_or_else(|| {
             PptError::Corrupted("NotesContainer is missing NotesAtom".to_string())
         })?;
-        if notes_atom.version != 1 || notes_atom.instance != 0 || notes_atom.data.len() != NOTES_ATOM_SIZE
+        if notes_atom.version != 1
+            || notes_atom.instance != 0
+            || notes_atom.data.len() != NOTES_ATOM_SIZE
         {
             return Err(PptError::Corrupted(format!(
                 "invalid NotesAtom header or length: version={}, instance={}, length={}",
@@ -249,7 +251,8 @@ impl SpeakerNotes {
         let Some(drawing) = self.record.find_child(PptRecordType::PPDrawing) else {
             return Ok(Vec::new());
         };
-        let parsed = crate::ppt::escher::EscherShapeFactory::extract_shapes_from_drawing(&drawing.data)?;
+        let parsed =
+            crate::ppt::escher::EscherShapeFactory::extract_shapes_from_drawing(&drawing.data)?;
         let mut shapes = Vec::with_capacity(parsed.len());
         for shape in &parsed {
             if let Some(shape) = Slide::<'static>::convert_escher_to_shape_enum(shape)? {
@@ -263,7 +266,8 @@ impl SpeakerNotes {
         let Some(drawing) = self.record.find_child(PptRecordType::PPDrawing) else {
             return Ok(String::new());
         };
-        let shapes = crate::ppt::escher::EscherShapeFactory::extract_shapes_from_drawing(&drawing.data)?;
+        let shapes =
+            crate::ppt::escher::EscherShapeFactory::extract_shapes_from_drawing(&drawing.data)?;
         let mut text = Vec::new();
         for shape in &shapes {
             collect_notes_body_text(shape, &mut text);
@@ -334,11 +338,9 @@ mod tests {
     #[test]
     fn notes_index_uses_ids_not_list_order() {
         let directory = SlideDirectory::new_for_test(0);
-        let index = NotesIndex::try_build(
-            &document_with_notes(&[(9, 0x345), (7, 0x123)]),
-            &directory,
-        )
-            .expect("valid notes index");
+        let index =
+            NotesIndex::try_build(&document_with_notes(&[(9, 0x345), (7, 0x123)]), &directory)
+                .expect("valid notes index");
         assert_eq!(index.notes.get(&0x123), Some(&7));
         assert_eq!(index.notes.get(&0x345), Some(&9));
     }
@@ -399,15 +401,10 @@ mod tests {
     fn writer_notes_round_trip_through_reader_api() {
         let mut writer = crate::ppt::writer::PptWriter::new();
         let slide = writer.add_slide().expect("add slide");
-        let notes_page = crate::ppt::writer::NotesPage::simple(
-            0,
-            "reader writer notes round trip",
-        )
-        .with_header("excluded notes header")
-        .with_footer("excluded notes footer");
-        writer
-            .set_notes_page(slide, notes_page)
-            .expect("set notes");
+        let notes_page = crate::ppt::writer::NotesPage::simple(0, "reader writer notes round trip")
+            .with_header("excluded notes header")
+            .with_footer("excluded notes footer");
+        writer.set_notes_page(slide, notes_page).expect("set notes");
         let path = std::env::temp_dir().join(format!(
             "litchi-ppt-notes-{}-{}.ppt",
             std::process::id(),
@@ -422,7 +419,10 @@ mod tests {
             .speaker_notes()
             .expect("read written notes")
             .expect("notes exist");
-        assert_eq!(notes.text().expect("extract written notes"), "reader writer notes round trip");
+        assert_eq!(
+            notes.text().expect("extract written notes"),
+            "reader writer notes round trip"
+        );
         let _ = std::fs::remove_file(path);
     }
 }

@@ -220,7 +220,11 @@ impl XlsFont {
             0xdd => XlsFontCharset::Thai,
             0xee => XlsFontCharset::EastEurope,
             0xff => XlsFontCharset::Oem,
-            value => return Err(invalid(format!("Font character set {value:#04x} is invalid"))),
+            value => {
+                return Err(invalid(format!(
+                    "Font character set {value:#04x} is invalid"
+                )));
+            },
         };
 
         let character_count = usize::from(data[14]);
@@ -368,15 +372,13 @@ mod tests {
 
     #[test]
     fn parses_normative_normal_and_bold_blue_fonts() {
-        let normal = XlsFont::parse_record(0, &font_record(400, false, 0x7fff, "Arial"))
-            .unwrap();
+        let normal = XlsFont::parse_record(0, &font_record(400, false, 0x7fff, "Arial")).unwrap();
         assert_eq!(normal.name(), "Arial");
         assert_eq!(normal.height_twips(), 200);
         assert!(!normal.is_bold());
         assert!(!normal.is_italic());
 
-        let bold = XlsFont::parse_record(5, &font_record(700, false, 0x000c, "Arial"))
-            .unwrap();
+        let bold = XlsFont::parse_record(5, &font_record(700, false, 0x000c, "Arial")).unwrap();
         assert!(bold.is_bold());
         assert_eq!(bold.color_index(), 0x000c);
     }

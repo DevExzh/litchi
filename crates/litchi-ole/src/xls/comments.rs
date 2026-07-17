@@ -16,16 +16,36 @@ const MSODRAWING_TYPE: u16 = 0x00EC;
 const COMMENT_OBJECT_TYPE: u16 = 0x0019;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CommentVisibility { Hidden, Visible }
+pub enum CommentVisibility {
+    Hidden,
+    Visible,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsCommentHorizontalAlignment { Left, Centered, Right, Justified, Distributed }
+pub enum XlsCommentHorizontalAlignment {
+    Left,
+    Centered,
+    Right,
+    Justified,
+    Distributed,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsCommentVerticalAlignment { Top, Centered, Bottom, Justified, Distributed }
+pub enum XlsCommentVerticalAlignment {
+    Top,
+    Centered,
+    Bottom,
+    Justified,
+    Distributed,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsCommentTextOrientation { None, Stacked, CounterClockwise, Clockwise }
+pub enum XlsCommentTextOrientation {
+    None,
+    Stacked,
+    CounterClockwise,
+    Clockwise,
+}
 
 /// Stable identity supplied by the comment's `OBJ`/`FtNts` structures.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -36,9 +56,15 @@ pub struct XlsCommentObjectIdentity {
 }
 
 impl XlsCommentObjectIdentity {
-    pub fn object_id(&self) -> u16 { self.object_id }
-    pub fn guid(&self) -> &[u8; 16] { &self.guid }
-    pub fn shared(&self) -> bool { self.shared }
+    pub fn object_id(&self) -> u16 {
+        self.object_id
+    }
+    pub fn guid(&self) -> &[u8; 16] {
+        &self.guid
+    }
+    pub fn shared(&self) -> bool {
+        self.shared
+    }
 }
 
 /// One formatting run from the comment's `TxORuns` structure.
@@ -49,8 +75,12 @@ pub struct XlsCommentTextRun {
 }
 
 impl XlsCommentTextRun {
-    pub fn character_index(&self) -> u16 { self.character_index }
-    pub fn font_index(&self) -> u16 { self.font_index }
+    pub fn character_index(&self) -> u16 {
+        self.character_index
+    }
+    pub fn font_index(&self) -> u16 {
+        self.font_index
+    }
 }
 
 /// Inert text properties retained from the comment's `TXO` record.
@@ -67,15 +97,31 @@ pub struct XlsCommentTextProperties {
 }
 
 impl XlsCommentTextProperties {
-    pub fn horizontal_alignment(&self) -> XlsCommentHorizontalAlignment { self.horizontal_alignment }
-    pub fn vertical_alignment(&self) -> XlsCommentVerticalAlignment { self.vertical_alignment }
-    pub fn orientation(&self) -> XlsCommentTextOrientation { self.orientation }
-    pub fn locked(&self) -> bool { self.locked }
-    pub fn justify_last_line(&self) -> bool { self.justify_last_line }
-    pub fn secret_edit(&self) -> bool { self.secret_edit }
-    pub fn font_when_empty(&self) -> u16 { self.font_when_empty }
+    pub fn horizontal_alignment(&self) -> XlsCommentHorizontalAlignment {
+        self.horizontal_alignment
+    }
+    pub fn vertical_alignment(&self) -> XlsCommentVerticalAlignment {
+        self.vertical_alignment
+    }
+    pub fn orientation(&self) -> XlsCommentTextOrientation {
+        self.orientation
+    }
+    pub fn locked(&self) -> bool {
+        self.locked
+    }
+    pub fn justify_last_line(&self) -> bool {
+        self.justify_last_line
+    }
+    pub fn secret_edit(&self) -> bool {
+        self.secret_edit
+    }
+    pub fn font_when_empty(&self) -> u16 {
+        self.font_when_empty
+    }
     /// Raw, unevaluated ObjFmla payload bytes, excluding its length field.
-    pub fn formula_bytes(&self) -> &[u8] { &self.formula_bytes }
+    pub fn formula_bytes(&self) -> &[u8] {
+        &self.formula_bytes
+    }
 }
 
 /// A fully linked, immutable BIFF8 cell comment.
@@ -94,16 +140,36 @@ pub struct XlsComment {
 }
 
 impl XlsComment {
-    pub fn row(&self) -> u16 { self.row }
-    pub fn column(&self) -> u8 { self.column }
-    pub fn visibility(&self) -> CommentVisibility { self.visibility }
-    pub fn row_hidden(&self) -> bool { self.row_hidden }
-    pub fn column_hidden(&self) -> bool { self.column_hidden }
-    pub fn identity(&self) -> &XlsCommentObjectIdentity { &self.identity }
-    pub fn author(&self) -> &str { &self.author }
-    pub fn text(&self) -> &str { &self.text }
-    pub fn text_properties(&self) -> &XlsCommentTextProperties { &self.text_properties }
-    pub fn text_runs(&self) -> &[XlsCommentTextRun] { &self.text_runs }
+    pub fn row(&self) -> u16 {
+        self.row
+    }
+    pub fn column(&self) -> u8 {
+        self.column
+    }
+    pub fn visibility(&self) -> CommentVisibility {
+        self.visibility
+    }
+    pub fn row_hidden(&self) -> bool {
+        self.row_hidden
+    }
+    pub fn column_hidden(&self) -> bool {
+        self.column_hidden
+    }
+    pub fn identity(&self) -> &XlsCommentObjectIdentity {
+        &self.identity
+    }
+    pub fn author(&self) -> &str {
+        &self.author
+    }
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+    pub fn text_properties(&self) -> &XlsCommentTextProperties {
+        &self.text_properties
+    }
+    pub fn text_runs(&self) -> &[XlsCommentTextRun] {
+        &self.text_runs
+    }
 }
 
 #[derive(Debug)]
@@ -150,12 +216,17 @@ pub(crate) struct CommentCollector {
 }
 
 impl CommentCollector {
-    pub(crate) fn new() -> Self { Self::default() }
+    pub(crate) fn new() -> Self {
+        Self::default()
+    }
 
     pub(crate) fn feed_record(&mut self, record_type: u16, data: &[u8]) -> XlsResult<()> {
         if let Some(mut pending) = self.pending_txo.take() {
             if record_type != CONTINUE_TYPE {
-                return invalid(format!("incomplete TXO for comment object {} must be followed by CONTINUE", pending.object_id));
+                return invalid(format!(
+                    "incomplete TXO for comment object {} must be followed by CONTINUE",
+                    pending.object_id
+                ));
             }
             let complete = feed_txo_continue(&mut pending, data)?;
             if complete {
@@ -168,12 +239,18 @@ impl CommentCollector {
 
         if let Some(object_id) = self.awaiting_drawing.take() {
             if record_type != MSODRAWING_TYPE {
-                return invalid(format!("comment OBJ {object_id} must be followed by its MSODRAWING textbox"));
+                return invalid(format!(
+                    "comment OBJ {object_id} must be followed by its MSODRAWING textbox"
+                ));
             }
-            if data.len() != 8 || u16_at(data, 0)? != 0 || u16_at(data, 2)? != 0xF00D
+            if data.len() != 8
+                || u16_at(data, 0)? != 0
+                || u16_at(data, 2)? != 0xF00D
                 || u32_at(data, 4)? != 0
             {
-                return invalid(format!("comment object {object_id} must be followed by an exact OfficeArtClientTextbox boundary"));
+                return invalid(format!(
+                    "comment object {object_id} must be followed by an exact OfficeArtClientTextbox boundary"
+                ));
             }
             self.awaiting_txo = Some(object_id);
             return Ok(());
@@ -181,7 +258,9 @@ impl CommentCollector {
 
         if let Some(object_id) = self.awaiting_txo {
             if record_type != TXO_TYPE {
-                return invalid(format!("comment object {object_id} textbox must be followed by TXO"));
+                return invalid(format!(
+                    "comment object {object_id} textbox must be followed by TXO"
+                ));
             }
             self.awaiting_txo = None;
             let pending = parse_txo(data, object_id)?;
@@ -207,18 +286,24 @@ impl CommentCollector {
                 if !self.object_ids.insert(object_id) {
                     return invalid(format!("duplicate OBJ object id: {object_id}"));
                 }
-            }
+            },
             RECORD_TYPE => {
                 let note = parse_note_record(data)?;
                 if !self.note_cells.insert((note.row, note.column)) {
-                    return invalid(format!("duplicate NOTE for cell ({}, {})", note.row, note.column));
+                    return invalid(format!(
+                        "duplicate NOTE for cell ({}, {})",
+                        note.row, note.column
+                    ));
                 }
                 if !self.note_object_ids.insert(note.object_id) {
-                    return invalid(format!("duplicate NOTE object reference: {}", note.object_id));
+                    return invalid(format!(
+                        "duplicate NOTE object reference: {}",
+                        note.object_id
+                    ));
                 }
                 self.notes.push(note);
-            }
-            _ => {}
+            },
+            _ => {},
         }
         Ok(())
     }
@@ -227,10 +312,17 @@ impl CommentCollector {
         let text = String::from_utf16(&pending.code_units)
             .map_err(|_| XlsError::InvalidData("TXO text contains invalid UTF-16".to_string()))?;
         let runs = parse_txo_runs(&pending.run_bytes, pending.character_count as u16)?;
-        let object = self.objects.get_mut(&pending.object_id)
-            .ok_or_else(|| XlsError::InvalidData(format!("TXO references unknown comment object {}", pending.object_id)))?;
+        let object = self.objects.get_mut(&pending.object_id).ok_or_else(|| {
+            XlsError::InvalidData(format!(
+                "TXO references unknown comment object {}",
+                pending.object_id
+            ))
+        })?;
         if object.text.is_some() {
-            return invalid(format!("comment object {} has more than one TXO", pending.object_id));
+            return invalid(format!(
+                "comment object {} has more than one TXO",
+                pending.object_id
+            ));
         }
         object.text = Some(text);
         object.text_properties = Some(pending.properties);
@@ -239,8 +331,13 @@ impl CommentCollector {
     }
 
     pub(crate) fn finish(self) -> XlsResult<Vec<XlsComment>> {
-        if self.awaiting_drawing.is_some() || self.awaiting_txo.is_some() || self.pending_txo.is_some() {
-            return invalid("worksheet ended with an incomplete comment object sequence".to_string());
+        if self.awaiting_drawing.is_some()
+            || self.awaiting_txo.is_some()
+            || self.pending_txo.is_some()
+        {
+            return invalid(
+                "worksheet ended with an incomplete comment object sequence".to_string(),
+            );
         }
         for object_id in self.objects.keys() {
             if !self.note_object_ids.contains(object_id) {
@@ -249,8 +346,12 @@ impl CommentCollector {
         }
         let mut comments = Vec::with_capacity(self.notes.len());
         for note in self.notes {
-            let object = self.objects.get(&note.object_id)
-                .ok_or_else(|| XlsError::InvalidData(format!("NOTE references missing comment OBJ {}", note.object_id)))?;
+            let object = self.objects.get(&note.object_id).ok_or_else(|| {
+                XlsError::InvalidData(format!(
+                    "NOTE references missing comment OBJ {}",
+                    note.object_id
+                ))
+            })?;
             comments.push(XlsComment {
                 row: note.row,
                 column: note.column,
@@ -259,8 +360,15 @@ impl CommentCollector {
                 column_hidden: note.column_hidden,
                 identity: object.identity.clone(),
                 author: note.author,
-                text: object.text.clone().ok_or_else(|| XlsError::InvalidData(format!("comment OBJ {} has no TXO", note.object_id)))?,
-                text_properties: object.text_properties.clone().ok_or_else(|| XlsError::InvalidData(format!("comment OBJ {} has no TXO properties", note.object_id)))?,
+                text: object.text.clone().ok_or_else(|| {
+                    XlsError::InvalidData(format!("comment OBJ {} has no TXO", note.object_id))
+                })?,
+                text_properties: object.text_properties.clone().ok_or_else(|| {
+                    XlsError::InvalidData(format!(
+                        "comment OBJ {} has no TXO properties",
+                        note.object_id
+                    ))
+                })?,
                 text_runs: object.text_runs.clone(),
             });
         }
@@ -269,31 +377,56 @@ impl CommentCollector {
 }
 
 fn parse_note_record(data: &[u8]) -> XlsResult<NoteRecord> {
-    if data.len() < 13 { return invalid(format!("NOTE payload is too short: {}", data.len())); }
+    if data.len() < 13 {
+        return invalid(format!("NOTE payload is too short: {}", data.len()));
+    }
     let row = u16_at(data, 0)?;
     let column = u16_at(data, 2)?;
-    if column > 255 { return invalid(format!("NOTE column exceeds BIFF8 limit: {column}")); }
+    if column > 255 {
+        return invalid(format!("NOTE column exceeds BIFF8 limit: {column}"));
+    }
     let flags = u16_at(data, 4)?;
-    if flags & !0x018A != 0 { return invalid(format!("NOTE contains reserved flag bits: {flags:#06x}")); }
+    if flags & !0x018A != 0 {
+        return invalid(format!("NOTE contains reserved flag bits: {flags:#06x}"));
+    }
     let object_id = u16_at(data, 6)?;
-    if object_id == 0 { return invalid("NOTE object id must not be zero".to_string()); }
+    if object_id == 0 {
+        return invalid("NOTE object id must not be zero".to_string());
+    }
     let character_count = u16_at(data, 8)? as usize;
     if !(1..=54).contains(&character_count) {
-        return invalid(format!("NOTE author length must be 1..=54, got {character_count}"));
+        return invalid(format!(
+            "NOTE author length must be 1..=54, got {character_count}"
+        ));
     }
     let string_flags = data[10];
-    if string_flags & !1 != 0 { return invalid(format!("NOTE author contains reserved string flags: {string_flags:#04x}")); }
+    if string_flags & !1 != 0 {
+        return invalid(format!(
+            "NOTE author contains reserved string flags: {string_flags:#04x}"
+        ));
+    }
     let width = if string_flags & 1 == 0 { 1 } else { 2 };
-    let byte_count = character_count.checked_mul(width)
+    let byte_count = character_count
+        .checked_mul(width)
         .ok_or_else(|| XlsError::InvalidData("NOTE author size overflow".to_string()))?;
-    let expected = 12usize.checked_add(byte_count)
+    let expected = 12usize
+        .checked_add(byte_count)
         .ok_or_else(|| XlsError::InvalidData("NOTE size overflow".to_string()))?;
-    if data.len() != expected { return invalid(format!("NOTE payload length must be {expected}, got {}", data.len())); }
+    if data.len() != expected {
+        return invalid(format!(
+            "NOTE payload length must be {expected}, got {}",
+            data.len()
+        ));
+    }
     let author = decode_unicode(&data[11..11 + byte_count], width == 2)?;
     Ok(NoteRecord {
         row,
         column: column as u8,
-        visibility: if flags & 0x0002 != 0 { CommentVisibility::Visible } else { CommentVisibility::Hidden },
+        visibility: if flags & 0x0002 != 0 {
+            CommentVisibility::Visible
+        } else {
+            CommentVisibility::Hidden
+        },
         row_hidden: flags & 0x0080 != 0,
         column_hidden: flags & 0x0100 != 0,
         object_id,
@@ -302,7 +435,12 @@ fn parse_note_record(data: &[u8]) -> XlsResult<NoteRecord> {
 }
 
 fn parse_cmo_id(data: &[u8]) -> XlsResult<u16> {
-    if data.len() < 22 { return invalid(format!("OBJ payload is too short for FtCmo: {}", data.len())); }
+    if data.len() < 22 {
+        return invalid(format!(
+            "OBJ payload is too short for FtCmo: {}",
+            data.len()
+        ));
+    }
     if u16_at(data, 0)? != 0x0015 || u16_at(data, 2)? != 0x0012 {
         return invalid("OBJ must begin with a 22-byte FtCmo".to_string());
     }
@@ -314,47 +452,68 @@ fn parse_cmo_id(data: &[u8]) -> XlsResult<u16> {
 
 fn parse_obj(data: &[u8]) -> XlsResult<Option<CommentObject>> {
     let object_id = parse_cmo_id(data)?;
-    if u16_at(data, 4)? != COMMENT_OBJECT_TYPE { return Ok(None); }
-    if object_id == 0 { return invalid("comment OBJ id must not be zero".to_string()); }
+    if u16_at(data, 4)? != COMMENT_OBJECT_TYPE {
+        return Ok(None);
+    }
+    if object_id == 0 {
+        return invalid("comment OBJ id must not be zero".to_string());
+    }
     let mut position = 22usize;
     let mut identity = None;
     let mut found_end = false;
     while position < data.len() {
         if data.len() - position < 4 {
-            if data[position..].iter().all(|&byte| byte == 0) { break; }
+            if data[position..].iter().all(|&byte| byte == 0) {
+                break;
+            }
             return invalid("truncated OBJ subrecord header".to_string());
         }
         let sub_type = u16_at(data, position)?;
         let size = u16_at(data, position + 2)? as usize;
         position += 4;
         if sub_type == 0 {
-            if size != 0 { return invalid("FtEnd size must be zero".to_string()); }
+            if size != 0 {
+                return invalid("FtEnd size must be zero".to_string());
+            }
             found_end = true;
             if data[position..].iter().any(|&byte| byte != 0) {
                 return invalid("non-zero OBJ padding after FtEnd".to_string());
             }
             break;
         }
-        let end = position.checked_add(size)
+        let end = position
+            .checked_add(size)
             .ok_or_else(|| XlsError::InvalidData("OBJ subrecord size overflow".to_string()))?;
-        let body = data.get(position..end)
+        let body = data
+            .get(position..end)
             .ok_or_else(|| XlsError::InvalidData("truncated OBJ subrecord".to_string()))?;
         if sub_type == 0x000D {
-            if size != 0x0016 { return invalid(format!("FtNts size must be 22, got {size}")); }
-            if identity.is_some() { return invalid("comment OBJ contains more than one FtNts".to_string()); }
+            if size != 0x0016 {
+                return invalid(format!("FtNts size must be 22, got {size}"));
+            }
+            if identity.is_some() {
+                return invalid("comment OBJ contains more than one FtNts".to_string());
+            }
             let guid: [u8; 16] = body[0..16].try_into().unwrap();
             let shared = match u16::from_le_bytes([body[16], body[17]]) {
                 0 => false,
                 1 => true,
                 value => return invalid(format!("invalid FtNts shared-note value: {value}")),
             };
-            identity = Some(XlsCommentObjectIdentity { object_id, guid, shared });
+            identity = Some(XlsCommentObjectIdentity {
+                object_id,
+                guid,
+                shared,
+            });
         }
         position = end;
     }
-    if !found_end { return invalid("comment OBJ is missing FtEnd".to_string()); }
+    if !found_end {
+        return invalid("comment OBJ is missing FtEnd".to_string());
+    }
     Ok(Some(CommentObject {
-        identity: identity.ok_or_else(|| XlsError::InvalidData("comment OBJ is missing FtNts".to_string()))?,
+        identity: identity
+            .ok_or_else(|| XlsError::InvalidData("comment OBJ is missing FtNts".to_string()))?,
         text: None,
         text_properties: None,
         text_runs: Vec::new(),
@@ -362,9 +521,13 @@ fn parse_obj(data: &[u8]) -> XlsResult<Option<CommentObject>> {
 }
 
 fn parse_txo(data: &[u8], object_id: u16) -> XlsResult<PendingTxo> {
-    if data.len() < 18 { return invalid(format!("TXO payload is too short: {}", data.len())); }
+    if data.len() < 18 {
+        return invalid(format!("TXO payload is too short: {}", data.len()));
+    }
     let options = u16_at(data, 0)?;
-    if options & !0xC27E != 0 { return invalid(format!("TXO contains reserved option bits: {options:#06x}")); }
+    if options & !0xC27E != 0 {
+        return invalid(format!("TXO contains reserved option bits: {options:#06x}"));
+    }
     let horizontal_alignment = match (options >> 1) & 7 {
         1 => XlsCommentHorizontalAlignment::Left,
         2 => XlsCommentHorizontalAlignment::Centered,
@@ -394,15 +557,27 @@ fn parse_txo(data: &[u8], object_id: u16) -> XlsResult<PendingTxo> {
     let character_count = u16_at(data, 10)? as usize;
     let run_byte_count = u16_at(data, 12)? as usize;
     if character_count == 0 {
-        if run_byte_count != 0 { return invalid("empty TXO text must have zero run bytes".to_string()); }
+        if run_byte_count != 0 {
+            return invalid("empty TXO text must have zero run bytes".to_string());
+        }
     } else if run_byte_count < 16 || run_byte_count % 8 != 0 {
-        return invalid(format!("non-empty TXO run size must be a multiple of 8 and at least 16, got {run_byte_count}"));
+        return invalid(format!(
+            "non-empty TXO run size must be a multiple of 8 and at least 16, got {run_byte_count}"
+        ));
     }
     let formula_size = u16_at(data, 16)? as usize;
-    if formula_size % 2 != 0 { return invalid(format!("TXO ObjFmla size must be even, got {formula_size}")); }
-    let expected = 18usize.checked_add(formula_size)
+    if formula_size % 2 != 0 {
+        return invalid(format!("TXO ObjFmla size must be even, got {formula_size}"));
+    }
+    let expected = 18usize
+        .checked_add(formula_size)
         .ok_or_else(|| XlsError::InvalidData("TXO formula size overflow".to_string()))?;
-    if data.len() != expected { return invalid(format!("TXO payload length must be {expected}, got {}", data.len())); }
+    if data.len() != expected {
+        return invalid(format!(
+            "TXO payload length must be {expected}, got {}",
+            data.len()
+        ));
+    }
     Ok(PendingTxo {
         object_id,
         character_count,
@@ -424,9 +599,14 @@ fn parse_txo(data: &[u8], object_id: u16) -> XlsResult<PendingTxo> {
 
 fn feed_txo_continue(pending: &mut PendingTxo, data: &[u8]) -> XlsResult<bool> {
     if pending.code_units.len() < pending.character_count {
-        let (&flags, characters) = data.split_first()
+        let (&flags, characters) = data
+            .split_first()
             .ok_or_else(|| XlsError::InvalidData("empty TXO text CONTINUE".to_string()))?;
-        if flags & !1 != 0 { return invalid(format!("TXO text CONTINUE contains reserved flags: {flags:#04x}")); }
+        if flags & !1 != 0 {
+            return invalid(format!(
+                "TXO text CONTINUE contains reserved flags: {flags:#04x}"
+            ));
+        }
         let wide = flags & 1 != 0;
         if wide && characters.len() % 2 != 0 {
             return invalid("TXO UTF-16 segment has an odd byte length".to_string());
@@ -437,10 +617,15 @@ fn feed_txo_continue(pending: &mut PendingTxo, data: &[u8]) -> XlsResult<bool> {
             return invalid("TXO text CONTINUE character count does not match cchText".to_string());
         }
         if wide {
-            pending.code_units.extend(characters.chunks_exact(2)
-                .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]])));
+            pending.code_units.extend(
+                characters
+                    .chunks_exact(2)
+                    .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]])),
+            );
         } else {
-            pending.code_units.extend(characters.iter().map(|&byte| u16::from(byte)));
+            pending
+                .code_units
+                .extend(characters.iter().map(|&byte| u16::from(byte)));
         }
         return Ok(false);
     }
@@ -454,7 +639,9 @@ fn feed_txo_continue(pending: &mut PendingTxo, data: &[u8]) -> XlsResult<bool> {
 }
 
 fn parse_txo_runs(data: &[u8], character_count: u16) -> XlsResult<Vec<XlsCommentTextRun>> {
-    if data.is_empty() { return Ok(Vec::new()); }
+    if data.is_empty() {
+        return Ok(Vec::new());
+    }
     if data.len() < 16 || data.len() % 8 != 0 {
         return invalid("invalid TxORuns byte count".to_string());
     }
@@ -464,9 +651,14 @@ fn parse_txo_runs(data: &[u8], character_count: u16) -> XlsResult<Vec<XlsComment
         let offset = index * 8;
         let character_index = u16_at(data, offset)?;
         if character_index > character_count {
-            return invalid(format!("TXO formatting run index {character_index} exceeds cchText {character_count}"));
+            return invalid(format!(
+                "TXO formatting run index {character_index} exceeds cchText {character_count}"
+            ));
         }
-        runs.push(XlsCommentTextRun { character_index, font_index: u16_at(data, offset + 2)? });
+        runs.push(XlsCommentTextRun {
+            character_index,
+            font_index: u16_at(data, offset + 2)?,
+        });
     }
     let last_offset = run_count * 8;
     if u16_at(data, last_offset)? != character_count {
@@ -477,7 +669,8 @@ fn parse_txo_runs(data: &[u8], character_count: u16) -> XlsResult<Vec<XlsComment
 
 fn decode_unicode(data: &[u8], wide: bool) -> XlsResult<String> {
     if wide {
-        let words: Vec<u16> = data.chunks_exact(2)
+        let words: Vec<u16> = data
+            .chunks_exact(2)
             .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
             .collect();
         String::from_utf16(&words)
@@ -488,18 +681,22 @@ fn decode_unicode(data: &[u8], wide: bool) -> XlsResult<String> {
 }
 
 fn u16_at(data: &[u8], offset: usize) -> XlsResult<u16> {
-    let bytes = data.get(offset..offset + 2)
+    let bytes = data
+        .get(offset..offset + 2)
         .ok_or_else(|| XlsError::InvalidData("truncated comment record".to_string()))?;
     Ok(u16::from_le_bytes(bytes.try_into().unwrap()))
 }
 
 fn u32_at(data: &[u8], offset: usize) -> XlsResult<u32> {
-    let bytes = data.get(offset..offset + 4)
+    let bytes = data
+        .get(offset..offset + 4)
         .ok_or_else(|| XlsError::InvalidData("truncated comment record".to_string()))?;
     Ok(u32::from_le_bytes(bytes.try_into().unwrap()))
 }
 
-fn invalid<T>(message: String) -> XlsResult<T> { Err(XlsError::InvalidData(message)) }
+fn invalid<T>(message: String) -> XlsResult<T> {
+    Err(XlsError::InvalidData(message))
+}
 
 #[cfg(test)]
 mod tests {
@@ -536,7 +733,9 @@ mod tests {
         data
     }
 
-    fn client_textbox() -> [u8; 8] { [0, 0, 0x0D, 0xF0, 0, 0, 0, 0] }
+    fn client_textbox() -> [u8; 8] {
+        [0, 0, 0x0D, 0xF0, 0, 0, 0, 0]
+    }
 
     fn note(object_id: u16, flags: u16) -> Vec<u8> {
         let mut data = Vec::new();
@@ -565,11 +764,15 @@ mod tests {
     fn links_obj_txo_continues_and_note() {
         let mut collector = CommentCollector::new();
         collector.feed_record(OBJ_TYPE, &obj(7)).unwrap();
-        collector.feed_record(MSODRAWING_TYPE, &client_textbox()).unwrap();
+        collector
+            .feed_record(MSODRAWING_TYPE, &client_textbox())
+            .unwrap();
         collector.feed_record(TXO_TYPE, &txo(5, 16)).unwrap();
         collector.feed_record(CONTINUE_TYPE, b"\0Hello").unwrap();
         collector.feed_record(CONTINUE_TYPE, &runs(5)).unwrap();
-        collector.feed_record(RECORD_TYPE, &note(7, 0x0182)).unwrap();
+        collector
+            .feed_record(RECORD_TYPE, &note(7, 0x0182))
+            .unwrap();
         let comments = collector.finish().unwrap();
         let comment = &comments[0];
         assert_eq!(comment.row(), 5);
@@ -586,7 +789,9 @@ mod tests {
     fn assembles_mixed_segmented_unicode_without_splitting_surrogates() {
         let mut collector = CommentCollector::new();
         collector.feed_record(OBJ_TYPE, &obj(8)).unwrap();
-        collector.feed_record(MSODRAWING_TYPE, &client_textbox()).unwrap();
+        collector
+            .feed_record(MSODRAWING_TYPE, &client_textbox())
+            .unwrap();
         collector.feed_record(TXO_TYPE, &txo(3, 16)).unwrap();
         collector.feed_record(CONTINUE_TYPE, b"\0A").unwrap();
         let mut wide = vec![1];
@@ -631,7 +836,8 @@ mod tests {
                 .join(name)
         };
 
-        let simple = XlsWorkbook::new(File::open(fixture("SimpleWithComments.xls")).unwrap()).unwrap();
+        let simple =
+            XlsWorkbook::new(File::open(fixture("SimpleWithComments.xls")).unwrap()).unwrap();
         let comments = simple.xls_worksheet(0).unwrap().comments();
         assert_eq!(comments.len(), 3);
         assert_eq!(comments[0].author(), "Yegor Kozlov");
@@ -642,7 +848,8 @@ mod tests {
         assert_ne!(comments[0].identity().guid(), &[0; 16]);
         assert_eq!(comments[0].text_runs().len(), 2);
 
-        let drawing = XlsWorkbook::new(File::open(fixture("DrawingAndComments.xls")).unwrap()).unwrap();
+        let drawing =
+            XlsWorkbook::new(File::open(fixture("DrawingAndComments.xls")).unwrap()).unwrap();
         let comments = drawing.xls_worksheet(0).unwrap().comments();
         assert_eq!(comments.len(), 3);
         assert!(comments.iter().all(|comment| !comment.text().is_empty()));
@@ -650,7 +857,11 @@ mod tests {
         let libreoffice = XlsWorkbook::new(File::open(fixture("comments.xls")).unwrap()).unwrap();
         let comments = libreoffice.xls_worksheet(0).unwrap().comments();
         assert_eq!(comments.len(), 3);
-        assert!(comments.iter().all(|comment| comment.author() == "Sven Nissel"));
+        assert!(
+            comments
+                .iter()
+                .all(|comment| comment.author() == "Sven Nissel")
+        );
         assert_eq!(comments[0].text(), "comment top row1 (index0)\n");
     }
 }

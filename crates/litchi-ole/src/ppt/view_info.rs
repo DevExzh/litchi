@@ -42,7 +42,9 @@ impl PowerPointViewKind {
         match instance {
             0 => Ok(Self::Slide),
             1 => Ok(Self::Notes),
-            _ => Err(corrupted("SlideViewInfo record instance must be zero or one")),
+            _ => Err(corrupted(
+                "SlideViewInfo record instance must be zero or one",
+            )),
         }
     }
 
@@ -66,16 +68,27 @@ impl PowerPointRatio {
         if denominator == 0 {
             return Err(corrupted("PowerPoint ratio denominator must not be zero"));
         }
-        Ok(Self { numerator, denominator })
+        Ok(Self {
+            numerator,
+            denominator,
+        })
     }
 
-    pub fn numerator(&self) -> i32 { self.numerator }
-    pub fn denominator(&self) -> i32 { self.denominator }
+    pub fn numerator(&self) -> i32 {
+        self.numerator
+    }
+    pub fn denominator(&self) -> i32 {
+        self.denominator
+    }
 
     fn normalized(self) -> (i64, i64) {
         let numerator = i64::from(self.numerator);
         let denominator = i64::from(self.denominator);
-        if denominator < 0 { (-numerator, -denominator) } else { (numerator, denominator) }
+        if denominator < 0 {
+            (-numerator, -denominator)
+        } else {
+            (numerator, denominator)
+        }
     }
 }
 
@@ -87,9 +100,15 @@ pub struct PowerPointViewOrigin {
 }
 
 impl PowerPointViewOrigin {
-    pub const fn new(x: i32, y: i32) -> Self { Self { x, y } }
-    pub fn x(&self) -> i32 { self.x }
-    pub fn y(&self) -> i32 { self.y }
+    pub const fn new(x: i32, y: i32) -> Self {
+        Self { x, y }
+    }
+    pub fn x(&self) -> i32 {
+        self.x
+    }
+    pub fn y(&self) -> i32 {
+        self.y
+    }
 }
 
 /// `ZoomViewInfoAtom`, including ignored bytes retained for exact identity.
@@ -124,15 +143,33 @@ impl PowerPointZoomViewInfo {
         })
     }
 
-    pub fn x_scale(&self) -> PowerPointRatio { self.x_scale }
-    pub fn y_scale(&self) -> PowerPointRatio { self.y_scale }
-    pub fn origin(&self) -> PowerPointViewOrigin { self.origin }
-    pub fn uses_variable_scale(&self) -> bool { self.use_variable_scale }
-    pub fn is_draft_mode(&self) -> bool { self.draft_mode }
-    pub fn ignored_bytes(&self) -> (&[u8; 24], &[u8; 2]) { (&self.ignored1, &self.ignored2) }
+    pub fn x_scale(&self) -> PowerPointRatio {
+        self.x_scale
+    }
+    pub fn y_scale(&self) -> PowerPointRatio {
+        self.y_scale
+    }
+    pub fn origin(&self) -> PowerPointViewOrigin {
+        self.origin
+    }
+    pub fn uses_variable_scale(&self) -> bool {
+        self.use_variable_scale
+    }
+    pub fn is_draft_mode(&self) -> bool {
+        self.draft_mode
+    }
+    pub fn ignored_bytes(&self) -> (&[u8; 24], &[u8; 2]) {
+        (&self.ignored1, &self.ignored2)
+    }
 
     fn parse(record: &PptRecord) -> Result<Self> {
-        validate_atom(record, PptRecordType::ViewInfoAtom, VIEW_INFO_ATOM_TYPE, 52, 0)?;
+        validate_atom(
+            record,
+            PptRecordType::ViewInfoAtom,
+            VIEW_INFO_ATOM_TYPE,
+            52,
+            0,
+        )?;
         let data = &record.data;
         let x_scale = PowerPointRatio::new(read_i32(data, 0), read_i32(data, 4))?;
         let y_scale = PowerPointRatio::new(read_i32(data, 8), read_i32(data, 12))?;
@@ -190,14 +227,30 @@ pub struct PowerPointSlideViewPreferences {
 
 impl PowerPointSlideViewPreferences {
     pub const fn new(snap_to_grid: bool, snap_to_shape: bool) -> Self {
-        Self { ignored: 0, snap_to_grid, snap_to_shape }
+        Self {
+            ignored: 0,
+            snap_to_grid,
+            snap_to_shape,
+        }
     }
-    pub fn snap_to_grid(&self) -> bool { self.snap_to_grid }
-    pub fn snap_to_shape(&self) -> bool { self.snap_to_shape }
-    pub fn ignored_byte(&self) -> u8 { self.ignored }
+    pub fn snap_to_grid(&self) -> bool {
+        self.snap_to_grid
+    }
+    pub fn snap_to_shape(&self) -> bool {
+        self.snap_to_shape
+    }
+    pub fn ignored_byte(&self) -> u8 {
+        self.ignored
+    }
 
     fn parse(record: &PptRecord) -> Result<Self> {
-        validate_atom(record, PptRecordType::SlideViewInfoAtom, SLIDE_VIEW_INFO_ATOM_TYPE, 3, 0)?;
+        validate_atom(
+            record,
+            PptRecordType::SlideViewInfoAtom,
+            SLIDE_VIEW_INFO_ATOM_TYPE,
+            3,
+            0,
+        )?;
         Ok(Self {
             ignored: record.data[0],
             snap_to_grid: strict_bool(record.data[1], "SlideViewInfoAtom.fSnapToGrid")?,
@@ -210,14 +263,21 @@ impl PowerPointSlideViewPreferences {
             0,
             0,
             SLIDE_VIEW_INFO_ATOM_TYPE,
-            &[self.ignored, u8::from(self.snap_to_grid), u8::from(self.snap_to_shape)],
+            &[
+                self.ignored,
+                u8::from(self.snap_to_grid),
+                u8::from(self.snap_to_shape),
+            ],
         )
     }
 }
 
 /// Orientation stored in a `GuideAtom`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PowerPointGuideOrientation { Horizontal, Vertical }
+pub enum PowerPointGuideOrientation {
+    Horizontal,
+    Vertical,
+}
 
 /// One alignment guide in master units.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -231,10 +291,17 @@ impl PowerPointGuide {
         if !(-15_840..=32_255).contains(&position) {
             return Err(corrupted("GuideAtom position is outside -15840..=32255"));
         }
-        Ok(Self { orientation, position })
+        Ok(Self {
+            orientation,
+            position,
+        })
     }
-    pub fn orientation(&self) -> PowerPointGuideOrientation { self.orientation }
-    pub fn position(&self) -> i32 { self.position }
+    pub fn orientation(&self) -> PowerPointGuideOrientation {
+        self.orientation
+    }
+    pub fn position(&self) -> i32 {
+        self.position
+    }
 
     fn parse(record: &PptRecord) -> Result<Self> {
         validate_atom(record, PptRecordType::GuideAtom, GUIDE_ATOM_TYPE, 8, 7)?;
@@ -275,12 +342,25 @@ impl PowerPointSlideViewInfo {
         guides: Vec<PowerPointGuide>,
     ) -> Result<Self> {
         validate_guides(&guides)?;
-        Ok(Self { kind, preferences, zoom, guides })
+        Ok(Self {
+            kind,
+            preferences,
+            zoom,
+            guides,
+        })
     }
-    pub fn kind(&self) -> PowerPointViewKind { self.kind }
-    pub fn preferences(&self) -> PowerPointSlideViewPreferences { self.preferences }
-    pub fn zoom(&self) -> Option<&PowerPointZoomViewInfo> { self.zoom.as_ref() }
-    pub fn guides(&self) -> &[PowerPointGuide] { &self.guides }
+    pub fn kind(&self) -> PowerPointViewKind {
+        self.kind
+    }
+    pub fn preferences(&self) -> PowerPointSlideViewPreferences {
+        self.preferences
+    }
+    pub fn zoom(&self) -> Option<&PowerPointZoomViewInfo> {
+        self.zoom.as_ref()
+    }
+    pub fn guides(&self) -> &[PowerPointGuide] {
+        &self.guides
+    }
 
     pub fn parse_record(record: &PptRecord) -> Result<Self> {
         let declared = usize::try_from(record.data_length)
@@ -291,7 +371,9 @@ impl PowerPointSlideViewInfo {
             || declared != record.data.len()
             || record.data.len() > MAX_CONTAINER_DATA
         {
-            return Err(corrupted("SlideViewInfo container has an invalid header or size"));
+            return Err(corrupted(
+                "SlideViewInfo container has an invalid header or size",
+            ));
         }
         let kind = PowerPointViewKind::from_instance(record.instance)?;
         let children = PptRecord::parse_sequence_strict(&record.data, "SlideViewInfo")?;
@@ -300,45 +382,74 @@ impl PowerPointSlideViewInfo {
         };
         let preferences = PowerPointSlideViewPreferences::parse(first)?;
         let mut index = 1usize;
-        let zoom = if children.get(index).is_some_and(|child| child.record_type == PptRecordType::ViewInfoAtom) {
+        let zoom = if children
+            .get(index)
+            .is_some_and(|child| child.record_type == PptRecordType::ViewInfoAtom)
+        {
             let zoom = PowerPointZoomViewInfo::parse(&children[index])?;
             index += 1;
             Some(zoom)
-        } else { None };
+        } else {
+            None
+        };
         let mut guides = Vec::with_capacity(children.len().saturating_sub(index));
         for child in &children[index..] {
             if child.record_type != PptRecordType::GuideAtom {
-                return Err(corrupted("SlideViewInfo contains an unexpected or out-of-order child"));
+                return Err(corrupted(
+                    "SlideViewInfo contains an unexpected or out-of-order child",
+                ));
             }
             guides.push(PowerPointGuide::parse(child)?);
         }
         validate_guides(&guides)?;
-        Ok(Self { kind, preferences, zoom, guides })
+        Ok(Self {
+            kind,
+            preferences,
+            zoom,
+            guides,
+        })
     }
 
     /// Serialize a complete container, preserving every ignored atom byte.
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         validate_guides(&self.guides)?;
         let mut data = self.preferences.to_bytes()?;
-        if let Some(zoom) = &self.zoom { data.extend(zoom.to_bytes()?); }
-        for guide in &self.guides { data.extend(guide.to_bytes()?); }
+        if let Some(zoom) = &self.zoom {
+            data.extend(zoom.to_bytes()?);
+        }
+        for guide in &self.guides {
+            data.extend(guide.to_bytes()?);
+        }
         if data.len() > MAX_CONTAINER_DATA {
-            return Err(corrupted("SlideViewInfo exceeds its bounded container size"));
+            return Err(corrupted(
+                "SlideViewInfo exceeds its bounded container size",
+            ));
         }
         record_bytes(0xF, self.kind.instance(), SLIDE_VIEW_INFO_TYPE, &data)
     }
 }
 
 fn validate_guides(guides: &[PowerPointGuide]) -> Result<()> {
-    let horizontal = guides.iter().filter(|guide| guide.orientation == PowerPointGuideOrientation::Horizontal).count();
+    let horizontal = guides
+        .iter()
+        .filter(|guide| guide.orientation == PowerPointGuideOrientation::Horizontal)
+        .count();
     let vertical = guides.len() - horizontal;
     if horizontal > 8 || vertical > 8 {
-        return Err(corrupted("SlideViewInfo contains more than eight guides of one orientation"));
+        return Err(corrupted(
+            "SlideViewInfo contains more than eight guides of one orientation",
+        ));
     }
     Ok(())
 }
 
-fn validate_atom(record: &PptRecord, record_type: PptRecordType, raw_type: u16, length: usize, instance: u16) -> Result<()> {
+fn validate_atom(
+    record: &PptRecord,
+    record_type: PptRecordType,
+    raw_type: u16,
+    length: usize,
+    instance: u16,
+) -> Result<()> {
     let declared = usize::try_from(record.data_length)
         .map_err(|_| corrupted(format!("PPT atom {raw_type} length does not fit memory")))?;
     if record.record_type != record_type
@@ -348,7 +459,9 @@ fn validate_atom(record: &PptRecord, record_type: PptRecordType, raw_type: u16, 
         || declared != length
         || record.data.len() != length
     {
-        return Err(corrupted(format!("PPT atom {raw_type} has an invalid header or length")));
+        return Err(corrupted(format!(
+            "PPT atom {raw_type} has an invalid header or length"
+        )));
     }
     Ok(())
 }
@@ -357,7 +470,8 @@ fn record_bytes(version: u16, instance: u16, record_type: u16, data: &[u8]) -> R
     if version > 0xF || instance > 0x0FFF {
         return Err(corrupted("PPT record version or instance is out of range"));
     }
-    let length = u32::try_from(data.len()).map_err(|_| corrupted("PPT view record payload exceeds 32-bit length"))?;
+    let length = u32::try_from(data.len())
+        .map_err(|_| corrupted("PPT view record payload exceeds 32-bit length"))?;
     let mut bytes = Vec::with_capacity(8 + data.len());
     bytes.extend_from_slice(&(version | instance << 4).to_le_bytes());
     bytes.extend_from_slice(&record_type.to_le_bytes());
@@ -374,20 +488,28 @@ pub struct PowerPointSlideViewInformation {
 }
 
 impl PowerPointSlideViewInformation {
-    pub fn slide(&self) -> Option<&PowerPointSlideViewInfo> { self.slide.as_ref() }
-    pub fn notes(&self) -> Option<&PowerPointSlideViewInfo> { self.notes.as_ref() }
+    pub fn slide(&self) -> Option<&PowerPointSlideViewInfo> {
+        self.slide.as_ref()
+    }
+    pub fn notes(&self) -> Option<&PowerPointSlideViewInfo> {
+        self.notes.as_ref()
+    }
 
     pub(crate) fn parse_records(records: &[&PptRecord]) -> Result<Self> {
         let mut information = Self::default();
         for record in records {
-            if record.record_type != PptRecordType::SlideViewInfo { continue; }
+            if record.record_type != PptRecordType::SlideViewInfo {
+                continue;
+            }
             let view = PowerPointSlideViewInfo::parse_record(record)?;
             let slot = match view.kind {
                 PowerPointViewKind::Slide => &mut information.slide,
                 PowerPointViewKind::Notes => &mut information.notes,
             };
             if slot.replace(view).is_some() {
-                return Err(corrupted("presentation contains duplicate SlideViewInfo instances"));
+                return Err(corrupted(
+                    "presentation contains duplicate SlideViewInfo instances",
+                ));
             }
         }
         Ok(information)
@@ -399,7 +521,8 @@ mod tests {
     use super::*;
 
     fn decode_hex(hex: &str) -> Vec<u8> {
-        hex.as_bytes().chunks_exact(2)
+        hex.as_bytes()
+            .chunks_exact(2)
             .map(|pair| u8::from_str_radix(std::str::from_utf8(pair).unwrap(), 16).unwrap())
             .collect()
     }
@@ -427,11 +550,17 @@ mod tests {
         assert!(view.preferences().snap_to_grid());
         assert!(!view.preferences().snap_to_shape());
         let zoom = view.zoom().unwrap();
-        assert_eq!((zoom.x_scale().numerator(), zoom.x_scale().denominator()), (86, 100));
+        assert_eq!(
+            (zoom.x_scale().numerator(), zoom.x_scale().denominator()),
+            (86, 100)
+        );
         assert_eq!((zoom.origin().x(), zoom.origin().y()), (-1542, -96));
         assert!(zoom.uses_variable_scale());
         assert_eq!(view.guides()[0].position(), 2160);
-        assert_eq!(view.guides()[1].orientation(), PowerPointGuideOrientation::Vertical);
+        assert_eq!(
+            view.guides()[1].orientation(),
+            PowerPointGuideOrientation::Vertical
+        );
         assert_eq!(view.to_bytes().unwrap(), bytes);
     }
 
@@ -453,13 +582,17 @@ mod tests {
         assert!(PowerPointSlideViewInfo::parse_record(&record).is_err());
 
         assert!(PowerPointGuide::new(PowerPointGuideOrientation::Horizontal, 32_256).is_err());
-        let nine = vec![PowerPointGuide::new(PowerPointGuideOrientation::Horizontal, 0).unwrap(); 9];
-        assert!(PowerPointSlideViewInfo::new(
-            PowerPointViewKind::Slide,
-            PowerPointSlideViewPreferences::new(false, false),
-            None,
-            nine,
-        ).is_err());
+        let nine =
+            vec![PowerPointGuide::new(PowerPointGuideOrientation::Horizontal, 0).unwrap(); 9];
+        assert!(
+            PowerPointSlideViewInfo::new(
+                PowerPointViewKind::Slide,
+                PowerPointSlideViewPreferences::new(false, false),
+                None,
+                nine,
+            )
+            .is_err()
+        );
 
         let mut truncated = poi_reference();
         truncated.pop();

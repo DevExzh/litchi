@@ -5,10 +5,10 @@
 //! the `biff` module; this module only models the logical structure and
 //! provides helpers to convert range references into BIFF formula bytes.
 
+use crate::xls::XlsDefinedNameFutureRecords;
 use crate::xls::XlsResult;
 use crate::xls::writer::formula::{Ptg, encode_ptg_tokens, parse_cell_ref};
 use crate::xls::{XlsBuiltInName, XlsDefinedNameKind, XlsError, XlsNameScope};
-use crate::xls::XlsDefinedNameFutureRecords;
 
 /// Complete inert BIFF8 `Lbl` metadata for names beyond simple ranges.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -38,38 +38,73 @@ impl XlsDefinedNameRecordOptions {
     pub(super) fn validate(&self, sheet_count: usize) -> XlsResult<()> {
         let name_len = self.name.encode_utf16().count();
         match self.kind {
-            XlsDefinedNameKind::User if !(1..=255).contains(&name_len) || self.name.contains('\0') => {
-                return Err(XlsError::InvalidData("defined name must contain 1..=255 non-NUL UTF-16 units".to_string()));
+            XlsDefinedNameKind::User
+                if !(1..=255).contains(&name_len) || self.name.contains('\0') =>
+            {
+                return Err(XlsError::InvalidData(
+                    "defined name must contain 1..=255 non-NUL UTF-16 units".to_string(),
+                ));
             },
             XlsDefinedNameKind::BuiltIn(_) => {},
             _ => {},
         }
         if matches!(self.scope, XlsNameScope::Worksheet(index) if index >= sheet_count) {
-            return Err(XlsError::InvalidData("defined name scope is outside worksheet collection".to_string()));
+            return Err(XlsError::InvalidData(
+                "defined name scope is outside worksheet collection".to_string(),
+            ));
         }
         if (self.function || self.vba_procedure) && !self.procedure {
-            return Err(XlsError::InvalidData("function/VBA name flags require procedure".to_string()));
+            return Err(XlsError::InvalidData(
+                "function/VBA name flags require procedure".to_string(),
+            ));
         }
         if self.function_group > 31 {
-            return Err(XlsError::InvalidData("defined name function group must be at most 31".to_string()));
+            return Err(XlsError::InvalidData(
+                "defined name function group must be at most 31".to_string(),
+            ));
         }
-        if self.shortcut_key.is_some_and(|key| {
-            self.function || !self.procedure || !key.is_ascii_alphabetic()
-        }) {
-            return Err(XlsError::InvalidData("invalid defined-name macro shortcut".to_string()));
+        if self
+            .shortcut_key
+            .is_some_and(|key| self.function || !self.procedure || !key.is_ascii_alphabetic())
+        {
+            return Err(XlsError::InvalidData(
+                "invalid defined-name macro shortcut".to_string(),
+            ));
         }
         if self.formula_tokens.len() > u16::MAX as usize
-            || self.formula_tokens.len().checked_add(self.formula_extra.len()).is_none_or(|len| len > 1_048_576)
+            || self
+                .formula_tokens
+                .len()
+                .checked_add(self.formula_extra.len())
+                .is_none_or(|len| len > 1_048_576)
         {
-            return Err(XlsError::InvalidData("defined-name formula bytes exceed resource bound".to_string()));
+            return Err(XlsError::InvalidData(
+                "defined-name formula bytes exceed resource bound".to_string(),
+            ));
         }
-        for value in [&self.custom_menu, &self.description, &self.help_topic, &self.status_bar] {
-            if value.chars().count() > 255 || value.chars().any(|character| u32::from(character) > 0xff) {
-                return Err(XlsError::InvalidData("legacy defined-name UI strings must be <=255 compressed characters".to_string()));
+        for value in [
+            &self.custom_menu,
+            &self.description,
+            &self.help_topic,
+            &self.status_bar,
+        ] {
+            if value.chars().count() > 255
+                || value.chars().any(|character| u32::from(character) > 0xff)
+            {
+                return Err(XlsError::InvalidData(
+                    "legacy defined-name UI strings must be <=255 compressed characters"
+                        .to_string(),
+                ));
             }
         }
-        if self.comment.as_ref().is_some_and(|comment| comment.encode_utf16().count() > 255) {
-            return Err(XlsError::InvalidData("defined-name comment exceeds 255 UTF-16 units".to_string()));
+        if self
+            .comment
+            .as_ref()
+            .is_some_and(|comment| comment.encode_utf16().count() > 255)
+        {
+            return Err(XlsError::InvalidData(
+                "defined-name comment exceeds 255 UTF-16 units".to_string(),
+            ));
         }
         Ok(())
     }
@@ -82,13 +117,48 @@ impl XlsDefinedNameRecordOptions {
     }
 
     pub(crate) fn built_in(&self) -> Option<XlsBuiltInName> {
-        match self.kind { XlsDefinedNameKind::BuiltIn(name) => Some(name), _ => None }
+        match self.kind {
+            XlsDefinedNameKind::BuiltIn(name) => Some(name),
+            _ => None,
+        }
     }
 }
 
-pub(super) fn validate_future_records(future:&XlsDefinedNameFutureRecords,serialized_name:&str)->XlsResult<()>{
-    if let Some(value)=&future.function_group{let count=value.function_name.encode_utf16().count();if !(1..=255).contains(&count)||value.function_name.contains('\0'){return Err(XlsError::InvalidData("NameFnGrp12 function name must contain 1..=255 non-NUL UTF-16 units".to_string()))}if !(32..=255).contains(&value.category){return Err(XlsError::InvalidData("NameFnGrp12 category must be in 32..=255".to_string()))}if !crate::xls::defined_names::unicode_name_eq(&value.function_name,serialized_name){return Err(XlsError::InvalidData("NameFnGrp12 function name must match its defined name".to_string()))}}
-    if let Some(value)=&future.publication{let count=value.name.encode_utf16().count();if !(1..=255).contains(&count)||value.name.contains('\0'){return Err(XlsError::InvalidData("NamePublish name must contain 1..=255 non-NUL UTF-16 units".to_string()))}if !crate::xls::defined_names::unicode_name_eq(&value.name,serialized_name){return Err(XlsError::InvalidData("NamePublish name must match its defined name".to_string()))}}
+pub(super) fn validate_future_records(
+    future: &XlsDefinedNameFutureRecords,
+    serialized_name: &str,
+) -> XlsResult<()> {
+    if let Some(value) = &future.function_group {
+        let count = value.function_name.encode_utf16().count();
+        if !(1..=255).contains(&count) || value.function_name.contains('\0') {
+            return Err(XlsError::InvalidData(
+                "NameFnGrp12 function name must contain 1..=255 non-NUL UTF-16 units".to_string(),
+            ));
+        }
+        if !(32..=255).contains(&value.category) {
+            return Err(XlsError::InvalidData(
+                "NameFnGrp12 category must be in 32..=255".to_string(),
+            ));
+        }
+        if !crate::xls::defined_names::unicode_name_eq(&value.function_name, serialized_name) {
+            return Err(XlsError::InvalidData(
+                "NameFnGrp12 function name must match its defined name".to_string(),
+            ));
+        }
+    }
+    if let Some(value) = &future.publication {
+        let count = value.name.encode_utf16().count();
+        if !(1..=255).contains(&count) || value.name.contains('\0') {
+            return Err(XlsError::InvalidData(
+                "NamePublish name must contain 1..=255 non-NUL UTF-16 units".to_string(),
+            ));
+        }
+        if !crate::xls::defined_names::unicode_name_eq(&value.name, serialized_name) {
+            return Err(XlsError::InvalidData(
+                "NamePublish name must match its defined name".to_string(),
+            ));
+        }
+    }
     Ok(())
 }
 

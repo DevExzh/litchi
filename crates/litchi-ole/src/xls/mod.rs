@@ -130,77 +130,75 @@ pub mod protection;
 /// XLS file writing
 pub mod writer;
 
-pub use cell::XlsCell;
-pub use comments::CommentVisibility;
+pub use access::{XlsWriteAccess, XlsWriteAccessEncoding};
+pub use alignment::{
+    XlsCellAlignment, XlsHorizontalAlignment, XlsReadingOrder, XlsTextRotation,
+    XlsVerticalAlignment,
+};
+pub use border_fill::{XlsBorderSide, XlsBorderStyle, XlsCellBorders, XlsCellFill, XlsFillPattern};
 pub use calculation::{
     XlsCalculationMode, XlsReferenceMode, XlsWorkbookCalculation, XlsWorksheetCalculation,
 };
-pub use scenario::{XlsScenario, XlsScenarioCell, XlsScenarioManager, XlsScenarioRange};
-pub use vba::XlsVbaMetadata;
-pub use environment::{XlsLinkUpdateMode, XlsObjectDisplayMode, XlsWorkbookEnvironment};
-pub use access::{XlsWriteAccess, XlsWriteAccessEncoding};
-pub use table_styles::XlsTableStyles;
-pub use shared_string_index::{XlsSharedStringBucket, XlsSharedStringIndex};
-pub use row_block_index::{
-    XlsDbCellRecord, XlsIndexedRow, XlsRowBlock, XlsRowBlockIndex,
-    XlsWorksheetIndexRecord,
-};
-pub use formula_errors::{
-    XlsFormulaErrorChecks, XlsFormulaErrorFeature, XlsFormulaErrorHeader,
-    XlsFormulaErrorRange,
-};
-pub use workbook_view::{XlsWorkbookView, XlsWorkbookWindow};
-pub use function_group::{XlsBuiltInFunctionCategories, XlsFunctionGroups};
-pub use external_link::{
-    XlsExternalCacheRow, XlsExternalCachedError, XlsExternalCachedValue, XlsExternalLinks,
-    XlsExternalName, XlsExternalNameBody, XlsExternalSheet, XlsExternalSheetReference,
-    XlsExternalWorkbook, XlsSupportingBook,
+pub use cell::XlsCell;
+pub use comments::CommentVisibility;
+pub use conditional_format::{
+    XlsConditionalAlignment, XlsConditionalBorder, XlsConditionalComparison,
+    XlsConditionalExtension, XlsConditionalFont, XlsConditionalFormatRange,
+    XlsConditionalFormatting, XlsConditionalFormatting12, XlsConditionalNumberFormat,
+    XlsConditionalPattern, XlsConditionalProtection, XlsConditionalRule, XlsConditionalRule12,
+    XlsConditionalRule12Kind, XlsConditionalRuleKind, XlsConditionalStyle,
 };
 pub use consolidation::{
-    XlsConsolidation, XlsConsolidationBuiltInName, XlsConsolidationFile,
-    XlsConsolidationFunction, XlsConsolidationRange, XlsConsolidationSource,
+    XlsConsolidation, XlsConsolidationBuiltInName, XlsConsolidationFile, XlsConsolidationFunction,
+    XlsConsolidationRange, XlsConsolidationSource,
 };
 pub use data_validation::{
     XlsDataValidationErrorStyle, XlsDataValidationFormula, XlsDataValidationImeMode,
     XlsDataValidationKind, XlsDataValidationOperator, XlsDataValidationRange,
     XlsDataValidationRule, XlsDataValidationSettings,
 };
-pub use error::{XlsEncryptionKind, XlsError, XlsResult};
 pub use defined_names::{
-    XlsBuiltInName, XlsDefinedName, XlsDefinedNameFutureRecords, XlsDefinedNameKind, XlsNameFnGrp12, XlsNamePublish, XlsNameScope,
+    XlsBuiltInName, XlsDefinedName, XlsDefinedNameFutureRecords, XlsDefinedNameKind,
+    XlsNameFnGrp12, XlsNamePublish, XlsNameScope,
 };
+pub use environment::{XlsLinkUpdateMode, XlsObjectDisplayMode, XlsWorkbookEnvironment};
+pub use error::{XlsEncryptionKind, XlsError, XlsResult};
+pub use external_link::{
+    XlsExternalCacheRow, XlsExternalCachedError, XlsExternalCachedValue, XlsExternalLinks,
+    XlsExternalName, XlsExternalNameBody, XlsExternalSheet, XlsExternalSheetReference,
+    XlsExternalWorkbook, XlsSupportingBook,
+};
+pub use font::{XlsFont, XlsFontCharset, XlsFontEscapement, XlsFontFamily, XlsFontUnderline};
+pub use formula_errors::{
+    XlsFormulaErrorChecks, XlsFormulaErrorFeature, XlsFormulaErrorHeader, XlsFormulaErrorRange,
+};
+pub use function_group::{XlsBuiltInFunctionCategories, XlsFunctionGroups};
+pub use layout::{XlsColumnLayout, XlsRowLayout};
 pub use number_format::{
-    XlsDateSystem, XlsEffectiveExtendedFormat, XlsExtendedFormat,
-    XlsExtendedFormatApplications, XlsExtendedFormatKind, XlsFormatting, XlsNumberFormat,
+    XlsDateSystem, XlsEffectiveExtendedFormat, XlsExtendedFormat, XlsExtendedFormatApplications,
+    XlsExtendedFormatKind, XlsFormatting, XlsNumberFormat,
+};
+pub use page_setup::{
+    XlsPageBreak, XlsPageSetup, XlsPrintComments, XlsPrintErrors, XlsPrintOrder,
+    XlsPrintOrientation, XlsPrintSetup,
 };
 pub use palette::{XlsColor, XlsPalette};
-pub use font::{XlsFont, XlsFontCharset, XlsFontEscapement, XlsFontFamily, XlsFontUnderline};
-pub use alignment::{
-    XlsCellAlignment, XlsHorizontalAlignment, XlsReadingOrder, XlsTextRotation,
-    XlsVerticalAlignment,
-};
-pub use border_fill::{
-    XlsBorderSide, XlsBorderStyle, XlsCellBorders, XlsCellFill, XlsFillPattern,
-};
-pub use layout::{XlsColumnLayout, XlsRowLayout};
-pub use sheet_layout::XlsWorksheetLayout;
-pub use view::{XlsPane, XlsPaneType, XlsSelection, XlsSelectionRange, XlsWorksheetView};
-pub use page_setup::{
-    XlsPageBreak, XlsPageSetup, XlsPrintComments, XlsPrintErrors, XlsPrintOrder, XlsPrintOrientation,
-    XlsPrintSetup,
-};
-pub use conditional_format::{
-    XlsConditionalAlignment, XlsConditionalBorder, XlsConditionalComparison,
-    XlsConditionalFont, XlsConditionalFormatRange, XlsConditionalFormatting,
-    XlsConditionalNumberFormat, XlsConditionalPattern, XlsConditionalProtection,
-    XlsConditionalExtension, XlsConditionalFormatting12, XlsConditionalRule, XlsConditionalRule12, XlsConditionalRule12Kind, XlsConditionalRuleKind, XlsConditionalStyle,
-};
-pub use sheet_metadata::{XlsSheetKind, XlsSheetMetadata, XlsSheetVisibility};
 pub use records::{
     PhoneticAlignment, PhoneticRun, PhoneticString, PhoneticType, SharedStringFormatRun,
     SharedStringProperties,
 };
+pub use row_block_index::{
+    XlsDbCellRecord, XlsIndexedRow, XlsRowBlock, XlsRowBlockIndex, XlsWorksheetIndexRecord,
+};
+pub use scenario::{XlsScenario, XlsScenarioCell, XlsScenarioManager, XlsScenarioRange};
 pub use shapes::XlsShape;
+pub use shared_string_index::{XlsSharedStringBucket, XlsSharedStringIndex};
+pub use sheet_layout::XlsWorksheetLayout;
+pub use sheet_metadata::{XlsSheetKind, XlsSheetMetadata, XlsSheetVisibility};
+pub use table_styles::XlsTableStyles;
+pub use vba::XlsVbaMetadata;
+pub use view::{XlsPane, XlsPaneType, XlsSelection, XlsSelectionRange, XlsWorksheetView};
 pub use workbook::{XlsOpenOptions, XlsWorkbook};
+pub use workbook_view::{XlsWorkbookView, XlsWorkbookWindow};
 pub use worksheet::XlsWorksheet;
 pub use writer::XlsWriter;

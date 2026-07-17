@@ -2,14 +2,14 @@ use super::super::OleFile;
 use super::bookmark::Bookmark;
 /// Document - the main API for working with Word document content.
 use super::comment::Comment;
-use super::footnote::Footnote;
 use super::encryption::decrypt_document_streams;
+use super::footnote::Footnote;
 use super::header_footer::HeaderFooter;
 use super::hyperlink::Hyperlink;
 use super::package::{DocError, DocOpenOptions, Result};
 use super::paragraph::{Paragraph, Run};
-use super::parts::bookmarks::BookmarksTable;
 use super::parts::associated_strings::DocumentAssociatedStrings;
+use super::parts::bookmarks::BookmarksTable;
 use super::parts::chp_bin_table::ChpBinTable;
 use super::parts::comments::CommentsTable;
 use super::parts::fib::FileInformationBlock;
@@ -574,9 +574,9 @@ impl Document {
     /// Parsing is deferred so nonconforming producer caches do not prevent the document's
     /// primary text from opening. Any malformed PLCF is reported when this metadata is requested.
     pub fn proofing_tables(&self) -> Result<&ProofingTables> {
-        self.proofing_tables.as_ref().map_err(|error| {
-            DocError::Corrupted(format!("invalid proofing metadata: {error}"))
-        })
+        self.proofing_tables
+            .as_ref()
+            .map_err(|error| DocError::Corrupted(format!("invalid proofing metadata: {error}")))
     }
 
     /// Get access to the fields table (if parsed).

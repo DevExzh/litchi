@@ -22,32 +22,27 @@ pub mod view;
 pub mod row_blocks;
 
 // Re-export public types
+pub use crate::xls::{
+    XlsConsolidation, XlsConsolidationBuiltInName, XlsConsolidationFile, XlsConsolidationFunction,
+    XlsConsolidationRange, XlsConsolidationSource,
+};
+pub use crate::xls::{XlsDefinedNameFutureRecords, XlsNameFnGrp12, XlsNamePublish};
 pub use biff::{AutoFilterConditionWrite, write_cfex12_marker, write_cfheader};
 pub use core::{
-    PivotCacheValue, XlsCalculationSettings, XlsCellValue, XlsConditionalFormat,
-    XlsCommentAnchor, XlsCommentTextRunWrite, XlsCommentWriteOptions,
+    PivotCacheValue, XlsAddInFunctionOptions, XlsCalculationSettings, XlsCellValue,
+    XlsCommentAnchor, XlsCommentTextRunWrite, XlsCommentWriteOptions, XlsConditionalFormat,
     XlsConditionalFormat12Group, XlsConditionalFormat12Rule, XlsConditionalFormat12Type,
     XlsConditionalFormatGroup, XlsConditionalFormatOperator, XlsConditionalFormatRange,
-    XlsConditionalFormatRule, XlsConditionalFormatType,
-    XlsConditionalPattern, XlsDataValidation, XlsDataValidationErrorStyle,
-    XlsDataValidationFormulaKind, XlsDataValidationImeMode, XlsDataValidationOperator,
-    XlsDataValidationOptions, XlsDataValidationRange, XlsDataValidationTableOptions,
-    XlsDataValidationType,
-    XlsFunctionGroupOptions,
-    XlsAddInFunctionOptions, XlsDdeOrOleItemOptions, XlsDdeOrOleLinkOptions,
+    XlsConditionalFormatRule, XlsConditionalFormatType, XlsConditionalPattern, XlsDataValidation,
+    XlsDataValidationErrorStyle, XlsDataValidationFormulaKind, XlsDataValidationImeMode,
+    XlsDataValidationOperator, XlsDataValidationOptions, XlsDataValidationRange,
+    XlsDataValidationTableOptions, XlsDataValidationType, XlsDdeOrOleItemOptions,
+    XlsDdeOrOleLinkOptions, XlsDefinedName, XlsDefinedNameRecordOptions,
     XlsExternalCacheRowOptions, XlsExternalDefinedNameOptions, XlsExternalSheetOptions,
-    XlsExternalWorkbookOptions,
-    XlsDefinedName, XlsDefinedNameRecordOptions, XlsPivotDataItemConfig, XlsPivotFieldConfig,
-    XlsPivotItemConfig,
-    XlsPageSetupOptions, XlsPivotTableConfig, XlsWorkbookEnvironmentOptions,
-    XlsWorkbookWindowOptions,
-    XlsWorksheetLayoutOptions, XlsWriter,
+    XlsExternalWorkbookOptions, XlsFunctionGroupOptions, XlsPageSetupOptions,
+    XlsPivotDataItemConfig, XlsPivotFieldConfig, XlsPivotItemConfig, XlsPivotTableConfig,
+    XlsWorkbookEnvironmentOptions, XlsWorkbookWindowOptions, XlsWorksheetLayoutOptions, XlsWriter,
 };
-pub use crate::xls::{
-    XlsConsolidation, XlsConsolidationBuiltInName, XlsConsolidationFile,
-    XlsConsolidationFunction, XlsConsolidationRange, XlsConsolidationSource,
-};
-pub use crate::xls::{XlsDefinedNameFutureRecords,XlsNameFnGrp12,XlsNamePublish};
 pub use formatting::{
     BorderStyle, Borders, CellStyle, ExtendedFormat, Fill, FillPattern, Font, FormattingManager,
     HorizontalAlignment, VerticalAlignment,

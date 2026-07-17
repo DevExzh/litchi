@@ -59,25 +59,63 @@ impl Default for XlsWorksheetLayout {
 }
 
 impl XlsWorksheetLayout {
-    pub fn default_row_height_twips(&self) -> u16 { self.default_row_height_twips }
-    pub fn empty_rows_hidden(&self) -> bool { self.empty_rows_hidden }
-    pub fn default_row_height_unsynced(&self) -> bool { self.default_row_height_unsynced }
-    pub fn thick_top_border(&self) -> bool { self.thick_top_border }
-    pub fn thick_bottom_border(&self) -> bool { self.thick_bottom_border }
-    pub fn default_column_width_chars(&self) -> u16 { self.default_column_width_chars }
-    pub fn max_row_outline_level(&self) -> u8 { self.max_row_outline_level }
-    pub fn max_column_outline_level(&self) -> u8 { self.max_column_outline_level }
-    pub fn row_gutter_width(&self) -> u16 { self.row_gutter_width }
-    pub fn column_gutter_height(&self) -> u16 { self.column_gutter_height }
-    pub fn show_automatic_page_breaks(&self) -> bool { self.show_automatic_page_breaks }
-    pub fn apply_styles_to_outlines(&self) -> bool { self.apply_styles_to_outlines }
-    pub fn summary_rows_below(&self) -> bool { self.summary_rows_below }
-    pub fn summary_columns_right(&self) -> bool { self.summary_columns_right }
-    pub fn fit_to_page(&self) -> bool { self.fit_to_page }
-    pub fn synchronize_horizontal_scrolling(&self) -> bool { self.synchronize_horizontal_scrolling }
-    pub fn synchronize_vertical_scrolling(&self) -> bool { self.synchronize_vertical_scrolling }
-    pub fn alternate_expression_evaluation(&self) -> bool { self.alternate_expression_evaluation }
-    pub fn alternate_formula_entry(&self) -> bool { self.alternate_formula_entry }
+    pub fn default_row_height_twips(&self) -> u16 {
+        self.default_row_height_twips
+    }
+    pub fn empty_rows_hidden(&self) -> bool {
+        self.empty_rows_hidden
+    }
+    pub fn default_row_height_unsynced(&self) -> bool {
+        self.default_row_height_unsynced
+    }
+    pub fn thick_top_border(&self) -> bool {
+        self.thick_top_border
+    }
+    pub fn thick_bottom_border(&self) -> bool {
+        self.thick_bottom_border
+    }
+    pub fn default_column_width_chars(&self) -> u16 {
+        self.default_column_width_chars
+    }
+    pub fn max_row_outline_level(&self) -> u8 {
+        self.max_row_outline_level
+    }
+    pub fn max_column_outline_level(&self) -> u8 {
+        self.max_column_outline_level
+    }
+    pub fn row_gutter_width(&self) -> u16 {
+        self.row_gutter_width
+    }
+    pub fn column_gutter_height(&self) -> u16 {
+        self.column_gutter_height
+    }
+    pub fn show_automatic_page_breaks(&self) -> bool {
+        self.show_automatic_page_breaks
+    }
+    pub fn apply_styles_to_outlines(&self) -> bool {
+        self.apply_styles_to_outlines
+    }
+    pub fn summary_rows_below(&self) -> bool {
+        self.summary_rows_below
+    }
+    pub fn summary_columns_right(&self) -> bool {
+        self.summary_columns_right
+    }
+    pub fn fit_to_page(&self) -> bool {
+        self.fit_to_page
+    }
+    pub fn synchronize_horizontal_scrolling(&self) -> bool {
+        self.synchronize_horizontal_scrolling
+    }
+    pub fn synchronize_vertical_scrolling(&self) -> bool {
+        self.synchronize_vertical_scrolling
+    }
+    pub fn alternate_expression_evaluation(&self) -> bool {
+        self.alternate_expression_evaluation
+    }
+    pub fn alternate_formula_entry(&self) -> bool {
+        self.alternate_formula_entry
+    }
 }
 
 pub(crate) struct SheetLayoutCollector {
@@ -144,12 +182,18 @@ impl SheetLayoutCollector {
         require_length(DEFAULT_ROW_HEIGHT_RECORD_TYPE, data, 4)?;
         let flags = read_u16(data, 0);
         if flags & !0x000f != 0 {
-            return invalid(DEFAULT_ROW_HEIGHT_RECORD_TYPE, "reserved flags must be zero");
+            return invalid(
+                DEFAULT_ROW_HEIGHT_RECORD_TYPE,
+                "reserved flags must be zero",
+            );
         }
         let height = read_u16(data, 2);
         let hidden = flags & 0x0002 != 0;
         if height > 8179 || (!hidden && height == 0) {
-            return invalid(DEFAULT_ROW_HEIGHT_RECORD_TYPE, "row height is outside the BIFF8 range");
+            return invalid(
+                DEFAULT_ROW_HEIGHT_RECORD_TYPE,
+                "row height is outside the BIFF8 range",
+            );
         }
         self.layout.default_row_height_twips = height;
         self.layout.default_row_height_unsynced = flags & 0x0001 != 0;
@@ -166,7 +210,10 @@ impl SheetLayoutCollector {
             return invalid(WSBOOL_RECORD_TYPE, "reserved flags must be zero");
         }
         if flags & 0x0010 != 0 {
-            return invalid(WSBOOL_RECORD_TYPE, "dialog-sheet flag is invalid in a worksheet substream");
+            return invalid(
+                WSBOOL_RECORD_TYPE,
+                "dialog-sheet flag is invalid in a worksheet substream",
+            );
         }
         self.layout.show_automatic_page_breaks = flags & 0x0001 != 0;
         self.layout.apply_styles_to_outlines = flags & 0x0020 != 0;
@@ -184,26 +231,37 @@ impl SheetLayoutCollector {
         require_length(DEF_COL_WIDTH_RECORD_TYPE, data, 2)?;
         let width = read_u16(data, 0);
         if width > 255 {
-            return invalid(DEF_COL_WIDTH_RECORD_TYPE, "default column width exceeds 255 characters");
+            return invalid(
+                DEF_COL_WIDTH_RECORD_TYPE,
+                "default column width exceeds 255 characters",
+            );
         }
         self.layout.default_column_width_chars = width;
         Ok(())
     }
 
-    pub(crate) fn finish(self) -> XlsWorksheetLayout { self.layout }
+    pub(crate) fn finish(self) -> XlsWorksheetLayout {
+        self.layout
+    }
 }
 
 fn decode_outline_level(encoded: u16) -> XlsResult<u8> {
     match encoded {
         0 => Ok(0),
         2..=8 => Ok((encoded - 1) as u8),
-        _ => invalid(GUTS_RECORD_TYPE, "outline level encoding must be 0 or 2..=8"),
+        _ => invalid(
+            GUTS_RECORD_TYPE,
+            "outline level encoding must be 0 or 2..=8",
+        ),
     }
 }
 
 fn require_length(record_type: u16, data: &[u8], expected: usize) -> XlsResult<()> {
     if data.len() != expected {
-        return Err(XlsError::InvalidLength { expected, found: data.len() });
+        return Err(XlsError::InvalidLength {
+            expected,
+            found: data.len(),
+        });
     }
     let _ = record_type;
     Ok(())
@@ -214,7 +272,10 @@ fn read_u16(data: &[u8], offset: usize) -> u16 {
 }
 
 fn invalid<T>(record_type: u16, message: impl Into<String>) -> XlsResult<T> {
-    Err(XlsError::InvalidRecord { record_type, message: message.into() })
+    Err(XlsError::InvalidRecord {
+        record_type,
+        message: message.into(),
+    })
 }
 
 #[cfg(test)]
@@ -224,22 +285,40 @@ mod tests {
     #[test]
     fn rejects_malformed_layout_records() {
         let mut collector = SheetLayoutCollector::new();
-        assert!(collector.feed_record(DEFAULT_ROW_HEIGHT_RECORD_TYPE, &[0, 0, 1]).is_err());
+        assert!(
+            collector
+                .feed_record(DEFAULT_ROW_HEIGHT_RECORD_TYPE, &[0, 0, 1])
+                .is_err()
+        );
 
         let mut collector = SheetLayoutCollector::new();
-        assert!(collector.feed_record(GUTS_RECORD_TYPE, &[0, 0, 0, 0, 1, 0, 0, 0]).is_err());
+        assert!(
+            collector
+                .feed_record(GUTS_RECORD_TYPE, &[0, 0, 0, 0, 1, 0, 0, 0])
+                .is_err()
+        );
 
         let mut collector = SheetLayoutCollector::new();
-        assert!(collector.feed_record(WSBOOL_RECORD_TYPE, &0x0002u16.to_le_bytes()).is_err());
+        assert!(
+            collector
+                .feed_record(WSBOOL_RECORD_TYPE, &0x0002u16.to_le_bytes())
+                .is_err()
+        );
 
         let mut collector = SheetLayoutCollector::new();
-        assert!(collector.feed_record(DEF_COL_WIDTH_RECORD_TYPE, &256u16.to_le_bytes()).is_err());
+        assert!(
+            collector
+                .feed_record(DEF_COL_WIDTH_RECORD_TYPE, &256u16.to_le_bytes())
+                .is_err()
+        );
     }
 
     #[test]
     fn rejects_duplicates_and_out_of_order_records() {
         let mut collector = SheetLayoutCollector::new();
-        collector.feed_record(WSBOOL_RECORD_TYPE, &0x00c1u16.to_le_bytes()).unwrap();
+        collector
+            .feed_record(WSBOOL_RECORD_TYPE, &0x00c1u16.to_le_bytes())
+            .unwrap();
         assert!(collector.feed_record(GUTS_RECORD_TYPE, &[0; 8]).is_err());
 
         let mut collector = SheetLayoutCollector::new();

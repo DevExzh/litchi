@@ -72,10 +72,12 @@ fn resolves_libreoffice_xf_font_references() {
     let workbook =
         XlsWorkbook::new(File::open(libreoffice_fixture("formats.xls")).unwrap()).unwrap();
     assert!(!workbook.extended_formats().is_empty());
-    assert!(workbook
-        .extended_formats()
-        .iter()
-        .all(|xf| workbook.extended_format_font(xf).is_some()));
+    assert!(
+        workbook
+            .extended_formats()
+            .iter()
+            .all(|xf| workbook.extended_format_font(xf).is_some())
+    );
 }
 
 #[test]

@@ -53,9 +53,24 @@ fn complete_validation_family_round_trips_as_inert_metadata() {
             sheet,
             custom,
             &[
-                XlsDataValidationRange { first_row: 8, last_row: 9, first_col: 4, last_col: 5 },
-                XlsDataValidationRange { first_row: 1, last_row: 2, first_col: 2, last_col: 3 },
-                XlsDataValidationRange { first_row: 4, last_row: 4, first_col: 0, last_col: 0 },
+                XlsDataValidationRange {
+                    first_row: 8,
+                    last_row: 9,
+                    first_col: 4,
+                    last_col: 5,
+                },
+                XlsDataValidationRange {
+                    first_row: 1,
+                    last_row: 2,
+                    first_col: 2,
+                    last_col: 3,
+                },
+                XlsDataValidationRange {
+                    first_row: 4,
+                    last_row: 4,
+                    first_col: 0,
+                    last_col: 0,
+                },
             ],
             XlsDataValidationOptions {
                 error_style: WriterErrorStyle::Warning,
@@ -66,10 +81,7 @@ fn complete_validation_family_round_trips_as_inert_metadata() {
         )
         .unwrap();
     writer
-        .add_data_validation(
-            sheet,
-            validation(5, XlsDataValidationType::Any),
-        )
+        .add_data_validation(sheet, validation(5, XlsDataValidationType::Any))
         .unwrap();
     writer
         .add_data_validation(
@@ -188,26 +200,30 @@ fn complete_validation_family_round_trips_as_inert_metadata() {
 fn malformed_writer_metadata_is_rejected() {
     let mut writer = XlsWriter::new();
     let sheet = writer.add_worksheet("Validation").unwrap();
-    assert!(writer
-        .set_data_validation_table_options(
-            sheet,
-            XlsDataValidationTableOptions {
-                x_left: 65_536,
-                ..XlsDataValidationTableOptions::default()
-            },
-        )
-        .is_err());
-    assert!(writer
-        .add_data_validation(
-            sheet,
-            validation(
-                0,
-                XlsDataValidationType::Custom {
-                    formula_tokens: Vec::new(),
+    assert!(
+        writer
+            .set_data_validation_table_options(
+                sheet,
+                XlsDataValidationTableOptions {
+                    x_left: 65_536,
+                    ..XlsDataValidationTableOptions::default()
                 },
-            ),
-        )
-        .is_ok());
+            )
+            .is_err()
+    );
+    assert!(
+        writer
+            .add_data_validation(
+                sheet,
+                validation(
+                    0,
+                    XlsDataValidationType::Custom {
+                        formula_tokens: Vec::new(),
+                    },
+                ),
+            )
+            .is_ok()
+    );
     let mut bytes = Cursor::new(Vec::new());
     assert!(writer.write_to(&mut bytes).is_err());
 }
@@ -216,21 +232,41 @@ fn malformed_writer_metadata_is_rejected() {
 fn explicit_zero_rule_dval_and_oversized_dv_are_handled_deterministically() {
     let mut writer = XlsWriter::new();
     let sheet = writer.add_worksheet("EmptyValidation").unwrap();
-    writer.set_data_validation_table_options(sheet, XlsDataValidationTableOptions {
-        window_closed: true, x_left: 7, y_top: 9, dropdown_object_id: None,
-    }).unwrap();
+    writer
+        .set_data_validation_table_options(
+            sheet,
+            XlsDataValidationTableOptions {
+                window_closed: true,
+                x_left: 7,
+                y_top: 9,
+                dropdown_object_id: None,
+            },
+        )
+        .unwrap();
     let mut bytes = Cursor::new(Vec::new());
     writer.write_to(&mut bytes).unwrap();
     let workbook = XlsWorkbook::new(Cursor::new(bytes.into_inner())).unwrap();
-    let settings = workbook.xls_worksheet(0).unwrap().data_validation_settings().unwrap();
+    let settings = workbook
+        .xls_worksheet(0)
+        .unwrap()
+        .data_validation_settings()
+        .unwrap();
     assert_eq!(settings.declared_rule_count(), 0);
     assert_eq!((settings.x_left(), settings.y_top()), (7, 9));
 
     let mut writer = XlsWriter::new();
     let sheet = writer.add_worksheet("Oversized").unwrap();
-    writer.add_data_validation(sheet, validation(0, XlsDataValidationType::Custom {
-        formula_tokens: vec![0x1d; 8_200],
-    })).unwrap();
+    writer
+        .add_data_validation(
+            sheet,
+            validation(
+                0,
+                XlsDataValidationType::Custom {
+                    formula_tokens: vec![0x1d; 8_200],
+                },
+            ),
+        )
+        .unwrap();
     let mut bytes = Cursor::new(Vec::new());
     assert!(writer.write_to(&mut bytes).is_err());
 }

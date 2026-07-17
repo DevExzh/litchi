@@ -63,9 +63,13 @@ impl<R: Read + Seek> RecordIter<R> {
         Ok(())
     }
 
-    pub(crate) fn stream_len(&self) -> u64 { self.stream_len }
+    pub(crate) fn stream_len(&self) -> u64 {
+        self.stream_len
+    }
 
-    pub(crate) fn current_position(&self) -> u64 { self.current_pos }
+    pub(crate) fn current_position(&self) -> u64 {
+        self.current_pos
+    }
 
     pub(crate) fn next_positioned(&mut self) -> Option<(u64, XlsResult<Record>)> {
         let position = self.current_pos;
@@ -301,7 +305,10 @@ impl BoundSheetRecord {
         let name = utils::parse_short_string(name_data, encoding)?;
         let name_length = name.encode_utf16().count();
         let forbidden = |character| {
-            matches!(character, '\0' | '\u{0003}' | ':' | '\\' | '*' | '?' | '/' | '[' | ']')
+            matches!(
+                character,
+                '\0' | '\u{0003}' | ':' | '\\' | '*' | '?' | '/' | '[' | ']'
+            )
         };
         if !(1..=31).contains(&name_length)
             || name.chars().any(forbidden)

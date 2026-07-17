@@ -1,3 +1,5 @@
+use super::directory::{SlideDirectory, SlideDirectoryEntry};
+use super::notes::{NoteDescriptor, NotesIndex};
 use crate::consts::PptRecordType;
 /// SlideFactory - Creates slides from persist mapping with zero-copy parsing.
 ///
@@ -5,8 +7,6 @@ use crate::consts::PptRecordType;
 use crate::ppt::package::{PptError, Result};
 use crate::ppt::persist::PersistMapping;
 use crate::ppt::records::PptRecord;
-use super::directory::{SlideDirectory, SlideDirectoryEntry};
-use super::notes::{NoteDescriptor, NotesIndex};
 use once_cell::unsync::OnceCell;
 
 /// Factory for creating slides from document data using persist mapping.

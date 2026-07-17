@@ -243,9 +243,9 @@ impl From<PptError> for litchi_core::Error {
             PptError::InvalidPassword => {
                 litchi_core::Error::InvalidFormat("invalid presentation password".to_string())
             },
-            PptError::UnsupportedEncryption(kind) => litchi_core::Error::InvalidFormat(format!(
-                "unsupported PPT encryption: {kind:?}"
-            )),
+            PptError::UnsupportedEncryption(kind) => {
+                litchi_core::Error::InvalidFormat(format!("unsupported PPT encryption: {kind:?}"))
+            },
             PptError::MalformedEncryptionHeader(s) => litchi_core::Error::CorruptedFile(s),
         }
     }

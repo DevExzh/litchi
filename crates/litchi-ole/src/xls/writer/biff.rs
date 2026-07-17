@@ -26,16 +26,16 @@ mod modern_globals;
 mod named_range;
 mod pivot;
 mod pivot_xfext;
-mod sst;
 mod scenario;
+mod sst;
 mod validation;
 mod vba;
 mod workbook;
 mod worksheet;
 
 pub(crate) use cells::write_formula;
-pub(crate) use conditional_format::Cf12Config;
 pub(crate) use comment::{CommentConfig, write_comments};
+pub(crate) use conditional_format::Cf12Config;
 
 pub(crate) use modern_globals::{
     sxdbex_creation_timestamp_bytes, write_compat12, write_compress_pictures,
@@ -93,7 +93,9 @@ pub fn write_scenario_manager<W: Write>(
     scenario::write_scenario_manager(writer, manager)
 }
 
-pub fn write_ob_proj<W: Write>(writer: &mut W) -> XlsResult<()> { vba::write_ob_proj(writer) }
+pub fn write_ob_proj<W: Write>(writer: &mut W) -> XlsResult<()> {
+    vba::write_ob_proj(writer)
+}
 pub fn write_ob_no_macros<W: Write>(writer: &mut W) -> XlsResult<()> {
     vba::write_ob_no_macros(writer)
 }
@@ -112,8 +114,18 @@ pub fn write_name_comment<W: Write>(writer: &mut W, name: &str, comment: &str) -
     named_range::write_name_comment(writer, name, comment)
 }
 
-pub fn write_name_function_group<W:Write>(writer:&mut W,value:&crate::xls::XlsNameFnGrp12)->XlsResult<()>{named_range::write_name_function_group(writer,value)}
-pub fn write_name_publish<W:Write>(writer:&mut W,value:&crate::xls::XlsNamePublish)->XlsResult<()>{named_range::write_name_publish(writer,value)}
+pub fn write_name_function_group<W: Write>(
+    writer: &mut W,
+    value: &crate::xls::XlsNameFnGrp12,
+) -> XlsResult<()> {
+    named_range::write_name_function_group(writer, value)
+}
+pub fn write_name_publish<W: Write>(
+    writer: &mut W,
+    value: &crate::xls::XlsNamePublish,
+) -> XlsResult<()> {
+    named_range::write_name_publish(writer, value)
+}
 
 pub fn write_defined_name_record<W: Write>(
     writer: &mut W,
@@ -790,20 +802,34 @@ pub fn write_cfrule<W: Write>(
     )
 }
 
-pub(crate) fn write_cfheader_with_identifier<W: Write>(writer:&mut W,ranges:&[(u32,u32,u16,u16)],num_rules:u16,identifier:u16)->XlsResult<()> {
+pub(crate) fn write_cfheader_with_identifier<W: Write>(
+    writer: &mut W,
+    ranges: &[(u32, u32, u16, u16)],
+    num_rules: u16,
+    identifier: u16,
+) -> XlsResult<()> {
     conditional_format::write_cfheader_with_identifier(writer, ranges, num_rules, identifier)
 }
 
-pub(crate) fn write_condfmt12<W: Write>(writer:&mut W,ranges:&[(u32,u32,u16,u16)],num_rules:u16,identifier:u16)->XlsResult<()> {
+pub(crate) fn write_condfmt12<W: Write>(
+    writer: &mut W,
+    ranges: &[(u32, u32, u16, u16)],
+    num_rules: u16,
+    identifier: u16,
+) -> XlsResult<()> {
     conditional_format::write_condfmt12(writer, ranges, num_rules, identifier)
 }
 
-pub(crate) fn write_cf12<W: Write>(writer:&mut W, config:&Cf12Config<'_>)->XlsResult<()> {
+pub(crate) fn write_cf12<W: Write>(writer: &mut W, config: &Cf12Config<'_>) -> XlsResult<()> {
     conditional_format::write_cf12(writer, config)
 }
 
 /// Write an exact `CFEx` marker which must immediately precede its associated `CF12` record.
-pub fn write_cfex12_marker<W: Write>(writer:&mut W,identifier:u16,enclosing:(u16,u16,u16,u16))->XlsResult<()> {
+pub fn write_cfex12_marker<W: Write>(
+    writer: &mut W,
+    identifier: u16,
+    enclosing: (u16, u16, u16, u16),
+) -> XlsResult<()> {
     conditional_format::write_cfex12_marker(writer, identifier, enclosing)
 }
 
@@ -973,7 +999,8 @@ mod tests {
             &mut buf,
             &crate::xls::writer::core::XlsWorkbookWindowOptions::default(),
             1,
-        ).unwrap();
+        )
+        .unwrap();
 
         assert_eq!(&buf[0..2], &[0x3D, 0x00]); // Record type 0x003D
         assert_eq!(&buf[2..4], &[18, 0]); // Length = 18
@@ -1126,7 +1153,8 @@ mod tests {
         write_function_groups(
             &mut buf,
             &crate::xls::writer::core::XlsFunctionGroupOptions::default(),
-        ).unwrap();
+        )
+        .unwrap();
 
         assert_eq!(&buf[0..2], &[0x9C, 0x00]); // Record type 0x009C
         // Record data follows the 4-byte header

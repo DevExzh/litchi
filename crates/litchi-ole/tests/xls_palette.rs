@@ -19,10 +19,7 @@ fn reads_palette_used_by_poi_colour_fixture() {
     let black = palette.color(0x08).unwrap();
     let yellow = palette.color(0x0d).unwrap();
     assert_eq!((black.red(), black.green(), black.blue()), (0, 0, 0));
-    assert_eq!(
-        (yellow.red(), yellow.green(), yellow.blue()),
-        (255, 255, 0)
-    );
+    assert_eq!((yellow.red(), yellow.green(), yellow.blue()), (255, 255, 0));
 }
 
 #[test]

@@ -17,11 +17,16 @@ pub struct XlsCommentAnchor {
 
 impl XlsCommentAnchor {
     pub(crate) fn validate(&self) -> XlsResult<()> {
-        if self.first_column > 255 || self.last_column > 255
-            || self.first_row > 65_535 || self.last_row > 65_535
-            || self.first_column_offset > 1023 || self.last_column_offset > 1023
-            || self.first_row_offset > 255 || self.last_row_offset > 255
-            || self.first_column > self.last_column || self.first_row > self.last_row
+        if self.first_column > 255
+            || self.last_column > 255
+            || self.first_row > 65_535
+            || self.last_row > 65_535
+            || self.first_column_offset > 1023
+            || self.last_column_offset > 1023
+            || self.first_row_offset > 255
+            || self.last_row_offset > 255
+            || self.first_column > self.last_column
+            || self.first_row > self.last_row
             || (self.move_with_cells && !self.size_with_cells)
         {
             return Err(XlsError::InvalidData(
@@ -80,9 +85,9 @@ pub(super) struct WritableComment {
 
 impl WritableComment {
     pub(super) fn anchor(&self) -> XlsCommentAnchor {
-        self.options.anchor.unwrap_or_else(|| {
-            XlsCommentAnchor::default_for_cell(self.row, self.column)
-        })
+        self.options
+            .anchor
+            .unwrap_or_else(|| XlsCommentAnchor::default_for_cell(self.row, self.column))
     }
 }
 
@@ -137,9 +142,17 @@ pub(crate) fn validate_comment(
             previous = Some(run.character_index);
         }
     }
-    let run_count = if text_len == 0 { 0 } else { options.text_runs.len().max(1) };
-    let run_bytes = run_count.checked_add(1).and_then(|count| count.checked_mul(8))
-        .ok_or_else(|| XlsError::InvalidData("comment formatting run size overflows".to_string()))?;
+    let run_count = if text_len == 0 {
+        0
+    } else {
+        options.text_runs.len().max(1)
+    };
+    let run_bytes = run_count
+        .checked_add(1)
+        .and_then(|count| count.checked_mul(8))
+        .ok_or_else(|| {
+            XlsError::InvalidData("comment formatting run size overflows".to_string())
+        })?;
     if run_bytes > 65_528 {
         return Err(XlsError::InvalidData(
             "comment formatting runs exceed the BIFF8 cbRuns limit".to_string(),

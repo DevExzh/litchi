@@ -13,7 +13,10 @@ const MAX_RANGES: usize = 1_024;
 const MAX_FEATURES: usize = u16::MAX as usize;
 
 fn invalid(record_type: u16, message: impl Into<String>) -> XlsError {
-    XlsError::InvalidRecord { record_type, message: message.into() }
+    XlsError::InvalidRecord {
+        record_type,
+        message: message.into(),
+    }
 }
 
 fn read_u16(data: &[u8], offset: usize, record_type: u16, field: &str) -> XlsResult<u16> {
@@ -30,7 +33,10 @@ fn read_u32(data: &[u8], offset: usize, record_type: u16, field: &str) -> XlsRes
 
 fn validate_frt_header(data: &[u8], record_type: u16) -> XlsResult<()> {
     if read_u16(data, 0, record_type, "frtHeader.rt")? != record_type {
-        return Err(invalid(record_type, "future-record type does not match containing record"));
+        return Err(invalid(
+            record_type,
+            "future-record type does not match containing record",
+        ));
     }
     if read_u16(data, 2, record_type, "frtHeader.grbitFrt")? != 0 {
         return Err(invalid(record_type, "future-record flags must be zero"));
@@ -39,7 +45,10 @@ fn validate_frt_header(data: &[u8], record_type: u16) -> XlsResult<()> {
         .get(4..12)
         .ok_or_else(|| invalid(record_type, "truncated future-record reserved bytes"))?;
     if reserved.iter().any(|&byte| byte != 0) {
-        return Err(invalid(record_type, "future-record reserved bytes must be zero"));
+        return Err(invalid(
+            record_type,
+            "future-record reserved bytes must be zero",
+        ));
     }
     Ok(())
 }
@@ -65,24 +74,38 @@ fn with_record_header(record_type: u16, payload: Vec<u8>) -> XlsResult<Vec<u8>> 
 pub struct XlsFormulaErrorHeader;
 
 impl XlsFormulaErrorHeader {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 
     pub fn parse_payload(data: &[u8]) -> XlsResult<Self> {
         if data.len() != HEADER_PAYLOAD_LEN {
             return Err(invalid(
                 FEAT_HDR_RECORD_TYPE,
-                format!("FeatHdr ISFFEC2 payload must be exactly 19 bytes, got {}", data.len()),
+                format!(
+                    "FeatHdr ISFFEC2 payload must be exactly 19 bytes, got {}",
+                    data.len()
+                ),
             ));
         }
         validate_frt_header(data, FEAT_HDR_RECORD_TYPE)?;
         if read_u16(data, 12, FEAT_HDR_RECORD_TYPE, "FeatHdr.isf")? != ISF_FEC2 {
-            return Err(invalid(FEAT_HDR_RECORD_TYPE, "FeatHdr shared-feature type must be ISFFEC2"));
+            return Err(invalid(
+                FEAT_HDR_RECORD_TYPE,
+                "FeatHdr shared-feature type must be ISFFEC2",
+            ));
         }
         if data[14] != 1 {
-            return Err(invalid(FEAT_HDR_RECORD_TYPE, "FeatHdr reserved byte must be one"));
+            return Err(invalid(
+                FEAT_HDR_RECORD_TYPE,
+                "FeatHdr reserved byte must be one",
+            ));
         }
         if read_u32(data, 15, FEAT_HDR_RECORD_TYPE, "FeatHdr.cbHdrData")? != 0 {
-            return Err(invalid(FEAT_HDR_RECORD_TYPE, "ISFFEC2 FeatHdr must not contain header data"));
+            return Err(invalid(
+                FEAT_HDR_RECORD_TYPE,
+                "ISFFEC2 FeatHdr must not contain header data",
+            ));
         }
         Ok(Self)
     }
@@ -120,10 +143,16 @@ impl XlsFormulaErrorRange {
         last_column: u16,
     ) -> XlsResult<Self> {
         if first_row > last_row {
-            return Err(invalid(FEAT_RECORD_TYPE, "range first row exceeds last row"));
+            return Err(invalid(
+                FEAT_RECORD_TYPE,
+                "range first row exceeds last row",
+            ));
         }
         if first_column > last_column || last_column > 255 {
-            return Err(invalid(FEAT_RECORD_TYPE, "range columns are reversed or exceed 255"));
+            return Err(invalid(
+                FEAT_RECORD_TYPE,
+                "range columns are reversed or exceed 255",
+            ));
         }
         Ok(Self {
             first_row,
@@ -133,10 +162,18 @@ impl XlsFormulaErrorRange {
         })
     }
 
-    pub fn first_row(self) -> u16 { self.first_row }
-    pub fn last_row(self) -> u16 { self.last_row }
-    pub fn first_column(self) -> u8 { self.first_column }
-    pub fn last_column(self) -> u8 { self.last_column }
+    pub fn first_row(self) -> u16 {
+        self.first_row
+    }
+    pub fn last_row(self) -> u16 {
+        self.last_row
+    }
+    pub fn first_column(self) -> u8 {
+        self.first_column
+    }
+    pub fn last_column(self) -> u8 {
+        self.last_column
+    }
 }
 
 /// Formula conditions selected by an `FFErrorCheck` bit field.
@@ -146,16 +183,36 @@ pub struct XlsFormulaErrorChecks {
 }
 
 impl XlsFormulaErrorChecks {
-    pub const fn from_bits(bits: u8) -> Self { Self { bits } }
-    pub const fn bits(self) -> u8 { self.bits }
-    pub const fn calculation_errors(self) -> bool { self.bits & 0x01 != 0 }
-    pub const fn empty_cell_references(self) -> bool { self.bits & 0x02 != 0 }
-    pub const fn numbers_stored_as_text(self) -> bool { self.bits & 0x04 != 0 }
-    pub const fn inconsistent_ranges(self) -> bool { self.bits & 0x08 != 0 }
-    pub const fn inconsistent_formulas(self) -> bool { self.bits & 0x10 != 0 }
-    pub const fn insufficient_date_time_formats(self) -> bool { self.bits & 0x20 != 0 }
-    pub const fn unprotected_formulas(self) -> bool { self.bits & 0x40 != 0 }
-    pub const fn data_validation(self) -> bool { self.bits & 0x80 != 0 }
+    pub const fn from_bits(bits: u8) -> Self {
+        Self { bits }
+    }
+    pub const fn bits(self) -> u8 {
+        self.bits
+    }
+    pub const fn calculation_errors(self) -> bool {
+        self.bits & 0x01 != 0
+    }
+    pub const fn empty_cell_references(self) -> bool {
+        self.bits & 0x02 != 0
+    }
+    pub const fn numbers_stored_as_text(self) -> bool {
+        self.bits & 0x04 != 0
+    }
+    pub const fn inconsistent_ranges(self) -> bool {
+        self.bits & 0x08 != 0
+    }
+    pub const fn inconsistent_formulas(self) -> bool {
+        self.bits & 0x10 != 0
+    }
+    pub const fn insufficient_date_time_formats(self) -> bool {
+        self.bits & 0x20 != 0
+    }
+    pub const fn unprotected_formulas(self) -> bool {
+        self.bits & 0x40 != 0
+    }
+    pub const fn data_validation(self) -> bool {
+        self.bits & 0x80 != 0
+    }
 }
 
 /// One worksheet formula error-checking shared feature.
@@ -184,19 +241,31 @@ impl XlsFormulaErrorFeature {
         if !(minimum..=MAX_RECORD_PAYLOAD_LEN).contains(&data.len()) {
             return Err(invalid(
                 FEAT_RECORD_TYPE,
-                format!("Feat ISFFEC2 payload must be {minimum}..={MAX_RECORD_PAYLOAD_LEN} bytes, got {}", data.len()),
+                format!(
+                    "Feat ISFFEC2 payload must be {minimum}..={MAX_RECORD_PAYLOAD_LEN} bytes, got {}",
+                    data.len()
+                ),
             ));
         }
         validate_frt_header(data, FEAT_RECORD_TYPE)?;
         if read_u16(data, 12, FEAT_RECORD_TYPE, "Feat.isf")? != ISF_FEC2 {
-            return Err(invalid(FEAT_RECORD_TYPE, "Feat shared-feature type must be ISFFEC2"));
+            return Err(invalid(
+                FEAT_RECORD_TYPE,
+                "Feat shared-feature type must be ISFFEC2",
+            ));
         }
         if data[14] != 0 || read_u32(data, 15, FEAT_RECORD_TYPE, "Feat.reserved2")? != 0 {
-            return Err(invalid(FEAT_RECORD_TYPE, "Feat reserved1 and reserved2 must be zero"));
+            return Err(invalid(
+                FEAT_RECORD_TYPE,
+                "Feat reserved1 and reserved2 must be zero",
+            ));
         }
         let range_count = usize::from(read_u16(data, 19, FEAT_RECORD_TYPE, "Feat.cref")?);
         if range_count > MAX_RANGES {
-            return Err(invalid(FEAT_RECORD_TYPE, format!("Feat range count exceeds {MAX_RANGES}")));
+            return Err(invalid(
+                FEAT_RECORD_TYPE,
+                format!("Feat range count exceeds {MAX_RANGES}"),
+            ));
         }
         if read_u32(data, 21, FEAT_RECORD_TYPE, "Feat.cbFeatData")? != FEATURE_DATA_LEN as u32 {
             return Err(invalid(FEAT_RECORD_TYPE, "ISFFEC2 cbFeatData must be four"));
@@ -230,19 +299,32 @@ impl XlsFormulaErrorFeature {
             )?);
             offset += 8;
         }
-        let raw_checks = read_u32(data, offset, FEAT_RECORD_TYPE, "FeatFormulaErr2.grffecIgnore")?;
+        let raw_checks = read_u32(
+            data,
+            offset,
+            FEAT_RECORD_TYPE,
+            "FeatFormulaErr2.grffecIgnore",
+        )?;
         if raw_checks & !0xFF != 0 {
-            return Err(invalid(FEAT_RECORD_TYPE, "FFErrorCheck reserved bits must be zero"));
+            return Err(invalid(
+                FEAT_RECORD_TYPE,
+                "FFErrorCheck reserved bits must be zero",
+            ));
         }
         Self::try_new(ranges, XlsFormulaErrorChecks::from_bits(raw_checks as u8))
     }
 
-    pub fn ranges(&self) -> &[XlsFormulaErrorRange] { &self.ranges }
-    pub fn checks(&self) -> XlsFormulaErrorChecks { self.checks }
+    pub fn ranges(&self) -> &[XlsFormulaErrorRange] {
+        &self.ranges
+    }
+    pub fn checks(&self) -> XlsFormulaErrorChecks {
+        self.checks
+    }
 
     /// Serialize the complete `Feat` payload deterministically.
     pub fn to_payload(&self) -> XlsResult<Vec<u8>> {
-        let size = self.ranges
+        let size = self
+            .ranges
             .len()
             .checked_mul(8)
             .and_then(|bytes| bytes.checked_add(FEATURE_FIXED_LEN + FEATURE_DATA_LEN))
@@ -281,7 +363,10 @@ pub(crate) struct FormulaErrorCollector {
 
 impl FormulaErrorCollector {
     pub(crate) fn new() -> Self {
-        Self { header_seen: false, features: Vec::new() }
+        Self {
+            header_seen: false,
+            features: Vec::new(),
+        }
     }
 
     pub(crate) fn feed_record(&mut self, record_type: u16, data: &[u8]) -> XlsResult<()> {
@@ -289,7 +374,10 @@ impl FormulaErrorCollector {
             return Ok(());
         }
         if data.len() < 14 {
-            return Err(invalid(record_type, "shared-feature record is truncated before isf"));
+            return Err(invalid(
+                record_type,
+                "shared-feature record is truncated before isf",
+            ));
         }
         if read_u16(data, 12, record_type, "shared-feature isf")? != ISF_FEC2 {
             return Ok(());
@@ -307,9 +395,13 @@ impl FormulaErrorCollector {
                     return Err(invalid(record_type, "ISFFEC2 Feat appears before FeatHdr"));
                 }
                 if self.features.len() >= MAX_FEATURES {
-                    return Err(invalid(record_type, "too many ISFFEC2 features in worksheet"));
+                    return Err(invalid(
+                        record_type,
+                        "too many ISFFEC2 features in worksheet",
+                    ));
                 }
-                self.features.push(XlsFormulaErrorFeature::parse_payload(data)?);
+                self.features
+                    .push(XlsFormulaErrorFeature::parse_payload(data)?);
             },
             _ => unreachable!(),
         }
@@ -318,7 +410,10 @@ impl FormulaErrorCollector {
 
     pub(crate) fn finish(self) -> XlsResult<Vec<XlsFormulaErrorFeature>> {
         if self.header_seen && self.features.is_empty() {
-            return Err(invalid(FEAT_HDR_RECORD_TYPE, "ISFFEC2 FeatHdr has no following Feat"));
+            return Err(invalid(
+                FEAT_HDR_RECORD_TYPE,
+                "ISFFEC2 FeatHdr has no following Feat",
+            ));
         }
         Ok(self.features)
     }
@@ -332,22 +427,31 @@ mod tests {
         0x67, 0x08, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 1, 0, 0, 0, 0,
     ];
     const POI_FEATURE: [u8; 39] = [
-        0x68, 0x08, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 1, 0, 4,
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0,
+        0x68, 0x08, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 1, 0, 4, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0,
     ];
 
     #[test]
     fn parses_and_round_trips_poi_reference_records() {
         let header = XlsFormulaErrorHeader::parse_payload(&POI_HEADER).unwrap();
         assert_eq!(header.to_payload(), POI_HEADER);
-        assert_eq!(&header.to_record_bytes().unwrap()[0..4], &[0x67, 0x08, 19, 0]);
+        assert_eq!(
+            &header.to_record_bytes().unwrap()[0..4],
+            &[0x67, 0x08, 19, 0]
+        );
         let feature = XlsFormulaErrorFeature::parse_payload(&POI_FEATURE).unwrap();
         assert_eq!(feature.ranges().len(), 1);
-        assert_eq!(feature.ranges()[0], XlsFormulaErrorRange::try_new(0, 0, 0, 0).unwrap());
+        assert_eq!(
+            feature.ranges()[0],
+            XlsFormulaErrorRange::try_new(0, 0, 0, 0).unwrap()
+        );
         assert!(feature.checks().numbers_stored_as_text());
         assert!(!feature.checks().calculation_errors());
         assert_eq!(feature.to_payload().unwrap(), POI_FEATURE);
-        assert_eq!(&feature.to_record_bytes().unwrap()[0..4], &[0x68, 0x08, 39, 0]);
+        assert_eq!(
+            &feature.to_record_bytes().unwrap()[0..4],
+            &[0x68, 0x08, 39, 0]
+        );
     }
 
     #[test]
@@ -357,11 +461,11 @@ mod tests {
             XlsFormulaErrorRange::try_new(12, 18, 3, 3).unwrap(),
             XlsFormulaErrorRange::try_new(22, 28, 3, 3).unwrap(),
         ];
-        let feature = XlsFormulaErrorFeature::try_new(
-            ranges.clone(),
-            XlsFormulaErrorChecks::from_bits(0xFF),
-        ).unwrap();
-        let reparsed = XlsFormulaErrorFeature::parse_payload(&feature.to_payload().unwrap()).unwrap();
+        let feature =
+            XlsFormulaErrorFeature::try_new(ranges.clone(), XlsFormulaErrorChecks::from_bits(0xFF))
+                .unwrap();
+        let reparsed =
+            XlsFormulaErrorFeature::parse_payload(&feature.to_payload().unwrap()).unwrap();
         assert_eq!(reparsed.ranges(), ranges);
         let checks = reparsed.checks();
         assert!(checks.calculation_errors());
@@ -415,18 +519,33 @@ mod tests {
         assert!(XlsFormulaErrorFeature::parse_payload(&POI_FEATURE[..38]).is_err());
 
         let range = XlsFormulaErrorRange::try_new(0, 0, 0, 0).unwrap();
-        assert!(XlsFormulaErrorFeature::try_new(
-            vec![range; MAX_RANGES + 1],
-            XlsFormulaErrorChecks::default(),
-        ).is_err());
+        assert!(
+            XlsFormulaErrorFeature::try_new(
+                vec![range; MAX_RANGES + 1],
+                XlsFormulaErrorChecks::default(),
+            )
+            .is_err()
+        );
 
         let mut collector = FormulaErrorCollector::new();
-        assert!(collector.feed_record(FEAT_RECORD_TYPE, &POI_FEATURE).is_err());
+        assert!(
+            collector
+                .feed_record(FEAT_RECORD_TYPE, &POI_FEATURE)
+                .is_err()
+        );
         let mut collector = FormulaErrorCollector::new();
-        collector.feed_record(FEAT_HDR_RECORD_TYPE, &POI_HEADER).unwrap();
-        assert!(collector.feed_record(FEAT_HDR_RECORD_TYPE, &POI_HEADER).is_err());
+        collector
+            .feed_record(FEAT_HDR_RECORD_TYPE, &POI_HEADER)
+            .unwrap();
+        assert!(
+            collector
+                .feed_record(FEAT_HDR_RECORD_TYPE, &POI_HEADER)
+                .is_err()
+        );
         let mut collector = FormulaErrorCollector::new();
-        collector.feed_record(FEAT_HDR_RECORD_TYPE, &POI_HEADER).unwrap();
+        collector
+            .feed_record(FEAT_HDR_RECORD_TYPE, &POI_HEADER)
+            .unwrap();
         assert!(collector.finish().is_err());
     }
 }

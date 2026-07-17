@@ -1,7 +1,7 @@
 use std::io::Cursor;
 
-use litchi_ole::xls::writer::XlsWriter;
 use litchi_ole::xls::XlsWorkbook;
+use litchi_ole::xls::writer::XlsWriter;
 
 #[test]
 fn protection_records_round_trip() {
@@ -43,7 +43,9 @@ fn protection_records_round_trip() {
 fn file_sharing_rejects_long_user_name() {
     let mut writer = XlsWriter::new();
     let long_name = "a".repeat(55);
-    assert!(writer
-        .set_file_sharing(false, Some("write"), &long_name)
-        .is_err());
+    assert!(
+        writer
+            .set_file_sharing(false, Some("write"), &long_name)
+            .is_err()
+    );
 }

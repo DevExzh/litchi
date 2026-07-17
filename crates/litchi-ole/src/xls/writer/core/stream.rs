@@ -7,7 +7,11 @@ use crate::xls::{XlsError, XlsResult};
 
 use super::named_range::XlsDefinedName as InternalDefinedName;
 use super::worksheet::WritableWorksheet;
-use super::{XlsCalculationSettings, XlsCellValue, XlsExternalWorkbookOptions, XlsFileSharing, XlsFunctionGroupOptions, XlsVbaWriteMetadata, XlsWorkbookEnvironmentOptions, XlsWorkbookProtection, XlsWorkbookWindowOptions};
+use super::{
+    XlsCalculationSettings, XlsCellValue, XlsExternalWorkbookOptions, XlsFileSharing,
+    XlsFunctionGroupOptions, XlsVbaWriteMetadata, XlsWorkbookEnvironmentOptions,
+    XlsWorkbookProtection, XlsWorkbookWindowOptions,
+};
 
 const DEFAULT_WRITE_ACCESS_USER: &str = "litchi";
 
@@ -35,7 +39,10 @@ pub(crate) fn generate_workbook_stream(
     dde_or_ole_links: &[super::XlsDdeOrOleLinkOptions],
     fmt: &FormattingManager,
     defined_names: &[InternalDefinedName],
-    defined_name_records: &[(super::XlsDefinedNameRecordOptions,crate::xls::XlsDefinedNameFutureRecords)],
+    defined_name_records: &[(
+        super::XlsDefinedNameRecordOptions,
+        crate::xls::XlsDefinedNameFutureRecords,
+    )],
     shared_strings: &[String],
     sst_total: u32,
     workbook_protection: Option<XlsWorkbookProtection>,
@@ -50,7 +57,10 @@ pub(crate) fn generate_workbook_stream(
             "active worksheet {active_sheet} must be selected in Window2"
         )));
     }
-    let selected_sheet_count = worksheets.iter().filter(|sheet| sheet.view.selected).count();
+    let selected_sheet_count = worksheets
+        .iter()
+        .filter(|sheet| sheet.view.selected)
+        .count();
     if selected_sheet_count != usize::from(workbook_window.selected_sheet_count) {
         return Err(XlsError::InvalidData(format!(
             "Window1 selected sheet count {} disagrees with Window2 selected state ({selected_sheet_count})",
@@ -62,23 +72,25 @@ pub(crate) fn generate_workbook_stream(
     let sheet_count = u16::try_from(worksheets.len()).unwrap_or(u16::MAX);
     let (protect_structure, protect_windows, password_hash, protect_revisions, revision_hash) =
         workbook_protection
-        .map(|protection| {
-            (
-                protection.protect_structure,
-                protection.protect_windows,
-                protection.password_hash.unwrap_or(0),
-                protection.protect_revisions,
-                protection.revision_password_hash.unwrap_or(0),
-            )
-        })
-        .unwrap_or((false, false, 0, false, 0));
+            .map(|protection| {
+                (
+                    protection.protect_structure,
+                    protection.protect_windows,
+                    protection.password_hash.unwrap_or(0),
+                    protection.protect_revisions,
+                    protection.revision_password_hash.unwrap_or(0),
+                )
+            })
+            .unwrap_or((false, false, 0, false, 0));
 
     // === Workbook Globals ===
 
     // BOF record (workbook)
     biff::write_bof(&mut stream, 0x0005)?;
 
-    if environment.template { biff::write_template(&mut stream)?; }
+    if environment.template {
+        biff::write_template(&mut stream)?;
+    }
 
     biff::write_interface_hdr(&mut stream, 0x04B0)?;
     biff::write_mms(&mut stream)?;
@@ -115,18 +127,17 @@ pub(crate) fn generate_workbook_stream(
     biff::write_password_rev4(&mut stream, revision_hash)?;
 
     // Window1 record (workbook window properties)
-    biff::write_window1(
-        &mut stream,
-        &workbook_window,
-        worksheets.len(),
-    )?;
+    biff::write_window1(&mut stream, &workbook_window, worksheets.len())?;
 
     biff::write_backup(&mut stream, environment.create_backup_copy)?;
-    biff::write_hide_obj(&mut stream, match environment.object_display_mode {
-        crate::xls::XlsObjectDisplayMode::ShowAll => 0,
-        crate::xls::XlsObjectDisplayMode::ShowPlaceholders => 1,
-        crate::xls::XlsObjectDisplayMode::HideAll => 2,
-    })?;
+    biff::write_hide_obj(
+        &mut stream,
+        match environment.object_display_mode {
+            crate::xls::XlsObjectDisplayMode::ShowAll => 0,
+            crate::xls::XlsObjectDisplayMode::ShowPlaceholders => 1,
+            crate::xls::XlsObjectDisplayMode::HideAll => 2,
+        },
+    )?;
     biff::write_date1904(&mut stream, use_1904_dates)?;
     biff::write_precision(&mut stream, calculation_settings.full_precision)?;
     biff::write_refresh_all(&mut stream, environment.refresh_external_data_on_load)?;
@@ -159,8 +170,9 @@ pub(crate) fn generate_workbook_stream(
 
     // Internal SUPBOOK / EXTERNSHEET records are required for 3D
     // references used by defined names (NameParsedFormula) and pivot caches.
-    let internal_links = (!defined_names.is_empty() || !defined_name_records.is_empty() || has_pivot_tables)
-        && !worksheets.is_empty();
+    let internal_links =
+        (!defined_names.is_empty() || !defined_name_records.is_empty() || has_pivot_tables)
+            && !worksheets.is_empty();
     if internal_links
         || !external_workbooks.is_empty()
         || !add_in_functions.is_empty()
@@ -191,12 +203,28 @@ pub(crate) fn generate_workbook_stream(
             biff::write_name_comment(&mut stream, &defined_name.name, comment)?;
         }
     }
-    let classic_limit=32usize-usize::from(function_groups.built_in.count());let extended_count=function_groups.custom_categories.len().saturating_sub(classic_limit);
-    for (defined_name,future) in defined_name_records {
-        if future.function_group.as_ref().is_some_and(|value|value.category_index()>=extended_count){return Err(XlsError::InvalidData("NameFnGrp12 category does not reference an emitted FnGrp12 record".to_string()))}
+    let classic_limit = 32usize - usize::from(function_groups.built_in.count());
+    let extended_count = function_groups
+        .custom_categories
+        .len()
+        .saturating_sub(classic_limit);
+    for (defined_name, future) in defined_name_records {
+        if future
+            .function_group
+            .as_ref()
+            .is_some_and(|value| value.category_index() >= extended_count)
+        {
+            return Err(XlsError::InvalidData(
+                "NameFnGrp12 category does not reference an emitted FnGrp12 record".to_string(),
+            ));
+        }
         biff::write_defined_name_record(&mut stream, defined_name)?;
-        if let Some(value)=&future.function_group{biff::write_name_function_group(&mut stream,value)?;}
-        if let Some(value)=&future.publication{biff::write_name_publish(&mut stream,value)?;}
+        if let Some(value) = &future.function_group {
+            biff::write_name_function_group(&mut stream, value)?;
+        }
+        if let Some(value) = &future.publication {
+            biff::write_name_publish(&mut stream, value)?;
+        }
     }
 
     // Pivot table globals: PIVOTCACHEDEFINITION records.
@@ -326,16 +354,19 @@ pub(crate) fn generate_workbook_stream(
         drawing_clusters.extend_from_slice(&[(1, 1), (2, 2)]);
     }
     let mut next_comment_drawing_id = if has_any_page_fields { 3u32 } else { 1u32 };
-    let comment_drawing_ids = worksheets.iter().map(|worksheet| {
-        if worksheet.comments.is_empty() {
-            None
-        } else {
-            let drawing_id = next_comment_drawing_id;
-            next_comment_drawing_id += 1;
-            drawing_clusters.push((drawing_id, worksheet.comments.len() as u32 + 1));
-            Some(drawing_id)
-        }
-    }).collect::<Vec<_>>();
+    let comment_drawing_ids = worksheets
+        .iter()
+        .map(|worksheet| {
+            if worksheet.comments.is_empty() {
+                None
+            } else {
+                let drawing_id = next_comment_drawing_id;
+                next_comment_drawing_id += 1;
+                drawing_clusters.push((drawing_id, worksheet.comments.len() as u32 + 1));
+                Some(drawing_id)
+            }
+        })
+        .collect::<Vec<_>>();
 
     biff::write_usesel_fs_value(&mut stream, environment.supports_natural_language_formulas)?;
 
@@ -354,7 +385,11 @@ pub(crate) fn generate_workbook_stream(
         biff::write_mso_drawing_group(&mut stream, &drawing_clusters)?;
     }
 
-    biff::write_country(&mut stream, environment.default_country_code, environment.current_country_code)?;
+    biff::write_country(
+        &mut stream,
+        environment.default_country_code,
+        environment.current_country_code,
+    )?;
 
     // SST record (shared string table)
     if !shared_strings.is_empty() {
@@ -696,22 +731,29 @@ pub(crate) fn generate_workbook_stream(
         let def_col_width_pos = def_col_width_pos.ok_or_else(|| {
             XlsError::InvalidData("worksheet is missing DEFCOLWIDTH for INDEX".to_string())
         })?;
-        let plan = crate::xls::writer::row_blocks::XlsRowBlockLayoutPlan::generate_from_staged(
-            u64::try_from(index_record_pos).map_err(|_| {
-                XlsError::InvalidData("worksheet INDEX position overflow".to_string())
-            })?,
-            u64::try_from(row_table_start.checked_sub(index_record_pos).ok_or_else(|| {
-                XlsError::InvalidData("worksheet row table precedes INDEX".to_string())
-            })?).map_err(|_| {
-                XlsError::InvalidData("worksheet row-table position overflow".to_string())
-            })?,
-            u64::try_from(def_col_width_pos.checked_sub(index_record_pos).ok_or_else(|| {
-                XlsError::InvalidData("worksheet DEFCOLWIDTH precedes INDEX".to_string())
-            })?).map_err(|_| {
-                XlsError::InvalidData("worksheet DEFCOLWIDTH position overflow".to_string())
-            })?,
-            &staged_row_table,
-        )?;
+        let plan =
+            crate::xls::writer::row_blocks::XlsRowBlockLayoutPlan::generate_from_staged(
+                u64::try_from(index_record_pos).map_err(|_| {
+                    XlsError::InvalidData("worksheet INDEX position overflow".to_string())
+                })?,
+                u64::try_from(
+                    row_table_start
+                        .checked_sub(index_record_pos)
+                        .ok_or_else(|| {
+                            XlsError::InvalidData("worksheet row table precedes INDEX".to_string())
+                        })?,
+                )
+                .map_err(|_| {
+                    XlsError::InvalidData("worksheet row-table position overflow".to_string())
+                })?,
+                u64::try_from(def_col_width_pos.checked_sub(index_record_pos).ok_or_else(
+                    || XlsError::InvalidData("worksheet DEFCOLWIDTH precedes INDEX".to_string()),
+                )?)
+                .map_err(|_| {
+                    XlsError::InvalidData("worksheet DEFCOLWIDTH position overflow".to_string())
+                })?,
+                &staged_row_table,
+            )?;
         let (index_record, row_table) = plan.into_records();
         stream.splice(index_record_pos..index_record_pos, index_record);
         stream.extend_from_slice(&row_table);
@@ -720,7 +762,9 @@ pub(crate) fn generate_workbook_stream(
             biff::write_mso_drawing_sheet1(&mut stream)?;
         }
         let has_pivot_page_object = worksheet.pivot_tables.iter().any(|pt| {
-            pt.page_entries.iter().any(|&(_, _, object_id)| object_id != 0xFFFF)
+            pt.page_entries
+                .iter()
+                .any(|&(_, _, object_id)| object_id != 0xFFFF)
         });
         if has_pivot_page_object {
             biff::write_pivot_page_mso_drawing(&mut stream)?;
@@ -728,22 +772,41 @@ pub(crate) fn generate_workbook_stream(
         }
         if let Some(drawing_id) = comment_drawing_ids[worksheet_index] {
             let mut reserved = HashSet::from([1u16]);
-            for object_id in worksheet.pivot_tables.iter().flat_map(|table| table.page_entries.iter().map(|entry| entry.2)) {
-                if object_id != 0xFFFF && object_id != 0 { reserved.insert(object_id); }
+            for object_id in worksheet
+                .pivot_tables
+                .iter()
+                .flat_map(|table| table.page_entries.iter().map(|entry| entry.2))
+            {
+                if object_id != 0xFFFF && object_id != 0 {
+                    reserved.insert(object_id);
+                }
             }
             let mut next_object_id = 1u16;
             let mut configs = Vec::with_capacity(worksheet.comments.len());
             let mut guids = HashSet::new();
             for comment in &worksheet.comments {
                 while reserved.contains(&next_object_id) {
-                    next_object_id = next_object_id.checked_add(1).ok_or_else(|| XlsError::InvalidData("worksheet comment object IDs are exhausted".to_string()))?;
+                    next_object_id = next_object_id.checked_add(1).ok_or_else(|| {
+                        XlsError::InvalidData(
+                            "worksheet comment object IDs are exhausted".to_string(),
+                        )
+                    })?;
                 }
                 let object_id = next_object_id;
                 reserved.insert(object_id);
                 next_object_id = next_object_id.saturating_add(1);
-                let guid = comment.options.guid.unwrap_or_else(|| super::comment::deterministic_comment_guid(worksheet_index, comment.row, comment.column, object_id));
+                let guid = comment.options.guid.unwrap_or_else(|| {
+                    super::comment::deterministic_comment_guid(
+                        worksheet_index,
+                        comment.row,
+                        comment.column,
+                        object_id,
+                    )
+                });
                 if !guids.insert(guid) {
-                    return Err(XlsError::InvalidData("comment GUID is duplicated after planning".to_string()));
+                    return Err(XlsError::InvalidData(
+                        "comment GUID is duplicated after planning".to_string(),
+                    ));
                 }
                 configs.push(biff::CommentConfig {
                     row: comment.row,
@@ -784,24 +847,38 @@ pub(crate) fn generate_workbook_stream(
             )?;
         }
 
-        if !worksheet.data_validations.is_empty() || worksheet.data_validation_table_options.is_some() {
+        if !worksheet.data_validations.is_empty()
+            || worksheet.data_validation_table_options.is_some()
+        {
             let dv_count = worksheet.data_validations.len() as u32;
             let table = worksheet.data_validation_table_options.unwrap_or_default();
-            biff::write_dval(&mut stream, biff::DvalConfig {
-                window_closed: table.window_closed,
-                x_left: table.x_left,
-                y_top: table.y_top,
-                dropdown_object_id: table.dropdown_object_id,
-                dv_count,
-            })?;
+            biff::write_dval(
+                &mut stream,
+                biff::DvalConfig {
+                    window_closed: table.window_closed,
+                    x_left: table.x_left,
+                    y_top: table.y_top,
+                    dropdown_object_id: table.dropdown_object_id,
+                    dv_count,
+                },
+            )?;
 
             for writable in &worksheet.data_validations {
                 let dv = &writable.validation;
                 let payload = dv.validation_type.to_biff_payload()?;
 
-                let ranges = writable.ranges.iter().map(|range| {
-                    (range.first_row, range.last_row, range.first_col, range.last_col)
-                }).collect::<Vec<_>>();
+                let ranges = writable
+                    .ranges
+                    .iter()
+                    .map(|range| {
+                        (
+                            range.first_row,
+                            range.last_row,
+                            range.first_col,
+                            range.last_col,
+                        )
+                    })
+                    .collect::<Vec<_>>();
 
                 let formula1 = payload.formula1.as_deref();
                 let formula2 = payload.formula2.as_deref();
@@ -830,17 +907,60 @@ pub(crate) fn generate_workbook_stream(
 
         if !worksheet.conditional_formats.is_empty() {
             for (identifier, group) in worksheet.conditional_formats.iter().enumerate() {
-                let ranges=group.ranges.iter().map(|range|(range.first_row,range.last_row,range.first_col,range.last_col)).collect::<Vec<_>>();
-                biff::write_cfheader_with_identifier(&mut stream,&ranges,group.rules.len() as u16,identifier as u16)?;
-                for rule in &group.rules{let(condition_type,comparison_op,formula1,formula2)=rule.format_type.to_biff_payload()?;let pattern=rule.pattern.as_ref().map(|pat|(pat.pattern as u16,pat.foreground_color&0x7f,pat.background_color&0x7f));biff::write_cfrule(&mut stream,condition_type,comparison_op,&formula1,&formula2,pattern)?;}
+                let ranges = group
+                    .ranges
+                    .iter()
+                    .map(|range| {
+                        (
+                            range.first_row,
+                            range.last_row,
+                            range.first_col,
+                            range.last_col,
+                        )
+                    })
+                    .collect::<Vec<_>>();
+                biff::write_cfheader_with_identifier(
+                    &mut stream,
+                    &ranges,
+                    group.rules.len() as u16,
+                    identifier as u16,
+                )?;
+                for rule in &group.rules {
+                    let (condition_type, comparison_op, formula1, formula2) =
+                        rule.format_type.to_biff_payload()?;
+                    let pattern = rule.pattern.as_ref().map(|pat| {
+                        (
+                            pat.pattern as u16,
+                            pat.foreground_color & 0x7f,
+                            pat.background_color & 0x7f,
+                        )
+                    });
+                    biff::write_cfrule(
+                        &mut stream,
+                        condition_type,
+                        comparison_op,
+                        &formula1,
+                        &formula2,
+                        pattern,
+                    )?;
+                }
             }
         }
 
         for (offset, group) in worksheet.conditional_formats12.iter().enumerate() {
             let identifier = worksheet.conditional_formats.len() + offset;
-            let ranges = group.ranges.iter().map(|range| {
-                (range.first_row, range.last_row, range.first_col, range.last_col)
-            }).collect::<Vec<_>>();
+            let ranges = group
+                .ranges
+                .iter()
+                .map(|range| {
+                    (
+                        range.first_row,
+                        range.last_row,
+                        range.first_col,
+                        range.last_col,
+                    )
+                })
+                .collect::<Vec<_>>();
             biff::write_condfmt12(
                 &mut stream,
                 &ranges,

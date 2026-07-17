@@ -14,10 +14,13 @@ fn poi_fixture(name: &str) -> PathBuf {
 
 #[test]
 fn scenario_manager_round_trip_keeps_values_inert() {
-    let mut base = XlsScenario::new("Base", vec![
-        XlsScenarioCell::new(1, 2, "=EXEC(\"not evaluated\")"),
-        XlsScenarioCell::new(4, 5, "42"),
-    ]);
+    let mut base = XlsScenario::new(
+        "Base",
+        vec![
+            XlsScenarioCell::new(1, 2, "=EXEC(\"not evaluated\")"),
+            XlsScenarioCell::new(4, 5, "42"),
+        ],
+    );
     base.set_creator(Some("作者".to_string()));
     base.set_comment(Some("Baseline scenario".to_string()));
     base.set_locked(true);
@@ -38,13 +41,20 @@ fn scenario_manager_round_trip_keeps_values_inert() {
     writer.write_to(&mut bytes).unwrap();
 
     let workbook = XlsWorkbook::new(Cursor::new(bytes.into_inner())).unwrap();
-    let manager = workbook.xls_worksheet(0).unwrap().scenario_manager().unwrap();
+    let manager = workbook
+        .xls_worksheet(0)
+        .unwrap()
+        .scenario_manager()
+        .unwrap();
     assert_eq!(manager.current_scenario(), Some(1));
     assert_eq!(manager.shown_scenario(), Some(0));
     assert_eq!(manager.result_ranges().len(), 1);
     assert_eq!(manager.scenarios()[0].creator(), Some("作者"));
     assert!(manager.scenarios()[0].is_locked());
-    assert_eq!(manager.scenarios()[0].cells()[0].value(), "=EXEC(\"not evaluated\")");
+    assert_eq!(
+        manager.scenarios()[0].cells()[0].value(),
+        "=EXEC(\"not evaluated\")"
+    );
     assert!(manager.scenarios()[1].cells()[0].is_deleted());
 }
 
@@ -66,7 +76,13 @@ fn writer_rejects_scenario_resource_bounds() {
     let sheet = writer.add_worksheet("Scenarios").unwrap();
     let too_many = XlsScenario::new(
         "Too many",
-        (0..33).map(|row| XlsScenarioCell::new(row, 0, "x")).collect(),
+        (0..33)
+            .map(|row| XlsScenarioCell::new(row, 0, "x"))
+            .collect(),
     );
-    assert!(writer.set_scenario_manager(sheet, XlsScenarioManager::new(vec![too_many])).is_err());
+    assert!(
+        writer
+            .set_scenario_manager(sheet, XlsScenarioManager::new(vec![too_many]))
+            .is_err()
+    );
 }

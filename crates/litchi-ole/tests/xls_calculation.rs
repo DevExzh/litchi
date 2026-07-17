@@ -9,17 +9,19 @@ use litchi_ole::xls::{XlsCalculationMode, XlsReferenceMode, XlsWorkbook};
 fn calculation_settings_round_trip() {
     let mut writer = XlsWriter::new();
     let sheet = writer.add_worksheet("Calculation").unwrap();
-    writer.set_calculation_settings(XlsCalculationSettings {
-        mode: XlsCalculationMode::Manual,
-        maximum_iterations: 321,
-        iteration_enabled: true,
-        iteration_delta: 0.000_25,
-        full_precision: false,
-        reference_mode: XlsReferenceMode::R1C1,
-        recalculate_before_save: false,
-        recalculation_engine_id: 0x1234_5678,
-        force_full_calculation: true,
-    }).unwrap();
+    writer
+        .set_calculation_settings(XlsCalculationSettings {
+            mode: XlsCalculationMode::Manual,
+            maximum_iterations: 321,
+            iteration_enabled: true,
+            iteration_delta: 0.000_25,
+            full_precision: false,
+            reference_mode: XlsReferenceMode::R1C1,
+            recalculate_before_save: false,
+            recalculation_engine_id: 0x1234_5678,
+            force_full_calculation: true,
+        })
+        .unwrap();
     writer.set_recalculation_pending(sheet, true).unwrap();
     let mut bytes = Cursor::new(Vec::new());
     writer.write_to(&mut bytes).unwrap();

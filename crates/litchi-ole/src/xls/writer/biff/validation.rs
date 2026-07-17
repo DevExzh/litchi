@@ -33,11 +33,15 @@ pub(crate) struct DvalConfig {
 }
 
 pub fn write_dval<W: Write>(writer: &mut W, cfg: DvalConfig) -> XlsResult<()> {
-    if cfg.x_left > 65_535 || cfg.y_top > 65_535 || cfg.dv_count > 65_534
+    if cfg.x_left > 65_535
+        || cfg.y_top > 65_535
+        || cfg.dv_count > 65_534
         || matches!(cfg.dropdown_object_id, Some(0))
         || cfg.dropdown_object_id.is_some_and(|id| id > 32_767)
     {
-        return Err(XlsError::InvalidData("DVAL metadata is out of range".to_string()));
+        return Err(XlsError::InvalidData(
+            "DVAL metadata is out of range".to_string(),
+        ));
     }
     // DVAL: options(2) + horiz_pos(4) + vert_pos(4) + cbo_id(4) + dv_no(4) = 18 bytes
     write_record_header(writer, 0x01B2, 18)?;
@@ -68,7 +72,9 @@ pub fn write_dv<W: Write>(
     }
 
     if ranges.len() > 432 {
-        return Err(XlsError::InvalidData("DV range count exceeds 432".to_string()));
+        return Err(XlsError::InvalidData(
+            "DV range count exceeds 432".to_string(),
+        ));
     }
     let dv_count_u16 = ranges.len() as u16;
 
@@ -180,7 +186,9 @@ pub fn write_dv<W: Write>(
     writer.write_all(&dv_count_u16.to_le_bytes())?;
     for (first_row_u32, last_row_u32, first_col, last_col) in ranges {
         if first_row_u32 > last_row_u32 || first_col > last_col || *last_col > 255 {
-            return Err(XlsError::InvalidData("DV contains an invalid target range".to_string()));
+            return Err(XlsError::InvalidData(
+                "DV contains an invalid target range".to_string(),
+            ));
         }
         let first_row = u16::try_from(*first_row_u32).map_err(|_| {
             XlsError::InvalidData(format!(

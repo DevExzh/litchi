@@ -58,20 +58,26 @@ impl XlsTableStyles {
             )));
         }
         if read_u16(data, 0, "frtHeader.rt")? != TABLE_STYLES_RECORD_TYPE {
-            return Err(invalid("TableStyles future-record type does not match 0x088E"));
+            return Err(invalid(
+                "TableStyles future-record type does not match 0x088E",
+            ));
         }
         if read_u16(data, 2, "frtHeader.grbitFrt")? != 0 {
             return Err(invalid("TableStyles future-record flags must be zero"));
         }
         if data[4..12].iter().any(|&byte| byte != 0) {
-            return Err(invalid("TableStyles future-record reserved bytes must be zero"));
+            return Err(invalid(
+                "TableStyles future-record reserved bytes must be zero",
+            ));
         }
 
         let total_style_count = read_u32(data, 12, "cts")?;
         let table_units = usize::from(read_u16(data, 16, "cchDefTableStyle")?);
         let pivot_units = usize::from(read_u16(data, 18, "cchDefPivotStyle")?);
         if table_units > MAX_STYLE_NAME_UNITS || pivot_units > MAX_STYLE_NAME_UNITS {
-            return Err(invalid("TableStyles default name exceeds 255 UTF-16 code units"));
+            return Err(invalid(
+                "TableStyles default name exceeds 255 UTF-16 code units",
+            ));
         }
         let table_bytes = table_units
             .checked_mul(2)
@@ -86,31 +92,35 @@ impl XlsTableStyles {
             .checked_add(pivot_bytes)
             .ok_or_else(|| invalid("TableStyles PivotTable style range overflows"))?;
         if pivot_end != data.len() {
-            return Err(invalid("TableStyles name lengths do not consume the payload exactly"));
+            return Err(invalid(
+                "TableStyles name lengths do not consume the payload exactly",
+            ));
         }
-        let default_table_style = decode_utf16(
-            &data[FIXED_PAYLOAD_LEN..table_end],
-            "default table style",
-        )?;
-        let default_pivot_style = decode_utf16(
-            &data[table_end..pivot_end],
-            "default PivotTable style",
-        )?;
-        Self::try_new(
-            total_style_count,
-            default_table_style,
-            default_pivot_style,
-        )
+        let default_table_style =
+            decode_utf16(&data[FIXED_PAYLOAD_LEN..table_end], "default table style")?;
+        let default_pivot_style =
+            decode_utf16(&data[table_end..pivot_end], "default PivotTable style")?;
+        Self::try_new(total_style_count, default_table_style, default_pivot_style)
     }
 
-    pub fn total_style_count(&self) -> u32 { self.total_style_count }
-    pub const fn built_in_style_count(&self) -> u32 { BUILT_IN_STYLE_COUNT }
+    pub fn total_style_count(&self) -> u32 {
+        self.total_style_count
+    }
+    pub const fn built_in_style_count(&self) -> u32 {
+        BUILT_IN_STYLE_COUNT
+    }
     pub fn custom_style_count(&self) -> u32 {
         self.total_style_count - BUILT_IN_STYLE_COUNT
     }
-    pub fn has_custom_styles(&self) -> bool { self.custom_style_count() != 0 }
-    pub fn default_table_style(&self) -> &str { &self.default_table_style }
-    pub fn default_pivot_style(&self) -> &str { &self.default_pivot_style }
+    pub fn has_custom_styles(&self) -> bool {
+        self.custom_style_count() != 0
+    }
+    pub fn default_table_style(&self) -> &str {
+        &self.default_table_style
+    }
+    pub fn default_pivot_style(&self) -> &str {
+        &self.default_pivot_style
+    }
 
     /// Serialize the complete TableStyles payload deterministically.
     pub fn to_payload(&self) -> XlsResult<Vec<u8>> {
@@ -145,10 +155,10 @@ impl XlsTableStyles {
         }
         let table_units = self.default_table_style.encode_utf16().collect::<Vec<_>>();
         let pivot_units = self.default_pivot_style.encode_utf16().collect::<Vec<_>>();
-        if table_units.len() > MAX_STYLE_NAME_UNITS
-            || pivot_units.len() > MAX_STYLE_NAME_UNITS
-        {
-            return Err(invalid("TableStyles default name exceeds 255 UTF-16 code units"));
+        if table_units.len() > MAX_STYLE_NAME_UNITS || pivot_units.len() > MAX_STYLE_NAME_UNITS {
+            return Err(invalid(
+                "TableStyles default name exceeds 255 UTF-16 code units",
+            ));
         }
         let size = table_units
             .len()
@@ -157,7 +167,9 @@ impl XlsTableStyles {
             .and_then(|bytes| bytes.checked_add(FIXED_PAYLOAD_LEN))
             .ok_or_else(|| invalid("TableStyles serialized size overflows"))?;
         if size > MAX_PAYLOAD_LEN {
-            return Err(invalid("TableStyles exceeds its specification-derived size cap"));
+            return Err(invalid(
+                "TableStyles exceeds its specification-derived size cap",
+            ));
         }
         Ok((table_units, pivot_units, size))
     }
@@ -177,7 +189,9 @@ pub(crate) struct TableStylesCollector {
 }
 
 impl TableStylesCollector {
-    pub(crate) fn new() -> Self { Self { value: None } }
+    pub(crate) fn new() -> Self {
+        Self { value: None }
+    }
 
     pub(crate) fn feed_record(&mut self, record_type: u16, data: &[u8]) -> XlsResult<()> {
         if record_type != TABLE_STYLES_RECORD_TYPE {
@@ -190,7 +204,9 @@ impl TableStylesCollector {
         Ok(())
     }
 
-    pub(crate) fn finish(self) -> Option<XlsTableStyles> { self.value }
+    pub(crate) fn finish(self) -> Option<XlsTableStyles> {
+        self.value
+    }
 }
 
 #[cfg(test)]
@@ -236,10 +252,7 @@ mod tests {
         assert_eq!(styles.custom_style_count(), 2);
         let record = styles.to_record_bytes().unwrap();
         assert_eq!(&record[..2], &[0x8e, 0x08]);
-        assert_eq!(
-            XlsTableStyles::parse_payload(&record[4..]).unwrap(),
-            styles
-        );
+        assert_eq!(XlsTableStyles::parse_payload(&record[4..]).unwrap(), styles);
     }
 
     #[test]
@@ -271,7 +284,13 @@ mod tests {
             .to_payload()
             .unwrap();
         let mut collector = TableStylesCollector::new();
-        collector.feed_record(TABLE_STYLES_RECORD_TYPE, &valid).unwrap();
-        assert!(collector.feed_record(TABLE_STYLES_RECORD_TYPE, &valid).is_err());
+        collector
+            .feed_record(TABLE_STYLES_RECORD_TYPE, &valid)
+            .unwrap();
+        assert!(
+            collector
+                .feed_record(TABLE_STYLES_RECORD_TYPE, &valid)
+                .is_err()
+        );
     }
 }

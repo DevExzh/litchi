@@ -62,7 +62,9 @@ pub struct XlsNameFnGrp12 {
 }
 
 impl XlsNameFnGrp12 {
-    pub fn category_index(&self) -> usize { usize::from(self.category - 32) }
+    pub fn category_index(&self) -> usize {
+        usize::from(self.category - 32)
+    }
 }
 
 /// Server publication metadata from `NamePublish`.
@@ -74,7 +76,9 @@ pub struct XlsNamePublish {
 }
 
 impl XlsDefinedName {
-    pub fn is_macro(&self) -> bool { self.function || self.vba_procedure || self.procedure }
+    pub fn is_macro(&self) -> bool {
+        self.function || self.vba_procedure || self.procedure
+    }
     /// Whether the rendered definition contains a deleted reference.
     pub fn is_deleted(&self) -> bool {
         self.formula
@@ -158,11 +162,19 @@ impl XlsBuiltInName {
 
     pub(crate) fn code(self) -> u8 {
         match self {
-            Self::ConsolidateArea => 0x00, Self::AutoOpen => 0x01,
-            Self::AutoClose => 0x02, Self::Extract => 0x03, Self::Database => 0x04,
-            Self::Criteria => 0x05, Self::PrintArea => 0x06, Self::PrintTitles => 0x07,
-            Self::Recorder => 0x08, Self::DataForm => 0x09, Self::AutoActivate => 0x0a,
-            Self::AutoDeactivate => 0x0b, Self::SheetTitle => 0x0c,
+            Self::ConsolidateArea => 0x00,
+            Self::AutoOpen => 0x01,
+            Self::AutoClose => 0x02,
+            Self::Extract => 0x03,
+            Self::Database => 0x04,
+            Self::Criteria => 0x05,
+            Self::PrintArea => 0x06,
+            Self::PrintTitles => 0x07,
+            Self::Recorder => 0x08,
+            Self::DataForm => 0x09,
+            Self::AutoActivate => 0x0a,
+            Self::AutoDeactivate => 0x0b,
+            Self::SheetTitle => 0x0c,
             Self::FilterDatabase => 0x0d,
         }
     }
@@ -227,17 +239,15 @@ impl DefinedNameSlot {
         if (function || !procedure) && shortcut != 0 {
             return invalid("Lbl shortcut key is not valid for these macro flags");
         }
-        if procedure
-            && !function
-            && shortcut != 0
-            && !shortcut.is_ascii_alphabetic()
-        {
+        if procedure && !function && shortcut != 0 && !shortcut.is_ascii_alphabetic() {
             return invalid("Lbl macro shortcut key must be an ASCII letter");
         }
 
         let character_count = usize::from(data[3]);
         let formula_len = usize::from(u16::from_le_bytes([data[4], data[5]]));
-        if data[6] != 0 || data[7] != 0 { return invalid("Lbl reserved3 field must be zero"); }
+        if data[6] != 0 || data[7] != 0 {
+            return invalid("Lbl reserved3 field must be zero");
+        }
         let itab = u16::from_le_bytes([data[8], data[9]]);
         let auxiliary_lengths = [data[10], data[11], data[12], data[13]].map(usize::from);
         let string_flags = data[LBL_HEADER_LEN];
@@ -297,21 +307,34 @@ impl DefinedNameSlot {
             .ok_or_else(|| invalid_error("Lbl formula is truncated"))?
             .to_vec();
         let auxiliary_len = auxiliary_lengths.iter().sum::<usize>();
-        let extra_end = data.len().checked_sub(auxiliary_len)
+        let extra_end = data
+            .len()
+            .checked_sub(auxiliary_len)
             .ok_or_else(|| invalid_error("Lbl auxiliary strings exceed payload"))?;
-        if extra_end < formula_end { return invalid("Lbl formula or auxiliary strings are truncated"); }
+        if extra_end < formula_end {
+            return invalid("Lbl formula or auxiliary strings are truncated");
+        }
         let formula_extra = data[formula_end..extra_end].to_vec();
         let mut auxiliary_offset = extra_end;
         let mut auxiliary_strings = Vec::with_capacity(4);
         for length in auxiliary_lengths {
-            let end = auxiliary_offset.checked_add(length)
+            let end = auxiliary_offset
+                .checked_add(length)
                 .ok_or_else(|| invalid_error("Lbl auxiliary string range overflows"))?;
-            let bytes = data.get(auxiliary_offset..end)
+            let bytes = data
+                .get(auxiliary_offset..end)
                 .ok_or_else(|| invalid_error("Lbl auxiliary string is truncated"))?;
-            auxiliary_strings.push(bytes.iter().map(|byte| char::from(*byte)).collect::<String>());
+            auxiliary_strings.push(
+                bytes
+                    .iter()
+                    .map(|byte| char::from(*byte))
+                    .collect::<String>(),
+            );
             auxiliary_offset = end;
         }
-        if auxiliary_offset != data.len() { return invalid("Lbl payload has unconsumed bytes"); }
+        if auxiliary_offset != data.len() {
+            return invalid("Lbl payload has unconsumed bytes");
+        }
 
         Ok(Self {
             record_index,
@@ -340,28 +363,70 @@ impl DefinedNameSlot {
     }
 
     pub(crate) fn attach_comment(&mut self, data: &[u8]) -> XlsResult<()> {
-        if self.comment.is_some() { return invalid("Lbl has duplicate NameCmt records"); }
+        if self.comment.is_some() {
+            return invalid("Lbl has duplicate NameCmt records");
+        }
         let (name, comment) = parse_name_comment(data)?;
-        if !unicode_name_eq(&name,&self.name) { return optional_invalid(NAME_CMT_RECORD_TYPE,"NameCmt name does not match preceding Lbl"); }
+        if !unicode_name_eq(&name, &self.name) {
+            return optional_invalid(
+                NAME_CMT_RECORD_TYPE,
+                "NameCmt name does not match preceding Lbl",
+            );
+        }
         self.comment = Some(comment);
         Ok(())
     }
 
-    pub(crate) fn attach_function_group(&mut self,data:&[u8])->XlsResult<()>{
-        if self.future_records.function_group.is_some(){return optional_invalid(NAME_FN_GRP12_RECORD_TYPE,"Lbl has duplicate NameFnGrp12 records")}
-        let value=parse_name_fn_grp12(data)?;
-        if !unicode_name_eq(&value.function_name,&self.name){return optional_invalid(NAME_FN_GRP12_RECORD_TYPE,"NameFnGrp12 name does not match preceding Lbl")}
-        self.future_records.function_group=Some(value);Ok(())
+    pub(crate) fn attach_function_group(&mut self, data: &[u8]) -> XlsResult<()> {
+        if self.future_records.function_group.is_some() {
+            return optional_invalid(
+                NAME_FN_GRP12_RECORD_TYPE,
+                "Lbl has duplicate NameFnGrp12 records",
+            );
+        }
+        let value = parse_name_fn_grp12(data)?;
+        if !unicode_name_eq(&value.function_name, &self.name) {
+            return optional_invalid(
+                NAME_FN_GRP12_RECORD_TYPE,
+                "NameFnGrp12 name does not match preceding Lbl",
+            );
+        }
+        self.future_records.function_group = Some(value);
+        Ok(())
     }
 
-    pub(crate) fn attach_publication(&mut self,data:&[u8])->XlsResult<()>{
-        if self.future_records.publication.is_some(){return optional_invalid(NAME_PUBLISH_RECORD_TYPE,"Lbl has duplicate NamePublish records")}
-        let value=parse_name_publish(data)?;
-        if !unicode_name_eq(&value.name,&self.name){return optional_invalid(NAME_PUBLISH_RECORD_TYPE,"NamePublish name does not match preceding Lbl")}
-        self.future_records.publication=Some(value);Ok(())
+    pub(crate) fn attach_publication(&mut self, data: &[u8]) -> XlsResult<()> {
+        if self.future_records.publication.is_some() {
+            return optional_invalid(
+                NAME_PUBLISH_RECORD_TYPE,
+                "Lbl has duplicate NamePublish records",
+            );
+        }
+        let value = parse_name_publish(data)?;
+        if !unicode_name_eq(&value.name, &self.name) {
+            return optional_invalid(
+                NAME_PUBLISH_RECORD_TYPE,
+                "NamePublish name does not match preceding Lbl",
+            );
+        }
+        self.future_records.publication = Some(value);
+        Ok(())
     }
 
-    pub(crate) fn validate_extended_category(&self,count:usize)->XlsResult<()>{if self.future_records.function_group.as_ref().is_some_and(|value|value.category_index()>=count){return optional_invalid(NAME_FN_GRP12_RECORD_TYPE,"NameFnGrp12 category does not reference an FnGrp12 record")}Ok(())}
+    pub(crate) fn validate_extended_category(&self, count: usize) -> XlsResult<()> {
+        if self
+            .future_records
+            .function_group
+            .as_ref()
+            .is_some_and(|value| value.category_index() >= count)
+        {
+            return optional_invalid(
+                NAME_FN_GRP12_RECORD_TYPE,
+                "NameFnGrp12 category does not reference an FnGrp12 record",
+            );
+        }
+        Ok(())
+    }
 
     /// Symbol table entry. Macro slots intentionally remain `None`.
     pub(crate) fn symbol(&self) -> Option<String> {
@@ -414,74 +479,184 @@ impl DefinedNameSlot {
 }
 
 fn parse_name_comment(data: &[u8]) -> XlsResult<(String, String)> {
-    if data.len() < 18 { return optional_invalid(NAME_CMT_RECORD_TYPE,"NameCmt is truncated"); }
+    if data.len() < 18 {
+        return optional_invalid(NAME_CMT_RECORD_TYPE, "NameCmt is truncated");
+    }
     if u16::from_le_bytes([data[0], data[1]]) != NAME_CMT_RECORD_TYPE
         || data[2..12].iter().any(|byte| *byte != 0)
-    { return optional_invalid(NAME_CMT_RECORD_TYPE,"NameCmt future-record header is invalid"); }
+    {
+        return optional_invalid(
+            NAME_CMT_RECORD_TYPE,
+            "NameCmt future-record header is invalid",
+        );
+    }
     let name_len = usize::from(u16::from_le_bytes([data[12], data[13]]));
     let comment_len = usize::from(u16::from_le_bytes([data[14], data[15]]));
-    if name_len > 255 || comment_len > 255 { return optional_invalid(NAME_CMT_RECORD_TYPE,"NameCmt strings exceed 255 characters"); }
+    if name_len > 255 || comment_len > 255 {
+        return optional_invalid(
+            NAME_CMT_RECORD_TYPE,
+            "NameCmt strings exceed 255 characters",
+        );
+    }
     let (name, offset) = parse_no_cch_string(data, 16, name_len)?;
     let (comment, offset) = parse_no_cch_string(data, offset, comment_len)?;
-    if offset != data.len() { return optional_invalid(NAME_CMT_RECORD_TYPE,"NameCmt strings do not consume payload"); }
+    if offset != data.len() {
+        return optional_invalid(
+            NAME_CMT_RECORD_TYPE,
+            "NameCmt strings do not consume payload",
+        );
+    }
     Ok((name, comment))
 }
 
-fn parse_name_fn_grp12(data:&[u8])->XlsResult<XlsNameFnGrp12>{
-    validate_frt_header(data,NAME_FN_GRP12_RECORD_TYPE)?;
-    if data.len()<20{return optional_invalid(NAME_FN_GRP12_RECORD_TYPE,"NameFnGrp12 is truncated")}
-    let cached=usize::from(u16::from_le_bytes([data[12],data[13]]));
-    if !(1..=255).contains(&cached){return optional_invalid(NAME_FN_GRP12_RECORD_TYPE,"NameFnGrp12 cached name length is outside 1..=255")}
-    let category=u16::from_le_bytes([data[14],data[15]]);
-    if !(32..=255).contains(&category){return optional_invalid(NAME_FN_GRP12_RECORD_TYPE,"NameFnGrp12 category is outside 32..=255")}
-    let(name,count,end)=parse_xl_name_unicode(data,16,NAME_FN_GRP12_RECORD_TYPE)?;
-    if count!=cached{return optional_invalid(NAME_FN_GRP12_RECORD_TYPE,"NameFnGrp12 cached and embedded name lengths differ")}
-    if end!=data.len(){return optional_invalid(NAME_FN_GRP12_RECORD_TYPE,"NameFnGrp12 string does not consume payload")}
-    Ok(XlsNameFnGrp12{function_name:name,category:category as u8})
+fn parse_name_fn_grp12(data: &[u8]) -> XlsResult<XlsNameFnGrp12> {
+    validate_frt_header(data, NAME_FN_GRP12_RECORD_TYPE)?;
+    if data.len() < 20 {
+        return optional_invalid(NAME_FN_GRP12_RECORD_TYPE, "NameFnGrp12 is truncated");
+    }
+    let cached = usize::from(u16::from_le_bytes([data[12], data[13]]));
+    if !(1..=255).contains(&cached) {
+        return optional_invalid(
+            NAME_FN_GRP12_RECORD_TYPE,
+            "NameFnGrp12 cached name length is outside 1..=255",
+        );
+    }
+    let category = u16::from_le_bytes([data[14], data[15]]);
+    if !(32..=255).contains(&category) {
+        return optional_invalid(
+            NAME_FN_GRP12_RECORD_TYPE,
+            "NameFnGrp12 category is outside 32..=255",
+        );
+    }
+    let (name, count, end) = parse_xl_name_unicode(data, 16, NAME_FN_GRP12_RECORD_TYPE)?;
+    if count != cached {
+        return optional_invalid(
+            NAME_FN_GRP12_RECORD_TYPE,
+            "NameFnGrp12 cached and embedded name lengths differ",
+        );
+    }
+    if end != data.len() {
+        return optional_invalid(
+            NAME_FN_GRP12_RECORD_TYPE,
+            "NameFnGrp12 string does not consume payload",
+        );
+    }
+    Ok(XlsNameFnGrp12 {
+        function_name: name,
+        category: category as u8,
+    })
 }
 
-fn parse_name_publish(data:&[u8])->XlsResult<XlsNamePublish>{
-    validate_frt_header(data,NAME_PUBLISH_RECORD_TYPE)?;
-    if data.len()<16{return optional_invalid(NAME_PUBLISH_RECORD_TYPE,"NamePublish is truncated")}
-    let flags=u16::from_le_bytes([data[12],data[13]]);
-    let(name,_,end)=parse_xl_name_unicode(data,14,NAME_PUBLISH_RECORD_TYPE)?;
-    if end!=data.len(){return optional_invalid(NAME_PUBLISH_RECORD_TYPE,"NamePublish string does not consume payload")}
-    Ok(XlsNamePublish{published:flags&1!=0,workbook_parameter:flags&2!=0,name})
+fn parse_name_publish(data: &[u8]) -> XlsResult<XlsNamePublish> {
+    validate_frt_header(data, NAME_PUBLISH_RECORD_TYPE)?;
+    if data.len() < 16 {
+        return optional_invalid(NAME_PUBLISH_RECORD_TYPE, "NamePublish is truncated");
+    }
+    let flags = u16::from_le_bytes([data[12], data[13]]);
+    let (name, _, end) = parse_xl_name_unicode(data, 14, NAME_PUBLISH_RECORD_TYPE)?;
+    if end != data.len() {
+        return optional_invalid(
+            NAME_PUBLISH_RECORD_TYPE,
+            "NamePublish string does not consume payload",
+        );
+    }
+    Ok(XlsNamePublish {
+        published: flags & 1 != 0,
+        workbook_parameter: flags & 2 != 0,
+        name,
+    })
 }
 
-fn validate_frt_header(data:&[u8],record_type:u16)->XlsResult<()>{
-    if data.len()<12{return optional_invalid(record_type,"future-record header is truncated")}
-    if u16::from_le_bytes([data[0],data[1]])!=record_type||data[2..12].iter().any(|byte|*byte!=0){return optional_invalid(record_type,"future-record header flags or reserved fields are invalid")}
+fn validate_frt_header(data: &[u8], record_type: u16) -> XlsResult<()> {
+    if data.len() < 12 {
+        return optional_invalid(record_type, "future-record header is truncated");
+    }
+    if u16::from_le_bytes([data[0], data[1]]) != record_type
+        || data[2..12].iter().any(|byte| *byte != 0)
+    {
+        return optional_invalid(
+            record_type,
+            "future-record header flags or reserved fields are invalid",
+        );
+    }
     Ok(())
 }
 
-fn parse_xl_name_unicode(data:&[u8],offset:usize,record_type:u16)->XlsResult<(String,usize,usize)>{
-    let header=data.get(offset..offset+3).ok_or_else(||optional_invalid_error(record_type,"XLNameUnicodeString header is truncated"))?;
-    let count=usize::from(u16::from_le_bytes([header[0],header[1]]));
-    if !(1..=255).contains(&count){return optional_invalid(record_type,"XLNameUnicodeString length is outside 1..=255")}
-    if header[2]&!1!=0{return optional_invalid(record_type,"XLNameUnicodeString flags are invalid")}
-    let width=if header[2]==0{1usize}else{2};
-    let start=offset+3;
-    let end=start.checked_add(count.checked_mul(width).ok_or_else(||optional_invalid_error(record_type,"XLNameUnicodeString size overflows"))?).ok_or_else(||optional_invalid_error(record_type,"XLNameUnicodeString end overflows"))?;
-    let bytes=data.get(start..end).ok_or_else(||optional_invalid_error(record_type,"XLNameUnicodeString is truncated"))?;
-    let value=if width==1{bytes.iter().map(|byte|char::from(*byte)).collect()}else{let units=bytes.chunks_exact(2).map(|chunk|u16::from_le_bytes([chunk[0],chunk[1]])).collect::<Vec<_>>();String::from_utf16(&units).map_err(|_|optional_invalid_error(record_type,"XLNameUnicodeString contains invalid UTF-16"))?};
-    if value.contains('\0'){return optional_invalid(record_type,"XLNameUnicodeString contains NUL")}
-    Ok((value,count,end))
+fn parse_xl_name_unicode(
+    data: &[u8],
+    offset: usize,
+    record_type: u16,
+) -> XlsResult<(String, usize, usize)> {
+    let header = data.get(offset..offset + 3).ok_or_else(|| {
+        optional_invalid_error(record_type, "XLNameUnicodeString header is truncated")
+    })?;
+    let count = usize::from(u16::from_le_bytes([header[0], header[1]]));
+    if !(1..=255).contains(&count) {
+        return optional_invalid(record_type, "XLNameUnicodeString length is outside 1..=255");
+    }
+    if header[2] & !1 != 0 {
+        return optional_invalid(record_type, "XLNameUnicodeString flags are invalid");
+    }
+    let width = if header[2] == 0 { 1usize } else { 2 };
+    let start = offset + 3;
+    let end = start
+        .checked_add(count.checked_mul(width).ok_or_else(|| {
+            optional_invalid_error(record_type, "XLNameUnicodeString size overflows")
+        })?)
+        .ok_or_else(|| optional_invalid_error(record_type, "XLNameUnicodeString end overflows"))?;
+    let bytes = data
+        .get(start..end)
+        .ok_or_else(|| optional_invalid_error(record_type, "XLNameUnicodeString is truncated"))?;
+    let value = if width == 1 {
+        bytes.iter().map(|byte| char::from(*byte)).collect()
+    } else {
+        let units = bytes
+            .chunks_exact(2)
+            .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
+            .collect::<Vec<_>>();
+        String::from_utf16(&units).map_err(|_| {
+            optional_invalid_error(record_type, "XLNameUnicodeString contains invalid UTF-16")
+        })?
+    };
+    if value.contains('\0') {
+        return optional_invalid(record_type, "XLNameUnicodeString contains NUL");
+    }
+    Ok((value, count, end))
 }
 
-pub(crate) fn unicode_name_eq(left:&str,right:&str)->bool{left.to_lowercase()==right.to_lowercase()}
+pub(crate) fn unicode_name_eq(left: &str, right: &str) -> bool {
+    left.to_lowercase() == right.to_lowercase()
+}
 
 fn parse_no_cch_string(data: &[u8], offset: usize, count: usize) -> XlsResult<(String, usize)> {
-    let flags = *data.get(offset).ok_or_else(|| optional_invalid_error(NAME_CMT_RECORD_TYPE,"NameCmt string flags are missing"))?;
-    if flags & !1 != 0 { return optional_invalid(NAME_CMT_RECORD_TYPE,"NameCmt string flags are invalid"); }
+    let flags = *data.get(offset).ok_or_else(|| {
+        optional_invalid_error(NAME_CMT_RECORD_TYPE, "NameCmt string flags are missing")
+    })?;
+    if flags & !1 != 0 {
+        return optional_invalid(NAME_CMT_RECORD_TYPE, "NameCmt string flags are invalid");
+    }
     let width = if flags == 0 { 1usize } else { 2 };
     let start = offset + 1;
-    let end = start.checked_add(count.checked_mul(width).ok_or_else(|| optional_invalid_error(NAME_CMT_RECORD_TYPE,"NameCmt string size overflows"))?)
-        .ok_or_else(|| optional_invalid_error(NAME_CMT_RECORD_TYPE,"NameCmt string end overflows"))?;
-    let bytes = data.get(start..end).ok_or_else(|| optional_invalid_error(NAME_CMT_RECORD_TYPE,"NameCmt string is truncated"))?;
-    let value = if width == 1 { bytes.iter().map(|byte| char::from(*byte)).collect() } else {
-        let units = bytes.chunks_exact(2).map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]])).collect::<Vec<_>>();
-        String::from_utf16(&units).map_err(|_| optional_invalid_error(NAME_CMT_RECORD_TYPE,"NameCmt contains invalid UTF-16"))?
+    let end = start
+        .checked_add(count.checked_mul(width).ok_or_else(|| {
+            optional_invalid_error(NAME_CMT_RECORD_TYPE, "NameCmt string size overflows")
+        })?)
+        .ok_or_else(|| {
+            optional_invalid_error(NAME_CMT_RECORD_TYPE, "NameCmt string end overflows")
+        })?;
+    let bytes = data.get(start..end).ok_or_else(|| {
+        optional_invalid_error(NAME_CMT_RECORD_TYPE, "NameCmt string is truncated")
+    })?;
+    let value = if width == 1 {
+        bytes.iter().map(|byte| char::from(*byte)).collect()
+    } else {
+        let units = bytes
+            .chunks_exact(2)
+            .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
+            .collect::<Vec<_>>();
+        String::from_utf16(&units).map_err(|_| {
+            optional_invalid_error(NAME_CMT_RECORD_TYPE, "NameCmt contains invalid UTF-16")
+        })?
     };
     Ok((value, end))
 }
@@ -497,8 +672,15 @@ fn invalid_error(message: &str) -> XlsError {
     }
 }
 
-fn optional_invalid<T>(record_type:u16,message:&str)->XlsResult<T>{Err(optional_invalid_error(record_type,message))}
-fn optional_invalid_error(record_type:u16,message:&str)->XlsError{XlsError::InvalidRecord{record_type,message:message.to_string()}}
+fn optional_invalid<T>(record_type: u16, message: &str) -> XlsResult<T> {
+    Err(optional_invalid_error(record_type, message))
+}
+fn optional_invalid_error(record_type: u16, message: &str) -> XlsError {
+    XlsError::InvalidRecord {
+        record_type,
+        message: message.to_string(),
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -529,15 +711,14 @@ mod tests {
 
     #[test]
     fn parses_compressed_unicode_hidden_and_scoped_names() {
-        let ordinary = DefinedNameSlot::parse(&lbl(FLAG_HIDDEN, 2, "Rate", false, &[0x1e, 2, 0]), 1)
-            .unwrap();
+        let ordinary =
+            DefinedNameSlot::parse(&lbl(FLAG_HIDDEN, 2, "Rate", false, &[0x1e, 2, 0]), 1).unwrap();
         assert_eq!(ordinary.name, "Rate");
         assert!(ordinary.hidden);
         assert_eq!(ordinary.itab, 2);
         assert_eq!(ordinary.formula_tokens, [0x1e, 2, 0]);
 
-        let unicode = DefinedNameSlot::parse(&lbl(0, 0, "税率", true, &[0x1e, 3, 0]), 2)
-            .unwrap();
+        let unicode = DefinedNameSlot::parse(&lbl(0, 0, "税率", true, &[0x1e, 3, 0]), 2).unwrap();
         assert_eq!(unicode.name, "税率");
     }
 
@@ -545,7 +726,13 @@ mod tests {
     fn parses_every_built_in_name() {
         for code in 0u8..=0x0d {
             let slot = DefinedNameSlot::parse(
-                &lbl(FLAG_BUILT_IN, 1, &char::from(code).to_string(), false, &[0x1e, 1, 0]),
+                &lbl(
+                    FLAG_BUILT_IN,
+                    1,
+                    &char::from(code).to_string(),
+                    false,
+                    &[0x1e, 1, 0],
+                ),
                 u32::from(code) + 1,
             )
             .unwrap();
@@ -555,10 +742,13 @@ mod tests {
 
     #[test]
     fn macro_slots_keep_indices_but_have_no_symbol_or_public_value() {
-        let slot = DefinedNameSlot::parse(&lbl(FLAG_PROCEDURE, 0, "Macro", false, &[]), 7)
-            .unwrap();
+        let slot = DefinedNameSlot::parse(&lbl(FLAG_PROCEDURE, 0, "Macro", false, &[]), 7).unwrap();
         assert!(slot.symbol().is_none());
-        assert!(slot.into_public(1, &FormulaContext::default()).unwrap().is_macro());
+        assert!(
+            slot.into_public(1, &FormulaContext::default())
+                .unwrap()
+                .is_macro()
+        );
     }
 
     #[test]
@@ -569,9 +759,11 @@ mod tests {
         assert!(DefinedNameSlot::parse(&truncated, 1).is_err());
         assert!(DefinedNameSlot::parse(&lbl(FLAG_BUILT_IN, 0, "x", false, &[]), 1).is_err());
         let invalid_scope = DefinedNameSlot::parse(&lbl(0, 3, "Name", false, &[]), 1).unwrap();
-        assert!(invalid_scope
-            .into_public(2, &FormulaContext::default())
-            .is_err());
+        assert!(
+            invalid_scope
+                .into_public(2, &FormulaContext::default())
+                .is_err()
+        );
     }
 
     #[test]

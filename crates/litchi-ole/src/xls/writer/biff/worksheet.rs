@@ -1,10 +1,10 @@
 //! Worksheet-level BIFF8 record writers.
 
-use crate::xls::{XlsError, XlsResult};
 use crate::xls::page_setup::{
     XlsPrintComments, XlsPrintErrors, XlsPrintOrder, XlsPrintOrientation,
 };
 use crate::xls::writer::core::{XlsPageSetupOptions, XlsWorksheetLayoutOptions};
+use crate::xls::{XlsError, XlsResult};
 use std::io::Write;
 
 use super::write_record_header;
@@ -15,20 +15,29 @@ fn write_unicode_string<W: Write>(writer: &mut W, value: &str) -> XlsResult<()> 
     writer.write_all(&(units.len() as u16).to_le_bytes())?;
     writer.write_all(&[u8::from(!compressed)])?;
     for unit in units {
-        if compressed { writer.write_all(&[unit as u8])?; }
-        else { writer.write_all(&unit.to_le_bytes())?; }
+        if compressed {
+            writer.write_all(&[unit as u8])?;
+        } else {
+            writer.write_all(&unit.to_le_bytes())?;
+        }
     }
     Ok(())
 }
 
-fn write_dcon_file<W: Write>(writer: &mut W, file: &crate::xls::XlsConsolidationFile) -> XlsResult<()> {
+fn write_dcon_file<W: Write>(
+    writer: &mut W,
+    file: &crate::xls::XlsConsolidationFile,
+) -> XlsResult<()> {
     let units = file.encoded_path().encode_utf16().collect::<Vec<_>>();
     let compressed = units.iter().all(|unit| *unit <= 0xff);
     writer.write_all(&(units.len() as u16).to_le_bytes())?;
     writer.write_all(&[u8::from(!compressed)])?;
     for unit in units {
-        if compressed { writer.write_all(&[unit as u8])?; }
-        else { writer.write_all(&unit.to_le_bytes())?; }
+        if compressed {
+            writer.write_all(&[unit as u8])?;
+        } else {
+            writer.write_all(&unit.to_le_bytes())?;
+        }
     }
     if file.is_self_reference() {
         writer.write_all(if compressed { &[0][..] } else { &[0, 0][..] })?;
@@ -53,20 +62,29 @@ pub fn write_consolidation<W: Write>(
             crate::xls::XlsConsolidationSource::CellRange { range, file } => {
                 payload.extend_from_slice(&range.first_row().to_le_bytes());
                 payload.extend_from_slice(&range.last_row().to_le_bytes());
-                payload.push(range.first_column()); payload.push(range.last_column());
+                payload.push(range.first_column());
+                payload.push(range.last_column());
                 write_dcon_file(&mut payload, file)?;
                 crate::xls::consolidation::DCON_REF_RECORD_TYPE
             },
             crate::xls::XlsConsolidationSource::DefinedName { name, file } => {
                 write_unicode_string(&mut payload, name)?;
-                if let Some(file) = file { write_dcon_file(&mut payload, file)?; }
-                else { payload.extend_from_slice(&0u16.to_le_bytes()); }
+                if let Some(file) = file {
+                    write_dcon_file(&mut payload, file)?;
+                } else {
+                    payload.extend_from_slice(&0u16.to_le_bytes());
+                }
                 crate::xls::consolidation::DCON_NAME_RECORD_TYPE
             },
             crate::xls::XlsConsolidationSource::BuiltInName { name, file } => {
-                payload.push(name.code()); payload.extend_from_slice(&0u16.to_le_bytes()); payload.push(0);
-                if let Some(file) = file { write_dcon_file(&mut payload, file)?; }
-                else { payload.extend_from_slice(&0u16.to_le_bytes()); }
+                payload.push(name.code());
+                payload.extend_from_slice(&0u16.to_le_bytes());
+                payload.push(0);
+                if let Some(file) = file {
+                    write_dcon_file(&mut payload, file)?;
+                } else {
+                    payload.extend_from_slice(&0u16.to_le_bytes());
+                }
                 crate::xls::consolidation::DCON_BIN_RECORD_TYPE
             },
         };
@@ -114,7 +132,9 @@ fn write_page_breaks<W: Write>(
     }
     let maximum = if record_type == 0x001b { 1026 } else { 255 };
     if page_breaks.len() > maximum {
-        return Err(XlsError::InvalidData("page-break count exceeds BIFF8 limit".to_string()));
+        return Err(XlsError::InvalidData(
+            "page-break count exceeds BIFF8 limit".to_string(),
+        ));
     }
     let mut ordered = page_breaks.to_vec();
     ordered.sort_unstable();
@@ -123,12 +143,16 @@ fn write_page_breaks<W: Write>(
             || (record_type == 0x001b && range_end > 16383)
             || (record_type == 0x001a && position > 255)
         {
-            return Err(XlsError::InvalidData("page-break range is invalid".to_string()));
+            return Err(XlsError::InvalidData(
+                "page-break range is invalid".to_string(),
+            ));
         }
         if index > 0 {
             let previous = ordered[index - 1];
             if position == previous.0 && range_start <= previous.2 {
-                return Err(XlsError::InvalidData("page-break ranges overlap".to_string()));
+                return Err(XlsError::InvalidData(
+                    "page-break ranges overlap".to_string(),
+                ));
             }
         }
     }
@@ -184,21 +208,31 @@ pub fn write_page_settings<W: Write>(
     }
 
     let mut flags = 0u16;
-    if options.print_order == XlsPrintOrder::OverThenDown { flags |= 0x0001; }
-    if options.printer_driver_data.is_none() { flags |= 0x0004; }
+    if options.print_order == XlsPrintOrder::OverThenDown {
+        flags |= 0x0001;
+    }
+    if options.printer_driver_data.is_none() {
+        flags |= 0x0004;
+    }
     match options.orientation {
         Some(XlsPrintOrientation::Portrait) => flags |= 0x0002,
         Some(XlsPrintOrientation::Landscape) => {},
         None => flags |= 0x0040,
     }
-    if options.black_and_white { flags |= 0x0008; }
-    if options.draft_quality { flags |= 0x0010; }
+    if options.black_and_white {
+        flags |= 0x0008;
+    }
+    if options.draft_quality {
+        flags |= 0x0010;
+    }
     match options.comments {
         XlsPrintComments::None => {},
         XlsPrintComments::AsDisplayed => flags |= 0x0020,
         XlsPrintComments::AtEnd => flags |= 0x0220,
     }
-    if options.starting_page_number.is_some() { flags |= 0x0080; }
+    if options.starting_page_number.is_some() {
+        flags |= 0x0080;
+    }
     flags |= match options.errors {
         XlsPrintErrors::Displayed => 0,
         XlsPrintErrors::Blank => 1 << 10,
@@ -341,7 +375,9 @@ pub fn write_calculation_settings<W: Write>(
         || !settings.iteration_delta.is_finite()
         || settings.iteration_delta < 0.0
     {
-        return Err(XlsError::InvalidData("invalid BIFF8 calculation settings".to_string()));
+        return Err(XlsError::InvalidData(
+            "invalid BIFF8 calculation settings".to_string(),
+        ));
     }
     let mode = match settings.mode {
         crate::xls::XlsCalculationMode::Manual => 0u16,
@@ -1001,7 +1037,10 @@ pub fn write_window2_options<W: Write>(
     flags |= u16::from(options.show_formulas);
     flags |= u16::from(options.show_gridlines) << 1;
     flags |= u16::from(options.show_row_column_headers) << 2;
-    if options.pane.is_some_and(|pane| pane.mode == crate::xls::writer::view::XlsPaneMode::Frozen) {
+    if options
+        .pane
+        .is_some_and(|pane| pane.mode == crate::xls::writer::view::XlsPaneMode::Frozen)
+    {
         flags |= 0x0108;
     }
     flags |= u16::from(options.show_zero_values) << 4;
@@ -1045,16 +1084,22 @@ pub fn write_selection_options<W: Write>(
     if selection.ranges.is_empty()
         || selection.ranges.len() > crate::xls::writer::view::MAX_SELECTION_RANGES
     {
-        return Err(XlsError::InvalidData("SELECTION range count must be 1..=1369".to_string()));
+        return Err(XlsError::InvalidData(
+            "SELECTION range count must be 1..=1369".to_string(),
+        ));
     }
     let payload_len = 9usize
         .checked_add(selection.ranges.len().checked_mul(6).ok_or_else(|| {
             XlsError::InvalidData("SELECTION payload length overflow".to_string())
         })?)
         .ok_or_else(|| XlsError::InvalidData("SELECTION payload length overflow".to_string()))?;
-    write_record_header(writer, 0x001d, u16::try_from(payload_len).map_err(|_| {
-        XlsError::InvalidData("SELECTION payload exceeds BIFF8 limit".to_string())
-    })?)?;
+    write_record_header(
+        writer,
+        0x001d,
+        u16::try_from(payload_len).map_err(|_| {
+            XlsError::InvalidData("SELECTION payload exceeds BIFF8 limit".to_string())
+        })?,
+    )?;
     writer.write_all(&[selection.pane.code()])?;
     writer.write_all(&selection.active_row.to_le_bytes())?;
     writer.write_all(&u16::from(selection.active_column).to_le_bytes())?;
@@ -1130,7 +1175,10 @@ pub fn write_selection<W: Write>(writer: &mut W) -> XlsResult<()> {
 #[cfg(test)]
 mod view_round_trip_tests {
     use super::*;
-    use crate::xls::view::{ViewCollector, PANE_RECORD_TYPE, SCL_RECORD_TYPE, SELECTION_RECORD_TYPE, WINDOW2_RECORD_TYPE};
+    use crate::xls::view::{
+        PANE_RECORD_TYPE, SCL_RECORD_TYPE, SELECTION_RECORD_TYPE, ViewCollector,
+        WINDOW2_RECORD_TYPE,
+    };
 
     fn payload(record: &[u8]) -> &[u8] {
         let length = usize::from(u16::from_le_bytes([record[2], record[3]]));
@@ -1149,14 +1197,25 @@ mod view_round_trip_tests {
         write_default_selection(&mut selection, 7, 5).unwrap();
 
         let mut collector = ViewCollector::new();
-        collector.feed_record(WINDOW2_RECORD_TYPE, payload(&window)).unwrap();
-        collector.feed_record(SCL_RECORD_TYPE, payload(&scl)).unwrap();
-        collector.feed_record(PANE_RECORD_TYPE, payload(&pane)).unwrap();
-        collector.feed_record(SELECTION_RECORD_TYPE, payload(&selection)).unwrap();
+        collector
+            .feed_record(WINDOW2_RECORD_TYPE, payload(&window))
+            .unwrap();
+        collector
+            .feed_record(SCL_RECORD_TYPE, payload(&scl))
+            .unwrap();
+        collector
+            .feed_record(PANE_RECORD_TYPE, payload(&pane))
+            .unwrap();
+        collector
+            .feed_record(SELECTION_RECORD_TYPE, payload(&selection))
+            .unwrap();
         let views = collector.finish().unwrap();
         let view = &views[0];
         assert_eq!(view.zoom_fraction(), Some((3, 4)));
-        assert_eq!(view.pane().unwrap().active_pane(), crate::xls::view::XlsPaneType::LowerRight);
+        assert_eq!(
+            view.pane().unwrap().active_pane(),
+            crate::xls::view::XlsPaneType::LowerRight
+        );
         assert_eq!(view.selections()[0].active_row(), 7);
         assert_eq!(view.selections()[0].active_column(), 5);
     }
