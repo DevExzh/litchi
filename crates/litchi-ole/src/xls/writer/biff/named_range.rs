@@ -217,3 +217,10 @@ pub(crate) fn write_name_comment<W: Write>(writer: &mut W, name: &str, comment: 
     writer.write_all(&data)?;
     Ok(())
 }
+
+fn push_frt_header(data:&mut Vec<u8>,record_type:u16){data.extend_from_slice(&record_type.to_le_bytes());data.extend_from_slice(&0u16.to_le_bytes());data.extend_from_slice(&0u64.to_le_bytes());}
+fn push_xl_name_unicode(data:&mut Vec<u8>,value:&str){let units=value.encode_utf16().collect::<Vec<_>>();data.extend_from_slice(&(units.len()as u16).to_le_bytes());let compressed=units.iter().all(|unit|*unit<=0xff);data.push(u8::from(!compressed));for unit in units{if compressed{data.push(unit as u8)}else{data.extend_from_slice(&unit.to_le_bytes())}}}
+
+pub(crate) fn write_name_function_group<W:Write>(writer:&mut W,value:&crate::xls::XlsNameFnGrp12)->XlsResult<()>{let mut data=Vec::new();push_frt_header(&mut data,0x0899);let count=value.function_name.encode_utf16().count();data.extend_from_slice(&(count as u16).to_le_bytes());data.extend_from_slice(&u16::from(value.category).to_le_bytes());push_xl_name_unicode(&mut data,&value.function_name);write_record_header(writer,0x0899,data.len()as u16)?;writer.write_all(&data)?;Ok(())}
+
+pub(crate) fn write_name_publish<W:Write>(writer:&mut W,value:&crate::xls::XlsNamePublish)->XlsResult<()>{let mut data=Vec::new();push_frt_header(&mut data,0x0893);let flags=u16::from(value.published)|(u16::from(value.workbook_parameter)<<1);data.extend_from_slice(&flags.to_le_bytes());push_xl_name_unicode(&mut data,&value.name);write_record_header(writer,0x0893,data.len()as u16)?;writer.write_all(&data)?;Ok(())}

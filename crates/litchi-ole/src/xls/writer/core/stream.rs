@@ -35,7 +35,7 @@ pub(crate) fn generate_workbook_stream(
     dde_or_ole_links: &[super::XlsDdeOrOleLinkOptions],
     fmt: &FormattingManager,
     defined_names: &[InternalDefinedName],
-    defined_name_records: &[super::XlsDefinedNameRecordOptions],
+    defined_name_records: &[(super::XlsDefinedNameRecordOptions,crate::xls::XlsDefinedNameFutureRecords)],
     shared_strings: &[String],
     sst_total: u32,
     workbook_protection: Option<XlsWorkbookProtection>,
@@ -191,8 +191,12 @@ pub(crate) fn generate_workbook_stream(
             biff::write_name_comment(&mut stream, &defined_name.name, comment)?;
         }
     }
-    for defined_name in defined_name_records {
+    let classic_limit=32usize-usize::from(function_groups.built_in.count());let extended_count=function_groups.custom_categories.len().saturating_sub(classic_limit);
+    for (defined_name,future) in defined_name_records {
+        if future.function_group.as_ref().is_some_and(|value|value.category_index()>=extended_count){return Err(XlsError::InvalidData("NameFnGrp12 category does not reference an emitted FnGrp12 record".to_string()))}
         biff::write_defined_name_record(&mut stream, defined_name)?;
+        if let Some(value)=&future.function_group{biff::write_name_function_group(&mut stream,value)?;}
+        if let Some(value)=&future.publication{biff::write_name_publish(&mut stream,value)?;}
     }
 
     // Pivot table globals: PIVOTCACHEDEFINITION records.

@@ -1,5 +1,6 @@
 //! Typed ODF presentation page-layout definitions.
 
+use crate::{FlatOpenDocument, OpenDocumentPackage};
 use litchi_core::{Error, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
@@ -222,7 +223,7 @@ impl PresentationPageLayout {
     }
 
     pub fn validate(&self) -> Result<()> {
-        validate_text(&self.name, "presentation page-layout name", false)?;
+        validate_ncname(&self.name, "presentation page-layout name")?;
         if let Some(value) = &self.display_name {
             validate_text(value, "presentation page-layout display name", true)?;
         }
@@ -445,6 +446,23 @@ pub fn parse_presentation_page_layouts(xml: &str) -> Result<PresentationPageLayo
     Ok(layouts)
 }
 
+impl OpenDocumentPackage {
+    /// Inspect named presentation page layouts in packaged `styles.xml`.
+    pub fn presentation_page_layouts(&self) -> Result<PresentationPageLayouts> {
+        self.styles_xml()?.map_or_else(
+            || Ok(PresentationPageLayouts::default()),
+            |xml| parse_presentation_page_layouts(&xml),
+        )
+    }
+}
+
+impl FlatOpenDocument {
+    /// Inspect named presentation page layouts in a flat presentation.
+    pub fn presentation_page_layouts(&self) -> Result<PresentationPageLayouts> {
+        parse_presentation_page_layouts(self.xml())
+    }
+}
+
 fn ensure_location(stack: &[Frame]) -> Result<()> {
     if !matches!(stack.last(), Some(Frame { namespace: NamespaceKind::Office, local }) if local == "styles") {
         return invalid("style:presentation-page-layout must be a direct office:styles child");
@@ -561,6 +579,157 @@ fn reject_spoofed_name(namespace: NamespaceKind, local: &str) -> Result<()> {
     Ok(())
 }
 
+#[derive(Clone, Debug)]
+struct XmlSpan {
+    start: usize,
+    end: usize,
+}
+
+enum StylesSite {
+    Content { insertion: usize },
+    Empty { span: XmlSpan, qname: String },
+}
+
+fn event_start(xml: &str, end: usize) -> Result<usize> {
+    xml[..end]
+        .rfind('<')
+        .ok_or_else(|| make_error("invalid page-layout XML event boundary"))
+}
+
+fn mutation_sites(xml: &str, name: &str) -> Result<(Option<XmlSpan>, StylesSite)> {
+    parse_presentation_page_layouts(xml)?;
+    let mut reader = NsReader::from_str(xml);
+    reader.config_mut().check_end_names = true;
+    let mut buffer = Vec::new();
+    let mut stack = Vec::<Frame>::new();
+    let mut target = None;
+    let mut open_target = None::<(usize, usize)>;
+    let mut styles_site = None;
+
+    loop {
+        let (resolved, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| make_error(format!("invalid presentation page-layout XML: {error}")))?;
+        let namespace = namespace_kind(&resolved)?;
+        match event {
+            Event::Start(ref element) => {
+                let end = reader.buffer_position() as usize;
+                let start = event_start(xml, end)?;
+                let local = decode_name(element.local_name().as_ref(), "element")?;
+                let depth = stack.len() + 1;
+                if namespace == NamespaceKind::Style
+                    && local == "presentation-page-layout"
+                    && matches!(stack.last(), Some(Frame { namespace: NamespaceKind::Office, local }) if local == "styles")
+                    && parse_layout(&reader, element)?.name == name
+                {
+                    if target.is_some() || open_target.replace((depth, start)).is_some() {
+                        return invalid("duplicate target presentation page layout");
+                    }
+                }
+                stack.push(Frame { namespace, local });
+            },
+            Event::Empty(ref element) => {
+                let end = reader.buffer_position() as usize;
+                let start = event_start(xml, end)?;
+                let local = decode_name(element.local_name().as_ref(), "element")?;
+                if namespace == NamespaceKind::Style
+                    && local == "presentation-page-layout"
+                    && matches!(stack.last(), Some(Frame { namespace: NamespaceKind::Office, local }) if local == "styles")
+                    && parse_layout(&reader, element)?.name == name
+                {
+                    if target.replace(XmlSpan { start, end }).is_some() || open_target.is_some() {
+                        return invalid("duplicate target presentation page layout");
+                    }
+                }
+                if namespace == NamespaceKind::Office && local == "styles" {
+                    if styles_site.is_some() {
+                        return invalid("multiple office:styles elements are not supported");
+                    }
+                    styles_site = Some(StylesSite::Empty {
+                        span: XmlSpan { start, end },
+                        qname: decode_name(element.name().as_ref(), "qualified element")?,
+                    });
+                }
+            },
+            Event::End(_) => {
+                let end = reader.buffer_position() as usize;
+                let start = event_start(xml, end)?;
+                let depth = stack.len();
+                let frame = stack
+                    .pop()
+                    .ok_or_else(|| make_error("presentation page-layout XML depth underflow"))?;
+                if open_target.is_some_and(|(target_depth, _)| target_depth == depth) {
+                    let (_, target_start) = open_target.take().expect("target depth checked");
+                    if target.replace(XmlSpan { start: target_start, end }).is_some() {
+                        return invalid("duplicate target presentation page layout");
+                    }
+                }
+                if frame.namespace == NamespaceKind::Office && frame.local == "styles" {
+                    if styles_site.is_some() {
+                        return invalid("multiple office:styles elements are not supported");
+                    }
+                    styles_site = Some(StylesSite::Content { insertion: start });
+                }
+            },
+            Event::DocType(_) | Event::PI(_) => {
+                return invalid("DTDs and processing instructions are prohibited in page layouts");
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+        buffer.clear();
+    }
+    if !stack.is_empty() || open_target.is_some() {
+        return invalid("unterminated presentation page-layout XML");
+    }
+    Ok((
+        target,
+        styles_site.ok_or_else(|| make_error("document has no office:styles element"))?,
+    ))
+}
+
+/// Insert or replace one page-layout definition while preserving unrelated XML bytes.
+pub fn set_presentation_page_layout_xml(
+    xml: &str,
+    layout: &PresentationPageLayout,
+) -> Result<String> {
+    layout.validate()?;
+    let (target, styles_site) = mutation_sites(xml, &layout.name)?;
+    let fragment = layout.to_xml_fragment()?;
+    if let Some(span) = target {
+        return Ok(format!("{}{}{}", &xml[..span.start], fragment, &xml[span.end..]));
+    }
+    Ok(match styles_site {
+        StylesSite::Content { insertion } => {
+            format!("{}{}{}", &xml[..insertion], fragment, &xml[insertion..])
+        },
+        StylesSite::Empty { span, qname } => {
+            let raw = &xml[span.start..span.end];
+            let slash = raw
+                .rfind("/>")
+                .ok_or_else(|| make_error("invalid empty office:styles element"))?;
+            format!(
+                "{}{}>{}</{}>{}",
+                &xml[..span.start],
+                &raw[..slash],
+                fragment,
+                qname,
+                &xml[span.end..]
+            )
+        },
+    })
+}
+
+/// Remove one page-layout definition while preserving unrelated XML bytes.
+pub fn remove_presentation_page_layout_xml(xml: &str, name: &str) -> Result<String> {
+    validate_ncname(name, "presentation page-layout name")?;
+    let (target, _) = mutation_sites(xml, name)?;
+    let Some(span) = target else {
+        return Ok(xml.to_owned());
+    };
+    Ok(format!("{}{}", &xml[..span.start], &xml[span.end..]))
+}
+
 fn write_layout(output: &mut String, layout: &PresentationPageLayout, standalone: bool) {
     output.push_str("<style:presentation-page-layout");
     if standalone {
@@ -616,10 +785,34 @@ fn validate_decimal(value: &str, complete: &str) -> Result<()> {
     let fraction = parts.next();
     if parts.next().is_some()
         || !integer.bytes().all(|value| value.is_ascii_digit())
-        || fraction.is_some_and(|value| value.is_empty() || !value.bytes().all(|byte| byte.is_ascii_digit()))
-        || integer.is_empty() && fraction.is_none()
+        || fraction.is_some_and(|value| !value.bytes().all(|byte| byte.is_ascii_digit()))
+        || integer.is_empty() && fraction.map_or(true, str::is_empty)
     {
         return invalid(format!("invalid presentation measure '{complete}'"));
+    }
+    Ok(())
+}
+
+fn ncname_start(character: char) -> bool {
+    matches!(character,
+        'A'..='Z' | '_' | 'a'..='z'
+        | '\u{c0}'..='\u{d6}' | '\u{d8}'..='\u{f6}' | '\u{f8}'..='\u{2ff}'
+        | '\u{370}'..='\u{37d}' | '\u{37f}'..='\u{1fff}' | '\u{200c}'..='\u{200d}'
+        | '\u{2070}'..='\u{218f}' | '\u{2c00}'..='\u{2fef}' | '\u{3001}'..='\u{d7ff}'
+        | '\u{f900}'..='\u{fdcf}' | '\u{fdf0}'..='\u{fffd}' | '\u{10000}'..='\u{effff}'
+    )
+}
+
+fn ncname_continue(character: char) -> bool {
+    ncname_start(character)
+        || matches!(character, '-' | '.' | '0'..='9' | '\u{b7}' | '\u{300}'..='\u{36f}' | '\u{203f}'..='\u{2040}')
+}
+
+fn validate_ncname(value: &str, context: &str) -> Result<()> {
+    validate_text(value, context, false)?;
+    let mut characters = value.chars();
+    if !characters.next().is_some_and(ncname_start) || !characters.all(ncname_continue) {
+        return invalid(format!("{context} is not an XML NCName"));
     }
     Ok(())
 }
@@ -711,5 +904,99 @@ mod tests {
                 .len(),
             2
         );
+    }
+
+    #[test]
+    fn exhausts_classes_and_geometry_lexicals() {
+        let classes = [
+            PresentationPlaceholderClass::Title,
+            PresentationPlaceholderClass::Outline,
+            PresentationPlaceholderClass::Subtitle,
+            PresentationPlaceholderClass::Text,
+            PresentationPlaceholderClass::Graphic,
+            PresentationPlaceholderClass::Object,
+            PresentationPlaceholderClass::Chart,
+            PresentationPlaceholderClass::Table,
+            PresentationPlaceholderClass::OrganizationChart,
+            PresentationPlaceholderClass::Page,
+            PresentationPlaceholderClass::Notes,
+            PresentationPlaceholderClass::Handout,
+            PresentationPlaceholderClass::Header,
+            PresentationPlaceholderClass::Footer,
+            PresentationPlaceholderClass::DateTime,
+            PresentationPlaceholderClass::PageNumber,
+        ];
+        let mut layout = PresentationPageLayout::new("_all.classes").unwrap();
+        for class in classes {
+            layout.placeholders.push(PresentationPlaceholder::new(
+                class,
+                "-.5cm".parse().unwrap(),
+                "1.cm".parse().unwrap(),
+                "-0.25%".parse().unwrap(),
+                "-2px".parse().unwrap(),
+            ));
+        }
+        let parsed = parse_presentation_page_layouts(&format!("{PREFIX}{}{SUFFIX}", layout.to_xml_fragment().unwrap())).unwrap();
+        assert_eq!(parsed.layouts[0].placeholders.len(), 16);
+        assert_eq!(parsed.layouts[0].placeholders[15].class, PresentationPlaceholderClass::PageNumber);
+        for value in [".5cm", "1.cm", "-.5%", "-0px", "01.00pt"] {
+            assert!(value.parse::<PresentationMeasure>().is_ok(), "rejected {value}");
+        }
+        for value in [".", ".cm", "+1cm", "1e2cm", "1 cm", "NaNcm"] {
+            assert!(value.parse::<PresentationMeasure>().is_err(), "accepted {value}");
+        }
+    }
+
+    #[test]
+    fn rejects_identity_duplicates_and_caps() {
+        for name in ["", "1layout", "bad:name", "two words"] {
+            assert!(PresentationPageLayout::new(name).is_err(), "accepted {name}");
+        }
+        let aliased_duplicate = format!(
+            r#"{PREFIX}<style:presentation-page-layout xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" style:name="a" s:name="b"/>{SUFFIX}"#
+        );
+        assert!(parse_presentation_page_layouts(&aliased_duplicate).is_err());
+        let mut capped = PresentationPageLayout::new("cap").unwrap();
+        let placeholder = PresentationPlaceholder::new(
+            PresentationPlaceholderClass::Text,
+            "0cm".parse().unwrap(),
+            "0cm".parse().unwrap(),
+            "1cm".parse().unwrap(),
+            "1cm".parse().unwrap(),
+        );
+        capped.placeholders = vec![placeholder; MAX_PLACEHOLDERS + 1];
+        assert!(capped.validate().is_err());
+        assert!(PresentationPageLayout::new("x".repeat(MAX_VALUE_BYTES + 1)).is_err());
+    }
+
+    #[test]
+    fn losslessly_inserts_replaces_and_removes() {
+        let original = format!(r#"{PREFIX}<!--keep--><style:style style:name="other"/>{SUFFIX}"#);
+        let mut layout = PresentationPageLayout::new("layout1").unwrap();
+        layout.display_name = Some("First".to_string());
+        let inserted = set_presentation_page_layout_xml(&original, &layout).unwrap();
+        assert!(inserted.contains("<!--keep--><style:style style:name=\"other\"/><style:presentation-page-layout"));
+        layout.display_name = Some("Replacement".to_string());
+        let replaced = set_presentation_page_layout_xml(&inserted, &layout).unwrap();
+        assert!(replaced.contains("style:display-name=\"Replacement\""));
+        assert!(!replaced.contains("style:display-name=\"First\""));
+        assert_eq!(remove_presentation_page_layout_xml(&replaced, "layout1").unwrap(), original);
+        assert_eq!(remove_presentation_page_layout_xml(&original, "missing").unwrap(), original);
+    }
+
+    #[test]
+    fn builder_writes_page_layouts() {
+        let mut builder = crate::PresentationBuilder::new();
+        let mut layout = PresentationPageLayout::new("builder_layout").unwrap();
+        layout.placeholders.push(PresentationPlaceholder::new(
+            PresentationPlaceholderClass::Title,
+            "1cm".parse().unwrap(),
+            "2cm".parse().unwrap(),
+            "20cm".parse().unwrap(),
+            "3cm".parse().unwrap(),
+        ));
+        builder.add_page_layout(layout).unwrap();
+        let presentation = crate::Presentation::from_bytes(builder.build().unwrap()).unwrap();
+        assert_eq!(presentation.page_layouts().unwrap().layouts[0].name, "builder_layout");
     }
 }

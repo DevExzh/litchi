@@ -8,6 +8,7 @@
 use crate::xls::XlsResult;
 use crate::xls::writer::formula::{Ptg, encode_ptg_tokens, parse_cell_ref};
 use crate::xls::{XlsBuiltInName, XlsDefinedNameKind, XlsError, XlsNameScope};
+use crate::xls::XlsDefinedNameFutureRecords;
 
 /// Complete inert BIFF8 `Lbl` metadata for names beyond simple ranges.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -83,6 +84,12 @@ impl XlsDefinedNameRecordOptions {
     pub(crate) fn built_in(&self) -> Option<XlsBuiltInName> {
         match self.kind { XlsDefinedNameKind::BuiltIn(name) => Some(name), _ => None }
     }
+}
+
+pub(super) fn validate_future_records(future:&XlsDefinedNameFutureRecords,serialized_name:&str)->XlsResult<()>{
+    if let Some(value)=&future.function_group{let count=value.function_name.encode_utf16().count();if !(1..=255).contains(&count)||value.function_name.contains('\0'){return Err(XlsError::InvalidData("NameFnGrp12 function name must contain 1..=255 non-NUL UTF-16 units".to_string()))}if !(32..=255).contains(&value.category){return Err(XlsError::InvalidData("NameFnGrp12 category must be in 32..=255".to_string()))}if !crate::xls::defined_names::unicode_name_eq(&value.function_name,serialized_name){return Err(XlsError::InvalidData("NameFnGrp12 function name must match its defined name".to_string()))}}
+    if let Some(value)=&future.publication{let count=value.name.encode_utf16().count();if !(1..=255).contains(&count)||value.name.contains('\0'){return Err(XlsError::InvalidData("NamePublish name must contain 1..=255 non-NUL UTF-16 units".to_string()))}if !crate::xls::defined_names::unicode_name_eq(&value.name,serialized_name){return Err(XlsError::InvalidData("NamePublish name must match its defined name".to_string()))}}
+    Ok(())
 }
 
 /// Workbook-level defined name (named range).

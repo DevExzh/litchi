@@ -109,6 +109,9 @@ pub fn write_name_comment<W: Write>(writer: &mut W, name: &str, comment: &str) -
     named_range::write_name_comment(writer, name, comment)
 }
 
+pub fn write_name_function_group<W:Write>(writer:&mut W,value:&crate::xls::XlsNameFnGrp12)->XlsResult<()>{named_range::write_name_function_group(writer,value)}
+pub fn write_name_publish<W:Write>(writer:&mut W,value:&crate::xls::XlsNamePublish)->XlsResult<()>{named_range::write_name_publish(writer,value)}
+
 pub fn write_defined_name_record<W: Write>(
     writer: &mut W,
     name: &crate::xls::writer::XlsDefinedNameRecordOptions,

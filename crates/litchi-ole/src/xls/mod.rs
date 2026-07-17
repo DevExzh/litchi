@@ -166,7 +166,7 @@ pub use data_validation::{
 };
 pub use error::{XlsEncryptionKind, XlsError, XlsResult};
 pub use defined_names::{
-    XlsBuiltInName, XlsDefinedName, XlsDefinedNameKind, XlsNameScope,
+    XlsBuiltInName, XlsDefinedName, XlsDefinedNameFutureRecords, XlsDefinedNameKind, XlsNameFnGrp12, XlsNamePublish, XlsNameScope,
 };
 pub use number_format::{
     XlsDateSystem, XlsEffectiveExtendedFormat, XlsExtendedFormat,

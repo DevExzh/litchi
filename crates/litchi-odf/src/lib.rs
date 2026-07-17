@@ -488,7 +488,8 @@ pub use odp::{
     PresentationMeasure, PresentationMeasureUnit, PresentationPageLayout,
     PresentationPageLayouts, PresentationPageMetadata, PresentationPageMetadataCollection,
     PresentationPlaceholder, PresentationPlaceholderClass, PresentationSettings,
-    PresentationTextDeclaration, CustomPresentationShow,
+    PresentationTextDeclaration, CustomPresentationShow, parse_presentation_page_layouts,
+    remove_presentation_page_layout_xml, set_presentation_page_layout_xml,
     ScriptEventListener, ShapeEventListener, SlideTransition, TransitionDirection, TransitionSound,
     TransitionSoundShow, TransitionSpeed, TransitionStyle, TransitionType,
 };

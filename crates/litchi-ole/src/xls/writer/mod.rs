@@ -43,6 +43,7 @@ pub use crate::xls::{
     XlsConsolidation, XlsConsolidationBuiltInName, XlsConsolidationFile,
     XlsConsolidationFunction, XlsConsolidationRange, XlsConsolidationSource,
 };
+pub use crate::xls::{XlsDefinedNameFutureRecords,XlsNameFnGrp12,XlsNamePublish};
 pub use formatting::{
     BorderStyle, Borders, CellStyle, ExtendedFormat, Fill, FillPattern, Font, FormattingManager,
     HorizontalAlignment, VerticalAlignment,

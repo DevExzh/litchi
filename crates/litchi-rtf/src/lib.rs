@@ -151,8 +151,8 @@ pub use shape::{
 pub use stylesheet::{Style, StyleSheet, StyleType};
 pub use table::{Cell, CellNestedTable, FloatingTablePosition, Row, Table, TableDistanceKind, TableDistanceScope,
     TableCellBorderSide, TableCellBorders, TableCellLayout, TableCellMergeAxis, TableCellMergeRole, TableCellMergeState, TableCellTextFlow, TableCellVerticalAlignment, TableDistanceTarget, TableDistanceUnit, TableEdge, TableEdgeDistances, TableHorizontalPosition,
-    TableHorizontalReference, TableSideDistance, TableVerticalPosition, TableVerticalReference,
-    TableRowAlignment, TableRowBorderSide, TableRowBorders, TableRowLayout, TableShading, TableWrapDistances, MAX_FLOATING_TABLE_DISTANCE_TWIPS, MAX_TABLE_CELLS_PER_ROW, MAX_TABLE_DISTANCE_TWIPS, MAX_TABLE_NESTING_DEPTH};
+    TableHorizontalReference, TableIndent, TableIndentUnit, TablePreferredWidth, TablePreferredWidthUnit, TableRowGeometry, TableRowHeight, TableSideDistance, TableVerticalPosition, TableVerticalReference,
+    TableRowAlignment, TableRowBorderSide, TableRowBorders, TableRowLayout, TableShading, TableWrapDistances, MAX_FLOATING_TABLE_DISTANCE_TWIPS, MAX_TABLE_CELLS_PER_ROW, MAX_TABLE_DISTANCE_TWIPS, MAX_TABLE_GEOMETRY_TWIPS, MAX_TABLE_NESTING_DEPTH, MAX_TABLE_WIDTH_PERCENT};
 pub use types::{
     Alignment, AssociatedCharacterFormatting, Color, ColorRef, ColorTable, DocumentElement, Font,
     FontFamily, FontPitch, FontRef, FontTable, Formatting, Indentation, Paragraph,

@@ -87,7 +87,8 @@ pub use mutable::MutablePresentation;
 pub use page_layout_definition::{
     PresentationMeasure, PresentationMeasureUnit, PresentationPageLayout,
     PresentationPageLayouts, PresentationPlaceholder, PresentationPlaceholderClass,
-    parse_presentation_page_layouts,
+    parse_presentation_page_layouts, remove_presentation_page_layout_xml,
+    set_presentation_page_layout_xml,
 };
 pub use page_metadata::{
     PresentationPageMetadata, PresentationPageMetadataCollection,

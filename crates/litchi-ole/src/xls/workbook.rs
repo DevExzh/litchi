@@ -396,12 +396,15 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         let mut workbook_view_collector = crate::xls::workbook_view::WorkbookViewCollector::new();
         let mut function_group_collector = crate::xls::function_group::FunctionGroupCollector::new();
         let mut external_link_collector = crate::xls::external_link::ExternalLinkCollector::new();
-        let mut name_comment_target = None;
+        let mut name_optional_target:Option<(usize,u8)>=None;
         let mut i = 0;
         while i < records.len() {
             let record = &records[i];
-            if !matches!(record.header.record_type, LBL_RECORD_TYPE | NAME_CMT_RECORD_TYPE | 0x003c) {
-                name_comment_target = None;
+            if !matches!(record.header.record_type, LBL_RECORD_TYPE | NAME_CMT_RECORD_TYPE | crate::xls::defined_names::NAME_FN_GRP12_RECORD_TYPE | crate::xls::defined_names::NAME_PUBLISH_RECORD_TYPE | 0x003c) {
+                name_optional_target=None;
+            }
+            if record.header.record_type==0x003c&&name_optional_target.is_some(){
+                return Err(XlsError::InvalidRecord{record_type:0x003c,message:"CONTINUE is not permitted after a post-Lbl optional record".to_string()});
             }
             protection_collector.feed_record(record.header.record_type, &record.data)?;
             calculation_collector.feed_record(record.header.record_type, &record.data)?;
@@ -494,15 +497,20 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                     defined_name_slots.push(DefinedNameSlot::parse_with_continuations(
                         &combined, record_index, continuation_chunks,
                     )?);
-                    name_comment_target = Some(defined_name_slots.len() - 1);
+                    name_optional_target=Some((defined_name_slots.len()-1,0));
+                    i=next-1;
                 },
                 NAME_CMT_RECORD_TYPE => {
-                    let target = name_comment_target.take().ok_or_else(|| XlsError::InvalidRecord {
+                    let (target,stage)=name_optional_target.ok_or_else(|| XlsError::InvalidRecord {
                         record_type: NAME_CMT_RECORD_TYPE,
                         message: "NameCmt does not immediately follow a Lbl record".to_string(),
                     })?;
+                    if stage!=0{return Err(XlsError::InvalidRecord{record_type:NAME_CMT_RECORD_TYPE,message:"NameCmt is duplicated or out of order in the Lbl optional-record sequence".to_string()})}
                     defined_name_slots[target].attach_comment(&record.data)?;
+                    name_optional_target=Some((target,1));
                 },
+                crate::xls::defined_names::NAME_FN_GRP12_RECORD_TYPE=>{let(target,stage)=name_optional_target.ok_or_else(||XlsError::InvalidRecord{record_type:crate::xls::defined_names::NAME_FN_GRP12_RECORD_TYPE,message:"NameFnGrp12 does not follow a Lbl record".to_string()})?;if stage>1{return Err(XlsError::InvalidRecord{record_type:crate::xls::defined_names::NAME_FN_GRP12_RECORD_TYPE,message:"NameFnGrp12 is duplicated or out of order in the Lbl optional-record sequence".to_string()})}defined_name_slots[target].attach_function_group(&record.data)?;name_optional_target=Some((target,2));},
+                crate::xls::defined_names::NAME_PUBLISH_RECORD_TYPE=>{let(target,stage)=name_optional_target.ok_or_else(||XlsError::InvalidRecord{record_type:crate::xls::defined_names::NAME_PUBLISH_RECORD_TYPE,message:"NamePublish does not follow a Lbl record".to_string()})?;if stage>2{return Err(XlsError::InvalidRecord{record_type:crate::xls::defined_names::NAME_PUBLISH_RECORD_TYPE,message:"NamePublish is duplicated or out of order in the Lbl optional-record sequence".to_string()})}defined_name_slots[target].attach_publication(&record.data)?;name_optional_target=Some((target,3));},
                 0x00FC => {
                     // SST
                     // SST may span multiple records, collect them all
@@ -535,6 +543,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                     self.shared_string_index = shared_string_index_collector.finish();
                     self.workbook_view = workbook_view_collector.finish(bound_sheets.len())?;
                     self.function_groups = function_group_collector.finish()?;
+                    let extended_count=self.function_groups.as_ref().map_or(0,|groups|groups.extended_categories().len());for slot in defined_name_slots.iter(){slot.validate_extended_category(extended_count)?;}
                     self.external_links = external_link_collector.finish(bound_sheets.len())?;
                     break;
                 },

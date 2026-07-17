@@ -8,9 +8,50 @@ use std::borrow::Cow;
 use std::collections::BTreeSet;
 
 pub const MAX_TABLE_DISTANCE_TWIPS: i32 = 31_680;
+pub const MAX_TABLE_GEOMETRY_TWIPS: i32 = 31_680;
+pub const MAX_TABLE_WIDTH_PERCENT: i32 = 5_000;
 pub const MAX_FLOATING_TABLE_DISTANCE_TWIPS: i32 = 31_680;
 pub const MAX_TABLE_NESTING_DEPTH: usize = 32;
 pub const MAX_TABLE_CELLS_PER_ROW: usize = 4_096;
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum TablePreferredWidthUnit { #[default] Null, Auto, Percent, Twips }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TablePreferredWidth { unit:TablePreferredWidthUnit, value:Option<u16> }
+impl TablePreferredWidth {
+    pub fn new(unit:TablePreferredWidthUnit,value:Option<u16>)->crate::RtfResult<Self>{let width=Self{unit,value};width.validate()?;Ok(width)}
+    pub const fn unit(self)->TablePreferredWidthUnit{self.unit}
+    pub const fn value(self)->Option<u16>{self.value}
+    pub(crate) fn validate(self)->crate::RtfResult<()>{match(self.unit,self.value){(TablePreferredWidthUnit::Null|TablePreferredWidthUnit::Auto,None)=>Ok(()),(TablePreferredWidthUnit::Percent,Some(value))if i32::from(value)<=MAX_TABLE_WIDTH_PERCENT=>Ok(()),(TablePreferredWidthUnit::Twips,Some(value))if i32::from(value)<=MAX_TABLE_GEOMETRY_TWIPS=>Ok(()),(TablePreferredWidthUnit::Null|TablePreferredWidthUnit::Auto,Some(_))=>Err(crate::RtfError::MalformedDocument("RTF null or auto preferred width cannot carry a value".to_string())),(TablePreferredWidthUnit::Percent|TablePreferredWidthUnit::Twips,None)=>Err(crate::RtfError::MalformedDocument("RTF percentage or twip preferred width requires a value".to_string())),_=>Err(crate::RtfError::MalformedDocument("RTF preferred table width is out of range".to_string()))}}
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum TableRowHeight { #[default] Automatic, Minimum(u16), Exact(u16) }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TableIndentUnit { Auto, Twips, Nil, Percent }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TableIndent { unit:TableIndentUnit, value:i32 }
+impl TableIndent {
+    pub fn new(unit:TableIndentUnit,value:i32)->crate::RtfResult<Self>{let indent=Self{unit,value};indent.validate()?;Ok(indent)}
+    pub const fn unit(self)->TableIndentUnit{self.unit}
+    pub const fn value(self)->i32{self.value}
+    pub(crate) fn validate(self)->crate::RtfResult<()>{let cap=match self.unit{TableIndentUnit::Twips=>MAX_TABLE_GEOMETRY_TWIPS,TableIndentUnit::Percent=>MAX_TABLE_WIDTH_PERCENT,TableIndentUnit::Auto|TableIndentUnit::Nil=>return if self.value==0{Ok(())}else{Err(crate::RtfError::MalformedDocument("RTF auto or nil table indent requires zero".to_string()))}};if self.value.unsigned_abs()<=cap as u32{Ok(())}else{Err(crate::RtfError::MalformedDocument("RTF table indent is out of range".to_string()))}}
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct TableRowGeometry { half_gap_twips:Option<u16>, left_edge_twips:Option<i32>, height:TableRowHeight, preferred_width:Option<TablePreferredWidth>, auto_fit:bool, indent:Option<TableIndent> }
+impl TableRowGeometry {
+    pub const fn half_gap_twips(self)->Option<u16>{self.half_gap_twips} pub fn set_half_gap_twips(&mut self,value:Option<u16>){self.half_gap_twips=value}
+    pub const fn left_edge_twips(self)->Option<i32>{self.left_edge_twips} pub fn set_left_edge_twips(&mut self,value:Option<i32>){self.left_edge_twips=value}
+    pub const fn height(self)->TableRowHeight{self.height} pub fn set_height(&mut self,value:TableRowHeight){self.height=value}
+    pub const fn preferred_width(self)->Option<TablePreferredWidth>{self.preferred_width} pub fn set_preferred_width(&mut self,value:Option<TablePreferredWidth>){self.preferred_width=value}
+    pub const fn auto_fit(self)->bool{self.auto_fit} pub fn set_auto_fit(&mut self,value:bool){self.auto_fit=value}
+    pub const fn indent(self)->Option<TableIndent>{self.indent} pub fn set_indent(&mut self,value:Option<TableIndent>){self.indent=value}
+    pub(crate) fn validate(self)->crate::RtfResult<()>{if self.half_gap_twips.is_some_and(|value|i32::from(value)>MAX_TABLE_GEOMETRY_TWIPS)||self.left_edge_twips.is_some_and(|value|value.unsigned_abs()>MAX_TABLE_GEOMETRY_TWIPS as u32)||matches!(self.height,TableRowHeight::Minimum(value)|TableRowHeight::Exact(value)if i32::from(value)>MAX_TABLE_GEOMETRY_TWIPS){return Err(crate::RtfError::MalformedDocument("RTF table row geometry is out of range".to_string()))}if let Some(width)=self.preferred_width{width.validate()?}if let Some(indent)=self.indent{indent.validate()?}Ok(())}
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableCellMergeAxis { Horizontal, Vertical }
@@ -174,6 +215,7 @@ pub struct Row<'a> {
     positioning: FloatingTablePosition,
     borders: TableRowBorders,
     shading: TableShading,
+    geometry: TableRowGeometry,
 }
 
 impl<'a> Row<'a> {
@@ -186,7 +228,7 @@ impl<'a> Row<'a> {
             padding: TableEdgeDistances::default(),
             spacing: TableEdgeDistances::default(),
             positioning: FloatingTablePosition::default(),
-            borders: Default::default(), shading: Default::default(),
+            borders: Default::default(), shading: Default::default(), geometry:Default::default(),
         }
     }
 
@@ -226,6 +268,8 @@ impl<'a> Row<'a> {
     pub fn shading(&self)->TableShading{self.shading}
     pub fn set_borders(&mut self,value:TableRowBorders){self.borders=value}
     pub fn set_shading(&mut self,value:TableShading){self.shading=value}
+    pub fn geometry(&self)->TableRowGeometry{self.geometry}
+    pub fn set_geometry(&mut self,value:TableRowGeometry){self.geometry=value}
 }
 
 impl<'a> Default for Row<'a> {
@@ -246,6 +290,7 @@ pub struct Cell<'a> {
     shading: TableShading,
     merge: TableCellMergeState,
     right_boundary: Option<i32>,
+    preferred_width: Option<TablePreferredWidth>,
     nested_tables: Vec<CellNestedTable<'a>>,
 }
 
@@ -256,9 +301,9 @@ pub struct CellNestedTable<'a> { pub text_offset: usize, pub table: Table<'a> }
 impl<'a> Cell<'a> {
     /// Create a new cell.
     pub fn new(text: Cow<'a, str>) -> Self {
-        Self { text, padding:TableEdgeDistances::default(), spacing:TableEdgeDistances::default(), layout:TableCellLayout::default(), borders:Default::default(), shading:Default::default(), merge:Default::default(), right_boundary:None, nested_tables:Vec::new() }
+        Self { text, padding:TableEdgeDistances::default(), spacing:TableEdgeDistances::default(), layout:TableCellLayout::default(), borders:Default::default(), shading:Default::default(), merge:Default::default(), right_boundary:None, preferred_width:None, nested_tables:Vec::new() }
     }
-    pub fn with_distances(text:Cow<'a,str>,padding:TableEdgeDistances,spacing:TableEdgeDistances)->Self{Self{text,padding,spacing,layout:TableCellLayout::default(),borders:Default::default(),shading:Default::default(),merge:Default::default(),right_boundary:None,nested_tables:Vec::new()}}
+    pub fn with_distances(text:Cow<'a,str>,padding:TableEdgeDistances,spacing:TableEdgeDistances)->Self{Self{text,padding,spacing,layout:TableCellLayout::default(),borders:Default::default(),shading:Default::default(),merge:Default::default(),right_boundary:None,preferred_width:None,nested_tables:Vec::new()}}
 
     /// Get the cell text.
     pub fn text(&self) -> &str {
@@ -278,6 +323,8 @@ impl<'a> Cell<'a> {
     pub fn set_merge(&mut self,value:TableCellMergeState){self.merge=value}
     pub fn right_boundary(&self)->Option<i32>{self.right_boundary}
     pub fn set_right_boundary(&mut self,value:Option<i32>){self.right_boundary=value}
+    pub fn preferred_width(&self)->Option<TablePreferredWidth>{self.preferred_width}
+    pub fn set_preferred_width(&mut self,value:Option<TablePreferredWidth>){self.preferred_width=value}
     pub fn nested_tables(&self)->&[CellNestedTable<'a>]{&self.nested_tables}
     pub fn add_nested_table(&mut self,text_offset:usize,table:Table<'a>)->crate::RtfResult<()>{if text_offset>self.text.len()||!self.text.is_char_boundary(text_offset)||self.nested_tables.last().is_some_and(|entry|entry.text_offset>text_offset){return Err(crate::RtfError::MalformedDocument("invalid nested-table text insertion offset".to_string()))}self.nested_tables.push(CellNestedTable{text_offset,table});Ok(())}
     pub(crate) fn nested_tables_mut(&mut self)->&mut Vec<CellNestedTable<'a>>{&mut self.nested_tables}

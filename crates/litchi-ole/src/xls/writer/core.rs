@@ -765,7 +765,7 @@ pub struct XlsWriter {
     string_map: HashMap<String, u32>,
     /// Workbook-level defined names (named ranges).
     defined_names: Vec<InternalDefinedName>,
-    defined_name_records: Vec<XlsDefinedNameRecordOptions>,
+    defined_name_records: Vec<(XlsDefinedNameRecordOptions,crate::xls::XlsDefinedNameFutureRecords)>,
     fmt: FormattingManager,
     /// Total number of string occurrences (including duplicates) for SST.cstTotal
     sst_total: u32,
@@ -1705,9 +1705,12 @@ impl XlsWriter {
             return Err(XlsError::InvalidData("defined name count exceeds BIFF8 bound".to_string()));
         }
         let index = self.defined_name_records.len();
-        self.defined_name_records.push(options);
+        self.defined_name_records.push((options,Default::default()));
         Ok(index)
     }
+
+    /// Add complete inert `Lbl` metadata and its ordered BIFF8 future records.
+    pub fn add_defined_name_record_with_future_records(&mut self,options:XlsDefinedNameRecordOptions,future:crate::xls::XlsDefinedNameFutureRecords)->XlsResult<usize>{options.validate(self.worksheets.len())?;self::named_range::validate_future_records(&future,options.serialized_name())?;if self.defined_names.len()+self.defined_name_records.len()>=usize::from(u16::MAX){return Err(XlsError::InvalidData("defined name count exceeds BIFF8 bound".to_string()))}let index=self.defined_name_records.len();self.defined_name_records.push((options,future));Ok(index)}
 
     /// Set the width of a column in character units.
     ///

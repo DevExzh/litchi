@@ -39,6 +39,7 @@ pub struct PresentationBuilder {
     settings: Option<crate::odp::PresentationSettings>,
     declarations: Option<crate::odp::PresentationDeclarations>,
     page_metadata: Option<crate::odp::PresentationPageMetadataCollection>,
+    page_layouts: crate::odp::PresentationPageLayouts,
 }
 
 fn encode_text_content(text: &str) -> String {
@@ -377,7 +378,35 @@ impl PresentationBuilder {
             settings: None,
             declarations: None,
             page_metadata: None,
+            page_layouts: crate::odp::PresentationPageLayouts::default(),
         }
+    }
+
+    /// Return validated page-layout definitions that will be written to `styles.xml`.
+    pub fn page_layouts(&self) -> &crate::odp::PresentationPageLayouts {
+        &self.page_layouts
+    }
+
+    /// Replace all custom page-layout definitions written by this builder.
+    pub fn set_page_layouts(
+        &mut self,
+        layouts: crate::odp::PresentationPageLayouts,
+    ) -> Result<&mut Self> {
+        layouts.validate()?;
+        self.page_layouts = layouts;
+        Ok(self)
+    }
+
+    /// Add one custom page layout without changing existing builder behavior.
+    pub fn add_page_layout(
+        &mut self,
+        layout: crate::odp::PresentationPageLayout,
+    ) -> Result<&mut Self> {
+        let mut layouts = self.page_layouts.clone();
+        layouts.layouts.push(layout);
+        layouts.validate()?;
+        self.page_layouts = layouts;
+        Ok(self)
     }
 
     /// Return the inert slide-show settings.
@@ -1150,7 +1179,10 @@ impl PresentationBuilder {
         writer.add_file("content.xml", content_xml.as_bytes())?;
 
         // Add styles.xml
-        let styles_xml = OdfStructure::default_styles_xml();
+        let mut styles_xml = OdfStructure::default_styles_xml();
+        for layout in &self.page_layouts.layouts {
+            styles_xml = crate::odp::set_presentation_page_layout_xml(&styles_xml, layout)?;
+        }
         writer.add_file("styles.xml", styles_xml.as_bytes())?;
 
         // Add meta.xml
