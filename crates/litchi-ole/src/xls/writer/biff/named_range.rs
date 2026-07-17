@@ -7,6 +7,8 @@
 use std::io::Write;
 
 use crate::xls::writer::XlsDefinedName;
+use crate::xls::writer::XlsDefinedNameRecordOptions;
+use crate::xls::{XlsDefinedNameKind, XlsNameScope};
 use crate::xls::{XlsError, XlsResult};
 
 use super::{has_multibyte_char, write_record_header};
@@ -123,5 +125,95 @@ pub(crate) fn write_name<W: Write>(
     // rgce (formula tokens)
     writer.write_all(rgce)?;
 
+    Ok(())
+}
+
+fn push_no_cch_string(data: &mut Vec<u8>, value: &str) {
+    let units = value.encode_utf16().collect::<Vec<_>>();
+    let compressed = units.iter().all(|unit| *unit <= 0xff);
+    data.push(u8::from(!compressed));
+    for unit in units {
+        if compressed { data.push(unit as u8); } else { data.extend_from_slice(&unit.to_le_bytes()); }
+    }
+}
+
+fn write_continued_record<W: Write>(writer: &mut W, record_type: u16, data: &[u8]) -> XlsResult<()> {
+    let mut offset = 0;
+    let first = data.len().min(8224);
+    write_record_header(writer, record_type, first as u16)?;
+    writer.write_all(&data[..first])?;
+    offset += first;
+    while offset < data.len() {
+        let end = (offset + 8224).min(data.len());
+        write_record_header(writer, 0x003c, (end - offset) as u16)?;
+        writer.write_all(&data[offset..end])?;
+        offset = end;
+    }
+    Ok(())
+}
+
+pub(crate) fn write_defined_name_record<W: Write>(
+    writer: &mut W,
+    name: &XlsDefinedNameRecordOptions,
+) -> XlsResult<()> {
+    let mut flags = u16::from(name.hidden)
+        | (u16::from(name.function) << 1)
+        | (u16::from(name.vba_procedure) << 2)
+        | (u16::from(name.procedure) << 3)
+        | (u16::from(name.calculated_expression) << 4)
+        | (u16::from(matches!(name.kind, XlsDefinedNameKind::BuiltIn(_))) << 5)
+        | (u16::from(name.function_group) << 6)
+        | (u16::from(name.published) << 13)
+        | (u16::from(name.workbook_parameter) << 14);
+    flags &= 0x7fff;
+    let mut data = Vec::new();
+    data.extend_from_slice(&flags.to_le_bytes());
+    data.push(name.shortcut_key.unwrap_or(0));
+    let (name_len, built_in) = match name.built_in() {
+        Some(value) => (1usize, Some(value.code())),
+        None => (name.name.encode_utf16().count(), None),
+    };
+    data.push(name_len as u8);
+    data.extend_from_slice(&(name.formula_tokens.len() as u16).to_le_bytes());
+    data.extend_from_slice(&0u16.to_le_bytes());
+    let itab = match name.scope {
+        XlsNameScope::Workbook => 0,
+        XlsNameScope::Worksheet(index) => u16::try_from(index + 1)
+            .map_err(|_| XlsError::InvalidData("defined name sheet scope exceeds u16".to_string()))?,
+    };
+    data.extend_from_slice(&itab.to_le_bytes());
+    for value in [&name.custom_menu, &name.description, &name.help_topic, &name.status_bar] {
+        data.push(value.chars().count() as u8);
+    }
+    if let Some(code) = built_in { data.extend_from_slice(&[0, code]); }
+    else { push_no_cch_string(&mut data, &name.name); }
+    data.extend_from_slice(&name.formula_tokens);
+    data.extend_from_slice(&name.formula_extra);
+    for value in [&name.custom_menu, &name.description, &name.help_topic, &name.status_bar] {
+        data.extend(value.chars().map(|character| character as u8));
+    }
+    write_continued_record(writer, 0x0018, &data)?;
+    if let Some(comment) = &name.comment {
+        write_name_comment(writer, name.serialized_name(), comment)?;
+    }
+    Ok(())
+}
+
+pub(crate) fn write_name_comment<W: Write>(writer: &mut W, name: &str, comment: &str) -> XlsResult<()> {
+    let name_len = name.encode_utf16().count();
+    let comment_len = comment.encode_utf16().count();
+    if name_len > 255 || comment_len > 255 {
+        return Err(XlsError::InvalidData("NameCmt strings exceed 255 UTF-16 units".to_string()));
+    }
+    let mut data = Vec::new();
+    data.extend_from_slice(&0x0894u16.to_le_bytes());
+    data.extend_from_slice(&0u16.to_le_bytes());
+    data.extend_from_slice(&0u64.to_le_bytes());
+    data.extend_from_slice(&(name_len as u16).to_le_bytes());
+    data.extend_from_slice(&(comment_len as u16).to_le_bytes());
+    push_no_cch_string(&mut data, name);
+    push_no_cch_string(&mut data, comment);
+    write_record_header(writer, 0x0894, data.len() as u16)?;
+    writer.write_all(&data)?;
     Ok(())
 }

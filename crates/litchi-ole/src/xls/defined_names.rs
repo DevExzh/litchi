@@ -4,6 +4,7 @@ use super::error::{XlsError, XlsResult};
 use super::formula::{FormulaContext, render_formula};
 
 pub(crate) const LBL_RECORD_TYPE: u16 = 0x0018;
+pub(crate) const NAME_CMT_RECORD_TYPE: u16 = 0x0894;
 const LBL_HEADER_LEN: usize = 14;
 const FLAG_HIDDEN: u16 = 0x0001;
 const FLAG_FUNCTION: u16 = 0x0002;
@@ -20,14 +21,30 @@ pub struct XlsDefinedName {
     pub name: String,
     pub scope: XlsNameScope,
     pub hidden: bool,
+    pub function: bool,
+    pub vba_procedure: bool,
+    pub procedure: bool,
+    pub calculated_expression: bool,
+    pub function_group: u8,
+    pub published: bool,
+    pub workbook_parameter: bool,
+    pub shortcut_key: Option<u8>,
     pub kind: XlsDefinedNameKind,
     /// Rendered formula using the same leading-`=` convention as cell formulas.
     pub formula: Option<String>,
     /// Original `NameParsedFormula.rgce` bytes.
     pub formula_tokens: Vec<u8>,
+    pub formula_extra: Vec<u8>,
+    pub continuation_chunks: Vec<Vec<u8>>,
+    pub custom_menu: String,
+    pub description: String,
+    pub help_topic: String,
+    pub status_bar: String,
+    pub comment: Option<String>,
 }
 
 impl XlsDefinedName {
+    pub fn is_macro(&self) -> bool { self.function || self.vba_procedure || self.procedure }
     /// Whether the rendered definition contains a deleted reference.
     pub fn is_deleted(&self) -> bool {
         self.formula
@@ -90,7 +107,7 @@ impl XlsBuiltInName {
         })
     }
 
-    fn canonical_name(self) -> &'static str {
+    pub(crate) fn canonical_name(self) -> &'static str {
         match self {
             Self::ConsolidateArea => "Consolidate_Area",
             Self::AutoOpen => "Auto_Open",
@@ -108,6 +125,17 @@ impl XlsBuiltInName {
             Self::FilterDatabase => "_FilterDatabase",
         }
     }
+
+    pub(crate) fn code(self) -> u8 {
+        match self {
+            Self::ConsolidateArea => 0x00, Self::AutoOpen => 0x01,
+            Self::AutoClose => 0x02, Self::Extract => 0x03, Self::Database => 0x04,
+            Self::Criteria => 0x05, Self::PrintArea => 0x06, Self::PrintTitles => 0x07,
+            Self::Recorder => 0x08, Self::DataForm => 0x09, Self::AutoActivate => 0x0a,
+            Self::AutoDeactivate => 0x0b, Self::SheetTitle => 0x0c,
+            Self::FilterDatabase => 0x0d,
+        }
+    }
 }
 
 /// One parsed `Lbl` slot. Macro slots remain here so `PtgName` indices do not shift.
@@ -117,13 +145,36 @@ pub(crate) struct DefinedNameSlot {
     name: String,
     itab: u16,
     hidden: bool,
-    is_macro: bool,
+    function: bool,
+    vba_procedure: bool,
+    procedure: bool,
+    calculated_expression: bool,
+    function_group: u8,
+    published: bool,
+    workbook_parameter: bool,
+    shortcut_key: Option<u8>,
     kind: XlsDefinedNameKind,
     formula_tokens: Vec<u8>,
+    formula_extra: Vec<u8>,
+    continuation_chunks: Vec<Vec<u8>>,
+    custom_menu: String,
+    description: String,
+    help_topic: String,
+    status_bar: String,
+    comment: Option<String>,
 }
 
 impl DefinedNameSlot {
+    #[cfg(test)]
     pub(crate) fn parse(data: &[u8], record_index: u32) -> XlsResult<Self> {
+        Self::parse_with_continuations(data, record_index, Vec::new())
+    }
+
+    pub(crate) fn parse_with_continuations(
+        data: &[u8],
+        record_index: u32,
+        continuation_chunks: Vec<Vec<u8>>,
+    ) -> XlsResult<Self> {
         if data.len() < LBL_HEADER_LEN + 1 {
             return invalid("Lbl is missing its fixed header or name flags");
         }
@@ -155,7 +206,9 @@ impl DefinedNameSlot {
 
         let character_count = usize::from(data[3]);
         let formula_len = usize::from(u16::from_le_bytes([data[4], data[5]]));
+        if data[6] != 0 || data[7] != 0 { return invalid("Lbl reserved3 field must be zero"); }
         let itab = u16::from_le_bytes([data[8], data[9]]);
+        let auxiliary_lengths = [data[10], data[11], data[12], data[13]].map(usize::from);
         let string_flags = data[LBL_HEADER_LEN];
         if string_flags & !0x01 != 0 {
             return invalid("Lbl name contains unsupported Unicode flags");
@@ -212,28 +265,66 @@ impl DefinedNameSlot {
             .get(name_end..formula_end)
             .ok_or_else(|| invalid_error("Lbl formula is truncated"))?
             .to_vec();
+        let auxiliary_len = auxiliary_lengths.iter().sum::<usize>();
+        let extra_end = data.len().checked_sub(auxiliary_len)
+            .ok_or_else(|| invalid_error("Lbl auxiliary strings exceed payload"))?;
+        if extra_end < formula_end { return invalid("Lbl formula or auxiliary strings are truncated"); }
+        let formula_extra = data[formula_end..extra_end].to_vec();
+        let mut auxiliary_offset = extra_end;
+        let mut auxiliary_strings = Vec::with_capacity(4);
+        for length in auxiliary_lengths {
+            let end = auxiliary_offset.checked_add(length)
+                .ok_or_else(|| invalid_error("Lbl auxiliary string range overflows"))?;
+            let bytes = data.get(auxiliary_offset..end)
+                .ok_or_else(|| invalid_error("Lbl auxiliary string is truncated"))?;
+            auxiliary_strings.push(bytes.iter().map(|byte| char::from(*byte)).collect::<String>());
+            auxiliary_offset = end;
+        }
+        if auxiliary_offset != data.len() { return invalid("Lbl payload has unconsumed bytes"); }
 
         Ok(Self {
             record_index,
             name,
             itab,
             hidden: flags & FLAG_HIDDEN != 0,
-            is_macro: function || vba || procedure,
+            function,
+            vba_procedure: vba,
+            procedure,
+            calculated_expression: flags & 0x0010 != 0,
+            function_group: function_group as u8,
+            published: flags & 0x2000 != 0,
+            workbook_parameter: flags & 0x4000 != 0,
+            shortcut_key: (shortcut != 0).then_some(shortcut),
             kind,
             formula_tokens,
+            formula_extra,
+            continuation_chunks,
+            custom_menu: auxiliary_strings.remove(0),
+            description: auxiliary_strings.remove(0),
+            help_topic: auxiliary_strings.remove(0),
+            status_bar: auxiliary_strings.remove(0),
+            comment: None,
         })
+    }
+
+    pub(crate) fn attach_comment(&mut self, data: &[u8]) -> XlsResult<()> {
+        if self.comment.is_some() { return invalid("Lbl has duplicate NameCmt records"); }
+        let (name, comment) = parse_name_comment(data)?;
+        if !name.eq_ignore_ascii_case(&self.name) { return invalid("NameCmt name does not match preceding Lbl"); }
+        self.comment = Some(comment);
+        Ok(())
     }
 
     /// Symbol table entry. Macro slots intentionally remain `None`.
     pub(crate) fn symbol(&self) -> Option<String> {
-        (!self.is_macro).then(|| self.name.clone())
+        (!(self.function || self.vba_procedure || self.procedure)).then(|| self.name.clone())
     }
 
     pub(crate) fn into_public(
         self,
         sheet_count: usize,
         context: &FormulaContext,
-    ) -> XlsResult<Option<XlsDefinedName>> {
+    ) -> XlsResult<XlsDefinedName> {
         let scope = if self.itab == 0 {
             XlsNameScope::Workbook
         } else {
@@ -243,22 +334,63 @@ impl DefinedNameSlot {
             }
             XlsNameScope::Worksheet(sheet_index)
         };
-        if self.is_macro {
-            return Ok(None);
-        }
         let formula = (!self.formula_tokens.is_empty())
             .then(|| render_formula(&self.formula_tokens, Some(context)))
             .flatten();
-        Ok(Some(XlsDefinedName {
+        Ok(XlsDefinedName {
             record_index: self.record_index,
             name: self.name,
             scope,
             hidden: self.hidden,
+            function: self.function,
+            vba_procedure: self.vba_procedure,
+            procedure: self.procedure,
+            calculated_expression: self.calculated_expression,
+            function_group: self.function_group,
+            published: self.published,
+            workbook_parameter: self.workbook_parameter,
+            shortcut_key: self.shortcut_key,
             kind: self.kind,
             formula,
             formula_tokens: self.formula_tokens,
-        }))
+            formula_extra: self.formula_extra,
+            continuation_chunks: self.continuation_chunks,
+            custom_menu: self.custom_menu,
+            description: self.description,
+            help_topic: self.help_topic,
+            status_bar: self.status_bar,
+            comment: self.comment,
+        })
     }
+}
+
+fn parse_name_comment(data: &[u8]) -> XlsResult<(String, String)> {
+    if data.len() < 18 { return invalid("NameCmt is truncated"); }
+    if u16::from_le_bytes([data[0], data[1]]) != NAME_CMT_RECORD_TYPE
+        || data[2..12].iter().any(|byte| *byte != 0)
+    { return invalid("NameCmt future-record header is invalid"); }
+    let name_len = usize::from(u16::from_le_bytes([data[12], data[13]]));
+    let comment_len = usize::from(u16::from_le_bytes([data[14], data[15]]));
+    if name_len > 255 || comment_len > 255 { return invalid("NameCmt strings exceed 255 characters"); }
+    let (name, offset) = parse_no_cch_string(data, 16, name_len)?;
+    let (comment, offset) = parse_no_cch_string(data, offset, comment_len)?;
+    if offset != data.len() { return invalid("NameCmt strings do not consume payload"); }
+    Ok((name, comment))
+}
+
+fn parse_no_cch_string(data: &[u8], offset: usize, count: usize) -> XlsResult<(String, usize)> {
+    let flags = *data.get(offset).ok_or_else(|| invalid_error("NameCmt string flags are missing"))?;
+    if flags & !1 != 0 { return invalid("NameCmt string flags are invalid"); }
+    let width = if flags == 0 { 1usize } else { 2 };
+    let start = offset + 1;
+    let end = start.checked_add(count.checked_mul(width).ok_or_else(|| invalid_error("NameCmt string size overflows"))?)
+        .ok_or_else(|| invalid_error("NameCmt string end overflows"))?;
+    let bytes = data.get(start..end).ok_or_else(|| invalid_error("NameCmt string is truncated"))?;
+    let value = if width == 1 { bytes.iter().map(|byte| char::from(*byte)).collect() } else {
+        let units = bytes.chunks_exact(2).map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]])).collect::<Vec<_>>();
+        String::from_utf16(&units).map_err(|_| invalid_error("NameCmt contains invalid UTF-16"))?
+    };
+    Ok((value, end))
 }
 
 fn invalid<T>(message: &str) -> XlsResult<T> {
@@ -330,10 +462,7 @@ mod tests {
         let slot = DefinedNameSlot::parse(&lbl(FLAG_PROCEDURE, 0, "Macro", false, &[]), 7)
             .unwrap();
         assert!(slot.symbol().is_none());
-        assert!(slot
-            .into_public(1, &FormulaContext::default())
-            .unwrap()
-            .is_none());
+        assert!(slot.into_public(1, &FormulaContext::default()).unwrap().is_macro());
     }
 
     #[test]
@@ -347,5 +476,19 @@ mod tests {
         assert!(invalid_scope
             .into_public(2, &FormulaContext::default())
             .is_err());
+    }
+
+    #[test]
+    fn name_comment_requires_exact_header_and_matching_preceding_name() {
+        let mut slot = DefinedNameSlot::parse(&lbl(0, 0, "Rate", false, &[]), 1).unwrap();
+        let mut comment = Vec::new();
+        comment.extend_from_slice(&NAME_CMT_RECORD_TYPE.to_le_bytes());
+        comment.extend_from_slice(&[0; 10]);
+        comment.extend_from_slice(&5u16.to_le_bytes());
+        comment.extend_from_slice(&1u16.to_le_bytes());
+        comment.extend_from_slice(&[0, b'O', b't', b'h', b'e', b'r', 0, b'X']);
+        assert!(slot.attach_comment(&comment).is_err());
+        comment[16] = 2;
+        assert!(slot.attach_comment(&comment).is_err());
     }
 }

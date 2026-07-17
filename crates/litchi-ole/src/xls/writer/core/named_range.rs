@@ -7,6 +7,83 @@
 
 use crate::xls::XlsResult;
 use crate::xls::writer::formula::{Ptg, encode_ptg_tokens, parse_cell_ref};
+use crate::xls::{XlsBuiltInName, XlsDefinedNameKind, XlsError, XlsNameScope};
+
+/// Complete inert BIFF8 `Lbl` metadata for names beyond simple ranges.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct XlsDefinedNameRecordOptions {
+    pub name: String,
+    pub kind: XlsDefinedNameKind,
+    pub scope: XlsNameScope,
+    pub hidden: bool,
+    pub function: bool,
+    pub vba_procedure: bool,
+    pub procedure: bool,
+    pub calculated_expression: bool,
+    pub function_group: u8,
+    pub published: bool,
+    pub workbook_parameter: bool,
+    pub shortcut_key: Option<u8>,
+    pub formula_tokens: Vec<u8>,
+    pub formula_extra: Vec<u8>,
+    pub custom_menu: String,
+    pub description: String,
+    pub help_topic: String,
+    pub status_bar: String,
+    pub comment: Option<String>,
+}
+
+impl XlsDefinedNameRecordOptions {
+    pub(super) fn validate(&self, sheet_count: usize) -> XlsResult<()> {
+        let name_len = self.name.encode_utf16().count();
+        match self.kind {
+            XlsDefinedNameKind::User if !(1..=255).contains(&name_len) || self.name.contains('\0') => {
+                return Err(XlsError::InvalidData("defined name must contain 1..=255 non-NUL UTF-16 units".to_string()));
+            },
+            XlsDefinedNameKind::BuiltIn(_) => {},
+            _ => {},
+        }
+        if matches!(self.scope, XlsNameScope::Worksheet(index) if index >= sheet_count) {
+            return Err(XlsError::InvalidData("defined name scope is outside worksheet collection".to_string()));
+        }
+        if (self.function || self.vba_procedure) && !self.procedure {
+            return Err(XlsError::InvalidData("function/VBA name flags require procedure".to_string()));
+        }
+        if self.function_group > 31 {
+            return Err(XlsError::InvalidData("defined name function group must be at most 31".to_string()));
+        }
+        if self.shortcut_key.is_some_and(|key| {
+            self.function || !self.procedure || !key.is_ascii_alphabetic()
+        }) {
+            return Err(XlsError::InvalidData("invalid defined-name macro shortcut".to_string()));
+        }
+        if self.formula_tokens.len() > u16::MAX as usize
+            || self.formula_tokens.len().checked_add(self.formula_extra.len()).is_none_or(|len| len > 1_048_576)
+        {
+            return Err(XlsError::InvalidData("defined-name formula bytes exceed resource bound".to_string()));
+        }
+        for value in [&self.custom_menu, &self.description, &self.help_topic, &self.status_bar] {
+            if value.chars().count() > 255 || value.chars().any(|character| u32::from(character) > 0xff) {
+                return Err(XlsError::InvalidData("legacy defined-name UI strings must be <=255 compressed characters".to_string()));
+            }
+        }
+        if self.comment.as_ref().is_some_and(|comment| comment.encode_utf16().count() > 255) {
+            return Err(XlsError::InvalidData("defined-name comment exceeds 255 UTF-16 units".to_string()));
+        }
+        Ok(())
+    }
+
+    pub(crate) fn serialized_name(&self) -> &str {
+        match self.kind {
+            XlsDefinedNameKind::User => &self.name,
+            XlsDefinedNameKind::BuiltIn(name) => name.canonical_name(),
+        }
+    }
+
+    pub(crate) fn built_in(&self) -> Option<XlsBuiltInName> {
+        match self.kind { XlsDefinedNameKind::BuiltIn(name) => Some(name), _ => None }
+    }
+}
 
 /// Workbook-level defined name (named range).
 ///

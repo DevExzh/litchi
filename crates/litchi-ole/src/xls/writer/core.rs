@@ -52,7 +52,7 @@ pub use self::data_validation::{
     XlsDataValidationImeMode, XlsDataValidationOperator, XlsDataValidationOptions,
     XlsDataValidationRange, XlsDataValidationTableOptions, XlsDataValidationType,
 };
-pub use self::named_range::XlsDefinedName;
+pub use self::named_range::{XlsDefinedName, XlsDefinedNameRecordOptions};
 use self::named_range::XlsDefinedName as InternalDefinedName;
 use self::worksheet::{
     AutoFilterColumnDef, AutoFilterRange, MergedRange, PivotCellXfRole, SortConfig, WritableCell,
@@ -765,6 +765,7 @@ pub struct XlsWriter {
     string_map: HashMap<String, u32>,
     /// Workbook-level defined names (named ranges).
     defined_names: Vec<InternalDefinedName>,
+    defined_name_records: Vec<XlsDefinedNameRecordOptions>,
     fmt: FormattingManager,
     /// Total number of string occurrences (including duplicates) for SST.cstTotal
     sst_total: u32,
@@ -791,6 +792,7 @@ impl XlsWriter {
             shared_strings: Vec::new(),
             string_map: HashMap::new(),
             defined_names: Vec::new(),
+            defined_name_records: Vec::new(),
             sst_total: 0,
             fmt: FormattingManager::new(),
             workbook_protection: None,
@@ -1694,6 +1696,17 @@ impl XlsWriter {
     /// Get all defined names in this workbook.
     pub fn named_ranges(&self) -> &[XlsDefinedName] {
         &self.defined_names
+    }
+
+    /// Add complete inert BIFF8 defined-name metadata.
+    pub fn add_defined_name_record(&mut self, options: XlsDefinedNameRecordOptions) -> XlsResult<usize> {
+        options.validate(self.worksheets.len())?;
+        if self.defined_names.len() + self.defined_name_records.len() >= usize::from(u16::MAX) {
+            return Err(XlsError::InvalidData("defined name count exceeds BIFF8 bound".to_string()));
+        }
+        let index = self.defined_name_records.len();
+        self.defined_name_records.push(options);
+        Ok(index)
     }
 
     /// Set the width of a column in character units.
@@ -2701,6 +2714,7 @@ impl XlsWriter {
             &self.dde_or_ole_links,
             &self.fmt,
             &self.defined_names,
+            &self.defined_name_records,
             &self.shared_strings,
             self.sst_total,
             self.workbook_protection,

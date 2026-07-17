@@ -5,11 +5,21 @@
 
 use crate::TextDirection;
 use std::borrow::Cow;
+use std::collections::BTreeSet;
 
 pub const MAX_TABLE_DISTANCE_TWIPS: i32 = 31_680;
 pub const MAX_FLOATING_TABLE_DISTANCE_TWIPS: i32 = 31_680;
 pub const MAX_TABLE_NESTING_DEPTH: usize = 32;
 pub const MAX_TABLE_CELLS_PER_ROW: usize = 4_096;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TableCellMergeAxis { Horizontal, Vertical }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TableCellMergeRole { First, Continuation }
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct TableCellMergeState { pub horizontal:Option<TableCellMergeRole>, pub vertical:Option<TableCellMergeRole> }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableHorizontalReference { Column, Margin, Page }
@@ -234,6 +244,8 @@ pub struct Cell<'a> {
     layout: TableCellLayout,
     borders: TableCellBorders,
     shading: TableShading,
+    merge: TableCellMergeState,
+    right_boundary: Option<i32>,
     nested_tables: Vec<CellNestedTable<'a>>,
 }
 
@@ -244,9 +256,9 @@ pub struct CellNestedTable<'a> { pub text_offset: usize, pub table: Table<'a> }
 impl<'a> Cell<'a> {
     /// Create a new cell.
     pub fn new(text: Cow<'a, str>) -> Self {
-        Self { text, padding:TableEdgeDistances::default(), spacing:TableEdgeDistances::default(), layout:TableCellLayout::default(), borders:Default::default(), shading:Default::default(), nested_tables:Vec::new() }
+        Self { text, padding:TableEdgeDistances::default(), spacing:TableEdgeDistances::default(), layout:TableCellLayout::default(), borders:Default::default(), shading:Default::default(), merge:Default::default(), right_boundary:None, nested_tables:Vec::new() }
     }
-    pub fn with_distances(text:Cow<'a,str>,padding:TableEdgeDistances,spacing:TableEdgeDistances)->Self{Self{text,padding,spacing,layout:TableCellLayout::default(),borders:Default::default(),shading:Default::default(),nested_tables:Vec::new()}}
+    pub fn with_distances(text:Cow<'a,str>,padding:TableEdgeDistances,spacing:TableEdgeDistances)->Self{Self{text,padding,spacing,layout:TableCellLayout::default(),borders:Default::default(),shading:Default::default(),merge:Default::default(),right_boundary:None,nested_tables:Vec::new()}}
 
     /// Get the cell text.
     pub fn text(&self) -> &str {
@@ -262,9 +274,41 @@ impl<'a> Cell<'a> {
     pub fn shading(&self)->TableShading{self.shading}
     pub fn set_borders(&mut self,value:TableCellBorders){self.borders=value}
     pub fn set_shading(&mut self,value:TableShading){self.shading=value}
+    pub fn merge(&self)->TableCellMergeState{self.merge}
+    pub fn set_merge(&mut self,value:TableCellMergeState){self.merge=value}
+    pub fn right_boundary(&self)->Option<i32>{self.right_boundary}
+    pub fn set_right_boundary(&mut self,value:Option<i32>){self.right_boundary=value}
     pub fn nested_tables(&self)->&[CellNestedTable<'a>]{&self.nested_tables}
     pub fn add_nested_table(&mut self,text_offset:usize,table:Table<'a>)->crate::RtfResult<()>{if text_offset>self.text.len()||!self.text.is_char_boundary(text_offset)||self.nested_tables.last().is_some_and(|entry|entry.text_offset>text_offset){return Err(crate::RtfError::MalformedDocument("invalid nested-table text insertion offset".to_string()))}self.nested_tables.push(CellNestedTable{text_offset,table});Ok(())}
     pub(crate) fn nested_tables_mut(&mut self)->&mut Vec<CellNestedTable<'a>>{&mut self.nested_tables}
 }
 
 impl<'a> Row<'a>{pub(crate) fn cells_mut(&mut self)->&mut [Cell<'a>]{&mut self.cells}}
+
+impl Table<'_>{
+    pub(crate) fn validate_merges(&self)->Result<(),String>{
+        let mut active_vertical:BTreeSet<(i32,i32)>=BTreeSet::new();
+        for row in self.rows(){
+            let mut horizontal_open=false;
+            let mut next_vertical:BTreeSet<(i32,i32)>=BTreeSet::new();
+            let mut left=0i32;
+            for(index,cell)in row.cells().iter().enumerate(){
+                let right=cell.right_boundary().unwrap_or(2880*((index+1)as i32));
+                match cell.merge().horizontal{
+                    None=>horizontal_open=false,
+                    Some(TableCellMergeRole::First)=>horizontal_open=true,
+                    Some(TableCellMergeRole::Continuation)=>{if !horizontal_open{return Err("RTF horizontal merge continuation does not follow a first cell".to_string())}},
+                }
+                let span=(left,right);
+                match cell.merge().vertical{
+                    None=>{},
+                    Some(TableCellMergeRole::First)=>{next_vertical.insert(span);},
+                    Some(TableCellMergeRole::Continuation)=>{if !active_vertical.contains(&span){return Err("RTF vertical merge continuation does not match a cell boundary in the preceding row".to_string())}next_vertical.insert(span);},
+                }
+                left=right;
+            }
+            active_vertical=next_vertical;
+        }
+        Ok(())
+    }
+}

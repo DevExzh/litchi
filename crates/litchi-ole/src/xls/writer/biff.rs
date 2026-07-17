@@ -105,6 +105,17 @@ pub fn write_name<W: Write>(writer: &mut W, name: &XlsDefinedName, rgce: &[u8]) 
     named_range::write_name(writer, name, rgce)
 }
 
+pub fn write_name_comment<W: Write>(writer: &mut W, name: &str, comment: &str) -> XlsResult<()> {
+    named_range::write_name_comment(writer, name, comment)
+}
+
+pub fn write_defined_name_record<W: Write>(
+    writer: &mut W,
+    name: &crate::xls::writer::XlsDefinedNameRecordOptions,
+) -> XlsResult<()> {
+    named_range::write_defined_name_record(writer, name)
+}
+
 /// Write FORMAT record (number format string)
 ///
 /// Record type: 0x041E

@@ -4,7 +4,8 @@ use crate::xls::cell::XlsCell;
 use crate::xls::error::{XlsError, XlsResult};
 use crate::xls::encryption::prepare_workbook_stream;
 use crate::xls::defined_names::{
-    DefinedNameSlot, LBL_RECORD_TYPE, XlsBuiltInName, XlsDefinedName, XlsDefinedNameKind,
+    DefinedNameSlot, LBL_RECORD_TYPE, NAME_CMT_RECORD_TYPE, XlsBuiltInName, XlsDefinedName,
+    XlsDefinedNameKind,
     XlsNameScope,
 };
 use crate::xls::formula::{FormulaContext, ptg_exp_anchor, render_formula, render_shared_formula};
@@ -144,6 +145,7 @@ pub struct XlsWorkbook<R: Read + Seek> {
     is_1904_date_system: bool,
     formula_context: FormulaContext,
     defined_names: Vec<XlsDefinedName>,
+    defined_name_records: Vec<XlsDefinedName>,
     formatting: Arc<XlsFormatting>,
     protection: protection::WorkbookProtection,
     calculation: crate::xls::calculation::XlsWorkbookCalculation,
@@ -190,6 +192,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             formula_context: FormulaContext::default(),
             external_links: crate::xls::XlsExternalLinks::default(),
             defined_names: Vec::new(),
+            defined_name_records: Vec::new(),
             formatting: Arc::new(XlsFormatting::default()),
             protection: protection::WorkbookProtection::default(),
             calculation: crate::xls::calculation::XlsWorkbookCalculation::default(),
@@ -238,6 +241,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             formula_context: FormulaContext::default(),
             external_links: crate::xls::XlsExternalLinks::default(),
             defined_names: Vec::new(),
+            defined_name_records: Vec::new(),
             formatting: Arc::new(XlsFormatting::default()),
             protection: protection::WorkbookProtection::default(),
             calculation: crate::xls::calculation::XlsWorkbookCalculation::default(),
@@ -307,12 +311,13 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                 .map(DefinedNameSlot::symbol)
                 .collect(),
         );
-        self.defined_names = defined_name_slots
+        self.defined_name_records = defined_name_slots
             .into_iter()
             .map(|slot| slot.into_public(bound_sheets.len(), &self.formula_context))
-            .collect::<XlsResult<Vec<_>>>()?
-            .into_iter()
-            .flatten()
+            .collect::<XlsResult<Vec<_>>>()?;
+        self.defined_names = self.defined_name_records.iter()
+            .filter(|name| !name.is_macro())
+            .cloned()
             .collect();
 
         // Parse worksheets from positions in the workbook stream
@@ -391,9 +396,13 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         let mut workbook_view_collector = crate::xls::workbook_view::WorkbookViewCollector::new();
         let mut function_group_collector = crate::xls::function_group::FunctionGroupCollector::new();
         let mut external_link_collector = crate::xls::external_link::ExternalLinkCollector::new();
+        let mut name_comment_target = None;
         let mut i = 0;
         while i < records.len() {
             let record = &records[i];
+            if !matches!(record.header.record_type, LBL_RECORD_TYPE | NAME_CMT_RECORD_TYPE | 0x003c) {
+                name_comment_target = None;
+            }
             protection_collector.feed_record(record.header.record_type, &record.data)?;
             calculation_collector.feed_record(record.header.record_type, &record.data)?;
             vba_collector.feed_record(record.header.record_type, &record.data)?;
@@ -468,10 +477,31 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                             record_type: LBL_RECORD_TYPE,
                             message: "Lbl record index overflows".to_string(),
                         })?;
-                    defined_name_slots.push(DefinedNameSlot::parse(
-                        &record.data,
-                        record_index,
+                    let mut combined = record.data.clone();
+                    let mut continuation_chunks = Vec::new();
+                    let mut next = i + 1;
+                    while next < records.len() && records[next].header.record_type == 0x003c {
+                        if combined.len().checked_add(records[next].data.len()).is_none_or(|len| len > 1_048_576) {
+                            return Err(XlsError::InvalidRecord {
+                                record_type: LBL_RECORD_TYPE,
+                                message: "Lbl continuation data exceeds resource bound".to_string(),
+                            });
+                        }
+                        continuation_chunks.push(records[next].data.clone());
+                        combined.extend_from_slice(&records[next].data);
+                        next += 1;
+                    }
+                    defined_name_slots.push(DefinedNameSlot::parse_with_continuations(
+                        &combined, record_index, continuation_chunks,
                     )?);
+                    name_comment_target = Some(defined_name_slots.len() - 1);
+                },
+                NAME_CMT_RECORD_TYPE => {
+                    let target = name_comment_target.take().ok_or_else(|| XlsError::InvalidRecord {
+                        record_type: NAME_CMT_RECORD_TYPE,
+                        message: "NameCmt does not immediately follow a Lbl record".to_string(),
+                    })?;
+                    defined_name_slots[target].attach_comment(&record.data)?;
                 },
                 0x00FC => {
                     // SST
@@ -1091,6 +1121,9 @@ impl<R: Read + Seek> XlsWorkbook<R> {
     pub fn defined_names(&self) -> &[XlsDefinedName] {
         &self.defined_names
     }
+
+    /// Every internal `Lbl`, including inert macro and procedure metadata.
+    pub fn defined_name_records(&self) -> &[XlsDefinedName] { &self.defined_name_records }
 
     /// Case-insensitive name lookup with sheet-local-before-workbook precedence.
     /// Duplicate definitions use the last matching `Lbl` record.

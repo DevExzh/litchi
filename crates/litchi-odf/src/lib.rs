@@ -324,6 +324,7 @@ mod variable_declaration;
 mod document_scripts;
 mod chart_properties;
 mod graphic_properties;
+mod text_properties;
 mod drawing_page_properties;
 mod font_face;
 mod line_numbering;
@@ -424,6 +425,11 @@ pub use graphic_properties::{
     GraphicPropertyNamespace, GraphicPropertyValue, GraphicStyleProperties,
     GraphicStylePropertiesSet, GraphicStyleRecord, parse_graphic_style_properties,
     set_graphic_style_properties_xml,
+};
+pub use text_properties::{
+    TextProperty, TextPropertyKind, TextPropertyNamespace, TextPropertyValue,
+    TextStyleProperties, TextStylePropertiesSet, TextStyleRecord,
+    parse_text_style_properties, set_text_style_properties_xml,
 };
 pub use drawing_page_properties::{
     DrawingPageBackgroundSize, DrawingPageColor, DrawingPageDuration, DrawingPageFill,

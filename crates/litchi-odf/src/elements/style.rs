@@ -185,6 +185,11 @@ impl Style {
         }
     }
 
+    /// Set one closed-name, lexically validated ODF text property.
+    pub fn set_typed_text_property(&mut self, property: &crate::TextProperty) {
+        self.set_text_property(&property.qualified_name(), &property.lexical());
+    }
+
     /// Set a paragraph property
     ///
     /// # Arguments

@@ -35,6 +35,7 @@ pub(crate) fn generate_workbook_stream(
     dde_or_ole_links: &[super::XlsDdeOrOleLinkOptions],
     fmt: &FormattingManager,
     defined_names: &[InternalDefinedName],
+    defined_name_records: &[super::XlsDefinedNameRecordOptions],
     shared_strings: &[String],
     sst_total: u32,
     workbook_protection: Option<XlsWorkbookProtection>,
@@ -158,7 +159,8 @@ pub(crate) fn generate_workbook_stream(
 
     // Internal SUPBOOK / EXTERNSHEET records are required for 3D
     // references used by defined names (NameParsedFormula) and pivot caches.
-    let internal_links = (!defined_names.is_empty() || has_pivot_tables) && !worksheets.is_empty();
+    let internal_links = (!defined_names.is_empty() || !defined_name_records.is_empty() || has_pivot_tables)
+        && !worksheets.is_empty();
     if internal_links
         || !external_workbooks.is_empty()
         || !add_in_functions.is_empty()
@@ -185,6 +187,12 @@ pub(crate) fn generate_workbook_stream(
     for defined_name in defined_names {
         let rgce = defined_name.to_biff_formula()?;
         biff::write_name(&mut stream, defined_name, &rgce)?;
+        if let Some(comment) = &defined_name.comment {
+            biff::write_name_comment(&mut stream, &defined_name.name, comment)?;
+        }
+    }
+    for defined_name in defined_name_records {
+        biff::write_defined_name_record(&mut stream, defined_name)?;
     }
 
     // Pivot table globals: PIVOTCACHEDEFINITION records.
