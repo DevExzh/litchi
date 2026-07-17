@@ -214,13 +214,13 @@ This document tracks the implementation status of features across all supported 
 | Sections | ✅ | ✅ | ✅ | Section parsing |
 | Styles | ✅ | ✅ | ✅ | StyleSheet generation |
 | Font tables | ✅ | ✅ | ✅ | Font table generation |
-| Headers/Footers | ❌ | ❌ | ❌ | Header/footer ranges and linkage |
-| Footnotes/Endnotes | ❌ | ❌ | ❌ | Footnote/endnote references and text |
+| Headers/Footers | ✅ | ✅ | ❌ | PlcfHdd story ranges: header/footer text per section and type |
+| Footnotes/Endnotes | ✅ | ✅ | ❌ | PlcffndRef/Txt and PlcfendRef/Txt references and text |
 | Numbering/Lists | ❌ | ❌ | ❌ | List structures and numbering formats |
-| Hyperlinks | ❌ | ❌ | ❌ | HYPERLINK fields and destinations |
+| Hyperlinks | ✅ | ✅ | ❌ | HYPERLINK fields with destination and display text |
 | Images | ❌ | ❌ | ❌ | Inline/floating pictures and blips |
 | Drawings/Shapes | ❌ | ❌ | ❌ | OfficeArt/Escher drawing objects |
-| Comments | ❌ | ❌ | ❌ | Annotation ranges and author data |
+| Comments | ✅ | ✅ | ❌ | Annotation ranges, authors, reply metadata (ATRDPost10) |
 | Track changes | ❌ | ❌ | ❌ | Revision marks and authors |
 
 ### Internal Structures
@@ -277,14 +277,14 @@ This document tracks the implementation status of features across all supported 
 | BOUNDSHEET records | ✅ | ✅ | ✅ | Sheet metadata |
 | RK/MulRK records | ✅ | ✅ | ✅ | Compressed numbers |
 | LABELSST records | ✅ | ✅ | ✅ | String references |
-| Merged cells | ❌ | ❌ | ❌ | MERGECELLS records (BIFF8) |
-| Hyperlinks | ❌ | ❌ | ❌ | HLINK records |
-| Comments/Notes | ❌ | ❌ | ❌ | NOTE/OBJ records |
+| Merged cells | ✅ | ✅ | ✅ | MERGECELLS records (BIFF8) |
+| Hyperlinks | ✅ | ✅ | ✅ | HLINK records with MS-OSHARED monikers (URL, file, internal) |
+| Comments/Notes | ✅ | ✅ | ✅ | NOTE/OBJ/TXO records with text runs |
 | Images/Drawing objects | ❌ | ❌ | ❌ | OfficeArt (Escher) drawing records |
 | Charts | ❌ | ❌ | ❌ | Chart sheets and embedded charts |
 | Pivot tables | ❌ | ❌ | ❌ | PivotCache/PivotTable records |
 | Auto-filter/Sort | ❌ | ❌ | ❌ | Filter/sort records |
-| Sheet protection | ❌ | ❌ | ❌ | PROTECT/PASSWORD records |
+| Sheet protection | ✅ | ✅ | ✅ | PROTECT/PASSWORD/OBJPROTECT/SCENPROTECT plus workbook protection |
 | Encryption / password-protected XLS | ❌ | ❌ | ❌ | File-level encryption |
 | VBA macros | ❌ | ❌ | ❌ | `VBA` storage in OLE container |
 
@@ -366,14 +366,14 @@ This document tracks the implementation status of features across all supported 
 | Hyperlinks | ✅ | ✅ | ✅ | URL and slide navigation |
 | Notes | ✅ | ✅ | ✅ | Speaker notes support |
 | Image extraction | ✅ | ✅ | ❌ | Pictures stream parsing |
-| Animations | ❌ | ❌ | ❌ | Build steps and timing |
-| Transitions | ❌ | ❌ | ❌ | Slide transitions and settings |
-| Tables | ❌ | ❌ | ❌ | Table shapes |
+| Animations | ✅ | ✅ | ✅ | AnimationInfo build steps, triggers, motion paths |
+| Transitions | ✅ | ✅ | ✅ | SSSlideInfoAtom transition type, speed, direction, advance |
+| Tables | ✅ | ✅ | ❌ | Table group shapes with grid and cell text |
 | Charts | ❌ | ❌ | ❌ | Embedded charts |
 | Audio/Video | ❌ | ❌ | ❌ | Embedded or linked media |
-| Comments | ❌ | ❌ | ❌ | Comments/annotations |
-| Slide timings | ❌ | ❌ | ❌ | Rehearsal and per-slide timing |
-| Custom slide shows | ❌ | ❌ | ❌ | Named slide subsets |
+| Comments | ✅ | ✅ | ❌ | Comment2000 per slide and presentation-wide aggregation |
+| Slide timings | ✅ | ✅ | ❌ | SSSlideInfoAtom slide time and advance modes |
+| Custom slide shows | ✅ | ✅ | ❌ | NamedShows containers with slide ID lists |
 | Encryption / password-protected PPT | ❌ | ❌ | ❌ | OLE encryption wrappers |
 | VBA macros | ❌ | ❌ | ❌ | `VBA` storage in OLE container |
 
