@@ -13,10 +13,13 @@ use crate::{Error, IWorkPackage, Result};
 pub(super) const HIGHLIGHT_MESSAGE_TYPE: u32 = 2_013;
 pub(super) const COMMENT_STORAGE_MESSAGE_TYPE: u32 = 3_056;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub(super) struct AnnotationReplyGraph {
     pub(super) storage_id: u64,
+    pub(super) body: String,
+    pub(super) creation_date_seconds: Option<f64>,
     pub(super) author_id: Option<u64>,
+    pub(super) storage_uuid: IWorkCommentUuid,
 }
 
 #[derive(Debug, Clone)]
@@ -143,7 +146,10 @@ pub(super) fn validate_annotation_graph(
         }
         replies.push(AnnotationReplyGraph {
             storage_id: reply_id,
+            body: reply.body,
+            creation_date_seconds: reply.creation_date_seconds,
             author_id: reply.author_id,
+            storage_uuid: reply.storage_uuid,
         });
     }
     Ok(Some(AnnotationGraph {

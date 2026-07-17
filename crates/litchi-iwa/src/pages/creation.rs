@@ -11,6 +11,7 @@ use crate::{IWorkPackage, IWorkThemeArchive, IWorkThemeExtensions, Result};
 
 const DOCUMENT_ARCHIVE_ENTRY: &str = "Index/Document.iwa";
 const STYLESHEET_ARCHIVE_ENTRY: &str = "Index/DocumentStylesheet.iwa";
+const ANNOTATION_ARCHIVE_ENTRY: &str = "Index/AnnotationAuthorStorage.iwa";
 const METADATA_ARCHIVE_ENTRY: &str = "Index/Metadata.iwa";
 const PROPERTIES_ENTRY: &str = "Metadata/Properties.plist";
 const DOCUMENT_IDENTIFIER_ENTRY: &str = "Metadata/DocumentIdentifier";
@@ -107,6 +108,7 @@ enum PagesObjectId {
     FooterPrimary = 29,
     FooterEven = 30,
     FooterFirst = 31,
+    AnnotationAuthorStorage = 32,
 }
 
 impl PagesObjectId {
@@ -173,6 +175,7 @@ const IDENTIFIED_STYLES: [(PagesObjectId, &str); 14] = [
 #[derive(Debug, Clone, Copy)]
 #[repr(u32)]
 enum PagesMessageType {
+    AnnotationAuthorStorage = 213,
     Stylesheet = 401,
     Storage = 2_001,
     CharacterStyle = 2_021,
@@ -264,6 +267,10 @@ impl PagesDocumentBuilder {
             &document_archive(&self.body_text, &self.language, &self.locale)?,
         )?;
         package.replace_archive(STYLESHEET_ARCHIVE_ENTRY, &stylesheet_archive()?)?;
+        package.replace_archive(
+            ANNOTATION_ARCHIVE_ENTRY,
+            &annotation_author_storage_archive()?,
+        )?;
         package.replace_archive(METADATA_ARCHIVE_ENTRY, &metadata_archive(&identity)?)?;
         insert_property_lists(&mut package, &identity)?;
         Ok(package)
@@ -275,6 +282,7 @@ fn document_archive(body_text: &str, language: &str, locale: &str) -> Result<Arc
         super_: tsa::DocumentArchive {
             super_: tsk::DocumentArchive {
                 locale_identifier: Some(locale.to_owned()),
+                annotation_author_storage: Some(reference(PagesObjectId::AnnotationAuthorStorage)),
                 creation_locale_identifier: Some(locale.to_owned()),
                 prevent_image_conversion_on_open: Some(true),
                 has_user_defined_locale: Some(false),
@@ -410,6 +418,7 @@ fn document_archive(body_text: &str, language: &str, locale: &str) -> Result<Arc
                     PagesObjectId::Body,
                     PagesObjectId::Theme,
                     PagesObjectId::Settings,
+                    PagesObjectId::AnnotationAuthorStorage,
                 ],
             )?,
             raw_object(
@@ -767,15 +776,27 @@ fn metadata_archive(identity: &IWorkDocumentIdentity) -> Result<Archive> {
             is_weak: None,
         })
         .collect();
+    document
+        .external_references
+        .push(tsp::ComponentExternalReference {
+            component_identifier: PagesObjectId::AnnotationAuthorStorage.value(),
+            object_identifier: None,
+            is_weak: None,
+        });
+
+    let annotation = component(
+        PagesObjectId::AnnotationAuthorStorage,
+        "AnnotationAuthorStorage",
+    );
 
     let metadata = tsp::PackageMetadata {
-        last_object_identifier: PagesObjectId::FooterFirst.value(),
+        last_object_identifier: PagesObjectId::AnnotationAuthorStorage.value(),
         revision: Some(tsp::DocumentRevision {
             sequence_32: Some(INITIAL_REVISION_SEQUENCE),
             identifier: Some(identity.version_uuid().to_owned()),
             sequence_64: None,
         }),
-        components: vec![stylesheet, document],
+        components: vec![stylesheet, annotation, document],
         read_version: PACKAGE_VERSION.to_vec(),
         write_version: PACKAGE_VERSION.to_vec(),
         file_format_version: FILE_FORMAT_VERSION.to_vec(),
@@ -787,6 +808,17 @@ fn metadata_archive(identity: &IWorkDocumentIdentity) -> Result<Archive> {
             PagesObjectId::PackageMetadata,
             PagesMessageType::PackageMetadata,
             metadata,
+            &[],
+        )?],
+    })
+}
+
+fn annotation_author_storage_archive() -> Result<Archive> {
+    Ok(Archive {
+        objects: vec![object(
+            PagesObjectId::AnnotationAuthorStorage,
+            PagesMessageType::AnnotationAuthorStorage,
+            tsk::AnnotationAuthorStorageArchive::default(),
             &[],
         )?],
     })
@@ -1053,9 +1085,10 @@ mod tests {
 
     use super::*;
 
-    const EXPECTED_ENTRIES: [&str; 6] = [
+    const EXPECTED_ENTRIES: [&str; 7] = [
         DOCUMENT_ARCHIVE_ENTRY,
         STYLESHEET_ARCHIVE_ENTRY,
+        ANNOTATION_ARCHIVE_ENTRY,
         METADATA_ARCHIVE_ENTRY,
         PROPERTIES_ENTRY,
         DOCUMENT_IDENTIFIER_ENTRY,
@@ -1109,6 +1142,40 @@ mod tests {
         }));
 
         let document = package.archive(DOCUMENT_ARCHIVE_ENTRY).unwrap();
+        let document_message = tp::DocumentArchive::decode(
+            document
+                .object(PagesObjectId::Document.value())
+                .unwrap()
+                .messages
+                .first()
+                .unwrap()
+                .data
+                .as_slice(),
+        )
+        .unwrap();
+        assert_eq!(
+            document_message
+                .super_
+                .super_
+                .annotation_author_storage
+                .unwrap()
+                .identifier,
+            PagesObjectId::AnnotationAuthorStorage.value()
+        );
+        let annotation = package.archive(ANNOTATION_ARCHIVE_ENTRY).unwrap();
+        let annotation = annotation
+            .object(PagesObjectId::AnnotationAuthorStorage.value())
+            .unwrap();
+        assert_eq!(
+            annotation.messages[0].type_,
+            PagesMessageType::AnnotationAuthorStorage.value()
+        );
+        assert!(
+            tsk::AnnotationAuthorStorageArchive::decode(annotation.messages[0].data.as_slice())
+                .unwrap()
+                .annotation_author
+                .is_empty()
+        );
         let template = document
             .object(PagesObjectId::SectionTemplate.value())
             .unwrap();

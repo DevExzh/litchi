@@ -14,9 +14,9 @@ use litchi_iwa::text::{
     ParagraphSpacingPoints, ParagraphStart, ParagraphTabAlignment, ParagraphTabLeader,
     ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops, TextAlignment, TextBackground,
     TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumnCount, TextColumnGap,
-    TextColumns, TextCommentBody, TextDecorations, TextFont, TextHyperlinkTarget, TextLanguage,
-    TextLigatures, TextOutline, TextPointSize, TextPosition, TextRange, TextScript, TextShadow,
-    TextStrikethrough, TextStyle, TextUnderline,
+    TextColumns, TextCommentBody, TextCommentReplyBody, TextDecorations, TextFont,
+    TextHyperlinkTarget, TextLanguage, TextLigatures, TextOutline, TextPointSize, TextPosition,
+    TextRange, TextScript, TextShadow, TextStrikethrough, TextStyle, TextUnderline,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -176,7 +176,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let end_byte = text[start_byte..]
             .find(char::is_whitespace)
             .map_or(text.len(), |offset| start_byte + offset);
-        editor.add_sheet_text_box_comment(
+        let comment = editor.add_sheet_text_box_comment(
             sheet_id,
             created.drawable_object_id,
             TextRange::from_utf16_indexes(
@@ -184,6 +184,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 text[..end_byte].encode_utf16().count(),
             )?,
             TextCommentBody::new("Created by litchi-iwa")?,
+        )?;
+        editor.add_sheet_text_box_comment_reply(
+            sheet_id,
+            created.drawable_object_id,
+            comment.id,
+            TextCommentReplyBody::new("Created reply by litchi-iwa")?,
         )?;
     }
     if let Some(newline) = text.find('\n') {

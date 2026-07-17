@@ -51,8 +51,8 @@ println!("{}", structured.summary());
   lossless web, mail, and Keynote navigation targets, and owned-object cleanup
 - Native cross-suite plain-text highlight CRUD with typed nonempty UTF-16 ranges,
   lossless table mutation and owned annotation cleanup
-- Native cross-suite ranged text-comment CRUD with nonempty typed bodies,
-  stable IDs and metadata, reply preservation, and scratch-package creation
+- Native cross-suite ranged text-comment and ordered direct-reply CRUD with
+  nonempty typed bodies, stable IDs and metadata, and scratch-package creation
 - Lossless Pages document body/header/footer visibility, facing-page layout,
   automatic hyphenation, and ligature options
 - Typed Numbers table header/footer counts, freeze state, and repeating-header
@@ -1136,10 +1136,14 @@ Ranged comments use `TextComment`, `TextCommentId`, and the nonempty
 `TextCommentBody` newtype. Create emits the complete native type-2013/type-3056
 graph used by all three applications. Update can move the range and replace the
 body without changing the annotation ID, timestamp, author, storage UUID, or
-reply thread. Delete validates exclusive ownership and reclaims the root,
-direct replies, and generated author. Unknown fields at the table, boundary,
-annotation, and comment-storage levels survive updates. See
-`edit_iwork_text_comment` and the three scratch text-box creation examples.
+reply thread. Ordered direct replies use `TextCommentReply`,
+`TextCommentReplyId`, and `TextCommentReplyBody`; create, read, update, and
+delete retain reply identity, timestamp, author, storage UUID, ordering, and
+unknown wire fields. Deletion validates exclusive ownership and reclaims the
+target storage and generated author when unused. Root deletion reclaims the
+entire thread. Unknown fields at the table, boundary, annotation, root, and
+reply-storage levels survive updates. See `edit_iwork_text_comment` and the
+three scratch text-box creation examples.
 Slide move, duplicate, and delete operations likewise rewrite only the nested
 slide-tree ownership list. Existing raw `TSP.Reference` payloads are reused,
 so extensions inside the show, slide tree, and individual references survive;

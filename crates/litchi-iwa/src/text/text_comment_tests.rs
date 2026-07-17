@@ -1,4 +1,4 @@
-use super::{TextCommentBody, TextPosition, TextRange};
+use super::{TextCommentBody, TextCommentReplyBody, TextPosition, TextRange};
 use crate::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
 use crate::numbers::{NumbersDocumentBuilder, NumbersEditor};
 use crate::pages::PagesEditor;
@@ -23,6 +23,10 @@ fn text_range(value: &str) -> TextRange {
 
 fn body(value: &str) -> TextCommentBody {
     TextCommentBody::new(value).unwrap()
+}
+
+fn reply_body(value: &str) -> TextCommentReplyBody {
+    TextCommentReplyBody::new(value).unwrap()
 }
 
 #[test]
@@ -52,6 +56,38 @@ fn text_comment_crud_round_trips_and_restores_pages_exactly() {
         std::slice::from_ref(&created)
     );
 
+    let reply = pages
+        .add_text_box_comment_reply(
+            text_box.drawable_object_id,
+            created.id,
+            reply_body("First reply"),
+        )
+        .unwrap();
+    assert_eq!(reply.comment_id, created.id);
+    assert_eq!(
+        pages
+            .text_box_comment_replies(text_box.drawable_object_id, created.id)
+            .unwrap()
+            .as_slice(),
+        std::slice::from_ref(&reply)
+    );
+    let updated_reply = pages
+        .update_text_box_comment_reply(
+            text_box.drawable_object_id,
+            created.id,
+            reply.id,
+            reply_body("Updated reply 😀"),
+        )
+        .unwrap();
+    assert_eq!(updated_reply.id, reply.id);
+    assert_eq!(updated_reply.body.as_str(), "Updated reply 😀");
+    assert_eq!(
+        updated_reply.creation_date_seconds,
+        reply.creation_date_seconds
+    );
+    assert_eq!(updated_reply.author_object_id, reply.author_object_id);
+    assert_eq!(updated_reply.storage_uuid, reply.storage_uuid);
+
     let mut pages = PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
     let updated = pages
         .update_text_box_comment(
@@ -67,6 +103,26 @@ fn text_comment_crud_round_trips_and_restores_pages_exactly() {
     assert_eq!(updated.creation_date_seconds, created.creation_date_seconds);
     assert_eq!(updated.author_object_id, created.author_object_id);
     assert_eq!(updated.storage_uuid, created.storage_uuid);
+    assert_eq!(updated.reply_count, 1);
+    assert_eq!(
+        pages
+            .remove_text_box_comment_reply(text_box.drawable_object_id, created.id, reply.id,)
+            .unwrap(),
+        updated_reply
+    );
+    assert!(
+        pages
+            .text_box_comment_replies(text_box.drawable_object_id, created.id)
+            .unwrap()
+            .is_empty()
+    );
+    let without_replies = pages
+        .text_box_comments(text_box.drawable_object_id)
+        .unwrap()
+        .into_iter()
+        .next()
+        .unwrap();
+    assert_eq!(without_replies.reply_count, 0);
 
     let before_overlap = pages.to_bytes().unwrap();
     assert!(
@@ -84,7 +140,7 @@ fn text_comment_crud_round_trips_and_restores_pages_exactly() {
         pages
             .remove_text_box_comment(text_box.drawable_object_id, created.id)
             .unwrap(),
-        updated
+        without_replies
     );
     assert!(
         pages
@@ -111,14 +167,39 @@ fn scratch_text_comments_work_in_numbers_and_keynote() {
             body("Numbers note"),
         )
         .unwrap();
+    let numbers_reply = numbers
+        .add_sheet_text_box_comment_reply(
+            sheet_id,
+            numbers_box.drawable_object_id,
+            numbers_comment.id,
+            reply_body("Numbers reply"),
+        )
+        .unwrap();
     let mut numbers = NumbersEditor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    let stored_numbers_comment = numbers
+        .sheet_text_box_comments(sheet_id, numbers_box.drawable_object_id)
+        .unwrap();
+    assert_eq!(stored_numbers_comment[0].id, numbers_comment.id);
+    assert_eq!(stored_numbers_comment[0].reply_count, 1);
     assert_eq!(
         numbers
-            .sheet_text_box_comments(sheet_id, numbers_box.drawable_object_id)
+            .sheet_text_box_comment_replies(
+                sheet_id,
+                numbers_box.drawable_object_id,
+                numbers_comment.id,
+            )
             .unwrap()
             .as_slice(),
-        std::slice::from_ref(&numbers_comment)
+        std::slice::from_ref(&numbers_reply)
     );
+    numbers
+        .remove_sheet_text_box_comment_reply(
+            sheet_id,
+            numbers_box.drawable_object_id,
+            numbers_comment.id,
+            numbers_reply.id,
+        )
+        .unwrap();
     numbers
         .remove_sheet_text_box_comment(sheet_id, numbers_box.drawable_object_id, numbers_comment.id)
         .unwrap();
@@ -135,14 +216,35 @@ fn scratch_text_comments_work_in_numbers_and_keynote() {
             body("Keynote note"),
         )
         .unwrap();
+    let keynote_reply = keynote
+        .add_slide_text_box_comment_reply(
+            0,
+            keynote_box.drawable_object_id,
+            keynote_comment.id,
+            reply_body("Keynote reply"),
+        )
+        .unwrap();
     let mut keynote = KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    let stored_keynote_comment = keynote
+        .slide_text_box_comments(0, keynote_box.drawable_object_id)
+        .unwrap();
+    assert_eq!(stored_keynote_comment[0].id, keynote_comment.id);
+    assert_eq!(stored_keynote_comment[0].reply_count, 1);
     assert_eq!(
         keynote
-            .slide_text_box_comments(0, keynote_box.drawable_object_id)
+            .slide_text_box_comment_replies(0, keynote_box.drawable_object_id, keynote_comment.id,)
             .unwrap()
             .as_slice(),
-        std::slice::from_ref(&keynote_comment)
+        std::slice::from_ref(&keynote_reply)
     );
+    keynote
+        .remove_slide_text_box_comment_reply(
+            0,
+            keynote_box.drawable_object_id,
+            keynote_comment.id,
+            keynote_reply.id,
+        )
+        .unwrap();
     keynote
         .remove_slide_text_box_comment(0, keynote_box.drawable_object_id, keynote_comment.id)
         .unwrap();

@@ -33,10 +33,10 @@ use crate::text::{
     ParagraphLineSpacing, ParagraphList, ParagraphListLevel, ParagraphListLevelPlacement,
     ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment, TextBackground,
     TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumns, TextComment,
-    TextCommentBody, TextCommentId, TextDecorations, TextFont, TextHighlight, TextHighlightId,
-    TextHyperlink, TextHyperlinkId, TextHyperlinkTarget, TextLanguage, TextLanguageRun,
-    TextLigatures, TextOutline, TextPosition, TextRange, TextScript, TextShadow, TextStorageInfo,
-    TextStyle,
+    TextCommentBody, TextCommentId, TextCommentReply, TextCommentReplyBody, TextCommentReplyId,
+    TextDecorations, TextFont, TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId,
+    TextHyperlinkTarget, TextLanguage, TextLanguageRun, TextLigatures, TextOutline, TextPosition,
+    TextRange, TextScript, TextShadow, TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     append_repeated_length_delimited_field, patch_fixed32_field, patch_length_delimited_field,
@@ -624,6 +624,60 @@ impl PagesEditor {
         let comment = staged.remove_text_comment(graph.storage_id, id)?;
         *self = Self::from_package(staged.into_package())?;
         Ok(comment)
+    }
+
+    /// Read every direct reply to a text-box comment in stored order.
+    pub fn text_box_comment_replies(
+        &self,
+        drawable_object_id: u64,
+        comment_id: TextCommentId,
+    ) -> Result<Vec<TextCommentReply>> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        self.text.text_comment_replies(graph.storage_id, comment_id)
+    }
+
+    /// Append a direct reply to a text-box comment.
+    pub fn add_text_box_comment_reply(
+        &mut self,
+        drawable_object_id: u64,
+        comment_id: TextCommentId,
+        body: TextCommentReplyBody,
+    ) -> Result<TextCommentReply> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let reply = staged.add_text_comment_reply(graph.storage_id, comment_id, body)?;
+        *self = Self::from_package(staged.into_package())?;
+        Ok(reply)
+    }
+
+    /// Update a direct text-box comment reply without changing its ID.
+    pub fn update_text_box_comment_reply(
+        &mut self,
+        drawable_object_id: u64,
+        comment_id: TextCommentId,
+        reply_id: TextCommentReplyId,
+        body: TextCommentReplyBody,
+    ) -> Result<TextCommentReply> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let reply =
+            staged.update_text_comment_reply(graph.storage_id, comment_id, reply_id, body)?;
+        *self = Self::from_package(staged.into_package())?;
+        Ok(reply)
+    }
+
+    /// Delete one direct text-box comment reply and its storage.
+    pub fn remove_text_box_comment_reply(
+        &mut self,
+        drawable_object_id: u64,
+        comment_id: TextCommentId,
+        reply_id: TextCommentReplyId,
+    ) -> Result<TextCommentReply> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let reply = staged.remove_text_comment_reply(graph.storage_id, comment_id, reply_id)?;
+        *self = Self::from_package(staged.into_package())?;
+        Ok(reply)
     }
 
     /// Read the canonical list preset of an ordinary text box.

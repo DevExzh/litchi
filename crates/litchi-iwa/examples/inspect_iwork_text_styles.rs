@@ -26,6 +26,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         if let Ok(comments) = editor.text_comments(storage.object_id) {
             println!("storage={} comments={comments:?}", storage.object_id);
+            for comment in comments {
+                if let Ok(replies) = editor.text_comment_replies(storage.object_id, comment.id) {
+                    println!(
+                        "storage={} comment={} replies={replies:?}",
+                        storage.object_id,
+                        comment.id.object_id()
+                    );
+                }
+            }
         }
         if let Ok(levels) = editor.paragraph_list_levels(storage.object_id) {
             println!("storage={} list_levels={levels:?}", storage.object_id);

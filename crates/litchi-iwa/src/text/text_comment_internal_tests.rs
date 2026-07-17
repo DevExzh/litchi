@@ -1,8 +1,4 @@
 use crate::archive::{ArchiveObject, RawMessage};
-use crate::comments::{
-    fresh_comment_storage_uuid, insert_comment_storage, update_comment_reply_reference,
-};
-use crate::package_metadata::{next_object_identifier, set_package_last_object_identifier};
 use crate::pages::PagesEditor;
 use crate::shapes::{DrawablePoint, DrawableSize};
 use crate::text::highlight_object::validate_annotation_graph;
@@ -38,6 +34,10 @@ fn range(start: usize, end: usize) -> TextRange {
 
 fn body(value: &str) -> TextCommentBody {
     TextCommentBody::new(value).unwrap()
+}
+
+fn reply_body(value: &str) -> TextCommentReplyBody {
+    TextCommentReplyBody::new(value).unwrap()
 }
 
 fn storage_message_index(object: &ArchiveObject) -> usize {
@@ -148,38 +148,184 @@ fn replies_survive_root_updates_and_are_reclaimed_on_delete() {
     let comment = editor
         .add_text_comment(storage_id, range(0, 5), body("root"))
         .unwrap();
-    let mut package = editor.into_package();
-    let archive_name = locate_storage(&package, storage_id).unwrap().archive_name;
-    let graph = {
-        let archive = package.archive(&archive_name).unwrap();
-        let annotation = archive.object(comment.id.object_id()).unwrap();
-        validate_annotation_graph(&package, &archive_name, comment.id.object_id(), annotation)
-            .unwrap()
-            .unwrap()
-    };
-    let reply_id = next_object_identifier(&package).unwrap();
-    let reply_uuid = fresh_comment_storage_uuid(&package).unwrap();
-    insert_comment_storage(
-        &mut package,
-        &archive_name,
-        reply_id,
-        "reply".to_owned(),
-        graph.author_id,
-        reply_uuid,
-    )
-    .unwrap();
-    update_comment_reply_reference(&mut package, graph.comment_storage_id, None, Some(reply_id))
+    let reply = editor
+        .add_text_comment_reply(storage_id, comment.id, reply_body("reply"))
         .unwrap();
-    set_package_last_object_identifier(&mut package, reply_id).unwrap();
 
-    let mut editor = super::super::IWorkTextEditor::from_package(package);
     assert_eq!(editor.text_comments(storage_id).unwrap()[0].reply_count, 1);
+    assert_eq!(
+        editor.text_comment_replies(storage_id, comment.id).unwrap()[0],
+        reply
+    );
     let updated = editor
         .update_text_comment(storage_id, comment.id, range(6, 10), body("updated"))
         .unwrap();
     assert_eq!(updated.reply_count, 1);
     editor.remove_text_comment(storage_id, comment.id).unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
+}
+
+#[test]
+fn reply_order_survives_middle_update_and_delete() {
+    let (mut editor, storage_id, baseline) = fixture();
+    let comment = editor
+        .add_text_comment(storage_id, range(0, 5), body("root"))
+        .unwrap();
+    let first = editor
+        .add_text_comment_reply(storage_id, comment.id, reply_body("first"))
+        .unwrap();
+    let second = editor
+        .add_text_comment_reply(storage_id, comment.id, reply_body("second"))
+        .unwrap();
+    let third = editor
+        .add_text_comment_reply(storage_id, comment.id, reply_body("third"))
+        .unwrap();
+    assert_eq!(
+        editor
+            .text_comment_replies(storage_id, comment.id)
+            .unwrap()
+            .iter()
+            .map(|reply| reply.id)
+            .collect::<Vec<_>>(),
+        vec![first.id, second.id, third.id]
+    );
+
+    let updated = editor
+        .update_text_comment_reply(
+            storage_id,
+            comment.id,
+            second.id,
+            reply_body("second updated"),
+        )
+        .unwrap();
+    assert_eq!(updated.id, second.id);
+    editor
+        .remove_text_comment_reply(storage_id, comment.id, second.id)
+        .unwrap();
+    assert_eq!(
+        editor
+            .text_comment_replies(storage_id, comment.id)
+            .unwrap()
+            .iter()
+            .map(|reply| reply.id)
+            .collect::<Vec<_>>(),
+        vec![first.id, third.id]
+    );
+
+    editor.remove_text_comment(storage_id, comment.id).unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+}
+
+#[test]
+fn reply_updates_preserve_unknown_fields_and_identity() {
+    let (mut editor, storage_id, baseline) = fixture();
+    let comment = editor
+        .add_text_comment(storage_id, range(0, 5), body("root"))
+        .unwrap();
+    let reply = editor
+        .add_text_comment_reply(storage_id, comment.id, reply_body("reply"))
+        .unwrap();
+    let mut package = editor.into_package();
+    let archive_name = locate_storage(&package, storage_id).unwrap().archive_name;
+    package
+        .update_archive(&archive_name, |archive| {
+            let object = archive.object_mut(reply.id.object_id()).unwrap();
+            let original = &object.messages[0];
+            let data = patch_varint_field(&original.data, 97, false, Some(31))?;
+            object.replace_message(
+                0,
+                RawMessage {
+                    type_: original.type_,
+                    data,
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+
+    let mut editor = super::super::IWorkTextEditor::from_package(package);
+    let updated = editor
+        .update_text_comment_reply(storage_id, comment.id, reply.id, reply_body("updated"))
+        .unwrap();
+    assert_eq!(updated.id, reply.id);
+    assert_eq!(updated.creation_date_seconds, reply.creation_date_seconds);
+    assert_eq!(updated.author_object_id, reply.author_object_id);
+    assert_eq!(updated.storage_uuid, reply.storage_uuid);
+    let package = editor.package();
+    assert!(
+        parse_wire_fields(
+            &package
+                .archive(&archive_name)
+                .unwrap()
+                .object(reply.id.object_id())
+                .unwrap()
+                .messages[0]
+                .data,
+        )
+        .unwrap()
+        .iter()
+        .any(|field| field.number == 97)
+    );
+
+    editor
+        .remove_text_comment_reply(storage_id, comment.id, reply.id)
+        .unwrap();
+    editor.remove_text_comment(storage_id, comment.id).unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+}
+
+#[test]
+fn shared_or_wrong_parent_replies_are_rejected_transactionally() {
+    let (mut editor, storage_id, _) = fixture();
+    let first = editor
+        .add_text_comment(storage_id, range(0, 5), body("first"))
+        .unwrap();
+    let second = editor
+        .add_text_comment(storage_id, range(6, 10), body("second"))
+        .unwrap();
+    let reply = editor
+        .add_text_comment_reply(storage_id, first.id, reply_body("reply"))
+        .unwrap();
+
+    let before_wrong_parent = editor.to_bytes().unwrap();
+    assert!(
+        editor
+            .update_text_comment_reply(storage_id, second.id, reply.id, reply_body("wrong parent"),)
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), before_wrong_parent);
+
+    let mut package = editor.into_package();
+    let archive_name = locate_storage(&package, storage_id).unwrap().archive_name;
+    package
+        .update_archive(&archive_name, |archive| {
+            let other = archive
+                .objects
+                .iter_mut()
+                .find(|object| {
+                    object.archive_info.identifier != Some(reply.id.object_id())
+                        && !object.archive_info.message_infos.is_empty()
+                })
+                .unwrap();
+            other.archive_info.message_infos[0]
+                .object_references
+                .push(reply.id.object_id());
+            Ok(())
+        })
+        .unwrap();
+    let mut editor = super::super::IWorkTextEditor::from_package(package);
+    let before_shared = editor.to_bytes().unwrap();
+    assert!(
+        editor
+            .update_text_comment_reply(storage_id, first.id, reply.id, reply_body("shared"),)
+            .is_err()
+    );
+    assert!(
+        editor
+            .remove_text_comment_reply(storage_id, first.id, reply.id)
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), before_shared);
 }
 
 #[test]

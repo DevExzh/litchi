@@ -66,9 +66,13 @@ use super::style::{
     TextOutline, TextScript, TextShadow, TextStyle,
 };
 use super::text_comment::{
-    add_text_comment, remove_text_comment, text_comments, update_text_comment,
+    add_text_comment, add_text_comment_reply, remove_text_comment, remove_text_comment_reply,
+    text_comment_replies, text_comments, update_text_comment, update_text_comment_reply,
 };
-use super::text_comment_types::{TextComment, TextCommentBody, TextCommentId};
+use super::text_comment_types::{
+    TextComment, TextCommentBody, TextCommentId, TextCommentReply, TextCommentReplyBody,
+    TextCommentReplyId,
+};
 
 const STORAGE_MESSAGE_TYPES: &[u32] = &[2001, 2022];
 
@@ -432,6 +436,46 @@ impl IWorkTextEditor {
         id: TextCommentId,
     ) -> Result<TextComment> {
         remove_text_comment(&mut self.package, object_id, id)
+    }
+
+    /// Read every direct reply to one ranged comment in stored order.
+    pub fn text_comment_replies(
+        &self,
+        object_id: u64,
+        comment_id: TextCommentId,
+    ) -> Result<Vec<TextCommentReply>> {
+        text_comment_replies(&self.package, object_id, comment_id)
+    }
+
+    /// Append a direct reply to one ranged comment.
+    pub fn add_text_comment_reply(
+        &mut self,
+        object_id: u64,
+        comment_id: TextCommentId,
+        body: TextCommentReplyBody,
+    ) -> Result<TextCommentReply> {
+        add_text_comment_reply(&mut self.package, object_id, comment_id, body)
+    }
+
+    /// Update a direct reply while retaining its ID and native metadata.
+    pub fn update_text_comment_reply(
+        &mut self,
+        object_id: u64,
+        comment_id: TextCommentId,
+        reply_id: TextCommentReplyId,
+        body: TextCommentReplyBody,
+    ) -> Result<TextCommentReply> {
+        update_text_comment_reply(&mut self.package, object_id, comment_id, reply_id, body)
+    }
+
+    /// Delete one direct reply and its owned comment storage.
+    pub fn remove_text_comment_reply(
+        &mut self,
+        object_id: u64,
+        comment_id: TextCommentId,
+        reply_id: TextCommentReplyId,
+    ) -> Result<TextCommentReply> {
+        remove_text_comment_reply(&mut self.package, object_id, comment_id, reply_id)
     }
 
     /// Read the canonical list preset applied uniformly to a text storage.

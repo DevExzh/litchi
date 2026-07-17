@@ -322,7 +322,7 @@ fn ensure_no_overlapping_highlight_table(
     Ok(())
 }
 
-fn add_author_external_reference(
+pub(super) fn add_author_external_reference(
     package: &mut IWorkPackage,
     source_entry: &str,
     author_entry: Option<&str>,
@@ -431,7 +431,7 @@ fn remove_detached_annotations(
     release_package_identifier_suffix(package, &removed_ids)
 }
 
-fn remove_registered_object(
+pub(super) fn remove_registered_object(
     package: &mut IWorkPackage,
     owning_component: Option<u64>,
     identifier: u64,
@@ -489,6 +489,6 @@ fn collect_annotations(
     Ok(annotations)
 }
 
-fn roundtrip(package: &IWorkPackage) -> Result<IWorkPackage> {
+pub(super) fn roundtrip(package: &IWorkPackage) -> Result<IWorkPackage> {
     IWorkPackage::from_bytes(&package.to_bytes()?)
 }

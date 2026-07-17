@@ -4,6 +4,7 @@
 //! Pages, Numbers, and Keynote documents.
 
 mod annotation;
+mod annotation_reply;
 pub(crate) mod columns;
 mod drop_cap;
 pub mod editor;
@@ -59,7 +60,10 @@ pub use paragraph_tabs::{
     ParagraphTabStops,
 };
 pub use position::{TextPosition, TextRange};
-pub use text_comment_types::{TextComment, TextCommentBody, TextCommentId};
+pub use text_comment_types::{
+    TextComment, TextCommentBody, TextCommentId, TextCommentReply, TextCommentReplyBody,
+    TextCommentReplyId,
+};
 
 pub use extractor::TextExtractor;
 pub use storage::{TextFragment, TextRun, TextStorage};
