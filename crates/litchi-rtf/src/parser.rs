@@ -224,6 +224,10 @@ struct State {
     character_border_seen: u8,
     /// Current paragraph properties
     paragraph: Paragraph,
+    /// Optional alignment selector for the next `tx` tab terminator.
+    pending_tab_alignment: Option<super::border::TabAlignment>,
+    /// Optional leader selector for the next `tx` or `tb` tab terminator.
+    pending_tab_leader: Option<super::border::TabLeader>,
     /// Unicode skip count (characters to skip after \u)
     unicode_skip: i32,
     /// Whether we're inside a table
@@ -326,6 +330,8 @@ impl Default for State {
             character_border_active: false,
             character_border_seen: 0,
             paragraph: Paragraph::default(),
+            pending_tab_alignment: None,
+            pending_tab_leader: None,
             unicode_skip: 1,
             in_table: false,
             cell_boundaries: SmallVec::new(),
@@ -3287,6 +3293,10 @@ impl<'a> Parser<'a> {
         let language_defaults = self.language_defaults;
         let state = self.current_state_mut()?;
 
+        if Self::apply_paragraph_tab_control(state, control)? {
+            return Ok(());
+        }
+
         if Self::apply_character_decoration_control(state, control)? {
             return Ok(());
         }
@@ -3420,6 +3430,8 @@ impl<'a> Parser<'a> {
             ControlWord::Pard => {
                 // Reset to default paragraph properties
                 state.paragraph = Paragraph::default();
+                state.pending_tab_alignment = None;
+                state.pending_tab_leader = None;
             },
 
             // Paragraph spacing
@@ -5427,10 +5439,16 @@ impl<'a> Parser<'a> {
                     },
                     ControlWord::FirstLineIndent(value) => level.first_line_indent = Some(*value),
                     ControlWord::TabPosition(value) => {
+                        let value = value.ok_or_else(|| {
+                            RtfError::MalformedDocument(
+                                "RTF list-level tx control requires a numeric parameter"
+                                    .to_string(),
+                            )
+                        })?;
                         if level.tabs.len() >= MAX_LIST_TABS {
                             return Err(RtfError::MalformedDocument("RTF list level has too many tabs".to_string()));
                         }
-                        level.tabs.push(*value);
+                        level.tabs.push(value);
                     },
                     ControlWord::ListLevelPicture(value) => {
                         level.picture_index = Some(u32::try_from(*value).map_err(|_| {
@@ -6144,6 +6162,9 @@ impl<'a> Parser<'a> {
     }
 
     fn apply_style_property(state: &mut State, control: &ControlWord<'_>) -> RtfResult<()> {
+        if Self::apply_paragraph_tab_control(state, control)? {
+            return Ok(());
+        }
         if Self::apply_character_decoration_control(state, control)? {
             return Ok(());
         }
@@ -6244,7 +6265,11 @@ impl<'a> Parser<'a> {
             ControlWord::RightToLeftParagraph => {
                 state.paragraph.direction = Some(TextDirection::RightToLeft);
             },
-            ControlWord::Pard => state.paragraph = Paragraph::default(),
+            ControlWord::Pard => {
+                state.paragraph = Paragraph::default();
+                state.pending_tab_alignment = None;
+                state.pending_tab_leader = None;
+            },
             ControlWord::SpaceBefore(value) => state.paragraph.spacing.before = *value,
             ControlWord::SpaceAfter(value) => state.paragraph.spacing.after = *value,
             ControlWord::SpaceBetween(value) => state.paragraph.spacing.line = *value,
@@ -6269,6 +6294,122 @@ impl<'a> Parser<'a> {
             _ => {},
         }
         Ok(())
+    }
+
+    fn apply_paragraph_tab_control(
+        state: &mut State,
+        control: &ControlWord<'_>,
+    ) -> RtfResult<bool> {
+        use super::border::{TabAlignment, TabLeader, TabStop};
+
+        fn require_flag(parameter: Option<i32>, name: &str) -> RtfResult<()> {
+            if parameter.is_some() {
+                return Err(RtfError::MalformedDocument(format!(
+                    "RTF {name} tab selector does not accept a numeric parameter"
+                )));
+            }
+            Ok(())
+        }
+
+        fn select_alignment(
+            state: &mut State,
+            parameter: Option<i32>,
+            name: &str,
+            alignment: TabAlignment,
+        ) -> RtfResult<()> {
+            require_flag(parameter, name)?;
+            if state.pending_tab_alignment.is_some() || state.pending_tab_leader.is_some() {
+                return Err(RtfError::MalformedDocument(
+                    "RTF tab alignment must occur once and before its leader".to_string(),
+                ));
+            }
+            state.pending_tab_alignment = Some(alignment);
+            Ok(())
+        }
+
+        fn select_leader(
+            state: &mut State,
+            parameter: Option<i32>,
+            name: &str,
+            leader: TabLeader,
+        ) -> RtfResult<()> {
+            require_flag(parameter, name)?;
+            if state.pending_tab_leader.is_some() {
+                return Err(RtfError::MalformedDocument(
+                    "RTF tab definition contains multiple leader selectors".to_string(),
+                ));
+            }
+            state.pending_tab_leader = Some(leader);
+            Ok(())
+        }
+
+        fn append(state: &mut State, position: Option<i32>, bar: bool) -> RtfResult<()> {
+            let position = position.ok_or_else(|| {
+                RtfError::MalformedDocument(format!(
+                    "RTF {} control requires a numeric parameter",
+                    if bar { "tb" } else { "tx" }
+                ))
+            })?;
+            if bar && state.pending_tab_alignment.is_some() {
+                return Err(RtfError::MalformedDocument(
+                    "RTF bar tab cannot have a tab-alignment selector".to_string(),
+                ));
+            }
+            let tab = TabStop {
+                position,
+                alignment: if bar {
+                    TabAlignment::Bar
+                } else {
+                    state.pending_tab_alignment.unwrap_or(TabAlignment::Left)
+                },
+                leader: state.pending_tab_leader.unwrap_or(TabLeader::None),
+            };
+            state.paragraph.tab_stops.push(tab).map_err(|_| {
+                RtfError::MalformedDocument(
+                    "RTF paragraph exceeds the 64-tab safety limit".to_string(),
+                )
+            })?;
+            state.pending_tab_alignment = None;
+            state.pending_tab_leader = None;
+            Ok(())
+        }
+
+        match control {
+            ControlWord::TabLeft(parameter) => {
+                select_alignment(state, *parameter, "tql", TabAlignment::Left)?;
+            },
+            ControlWord::TabRight(parameter) => {
+                select_alignment(state, *parameter, "tqr", TabAlignment::Right)?;
+            },
+            ControlWord::TabCenter(parameter) => {
+                select_alignment(state, *parameter, "tqc", TabAlignment::Center)?;
+            },
+            ControlWord::TabDecimal(parameter) => {
+                select_alignment(state, *parameter, "tqdec", TabAlignment::Decimal)?;
+            },
+            ControlWord::TabLeaderDot(parameter) => {
+                select_leader(state, *parameter, "tldot", TabLeader::Dot)?;
+            },
+            ControlWord::TabLeaderMiddleDot(parameter) => {
+                select_leader(state, *parameter, "tlmdot", TabLeader::MiddleDot)?;
+            },
+            ControlWord::TabLeaderHyphen(parameter) => {
+                select_leader(state, *parameter, "tlhyph", TabLeader::Hyphen)?;
+            },
+            ControlWord::TabLeaderUnderscore(parameter) => {
+                select_leader(state, *parameter, "tlul", TabLeader::Underscore)?;
+            },
+            ControlWord::TabLeaderThick(parameter) => {
+                select_leader(state, *parameter, "tlth", TabLeader::ThickLine)?;
+            },
+            ControlWord::TabLeaderEqual(parameter) => {
+                select_leader(state, *parameter, "tleq", TabLeader::Equal)?;
+            },
+            ControlWord::TabPosition(position) => append(state, *position, false)?,
+            ControlWord::TabBar(position) => append(state, *position, true)?,
+            _ => return Ok(false),
+        }
+        Ok(true)
     }
 
     fn parse_file_table(&mut self) -> RtfResult<crate::FileTable<'a>> {

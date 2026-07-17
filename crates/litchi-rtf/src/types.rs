@@ -308,6 +308,8 @@ pub struct Paragraph {
     pub spacing: Spacing,
     /// Indentation
     pub indentation: Indentation,
+    /// Custom tab stops in RTF declaration order
+    pub tab_stops: super::border::TabStops,
     /// Borders
     pub borders: Borders,
     /// Shading/background

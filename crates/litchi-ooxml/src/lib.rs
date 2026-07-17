@@ -38,6 +38,7 @@ pub mod api;
 pub mod charts;
 pub mod common;
 pub mod custom_properties;
+pub mod custom_xml_data;
 pub mod docx;
 pub mod drawings;
 pub mod embedded_object;

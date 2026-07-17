@@ -303,6 +303,16 @@ pub enum PptRecordType {
     NamedShow = 1041,
     /// Named show slides atom
     NamedShowSlides = 1042,
+    /// Slide or notes view information container
+    SlideViewInfo = 1018,
+    /// Slide or notes alignment guide atom
+    GuideAtom = 1019,
+    /// Zoom view information atom
+    ViewInfoAtom = 1021,
+    /// Slide view editing-preferences atom
+    SlideViewInfoAtom = 1022,
+    /// Document information list container
+    DocInfoList = 2000,
     /// Comment 2000 record
     Comment2000 = 12000,
     /// Comment 2000 atom record
@@ -466,6 +476,11 @@ impl From<u16> for PptRecordType {
             1040 => PptRecordType::NamedShows,
             1041 => PptRecordType::NamedShow,
             1042 => PptRecordType::NamedShowSlides,
+            1018 => PptRecordType::SlideViewInfo,
+            1019 => PptRecordType::GuideAtom,
+            1021 => PptRecordType::ViewInfoAtom,
+            1022 => PptRecordType::SlideViewInfoAtom,
+            2000 => PptRecordType::DocInfoList,
             12000 => PptRecordType::Comment2000,
             12001 => PptRecordType::Comment2000Atom,
             12004 => PptRecordType::CommentIndex10,

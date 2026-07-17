@@ -2649,8 +2649,10 @@ impl<W: Write> RtfWriter<W> {
         // Shading (if any)
         self.write_shading(&para.shading)?;
 
-        // Note: Tab stops would be written here if they were part of Paragraph
-        // For now, they would need to be passed separately or stored elsewhere
+        // Custom tab stops, retained in declaration order.
+        for tab in &para.tab_stops {
+            self.write_tab_stop(tab)?;
+        }
 
         // Keep together
         if para.keep_together {
@@ -2818,34 +2820,34 @@ impl<W: Write> RtfWriter<W> {
 
     /// Write tab stop
     ///
-    /// # Note
-    ///
-    /// This method is provided for completeness but is not currently used in document
-    /// serialization. It will be integrated once tab stops are fully implemented in
-    /// the paragraph properties.
-    #[allow(dead_code)]
     fn write_tab_stop(&mut self, tab: &TabStop) -> io::Result<()> {
-        // Tab alignment
+        // The left kind is implicit. A bar tab uses `tbN` as its terminator.
         match tab.alignment {
-            TabAlignment::Left => self.write_control_word("tql", None)?,
+            TabAlignment::Left | TabAlignment::Bar => {},
             TabAlignment::Right => self.write_control_word("tqr", None)?,
             TabAlignment::Center => self.write_control_word("tqc", None)?,
             TabAlignment::Decimal => self.write_control_word("tqdec", None)?,
-            TabAlignment::Bar => self.write_control_word("tb", None)?,
         }
 
         // Tab leader
         match tab.leader {
             TabLeader::None => {},
             TabLeader::Dot => self.write_control_word("tldot", None)?,
+            TabLeader::MiddleDot => self.write_control_word("tlmdot", None)?,
             TabLeader::Hyphen => self.write_control_word("tlhyph", None)?,
             TabLeader::Underscore => self.write_control_word("tlul", None)?,
             TabLeader::ThickLine => self.write_control_word("tlth", None)?,
             TabLeader::Equal => self.write_control_word("tleq", None)?,
         }
 
-        // Tab position
-        self.write_control_word("tx", Some(tab.position))?;
+        self.write_control_word(
+            if tab.alignment == TabAlignment::Bar {
+                "tb"
+            } else {
+                "tx"
+            },
+            Some(tab.position),
+        )?;
 
         Ok(())
     }

@@ -54,6 +54,7 @@
 pub mod package;
 pub mod presentation;
 pub mod sound_collection;
+pub mod view_info;
 
 /// PPT file writing
 pub mod writer;
@@ -97,6 +98,11 @@ pub mod text_run;
 pub use package::{Package, PptEncryptionKind, PptError, PptOpenOptions};
 pub use presentation::Presentation;
 pub use sound_collection::{EmbeddedPowerPointSound, PowerPointSoundCollection};
+pub use view_info::{
+    PowerPointGuide, PowerPointGuideOrientation, PowerPointRatio, PowerPointSlideViewInfo,
+    PowerPointSlideViewInformation, PowerPointSlideViewPreferences, PowerPointViewKind,
+    PowerPointViewOrigin, PowerPointZoomViewInfo,
+};
 pub use slide::{
     Slide, SlideData, SlideDirectory, SlideDirectoryEntry, SlideFactory, SpeakerNotes,
 };

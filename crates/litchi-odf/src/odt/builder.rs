@@ -38,6 +38,7 @@ enum DocumentElement {
 pub struct DocumentBuilder {
     elements: Vec<DocumentElement>,
     metadata: Metadata,
+    paragraph_tab_styles: Vec<crate::ParagraphStyleTabStops>,
 }
 
 impl Default for DocumentBuilder {
@@ -60,7 +61,30 @@ impl DocumentBuilder {
         Self {
             elements: Vec::new(),
             metadata: Metadata::default(),
+            paragraph_tab_styles: Vec::new(),
         }
+    }
+
+    /// Add a named or default paragraph style carrying typed tab stops.
+    pub fn add_paragraph_tab_style(
+        &mut self,
+        style: crate::ParagraphStyleTabStops,
+    ) -> Result<&mut Self> {
+        style.validate()?;
+        if self.paragraph_tab_styles.len() >= 4_096 {
+            return Err(litchi_core::Error::InvalidFormat(
+                "document builder exceeds 4096 paragraph tab styles".to_owned(),
+            ));
+        }
+        if self.paragraph_tab_styles.iter().any(|existing| {
+            existing.is_default_style == style.is_default_style && existing.name == style.name
+        }) {
+            return Err(litchi_core::Error::InvalidFormat(
+                "duplicate paragraph tab style identity".to_owned(),
+            ));
+        }
+        self.paragraph_tab_styles.push(style);
+        Ok(self)
     }
 
     /// Set document metadata
@@ -442,7 +466,15 @@ impl DocumentBuilder {
 
     /// Generate styles.xml with list styles
     fn generate_styles_xml(&self) -> String {
-        r#"<?xml version="1.0" encoding="UTF-8"?><office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" xmlns:number="urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:chart="urn:oasis:names:tc:opendocument:xmlns:chart:1.0" xmlns:dr3d="urn:oasis:names:tc:opendocument:xmlns:dr3d:1.0" xmlns:math="http://www.w3.org/1998/Math/MathML" xmlns:form="urn:oasis:names:tc:opendocument:xmlns:form:1.0" xmlns:script="urn:oasis:names:tc:opendocument:xmlns:script:1.0" office:version="1.3"><office:font-face-decls/><office:styles><!-- Numbered list style --><text:list-style style:name="L1"><text:list-level-style-number text:level="1" text:style-name="Numbering_20_Symbols" style:num-format="1"><style:list-level-properties text:list-level-position-and-space-mode="label-alignment"><style:list-level-label-alignment text:label-followed-by="listtab" text:list-tab-stop-position="1.27cm" fo:text-indent="-0.635cm" fo:margin-left="1.27cm"/></style:list-level-properties></text:list-level-style-number><text:list-level-style-number text:level="2" text:style-name="Numbering_20_Symbols" style:num-format="1"><style:list-level-properties text:list-level-position-and-space-mode="label-alignment"><style:list-level-label-alignment text:label-followed-by="listtab" text:list-tab-stop-position="1.905cm" fo:text-indent="-0.635cm" fo:margin-left="1.905cm"/></style:list-level-properties></text:list-level-style-number><text:list-level-style-number text:level="3" text:style-name="Numbering_20_Symbols" style:num-format="1"><style:list-level-properties text:list-level-position-and-space-mode="label-alignment"><style:list-level-label-alignment text:label-followed-by="listtab" text:list-tab-stop-position="2.54cm" fo:text-indent="-0.635cm" fo:margin-left="2.54cm"/></style:list-level-properties></text:list-level-style-number></text:list-style></office:styles><office:automatic-styles/><office:master-styles/></office:document-styles>"#.to_string()
+        let mut xml = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" xmlns:number="urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:chart="urn:oasis:names:tc:opendocument:xmlns:chart:1.0" xmlns:dr3d="urn:oasis:names:tc:opendocument:xmlns:dr3d:1.0" xmlns:math="http://www.w3.org/1998/Math/MathML" xmlns:form="urn:oasis:names:tc:opendocument:xmlns:form:1.0" xmlns:script="urn:oasis:names:tc:opendocument:xmlns:script:1.0" office:version="1.3"><office:font-face-decls/><office:styles><!-- Numbered list style --><text:list-style style:name="L1"><text:list-level-style-number text:level="1" text:style-name="Numbering_20_Symbols" style:num-format="1"><style:list-level-properties text:list-level-position-and-space-mode="label-alignment"><style:list-level-label-alignment text:label-followed-by="listtab" text:list-tab-stop-position="1.27cm" fo:text-indent="-0.635cm" fo:margin-left="1.27cm"/></style:list-level-properties></text:list-level-style-number><text:list-level-style-number text:level="2" text:style-name="Numbering_20_Symbols" style:num-format="1"><style:list-level-properties text:list-level-position-and-space-mode="label-alignment"><style:list-level-label-alignment text:label-followed-by="listtab" text:list-tab-stop-position="1.905cm" fo:text-indent="-0.635cm" fo:margin-left="1.905cm"/></style:list-level-properties></text:list-level-style-number><text:list-level-style-number text:level="3" text:style-name="Numbering_20_Symbols" style:num-format="1"><style:list-level-properties text:list-level-position-and-space-mode="label-alignment"><style:list-level-label-alignment text:label-followed-by="listtab" text:list-tab-stop-position="2.54cm" fo:text-indent="-0.635cm" fo:margin-left="2.54cm"/></style:list-level-properties></text:list-level-style-number></text:list-style></office:styles><office:automatic-styles/><office:master-styles/></office:document-styles>"#.to_string();
+        if !self.paragraph_tab_styles.is_empty() {
+            let insertion = xml.find("</office:styles>").expect("static styles root");
+            let fragments = self.paragraph_tab_styles.iter()
+                .map(|style| style.to_xml_fragment().expect("validated paragraph tab style"))
+                .collect::<String>();
+            xml.insert_str(insertion, &fragments);
+        }
+        xml
     }
 
     /// Build the document and return as bytes

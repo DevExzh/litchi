@@ -297,6 +297,7 @@ pub mod drawing_opacity;
 pub mod drawing_stroke_dash;
 pub mod named_expression;
 pub mod content_validation;
+mod paragraph_tab_stop;
 /// ODF XML element classes
 pub mod elements;
 pub use elements::field::{
@@ -351,6 +352,12 @@ pub use core::{
     ManifestChecksumAlgorithm, ManifestEncryption, ManifestEncryptionAlgorithm, ManifestEntry,
     ManifestKeyDerivation, ManifestStartKeyGeneration, OdfMetadata, TemplateMetadata,
     UserDefinedMetadata, UserDefinedValueType,
+};
+pub use paragraph_tab_stop::{
+    MAX_PARAGRAPH_TAB_STOPS, OdfTabStopPosition, ParagraphStyleTabStopSet,
+    ParagraphStyleTabStops, ParagraphTabLeaderColor, ParagraphTabLeaderStyle,
+    ParagraphTabLeaderType, ParagraphTabLeaderWidth, ParagraphTabStop,
+    ParagraphTabStopType, ParagraphTabStops, parse_paragraph_style_tab_stops,
 };
 pub use formula::{FormulaDocument, MathAttribute, MathContent, MathElement, MathElementKind};
 pub use form::{

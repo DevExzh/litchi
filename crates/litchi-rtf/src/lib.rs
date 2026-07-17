@@ -70,7 +70,7 @@ pub use annotation::{Annotation, AnnotationType, Revision, RevisionAuthor, Revis
 pub use bookmark::{Bookmark, BookmarkTable};
 pub use border::{
     Border, BorderStyle, Borders, CharacterBorder, CharacterBorderStyle, CharacterShading,
-    Shading, ShadingPattern, TabAlignment, TabLeader, TabStop,
+    MAX_PARAGRAPH_TAB_STOPS, Shading, ShadingPattern, TabAlignment, TabLeader, TabStop, TabStops,
 };
 pub use compressed::{compress, decompress, is_compressed_rtf};
 pub use document::RtfDocument;

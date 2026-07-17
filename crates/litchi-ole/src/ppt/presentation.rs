@@ -14,6 +14,7 @@ use super::parsers::PptRecordParser;
 use super::persist::PersistMapping;
 use super::slide::{Slide, SlideDirectory, SlideFactory};
 use super::sound_collection::PowerPointSoundCollection;
+use super::view_info::PowerPointSlideViewInformation;
 use crate::consts::PptRecordType;
 #[cfg(feature = "imgconv")]
 use crate::extractor::{ExtractedImage, ImageExtractor};
@@ -487,6 +488,12 @@ impl Presentation {
     #[cfg(feature = "imgconv")]
     pub fn has_pictures(&self) -> bool {
         self.pictures_data.is_some()
+    }
+
+    /// Strictly parse slide and notes editing-view information.
+    pub fn slide_view_information(&self) -> Result<PowerPointSlideViewInformation> {
+        let records = self.parser.find_records_ref();
+        PowerPointSlideViewInformation::parse_records(&records)
     }
 
     /// Parse custom slide shows (named shows) from the Document container.

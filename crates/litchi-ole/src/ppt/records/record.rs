@@ -141,6 +141,8 @@ impl PptRecord {
                 | PptRecordType::Handout
                 | PptRecordType::MainMaster
                 | PptRecordType::HeadersFooters
+                | PptRecordType::DocInfoList
+                | PptRecordType::SlideViewInfo
                 | PptRecordType::ExObjList
                 | PptRecordType::VBAInfo
                 | PptRecordType::SlideListWithText

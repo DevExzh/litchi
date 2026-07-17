@@ -401,6 +401,8 @@ pub enum TabLeader {
     None,
     /// Dot leader (........)
     Dot,
+    /// Middle-dot leader
+    MiddleDot,
     /// Hyphen leader (--------)
     Hyphen,
     /// Underscore leader (________)
@@ -420,6 +422,103 @@ pub struct TabStop {
     pub alignment: TabAlignment,
     /// Leader character
     pub leader: TabLeader,
+}
+
+impl Default for TabStop {
+    fn default() -> Self {
+        Self::new(0)
+    }
+}
+
+/// Maximum number of custom tab stops retained for one paragraph.
+///
+/// The RTF grammar permits a repeated sequence without an encoded count. This
+/// implementation bound keeps paragraph state fixed-size and prevents an
+/// attacker-controlled allocation while accommodating normal word-processor
+/// output.
+pub const MAX_PARAGRAPH_TAB_STOPS: usize = 64;
+
+/// Fixed-capacity custom tab stops for a paragraph or paragraph style.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TabStops {
+    entries: [TabStop; MAX_PARAGRAPH_TAB_STOPS],
+    len: u8,
+}
+
+impl TabStops {
+    /// Create an empty collection.
+    #[inline]
+    pub const fn new() -> Self {
+        Self {
+            entries: [TabStop {
+                position: 0,
+                alignment: TabAlignment::Left,
+                leader: TabLeader::None,
+            }; MAX_PARAGRAPH_TAB_STOPS],
+            len: 0,
+        }
+    }
+
+    /// Number of stored custom tab stops.
+    #[inline]
+    pub const fn len(&self) -> usize {
+        self.len as usize
+    }
+
+    /// Whether no custom tab stops are stored.
+    #[inline]
+    pub const fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
+    /// Stored tab stops in declaration order.
+    #[inline]
+    pub fn as_slice(&self) -> &[TabStop] {
+        &self.entries[..self.len()]
+    }
+
+    /// Iterate over tab stops in declaration order.
+    #[inline]
+    pub fn iter(&self) -> std::slice::Iter<'_, TabStop> {
+        self.as_slice().iter()
+    }
+
+    /// Append a tab stop, returning the value when the collection is full.
+    pub fn push(&mut self, tab: TabStop) -> Result<(), TabStop> {
+        if self.len() == MAX_PARAGRAPH_TAB_STOPS {
+            return Err(tab);
+        }
+        self.entries[self.len()] = tab;
+        self.len += 1;
+        Ok(())
+    }
+
+    /// Remove all custom tab stops.
+    #[inline]
+    pub fn clear(&mut self) {
+        self.len = 0;
+    }
+}
+
+impl Default for TabStops {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl AsRef<[TabStop]> for TabStops {
+    fn as_ref(&self) -> &[TabStop] {
+        self.as_slice()
+    }
+}
+
+impl<'a> IntoIterator for &'a TabStops {
+    type Item = &'a TabStop;
+    type IntoIter = std::slice::Iter<'a, TabStop>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
 }
 
 impl TabStop {
