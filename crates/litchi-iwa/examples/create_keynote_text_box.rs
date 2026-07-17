@@ -14,8 +14,9 @@ use litchi_iwa::text::{
     ParagraphSpacingPoints, ParagraphStart, ParagraphTabAlignment, ParagraphTabLeader,
     ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops, TextAlignment, TextBackground,
     TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumnCount, TextColumns,
-    TextDecorations, TextFont, TextLanguage, TextLigatures, TextOutline, TextPointSize,
-    TextPosition, TextScript, TextShadow, TextStrikethrough, TextStyle, TextUnderline,
+    TextDecorations, TextFont, TextHyperlinkTarget, TextLanguage, TextLigatures, TextOutline,
+    TextPointSize, TextPosition, TextRange, TextScript, TextShadow, TextStrikethrough, TextStyle,
+    TextUnderline,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -173,6 +174,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             created.drawable_object_id,
             TextPosition::from_utf16_index(start_index)?,
             TextLanguage::tag("fr-CA")?,
+        )?;
+        let word_end = text[newline + 1..]
+            .find(char::is_whitespace)
+            .map_or(text.len(), |offset| newline + 1 + offset);
+        let end_index = text[..word_end].encode_utf16().count();
+        editor.add_slide_text_box_hyperlink(
+            0,
+            created.drawable_object_id,
+            TextRange::new(
+                TextPosition::from_utf16_index(start_index)?,
+                TextPosition::from_utf16_index(end_index)?,
+            )?,
+            TextHyperlinkTarget::new("https://example.com/keynote")?,
         )?;
     }
     editor.set_slide_text_box_paragraph_drop_cap(

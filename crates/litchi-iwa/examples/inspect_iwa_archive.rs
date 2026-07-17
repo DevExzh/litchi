@@ -18,8 +18,8 @@ use litchi_iwa::protobuf::tss::StylesheetArchive;
 use litchi_iwa::protobuf::tst::TableDataList;
 use litchi_iwa::protobuf::tst::{TableInfoArchive, TableModelArchive};
 use litchi_iwa::protobuf::tswp::{
-    CharacterStyleArchive, ColumnStyleArchive, DropCapStyleArchive, ListStyleArchive,
-    ParagraphStyleArchive, ShapeInfoArchive, ShapeStyleArchive, StorageArchive,
+    CharacterStyleArchive, ColumnStyleArchive, DropCapStyleArchive, HyperlinkFieldArchive,
+    ListStyleArchive, ParagraphStyleArchive, ShapeInfoArchive, ShapeStyleArchive, StorageArchive,
 };
 use prost::Message;
 
@@ -85,6 +85,11 @@ fn print_archive(archive: litchi_iwa::archive::Archive, object_id: Option<u64>) 
                     .map(|byte| format!("{byte:02x}"))
                     .collect::<String>();
                 println!("  payload_hex={hex}");
+            }
+            if message.type_ == 2_032
+                && let Ok(hyperlink) = HyperlinkFieldArchive::decode(message.data.as_slice())
+            {
+                println!("  hyperlink={hyperlink:#?}");
             }
             if message.type_ == 8
                 && let Ok(build) = kn::BuildArchive::decode(message.data.as_slice())

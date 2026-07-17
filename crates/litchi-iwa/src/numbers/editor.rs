@@ -42,8 +42,9 @@ use crate::text::{
     ParagraphLineSpacing, ParagraphList, ParagraphListLevel, ParagraphListLevelPlacement,
     ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment, TextBackground,
     TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumns, TextDecorations,
-    TextFont, TextLanguage, TextLanguageRun, TextLigatures, TextOutline, TextPosition, TextScript,
-    TextShadow, TextStorageInfo, TextStyle,
+    TextFont, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget, TextLanguage, TextLanguageRun,
+    TextLigatures, TextOutline, TextPosition, TextRange, TextScript, TextShadow, TextStorageInfo,
+    TextStyle,
 };
 use crate::wire::{
     patch_length_delimited_field, patch_nested_fixed32_field, patch_nested_length_delimited_field,
@@ -736,6 +737,61 @@ impl NumbersEditor {
             *self = Self::from_package(text.into_package())?;
         }
         Ok(changed)
+    }
+
+    /// Read every hyperlink in a sheet-owned text box.
+    pub fn sheet_text_box_hyperlinks(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<Vec<TextHyperlink>> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        IWorkTextEditor::from_package(self.package.clone()).text_hyperlinks(graph.storage_id)
+    }
+
+    /// Create a hyperlink over a nonempty, unoccupied UTF-16 text range.
+    pub fn add_sheet_text_box_hyperlink(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        range: TextRange,
+        target: TextHyperlinkTarget,
+    ) -> Result<TextHyperlink> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let hyperlink = text.add_text_hyperlink(graph.storage_id, range, target)?;
+        *self = Self::from_package(text.into_package())?;
+        Ok(hyperlink)
+    }
+
+    /// Update a text-box hyperlink's range and target without changing its ID.
+    pub fn update_sheet_text_box_hyperlink(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        id: TextHyperlinkId,
+        range: TextRange,
+        target: TextHyperlinkTarget,
+    ) -> Result<TextHyperlink> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let hyperlink = text.update_text_hyperlink(graph.storage_id, id, range, target)?;
+        *self = Self::from_package(text.into_package())?;
+        Ok(hyperlink)
+    }
+
+    /// Delete a text-box hyperlink and its owned smart-field object.
+    pub fn remove_sheet_text_box_hyperlink(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        id: TextHyperlinkId,
+    ) -> Result<TextHyperlink> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let hyperlink = text.remove_text_hyperlink(graph.storage_id, id)?;
+        *self = Self::from_package(text.into_package())?;
+        Ok(hyperlink)
     }
 
     /// Read the canonical list preset of a sheet-owned text box.

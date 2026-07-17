@@ -47,6 +47,8 @@ println!("{}", structured.summary());
   left/center/right/decimal tab stops with leaders across Pages, Numbers, and Keynote
 - Typed BCP 47 text-language run CRUD at validated UTF-16 scalar boundaries,
   including automatic-language sentinels and lossless boundary deletion
+- Native cross-suite text-hyperlink CRUD with typed nonempty UTF-16 ranges,
+  lossless web, mail, and Keynote navigation targets, and owned-object cleanup
 - Lossless Pages document body/header/footer visibility, facing-page layout,
   automatic hyphenation, and ligature options
 - Typed Numbers table header/footer counts, freeze state, and repeating-header
@@ -1108,6 +1110,15 @@ document language, matching real Pages, Numbers, and Keynote output. Individual
 nonzero boundaries or the complete language table can be deleted without
 changing text or sibling formatting. See `edit_iwork_text_language` and
 `inspect_iwork_text_styles`.
+The same storages expose native hyperlinks as `TextHyperlink` values with
+strict `TextRange`, `TextHyperlinkTarget`, and `TextHyperlinkId` types. Create
+rejects overlaps with hyperlinks or other smart fields, update retains the
+smart-field identity, and delete reclaims the owned object and package
+identifier suffix. Unknown fields in the storage table, individual boundaries,
+and hyperlink payload survive edits. Web URLs, `mailto:` links, and Keynote
+targets such as `?slide=next` are represented losslessly. The Pages, Numbers,
+and Keynote text-box editors provide ownership-checked wrappers; see
+`edit_iwork_text_hyperlink` and `inspect_iwork_text_styles`.
 Slide move, duplicate, and delete operations likewise rewrite only the nested
 slide-tree ownership list. Existing raw `TSP.Reference` payloads are reused,
 so extensions inside the show, slide tree, and individual references survive;

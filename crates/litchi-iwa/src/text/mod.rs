@@ -8,15 +8,23 @@ mod drop_cap;
 pub mod editor;
 pub mod extractor;
 mod font;
+mod hyperlink;
+mod hyperlink_object;
+mod hyperlink_storage;
+mod hyperlink_types;
 mod language;
 mod language_types;
 mod paragraph_alignment;
 mod paragraph_list;
 mod paragraph_tabs;
+mod position;
 pub mod storage;
+mod storage_wire;
 pub mod style;
 mod style_registry;
 
+#[cfg(test)]
+mod hyperlink_tests;
 #[cfg(test)]
 mod language_tests;
 
@@ -31,12 +39,14 @@ pub use drop_cap::{
 };
 pub use editor::{IWorkTextEditor, TextStorageInfo};
 pub use font::{TextFont, TextFontName};
-pub use language_types::{TextLanguage, TextLanguageRun, TextLanguageTag, TextPosition};
+pub use hyperlink_types::{TextHyperlink, TextHyperlinkId, TextHyperlinkTarget};
+pub use language_types::{TextLanguage, TextLanguageRun, TextLanguageTag};
 pub use paragraph_list::{ParagraphList, ParagraphListLevel, ParagraphListLevelPlacement};
 pub use paragraph_tabs::{
     ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
     ParagraphTabStops,
 };
+pub use position::{TextPosition, TextRange};
 
 pub use extractor::TextExtractor;
 pub use storage::{TextFragment, TextRun, TextStorage};

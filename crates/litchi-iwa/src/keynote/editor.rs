@@ -30,8 +30,9 @@ use crate::text::{
     ParagraphLineSpacing, ParagraphList, ParagraphListLevel, ParagraphListLevelPlacement,
     ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment, TextBackground,
     TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumns, TextDecorations,
-    TextFont, TextLanguage, TextLanguageRun, TextLigatures, TextOutline, TextPosition, TextScript,
-    TextShadow, TextStorageInfo, TextStyle,
+    TextFont, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget, TextLanguage, TextLanguageRun,
+    TextLigatures, TextOutline, TextPosition, TextRange, TextScript, TextShadow, TextStorageInfo,
+    TextStyle,
 };
 use crate::wire::{
     append_repeated_length_delimited_field, parse_wire_fields, patch_fixed32_field,
@@ -1402,6 +1403,61 @@ impl KeynoteEditor {
             *self = Self::from_package(staged.into_package())?;
         }
         Ok(changed)
+    }
+
+    /// Read every hyperlink in an ordinary slide text box.
+    pub fn slide_text_box_hyperlinks(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<Vec<TextHyperlink>> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text.text_hyperlinks(graph.storage_id)
+    }
+
+    /// Create a hyperlink over a nonempty, unoccupied UTF-16 text range.
+    pub fn add_slide_text_box_hyperlink(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        range: TextRange,
+        target: TextHyperlinkTarget,
+    ) -> Result<TextHyperlink> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let hyperlink = staged.add_text_hyperlink(graph.storage_id, range, target)?;
+        *self = Self::from_package(staged.into_package())?;
+        Ok(hyperlink)
+    }
+
+    /// Update a text-box hyperlink's range and target without changing its ID.
+    pub fn update_slide_text_box_hyperlink(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        id: TextHyperlinkId,
+        range: TextRange,
+        target: TextHyperlinkTarget,
+    ) -> Result<TextHyperlink> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let hyperlink = staged.update_text_hyperlink(graph.storage_id, id, range, target)?;
+        *self = Self::from_package(staged.into_package())?;
+        Ok(hyperlink)
+    }
+
+    /// Delete a text-box hyperlink and its owned smart-field object.
+    pub fn remove_slide_text_box_hyperlink(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        id: TextHyperlinkId,
+    ) -> Result<TextHyperlink> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let hyperlink = staged.remove_text_hyperlink(graph.storage_id, id)?;
+        *self = Self::from_package(staged.into_package())?;
+        Ok(hyperlink)
     }
 
     /// Read the canonical list preset of an ordinary slide text box.

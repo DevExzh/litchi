@@ -2,32 +2,9 @@
 
 use crate::{Error, Result};
 
+use super::position::TextPosition;
+
 const MAX_LANGUAGE_TAG_BYTES: usize = 255;
-
-/// A UTF-16 code-unit boundary in an iWork text storage.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
-pub struct TextPosition(u32);
-
-impl TextPosition {
-    /// The beginning of a text storage.
-    pub const ZERO: Self = Self(0);
-
-    /// Construct a position from a UTF-16 code-unit index.
-    pub fn from_utf16_index(index: usize) -> Result<Self> {
-        u32::try_from(index)
-            .map(Self)
-            .map_err(|_| Error::ParseError("UTF-16 text position exceeds u32".to_owned()))
-    }
-
-    /// Return the native UTF-16 code-unit index.
-    pub const fn utf16_index(self) -> u32 {
-        self.0
-    }
-
-    pub(crate) const fn from_native(index: u32) -> Self {
-        Self(index)
-    }
-}
 
 /// A validated BCP 47-style language tag, preserving native spelling and case.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]

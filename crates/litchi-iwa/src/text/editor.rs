@@ -12,7 +12,7 @@ use crate::protobuf::tswp::{
 };
 use crate::shapes::RgbaColor;
 use crate::wire::{
-    parse_wire_fields, patch_nested_varint_field, patch_varint_field,
+    parse_wire_fields, patch_length_delimited_field, patch_nested_varint_field, patch_varint_field,
     repeated_length_delimited_payloads, rewrite_repeated_length_delimited_fields,
     transform_length_delimited_field,
 };
@@ -23,11 +23,16 @@ use super::drop_cap::{
     paragraph_drop_caps, remove_paragraph_drop_cap, set_paragraph_drop_cap,
 };
 use super::font::TextFont;
+use super::hyperlink::{
+    add_text_hyperlink, remove_text_hyperlink, remove_unreferenced_hyperlink_objects,
+    text_hyperlinks, update_text_hyperlink,
+};
+use super::hyperlink_types::{TextHyperlink, TextHyperlinkId, TextHyperlinkTarget};
 use super::language::{
     remove_text_language_boundary, reset_text_languages, set_text_language, text_language,
     text_languages,
 };
-use super::language_types::{TextLanguage, TextLanguageRun, TextPosition};
+use super::language_types::{TextLanguage, TextLanguageRun};
 use super::paragraph_alignment::{
     paragraph_alignment, paragraph_indents, paragraph_line_spacing, paragraph_spacing,
     paragraph_tab_stops, reset_paragraph_alignment, reset_paragraph_indents,
@@ -49,6 +54,7 @@ use super::paragraph_list::{
     set_paragraph_list, set_paragraph_list_level,
 };
 use super::paragraph_tabs::ParagraphTabStops;
+use super::position::{TextPosition, TextRange};
 use super::style::{
     ParagraphIndents, ParagraphLineSpacing, ParagraphSpacing, TextAlignment, TextBackground,
     TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextDecorations, TextLigatures,
@@ -314,6 +320,41 @@ impl IWorkTextEditor {
             self.package = staged;
         }
         Ok(changed)
+    }
+
+    /// Read every native hyperlink in a text storage.
+    pub fn text_hyperlinks(&self, object_id: u64) -> Result<Vec<TextHyperlink>> {
+        text_hyperlinks(&self.package, object_id)
+    }
+
+    /// Create a native hyperlink over a nonempty, unoccupied UTF-16 range.
+    pub fn add_text_hyperlink(
+        &mut self,
+        object_id: u64,
+        range: TextRange,
+        target: TextHyperlinkTarget,
+    ) -> Result<TextHyperlink> {
+        add_text_hyperlink(&mut self.package, object_id, range, &target)
+    }
+
+    /// Atomically update a hyperlink's range and target while retaining its ID.
+    pub fn update_text_hyperlink(
+        &mut self,
+        object_id: u64,
+        id: TextHyperlinkId,
+        range: TextRange,
+        target: TextHyperlinkTarget,
+    ) -> Result<TextHyperlink> {
+        update_text_hyperlink(&mut self.package, object_id, id, range, &target)
+    }
+
+    /// Delete one native hyperlink and reclaim its owned smart-field object.
+    pub fn remove_text_hyperlink(
+        &mut self,
+        object_id: u64,
+        id: TextHyperlinkId,
+    ) -> Result<TextHyperlink> {
+        remove_text_hyperlink(&mut self.package, object_id, id)
     }
 
     /// Read the canonical list preset applied uniformly to a text storage.
@@ -1046,6 +1087,7 @@ fn replace_storage_text(
     replacement: &str,
 ) -> Result<()> {
     let archive_name = find_storage_archive(package, object_id)?;
+    let mut removed_references = std::collections::HashSet::new();
     package.update_archive(&archive_name, |archive| {
         let object = archive.object_mut(object_id).ok_or_else(|| {
             Error::ParseError(format!("Text storage object {object_id} not found"))
@@ -1090,14 +1132,14 @@ fn replace_storage_text(
         } else {
             vec![updated]
         };
-        let data = patch_storage_text_wire(original, &range, replacement_units, &storage.text)?;
+        let data = patch_storage_text_wire(original, &range, replacement_units, &storage)?;
         if StorageArchive::decode(data.as_slice())? != storage {
             return Err(Error::InvalidFormat(
                 "TSWP text-storage wire patch failed validation".to_owned(),
             ));
         }
         let current_references = storage_object_references(&storage);
-        let removed_references = previous_references
+        removed_references = previous_references
             .into_iter()
             .filter(|identifier| !current_references.contains(identifier))
             .collect::<std::collections::HashSet<_>>();
@@ -1117,7 +1159,8 @@ fn replace_storage_text(
                 .retain(|identifier| !removed_references.contains(identifier));
         }
         Ok(())
-    })
+    })?;
+    remove_unreferenced_hyperlink_objects(package, &archive_name, &removed_references)
 }
 
 fn find_storage_archive(package: &IWorkPackage, object_id: u64) -> Result<String> {
@@ -1192,7 +1235,6 @@ fn adjust_storage_attributes(
     }
     for table in [
         &mut storage.table_attachment,
-        &mut storage.table_smartfield,
         &mut storage.table_bookmark,
         &mut storage.table_footnote,
         &mut storage.table_rubyfield,
@@ -1203,6 +1245,13 @@ fn adjust_storage_attributes(
     ] {
         adjust_object_table(table, &range, replacement_units, false)?;
     }
+    adjust_object_table(
+        &mut storage.table_smartfield,
+        &range,
+        replacement_units,
+        false,
+    )?;
+    normalize_smartfield_table(&mut storage.table_smartfield);
     // A drop-cap record is a paragraph-start boundary. Numbers commonly emits
     // an explicit index-zero entry with no style reference as a sentinel, and
     // replacing the paragraph text must not erase that structural marker.
@@ -1229,9 +1278,10 @@ fn patch_storage_text_wire(
     original: &[u8],
     range: &Range<usize>,
     replacement_units: usize,
-    text: &[String],
+    storage: &StorageArchive,
 ) -> Result<Vec<u8>> {
-    let text = text
+    let text = storage
+        .text
         .iter()
         .map(|value| value.as_bytes().to_vec())
         .collect::<Vec<_>>();
@@ -1241,10 +1291,22 @@ fn patch_storage_text_wire(
             adjust_index_table_wire(table, range, replacement_units, true)
         })?;
     }
-    for field in [9, 11, 15, 16, 18, 21, 22, 23, 27] {
+    for field in [9, 15, 16, 18, 21, 22, 23, 27] {
         data = transform_optional_table(&data, field, |table| {
             adjust_index_table_wire(table, range, replacement_units, false)
         })?;
+    }
+    let smart_field_tables = repeated_length_delimited_payloads(&data, 11)?;
+    if smart_field_tables.len() > 1 {
+        return Err(Error::InvalidFormat(format!(
+            "singular TSWP storage table field 11 occurs {} times",
+            smart_field_tables.len()
+        )));
+    }
+    if let Some(table) = smart_field_tables.first() {
+        let adjusted = adjust_index_table_wire(table, range, replacement_units, false)?;
+        let normalized = normalize_smartfield_table_wire(&adjusted)?;
+        data = patch_length_delimited_field(&data, 11, true, normalized.as_deref())?;
     }
     for field in [6, 14, 19, 20, 24] {
         data = transform_optional_table(&data, field, |table| {
@@ -1257,6 +1319,60 @@ fn patch_storage_text_wire(
         })?;
     }
     Ok(data)
+}
+
+fn normalize_smartfield_table(table: &mut Option<ObjectAttributeTable>) {
+    let Some(entries) = table.as_mut().map(|table| &mut table.entries) else {
+        return;
+    };
+    let Some(first_object) = entries.iter().position(|entry| entry.object.is_some()) else {
+        *table = None;
+        return;
+    };
+    if first_object > 1 {
+        entries.drain(..first_object - 1);
+    }
+    if entries[0].object.is_none() {
+        entries[0].character_index = 0;
+    } else if entries[0].character_index != 0 {
+        entries.insert(
+            0,
+            crate::protobuf::tswp::object_attribute_table::ObjectAttribute {
+                character_index: 0,
+                object: None,
+            },
+        );
+    }
+}
+
+fn normalize_smartfield_table_wire(table: &[u8]) -> Result<Option<Vec<u8>>> {
+    let mut entries = repeated_length_delimited_payloads(table, 1)?
+        .into_iter()
+        .map(|raw| {
+            let entry =
+                crate::protobuf::tswp::object_attribute_table::ObjectAttribute::decode(raw)?;
+            Ok((entry, raw.to_vec()))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let Some(first_object) = entries.iter().position(|(entry, _)| entry.object.is_some()) else {
+        return Ok(None);
+    };
+    if first_object > 1 {
+        entries.drain(..first_object - 1);
+    }
+    if entries[0].0.object.is_none() {
+        entries[0].0.character_index = 0;
+        entries[0].1 = patch_varint_field(&entries[0].1, 1, true, Some(0))?;
+    } else if entries[0].0.character_index != 0 {
+        let sentinel = crate::protobuf::tswp::object_attribute_table::ObjectAttribute {
+            character_index: 0,
+            object: None,
+        };
+        let raw = sentinel.encode_to_vec();
+        entries.insert(0, (sentinel, raw));
+    }
+    let entries = entries.into_iter().map(|(_, raw)| raw).collect::<Vec<_>>();
+    rewrite_repeated_length_delimited_fields(table, 1, &entries).map(Some)
 }
 
 fn transform_optional_table<F>(data: &[u8], field_number: u32, transform: F) -> Result<Vec<u8>>
