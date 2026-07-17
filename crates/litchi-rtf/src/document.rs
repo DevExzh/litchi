@@ -185,11 +185,10 @@ impl<'a> RtfDocument<'a> {
                     let mut owned_row = super::table::Row::new();
                     owned_row.set_direction(row.direction());
                     for cell in row.cells() {
-                        let owned_cell =
-                            super::table::Cell::new(Cow::Owned(cell.text().to_string()));
+                        let owned_cell = super::table::Cell::with_distances(Cow::Owned(cell.text().to_string()),cell.padding().clone(),cell.spacing().clone());
                         owned_row.add_cell(owned_cell);
                     }
-                    owned_table.add_row(owned_row);
+                    owned_row.set_padding(row.padding().clone());owned_row.set_spacing(row.spacing().clone());owned_table.add_row(owned_row);
                 }
                 owned_table
             })

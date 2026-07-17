@@ -39,6 +39,7 @@ pub mod volatile_dependencies;
 pub mod xml_maps;
 pub mod connections;
 pub mod chart;
+pub mod chartsheet;
 mod comments;
 pub mod conditional_formatting;
 pub mod data_validation;
@@ -74,6 +75,13 @@ pub mod threaded_comments;
 pub mod views;
 pub mod workbook;
 pub mod worksheet;
+pub use chartsheet::{
+    ChartSheet, ChartSheetChartResource, ChartSheetColor, ChartSheetConformance,
+    ChartSheetDrawingResource, ChartSheetEntry, ChartSheetHeaderFooter, ChartSheetMargins,
+    ChartSheetPackage, ChartSheetPageSetup, ChartSheetProperties, ChartSheetProtection,
+    ChartSheetState, ChartSheetView, PageOrientation, load_chartsheet, parse_chartsheet,
+    store_chartsheet, write_chartsheet,
+};
 pub mod writer;
 
 // Re-export main types for convenience

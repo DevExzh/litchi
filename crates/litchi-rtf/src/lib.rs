@@ -149,7 +149,8 @@ pub use shape::{
     ShapeGroup, ShapeLine, ShapeProperty, ShapeType, WrapMode,
 };
 pub use stylesheet::{Style, StyleSheet, StyleType};
-pub use table::{Cell, Row, Table};
+pub use table::{Cell, Row, Table, TableDistanceKind, TableDistanceScope, TableDistanceTarget,
+    TableDistanceUnit, TableEdge, TableEdgeDistances, TableSideDistance, MAX_TABLE_DISTANCE_TWIPS};
 pub use types::{
     Alignment, AssociatedCharacterFormatting, Color, ColorRef, ColorTable, DocumentElement, Font,
     FontFamily, FontPitch, FontRef, FontTable, Formatting, Indentation, Paragraph,

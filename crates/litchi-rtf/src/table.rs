@@ -6,6 +6,30 @@
 use crate::TextDirection;
 use std::borrow::Cow;
 
+pub const MAX_TABLE_DISTANCE_TWIPS: i32 = 31_680;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TableDistanceUnit { Null, Twips }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TableDistanceScope { Row, Cell }
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TableDistanceKind { Padding, Spacing }
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TableEdge { Left, Right, Top, Bottom }
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TableDistanceTarget { pub scope: TableDistanceScope, pub kind: TableDistanceKind, pub edge: TableEdge }
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct TableSideDistance { pub value: Option<u16>, pub unit: Option<TableDistanceUnit> }
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct TableEdgeDistances { pub left: TableSideDistance, pub right: TableSideDistance, pub top: TableSideDistance, pub bottom: TableSideDistance }
+impl TableEdgeDistances {
+    pub(crate) fn side_mut(&mut self, edge: TableEdge) -> &mut TableSideDistance { match edge { TableEdge::Left=>&mut self.left,TableEdge::Right=>&mut self.right,TableEdge::Top=>&mut self.top,TableEdge::Bottom=>&mut self.bottom } }
+    pub fn validate(&self) -> crate::RtfResult<()> { for side in [&self.left,&self.right,&self.top,&self.bottom] { if side.value.is_some_and(|value|i32::from(value)>MAX_TABLE_DISTANCE_TWIPS){return Err(crate::RtfError::MalformedDocument("RTF table distance is out of range".to_string()))} } Ok(()) }
+}
+
 /// A table in an RTF document.
 #[derive(Debug, Clone)]
 pub struct Table<'a> {
@@ -63,6 +87,8 @@ pub struct Row<'a> {
     cells: Vec<Cell<'a>>,
     /// Explicit row direction.
     direction: Option<TextDirection>,
+    padding: TableEdgeDistances,
+    spacing: TableEdgeDistances,
 }
 
 impl<'a> Row<'a> {
@@ -71,6 +97,8 @@ impl<'a> Row<'a> {
         Self {
             cells: Vec::new(),
             direction: None,
+            padding: TableEdgeDistances::default(),
+            spacing: TableEdgeDistances::default(),
         }
     }
 
@@ -98,6 +126,10 @@ impl<'a> Row<'a> {
     pub fn set_direction(&mut self, direction: Option<TextDirection>) {
         self.direction = direction;
     }
+    pub fn padding(&self)->&TableEdgeDistances{&self.padding}
+    pub fn spacing(&self)->&TableEdgeDistances{&self.spacing}
+    pub fn set_padding(&mut self,value:TableEdgeDistances){self.padding=value}
+    pub fn set_spacing(&mut self,value:TableEdgeDistances){self.spacing=value}
 }
 
 impl<'a> Default for Row<'a> {
@@ -111,16 +143,23 @@ impl<'a> Default for Row<'a> {
 pub struct Cell<'a> {
     /// Cell text content
     text: Cow<'a, str>,
+    padding: TableEdgeDistances,
+    spacing: TableEdgeDistances,
 }
 
 impl<'a> Cell<'a> {
     /// Create a new cell.
     pub fn new(text: Cow<'a, str>) -> Self {
-        Self { text }
+        Self { text, padding:TableEdgeDistances::default(), spacing:TableEdgeDistances::default() }
     }
+    pub fn with_distances(text:Cow<'a,str>,padding:TableEdgeDistances,spacing:TableEdgeDistances)->Self{Self{text,padding,spacing}}
 
     /// Get the cell text.
     pub fn text(&self) -> &str {
         &self.text
     }
+    pub fn padding(&self)->&TableEdgeDistances{&self.padding}
+    pub fn spacing(&self)->&TableEdgeDistances{&self.spacing}
+    pub fn set_padding(&mut self,value:TableEdgeDistances){self.padding=value}
+    pub fn set_spacing(&mut self,value:TableEdgeDistances){self.spacing=value}
 }

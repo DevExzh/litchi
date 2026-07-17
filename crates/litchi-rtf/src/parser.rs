@@ -276,6 +276,11 @@ struct State {
     in_table: bool,
     /// Cell boundaries for current row (in twips)
     cell_boundaries: SmallVec<[i32; 8]>,
+    table_row_padding: crate::TableEdgeDistances,
+    table_row_spacing: crate::TableEdgeDistances,
+    pending_cell_padding: crate::TableEdgeDistances,
+    pending_cell_spacing: crate::TableEdgeDistances,
+    cell_distances: SmallVec<[(crate::TableEdgeDistances, crate::TableEdgeDistances); 8]>,
     /// Current destination (for skipping non-document content)
     destination: Destination,
     /// Whether this body-flow group is an explicit section-format snapshot.
@@ -354,6 +359,12 @@ fn is_section_control(control: &ControlWord<'_>) -> bool {
     )
 }
 
+fn apply_table_distance(state:&mut State,target:crate::TableDistanceTarget,parameter:Option<i32>,unit:bool)->RtfResult<()> {
+    let value=parameter.ok_or_else(||RtfError::MalformedDocument("RTF table distance control requires a parameter".to_string()))?;
+    let distances=match (target.scope,target.kind){(crate::TableDistanceScope::Row,crate::TableDistanceKind::Padding)=>&mut state.table_row_padding,(crate::TableDistanceScope::Row,crate::TableDistanceKind::Spacing)=>&mut state.table_row_spacing,(crate::TableDistanceScope::Cell,crate::TableDistanceKind::Padding)=>&mut state.pending_cell_padding,(crate::TableDistanceScope::Cell,crate::TableDistanceKind::Spacing)=>&mut state.pending_cell_spacing};
+    let side=distances.side_mut(target.edge);if unit{side.unit=Some(match value{0=>crate::TableDistanceUnit::Null,3=>crate::TableDistanceUnit::Twips,_=>return Err(RtfError::MalformedDocument("RTF table distance unit must be 0 or 3".to_string()))});}else{if !(0..=crate::MAX_TABLE_DISTANCE_TWIPS).contains(&value){return Err(RtfError::MalformedDocument("RTF table distance value is out of range".to_string()))}side.value=Some(value as u16);}Ok(())
+}
+
 fn associated_font_ref(value: Option<i32>) -> RtfResult<FontRef> {
     let value = value.ok_or_else(|| {
         RtfError::MalformedDocument("RTF af control requires a numeric parameter".to_string())
@@ -394,6 +405,8 @@ impl Default for State {
             unicode_skip: 1,
             in_table: false,
             cell_boundaries: SmallVec::new(),
+            table_row_padding: Default::default(), table_row_spacing: Default::default(),
+            pending_cell_padding: Default::default(), pending_cell_spacing: Default::default(), cell_distances: SmallVec::new(),
             destination: Destination::DocumentBody,
             visible_section_format: false,
             section_column_number: None,
@@ -3672,6 +3685,7 @@ impl<'a> Parser<'a> {
             ControlWord::TableRowDefaults => {
                 // Start a new row definition
                 state.cell_boundaries.clear();
+                state.table_row_padding=Default::default();state.table_row_spacing=Default::default();state.pending_cell_padding=Default::default();state.pending_cell_spacing=Default::default();state.cell_distances.clear();
                 self.start_table_if_needed();
                 if let Some(row) = &mut self.current_row {
                     row.set_direction(None);
@@ -3702,13 +3716,17 @@ impl<'a> Parser<'a> {
             ControlWord::CellX(boundary) => {
                 // Cell boundary definition
                 state.cell_boundaries.push(*boundary);
+                if state.cell_distances.len()>=4096{return Err(RtfError::MalformedDocument("RTF row exceeds 4096 cell distance definitions".to_string()))}state.cell_distances.push((std::mem::take(&mut state.pending_cell_padding),std::mem::take(&mut state.pending_cell_spacing)));
             },
+            ControlWord::TableDistanceValue(target,value)=>apply_table_distance(state,*target,*value,false)?,
+            ControlWord::TableDistanceUnit(target,value)=>apply_table_distance(state,*target,*value,true)?,
             ControlWord::TableCell => {
                 // Cell break - finalize current cell
                 self.finalize_cell();
             },
             ControlWord::TableRow => {
                 // Row break - finalize current row
+                let row_padding=state.table_row_padding.clone();let row_spacing=state.table_row_spacing.clone();if let Some(row)=&mut self.current_row{row.set_padding(row_padding);row.set_spacing(row_spacing);}
                 self.finalize_row();
             },
 
@@ -8217,7 +8235,7 @@ impl<'a> Parser<'a> {
             // Convert cell text to string
             if let Ok(text_str) = std::str::from_utf8(&self.current_cell_text) {
                 let allocated = self.arena.alloc_str(text_str);
-                let cell = super::table::Cell::new(Cow::Borrowed(allocated));
+                let index=self.current_row.as_ref().map_or(0,|row|row.cell_count());let (padding,spacing)=self.current_state().ok().and_then(|state|state.cell_distances.get(index)).cloned().unwrap_or_default();let cell = super::table::Cell::with_distances(Cow::Borrowed(allocated),padding,spacing);
 
                 // Add cell to current row
                 if let Some(row) = &mut self.current_row {

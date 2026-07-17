@@ -44,6 +44,9 @@ mod access;
 /// BIFF8 default table and PivotTable style catalog metadata.
 mod table_styles;
 
+/// BIFF8 extended shared-string table lookup index.
+mod shared_string_index;
+
 /// BIFF8 formula error-checking shared features.
 mod formula_errors;
 
@@ -133,6 +136,7 @@ pub use vba::XlsVbaMetadata;
 pub use environment::{XlsLinkUpdateMode, XlsObjectDisplayMode, XlsWorkbookEnvironment};
 pub use access::{XlsWriteAccess, XlsWriteAccessEncoding};
 pub use table_styles::XlsTableStyles;
+pub use shared_string_index::{XlsSharedStringBucket, XlsSharedStringIndex};
 pub use formula_errors::{
     XlsFormulaErrorChecks, XlsFormulaErrorFeature, XlsFormulaErrorHeader,
     XlsFormulaErrorRange,

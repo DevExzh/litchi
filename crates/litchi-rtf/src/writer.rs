@@ -2928,10 +2928,14 @@ impl<W: Write> RtfWriter<W> {
                 None,
             )?;
         }
+        self.write_table_distances("trpadd","trpaddf",row.padding())?;
+        self.write_table_distances("trspd","trspdf",row.spacing())?;
 
         // Cell boundaries
         let cell_width = 2880; // Default cell width (2 inches)
-        for (i, _cell) in row.cells().iter().enumerate() {
+        for (i, cell) in row.cells().iter().enumerate() {
+            self.write_table_distances("clpad","clpadf",cell.padding())?;
+            self.write_table_distances("clspd","clspdf",cell.spacing())?;
             let boundary = cell_width * ((i + 1) as i32);
             self.write_control_word("cellx", Some(boundary))?;
         }
@@ -2951,6 +2955,10 @@ impl<W: Write> RtfWriter<W> {
         self.write_str("\n")?;
 
         Ok(())
+    }
+
+    fn write_table_distances(&mut self,value_prefix:&str,unit_prefix:&str,distances:&TableEdgeDistances)->io::Result<()> {
+        distances.validate().map_err(|error|io::Error::new(io::ErrorKind::InvalidInput,error.to_string()))?;for (suffix,side) in [("l",distances.left),("r",distances.right),("t",distances.top),("b",distances.bottom)]{if let Some(value)=side.value{self.write_control_word(&format!("{value_prefix}{suffix}"),Some(i32::from(value)))?;}if let Some(unit)=side.unit{self.write_control_word(&format!("{unit_prefix}{suffix}"),Some(match unit{TableDistanceUnit::Null=>0,TableDistanceUnit::Twips=>3}))?;}}Ok(())
     }
 
     /// Write a control word
