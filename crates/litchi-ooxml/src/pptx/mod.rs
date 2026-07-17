@@ -66,6 +66,7 @@ pub mod handout;
 pub mod hyperlinks;
 pub mod media;
 pub mod media_parts;
+pub mod notes;
 mod namespace;
 pub mod package;
 pub mod parts;
@@ -107,6 +108,10 @@ pub use media_parts::{
     SlideMediaConformance, SlideMediaKind, SlideMediaList, SlideMediaPicture,
     SlideMediaPoster, SlideMediaTransform, load_slide_media, parse_slide_media,
     store_slide_media, write_slide_media_pictures,
+};
+pub use notes::{
+    PptxNotesConformance, PptxNotesGraph, PptxNotesMasterResource,
+    PptxNotesSlideResource, PptxNotesThemeResource, load_notes_graph, store_notes_graph,
 };
 pub use package::Package;
 pub use parts::{ChartData, ChartSeries, ChartType};

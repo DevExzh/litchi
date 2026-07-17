@@ -39,6 +39,7 @@ use litchi_cfb::writer::OleWriter;
 use std::collections::HashMap;
 
 mod conditional_format;
+mod comment;
 mod data_validation;
 mod named_range;
 mod stream;
@@ -50,6 +51,7 @@ pub use self::conditional_format::{
     XlsConditionalFormatRange, XlsConditionalFormatRule, XlsConditionalFormatType,
     XlsConditionalPattern,
 };
+pub use self::comment::{XlsCommentAnchor, XlsCommentTextRunWrite, XlsCommentWriteOptions};
 pub use self::data_validation::{
     XlsDataValidation, XlsDataValidationErrorStyle, XlsDataValidationFormulaKind,
     XlsDataValidationImeMode, XlsDataValidationOperator, XlsDataValidationOptions,
@@ -1068,6 +1070,31 @@ impl XlsWriter {
             url: url.to_string(),
         });
 
+        Ok(())
+    }
+
+    /// Add a canonical, macro-inert BIFF8 comment to a cell.
+    pub fn add_comment(&mut self, sheet: usize, row: u32, col: u16, author: &str, text: &str) -> XlsResult<()> {
+        self.add_comment_with_options(sheet, row, col, author, text, XlsCommentWriteOptions::default())
+    }
+
+    /// Add a canonical BIFF8 comment with explicit visibility, anchor, rich runs, and GUID options.
+    pub fn add_comment_with_options(&mut self, sheet: usize, row: u32, col: u16, author: &str, text: &str, options: XlsCommentWriteOptions) -> XlsResult<()> {
+        let (row, column) = comment::validate_comment(row, col, author, text, &options)?;
+        let worksheet = self.worksheets.get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {sheet}")))?;
+        if worksheet.comments.len() >= 1022 {
+            return Err(XlsError::InvalidData("a worksheet cannot contain more than 1022 canonical comment shapes".to_string()));
+        }
+        if worksheet.comments.iter().any(|comment| comment.row == row && comment.column == column) {
+            return Err(XlsError::InvalidData("a cell cannot contain more than one comment".to_string()));
+        }
+        if let Some(guid) = options.guid
+            && worksheet.comments.iter().any(|comment| comment.options.guid == Some(guid))
+        {
+            return Err(XlsError::InvalidData("comment GUID override is duplicated on the worksheet".to_string()));
+        }
+        worksheet.add_comment(comment::WritableComment { row, column, author: author.to_string(), text: text.to_string(), options });
         Ok(())
     }
 

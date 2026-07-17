@@ -336,6 +336,8 @@ mod bibliography_configuration;
 pub use bibliography_configuration::{
     OdfBibliographyConfiguration, OdfBibliographyField, OdfBibliographySortKey,
 };
+mod data_styles;
+pub use data_styles::*;
 /// Inert semantic discovery of embedded OpenDocument and OLE objects.
 mod embedded_object;
 /// OpenDocument database front-end (.odb) support.

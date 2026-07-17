@@ -55,6 +55,7 @@ pub struct RtfWriter<W: Write> {
 enum BodyEventKind<'b, 'a> {
     GeneratedListMarker(&'b crate::GeneratedListMarker<'a>),
     LegacyTextBox(&'b crate::LegacyTextBox<'a>),
+    LegacyDrawing(&'b crate::LegacyDrawing<'a>),
     NavigationEntry(&'b crate::NavigationEntry<'a>),
     BookmarkStart(&'b Bookmark<'a>),
     BookmarkEnd(&'b Bookmark<'a>),
@@ -195,6 +196,7 @@ impl<W: Write> RtfWriter<W> {
             doc.navigation_entries(),
             doc.generated_list_markers(),
             doc.legacy_text_boxes(),
+            doc.legacy_drawings(),
             doc.form_fields(),
         )?;
 
@@ -1726,6 +1728,7 @@ impl<W: Write> RtfWriter<W> {
         navigation_entries: &[crate::NavigationEntry<'_>],
         generated_list_markers: &[crate::GeneratedListMarker<'_>],
         legacy_text_boxes: &[crate::LegacyTextBox<'_>],
+        legacy_drawings: &[crate::LegacyDrawing<'_>],
         form_fields: &[crate::FormField<'_>],
     ) -> io::Result<()> {
         if bookmarks.bookmarks().is_empty()
@@ -1734,6 +1737,7 @@ impl<W: Write> RtfWriter<W> {
             && navigation_entries.is_empty()
             && generated_list_markers.is_empty()
             && legacy_text_boxes.is_empty()
+            && legacy_drawings.is_empty()
             && form_fields.is_empty()
         {
             for block in blocks {
@@ -1750,6 +1754,7 @@ impl<W: Write> RtfWriter<W> {
             .saturating_add(revisions.len())
             .saturating_mul(2);
         let event_count = event_count.saturating_add(navigation_entries.len());
+        let event_count = event_count.saturating_add(legacy_drawings.len());
         let event_count = event_count.saturating_add(form_fields.len().saturating_mul(2));
         let mut events = Vec::with_capacity(event_count);
         if form_fields.len() > crate::form_field::MAX_FORM_FIELDS {
@@ -1916,6 +1921,37 @@ impl<W: Write> RtfWriter<W> {
                 kind: BodyEventKind::LegacyTextBox(text_box),
             });
             previous_legacy_text_box_position = Some(text_box.position);
+        }
+
+        if legacy_drawings.len() > crate::MAX_LEGACY_DRAWINGS {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "RTF legacy drawing count exceeds the safety limit",
+            ));
+        }
+        let mut previous_legacy_drawing_position = None;
+        for drawing in legacy_drawings {
+            drawing
+                .validate()
+                .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+            if body.get(drawing.position..drawing.position).is_none() {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF legacy drawing position is not a UTF-8 body boundary",
+                ));
+            }
+            if previous_legacy_drawing_position.is_some_and(|position| position > drawing.position) {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF legacy drawings are not ordered by body position",
+                ));
+            }
+            events.push(BodyEvent {
+                offset: drawing.position,
+                order: 1,
+                kind: BodyEventKind::LegacyDrawing(drawing),
+            });
+            previous_legacy_drawing_position = Some(drawing.position);
         }
 
         if navigation_entries.len() > crate::navigation_entry::MAX_NAVIGATION_ENTRIES {
@@ -2116,6 +2152,7 @@ impl<W: Write> RtfWriter<W> {
                 self.write_generated_list_marker(marker)
             },
             BodyEventKind::LegacyTextBox(text_box) => self.write_legacy_text_box(text_box),
+            BodyEventKind::LegacyDrawing(drawing) => self.write_legacy_drawing(drawing),
             BodyEventKind::NavigationEntry(entry) => self.write_navigation_entry(entry),
             BodyEventKind::BookmarkStart(bookmark) => self.write_bookmark_start(bookmark),
             BodyEventKind::BookmarkEnd(bookmark) => self.write_bookmark_end(bookmark.name.as_ref()),
@@ -2200,6 +2237,210 @@ impl<W: Write> RtfWriter<W> {
         }
         self.write_destination_text(&text_box.text[start..])?;
         self.write_str("}}")
+    }
+
+    /// Write one inert Word 6/95 drawing destination canonically.
+    pub fn write_legacy_drawing(&mut self, drawing: &crate::LegacyDrawing<'_>) -> io::Result<()> {
+        drawing
+            .validate()
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+        self.write_str("{\\*\\do")?;
+        self.write_control_word(
+            match drawing.horizontal_anchor {
+                crate::LegacyHorizontalAnchor::Page => "dobxpage",
+                crate::LegacyHorizontalAnchor::Margin => "dobxmargin",
+                crate::LegacyHorizontalAnchor::Column => "dobxcolumn",
+            },
+            None,
+        )?;
+        self.write_control_word(
+            match drawing.vertical_anchor {
+                crate::LegacyVerticalAnchor::Page => "dobypage",
+                crate::LegacyVerticalAnchor::Margin => "dobymargin",
+                crate::LegacyVerticalAnchor::Paragraph => "dobypara",
+            },
+            None,
+        )?;
+        self.write_control_word("dodhgt", Some(drawing.z_order))?;
+        if drawing.locked { self.write_control_word("dolock", None)?; }
+        self.write_legacy_drawing_primitive(&drawing.primitive)?;
+        self.write_str("}")
+    }
+
+    fn write_legacy_geometry(&mut self, geometry: crate::LegacyDrawingGeometry) -> io::Result<()> {
+        self.write_control_word("dpx", Some(geometry.x))?;
+        self.write_control_word("dpy", Some(geometry.y))?;
+        self.write_control_word("dpxsize", Some(geometry.width))?;
+        self.write_control_word("dpysize", Some(geometry.height))
+    }
+
+    fn write_legacy_point(&mut self, point: crate::LegacyDrawingPoint) -> io::Result<()> {
+        self.write_control_word("dpptx", Some(point.x))?;
+        self.write_control_word("dppty", Some(point.y))
+    }
+
+    fn write_legacy_drawing_primitive(&mut self, primitive: &crate::LegacyDrawingPrimitive<'_>) -> io::Result<()> {
+        match primitive {
+            crate::LegacyDrawingPrimitive::Group { geometry, children, end_geometry } => {
+                self.write_control_word("dpgroup", None)?;
+                let count = i32::try_from(children.len()).map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "legacy drawing child count overflow"))?;
+                self.write_control_word("dpcount", Some(count))?;
+                self.write_legacy_geometry(*geometry)?;
+                for child in children { self.write_legacy_drawing_primitive(child)?; }
+                self.write_control_word("dpendgroup", None)?;
+                self.write_legacy_geometry(*end_geometry)
+            },
+            crate::LegacyDrawingPrimitive::Callout(callout) => {
+                self.write_control_word("dpcallout", None)?;
+                self.write_control_word(match callout.callout_type {
+                    crate::LegacyCalloutType::RightAngle => "dpcotright",
+                    crate::LegacyCalloutType::Single => "dpcotsingle",
+                    crate::LegacyCalloutType::Double => "dpcotdouble",
+                    crate::LegacyCalloutType::Triple => "dpcottriple",
+                }, None)?;
+                if let Some(angle) = callout.angle { self.write_control_word("dpcoa", Some(i32::from(angle)))?; }
+                if callout.accent { self.write_control_word("dpcoaccent", None)?; }
+                if callout.smart_attach { self.write_control_word("dpcosmarta", None)?; }
+                if callout.best_fit { self.write_control_word("dpcobestfit", None)?; }
+                if callout.minus_x { self.write_control_word("dpcominusx", None)?; }
+                if callout.minus_y { self.write_control_word("dpcominusy", None)?; }
+                if callout.border { self.write_control_word("dpcoborder", None)?; }
+                if let Some(attachment) = callout.attachment { self.write_control_word(match attachment {
+                    crate::LegacyCalloutAttachment::Top => "dpcodtop",
+                    crate::LegacyCalloutAttachment::Center => "dpcodcenter",
+                    crate::LegacyCalloutAttachment::Bottom => "dpcodbottom",
+                    crate::LegacyCalloutAttachment::Absolute => "dpcodabs",
+                }, None)?; }
+                if let Some(value) = callout.descent { self.write_control_word("dpcodescent", Some(value))?; }
+                self.write_control_word("dpcooffset", Some(callout.offset))?;
+                self.write_control_word("dpcolength", Some(callout.length))?;
+                self.write_legacy_geometry(callout.geometry)?;
+                self.write_legacy_drawing_primitive(&callout.polyline)?;
+                self.write_legacy_drawing_primitive(&callout.text_box)?;
+                self.write_legacy_properties(callout.properties)
+            },
+            crate::LegacyDrawingPrimitive::Line { start, end, geometry, properties } => {
+                self.write_control_word("dpline", None)?;
+                self.write_legacy_point(*start)?;
+                self.write_legacy_point(*end)?;
+                self.write_legacy_geometry(*geometry)?;
+                self.write_legacy_properties(*properties)
+            },
+            crate::LegacyDrawingPrimitive::Rectangle { rounded, geometry, properties } => {
+                self.write_control_word("dprect", None)?;
+                if *rounded { self.write_control_word("dproundr", None)?; }
+                self.write_legacy_geometry(*geometry)?;
+                self.write_legacy_properties(*properties)
+            },
+            crate::LegacyDrawingPrimitive::TextBox { text_box, properties } => {
+                self.write_control_word("dptxbx", None)?;
+                if let Some(value) = text_box.margin { self.write_control_word("dptxbxmar", Some(value))?; }
+                if text_box.direction != crate::LegacyTextDirection::LeftToRightTopToBottom {
+                    self.write_control_word(match text_box.direction {
+                        crate::LegacyTextDirection::LeftToRightTopToBottom => "dptxlrtb",
+                        crate::LegacyTextDirection::LeftToRightTopToBottomVertical => "dptxlrtbv",
+                        crate::LegacyTextDirection::TopToBottomRightToLeft => "dptxtbrl",
+                        crate::LegacyTextDirection::TopToBottomRightToLeftVertical => "dptxtbrlv",
+                        crate::LegacyTextDirection::BottomToTopLeftToRight => "dptxbtlr",
+                    }, None)?;
+                }
+                self.write_legacy_text_box_text(text_box)?;
+                self.write_legacy_geometry(crate::LegacyDrawingGeometry {
+                    x: text_box.x.unwrap_or(0), y: text_box.y.unwrap_or(0),
+                    width: text_box.width.unwrap_or(0), height: text_box.height.unwrap_or(0),
+                })?;
+                self.write_legacy_properties(*properties)
+            },
+            crate::LegacyDrawingPrimitive::Ellipse { geometry, properties } => {
+                self.write_control_word("dpellipse", None)?;
+                self.write_legacy_geometry(*geometry)?;
+                self.write_legacy_properties(*properties)
+            },
+            crate::LegacyDrawingPrimitive::Polyline { closed, points, geometry, properties } => {
+                self.write_control_word("dppolyline", None)?;
+                if *closed { self.write_control_word("dppolygon", None)?; }
+                let count = i32::try_from(points.len()).map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "legacy drawing point count overflow"))?;
+                self.write_control_word("dppolycount", Some(count))?;
+                for point in points { self.write_legacy_point(*point)?; }
+                self.write_legacy_geometry(*geometry)?;
+                self.write_legacy_properties(*properties)
+            },
+            crate::LegacyDrawingPrimitive::Arc { flip_x, flip_y, geometry, properties } => {
+                self.write_control_word("dparc", None)?;
+                if *flip_x { self.write_control_word("dparcflipx", None)?; }
+                if *flip_y { self.write_control_word("dparcflipy", None)?; }
+                self.write_legacy_geometry(*geometry)?;
+                self.write_legacy_properties(*properties)
+            },
+        }
+    }
+
+    fn write_legacy_text_box_text(&mut self, text_box: &crate::LegacyTextBox<'_>) -> io::Result<()> {
+        self.write_str("{\\dptxbxtext ")?;
+        let mut start = 0;
+        for (index, character) in text_box.text.char_indices() {
+            if character != '\t' && character != '\n' { continue; }
+            self.write_destination_text(&text_box.text[start..index])?;
+            self.write_str(if character == '\t' { "\\tab " } else { "\\par " })?;
+            start = index + character.len_utf8();
+        }
+        self.write_destination_text(&text_box.text[start..])?;
+        self.write_str("}")
+    }
+
+    fn write_legacy_color(
+        &mut self,
+        gray: &str,
+        red_control: &str,
+        green_control: &str,
+        blue_control: &str,
+        palette_control: &str,
+        color: crate::LegacyDrawingColor,
+    ) -> io::Result<()> {
+        match color {
+            crate::LegacyDrawingColor::Gray(value) => self.write_control_word(gray, Some(i32::from(value))),
+            crate::LegacyDrawingColor::Rgb { red, green, blue, palette } => {
+                self.write_control_word(red_control, Some(i32::from(red)))?;
+                self.write_control_word(green_control, Some(i32::from(green)))?;
+                self.write_control_word(blue_control, Some(i32::from(blue)))?;
+                if palette { self.write_control_word(palette_control, None)?; }
+                Ok(())
+            },
+        }
+    }
+
+    fn write_legacy_arrow(&mut self, prefix: &str, arrow: crate::LegacyDrawingArrow) -> io::Result<()> {
+        self.write_control_word(&format!("{prefix}{}", match arrow.fill { crate::LegacyDrawingArrowFill::Solid => "sol", crate::LegacyDrawingArrowFill::Hollow => "hol" }), None)?;
+        self.write_control_word(&format!("{prefix}l"), Some(arrow.length as i32))?;
+        self.write_control_word(&format!("{prefix}w"), Some(arrow.width as i32))
+    }
+
+    fn write_legacy_properties(&mut self, properties: crate::LegacyDrawingProperties) -> io::Result<()> {
+        if let Some(line) = properties.line {
+            self.write_control_word(match line.style {
+                crate::LegacyDrawingLineStyle::Solid => "dplinesolid",
+                crate::LegacyDrawingLineStyle::Hollow => "dplinehollow",
+                crate::LegacyDrawingLineStyle::Dashed => "dplinedash",
+                crate::LegacyDrawingLineStyle::Dotted => "dplinedot",
+                crate::LegacyDrawingLineStyle::DashDot => "dplinedado",
+                crate::LegacyDrawingLineStyle::DashDotDot => "dplinedadodo",
+            }, None)?;
+            self.write_legacy_color("dplinegray", "dplinecor", "dplinecog", "dplinecob", "dplinepal", line.color)?;
+            self.write_control_word("dplinew", Some(line.width))?;
+        }
+        if let Some(fill) = properties.fill {
+            self.write_legacy_color("dpfillfggray", "dpfillfgcr", "dpfillfgcg", "dpfillfgcb", "dpfillfgpal", fill.foreground)?;
+            self.write_legacy_color("dpfillbggray", "dpfillbgcr", "dpfillbgcg", "dpfillbgcb", "dpfillbgpal", fill.background)?;
+            self.write_control_word("dpfillpat", Some(fill.pattern as i32))?;
+        }
+        if let Some(arrow) = properties.start_arrow { self.write_legacy_arrow("dpastart", arrow)?; }
+        if let Some(arrow) = properties.end_arrow { self.write_legacy_arrow("dpaend", arrow)?; }
+        if let Some(shadow) = properties.shadow {
+            self.write_control_word("dpshadow", None)?;
+            self.write_control_word("dpshadx", Some(shadow.x_offset))?;
+            self.write_control_word("dpshady", Some(shadow.y_offset))?;
+        }
+        Ok(())
     }
 
     /// Write one inert generated list-marker destination.

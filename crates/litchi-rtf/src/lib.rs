@@ -44,6 +44,7 @@ mod xml_namespace;
 mod theme;
 mod latent_style;
 mod legacy_text_box;
+mod legacy_drawing;
 mod legacy_numbering;
 mod paragraph_group;
 mod note_options;
@@ -96,6 +97,15 @@ pub use theme::DocumentTheme;
 pub use latent_style::{LatentStyleException, LatentStyles};
 pub use legacy_text_box::{
     LegacyHorizontalAnchor, LegacyTextBox, LegacyTextDirection, LegacyVerticalAnchor,
+};
+pub use legacy_drawing::{
+    LegacyCallout, LegacyCalloutAttachment, LegacyCalloutType, LegacyDrawing,
+    LegacyDrawingArrow, LegacyDrawingArrowFill, LegacyDrawingArrowSize, LegacyDrawingColor,
+    LegacyDrawingFill, LegacyDrawingFillPattern, LegacyDrawingGeometry, LegacyDrawingLine,
+    LegacyDrawingLineStyle, LegacyDrawingPoint, LegacyDrawingPrimitive, LegacyDrawingProperties,
+    LegacyDrawingShadow, MAX_LEGACY_DRAWINGS, MAX_LEGACY_DRAWING_DEPTH,
+    MAX_LEGACY_DRAWING_POINTS, MAX_LEGACY_DRAWING_PRIMITIVES,
+    MAX_LEGACY_DRAWING_TOTAL_POINTS,
 };
 pub use legacy_numbering::{
     LegacyNumberingAlignment, LegacyNumberingFormat, LegacySectionNumbering,

@@ -170,14 +170,16 @@ impl CommentCollector {
             if record_type != MSODRAWING_TYPE {
                 return invalid(format!("comment OBJ {object_id} must be followed by its MSODRAWING textbox"));
             }
+            if data.len() != 8 || u16_at(data, 0)? != 0 || u16_at(data, 2)? != 0xF00D
+                || u32_at(data, 4)? != 0
+            {
+                return invalid(format!("comment object {object_id} must be followed by an exact OfficeArtClientTextbox boundary"));
+            }
             self.awaiting_txo = Some(object_id);
             return Ok(());
         }
 
         if let Some(object_id) = self.awaiting_txo {
-            if record_type == CONTINUE_TYPE {
-                return Ok(());
-            }
             if record_type != TXO_TYPE {
                 return invalid(format!("comment object {object_id} textbox must be followed by TXO"));
             }
@@ -534,6 +536,8 @@ mod tests {
         data
     }
 
+    fn client_textbox() -> [u8; 8] { [0, 0, 0x0D, 0xF0, 0, 0, 0, 0] }
+
     fn note(object_id: u16, flags: u16) -> Vec<u8> {
         let mut data = Vec::new();
         data.extend_from_slice(&5u16.to_le_bytes());
@@ -561,7 +565,7 @@ mod tests {
     fn links_obj_txo_continues_and_note() {
         let mut collector = CommentCollector::new();
         collector.feed_record(OBJ_TYPE, &obj(7)).unwrap();
-        collector.feed_record(MSODRAWING_TYPE, &[0; 8]).unwrap();
+        collector.feed_record(MSODRAWING_TYPE, &client_textbox()).unwrap();
         collector.feed_record(TXO_TYPE, &txo(5, 16)).unwrap();
         collector.feed_record(CONTINUE_TYPE, b"\0Hello").unwrap();
         collector.feed_record(CONTINUE_TYPE, &runs(5)).unwrap();
@@ -582,7 +586,7 @@ mod tests {
     fn assembles_mixed_segmented_unicode_without_splitting_surrogates() {
         let mut collector = CommentCollector::new();
         collector.feed_record(OBJ_TYPE, &obj(8)).unwrap();
-        collector.feed_record(MSODRAWING_TYPE, &[]).unwrap();
+        collector.feed_record(MSODRAWING_TYPE, &client_textbox()).unwrap();
         collector.feed_record(TXO_TYPE, &txo(3, 16)).unwrap();
         collector.feed_record(CONTINUE_TYPE, b"\0A").unwrap();
         let mut wide = vec![1];
@@ -605,6 +609,10 @@ mod tests {
         let mut collector = CommentCollector::new();
         collector.feed_record(OBJ_TYPE, &obj(1)).unwrap();
         assert!(collector.feed_record(TXO_TYPE, &txo(1, 16)).is_err());
+
+        let mut collector = CommentCollector::new();
+        collector.feed_record(OBJ_TYPE, &obj(2)).unwrap();
+        assert!(collector.feed_record(MSODRAWING_TYPE, &[0; 8]).is_err());
 
         let mut bad_runs = runs(2);
         bad_runs[8..10].copy_from_slice(&1u16.to_le_bytes());

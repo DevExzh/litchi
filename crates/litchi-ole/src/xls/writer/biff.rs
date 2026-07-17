@@ -20,6 +20,7 @@ use crate::xls::writer::XlsDefinedName;
 use std::io::Write;
 
 mod cells;
+mod comment;
 mod conditional_format;
 mod modern_globals;
 mod named_range;
@@ -34,6 +35,7 @@ mod worksheet;
 
 pub(crate) use cells::write_formula;
 pub(crate) use conditional_format::Cf12Config;
+pub(crate) use comment::{CommentConfig, write_comments};
 
 pub(crate) use modern_globals::{
     sxdbex_creation_timestamp_bytes, write_compat12, write_compress_pictures,

@@ -131,6 +131,7 @@ pub mod protection;
 pub mod writer;
 
 pub use cell::XlsCell;
+pub use comments::CommentVisibility;
 pub use calculation::{
     XlsCalculationMode, XlsReferenceMode, XlsWorkbookCalculation, XlsWorksheetCalculation,
 };

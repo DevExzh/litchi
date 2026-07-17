@@ -14,7 +14,7 @@
 //! - MS-XLS sections 2.4.271–2.4.283
 //! - Reader counterpart: `crate::xls::pivot_table`
 
-use crate::xls::XlsResult;
+use crate::xls::{XlsError, XlsResult};
 use std::io::Write;
 
 use super::write_record_header;
@@ -604,12 +604,6 @@ struct EscherProperty {
 }
 
 #[derive(Clone, Copy)]
-struct DrawingGroupCluster {
-    drawing_group_id: u32,
-    used_shape_ids: u32,
-}
-
-#[derive(Clone, Copy)]
 struct ObjSubrecordHeader {
     sid: u16,
     data_size: u16,
@@ -759,14 +753,22 @@ fn write_escher_client_anchor<W: Write>(
 
 /// Write a MsoDrawingGroup record (0x00EB) to the globals stream.
 /// This initializes the Escher drawing container group for the workbook.
-pub fn write_mso_drawing_group<W: Write>(writer: &mut W) -> XlsResult<()> {
-    write_record_header(writer, MSO_DRAWING_GROUP_RECORD_ID, 98)?;
+pub fn write_mso_drawing_group<W: Write>(writer: &mut W, clusters: &[(u32, u32)]) -> XlsResult<()> {
+    if clusters.is_empty() {
+        return Err(XlsError::InvalidData("MsoDrawingGroup requires at least one drawing cluster".to_string()));
+    }
+    let fdgg_length = 16usize.checked_add(clusters.len() * 8).ok_or_else(|| XlsError::InvalidData("drawing group size overflows".to_string()))?;
+    let container_length = fdgg_length + 66;
+    if container_length > 8224 {
+        return Err(XlsError::InvalidData("MsoDrawingGroup exceeds 8224 bytes".to_string()));
+    }
+    write_record_header(writer, MSO_DRAWING_GROUP_RECORD_ID, container_length as u16)?;
     write_escher_record_header(
         writer,
         EscherRecordHeader {
             options: 0x000F,
             record_id: ESCHER_DGG_CONTAINER,
-            data_size: 0x5A,
+            data_size: (container_length - 8) as u32,
         },
     )?;
     write_escher_record_header(
@@ -774,25 +776,17 @@ pub fn write_mso_drawing_group<W: Write>(writer: &mut W) -> XlsResult<()> {
         EscherRecordHeader {
             options: 0x0000,
             record_id: ESCHER_DGG,
-            data_size: 0x20,
+            data_size: fdgg_length as u32,
         },
     )?;
-    writer.write_all(&0x0000_0802u32.to_le_bytes())?;
-    writer.write_all(&3u32.to_le_bytes())?;
-    writer.write_all(&3u32.to_le_bytes())?;
-    writer.write_all(&2u32.to_le_bytes())?;
-    for cluster in [
-        DrawingGroupCluster {
-            drawing_group_id: 1,
-            used_shape_ids: 1,
-        },
-        DrawingGroupCluster {
-            drawing_group_id: 2,
-            used_shape_ids: 2,
-        },
-    ] {
-        writer.write_all(&cluster.drawing_group_id.to_le_bytes())?;
-        writer.write_all(&cluster.used_shape_ids.to_le_bytes())?;
+    let spid_max = clusters.iter().map(|(drawing_id, used)| (drawing_id << 10) + used).max().unwrap();
+    writer.write_all(&spid_max.to_le_bytes())?;
+    writer.write_all(&(clusters.len() as u32 + 1).to_le_bytes())?;
+    writer.write_all(&clusters.iter().map(|(_, used)| *used).sum::<u32>().to_le_bytes())?;
+    writer.write_all(&(clusters.len() as u32).to_le_bytes())?;
+    for &(drawing_group_id, used_shape_ids) in clusters {
+        writer.write_all(&drawing_group_id.to_le_bytes())?;
+        writer.write_all(&used_shape_ids.to_le_bytes())?;
     }
     write_escher_record_header(
         writer,

@@ -25,6 +25,7 @@ pub mod row_blocks;
 pub use biff::{AutoFilterConditionWrite, write_cfex12_marker, write_cfheader};
 pub use core::{
     PivotCacheValue, XlsCalculationSettings, XlsCellValue, XlsConditionalFormat,
+    XlsCommentAnchor, XlsCommentTextRunWrite, XlsCommentWriteOptions,
     XlsConditionalFormat12Group, XlsConditionalFormat12Rule, XlsConditionalFormat12Type,
     XlsConditionalFormatGroup, XlsConditionalFormatOperator, XlsConditionalFormatRange,
     XlsConditionalFormatRule, XlsConditionalFormatType,

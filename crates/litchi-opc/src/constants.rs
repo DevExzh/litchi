@@ -352,6 +352,10 @@ pub mod relationship_type {
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide";
     pub const NOTES_MASTER: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesMaster";
+    pub const STRICT_NOTES_SLIDE: &str =
+        "http://purl.oclc.org/ooxml/officeDocument/relationships/notesSlide";
+    pub const STRICT_NOTES_MASTER: &str =
+        "http://purl.oclc.org/ooxml/officeDocument/relationships/notesMaster";
     pub const HANDOUT_MASTER: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/handoutMaster";
     pub const COMMENT_AUTHORS: &str =

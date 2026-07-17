@@ -4,6 +4,7 @@ use super::{
     XlsCellValue, XlsConditionalFormat, XlsConditionalFormat12Group, XlsConditionalFormatGroup, XlsConditionalFormatRange, XlsConditionalFormatRule, XlsDataValidation, XlsDataValidationOptions,
     XlsDataValidationRange, XlsDataValidationTableOptions, XlsPageSetupOptions,
 };
+use super::comment::WritableComment;
 use crate::xls::writer::biff::AutoFilterConditionWrite;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -108,6 +109,7 @@ pub(super) struct WritableWorksheet {
     pub auto_filter: Option<AutoFilterRange>,
     /// Cell or range hyperlinks stored for this worksheet.
     pub hyperlinks: Vec<XlsHyperlink>,
+    pub comments: Vec<WritableComment>,
     /// Per-column AutoFilter conditions.
     pub auto_filter_columns: Vec<AutoFilterColumnDef>,
     /// Sort configuration.
@@ -169,6 +171,7 @@ impl WritableWorksheet {
             vertical_page_breaks: Vec::new(),
             auto_filter: None,
             hyperlinks: Vec::new(),
+            comments: Vec::new(),
             auto_filter_columns: Vec::new(),
             sort_config: None,
             pivot_tables: Vec::new(),
@@ -243,6 +246,10 @@ impl WritableWorksheet {
 
     pub(super) fn add_hyperlink(&mut self, hyperlink: XlsHyperlink) {
         self.hyperlinks.push(hyperlink);
+    }
+
+    pub(super) fn add_comment(&mut self, comment: WritableComment) {
+        self.comments.push(comment);
     }
 
     pub(super) fn show_column(&mut self, col: u16) {

@@ -89,10 +89,8 @@ fn rejects_misplaced_malformed_active_and_binary_legacy_text_boxes() {
 }
 
 #[test]
-fn ignores_unrelated_inert_legacy_drawings() {
-    let document = RtfDocument::parse(r#"{\rtf1 A{\*\do\dpline\dpx1}B}"#).unwrap();
-    assert_eq!(document.text(), "AB");
-    assert!(document.legacy_text_boxes().is_empty());
+fn rejects_malformed_non_text_legacy_drawings() {
+    assert!(RtfDocument::parse(r#"{\rtf1 A{\*\do\dpline\dpx1}B}"#).is_err());
 }
 
 fn isolated_drawing(fixture: &[u8]) -> Vec<u8> {

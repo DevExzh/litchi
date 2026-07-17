@@ -540,6 +540,18 @@ impl Package {
         crate::embedded_object::discover_embedded_parts(&self.opc)
     }
 
+    /// Load the bounded, inert notes-slide/notes-master graph.
+    pub fn notes_graph(&self) -> Result<Option<crate::pptx::notes::PptxNotesGraph>> {
+        let presentation = self.opc.main_document_part()?.partname().clone();
+        crate::pptx::notes::load_notes_graph(&self.opc, &presentation)
+    }
+
+    /// Deterministically store an already coherent bounded notes graph.
+    pub fn store_notes_graph(&mut self, graph: &crate::pptx::notes::PptxNotesGraph) -> Result<()> {
+        let presentation = self.opc.main_document_part()?.partname().clone();
+        crate::pptx::notes::store_notes_graph(&mut self.opc, &presentation, graph)
+    }
+
     /// Get mutable access to the underlying OPC package.
     ///
     /// This provides access to lower-level package operations for modification.
@@ -1015,7 +1027,7 @@ impl Package {
         temp_pres_part.relate_to("theme/theme1.xml", rt::THEME);
 
         // Add relationship to notesMaster (required when we have notesSlides)
-        let _notes_master_rel_id =
+        let notes_master_rel_id =
             temp_pres_part.relate_to("notesMasters/notesMaster1.xml", rt::NOTES_MASTER);
 
         // Add relationship to commentAuthors if there are comments
@@ -1294,7 +1306,7 @@ impl Package {
         // Note: notesMasterIdLst is NOT required for handout master (per python-pptx reference)
         let pres_xml = pres.generate_presentation_xml_with_rels(
             Some(&slide_rel_ids),
-            None, // notesMasterIdLst not needed
+            Some(&notes_master_rel_id),
             handout_rel_id.as_deref(),
         )?;
         temp_pres_part.set_blob(pres_xml.into_bytes());

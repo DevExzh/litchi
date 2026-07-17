@@ -2,7 +2,6 @@
 use crate::error::Result;
 use crate::pptx::parts::{SlideLayoutPart, SlideMasterPart, SlidePart};
 use crate::pptx::shapes::base::BaseShape;
-use litchi_opc::packuri::PackURI;
 
 /// A slide in a presentation.
 ///
@@ -425,35 +424,16 @@ impl<'a> Slide<'a> {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn notes(&self) -> Result<Option<String>> {
-        // Check if we have package reference
-        let package = match self.package {
-            Some(pkg) => pkg,
-            None => return Ok(None),
-        };
-
-        // Look for notes relationship
-        let slide_part = self.part.part();
-        let rels = slide_part.rels();
-
-        // Find the notes relationship (type is notesSlide)
-        let notes_rel = rels.iter().find(|rel| {
-            rel.reltype()
-                == "http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide"
-        });
-
-        if let Some(rel) = notes_rel {
-            // Get the notes part
-            let base_uri = slide_part.partname().base_uri();
-            let notes_partname = PackURI::from_rel_ref(base_uri, rel.target_ref())
-                .map_err(crate::error::OoxmlError::InvalidFormat)?;
-
-            if let Ok(notes_part) = package.get_part(&notes_partname) {
-                // Extract text from notes
-                return Self::extract_notes_text(notes_part.blob());
-            }
+        match self.notes_resource()? {
+            Some(resource) => resource.text(),
+            None => Ok(None),
         }
+    }
 
-        Ok(None)
+    /// Get the validated inert raw notes-slide resource for this slide.
+    pub fn notes_resource(&self) -> Result<Option<crate::pptx::notes::PptxNotesSlideResource>> {
+        let Some(package) = self.package else { return Ok(None); };
+        crate::pptx::notes::load_slide_notes_resource(package, self.part.part().partname())
     }
 
     /// Extract text from notes XML.

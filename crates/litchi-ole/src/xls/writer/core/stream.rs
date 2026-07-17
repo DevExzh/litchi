@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::xls::writer::biff;
 use crate::xls::writer::formatting::FormattingManager;
@@ -321,6 +321,22 @@ pub(crate) fn generate_workbook_stream(
         }
     }
 
+    let mut drawing_clusters = Vec::<(u32, u32)>::new();
+    if has_any_page_fields {
+        drawing_clusters.extend_from_slice(&[(1, 1), (2, 2)]);
+    }
+    let mut next_comment_drawing_id = if has_any_page_fields { 3u32 } else { 1u32 };
+    let comment_drawing_ids = worksheets.iter().map(|worksheet| {
+        if worksheet.comments.is_empty() {
+            None
+        } else {
+            let drawing_id = next_comment_drawing_id;
+            next_comment_drawing_id += 1;
+            drawing_clusters.push((drawing_id, worksheet.comments.len() as u32 + 1));
+            Some(drawing_id)
+        }
+    }).collect::<Vec<_>>();
+
     biff::write_usesel_fs_value(&mut stream, environment.supports_natural_language_formulas)?;
 
     for worksheet in worksheets {
@@ -334,8 +350,8 @@ pub(crate) fn generate_workbook_stream(
     }
 
     // MsoDrawingGroup (0x00EB) — if we have page fields, Excel expects a drawing group
-    if has_any_page_fields {
-        biff::write_mso_drawing_group(&mut stream)?;
+    if !drawing_clusters.is_empty() {
+        biff::write_mso_drawing_group(&mut stream, &drawing_clusters)?;
     }
 
     biff::write_country(&mut stream, environment.default_country_code, environment.current_country_code)?;
@@ -358,7 +374,7 @@ pub(crate) fn generate_workbook_stream(
     // Track actual worksheet positions
     let mut actual_positions = Vec::new();
 
-    for worksheet in worksheets {
+    for (worksheet_index, worksheet) in worksheets.iter().enumerate() {
         // Record the position of this worksheet's BOF
         let worksheet_pos = stream.len() as u32;
         actual_positions.push(worksheet_pos);
@@ -474,11 +490,6 @@ pub(crate) fn generate_workbook_stream(
             for selection in &worksheet.view.selections {
                 biff::write_selection_options(&mut stream, selection)?;
             }
-        }
-
-        // MsoDrawing (0x00EC) for non-pivot sheets. Window view records must remain contiguous.
-        if has_any_page_fields && worksheet.pivot_tables.is_empty() {
-            biff::write_mso_drawing_sheet1(&mut stream)?;
         }
 
         if let Some(protection) = worksheet.sheet_protection {
@@ -705,6 +716,52 @@ pub(crate) fn generate_workbook_stream(
         stream.splice(index_record_pos..index_record_pos, index_record);
         stream.extend_from_slice(&row_table);
 
+        if has_any_page_fields && worksheet.pivot_tables.is_empty() {
+            biff::write_mso_drawing_sheet1(&mut stream)?;
+        }
+        let has_pivot_page_object = worksheet.pivot_tables.iter().any(|pt| {
+            pt.page_entries.iter().any(|&(_, _, object_id)| object_id != 0xFFFF)
+        });
+        if has_pivot_page_object {
+            biff::write_pivot_page_mso_drawing(&mut stream)?;
+            biff::write_pivot_page_obj(&mut stream)?;
+        }
+        if let Some(drawing_id) = comment_drawing_ids[worksheet_index] {
+            let mut reserved = HashSet::from([1u16]);
+            for object_id in worksheet.pivot_tables.iter().flat_map(|table| table.page_entries.iter().map(|entry| entry.2)) {
+                if object_id != 0xFFFF && object_id != 0 { reserved.insert(object_id); }
+            }
+            let mut next_object_id = 1u16;
+            let mut configs = Vec::with_capacity(worksheet.comments.len());
+            let mut guids = HashSet::new();
+            for comment in &worksheet.comments {
+                while reserved.contains(&next_object_id) {
+                    next_object_id = next_object_id.checked_add(1).ok_or_else(|| XlsError::InvalidData("worksheet comment object IDs are exhausted".to_string()))?;
+                }
+                let object_id = next_object_id;
+                reserved.insert(object_id);
+                next_object_id = next_object_id.saturating_add(1);
+                let guid = comment.options.guid.unwrap_or_else(|| super::comment::deterministic_comment_guid(worksheet_index, comment.row, comment.column, object_id));
+                if !guids.insert(guid) {
+                    return Err(XlsError::InvalidData("comment GUID is duplicated after planning".to_string()));
+                }
+                configs.push(biff::CommentConfig {
+                    row: comment.row,
+                    column: comment.column,
+                    author: &comment.author,
+                    text: &comment.text,
+                    visible: comment.options.visible,
+                    shared: comment.options.shared,
+                    anchor: comment.anchor(),
+                    text_runs: &comment.options.text_runs,
+                    font_when_empty: comment.options.font_when_empty,
+                    guid,
+                    object_id,
+                });
+            }
+            biff::write_comments(&mut stream, drawing_id, &configs)?;
+        }
+
         // Hyperlink records for cells or ranges.
         for hyperlink in &worksheet.hyperlinks {
             biff::write_hyperlink(
@@ -808,15 +865,6 @@ pub(crate) fn generate_workbook_stream(
                 };
                 biff::write_cf12(&mut stream, &config)?;
             }
-        }
-
-        if worksheet.pivot_tables.iter().any(|pt| {
-            pt.page_entries
-                .iter()
-                .any(|&(_, _, object_id)| object_id != 0xFFFF)
-        }) {
-            biff::write_pivot_page_mso_drawing(&mut stream)?;
-            biff::write_pivot_page_obj(&mut stream)?;
         }
 
         // Pivot table records (SX* family).

@@ -580,7 +580,11 @@ pub struct Parser<'a> {
     shapes: Vec<super::shape::Shape<'a>>,
     /// Inert legacy drawing text boxes.
     legacy_text_boxes: Vec<crate::LegacyTextBox<'a>>,
+    /// Inert legacy drawing primitives other than top-level compatibility text boxes.
+    legacy_drawings: Vec<crate::LegacyDrawing<'a>>,
     legacy_text_box_text_bytes: usize,
+    legacy_drawing_primitives: usize,
+    legacy_drawing_points: usize,
     /// Shape groups
     shape_groups: Vec<super::shape::ShapeGroup<'a>>,
     /// Stylesheet
@@ -661,6 +665,168 @@ struct LegacyTextBoxBuilder {
     margin: Option<i32>,
     z_order: Option<i32>,
     direction: Option<crate::LegacyTextDirection>,
+}
+
+#[derive(Clone, Copy)]
+enum LegacySimpleKind {
+    Line,
+    Rectangle,
+    Ellipse,
+    Polyline,
+    Arc,
+}
+
+#[derive(Default)]
+struct LegacyColorBuilder {
+    gray: Option<i32>,
+    red: Option<i32>,
+    green: Option<i32>,
+    blue: Option<i32>,
+    palette: bool,
+}
+
+impl LegacyColorBuilder {
+    fn is_empty(&self) -> bool {
+        self.gray.is_none() && self.red.is_none() && self.green.is_none() && self.blue.is_none() && !self.palette
+    }
+
+    fn finish(&self, name: &str) -> RtfResult<Option<crate::LegacyDrawingColor>> {
+        if let Some(gray) = self.gray {
+            if self.red.is_some() || self.green.is_some() || self.blue.is_some() || self.palette {
+                return Err(Parser::legacy_error(&format!("{name} mixes grayscale and RGB")));
+            }
+            return Ok(Some(crate::LegacyDrawingColor::gray_half_percent(gray)?));
+        }
+        if self.is_empty() {
+            return Ok(None);
+        }
+        let component = |value: Option<i32>| -> RtfResult<u8> {
+            u8::try_from(value.ok_or_else(|| Parser::legacy_error(&format!("incomplete {name} RGB color")))?)
+                .map_err(|_| Parser::legacy_error(&format!("{name} RGB component is outside 0..=255")))
+        };
+        Ok(Some(crate::LegacyDrawingColor::Rgb {
+            red: component(self.red)?,
+            green: component(self.green)?,
+            blue: component(self.blue)?,
+            palette: self.palette,
+        }))
+    }
+}
+
+#[derive(Default)]
+struct LegacyArrowBuilder {
+    fill: Option<crate::LegacyDrawingArrowFill>,
+    length: Option<i32>,
+    width: Option<i32>,
+}
+
+impl LegacyArrowBuilder {
+    fn finish(&self, name: &str) -> RtfResult<Option<crate::LegacyDrawingArrow>> {
+        if self.fill.is_none() && self.length.is_none() && self.width.is_none() {
+            return Ok(None);
+        }
+        Ok(Some(crate::LegacyDrawingArrow {
+            fill: self.fill.ok_or_else(|| Parser::legacy_error(&format!("incomplete {name} arrow")))?,
+            length: crate::LegacyDrawingArrowSize::try_from(self.length.ok_or_else(|| Parser::legacy_error(&format!("incomplete {name} arrow")))?)?,
+            width: crate::LegacyDrawingArrowSize::try_from(self.width.ok_or_else(|| Parser::legacy_error(&format!("incomplete {name} arrow")))?)?,
+        }))
+    }
+}
+
+#[derive(Default)]
+struct LegacyPropertiesBuilder {
+    line_style: Option<crate::LegacyDrawingLineStyle>,
+    line_color: LegacyColorBuilder,
+    line_width: Option<i32>,
+    fill_foreground: LegacyColorBuilder,
+    fill_background: LegacyColorBuilder,
+    fill_pattern: Option<i32>,
+    start_arrow: LegacyArrowBuilder,
+    end_arrow: LegacyArrowBuilder,
+    shadow: bool,
+    shadow_x: Option<i32>,
+    shadow_y: Option<i32>,
+}
+
+impl LegacyPropertiesBuilder {
+    fn set<T>(slot: &mut Option<T>, value: T, name: &str) -> RtfResult<()> {
+        Parser::set_legacy_once(slot, value, name)
+    }
+
+    fn flag(slot: &mut bool, name: &str) -> RtfResult<()> {
+        if *slot { return Err(Parser::legacy_error(&format!("duplicate {name}"))); }
+        *slot = true;
+        Ok(())
+    }
+
+    fn apply(&mut self, control: &ControlWord<'_>) -> RtfResult<bool> {
+        match control {
+            ControlWord::LegacyDrawingLineStyle(value) => Self::set(&mut self.line_style, *value, "line style")?,
+            ControlWord::LegacyDrawingLineGray(value) => Self::set(&mut self.line_color.gray, *value, "line grayscale")?,
+            ControlWord::LegacyDrawingLineRed(value) => Self::set(&mut self.line_color.red, *value, "line red")?,
+            ControlWord::LegacyDrawingLineGreen(value) => Self::set(&mut self.line_color.green, *value, "line green")?,
+            ControlWord::LegacyDrawingLineBlue(value) => Self::set(&mut self.line_color.blue, *value, "line blue")?,
+            ControlWord::LegacyDrawingLinePalette => Self::flag(&mut self.line_color.palette, "line palette")?,
+            ControlWord::LegacyDrawingLineWidth(value) => Self::set(&mut self.line_width, *value, "line width")?,
+            ControlWord::LegacyDrawingFillForegroundGray(value) => Self::set(&mut self.fill_foreground.gray, *value, "foreground grayscale")?,
+            ControlWord::LegacyDrawingFillForegroundRed(value) => Self::set(&mut self.fill_foreground.red, *value, "foreground red")?,
+            ControlWord::LegacyDrawingFillForegroundGreen(value) => Self::set(&mut self.fill_foreground.green, *value, "foreground green")?,
+            ControlWord::LegacyDrawingFillForegroundBlue(value) => Self::set(&mut self.fill_foreground.blue, *value, "foreground blue")?,
+            ControlWord::LegacyDrawingFillForegroundPalette => Self::flag(&mut self.fill_foreground.palette, "foreground palette")?,
+            ControlWord::LegacyDrawingFillBackgroundGray(value) => Self::set(&mut self.fill_background.gray, *value, "background grayscale")?,
+            ControlWord::LegacyDrawingFillBackgroundRed(value) => Self::set(&mut self.fill_background.red, *value, "background red")?,
+            ControlWord::LegacyDrawingFillBackgroundGreen(value) => Self::set(&mut self.fill_background.green, *value, "background green")?,
+            ControlWord::LegacyDrawingFillBackgroundBlue(value) => Self::set(&mut self.fill_background.blue, *value, "background blue")?,
+            ControlWord::LegacyDrawingFillBackgroundPalette => Self::flag(&mut self.fill_background.palette, "background palette")?,
+            ControlWord::LegacyDrawingFillPattern(value) => Self::set(&mut self.fill_pattern, *value, "fill pattern")?,
+            ControlWord::LegacyDrawingStartArrowFill(value) => Self::set(&mut self.start_arrow.fill, *value, "start arrow fill")?,
+            ControlWord::LegacyDrawingStartArrowLength(value) => Self::set(&mut self.start_arrow.length, *value, "start arrow length")?,
+            ControlWord::LegacyDrawingStartArrowWidth(value) => Self::set(&mut self.start_arrow.width, *value, "start arrow width")?,
+            ControlWord::LegacyDrawingEndArrowFill(value) => Self::set(&mut self.end_arrow.fill, *value, "end arrow fill")?,
+            ControlWord::LegacyDrawingEndArrowLength(value) => Self::set(&mut self.end_arrow.length, *value, "end arrow length")?,
+            ControlWord::LegacyDrawingEndArrowWidth(value) => Self::set(&mut self.end_arrow.width, *value, "end arrow width")?,
+            ControlWord::LegacyDrawingShadow => Self::flag(&mut self.shadow, "shadow")?,
+            ControlWord::LegacyDrawingShadowX(value) => Self::set(&mut self.shadow_x, *value, "shadow x")?,
+            ControlWord::LegacyDrawingShadowY(value) => Self::set(&mut self.shadow_y, *value, "shadow y")?,
+            _ => return Ok(false),
+        }
+        Ok(true)
+    }
+
+    fn finish(self) -> RtfResult<crate::LegacyDrawingProperties> {
+        let line_color = self.line_color.finish("line")?;
+        let line = if self.line_style.is_some() || line_color.is_some() || self.line_width.is_some() {
+            let style = self.line_style.unwrap_or(crate::LegacyDrawingLineStyle::Solid);
+            Some(crate::LegacyDrawingLine {
+                style,
+                color: line_color.unwrap_or(crate::LegacyDrawingColor::Rgb { red: 0, green: 0, blue: 0, palette: false }),
+                width: self.line_width.unwrap_or(0),
+            })
+        } else { None };
+        let foreground = self.fill_foreground.finish("foreground fill")?;
+        let background = self.fill_background.finish("background fill")?;
+        let fill = if foreground.is_some() || background.is_some() || self.fill_pattern.is_some() {
+            Some(crate::LegacyDrawingFill {
+                foreground: foreground.unwrap_or(crate::LegacyDrawingColor::Rgb { red: 255, green: 255, blue: 255, palette: false }),
+                background: background.unwrap_or(crate::LegacyDrawingColor::Rgb { red: 0, green: 0, blue: 0, palette: false }),
+                pattern: crate::LegacyDrawingFillPattern::try_from(self.fill_pattern.ok_or_else(|| Parser::legacy_error("fill colors lack dpfillpat"))?)?,
+            })
+        } else { None };
+        let shadow = if self.shadow || self.shadow_x.is_some() || self.shadow_y.is_some() {
+            if !self.shadow { return Err(Parser::legacy_error("shadow offsets lack dpshadow")); }
+            Some(crate::LegacyDrawingShadow {
+                x_offset: self.shadow_x.ok_or_else(|| Parser::legacy_error("dpshadow lacks dpshadx"))?,
+                y_offset: self.shadow_y.ok_or_else(|| Parser::legacy_error("dpshadow lacks dpshady"))?,
+            })
+        } else { None };
+        Ok(crate::LegacyDrawingProperties {
+            line,
+            fill,
+            start_arrow: self.start_arrow.finish("start")?,
+            end_arrow: self.end_arrow.finish("end")?,
+            shadow,
+        })
+    }
 }
 
 #[derive(Default)]
@@ -744,7 +910,10 @@ impl<'a> Parser<'a> {
             next_bookmark_order: 0,
             shapes: Vec::new(),
             legacy_text_boxes: Vec::new(),
+            legacy_drawings: Vec::new(),
             legacy_text_box_text_bytes: 0,
+            legacy_drawing_primitives: 0,
+            legacy_drawing_points: 0,
             shape_groups: Vec::new(),
             stylesheet: super::stylesheet::StyleSheet::new(),
             saw_stylesheet: false,
@@ -1058,6 +1227,7 @@ impl<'a> Parser<'a> {
             bookmarks: self.bookmarks,
             shapes: self.shapes,
             legacy_text_boxes: self.legacy_text_boxes,
+            legacy_drawings: self.legacy_drawings,
             shape_groups: self.shape_groups,
             stylesheet: self.stylesheet,
             info: self.info,
@@ -1265,11 +1435,9 @@ impl<'a> Parser<'a> {
                                     .to_string(),
                             ));
                         },
-                        Some(Token::Control(
-                            ControlWord::LegacyTextBox | ControlWord::LegacyTextBoxText,
-                        )) => {
+                        Some(Token::Control(control)) if Self::is_legacy_drawing_control(control) => {
                             return Err(RtfError::MalformedDocument(
-                                "RTF legacy text-box controls must occur inside a starred do destination"
+                                "RTF legacy drawing controls must occur inside a starred do destination"
                                     .to_string(),
                             ));
                         },
@@ -1290,8 +1458,12 @@ impl<'a> Parser<'a> {
                             ));
                         },
                         Some(Token::Control(ControlWord::LegacyDrawingObject)) => {
-                            if let Some(text_box) = self.parse_legacy_text_box()? {
-                                self.legacy_text_boxes.push(text_box);
+                            if self.legacy_do_starts_with_text_box() {
+                                if let Some(text_box) = self.parse_legacy_text_box()? {
+                                    self.legacy_text_boxes.push(text_box);
+                                }
+                            } else if let Some(drawing) = self.parse_legacy_drawing()? {
+                                self.legacy_drawings.push(drawing);
                             }
                             self.states.pop();
                             return Ok(());
@@ -9498,6 +9670,382 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn is_legacy_drawing_control(control: &ControlWord<'_>) -> bool {
+        matches!(
+            control,
+            ControlWord::LegacyTextBox
+                | ControlWord::LegacyTextBoxText
+                | ControlWord::LegacyDrawingLock
+                | ControlWord::LegacyDrawingGroup
+                | ControlWord::LegacyDrawingCount(_)
+                | ControlWord::LegacyDrawingEndGroup
+                | ControlWord::LegacyDrawingArc
+                | ControlWord::LegacyDrawingCallout
+                | ControlWord::LegacyDrawingEllipse
+                | ControlWord::LegacyDrawingLine
+                | ControlWord::LegacyDrawingPolygon
+                | ControlWord::LegacyDrawingPolyline
+                | ControlWord::LegacyDrawingRectangle
+                | ControlWord::LegacyDrawingRoundRectangle
+                | ControlWord::LegacyDrawingPointX(_)
+                | ControlWord::LegacyDrawingPointY(_)
+                | ControlWord::LegacyDrawingArcFlipX
+                | ControlWord::LegacyDrawingArcFlipY
+                | ControlWord::LegacyCalloutType(_)
+                | ControlWord::LegacyCalloutAngle(_)
+                | ControlWord::LegacyCalloutAccent
+                | ControlWord::LegacyCalloutSmartAttach
+                | ControlWord::LegacyCalloutBestFit
+                | ControlWord::LegacyCalloutMinusX
+                | ControlWord::LegacyCalloutMinusY
+                | ControlWord::LegacyCalloutBorder
+                | ControlWord::LegacyCalloutAttachment(_)
+                | ControlWord::LegacyCalloutDescent(_)
+                | ControlWord::LegacyCalloutOffset(_)
+                | ControlWord::LegacyCalloutLength(_)
+                | ControlWord::LegacyDrawingLineStyle(_)
+                | ControlWord::LegacyDrawingLineGray(_)
+                | ControlWord::LegacyDrawingLineRed(_)
+                | ControlWord::LegacyDrawingLineGreen(_)
+                | ControlWord::LegacyDrawingLineBlue(_)
+                | ControlWord::LegacyDrawingLinePalette
+                | ControlWord::LegacyDrawingLineWidth(_)
+                | ControlWord::LegacyDrawingFillForegroundGray(_)
+                | ControlWord::LegacyDrawingFillForegroundRed(_)
+                | ControlWord::LegacyDrawingFillForegroundGreen(_)
+                | ControlWord::LegacyDrawingFillForegroundBlue(_)
+                | ControlWord::LegacyDrawingFillForegroundPalette
+                | ControlWord::LegacyDrawingFillBackgroundGray(_)
+                | ControlWord::LegacyDrawingFillBackgroundRed(_)
+                | ControlWord::LegacyDrawingFillBackgroundGreen(_)
+                | ControlWord::LegacyDrawingFillBackgroundBlue(_)
+                | ControlWord::LegacyDrawingFillBackgroundPalette
+                | ControlWord::LegacyDrawingFillPattern(_)
+                | ControlWord::LegacyDrawingStartArrowFill(_)
+                | ControlWord::LegacyDrawingStartArrowLength(_)
+                | ControlWord::LegacyDrawingStartArrowWidth(_)
+                | ControlWord::LegacyDrawingEndArrowFill(_)
+                | ControlWord::LegacyDrawingEndArrowLength(_)
+                | ControlWord::LegacyDrawingEndArrowWidth(_)
+                | ControlWord::LegacyDrawingShadow
+                | ControlWord::LegacyDrawingShadowX(_)
+                | ControlWord::LegacyDrawingShadowY(_)
+        )
+    }
+
+    fn legacy_primitive_start(control: &ControlWord<'_>) -> bool {
+        matches!(
+            control,
+            ControlWord::LegacyDrawingGroup
+                | ControlWord::LegacyDrawingCallout
+                | ControlWord::LegacyDrawingLine
+                | ControlWord::LegacyDrawingRectangle
+                | ControlWord::LegacyTextBox
+                | ControlWord::LegacyDrawingEllipse
+                | ControlWord::LegacyDrawingPolyline
+                | ControlWord::LegacyDrawingArc
+        )
+    }
+
+    fn legacy_do_starts_with_text_box(&self) -> bool {
+        self.tokens[self.pos.saturating_add(2)..]
+            .iter()
+            .find_map(|token| match token {
+                Token::Control(control) if Self::legacy_primitive_start(control) => {
+                    Some(matches!(control, ControlWord::LegacyTextBox))
+                },
+                Token::CloseBrace => Some(false),
+                _ => None,
+            })
+            .unwrap_or(false)
+    }
+
+    fn skip_legacy_whitespace(&mut self) {
+        while matches!(self.tokens.get(self.pos), Some(Token::Text(text)) if text.trim().is_empty()) {
+            self.pos += 1;
+        }
+    }
+
+    fn parse_legacy_drawing(&mut self) -> RtfResult<Option<crate::LegacyDrawing<'a>>> {
+        if self.current_state()?.destination != Destination::DocumentBody {
+            return Err(RtfError::MalformedDocument(
+                "RTF legacy drawing may occur only in the document body".to_string(),
+            ));
+        }
+        self.pos += 2;
+        let mut horizontal_anchor = None;
+        let mut vertical_anchor = None;
+        let mut z_order = None;
+        let mut locked = false;
+        loop {
+            self.skip_legacy_whitespace();
+            match self.tokens.get(self.pos) {
+                Some(Token::Control(ControlWord::LegacyAnchorXPage)) => Self::set_legacy_once(&mut horizontal_anchor, crate::LegacyHorizontalAnchor::Page, "horizontal anchor")?,
+                Some(Token::Control(ControlWord::LegacyAnchorXMargin)) => Self::set_legacy_once(&mut horizontal_anchor, crate::LegacyHorizontalAnchor::Margin, "horizontal anchor")?,
+                Some(Token::Control(ControlWord::LegacyAnchorXColumn)) => Self::set_legacy_once(&mut horizontal_anchor, crate::LegacyHorizontalAnchor::Column, "horizontal anchor")?,
+                Some(Token::Control(ControlWord::LegacyAnchorYPage)) => Self::set_legacy_once(&mut vertical_anchor, crate::LegacyVerticalAnchor::Page, "vertical anchor")?,
+                Some(Token::Control(ControlWord::LegacyAnchorYMargin)) => Self::set_legacy_once(&mut vertical_anchor, crate::LegacyVerticalAnchor::Margin, "vertical anchor")?,
+                Some(Token::Control(ControlWord::LegacyAnchorYParagraph)) => Self::set_legacy_once(&mut vertical_anchor, crate::LegacyVerticalAnchor::Paragraph, "vertical anchor")?,
+                Some(Token::Control(ControlWord::LegacyDrawingHeight(value))) => Self::set_legacy_once(&mut z_order, *value, "z-order")?,
+                Some(Token::Control(ControlWord::LegacyDrawingLock)) => {
+                    if locked { return Err(Self::legacy_error("duplicate dolock")); }
+                    locked = true;
+                },
+                Some(Token::Control(control)) if Self::legacy_primitive_start(control) => break,
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    return Ok(None);
+                },
+                Some(_) => return Err(Self::legacy_error("invalid or out-of-order dohead control")),
+                None => return Err(RtfError::UnexpectedEof),
+            }
+            self.pos += 1;
+        }
+        let primitive = self.parse_legacy_primitive(1)?;
+        self.skip_legacy_whitespace();
+        if !matches!(self.tokens.get(self.pos), Some(Token::CloseBrace)) {
+            return Err(Self::legacy_error("trailing content after primitive"));
+        }
+        self.pos += 1;
+        let drawing = crate::LegacyDrawing {
+            position: self.body_text_len,
+            horizontal_anchor: horizontal_anchor.ok_or_else(|| Self::legacy_error("missing horizontal anchor"))?,
+            vertical_anchor: vertical_anchor.ok_or_else(|| Self::legacy_error("missing vertical anchor"))?,
+            z_order: z_order.ok_or_else(|| Self::legacy_error("missing dodhgt"))?,
+            locked,
+            primitive,
+        };
+        drawing.validate()?;
+        if self.legacy_drawings.len() >= crate::MAX_LEGACY_DRAWINGS {
+            return Err(Self::legacy_error("top-level count exceeds the safety limit"));
+        }
+        Ok(Some(drawing))
+    }
+
+    fn legacy_error(message: &str) -> RtfError {
+        RtfError::MalformedDocument(format!("RTF legacy drawing {message}"))
+    }
+
+    fn set_legacy_once<T>(slot: &mut Option<T>, value: T, name: &str) -> RtfResult<()> {
+        if slot.replace(value).is_some() {
+            return Err(Self::legacy_error(&format!("contains duplicate {name}")));
+        }
+        Ok(())
+    }
+
+    fn parse_legacy_geometry(&mut self) -> RtfResult<crate::LegacyDrawingGeometry> {
+        self.skip_legacy_whitespace();
+        let x = match self.tokens.get(self.pos) { Some(Token::Control(ControlWord::LegacyDrawingX(value))) => *value, _ => return Err(Self::legacy_error("geometry must begin with dpx")) };
+        self.pos += 1;
+        self.skip_legacy_whitespace();
+        let y = match self.tokens.get(self.pos) { Some(Token::Control(ControlWord::LegacyDrawingY(value))) => *value, _ => return Err(Self::legacy_error("dpx must be followed by dpy")) };
+        self.pos += 1;
+        self.skip_legacy_whitespace();
+        let width = match self.tokens.get(self.pos) { Some(Token::Control(ControlWord::LegacyDrawingWidth(value))) => *value, _ => return Err(Self::legacy_error("dpy must be followed by dpxsize")) };
+        self.pos += 1;
+        self.skip_legacy_whitespace();
+        let height = match self.tokens.get(self.pos) { Some(Token::Control(ControlWord::LegacyDrawingHeightSize(value))) => *value, _ => return Err(Self::legacy_error("dpxsize must be followed by dpysize")) };
+        self.pos += 1;
+        let geometry = crate::LegacyDrawingGeometry { x, y, width, height };
+        geometry.validate()?;
+        Ok(geometry)
+    }
+
+    fn parse_legacy_point(&mut self) -> RtfResult<crate::LegacyDrawingPoint> {
+        self.skip_legacy_whitespace();
+        let x = match self.tokens.get(self.pos) { Some(Token::Control(ControlWord::LegacyDrawingPointX(value))) => *value, _ => return Err(Self::legacy_error("point must begin with dpptx")) };
+        self.pos += 1;
+        self.skip_legacy_whitespace();
+        let y = match self.tokens.get(self.pos) { Some(Token::Control(ControlWord::LegacyDrawingPointY(value))) => *value, _ => return Err(Self::legacy_error("dpptx must be followed by dppty")) };
+        self.pos += 1;
+        Ok(crate::LegacyDrawingPoint { x, y })
+    }
+
+    fn parse_legacy_primitive(&mut self, depth: usize) -> RtfResult<crate::LegacyDrawingPrimitive<'a>> {
+        if depth > crate::MAX_LEGACY_DRAWING_DEPTH {
+            return Err(Self::legacy_error("nesting exceeds the safety limit"));
+        }
+        self.legacy_drawing_primitives = self.legacy_drawing_primitives.checked_add(1).ok_or_else(|| Self::legacy_error("primitive count overflow"))?;
+        if self.legacy_drawing_primitives > crate::MAX_LEGACY_DRAWING_PRIMITIVES {
+            return Err(Self::legacy_error("primitive count exceeds the safety limit"));
+        }
+        self.skip_legacy_whitespace();
+        let control = self.tokens.get(self.pos).cloned().ok_or(RtfError::UnexpectedEof)?;
+        self.pos += 1;
+        match control {
+            Token::Control(ControlWord::LegacyDrawingGroup) => self.parse_legacy_group(depth),
+            Token::Control(ControlWord::LegacyDrawingCallout) => self.parse_legacy_callout(depth),
+            Token::Control(ControlWord::LegacyDrawingLine) => {
+                let start = self.parse_legacy_point()?;
+                let end = self.parse_legacy_point()?;
+                let (geometry, properties, _) = self.parse_legacy_simple_tail(LegacySimpleKind::Line)?;
+                Ok(crate::LegacyDrawingPrimitive::Line { start, end, geometry, properties })
+            },
+            Token::Control(ControlWord::LegacyDrawingRectangle) => {
+                let (geometry, properties, rounded) = self.parse_legacy_simple_tail(LegacySimpleKind::Rectangle)?;
+                Ok(crate::LegacyDrawingPrimitive::Rectangle { rounded: rounded != 0, geometry, properties })
+            },
+            Token::Control(ControlWord::LegacyDrawingEllipse) => {
+                let (geometry, properties, _) = self.parse_legacy_simple_tail(LegacySimpleKind::Ellipse)?;
+                Ok(crate::LegacyDrawingPrimitive::Ellipse { geometry, properties })
+            },
+            Token::Control(ControlWord::LegacyDrawingPolyline) => self.parse_legacy_polyline(),
+            Token::Control(ControlWord::LegacyDrawingArc) => {
+                let (geometry, properties, flags) = self.parse_legacy_simple_tail(LegacySimpleKind::Arc)?;
+                Ok(crate::LegacyDrawingPrimitive::Arc { flip_x: flags & 1 != 0, flip_y: flags & 2 != 0, geometry, properties })
+            },
+            Token::Control(ControlWord::LegacyTextBox) => self.parse_nested_legacy_text_box(),
+            _ => Err(Self::legacy_error("expected a drawing primitive")),
+        }
+    }
+
+    fn parse_legacy_group(&mut self, depth: usize) -> RtfResult<crate::LegacyDrawingPrimitive<'a>> {
+        self.skip_legacy_whitespace();
+        let declared = match self.tokens.get(self.pos) {
+            Some(Token::Control(ControlWord::LegacyDrawingCount(value))) if *value > 0 => usize::try_from(*value).map_err(|_| Self::legacy_error("invalid dpcount"))?,
+            _ => return Err(Self::legacy_error("dpgroup lacks positive dpcount")),
+        };
+        self.pos += 1;
+        let geometry = self.parse_legacy_geometry()?;
+        let mut children = Vec::new();
+        loop {
+            self.skip_legacy_whitespace();
+            match self.tokens.get(self.pos) {
+                Some(Token::Control(ControlWord::LegacyDrawingEndGroup)) => { self.pos += 1; break; },
+                Some(Token::Control(control)) if Self::legacy_primitive_start(control) => children.push(self.parse_legacy_primitive(depth + 1)?),
+                Some(_) => return Err(Self::legacy_error("invalid content in dpgroup")),
+                None => return Err(RtfError::UnexpectedEof),
+            }
+        }
+        if declared != children.len() && declared != children.len().saturating_add(1) {
+            return Err(Self::legacy_error("dpcount does not match group children"));
+        }
+        let end_geometry = self.parse_legacy_geometry()?;
+        Ok(crate::LegacyDrawingPrimitive::Group { geometry, children, end_geometry })
+    }
+
+    fn parse_legacy_polyline(&mut self) -> RtfResult<crate::LegacyDrawingPrimitive<'a>> {
+        self.skip_legacy_whitespace();
+        let closed = if matches!(self.tokens.get(self.pos), Some(Token::Control(ControlWord::LegacyDrawingPolygon))) { self.pos += 1; true } else { false };
+        self.skip_legacy_whitespace();
+        let count = match self.tokens.get(self.pos) {
+            Some(Token::Control(ControlWord::LegacyDrawingCount(value))) => usize::try_from(*value).map_err(|_| Self::legacy_error("invalid polyline point count"))?,
+            _ => return Err(Self::legacy_error("dppolyline lacks dppolycount")),
+        };
+        if count == 0 || count > crate::MAX_LEGACY_DRAWING_POINTS { return Err(Self::legacy_error("polyline point count exceeds the safety limit")); }
+        self.pos += 1;
+        let mut points = Vec::with_capacity(count);
+        for _ in 0..count { points.push(self.parse_legacy_point()?); }
+        self.legacy_drawing_points = self.legacy_drawing_points.checked_add(count).ok_or_else(|| Self::legacy_error("point count overflow"))?;
+        if self.legacy_drawing_points > crate::MAX_LEGACY_DRAWING_TOTAL_POINTS { return Err(Self::legacy_error("aggregate point count exceeds the safety limit")); }
+        let (geometry, properties, _) = self.parse_legacy_simple_tail(LegacySimpleKind::Polyline)?;
+        Ok(crate::LegacyDrawingPrimitive::Polyline { closed, points, geometry, properties })
+    }
+
+    fn parse_nested_legacy_text_box(&mut self) -> RtfResult<crate::LegacyDrawingPrimitive<'a>> {
+        let mut margin = None;
+        let mut direction = None;
+        let mut text = None;
+        loop {
+            self.skip_legacy_whitespace();
+            match self.tokens.get(self.pos) {
+                Some(Token::Control(ControlWord::LegacyTextBoxMargin(value))) => { Self::set_legacy_once(&mut margin, *value, "text-box margin")?; self.pos += 1; },
+                Some(Token::Control(ControlWord::LegacyTextLeftRightTopBottom)) => { Self::set_legacy_once(&mut direction, crate::LegacyTextDirection::LeftToRightTopToBottom, "text direction")?; self.pos += 1; },
+                Some(Token::Control(ControlWord::LegacyTextLeftRightTopBottomVertical)) => { Self::set_legacy_once(&mut direction, crate::LegacyTextDirection::LeftToRightTopToBottomVertical, "text direction")?; self.pos += 1; },
+                Some(Token::Control(ControlWord::LegacyTextTopBottomRightLeft)) => { Self::set_legacy_once(&mut direction, crate::LegacyTextDirection::TopToBottomRightToLeft, "text direction")?; self.pos += 1; },
+                Some(Token::Control(ControlWord::LegacyTextTopBottomRightLeftVertical)) => { Self::set_legacy_once(&mut direction, crate::LegacyTextDirection::TopToBottomRightToLeftVertical, "text direction")?; self.pos += 1; },
+                Some(Token::Control(ControlWord::LegacyTextBottomTopLeftRight)) => { Self::set_legacy_once(&mut direction, crate::LegacyTextDirection::BottomToTopLeftToRight, "text direction")?; self.pos += 1; },
+                Some(Token::OpenBrace) if matches!(self.tokens.get(self.pos + 1), Some(Token::Control(ControlWord::LegacyTextBoxText))) => {
+                    if text.is_some() { return Err(Self::legacy_error("duplicate dptxbxtext")); }
+                    let mut dummy = LegacyTextBoxBuilder::default();
+                    text = Some(self.parse_legacy_text_box_text(&mut dummy)?);
+                },
+                _ => break,
+            }
+        }
+        let geometry = self.parse_legacy_geometry()?;
+        let properties = self.parse_legacy_properties_until_boundary()?;
+        let text = text.ok_or_else(|| Self::legacy_error("text box lacks dptxbxtext"))?;
+        self.legacy_text_box_text_bytes = self.legacy_text_box_text_bytes.checked_add(text.len()).ok_or_else(|| Self::legacy_error("text-box text size overflow"))?;
+        if self.legacy_text_box_text_bytes > crate::legacy_text_box::MAX_LEGACY_TEXT_BOX_TOTAL_BYTES { return Err(Self::legacy_error("text-box text exceeds aggregate safety limit")); }
+        let text_box = crate::LegacyTextBox {
+            text: Cow::Borrowed(self.arena.alloc_str(&text)),
+            position: self.body_text_len,
+            horizontal_anchor: None,
+            vertical_anchor: None,
+            x: Some(geometry.x), y: Some(geometry.y), width: Some(geometry.width), height: Some(geometry.height),
+            margin,
+            z_order: None,
+            direction: direction.unwrap_or_default(),
+        };
+        text_box.validate()?;
+        Ok(crate::LegacyDrawingPrimitive::TextBox { text_box, properties })
+    }
+
+    fn parse_legacy_callout(&mut self, depth: usize) -> RtfResult<crate::LegacyDrawingPrimitive<'a>> {
+        let mut callout_type = None; let mut angle = None; let mut attachment = None; let mut descent = None;
+        let mut accent = false; let mut smart_attach = false; let mut best_fit = false; let mut minus_x = false; let mut minus_y = false; let mut border = false;
+        let mut offset = None; let mut length = None;
+        loop {
+            self.skip_legacy_whitespace();
+            match self.tokens.get(self.pos) {
+                Some(Token::Control(ControlWord::LegacyCalloutType(value))) => { Self::set_legacy_once(&mut callout_type, *value, "callout type")?; self.pos += 1; },
+                Some(Token::Control(ControlWord::LegacyCalloutAngle(value))) => { let value = u8::try_from(*value).map_err(|_| Self::legacy_error("invalid callout angle"))?; if !matches!(value, 0|30|45|60|90) { return Err(Self::legacy_error("invalid callout angle")); } Self::set_legacy_once(&mut angle, value, "callout angle")?; self.pos += 1; },
+                Some(Token::Control(ControlWord::LegacyCalloutAttachment(value))) => { Self::set_legacy_once(&mut attachment, *value, "callout attachment")?; self.pos += 1; },
+                Some(Token::Control(ControlWord::LegacyCalloutDescent(value))) => { Self::set_legacy_once(&mut descent, *value, "callout descent")?; self.pos += 1; },
+                Some(Token::Control(ControlWord::LegacyCalloutOffset(value))) => { Self::set_legacy_once(&mut offset, *value, "callout offset")?; self.pos += 1; },
+                Some(Token::Control(ControlWord::LegacyCalloutLength(value))) => { Self::set_legacy_once(&mut length, *value, "callout length")?; self.pos += 1; },
+                Some(Token::Control(ControlWord::LegacyCalloutAccent)) if !accent => { accent=true; self.pos+=1; },
+                Some(Token::Control(ControlWord::LegacyCalloutSmartAttach)) if !smart_attach => { smart_attach=true; self.pos+=1; },
+                Some(Token::Control(ControlWord::LegacyCalloutBestFit)) if !best_fit => { best_fit=true; self.pos+=1; },
+                Some(Token::Control(ControlWord::LegacyCalloutMinusX)) if !minus_x => { minus_x=true; self.pos+=1; },
+                Some(Token::Control(ControlWord::LegacyCalloutMinusY)) if !minus_y => { minus_y=true; self.pos+=1; },
+                Some(Token::Control(ControlWord::LegacyCalloutBorder)) if !border => { border=true; self.pos+=1; },
+                _ => break,
+            }
+        }
+        let geometry = self.parse_legacy_geometry()?;
+        self.skip_legacy_whitespace();
+        if !matches!(self.tokens.get(self.pos), Some(Token::Control(ControlWord::LegacyDrawingPolyline))) { return Err(Self::legacy_error("callout lacks polyline")); }
+        let polyline = Box::new(self.parse_legacy_primitive(depth + 1)?);
+        self.skip_legacy_whitespace();
+        if !matches!(self.tokens.get(self.pos), Some(Token::Control(ControlWord::LegacyTextBox))) { return Err(Self::legacy_error("callout lacks trailing text box")); }
+        let text_box = Box::new(self.parse_legacy_primitive(depth + 1)?);
+        let properties = self.parse_legacy_properties_until_boundary()?;
+        Ok(crate::LegacyDrawingPrimitive::Callout(crate::LegacyCallout {
+            callout_type: callout_type.ok_or_else(|| Self::legacy_error("callout lacks type"))?, angle, accent, smart_attach, best_fit, minus_x, minus_y, border, attachment, descent,
+            offset: offset.ok_or_else(|| Self::legacy_error("callout lacks offset"))?, length: length.ok_or_else(|| Self::legacy_error("callout lacks length"))?, polyline, text_box, geometry, properties,
+        }))
+    }
+
+    fn parse_legacy_simple_tail(&mut self, kind: LegacySimpleKind) -> RtfResult<(crate::LegacyDrawingGeometry, crate::LegacyDrawingProperties, u8)> {
+        let mut flags = 0u8;
+        loop {
+            self.skip_legacy_whitespace();
+            match (kind, self.tokens.get(self.pos)) {
+                (LegacySimpleKind::Rectangle, Some(Token::Control(ControlWord::LegacyDrawingRoundRectangle))) if flags == 0 => { flags=1; self.pos+=1; },
+                (LegacySimpleKind::Arc, Some(Token::Control(ControlWord::LegacyDrawingArcFlipX))) if flags & 1 == 0 => { flags|=1; self.pos+=1; },
+                (LegacySimpleKind::Arc, Some(Token::Control(ControlWord::LegacyDrawingArcFlipY))) if flags & 2 == 0 => { flags|=2; self.pos+=1; },
+                _ => break,
+            }
+        }
+        let geometry = self.parse_legacy_geometry()?;
+        let properties = self.parse_legacy_properties_until_boundary()?;
+        Ok((geometry, properties, flags))
+    }
+
+    fn parse_legacy_properties_until_boundary(&mut self) -> RtfResult<crate::LegacyDrawingProperties> {
+        let mut builder = LegacyPropertiesBuilder::default();
+        loop {
+            self.skip_legacy_whitespace();
+            let Some(Token::Control(control)) = self.tokens.get(self.pos) else { break };
+            if Self::legacy_primitive_start(control) || matches!(control, ControlWord::LegacyDrawingEndGroup) { break; }
+            if !builder.apply(control)? { break; }
+            self.pos += 1;
+        }
+        builder.finish()
+    }
+
     /// Parse picture/image content.
     ///
     /// Pictures in RTF have the format:
@@ -10673,6 +11221,7 @@ pub struct ParsedDocument<'a> {
     pub shapes: Vec<super::shape::Shape<'a>>,
     /// Inert legacy drawing text boxes.
     pub legacy_text_boxes: Vec<crate::LegacyTextBox<'a>>,
+    pub legacy_drawings: Vec<crate::LegacyDrawing<'a>>,
     /// Shape groups
     pub shape_groups: Vec<super::shape::ShapeGroup<'a>>,
     /// Stylesheet

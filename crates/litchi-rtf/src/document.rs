@@ -77,6 +77,8 @@ pub struct RtfDocument<'a> {
     shapes: Vec<super::shape::Shape<'a>>,
     /// Inert positional legacy drawing text boxes.
     legacy_text_boxes: Vec<crate::LegacyTextBox<'a>>,
+    /// Inert positional legacy drawing primitives.
+    legacy_drawings: Vec<crate::LegacyDrawing<'a>>,
     /// Shape groups
     shape_groups: Vec<super::shape::ShapeGroup<'a>>,
     /// Stylesheet
@@ -285,6 +287,11 @@ impl<'a> RtfDocument<'a> {
                 .legacy_text_boxes
                 .into_iter()
                 .map(crate::LegacyTextBox::into_owned)
+                .collect(),
+            legacy_drawings: parsed
+                .legacy_drawings
+                .into_iter()
+                .map(crate::LegacyDrawing::into_owned)
                 .collect(),
             shape_groups: Self::convert_shape_groups_to_owned(parsed.shape_groups),
             stylesheet: Self::convert_stylesheet_to_owned(parsed.stylesheet),
@@ -1203,6 +1210,37 @@ impl<'a> RtfDocument<'a> {
 
     pub fn clear_legacy_text_boxes(&mut self) {
         self.legacy_text_boxes.clear();
+    }
+
+    /// Return inert positional legacy drawing primitives other than top-level text boxes.
+    pub fn legacy_drawings(&self) -> &[crate::LegacyDrawing<'_>] {
+        &self.legacy_drawings
+    }
+
+    pub fn push_legacy_drawing(&mut self, drawing: crate::LegacyDrawing<'a>) -> RtfResult<()> {
+        drawing.validate()?;
+        if self.legacy_drawings.len() >= crate::MAX_LEGACY_DRAWINGS {
+            return Err(RtfError::MalformedDocument(
+                "RTF legacy drawing count exceeds the safety limit".to_string(),
+            ));
+        }
+        let body = self.text();
+        if body.get(drawing.position..drawing.position).is_none() {
+            return Err(RtfError::MalformedDocument(
+                "RTF legacy drawing position is not a UTF-8 body boundary".to_string(),
+            ));
+        }
+        if self.legacy_drawings.last().is_some_and(|previous| previous.position > drawing.position) {
+            return Err(RtfError::MalformedDocument(
+                "RTF legacy drawings are out of body order".to_string(),
+            ));
+        }
+        self.legacy_drawings.push(drawing);
+        Ok(())
+    }
+
+    pub fn clear_legacy_drawings(&mut self) {
+        self.legacy_drawings.clear();
     }
 
     /// Get all shape groups in the document.
