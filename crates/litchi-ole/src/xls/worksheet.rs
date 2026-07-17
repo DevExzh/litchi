@@ -60,6 +60,8 @@ pub struct XlsWorksheet {
     scenario_manager: Option<crate::xls::scenario::XlsScenarioManager>,
     vba_code_name: Option<String>,
     conditional_formattings: Vec<XlsConditionalFormatting>,
+    conditional_formattings12:Vec<crate::xls::conditional_format::XlsConditionalFormatting12>,
+    conditional_format_extensions:Vec<crate::xls::conditional_format::XlsConditionalExtension>,
     consolidation: Option<crate::xls::consolidation::XlsConsolidation>,
     formula_error_features: Vec<crate::xls::formula_errors::XlsFormulaErrorFeature>,
     row_block_index: std::result::Result<
@@ -96,7 +98,7 @@ impl XlsWorksheet {
             calculation: crate::xls::calculation::XlsWorksheetCalculation::default(),
             scenario_manager: None,
             vba_code_name: None,
-            conditional_formattings: Vec::new(),
+            conditional_formattings: Vec::new(),conditional_formattings12:Vec::new(),conditional_format_extensions:Vec::new(),
             consolidation: None,
             formula_error_features: Vec::new(),
             row_block_index: Ok(None),
@@ -130,7 +132,7 @@ impl XlsWorksheet {
             calculation: crate::xls::calculation::XlsWorksheetCalculation::default(),
             scenario_manager: None,
             vba_code_name: None,
-            conditional_formattings: Vec::new(),
+            conditional_formattings: Vec::new(),conditional_formattings12:Vec::new(),conditional_format_extensions:Vec::new(),
             consolidation: None,
             formula_error_features: Vec::new(),
             row_block_index: Ok(None),
@@ -462,6 +464,10 @@ impl XlsWorksheet {
     ) {
         self.conditional_formattings = conditional_formattings;
     }
+    pub fn conditional_formattings12(&self)->&[crate::xls::conditional_format::XlsConditionalFormatting12]{&self.conditional_formattings12}
+    pub fn conditional_format_extensions(&self)->&[crate::xls::conditional_format::XlsConditionalExtension]{&self.conditional_format_extensions}
+    pub(crate) fn set_conditional_formattings12(&mut self,value:Vec<crate::xls::conditional_format::XlsConditionalFormatting12>){self.conditional_formattings12=value}
+    pub(crate) fn set_conditional_format_extensions(&mut self,value:Vec<crate::xls::conditional_format::XlsConditionalExtension>){self.conditional_format_extensions=value}
 
     /// Data-consolidation settings and inert source directory for this worksheet.
     pub fn consolidation(&self) -> Option<&crate::xls::consolidation::XlsConsolidation> {

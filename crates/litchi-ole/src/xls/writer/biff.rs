@@ -33,6 +33,7 @@ mod workbook;
 mod worksheet;
 
 pub(crate) use cells::write_formula;
+pub(crate) use conditional_format::Cf12Config;
 
 pub(crate) use modern_globals::{
     sxdbex_creation_timestamp_bytes, write_compat12, write_compress_pictures,
@@ -785,6 +786,23 @@ pub fn write_cfrule<W: Write>(
         formula2,
         pattern,
     )
+}
+
+pub(crate) fn write_cfheader_with_identifier<W: Write>(writer:&mut W,ranges:&[(u32,u32,u16,u16)],num_rules:u16,identifier:u16)->XlsResult<()> {
+    conditional_format::write_cfheader_with_identifier(writer, ranges, num_rules, identifier)
+}
+
+pub(crate) fn write_condfmt12<W: Write>(writer:&mut W,ranges:&[(u32,u32,u16,u16)],num_rules:u16,identifier:u16)->XlsResult<()> {
+    conditional_format::write_condfmt12(writer, ranges, num_rules, identifier)
+}
+
+pub(crate) fn write_cf12<W: Write>(writer:&mut W, config:&Cf12Config<'_>)->XlsResult<()> {
+    conditional_format::write_cf12(writer, config)
+}
+
+/// Write an exact `CFEx` marker which must immediately precede its associated `CF12` record.
+pub fn write_cfex12_marker<W: Write>(writer:&mut W,identifier:u16,enclosing:(u16,u16,u16,u16))->XlsResult<()> {
+    conditional_format::write_cfex12_marker(writer, identifier, enclosing)
 }
 
 #[cfg(test)]

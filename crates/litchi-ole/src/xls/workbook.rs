@@ -658,7 +658,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             view_collector.feed_record(record.header.record_type, &record.data)?;
             page_setup_collector.feed_record(record.header.record_type, &record.data)?;
             protection_collector.feed_record(record.header.record_type, &record.data)?;
-            conditional_format_collector.feed_record(record.header.record_type, &record.data)?;
+            conditional_format_collector.feed_record(record.header.record_type, &record.data,formula_context)?;
             calculation_collector.feed_record(record.header.record_type, &record.data)?;
             scenario_collector.feed_record(record.header.record_type, &record.data)?;
             vba_collector.feed_record(record.header.record_type, &record.data)?;
@@ -944,7 +944,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         worksheet.set_sheet_layout(sheet_layout_collector.finish());
         worksheet.set_worksheet_views(view_collector.finish()?);
         worksheet.set_page_setup(page_setup_collector.finish()?);
-        worksheet.set_conditional_formattings(conditional_format_collector.finish()?);
+        let(legacy,future,extensions)=conditional_format_collector.finish()?;worksheet.set_conditional_formattings(legacy);worksheet.set_conditional_formattings12(future);worksheet.set_conditional_format_extensions(extensions);
         worksheet.set_calculation(calculation_collector.finish()?);
         worksheet.set_scenario_manager(scenario_collector.finish()?);
         worksheet.set_vba_code_name(vba_collector.finish());

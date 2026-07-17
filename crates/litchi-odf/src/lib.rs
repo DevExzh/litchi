@@ -459,7 +459,8 @@ pub use line_numbering::{
 };
 pub use notes_configuration::{
     OdfFootnotePosition, OdfNoteClass, OdfNoteNumberingScope, OdfNotesConfiguration,
-    OdfNotesConfigurations, parse_notes_configurations,
+    OdfNotesConfigurations, parse_notes_configurations, remove_notes_configuration_xml,
+    set_notes_configuration_xml,
 };
 pub use embedded_object::{
     OdfEmbeddedObject, OdfEmbeddedObjectKind, OdfEmbeddedObjectPart,

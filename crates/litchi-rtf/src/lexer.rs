@@ -346,6 +346,10 @@ pub enum ControlWord<'a> {
 
     // Tables
     TableRowDefaults,
+    TableRowIndex(Option<i32>),
+    TableRowBandIndex(Option<i32>),
+    TableLastRow(Option<i32>),
+    TableAutoformatFlag(crate::TableAutoformatFlag, Option<i32>),
     TableRow,
     TableCell,
     CellX(i32),
@@ -1238,6 +1242,20 @@ impl<'a> Lexer<'a> {
 
             // Tables
             "trowd" => ControlWord::TableRowDefaults,
+            "irow" => ControlWord::TableRowIndex(param),
+            "irowband" => ControlWord::TableRowBandIndex(param),
+            "lastrow" => ControlWord::TableLastRow(param),
+            "tbllkborder" => ControlWord::TableAutoformatFlag(crate::TableAutoformatFlag::Border,param),
+            "tbllkshading" => ControlWord::TableAutoformatFlag(crate::TableAutoformatFlag::Shading,param),
+            "tbllkfont" => ControlWord::TableAutoformatFlag(crate::TableAutoformatFlag::Font,param),
+            "tbllkcolor" => ControlWord::TableAutoformatFlag(crate::TableAutoformatFlag::Color,param),
+            "tbllkbestfit" => ControlWord::TableAutoformatFlag(crate::TableAutoformatFlag::BestFit,param),
+            "tbllkhdrrows" => ControlWord::TableAutoformatFlag(crate::TableAutoformatFlag::HeaderRows,param),
+            "tbllklastrow" => ControlWord::TableAutoformatFlag(crate::TableAutoformatFlag::LastRow,param),
+            "tbllkhdrcols" => ControlWord::TableAutoformatFlag(crate::TableAutoformatFlag::HeaderColumns,param),
+            "tbllklastcol" => ControlWord::TableAutoformatFlag(crate::TableAutoformatFlag::LastColumn,param),
+            "tbllknorowband" => ControlWord::TableAutoformatFlag(crate::TableAutoformatFlag::NoRowBanding,param),
+            "tbllknocolband" => ControlWord::TableAutoformatFlag(crate::TableAutoformatFlag::NoColumnBanding,param),
             "row" => ControlWord::TableRow,
             "cell" => ControlWord::TableCell,
             "cellx" => ControlWord::CellX(param_value),

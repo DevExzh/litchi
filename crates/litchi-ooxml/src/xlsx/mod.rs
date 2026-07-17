@@ -77,8 +77,10 @@ pub mod workbook;
 pub mod worksheet;
 pub use chartsheet::{
     ChartSheet, ChartSheetBackgroundPicture, ChartSheetChartCompanionResource, ChartSheetChartResource,
-    ChartSheetChartResourceKind, ChartSheetChartUserShapeImageContentType, ChartSheetChartUserShapeImageResource,
-    ChartSheetChartUserShapesResource, ChartSheetColor, ChartSheetConformance,
+    ChartSheetChartResourceKind, ChartSheetChartImageContentType, ChartSheetChartImageResource,
+    ChartSheetChartUserShapeImageContentType, ChartSheetChartUserShapeImageResource, ChartSheetChartUserShapesResource,
+    ChartSheetChartEmbeddedPackageContentType, ChartSheetChartEmbeddedPackageResource, ChartSheetChartThemeOverrideResource,
+    ChartSheetChartOutboundResource, ChartSheetColor, ChartSheetConformance,
     ChartSheetExtension, ChartSheetExtensionList, ChartSheetExtensionRelationship, ChartSheetExtensionRelationshipTarget,
     ChartSheetCustomView, ChartSheetDrawingResource, ChartSheetEntry, ChartSheetHeaderFooter, ChartSheetMargins, ChartSheetPrinterSettings,
     ChartSheetImageContentType, ChartSheetPackage, ChartSheetPageSetup, ChartSheetProperties, ChartSheetProtection, ChartSheetVmlDrawingResource,

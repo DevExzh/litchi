@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use super::{
-    XlsCellValue, XlsConditionalFormat, XlsDataValidation, XlsDataValidationOptions,
+    XlsCellValue, XlsConditionalFormat, XlsConditionalFormat12Group, XlsConditionalFormatGroup, XlsConditionalFormatRange, XlsConditionalFormatRule, XlsDataValidation, XlsDataValidationOptions,
     XlsDataValidationRange, XlsDataValidationTableOptions, XlsPageSetupOptions,
 };
 use crate::xls::writer::biff::AutoFilterConditionWrite;
@@ -97,7 +97,8 @@ pub(super) struct WritableWorksheet {
     pub merged_ranges: Vec<MergedRange>,
     pub data_validations: Vec<WritableDataValidation>,
     pub data_validation_table_options: Option<XlsDataValidationTableOptions>,
-    pub conditional_formats: Vec<XlsConditionalFormat>,
+    pub conditional_formats: Vec<XlsConditionalFormatGroup>,
+    pub conditional_formats12: Vec<XlsConditionalFormat12Group>,
     pub view: crate::xls::writer::view::XlsWorksheetViewOptions,
     pub sheet_protection: Option<XlsSheetProtection>,
     pub sheet_layout: super::XlsWorksheetLayoutOptions,
@@ -159,6 +160,7 @@ impl WritableWorksheet {
             data_validations: Vec::new(),
             data_validation_table_options: None,
             conditional_formats: Vec::new(),
+            conditional_formats12: Vec::new(),
             view: crate::xls::writer::view::XlsWorksheetViewOptions::default(),
             sheet_protection: None,
             sheet_layout: super::XlsWorksheetLayoutOptions::default(),
@@ -208,7 +210,11 @@ impl WritableWorksheet {
     }
 
     pub(super) fn add_conditional_format(&mut self, cf: XlsConditionalFormat) {
-        self.conditional_formats.push(cf);
+        self.conditional_formats.push(XlsConditionalFormatGroup{ranges:vec![XlsConditionalFormatRange{first_row:cf.first_row,last_row:cf.last_row,first_col:cf.first_col,last_col:cf.last_col}],rules:vec![XlsConditionalFormatRule{format_type:cf.format_type,pattern:cf.pattern}]});
+    }
+    pub(super) fn add_conditional_format_group(&mut self,group:XlsConditionalFormatGroup){self.conditional_formats.push(group)}
+    pub(super) fn add_conditional_format12_group(&mut self, group: XlsConditionalFormat12Group) {
+        self.conditional_formats12.push(group);
     }
 
     pub(super) fn set_freeze_panes(&mut self, freeze_rows: u32, freeze_cols: u16) {

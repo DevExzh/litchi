@@ -13,6 +13,7 @@ pub const MAX_TABLE_WIDTH_PERCENT: i32 = 5_000;
 pub const MAX_FLOATING_TABLE_DISTANCE_TWIPS: i32 = 31_680;
 pub const MAX_TABLE_NESTING_DEPTH: usize = 32;
 pub const MAX_TABLE_CELLS_PER_ROW: usize = 4_096;
+pub const MAX_TABLE_ROW_INDEX: u16 = u16::MAX;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum TablePreferredWidthUnit { #[default] Null, Auto, Percent, Twips }
@@ -136,6 +137,27 @@ pub struct TableDistanceTarget { pub scope: TableDistanceScope, pub kind: TableD
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableRowAlignment { Left, Center, Right }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TableAutoformatFlag { Border, Shading, Font, Color, BestFit, HeaderRows, LastRow, HeaderColumns, LastColumn, NoRowBanding, NoColumnBanding }
+
+impl TableAutoformatFlag {
+    const fn bit(self)->u16{match self{Self::Border=>1<<0,Self::Shading=>1<<1,Self::Font=>1<<2,Self::Color=>1<<3,Self::BestFit=>1<<4,Self::HeaderRows=>1<<5,Self::LastRow=>1<<6,Self::HeaderColumns=>1<<7,Self::LastColumn=>1<<8,Self::NoRowBanding=>1<<9,Self::NoColumnBanding=>1<<10}}
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct TableAutoformatFlags { bits:u16 }
+impl TableAutoformatFlags {
+    pub const fn contains(self,flag:TableAutoformatFlag)->bool{self.bits&flag.bit()!=0}
+    pub fn set(&mut self,flag:TableAutoformatFlag,enabled:bool){if enabled{self.bits|=flag.bit()}else{self.bits&=!flag.bit()}}
+    pub(crate) fn insert(&mut self,flag:TableAutoformatFlag)->bool{let was_present=self.contains(flag);self.set(flag,true);!was_present}
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TableRowBandIndex { Header, Row(u16) }
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct TableRowBanding { pub row_index:Option<u16>, pub band_index:Option<TableRowBandIndex>, pub last_row:bool }
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct TableRowLayout { pub header: bool, pub keep_together: bool, pub keep_with_following: bool, pub alignment: Option<TableRowAlignment> }
 
@@ -222,6 +244,8 @@ pub struct Row<'a> {
     borders: TableRowBorders,
     shading: TableShading,
     geometry: TableRowGeometry,
+    autoformat_flags: TableAutoformatFlags,
+    banding: TableRowBanding,
 }
 
 impl<'a> Row<'a> {
@@ -234,7 +258,7 @@ impl<'a> Row<'a> {
             padding: TableEdgeDistances::default(),
             spacing: TableEdgeDistances::default(),
             positioning: FloatingTablePosition::default(),
-            borders: Default::default(), shading: Default::default(), geometry:Default::default(),
+            borders: Default::default(), shading: Default::default(), geometry:Default::default(), autoformat_flags:Default::default(), banding:Default::default(),
         }
     }
 
@@ -276,6 +300,10 @@ impl<'a> Row<'a> {
     pub fn set_shading(&mut self,value:TableShading){self.shading=value}
     pub fn geometry(&self)->TableRowGeometry{self.geometry}
     pub fn set_geometry(&mut self,value:TableRowGeometry){self.geometry=value}
+    pub const fn autoformat_flags(&self)->TableAutoformatFlags{self.autoformat_flags}
+    pub fn set_autoformat_flags(&mut self,value:TableAutoformatFlags){self.autoformat_flags=value}
+    pub const fn banding(&self)->TableRowBanding{self.banding}
+    pub fn set_banding(&mut self,value:TableRowBanding){self.banding=value}
 }
 
 impl<'a> Default for Row<'a> {

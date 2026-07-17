@@ -192,7 +192,7 @@ pub use conditional_format::{
     XlsConditionalAlignment, XlsConditionalBorder, XlsConditionalComparison,
     XlsConditionalFont, XlsConditionalFormatRange, XlsConditionalFormatting,
     XlsConditionalNumberFormat, XlsConditionalPattern, XlsConditionalProtection,
-    XlsConditionalRule, XlsConditionalRuleKind, XlsConditionalStyle,
+    XlsConditionalExtension, XlsConditionalFormatting12, XlsConditionalRule, XlsConditionalRule12, XlsConditionalRule12Kind, XlsConditionalRuleKind, XlsConditionalStyle,
 };
 pub use sheet_metadata::{XlsSheetKind, XlsSheetMetadata, XlsSheetVisibility};
 pub use records::{

@@ -22,9 +22,12 @@ pub mod view;
 pub mod row_blocks;
 
 // Re-export public types
-pub use biff::AutoFilterConditionWrite;
+pub use biff::{AutoFilterConditionWrite, write_cfex12_marker, write_cfheader};
 pub use core::{
-    PivotCacheValue, XlsCalculationSettings, XlsCellValue, XlsConditionalFormat, XlsConditionalFormatType,
+    PivotCacheValue, XlsCalculationSettings, XlsCellValue, XlsConditionalFormat,
+    XlsConditionalFormat12Group, XlsConditionalFormat12Rule, XlsConditionalFormat12Type,
+    XlsConditionalFormatGroup, XlsConditionalFormatOperator, XlsConditionalFormatRange,
+    XlsConditionalFormatRule, XlsConditionalFormatType,
     XlsConditionalPattern, XlsDataValidation, XlsDataValidationErrorStyle,
     XlsDataValidationFormulaKind, XlsDataValidationImeMode, XlsDataValidationOperator,
     XlsDataValidationOptions, XlsDataValidationRange, XlsDataValidationTableOptions,

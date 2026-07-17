@@ -33,6 +33,8 @@ const CHART_STYLE_REL: &str = "http://schemas.microsoft.com/office/2011/relation
 const CHART_COLOR_STYLE_REL: &str = "http://schemas.microsoft.com/office/2011/relationships/chartColorStyle";
 const CHART_USER_SHAPES_REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartUserShapes";
 const STRICT_CHART_USER_SHAPES_REL: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships/chartUserShapes";
+const THEME_OVERRIDE_REL:&str="http://schemas.openxmlformats.org/officeDocument/2006/relationships/themeOverride";
+const STRICT_THEME_OVERRIDE_REL:&str="http://purl.oclc.org/ooxml/officeDocument/relationships/themeOverride";
 const VML_DRAWING_REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing";
 const STRICT_VML_DRAWING_REL: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships/vmlDrawing";
 const CHARTSHEET_CT: &str = "application/vnd.openxmlformats-officedocument.spreadsheetml.chartsheet+xml";
@@ -42,6 +44,7 @@ const CHART_EX_CT: &str = "application/vnd.ms-office.chartex+xml";
 const CHART_STYLE_CT: &str = "application/vnd.ms-office.chartstyle+xml";
 const CHART_COLOR_STYLE_CT: &str = "application/vnd.ms-office.chartcolorstyle+xml";
 const CHART_USER_SHAPES_CT: &str = "application/vnd.openxmlformats-officedocument.drawingml.chartshapes+xml";
+const THEME_OVERRIDE_CT:&str="application/vnd.openxmlformats-officedocument.themeOverride+xml";
 const VML_DRAWING_CT: &str = "application/vnd.openxmlformats-officedocument.vmlDrawing";
 const MAX_XML_BYTES: usize = 32 * 1024 * 1024;
 const MAX_DRAWING_BYTES: usize = 16 * 1024 * 1024;
@@ -62,6 +65,10 @@ const MAX_CHART_STYLE_PARTS: usize = 16;
 const MAX_CHART_USER_SHAPES_BYTES: usize = 8 * 1024 * 1024;
 const MAX_CHART_USER_SHAPE_IMAGES: usize = 256;
 const MAX_CHART_USER_SHAPE_IMAGE_BYTES: usize = 32 * 1024 * 1024;
+const MAX_CHART_DIRECT_IMAGES:usize=256;
+const MAX_CHART_THEME_OVERRIDE_BYTES:usize=4*1024*1024;
+const MAX_CHART_THEME_IMAGES:usize=256;
+const MAX_CHART_EMBEDDED_PACKAGE_BYTES:usize=64*1024*1024;
 const MAX_WEB_PUBLISH_ITEMS: usize = 4096;
 const MAX_WEB_PUBLISH_STRING_BYTES: usize = 64 * 1024;
 const MAX_EXTENSIONS: usize = 1024;
@@ -84,6 +91,8 @@ impl ChartSheetConformance {
     fn chart_rel(self) -> &'static str { match self { Self::Transitional => rt::CHART, Self::Strict => rt::STRICT_CHART } }
     fn image_rel(self) -> &'static str { match self { Self::Transitional => IMAGE_REL, Self::Strict => STRICT_IMAGE_REL } }
     fn chart_user_shapes_rel(self) -> &'static str { match self { Self::Transitional => CHART_USER_SHAPES_REL, Self::Strict => STRICT_CHART_USER_SHAPES_REL } }
+    fn theme_override_rel(self)->&'static str{match self{Self::Transitional=>THEME_OVERRIDE_REL,Self::Strict=>STRICT_THEME_OVERRIDE_REL}}
+    fn package_rel(self)->&'static str{match self{Self::Transitional=>rt::PACKAGE,Self::Strict=>rt::STRICT_PACKAGE}}
     fn vml_drawing_rel(self) -> &'static str { match self { Self::Transitional => VML_DRAWING_REL, Self::Strict => STRICT_VML_DRAWING_REL } }
     fn printer_rel(self)->&'static str{match self{Self::Transitional=>PRINTER_REL,Self::Strict=>STRICT_PRINTER_REL}}
 }
@@ -296,11 +305,11 @@ pub struct ChartSheetChartCompanionResource {
 
 /// Supported inert image payload types for a chartEx chart-user-shapes drawing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ChartSheetChartUserShapeImageContentType {
+pub enum ChartSheetChartImageContentType {
     Bmp, Gif, Png, Tif, Tiff, Icon, Pcx, Jpeg, Jp2, Emf, Wmf, Svg,
 }
 
-impl ChartSheetChartUserShapeImageContentType {
+impl ChartSheetChartImageContentType {
     pub fn as_str(self) -> &'static str { match self {
         Self::Bmp=>"image/bmp",Self::Gif=>"image/gif",Self::Png=>"image/png",Self::Tif=>"image/tif",Self::Tiff=>"image/tiff",Self::Icon=>"image/x-icon",Self::Pcx=>"image/x-pcx",Self::Jpeg=>"image/jpeg",Self::Jp2=>"image/jp2",Self::Emf=>"image/x-emf",Self::Wmf=>"image/x-wmf",Self::Svg=>"image/svg+xml",
     }}
@@ -313,10 +322,10 @@ impl ChartSheetChartUserShapeImageContentType {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChartSheetChartUserShapeImageResource {
+pub struct ChartSheetChartImageResource {
     pub relationship_id:String,
     pub part_name:String,
-    pub content_type:ChartSheetChartUserShapeImageContentType,
+    pub content_type:ChartSheetChartImageContentType,
     /// Preserved without decoding, rendering, metadata inspection, or external fetches.
     pub data:Vec<u8>,
 }
@@ -328,8 +337,31 @@ pub struct ChartSheetChartUserShapesResource {
     pub content_type:String,
     /// Preserved without interpreting shapes, actions, hyperlinks, or embedded markup.
     pub data:Vec<u8>,
-    pub images:Vec<ChartSheetChartUserShapeImageResource>,
+    pub images:Vec<ChartSheetChartImageResource>,
 }
+
+pub type ChartSheetChartUserShapeImageContentType=ChartSheetChartImageContentType;
+pub type ChartSheetChartUserShapeImageResource=ChartSheetChartImageResource;
+
+#[derive(Debug,Clone,Copy,PartialEq,Eq)]
+pub enum ChartSheetChartEmbeddedPackageContentType{Docx,Dotx,Potx,Ppsx,Pptx,Sldx,Thmx,Xlsx,Xltx}
+impl ChartSheetChartEmbeddedPackageContentType{
+    pub fn as_str(self)->&'static str{match self{Self::Docx=>"application/vnd.openxmlformats-officedocument.wordprocessingml.document",Self::Dotx=>"application/vnd.openxmlformats-officedocument.wordprocessingml.template",Self::Potx=>"application/vnd.openxmlformats-officedocument.presentationml.template",Self::Ppsx=>"application/vnd.openxmlformats-officedocument.presentationml.slideshow",Self::Pptx=>"application/vnd.openxmlformats-officedocument.presentationml.presentation",Self::Sldx=>"application/vnd.openxmlformats-officedocument.presentationml.slide",Self::Thmx=>"application/vnd.ms-officetheme",Self::Xlsx=>"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",Self::Xltx=>"application/vnd.openxmlformats-officedocument.spreadsheetml.template"}}
+    fn parse(value:&str)->Result<Self>{match value{"application/vnd.openxmlformats-officedocument.wordprocessingml.document"=>Ok(Self::Docx),"application/vnd.openxmlformats-officedocument.wordprocessingml.template"=>Ok(Self::Dotx),"application/vnd.openxmlformats-officedocument.presentationml.template"=>Ok(Self::Potx),"application/vnd.openxmlformats-officedocument.presentationml.slideshow"=>Ok(Self::Ppsx),"application/vnd.openxmlformats-officedocument.presentationml.presentation"=>Ok(Self::Pptx),"application/vnd.openxmlformats-officedocument.presentationml.slide"=>Ok(Self::Sldx),"application/vnd.ms-officetheme"=>Ok(Self::Thmx),"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"=>Ok(Self::Xlsx),"application/vnd.openxmlformats-officedocument.spreadsheetml.template"=>Ok(Self::Xltx),_=>Err(invalid(format!("unsupported or active chartEx embedded-package content type '{value}'")))}}
+    fn validates_part_name(self,value:&str)->bool{let suffix=match self{Self::Docx=>".docx",Self::Dotx=>".dotx",Self::Potx=>".potx",Self::Ppsx=>".ppsx",Self::Pptx=>".pptx",Self::Sldx=>".sldx",Self::Thmx=>".thmx",Self::Xlsx=>".xlsx",Self::Xltx=>".xltx"};value.to_ascii_lowercase().ends_with(suffix)}
+}
+
+#[derive(Debug,Clone,PartialEq,Eq)]
+pub struct ChartSheetChartThemeOverrideResource{pub relationship_id:String,pub part_name:String,pub content_type:String,/// Preserved without theme application, image rendering, or external access.
+pub data:Vec<u8>,pub images:Vec<ChartSheetChartImageResource>}
+
+#[derive(Debug,Clone,PartialEq,Eq)]
+pub struct ChartSheetChartEmbeddedPackageResource{pub relationship_id:String,pub part_name:String,pub content_type:ChartSheetChartEmbeddedPackageContentType,/// Preserved without opening, parsing, activation, macro execution, or external access.
+pub data:Vec<u8>}
+
+#[derive(Debug,Clone,PartialEq,Eq)]
+pub enum ChartSheetChartOutboundResource{Image(ChartSheetChartImageResource),ThemeOverride(ChartSheetChartThemeOverrideResource),EmbeddedPackage(ChartSheetChartEmbeddedPackageResource)}
+impl ChartSheetChartOutboundResource{fn relationship_id(&self)->&str{match self{Self::Image(value)=>&value.relationship_id,Self::ThemeOverride(value)=>&value.relationship_id,Self::EmbeddedPackage(value)=>&value.relationship_id}}}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ChartSheetChartResourceKind {
@@ -338,6 +370,7 @@ pub enum ChartSheetChartResourceKind {
         styles: Vec<ChartSheetChartCompanionResource>,
         color_styles: Vec<ChartSheetChartCompanionResource>,
         user_shapes: Option<ChartSheetChartUserShapesResource>,
+        outbound_resources:Vec<ChartSheetChartOutboundResource>,
     },
 }
 
@@ -578,21 +611,25 @@ fn load_chart_resource(package:&OpcPackage,drawing_part:&dyn Part,reference:&Dra
     let kind=match reference.kind{
         DrawingChartKind::Classic=>{require_content_type(part,CHART_CT,"chart")?;validate_chart_xml(part.blob(),conformance)?;if !part.rels().is_empty(){return Err(invalid("bounded classic chart must be a relationship-free leaf"))}add_resource(total,part.blob().len(),MAX_CHART_BYTES,"chart bytes")?;ChartSheetChartResourceKind::Classic}
         DrawingChartKind::Extended=>{
-            require_content_type(part,CHART_EX_CT,"chartEx")?;validate_chart_ex_xml(part.blob())?;add_resource(total,part.blob().len(),MAX_CHART_EX_BYTES,"chartEx bytes")?;
-            let(mut styles,mut color_styles,mut user_shapes)=(Vec::new(),Vec::new(),None);
+            require_content_type(part,CHART_EX_CT,"chartEx")?;let references=validate_chart_ex_relationships(part.blob(),conformance)?;add_resource(total,part.blob().len(),MAX_CHART_EX_BYTES,"chartEx bytes")?;
+            let(mut styles,mut color_styles,mut user_shapes,mut outbound_resources)=(Vec::new(),Vec::new(),None,Vec::new());let(mut theme_seen,mut package_seen)=(false,false);
             for relationship in part.rels().iter(){
                 if relationship.reltype()==conformance.chart_user_shapes_rel(){
                     if user_shapes.is_some(){return Err(invalid("chartEx has multiple chartUserShapes relationships"))}
                     if relationship.is_external(){return Err(invalid("external chartUserShapes relationship is rejected"))}
                     user_shapes=Some(load_chart_user_shapes_resource(package,relationship,conformance,total)?);continue
                 }
-                let(target,root,max_bytes,collection)=match relationship.reltype(){CHART_STYLE_REL=>(CHART_STYLE_CT,"chartStyle",MAX_CHART_STYLE_BYTES,&mut styles),CHART_COLOR_STYLE_REL=>(CHART_COLOR_STYLE_CT,"colorStyle",MAX_CHART_COLOR_STYLE_BYTES,&mut color_styles),_=>return Err(invalid("chartEx has an unsupported outbound relationship; package, image, and themeOverride are outside this bounded family"))};
+                if relationship.reltype()==conformance.image_rel(){if outbound_resources.iter().filter(|value|matches!(value,ChartSheetChartOutboundResource::Image(_))).count()>=MAX_CHART_DIRECT_IMAGES{return Err(limit("chartEx direct image count"))}outbound_resources.push(ChartSheetChartOutboundResource::Image(load_chart_image_resource(package,relationship,total,"chartEx direct image")?));continue}
+                if relationship.reltype()==conformance.theme_override_rel(){if theme_seen{return Err(invalid("chartEx has multiple themeOverride relationships"))}theme_seen=true;outbound_resources.push(ChartSheetChartOutboundResource::ThemeOverride(load_chart_theme_override_resource(package,relationship,conformance,total)?));continue}
+                if relationship.reltype()==conformance.package_rel(){if package_seen{return Err(invalid("chartEx has multiple embedded package relationships"))}package_seen=true;outbound_resources.push(ChartSheetChartOutboundResource::EmbeddedPackage(load_chart_embedded_package_resource(package,relationship,total)?));continue}
+                let(target,root,max_bytes,collection)=match relationship.reltype(){CHART_STYLE_REL=>(CHART_STYLE_CT,"chartStyle",MAX_CHART_STYLE_BYTES,&mut styles),CHART_COLOR_STYLE_REL=>(CHART_COLOR_STYLE_CT,"colorStyle",MAX_CHART_COLOR_STYLE_BYTES,&mut color_styles),_=>return Err(invalid("chartEx has an unsupported or active outbound relationship"))};
                 if collection.len()>=MAX_CHART_STYLE_PARTS{return Err(limit("chart companion count"))}if relationship.is_external(){return Err(invalid("external chartEx companion relationship is rejected"))}
                 let companion_name=relationship.target_partname()?;if !companion_name.as_str().starts_with("/xl/charts/")||!companion_name.as_str().ends_with(".xml"){return Err(invalid("chart companion target is outside /xl/charts or lacks .xml suffix"))}
                 let companion=package.get_part(&companion_name)?;require_content_type(companion,target,"chart companion")?;validate_chart_companion_xml(companion.blob(),root,max_bytes)?;if !companion.rels().is_empty(){return Err(invalid("chart companion must be a relationship-free leaf"))}add_resource(total,companion.blob().len(),max_bytes,"chart companion bytes")?;
                 collection.push(ChartSheetChartCompanionResource{relationship_id:relationship.r_id().to_owned(),part_name:companion_name.to_string(),content_type:companion.content_type().to_owned(),data:companion.blob().to_vec()});
             }
-            styles.sort_by(|left,right|left.relationship_id.cmp(&right.relationship_id));color_styles.sort_by(|left,right|left.relationship_id.cmp(&right.relationship_id));ChartSheetChartResourceKind::Extended{styles,color_styles,user_shapes}
+            let image_ids=outbound_resources.iter().filter_map(|value|match value{ChartSheetChartOutboundResource::Image(image)=>Some(image.relationship_id.clone()),_=>None}).collect::<BTreeSet<_>>();let package_id=outbound_resources.iter().find_map(|value|match value{ChartSheetChartOutboundResource::EmbeddedPackage(package)=>Some(package.relationship_id.clone()),_=>None});if image_ids!=references.images||package_id!=references.package{return Err(invalid("chartEx XML relationship references do not close over direct images and embedded package"))}
+            styles.sort_by(|left,right|left.relationship_id.cmp(&right.relationship_id));color_styles.sort_by(|left,right|left.relationship_id.cmp(&right.relationship_id));outbound_resources.sort_by(|left,right|left.relationship_id().cmp(right.relationship_id()));ChartSheetChartResourceKind::Extended{styles,color_styles,user_shapes,outbound_resources}
         }
     };
     Ok(ChartSheetChartResource{relationship_id:reference.relationship_id.clone(),part_name:name.to_string(),content_type:part.content_type().to_owned(),data:part.blob().to_vec(),kind})
@@ -606,6 +643,12 @@ fn load_chart_user_shapes_resource(package:&OpcPackage,relationship:&litchi_opc:
     images.sort_by(|left,right|left.relationship_id.cmp(&right.relationship_id));Ok(ChartSheetChartUserShapesResource{relationship_id:relationship.r_id().to_owned(),part_name:name.to_string(),content_type:part.content_type().to_owned(),data:part.blob().to_vec(),images})
 }
 
+fn load_chart_image_resource(package:&OpcPackage,relationship:&litchi_opc::Relationship,total:&mut usize,label:&str)->Result<ChartSheetChartImageResource>{if relationship.is_external(){return Err(invalid(format!("external {label} relationship is rejected")))}let name=relationship.target_partname()?;if !name.as_str().starts_with("/xl/media/"){return Err(invalid(format!("{label} is outside /xl/media")))}let part=package.get_part(&name)?;let content_type=ChartSheetChartImageContentType::parse(part.content_type())?;if !content_type.validates_part_name(name.as_str()){return Err(invalid(format!("{label} suffix does not match its content type")))}if !part.rels().is_empty(){return Err(invalid(format!("{label} must be a relationship-free leaf")))}add_resource(total,part.blob().len(),MAX_CHART_USER_SHAPE_IMAGE_BYTES,"chart image bytes")?;Ok(ChartSheetChartImageResource{relationship_id:relationship.r_id().to_owned(),part_name:name.to_string(),content_type,data:part.blob().to_vec()})}
+
+fn load_chart_theme_override_resource(package:&OpcPackage,relationship:&litchi_opc::Relationship,conformance:ChartSheetConformance,total:&mut usize)->Result<ChartSheetChartThemeOverrideResource>{if relationship.is_external(){return Err(invalid("external themeOverride relationship is rejected"))}let name=relationship.target_partname()?;if !name.as_str().starts_with("/xl/theme/")||!name.as_str().ends_with(".xml"){return Err(invalid("themeOverride target is outside /xl/theme or lacks .xml suffix"))}let part=package.get_part(&name)?;require_content_type(part,THEME_OVERRIDE_CT,"themeOverride")?;let referenced=validate_theme_override_xml(part.blob(),conformance)?;add_resource(total,part.blob().len(),MAX_CHART_THEME_OVERRIDE_BYTES,"themeOverride bytes")?;if referenced.len()>MAX_CHART_THEME_IMAGES{return Err(limit("themeOverride image count"))}if part.rels().iter().count()!=referenced.len(){return Err(invalid("themeOverride image relationships are missing or orphaned"))}let mut images=Vec::with_capacity(referenced.len());for id in referenced{let image_relationship=internal_relationship(part,&id,conformance.image_rel())?;images.push(load_chart_image_resource(package,image_relationship,total,"themeOverride image")?);}images.sort_by(|left,right|left.relationship_id.cmp(&right.relationship_id));Ok(ChartSheetChartThemeOverrideResource{relationship_id:relationship.r_id().to_owned(),part_name:name.to_string(),content_type:part.content_type().to_owned(),data:part.blob().to_vec(),images})}
+
+fn load_chart_embedded_package_resource(package:&OpcPackage,relationship:&litchi_opc::Relationship,total:&mut usize)->Result<ChartSheetChartEmbeddedPackageResource>{if relationship.is_external(){return Err(invalid("external chartEx embedded-package relationship is rejected"))}let name=relationship.target_partname()?;if !name.as_str().starts_with("/xl/embeddings/"){return Err(invalid("chartEx embedded package is outside /xl/embeddings"))}let part=package.get_part(&name)?;let content_type=ChartSheetChartEmbeddedPackageContentType::parse(part.content_type())?;if !content_type.validates_part_name(name.as_str()){return Err(invalid("chartEx embedded-package suffix does not match its content type"))}if !part.rels().is_empty(){return Err(invalid("chartEx embedded package must be a relationship-free opaque leaf"))}add_resource(total,part.blob().len(),MAX_CHART_EMBEDDED_PACKAGE_BYTES,"chartEx embedded-package bytes")?;Ok(ChartSheetChartEmbeddedPackageResource{relationship_id:relationship.r_id().to_owned(),part_name:name.to_string(),content_type,data:part.blob().to_vec()})}
+
 /// Adds a preflighted chartsheet package graph and workbook sheet entry.
 pub fn store_chartsheet(package: &mut OpcPackage, workbook_name: &PackURI, value: &ChartSheetPackage, conformance: ChartSheetConformance) -> Result<()> {
     validate_package_value(value, conformance)?;
@@ -617,7 +660,7 @@ pub fn store_chartsheet(package: &mut OpcPackage, workbook_name: &PackURI, value
     let legacy_hf_uri=value.legacy_header_footer_drawing.as_ref().map(|resource|new_uri(package,&resource.part_name,"/xl/drawings/")).transpose()?;
     let picture_uri=value.background_picture.as_ref().map(|picture|new_uri(package,&picture.part_name,"/xl/media/")).transpose()?;
     let printer_uri=value.printer_settings.as_ref().map(|settings|{let uri=PackURI::new(&settings.resource.part_name).map_err(OoxmlError::InvalidUri)?;validate_printer_settings_uri(&uri)?;if package.iter_parts().any(|part|part.partname()==&uri){return Err(invalid(format!("part '{uri}' already exists")))}Ok(uri)}).transpose()?;
-    let mut chart_uris = BTreeMap::new();let mut companion_uris=BTreeMap::new();let mut user_shape_uris=BTreeMap::new();let mut user_shape_image_uris=BTreeMap::new();for chart in &value.drawing.charts{chart_uris.insert(chart.relationship_id.clone(),new_uri(package,&chart.part_name,"/xl/charts/")?);if let ChartSheetChartResourceKind::Extended{styles,color_styles,user_shapes}=&chart.kind{for companion in styles.iter().chain(color_styles){companion_uris.insert((chart.relationship_id.clone(),companion.relationship_id.clone()),new_uri(package,&companion.part_name,"/xl/charts/")?);}if let Some(user_shapes)=user_shapes{user_shape_uris.insert(chart.relationship_id.clone(),new_uri(package,&user_shapes.part_name,"/xl/drawings/")?);for image in &user_shapes.images{user_shape_image_uris.insert((chart.relationship_id.clone(),image.relationship_id.clone()),new_uri(package,&image.part_name,"/xl/media/")?);}}}}
+    let mut chart_uris = BTreeMap::new();let mut companion_uris=BTreeMap::new();let mut user_shape_uris=BTreeMap::new();let mut user_shape_image_uris=BTreeMap::new();let mut outbound_uris=BTreeMap::new();let mut theme_image_uris=BTreeMap::new();for chart in &value.drawing.charts{chart_uris.insert(chart.relationship_id.clone(),new_uri(package,&chart.part_name,"/xl/charts/")?);if let ChartSheetChartResourceKind::Extended{styles,color_styles,user_shapes,outbound_resources}=&chart.kind{for companion in styles.iter().chain(color_styles){companion_uris.insert((chart.relationship_id.clone(),companion.relationship_id.clone()),new_uri(package,&companion.part_name,"/xl/charts/")?);}if let Some(user_shapes)=user_shapes{user_shape_uris.insert(chart.relationship_id.clone(),new_uri(package,&user_shapes.part_name,"/xl/drawings/")?);for image in &user_shapes.images{user_shape_image_uris.insert((chart.relationship_id.clone(),image.relationship_id.clone()),new_uri(package,&image.part_name,"/xl/media/")?);}}for resource in outbound_resources{let relationship_id=resource.relationship_id().to_owned();let(prefix,part_name)=match resource{ChartSheetChartOutboundResource::Image(image)=>("/xl/media/",image.part_name.as_str()),ChartSheetChartOutboundResource::ThemeOverride(theme)=>("/xl/theme/",theme.part_name.as_str()),ChartSheetChartOutboundResource::EmbeddedPackage(embedded)=>("/xl/embeddings/",embedded.part_name.as_str())};outbound_uris.insert((chart.relationship_id.clone(),relationship_id.clone()),new_uri(package,part_name,prefix)?);if let ChartSheetChartOutboundResource::ThemeOverride(theme)=resource{for image in &theme.images{theme_image_uris.insert((chart.relationship_id.clone(),relationship_id.clone(),image.relationship_id.clone()),new_uri(package,&image.part_name,"/xl/media/")?);}}}}}
     let updated_workbook = insert_workbook_entry(workbook.blob(), &value.entry, conformance)?; let chartsheet_xml = write_chartsheet(&value.chartsheet, conformance)?;
     package.get_part_mut(workbook_name)?.set_blob(updated_workbook);
     package.add_part(Box::new(BlobPart::new(chartsheet_uri.clone(), CHARTSHEET_CT.into(), chartsheet_xml)));
@@ -626,7 +669,7 @@ pub fn store_chartsheet(package: &mut OpcPackage, workbook_name: &PackURI, value
     if let (Some(resource),Some(uri))=(&value.legacy_header_footer_drawing,&legacy_hf_uri){package.add_part(Box::new(BlobPart::new(uri.clone(),resource.content_type.clone(),resource.data.clone())));}
     if let (Some(picture),Some(uri))=(&value.background_picture,&picture_uri){package.add_part(Box::new(BlobPart::new(uri.clone(),picture.content_type.as_str().into(),picture.data.clone())));}
     if let (Some(settings),Some(uri))=(&value.printer_settings,&printer_uri){package.add_part(Box::new(BlobPart::new(uri.clone(),PRINTER_CT.into(),settings.resource.data.clone())));}
-    for chart in &value.drawing.charts{package.add_part(Box::new(BlobPart::new(chart_uris[&chart.relationship_id].clone(),chart.content_type.clone(),chart.data.clone())));if let ChartSheetChartResourceKind::Extended{styles,color_styles,user_shapes}=&chart.kind{for companion in styles.iter().chain(color_styles){package.add_part(Box::new(BlobPart::new(companion_uris[&(chart.relationship_id.clone(),companion.relationship_id.clone())].clone(),companion.content_type.clone(),companion.data.clone())));}if let Some(user_shapes)=user_shapes{package.add_part(Box::new(BlobPart::new(user_shape_uris[&chart.relationship_id].clone(),user_shapes.content_type.clone(),user_shapes.data.clone())));for image in &user_shapes.images{package.add_part(Box::new(BlobPart::new(user_shape_image_uris[&(chart.relationship_id.clone(),image.relationship_id.clone())].clone(),image.content_type.as_str().into(),image.data.clone())));}}}}
+    for chart in &value.drawing.charts{package.add_part(Box::new(BlobPart::new(chart_uris[&chart.relationship_id].clone(),chart.content_type.clone(),chart.data.clone())));if let ChartSheetChartResourceKind::Extended{styles,color_styles,user_shapes,outbound_resources}=&chart.kind{for companion in styles.iter().chain(color_styles){package.add_part(Box::new(BlobPart::new(companion_uris[&(chart.relationship_id.clone(),companion.relationship_id.clone())].clone(),companion.content_type.clone(),companion.data.clone())));}if let Some(user_shapes)=user_shapes{package.add_part(Box::new(BlobPart::new(user_shape_uris[&chart.relationship_id].clone(),user_shapes.content_type.clone(),user_shapes.data.clone())));for image in &user_shapes.images{package.add_part(Box::new(BlobPart::new(user_shape_image_uris[&(chart.relationship_id.clone(),image.relationship_id.clone())].clone(),image.content_type.as_str().into(),image.data.clone())));}}for resource in outbound_resources{let key=(chart.relationship_id.clone(),resource.relationship_id().to_owned());let uri=outbound_uris[&key].clone();match resource{ChartSheetChartOutboundResource::Image(image)=>package.add_part(Box::new(BlobPart::new(uri,image.content_type.as_str().into(),image.data.clone()))),ChartSheetChartOutboundResource::ThemeOverride(theme)=>{package.add_part(Box::new(BlobPart::new(uri,theme.content_type.clone(),theme.data.clone())));for image in &theme.images{let image_uri=theme_image_uris[&(chart.relationship_id.clone(),theme.relationship_id.clone(),image.relationship_id.clone())].clone();package.add_part(Box::new(BlobPart::new(image_uri,image.content_type.as_str().into(),image.data.clone())));}},ChartSheetChartOutboundResource::EmbeddedPackage(embedded)=>package.add_part(Box::new(BlobPart::new(uri,embedded.content_type.as_str().into(),embedded.data.clone())))}}}}
     package.get_part_mut(workbook_name)?.rels_mut().add_relationship(conformance.chartsheet_rel().into(), chartsheet_uri.relative_ref(workbook_name.base_uri()), value.entry.workbook_relationship_id.clone(), false);
     package.get_part_mut(&chartsheet_uri)?.rels_mut().add_relationship(conformance.drawing_rel().into(), drawing_uri.relative_ref(chartsheet_uri.base_uri()), value.chartsheet.drawing_relationship_id.clone(), false);
     if let (Some(resource),Some(uri))=(&value.legacy_drawing,&legacy_uri){package.get_part_mut(&chartsheet_uri)?.rels_mut().add_relationship(conformance.vml_drawing_rel().into(),uri.relative_ref(chartsheet_uri.base_uri()),resource.relationship_id.clone(),false);}
@@ -634,7 +677,7 @@ pub fn store_chartsheet(package: &mut OpcPackage, workbook_name: &PackURI, value
     if let (Some(picture),Some(uri))=(&value.background_picture,&picture_uri){package.get_part_mut(&chartsheet_uri)?.rels_mut().add_relationship(conformance.image_rel().into(),uri.relative_ref(chartsheet_uri.base_uri()),picture.relationship_id.clone(),false);}
     if let (Some(settings),Some(uri))=(&value.printer_settings,&printer_uri){package.get_part_mut(&chartsheet_uri)?.rels_mut().add_relationship(conformance.printer_rel().into(),uri.relative_ref(chartsheet_uri.base_uri()),settings.relationship_id.clone(),false);}
     for relationship in &value.extension_relationships{let(target,external)=match &relationship.target{ChartSheetExtensionRelationshipTarget::Internal{part_name}=>(PackURI::new(part_name).map_err(OoxmlError::InvalidUri)?.relative_ref(chartsheet_uri.base_uri()),false),ChartSheetExtensionRelationshipTarget::External{target}=>(target.clone(),true)};package.get_part_mut(&chartsheet_uri)?.rels_mut().add_relationship(relationship.relationship_type.clone(),target,relationship.relationship_id.clone(),external);}
-    for chart in &value.drawing.charts{let relationship_type=match &chart.kind{ChartSheetChartResourceKind::Classic=>conformance.chart_rel(),ChartSheetChartResourceKind::Extended{..}=>CHART_EX_REL};package.get_part_mut(&drawing_uri)?.rels_mut().add_relationship(relationship_type.into(),chart_uris[&chart.relationship_id].relative_ref(drawing_uri.base_uri()),chart.relationship_id.clone(),false);if let ChartSheetChartResourceKind::Extended{styles,color_styles,user_shapes}=&chart.kind{for(companions,relationship_type)in[(styles,CHART_STYLE_REL),(color_styles,CHART_COLOR_STYLE_REL)]{for companion in companions{let uri=&companion_uris[&(chart.relationship_id.clone(),companion.relationship_id.clone())];package.get_part_mut(&chart_uris[&chart.relationship_id])?.rels_mut().add_relationship(relationship_type.into(),uri.relative_ref(chart_uris[&chart.relationship_id].base_uri()),companion.relationship_id.clone(),false);}}if let Some(user_shapes)=user_shapes{let uri=&user_shape_uris[&chart.relationship_id];package.get_part_mut(&chart_uris[&chart.relationship_id])?.rels_mut().add_relationship(conformance.chart_user_shapes_rel().into(),uri.relative_ref(chart_uris[&chart.relationship_id].base_uri()),user_shapes.relationship_id.clone(),false);for image in &user_shapes.images{let image_uri=&user_shape_image_uris[&(chart.relationship_id.clone(),image.relationship_id.clone())];package.get_part_mut(uri)?.rels_mut().add_relationship(conformance.image_rel().into(),image_uri.relative_ref(uri.base_uri()),image.relationship_id.clone(),false);}}}}
+    for chart in &value.drawing.charts{let relationship_type=match &chart.kind{ChartSheetChartResourceKind::Classic=>conformance.chart_rel(),ChartSheetChartResourceKind::Extended{..}=>CHART_EX_REL};package.get_part_mut(&drawing_uri)?.rels_mut().add_relationship(relationship_type.into(),chart_uris[&chart.relationship_id].relative_ref(drawing_uri.base_uri()),chart.relationship_id.clone(),false);if let ChartSheetChartResourceKind::Extended{styles,color_styles,user_shapes,outbound_resources}=&chart.kind{for(companions,relationship_type)in[(styles,CHART_STYLE_REL),(color_styles,CHART_COLOR_STYLE_REL)]{for companion in companions{let uri=&companion_uris[&(chart.relationship_id.clone(),companion.relationship_id.clone())];package.get_part_mut(&chart_uris[&chart.relationship_id])?.rels_mut().add_relationship(relationship_type.into(),uri.relative_ref(chart_uris[&chart.relationship_id].base_uri()),companion.relationship_id.clone(),false);}}if let Some(user_shapes)=user_shapes{let uri=&user_shape_uris[&chart.relationship_id];package.get_part_mut(&chart_uris[&chart.relationship_id])?.rels_mut().add_relationship(conformance.chart_user_shapes_rel().into(),uri.relative_ref(chart_uris[&chart.relationship_id].base_uri()),user_shapes.relationship_id.clone(),false);for image in &user_shapes.images{let image_uri=&user_shape_image_uris[&(chart.relationship_id.clone(),image.relationship_id.clone())];package.get_part_mut(uri)?.rels_mut().add_relationship(conformance.image_rel().into(),image_uri.relative_ref(uri.base_uri()),image.relationship_id.clone(),false);}}for resource in outbound_resources{let key=(chart.relationship_id.clone(),resource.relationship_id().to_owned());let uri=&outbound_uris[&key];let relationship_type=match resource{ChartSheetChartOutboundResource::Image(_)=>conformance.image_rel(),ChartSheetChartOutboundResource::ThemeOverride(_)=>conformance.theme_override_rel(),ChartSheetChartOutboundResource::EmbeddedPackage(_)=>conformance.package_rel()};package.get_part_mut(&chart_uris[&chart.relationship_id])?.rels_mut().add_relationship(relationship_type.into(),uri.relative_ref(chart_uris[&chart.relationship_id].base_uri()),resource.relationship_id().to_owned(),false);if let ChartSheetChartOutboundResource::ThemeOverride(theme)=resource{for image in &theme.images{let image_uri=&theme_image_uris[&(chart.relationship_id.clone(),theme.relationship_id.clone(),image.relationship_id.clone())];package.get_part_mut(uri)?.rels_mut().add_relationship(conformance.image_rel().into(),image_uri.relative_ref(uri.base_uri()),image.relationship_id.clone(),false);}}}}}
     Ok(())
 }
 
@@ -657,10 +700,39 @@ fn validate_chart_resource_value<'a>(chart:&'a ChartSheetChartResource,reference
     validate_id(&chart.relationship_id)?;let uri=PackURI::new(&chart.part_name).map_err(OoxmlError::InvalidUri)?;if !uri.as_str().starts_with("/xl/charts/")||!uri.as_str().ends_with(".xml"){return Err(invalid("chart resource is outside /xl/charts or lacks .xml suffix"))}
     match(&chart.kind,reference.kind){
         (ChartSheetChartResourceKind::Classic,DrawingChartKind::Classic)=>{if chart.content_type!=CHART_CT{return Err(invalid("classic chart has invalid content type"))}validate_chart_xml(&chart.data,conformance)?;add_resource(total,chart.data.len(),MAX_CHART_BYTES,"chart bytes")?;}
-        (ChartSheetChartResourceKind::Extended{styles,color_styles,user_shapes},DrawingChartKind::Extended)=>{if chart.content_type!=CHART_EX_CT{return Err(invalid("chartEx has invalid content type"))}validate_chart_ex_xml(&chart.data)?;add_resource(total,chart.data.len(),MAX_CHART_EX_BYTES,"chartEx bytes")?;if styles.len()>MAX_CHART_STYLE_PARTS||color_styles.len()>MAX_CHART_STYLE_PARTS{return Err(limit("chart companion count"))}let mut ids=HashSet::new();for(companions,content_type,root,max_bytes)in[(styles,CHART_STYLE_CT,"chartStyle",MAX_CHART_STYLE_BYTES),(color_styles,CHART_COLOR_STYLE_CT,"colorStyle",MAX_CHART_COLOR_STYLE_BYTES)]{for companion in companions{validate_id(&companion.relationship_id)?;if !ids.insert(companion.relationship_id.as_str()){return Err(invalid("chartEx companion relationship IDs collide"))}if companion.content_type!=content_type{return Err(invalid("chart companion has invalid content type"))}let uri=PackURI::new(&companion.part_name).map_err(OoxmlError::InvalidUri)?;if !uri.as_str().starts_with("/xl/charts/")||!uri.as_str().ends_with(".xml"){return Err(invalid("chart companion is outside /xl/charts or lacks .xml suffix"))}validate_chart_companion_xml(&companion.data,root,max_bytes)?;add_resource(total,companion.data.len(),max_bytes,"chart companion bytes")?;if resources.insert(companion.part_name.clone(),&companion.data).is_some(){return Err(invalid("duplicate chartsheet resource part name"))}}}if let Some(user_shapes)=user_shapes{validate_id(&user_shapes.relationship_id)?;if !ids.insert(user_shapes.relationship_id.as_str()){return Err(invalid("chartEx outbound relationship IDs collide"))}if user_shapes.content_type!=CHART_USER_SHAPES_CT{return Err(invalid("chartUserShapes has invalid content type"))}let uri=PackURI::new(&user_shapes.part_name).map_err(OoxmlError::InvalidUri)?;if !uri.as_str().starts_with("/xl/drawings/")||!uri.as_str().ends_with(".xml"){return Err(invalid("chartUserShapes is outside /xl/drawings or lacks .xml suffix"))}let referenced=validate_chart_user_shapes_xml(&user_shapes.data,conformance)?;if referenced.len()!=user_shapes.images.len()||user_shapes.images.len()>MAX_CHART_USER_SHAPE_IMAGES{return Err(invalid("chartUserShapes image relationship metadata does not match XML references"))}add_resource(total,user_shapes.data.len(),MAX_CHART_USER_SHAPES_BYTES,"chartUserShapes bytes")?;if resources.insert(user_shapes.part_name.clone(),&user_shapes.data).is_some(){return Err(invalid("duplicate chartsheet resource part name"))}let mut image_ids=BTreeSet::new();for image in &user_shapes.images{validate_id(&image.relationship_id)?;if !referenced.contains(&image.relationship_id)||!image_ids.insert(image.relationship_id.as_str()){return Err(invalid("chartUserShapes image metadata is duplicate or unreferenced"))}let image_uri=PackURI::new(&image.part_name).map_err(OoxmlError::InvalidUri)?;if !image_uri.as_str().starts_with("/xl/media/")||!image.content_type.validates_part_name(image_uri.as_str()){return Err(invalid("invalid chart user-shape image path or content type suffix"))}add_resource(total,image.data.len(),MAX_CHART_USER_SHAPE_IMAGE_BYTES,"chart user-shape image bytes")?;if resources.insert(image.part_name.clone(),&image.data).is_some(){return Err(invalid("duplicate chartsheet resource part name"))}}}}
+        (ChartSheetChartResourceKind::Extended{styles,color_styles,user_shapes,..},DrawingChartKind::Extended)=>{if chart.content_type!=CHART_EX_CT{return Err(invalid("chartEx has invalid content type"))}validate_chart_ex_relationships(&chart.data,conformance)?;add_resource(total,chart.data.len(),MAX_CHART_EX_BYTES,"chartEx bytes")?;if styles.len()>MAX_CHART_STYLE_PARTS||color_styles.len()>MAX_CHART_STYLE_PARTS{return Err(limit("chart companion count"))}let mut ids=HashSet::new();for(companions,content_type,root,max_bytes)in[(styles,CHART_STYLE_CT,"chartStyle",MAX_CHART_STYLE_BYTES),(color_styles,CHART_COLOR_STYLE_CT,"colorStyle",MAX_CHART_COLOR_STYLE_BYTES)]{for companion in companions{validate_id(&companion.relationship_id)?;if !ids.insert(companion.relationship_id.as_str()){return Err(invalid("chartEx companion relationship IDs collide"))}if companion.content_type!=content_type{return Err(invalid("chart companion has invalid content type"))}let uri=PackURI::new(&companion.part_name).map_err(OoxmlError::InvalidUri)?;if !uri.as_str().starts_with("/xl/charts/")||!uri.as_str().ends_with(".xml"){return Err(invalid("chart companion is outside /xl/charts or lacks .xml suffix"))}validate_chart_companion_xml(&companion.data,root,max_bytes)?;add_resource(total,companion.data.len(),max_bytes,"chart companion bytes")?;if resources.insert(companion.part_name.clone(),&companion.data).is_some(){return Err(invalid("duplicate chartsheet resource part name"))}}}if let Some(user_shapes)=user_shapes{validate_id(&user_shapes.relationship_id)?;if !ids.insert(user_shapes.relationship_id.as_str()){return Err(invalid("chartEx outbound relationship IDs collide"))}if user_shapes.content_type!=CHART_USER_SHAPES_CT{return Err(invalid("chartUserShapes has invalid content type"))}let uri=PackURI::new(&user_shapes.part_name).map_err(OoxmlError::InvalidUri)?;if !uri.as_str().starts_with("/xl/drawings/")||!uri.as_str().ends_with(".xml"){return Err(invalid("chartUserShapes is outside /xl/drawings or lacks .xml suffix"))}let referenced=validate_chart_user_shapes_xml(&user_shapes.data,conformance)?;if referenced.len()!=user_shapes.images.len()||user_shapes.images.len()>MAX_CHART_USER_SHAPE_IMAGES{return Err(invalid("chartUserShapes image relationship metadata does not match XML references"))}add_resource(total,user_shapes.data.len(),MAX_CHART_USER_SHAPES_BYTES,"chartUserShapes bytes")?;if resources.insert(user_shapes.part_name.clone(),&user_shapes.data).is_some(){return Err(invalid("duplicate chartsheet resource part name"))}let mut image_ids=BTreeSet::new();for image in &user_shapes.images{validate_id(&image.relationship_id)?;if !referenced.contains(&image.relationship_id)||!image_ids.insert(image.relationship_id.as_str()){return Err(invalid("chartUserShapes image metadata is duplicate or unreferenced"))}let image_uri=PackURI::new(&image.part_name).map_err(OoxmlError::InvalidUri)?;if !image_uri.as_str().starts_with("/xl/media/")||!image.content_type.validates_part_name(image_uri.as_str()){return Err(invalid("invalid chart user-shape image path or content type suffix"))}add_resource(total,image.data.len(),MAX_CHART_USER_SHAPE_IMAGE_BYTES,"chart user-shape image bytes")?;if resources.insert(image.part_name.clone(),&image.data).is_some(){return Err(invalid("duplicate chartsheet resource part name"))}}}validate_chart_outbound_resources(chart,conformance,total,resources)?;}
         _=>return Err(invalid("drawing chart reference kind and chart resource kind differ")),
     }
     if resources.insert(chart.part_name.clone(),&chart.data).is_some(){return Err(invalid("duplicate chart resource part name"))}Ok(())
+}
+
+fn validate_chart_outbound_resources<'a>(chart:&'a ChartSheetChartResource,conformance:ChartSheetConformance,total:&mut usize,resources:&mut BTreeMap<String,&'a Vec<u8>>)->Result<()> {
+    let ChartSheetChartResourceKind::Extended{styles,color_styles,user_shapes,outbound_resources}=&chart.kind else{return Ok(())};
+    let references=validate_chart_ex_relationships(&chart.data,conformance)?;
+    let mut source_ids=HashSet::new();
+    for companion in styles.iter().chain(color_styles){source_ids.insert(companion.relationship_id.as_str());}
+    if let Some(user_shapes)=user_shapes{source_ids.insert(user_shapes.relationship_id.as_str());}
+    let mut direct_ids=BTreeSet::new();let mut package_id=None;let mut theme_count=0usize;let mut package_count=0usize;
+    if outbound_resources.iter().filter(|resource|matches!(resource,ChartSheetChartOutboundResource::Image(_))).count()>MAX_CHART_DIRECT_IMAGES{return Err(limit("chartEx direct image count"))}
+    for resource in outbound_resources{
+        validate_id(resource.relationship_id())?;
+        if !source_ids.insert(resource.relationship_id()){return Err(invalid("chartEx outbound relationship IDs collide"))}
+        match resource{
+            ChartSheetChartOutboundResource::Image(image)=>{if !direct_ids.insert(image.relationship_id.clone()){return Err(invalid("chartEx direct image relationship IDs collide"))}validate_chart_image_value(image,total,resources,MAX_CHART_USER_SHAPE_IMAGE_BYTES,"chartEx direct image bytes")?;}
+            ChartSheetChartOutboundResource::ThemeOverride(theme)=>{theme_count+=1;if theme_count>1{return Err(invalid("chartEx has multiple themeOverride relationships"))}if theme.content_type!=THEME_OVERRIDE_CT{return Err(invalid("themeOverride has invalid content type"))}let uri=PackURI::new(&theme.part_name).map_err(OoxmlError::InvalidUri)?;if !uri.as_str().starts_with("/xl/theme/")||!uri.as_str().ends_with(".xml"){return Err(invalid("themeOverride is outside /xl/theme or lacks .xml suffix"))}let theme_references=validate_theme_override_xml(&theme.data,conformance)?;if theme.images.len()>MAX_CHART_THEME_IMAGES||theme.images.len()!=theme_references.len(){return Err(invalid("themeOverride image relationship metadata does not match XML references"))}add_resource(total,theme.data.len(),MAX_CHART_THEME_OVERRIDE_BYTES,"themeOverride bytes")?;if resources.insert(theme.part_name.clone(),&theme.data).is_some(){return Err(invalid("duplicate chartsheet resource part name"))}let mut image_ids=BTreeSet::new();for image in &theme.images{validate_id(&image.relationship_id)?;if !image_ids.insert(image.relationship_id.clone())||!theme_references.contains(&image.relationship_id){return Err(invalid("themeOverride image metadata is duplicate or unreferenced"))}validate_chart_image_value(image,total,resources,MAX_CHART_USER_SHAPE_IMAGE_BYTES,"themeOverride image bytes")?;}}
+            ChartSheetChartOutboundResource::EmbeddedPackage(embedded)=>{package_count+=1;if package_count>1{return Err(invalid("chartEx has multiple embedded package relationships"))}let uri=PackURI::new(&embedded.part_name).map_err(OoxmlError::InvalidUri)?;if !uri.as_str().starts_with("/xl/embeddings/")||!embedded.content_type.validates_part_name(uri.as_str()){return Err(invalid("invalid chartEx embedded package path or content type suffix"))}add_resource(total,embedded.data.len(),MAX_CHART_EMBEDDED_PACKAGE_BYTES,"chartEx embedded package bytes")?;if resources.insert(embedded.part_name.clone(),&embedded.data).is_some(){return Err(invalid("duplicate chartsheet resource part name"))}package_id=Some(embedded.relationship_id.clone());}
+        }
+    }
+    if direct_ids!=references.images||package_id!=references.package{return Err(invalid("chartEx outbound relationship metadata does not match XML references"))}
+    Ok(())
+}
+
+fn validate_chart_image_value<'a>(image:&'a ChartSheetChartImageResource,total:&mut usize,resources:&mut BTreeMap<String,&'a Vec<u8>>,max_bytes:usize,label:&str)->Result<()> {
+    let uri=PackURI::new(&image.part_name).map_err(OoxmlError::InvalidUri)?;
+    if !uri.as_str().starts_with("/xl/media/")||!image.content_type.validates_part_name(uri.as_str()){return Err(invalid("invalid chart image path or content type suffix"))}
+    add_resource(total,image.data.len(),max_bytes,label)?;
+    if resources.insert(image.part_name.clone(),&image.data).is_some(){return Err(invalid("duplicate chartsheet resource part name"))}
+    Ok(())
 }
 
 fn validate_vml_pair<'a>(id:Option<&str>,resource:Option<&'a ChartSheetVmlDrawingResource>,label:&str,total:&mut usize,resources:&mut BTreeMap<String,&'a Vec<u8>>)->Result<()>{match(id,resource){(None,None)=>Ok(()),(Some(id),Some(resource))=>{validate_id(id)?;validate_id(&resource.relationship_id)?;if id!=resource.relationship_id{return Err(invalid(format!("{label} relationship and resource metadata differ")))}let uri=PackURI::new(&resource.part_name).map_err(OoxmlError::InvalidUri)?;if !uri.as_str().starts_with("/xl/drawings/")||!uri.as_str().ends_with(".vml")||resource.content_type!=VML_DRAWING_CT{return Err(invalid(format!("invalid {label} VML resource path or content type")))} add_resource(total,resource.data.len(),MAX_VML_DRAWING_BYTES,"VML drawing bytes")?;if resources.insert(resource.part_name.clone(),&resource.data).is_some(){return Err(invalid("duplicate chartsheet resource part name"))}Ok(())},_=>Err(invalid(format!("{label} relationship and resource must either both be present or both be absent")))}}
@@ -811,9 +883,12 @@ fn collect_drawing_chart_references(node:&Node,conformance:ChartSheetConformance
 }
 
 fn validate_chart_xml(xml: &[u8], conformance: ChartSheetConformance) -> Result<()> { if xml.len() > MAX_CHART_BYTES { return Err(limit("chart bytes")); } let root = parse_document(xml, MAX_CHART_BYTES)?; if root.namespace == conformance.chart() && root.name == "chartSpace" { Ok(()) } else { Err(invalid("chart root does not match chartsheet conformance")) } }
-fn validate_chart_ex_xml(xml:&[u8])->Result<()>{if xml.len()>MAX_CHART_EX_BYTES{return Err(limit("chartEx bytes"))}let root=parse_document(xml,MAX_CHART_EX_BYTES)?;if root.namespace==CHART_EX&&root.name=="chartSpace"{Ok(())}else{Err(invalid("invalid chartEx root"))}}
 fn validate_chart_companion_xml(xml:&[u8],root_name:&str,max_bytes:usize)->Result<()>{if xml.len()>max_bytes{return Err(limit("chart companion bytes"))}let root=parse_document(xml,max_bytes)?;if root.namespace==CHART_STYLE&&root.name==root_name{Ok(())}else{Err(invalid(format!("invalid chart companion root '{root_name}'")))}}
 fn validate_chart_user_shapes_xml(xml:&[u8],conformance:ChartSheetConformance)->Result<BTreeSet<String>>{if xml.len()>MAX_CHART_USER_SHAPES_BYTES{return Err(limit("chartUserShapes bytes"))}let root=parse_document(xml,MAX_CHART_USER_SHAPES_BYTES)?;if root.namespace!=conformance.chart()||root.name!="userShapes"{return Err(invalid("chartUserShapes root does not match chartsheet conformance"))}let mut ids=BTreeSet::new();collect_extension_relationship_ids(&root,conformance.rel(),&mut ids)?;Ok(ids)}
+#[derive(Default)]struct ChartExRelationshipReferences{images:BTreeSet<String>,package:Option<String>}
+fn validate_chart_ex_relationships(xml:&[u8],conformance:ChartSheetConformance)->Result<ChartExRelationshipReferences>{if xml.len()>MAX_CHART_EX_BYTES{return Err(limit("chartEx bytes"))}let root=parse_document(xml,MAX_CHART_EX_BYTES)?;if root.namespace!=CHART_EX||root.name!="chartSpace"{return Err(invalid("invalid chartEx root"))}let mut references=ChartExRelationshipReferences::default();collect_chart_ex_relationships(&root,conformance,&mut references)?;Ok(references)}
+fn collect_chart_ex_relationships(node:&Node,conformance:ChartSheetConformance,references:&mut ChartExRelationshipReferences)->Result<()>{let external_data=node.namespace==CHART_EX&&node.name=="externalData";if external_data&&optional(node,CHART_EX,"autoUpdate").is_some_and(|value|matches!(value,"1"|"true")){return Err(invalid("auto-updating chartEx external data is rejected"))}for attribute in &node.attributes{if attribute.namespace==conformance.rel(){validate_id(&attribute.value)?;if external_data&&attribute.name=="id"{if references.package.replace(attribute.value.clone()).is_some(){return Err(invalid("chartEx has multiple externalData package references"))}}else{if external_data{return Err(invalid("chartEx externalData has an unsupported relationship attribute"))}references.images.insert(attribute.value.clone());}}}for child in &node.children{collect_chart_ex_relationships(child,conformance,references)?;}Ok(())}
+fn validate_theme_override_xml(xml:&[u8],conformance:ChartSheetConformance)->Result<BTreeSet<String>>{if xml.len()>MAX_CHART_THEME_OVERRIDE_BYTES{return Err(limit("themeOverride bytes"))}let root=parse_document(xml,MAX_CHART_THEME_OVERRIDE_BYTES)?;let namespace=if conformance==ChartSheetConformance::Strict{STRICT_DRAWING_MAIN}else{DRAWING_MAIN};if root.namespace!=namespace||root.name!="themeOverride"{return Err(invalid("themeOverride root does not match chartsheet conformance"))}let mut ids=BTreeSet::new();collect_extension_relationship_ids(&root,conformance.rel(),&mut ids)?;Ok(ids)}
 
 fn parse_document(xml: &[u8], max_bytes: usize) -> Result<Node> {
     parse_document_with_capabilities(xml,max_bytes,&MceCapabilities::ooxml_baseline())
@@ -871,26 +946,26 @@ mod tests {
     const POI_ONE: &[u8] = include_bytes!("../../../../3rdparty/poi/test-data/spreadsheet/WithChartSheet.xlsx");
     const POI_TWO: &[u8] = include_bytes!("../../../../3rdparty/poi/test-data/spreadsheet/chart_sheet.xlsx");
     const LO_CHART_EX: &[u8]=include_bytes!("../../../../3rdparty/libreoffice-core/chart2/qa/extras/data/xlsx/boxWhisker.xlsx");
-    const LO_USER_SHAPES_IMAGES:&[u8]=include_bytes!("../../../../3rdparty/libreoffice-core/chart2/qa/extras/data/xlsx/tdf143127.xlsx");
+    pub(super) const LO_USER_SHAPES_IMAGES:&[u8]=include_bytes!("../../../../3rdparty/libreoffice-core/chart2/qa/extras/data/xlsx/tdf143127.xlsx");
     fn sheet() -> ChartSheet { ChartSheet { properties: Some(ChartSheetProperties { published: Some(true), code_name: Some("ChartCode".into()), tab_color: Some(ChartSheetColor { automatic: None, indexed: None, rgb: Some("FF336699".into()), theme: None, tint: Some(0.25) }) }), views: vec![ChartSheetView { tab_selected: Some(true), zoom_scale: Some(125), workbook_view_id: 0, zoom_to_fit: Some(false) }], protection: Some(ChartSheetProtection { password_hash: Some("ABCD".into()), content: Some(true), objects: Some(false) }), custom_views: Some(vec![ChartSheetCustomView { guid: "{00112233-4455-6677-8899-AABBCCDDEEFF}".into(), scale: Some(175), state: Some(ChartSheetState::Hidden), zoom_to_fit: Some(true) }, ChartSheetCustomView { guid: "{10213243-5465-7687-98A9-BACBDCEDFE0F}".into(), scale: None, state: None, zoom_to_fit: Some(false) }]), margins: Some(ChartSheetMargins { left: 0.7, right: 0.7, top: 0.75, bottom: 0.75, header: 0.3, footer: 0.3 }), page_setup: Some(ChartSheetPageSetup { paper_size: Some(1), first_page_number: Some(1), orientation: Some(PageOrientation::Landscape), use_printer_defaults: Some(true), black_and_white: Some(false), draft: Some(false), use_first_page_number: Some(true), horizontal_dpi: Some(600), vertical_dpi: Some(600), copies: Some(1), printer_settings_relationship_id:Some("rIdPrinter".into()) }), header_footer: Some(ChartSheetHeaderFooter { align_with_margins: Some(false), odd_header: Some("&CChart & Report".into()), ..Default::default() }), drawing_relationship_id: "rIdDrawing".into(), legacy_drawing_relationship_id:Some("rIdLegacy".into()), legacy_header_footer_drawing_relationship_id:Some("rIdLegacyHF".into()), background_picture_relationship_id:Some("rIdBackground".into()), web_publish_items:Some(ChartSheetWebPublishItems{count:Some(2),items:vec![ChartSheetWebPublishItem{id:11289,div_id:"Views_11289".into(),source_type:ChartSheetWebSourceType::Range,source_ref:Some("A6:C6".into()),source_object:None,destination_file:"file:///definitely/not/accessed/Publish.htm".into(),title:Some("Range & title".into()),auto_republish:Some(false)},ChartSheetWebPublishItem{id:6433,div_id:"Views_6433".into(),source_type:ChartSheetWebSourceType::Chart,source_ref:None,source_object:Some("https://example.invalid/Chart 1".into()),destination_file:"https://example.invalid/Publish.mht".into(),title:None,auto_republish:None}]}) , extension_list:None } }
     fn drawing(conformance: ChartSheetConformance) -> Vec<u8> { format!("<xdr:wsDr xmlns:xdr=\"{}\" xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\"><xdr:absoluteAnchor><a:graphic><a:graphicData><c:chart xmlns:c=\"{}\" xmlns:r=\"{}\" r:id=\"rIdChart\"/></a:graphicData></a:graphic></xdr:absoluteAnchor></xdr:wsDr>", conformance.xdr(), conformance.chart(), conformance.rel()).into_bytes() }
     fn chart(conformance: ChartSheetConformance) -> Vec<u8> { format!("<c:chartSpace xmlns:c=\"{}\"><c:chart/></c:chartSpace>", conformance.chart()).into_bytes() }
     fn vml(id:&str,name:&str)->ChartSheetVmlDrawingResource{ChartSheetVmlDrawingResource{relationship_id:id.into(),part_name:format!("/xl/drawings/{name}.vml"),content_type:VML_DRAWING_CT.into(),data:format!("<xml xmlns:v=\"urn:schemas-microsoft-com:vml\"><v:shape href=\"https://example.invalid/{name}\"/></xml>").into_bytes()}}
     fn value(conformance: ChartSheetConformance) -> ChartSheetPackage { ChartSheetPackage { entry: ChartSheetEntry { name: "Chart 1".into(), sheet_id: 2, state: ChartSheetState::Visible, workbook_relationship_id: "rIdChartSheet".into(), part_name: "/xl/chartsheets/sheet1.xml".into() }, chartsheet: sheet(), drawing: ChartSheetDrawingResource { part_name: "/xl/drawings/drawing1.xml".into(), content_type: DRAWING_CT.into(), data: drawing(conformance), charts: vec![ChartSheetChartResource { relationship_id: "rIdChart".into(), part_name: "/xl/charts/chart1.xml".into(), content_type: CHART_CT.into(), data: chart(conformance), kind:ChartSheetChartResourceKind::Classic }] }, legacy_drawing:Some(vml("rIdLegacy","vmlDrawing1")), legacy_header_footer_drawing:Some(vml("rIdLegacyHF","vmlDrawing2")), background_picture:Some(ChartSheetBackgroundPicture{relationship_id:"rIdBackground".into(),part_name:"/xl/media/background1.png".into(),content_type:ChartSheetImageContentType::Png,data:vec![0,255,1,254]}),printer_settings:Some(ChartSheetPrinterSettings{relationship_id:"rIdPrinter".into(),resource:PrinterSettingsResource{part_name:"/xl/printerSettings/printerSettings1.bin".into(),data:vec![0x44,0x45,0x56,0x4d,0x4f,0x44,0x45,0,255]}}), extension_relationships:vec![] } }
-    fn base_package(conformance: ChartSheetConformance) -> (OpcPackage, PackURI) { let mut package = OpcPackage::new(); let uri = PackURI::new("/xl/workbook.xml").unwrap(); let xml = format!("<x:workbook xmlns:x=\"{}\" xmlns:r=\"{}\"><x:sheets><x:sheet name=\"Data\" sheetId=\"1\" r:id=\"rIdData\"/></x:sheets></x:workbook>", conformance.sml(), conformance.rel()); package.add_part(Box::new(BlobPart::new(uri.clone(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml".into(), xml.into_bytes()))); (package, uri) }
+    pub(super) fn base_package(conformance: ChartSheetConformance) -> (OpcPackage, PackURI) { let mut package = OpcPackage::new(); let uri = PackURI::new("/xl/workbook.xml").unwrap(); let xml = format!("<x:workbook xmlns:x=\"{}\" xmlns:r=\"{}\"><x:sheets><x:sheet name=\"Data\" sheetId=\"1\" r:id=\"rIdData\"/></x:sheets></x:workbook>", conformance.sml(), conformance.rel()); package.add_part(Box::new(BlobPart::new(uri.clone(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml".into(), xml.into_bytes()))); (package, uri) }
 
     fn ext(uri:&str,payload:&str)->ChartSheetExtension{ChartSheetExtension{uri:uri.into(),payload_xml:payload.as_bytes().to_vec()}}
     fn companion(id:&str,path:&str,content_type:&str,data:&[u8])->ChartSheetChartCompanionResource{ChartSheetChartCompanionResource{relationship_id:id.into(),part_name:path.into(),content_type:content_type.into(),data:data.to_vec()}}
 
-    #[test]fn real_libreoffice_chart_ex_fixture_round_trips_as_inert_resources(){let source=OpcPackage::from_bytes(LO_CHART_EX).unwrap();let blob=|path:&str|source.get_part(&PackURI::new(path).unwrap()).unwrap().blob().to_vec();let mut expected=value(ChartSheetConformance::Transitional);expected.drawing.data=blob("/xl/drawings/drawing1.xml");expected.drawing.charts=vec![ChartSheetChartResource{relationship_id:"rId1".into(),part_name:"/xl/charts/chartEx1.xml".into(),content_type:CHART_EX_CT.into(),data:blob("/xl/charts/chartEx1.xml"),kind:ChartSheetChartResourceKind::Extended{styles:vec![companion("rId1","/xl/charts/style1.xml",CHART_STYLE_CT,&blob("/xl/charts/style1.xml"))],color_styles:vec![companion("rId2","/xl/charts/colors1.xml",CHART_COLOR_STYLE_CT,&blob("/xl/charts/colors1.xml"))],user_shapes:None}}];let(mut package,workbook)=base_package(ChartSheetConformance::Transitional);store_chartsheet(&mut package,&workbook,&expected,ChartSheetConformance::Transitional).unwrap();let loaded=load_chartsheet(&package,&workbook,"rIdChartSheet").unwrap();assert_eq!(loaded,expected);assert!(matches!(loaded.drawing.charts[0].kind,ChartSheetChartResourceKind::Extended{..}));}
+    #[test]fn real_libreoffice_chart_ex_fixture_round_trips_as_inert_resources(){let source=OpcPackage::from_bytes(LO_CHART_EX).unwrap();let blob=|path:&str|source.get_part(&PackURI::new(path).unwrap()).unwrap().blob().to_vec();let mut expected=value(ChartSheetConformance::Transitional);expected.drawing.data=blob("/xl/drawings/drawing1.xml");expected.drawing.charts=vec![ChartSheetChartResource{relationship_id:"rId1".into(),part_name:"/xl/charts/chartEx1.xml".into(),content_type:CHART_EX_CT.into(),data:blob("/xl/charts/chartEx1.xml"),kind:ChartSheetChartResourceKind::Extended{styles:vec![companion("rId1","/xl/charts/style1.xml",CHART_STYLE_CT,&blob("/xl/charts/style1.xml"))],color_styles:vec![companion("rId2","/xl/charts/colors1.xml",CHART_COLOR_STYLE_CT,&blob("/xl/charts/colors1.xml"))],user_shapes:None,outbound_resources:vec![]}}];let(mut package,workbook)=base_package(ChartSheetConformance::Transitional);store_chartsheet(&mut package,&workbook,&expected,ChartSheetConformance::Transitional).unwrap();let loaded=load_chartsheet(&package,&workbook,"rIdChartSheet").unwrap();assert_eq!(loaded,expected);assert!(matches!(loaded.drawing.charts[0].kind,ChartSheetChartResourceKind::Extended{..}));}
 
     #[test]fn chart_ex_strict_mce_selects_extended_choice_and_preserves_classic_fallback_behavior(){let strict=format!("<xdr:wsDr xmlns:xdr=\"{STRICT_XDR}\" xmlns:a=\"{STRICT_DRAWING_MAIN}\" xmlns:c=\"{STRICT_CHART}\" xmlns:r=\"{STRICT_REL}\" xmlns:cx=\"{CHART_EX}\" xmlns:cx1=\"{CHART_EX_CHOICE}\" xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\"><mc:AlternateContent><mc:Choice Requires=\"cx1\"><a:graphic><a:graphicData uri=\"{CHART_EX}\"><cx:chart r:id=\"rIdExtended\"/></a:graphicData></a:graphic></mc:Choice><mc:Fallback><a:graphic><a:graphicData uri=\"{STRICT_CHART}\"><c:chart r:id=\"rIdClassic\"/></a:graphicData></a:graphic></mc:Fallback></mc:AlternateContent></xdr:wsDr>");let references=drawing_chart_references(strict.as_bytes(),ChartSheetConformance::Strict).unwrap();assert_eq!(references,vec![DrawingChartReference{relationship_id:"rIdExtended".into(),kind:DrawingChartKind::Extended}]);let fallback=strict.replace(&format!("xmlns:cx1=\"{CHART_EX_CHOICE}\""),"xmlns:cx1=\"urn:unsupported-chart-version\"");let references=drawing_chart_references(fallback.as_bytes(),ChartSheetConformance::Strict).unwrap();assert_eq!(references,vec![DrawingChartReference{relationship_id:"rIdClassic".into(),kind:DrawingChartKind::Classic}]);}
 
-    #[test]fn rejects_chart_ex_drawing_shape_roots_cardinality_relationships_and_caps(){let drawing=|body:&str|format!("<xdr:wsDr xmlns:xdr=\"{XDR}\" xmlns:a=\"{DRAWING_MAIN}\" xmlns:r=\"{REL}\" xmlns:cx=\"{CHART_EX}\">{body}</xdr:wsDr>");for body in [format!("<a:graphicData uri=\"urn:wrong\"><cx:chart r:id=\"rId1\"/></a:graphicData>"),format!("<a:graphicData uri=\"{CHART_EX}\"><cx:chart/></a:graphicData>"),format!("<a:graphicData uri=\"{CHART_EX}\"><cx:chart r:id=\"rId1\"/><cx:chart r:id=\"rId2\"/></a:graphicData>"),format!("<a:graphicData uri=\"{CHART_EX}\"><cx:wrong r:id=\"rId1\"/></a:graphicData>"),format!("<a:graphicData uri=\"{CHART_EX}\" bad=\"1\"><cx:chart r:id=\"rId1\"/></a:graphicData>")]{assert!(drawing_chart_references(drawing(&body).as_bytes(),ChartSheetConformance::Transitional).is_err(),"accepted {body}");}assert!(validate_chart_ex_xml(b"<cx:chartSpace xmlns:cx=\"urn:wrong\"/>").is_err());assert!(validate_chart_companion_xml(b"<cs:colorStyle xmlns:cs=\"http://schemas.microsoft.com/office/drawing/2012/chartStyle\"/>","chartStyle",MAX_CHART_STYLE_BYTES).is_err());assert!(validate_chart_ex_xml(&[b' ';MAX_CHART_EX_BYTES+1]).is_err());let mut bad=value(ChartSheetConformance::Transitional);bad.drawing.data=drawing(&format!("<a:graphicData uri=\"{CHART_EX}\"><cx:chart r:id=\"rIdEx\"/></a:graphicData>")).into_bytes();bad.drawing.charts=vec![ChartSheetChartResource{relationship_id:"rIdEx".into(),part_name:"/xl/charts/chartEx1.xml".into(),content_type:CHART_EX_CT.into(),data:format!("<cx:chartSpace xmlns:cx=\"{CHART_EX}\"/>").into_bytes(),kind:ChartSheetChartResourceKind::Extended{styles:vec![companion("rIdSame","/xl/charts/style1.xml",CHART_STYLE_CT,&format!("<cs:chartStyle xmlns:cs=\"{CHART_STYLE}\"/>" ).into_bytes())],color_styles:vec![companion("rIdSame","/xl/charts/colors1.xml",CHART_COLOR_STYLE_CT,&format!("<cs:colorStyle xmlns:cs=\"{CHART_STYLE}\"/>" ).into_bytes())],user_shapes:None}}];let(mut package,workbook)=base_package(ChartSheetConformance::Transitional);assert!(store_chartsheet(&mut package,&workbook,&bad,ChartSheetConformance::Transitional).is_err());assert!(package.get_part(&PackURI::new("/xl/chartsheets/sheet1.xml").unwrap()).is_err());}
+    #[test]fn rejects_chart_ex_drawing_shape_roots_cardinality_relationships_and_caps(){let drawing=|body:&str|format!("<xdr:wsDr xmlns:xdr=\"{XDR}\" xmlns:a=\"{DRAWING_MAIN}\" xmlns:r=\"{REL}\" xmlns:cx=\"{CHART_EX}\">{body}</xdr:wsDr>");for body in [format!("<a:graphicData uri=\"urn:wrong\"><cx:chart r:id=\"rId1\"/></a:graphicData>"),format!("<a:graphicData uri=\"{CHART_EX}\"><cx:chart/></a:graphicData>"),format!("<a:graphicData uri=\"{CHART_EX}\"><cx:chart r:id=\"rId1\"/><cx:chart r:id=\"rId2\"/></a:graphicData>"),format!("<a:graphicData uri=\"{CHART_EX}\"><cx:wrong r:id=\"rId1\"/></a:graphicData>"),format!("<a:graphicData uri=\"{CHART_EX}\" bad=\"1\"><cx:chart r:id=\"rId1\"/></a:graphicData>")]{assert!(drawing_chart_references(drawing(&body).as_bytes(),ChartSheetConformance::Transitional).is_err(),"accepted {body}");}assert!(validate_chart_ex_relationships(b"<cx:chartSpace xmlns:cx=\"urn:wrong\"/>",ChartSheetConformance::Transitional).is_err());assert!(validate_chart_companion_xml(b"<cs:colorStyle xmlns:cs=\"http://schemas.microsoft.com/office/drawing/2012/chartStyle\"/>","chartStyle",MAX_CHART_STYLE_BYTES).is_err());assert!(validate_chart_ex_relationships(&[b' ';MAX_CHART_EX_BYTES+1],ChartSheetConformance::Transitional).is_err());let mut bad=value(ChartSheetConformance::Transitional);bad.drawing.data=drawing(&format!("<a:graphicData uri=\"{CHART_EX}\"><cx:chart r:id=\"rIdEx\"/></a:graphicData>")).into_bytes();bad.drawing.charts=vec![ChartSheetChartResource{relationship_id:"rIdEx".into(),part_name:"/xl/charts/chartEx1.xml".into(),content_type:CHART_EX_CT.into(),data:format!("<cx:chartSpace xmlns:cx=\"{CHART_EX}\"/>").into_bytes(),kind:ChartSheetChartResourceKind::Extended{styles:vec![companion("rIdSame","/xl/charts/style1.xml",CHART_STYLE_CT,&format!("<cs:chartStyle xmlns:cs=\"{CHART_STYLE}\"/>" ).into_bytes())],color_styles:vec![companion("rIdSame","/xl/charts/colors1.xml",CHART_COLOR_STYLE_CT,&format!("<cs:colorStyle xmlns:cs=\"{CHART_STYLE}\"/>" ).into_bytes())],user_shapes:None,outbound_resources:vec![]}}];let(mut package,workbook)=base_package(ChartSheetConformance::Transitional);assert!(store_chartsheet(&mut package,&workbook,&bad,ChartSheetConformance::Transitional).is_err());assert!(package.get_part(&PackURI::new("/xl/chartsheets/sheet1.xml").unwrap()).is_err());}
 
-    #[test]fn rejects_chart_ex_wrong_type_orphan_escape_outbound_and_companion_graphs(){let conformance=ChartSheetConformance::Transitional;let source=OpcPackage::from_bytes(LO_CHART_EX).unwrap();let blob=|path:&str|source.get_part(&PackURI::new(path).unwrap()).unwrap().blob().to_vec();let mut expected=value(conformance);expected.drawing.data=blob("/xl/drawings/drawing1.xml");expected.drawing.charts=vec![ChartSheetChartResource{relationship_id:"rId1".into(),part_name:"/xl/charts/chartEx1.xml".into(),content_type:CHART_EX_CT.into(),data:blob("/xl/charts/chartEx1.xml"),kind:ChartSheetChartResourceKind::Extended{styles:vec![companion("rId1","/xl/charts/style1.xml",CHART_STYLE_CT,&blob("/xl/charts/style1.xml"))],color_styles:vec![companion("rId2","/xl/charts/colors1.xml",CHART_COLOR_STYLE_CT,&blob("/xl/charts/colors1.xml"))],user_shapes:None}}];for(kind,target,external)in[(rt::CHART,"../charts/chartEx1.xml",false),(CHART_EX_REL,"../../../evil.xml",false),(CHART_EX_REL,"https://example.invalid/chartEx.xml",true)]{let(mut package,workbook)=base_package(conformance);store_chartsheet(&mut package,&workbook,&expected,conformance).unwrap();let drawing=package.get_part_mut(&PackURI::new("/xl/drawings/drawing1.xml").unwrap()).unwrap();drawing.rels_mut().remove("rId1");drawing.rels_mut().add_relationship(kind.into(),target.into(),"rId1".into(),external);assert!(load_chartsheet(&package,&workbook,"rIdChartSheet").is_err(),"accepted {kind} {target}");}let(mut package,workbook)=base_package(conformance);store_chartsheet(&mut package,&workbook,&expected,conformance).unwrap();package.get_part_mut(&PackURI::new("/xl/drawings/drawing1.xml").unwrap()).unwrap().rels_mut().add_relationship(CHART_EX_REL.into(),"../charts/chartEx1.xml".into(),"rIdOrphan".into(),false);assert!(load_chartsheet(&package,&workbook,"rIdChartSheet").is_err());let(mut package,workbook)=base_package(conformance);store_chartsheet(&mut package,&workbook,&expected,conformance).unwrap();package.get_part_mut(&PackURI::new("/xl/charts/chartEx1.xml").unwrap()).unwrap().rels_mut().add_relationship(IMAGE_REL.into(),"../media/image1.png".into(),"rIdImage".into(),false);assert!(load_chartsheet(&package,&workbook,"rIdChartSheet").is_err());let(mut package,workbook)=base_package(conformance);store_chartsheet(&mut package,&workbook,&expected,conformance).unwrap();package.get_part_mut(&PackURI::new("/xl/charts/style1.xml").unwrap()).unwrap().rels_mut().add_relationship(IMAGE_REL.into(),"../media/image1.png".into(),"rIdOutbound".into(),false);assert!(load_chartsheet(&package,&workbook,"rIdChartSheet").is_err());}
+    #[test]fn rejects_chart_ex_wrong_type_orphan_escape_outbound_and_companion_graphs(){let conformance=ChartSheetConformance::Transitional;let source=OpcPackage::from_bytes(LO_CHART_EX).unwrap();let blob=|path:&str|source.get_part(&PackURI::new(path).unwrap()).unwrap().blob().to_vec();let mut expected=value(conformance);expected.drawing.data=blob("/xl/drawings/drawing1.xml");expected.drawing.charts=vec![ChartSheetChartResource{relationship_id:"rId1".into(),part_name:"/xl/charts/chartEx1.xml".into(),content_type:CHART_EX_CT.into(),data:blob("/xl/charts/chartEx1.xml"),kind:ChartSheetChartResourceKind::Extended{styles:vec![companion("rId1","/xl/charts/style1.xml",CHART_STYLE_CT,&blob("/xl/charts/style1.xml"))],color_styles:vec![companion("rId2","/xl/charts/colors1.xml",CHART_COLOR_STYLE_CT,&blob("/xl/charts/colors1.xml"))],user_shapes:None,outbound_resources:vec![]}}];for(kind,target,external)in[(rt::CHART,"../charts/chartEx1.xml",false),(CHART_EX_REL,"../../../evil.xml",false),(CHART_EX_REL,"https://example.invalid/chartEx.xml",true)]{let(mut package,workbook)=base_package(conformance);store_chartsheet(&mut package,&workbook,&expected,conformance).unwrap();let drawing=package.get_part_mut(&PackURI::new("/xl/drawings/drawing1.xml").unwrap()).unwrap();drawing.rels_mut().remove("rId1");drawing.rels_mut().add_relationship(kind.into(),target.into(),"rId1".into(),external);assert!(load_chartsheet(&package,&workbook,"rIdChartSheet").is_err(),"accepted {kind} {target}");}let(mut package,workbook)=base_package(conformance);store_chartsheet(&mut package,&workbook,&expected,conformance).unwrap();package.get_part_mut(&PackURI::new("/xl/drawings/drawing1.xml").unwrap()).unwrap().rels_mut().add_relationship(CHART_EX_REL.into(),"../charts/chartEx1.xml".into(),"rIdOrphan".into(),false);assert!(load_chartsheet(&package,&workbook,"rIdChartSheet").is_err());let(mut package,workbook)=base_package(conformance);store_chartsheet(&mut package,&workbook,&expected,conformance).unwrap();package.get_part_mut(&PackURI::new("/xl/charts/chartEx1.xml").unwrap()).unwrap().rels_mut().add_relationship(IMAGE_REL.into(),"../media/image1.png".into(),"rIdImage".into(),false);assert!(load_chartsheet(&package,&workbook,"rIdChartSheet").is_err());let(mut package,workbook)=base_package(conformance);store_chartsheet(&mut package,&workbook,&expected,conformance).unwrap();package.get_part_mut(&PackURI::new("/xl/charts/style1.xml").unwrap()).unwrap().rels_mut().add_relationship(IMAGE_REL.into(),"../media/image1.png".into(),"rIdOutbound".into(),false);assert!(load_chartsheet(&package,&workbook,"rIdChartSheet").is_err());}
 
-    fn chart_ex_user_shapes(conformance:ChartSheetConformance)->ChartSheetPackage{let source=OpcPackage::from_bytes(LO_USER_SHAPES_IMAGES).unwrap();let blob=|path:&str|source.get_part(&PackURI::new(path).unwrap()).unwrap().blob().to_vec();let mut value=value(conformance);value.drawing.data=format!("<xdr:wsDr xmlns:xdr=\"{}\" xmlns:a=\"{}\" xmlns:r=\"{}\" xmlns:cx=\"{CHART_EX}\"><a:graphic><a:graphicData uri=\"{CHART_EX}\"><cx:chart r:id=\"rIdChartEx\"/></a:graphicData></a:graphic></xdr:wsDr>",conformance.xdr(),if conformance==ChartSheetConformance::Strict{STRICT_DRAWING_MAIN}else{DRAWING_MAIN},conformance.rel()).into_bytes();let user_shapes_data=if conformance==ChartSheetConformance::Transitional{blob("/xl/drawings/drawing2.xml")}else{String::from_utf8(blob("/xl/drawings/drawing2.xml")).unwrap().replace(CHART,STRICT_CHART).replace("http://schemas.openxmlformats.org/drawingml/2006/chartDrawing","http://purl.oclc.org/ooxml/drawingml/chartDrawing").replace(DRAWING_MAIN,STRICT_DRAWING_MAIN).replace(REL,STRICT_REL).into_bytes()};value.drawing.charts=vec![ChartSheetChartResource{relationship_id:"rIdChartEx".into(),part_name:"/xl/charts/chartEx1.xml".into(),content_type:CHART_EX_CT.into(),data:format!("<cx:chartSpace xmlns:cx=\"{CHART_EX}\"/>").into_bytes(),kind:ChartSheetChartResourceKind::Extended{styles:vec![],color_styles:vec![],user_shapes:Some(ChartSheetChartUserShapesResource{relationship_id:"rIdUserShapes".into(),part_name:"/xl/drawings/chartDrawing1.xml".into(),content_type:CHART_USER_SHAPES_CT.into(),data:user_shapes_data,images:vec![ChartSheetChartUserShapeImageResource{relationship_id:"rId1".into(),part_name:"/xl/media/image1.png".into(),content_type:ChartSheetChartUserShapeImageContentType::Png,data:blob("/xl/media/image1.png")},ChartSheetChartUserShapeImageResource{relationship_id:"rId2".into(),part_name:"/xl/media/image2.svg".into(),content_type:ChartSheetChartUserShapeImageContentType::Svg,data:blob("/xl/media/image2.svg")}]})}}];value}
+    pub(super) fn chart_ex_user_shapes(conformance:ChartSheetConformance)->ChartSheetPackage{let source=OpcPackage::from_bytes(LO_USER_SHAPES_IMAGES).unwrap();let blob=|path:&str|source.get_part(&PackURI::new(path).unwrap()).unwrap().blob().to_vec();let mut value=value(conformance);value.drawing.data=format!("<xdr:wsDr xmlns:xdr=\"{}\" xmlns:a=\"{}\" xmlns:r=\"{}\" xmlns:cx=\"{CHART_EX}\"><a:graphic><a:graphicData uri=\"{CHART_EX}\"><cx:chart r:id=\"rIdChartEx\"/></a:graphicData></a:graphic></xdr:wsDr>",conformance.xdr(),if conformance==ChartSheetConformance::Strict{STRICT_DRAWING_MAIN}else{DRAWING_MAIN},conformance.rel()).into_bytes();let user_shapes_data=if conformance==ChartSheetConformance::Transitional{blob("/xl/drawings/drawing2.xml")}else{String::from_utf8(blob("/xl/drawings/drawing2.xml")).unwrap().replace(CHART,STRICT_CHART).replace("http://schemas.openxmlformats.org/drawingml/2006/chartDrawing","http://purl.oclc.org/ooxml/drawingml/chartDrawing").replace(DRAWING_MAIN,STRICT_DRAWING_MAIN).replace(REL,STRICT_REL).into_bytes()};value.drawing.charts=vec![ChartSheetChartResource{relationship_id:"rIdChartEx".into(),part_name:"/xl/charts/chartEx1.xml".into(),content_type:CHART_EX_CT.into(),data:format!("<cx:chartSpace xmlns:cx=\"{CHART_EX}\"/>").into_bytes(),kind:ChartSheetChartResourceKind::Extended{styles:vec![],color_styles:vec![],user_shapes:Some(ChartSheetChartUserShapesResource{relationship_id:"rIdUserShapes".into(),part_name:"/xl/drawings/chartDrawing1.xml".into(),content_type:CHART_USER_SHAPES_CT.into(),data:user_shapes_data,images:vec![ChartSheetChartUserShapeImageResource{relationship_id:"rId1".into(),part_name:"/xl/media/image1.png".into(),content_type:ChartSheetChartUserShapeImageContentType::Png,data:blob("/xl/media/image1.png")},ChartSheetChartUserShapeImageResource{relationship_id:"rId2".into(),part_name:"/xl/media/image2.svg".into(),content_type:ChartSheetChartUserShapeImageContentType::Svg,data:blob("/xl/media/image2.svg")}]}),outbound_resources:vec![]}}];value}
     #[test]fn chart_ex_user_shapes_png_svg_transitional_and_strict_round_trip(){for conformance in [ChartSheetConformance::Transitional,ChartSheetConformance::Strict]{let expected=chart_ex_user_shapes(conformance);let(mut package,workbook)=base_package(conformance);store_chartsheet(&mut package,&workbook,&expected,conformance).unwrap();let loaded=load_chartsheet(&package,&workbook,"rIdChartSheet").unwrap();assert_eq!(loaded,expected);let chart=package.get_part(&PackURI::new("/xl/charts/chartEx1.xml").unwrap()).unwrap();assert_eq!(chart.rels().get("rIdUserShapes").unwrap().reltype(),conformance.chart_user_shapes_rel());let shapes=package.get_part(&PackURI::new("/xl/drawings/chartDrawing1.xml").unwrap()).unwrap();assert!(shapes.rels().iter().all(|relationship|relationship.reltype()==conformance.image_rel()));}}
     #[test]fn chart_ex_user_shapes_rejects_graph_mime_namespace_collision_and_caps(){let conformance=ChartSheetConformance::Transitional;let mut bad=chart_ex_user_shapes(conformance);if let ChartSheetChartResourceKind::Extended{user_shapes:Some(shapes),..}=&mut bad.drawing.charts[0].kind{shapes.images[0].content_type=ChartSheetChartUserShapeImageContentType::Gif;}let(mut package,workbook)=base_package(conformance);assert!(store_chartsheet(&mut package,&workbook,&bad,conformance).is_err());let mut bad=chart_ex_user_shapes(conformance);if let ChartSheetChartResourceKind::Extended{user_shapes:Some(shapes),..}=&mut bad.drawing.charts[0].kind{shapes.images.pop();}let(mut package,workbook)=base_package(conformance);assert!(store_chartsheet(&mut package,&workbook,&bad,conformance).is_err());let mut bad=chart_ex_user_shapes(ChartSheetConformance::Strict);if let ChartSheetChartResourceKind::Extended{user_shapes:Some(shapes),..}=&mut bad.drawing.charts[0].kind{shapes.data=String::from_utf8(std::mem::take(&mut shapes.data)).unwrap().replace(STRICT_CHART,CHART).into_bytes();}let(mut package,workbook)=base_package(ChartSheetConformance::Strict);assert!(store_chartsheet(&mut package,&workbook,&bad,ChartSheetConformance::Strict).is_err());let mut bad=chart_ex_user_shapes(conformance);if let ChartSheetChartResourceKind::Extended{styles,user_shapes:Some(shapes),..}=&mut bad.drawing.charts[0].kind{styles.push(companion(&shapes.relationship_id,"/xl/charts/style1.xml",CHART_STYLE_CT,format!("<cs:chartStyle xmlns:cs=\"{CHART_STYLE}\"/>").as_bytes()));}let(mut package,workbook)=base_package(conformance);assert!(store_chartsheet(&mut package,&workbook,&bad,conformance).is_err());let mut bad=chart_ex_user_shapes(conformance);if let ChartSheetChartResourceKind::Extended{user_shapes:Some(shapes),..}=&mut bad.drawing.charts[0].kind{shapes.images[0].data=vec![0;MAX_CHART_USER_SHAPE_IMAGE_BYTES+1];}let(mut package,workbook)=base_package(conformance);assert!(store_chartsheet(&mut package,&workbook,&bad,conformance).is_err());}
     fn with_extension_relationships(conformance:ChartSheetConformance)->ChartSheetPackage{let mut value=value(conformance);value.chartsheet.extension_list=Some(ChartSheetExtensionList{extensions:vec![ext("urn:duplicate",&format!("<u:payload xmlns:u=\"urn:vendor\" xmlns:r=\"{}\" r:id=\"rIdExtInternal\">before<u:child/>after</u:payload>",conformance.rel())),ext("urn:duplicate",&format!("<v:external xmlns:v=\"urn:vendor-two\" xmlns:r=\"{}\" r:link=\"rIdExtExternal\"/>",conformance.rel()))]});value.extension_relationships=vec![ChartSheetExtensionRelationship{relationship_id:"rIdExtInternal".into(),relationship_type:"urn:relationship:internal".into(),target:ChartSheetExtensionRelationshipTarget::Internal{part_name:"/xl/custom/ext.bin".into()}},ChartSheetExtensionRelationship{relationship_id:"rIdExtExternal".into(),relationship_type:"urn:relationship:external".into(),target:ChartSheetExtensionRelationshipTarget::External{target:"https://example.invalid/not-fetched".into()}}];value.extension_relationships.sort_by(|left,right|left.relationship_id.cmp(&right.relationship_id));let xml=write_chartsheet(&value.chartsheet,conformance).unwrap();value.chartsheet=parse_chartsheet(&xml).unwrap().1;value}
@@ -928,4 +1003,214 @@ mod tests {
     #[test]fn rejects_external_wrong_type_escaped_and_unreferenced_picture_relationships(){for (kind,target,external) in [(IMAGE_REL,"https://example.invalid/background.png",true),(rt::CHART,"../media/background1.png",false),(IMAGE_REL,"../../../evil.png",false)]{let conformance=ChartSheetConformance::Transitional;let(mut package,workbook)=base_package(conformance);store_chartsheet(&mut package,&workbook,&value(conformance),conformance).unwrap();let chartsheet=package.get_part_mut(&PackURI::new("/xl/chartsheets/sheet1.xml").unwrap()).unwrap();chartsheet.rels_mut().remove("rIdBackground");chartsheet.rels_mut().add_relationship(kind.into(),target.into(),"rIdBackground".into(),external);assert!(load_chartsheet(&package,&workbook,"rIdChartSheet").is_err(),"accepted {kind} {target}");}let conformance=ChartSheetConformance::Transitional;let(mut package,workbook)=base_package(conformance);store_chartsheet(&mut package,&workbook,&value(conformance),conformance).unwrap();package.get_part_mut(&PackURI::new("/xl/chartsheets/sheet1.xml").unwrap()).unwrap().rels_mut().add_relationship(IMAGE_REL.into(),"../media/background1.png".into(),"rIdExtra".into(),false);assert!(load_chartsheet(&package,&workbook,"rIdChartSheet").is_err());}
     #[test]fn rejects_existing_background_part_collision_before_mutation(){let conformance=ChartSheetConformance::Transitional;let(mut package,workbook)=base_package(conformance);package.add_part(Box::new(BlobPart::new(PackURI::new("/xl/media/background1.png").unwrap(),"image/png".into(),vec![9])));assert!(store_chartsheet(&mut package,&workbook,&value(conformance),conformance).is_err());assert!(package.get_part(&PackURI::new("/xl/chartsheets/sheet1.xml").unwrap()).is_err());}
     #[test] fn rejects_malformed_caps_and_graphs() { assert!(parse_chartsheet(b"<!DOCTYPE x><chartsheet/>").is_err()); assert!(parse_chartsheet(format!("<chartsheet xmlns=\"{SML}\"><sheetViews><sheetView workbookViewId=\"0\" zoomScale=\"401\"/></sheetViews><drawing xmlns:r=\"{REL}\" r:id=\"rId1\"/></chartsheet>").as_bytes()).is_err()); for custom in ["<customSheetViews/>", "<customSheetViews><customSheetView guid=\"bad\"/></customSheetViews>", "<customSheetViews><customSheetView guid=\"{00112233-4455-6677-8899-AABBCCDDEEFF}\" scale=\"401\"/></customSheetViews>", "<customSheetViews><customSheetView guid=\"{00112233-4455-6677-8899-AABBCCDDEEFF}\"/><customSheetView guid=\"{00112233-4455-6677-8899-aabbccddeeff}\"/></customSheetViews>"] { let xml = format!("<chartsheet xmlns=\"{SML}\" xmlns:r=\"{REL}\"><sheetViews><sheetView workbookViewId=\"0\"/></sheetViews>{custom}<drawing r:id=\"rId1\"/></chartsheet>"); assert!(parse_chartsheet(xml.as_bytes()).is_err(), "{custom}"); } assert!(parse_chartsheet(&vec![b' '; MAX_XML_BYTES + 1]).is_err()); let (mut package, workbook) = base_package(ChartSheetConformance::Transitional); let expected = value(ChartSheetConformance::Transitional); store_chartsheet(&mut package, &workbook, &expected, ChartSheetConformance::Transitional).unwrap(); package.get_part_mut(&PackURI::new("/xl/drawings/drawing1.xml").unwrap()).unwrap().rels_mut().add_relationship(rt::IMAGE.into(), "../media/x.png".into(), "rIdBad".into(), false); assert!(load_chartsheet(&package, &workbook, "rIdChartSheet").is_err()); }
+}
+
+#[cfg(test)]
+mod chart_outbound_tests {
+    use super::*;
+
+    fn outbound_value(conformance: ChartSheetConformance) -> ChartSheetPackage {
+        let source = OpcPackage::from_bytes(tests::LO_USER_SHAPES_IMAGES).unwrap();
+        let blob = |path: &str| {
+            source
+                .get_part(&PackURI::new(path).unwrap())
+                .unwrap()
+                .blob()
+                .to_vec()
+        };
+        let mut value = tests::chart_ex_user_shapes(conformance);
+        let drawing_main = if conformance == ChartSheetConformance::Strict {
+            STRICT_DRAWING_MAIN
+        } else {
+            DRAWING_MAIN
+        };
+        let chart = &mut value.drawing.charts[0];
+        chart.data = format!(
+            "<cx:chartSpace xmlns:cx=\"{CHART_EX}\" xmlns:a=\"{drawing_main}\" xmlns:r=\"{}\"><cx:chart><cx:plotArea><cx:plotAreaRegion><cx:series><cx:spPr><a:blipFill><a:blip r:embed=\"rIdDirectImage\"/></a:blipFill></cx:spPr></cx:series></cx:plotAreaRegion></cx:plotArea></cx:chart><cx:externalData r:id=\"rIdPackage\" cx:autoUpdate=\"0\"/></cx:chartSpace>",
+            conformance.rel()
+        )
+        .into_bytes();
+        let theme_data = format!(
+            "<a:themeOverride xmlns:a=\"{drawing_main}\" xmlns:r=\"{}\" xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\" xmlns:u=\"urn:unsupported\"><mc:AlternateContent><mc:Choice Requires=\"u\"><u:active/></mc:Choice><mc:Fallback><a:fmtScheme name=\"Inert\"><a:fillStyleLst><a:blipFill><a:blip r:embed=\"rIdThemeImage\"/></a:blipFill></a:fillStyleLst><a:lnStyleLst/><a:effectStyleLst/><a:bgFillStyleLst/></a:fmtScheme></mc:Fallback></mc:AlternateContent></a:themeOverride>",
+            conformance.rel()
+        )
+        .into_bytes();
+        let ChartSheetChartResourceKind::Extended {
+            outbound_resources,
+            ..
+        } = &mut chart.kind
+        else {
+            unreachable!()
+        };
+        *outbound_resources = vec![
+            ChartSheetChartOutboundResource::Image(ChartSheetChartImageResource {
+                relationship_id: "rIdDirectImage".into(),
+                part_name: "/xl/media/chartDirect1.png".into(),
+                content_type: ChartSheetChartImageContentType::Png,
+                data: blob("/xl/media/image1.png"),
+            }),
+            ChartSheetChartOutboundResource::EmbeddedPackage(
+                ChartSheetChartEmbeddedPackageResource {
+                    relationship_id: "rIdPackage".into(),
+                    part_name: "/xl/embeddings/Microsoft_Excel_Worksheet1.xlsx".into(),
+                    content_type: ChartSheetChartEmbeddedPackageContentType::Xlsx,
+                    data: tests::LO_USER_SHAPES_IMAGES.to_vec(),
+                },
+            ),
+            ChartSheetChartOutboundResource::ThemeOverride(
+                ChartSheetChartThemeOverrideResource {
+                    relationship_id: "rIdTheme".into(),
+                    part_name: "/xl/theme/themeOverride1.xml".into(),
+                    content_type: THEME_OVERRIDE_CT.into(),
+                    data: theme_data,
+                    images: vec![ChartSheetChartImageResource {
+                        relationship_id: "rIdThemeImage".into(),
+                        part_name: "/xl/media/themeImage1.svg".into(),
+                        content_type: ChartSheetChartImageContentType::Svg,
+                        data: blob("/xl/media/image2.svg"),
+                    }],
+                },
+            ),
+        ];
+        value
+    }
+
+    #[test]
+    fn chart_ex_complete_outbound_family_round_trips_strict_and_transitional() {
+        for conformance in [
+            ChartSheetConformance::Transitional,
+            ChartSheetConformance::Strict,
+        ] {
+            let expected = outbound_value(conformance);
+            let (mut package, workbook) = tests::base_package(conformance);
+            store_chartsheet(&mut package, &workbook, &expected, conformance).unwrap();
+            let loaded = load_chartsheet(&package, &workbook, "rIdChartSheet").unwrap();
+            assert_eq!(loaded, expected);
+            let chart_uri = PackURI::new("/xl/charts/chartEx1.xml").unwrap();
+            let chart = package.get_part(&chart_uri).unwrap();
+            assert_eq!(
+                chart.rels().get("rIdDirectImage").unwrap().reltype(),
+                conformance.image_rel()
+            );
+            assert_eq!(
+                chart.rels().get("rIdTheme").unwrap().reltype(),
+                conformance.theme_override_rel()
+            );
+            assert_eq!(
+                chart.rels().get("rIdPackage").unwrap().reltype(),
+                conformance.package_rel()
+            );
+            let theme = package
+                .get_part(&PackURI::new("/xl/theme/themeOverride1.xml").unwrap())
+                .unwrap();
+            assert_eq!(
+                theme.rels().get("rIdThemeImage").unwrap().reltype(),
+                conformance.image_rel()
+            );
+            let (mut second, second_workbook) = tests::base_package(conformance);
+            store_chartsheet(&mut second, &second_workbook, &loaded, conformance).unwrap();
+            assert_eq!(
+                load_chartsheet(&second, &second_workbook, "rIdChartSheet").unwrap(),
+                loaded
+            );
+        }
+    }
+
+    #[test]
+    fn chart_ex_outbound_rejects_active_external_mismatch_collision_roots_and_caps() {
+        let conformance = ChartSheetConformance::Transitional;
+        let mut bad = outbound_value(conformance);
+        bad.drawing.charts[0].data = String::from_utf8(bad.drawing.charts[0].data.clone())
+            .unwrap()
+            .replace("autoUpdate=\"0\"", "autoUpdate=\"true\"")
+            .into_bytes();
+        let (mut package, workbook) = tests::base_package(conformance);
+        assert!(store_chartsheet(&mut package, &workbook, &bad, conformance).is_err());
+        assert!(package
+            .get_part(&PackURI::new("/xl/chartsheets/sheet1.xml").unwrap())
+            .is_err());
+
+        let mut bad = outbound_value(conformance);
+        bad.drawing.charts[0].data = String::from_utf8(bad.drawing.charts[0].data.clone())
+            .unwrap()
+            .replace(" r:embed=\"rIdDirectImage\"", "")
+            .into_bytes();
+        let (mut package, workbook) = tests::base_package(conformance);
+        assert!(store_chartsheet(&mut package, &workbook, &bad, conformance).is_err());
+
+        let mut bad = outbound_value(conformance);
+        if let ChartSheetChartResourceKind::Extended {
+            outbound_resources,
+            ..
+        } = &mut bad.drawing.charts[0].kind
+        {
+            let theme = outbound_resources
+                .iter_mut()
+                .find_map(|resource| match resource {
+                    ChartSheetChartOutboundResource::ThemeOverride(theme) => Some(theme),
+                    _ => None,
+                })
+                .unwrap();
+            theme.data = String::from_utf8(theme.data.clone())
+                .unwrap()
+                .replace("themeOverride", "theme")
+                .into_bytes();
+        }
+        let (mut package, workbook) = tests::base_package(conformance);
+        assert!(store_chartsheet(&mut package, &workbook, &bad, conformance).is_err());
+
+        let mut bad = outbound_value(conformance);
+        if let ChartSheetChartResourceKind::Extended {
+            user_shapes: Some(shapes),
+            outbound_resources,
+            ..
+        } = &mut bad.drawing.charts[0].kind
+        {
+            outbound_resources[0] = match outbound_resources[0].clone() {
+                ChartSheetChartOutboundResource::Image(mut image) => {
+                    image.relationship_id = shapes.relationship_id.clone();
+                    ChartSheetChartOutboundResource::Image(image)
+                }
+                _ => unreachable!(),
+            };
+        }
+        let (mut package, workbook) = tests::base_package(conformance);
+        assert!(store_chartsheet(&mut package, &workbook, &bad, conformance).is_err());
+
+        let expected = outbound_value(conformance);
+        let (mut package, workbook) = tests::base_package(conformance);
+        store_chartsheet(&mut package, &workbook, &expected, conformance).unwrap();
+        let chart = package
+            .get_part_mut(&PackURI::new("/xl/charts/chartEx1.xml").unwrap())
+            .unwrap();
+        chart.rels_mut().remove("rIdPackage");
+        chart.rels_mut().add_relationship(
+            conformance.package_rel().into(),
+            "https://example.invalid/active.xlsx".into(),
+            "rIdPackage".into(),
+            true,
+        );
+        assert!(load_chartsheet(&package, &workbook, "rIdChartSheet").is_err());
+
+        let mut bad = outbound_value(conformance);
+        if let ChartSheetChartResourceKind::Extended {
+            outbound_resources,
+            ..
+        } = &mut bad.drawing.charts[0].kind
+        {
+            let embedded = outbound_resources
+                .iter_mut()
+                .find_map(|resource| match resource {
+                    ChartSheetChartOutboundResource::EmbeddedPackage(embedded) => Some(embedded),
+                    _ => None,
+                })
+                .unwrap();
+            embedded.data = vec![0; MAX_CHART_EMBEDDED_PACKAGE_BYTES + 1];
+        }
+        let (mut package, workbook) = tests::base_package(conformance);
+        assert!(store_chartsheet(&mut package, &workbook, &bad, conformance).is_err());
+        assert!(package
+            .get_part(&PackURI::new("/xl/chartsheets/sheet1.xml").unwrap())
+            .is_err());
+    }
 }

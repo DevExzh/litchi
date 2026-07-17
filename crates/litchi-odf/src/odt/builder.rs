@@ -48,6 +48,7 @@ pub struct DocumentBuilder {
     page_layout_columns: Vec<(String, crate::StyleColumns)>,
     page_layout_footnote_separators: Vec<(String, crate::StyleFootnoteSeparator)>,
     page_layout_header_footer_properties: Vec<(String, crate::PageHeaderFooterRegion, crate::HeaderFooterStyleProperties)>,
+    notes_configurations: crate::OdfNotesConfigurations,
 }
 
 impl Default for DocumentBuilder {
@@ -80,7 +81,36 @@ impl DocumentBuilder {
             page_layout_columns: Vec::new(),
             page_layout_footnote_separators: Vec::new(),
             page_layout_header_footer_properties: Vec::new(),
+            notes_configurations: crate::OdfNotesConfigurations::default(),
         }
+    }
+
+    /// Return footnote and endnote configurations emitted to `styles.xml`.
+    pub fn notes_configurations(&self) -> &crate::OdfNotesConfigurations {
+        &self.notes_configurations
+    }
+
+    /// Replace the validated footnote and endnote configurations.
+    pub fn set_notes_configurations(
+        &mut self,
+        configurations: crate::OdfNotesConfigurations,
+    ) -> Result<&mut Self> {
+        configurations.validate()?;
+        self.notes_configurations = configurations;
+        Ok(self)
+    }
+
+    /// Set one validated note-class configuration.
+    pub fn set_notes_configuration(
+        &mut self,
+        configuration: crate::OdfNotesConfiguration,
+    ) -> Result<&mut Self> {
+        configuration.validate()?;
+        match configuration.note_class {
+            crate::OdfNoteClass::Footnote => self.notes_configurations.footnote = Some(configuration),
+            crate::OdfNoteClass::Endnote => self.notes_configurations.endnote = Some(configuration),
+        }
+        Ok(self)
     }
 
     /// Add a named or default paragraph style carrying typed tab stops.
@@ -611,6 +641,7 @@ impl DocumentBuilder {
         if !self.table_row_property_styles.is_empty(){let insertion=xml.find("</office:styles>").expect("static styles root");let fragments=self.table_row_property_styles.iter().map(|x|x.to_xml_fragment().expect("validated table-row property style")).collect::<String>();xml.insert_str(insertion,&fragments);}
         if !self.table_property_styles.is_empty(){let insertion=xml.find("</office:styles>").expect("static styles root");let fragments=self.table_property_styles.iter().map(|x|x.to_xml_fragment().expect("validated table property style")).collect::<String>();xml.insert_str(insertion,&fragments);}
         if !self.section_property_styles.is_empty(){let insertion=xml.find("</office:styles>").expect("static styles root");let fragments=self.section_property_styles.iter().map(|x|x.to_xml_fragment().expect("validated section property style")).collect::<String>();xml.insert_str(insertion,&fragments);}
+        if self.notes_configurations.footnote.is_some() || self.notes_configurations.endnote.is_some() { let insertion=xml.find("</office:styles>").expect("static styles root"); let fragments=self.notes_configurations.to_xml_fragment().expect("validated notes configurations"); xml.insert_str(insertion,&fragments); }
         if !self.page_layout_columns.is_empty() || !self.page_layout_footnote_separators.is_empty() || !self.page_layout_header_footer_properties.is_empty() {
             let mut fragments = self
                 .page_layout_columns

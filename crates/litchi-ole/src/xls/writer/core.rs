@@ -45,7 +45,10 @@ mod stream;
 mod worksheet;
 
 pub use self::conditional_format::{
-    XlsConditionalFormat, XlsConditionalFormatType, XlsConditionalPattern,
+    XlsConditionalFormat, XlsConditionalFormat12Group, XlsConditionalFormat12Rule,
+    XlsConditionalFormat12Type, XlsConditionalFormatGroup, XlsConditionalFormatOperator,
+    XlsConditionalFormatRange, XlsConditionalFormatRule, XlsConditionalFormatType,
+    XlsConditionalPattern,
 };
 pub use self::data_validation::{
     XlsDataValidation, XlsDataValidationErrorStyle, XlsDataValidationFormulaKind,
@@ -2101,7 +2104,9 @@ impl XlsWriter {
         sheet: usize,
         cf: XlsConditionalFormat,
     ) -> XlsResult<()> {
-        if cf.first_row > cf.last_row || cf.first_col > cf.last_col {
+        if cf.first_row > cf.last_row || cf.first_col > cf.last_col
+            || cf.last_row > 65_535 || cf.last_col > 255
+        {
             return Err(XlsError::InvalidData(
                 "add_conditional_format: first row/col must be <= last row/col".to_string(),
             ));
@@ -2114,6 +2119,103 @@ impl XlsWriter {
 
         worksheet.add_conditional_format(cf);
 
+        Ok(())
+    }
+
+    /// Add one legacy `CONDFMT` collection with ordered ranges and one to three ordered rules.
+    pub fn add_conditional_format_group(&mut self,sheet:usize,group:XlsConditionalFormatGroup)->XlsResult<()>{if group.ranges.is_empty()||group.ranges.len()>1026{return Err(XlsError::InvalidData("conditional-format range count must be 1..=1026".to_string()))}if group.rules.is_empty()||group.rules.len()>3{return Err(XlsError::InvalidData("legacy conditional-format rule count must be 1..=3".to_string()))}for range in &group.ranges{if range.first_row>range.last_row||range.first_col>range.last_col||range.last_row>65_535||range.last_col>255{return Err(XlsError::InvalidData("conditional-format range is outside BIFF8 bounds".to_string()))}}for rule in &group.rules{rule.format_type.to_biff_payload()?;}self.worksheets.get_mut(sheet).ok_or_else(||XlsError::WorksheetNotFound(format!("Sheet {sheet}")))?.add_conditional_format_group(group);Ok(())}
+
+    /// Add one future `CondFmt12` collection. Formula tokens and visual
+    /// payloads are serialized exactly and are never evaluated.
+    pub fn add_conditional_format12_group(
+        &mut self,
+        sheet: usize,
+        group: XlsConditionalFormat12Group,
+    ) -> XlsResult<()> {
+        if group.ranges.is_empty() || group.ranges.len() > 1026 {
+            return Err(XlsError::InvalidData(
+                "future conditional-format range count must be 1..=1026".to_string(),
+            ));
+        }
+        if group.rules.is_empty() || group.rules.len() > usize::from(u16::MAX) {
+            return Err(XlsError::InvalidData(
+                "future conditional-format rule count must be 1..=65535".to_string(),
+            ));
+        }
+        for range in &group.ranges {
+            if range.first_row > range.last_row || range.first_col > range.last_col
+                || range.last_row > 65_535 || range.last_col > 255
+            {
+                return Err(XlsError::InvalidData(
+                    "future conditional-format range is outside BIFF8 bounds".to_string(),
+                ));
+            }
+        }
+        let worksheet = self.worksheets.get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {sheet}")))?;
+        if worksheet.conditional_formats.len() + worksheet.conditional_formats12.len() >= 32_768 {
+            return Err(XlsError::InvalidData(
+                "conditional-format group count exceeds the 15-bit BIFF identifier space".to_string(),
+            ));
+        }
+        let mut priorities = worksheet.conditional_formats12.iter()
+            .flat_map(|existing| existing.rules.iter().map(|rule| rule.priority))
+            .collect::<std::collections::HashSet<_>>();
+        for rule in &group.rules {
+            if rule.priority == 0 || !priorities.insert(rule.priority) {
+                return Err(XlsError::InvalidData(
+                    "future conditional-format priorities must be nonzero and unique per sheet".to_string(),
+                ));
+            }
+            if !matches!(rule.template, 0..=5 | 7..=12 | 15..=27 | 29 | 30) {
+                return Err(XlsError::InvalidData(
+                    "future conditional-format template is invalid".to_string(),
+                ));
+            }
+            let between = matches!(
+                rule.format_type,
+                XlsConditionalFormat12Type::CellValue {
+                    operator: XlsConditionalFormatOperator::Between
+                        | XlsConditionalFormatOperator::NotBetween,
+                    ..
+                }
+            );
+            if let XlsConditionalFormat12Type::CellValue { formula2, .. } = &rule.format_type {
+                if between != formula2.is_some() {
+                    return Err(XlsError::InvalidData(
+                        "between/not-between CF12 rules require two formulas; other comparisons require one".to_string(),
+                    ));
+                }
+            }
+            let visual = matches!(
+                rule.format_type,
+                XlsConditionalFormat12Type::ColorScale { .. }
+                    | XlsConditionalFormat12Type::DataBar { .. }
+                    | XlsConditionalFormat12Type::IconSet { .. }
+            );
+            if visual && (rule.stop_if_true || rule.differential_format != [0, 0, 0, 0, 0, 0]) {
+                return Err(XlsError::InvalidData(
+                    "visual CF12 rules require an empty DXFN12 and cannot stop-if-true".to_string(),
+                ));
+            }
+            let (condition_type, comparison, formula1, formula2, active_formula, payload) =
+                rule.format_type.biff_parts();
+            let config = crate::xls::writer::biff::Cf12Config {
+                condition_type,
+                comparison,
+                differential_format: &rule.differential_format,
+                formula1,
+                formula2,
+                active_formula,
+                stop_if_true: rule.stop_if_true,
+                priority: rule.priority,
+                template: rule.template,
+                template_parameters: rule.template_parameters,
+                rule_payload: payload,
+            };
+            crate::xls::writer::biff::write_cf12(&mut Vec::new(), &config)?;
+        }
+        worksheet.add_conditional_format12_group(group);
         Ok(())
     }
 

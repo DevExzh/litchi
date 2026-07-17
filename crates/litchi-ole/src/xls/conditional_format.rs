@@ -1,9 +1,14 @@
 //! Legacy BIFF8 conditional formatting (`CONDFMT` and `CF`).
 
 use crate::xls::error::{XlsError, XlsResult};
+use crate::xls::formula::{FormulaContext, render_formula};
+use std::collections::HashSet;
 
 pub(crate) const CONDFMT_RECORD_TYPE: u16 = 0x01b0;
 pub(crate) const CF_RECORD_TYPE: u16 = 0x01b1;
+pub(crate) const CONDFMT12_RECORD_TYPE: u16 = 0x0879;
+pub(crate) const CF12_RECORD_TYPE: u16 = 0x087a;
+pub(crate) const CFEX_RECORD_TYPE: u16 = 0x087b;
 
 fn invalid(record_type: u16, message: impl Into<String>) -> XlsError {
     XlsError::InvalidRecord {
@@ -190,6 +195,8 @@ pub struct XlsConditionalRule {
     style: XlsConditionalStyle,
     formula1_tokens: Vec<u8>,
     formula2_tokens: Vec<u8>,
+    formula1_rendered: Option<String>,
+    formula2_rendered: Option<String>,
 }
 
 impl XlsConditionalRule {
@@ -197,7 +204,35 @@ impl XlsConditionalRule {
     pub fn style(&self) -> &XlsConditionalStyle { &self.style }
     pub fn formula1_tokens(&self) -> &[u8] { &self.formula1_tokens }
     pub fn formula2_tokens(&self) -> &[u8] { &self.formula2_tokens }
+    pub fn formula1_rendered(&self) -> Option<&str> { self.formula1_rendered.as_deref() }
+    pub fn formula2_rendered(&self) -> Option<&str> { self.formula2_rendered.as_deref() }
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum XlsConditionalRule12Kind { CellValue(XlsConditionalComparison), Formula, ColorScale, DataBar, Filter, IconSet }
+
+/// Office 2007 future conditional-formatting rule. Visual payloads remain inert bytes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct XlsConditionalRule12 {
+    kind:XlsConditionalRule12Kind, priority:u16, stop_if_true:bool, template:u16,
+    differential_format:Vec<u8>, formula1_tokens:Vec<u8>, formula2_tokens:Vec<u8>, active_formula_tokens:Vec<u8>,
+    formula1_rendered:Option<String>, formula2_rendered:Option<String>, active_formula_rendered:Option<String>,
+    template_parameters:[u8;16], rule_payload:Vec<u8>,
+}
+impl XlsConditionalRule12 {
+    pub fn kind(&self)->XlsConditionalRule12Kind{self.kind} pub fn priority(&self)->u16{self.priority} pub fn stop_if_true(&self)->bool{self.stop_if_true} pub fn template(&self)->u16{self.template}
+    pub fn differential_format(&self)->&[u8]{&self.differential_format} pub fn formula1_tokens(&self)->&[u8]{&self.formula1_tokens} pub fn formula2_tokens(&self)->&[u8]{&self.formula2_tokens} pub fn active_formula_tokens(&self)->&[u8]{&self.active_formula_tokens}
+    pub fn formula1_rendered(&self)->Option<&str>{self.formula1_rendered.as_deref()} pub fn formula2_rendered(&self)->Option<&str>{self.formula2_rendered.as_deref()} pub fn active_formula_rendered(&self)->Option<&str>{self.active_formula_rendered.as_deref()}
+    pub fn template_parameters(&self)->&[u8;16]{&self.template_parameters} pub fn rule_payload(&self)->&[u8]{&self.rule_payload}
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct XlsConditionalFormatting12 { identifier:u16, tough_recalculation:bool, enclosing_range:XlsConditionalFormatRange, ranges:Vec<XlsConditionalFormatRange>, rules:Vec<XlsConditionalRule12> }
+impl XlsConditionalFormatting12 { pub fn identifier(&self)->u16{self.identifier} pub fn requires_tough_recalculation(&self)->bool{self.tough_recalculation} pub fn enclosing_range(&self)->XlsConditionalFormatRange{self.enclosing_range} pub fn ranges(&self)->&[XlsConditionalFormatRange]{&self.ranges} pub fn rules(&self)->&[XlsConditionalRule12]{&self.rules} }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct XlsConditionalExtension { identifier:u16, legacy_rule_index:Option<u16>, priority:u16, active:bool, stop_if_true:bool, template:u8, differential_format:Vec<u8>, template_parameters:[u8;16], future_rule:Option<XlsConditionalRule12> }
+impl XlsConditionalExtension { pub fn identifier(&self)->u16{self.identifier} pub fn legacy_rule_index(&self)->Option<u16>{self.legacy_rule_index} pub fn priority(&self)->u16{self.priority} pub fn active(&self)->bool{self.active} pub fn stop_if_true(&self)->bool{self.stop_if_true} pub fn template(&self)->u8{self.template} pub fn differential_format(&self)->&[u8]{&self.differential_format} pub fn template_parameters(&self)->&[u8;16]{&self.template_parameters} pub fn future_rule(&self)->Option<&XlsConditionalRule12>{self.future_rule.as_ref()} }
 
 /// A range set and its one-to-three legacy conditional formatting rules.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -448,7 +483,7 @@ fn parse_style(data: &[u8]) -> XlsResult<(XlsConditionalStyle, usize)> {
     }, offset))
 }
 
-fn parse_cf(data: &[u8]) -> XlsResult<XlsConditionalRule> {
+fn parse_cf(data: &[u8], context:Option<&FormulaContext>) -> XlsResult<XlsConditionalRule> {
     if data.len() < 12 {
         return Err(invalid(CF_RECORD_TYPE, "CF payload is shorter than 12 bytes"));
     }
@@ -486,50 +521,71 @@ fn parse_cf(data: &[u8]) -> XlsResult<XlsConditionalRule> {
     if data.len() != formula_offset + formula1_len + formula2_len {
         return Err(invalid(CF_RECORD_TYPE, "CF formula lengths do not match the record payload"));
     }
+    let formula1_tokens=data[formula_offset..formula_offset + formula1_len].to_vec();let formula2_tokens=data[formula_offset + formula1_len..].to_vec();
     Ok(XlsConditionalRule {
         kind,
         style,
-        formula1_tokens: data[formula_offset..formula_offset + formula1_len].to_vec(),
-        formula2_tokens: data[formula_offset + formula1_len..].to_vec(),
+        formula1_rendered:render_formula(&formula1_tokens,context),formula2_rendered:render_formula(&formula2_tokens,context),formula1_tokens,formula2_tokens,
     })
 }
+
+fn parse_frt_header(data:&[u8],record_type:u16,referenced:bool)->XlsResult<XlsConditionalFormatRange>{if data.len()<12{return Err(invalid(record_type,"future conditional-format record is shorter than its FRT header"))}if read_u16(data,0)!=record_type{return Err(invalid(record_type,"FRT header record type does not match its containing record"))}let flags=read_u16(data,2);if flags!=u16::from(referenced){return Err(invalid(record_type,"FRT reference flags are invalid"))}let range=parse_range(&data[4..12],record_type)?;if !referenced&&data[4..12].iter().any(|byte|*byte!=0){return Err(invalid(record_type,"unreferenced FRT header range must be zero"))}Ok(range)}
+fn dxf12_length(data:&[u8],offset:usize,record_type:u16)->XlsResult<usize>{let cb=usize::try_from(*data.get(offset..offset+4).and_then(|bytes|bytes.try_into().ok()).map(u32::from_le_bytes).as_ref().ok_or_else(||invalid(record_type,"truncated DXFN12"))?).map_err(|_|invalid(record_type,"DXFN12 length overflows"))?;if cb==0{if data.get(offset+4..offset+6)!=Some(&[0,0]){return Err(invalid(record_type,"empty DXFN12 reserved field must be zero"))}Ok(6)}else{let length=4usize.checked_add(cb).ok_or_else(||invalid(record_type,"DXFN12 length overflows"))?;if data.get(offset..offset+length).is_none(){return Err(invalid(record_type,"truncated DXFN12 payload"))}Ok(length)}}
+fn comparison(value:u8,record_type:u16)->XlsResult<XlsConditionalComparison>{Ok(match value{1=>XlsConditionalComparison::Between,2=>XlsConditionalComparison::NotBetween,3=>XlsConditionalComparison::Equal,4=>XlsConditionalComparison::NotEqual,5=>XlsConditionalComparison::GreaterThan,6=>XlsConditionalComparison::LessThan,7=>XlsConditionalComparison::GreaterThanOrEqual,8=>XlsConditionalComparison::LessThanOrEqual,_=>return Err(invalid(record_type,"conditional comparison must be in 1..=8"))})}
+fn valid_template(value:u16)->bool{matches!(value,0..=5|7..=12|15..=27|29|30)}
+
+fn parse_cf12(data:&[u8],context:Option<&FormulaContext>,priorities:&mut HashSet<u16>)->XlsResult<XlsConditionalRule12>{parse_frt_header(data,CF12_RECORD_TYPE,false)?;if data.len()<24{return Err(invalid(CF12_RECORD_TYPE,"CF12 payload is truncated"))}let ct=data[12];let cp=data[13];let cce1=usize::from(read_u16(data,14));let cce2=usize::from(read_u16(data,16));if cce1>16409||cce2>16409{return Err(invalid(CF12_RECORD_TYPE,"CF12 formula exceeds 16409 bytes"))}let kind=match ct{1=>XlsConditionalRule12Kind::CellValue(comparison(cp,CF12_RECORD_TYPE)?),2 if cp==0=>XlsConditionalRule12Kind::Formula,3 if cp==0=>XlsConditionalRule12Kind::ColorScale,4 if cp==0=>XlsConditionalRule12Kind::DataBar,5 if cp==0=>XlsConditionalRule12Kind::Filter,6 if cp==0=>XlsConditionalRule12Kind::IconSet,2..=6=>return Err(invalid(CF12_RECORD_TYPE,"non-comparison CF12 rule has a nonzero operator")),_=>return Err(invalid(CF12_RECORD_TYPE,"CF12 condition type must be in 1..=6"))};if !matches!(kind,XlsConditionalRule12Kind::CellValue(XlsConditionalComparison::Between|XlsConditionalComparison::NotBetween))&&cce2!=0{return Err(invalid(CF12_RECORD_TYPE,"CF12 second formula is not allowed for this rule"))}if matches!(kind,XlsConditionalRule12Kind::ColorScale|XlsConditionalRule12Kind::DataBar|XlsConditionalRule12Kind::Filter|XlsConditionalRule12Kind::IconSet)&&cce1+cce2!=0{return Err(invalid(CF12_RECORD_TYPE,"visual CF12 rule cannot contain comparison formulas"))}let dxf_len=dxf12_length(data,18,CF12_RECORD_TYPE)?;let differential_format=data[18..18+dxf_len].to_vec();if matches!(kind,XlsConditionalRule12Kind::ColorScale|XlsConditionalRule12Kind::DataBar|XlsConditionalRule12Kind::IconSet)&&read_u32(data,18)!=0{return Err(invalid(CF12_RECORD_TYPE,"visual CF12 DXFN12 must be empty"))}let mut offset=18+dxf_len;let formula1_tokens=data.get(offset..offset+cce1).ok_or_else(||invalid(CF12_RECORD_TYPE,"truncated CF12 first formula"))?.to_vec();offset+=cce1;let formula2_tokens=data.get(offset..offset+cce2).ok_or_else(||invalid(CF12_RECORD_TYPE,"truncated CF12 second formula"))?.to_vec();offset+=cce2;let active_len=usize::from(*data.get(offset..offset+2).and_then(|bytes|bytes.try_into().ok()).map(u16::from_le_bytes).as_ref().ok_or_else(||invalid(CF12_RECORD_TYPE,"truncated CF12 activity formula"))?);offset+=2;let active_formula_tokens=data.get(offset..offset+active_len).ok_or_else(||invalid(CF12_RECORD_TYPE,"truncated CF12 activity formula"))?.to_vec();offset+=active_len;if !matches!(kind,XlsConditionalRule12Kind::ColorScale|XlsConditionalRule12Kind::DataBar|XlsConditionalRule12Kind::IconSet)&&active_len!=0{return Err(invalid(CF12_RECORD_TYPE,"activity formula is only valid for visual CF12 rules"))}let options=*data.get(offset).ok_or_else(||invalid(CF12_RECORD_TYPE,"truncated CF12 options"))?;offset+=1;if options&0xec!=0{return Err(invalid(CF12_RECORD_TYPE,"CF12 options contain reserved bits"))}let stop_if_true=options&2!=0;if stop_if_true&&matches!(kind,XlsConditionalRule12Kind::ColorScale|XlsConditionalRule12Kind::DataBar|XlsConditionalRule12Kind::IconSet){return Err(invalid(CF12_RECORD_TYPE,"visual CF12 rule cannot stop-if-true"))}let priority=read_u16(data.get(offset..offset+2).ok_or_else(||invalid(CF12_RECORD_TYPE,"truncated CF12 priority"))?,0);offset+=2;if !priorities.insert(priority){return Err(invalid(CF12_RECORD_TYPE,"conditional-format priority is duplicated"))}let template=read_u16(data.get(offset..offset+2).ok_or_else(||invalid(CF12_RECORD_TYPE,"truncated CF12 template"))?,0);offset+=2;if !valid_template(template){return Err(invalid(CF12_RECORD_TYPE,"CF12 template is invalid"))}if data.get(offset)!=Some(&16){return Err(invalid(CF12_RECORD_TYPE,"CF12 template parameter length must be 16"))}offset+=1;let template_parameters:[u8;16]=data.get(offset..offset+16).ok_or_else(||invalid(CF12_RECORD_TYPE,"truncated CF12 template parameters"))?.try_into().unwrap();offset+=16;let rule_payload=data[offset..].to_vec();if matches!(kind,XlsConditionalRule12Kind::CellValue(_) | XlsConditionalRule12Kind::Formula)&&!rule_payload.is_empty(){return Err(invalid(CF12_RECORD_TYPE,"comparison/formula CF12 has unexpected rule payload"))}Ok(XlsConditionalRule12{kind,priority,stop_if_true,template,differential_format,formula1_rendered:render_formula(&formula1_tokens,context),formula2_rendered:render_formula(&formula2_tokens,context),active_formula_rendered:render_formula(&active_formula_tokens,context),formula1_tokens,formula2_tokens,active_formula_tokens,template_parameters,rule_payload})}
+
+fn parse_condfmt12(data:&[u8])->XlsResult<PendingFormatting12>{let reference=parse_frt_header(data,CONDFMT12_RECORD_TYPE,true)?;let pending=parse_condfmt(data.get(12..).ok_or_else(||invalid(CONDFMT12_RECORD_TYPE,"truncated CondFmt12"))?)?;if reference!=pending.group.enclosing_range{return Err(invalid(CONDFMT12_RECORD_TYPE,"CondFmt12 FRT range does not match its enclosing range"))}Ok(PendingFormatting12{group:XlsConditionalFormatting12{identifier:pending.group.identifier,tough_recalculation:pending.group.tough_recalculation,enclosing_range:pending.group.enclosing_range,ranges:pending.group.ranges,rules:Vec::with_capacity(pending.declared_rules)},declared_rules:pending.declared_rules})}
+struct PendingFormatting12{group:XlsConditionalFormatting12,declared_rules:usize}
+
+enum ParsedExtension{Legacy{extension:XlsConditionalExtension,group_index:usize},Future{identifier:u16,reference:XlsConditionalFormatRange}}
+fn parse_cfex(data:&[u8],legacy:&[(u16,usize,XlsConditionalFormatRange)],priorities:&mut HashSet<u16>)->XlsResult<ParsedExtension>{let reference=parse_frt_header(data,CFEX_RECORD_TYPE,true)?;if data.len()<18{return Err(invalid(CFEX_RECORD_TYPE,"CFEx payload is truncated"))}let future=read_u32(data,12);if future>1{return Err(invalid(CFEX_RECORD_TYPE,"CFEx fIsCF12 must be zero or one"))}let identifier=read_u16(data,16);let group_index=legacy.iter().find_map(|(candidate,index,enclosing)|(*candidate==identifier&&*enclosing==reference).then_some(*index)).ok_or_else(||invalid(CFEX_RECORD_TYPE,"CFEx references an unknown legacy CondFmt identifier and range"))?;if future==1{if data.len()!=18{return Err(invalid(CFEX_RECORD_TYPE,"CFEx preceding CF12 must omit extension content"))}return Ok(ParsedExtension::Future{identifier,reference})}if data.len()<43{return Err(invalid(CFEX_RECORD_TYPE,"CFExNonCF12 payload is truncated"))}let rule_index=read_u16(data,18);let cp=data[20];if cp>8{return Err(invalid(CFEX_RECORD_TYPE,"CFEx comparison is invalid"))}let template=data[21];if !valid_template(u16::from(template)){return Err(invalid(CFEX_RECORD_TYPE,"CFEx template is invalid"))}let priority=read_u16(data,22);if !priorities.insert(priority){return Err(invalid(CFEX_RECORD_TYPE,"conditional-format priority is duplicated"))}let flags=data[24];if flags&0xf4!=0{return Err(invalid(CFEX_RECORD_TYPE,"CFEx flags contain reserved bits"))}let has_dxf=data[25];if has_dxf>1{return Err(invalid(CFEX_RECORD_TYPE,"CFEx fHasDXF must be zero or one"))}let dxf_len=if has_dxf==1{dxf12_length(data,26,CFEX_RECORD_TYPE)?}else{0};let mut offset=26+dxf_len;if data.get(offset)!=Some(&16){return Err(invalid(CFEX_RECORD_TYPE,"CFEx template parameter length must be 16"))}offset+=1;let template_parameters=data.get(offset..offset+16).ok_or_else(||invalid(CFEX_RECORD_TYPE,"truncated CFEx template parameters"))?.try_into().unwrap();offset+=16;if offset!=data.len(){return Err(invalid(CFEX_RECORD_TYPE,"CFEx has trailing bytes"))}Ok(ParsedExtension::Legacy{extension:XlsConditionalExtension{identifier,legacy_rule_index:Some(rule_index),priority,active:flags&1!=0,stop_if_true:flags&2!=0,template,differential_format:if dxf_len==0{Vec::new()}else{data[26..26+dxf_len].to_vec()},template_parameters,future_rule:None},group_index})}
 
 /// Enforces the `CondFmt 1*3CF` collection grammar.
 pub(crate) struct ConditionalFormatCollector {
     groups: Vec<XlsConditionalFormatting>,
     pending: Option<PendingFormatting>,
+    future_groups:Vec<XlsConditionalFormatting12>,pending12:Option<PendingFormatting12>,extensions:Vec<XlsConditionalExtension>,pending_extension:Option<(u16,XlsConditionalFormatRange)>,
+    identifiers:Vec<(u16,usize,XlsConditionalFormatRange)>,priorities:HashSet<u16>,extension_phase:bool,
 }
 
 impl ConditionalFormatCollector {
     pub(crate) fn new() -> Self {
-        Self { groups: Vec::new(), pending: None }
+        Self { groups:Vec::new(),pending:None,future_groups:Vec::new(),pending12:None,extensions:Vec::new(),pending_extension:None,identifiers:Vec::new(),priorities:HashSet::new(),extension_phase:false }
     }
 
-    pub(crate) fn feed_record(&mut self, record_type: u16, data: &[u8]) -> XlsResult<()> {
+    pub(crate) fn feed_record(&mut self, record_type: u16, data: &[u8],context:Option<&FormulaContext>) -> XlsResult<()> {
         if self.pending.is_some() && record_type != CF_RECORD_TYPE {
             return Err(invalid(record_type, "CONDFMT must be followed immediately by its declared CF records"));
         }
+        if self.pending12.is_some()&&record_type!=CF12_RECORD_TYPE{return Err(invalid(record_type,"CondFmt12 must be followed immediately by its declared CF12 records"))}
+        if self.pending_extension.is_some()&&record_type!=CF12_RECORD_TYPE{return Err(invalid(record_type,"CFEx with fIsCF12 must be followed immediately by CF12"))}
         match record_type {
             CONDFMT_RECORD_TYPE => {
+                if self.extension_phase{return Err(invalid(record_type,"CondFmt cannot follow CFEx records"))}
                 self.pending = Some(parse_condfmt(data)?);
             }
             CF_RECORD_TYPE => {
                 let pending = self.pending.as_mut().ok_or_else(|| invalid(record_type, "orphan CF record without CONDFMT"))?;
-                pending.group.rules.push(parse_cf(data)?);
+                pending.group.rules.push(parse_cf(data,context)?);
                 if pending.group.rules.len() == pending.declared_rules {
-                    self.groups.push(self.pending.take().unwrap().group);
+                    let group=self.pending.take().unwrap().group;if self.identifiers.iter().any(|(identifier,_,range)|*identifier==group.identifier&&*range==group.enclosing_range){return Err(invalid(record_type,"conditional-format identifier and range are duplicated"))}self.identifiers.push((group.identifier,self.groups.len(),group.enclosing_range));self.groups.push(group);
                 }
             }
+            CONDFMT12_RECORD_TYPE=>{if self.extension_phase{return Err(invalid(record_type,"CondFmt12 cannot follow CFEx records"))}self.pending12=Some(parse_condfmt12(data)?);}
+            CF12_RECORD_TYPE=>{let rule=parse_cf12(data,context,&mut self.priorities)?;if let Some(pending)=self.pending12.as_mut(){pending.group.rules.push(rule);if pending.group.rules.len()==pending.declared_rules{self.future_groups.push(self.pending12.take().unwrap().group);}}else if let Some((identifier,_))=self.pending_extension.take(){self.extensions.push(XlsConditionalExtension{identifier,legacy_rule_index:None,priority:rule.priority,active:true,stop_if_true:rule.stop_if_true,template:rule.template as u8,differential_format:Vec::new(),template_parameters:rule.template_parameters,future_rule:Some(rule)});}else{return Err(invalid(record_type,"orphan CF12 record"))}}
+            CFEX_RECORD_TYPE=>{self.extension_phase=true;match parse_cfex(data,&self.identifiers,&mut self.priorities)?{ParsedExtension::Legacy{extension,group_index}=>{if usize::from(extension.legacy_rule_index.unwrap())>=self.groups[group_index].rules.len(){return Err(invalid(record_type,"CFEx legacy rule index is out of range"))}self.extensions.push(extension)},ParsedExtension::Future{identifier,reference}=>self.pending_extension=Some((identifier,reference))}}
             _ => {}
         }
         Ok(())
     }
 
-    pub(crate) fn finish(self) -> XlsResult<Vec<XlsConditionalFormatting>> {
-        if self.pending.is_some() {
+    pub(crate) fn finish(self) -> XlsResult<(Vec<XlsConditionalFormatting>,Vec<XlsConditionalFormatting12>,Vec<XlsConditionalExtension>)> {
+        if self.pending.is_some()||self.pending12.is_some()||self.pending_extension.is_some() {
             Err(invalid(CONDFMT_RECORD_TYPE, "worksheet ended before all declared CF rules were read"))
         } else {
-            Ok(self.groups)
+            Ok((self.groups,self.future_groups,self.extensions))
         }
     }
 }
@@ -537,6 +593,7 @@ impl ConditionalFormatCollector {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use litchi_core::sheet::WorkbookTrait;
 
     fn header(rule_count: u16) -> Vec<u8> {
         let mut data = Vec::new();
@@ -562,10 +619,10 @@ mod tests {
     #[test]
     fn parses_and_collects_legacy_rules() {
         let mut collector = ConditionalFormatCollector::new();
-        collector.feed_record(CONDFMT_RECORD_TYPE, &header(2)).unwrap();
-        collector.feed_record(CF_RECORD_TYPE, &rule(1, 1, &[0x1e, 1, 0], &[0x1e, 5, 0])).unwrap();
-        collector.feed_record(CF_RECORD_TYPE, &rule(2, 0, &[0x1d], &[])).unwrap();
-        let groups = collector.finish().unwrap();
+        collector.feed_record(CONDFMT_RECORD_TYPE, &header(2),None).unwrap();
+        collector.feed_record(CF_RECORD_TYPE, &rule(1, 1, &[0x1e, 1, 0], &[0x1e, 5, 0]),None).unwrap();
+        collector.feed_record(CF_RECORD_TYPE, &rule(2, 0, &[0x1d], &[]),None).unwrap();
+        let groups = collector.finish().unwrap().0;
         assert_eq!(groups[0].rules().len(), 2);
         assert_eq!(groups[0].rules()[0].kind(), XlsConditionalRuleKind::CellValue(XlsConditionalComparison::Between));
         assert_eq!(groups[0].rules()[1].formula1_tokens(), &[0x1d]);
@@ -574,14 +631,14 @@ mod tests {
     #[test]
     fn rejects_malformed_ranges_formulas_and_sequences() {
         assert!(parse_condfmt(&header(0)).is_err());
-        assert!(parse_cf(&rule(2, 1, &[0x1d], &[])).is_err());
-        assert!(parse_cf(&rule(1, 5, &[0x1e, 1, 0], &[0x1e, 2, 0])).is_err());
+        assert!(parse_cf(&rule(2, 1, &[0x1d], &[]), None).is_err());
+        assert!(parse_cf(&rule(1, 5, &[0x1e, 1, 0], &[0x1e, 2, 0]), None).is_err());
 
         let mut collector = ConditionalFormatCollector::new();
-        assert!(collector.feed_record(CF_RECORD_TYPE, &rule(2, 0, &[0x1d], &[])).is_err());
+        assert!(collector.feed_record(CF_RECORD_TYPE, &rule(2, 0, &[0x1d], &[]),None).is_err());
         let mut collector = ConditionalFormatCollector::new();
-        collector.feed_record(CONDFMT_RECORD_TYPE, &header(1)).unwrap();
-        assert!(collector.feed_record(0x000a, &[]).is_err());
+        collector.feed_record(CONDFMT_RECORD_TYPE, &header(1),None).unwrap();
+        assert!(collector.feed_record(0x000a, &[],None).is_err());
     }
 
     #[test]
@@ -600,7 +657,21 @@ mod tests {
         assert_eq!(groups[0].rules()[0].kind(), XlsConditionalRuleKind::CellValue(XlsConditionalComparison::GreaterThan));
         assert!(groups[0].rules()[0].style().font().is_some());
         assert_eq!(groups[1].rules()[0].kind(), XlsConditionalRuleKind::Formula);
+        assert!(groups.iter().flat_map(|group|group.rules()).any(|rule|rule.formula1_rendered().is_some()));
         assert_eq!(groups[2].rules()[1].kind(), XlsConditionalRuleKind::CellValue(XlsConditionalComparison::Between));
         assert!(!groups[2].rules()[1].formula2_tokens().is_empty());
+    }
+
+
+    #[test]
+    fn reads_poi_future_conditional_formatting_fixture() {
+        use crate::xls::XlsWorkbook;
+        use std::fs::File;
+        use std::path::Path;
+        let fixture=Path::new(env!("CARGO_MANIFEST_DIR")).join("../../3rdparty/poi/test-data/spreadsheet/NewStyleConditionalFormattings.xls");
+        let workbook=XlsWorkbook::new(File::open(fixture).unwrap()).unwrap();
+        let mut count=0usize;let mut priorities=HashSet::new();
+        for sheet in 0..workbook.worksheet_count(){let worksheet=workbook.xls_worksheet(sheet).unwrap();for group in worksheet.conditional_formattings12(){assert!(!group.ranges().is_empty());for rule in group.rules(){assert!(priorities.insert(rule.priority()));assert!(rule.differential_format().len()>=6);count+=1;}}for extension in worksheet.conditional_format_extensions(){assert!(priorities.insert(extension.priority()));count+=1;}}
+        assert!(count>0);
     }
 }

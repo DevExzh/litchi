@@ -18,7 +18,12 @@ pub enum XlsConditionalFormatType {
         /// Formula string (without leading `=`).
         formula: String,
     },
+    CellValue { operator:XlsConditionalFormatOperator, formula1:String, formula2:Option<String> },
 }
+
+#[derive(Debug,Clone,Copy,PartialEq,Eq)]
+pub enum XlsConditionalFormatOperator{Between,NotBetween,Equal,NotEqual,GreaterThan,LessThan,GreaterThanOrEqual,LessThanOrEqual}
+impl XlsConditionalFormatOperator{fn code(self)->u8{match self{Self::Between=>1,Self::NotBetween=>2,Self::Equal=>3,Self::NotEqual=>4,Self::GreaterThan=>5,Self::LessThan=>6,Self::GreaterThanOrEqual=>7,Self::LessThanOrEqual=>8}}}
 
 impl XlsConditionalFormatType {
     /// Convert this conditional format description into BIFF8 CFRule payload
@@ -46,6 +51,7 @@ impl XlsConditionalFormatType {
                 // Second formula is unused for simple expression-based rules.
                 Ok((condition_type, comparison_op, formula1, Vec::new()))
             },
+            XlsConditionalFormatType::CellValue{operator,formula1,formula2}=>{let needs_two=matches!(operator,XlsConditionalFormatOperator::Between|XlsConditionalFormatOperator::NotBetween);if needs_two!=formula2.is_some(){return Err(XlsError::InvalidData("between/not-between conditional format requires two formulas; other comparisons require one".to_string()))}let encode=|formula:&str|->XlsResult<Vec<u8>>{let tokens=tokenizer.tokenize(formula).map_err(|error|XlsError::InvalidData(format!("Invalid conditional formatting formula '{formula}': {error}")))?;Ok(encode_ptg_tokens(&tokens))};Ok((1,operator.code(),encode(formula1)?,formula2.as_deref().map(encode).transpose()?.unwrap_or_default()))},
         }
     }
 }
@@ -71,10 +77,75 @@ pub struct XlsConditionalFormat {
     pub pattern: Option<XlsConditionalPattern>,
 }
 
+#[derive(Debug,Clone,Copy,PartialEq,Eq)]
+pub struct XlsConditionalFormatRange{pub first_row:u32,pub last_row:u32,pub first_col:u16,pub last_col:u16}
+#[derive(Debug,Clone)]
+pub struct XlsConditionalFormatRule{pub format_type:XlsConditionalFormatType,pub pattern:Option<XlsConditionalPattern>}
+#[derive(Debug,Clone)]
+pub struct XlsConditionalFormatGroup{pub ranges:Vec<XlsConditionalFormatRange>,pub rules:Vec<XlsConditionalFormatRule>}
+
+/// A future-record (`CF12`) conditional-format rule type.
+///
+/// Formula fields contain encoded BIFF Ptg tokens. Visual rule payloads are
+/// preserved and written verbatim; the writer never evaluates them.
+#[derive(Debug, Clone)]
+pub enum XlsConditionalFormat12Type {
+    CellValue {
+        operator: XlsConditionalFormatOperator,
+        formula1: Vec<u8>,
+        formula2: Option<Vec<u8>>,
+    },
+    Formula { formula: Vec<u8> },
+    ColorScale { active_formula: Vec<u8>, payload: Vec<u8> },
+    DataBar { active_formula: Vec<u8>, payload: Vec<u8> },
+    Filter { payload: Vec<u8> },
+    IconSet { active_formula: Vec<u8>, payload: Vec<u8> },
+}
+
+impl XlsConditionalFormat12Type {
+    pub(crate) fn biff_parts(&self) -> (u8, u8, &[u8], &[u8], &[u8], &[u8]) {
+        match self {
+            Self::CellValue { operator, formula1, formula2 } => {
+                (1, operator.code(), formula1, formula2.as_deref().unwrap_or(&[]), &[], &[])
+            }
+            Self::Formula { formula } => (2, 0, formula, &[], &[], &[]),
+            Self::ColorScale { active_formula, payload } => {
+                (3, 0, &[], &[], active_formula, payload)
+            }
+            Self::DataBar { active_formula, payload } => {
+                (4, 0, &[], &[], active_formula, payload)
+            }
+            Self::Filter { payload } => (5, 0, &[], &[], &[], payload),
+            Self::IconSet { active_formula, payload } => {
+                (6, 0, &[], &[], active_formula, payload)
+            }
+        }
+    }
+}
+
+/// One ordered rule in a `CondFmt12` collection.
+#[derive(Debug, Clone)]
+pub struct XlsConditionalFormat12Rule {
+    pub format_type: XlsConditionalFormat12Type,
+    /// Complete serialized DXFN12 structure, including its length prefix.
+    pub differential_format: Vec<u8>,
+    pub stop_if_true: bool,
+    pub priority: u16,
+    pub template: u16,
+    pub template_parameters: [u8; 16],
+}
+
+/// One future conditional-format collection with ordered ranges and rules.
+#[derive(Debug, Clone)]
+pub struct XlsConditionalFormat12Group {
+    pub ranges: Vec<XlsConditionalFormatRange>,
+    pub rules: Vec<XlsConditionalFormat12Rule>,
+}
+
 impl XlsConditionalFormat {
     /// Convert the optional pattern into BIFF8 PatternFormatting triple
     /// `(pattern_code, fg_index, bg_index)`.
-    pub(crate) fn to_biff_pattern(&self) -> Option<(u16, u16, u16)> {
+    pub fn to_biff_pattern(&self) -> Option<(u16, u16, u16)> {
         let pat = self.pattern.as_ref()?;
         let pattern_code = pat.pattern as u16;
         let fg = pat.foreground_color & 0x007F;
@@ -228,6 +299,7 @@ mod tests {
             XlsConditionalFormatType::Formula { formula } => {
                 assert_eq!(formula, "A1>0");
             },
+            XlsConditionalFormatType::CellValue { .. } => unreachable!(),
         }
     }
 

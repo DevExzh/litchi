@@ -772,24 +772,41 @@ pub(crate) fn generate_workbook_stream(
         }
 
         if !worksheet.conditional_formats.is_empty() {
-            for cf in &worksheet.conditional_formats {
-                let ranges = [(cf.first_row, cf.last_row, cf.first_col, cf.last_col)];
+            for (identifier, group) in worksheet.conditional_formats.iter().enumerate() {
+                let ranges=group.ranges.iter().map(|range|(range.first_row,range.last_row,range.first_col,range.last_col)).collect::<Vec<_>>();
+                biff::write_cfheader_with_identifier(&mut stream,&ranges,group.rules.len() as u16,identifier as u16)?;
+                for rule in &group.rules{let(condition_type,comparison_op,formula1,formula2)=rule.format_type.to_biff_payload()?;let pattern=rule.pattern.as_ref().map(|pat|(pat.pattern as u16,pat.foreground_color&0x7f,pat.background_color&0x7f));biff::write_cfrule(&mut stream,condition_type,comparison_op,&formula1,&formula2,pattern)?;}
+            }
+        }
 
-                // One CFHEADER per rule with a single region keeps the
-                // implementation simple and matches Excel's expectations.
-                biff::write_cfheader(&mut stream, &ranges, 1)?;
-
-                let (condition_type, comparison_op, formula1, formula2) =
-                    cf.format_type.to_biff_payload()?;
-
-                biff::write_cfrule(
-                    &mut stream,
+        for (offset, group) in worksheet.conditional_formats12.iter().enumerate() {
+            let identifier = worksheet.conditional_formats.len() + offset;
+            let ranges = group.ranges.iter().map(|range| {
+                (range.first_row, range.last_row, range.first_col, range.last_col)
+            }).collect::<Vec<_>>();
+            biff::write_condfmt12(
+                &mut stream,
+                &ranges,
+                group.rules.len() as u16,
+                identifier as u16,
+            )?;
+            for rule in &group.rules {
+                let (condition_type, comparison, formula1, formula2, active_formula, payload) =
+                    rule.format_type.biff_parts();
+                let config = biff::Cf12Config {
                     condition_type,
-                    comparison_op,
-                    &formula1,
-                    &formula2,
-                    cf.to_biff_pattern(),
-                )?;
+                    comparison,
+                    differential_format: &rule.differential_format,
+                    formula1,
+                    formula2,
+                    active_formula,
+                    stop_if_true: rule.stop_if_true,
+                    priority: rule.priority,
+                    template: rule.template,
+                    template_parameters: rule.template_parameters,
+                    rule_payload: payload,
+                };
+                biff::write_cf12(&mut stream, &config)?;
             }
         }
 
