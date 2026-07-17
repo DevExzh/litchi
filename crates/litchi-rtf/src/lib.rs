@@ -133,8 +133,10 @@ pub use object::{EmbeddedObject, ObjectKind, OleObjectHeader};
 pub use picture::{ImageType, Picture, PictureIdentity, detect_image_type};
 pub use section::{
     HeaderFooter, HeaderFooterParagraph, HeaderFooterType, Note, PageNumberFormat, PageOrientation,
-    Section, SectionBreakType, SectionColumn, SectionColumns, SectionProperties, VerticalAlignment,
-    MAX_SECTION_COLUMNS, MAX_SECTION_COLUMN_TWIPS,
+    Section, SectionBreakType, SectionColumn, SectionColumns, SectionLineNumbering,
+    SectionLineNumberRestart, SectionProperties, VerticalAlignment, MAX_SECTION_COLUMNS,
+    MAX_SECTION_COLUMN_TWIPS, MAX_SECTION_LINE_DISTANCE, MAX_SECTION_LINE_INCREMENT,
+    MAX_SECTION_LINE_START,
 };
 pub use shape::{
     Fill, FillType, GradientDirection, OfficeArtColor, OfficeArtOpacity, Shape, ShapeGeometry,

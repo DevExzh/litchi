@@ -287,6 +287,9 @@ fn is_section_control(control: &ControlWord<'_>) -> bool {
             | ControlWord::VerticalAlignJustify
             | ControlWord::VerticalAlignBottom
             | ControlWord::LineNumbering(_)
+            | ControlWord::LineNumberDistance(_)
+            | ControlWord::LineNumberStart(_)
+            | ControlWord::LineNumberRestartSection
             | ControlWord::LineNumberRestartPage
             | ControlWord::LineNumberContinuous
             | ControlWord::LeftToRightSection
@@ -3655,6 +3658,21 @@ impl<'a> Parser<'a> {
             PageNumberFormat, PageOrientation, SectionBreakType, VerticalAlignment,
         };
 
+        let is_line_numbering_control = matches!(
+            control,
+            ControlWord::LineNumbering(_)
+                | ControlWord::LineNumberDistance(_)
+                | ControlWord::LineNumberStart(_)
+                | ControlWord::LineNumberRestartSection
+                | ControlWord::LineNumberRestartPage
+                | ControlWord::LineNumberContinuous
+        );
+        if is_line_numbering_control
+            && self.current_state()?.destination != Destination::DocumentBody
+        {
+            return Ok(true);
+        }
+
         if let Some(side) = match control {
             ControlWord::PageBorderTop => Some(crate::PageBorderSide::Top),
             ControlWord::PageBorderLeft => Some(crate::PageBorderSide::Left),
@@ -3953,9 +3971,50 @@ impl<'a> Parser<'a> {
             ControlWord::VerticalAlignBottom => {
                 properties.vertical_alignment = VerticalAlignment::Bottom;
             },
-            ControlWord::LineNumbering(value) => properties.line_numbering = *value > 0,
-            ControlWord::LineNumberRestartPage => properties.line_number_restart = true,
-            ControlWord::LineNumberContinuous => properties.line_number_restart = false,
+            ControlWord::LineNumbering(value) => {
+                let value = value.unwrap_or(1);
+                if value < 0 || value > i32::from(super::section::MAX_SECTION_LINE_INCREMENT) {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF line-number increment must be in 0..=65535".to_string(),
+                    ));
+                }
+                properties.line_numbering.increment = if value == 0 {
+                    None
+                } else {
+                    Some(value as u16)
+                };
+            },
+            ControlWord::LineNumberDistance(value) => {
+                let value = value.unwrap_or(360);
+                if !(0..=super::section::MAX_SECTION_LINE_DISTANCE).contains(&value) {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF line-number distance must be in 0..=31680 twips".to_string(),
+                    ));
+                }
+                properties.line_numbering.distance = Some(value);
+            },
+            ControlWord::LineNumberStart(value) => {
+                let value = value.unwrap_or(1);
+                if value <= 0 || value as u32 > super::section::MAX_SECTION_LINE_START {
+                    return Err(RtfError::MalformedDocument(format!(
+                        "RTF starting line number must be in 1..={}",
+                        super::section::MAX_SECTION_LINE_START
+                    )));
+                }
+                properties.line_numbering.start = Some(value as u32);
+            },
+            ControlWord::LineNumberRestartSection => {
+                properties.line_numbering.restart =
+                    Some(super::section::SectionLineNumberRestart::Section);
+            },
+            ControlWord::LineNumberRestartPage => {
+                properties.line_numbering.restart =
+                    Some(super::section::SectionLineNumberRestart::Page);
+            },
+            ControlWord::LineNumberContinuous => {
+                properties.line_numbering.restart =
+                    Some(super::section::SectionLineNumberRestart::Continuous);
+            },
             _ => {},
         }
         Ok(true)

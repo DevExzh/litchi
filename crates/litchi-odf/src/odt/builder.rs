@@ -39,6 +39,7 @@ pub struct DocumentBuilder {
     elements: Vec<DocumentElement>,
     metadata: Metadata,
     paragraph_tab_styles: Vec<crate::ParagraphStyleTabStops>,
+    paragraph_drop_cap_styles: Vec<crate::ParagraphStyleDropCap>,
     page_layout_columns: Vec<(String, crate::StyleColumns)>,
     page_layout_footnote_separators: Vec<(String, crate::StyleFootnoteSeparator)>,
 }
@@ -64,6 +65,7 @@ impl DocumentBuilder {
             elements: Vec::new(),
             metadata: Metadata::default(),
             paragraph_tab_styles: Vec::new(),
+            paragraph_drop_cap_styles: Vec::new(),
             page_layout_columns: Vec::new(),
             page_layout_footnote_separators: Vec::new(),
         }
@@ -88,6 +90,26 @@ impl DocumentBuilder {
             ));
         }
         self.paragraph_tab_styles.push(style);
+        Ok(self)
+    }
+
+    /// Add a typed paragraph drop-cap style definition.
+    pub fn add_paragraph_drop_cap_style(
+        &mut self,
+        style: crate::ParagraphStyleDropCap,
+    ) -> Result<&mut Self> {
+        style.validate()?;
+        if self.paragraph_drop_cap_styles.len() >= 4_096 {
+            return Err(litchi_core::Error::InvalidFormat("too many paragraph drop-cap styles".to_string()));
+        }
+        if self.paragraph_drop_cap_styles.iter().any(|old| old.name == style.name && old.is_default_style == style.is_default_style) {
+            return Err(litchi_core::Error::InvalidFormat("duplicate paragraph drop-cap style identity".to_string()));
+        }
+        if let Some(tabs) = self.paragraph_tab_styles.iter().find(|tabs| crate::paragraph_drop_cap::same_style_identity(&style, tabs))
+            && tabs.parent_style_name != style.parent_style_name {
+            return Err(litchi_core::Error::InvalidFormat("paragraph style parent definitions conflict".to_string()));
+        }
+        self.paragraph_drop_cap_styles.push(style);
         Ok(self)
     }
 
@@ -528,7 +550,20 @@ impl DocumentBuilder {
         if !self.paragraph_tab_styles.is_empty() {
             let insertion = xml.find("</office:styles>").expect("static styles root");
             let fragments = self.paragraph_tab_styles.iter()
-                .map(|style| style.to_xml_fragment().expect("validated paragraph tab style"))
+                .map(|style| self.paragraph_drop_cap_styles.iter()
+                    .find(|cap| crate::paragraph_drop_cap::same_style_identity(cap, style))
+                    .map_or_else(
+                        || style.to_xml_fragment().expect("validated paragraph tab style"),
+                        |cap| crate::paragraph_drop_cap::merge_with_tab_style(style, cap).expect("validated merged paragraph style"),
+                    ))
+                .collect::<String>();
+            xml.insert_str(insertion, &fragments);
+        }
+        if !self.paragraph_drop_cap_styles.is_empty() {
+            let insertion = xml.find("</office:styles>").expect("static styles root");
+            let fragments = self.paragraph_drop_cap_styles.iter()
+                .filter(|cap| !self.paragraph_tab_styles.iter().any(|tabs| crate::paragraph_drop_cap::same_style_identity(cap, tabs)))
+                .map(|style| style.to_xml_fragment().expect("validated paragraph drop-cap style"))
                 .collect::<String>();
             xml.insert_str(insertion, &fragments);
         }

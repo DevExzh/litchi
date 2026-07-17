@@ -298,6 +298,7 @@ pub mod drawing_stroke_dash;
 pub mod named_expression;
 pub mod content_validation;
 mod paragraph_tab_stop;
+mod paragraph_drop_cap;
 mod style_columns;
 mod footnote_separator;
 /// ODF XML element classes
@@ -360,6 +361,10 @@ pub use paragraph_tab_stop::{
     ParagraphStyleTabStops, ParagraphTabLeaderColor, ParagraphTabLeaderStyle,
     ParagraphTabLeaderType, ParagraphTabLeaderWidth, ParagraphTabStop,
     ParagraphTabStopType, ParagraphTabStops, parse_paragraph_style_tab_stops,
+};
+pub use paragraph_drop_cap::{
+    DropCapDistance, DropCapLength, ParagraphDropCap, ParagraphStyleDropCap,
+    ParagraphStyleDropCapSet, parse_paragraph_style_drop_caps,
 };
 pub use style_columns::{
     MAX_STYLE_COLUMNS, StyleColumn, StyleColumnLength, StyleColumnSeparator,

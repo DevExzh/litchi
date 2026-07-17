@@ -34,6 +34,7 @@ pub mod workbook_metadata;
 pub mod calculation_properties;
 pub mod calculation_chain;
 pub mod query_table;
+pub mod revisions;
 pub mod volatile_dependencies;
 pub mod xml_maps;
 pub mod connections;
@@ -88,6 +89,13 @@ pub use query_table::{
     QueryTableField, QueryTableGrowShrinkType, QueryTableIconSet, QueryTableRefresh,
     QueryTableSortBy, QueryTableSortCondition, QueryTableSortMethod, QueryTableSortState,
     WorksheetQueryTable, parse_query_table, write_query_table,
+};
+pub use revisions::{
+    RevisionAttribute, RevisionAttributeNamespace, RevisionConformance, RevisionHeader,
+    RevisionHeaderProperties, RevisionHeaders, RevisionLog, RevisionLogPart, RevisionRecord,
+    RevisionRecordKind, RevisionUser, RevisionUsers, RevisionXmlElement, WorkbookRevisions,
+    load_workbook_revisions, parse_revision_headers, parse_revision_log, parse_revision_users,
+    store_workbook_revisions, write_revision_headers, write_revision_log, write_revision_users,
 };
 pub use auto_filter::{
     AutoFilterDefinition, CalendarType, ColorFilter, CustomFilter, CustomFilterOperator,

@@ -83,6 +83,7 @@ pub use parts::fields::{
     Field, FieldBoundary, FieldDescriptor, FieldEndFlags, FieldMarker, FieldMarkerValue,
     FieldStory, FieldStoryTable, FieldType, FieldsTable,
 };
+pub use parts::list_names::ListNamesTable;
 pub use parts::numbering::{ListLevel, ListTables, NumberFormat};
 pub use parts::pap::ParagraphConditionalFormatting;
 pub use parts::saved_by::{SavedByEntry, SavedByTable};

@@ -2330,8 +2330,11 @@ mod tests {
             section.properties.vertical_alignment,
             crate::VerticalAlignment::Center
         );
-        assert!(section.properties.line_numbering);
-        assert!(section.properties.line_number_restart);
+        assert!(section.properties.line_numbering.is_enabled());
+        assert_eq!(
+            section.properties.line_numbering.restart,
+            Some(crate::SectionLineNumberRestart::Page)
+        );
         assert_eq!(
             section
                 .get_header(super::super::section::HeaderFooterType::Header)

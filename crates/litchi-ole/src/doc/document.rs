@@ -17,6 +17,7 @@ use super::parts::fields::FieldsTable;
 use super::parts::footnotes::{EndnotesTable, FootnotesTable};
 use super::parts::headers::HeadersTable;
 use super::parts::hyperlinks::HyperlinksTable;
+use super::parts::list_names::ListNamesTable;
 use super::parts::numbering::ListTables;
 use super::parts::pap_bin_table::PapBinTable;
 use super::parts::paragraph_extractor::{ExtractedParagraph, ParagraphExtractor};
@@ -95,6 +96,8 @@ pub struct Document {
     revision_authors: RevisionAuthorTable,
     /// Fixed associated-document strings
     associated_strings: Option<DocumentAssociatedStrings>,
+    /// Names parallel to list definitions for LISTNUM fields
+    list_names: Option<ListNamesTable>,
     /// Section ranges, layout, and property revision marks
     sections: SectionsTable,
     /// Hyperlinks table
@@ -191,6 +194,7 @@ impl Document {
         let bookmarks_table = BookmarksTable::parse(&fib, &table_stream)?;
         let revision_authors = RevisionAuthorTable::parse(&fib, &table_stream)?;
         let associated_strings = DocumentAssociatedStrings::parse(&fib, &table_stream)?;
+        let list_names = ListNamesTable::parse(&fib, &table_stream)?;
         let sections =
             SectionsTable::parse(&fib, &table_stream, &word_document, &revision_authors)?;
 
@@ -259,6 +263,7 @@ impl Document {
             bookmarks_table,
             revision_authors,
             associated_strings,
+            list_names,
             sections,
             hyperlinks_table,
             list_tables,
@@ -552,6 +557,11 @@ impl Document {
     /// Template and mail-merge paths are inert strings and are never opened.
     pub fn associated_strings(&self) -> Option<&DocumentAssociatedStrings> {
         self.associated_strings.as_ref()
+    }
+
+    /// Get the ordered `LISTNUM` list-name metadata table.
+    pub fn list_names(&self) -> Option<&ListNamesTable> {
+        self.list_names.as_ref()
     }
 
     /// Get access to the fields table (if parsed).
@@ -874,6 +884,17 @@ impl Document {
     /// ```
     pub fn list_tables(&self) -> Option<&ListTables> {
         self.list_tables.as_ref()
+    }
+
+    /// Resolve a non-empty `LISTNUM` name by zero-based `PlfLst` definition index.
+    ///
+    /// Entries beyond the list-definition array are ignored as required by `[MS-DOC]`.
+    pub fn list_name_for_definition_index(&self, index: usize) -> Option<&str> {
+        let definition_count = self.list_tables.as_ref()?.structures().len();
+        if index >= definition_count {
+            return None;
+        }
+        self.list_names.as_ref()?.name(index)
     }
 
     /// Get list/numbering information for a specific paragraph.

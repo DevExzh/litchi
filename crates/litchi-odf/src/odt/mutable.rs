@@ -236,6 +236,15 @@ impl MutableDocument {
     }
 
     /// Add an empty master page and its referenced page layout.
+    /// Replace, insert, or remove one existing paragraph style's direct drop cap.
+    pub fn set_paragraph_style_drop_cap(&mut self, style: &crate::ParagraphStyleDropCap) -> Result<()> {
+        let styles = self.styles_xml.as_deref().ok_or_else(|| litchi_core::Error::InvalidFormat(
+            "document has no styles.xml paragraph style to modify".to_string()))?;
+        self.styles_xml = Some(crate::paragraph_drop_cap::set_paragraph_style_drop_cap_xml(styles, style)?);
+        Ok(())
+    }
+
+    /// Add an empty master page and its referenced page layout.
     ///
     /// A minimal page layout is created in `office:automatic-styles` when a
     /// layout with `page_layout_name` does not already exist.

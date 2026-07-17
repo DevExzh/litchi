@@ -3193,13 +3193,24 @@ impl<W: Write> RtfWriter<W> {
             },
             None,
         )?;
-        if section.properties.line_numbering {
-            self.write_control_word("linemod", Some(1))?;
+        section.properties.line_numbering.validate().map_err(|error| {
+            io::Error::new(io::ErrorKind::InvalidInput, error.to_string())
+        })?;
+        if let Some(increment) = section.properties.line_numbering.increment {
+            self.write_control_word("linemod", Some(i32::from(increment)))?;
+        }
+        if let Some(distance) = section.properties.line_numbering.distance {
+            self.write_control_word("linex", Some(distance))?;
+        }
+        if let Some(start) = section.properties.line_numbering.start {
+            self.write_control_word("linestarts", Some(start as i32))?;
+        }
+        if let Some(restart) = section.properties.line_numbering.restart {
             self.write_control_word(
-                if section.properties.line_number_restart {
-                    "lineppage"
-                } else {
-                    "linecont"
+                match restart {
+                    crate::SectionLineNumberRestart::Section => "linerestart",
+                    crate::SectionLineNumberRestart::Page => "lineppage",
+                    crate::SectionLineNumberRestart::Continuous => "linecont",
                 },
                 None,
             )?;

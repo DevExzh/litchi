@@ -12,6 +12,15 @@ pub const MAX_SECTION_COLUMNS: u16 = 64;
 /// Maximum accepted column width or inter-column spacing, in twips.
 pub const MAX_SECTION_COLUMN_TWIPS: i32 = 31_680;
 
+/// Maximum accepted line-number increment.
+pub const MAX_SECTION_LINE_INCREMENT: u16 = u16::MAX;
+
+/// Maximum accepted line-number distance from text, in twips.
+pub const MAX_SECTION_LINE_DISTANCE: i32 = 31_680;
+
+/// Maximum retained starting line number.
+pub const MAX_SECTION_LINE_START: u32 = 1_000_000;
+
 /// One explicitly sized section column.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SectionColumn {
@@ -191,6 +200,81 @@ pub enum VerticalAlignment {
     Bottom,
 }
 
+/// Restart behavior for section line numbering.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SectionLineNumberRestart {
+    /// Restart numbering at each section (`linerestart`).
+    Section,
+    /// Restart numbering on each page (`lineppage`).
+    Page,
+    /// Continue numbering from the previous section (`linecont`).
+    Continuous,
+}
+
+/// Complete explicit section line-numbering state.
+///
+/// `increment == None` means numbering is disabled. Other fields retain
+/// independently authored section controls such as the ubiquitous `linex0`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct SectionLineNumbering {
+    /// Amount added to each displayed line number (`linemod`).
+    pub increment: Option<u16>,
+    /// Distance from the text column to the line number (`linex`), in twips.
+    pub distance: Option<i32>,
+    /// One-based starting line number (`linestarts`).
+    pub start: Option<u32>,
+    /// Explicit restart mode.
+    pub restart: Option<SectionLineNumberRestart>,
+}
+
+impl SectionLineNumbering {
+    /// Construct enabled line numbering with the given increment.
+    pub fn new(increment: u16) -> crate::RtfResult<Self> {
+        let value = Self {
+            increment: Some(increment),
+            ..Self::default()
+        };
+        value.validate()?;
+        Ok(value)
+    }
+
+    /// Whether this section explicitly enables line numbering.
+    pub fn is_enabled(&self) -> bool {
+        self.increment.is_some()
+    }
+
+    /// Whether no line-numbering controls were authored.
+    pub fn is_empty(&self) -> bool {
+        *self == Self::default()
+    }
+
+    /// Validate line-numbering values against implementation safety bounds.
+    pub fn validate(&self) -> crate::RtfResult<()> {
+        if self.increment == Some(0) {
+            return Err(crate::RtfError::MalformedDocument(
+                "RTF line-number increment must be in 1..=65535".to_string(),
+            ));
+        }
+        if self
+            .distance
+            .is_some_and(|value| !(0..=MAX_SECTION_LINE_DISTANCE).contains(&value))
+        {
+            return Err(crate::RtfError::MalformedDocument(
+                "RTF line-number distance must be in 0..=31680 twips".to_string(),
+            ));
+        }
+        if self
+            .start
+            .is_some_and(|value| !(1..=MAX_SECTION_LINE_START).contains(&value))
+        {
+            return Err(crate::RtfError::MalformedDocument(format!(
+                "RTF starting line number must be in 1..={MAX_SECTION_LINE_START}"
+            )));
+        }
+        Ok(())
+    }
+}
+
 /// Section-level footnote placement override.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SectionFootnotePlacement {
@@ -262,10 +346,8 @@ pub struct SectionProperties {
     pub page_number_format: PageNumberFormat,
     /// Vertical alignment
     pub vertical_alignment: VerticalAlignment,
-    /// Line numbering enabled
-    pub line_numbering: bool,
-    /// Line number restart on each page
-    pub line_number_restart: bool,
+    /// Typed section line-numbering properties.
+    pub line_numbering: SectionLineNumbering,
     /// Explicit section-level footnote and endnote overrides.
     pub note_options: SectionNoteOptions,
     /// Page-border edges and placement for this section.
@@ -291,8 +373,7 @@ impl Default for SectionProperties {
             page_number_start: 1,
             page_number_format: PageNumberFormat::default(),
             vertical_alignment: VerticalAlignment::default(),
-            line_numbering: false,
-            line_number_restart: false,
+            line_numbering: SectionLineNumbering::default(),
             note_options: SectionNoteOptions::default(),
             page_borders: crate::PageBorders::default(),
         }
