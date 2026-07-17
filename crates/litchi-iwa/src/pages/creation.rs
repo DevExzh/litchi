@@ -1,5 +1,9 @@
 //! Construction of independent Pages packages without bundled templates.
 
+mod table_bootstrap;
+
+pub(super) use table_bootstrap::bootstrap_first_table_graph;
+
 use plist::Value;
 use prost::Message;
 

@@ -121,11 +121,9 @@ shrinking rejects any operation that would discard stored cells:
 use litchi_iwa::numbers::CellValue;
 use litchi_iwa::pages::PagesEditor;
 
-let mut pages = PagesEditor::builder()
-    .body_text("Quarterly revenue\n")
-    .body_table("Revenue", 4, 3)
-    .build()?;
-let table = pages.tables()?.remove(0);
+let mut pages = PagesEditor::create_with_text("Quarterly revenue\n")?;
+let first_anchor = pages.body_text()?.encode_utf16().count();
+let table = pages.add_table(first_anchor, "Revenue", 4, 3)?;
 pages.set_table_cell(
     table.model_object_id,
     0,
@@ -146,8 +144,9 @@ pages.save("created-with-table.pages")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
 
-`PagesEditor::add_table` uses an existing table as a native style template but
-allocates independent cell stores, row and column identities, and formula
+`PagesEditor::add_table` bootstraps the first native table in a scratch-created
+document and reuses an existing native style template for later tables. Every
+table receives independent cell stores, row and column identities, and formula
 ownership. The same table operations work on app-created files; see
 `add_pages_table` and `edit_pages_table`.
 `PagesEditor::remove_table` transactionally removes the body anchor and the

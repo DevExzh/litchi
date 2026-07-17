@@ -178,9 +178,11 @@ impl PagesEditor {
 
     /// Insert an independent empty native table at a UTF-16 body position.
     ///
-    /// An existing body table supplies native style and storage templates; no
-    /// cells or formula state are shared with it. The insertion is
-    /// transactional and shifts later text attributes and attachments.
+    /// An existing body table supplies native style and storage templates. A
+    /// table-less document created by [`PagesEditor::create`] bootstraps that
+    /// native scaffold automatically. No cells or formula state are shared,
+    /// and the insertion transaction shifts later text attributes and
+    /// attachments.
     pub fn add_table(
         &mut self,
         anchor_character_index: usize,
@@ -188,11 +190,7 @@ impl PagesEditor {
         rows: usize,
         columns: usize,
     ) -> Result<PagesTableInfo> {
-        let template = body_table_graphs(self)?.into_iter().next().ok_or_else(|| {
-            Error::ParseError(
-                "Adding a Pages table requires an existing native table style template".to_owned(),
-            )
-        })?;
+        let template = body_table_graphs(self)?.into_iter().next();
         let body_length = self.body_text()?.encode_utf16().count();
         if anchor_character_index > body_length {
             return Err(Error::ParseError(format!(
@@ -202,56 +200,75 @@ impl PagesEditor {
 
         let source = self.package();
         let mut staged = source.clone();
-        let (new_info_id, new_model_id) =
-            crate::numbers::editor::create_empty_table_graph_in_package(
+        let (new_info_id, new_model_id, new_attachment_id) = if let Some(template) = template {
+            let (new_info_id, new_model_id) =
+                crate::numbers::editor::create_empty_table_graph_in_package(
+                    &mut staged,
+                    template.info.drawable_object_id,
+                    template.info.model_object_id,
+                    self.body_storage_id,
+                    name,
+                    rows,
+                    columns,
+                )?;
+
+            let new_attachment_id = next_object_identifier(&staged)?;
+            let attachment_archive_name =
+                find_object_archive(source, template.attachment_object_id)?;
+            let attachment_archive = source.archive(&attachment_archive_name)?;
+            let attachment_object = attachment_archive
+                .object(template.attachment_object_id)
+                .ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Pages table attachment {} is missing",
+                        template.attachment_object_id
+                    ))
+                })?;
+            let remap = HashMap::from([
+                (template.attachment_object_id, new_attachment_id),
+                (template.info.drawable_object_id, new_info_id),
+            ]);
+            let cloned_attachment = clone_pages_text_box_object(attachment_object, &remap)?;
+            staged.update_archive(&attachment_archive_name, |archive| {
+                archive.insert_object(cloned_attachment)
+            })?;
+
+            if let Some(component) =
+                component_identifier_for_entry(source, &attachment_archive_name)?
+            {
+                if component_uuid_identifiers(source, component)?
+                    .is_some_and(|identifiers| identifiers.contains(&template.attachment_object_id))
+                {
+                    add_component_object_uuids(&mut staged, component, &[new_attachment_id])?;
+                }
+                let new_info_archive = find_object_archive(&staged, new_info_id)?;
+                if let Some(target_component) =
+                    component_identifier_for_entry(&staged, &new_info_archive)?
+                    && target_component != component
+                {
+                    add_component_external_reference(
+                        &mut staged,
+                        component,
+                        target_component,
+                        new_info_id,
+                    )?;
+                }
+            }
+            (new_info_id, new_model_id, new_attachment_id)
+        } else {
+            let graph = crate::pages::creation::bootstrap_first_table_graph(
                 &mut staged,
-                template.info.drawable_object_id,
-                template.info.model_object_id,
                 self.body_storage_id,
                 name,
                 rows,
                 columns,
             )?;
-
-        let new_attachment_id = next_object_identifier(&staged)?;
-        let attachment_archive_name = find_object_archive(source, template.attachment_object_id)?;
-        let attachment_archive = source.archive(&attachment_archive_name)?;
-        let attachment_object = attachment_archive
-            .object(template.attachment_object_id)
-            .ok_or_else(|| {
-                Error::InvalidFormat(format!(
-                    "Pages table attachment {} is missing",
-                    template.attachment_object_id
-                ))
-            })?;
-        let remap = HashMap::from([
-            (template.attachment_object_id, new_attachment_id),
-            (template.info.drawable_object_id, new_info_id),
-        ]);
-        let cloned_attachment = clone_pages_text_box_object(attachment_object, &remap)?;
-        staged.update_archive(&attachment_archive_name, |archive| {
-            archive.insert_object(cloned_attachment)
-        })?;
-
-        if let Some(component) = component_identifier_for_entry(source, &attachment_archive_name)? {
-            if component_uuid_identifiers(source, component)?
-                .is_some_and(|identifiers| identifiers.contains(&template.attachment_object_id))
-            {
-                add_component_object_uuids(&mut staged, component, &[new_attachment_id])?;
-            }
-            let new_info_archive = find_object_archive(&staged, new_info_id)?;
-            if let Some(target_component) =
-                component_identifier_for_entry(&staged, &new_info_archive)?
-                && target_component != component
-            {
-                add_component_external_reference(
-                    &mut staged,
-                    component,
-                    target_component,
-                    new_info_id,
-                )?;
-            }
-        }
+            (
+                graph.info_object_id,
+                graph.model_object_id,
+                graph.attachment_object_id,
+            )
+        };
 
         let mut text_editor = IWorkTextEditor::from_package(staged);
         text_editor.replace_text(
@@ -266,7 +283,10 @@ impl PagesEditor {
             anchor_character_index,
             new_attachment_id,
         )?;
-        set_package_last_object_identifier(&mut staged, new_attachment_id)?;
+        let last_identifier = next_object_identifier(&staged)?
+            .checked_sub(1)
+            .ok_or_else(|| Error::InvalidFormat("Pages package has no object IDs".to_owned()))?;
+        set_package_last_object_identifier(&mut staged, last_identifier)?;
 
         let verified = Self::from_bytes(&staged.to_bytes()?)?;
         let created = verified.require_body_table(new_model_id)?;
@@ -673,6 +693,8 @@ mod tests {
     use super::*;
     use crate::pages::PagesDocumentBuilder;
 
+    const SOURCE_BUILT_TABLE_INFO_OBJECT_ID: u64 = 9;
+
     #[test]
     fn source_built_table_roundtrips_cell_updates() {
         let mut editor = PagesDocumentBuilder::new()
@@ -788,13 +810,56 @@ mod tests {
     }
 
     #[test]
-    fn insertion_without_template_is_transactional() {
+    fn inserts_and_removes_first_table_without_a_template() {
         let mut editor = PagesDocumentBuilder::new()
-            .body_text("No table")
+            .body_text("Before 🙂 after")
             .build()
             .unwrap();
+        let anchor = "Before 🙂".encode_utf16().count();
+        let created = editor.add_table(anchor, "First runtime", 2, 3).unwrap();
+        assert_eq!(created.anchor_character_index, anchor);
+        assert_eq!((created.rows, created.columns), (2, 3));
+        editor
+            .set_table_cell(
+                created.model_object_id,
+                1,
+                2,
+                PagesCellValue::Text("bootstrapped".to_owned()),
+            )
+            .unwrap();
+        let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .table(created.model_object_id)
+                .unwrap()
+                .get_cell(1, 2),
+            Some(&PagesCellValue::Text("bootstrapped".to_owned()))
+        );
+        reopened.remove_table(created.model_object_id).unwrap();
+        assert!(reopened.tables().unwrap().is_empty());
+        assert_eq!(reopened.body_text().unwrap(), "Before 🙂 after");
+    }
+
+    #[test]
+    fn first_table_bootstrap_rejects_reserved_id_collision_transactionally() {
+        let mut package = PagesDocumentBuilder::new()
+            .body_text("Collision")
+            .build_package()
+            .unwrap();
+        package
+            .update_archive("Index/Document.iwa", |archive| {
+                archive.insert_object(ArchiveObject::new(
+                    SOURCE_BUILT_TABLE_INFO_OBJECT_ID,
+                    vec![RawMessage {
+                        type_: u32::MAX,
+                        data: Vec::new(),
+                    }],
+                )?)
+            })
+            .unwrap();
+        let mut editor = PagesEditor::from_package(package).unwrap();
         let before = editor.to_bytes().unwrap();
-        assert!(editor.add_table(0, "Missing template", 2, 2).is_err());
+        assert!(editor.add_table(0, "Collision", 2, 2).is_err());
         assert_eq!(editor.to_bytes().unwrap(), before);
     }
 

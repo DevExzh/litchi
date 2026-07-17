@@ -335,6 +335,95 @@ pub(crate) fn clone_component_registration(
     })
 }
 
+/// Append a fully specified unversioned component registration.
+///
+/// The caller is responsible for assigning fresh object UUIDs. Existing
+/// component identifiers, locators, and UUID values are rejected so malformed
+/// registries cannot be created accidentally.
+pub(crate) fn add_component_registration(
+    package: &mut IWorkPackage,
+    component: &crate::protobuf::tsp::ComponentInfo,
+) -> Result<()> {
+    if !package.contains_entry(PACKAGE_METADATA_ENTRY) {
+        return Ok(());
+    }
+    let locator = component
+        .locator
+        .as_deref()
+        .unwrap_or(&component.preferred_locator);
+    if component.identifier == 0 || locator.is_empty() || locator.contains('/') {
+        return Err(Error::ParseError(format!(
+            "Invalid iWork component registration {} at {locator:?}",
+            component.identifier
+        )));
+    }
+    package.update_archive(PACKAGE_METADATA_ENTRY, |archive| {
+        let (object_index, message_index) = package_metadata_location(archive)?;
+        let object = &mut archive.objects[object_index];
+        let original = &object.messages[message_index];
+        let metadata = crate::protobuf::tsp::PackageMetadata::decode(original.data.as_slice())?;
+        if metadata
+            .components
+            .iter()
+            .chain(&metadata.versioned_components)
+            .any(|existing| {
+                existing.identifier == component.identifier
+                    || existing
+                        .locator
+                        .as_deref()
+                        .unwrap_or(&existing.preferred_locator)
+                        == locator
+            })
+        {
+            return Err(Error::InvalidFormat(format!(
+                "PackageMetadata already contains component {} or locator {locator}",
+                component.identifier
+            )));
+        }
+        let existing_uuids = metadata
+            .components
+            .iter()
+            .chain(&metadata.versioned_components)
+            .flat_map(|existing| &existing.object_uuid_map_entries)
+            .map(|entry| (entry.uuid.lower, entry.uuid.upper))
+            .collect::<HashSet<_>>();
+        let mut requested_uuids = HashSet::new();
+        for entry in &component.object_uuid_map_entries {
+            let uuid = (entry.uuid.lower, entry.uuid.upper);
+            if existing_uuids.contains(&uuid) || !requested_uuids.insert(uuid) {
+                return Err(Error::InvalidFormat(
+                    "Package component registration repeats an object UUID".to_owned(),
+                ));
+            }
+        }
+
+        let data = append_repeated_length_delimited_field(
+            original.data.as_slice(),
+            3,
+            &component.encode_to_vec(),
+        )?;
+        let verified = crate::protobuf::tsp::PackageMetadata::decode(data.as_slice())?;
+        let matches = verified
+            .components
+            .iter()
+            .filter(|existing| *existing == component)
+            .count();
+        if matches != 1 {
+            return Err(Error::InvalidFormat(
+                "Package component insertion failed validation".to_owned(),
+            ));
+        }
+        object.replace_message(
+            message_index,
+            RawMessage {
+                type_: PACKAGE_METADATA_MESSAGE_TYPE,
+                data,
+            },
+        )?;
+        Ok(())
+    })
+}
+
 pub(crate) fn remove_component_registration(
     package: &mut IWorkPackage,
     component_identifier: u64,
