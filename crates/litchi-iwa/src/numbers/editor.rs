@@ -71,6 +71,7 @@ const STORAGE_MESSAGE_TYPES: &[u32] = &[2_001, 2_022];
 const DOCUMENT_COMPONENT_IDENTIFIER: u64 = 1;
 const TEXT_BOX_DUPLICATE_OFFSET: f32 = 10.0;
 const TABLE_DUPLICATE_OFFSET: f32 = 10.0;
+const EMPTY_TABLE_POSITION_OFFSET: f32 = 40.0;
 
 /// Stable identity and dimensions of a Numbers table.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -2495,8 +2496,6 @@ impl NumbersEditor {
         rows: usize,
         columns: usize,
     ) -> Result<NumbersTableInfo> {
-        validate_name(name, "table")?;
-        let (rows_u32, columns_u32) = validate_table_dimensions(rows, columns)?;
         let sheets = self.sheets()?;
         if !sheets.iter().any(|sheet| sheet.object_id == sheet_id) {
             return Err(Error::ParseError(format!(
@@ -2511,129 +2510,21 @@ impl NumbersEditor {
             )
         })?;
         let template_owner = find_table_owner(&self.package, template.object_id)?;
-        let locations = object_locations(&self.package)?;
-        let template_info_archive = locations
-            .get(&template_owner.table_info_id)
-            .ok_or_else(|| Error::InvalidFormat("Numbers table info is missing".to_owned()))?;
-        let template_info_component = self.package.archive(template_info_archive)?;
-        let template_info_object = template_info_component
-            .object(template_owner.table_info_id)
-            .ok_or_else(|| Error::InvalidFormat("Numbers table info is missing".to_owned()))?;
-        let (info_message_index, mut table_info) = decode_table_info(template_info_object)?;
-        let template_model_archive = locations
-            .get(&template.object_id)
-            .ok_or_else(|| Error::InvalidFormat("Numbers table model is missing".to_owned()))?;
-        let template_model_component = self.package.archive(template_model_archive)?;
-        let template_model_object = template_model_component
-            .object(template.object_id)
-            .ok_or_else(|| Error::InvalidFormat("Numbers table model is missing".to_owned()))?;
-        let model_message_index = find_table_model_message(template_model_object)?;
-
-        let mut next_identifier = next_object_identifier(&self.package)?;
-        let new_info_id = take_identifier(&mut next_identifier)?;
-        let new_model_id = take_identifier(&mut next_identifier)?;
-        let owned_kinds = table_owned_objects(&template.model)?;
-        let mut remap = HashMap::with_capacity(owned_kinds.len() + 2);
-        remap.insert(template_owner.table_info_id, new_info_id);
-        remap.insert(template.object_id, new_model_id);
-        for &identifier in owned_kinds.keys() {
-            remap.insert(identifier, take_identifier(&mut next_identifier)?);
-        }
-
-        let existing_table_ids = descriptors
-            .iter()
-            .map(|descriptor| descriptor.model.table_id.as_str())
-            .collect::<HashSet<_>>();
-        let table_uuid = allocate_table_uuid(new_model_id, &existing_table_ids);
-        let mut model = template.model.clone();
-        prepare_empty_table_model(&mut model, &remap, &table_uuid, name, rows_u32, columns_u32)?;
-
-        table_info.super_.parent = Some(crate::protobuf::tsp::Reference {
-            identifier: sheet_id,
-            ..Default::default()
-        });
-        if template_owner.sheet_id == sheet_id
-            && let Some(position) = table_info
-                .super_
-                .geometry
-                .as_mut()
-                .and_then(|geometry| geometry.position.as_mut())
-        {
-            position.x += 40.0;
-            position.y += 40.0;
-        }
-        table_info.super_.comment = None;
-        table_info.super_.pencil_annotations.clear();
-        table_info.super_.title = None;
-        table_info.super_.caption = None;
-        table_info.table_model = crate::protobuf::tsp::Reference {
-            identifier: new_model_id,
-            ..Default::default()
-        };
-        table_info.editing_state = None;
-        table_info.summary_model = None;
-        table_info.category_order = None;
-        table_info.view_column_row_uids = None;
-        table_info.pivot_data_model = None;
-        table_info.pivot_order = None;
-
-        let mut info_remap = remap.clone();
-        info_remap.insert(template_owner.sheet_id, sheet_id);
-        let mut objects = Vec::with_capacity(owned_kinds.len() + 2);
-        objects.push((
-            template_info_archive.clone(),
-            clone_single_payload_object(
-                template_info_object,
-                new_info_id,
-                info_message_index,
-                table_info.encode_to_vec(),
-                vec![sheet_id, new_model_id],
-                &info_remap,
-                false,
-            )?,
-        ));
-        objects.push((
-            template_model_archive.clone(),
-            clone_single_payload_object(
-                template_model_object,
-                new_model_id,
-                model_message_index,
-                model.encode_to_vec(),
-                table_model_references(&model),
-                &remap,
-                false,
-            )?,
-        ));
-        for (&source_id, &kind) in &owned_kinds {
-            let archive_name = locations.get(&source_id).ok_or_else(|| {
-                Error::InvalidFormat(format!(
-                    "Numbers table storage object {source_id} is missing"
-                ))
-            })?;
-            let source_archive = self.package.archive(archive_name)?;
-            let source = source_archive.object(source_id).ok_or_else(|| {
-                Error::InvalidFormat(format!(
-                    "Numbers table storage object {source_id} is missing"
-                ))
-            })?;
-            objects.push((
-                archive_name.clone(),
-                clone_empty_table_storage(
-                    source,
-                    remap[&source_id],
-                    kind,
-                    rows_u32,
-                    columns_u32,
-                    new_model_id,
-                )?,
-            ));
-        }
-
         let mut staged = self.package.clone();
-        for (archive_name, object) in objects {
-            staged.update_archive(&archive_name, |archive| archive.insert_object(object))?;
-        }
-        register_cloned_numbers_objects(&mut staged, &self.package, &locations, &remap)?;
+        let graph = table_create::create_empty_table_graph(
+            &mut staged,
+            template_owner.table_info_id,
+            template.object_id,
+            template_owner.sheet_id,
+            sheet_id,
+            name,
+            rows,
+            columns,
+            (template_owner.sheet_id == sheet_id).then_some(EMPTY_TABLE_POSITION_OFFSET),
+        )?;
+        let new_info_id = graph.info_object_id;
+        let new_model_id = graph.model_object_id;
+        let locations = object_locations(&staged)?;
         let sheet_archive_name = locations
             .get(&sheet_id)
             .ok_or_else(|| Error::InvalidFormat(format!("Numbers sheet {sheet_id} is missing")))?;
@@ -2673,24 +2564,6 @@ impl NumbersEditor {
             }
             Ok(())
         })?;
-        register_numbers_component_reference(
-            &mut staged,
-            sheet_archive_name,
-            template_info_archive,
-            new_info_id,
-        )?;
-        let table_last_identifier = next_identifier.checked_sub(1).ok_or_else(|| {
-            Error::InvalidFormat("Numbers table creation allocated no identifiers".to_owned())
-        })?;
-        set_package_last_object_identifier(&mut staged, table_last_identifier)?;
-        if create_empty_table_formula_graph(&mut staged, new_info_id, &table_uuid)?.is_some() {
-            register_numbers_component_reference(
-                &mut staged,
-                "Index/CalculationEngine.iwa",
-                template_info_archive,
-                new_info_id,
-            )?;
-        }
 
         let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
         let created = verified
@@ -3130,6 +3003,29 @@ pub(crate) fn remove_table_formula_graph_in_package(
     formula_clone::remove_table_formula_graph_for_contexts(package, table_context_ids)
 }
 
+pub(crate) fn create_empty_table_graph_in_package(
+    package: &mut IWorkPackage,
+    template_info_id: u64,
+    template_model_id: u64,
+    parent_id: u64,
+    name: &str,
+    rows: usize,
+    columns: usize,
+) -> Result<(u64, u64)> {
+    let graph = table_create::create_empty_table_graph(
+        package,
+        template_info_id,
+        template_model_id,
+        parent_id,
+        parent_id,
+        name,
+        rows,
+        columns,
+        None,
+    )?;
+    Ok((graph.info_object_id, graph.model_object_id))
+}
+
 mod column_insert;
 mod date_time_fields;
 mod formula_clone;
@@ -3142,6 +3038,7 @@ mod sheet_images;
 mod sheet_movies;
 mod sheet_shapes;
 mod storage;
+mod table_create;
 mod table_delete;
 mod table_dimension;
 mod table_duplicate;

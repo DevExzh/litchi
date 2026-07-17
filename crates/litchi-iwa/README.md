@@ -134,11 +134,22 @@ pages.set_table_cell(
 )?;
 pages.rename_table(table.model_object_id, "Revenue by Quarter")?;
 pages.resize_table(table.model_object_id, 5, 4)?;
+let second_anchor = pages.body_text()?.encode_utf16().count();
+let notes = pages.add_table(second_anchor, "Notes", 2, 2)?;
+pages.set_table_cell(
+    notes.model_object_id,
+    0,
+    0,
+    CellValue::Text("Generated independently".to_owned()),
+)?;
 pages.save("created-with-table.pages")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
 
-The same table operations work on app-created files; see `edit_pages_table`.
+`PagesEditor::add_table` uses an existing table as a native style template but
+allocates independent cell stores, row and column identities, and formula
+ownership. The same table operations work on app-created files; see
+`add_pages_table` and `edit_pages_table`.
 `PagesEditor::remove_table` transactionally removes the body anchor and the
 table's private storage and formula graph while preserving shared objects and
 other tables. See `remove_pages_table` for a complete file-to-file example and

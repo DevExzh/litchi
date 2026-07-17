@@ -44,14 +44,22 @@ struct CellTileSource {
 /// editable, but there is no component in which to register formula state.
 pub(super) fn create_empty_table_formula_graph(
     package: &mut IWorkPackage,
+    template_table_info_id: u64,
     table_info_id: u64,
     table_uuid: &str,
-) -> Result<Option<u64>> {
-    if !package.contains_entry(CALCULATION_ENGINE_ENTRY) {
+) -> Result<Option<(String, u64)>> {
+    let contexts = HashSet::from([template_table_info_id]);
+    let calculation_engine_entry =
+        removal::calculation_engine_entry_for_contexts(package, &contexts)?.or_else(|| {
+            package
+                .contains_entry(CALCULATION_ENGINE_ENTRY)
+                .then(|| CALCULATION_ENGINE_ENTRY.to_owned())
+        });
+    let Some(calculation_engine_entry) = calculation_engine_entry else {
         return Ok(None);
-    }
+    };
     let table_uuid = parse_table_uuid(table_uuid)?;
-    let archive = package.archive(CALCULATION_ENGINE_ENTRY)?;
+    let archive = package.archive(&calculation_engine_entry)?;
     calculation_engine_location(&archive)?;
     let internal_owner_id = next_internal_owner_id(&archive)?;
     let owner_id = next_object_identifier(package)?;
@@ -61,7 +69,7 @@ pub(super) fn create_empty_table_formula_graph(
         owner_id: uuid_as_cfuuid(&owner.formula_owner_uid),
     };
 
-    package.update_archive(CALCULATION_ENGINE_ENTRY, |archive| {
+    package.update_archive(&calculation_engine_entry, |archive| {
         let (engine_id, engine_message_index) = calculation_engine_location(archive)?;
         let engine_object = archive.object_mut(engine_id).ok_or_else(|| {
             Error::InvalidFormat("Numbers CalculationEngine root is missing".to_owned())
@@ -97,10 +105,10 @@ pub(super) fn create_empty_table_formula_graph(
     })?;
 
     set_package_last_object_identifier(package, owner_id)?;
-    if let Some(component) = component_identifier_for_entry(package, CALCULATION_ENGINE_ENTRY)? {
+    if let Some(component) = component_identifier_for_entry(package, &calculation_engine_entry)? {
         add_component_object_uuids(package, component, &[owner_id])?;
     }
-    Ok(Some(owner_id))
+    Ok(Some((calculation_engine_entry, owner_id)))
 }
 
 /// Clone the CalculationEngine owner family associated with one table.

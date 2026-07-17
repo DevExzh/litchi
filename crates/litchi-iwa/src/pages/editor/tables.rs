@@ -176,6 +176,113 @@ impl PagesEditor {
         Ok(())
     }
 
+    /// Insert an independent empty native table at a UTF-16 body position.
+    ///
+    /// An existing body table supplies native style and storage templates; no
+    /// cells or formula state are shared with it. The insertion is
+    /// transactional and shifts later text attributes and attachments.
+    pub fn add_table(
+        &mut self,
+        anchor_character_index: usize,
+        name: &str,
+        rows: usize,
+        columns: usize,
+    ) -> Result<PagesTableInfo> {
+        let template = body_table_graphs(self)?.into_iter().next().ok_or_else(|| {
+            Error::ParseError(
+                "Adding a Pages table requires an existing native table style template".to_owned(),
+            )
+        })?;
+        let body_length = self.body_text()?.encode_utf16().count();
+        if anchor_character_index > body_length {
+            return Err(Error::ParseError(format!(
+                "Pages table anchor {anchor_character_index} exceeds body length {body_length}"
+            )));
+        }
+
+        let source = self.package();
+        let mut staged = source.clone();
+        let (new_info_id, new_model_id) =
+            crate::numbers::editor::create_empty_table_graph_in_package(
+                &mut staged,
+                template.info.drawable_object_id,
+                template.info.model_object_id,
+                self.body_storage_id,
+                name,
+                rows,
+                columns,
+            )?;
+
+        let new_attachment_id = next_object_identifier(&staged)?;
+        let attachment_archive_name = find_object_archive(source, template.attachment_object_id)?;
+        let attachment_archive = source.archive(&attachment_archive_name)?;
+        let attachment_object = attachment_archive
+            .object(template.attachment_object_id)
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Pages table attachment {} is missing",
+                    template.attachment_object_id
+                ))
+            })?;
+        let remap = HashMap::from([
+            (template.attachment_object_id, new_attachment_id),
+            (template.info.drawable_object_id, new_info_id),
+        ]);
+        let cloned_attachment = clone_pages_text_box_object(attachment_object, &remap)?;
+        staged.update_archive(&attachment_archive_name, |archive| {
+            archive.insert_object(cloned_attachment)
+        })?;
+
+        if let Some(component) = component_identifier_for_entry(source, &attachment_archive_name)? {
+            if component_uuid_identifiers(source, component)?
+                .is_some_and(|identifiers| identifiers.contains(&template.attachment_object_id))
+            {
+                add_component_object_uuids(&mut staged, component, &[new_attachment_id])?;
+            }
+            let new_info_archive = find_object_archive(&staged, new_info_id)?;
+            if let Some(target_component) =
+                component_identifier_for_entry(&staged, &new_info_archive)?
+                && target_component != component
+            {
+                add_component_external_reference(
+                    &mut staged,
+                    component,
+                    target_component,
+                    new_info_id,
+                )?;
+            }
+        }
+
+        let mut text_editor = IWorkTextEditor::from_package(staged);
+        text_editor.replace_text(
+            self.body_storage_id,
+            anchor_character_index..anchor_character_index,
+            "\u{fffc}",
+        )?;
+        staged = text_editor.into_package();
+        add_body_drawable_attachment(
+            &mut staged,
+            self.body_storage_id,
+            anchor_character_index,
+            new_attachment_id,
+        )?;
+        set_package_last_object_identifier(&mut staged, new_attachment_id)?;
+
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        let created = verified.require_body_table(new_model_id)?;
+        if created.info.drawable_object_id != new_info_id
+            || created.info.anchor_character_index != anchor_character_index
+            || created.info.name != name
+            || (created.info.rows, created.info.columns) != (rows, columns)
+        {
+            return Err(Error::InvalidFormat(
+                "Pages table insertion produced unexpected properties".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(created.info)
+    }
+
     /// Remove a reachable body table and its private native storage graph.
     ///
     /// The body attachment marker, drawable, model, private cell stores,
@@ -600,6 +707,107 @@ mod tests {
         assert_eq!(table.get_cell(1, 1), Some(&PagesCellValue::Number(42.5)));
         reopened.clear_table_cell(model_id, 0, 0).unwrap();
         assert!(reopened.table(model_id).unwrap().get_cell(0, 0).is_none());
+    }
+
+    #[test]
+    fn inserts_independent_table_and_shifts_existing_anchor() {
+        let body = "Alpha 🙂\nBeta\n";
+        let mut editor = PagesDocumentBuilder::new()
+            .body_text(body)
+            .body_table("Source", 3, 2)
+            .build()
+            .unwrap();
+        let source = editor.tables().unwrap().remove(0);
+        editor
+            .set_table_cell(
+                source.model_object_id,
+                1,
+                1,
+                PagesCellValue::Text("source only".to_owned()),
+            )
+            .unwrap();
+        let anchor = "Alpha 🙂\n".encode_utf16().count();
+
+        let inserted = editor.add_table(anchor, "Inserted", 4, 3).unwrap();
+        assert_eq!(inserted.anchor_character_index, anchor);
+        assert_eq!((inserted.rows, inserted.columns), (4, 3));
+        assert!(
+            editor
+                .table(inserted.model_object_id)
+                .unwrap()
+                .cells
+                .is_empty()
+        );
+        let tables = editor.tables().unwrap();
+        assert_eq!(tables.len(), 2);
+        assert_eq!(tables[0], inserted);
+        assert_eq!(
+            tables[1].anchor_character_index,
+            body.encode_utf16().count() + 1
+        );
+        assert_eq!(tables[1].model_object_id, source.model_object_id);
+
+        editor
+            .set_table_cell(
+                inserted.model_object_id,
+                0,
+                0,
+                PagesCellValue::Text("inserted only".to_owned()),
+            )
+            .unwrap();
+        let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .table(source.model_object_id)
+                .unwrap()
+                .get_cell(1, 1),
+            Some(&PagesCellValue::Text("source only".to_owned()))
+        );
+        assert_eq!(
+            reopened
+                .table(inserted.model_object_id)
+                .unwrap()
+                .get_cell(0, 0),
+            Some(&PagesCellValue::Text("inserted only".to_owned()))
+        );
+        reopened.remove_table(inserted.model_object_id).unwrap();
+        let retained = reopened.tables().unwrap();
+        assert_eq!(retained.len(), 1);
+        assert_eq!(retained[0].model_object_id, source.model_object_id);
+        assert_eq!(
+            retained[0].anchor_character_index,
+            body.encode_utf16().count()
+        );
+        assert_eq!(
+            reopened
+                .table(source.model_object_id)
+                .unwrap()
+                .get_cell(1, 1),
+            Some(&PagesCellValue::Text("source only".to_owned()))
+        );
+    }
+
+    #[test]
+    fn insertion_without_template_is_transactional() {
+        let mut editor = PagesDocumentBuilder::new()
+            .body_text("No table")
+            .build()
+            .unwrap();
+        let before = editor.to_bytes().unwrap();
+        assert!(editor.add_table(0, "Missing template", 2, 2).is_err());
+        assert_eq!(editor.to_bytes().unwrap(), before);
+    }
+
+    #[test]
+    fn invalid_insertion_anchor_is_transactional() {
+        let mut editor = PagesDocumentBuilder::new()
+            .body_text("Short")
+            .body_table("Template", 2, 2)
+            .build()
+            .unwrap();
+        let before = editor.to_bytes().unwrap();
+        assert!(editor.add_table(usize::MAX, "Invalid", 2, 2).is_err());
+        assert_eq!(editor.to_bytes().unwrap(), before);
     }
 
     #[test]

@@ -237,7 +237,7 @@ fn prune_global_cell_dependencies(
     })
 }
 
-fn calculation_engine_entry_for_contexts(
+pub(super) fn calculation_engine_entry_for_contexts(
     package: &IWorkPackage,
     table_context_ids: &HashSet<u64>,
 ) -> Result<Option<String>> {

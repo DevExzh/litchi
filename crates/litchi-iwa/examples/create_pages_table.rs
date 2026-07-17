@@ -32,6 +32,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         PagesCellValue::Number(125_000.0),
     )?;
     editor.set_table_cell(table.model_object_id, 1, 2, PagesCellValue::Number(0.18))?;
+    let second_anchor = editor.body_text()?.encode_utf16().count();
+    let notes = editor.add_table(second_anchor, "Notes", 2, 2)?;
+    editor.set_table_cell(
+        notes.model_object_id,
+        0,
+        0,
+        PagesCellValue::Text("Generated independently".to_owned()),
+    )?;
     editor.save(output)?;
     Ok(())
 }

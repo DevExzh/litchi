@@ -281,7 +281,7 @@ pub struct PagesDocumentBuilder {
     body_text: String,
     language: String,
     locale: String,
-    initial_table: Option<InitialPagesTable>,
+    initial_tables: Vec<InitialPagesTable>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -297,7 +297,7 @@ impl Default for PagesDocumentBuilder {
             body_text: String::new(),
             language: DEFAULT_LANGUAGE.to_owned(),
             locale: DEFAULT_LOCALE.to_owned(),
-            initial_table: None,
+            initial_tables: Vec::new(),
         }
     }
 }
@@ -331,7 +331,7 @@ impl PagesDocumentBuilder {
     /// The table owns independent cell storage and is immediately writable
     /// through [`PagesEditor::set_table_cell`](super::editor::PagesEditor::set_table_cell).
     pub fn body_table(mut self, name: impl Into<String>, rows: usize, columns: usize) -> Self {
-        self.initial_table = Some(InitialPagesTable {
+        self.initial_tables.push(InitialPagesTable {
             name: name.into(),
             rows,
             columns,
@@ -352,20 +352,17 @@ impl PagesDocumentBuilder {
                 "Pages document locale cannot be empty".to_owned(),
             ));
         }
-        if let Some(table) = &self.initial_table {
+        for table in &self.initial_tables {
             validate_initial_table(table)?;
         }
+
+        let first_table = self.initial_tables.first();
 
         let identity = IWorkDocumentIdentity::generate();
         let mut package = IWorkPackage::new();
         package.replace_archive(
             DOCUMENT_ARCHIVE_ENTRY,
-            &document_archive(
-                &self.body_text,
-                &self.language,
-                &self.locale,
-                self.initial_table.as_ref(),
-            )?,
+            &document_archive(&self.body_text, &self.language, &self.locale, first_table)?,
         )?;
         package.replace_archive(STYLESHEET_ARCHIVE_ENTRY, &stylesheet_archive()?)?;
         package.replace_archive(
@@ -374,12 +371,20 @@ impl PagesDocumentBuilder {
         )?;
         package.replace_archive(
             METADATA_ARCHIVE_ENTRY,
-            &metadata_archive(&identity, self.initial_table.is_some())?,
+            &metadata_archive(&identity, first_table.is_some())?,
         )?;
-        if let Some(table) = &self.initial_table {
+        if let Some(table) = first_table {
             install_initial_table_graph(&mut package, table, &self.language, &self.locale)?;
         }
         insert_property_lists(&mut package, &identity)?;
+        if self.initial_tables.len() > 1 {
+            let mut editor = PagesEditor::from_package(package)?;
+            for table in &self.initial_tables[1..] {
+                let anchor = editor.body_text()?.encode_utf16().count();
+                editor.add_table(anchor, &table.name, table.rows, table.columns)?;
+            }
+            package = editor.package().clone();
+        }
         Ok(package)
     }
 }
@@ -1470,6 +1475,45 @@ mod tests {
         let reopened = PagesEditor::from_bytes(&encoded).unwrap();
         assert_eq!(reopened.body_text().unwrap(), "Updated through CRUD");
         assert_eq!(reopened.sections().len(), 1);
+    }
+
+    #[test]
+    fn repeated_body_table_calls_append_independent_tables() {
+        let body = "Tables 🙂\n";
+        let editor = PagesDocumentBuilder::new()
+            .body_text(body)
+            .body_table("First", 2, 3)
+            .body_table("Second", 4, 1)
+            .build()
+            .unwrap();
+        let tables = editor.tables().unwrap();
+        assert_eq!(tables.len(), 2);
+        assert_eq!(tables[0].name, "First");
+        assert_eq!((tables[0].rows, tables[0].columns), (2, 3));
+        assert_eq!(
+            tables[0].anchor_character_index,
+            body.encode_utf16().count()
+        );
+        assert_eq!(tables[1].name, "Second");
+        assert_eq!((tables[1].rows, tables[1].columns), (4, 1));
+        assert_eq!(
+            tables[1].anchor_character_index,
+            body.encode_utf16().count() + 1
+        );
+        assert!(
+            editor
+                .table(tables[0].model_object_id)
+                .unwrap()
+                .cells
+                .is_empty()
+        );
+        assert!(
+            editor
+                .table(tables[1].model_object_id)
+                .unwrap()
+                .cells
+                .is_empty()
+        );
     }
 
     #[test]
