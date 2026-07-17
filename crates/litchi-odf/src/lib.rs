@@ -322,6 +322,7 @@ mod generic;
 mod media;
 mod variable_declaration;
 mod document_scripts;
+mod chart_properties;
 mod drawing_page_properties;
 mod font_face;
 mod line_numbering;
@@ -407,6 +408,15 @@ pub use variable_declaration::{
 pub use document_scripts::{
     OdfDocumentEventListener, OdfDocumentScripts, OdfEmbeddedScript, OdfScriptBinding,
     OdfScriptEventListener, parse_document_scripts,
+};
+pub use chart_properties::{
+    ChartAngle, ChartAxisLabelPosition, ChartAxisPosition, ChartDataLabelNumber, ChartDirection,
+    ChartDouble, ChartEmptyCellTreatment, ChartErrorCategory, ChartInteger, ChartInterpolation,
+    ChartLabelArrangement, ChartLabelPosition, ChartLabelSeparator, ChartNonNegativeInteger,
+    ChartNonNegativeLength, ChartPercent, ChartPositiveInteger, ChartRegressionType,
+    ChartSeriesSource, ChartSolidType, ChartStyleProperties, ChartStylePropertiesSet,
+    ChartStyleRecord, ChartSymbolImage, ChartSymbolName, ChartSymbolType, ChartTickMarkPosition,
+    parse_chart_style_properties, set_chart_style_properties_xml,
 };
 pub use drawing_page_properties::{
     DrawingPageBackgroundSize, DrawingPageColor, DrawingPageDuration, DrawingPageFill,

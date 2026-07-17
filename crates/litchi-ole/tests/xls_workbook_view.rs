@@ -50,6 +50,9 @@ fn workbook_window_and_sheet_ids_round_trip() {
     assert_eq!(window.first_visible_sheet_index(), 1);
     assert_eq!(window.selected_sheet_count(), 2);
     assert_eq!(window.sheet_tab_ratio_per_mille(), 725);
+    assert!(!workbook.xls_worksheet(0).unwrap().worksheet_view().unwrap().is_selected());
+    assert!(workbook.xls_worksheet(1).unwrap().worksheet_view().unwrap().is_selected());
+    assert!(workbook.xls_worksheet(2).unwrap().worksheet_view().unwrap().is_selected());
 }
 
 #[test]
@@ -71,6 +74,25 @@ fn reads_poi_simple_workbook_window_and_sheet_ids() {
     assert_eq!(window.first_visible_sheet_index(), 0);
     assert_eq!(window.selected_sheet_count(), 1);
     assert_eq!(window.sheet_tab_ratio_per_mille(), 600);
+    assert!(workbook.xls_worksheet(0).unwrap().worksheet_view().unwrap().is_selected());
+    assert!(!workbook.xls_worksheet(1).unwrap().worksheet_view().unwrap().is_selected());
+    assert!(!workbook.xls_worksheet(2).unwrap().worksheet_view().unwrap().is_selected());
+}
+
+#[test]
+fn writer_rejects_window1_window2_selection_disagreement() {
+    use litchi_ole::xls::writer::XlsWorksheetViewOptions;
+
+    let mut writer = XlsWriter::new();
+    writer.add_worksheet("One").unwrap();
+    let second = writer.add_worksheet("Two").unwrap();
+    writer
+        .set_worksheet_view(
+            second,
+            XlsWorksheetViewOptions { selected: true, ..Default::default() },
+        )
+        .unwrap();
+    assert!(writer.write_to(&mut Cursor::new(Vec::new())).is_err());
 }
 
 #[test]

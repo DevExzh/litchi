@@ -333,6 +333,24 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             }
         }
 
+        let visible_tabs = bound_sheets
+            .iter()
+            .map(|sheet| matches!(sheet.visible, crate::xls::records::SheetVisible::Visible))
+            .collect::<Vec<_>>();
+        let selected_worksheet_tabs = self
+            .sheets
+            .iter()
+            .map(|sheet| {
+                sheet
+                    .parsed_worksheet_index()
+                    .and_then(|index| self.worksheets.get(index))
+                    .and_then(|worksheet| worksheet.worksheet_view())
+                    .map(|view| view.is_selected())
+            })
+            .collect::<Vec<_>>();
+        self.workbook_view
+            .validate_sheet_state(&visible_tabs, &selected_worksheet_tabs)?;
+
         Ok(())
     }
 

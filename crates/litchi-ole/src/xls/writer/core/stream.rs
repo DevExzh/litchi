@@ -39,6 +39,20 @@ pub(crate) fn generate_workbook_stream(
     worksheets: &[WritableWorksheet],
     string_map: &HashMap<String, u32>,
 ) -> XlsResult<WorkbookStreams> {
+    workbook_window.validate_for_sheet_count(worksheets.len())?;
+    let active_sheet = usize::from(workbook_window.active_sheet_index);
+    if !worksheets[active_sheet].view.selected {
+        return Err(XlsError::InvalidData(format!(
+            "active worksheet {active_sheet} must be selected in Window2"
+        )));
+    }
+    let selected_sheet_count = worksheets.iter().filter(|sheet| sheet.view.selected).count();
+    if selected_sheet_count != usize::from(workbook_window.selected_sheet_count) {
+        return Err(XlsError::InvalidData(format!(
+            "Window1 selected sheet count {} disagrees with Window2 selected state ({selected_sheet_count})",
+            workbook_window.selected_sheet_count
+        )));
+    }
     let mut stream = Vec::new();
     let has_pivot_tables = worksheets.iter().any(|ws| !ws.pivot_tables.is_empty());
     let sheet_count = u16::try_from(worksheets.len()).unwrap_or(u16::MAX);

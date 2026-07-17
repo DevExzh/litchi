@@ -571,6 +571,11 @@ impl XlsWorkbookWindowOptions {
         if self.sheet_tab_ratio_per_mille > 1000 {
             return Err(XlsError::InvalidData("sheet tab ratio must be at most 1000".to_string()));
         }
+        if self.very_hidden && !self.hidden {
+            return Err(XlsError::InvalidData(
+                "very hidden workbook windows must also be hidden".to_string(),
+            ));
+        }
         Ok(())
     }
 
@@ -711,6 +716,7 @@ impl XlsWriter {
         let index = self.worksheets.len();
         self.worksheets
             .push(WritableWorksheet::new(name.to_string()));
+        self.synchronize_workbook_window_selection();
         Ok(index)
     }
 
@@ -2037,7 +2043,22 @@ impl XlsWriter {
     pub fn set_workbook_window(&mut self, options: XlsWorkbookWindowOptions) -> XlsResult<()> {
         options.validate_intrinsic()?;
         self.workbook_window_options = options;
+        self.synchronize_workbook_window_selection();
         Ok(())
+    }
+
+    fn synchronize_workbook_window_selection(&mut self) {
+        let sheet_count = self.worksheets.len();
+        let selected_count = usize::from(self.workbook_window_options.selected_sheet_count);
+        let active = usize::from(self.workbook_window_options.active_sheet_index);
+        if selected_count == 0 || selected_count > sheet_count || active >= sheet_count {
+            return;
+        }
+        let first_selected = active.min(sheet_count - selected_count);
+        let selected_range = first_selected..first_selected + selected_count;
+        for (index, worksheet) in self.worksheets.iter_mut().enumerate() {
+            worksheet.view.selected = selected_range.contains(&index);
+        }
     }
 
     pub fn set_function_groups(&mut self, options: XlsFunctionGroupOptions) -> XlsResult<()> {

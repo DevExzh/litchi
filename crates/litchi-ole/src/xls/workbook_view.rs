@@ -73,6 +73,61 @@ impl XlsWorkbookView {
     /// Workbook windows in `Window1` record order.
     pub fn windows(&self) -> &[XlsWorkbookWindow] { &self.windows }
     pub fn primary_window(&self) -> Option<&XlsWorkbookWindow> { self.windows.first() }
+
+    pub(crate) fn validate_sheet_state(
+        &self,
+        visible_tabs: &[bool],
+        selected_worksheet_tabs: &[Option<bool>],
+    ) -> XlsResult<()> {
+        if visible_tabs.len() != selected_worksheet_tabs.len() {
+            return invalid(
+                WINDOW1_RECORD_TYPE,
+                "Window1 cross-record state has inconsistent sheet cardinality",
+            );
+        }
+
+        for window in &self.windows {
+            let active = usize::from(window.active_sheet_index);
+            let first_visible = usize::from(window.first_visible_sheet_index);
+            if !visible_tabs[active] {
+                return invalid(
+                    WINDOW1_RECORD_TYPE,
+                    format!("active sheet index {active} refers to a hidden BoundSheet8 tab"),
+                );
+            }
+            if !visible_tabs[first_visible] {
+                return invalid(
+                    WINDOW1_RECORD_TYPE,
+                    format!(
+                        "first visible sheet index {first_visible} refers to a hidden BoundSheet8 tab"
+                    ),
+                );
+            }
+        }
+
+        let Some(window) = self.primary_window() else { return Ok(()); };
+        let active = usize::from(window.active_sheet_index);
+        if selected_worksheet_tabs[active] == Some(false) {
+            return invalid(
+                WINDOW1_RECORD_TYPE,
+                format!("active sheet index {active} is not selected in Window2"),
+            );
+        }
+
+        let selected_count = selected_worksheet_tabs.iter().flatten().filter(|selected| **selected).count();
+        let declared_count = usize::from(window.selected_sheet_count);
+        if selected_count > declared_count
+            || (selected_worksheet_tabs.iter().all(Option::is_some) && selected_count != declared_count)
+        {
+            return invalid(
+                WINDOW1_RECORD_TYPE,
+                format!(
+                    "selected sheet count {declared_count} disagrees with Window2 selected state ({selected_count})"
+                ),
+            );
+        }
+        Ok(())
+    }
 }
 
 pub(crate) struct WorkbookViewCollector {
@@ -176,6 +231,9 @@ fn parse_window1(data: &[u8]) -> XlsResult<XlsWorkbookWindow> {
     if flags & 0xff80 != 0 {
         return invalid(WINDOW1_RECORD_TYPE, "Window1 reserved flag bits must be zero");
     }
+    if flags & 0x0004 != 0 && flags & 0x0001 == 0 {
+        return invalid(WINDOW1_RECORD_TYPE, "Window1 fVeryHidden requires fHidden");
+    }
     let ratio = read_u16(data, 16);
     if ratio > 1000 {
         return invalid(WINDOW1_RECORD_TYPE, "sheet tab ratio must be at most 1000");
@@ -236,10 +294,32 @@ mod tests {
         zero_width[4] = 0;
         zero_width[5] = 0;
         assert!(parse_window1(&zero_width).is_err());
+        let mut very_hidden_without_hidden = valid_window();
+        very_hidden_without_hidden[8] |= 0x04;
+        assert!(parse_window1(&very_hidden_without_hidden).is_err());
 
         let mut collector = WorkbookViewCollector::new();
         collector.feed_record(WINDOW1_RECORD_TYPE, &valid_window()).unwrap();
         assert!(collector.feed_record(RR_TAB_ID_RECORD_TYPE, &[1, 0]).is_err());
+    }
+
+    #[test]
+    fn validates_boundsheet_visibility_and_window2_selection() {
+        let mut first_hidden = valid_window();
+        first_hidden[12] = 1;
+        let view = XlsWorkbookView {
+            sheet_ids: vec![1, 2],
+            windows: vec![parse_window1(&first_hidden).unwrap()],
+        };
+        assert!(view.validate_sheet_state(&[true, false], &[Some(true), Some(false)]).is_err());
+
+        let view = XlsWorkbookView {
+            sheet_ids: vec![1, 2],
+            windows: vec![parse_window1(&valid_window()).unwrap()],
+        };
+        assert!(view.validate_sheet_state(&[true, true], &[Some(false), Some(true)]).is_err());
+        assert!(view.validate_sheet_state(&[true, true], &[Some(true), Some(true)]).is_err());
+        assert!(view.validate_sheet_state(&[true, true], &[Some(true), None]).is_ok());
     }
 
     #[test]

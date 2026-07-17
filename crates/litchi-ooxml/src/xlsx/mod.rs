@@ -79,6 +79,7 @@ pub use chartsheet::{
     ChartSheet, ChartSheetBackgroundPicture, ChartSheetChartResource, ChartSheetColor, ChartSheetConformance,
     ChartSheetCustomView, ChartSheetDrawingResource, ChartSheetEntry, ChartSheetHeaderFooter, ChartSheetMargins,
     ChartSheetImageContentType, ChartSheetPackage, ChartSheetPageSetup, ChartSheetProperties, ChartSheetProtection, ChartSheetVmlDrawingResource,
+    ChartSheetWebPublishItem, ChartSheetWebPublishItems, ChartSheetWebSourceType,
     ChartSheetState, ChartSheetView, PageOrientation, load_chartsheet, parse_chartsheet,
     store_chartsheet, write_chartsheet,
 };

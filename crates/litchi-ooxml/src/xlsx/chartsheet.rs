@@ -40,6 +40,8 @@ const MAX_STRING_BYTES: usize = 4 * 1024 * 1024;
 const MAX_VIEWS: usize = 256;
 const MAX_CUSTOM_VIEWS: usize = 1024;
 const MAX_CHARTS: usize = 256;
+const MAX_WEB_PUBLISH_ITEMS: usize = 4096;
+const MAX_WEB_PUBLISH_STRING_BYTES: usize = 64 * 1024;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ChartSheetConformance { Transitional, Strict }
@@ -133,6 +135,37 @@ pub struct ChartSheetHeaderFooter {
     pub first_header: Option<String>, pub first_footer: Option<String>,
 }
 
+/// Schema-complete `ST_WebSourceType` values for inert web-publishing metadata.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ChartSheetWebSourceType { Sheet, PrintArea, AutoFilter, Range, Chart, PivotTable, Query, Label }
+
+impl ChartSheetWebSourceType {
+    pub fn as_str(self) -> &'static str { match self { Self::Sheet => "sheet", Self::PrintArea => "printArea", Self::AutoFilter => "autoFilter", Self::Range => "range", Self::Chart => "chart", Self::PivotTable => "pivotTable", Self::Query => "query", Self::Label => "label" } }
+    fn parse(value:&str)->Result<Self>{match value{"sheet"=>Ok(Self::Sheet),"printArea"=>Ok(Self::PrintArea),"autoFilter"=>Ok(Self::AutoFilter),"range"=>Ok(Self::Range),"chart"=>Ok(Self::Chart),"pivotTable"=>Ok(Self::PivotTable),"query"=>Ok(Self::Query),"label"=>Ok(Self::Label),_=>Err(invalid(format!("invalid web publish sourceType '{value}'")))}}
+}
+
+/// One `webPublishItem`; all paths, names, and references are opaque inert strings.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChartSheetWebPublishItem {
+    pub id: u32,
+    pub div_id: String,
+    pub source_type: ChartSheetWebSourceType,
+    pub source_ref: Option<String>,
+    pub source_object: Option<String>,
+    pub destination_file: String,
+    pub title: Option<String>,
+    /// `None` preserves the schema default; no publishing action is ever performed.
+    pub auto_republish: Option<bool>,
+}
+
+/// A present `webPublishItems` collection is schema-required to be non-empty.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChartSheetWebPublishItems {
+    /// Preserves explicit `count`; when present it must equal `items.len()`.
+    pub count: Option<u32>,
+    pub items: Vec<ChartSheetWebPublishItem>,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct ChartSheet {
     pub properties: Option<ChartSheetProperties>,
@@ -148,6 +181,8 @@ pub struct ChartSheet {
     pub legacy_header_footer_drawing_relationship_id: Option<String>,
     /// Relationship for the optional tiled chartsheet background image.
     pub background_picture_relationship_id: Option<String>,
+    /// Inert web-publishing metadata. Destinations and sources are never resolved or accessed.
+    pub web_publish_items: Option<ChartSheetWebPublishItems>,
 }
 
 /// Supported inert image media types for chartsheet backgrounds.
@@ -239,20 +274,34 @@ pub fn parse_chartsheet(xml: &[u8]) -> Result<(ChartSheetConformance, ChartSheet
     let legacy_drawing_relationship_id=parse_relationship_leaf(&root,conformance,"legacyDrawing")?;
     let legacy_header_footer_drawing_relationship_id=parse_relationship_leaf(&root,conformance,"legacyDrawingHF")?;
     let background_picture_relationship_id = one_child(&root, conformance.sml(), "picture")?.map(|picture| { leaf(picture,"chartsheet picture")?; no_attributes(picture,&[(conformance.rel(),"id")])?; Ok::<_,OoxmlError>(required(picture,conformance.rel(),"id")?.to_owned()) }).transpose()?;
-    let value = ChartSheet { properties, views, protection, custom_views, margins, page_setup, header_footer, drawing_relationship_id, legacy_drawing_relationship_id, legacy_header_footer_drawing_relationship_id, background_picture_relationship_id };
+    let web_publish_items=one_child(&root,conformance.sml(),"webPublishItems")?.map(|node|parse_web_publish_items(node,conformance)).transpose()?;
+    let value = ChartSheet { properties, views, protection, custom_views, margins, page_setup, header_footer, drawing_relationship_id, legacy_drawing_relationship_id, legacy_header_footer_drawing_relationship_id, background_picture_relationship_id, web_publish_items };
     validate_chartsheet(&value)?; Ok((conformance, value))
 }
 
 fn validate_root_order(root: &Node) -> Result<()> {
     let mut last = 0u8;
     for child in &root.children {
-        let order = match child.name.as_str() { "sheetPr" => 1, "sheetViews" => 2, "sheetProtection" => 3, "customSheetViews" => 4, "pageMargins" => 5, "pageSetup" => 6, "headerFooter" => 7, "drawing" => 8, "legacyDrawing" => 9, "legacyDrawingHF" => 10, "picture" => 11, name => return Err(invalid(format!("unsupported chartsheet child '{name}'"))) };
+        let order = match child.name.as_str() { "sheetPr" => 1, "sheetViews" => 2, "sheetProtection" => 3, "customSheetViews" => 4, "pageMargins" => 5, "pageSetup" => 6, "headerFooter" => 7, "drawing" => 8, "legacyDrawing" => 9, "legacyDrawingHF" => 10, "picture" => 11, "webPublishItems" => 12, name => return Err(invalid(format!("unsupported chartsheet child '{name}'"))) };
         if order <= last { return Err(invalid("chartsheet children are duplicated or out of schema order")); } last = order;
     }
     Ok(())
 }
 
 fn parse_relationship_leaf(root:&Node,conformance:ChartSheetConformance,name:&str)->Result<Option<String>>{one_child(root,conformance.sml(),name)?.map(|node|{leaf(node,name)?;no_attributes(node,&[(conformance.rel(),"id")])?;Ok(required(node,conformance.rel(),"id")?.to_owned())}).transpose()}
+
+fn parse_web_publish_items(node:&Node,conformance:ChartSheetConformance)->Result<ChartSheetWebPublishItems>{
+    whitespace(node)?;no_attributes(node,&[("","count")])?;
+    if node.children.is_empty(){return Err(invalid("webPublishItems requires at least one webPublishItem"))}
+    if node.children.len()>MAX_WEB_PUBLISH_ITEMS{return Err(limit("web publish item count"))}
+    let count=u32_optional(node,"count")?;let mut items=Vec::with_capacity(node.children.len());
+    for child in &node.children{
+        if child.namespace!=conformance.sml()||child.name!="webPublishItem"{return Err(invalid("webPublishItems contains an unsupported child"))}
+        leaf(child,"web publish item")?;whitespace(child)?;no_attributes(child,&[("","id"),("","divId"),("","sourceType"),("","sourceRef"),("","sourceObject"),("","destinationFile"),("","title"),("","autoRepublish")])?;
+        items.push(ChartSheetWebPublishItem{id:required(child,"","id")?.parse().map_err(|_|invalid("invalid web publish item id"))?,div_id:required(child,"","divId")?.to_owned(),source_type:ChartSheetWebSourceType::parse(required(child,"","sourceType")?)?,source_ref:optional(child,"","sourceRef").map(str::to_owned),source_object:optional(child,"","sourceObject").map(str::to_owned),destination_file:required(child,"","destinationFile")?.to_owned(),title:optional(child,"","title").map(str::to_owned),auto_republish:bool_optional(child,"autoRepublish")?});
+    }
+    let value=ChartSheetWebPublishItems{count,items};validate_web_publish_items(&value)?;Ok(value)
+}
 
 fn parse_properties(node: &Node) -> Result<ChartSheetProperties> {
     whitespace(node)?; no_attributes(node, &[("", "published"), ("", "codeName")])?;
@@ -341,6 +390,7 @@ pub fn write_chartsheet(value: &ChartSheet, conformance: ChartSheetConformance) 
     if let Some(id)=&value.legacy_drawing_relationship_id{write_relationship_leaf(&mut out,"legacyDrawing",id);}
     if let Some(id)=&value.legacy_header_footer_drawing_relationship_id{write_relationship_leaf(&mut out,"legacyDrawingHF",id);}
     if let Some(id)=&value.background_picture_relationship_id{out.extend_from_slice(b"<x:picture");attr(&mut out,"r:id",id);out.extend_from_slice(b"/>");}
+    if let Some(collection)=&value.web_publish_items{out.extend_from_slice(b"<x:webPublishItems");u32_attr_opt(&mut out,"count",collection.count);out.push(b'>');for item in &collection.items{out.extend_from_slice(b"<x:webPublishItem");attr(&mut out,"id",&item.id.to_string());attr(&mut out,"divId",&item.div_id);attr(&mut out,"sourceType",item.source_type.as_str());attr_opt(&mut out,"sourceRef",item.source_ref.as_deref());attr_opt(&mut out,"sourceObject",item.source_object.as_deref());attr(&mut out,"destinationFile",&item.destination_file);attr_opt(&mut out,"title",item.title.as_deref());bool_attr_opt(&mut out,"autoRepublish",item.auto_republish);out.extend_from_slice(b"/>");}out.extend_from_slice(b"</x:webPublishItems>");}
     out.extend_from_slice(b"</x:chartsheet>");
     if out.len() > MAX_XML_BYTES { return Err(limit("serialized XML bytes")); } Ok(out)
 }
@@ -430,8 +480,27 @@ fn validate_chartsheet(value: &ChartSheet) -> Result<()> {
     if let Some(m) = value.margins { for margin in [m.left, m.right, m.top, m.bottom, m.header, m.footer] { if !margin.is_finite() || !(0.0..49.0).contains(&margin) { return Err(invalid("chartsheet margin is outside Office's [0, 49) range")); } } }
     if let Some(setup) = &value.page_setup { if setup.first_page_number.is_some_and(|v| v > 65_534) { return Err(invalid("firstPageNumber exceeds Excel's limit")); } if setup.copies.is_some_and(|v| !(1..=32_767).contains(&v)) { return Err(invalid("copies is outside Excel's supported range")); } if setup.horizontal_dpi == Some(0) || setup.vertical_dpi == Some(0) { return Err(invalid("page setup DPI must be positive")); } }
     if let Some(hf) = &value.header_footer { for text in [&hf.odd_header, &hf.odd_footer, &hf.even_header, &hf.even_footer, &hf.first_header, &hf.first_footer].into_iter().flatten() { bounded(text)?; } }
+    if let Some(items)=&value.web_publish_items{validate_web_publish_items(items)?;}
     Ok(())
 }
+
+fn validate_web_publish_items(value:&ChartSheetWebPublishItems)->Result<()>{
+    if value.items.is_empty(){return Err(invalid("webPublishItems requires at least one webPublishItem"))}
+    if value.items.len()>MAX_WEB_PUBLISH_ITEMS{return Err(limit("web publish item count"))}
+    if value.count.is_some_and(|count|usize::try_from(count).ok()!=Some(value.items.len())){return Err(invalid("webPublishItems count does not match item cardinality"))}
+    let mut ids=HashSet::new();let mut div_ids=HashSet::new();
+    for item in &value.items{
+        if !ids.insert(item.id){return Err(invalid(format!("duplicate web publish item id {}",item.id)))}
+        if item.div_id.is_empty()||item.destination_file.is_empty(){return Err(invalid("web publish divId and destinationFile must be non-empty"))}
+        for string in [Some(&item.div_id),Some(&item.destination_file),item.source_ref.as_ref(),item.source_object.as_ref(),item.title.as_ref()].into_iter().flatten(){bounded_web_publish(string)?;}
+        if !div_ids.insert(item.div_id.as_str()){return Err(invalid(format!("duplicate web publish divId '{}'",item.div_id)))}
+        if item.source_type==ChartSheetWebSourceType::Range&&item.source_ref.as_deref().is_none_or(str::is_empty){return Err(invalid("range web publish item requires non-empty sourceRef"))}
+        if matches!(item.source_type,ChartSheetWebSourceType::PivotTable|ChartSheetWebSourceType::Query|ChartSheetWebSourceType::Label)&&item.source_object.as_deref().is_none_or(str::is_empty){return Err(invalid("object web publish item requires non-empty sourceObject"))}
+    }
+    Ok(())
+}
+
+fn bounded_web_publish(value:&str)->Result<()>{if value.len()<=MAX_WEB_PUBLISH_STRING_BYTES{Ok(())}else{Err(limit("web publish string bytes"))}}
 
 fn workbook_entry(root: &Node, conformance: ChartSheetConformance, relationship_id: &str, part_name: String) -> Result<ChartSheetEntry> {
     let sheets = required_child(root, conformance.sml(), "sheets")?; let mut found = None;
@@ -517,7 +586,7 @@ mod tests {
     use super::*;
     const POI_ONE: &[u8] = include_bytes!("../../../../3rdparty/poi/test-data/spreadsheet/WithChartSheet.xlsx");
     const POI_TWO: &[u8] = include_bytes!("../../../../3rdparty/poi/test-data/spreadsheet/chart_sheet.xlsx");
-    fn sheet() -> ChartSheet { ChartSheet { properties: Some(ChartSheetProperties { published: Some(true), code_name: Some("ChartCode".into()), tab_color: Some(ChartSheetColor { automatic: None, indexed: None, rgb: Some("FF336699".into()), theme: None, tint: Some(0.25) }) }), views: vec![ChartSheetView { tab_selected: Some(true), zoom_scale: Some(125), workbook_view_id: 0, zoom_to_fit: Some(false) }], protection: Some(ChartSheetProtection { password_hash: Some("ABCD".into()), content: Some(true), objects: Some(false) }), custom_views: Some(vec![ChartSheetCustomView { guid: "{00112233-4455-6677-8899-AABBCCDDEEFF}".into(), scale: Some(175), state: Some(ChartSheetState::Hidden), zoom_to_fit: Some(true) }, ChartSheetCustomView { guid: "{10213243-5465-7687-98A9-BACBDCEDFE0F}".into(), scale: None, state: None, zoom_to_fit: Some(false) }]), margins: Some(ChartSheetMargins { left: 0.7, right: 0.7, top: 0.75, bottom: 0.75, header: 0.3, footer: 0.3 }), page_setup: Some(ChartSheetPageSetup { paper_size: Some(1), first_page_number: Some(1), orientation: Some(PageOrientation::Landscape), use_printer_defaults: Some(true), black_and_white: Some(false), draft: Some(false), use_first_page_number: Some(true), horizontal_dpi: Some(600), vertical_dpi: Some(600), copies: Some(1) }), header_footer: Some(ChartSheetHeaderFooter { align_with_margins: Some(false), odd_header: Some("&CChart & Report".into()), ..Default::default() }), drawing_relationship_id: "rIdDrawing".into(), legacy_drawing_relationship_id:Some("rIdLegacy".into()), legacy_header_footer_drawing_relationship_id:Some("rIdLegacyHF".into()), background_picture_relationship_id:Some("rIdBackground".into()) } }
+    fn sheet() -> ChartSheet { ChartSheet { properties: Some(ChartSheetProperties { published: Some(true), code_name: Some("ChartCode".into()), tab_color: Some(ChartSheetColor { automatic: None, indexed: None, rgb: Some("FF336699".into()), theme: None, tint: Some(0.25) }) }), views: vec![ChartSheetView { tab_selected: Some(true), zoom_scale: Some(125), workbook_view_id: 0, zoom_to_fit: Some(false) }], protection: Some(ChartSheetProtection { password_hash: Some("ABCD".into()), content: Some(true), objects: Some(false) }), custom_views: Some(vec![ChartSheetCustomView { guid: "{00112233-4455-6677-8899-AABBCCDDEEFF}".into(), scale: Some(175), state: Some(ChartSheetState::Hidden), zoom_to_fit: Some(true) }, ChartSheetCustomView { guid: "{10213243-5465-7687-98A9-BACBDCEDFE0F}".into(), scale: None, state: None, zoom_to_fit: Some(false) }]), margins: Some(ChartSheetMargins { left: 0.7, right: 0.7, top: 0.75, bottom: 0.75, header: 0.3, footer: 0.3 }), page_setup: Some(ChartSheetPageSetup { paper_size: Some(1), first_page_number: Some(1), orientation: Some(PageOrientation::Landscape), use_printer_defaults: Some(true), black_and_white: Some(false), draft: Some(false), use_first_page_number: Some(true), horizontal_dpi: Some(600), vertical_dpi: Some(600), copies: Some(1) }), header_footer: Some(ChartSheetHeaderFooter { align_with_margins: Some(false), odd_header: Some("&CChart & Report".into()), ..Default::default() }), drawing_relationship_id: "rIdDrawing".into(), legacy_drawing_relationship_id:Some("rIdLegacy".into()), legacy_header_footer_drawing_relationship_id:Some("rIdLegacyHF".into()), background_picture_relationship_id:Some("rIdBackground".into()), web_publish_items:Some(ChartSheetWebPublishItems{count:Some(2),items:vec![ChartSheetWebPublishItem{id:11289,div_id:"Views_11289".into(),source_type:ChartSheetWebSourceType::Range,source_ref:Some("A6:C6".into()),source_object:None,destination_file:"file:///definitely/not/accessed/Publish.htm".into(),title:Some("Range & title".into()),auto_republish:Some(false)},ChartSheetWebPublishItem{id:6433,div_id:"Views_6433".into(),source_type:ChartSheetWebSourceType::Chart,source_ref:None,source_object:Some("https://example.invalid/Chart 1".into()),destination_file:"https://example.invalid/Publish.mht".into(),title:None,auto_republish:None}]}) } }
     fn drawing(conformance: ChartSheetConformance) -> Vec<u8> { format!("<xdr:wsDr xmlns:xdr=\"{}\" xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\"><xdr:absoluteAnchor><a:graphic><a:graphicData><c:chart xmlns:c=\"{}\" xmlns:r=\"{}\" r:id=\"rIdChart\"/></a:graphicData></a:graphic></xdr:absoluteAnchor></xdr:wsDr>", conformance.xdr(), conformance.chart(), conformance.rel()).into_bytes() }
     fn chart(conformance: ChartSheetConformance) -> Vec<u8> { format!("<c:chartSpace xmlns:c=\"{}\"><c:chart/></c:chartSpace>", conformance.chart()).into_bytes() }
     fn vml(id:&str,name:&str)->ChartSheetVmlDrawingResource{ChartSheetVmlDrawingResource{relationship_id:id.into(),part_name:format!("/xl/drawings/{name}.vml"),content_type:VML_DRAWING_CT.into(),data:format!("<xml xmlns:v=\"urn:schemas-microsoft-com:vml\"><v:shape href=\"https://example.invalid/{name}\"/></xml>").into_bytes()}}
@@ -530,6 +599,11 @@ mod tests {
     #[test] fn mce_fallback_selects_custom_chartsheet_views() { let xml = format!("<x:chartsheet xmlns:x=\"{SML}\" xmlns:r=\"{REL}\" xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\" xmlns:u=\"urn:unsupported\"><x:sheetViews><x:sheetView workbookViewId=\"0\"/></x:sheetViews><mc:AlternateContent><mc:Choice Requires=\"u\"><u:customViews/></mc:Choice><mc:Fallback><x:customSheetViews><x:customSheetView guid=\"{{00112233-4455-6677-8899-AABBCCDDEEFF}}\" scale=\"200\"/></x:customSheetViews></mc:Fallback></mc:AlternateContent><x:drawing r:id=\"rId1\"/></x:chartsheet>"); let parsed = parse_chartsheet(xml.as_bytes()).unwrap().1; assert_eq!(parsed.custom_views.unwrap()[0].scale, Some(200)); }
     #[test] fn loads_both_poi_chartsheet_graphs() { for (bytes, name, zoom) in [(POI_ONE, "Chart2", 131), (POI_TWO, "Chart1", 84)] { let package = OpcPackage::from_bytes(bytes).unwrap(); let workbook = PackURI::new("/xl/workbook.xml").unwrap(); let workbook_part = package.get_part(&workbook).unwrap(); let id = workbook_part.rels().iter().find(|rel| rel.reltype() == CHARTSHEET_REL).unwrap().r_id().to_owned(); let loaded = load_chartsheet(&package, &workbook, &id).unwrap(); assert_eq!(loaded.entry.name, name); assert_eq!(loaded.chartsheet.views[0].zoom_scale, Some(zoom)); assert_eq!(loaded.drawing.charts.len(), 1); assert!(loaded.drawing.charts[0].data.starts_with(b"<?xml")); } }
     #[test] fn strict_package_writer_round_trips_complete_leaf_graph() { let conformance = ChartSheetConformance::Strict; let (mut package, workbook) = base_package(conformance); let expected = value(conformance); store_chartsheet(&mut package, &workbook, &expected, conformance).unwrap(); assert_eq!(load_chartsheet(&package, &workbook, "rIdChartSheet").unwrap(), expected); }
+    #[test]fn web_publish_schema_enum_and_deterministic_round_trip(){let mut body=String::from("<webPublishItems count=\"8\">");for(index,kind)in ["sheet","printArea","autoFilter","range","chart","pivotTable","query","label"].iter().enumerate(){let source_ref=if *kind=="range"{" sourceRef=\"A1:B2\""}else{""};let source_object=if matches!(*kind,"pivotTable"|"query"|"label"){" sourceObject=\"OpaqueName\""}else{""};body.push_str(&format!("<webPublishItem id=\"{index}\" divId=\"Div{index}\" sourceType=\"{kind}\"{source_ref}{source_object} destinationFile=\"opaque:{index}\" autoRepublish=\"{}\"/>",if index%2==0{"true"}else{"0"}));}body.push_str("</webPublishItems>");let xml=format!("<chartsheet xmlns=\"{STRICT_SML}\" xmlns:r=\"{STRICT_REL}\"><sheetViews><sheetView workbookViewId=\"0\"/></sheetViews><drawing r:id=\"rIdD\"/>{body}</chartsheet>");let(kind,parsed)=parse_chartsheet(xml.as_bytes()).unwrap();assert_eq!(kind,ChartSheetConformance::Strict);let items=&parsed.web_publish_items.as_ref().unwrap().items;assert_eq!(items.iter().map(|item|item.source_type).collect::<Vec<_>>(),vec![ChartSheetWebSourceType::Sheet,ChartSheetWebSourceType::PrintArea,ChartSheetWebSourceType::AutoFilter,ChartSheetWebSourceType::Range,ChartSheetWebSourceType::Chart,ChartSheetWebSourceType::PivotTable,ChartSheetWebSourceType::Query,ChartSheetWebSourceType::Label]);let first=write_chartsheet(&parsed,kind).unwrap();let reparsed=parse_chartsheet(&first).unwrap().1;let second=write_chartsheet(&reparsed,kind).unwrap();assert_eq!(first,second);assert_eq!(parsed,reparsed);}
+    #[test]fn web_publish_mce_fallback_and_inert_references(){let xml=format!("<x:chartsheet xmlns:x=\"{SML}\" xmlns:r=\"{REL}\" xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\" xmlns:u=\"urn:unsupported\"><x:sheetViews><x:sheetView workbookViewId=\"0\"/></x:sheetViews><x:drawing r:id=\"rIdD\"/><mc:AlternateContent><mc:Choice Requires=\"u\"><u:run href=\"https://example.invalid/execute\"/></mc:Choice><mc:Fallback><x:webPublishItems><x:webPublishItem id=\"0\" divId=\"D\" sourceType=\"chart\" sourceObject=\"file:///not/read\" destinationFile=\"/tmp/not-written\" title=\"$(never-execute)\"/></x:webPublishItems></mc:Fallback></mc:AlternateContent></x:chartsheet>");let(_,parsed)=parse_chartsheet(xml.as_bytes()).unwrap();let item=&parsed.web_publish_items.as_ref().unwrap().items[0];assert_eq!(item.destination_file,"/tmp/not-written");assert_eq!(item.auto_republish,None);assert_eq!(parse_chartsheet(&write_chartsheet(&parsed,ChartSheetConformance::Transitional).unwrap()).unwrap().1,parsed);}
+    #[test]fn web_publish_package_load_store_preserves_metadata_only(){let conformance=ChartSheetConformance::Transitional;let(mut package,workbook)=base_package(conformance);let expected=value(conformance);store_chartsheet(&mut package,&workbook,&expected,conformance).unwrap();let loaded=load_chartsheet(&package,&workbook,"rIdChartSheet").unwrap();assert_eq!(loaded.chartsheet.web_publish_items,expected.chartsheet.web_publish_items);}
+    #[test]fn rejects_web_publish_malformed_duplicates_cardinality_and_order(){let wrap=|body:&str|format!("<chartsheet xmlns=\"{SML}\" xmlns:r=\"{REL}\"><sheetViews><sheetView workbookViewId=\"0\"/></sheetViews><drawing r:id=\"rIdD\"/>{body}</chartsheet>");for body in ["<webPublishItems/>","<webPublishItems count=\"2\"><webPublishItem id=\"1\" divId=\"A\" sourceType=\"sheet\" destinationFile=\"x\"/></webPublishItems>","<webPublishItems><webPublishItem id=\"1\" divId=\"A\" sourceType=\"sheet\" destinationFile=\"x\"/><webPublishItem id=\"1\" divId=\"B\" sourceType=\"sheet\" destinationFile=\"y\"/></webPublishItems>","<webPublishItems><webPublishItem id=\"1\" divId=\"A\" sourceType=\"sheet\" destinationFile=\"x\"/><webPublishItem id=\"2\" divId=\"A\" sourceType=\"sheet\" destinationFile=\"y\"/></webPublishItems>","<webPublishItems><webPublishItem id=\"4294967296\" divId=\"A\" sourceType=\"sheet\" destinationFile=\"x\"/></webPublishItems>","<webPublishItems><webPublishItem id=\"1\" divId=\"A\" sourceType=\"bad\" destinationFile=\"x\"/></webPublishItems>","<webPublishItems><webPublishItem id=\"1\" divId=\"A\" sourceType=\"range\" destinationFile=\"x\"/></webPublishItems>","<webPublishItems><webPublishItem id=\"1\" divId=\"A\" sourceType=\"query\" destinationFile=\"x\"/></webPublishItems>","<webPublishItems><webPublishItem id=\"1\" divId=\"A\" sourceType=\"sheet\" destinationFile=\"x\" autoRepublish=\"on\"/></webPublishItems>","<webPublishItems><webPublishItem id=\"1\" divId=\"A\" sourceType=\"sheet\" destinationFile=\"x\" extra=\"1\"/></webPublishItems>"]{let xml=wrap(body);assert!(parse_chartsheet(xml.as_bytes()).is_err(),"accepted {body}");}let out_of_order=format!("<chartsheet xmlns=\"{SML}\" xmlns:r=\"{REL}\"><sheetViews><sheetView workbookViewId=\"0\"/></sheetViews><webPublishItems><webPublishItem id=\"1\" divId=\"A\" sourceType=\"sheet\" destinationFile=\"x\"/></webPublishItems><drawing r:id=\"rIdD\"/></chartsheet>");assert!(parse_chartsheet(out_of_order.as_bytes()).is_err());}
+    #[test]fn rejects_web_publish_count_and_string_caps(){let mut body=String::from("<webPublishItems>");for index in 0..=MAX_WEB_PUBLISH_ITEMS{body.push_str(&format!("<webPublishItem id=\"{index}\" divId=\"D{index}\" sourceType=\"sheet\" destinationFile=\"x\"/>"));}body.push_str("</webPublishItems>");let xml=format!("<chartsheet xmlns=\"{SML}\" xmlns:r=\"{REL}\"><sheetViews><sheetView workbookViewId=\"0\"/></sheetViews><drawing r:id=\"rIdD\"/>{body}</chartsheet>");assert!(parse_chartsheet(xml.as_bytes()).is_err());let mut value=sheet();value.web_publish_items.as_mut().unwrap().items[0].title=Some("x".repeat(MAX_WEB_PUBLISH_STRING_BYTES+1));assert!(write_chartsheet(&value,ChartSheetConformance::Transitional).is_err());}
     #[test]fn picture_mce_schema_and_inert_round_trip(){let xml=format!("<x:chartsheet xmlns:x=\"{SML}\" xmlns:r=\"{REL}\" xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\" xmlns:u=\"urn:unsupported\"><x:sheetViews><x:sheetView workbookViewId=\"0\"/></x:sheetViews><x:drawing r:id=\"rIdDrawing\"/><mc:AlternateContent><mc:Choice Requires=\"u\"><u:picture/></mc:Choice><mc:Fallback><x:picture r:id=\"rIdBackground\"/></mc:Fallback></mc:AlternateContent></x:chartsheet>");let(_,parsed)=parse_chartsheet(xml.as_bytes()).unwrap();assert_eq!(parsed.background_picture_relationship_id.as_deref(),Some("rIdBackground"));let written=write_chartsheet(&parsed,ChartSheetConformance::Transitional).unwrap();assert!(String::from_utf8(written.clone()).unwrap().contains("<x:drawing r:id=\"rIdDrawing\"/><x:picture r:id=\"rIdBackground\"/>"));assert_eq!(parse_chartsheet(&written).unwrap().1,parsed);}
     #[test]fn transitional_picture_package_round_trip_preserves_opaque_bytes(){let conformance=ChartSheetConformance::Transitional;let(mut package,workbook)=base_package(conformance);let expected=value(conformance);store_chartsheet(&mut package,&workbook,&expected,conformance).unwrap();let loaded=load_chartsheet(&package,&workbook,"rIdChartSheet").unwrap();assert_eq!(loaded.background_picture.as_ref().unwrap().data,vec![0,255,1,254]);assert_eq!(loaded,expected);}
     #[test]fn vml_mce_schema_order_and_inert_round_trip(){let xml=format!("<x:chartsheet xmlns:x=\"{SML}\" xmlns:r=\"{REL}\" xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\" xmlns:u=\"urn:unsupported\"><x:sheetViews><x:sheetView workbookViewId=\"0\"/></x:sheetViews><x:drawing r:id=\"rIdDrawing\"/><mc:AlternateContent><mc:Choice Requires=\"u\"><u:vml/></mc:Choice><mc:Fallback><x:legacyDrawing r:id=\"rIdLegacy\"/><x:legacyDrawingHF r:id=\"rIdLegacyHF\"/></mc:Fallback></mc:AlternateContent><x:picture r:id=\"rIdBackground\"/></x:chartsheet>");let(_,parsed)=parse_chartsheet(xml.as_bytes()).unwrap();assert_eq!(parsed.legacy_drawing_relationship_id.as_deref(),Some("rIdLegacy"));assert_eq!(parsed.legacy_header_footer_drawing_relationship_id.as_deref(),Some("rIdLegacyHF"));let written=write_chartsheet(&parsed,ChartSheetConformance::Transitional).unwrap();let text=String::from_utf8(written.clone()).unwrap();assert!(text.contains("<x:drawing r:id=\"rIdDrawing\"/><x:legacyDrawing r:id=\"rIdLegacy\"/><x:legacyDrawingHF r:id=\"rIdLegacyHF\"/><x:picture"));assert_eq!(parse_chartsheet(&written).unwrap().1,parsed);}

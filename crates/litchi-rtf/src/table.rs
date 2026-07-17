@@ -49,6 +49,21 @@ pub enum TableEdge { Left, Right, Top, Bottom }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TableDistanceTarget { pub scope: TableDistanceScope, pub kind: TableDistanceKind, pub edge: TableEdge }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TableRowAlignment { Left, Center, Right }
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct TableRowLayout { pub header: bool, pub keep_together: bool, pub keep_with_following: bool, pub alignment: Option<TableRowAlignment> }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TableCellVerticalAlignment { Top, Center, Bottom }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TableCellTextFlow { LeftToRightTopToBottom, RightToLeftTopToBottom, LeftToRightBottomToTop, LeftToRightTopToBottomVertical, TopToBottomRightToLeftVertical }
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct TableCellLayout { pub vertical_alignment: Option<TableCellVerticalAlignment>, pub text_flow: Option<TableCellTextFlow>, pub fit_text: bool, pub no_wrap: bool, pub hide_mark: bool }
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct TableSideDistance { pub value: Option<u16>, pub unit: Option<TableDistanceUnit> }
 
@@ -116,6 +131,7 @@ pub struct Row<'a> {
     cells: Vec<Cell<'a>>,
     /// Explicit row direction.
     direction: Option<TextDirection>,
+    layout: TableRowLayout,
     padding: TableEdgeDistances,
     spacing: TableEdgeDistances,
     positioning: FloatingTablePosition,
@@ -127,6 +143,7 @@ impl<'a> Row<'a> {
         Self {
             cells: Vec::new(),
             direction: None,
+            layout: TableRowLayout::default(),
             padding: TableEdgeDistances::default(),
             spacing: TableEdgeDistances::default(),
             positioning: FloatingTablePosition::default(),
@@ -157,6 +174,8 @@ impl<'a> Row<'a> {
     pub fn set_direction(&mut self, direction: Option<TextDirection>) {
         self.direction = direction;
     }
+    pub fn layout(&self)->&TableRowLayout{&self.layout}
+    pub fn set_layout(&mut self,value:TableRowLayout){self.layout=value}
     pub fn padding(&self)->&TableEdgeDistances{&self.padding}
     pub fn spacing(&self)->&TableEdgeDistances{&self.spacing}
     pub fn set_padding(&mut self,value:TableEdgeDistances){self.padding=value}
@@ -178,6 +197,7 @@ pub struct Cell<'a> {
     text: Cow<'a, str>,
     padding: TableEdgeDistances,
     spacing: TableEdgeDistances,
+    layout: TableCellLayout,
     nested_tables: Vec<CellNestedTable<'a>>,
 }
 
@@ -188,9 +208,9 @@ pub struct CellNestedTable<'a> { pub text_offset: usize, pub table: Table<'a> }
 impl<'a> Cell<'a> {
     /// Create a new cell.
     pub fn new(text: Cow<'a, str>) -> Self {
-        Self { text, padding:TableEdgeDistances::default(), spacing:TableEdgeDistances::default(), nested_tables:Vec::new() }
+        Self { text, padding:TableEdgeDistances::default(), spacing:TableEdgeDistances::default(), layout:TableCellLayout::default(), nested_tables:Vec::new() }
     }
-    pub fn with_distances(text:Cow<'a,str>,padding:TableEdgeDistances,spacing:TableEdgeDistances)->Self{Self{text,padding,spacing,nested_tables:Vec::new()}}
+    pub fn with_distances(text:Cow<'a,str>,padding:TableEdgeDistances,spacing:TableEdgeDistances)->Self{Self{text,padding,spacing,layout:TableCellLayout::default(),nested_tables:Vec::new()}}
 
     /// Get the cell text.
     pub fn text(&self) -> &str {
@@ -200,6 +220,8 @@ impl<'a> Cell<'a> {
     pub fn spacing(&self)->&TableEdgeDistances{&self.spacing}
     pub fn set_padding(&mut self,value:TableEdgeDistances){self.padding=value}
     pub fn set_spacing(&mut self,value:TableEdgeDistances){self.spacing=value}
+    pub fn layout(&self)->&TableCellLayout{&self.layout}
+    pub fn set_layout(&mut self,value:TableCellLayout){self.layout=value}
     pub fn nested_tables(&self)->&[CellNestedTable<'a>]{&self.nested_tables}
     pub fn add_nested_table(&mut self,text_offset:usize,table:Table<'a>)->crate::RtfResult<()>{if text_offset>self.text.len()||!self.text.is_char_boundary(text_offset)||self.nested_tables.last().is_some_and(|entry|entry.text_offset>text_offset){return Err(crate::RtfError::MalformedDocument("invalid nested-table text insertion offset".to_string()))}self.nested_tables.push(CellNestedTable{text_offset,table});Ok(())}
     pub(crate) fn nested_tables_mut(&mut self)->&mut Vec<CellNestedTable<'a>>{&mut self.nested_tables}

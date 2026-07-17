@@ -150,9 +150,9 @@ pub use shape::{
 };
 pub use stylesheet::{Style, StyleSheet, StyleType};
 pub use table::{Cell, CellNestedTable, FloatingTablePosition, Row, Table, TableDistanceKind, TableDistanceScope,
-    TableDistanceTarget, TableDistanceUnit, TableEdge, TableEdgeDistances, TableHorizontalPosition,
+    TableCellLayout, TableCellTextFlow, TableCellVerticalAlignment, TableDistanceTarget, TableDistanceUnit, TableEdge, TableEdgeDistances, TableHorizontalPosition,
     TableHorizontalReference, TableSideDistance, TableVerticalPosition, TableVerticalReference,
-    TableWrapDistances, MAX_FLOATING_TABLE_DISTANCE_TWIPS, MAX_TABLE_CELLS_PER_ROW, MAX_TABLE_DISTANCE_TWIPS, MAX_TABLE_NESTING_DEPTH};
+    TableRowAlignment, TableRowLayout, TableWrapDistances, MAX_FLOATING_TABLE_DISTANCE_TWIPS, MAX_TABLE_CELLS_PER_ROW, MAX_TABLE_DISTANCE_TWIPS, MAX_TABLE_NESTING_DEPTH};
 pub use types::{
     Alignment, AssociatedCharacterFormatting, Color, ColorRef, ColorTable, DocumentElement, Font,
     FontFamily, FontPitch, FontRef, FontTable, Formatting, Indentation, Paragraph,
