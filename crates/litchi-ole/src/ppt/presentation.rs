@@ -3,18 +3,18 @@ use super::document_properties::PowerPoint12DocumentProperties;
 #[cfg(feature = "imgconv")]
 use super::encryption::decrypt_pictures;
 use super::encryption::decrypt_powerpoint_document;
-use super::main_master::PowerPoint12MainMasterMetadata;
 use super::header_footer::{
     PowerPointHeaderFooterDisplayText, PowerPointHeaderFooterParent,
     PowerPointHeaderFooterParentOrdinal, PowerPointHeaderFooterScope, PowerPointHeaderFooters,
 };
+use super::main_master::PowerPoint12MainMasterMetadata;
+use super::non_zoom_view::PowerPointOutlineSorterViewInformation;
 /// High-performance Presentation API with zero-copy slide parsing.
 use super::package::{PptError, PptOpenOptions, Result};
 use super::parsers::PptRecordParser;
 use super::persist::PersistMapping;
-use super::slide::{Slide, SlideDirectory, SlideFactory};
+use super::slide::{ParsedComment, Slide, SlideDirectory, SlideFactory};
 use super::sound_collection::PowerPointSoundCollection;
-use super::non_zoom_view::PowerPointOutlineSorterViewInformation;
 use super::view_info::PowerPointSlideViewInformation;
 use crate::consts::PptRecordType;
 #[cfg(feature = "imgconv")]
@@ -107,11 +107,8 @@ impl Presentation {
         let current_user_data = current_user_data
             .as_deref()
             .ok_or_else(|| PptError::StreamNotFound("Current User".to_string()))?;
-        let slide_directory = SlideDirectory::build(
-            &powerpoint_document,
-            current_user_data,
-            &persist_mapping,
-        )?;
+        let slide_directory =
+            SlideDirectory::build(&powerpoint_document, current_user_data, &persist_mapping)?;
 
         // Try to read Pictures stream for image extraction
         #[cfg(feature = "imgconv")]
@@ -321,9 +318,7 @@ impl Presentation {
                 first_notes_display = placeholder_display_from_shapes(notes.shapes()?)?;
             }
         }
-        if !has_master_display
-            && let Some(display) = first_unoverridden_slide_display
-        {
+        if !has_master_display && let Some(display) = first_unoverridden_slide_display {
             values.attach_placeholder_display(
                 PowerPointHeaderFooterScope::PresentationSlides,
                 display,
@@ -498,9 +493,34 @@ impl Presentation {
     }
 
     /// Strictly parse outline and slide-sorter editing-view information.
-    pub fn outline_sorter_view_information(&self) -> Result<PowerPointOutlineSorterViewInformation> {
+    pub fn outline_sorter_view_information(
+        &self,
+    ) -> Result<PowerPointOutlineSorterViewInformation> {
         let records = self.parser.find_records_ref();
         PowerPointOutlineSorterViewInformation::parse_records(&records)
+    }
+
+    /// Parse all slide comments in the presentation.
+    ///
+    /// Comments are stored per slide inside `ProgTags/ProgBinaryTag/BinaryTagData`
+    /// as `Comment2000` (type=12000) containers. Only slides with at least one
+    /// comment produce an entry.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a slide or one of its comment records is malformed.
+    pub fn comments(&self) -> Result<Vec<ParsedSlideComments>> {
+        let mut result = Vec::new();
+        for slide in self.slides()? {
+            let comments = slide.comments()?;
+            if !comments.is_empty() {
+                result.push(ParsedSlideComments {
+                    slide_number: slide.slide_number(),
+                    comments,
+                });
+            }
+        }
+        Ok(result)
     }
 
     /// Parse custom slide shows (named shows) from the Document container.
@@ -584,7 +604,8 @@ fn placeholder_display_from_record(
     let Some(drawing) = record.find_child(PptRecordType::PPDrawing) else {
         return Ok(None);
     };
-    let parsed = crate::ppt::escher::EscherShapeFactory::extract_shapes_from_drawing(&drawing.data)?;
+    let parsed =
+        crate::ppt::escher::EscherShapeFactory::extract_shapes_from_drawing(&drawing.data)?;
     let mut shapes = Vec::with_capacity(parsed.len());
     for shape in &parsed {
         if let Some(shape) = Slide::<'static>::convert_escher_to_shape_enum(shape)? {
@@ -632,4 +653,100 @@ pub struct ParsedCustomShow {
     pub name: String,
     /// 0-based slide indices in presentation order.
     pub slide_indices: Vec<usize>,
+}
+
+/// Comments parsed from a single slide of a presentation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedSlideComments {
+    /// 1-based slide number the comments belong to.
+    pub slide_number: usize,
+    /// Comments in record order.
+    pub comments: Vec<ParsedComment>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ppt::records::PptRecord;
+
+    fn record(record_type: PptRecordType, data: Vec<u8>, children: Vec<PptRecord>) -> PptRecord {
+        PptRecord {
+            record_type,
+            record_type_raw: 0,
+            version: 0,
+            instance: 0,
+            data_length: data.len() as u32,
+            data,
+            children,
+        }
+    }
+
+    fn named_shows(children: Vec<PptRecord>) -> PptRecord {
+        record(PptRecordType::NamedShows, Vec::new(), children)
+    }
+
+    fn named_show(name: &str, slide_ids: &[u32]) -> PptRecord {
+        let name_bytes: Vec<u8> = name
+            .encode_utf16()
+            .flat_map(|unit| unit.to_le_bytes())
+            .collect();
+        let slide_bytes: Vec<u8> = slide_ids.iter().flat_map(|id| id.to_le_bytes()).collect();
+        record(
+            PptRecordType::NamedShow,
+            Vec::new(),
+            vec![
+                record(PptRecordType::CString, name_bytes, Vec::new()),
+                record(PptRecordType::NamedShowSlides, slide_bytes, Vec::new()),
+            ],
+        )
+    }
+
+    #[test]
+    fn parses_named_shows_container() {
+        let container = named_shows(vec![
+            named_show("Demo Show", &[0x101, 0x103]),
+            named_show("Short", &[0x100]),
+        ]);
+
+        let mut shows = Vec::new();
+        Presentation::parse_named_shows(&container, &mut shows);
+
+        assert_eq!(shows.len(), 2);
+        assert_eq!(shows[0].name, "Demo Show");
+        assert_eq!(shows[0].slide_indices, vec![1, 3]);
+        assert_eq!(shows[1].name, "Short");
+        assert_eq!(shows[1].slide_indices, vec![0]);
+    }
+
+    #[test]
+    fn ignores_trailing_partial_slide_id_bytes() {
+        let mut show = named_show("Odd", &[0x102]);
+        // Append 3 stray bytes to the NamedShowSlides atom.
+        show.children[1].data.extend_from_slice(&[0xAA, 0xBB, 0xCC]);
+        let container = named_shows(vec![show]);
+
+        let mut shows = Vec::new();
+        Presentation::parse_named_shows(&container, &mut shows);
+
+        assert_eq!(shows.len(), 1);
+        assert_eq!(shows[0].slide_indices, vec![2]);
+    }
+
+    #[test]
+    fn skips_named_show_without_name() {
+        let show = record(
+            PptRecordType::NamedShow,
+            Vec::new(),
+            vec![record(
+                PptRecordType::NamedShowSlides,
+                0x101u32.to_le_bytes().to_vec(),
+                Vec::new(),
+            )],
+        );
+        let container = named_shows(vec![show]);
+
+        let mut shows = Vec::new();
+        Presentation::parse_named_shows(&container, &mut shows);
+        assert!(shows.is_empty());
+    }
 }

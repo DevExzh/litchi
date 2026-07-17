@@ -9,6 +9,7 @@ use crate::ppt::animation::{ShapeAnimation, SlideAnimationExtension};
 use crate::ppt::slide_extension::PowerPoint12SlideExtension;
 use crate::ppt::slide_round_trip::PowerPoint12SlideRoundTripMetadata;
 use crate::ppt::slide_sync::PowerPointSlideSyncInfo;
+use crate::ppt::transition::{TransitionInfo, parse_transition};
 use once_cell::unsync::OnceCell;
 
 /// A slide in a PowerPoint presentation with lazy-loaded shapes.
@@ -597,6 +598,26 @@ impl<'doc> Slide<'doc> {
     /// Returns an error when the PowerPoint 10 programmable tag or a comment record is malformed.
     pub fn comments(&self) -> Result<Vec<ParsedComment>> {
         crate::ppt::comments::parse_slide_comments(&self.record)
+    }
+
+    /// Get the slide transition from the `SSSlideInfoAtom` record.
+    ///
+    /// The transition describes the visual effect (type, direction, speed),
+    /// the advance mode (on click, automatic, or both), and an optional
+    /// sound played when the slide is shown.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(None)` when the slide has no `SSSlideInfoAtom` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the `SSSlideInfoAtom` record is truncated.
+    pub fn transition(&self) -> Result<Option<TransitionInfo>> {
+        match self.record.find_child(PptRecordType::SSSlideInfoAtom) {
+            Some(info) => Ok(Some(parse_transition(info)?)),
+            None => Ok(None),
+        }
     }
 
     /// Get the slide timing from the SSSlideInfoAtom record.

@@ -256,4 +256,47 @@ mod tests {
         assert_eq!(info.speed, TransitionSpeed::Medium);
         assert!(!info.has_effect());
     }
+
+    fn slide_info_record(data: Vec<u8>) -> PptRecord {
+        PptRecord {
+            record_type: PptRecordType::SSSlideInfoAtom,
+            record_type_raw: 0x03F9,
+            version: 0,
+            instance: 0,
+            data_length: data.len() as u32,
+            data,
+            children: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn rejects_truncated_slide_show_slide_info_atom() {
+        let record = slide_info_record(vec![0u8; 8]);
+        assert!(parse_transition(&record).is_err());
+    }
+
+    #[test]
+    fn rejects_wrong_record_type() {
+        let mut record = slide_info_record(vec![0u8; 16]);
+        record.record_type = PptRecordType::CString;
+        assert!(parse_transition(&record).is_err());
+    }
+
+    #[test]
+    fn parses_minimal_slide_show_slide_info_atom() {
+        // slideTime=2000ms, soundIdRef=0, direction=0, effect=9 (Wipe),
+        // flags=auto-advance bit only, speed=2 (Fast)
+        let mut data = vec![0u8; 16];
+        data[0..4].copy_from_slice(&2000u32.to_le_bytes());
+        data[9] = 9;
+        data[10..12].copy_from_slice(&0x0400u16.to_le_bytes());
+        data[12] = 2;
+
+        let info = parse_transition(&slide_info_record(data)).expect("parse transition");
+        assert_eq!(info.transition_type, TransitionType::Wipe);
+        assert_eq!(info.speed, TransitionSpeed::Fast);
+        assert_eq!(info.advance_mode, AdvanceMode::Automatic);
+        assert_eq!(info.advance_time_ms, Some(2000));
+        assert!(info.sound.is_none());
+    }
 }

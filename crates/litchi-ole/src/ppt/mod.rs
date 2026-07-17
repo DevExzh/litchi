@@ -55,6 +55,8 @@ pub mod package;
 pub mod presentation;
 pub mod sound_collection;
 pub mod view_info;
+
+// Non-zoom (outline and slide-sorter) view metadata
 pub mod non_zoom_view;
 
 /// PPT file writing
@@ -96,20 +98,21 @@ pub mod text_ruler;
 pub mod text_run;
 
 // Re-export main types for convenience
-pub use package::{Package, PptEncryptionKind, PptError, PptOpenOptions};
-pub use presentation::Presentation;
-pub use sound_collection::{EmbeddedPowerPointSound, PowerPointSoundCollection};
 pub use non_zoom_view::{
-    PowerPointNoZoomViewInfo, PowerPointNonZoomViewKind,
-    PowerPointOutlineSorterViewInfo, PowerPointOutlineSorterViewInformation,
+    PowerPointNoZoomViewInfo, PowerPointNonZoomViewKind, PowerPointOutlineSorterViewInfo,
+    PowerPointOutlineSorterViewInformation,
 };
+pub use package::{Package, PptEncryptionKind, PptError, PptOpenOptions};
+pub use presentation::{ParsedCustomShow, ParsedSlideComments, Presentation};
+pub use slide::{
+    ParsedComment, ParsedSlideTiming, Slide, SlideData, SlideDirectory, SlideDirectoryEntry,
+    SlideFactory, SpeakerNotes,
+};
+pub use sound_collection::{EmbeddedPowerPointSound, PowerPointSoundCollection};
 pub use view_info::{
     PowerPointGuide, PowerPointGuideOrientation, PowerPointRatio, PowerPointSlideViewInfo,
     PowerPointSlideViewInformation, PowerPointSlideViewPreferences, PowerPointViewKind,
     PowerPointViewOrigin, PowerPointZoomViewInfo,
-};
-pub use slide::{
-    Slide, SlideData, SlideDirectory, SlideDirectoryEntry, SlideFactory, SpeakerNotes,
 };
 
 // Re-export record types
@@ -195,3 +198,8 @@ pub use writer::{
 // Animation and transition support
 pub mod animation;
 pub mod transition;
+
+// Re-export transition types for ergonomic read access
+pub use transition::{
+    AdvanceMode, SoundAction, TransitionDirection, TransitionInfo, TransitionSpeed, TransitionType,
+};
