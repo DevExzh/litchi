@@ -50,6 +50,14 @@ use super::language::{
     text_languages,
 };
 use super::language_types::{TextLanguage, TextLanguageRun};
+use super::number_attachment::{
+    insert_text_number_attachment, remove_text_number_attachment,
+    remove_unreferenced_number_attachment_objects, text_number_attachments,
+    update_text_number_attachment,
+};
+use super::number_attachment_types::{
+    TextNumberAttachment, TextNumberAttachmentId, TextNumberAttachmentSettings,
+};
 use super::paragraph_alignment::{
     paragraph_alignment, paragraph_indents, paragraph_line_spacing, paragraph_spacing,
     paragraph_tab_stops, reset_paragraph_alignment, reset_paragraph_indents,
@@ -467,6 +475,43 @@ impl IWorkTextEditor {
         id: TextDateTimeFieldId,
     ) -> Result<TextDateTimeField> {
         remove_text_date_time_field(&mut self.package, object_id, id)
+    }
+
+    /// Read every native page/slide-number attachment in a text storage.
+    pub fn text_number_attachments(&self, object_id: u64) -> Result<Vec<TextNumberAttachment>> {
+        text_number_attachments(&self.package, object_id)
+    }
+
+    /// Atomically insert U+FFFC and its native textual number attachment.
+    ///
+    /// Attachment evaluation is storage-context dependent. Prefer the Pages
+    /// high-level wrappers when creating page numbers or page counts.
+    pub fn insert_text_number_attachment(
+        &mut self,
+        object_id: u64,
+        position: TextPosition,
+        settings: TextNumberAttachmentSettings,
+    ) -> Result<TextNumberAttachment> {
+        insert_text_number_attachment(&mut self.package, object_id, position, &settings)
+    }
+
+    /// Atomically update the lossless payload of a number attachment.
+    pub fn update_text_number_attachment(
+        &mut self,
+        object_id: u64,
+        id: TextNumberAttachmentId,
+        settings: TextNumberAttachmentSettings,
+    ) -> Result<TextNumberAttachment> {
+        update_text_number_attachment(&mut self.package, object_id, id, &settings)
+    }
+
+    /// Delete one number attachment together with its U+FFFC placeholder.
+    pub fn remove_text_number_attachment(
+        &mut self,
+        object_id: u64,
+        id: TextNumberAttachmentId,
+    ) -> Result<TextNumberAttachment> {
+        remove_text_number_attachment(&mut self.package, object_id, id)
     }
 
     /// Read every native plain highlight in a text storage.
@@ -1382,6 +1427,7 @@ pub(super) fn replace_storage_text(
     })?;
     remove_unreferenced_hyperlink_objects(package, &archive_name, &removed_references)?;
     remove_unreferenced_date_time_objects(package, &archive_name, &removed_references)?;
+    remove_unreferenced_number_attachment_objects(package, &archive_name, &removed_references)?;
     remove_unreferenced_bookmark_objects(package, &archive_name, &removed_references)?;
     remove_unreferenced_highlight_objects(package, &archive_name, &removed_references)
 }
@@ -1467,6 +1513,13 @@ fn adjust_storage_attributes(
     ] {
         adjust_object_table(table, &range, replacement_units, false)?;
     }
+    if storage
+        .table_attachment
+        .as_ref()
+        .is_some_and(|table| table.entries.is_empty())
+    {
+        storage.table_attachment = None;
+    }
     normalize_ranged_object_table(&mut storage.table_bookmark);
     adjust_object_table(
         &mut storage.table_smartfield,
@@ -1521,7 +1574,20 @@ fn patch_storage_text_wire(
             adjust_index_table_wire(table, range, replacement_units, true)
         })?;
     }
-    for field in [9, 16, 18, 21, 22, 27] {
+    let attachment_tables = repeated_length_delimited_payloads(&data, 9)?;
+    if attachment_tables.len() > 1 {
+        return Err(Error::InvalidFormat(format!(
+            "singular TSWP storage table field 9 occurs {} times",
+            attachment_tables.len()
+        )));
+    }
+    if let Some(table) = attachment_tables.first() {
+        let adjusted = adjust_index_table_wire(table, range, replacement_units, false)?;
+        let replacement =
+            (!repeated_length_delimited_payloads(&adjusted, 1)?.is_empty()).then_some(adjusted);
+        data = patch_length_delimited_field(&data, 9, true, replacement.as_deref())?;
+    }
+    for field in [16, 18, 21, 22, 27] {
         data = transform_optional_table(&data, field, |table| {
             adjust_index_table_wire(table, range, replacement_units, false)
         })?;
@@ -1976,7 +2042,7 @@ mod tests {
                 .collect::<Vec<_>>(),
             [0, 1, 4]
         );
-        assert!(storage.table_attachment.unwrap().entries.is_empty());
+        assert!(storage.table_attachment.is_none());
     }
 
     #[test]

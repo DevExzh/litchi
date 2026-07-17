@@ -51,6 +51,8 @@ println!("{}", structured.summary());
   lossless web, mail, and Keynote navigation targets, and owned-object cleanup
 - Native cross-suite Date & Time smart-field CRUD with typed ICU formats,
   locale identifiers, formatter styles, refresh plans, and Apple-reference instants
+- Native Pages page-number/page-count attachment CRUD with typed kinds, exact
+  U+FFFC placement, lossless number metadata, and header/footer support
 - Native Pages body-bookmark CRUD with typed names, lossless visibility values,
   strict UTF-16 ranges, and owned bookmark-field cleanup
 - Native cross-suite plain-text highlight CRUD with typed nonempty UTF-16 ranges,
@@ -1149,6 +1151,17 @@ Deletion retains visible text and reclaims the owned field object; ordinary text
 replacement also reclaims orphaned fields. Pages body and text-box, Numbers
 sheet text-box, and Keynote slide text-box wrappers enforce document ownership.
 See `create_iwork_date_time_field` and `inspect_iwork_date_time_fields`.
+Native textual number attachments are represented by `TextNumberAttachment`.
+Insertion atomically adds the U+FFFC placeholder, point-table entry, object, and
+indexed reference; deletion reverses that graph and ordinary text replacement
+reclaims orphaned objects. Typed settings distinguish page number, page count,
+footnote mark, and unknown future kinds while preserving optional string and
+number-format metadata. Pages exposes body, reachable header/footer, and text-box
+wrappers. The shared low-level reader also decodes native Keynote slide-number
+storage without claiming that ordinary Numbers or Keynote text boxes evaluate
+page numbers. See `create_pages_number_attachments`,
+`create_pages_text_box_number_attachment`, and
+`inspect_iwork_number_attachments`.
 Pages body text additionally exposes native ranged bookmarks as `TextBookmark`
 values. `TextBookmarkSettings` carries an optional validated name and a lossless
 visible/hidden value; create and update reject empty, overlapping, out-of-bounds,

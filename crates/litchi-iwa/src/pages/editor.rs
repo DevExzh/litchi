@@ -2164,12 +2164,14 @@ impl PagesEditor {
             let Some(reference) = entry.object else {
                 continue;
             };
-            let attachment: DrawableAttachmentArchive = decode_typed_package_object(
+            let Some(attachment) = decode_optional_typed_package_object::<DrawableAttachmentArchive>(
                 self.package(),
                 reference.identifier,
                 DRAWABLE_ATTACHMENT_MESSAGE_TYPE,
-                "TSWP.DrawableAttachmentArchive",
-            )?;
+            )?
+            else {
+                continue;
+            };
             if attachment
                 .drawable
                 .is_some_and(|item| item.identifier == drawable_object_id)
@@ -2317,6 +2319,39 @@ fn decode_typed_package_object<T: Message + Default>(
             "object {identifier} has no decodable {type_name} payload"
         ))
     })
+}
+
+fn decode_optional_typed_package_object<T: Message + Default>(
+    package: &IWorkPackage,
+    identifier: u64,
+    message_type: u32,
+) -> Result<Option<T>> {
+    let mut found = false;
+    let mut decoded = None;
+    for name in package.iwa_entry_names() {
+        let archive = package.archive(name)?;
+        let Some(object) = archive.object(identifier) else {
+            continue;
+        };
+        if found {
+            return Err(Error::InvalidFormat(format!(
+                "object {identifier} occurs in more than one Pages component"
+            )));
+        }
+        found = true;
+        decoded = object
+            .messages
+            .iter()
+            .find(|message| message.type_ == message_type)
+            .map(|message| T::decode(message.data.as_slice()))
+            .transpose()?;
+    }
+    if !found {
+        return Err(Error::InvalidFormat(format!(
+            "Pages body attachment references missing object {identifier}"
+        )));
+    }
+    Ok(decoded)
 }
 
 fn remap_pages_reference_paths(
@@ -3732,6 +3767,7 @@ mod document_options;
 mod footnote_settings;
 mod images;
 mod movies;
+mod number_attachments;
 mod page_layout;
 mod section_background;
 mod section_content;

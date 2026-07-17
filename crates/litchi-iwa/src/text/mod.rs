@@ -26,6 +26,10 @@ mod hyperlink_storage;
 mod hyperlink_types;
 mod language;
 mod language_types;
+mod number_attachment;
+mod number_attachment_object;
+mod number_attachment_storage;
+mod number_attachment_types;
 mod paragraph_alignment;
 mod paragraph_list;
 mod paragraph_tabs;
@@ -48,6 +52,8 @@ mod highlight_tests;
 mod hyperlink_tests;
 #[cfg(test)]
 mod language_tests;
+#[cfg(test)]
+mod number_attachment_tests;
 #[cfg(test)]
 mod text_comment_tests;
 
@@ -73,6 +79,10 @@ pub use font::{TextFont, TextFontName};
 pub use highlight_types::{TextHighlight, TextHighlightId};
 pub use hyperlink_types::{TextHyperlink, TextHyperlinkId, TextHyperlinkTarget};
 pub use language_types::{TextLanguage, TextLanguageRun, TextLanguageTag};
+pub use number_attachment_types::{
+    TextNumberAttachment, TextNumberAttachmentFormat, TextNumberAttachmentId,
+    TextNumberAttachmentKind, TextNumberAttachmentSettings, TextNumberAttachmentText,
+};
 pub use paragraph_list::{ParagraphList, ParagraphListLevel, ParagraphListLevelPlacement};
 pub use paragraph_tabs::{
     ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
