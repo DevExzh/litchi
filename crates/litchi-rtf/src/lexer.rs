@@ -362,6 +362,15 @@ pub enum ControlWord<'a> {
     BorderWidth(Option<i32>),
     BorderColor(Option<i32>),
     BorderSpace(Option<i32>),
+    PageBorderTop,
+    PageBorderLeft,
+    PageBorderBottom,
+    PageBorderRight,
+    PageBorderOptions(Option<i32>),
+    PageBorderSurroundHeader,
+    PageBorderSurroundFooter,
+    PageBorderSnap,
+    PageBorderArt(Option<i32>),
 
     // Shading
     Shading(i32),
@@ -1172,6 +1181,15 @@ impl<'a> Lexer<'a> {
             "brdrw" => ControlWord::BorderWidth(param),
             "brdrcf" => ControlWord::BorderColor(param),
             "brsp" => ControlWord::BorderSpace(param),
+            "pgbrdrt" => ControlWord::PageBorderTop,
+            "pgbrdrl" => ControlWord::PageBorderLeft,
+            "pgbrdrb" => ControlWord::PageBorderBottom,
+            "pgbrdrr" => ControlWord::PageBorderRight,
+            "pgbrdropt" => ControlWord::PageBorderOptions(param),
+            "pgbrdrhead" => ControlWord::PageBorderSurroundHeader,
+            "pgbrdrfoot" => ControlWord::PageBorderSurroundFooter,
+            "pgbrdrsnap" => ControlWord::PageBorderSnap,
+            "brdrart" => ControlWord::PageBorderArt(param),
 
             // Shading
             "shading" => ControlWord::Shading(param_value),

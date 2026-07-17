@@ -78,6 +78,7 @@ pub use image::{Image, ImageError};
 pub use package::{DocEncryptionKind, DocError, DocOpenOptions, Package};
 pub use paragraph::{Paragraph, Run};
 pub use parts::chp::CharacterConditionalFormatting;
+pub use parts::associated_strings::{AssociatedStringSlot, DocumentAssociatedStrings};
 pub use parts::fields::{
     Field, FieldBoundary, FieldDescriptor, FieldEndFlags, FieldMarker, FieldMarkerValue,
     FieldStory, FieldStoryTable, FieldType, FieldsTable,

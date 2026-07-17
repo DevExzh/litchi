@@ -9,6 +9,7 @@ use super::hyperlink::Hyperlink;
 use super::package::{DocError, DocOpenOptions, Result};
 use super::paragraph::{Paragraph, Run};
 use super::parts::bookmarks::BookmarksTable;
+use super::parts::associated_strings::DocumentAssociatedStrings;
 use super::parts::chp_bin_table::ChpBinTable;
 use super::parts::comments::CommentsTable;
 use super::parts::fib::FileInformationBlock;
@@ -92,6 +93,8 @@ pub struct Document {
     bookmarks_table: BookmarksTable,
     /// Revision-mark authors
     revision_authors: RevisionAuthorTable,
+    /// Fixed associated-document strings
+    associated_strings: Option<DocumentAssociatedStrings>,
     /// Section ranges, layout, and property revision marks
     sections: SectionsTable,
     /// Hyperlinks table
@@ -187,6 +190,7 @@ impl Document {
         let comments_table = CommentsTable::parse(&fib, &table_stream)?;
         let bookmarks_table = BookmarksTable::parse(&fib, &table_stream)?;
         let revision_authors = RevisionAuthorTable::parse(&fib, &table_stream)?;
+        let associated_strings = DocumentAssociatedStrings::parse(&fib, &table_stream)?;
         let sections =
             SectionsTable::parse(&fib, &table_stream, &word_document, &revision_authors)?;
 
@@ -254,6 +258,7 @@ impl Document {
             comments_table,
             bookmarks_table,
             revision_authors,
+            associated_strings,
             sections,
             hyperlinks_table,
             list_tables,
@@ -540,6 +545,13 @@ impl Document {
     /// exact UPX property payloads for subsequent inheritance and formatting.
     pub fn stylesheet(&self) -> Option<&StyleSheet> {
         self.stylesheet.as_ref()
+    }
+
+    /// Get the document's fixed associated-string metadata table.
+    ///
+    /// Template and mail-merge paths are inert strings and are never opened.
+    pub fn associated_strings(&self) -> Option<&DocumentAssociatedStrings> {
+        self.associated_strings.as_ref()
     }
 
     /// Get access to the fields table (if parsed).

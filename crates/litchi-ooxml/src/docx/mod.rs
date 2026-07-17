@@ -69,6 +69,7 @@ mod namespace;
 pub mod numbering;
 pub mod list;
 pub mod mail_merge;
+pub mod modern_comments;
 pub mod package;
 pub mod paragraph;
 pub mod parts;
@@ -106,6 +107,14 @@ pub use mail_merge::{
     MailMergeConformance, MailMergeDataSourceObject, MailMergeDataType, MailMergeDestination,
     MailMergeFieldMap, MailMergeFieldMappingType, MailMergeMainDocumentType, MailMergeRecipient,
     MailMergeRecipients, MailMergeSettings,
+};
+pub use modern_comments::{
+    CommentExtension, CommentIdMapping, CommentReaction, CommentReactionInfo,
+    CommentReactionUser, ExtensibleComment, ModernCommentConformance, ModernCommentMetadata,
+    ModernCommentRelationshipIds, Person, PresenceInfo, load_modern_comment_metadata,
+    parse_comments_extended, parse_comments_extensible, parse_comments_ids, parse_people,
+    store_modern_comment_metadata, write_comments_extended, write_comments_extensible,
+    write_comments_ids, write_people,
 };
 pub use image::InlineImage;
 pub use numbering::{AbstractNum, Num, Numbering};

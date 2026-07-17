@@ -39,6 +39,7 @@ pub struct DocumentBuilder {
     elements: Vec<DocumentElement>,
     metadata: Metadata,
     paragraph_tab_styles: Vec<crate::ParagraphStyleTabStops>,
+    page_layout_columns: Vec<(String, crate::StyleColumns)>,
 }
 
 impl Default for DocumentBuilder {
@@ -62,6 +63,7 @@ impl DocumentBuilder {
             elements: Vec::new(),
             metadata: Metadata::default(),
             paragraph_tab_styles: Vec::new(),
+            page_layout_columns: Vec::new(),
         }
     }
 
@@ -84,6 +86,28 @@ impl DocumentBuilder {
             ));
         }
         self.paragraph_tab_styles.push(style);
+        Ok(self)
+    }
+
+    /// Add a named automatic page layout with typed multi-column properties.
+    pub fn add_page_layout_columns(
+        &mut self,
+        page_layout_name: impl Into<String>,
+        columns: crate::StyleColumns,
+    ) -> Result<&mut Self> {
+        let name = page_layout_name.into();
+        columns.to_page_layout_fragment(&name)?;
+        if self.page_layout_columns.len() >= 4_096 {
+            return Err(litchi_core::Error::InvalidFormat(
+                "document builder exceeds 4096 column page layouts".to_owned(),
+            ));
+        }
+        if self.page_layout_columns.iter().any(|(existing, _)| existing == &name) {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "duplicate page layout '{name}'"
+            )));
+        }
+        self.page_layout_columns.push((name, columns));
         Ok(self)
     }
 
@@ -473,6 +497,24 @@ impl DocumentBuilder {
                 .map(|style| style.to_xml_fragment().expect("validated paragraph tab style"))
                 .collect::<String>();
             xml.insert_str(insertion, &fragments);
+        }
+        if !self.page_layout_columns.is_empty() {
+            let fragments = self
+                .page_layout_columns
+                .iter()
+                .map(|(name, columns)| {
+                    columns
+                        .to_page_layout_fragment(name)
+                        .expect("validated column page layout")
+                })
+                .collect::<String>();
+            xml = xml.replacen(
+                "<office:automatic-styles/>",
+                &format!(
+                    "<office:automatic-styles>{fragments}</office:automatic-styles>"
+                ),
+                1,
+            );
         }
         xml
     }

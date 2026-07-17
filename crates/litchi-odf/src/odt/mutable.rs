@@ -176,6 +176,35 @@ impl MutableDocument {
         Ok(())
     }
 
+    /// Create or replace typed columns in one existing page layout.
+    pub fn set_page_layout_columns(
+        &mut self,
+        page_layout_name: &str,
+        columns: &crate::StyleColumns,
+    ) -> Result<()> {
+        let styles = self.styles_xml.as_deref().ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(
+                "document has no styles.xml page layout to modify".to_string(),
+            )
+        })?;
+        let layouts = parse_page_layouts(styles)?;
+        let layout = layouts
+            .iter()
+            .find(|layout| layout.name == page_layout_name)
+            .ok_or_else(|| {
+                litchi_core::Error::InvalidFormat(format!(
+                    "page layout '{page_layout_name}' does not exist"
+                ))
+            })?;
+        let replacement = crate::style_columns::replace_page_layout_columns(layout, columns)?;
+        self.styles_xml = Some(set_page_layout_xml(
+            styles,
+            page_layout_name,
+            &replacement,
+        )?);
+        Ok(())
+    }
+
     /// Add an empty master page and its referenced page layout.
     ///
     /// A minimal page layout is created in `office:automatic-styles` when a

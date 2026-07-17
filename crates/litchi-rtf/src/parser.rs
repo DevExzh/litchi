@@ -292,6 +292,14 @@ fn is_section_control(control: &ControlWord<'_>) -> bool {
             | ControlWord::SectionEndnoteRestart(_)
             | ControlWord::SectionFootnoteNumbering(_)
             | ControlWord::SectionEndnoteNumbering(_)
+            | ControlWord::PageBorderTop
+            | ControlWord::PageBorderLeft
+            | ControlWord::PageBorderBottom
+            | ControlWord::PageBorderRight
+            | ControlWord::PageBorderOptions(_)
+            | ControlWord::PageBorderSurroundHeader
+            | ControlWord::PageBorderSurroundFooter
+            | ControlWord::PageBorderSnap
     )
 }
 
@@ -3636,6 +3644,29 @@ impl<'a> Parser<'a> {
             PageNumberFormat, PageOrientation, SectionBreakType, VerticalAlignment,
         };
 
+        if let Some(side) = match control {
+            ControlWord::PageBorderTop => Some(crate::PageBorderSide::Top),
+            ControlWord::PageBorderLeft => Some(crate::PageBorderSide::Left),
+            ControlWord::PageBorderBottom => Some(crate::PageBorderSide::Bottom),
+            ControlWord::PageBorderRight => Some(crate::PageBorderSide::Right),
+            _ => None,
+        } {
+            let border = self.parse_page_border_run()?;
+            if self.sections.is_empty() {
+                if self.sections.len() >= MAX_SECTIONS {
+                    return Err(RtfError::MalformedDocument("RTF section count exceeds limit".to_string()));
+                }
+                self.sections.push(super::section::Section::new());
+            }
+            let section = self.sections.last_mut().ok_or_else(|| RtfError::MalformedDocument("no active RTF section".to_string()))?;
+            if section.properties.page_borders.get(side).is_some() {
+                return Err(RtfError::MalformedDocument("duplicate RTF page-border edge".to_string()));
+            }
+            section.properties.page_borders.set(side, border);
+            self.section_properties_active = true;
+            return Ok(true);
+        }
+
         if matches!(control, ControlWord::Section) {
             self.section_properties_active = false;
             self.section_note_options_closed = false;
@@ -3711,6 +3742,13 @@ impl<'a> Parser<'a> {
             ControlWord::SectionDefault => {
                 *properties = super::section::SectionProperties::default();
             },
+            ControlWord::PageBorderOptions(value) => {
+                let value = value.ok_or_else(|| RtfError::MalformedDocument("RTF pgbrdropt requires a numeric parameter".to_string()))?;
+                properties.page_borders.set_option_value(value)?;
+            },
+            ControlWord::PageBorderSurroundHeader => properties.page_borders.surround_header = true,
+            ControlWord::PageBorderSurroundFooter => properties.page_borders.surround_footer = true,
+            ControlWord::PageBorderSnap => properties.page_borders.snap_to_text_borders = true,
             ControlWord::SectionFootnotePlacement(value) => {
                 properties.note_options.footnote_placement = Some(*value);
             },
@@ -3805,6 +3843,87 @@ impl<'a> Parser<'a> {
             _ => {},
         }
         Ok(true)
+    }
+
+    fn parse_page_border_run(&mut self) -> RtfResult<crate::PageBorder> {
+        let mut border = crate::PageBorder::default();
+        let mut saw_style = false;
+        let mut seen = 0u8;
+        loop {
+            let Some(Token::Control(control)) = self.tokens.get(self.pos) else { break; };
+            let style = match control {
+                ControlWord::BorderNone => Some(crate::PageBorderStyle::None),
+                ControlWord::BorderSingle => Some(crate::PageBorderStyle::Single),
+                ControlWord::BorderThick => Some(crate::PageBorderStyle::Thick),
+                ControlWord::BorderDotted => Some(crate::PageBorderStyle::Dotted),
+                ControlWord::BorderDashed => Some(crate::PageBorderStyle::Dashed),
+                ControlWord::BorderDashSmall => Some(crate::PageBorderStyle::DashSmallGap),
+                ControlWord::BorderDotDash => Some(crate::PageBorderStyle::DotDash),
+                ControlWord::BorderDotDotDash => Some(crate::PageBorderStyle::DotDotDash),
+                ControlWord::BorderDouble => Some(crate::PageBorderStyle::Double),
+                ControlWord::BorderTriple => Some(crate::PageBorderStyle::Triple),
+                ControlWord::BorderThinThickSmall => Some(crate::PageBorderStyle::ThinThickSmallGap),
+                ControlWord::BorderThickThinSmall => Some(crate::PageBorderStyle::ThickThinSmallGap),
+                ControlWord::BorderThinThickThinSmall => Some(crate::PageBorderStyle::ThinThickThinSmallGap),
+                ControlWord::BorderThinThickMedium => Some(crate::PageBorderStyle::ThinThickMediumGap),
+                ControlWord::BorderThickThinMedium => Some(crate::PageBorderStyle::ThickThinMediumGap),
+                ControlWord::BorderThinThickThinMedium => Some(crate::PageBorderStyle::ThinThickThinMediumGap),
+                ControlWord::BorderThinThickLarge => Some(crate::PageBorderStyle::ThinThickLargeGap),
+                ControlWord::BorderThickThinLarge => Some(crate::PageBorderStyle::ThickThinLargeGap),
+                ControlWord::BorderThinThickThinLarge => Some(crate::PageBorderStyle::ThinThickThinLargeGap),
+                ControlWord::BorderWave => Some(crate::PageBorderStyle::Wavy),
+                ControlWord::BorderWavyDouble => Some(crate::PageBorderStyle::DoubleWavy),
+                ControlWord::BorderStriped => Some(crate::PageBorderStyle::Striped),
+                ControlWord::BorderEmbossed => Some(crate::PageBorderStyle::Embossed),
+                ControlWord::BorderEngraved => Some(crate::PageBorderStyle::Engraved),
+                ControlWord::BorderOutset => Some(crate::PageBorderStyle::Outset),
+                ControlWord::BorderInset => Some(crate::PageBorderStyle::Inset),
+                _ => None,
+            };
+            if let Some(style) = style {
+                if saw_style { return Err(RtfError::MalformedDocument("duplicate RTF page-border style".to_string())); }
+                saw_style = true;
+                border.style = style;
+                self.pos += 1;
+                continue;
+            }
+            match control {
+                ControlWord::PageBorderArt(value) => {
+                    if saw_style { return Err(RtfError::MalformedDocument("duplicate RTF page-border style/art".to_string())); }
+                    let value = value.ok_or_else(|| RtfError::MalformedDocument("RTF brdrart requires a numeric parameter".to_string()))?;
+                    border.art = Some(u8::try_from(value).map_err(|_| RtfError::MalformedDocument("invalid RTF page-border art".to_string()))?);
+                    saw_style = true;
+                },
+                ControlWord::BorderWidth(value) => {
+                    if !saw_style || seen & 1 != 0 { return Err(RtfError::MalformedDocument("invalid or duplicate RTF page-border width".to_string())); }
+                    border.width = u8::try_from(value.ok_or_else(|| RtfError::MalformedDocument("RTF page brdrw requires a numeric parameter".to_string()))?).map_err(|_| RtfError::MalformedDocument("invalid RTF page-border width".to_string()))?;
+                    seen |= 1;
+                },
+                ControlWord::BorderColor(value) => {
+                    if !saw_style || seen & 2 != 0 { return Err(RtfError::MalformedDocument("invalid or duplicate RTF page-border color".to_string())); }
+                    border.color_ref = u16::try_from(value.ok_or_else(|| RtfError::MalformedDocument("RTF page brdrcf requires a numeric parameter".to_string()))?).map_err(|_| RtfError::MalformedDocument("invalid RTF page-border color".to_string()))?;
+                    seen |= 2;
+                },
+                ControlWord::BorderSpace(value) => {
+                    if !saw_style || seen & 4 != 0 { return Err(RtfError::MalformedDocument("invalid or duplicate RTF page-border spacing".to_string())); }
+                    border.space = u16::try_from(value.ok_or_else(|| RtfError::MalformedDocument("RTF page brsp requires a numeric parameter".to_string()))?).map_err(|_| RtfError::MalformedDocument("invalid RTF page-border spacing".to_string()))?;
+                    seen |= 4;
+                },
+                ControlWord::BorderShadow => {
+                    if !saw_style || seen & 8 != 0 { return Err(RtfError::MalformedDocument("invalid or duplicate RTF page-border shadow".to_string())); }
+                    border.shadow = true; seen |= 8;
+                },
+                ControlWord::BorderFrame => {
+                    if !saw_style || seen & 16 != 0 { return Err(RtfError::MalformedDocument("invalid or duplicate RTF page-border frame".to_string())); }
+                    border.frame = true; seen |= 16;
+                },
+                _ => break,
+            }
+            self.pos += 1;
+        }
+        if !saw_style { return Err(RtfError::MalformedDocument("RTF page-border edge requires a style or art control".to_string())); }
+        border.validate()?;
+        Ok(border)
     }
 
     fn parse_revision_table(&mut self) -> RtfResult<()> {

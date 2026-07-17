@@ -3117,6 +3117,7 @@ impl<W: Write> RtfWriter<W> {
         // Write section properties
         self.write_control_word("sectd", None)?;
         self.write_section_note_options(&section.properties.note_options)?;
+        self.write_page_borders(&section.properties.page_borders)?;
 
         if let Some(direction) = section.properties.direction {
             self.write_control_word(
@@ -3193,6 +3194,31 @@ impl<W: Write> RtfWriter<W> {
             self.write_header_footer(hf)?;
         }
 
+        Ok(())
+    }
+
+    /// Write canonical section page-border options and edges.
+    pub fn write_page_borders(&mut self, borders: &crate::PageBorders) -> io::Result<()> {
+        borders.validate().map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+        if borders.is_empty() { return Ok(()); }
+        if borders.option_value() != 0 { self.write_control_word("pgbrdropt", Some(borders.option_value()))?; }
+        if borders.surround_header { self.write_control_word("pgbrdrhead", None)?; }
+        if borders.surround_footer { self.write_control_word("pgbrdrfoot", None)?; }
+        if borders.snap_to_text_borders { self.write_control_word("pgbrdrsnap", None)?; }
+        for (control, border) in [
+            ("pgbrdrt", borders.top), ("pgbrdrl", borders.left),
+            ("pgbrdrb", borders.bottom), ("pgbrdrr", borders.right),
+        ] {
+            let Some(border) = border else { continue; };
+            self.write_control_word(control, None)?;
+            if let Some(art) = border.art { self.write_control_word("brdrart", Some(i32::from(art)))?; }
+            else { self.write_control_word(border.style.control_word(), None)?; }
+            self.write_control_word("brdrw", Some(i32::from(border.width)))?;
+            self.write_control_word("brdrcf", Some(i32::from(border.color_ref)))?;
+            self.write_control_word("brsp", Some(i32::from(border.space)))?;
+            if border.shadow { self.write_control_word("brdrsh", None)?; }
+            if border.frame { self.write_control_word("brdrframe", None)?; }
+        }
         Ok(())
     }
 

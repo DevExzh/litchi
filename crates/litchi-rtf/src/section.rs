@@ -141,6 +141,8 @@ pub struct SectionProperties {
     pub line_number_restart: bool,
     /// Explicit section-level footnote and endnote overrides.
     pub note_options: SectionNoteOptions,
+    /// Page-border edges and placement for this section.
+    pub page_borders: crate::PageBorders,
 }
 
 impl Default for SectionProperties {
@@ -166,6 +168,7 @@ impl Default for SectionProperties {
             line_numbering: false,
             line_number_restart: false,
             note_options: SectionNoteOptions::default(),
+            page_borders: crate::PageBorders::default(),
         }
     }
 }

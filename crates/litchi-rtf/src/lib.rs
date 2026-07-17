@@ -29,6 +29,7 @@
 mod annotation;
 mod bookmark;
 mod border;
+mod page_border;
 mod compressed;
 mod document;
 mod document_variable;
@@ -95,6 +96,10 @@ pub use legacy_numbering::{
     LegacySectionNumberingLevel,
 };
 pub use paragraph_group::{ParagraphGroupProperty, ParagraphGroupPropertyTable};
+pub use page_border::{
+    PageBorder, PageBorderAppliesTo, PageBorderDepth, PageBorderOffset, PageBorderSide,
+    PageBorderStyle, PageBorders,
+};
 pub use note_options::{
     EndnoteRestart, FootnoteRestart, NoteNumberingStyle, NoteOptions, NotePlacement,
     PresentNoteKinds,

@@ -85,6 +85,8 @@ impl PageLayoutAttribute {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PageLayoutProperties {
     attributes: Vec<PageLayoutAttribute>,
+    /// Typed multi-column layout, if present.
+    pub columns: Option<crate::StyleColumns>,
     /// The exact `style:page-layout-properties` element, including background,
     /// columns, and footnote-separator children.
     pub xml: String,
@@ -221,7 +223,7 @@ pub(crate) fn parse_page_layouts(xml: &str) -> Result<Vec<PageLayout>> {
                         kind,
                         attributes,
                         xml[event_start..event_end].to_string(),
-                    );
+                    )?;
                 }
             },
             Event::End(element) if active.is_some() => {
@@ -237,7 +239,7 @@ pub(crate) fn parse_page_layouts(xml: &str) -> Result<Vec<PageLayout>> {
                             child.kind,
                             child.attributes,
                             xml[child.start..event_end].to_string(),
-                        );
+                        )?;
                     }
                 }
                 builder.depth = builder.depth.checked_sub(1).ok_or_else(|| {
@@ -470,14 +472,25 @@ fn store_child(
     kind: ChildKind,
     attributes: Vec<PageLayoutAttribute>,
     xml: String,
-) {
+) -> Result<()> {
     match kind {
         ChildKind::Properties => {
-            layout.properties = Some(PageLayoutProperties { attributes, xml });
+            let mut parsed = crate::style_columns::parse_page_layout_property_columns(&xml)?;
+            if parsed.len() > 1 {
+                return Err(Error::InvalidFormat(
+                    "page-layout-properties has multiple style:columns children".to_string(),
+                ));
+            }
+            layout.properties = Some(PageLayoutProperties {
+                attributes,
+                columns: parsed.pop(),
+                xml,
+            });
         },
         ChildKind::HeaderStyle => layout.header_style_xml = Some(xml),
         ChildKind::FooterStyle => layout.footer_style_xml = Some(xml),
     }
+    Ok(())
 }
 
 fn push_layout(layouts: &mut Vec<PageLayout>, layout: PageLayout) -> Result<()> {
