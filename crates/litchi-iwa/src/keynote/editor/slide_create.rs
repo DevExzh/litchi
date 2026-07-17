@@ -101,7 +101,6 @@ impl KeynoteEditor {
                 )));
             }
         }
-        let attachment_id = take_identifier(&mut next_identifier)?;
         let new_slide_id = remap[&resolved.slide_id];
         let new_note_id = remap[&note_source.note_id];
         let new_note_storage_id = remap[&note_source.storage_id];
@@ -144,9 +143,19 @@ impl KeynoteEditor {
         if let Some(reference) = &resolved.slide.user_defined_guide_storage {
             clear_user_guides(&mut new_archive, remap[&reference.identifier])?;
         }
-        if let Some(attachment) =
-            prepare_slide_number(&mut new_archive, new_slide_id, attachment_id)?
-        {
+        let attachment =
+            prepare_slide_number(&mut new_archive, new_slide_id, &mut next_identifier)?;
+        let attachment_id = attachment
+            .as_ref()
+            .map(|object| {
+                object.archive_info.identifier.ok_or_else(|| {
+                    Error::InvalidFormat(
+                        "Created Keynote slide-number attachment has no identifier".to_owned(),
+                    )
+                })
+            })
+            .transpose()?;
+        if let Some(attachment) = attachment {
             new_archive.insert_object(attachment)?;
         }
 
@@ -191,6 +200,9 @@ impl KeynoteEditor {
             &remap,
             &note_source,
         )?;
+        if let Some(attachment_id) = attachment_id {
+            add_component_object_uuids(&mut staged, new_slide_id, &[attachment_id])?;
+        }
         set_package_last_object_identifier(&mut staged, next_identifier - 1)?;
 
         let preview = KeynoteEditor::from_package(staged.clone())?;

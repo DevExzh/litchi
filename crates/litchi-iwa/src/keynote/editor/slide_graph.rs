@@ -5,6 +5,7 @@ use super::*;
 const IMAGE_MESSAGE_TYPE: u32 = 3_005;
 const MASK_MESSAGE_TYPE: u32 = 3_006;
 const MOVIE_MESSAGE_TYPE: u32 = 3_007;
+const STORAGELESS_PLACEHOLDER_STORAGE_ID: u64 = 0;
 
 pub(super) struct ObjectGraph {
     pub(super) objects: HashMap<u64, Vec<RawMessage>>,
@@ -109,6 +110,7 @@ impl ObjectGraph {
                         .and_then(|shape| shape.owned_storage)
                 })
                 .map(|reference| reference.identifier)
+                .filter(|identifier| *identifier != STORAGELESS_PLACEHOLDER_STORAGE_ID)
         }))
     }
 

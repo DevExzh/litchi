@@ -10,6 +10,8 @@ use prost::Message;
 
 use super::editor::KeynoteEditor;
 
+mod slide_number;
+
 const DOCUMENT_ARCHIVE_ENTRY: &str = "Index/Document.iwa";
 const TEMPLATE_ARCHIVE_ENTRY: &str = "Index/TemplateSlide-8.iwa";
 const SLIDE_ARCHIVE_ENTRY: &str = "Index/Slide-14.iwa";
@@ -63,6 +65,8 @@ const CHARACTER_STYLE: u64 = 25;
 const SHAPE_STYLE: u64 = 26;
 const MEDIA_STYLE: u64 = 27;
 const DROP_CAP_STYLE: u64 = 28;
+const TEMPLATE_SLIDE_NUMBER: u64 = 29;
+const LIVE_SLIDE_NUMBER: u64 = 30;
 const CALCULATION_ENGINE: u64 = 31;
 const FUNCTION_BROWSER_STATE: u64 = 32;
 const CUSTOM_FORMAT_LIST: u64 = 33;
@@ -103,6 +107,7 @@ const TEMPLATE_OBJECTS: &[u64] = &[
     TEMPLATE_TITLE_STORAGE,
     TEMPLATE_BODY_STORAGE,
     TEMPLATE_GUIDES,
+    TEMPLATE_SLIDE_NUMBER,
 ];
 const SLIDE_OBJECTS: &[u64] = &[
     LIVE_SLIDE,
@@ -113,6 +118,7 @@ const SLIDE_OBJECTS: &[u64] = &[
     LIVE_NOTE,
     LIVE_NOTE_STORAGE,
     LIVE_GUIDES,
+    LIVE_SLIDE_NUMBER,
 ];
 
 #[derive(Debug, Clone, Copy)]
@@ -167,6 +173,7 @@ pub struct KeynoteDocumentBuilder {
     locale: String,
     width: f32,
     height: f32,
+    slide_number_visible: bool,
 }
 
 impl Default for KeynoteDocumentBuilder {
@@ -179,6 +186,7 @@ impl Default for KeynoteDocumentBuilder {
             locale: DEFAULT_LOCALE.to_owned(),
             width: DEFAULT_WIDTH,
             height: DEFAULT_HEIGHT,
+            slide_number_visible: false,
         }
     }
 }
@@ -218,6 +226,15 @@ impl KeynoteDocumentBuilder {
     pub fn slide_size(mut self, width: f32, height: f32) -> Self {
         self.width = width;
         self.height = height;
+        self
+    }
+
+    /// Show the native slide-number placeholder on the initial slide.
+    ///
+    /// The placeholder graph is always created so visibility can be toggled
+    /// later without consulting an Apple template.
+    pub const fn slide_number_visible(mut self, visible: bool) -> Self {
+        self.slide_number_visible = visible;
         self
     }
 
@@ -341,8 +358,8 @@ fn document_archive(builder: &KeynoteDocumentBuilder, template_id: tsp::Uuid) ->
         automatically_plays_upon_open: Some(false),
         ..Default::default()
     };
-    let live_node = slide_node(LIVE_SLIDE, template_id, true);
-    let template_node = slide_node(TEMPLATE_SLIDE, template_id, false);
+    let live_node = slide_node(LIVE_SLIDE, template_id, true, builder.slide_number_visible);
+    let template_node = slide_node(TEMPLATE_SLIDE, template_id, false, false);
 
     let common_theme = IWorkThemeArchive::new(
         tss::ThemeArchive {
@@ -509,6 +526,8 @@ fn template_archive(builder: &KeynoteDocumentBuilder) -> Result<Archive> {
         TEMPLATE_TITLE,
         TEMPLATE_BODY,
         TEMPLATE_GUIDES,
+        TEMPLATE_SLIDE_NUMBER,
+        false,
         None,
         None,
         Some(DEFAULT_LAYOUT_NAME.to_owned()),
@@ -519,7 +538,13 @@ fn template_archive(builder: &KeynoteDocumentBuilder) -> Result<Archive> {
                 TEMPLATE_SLIDE,
                 KeynoteMessageType::Slide,
                 slide,
-                &[SLIDE_STYLE, TEMPLATE_TITLE, TEMPLATE_BODY, TEMPLATE_GUIDES],
+                &[
+                    SLIDE_STYLE,
+                    TEMPLATE_TITLE,
+                    TEMPLATE_BODY,
+                    TEMPLATE_GUIDES,
+                    TEMPLATE_SLIDE_NUMBER,
+                ],
             )?,
             object(
                 TEMPLATE_TITLE,
@@ -561,6 +586,15 @@ fn template_archive(builder: &KeynoteDocumentBuilder) -> Result<Archive> {
                 tsd::GuideStorageArchive::default(),
                 &[],
             )?,
+            object(
+                TEMPLATE_SLIDE_NUMBER,
+                KeynoteMessageType::Placeholder,
+                slide_number::placeholder(
+                    TEMPLATE_SLIDE,
+                    slide_number::PlaceholderContext::Template,
+                ),
+                &[TEMPLATE_SLIDE, SHAPE_STYLE],
+            )?,
         ],
     })
 }
@@ -570,6 +604,8 @@ fn slide_archive(builder: &KeynoteDocumentBuilder) -> Result<Archive> {
         LIVE_TITLE,
         LIVE_BODY,
         LIVE_GUIDES,
+        LIVE_SLIDE_NUMBER,
+        builder.slide_number_visible,
         Some(TEMPLATE_SLIDE),
         Some(LIVE_NOTE),
         None,
@@ -587,6 +623,7 @@ fn slide_archive(builder: &KeynoteDocumentBuilder) -> Result<Archive> {
                     LIVE_GUIDES,
                     TEMPLATE_SLIDE,
                     LIVE_NOTE,
+                    LIVE_SLIDE_NUMBER,
                 ],
             )?,
             object(
@@ -643,12 +680,23 @@ fn slide_archive(builder: &KeynoteDocumentBuilder) -> Result<Archive> {
                 tsd::GuideStorageArchive::default(),
                 &[],
             )?,
+            object(
+                LIVE_SLIDE_NUMBER,
+                KeynoteMessageType::Placeholder,
+                slide_number::placeholder(LIVE_SLIDE, slide_number::PlaceholderContext::Live),
+                &[LIVE_SLIDE, SHAPE_STYLE],
+            )?,
         ],
     })
 }
 
 #[allow(deprecated)]
-fn slide_node(slide_id: u64, template_id: tsp::Uuid, live: bool) -> kn::SlideNodeArchive {
+fn slide_node(
+    slide_id: u64,
+    template_id: tsp::Uuid,
+    live: bool,
+    slide_number_visible: bool,
+) -> kn::SlideNodeArchive {
     kn::SlideNodeArchive {
         slide: Some(reference(slide_id)),
         depth: Some(1),
@@ -657,7 +705,7 @@ fn slide_node(slide_id: u64, template_id: tsp::Uuid, live: bool) -> kn::SlideNod
         has_builds: false,
         has_transition: false,
         has_note: Some(live),
-        is_slide_number_visible: Some(false),
+        is_slide_number_visible: Some(slide_number_visible),
         build_event_count: Some(0),
         build_event_count_cache_version: Some(1),
         has_explicit_builds: Some(false),
@@ -672,17 +720,26 @@ fn slide(
     title_id: u64,
     body_id: u64,
     guides_id: u64,
+    slide_number_id: u64,
+    slide_number_visible: bool,
     template_slide_id: Option<u64>,
     note_id: Option<u64>,
     name: Option<String>,
 ) -> kn::SlideArchive {
+    let mut owned_drawables = vec![reference(title_id), reference(body_id)];
+    let mut drawables_z_order = owned_drawables.clone();
+    if slide_number_visible {
+        owned_drawables.push(reference(slide_number_id));
+        drawables_z_order.push(reference(slide_number_id));
+    }
     kn::SlideArchive {
         style: reference(SLIDE_STYLE),
         transition: transition(),
         title_placeholder: Some(reference(title_id)),
         body_placeholder: Some(reference(body_id)),
-        owned_drawables: vec![reference(title_id), reference(body_id)],
-        drawables_z_order: vec![reference(title_id), reference(body_id)],
+        slide_number_placeholder: Some(reference(slide_number_id)),
+        owned_drawables,
+        drawables_z_order,
         instructional_text_map: Some(kn::slide_archive::InstructionalTextMap::default()),
         name,
         template_slide: template_slide_id.map(reference),
@@ -1535,6 +1592,55 @@ mod tests {
         let removed = editor.remove_slide(0).unwrap();
         assert_eq!(removed.title.as_deref(), Some(DEFAULT_TITLE));
         assert_eq!(editor.slides().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn generated_presentation_materializes_native_slide_number_placeholders() {
+        let mut hidden = KeynoteEditor::create().unwrap();
+        assert_eq!(
+            hidden.slides().unwrap()[0].is_slide_number_visible,
+            Some(false)
+        );
+        hidden.set_slide_number_visible(0, true).unwrap();
+        assert_eq!(
+            hidden.slides().unwrap()[0].is_slide_number_visible,
+            Some(true)
+        );
+        hidden.set_slide_number_visible(0, false).unwrap();
+        assert_eq!(
+            hidden.slides().unwrap()[0].is_slide_number_visible,
+            Some(false)
+        );
+
+        let mut visible = KeynoteDocumentBuilder::new()
+            .slide_number_visible(true)
+            .build()
+            .unwrap();
+        assert_eq!(
+            visible.slides().unwrap()[0].is_slide_number_visible,
+            Some(true)
+        );
+
+        let layout = visible.default_slide_layout().unwrap();
+        let created = visible.add_slide(layout).unwrap();
+        assert_eq!(created.is_slide_number_visible, Some(false));
+        visible.set_slide_number_visible(1, true).unwrap();
+        assert_eq!(
+            visible.slides().unwrap()[1].is_slide_number_visible,
+            Some(true)
+        );
+        assert_eq!(visible.slide_text_storages(1).unwrap().len(), 2);
+
+        let reopened = KeynoteEditor::from_bytes(&visible.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .slides()
+                .unwrap()
+                .iter()
+                .map(|slide| slide.is_slide_number_visible)
+                .collect::<Vec<_>>(),
+            [Some(true), Some(true)]
+        );
     }
 
     #[test]

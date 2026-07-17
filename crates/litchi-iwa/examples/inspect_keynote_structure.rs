@@ -15,6 +15,8 @@ use litchi_iwa::protobuf::tsp::PackageMetadata;
 use litchi_iwa::protobuf::tswp::{ShapeInfoArchive, StorageArchive};
 use prost::Message;
 
+const STORAGELESS_PLACEHOLDER_STORAGE_ID: u64 = 0;
+
 const PACKAGE_METADATA_MESSAGE_TYPE: u32 = 11_006;
 
 #[allow(deprecated)]
@@ -349,7 +351,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             decode::<PlaceholderArchive>(object)
                                 .and_then(|placeholder| placeholder.super_.owned_storage)
                         })
-                        .map(|reference| reference.identifier);
+                        .map(|reference| reference.identifier)
+                        .filter(|identifier| *identifier != STORAGELESS_PLACEHOLDER_STORAGE_ID);
                     println!(
                         "  drawable={} archive={} types={:?} storage={:?}",
                         drawable.identifier,

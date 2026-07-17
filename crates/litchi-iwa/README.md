@@ -65,9 +65,10 @@ println!("{}", structured.summary());
   settings with lossless optional-field presence
 - Lossless Numbers table-title visibility and title-outline settings
 - Typed Keynote theme-layout discovery and fresh empty-slide creation with native
-  component registration, speaker notes, slide numbers, and transactional insertion
-- Wire-preserving Keynote per-slide number visibility with native placeholder
-  ownership and z-order invariants
+  component registration, speaker notes, storage-less slide-number placeholders,
+  and transactional insertion
+- Source-free and wire-preserving Keynote per-slide number visibility with native
+  placeholder ownership and z-order invariants
 - Native Keynote build-in/build-out object CRUD with typed On Click / After Transition /
   With Previous / After Previous timing, typed Rotate / Scale / Opacity / Move actions,
   editable Bézier motion paths, typed Blink / Bounce / Flip / Jiggle / Pop / Pulse
@@ -429,6 +430,27 @@ numbers.save("created-with-audio.numbers")?;
 ```
 
 ### Create Keynote presentations from scratch
+
+The builder materializes Keynote's modern storage-less slide-number placeholder
+graph in both the theme layout and live slide. It can be initially visible or
+retained hidden for later toggling; fresh slides cloned from the layout preserve
+the same native behavior:
+
+```rust
+use litchi_iwa::keynote::KeynoteDocumentBuilder;
+
+let mut keynote = KeynoteDocumentBuilder::new()
+    .title("Native slide numbers")
+    .slide_number_visible(true)
+    .build()?;
+let layout = keynote.default_slide_layout()?;
+keynote.add_slide(layout)?;
+keynote.set_slide_number_visible(1, true)?;
+keynote.save("created-with-slide-numbers.key")?;
+# Ok::<(), litchi_iwa::Error>(())
+```
+
+See `create_keynote_slide_numbers` for a complete source-free example.
 
 Scratch-created presentations can add ordinary text boxes directly to any
 slide. The shape, text storage, stand-ins, ownership, z-order, and metadata are

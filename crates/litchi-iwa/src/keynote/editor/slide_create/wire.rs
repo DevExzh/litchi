@@ -46,6 +46,7 @@ const STORAGE_ATTACHMENT_TABLE_FIELD: u32 = 9;
 const GUIDE_STORAGE_GUIDES_FIELD: u32 = 1;
 const OBJECT_REPLACEMENT_CHARACTER: &str = "\u{fffc}";
 const IWORK_MESSAGE_VERSIONS: &[u32] = &[1, 0, 5];
+const STORAGELESS_PLACEHOLDER_STORAGE_ID: u64 = 0;
 
 pub(super) fn insert_slide_node(
     package: &mut IWorkPackage,
@@ -417,7 +418,7 @@ pub(super) fn clear_user_guides(archive: &mut Archive, guide_storage_id: u64) ->
 pub(super) fn prepare_slide_number(
     archive: &mut Archive,
     slide_id: u64,
-    attachment_id: u64,
+    next_identifier: &mut u64,
 ) -> Result<Option<ArchiveObject>> {
     let slide = archive.object(slide_id).ok_or_else(|| {
         Error::InvalidFormat(format!("Keynote created slide {slide_id} is missing"))
@@ -458,6 +459,10 @@ pub(super) fn prepare_slide_number(
             Error::InvalidFormat("Keynote slide-number placeholder has no storage".to_owned())
         })?
         .identifier;
+    if storage_id == STORAGELESS_PLACEHOLDER_STORAGE_ID {
+        return Ok(None);
+    }
+    let attachment_id = take_identifier(next_identifier)?;
     let table = tswp::ObjectAttributeTable {
         entries: vec![tswp::object_attribute_table::ObjectAttribute {
             character_index: 0,
