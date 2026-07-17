@@ -39,7 +39,9 @@ use super::paragraph_alignment::{
     text_script, text_shadow, text_style,
 };
 use super::paragraph_list::{
-    ParagraphList, paragraph_list, reset_paragraph_list, set_paragraph_list,
+    ParagraphList, ParagraphListLevel, ParagraphListLevelPlacement, paragraph_list,
+    paragraph_list_level, paragraph_list_levels, reset_paragraph_list, reset_paragraph_list_level,
+    set_paragraph_list, set_paragraph_list_level,
 };
 use super::paragraph_tabs::ParagraphTabStops;
 use super::style::{
@@ -271,6 +273,64 @@ impl IWorkTextEditor {
             if paragraph_list(&verified, object_id)? != ParagraphList::None {
                 return Err(Error::InvalidFormat(
                     "iWork paragraph-list reset failed round-trip validation".to_owned(),
+                ));
+            }
+            self.package = staged;
+        }
+        Ok(changed)
+    }
+
+    /// Read every effective list-level boundary in a text storage.
+    pub fn paragraph_list_levels(
+        &self,
+        object_id: u64,
+    ) -> Result<Vec<ParagraphListLevelPlacement>> {
+        paragraph_list_levels(&self.package, object_id)
+    }
+
+    /// Read the effective list level at one validated paragraph start.
+    pub fn paragraph_list_level(
+        &self,
+        object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<ParagraphListLevel> {
+        paragraph_list_level(&self.package, object_id, paragraph)
+    }
+
+    /// Atomically set one paragraph's zero-based list nesting level.
+    pub fn set_paragraph_list_level(
+        &mut self,
+        object_id: u64,
+        paragraph: ParagraphStart,
+        level: ParagraphListLevel,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        set_paragraph_list_level(&mut staged, object_id, paragraph, level)?;
+        let bytes = staged.to_bytes()?;
+        let verified = IWorkPackage::from_bytes(&bytes)?;
+        if paragraph_list_level(&verified, object_id, paragraph)? != level {
+            return Err(Error::InvalidFormat(
+                "iWork paragraph list-level update failed round-trip validation".to_owned(),
+            ));
+        }
+        self.package = staged;
+        Ok(())
+    }
+
+    /// Restore one paragraph to the top-level list nesting level.
+    pub fn reset_paragraph_list_level(
+        &mut self,
+        object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = reset_paragraph_list_level(&mut staged, object_id, paragraph)?;
+        if changed {
+            let bytes = staged.to_bytes()?;
+            let verified = IWorkPackage::from_bytes(&bytes)?;
+            if paragraph_list_level(&verified, object_id, paragraph)? != ParagraphListLevel::ZERO {
+                return Err(Error::InvalidFormat(
+                    "iWork paragraph list-level reset failed round-trip validation".to_owned(),
                 ));
             }
             self.package = staged;

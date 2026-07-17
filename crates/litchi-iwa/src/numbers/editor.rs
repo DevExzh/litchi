@@ -39,10 +39,10 @@ use crate::shapes::{
 };
 use crate::text::{
     IWorkTextEditor, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphIndents,
-    ParagraphLineSpacing, ParagraphList, ParagraphSpacing, ParagraphStart, ParagraphTabStops,
-    TextAlignment, TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing,
-    TextColumns, TextDecorations, TextFont, TextLigatures, TextOutline, TextScript, TextShadow,
-    TextStorageInfo, TextStyle,
+    ParagraphLineSpacing, ParagraphList, ParagraphListLevel, ParagraphListLevelPlacement,
+    ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment, TextBackground,
+    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumns, TextDecorations,
+    TextFont, TextLigatures, TextOutline, TextScript, TextShadow, TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     patch_length_delimited_field, patch_nested_fixed32_field, patch_nested_length_delimited_field,
@@ -702,6 +702,59 @@ impl NumbersEditor {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
         let changed = text.reset_paragraph_list(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(text.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read every list-level boundary in a sheet-owned text box.
+    pub fn sheet_text_box_paragraph_list_levels(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<Vec<ParagraphListLevelPlacement>> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        IWorkTextEditor::from_package(self.package.clone()).paragraph_list_levels(graph.storage_id)
+    }
+
+    /// Read one paragraph's effective list nesting level.
+    pub fn sheet_text_box_paragraph_list_level(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<ParagraphListLevel> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        IWorkTextEditor::from_package(self.package.clone())
+            .paragraph_list_level(graph.storage_id, paragraph)
+    }
+
+    /// Atomically set one paragraph's list nesting level.
+    pub fn set_sheet_text_box_paragraph_list_level(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+        level: ParagraphListLevel,
+    ) -> Result<()> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        text.set_paragraph_list_level(graph.storage_id, paragraph, level)?;
+        *self = Self::from_package(text.into_package())?;
+        Ok(())
+    }
+
+    /// Restore one paragraph to the top-level list nesting level.
+    pub fn reset_sheet_text_box_paragraph_list_level(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let changed = text.reset_paragraph_list_level(graph.storage_id, paragraph)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
         }

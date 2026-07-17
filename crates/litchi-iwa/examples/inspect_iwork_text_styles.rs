@@ -15,6 +15,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let editor = IWorkTextEditor::open(input)?;
     for storage in editor.storages()? {
+        if let Ok(levels) = editor.paragraph_list_levels(storage.object_id) {
+            println!("storage={} list_levels={levels:?}", storage.object_id);
+        }
         match (
             editor.text_style(storage.object_id),
             editor.text_font(storage.object_id),

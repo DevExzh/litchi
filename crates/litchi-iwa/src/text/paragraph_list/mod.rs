@@ -1,5 +1,6 @@
 //! Transactional paragraph-list CRUD shared by Pages, Numbers, and Keynote.
 
+mod levels;
 mod native;
 mod storage;
 mod types;
@@ -11,7 +12,12 @@ use crate::text::style_registry::{
 };
 use crate::{Error, IWorkPackage, Result};
 
-pub use types::ParagraphList;
+pub use types::{ParagraphList, ParagraphListLevel, ParagraphListLevelPlacement};
+
+pub(super) use levels::{
+    paragraph_list_level, paragraph_list_levels, reset_paragraph_list_level,
+    set_paragraph_list_level,
+};
 
 pub(super) fn paragraph_list(package: &IWorkPackage, storage_id: u64) -> Result<ParagraphList> {
     let storage = storage::locate(package, storage_id)?;
@@ -100,5 +106,7 @@ pub(super) fn reset_paragraph_list(package: &mut IWorkPackage, storage_id: u64) 
     Ok(true)
 }
 
+#[cfg(test)]
+mod level_tests;
 #[cfg(test)]
 mod tests;

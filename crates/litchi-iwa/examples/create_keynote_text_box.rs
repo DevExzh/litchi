@@ -10,12 +10,12 @@ use litchi_iwa::shapes::{
 use litchi_iwa::text::{
     DropCapCharacterCount, DropCapLineCount, DropCapOutdent, DropCapPadding, DropCapRaisedLines,
     DropCapWrap, ParagraphDropCap, ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing,
-    ParagraphLineSpacingPoints, ParagraphList, ParagraphSpacing, ParagraphSpacingPoints,
-    ParagraphStart, ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition,
-    ParagraphTabStop, ParagraphTabStops, TextAlignment, TextBackground, TextBaselineShift,
-    TextCapitalization, TextCharacterSpacing, TextColumnCount, TextColumns, TextDecorations,
-    TextFont, TextLigatures, TextOutline, TextPointSize, TextScript, TextShadow, TextStrikethrough,
-    TextStyle, TextUnderline,
+    ParagraphLineSpacingPoints, ParagraphList, ParagraphListLevel, ParagraphSpacing,
+    ParagraphSpacingPoints, ParagraphStart, ParagraphTabAlignment, ParagraphTabLeader,
+    ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops, TextAlignment, TextBackground,
+    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumnCount, TextColumns,
+    TextDecorations, TextFont, TextLigatures, TextOutline, TextPointSize, TextScript, TextShadow,
+    TextStrikethrough, TextStyle, TextUnderline,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -23,9 +23,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = arguments
         .next()
         .ok_or("usage: create_keynote_text_box <output.key> [text]")?;
-    let text = arguments
-        .next()
-        .unwrap_or_else(|| "Quarterly result\t42.50 — built from typed IWA objects".to_owned());
+    let text = arguments.next().unwrap_or_else(|| {
+        "Quarterly result\t42.50 — built from typed IWA objects\nOutlook\tNested bullet item"
+            .to_owned()
+    });
     if arguments.next().is_some() {
         return Err("unexpected extra arguments".into());
     }
@@ -158,6 +159,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         created.drawable_object_id,
         ParagraphList::Bullet,
     )?;
+    if let Some(newline) = text.find('\n') {
+        let start = ParagraphStart::from_utf16_index(text[..=newline].encode_utf16().count())?;
+        editor.set_slide_text_box_paragraph_list_level(
+            0,
+            created.drawable_object_id,
+            start,
+            ParagraphListLevel::ONE,
+        )?;
+    }
     editor.set_slide_text_box_paragraph_drop_cap(
         0,
         created.drawable_object_id,

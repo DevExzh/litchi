@@ -26,7 +26,7 @@ pub use drop_cap::{
 };
 pub use editor::{IWorkTextEditor, TextStorageInfo};
 pub use font::{TextFont, TextFontName};
-pub use paragraph_list::ParagraphList;
+pub use paragraph_list::{ParagraphList, ParagraphListLevel, ParagraphListLevelPlacement};
 pub use paragraph_tabs::{
     ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
     ParagraphTabStops,
