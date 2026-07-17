@@ -9,6 +9,10 @@
 //! - Legend text
 //! - Grid data (row/column names and values)
 
+mod archive;
+mod kind;
 pub mod metadata_extractor;
 
+pub use archive::IWorkChartArchive;
+pub use kind::ChartKind;
 pub use metadata_extractor::{ChartMetadata, ChartMetadataExtractor};

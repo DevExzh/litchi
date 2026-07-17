@@ -106,10 +106,19 @@ fn decode_comment_storage_archive(data: &[u8]) -> Result<Box<dyn DecodedMessage>
     Ok(Box::new(CommentStorageArchiveWrapper(msg)) as Box<dyn DecodedMessage>)
 }
 
-/// Static decoder function for ChartArchive messages
-fn decode_chart_archive(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
-    let msg = tsch::ChartArchive::decode(data)?;
-    Ok(Box::new(ChartArchiveWrapper(msg)) as Box<dyn DecodedMessage>)
+fn decode_legacy_chart(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
+    let message = tsch::pre_uff::ChartInfoArchive::decode(data)?;
+    Ok(Box::new(LegacyChartArchiveWrapper(message)) as Box<dyn DecodedMessage>)
+}
+
+fn decode_chart_mediator(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
+    let message = tsch::ChartMediatorArchive::decode(data)?;
+    Ok(Box::new(ChartMediatorArchiveWrapper(message)) as Box<dyn DecodedMessage>)
+}
+
+fn decode_chart_drawable(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
+    let message = crate::charts::IWorkChartArchive::decode(data)?;
+    Ok(Box::new(ChartDrawableArchiveWrapper(message)) as Box<dyn DecodedMessage>)
 }
 
 type DecoderMap = phf::Map<u32, fn(&[u8]) -> Result<Box<dyn DecodedMessage>>>;
@@ -157,9 +166,9 @@ static DECODERS: DecoderMap = phf_map! {
     3056u32 => decode_comment_storage_archive,
 
     // TSCH (Charts) types
-    5000u32 => decode_chart_archive,
-    5004u32 => decode_chart_archive,  // ChartMediatorArchive
-    5021u32 => decode_chart_archive,  // ChartDrawableArchive
+    5000u32 => decode_legacy_chart,
+    5004u32 => decode_chart_mediator,
+    5021u32 => decode_chart_drawable,
 
     // TSWP (Word Processing) types - Text storage used across all apps
     2001u32 => decode_storage_archive,
@@ -516,38 +525,55 @@ impl DecodedMessage for CommentStorageArchiveWrapper {
     }
 }
 
-/// Wrapper for Chart Archive
+/// Wrapper for the legacy, inline-data chart representation.
 #[derive(Debug)]
-pub struct ChartArchiveWrapper(pub tsch::ChartArchive);
+pub struct LegacyChartArchiveWrapper(pub tsch::pre_uff::ChartInfoArchive);
 
-impl DecodedMessage for ChartArchiveWrapper {
+impl DecodedMessage for LegacyChartArchiveWrapper {
     fn message_type(&self) -> u32 {
-        600
+        5_000
     }
 
     fn extract_text(&self) -> Vec<String> {
-        // Charts contain text in grid data (row/column names)
-        // and may have titles in referenced text storage objects
-        let mut text = Vec::new();
+        self.0
+            .chart_model
+            .inline_grid
+            .iter()
+            .flat_map(|grid| grid.row_name.iter().chain(&grid.column_name))
+            .filter(|text| !text.is_empty())
+            .cloned()
+            .collect()
+    }
+}
 
-        // Extract grid data (row and column names)
-        if let Some(ref grid) = self.0.grid {
-            // Add row names
-            for row_name in &grid.row_name {
-                if !row_name.is_empty() {
-                    text.push(row_name.clone());
-                }
-            }
+/// Wrapper for a chart's data mediator.
+#[derive(Debug)]
+pub struct ChartMediatorArchiveWrapper(pub tsch::ChartMediatorArchive);
 
-            // Add column names
-            for col_name in &grid.column_name {
-                if !col_name.is_empty() {
-                    text.push(col_name.clone());
-                }
-            }
-        }
+impl DecodedMessage for ChartMediatorArchiveWrapper {
+    fn message_type(&self) -> u32 {
+        5_004
+    }
+}
 
-        text
+/// Wrapper for an extension-backed modern chart drawable.
+#[derive(Debug)]
+pub struct ChartDrawableArchiveWrapper(pub crate::charts::IWorkChartArchive);
+
+impl DecodedMessage for ChartDrawableArchiveWrapper {
+    fn message_type(&self) -> u32 {
+        5_021
+    }
+
+    fn extract_text(&self) -> Vec<String> {
+        self.0
+            .chart
+            .iter()
+            .filter_map(|chart| chart.grid.as_ref())
+            .flat_map(|grid| grid.row_name.iter().chain(&grid.column_name))
+            .filter(|text| !text.is_empty())
+            .cloned()
+            .collect()
     }
 }
 
@@ -623,6 +649,26 @@ mod tests {
         let decoded = decode(3056, &comment.encode_to_vec()).unwrap();
         assert_eq!(decoded.message_type(), 3056);
         assert_eq!(decoded.extract_text(), ["Review this"]);
+    }
+
+    #[test]
+    fn modern_chart_drawables_decode_the_extension_payload() {
+        let chart = crate::charts::IWorkChartArchive::new(
+            tsch::ChartDrawableArchive::default(),
+            tsch::ChartArchive {
+                chart_type: Some(tsch::ChartType::ColumnChartType2D as i32),
+                grid: Some(tsch::ChartGridArchive {
+                    row_name: vec!["Revenue".to_owned()],
+                    column_name: vec!["2026".to_owned()],
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+        );
+        let decoded = decode(5_021, &chart.encode().unwrap()).unwrap();
+
+        assert_eq!(decoded.message_type(), 5_021);
+        assert_eq!(decoded.extract_text(), ["Revenue", "2026"]);
     }
 
     #[test]

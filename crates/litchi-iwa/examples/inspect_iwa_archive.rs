@@ -4,6 +4,7 @@ use std::env;
 
 use litchi_iwa::IWorkPackage;
 use litchi_iwa::IWorkThemeArchive;
+use litchi_iwa::charts::IWorkChartArchive;
 use litchi_iwa::protobuf::kn;
 use litchi_iwa::protobuf::tn;
 use litchi_iwa::protobuf::tp::{
@@ -79,6 +80,11 @@ fn print_archive(archive: litchi_iwa::archive::Archive, object_id: Option<u64>) 
             }
         }
         for message in &object.messages {
+            if message.type_ == 5_021
+                && let Ok(chart) = IWorkChartArchive::decode(message.data.as_slice())
+            {
+                println!("  chart_drawable={chart:#?}");
+            }
             if matches!(message.type_, 0 | 8 | 153 | 205 | 212 | 213 | 3_056) {
                 let hex = message
                     .data
