@@ -9,6 +9,9 @@ mod bookmark;
 mod bookmark_object;
 mod bookmark_types;
 pub(crate) mod columns;
+mod date_time;
+mod date_time_object;
+mod date_time_types;
 mod drop_cap;
 pub mod editor;
 pub mod extractor;
@@ -27,6 +30,7 @@ mod paragraph_alignment;
 mod paragraph_list;
 mod paragraph_tabs;
 mod position;
+mod smart_field_object;
 pub mod storage;
 mod storage_wire;
 pub mod style;
@@ -36,6 +40,8 @@ mod text_comment_types;
 
 #[cfg(test)]
 mod bookmark_tests;
+#[cfg(test)]
+mod date_time_tests;
 #[cfg(test)]
 mod highlight_tests;
 #[cfg(test)]
@@ -51,6 +57,11 @@ pub use bookmark_types::{
 pub use columns::{
     EqualTextColumns, FollowingTextColumn, TextColumnCount, TextColumnGap, TextColumnWidth,
     TextColumns, VariableTextColumns,
+};
+pub use date_time_types::{
+    TextDateTimeDisplayText, TextDateTimeField, TextDateTimeFieldId, TextDateTimeFieldSettings,
+    TextDateTimeFormat, TextDateTimeFormatterStyle, TextDateTimeInstant,
+    TextDateTimeLocaleIdentifier, TextDateTimeUpdatePlan,
 };
 pub use drop_cap::{
     DropCapCharacterCount, DropCapCharacterScale, DropCapCornerRadius, DropCapLineCount,

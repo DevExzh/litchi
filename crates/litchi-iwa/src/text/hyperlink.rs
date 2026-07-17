@@ -10,8 +10,7 @@ use crate::package_metadata::{
 use crate::{Error, IWorkPackage, Result};
 
 use super::hyperlink_object::{
-    ensure_no_metadata_reference, new_hyperlink_object, patch_hyperlink_target,
-    require_exclusive_storage_reference, validate_hyperlink_object,
+    new_hyperlink_object, patch_hyperlink_target, validate_hyperlink_object,
 };
 use super::hyperlink_storage::{
     Boundary, RangedObjectTable, add_range, decoded_boundaries, encode_table,
@@ -20,6 +19,9 @@ use super::hyperlink_storage::{
 };
 use super::hyperlink_types::{TextHyperlink, TextHyperlinkId, TextHyperlinkTarget};
 use super::position::{TextPosition, TextRange};
+use super::smart_field_object::{
+    ensure_no_metadata_reference, require_exclusive_storage_reference,
+};
 use super::storage_wire::{StorageLocation, text_utf16_len};
 
 /// Read every native hyperlink in a storage, ordered by text position.

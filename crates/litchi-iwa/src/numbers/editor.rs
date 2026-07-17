@@ -3204,6 +3204,7 @@ impl NumbersEditor {
 }
 
 mod column_insert;
+mod date_time_fields;
 mod formula_clone;
 mod formula_dependency_shift;
 mod model;

@@ -4278,6 +4278,7 @@ impl KeynoteEditor {
 }
 
 mod builds;
+mod date_time_fields;
 mod placeholder_ownership;
 mod placeholder_visibility;
 mod show_settings;

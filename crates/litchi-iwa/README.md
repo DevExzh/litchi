@@ -49,6 +49,8 @@ println!("{}", structured.summary());
   including automatic-language sentinels and lossless boundary deletion
 - Native cross-suite text-hyperlink CRUD with typed nonempty UTF-16 ranges,
   lossless web, mail, and Keynote navigation targets, and owned-object cleanup
+- Native cross-suite Date & Time smart-field CRUD with typed ICU formats,
+  locale identifiers, formatter styles, refresh plans, and Apple-reference instants
 - Native Pages body-bookmark CRUD with typed names, lossless visibility values,
   strict UTF-16 ranges, and owned bookmark-field cleanup
 - Native cross-suite plain-text highlight CRUD with typed nonempty UTF-16 ranges,
@@ -1137,6 +1139,16 @@ and hyperlink payload survive edits. Web URLs, `mailto:` links, and Keynote
 targets such as `?slide=next` are represented losslessly. The Pages, Numbers,
 and Keynote text-box editors provide ownership-checked wrappers; see
 `edit_iwork_text_hyperlink` and `inspect_iwork_text_styles`.
+Native Date & Time fields use `TextDateTimeField` and lossless typed formatter
+settings. Existing text can be attached to a field, or `insert_*_date_time_field`
+can atomically insert caller-supplied localized display text and its smart-field
+object. The crate deliberately does not emulate Apple's locale formatter: the
+display text is explicit while the ICU pattern, locale, date/time styles,
+refresh plan, update flag, and Apple-reference-date instant remain structured.
+Deletion retains visible text and reclaims the owned field object; ordinary text
+replacement also reclaims orphaned fields. Pages body and text-box, Numbers
+sheet text-box, and Keynote slide text-box wrappers enforce document ownership.
+See `create_iwork_date_time_field` and `inspect_iwork_date_time_fields`.
 Pages body text additionally exposes native ranged bookmarks as `TextBookmark`
 values. `TextBookmarkSettings` carries an optional validated name and a lossless
 visible/hidden value; create and update reject empty, overlapping, out-of-bounds,

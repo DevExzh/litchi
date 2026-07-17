@@ -23,6 +23,13 @@ use super::bookmark::{
     update_text_bookmark,
 };
 use super::bookmark_types::{TextBookmark, TextBookmarkId, TextBookmarkSettings};
+use super::date_time::{
+    add_text_date_time_field, insert_text_date_time_field, remove_text_date_time_field,
+    remove_unreferenced_date_time_objects, text_date_time_fields, update_text_date_time_field,
+};
+use super::date_time_types::{
+    TextDateTimeDisplayText, TextDateTimeField, TextDateTimeFieldId, TextDateTimeFieldSettings,
+};
 use super::drop_cap::{
     ParagraphDropCap, ParagraphDropCapPlacement, ParagraphStart, paragraph_drop_cap,
     paragraph_drop_caps, remove_paragraph_drop_cap, set_paragraph_drop_cap,
@@ -408,6 +415,58 @@ impl IWorkTextEditor {
         id: TextBookmarkId,
     ) -> Result<TextBookmark> {
         remove_text_bookmark(&mut self.package, object_id, id)
+    }
+
+    /// Read every native Date & Time smart field in a text storage.
+    pub fn text_date_time_fields(&self, object_id: u64) -> Result<Vec<TextDateTimeField>> {
+        text_date_time_fields(&self.package, object_id)
+    }
+
+    /// Attach a Date & Time field to existing nonempty text.
+    pub fn add_text_date_time_field(
+        &mut self,
+        object_id: u64,
+        range: TextRange,
+        settings: TextDateTimeFieldSettings,
+    ) -> Result<TextDateTimeField> {
+        add_text_date_time_field(&mut self.package, object_id, range, &settings)
+    }
+
+    /// Atomically insert exact display text and attach a Date & Time field.
+    pub fn insert_text_date_time_field(
+        &mut self,
+        object_id: u64,
+        position: TextPosition,
+        display_text: TextDateTimeDisplayText,
+        settings: TextDateTimeFieldSettings,
+    ) -> Result<TextDateTimeField> {
+        insert_text_date_time_field(
+            &mut self.package,
+            object_id,
+            position,
+            &display_text,
+            &settings,
+        )
+    }
+
+    /// Atomically update a Date & Time field's range and formatter payload.
+    pub fn update_text_date_time_field(
+        &mut self,
+        object_id: u64,
+        id: TextDateTimeFieldId,
+        range: TextRange,
+        settings: TextDateTimeFieldSettings,
+    ) -> Result<TextDateTimeField> {
+        update_text_date_time_field(&mut self.package, object_id, id, range, &settings)
+    }
+
+    /// Delete one Date & Time field while retaining its visible text.
+    pub fn remove_text_date_time_field(
+        &mut self,
+        object_id: u64,
+        id: TextDateTimeFieldId,
+    ) -> Result<TextDateTimeField> {
+        remove_text_date_time_field(&mut self.package, object_id, id)
     }
 
     /// Read every native plain highlight in a text storage.
@@ -1241,7 +1300,7 @@ impl IWorkTextEditor {
     }
 }
 
-fn replace_storage_text(
+pub(super) fn replace_storage_text(
     package: &mut IWorkPackage,
     object_id: u64,
     range: Range<usize>,
@@ -1322,6 +1381,7 @@ fn replace_storage_text(
         Ok(())
     })?;
     remove_unreferenced_hyperlink_objects(package, &archive_name, &removed_references)?;
+    remove_unreferenced_date_time_objects(package, &archive_name, &removed_references)?;
     remove_unreferenced_bookmark_objects(package, &archive_name, &removed_references)?;
     remove_unreferenced_highlight_objects(package, &archive_name, &removed_references)
 }

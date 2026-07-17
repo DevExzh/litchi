@@ -8,6 +8,7 @@ use crate::wire::patch_length_delimited_field;
 use crate::{Error, IWorkPackage, Result};
 
 use super::hyperlink_types::TextHyperlinkTarget;
+use super::smart_field_object::{generated_text_attribute_uuid, validate_text_attribute_uuid};
 
 const HYPERLINK_TARGET_FIELD: u32 = 2;
 pub(super) const HYPERLINK_MESSAGE_TYPE: u32 = 2_032;
@@ -44,7 +45,7 @@ pub(super) fn validate_hyperlink_object(
                 "iWork hyperlink object {identifier} is missing its text-attribute UUID"
             ))
         })?;
-    validate_uuid(identifier, uuid)?;
+    validate_text_attribute_uuid(identifier, "hyperlink", uuid)?;
     let target = hyperlink.url_ref.ok_or_else(|| {
         Error::InvalidFormat(format!(
             "iWork hyperlink object {identifier} is missing its target"
@@ -53,32 +54,14 @@ pub(super) fn validate_hyperlink_object(
     TextHyperlinkTarget::new(target.into_boxed_str()).map(Some)
 }
 
-fn validate_uuid(identifier: u64, uuid: &str) -> Result<()> {
-    let valid = uuid.len() == 36
-        && uuid.bytes().enumerate().all(|(index, byte)| match index {
-            8 | 13 | 18 | 23 => byte == b'-',
-            _ => byte.is_ascii_hexdigit(),
-        });
-    if !valid {
-        return Err(Error::InvalidFormat(format!(
-            "iWork hyperlink object {identifier} has an invalid text-attribute UUID"
-        )));
-    }
-    Ok(())
-}
-
 pub(super) fn new_hyperlink_object(
     identifier: u64,
     target: &TextHyperlinkTarget,
 ) -> Result<ArchiveObject> {
-    let braced = litchi_core::id::generate_guid_braced();
-    let uuid = braced
-        .strip_prefix('{')
-        .and_then(|uuid| uuid.strip_suffix('}'))
-        .ok_or_else(|| Error::InvalidFormat("generated UUID is not braced".to_owned()))?;
+    let uuid = generated_text_attribute_uuid()?;
     let hyperlink = tswp::HyperlinkFieldArchive {
         super_: Some(tswp::SmartFieldArchive {
-            text_attribute_uuid_string: Some(uuid.to_owned()),
+            text_attribute_uuid_string: Some(uuid),
         }),
         url_ref: Some(target.as_str().to_owned()),
     };
@@ -135,57 +118,4 @@ pub(super) fn patch_hyperlink_target(
         )?;
         Ok(())
     })
-}
-
-pub(super) fn require_exclusive_storage_reference(
-    package: &IWorkPackage,
-    storage_id: u64,
-    identifier: u64,
-    label: &str,
-) -> Result<()> {
-    let mut owners = Vec::new();
-    for archive_name in package.iwa_entry_names() {
-        for object in package.archive(archive_name)?.objects {
-            let object_id = object.archive_info.identifier.ok_or_else(|| {
-                Error::InvalidFormat(format!("object in {archive_name} has no identifier"))
-            })?;
-            if object
-                .archive_info
-                .message_infos
-                .iter()
-                .any(|info| info.object_references.contains(&identifier))
-            {
-                owners.push(object_id);
-            }
-        }
-    }
-    if owners != [storage_id] {
-        return Err(Error::InvalidFormat(format!(
-            "{label} object {identifier} must be referenced only by text storage {storage_id}, found {owners:?}"
-        )));
-    }
-    Ok(())
-}
-
-pub(super) fn ensure_no_metadata_reference(
-    package: &IWorkPackage,
-    identifier: u64,
-    label: &str,
-) -> Result<()> {
-    for archive_name in package.iwa_entry_names() {
-        for object in package.archive(archive_name)?.objects {
-            if object.archive_info.message_infos.iter().any(|info| {
-                info.object_references.contains(&identifier)
-                    || info
-                        .field_infos
-                        .iter()
-                        .any(|field| field.object_references.contains(&identifier))
-            }) {
-                return Err(Error::InvalidFormat(format!(
-                    "{label} object {identifier} retains an indexed reference in {archive_name}"
-                )));
-            }
-        }
-    }
-    Ok(())
 }

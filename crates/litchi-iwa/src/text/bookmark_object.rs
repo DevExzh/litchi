@@ -8,6 +8,7 @@ use crate::wire::{patch_length_delimited_field, patch_varint_field};
 use crate::{Error, IWorkPackage, Result};
 
 use super::bookmark_types::{TextBookmarkName, TextBookmarkSettings, TextBookmarkVisibility};
+use super::smart_field_object::{generated_text_attribute_uuid, validate_text_attribute_uuid};
 
 const BOOKMARK_NAME_FIELD: u32 = 2;
 const BOOKMARK_HIDDEN_FIELD: u32 = 4;
@@ -46,7 +47,7 @@ pub(super) fn validate_bookmark_object(
                 "iWork bookmark object {identifier} is missing its text-attribute UUID"
             ))
         })?;
-    validate_uuid(identifier, uuid)?;
+    validate_text_attribute_uuid(identifier, "bookmark", uuid)?;
     if bookmark.ranged != Some(RANGED_BOOKMARK) {
         return Err(Error::InvalidFormat(format!(
             "iWork bookmark object {identifier} is not a ranged bookmark"
@@ -62,32 +63,14 @@ pub(super) fn validate_bookmark_object(
     }))
 }
 
-fn validate_uuid(identifier: u64, uuid: &str) -> Result<()> {
-    let valid = uuid.len() == 36
-        && uuid.bytes().enumerate().all(|(index, byte)| match index {
-            8 | 13 | 18 | 23 => byte == b'-',
-            _ => byte.is_ascii_hexdigit(),
-        });
-    if !valid {
-        return Err(Error::InvalidFormat(format!(
-            "iWork bookmark object {identifier} has an invalid text-attribute UUID"
-        )));
-    }
-    Ok(())
-}
-
 pub(super) fn new_bookmark_object(
     identifier: u64,
     settings: &TextBookmarkSettings,
 ) -> Result<ArchiveObject> {
-    let braced = litchi_core::id::generate_guid_braced();
-    let uuid = braced
-        .strip_prefix('{')
-        .and_then(|uuid| uuid.strip_suffix('}'))
-        .ok_or_else(|| Error::InvalidFormat("generated UUID is not braced".to_owned()))?;
+    let uuid = generated_text_attribute_uuid()?;
     let bookmark = tswp::BookmarkFieldArchive {
         super_: Some(tswp::SmartFieldArchive {
-            text_attribute_uuid_string: Some(uuid.to_owned()),
+            text_attribute_uuid_string: Some(uuid),
         }),
         name: settings.name.as_ref().map(|name| name.as_str().to_owned()),
         ranged: Some(RANGED_BOOKMARK),

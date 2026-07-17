@@ -13,13 +13,15 @@ use super::bookmark_object::{
     new_bookmark_object, patch_bookmark_settings, validate_bookmark_object,
 };
 use super::bookmark_types::{TextBookmark, TextBookmarkId, TextBookmarkSettings};
-use super::hyperlink_object::{ensure_no_metadata_reference, require_exclusive_storage_reference};
 use super::hyperlink_storage::{
     Boundary, RangedObjectTable, add_range, decoded_boundaries, encode_table,
     ensure_range_available, locate_storage, patch_ranged_object_table, raw_boundaries,
     remove_range, validate_range,
 };
 use super::position::{TextPosition, TextRange};
+use super::smart_field_object::{
+    ensure_no_metadata_reference, require_exclusive_storage_reference,
+};
 use super::storage_wire::{StorageLocation, text_utf16_len};
 
 const BOOKMARK_TABLE: RangedObjectTable = RangedObjectTable::Bookmark;

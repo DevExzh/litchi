@@ -3,7 +3,10 @@
 use std::ops::Range;
 
 use super::PagesEditor;
-use crate::text::{TextBookmark, TextBookmarkId, TextBookmarkSettings, TextRange};
+use crate::text::{
+    TextBookmark, TextBookmarkId, TextBookmarkSettings, TextDateTimeDisplayText, TextDateTimeField,
+    TextDateTimeFieldId, TextDateTimeFieldSettings, TextPosition, TextRange,
+};
 use crate::{Error, Result};
 
 impl PagesEditor {
@@ -36,6 +39,56 @@ impl PagesEditor {
     /// Delete one native body bookmark and reclaim its owned field object.
     pub fn remove_body_bookmark(&mut self, id: TextBookmarkId) -> Result<TextBookmark> {
         self.text.remove_text_bookmark(self.body_storage_id, id)
+    }
+
+    /// Read every native Date & Time field in the main body.
+    pub fn body_date_time_fields(&self) -> Result<Vec<TextDateTimeField>> {
+        self.text.text_date_time_fields(self.body_storage_id)
+    }
+
+    /// Attach a Date & Time field to existing body text.
+    pub fn add_body_date_time_field(
+        &mut self,
+        range: TextRange,
+        settings: TextDateTimeFieldSettings,
+    ) -> Result<TextDateTimeField> {
+        self.text
+            .add_text_date_time_field(self.body_storage_id, range, settings)
+    }
+
+    /// Atomically insert exact display text and its Date & Time field.
+    pub fn insert_body_date_time_field(
+        &mut self,
+        position: TextPosition,
+        display_text: TextDateTimeDisplayText,
+        settings: TextDateTimeFieldSettings,
+    ) -> Result<TextDateTimeField> {
+        self.text.insert_text_date_time_field(
+            self.body_storage_id,
+            position,
+            display_text,
+            settings,
+        )
+    }
+
+    /// Atomically update a body Date & Time field's range and formatter payload.
+    pub fn update_body_date_time_field(
+        &mut self,
+        id: TextDateTimeFieldId,
+        range: TextRange,
+        settings: TextDateTimeFieldSettings,
+    ) -> Result<TextDateTimeField> {
+        self.text
+            .update_text_date_time_field(self.body_storage_id, id, range, settings)
+    }
+
+    /// Delete one body Date & Time field while retaining its visible text.
+    pub fn remove_body_date_time_field(
+        &mut self,
+        id: TextDateTimeFieldId,
+    ) -> Result<TextDateTimeField> {
+        self.text
+            .remove_text_date_time_field(self.body_storage_id, id)
     }
 
     /// Replace a UTF-16 range in the body without creating or deleting section boundaries.
