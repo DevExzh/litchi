@@ -148,4 +148,66 @@ mod tests {
         assert_eq!(out[1].first_row, 5);
         assert_eq!(out[1].last_row, 10);
     }
+
+    #[test]
+    fn test_rejects_truncated_records_without_panicking() {
+        let mut out = Vec::new();
+
+        // Too short to hold the cmcs count field.
+        assert!(parse_mergecells_record(&[], &mut out).is_err());
+        assert!(parse_mergecells_record(&[1], &mut out).is_err());
+
+        // cmcs claims two ranges but the payload holds only one.
+        let mut data = Vec::new();
+        data.extend_from_slice(&2u16.to_le_bytes());
+        data.extend_from_slice(&[0u8; 8]);
+        assert!(parse_mergecells_record(&data, &mut out).is_err());
+
+        // Range array truncated mid-entry.
+        let mut data = Vec::new();
+        data.extend_from_slice(&1u16.to_le_bytes());
+        data.extend_from_slice(&[0u8; 5]);
+        assert!(parse_mergecells_record(&data, &mut out).is_err());
+
+        // No partial ranges may leak into the output on failure.
+        assert!(out.is_empty());
+    }
+
+    #[test]
+    fn reads_poi_merged_cell_fixtures() {
+        use crate::xls::XlsWorkbook;
+        use std::fs::File;
+        use std::path::Path;
+
+        let fixture = |name: &str| {
+            Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../3rdparty/poi/test-data/spreadsheet")
+                .join(name)
+        };
+
+        // Single merged region: rows 8-15, columns C-F (0-based 7-14 / 2-5).
+        let workbook = XlsWorkbook::new(File::open(fixture("53109.xls")).unwrap()).unwrap();
+        let merged = workbook.xls_worksheet(0).unwrap().merged_cells();
+        assert_eq!(merged.len(), 1);
+        assert_eq!(
+            merged[0],
+            MergedCellRange {
+                first_row: 7,
+                last_row: 14,
+                first_col: 2,
+                last_col: 5,
+            }
+        );
+        assert_eq!(merged[0].row_span(), 8);
+        assert_eq!(merged[0].col_span(), 4);
+        assert!(merged[0].contains(10, 3));
+        assert!(!merged[0].contains(6, 3));
+
+        // A workbook holding many merged regions across several sheets.
+        let workbook = XlsWorkbook::new(File::open(fixture("59858.xls")).unwrap()).unwrap();
+        let per_sheet: Vec<usize> = (0..workbook.sheets().len())
+            .map(|index| workbook.xls_worksheet(index).unwrap().merged_cells().len())
+            .collect();
+        assert_eq!(per_sheet, [5, 366, 15, 352, 172, 0, 0]);
+    }
 }
