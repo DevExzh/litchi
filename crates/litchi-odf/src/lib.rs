@@ -325,6 +325,7 @@ mod document_scripts;
 mod chart_properties;
 mod graphic_properties;
 mod text_properties;
+mod ruby_family;
 mod drawing_page_properties;
 mod font_face;
 mod line_numbering;
@@ -430,6 +431,12 @@ pub use text_properties::{
     TextProperty, TextPropertyKind, TextPropertyNamespace, TextPropertyValue,
     TextStyleProperties, TextStylePropertiesSet, TextStyleRecord,
     parse_text_style_properties, set_text_style_properties_xml,
+};
+pub use ruby_family::{
+    RubyAlignment, RubyAnnotation, RubyAnnotations, RubyBase, RubyPosition, RubyProperties,
+    RubyStyle, RubyStyles, insert_ruby_annotation_xml, parse_ruby_annotations,
+    parse_ruby_styles, remove_ruby_annotation_xml, remove_ruby_style_xml,
+    replace_ruby_annotation_xml, set_ruby_style_xml,
 };
 pub use drawing_page_properties::{
     DrawingPageBackgroundSize, DrawingPageColor, DrawingPageDuration, DrawingPageFill,

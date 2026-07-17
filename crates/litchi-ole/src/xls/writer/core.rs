@@ -1992,6 +1992,7 @@ impl XlsWriter {
         validation: XlsDataValidation,
     ) -> XlsResult<()> {
         if validation.first_row > validation.last_row || validation.first_col > validation.last_col
+            || validation.last_row > 65_535 || validation.last_col > 255
         {
             return Err(XlsError::InvalidData(
                 "add_data_validation: first row/col must be <= last row/col".to_string(),
@@ -2073,10 +2074,6 @@ impl XlsWriter {
             }
         }
         written.ranges.extend_from_slice(additional_ranges);
-        written.ranges.sort_unstable_by_key(|range| {
-            (range.first_row, range.first_col, range.last_row, range.last_col)
-        });
-        written.ranges.dedup();
         written.options = options;
         Ok(())
     }
@@ -2095,7 +2092,7 @@ impl XlsWriter {
         }
         let worksheet = self.worksheets.get_mut(sheet)
             .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
-        worksheet.data_validation_table_options = options;
+        worksheet.data_validation_table_options = Some(options);
         Ok(())
     }
 

@@ -727,9 +727,9 @@ pub(crate) fn generate_workbook_stream(
             )?;
         }
 
-        if !worksheet.data_validations.is_empty() {
+        if !worksheet.data_validations.is_empty() || worksheet.data_validation_table_options.is_some() {
             let dv_count = worksheet.data_validations.len() as u32;
-            let table = worksheet.data_validation_table_options;
+            let table = worksheet.data_validation_table_options.unwrap_or_default();
             biff::write_dval(&mut stream, biff::DvalConfig {
                 window_closed: table.window_closed,
                 x_left: table.x_left,

@@ -1,6 +1,7 @@
 //! BIFF8 worksheet data-validation records.
 
 use super::{XlsError, XlsResult};
+use super::formula::{FormulaContext, render_formula};
 
 pub(crate) const DVAL_RECORD_TYPE: u16 = 0x01B2;
 pub(crate) const DV_RECORD_TYPE: u16 = 0x01BE;
@@ -43,10 +44,12 @@ pub enum XlsDataValidationImeMode {
 
 /// An unevaluated BIFF formula token stream from a `DV` record.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsDataValidationFormula { tokens: Vec<u8> }
+pub struct XlsDataValidationFormula { tokens: Vec<u8>, rendered: Option<String> }
 
 impl XlsDataValidationFormula {
     pub fn tokens(&self) -> &[u8] { &self.tokens }
+    /// Best-effort inert rendering using the workbook's existing BIFF token renderer.
+    pub fn rendered(&self) -> Option<&str> { self.rendered.as_deref() }
 }
 
 /// An inclusive BIFF8 cell range targeted by a validation rule.
@@ -137,7 +140,7 @@ pub(crate) fn parse_dval(data: &[u8]) -> XlsResult<XlsDataValidationSettings> {
     })
 }
 
-pub(crate) fn parse_dv(data: &[u8]) -> XlsResult<XlsDataValidationRule> {
+pub(crate) fn parse_dv(data: &[u8], formula_context: Option<&FormulaContext>) -> XlsResult<XlsDataValidationRule> {
     let mut cursor = Cursor::new(data);
     let options = cursor.u32()?;
     if options & 0xFF00_0000 != 0 {
@@ -173,7 +176,11 @@ pub(crate) fn parse_dv(data: &[u8]) -> XlsResult<XlsDataValidationRule> {
         10 => XlsDataValidationImeMode::HalfWidthHangul,
         value => return invalid(format!("invalid DV IME mode: {value}")),
     };
-    let operator = match (options >> 20) & 0x0F {
+    let raw_operator = (options >> 20) & 0x0F;
+    let operator = if matches!(kind, XlsDataValidationKind::Any | XlsDataValidationKind::List | XlsDataValidationKind::Custom) {
+        // This field is undefined and MUST be ignored for operator-less validation kinds.
+        XlsDataValidationOperator::Between
+    } else { match raw_operator {
         0 => XlsDataValidationOperator::Between,
         1 => XlsDataValidationOperator::NotBetween,
         2 => XlsDataValidationOperator::Equal,
@@ -183,14 +190,17 @@ pub(crate) fn parse_dv(data: &[u8]) -> XlsResult<XlsDataValidationRule> {
         6 => XlsDataValidationOperator::GreaterOrEqual,
         7 => XlsDataValidationOperator::LessOrEqual,
         value => return invalid(format!("invalid DV operator: {value}")),
-    };
+    }};
 
     let prompt_title = cursor.unicode_string(32)?;
     let error_title = cursor.unicode_string(32)?;
     let prompt = cursor.unicode_string(255)?;
     let error = cursor.unicode_string(225)?;
-    let formula1 = cursor.formula()?;
-    let formula2 = cursor.formula()?;
+    let mut formula1 = cursor.formula()?;
+    let mut formula2 = cursor.formula()?;
+    for formula in [&mut formula1, &mut formula2].into_iter().flatten() {
+        formula.rendered = render_formula(&formula.tokens, formula_context);
+    }
     let needs_two = !matches!(kind, XlsDataValidationKind::Any | XlsDataValidationKind::List | XlsDataValidationKind::Custom)
         && matches!(operator, XlsDataValidationOperator::Between | XlsDataValidationOperator::NotBetween);
     match kind {
@@ -310,7 +320,7 @@ impl<'a> Cursor<'a> {
         let size = self.u16()? as usize;
         self.take(2)?;
         let tokens = self.take(size)?;
-        Ok((!tokens.is_empty()).then(|| XlsDataValidationFormula { tokens: tokens.to_vec() }))
+        Ok((!tokens.is_empty()).then(|| XlsDataValidationFormula { tokens: tokens.to_vec(), rendered: None }))
     }
 }
 
@@ -354,10 +364,11 @@ mod tests {
         assert!(settings.window_closed());
         assert_eq!(settings.declared_rule_count(), 1);
 
-        let rule = parse_dv(&valid_dv()).unwrap();
+        let rule = parse_dv(&valid_dv(), None).unwrap();
         assert_eq!(rule.kind(), XlsDataValidationKind::Whole);
         assert_eq!(rule.error_style(), XlsDataValidationErrorStyle::Warning);
         assert_eq!(rule.formula1().unwrap().tokens(), &[0x1E, 1, 0]);
+        assert_eq!(rule.formula1().unwrap().rendered(), Some("=1"));
         assert_eq!(rule.formula2().unwrap().tokens(), &[0x1E, 10, 0]);
         assert_eq!(rule.ranges()[0].first_row(), 2);
         assert_eq!(rule.ranges()[0].last_column(), 5);
@@ -370,24 +381,38 @@ mod tests {
         assert!(parse_dval(&dval).is_err());
         let mut dv = valid_dv();
         dv[3] = 0x80;
-        assert!(parse_dv(&dv).is_err());
+        assert!(parse_dv(&dv, None).is_err());
         let mut dv = valid_dv();
         let end = dv.len();
         dv[end - 8..end - 6].copy_from_slice(&5u16.to_le_bytes());
         dv[end - 6..end - 4].copy_from_slice(&4u16.to_le_bytes());
-        assert!(parse_dv(&dv).is_err());
+        assert!(parse_dv(&dv, None).is_err());
     }
 
     #[test]
     fn enforces_formula_cardinality_and_range_limit() {
         let mut dv = valid_dv();
         dv[0] = 0;
-        assert!(parse_dv(&dv).is_err());
+        assert!(parse_dv(&dv, None).is_err());
         let mut data = 3u32.to_le_bytes().to_vec();
         for _ in 0..4 { string(&mut data, "\0"); }
         formula(&mut data, &[0x17, 1, 0, b'A']);
         formula(&mut data, &[]);
         data.extend_from_slice(&0u16.to_le_bytes());
-        assert!(parse_dv(&data).is_err());
+        assert!(parse_dv(&data, None).is_err());
+    }
+
+    #[test]
+    fn ignores_undefined_operator_bits_for_list_validations() {
+        let options = 3u32 | (15 << 20);
+        let mut data = options.to_le_bytes().to_vec();
+        for _ in 0..4 { string(&mut data, "\0"); }
+        formula(&mut data, &[0x17, 1, 0, b'A']);
+        formula(&mut data, &[]);
+        data.extend_from_slice(&1u16.to_le_bytes());
+        for value in [0u16, 0, 0, 0] { data.extend_from_slice(&value.to_le_bytes()); }
+        let rule = parse_dv(&data, None).unwrap();
+        assert_eq!(rule.kind(), XlsDataValidationKind::List);
+        assert_eq!(rule.operator(), XlsDataValidationOperator::Between);
     }
 }

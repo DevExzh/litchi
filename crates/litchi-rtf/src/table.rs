@@ -42,15 +42,21 @@ impl TableIndent {
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct TableRowGeometry { half_gap_twips:Option<u16>, left_edge_twips:Option<i32>, height:TableRowHeight, preferred_width:Option<TablePreferredWidth>, auto_fit:bool, indent:Option<TableIndent> }
+pub struct TableRowGeometry { half_gap_twips:Option<u16>, left_edge_twips:Option<i32>, height:TableRowHeight, preferred_width:Option<TablePreferredWidth>, leading_invisible_width:Option<TablePreferredWidth>, trailing_invisible_width:Option<TablePreferredWidth>, auto_fit:bool, indent:Option<TableIndent> }
 impl TableRowGeometry {
     pub const fn half_gap_twips(self)->Option<u16>{self.half_gap_twips} pub fn set_half_gap_twips(&mut self,value:Option<u16>){self.half_gap_twips=value}
     pub const fn left_edge_twips(self)->Option<i32>{self.left_edge_twips} pub fn set_left_edge_twips(&mut self,value:Option<i32>){self.left_edge_twips=value}
     pub const fn height(self)->TableRowHeight{self.height} pub fn set_height(&mut self,value:TableRowHeight){self.height=value}
     pub const fn preferred_width(self)->Option<TablePreferredWidth>{self.preferred_width} pub fn set_preferred_width(&mut self,value:Option<TablePreferredWidth>){self.preferred_width=value}
+    /// Width of the invisible cell at the logical beginning of the row (`trftsWidthB`/`trwWidthB`).
+    /// This is the left side for an LTR row and the right side for an RTL row.
+    pub const fn leading_invisible_width(self)->Option<TablePreferredWidth>{self.leading_invisible_width} pub fn set_leading_invisible_width(&mut self,value:Option<TablePreferredWidth>){self.leading_invisible_width=value}
+    /// Width of the invisible cell at the logical end of the row (`trftsWidthA`/`trwWidthA`).
+    /// This is the right side for an LTR row and the left side for an RTL row.
+    pub const fn trailing_invisible_width(self)->Option<TablePreferredWidth>{self.trailing_invisible_width} pub fn set_trailing_invisible_width(&mut self,value:Option<TablePreferredWidth>){self.trailing_invisible_width=value}
     pub const fn auto_fit(self)->bool{self.auto_fit} pub fn set_auto_fit(&mut self,value:bool){self.auto_fit=value}
     pub const fn indent(self)->Option<TableIndent>{self.indent} pub fn set_indent(&mut self,value:Option<TableIndent>){self.indent=value}
-    pub(crate) fn validate(self)->crate::RtfResult<()>{if self.half_gap_twips.is_some_and(|value|i32::from(value)>MAX_TABLE_GEOMETRY_TWIPS)||self.left_edge_twips.is_some_and(|value|value.unsigned_abs()>MAX_TABLE_GEOMETRY_TWIPS as u32)||matches!(self.height,TableRowHeight::Minimum(value)|TableRowHeight::Exact(value)if i32::from(value)>MAX_TABLE_GEOMETRY_TWIPS){return Err(crate::RtfError::MalformedDocument("RTF table row geometry is out of range".to_string()))}if let Some(width)=self.preferred_width{width.validate()?}if let Some(indent)=self.indent{indent.validate()?}Ok(())}
+    pub(crate) fn validate(self)->crate::RtfResult<()>{if self.half_gap_twips.is_some_and(|value|i32::from(value)>MAX_TABLE_GEOMETRY_TWIPS)||self.left_edge_twips.is_some_and(|value|value.unsigned_abs()>MAX_TABLE_GEOMETRY_TWIPS as u32)||matches!(self.height,TableRowHeight::Minimum(value)|TableRowHeight::Exact(value)if i32::from(value)>MAX_TABLE_GEOMETRY_TWIPS){return Err(crate::RtfError::MalformedDocument("RTF table row geometry is out of range".to_string()))}for width in [self.preferred_width,self.leading_invisible_width,self.trailing_invisible_width].into_iter().flatten(){width.validate()?}if let Some(indent)=self.indent{indent.validate()?}Ok(())}
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

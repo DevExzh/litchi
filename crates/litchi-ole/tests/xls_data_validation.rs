@@ -52,12 +52,11 @@ fn complete_validation_family_round_trips_as_inert_metadata() {
         .add_data_validation_with_options(
             sheet,
             custom,
-            &[XlsDataValidationRange {
-                first_row: 1,
-                last_row: 2,
-                first_col: 2,
-                last_col: 3,
-            }],
+            &[
+                XlsDataValidationRange { first_row: 8, last_row: 9, first_col: 4, last_col: 5 },
+                XlsDataValidationRange { first_row: 1, last_row: 2, first_col: 2, last_col: 3 },
+                XlsDataValidationRange { first_row: 4, last_row: 4, first_col: 0, last_col: 0 },
+            ],
             XlsDataValidationOptions {
                 error_style: WriterErrorStyle::Warning,
                 allow_blank: false,
@@ -169,7 +168,11 @@ fn complete_validation_family_round_trips_as_inert_metadata() {
     assert!(!rules[0].allow_blank());
     assert!(rules[0].suppress_dropdown());
     assert_eq!(rules[0].formula1().unwrap().tokens(), &[0x1d, 1]);
-    assert_eq!(rules[0].ranges().len(), 2);
+    assert_eq!(rules[0].ranges().len(), 4);
+    assert_eq!(rules[0].ranges()[0].first_row(), 4);
+    assert_eq!(rules[0].ranges()[1].first_row(), 8);
+    assert_eq!(rules[0].ranges()[2].first_row(), 1);
+    assert_eq!(rules[0].ranges()[3].first_row(), 4);
     assert_eq!(rules[1].kind(), XlsDataValidationKind::Any);
     assert_eq!(rules[2].kind(), XlsDataValidationKind::Decimal);
     assert_eq!(rules[3].kind(), XlsDataValidationKind::Date);
@@ -205,6 +208,29 @@ fn malformed_writer_metadata_is_rejected() {
             ),
         )
         .is_ok());
+    let mut bytes = Cursor::new(Vec::new());
+    assert!(writer.write_to(&mut bytes).is_err());
+}
+
+#[test]
+fn explicit_zero_rule_dval_and_oversized_dv_are_handled_deterministically() {
+    let mut writer = XlsWriter::new();
+    let sheet = writer.add_worksheet("EmptyValidation").unwrap();
+    writer.set_data_validation_table_options(sheet, XlsDataValidationTableOptions {
+        window_closed: true, x_left: 7, y_top: 9, dropdown_object_id: None,
+    }).unwrap();
+    let mut bytes = Cursor::new(Vec::new());
+    writer.write_to(&mut bytes).unwrap();
+    let workbook = XlsWorkbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    let settings = workbook.xls_worksheet(0).unwrap().data_validation_settings().unwrap();
+    assert_eq!(settings.declared_rule_count(), 0);
+    assert_eq!((settings.x_left(), settings.y_top()), (7, 9));
+
+    let mut writer = XlsWriter::new();
+    let sheet = writer.add_worksheet("Oversized").unwrap();
+    writer.add_data_validation(sheet, validation(0, XlsDataValidationType::Custom {
+        formula_tokens: vec![0x1d; 8_200],
+    })).unwrap();
     let mut bytes = Cursor::new(Vec::new());
     assert!(writer.write_to(&mut bytes).is_err());
 }

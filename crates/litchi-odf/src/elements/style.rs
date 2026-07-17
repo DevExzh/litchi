@@ -190,6 +190,33 @@ impl Style {
         self.set_text_property(&property.qualified_name(), &property.lexical());
     }
 
+    /// Set validated ODF ruby properties on this style.
+    pub fn set_typed_ruby_properties(&mut self, properties: &crate::RubyProperties) {
+        let mut found = false;
+        for child in &mut self.element.children {
+            if child.tag_name() == "style:ruby-properties" {
+                if let Some(value) = properties.position {
+                    child.set_attribute("style:ruby-position", value.as_str());
+                }
+                if let Some(value) = properties.alignment {
+                    child.set_attribute("style:ruby-align", value.as_str());
+                }
+                found = true;
+                break;
+            }
+        }
+        if !found {
+            let mut ruby = Element::new("style:ruby-properties");
+            if let Some(value) = properties.position {
+                ruby.set_attribute("style:ruby-position", value.as_str());
+            }
+            if let Some(value) = properties.alignment {
+                ruby.set_attribute("style:ruby-align", value.as_str());
+            }
+            self.element.children.push(ruby);
+        }
+    }
+
     /// Set a paragraph property
     ///
     /// # Arguments

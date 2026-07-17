@@ -744,7 +744,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                             message: "DV record exceeds the count declared by DVAL".to_string(),
                         });
                     }
-                    worksheet.add_data_validation(super::data_validation::parse_dv(&record.data)?);
+                    worksheet.add_data_validation(super::data_validation::parse_dv(&record.data, formula_context)?);
                     *remaining -= 1;
                 }
                 0x000A => { // EOF - End of worksheet
@@ -1543,6 +1543,37 @@ mod tests {
             range.first_row() <= 8 && range.last_row() >= 8
                 && range.first_column() <= 5 && range.last_column() >= 5
         }));
+    }
+
+    #[test]
+    fn worksheet_rejects_malformed_optional_validation_records_and_continue() {
+        for stream in [
+            {
+                let mut stream=Vec::new();
+                push_record(&mut stream, super::super::data_validation::DVAL_RECORD_TYPE, &[0;17]);
+                push_record(&mut stream, 0x000A, &[]);
+                stream
+            },
+            {
+                let mut stream=Vec::new();
+                push_record(&mut stream, super::super::data_validation::DVAL_RECORD_TYPE, &dval_data(1));
+                push_record(&mut stream, super::super::data_validation::DV_RECORD_TYPE, &[]);
+                push_record(&mut stream, 0x000A, &[]);
+                stream
+            },
+            {
+                let mut stream=Vec::new();
+                push_record(&mut stream, super::super::data_validation::DVAL_RECORD_TYPE, &dval_data(1));
+                push_record(&mut stream, 0x003C, &[0]);
+                push_record(&mut stream, 0x000A, &[]);
+                stream
+            },
+        ] {
+            let mut records=RecordIter::new(Cursor::new(stream)).unwrap();
+            assert!(XlsWorkbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+                &mut records,&XlsEncoding::Utf16Le,"Sheet1",Arc::new(Vec::new()),Arc::new(Vec::new()),None,Arc::new(XlsFormatting::default()),
+            ).is_err());
+        }
     }
 
     #[test]
