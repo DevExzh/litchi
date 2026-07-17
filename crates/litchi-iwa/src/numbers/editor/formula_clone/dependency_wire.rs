@@ -115,19 +115,34 @@ pub(super) fn remove_formula_owners_from_engine(
 
     let data = transform_length_delimited_field(original, 2, |tracker_data| {
         let tracker = tsce::DependencyTrackerArchive::decode(tracker_data)?;
-        let mut data = crate::wire::remove_repeated_length_delimited_field_where(
-            tracker_data,
-            6,
-            |payload| Ok(owner_ids.contains(&tsp::Reference::decode(payload)?.identifier)),
-        )?;
+        let references = crate::wire::repeated_length_delimited_payloads(tracker_data, 6)?;
+        let retained = references
+            .iter()
+            .filter_map(|payload| {
+                tsp::Reference::decode(*payload)
+                    .map(|reference| {
+                        (!owner_ids.contains(&reference.identifier)).then(|| payload.to_vec())
+                    })
+                    .transpose()
+            })
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        let mut data =
+            crate::wire::rewrite_repeated_length_delimited_fields(tracker_data, 6, &retained)?;
         if tracker.owner_id_map.is_some() {
             data = transform_length_delimited_field(&data, 3, |map_data| {
-                crate::wire::remove_repeated_length_delimited_field_where(map_data, 1, |payload| {
-                    Ok(internal_owner_ids.contains(
-                        &tsce::owner_id_map_archive::OwnerIdMapArchiveEntry::decode(payload)?
-                            .internal_owner_id,
-                    ))
-                })
+                let entries = crate::wire::repeated_length_delimited_payloads(map_data, 1)?;
+                let retained = entries
+                    .iter()
+                    .filter_map(|payload| {
+                        tsce::owner_id_map_archive::OwnerIdMapArchiveEntry::decode(*payload)
+                            .map(|entry| {
+                                (!internal_owner_ids.contains(&entry.internal_owner_id))
+                                    .then(|| payload.to_vec())
+                            })
+                            .transpose()
+                    })
+                    .collect::<std::result::Result<Vec<_>, _>>()?;
+                crate::wire::rewrite_repeated_length_delimited_fields(map_data, 1, &retained)
             })?;
         }
         patch_varint_field(
@@ -191,6 +206,55 @@ pub(super) fn remap_cell_records(
             }
         }
     }
+}
+
+pub(super) fn prune_internal_owner_edges(
+    records: &mut [tsce::CellRecordExpandedArchive],
+    removed_internal_ids: &HashSet<u32>,
+) -> bool {
+    let mut changed = false;
+    for record in records {
+        if let Some(edges) = &mut record.expanded_edges {
+            let previous_len = edges.internal_owner_id_for_edge.len();
+            edges
+                .internal_owner_id_for_edge
+                .retain(|identifier| !removed_internal_ids.contains(identifier));
+            changed |= edges.internal_owner_id_for_edge.len() != previous_len;
+        }
+    }
+    changed
+}
+
+pub(super) fn prune_formula_owner_cell_edges_wire(
+    original: &[u8],
+    expected: &tsce::FormulaOwnerDependenciesArchive,
+    removed_internal_ids: &HashSet<u32>,
+) -> Result<Vec<u8>> {
+    let data = transform_length_delimited_fields_at_path(original, &[4, 1, 6], |edges| {
+        prune_repeated_internal_ids(edges, 5, removed_internal_ids)
+    })?;
+    if tsce::FormulaOwnerDependenciesArchive::decode(data.as_slice())? != *expected {
+        return Err(Error::InvalidFormat(
+            "iWork formula-owner dependency pruning failed wire validation".to_owned(),
+        ));
+    }
+    Ok(data)
+}
+
+pub(super) fn prune_cell_tile_edges_wire(
+    original: &[u8],
+    expected: &tsce::CellRecordTileArchive,
+    removed_internal_ids: &HashSet<u32>,
+) -> Result<Vec<u8>> {
+    let data = transform_length_delimited_fields_at_path(original, &[4, 6], |edges| {
+        prune_repeated_internal_ids(edges, 5, removed_internal_ids)
+    })?;
+    if tsce::CellRecordTileArchive::decode(data.as_slice())? != *expected {
+        return Err(Error::InvalidFormat(
+            "iWork dependency-tile pruning failed wire validation".to_owned(),
+        ));
+    }
+    Ok(data)
 }
 
 pub(super) fn remap_formula_owner_wire(
@@ -280,6 +344,23 @@ fn remap_repeated_internal_ids(
                 .ok()
                 .and_then(|identifier| remap.get(&identifier).copied())
                 .map_or(identifier, u64::from)
+        })
+        .collect::<Vec<_>>();
+    crate::wire::rewrite_repeated_varint_fields(data, field_number, &replacements)
+}
+
+fn prune_repeated_internal_ids(
+    data: &[u8],
+    field_number: u32,
+    removed_internal_ids: &HashSet<u32>,
+) -> Result<Vec<u8>> {
+    let values = crate::wire::repeated_varint_values(data, field_number)?;
+    let replacements = values
+        .into_iter()
+        .filter(|identifier| {
+            u32::try_from(*identifier)
+                .map(|identifier| !removed_internal_ids.contains(&identifier))
+                .unwrap_or(true)
         })
         .collect::<Vec<_>>();
     crate::wire::rewrite_repeated_varint_fields(data, field_number, &replacements)

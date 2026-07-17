@@ -139,6 +139,10 @@ pages.save("created-with-table.pages")?;
 ```
 
 The same table operations work on app-created files; see `edit_pages_table`.
+`PagesEditor::remove_table` transactionally removes the body anchor and the
+table's private storage and formula graph while preserving shared objects and
+other tables. See `remove_pages_table` for a complete file-to-file example and
+`inspect_pages_tables` for model identifiers and dimensions.
 
 Scratch-created documents can also add independent, body-anchored text boxes;
 no existing drawable or template package is required:

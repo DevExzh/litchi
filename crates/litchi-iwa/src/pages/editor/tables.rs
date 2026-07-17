@@ -53,6 +53,8 @@ impl PagesTable {
 #[derive(Debug, Clone)]
 struct PagesTableGraph {
     info: PagesTableInfo,
+    attachment_object_id: u64,
+    formula_context_ids: Vec<u64>,
 }
 
 impl PagesEditor {
@@ -174,6 +176,159 @@ impl PagesEditor {
         Ok(())
     }
 
+    /// Remove a reachable body table and its private native storage graph.
+    ///
+    /// The body attachment marker, drawable, model, private cell stores,
+    /// formula owner family, component references, and UUID registrations are
+    /// removed transactionally. Storage shared with another table is retained.
+    pub fn remove_table(&mut self, model_object_id: u64) -> Result<PagesTableInfo> {
+        let graph = self.require_body_table(model_object_id)?;
+        let tables = body_table_graphs(self)?;
+        let owned = crate::numbers::editor::table_owned_object_ids_in_package(
+            self.package(),
+            model_object_id,
+        )?;
+        let mut shared_owned = HashSet::new();
+        for table in tables
+            .iter()
+            .filter(|table| table.info.model_object_id != model_object_id)
+        {
+            shared_owned.extend(crate::numbers::editor::table_owned_object_ids_in_package(
+                self.package(),
+                table.info.model_object_id,
+            )?);
+        }
+        let private_owned = owned
+            .into_iter()
+            .filter(|identifier| !shared_owned.contains(identifier));
+        let mut removed_identifiers = vec![
+            graph.attachment_object_id,
+            graph.info.drawable_object_id,
+            graph.info.model_object_id,
+        ];
+        removed_identifiers.extend(private_owned);
+        let unique = removed_identifiers.iter().copied().collect::<HashSet<_>>();
+        if unique.len() != removed_identifiers.len() {
+            return Err(Error::InvalidFormat(format!(
+                "Pages table model {model_object_id} reuses private graph identifiers"
+            )));
+        }
+
+        let mut object_components = Vec::with_capacity(removed_identifiers.len());
+        for &identifier in &removed_identifiers {
+            let archive_name = find_object_archive(self.package(), identifier)?;
+            let component = component_identifier_for_entry(self.package(), &archive_name)?;
+            object_components.push((identifier, archive_name, component));
+        }
+
+        let mut text_editor = IWorkTextEditor::from_package(self.package().clone());
+        let anchor_end = graph
+            .info
+            .anchor_character_index
+            .checked_add(1)
+            .ok_or_else(|| Error::ParseError("Pages table anchor overflow".to_owned()))?;
+        text_editor.replace_text(
+            self.body_storage_id,
+            graph.info.anchor_character_index..anchor_end,
+            "",
+        )?;
+        let mut staged = text_editor.into_package();
+        let mut formula_context_ids = graph.formula_context_ids.clone();
+        for &identifier in &removed_identifiers {
+            if !formula_context_ids.contains(&identifier) {
+                formula_context_ids.push(identifier);
+            }
+        }
+        let formula_identifiers = crate::numbers::editor::remove_table_formula_graph_in_package(
+            &mut staged,
+            &formula_context_ids,
+        )?;
+        let mut removed_components = HashMap::new();
+        for (identifier, archive_name, component) in object_components {
+            if let Some(component) = component {
+                remove_component_external_references_to_object(&mut staged, component, identifier)?;
+                if component_uuid_identifiers(&staged, component)?
+                    .is_some_and(|identifiers| identifiers.contains(&identifier))
+                {
+                    remove_component_object_uuids(&mut staged, component, &[identifier])?;
+                }
+            }
+            if remove_table_object(&mut staged, &archive_name, identifier)? {
+                if let Some(component) = component {
+                    removed_components.insert(archive_name, component);
+                }
+            }
+        }
+        for (archive_name, component) in removed_components {
+            if !staged.contains_entry(&archive_name) {
+                remove_component_registration(&mut staged, component)?;
+            }
+        }
+        removed_identifiers.extend(formula_identifiers);
+        let mut pending = graph.formula_context_ids.clone();
+        let mut examined = HashSet::new();
+        while let Some(identifier) = pending.pop() {
+            if !examined.insert(identifier)
+                || removed_identifiers.contains(&identifier)
+                || package_references_object(&staged, identifier)?
+            {
+                continue;
+            }
+            let Ok(archive_name) = find_object_archive(&staged, identifier) else {
+                continue;
+            };
+            let archive = staged.archive(&archive_name)?;
+            let object = archive.object(identifier).ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Pages table context object {identifier} is missing"
+                ))
+            })?;
+            pending.extend(
+                object
+                    .archive_info
+                    .message_infos
+                    .iter()
+                    .flat_map(|message| {
+                        message.object_references.iter().copied().chain(
+                            message
+                                .field_infos
+                                .iter()
+                                .flat_map(|field| field.object_references.iter().copied()),
+                        )
+                    }),
+            );
+            let component = component_identifier_for_entry(&staged, &archive_name)?;
+            if let Some(component) = component {
+                remove_component_external_references_to_object(&mut staged, component, identifier)?;
+                if component_uuid_identifiers(&staged, component)?
+                    .is_some_and(|identifiers| identifiers.contains(&identifier))
+                {
+                    remove_component_object_uuids(&mut staged, component, &[identifier])?;
+                }
+            }
+            if remove_table_object(&mut staged, &archive_name, identifier)? {
+                if let Some(component) = component {
+                    remove_component_registration(&mut staged, component)?;
+                }
+            }
+            removed_identifiers.push(identifier);
+        }
+        release_package_identifier_suffix(&mut staged, &removed_identifiers)?;
+
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified
+            .tables()?
+            .iter()
+            .any(|table| table.model_object_id == model_object_id)
+        {
+            return Err(Error::InvalidFormat(
+                "Pages table deletion failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(graph.info)
+    }
+
     fn require_body_table(&self, model_object_id: u64) -> Result<PagesTableGraph> {
         body_table_graphs(self)?
             .into_iter()
@@ -277,7 +432,28 @@ fn body_table_graphs(editor: &PagesEditor) -> Result<Vec<PagesTableGraph>> {
                 drawable.identifier
             )));
         }
+        let mut formula_context_ids = vec![drawable.identifier, model_id];
+        for reference in object
+            .archive_info
+            .message_infos
+            .iter()
+            .chain(&model_object.archive_info.message_infos)
+            .flat_map(|message| {
+                message.object_references.iter().copied().chain(
+                    message
+                        .field_infos
+                        .iter()
+                        .flat_map(|field| field.object_references.iter().copied()),
+                )
+            })
+        {
+            if !formula_context_ids.contains(&reference) {
+                formula_context_ids.push(reference);
+            }
+        }
         result.push(PagesTableGraph {
+            attachment_object_id: attachment_reference.identifier,
+            formula_context_ids,
             info: PagesTableInfo {
                 drawable_object_id: drawable.identifier,
                 model_object_id: model_id,
@@ -288,8 +464,101 @@ fn body_table_graphs(editor: &PagesEditor) -> Result<Vec<PagesTableGraph>> {
             },
         });
     }
+    let table_roots = result
+        .iter()
+        .flat_map(|graph| {
+            [
+                graph.attachment_object_id,
+                graph.info.drawable_object_id,
+                graph.info.model_object_id,
+            ]
+        })
+        .collect::<HashSet<_>>();
+    for graph in &mut result {
+        let mut excluded = table_roots.clone();
+        excluded.remove(&graph.attachment_object_id);
+        excluded.remove(&graph.info.drawable_object_id);
+        excluded.remove(&graph.info.model_object_id);
+        excluded.insert(editor.body_storage_id);
+        expand_formula_contexts(editor.package(), &mut graph.formula_context_ids, &excluded)?;
+    }
     result.sort_by_key(|graph| graph.info.anchor_character_index);
     Ok(result)
+}
+
+fn expand_formula_contexts(
+    package: &IWorkPackage,
+    contexts: &mut Vec<u64>,
+    excluded: &HashSet<u64>,
+) -> Result<()> {
+    const CALCULATION_ENGINE_MESSAGE_TYPE: u32 = 4_000;
+    const FORMULA_OWNER_MESSAGE_TYPE: u32 = 4_008;
+    const CELL_RECORD_TILE_MESSAGE_TYPE: u32 = 4_009;
+
+    contexts.retain(|identifier| !excluded.contains(identifier));
+    let mut seen = contexts.iter().copied().collect::<HashSet<_>>();
+    let mut cursor = 0usize;
+    while cursor < contexts.len() {
+        let identifier = contexts[cursor];
+        cursor += 1;
+        let Ok(archive_name) = find_object_archive(package, identifier) else {
+            continue;
+        };
+        let archive = package.archive(&archive_name)?;
+        let object = archive.object(identifier).ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Pages table context object {identifier} is missing"
+            ))
+        })?;
+        if object.messages.iter().any(|message| {
+            matches!(
+                message.type_,
+                CALCULATION_ENGINE_MESSAGE_TYPE
+                    | FORMULA_OWNER_MESSAGE_TYPE
+                    | CELL_RECORD_TILE_MESSAGE_TYPE
+            )
+        }) {
+            continue;
+        }
+        for reference in object
+            .archive_info
+            .message_infos
+            .iter()
+            .flat_map(|message| {
+                message.object_references.iter().copied().chain(
+                    message
+                        .field_infos
+                        .iter()
+                        .flat_map(|field| field.object_references.iter().copied()),
+                )
+            })
+        {
+            if !excluded.contains(&reference) && seen.insert(reference) {
+                contexts.push(reference);
+            }
+        }
+    }
+    Ok(())
+}
+
+fn remove_table_object(
+    package: &mut IWorkPackage,
+    archive_name: &str,
+    identifier: u64,
+) -> Result<bool> {
+    let mut archive = package.archive(archive_name)?;
+    archive.remove_object(identifier).ok_or_else(|| {
+        Error::InvalidFormat(format!("Pages table object {identifier} is missing"))
+    })?;
+    if archive.objects.is_empty() {
+        package.remove_entry(archive_name).ok_or_else(|| {
+            Error::InvalidFormat(format!("Pages table component {archive_name} is missing"))
+        })?;
+        Ok(true)
+    } else {
+        package.replace_archive(archive_name, &archive)?;
+        Ok(false)
+    }
 }
 
 #[cfg(test)]
@@ -391,6 +660,54 @@ mod tests {
         assert!(editor.rename_table(model_id, "").is_err());
         assert_eq!(editor.to_bytes().unwrap(), before);
         assert!(editor.resize_table(model_id, 2, 2).is_err());
+        assert_eq!(editor.to_bytes().unwrap(), before);
+    }
+
+    #[test]
+    fn source_built_table_deletion_removes_private_graph_and_anchor() {
+        let body = "Before 🙂 after";
+        let mut editor = PagesDocumentBuilder::new()
+            .body_text(body)
+            .body_table("Disposable", 3, 2)
+            .build()
+            .unwrap();
+        let table = editor.tables().unwrap().remove(0);
+        let owned = crate::numbers::editor::table_owned_object_ids_in_package(
+            editor.package(),
+            table.model_object_id,
+        )
+        .unwrap();
+        editor
+            .set_table_cell(
+                table.model_object_id,
+                1,
+                1,
+                PagesCellValue::Text("removed".to_owned()),
+            )
+            .unwrap();
+
+        let removed = editor.remove_table(table.model_object_id).unwrap();
+        assert_eq!(removed, table);
+        assert!(editor.tables().unwrap().is_empty());
+        assert_eq!(editor.body_text().unwrap(), body);
+        let mut removed_ids = owned;
+        removed_ids.extend([table.drawable_object_id, table.model_object_id]);
+        for identifier in removed_ids {
+            assert!(find_object_archive(editor.package(), identifier).is_err());
+        }
+        let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert!(reopened.tables().unwrap().is_empty());
+        assert_eq!(reopened.body_text().unwrap(), body);
+    }
+
+    #[test]
+    fn missing_table_deletion_is_transactional() {
+        let mut editor = PagesDocumentBuilder::new()
+            .body_table("Retained", 2, 2)
+            .build()
+            .unwrap();
+        let before = editor.to_bytes().unwrap();
+        assert!(editor.remove_table(u64::MAX).is_err());
         assert_eq!(editor.to_bytes().unwrap(), before);
     }
 }

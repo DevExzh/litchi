@@ -3112,6 +3112,24 @@ pub(crate) fn resize_table_in_package(
     model::resize_attached_table_in_package(package, table_id, rows, columns)
 }
 
+pub(crate) fn table_owned_object_ids_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+) -> Result<Vec<u64>> {
+    let descriptor = model::attached_table_descriptor(package, table_id)?;
+    let locations = object_locations(package)?;
+    Ok(table_owned_graph(package, &locations, &descriptor.model)?
+        .into_keys()
+        .collect())
+}
+
+pub(crate) fn remove_table_formula_graph_in_package(
+    package: &mut IWorkPackage,
+    table_context_ids: &[u64],
+) -> Result<Vec<u64>> {
+    formula_clone::remove_table_formula_graph_for_contexts(package, table_context_ids)
+}
+
 mod column_insert;
 mod date_time_fields;
 mod formula_clone;

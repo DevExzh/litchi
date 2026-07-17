@@ -2136,7 +2136,10 @@ fn locate_cell_in_descriptor(
     })
 }
 
-fn attached_table_descriptor(package: &IWorkPackage, table_id: u64) -> Result<TableDescriptor> {
+pub(super) fn attached_table_descriptor(
+    package: &IWorkPackage,
+    table_id: u64,
+) -> Result<TableDescriptor> {
     let locations = object_locations(package)?;
     let model_archive_name = locations.get(&table_id).ok_or_else(|| {
         Error::ParseError(format!("iWork table model object {table_id} not found"))

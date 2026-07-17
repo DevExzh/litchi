@@ -19,7 +19,7 @@ use dependency_wire::{
 pub(super) use formula_storage::{
     remap_cloned_formula_owner_storage, remap_cloned_formula_storage,
 };
-pub(super) use removal::remove_table_formula_graph;
+pub(super) use removal::{remove_table_formula_graph, remove_table_formula_graph_for_contexts};
 
 const CALCULATION_ENGINE_ENTRY: &str = "Index/CalculationEngine.iwa";
 const CALCULATION_ENGINE_MESSAGE_TYPE: u32 = 4_000;
