@@ -60,6 +60,7 @@ pub mod animations;
 pub mod backgrounds;
 pub mod customshow;
 pub mod comments;
+pub mod embedded_fonts;
 pub mod format;
 pub mod handout;
 pub mod hyperlinks;
@@ -90,6 +91,11 @@ pub use comments::{
     PresentationComments, SlideCommentList, load_presentation_comments,
     parse_comment_authors, parse_slide_comments, store_presentation_comments,
     write_comment_authors, write_slide_comments,
+};
+pub use embedded_fonts::{
+    EmbeddedFont, EmbeddedFontConformance, EmbeddedFontFace, EmbeddedFontResource,
+    EmbeddedFontStyle, PresentationEmbeddedFonts, load_embedded_fonts, parse_embedded_fonts,
+    store_embedded_fonts, write_embedded_font_list,
 };
 pub use format::{ImageFormat, TextFormat};
 pub use handout::{HandoutHeaderFooter, HandoutLayout, HandoutMaster};

@@ -236,6 +236,10 @@ impl MutableDocument {
     }
 
     /// Add an empty master page and its referenced page layout.
+    /// Replace one existing named list level's modern label alignment.
+    pub fn set_list_level_label_alignment(&mut self,item:&crate::ListStyleLevelLabelAlignment)->Result<()>{let styles=self.styles_xml.as_deref().ok_or_else(||litchi_core::Error::InvalidFormat("document has no styles.xml list style to modify".to_string()))?;self.styles_xml=Some(crate::list_label_alignment::replace_list_level_label_alignment_xml(styles,item)?);Ok(())}
+
+    /// Add an empty master page and its referenced page layout.
     /// Replace, insert, or remove one existing paragraph style's direct drop cap.
     pub fn set_paragraph_style_drop_cap(&mut self, style: &crate::ParagraphStyleDropCap) -> Result<()> {
         let styles = self.styles_xml.as_deref().ok_or_else(|| litchi_core::Error::InvalidFormat(

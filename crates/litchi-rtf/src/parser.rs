@@ -19,6 +19,31 @@ enum RtfEncoding {
     Cp850,
 }
 
+fn strict_paragraph_toggle(
+    value: Option<i32>,
+    name: &str,
+) -> std::result::Result<bool, RtfError> {
+    match value {
+        None | Some(1) => Ok(true),
+        Some(0) => Ok(false),
+        Some(_) => Err(RtfError::MalformedDocument(format!(
+            "RTF {name} accepts only 0 or 1"
+        ))),
+    }
+}
+
+fn strict_paragraph_selector(
+    value: Option<i32>,
+    name: &str,
+) -> std::result::Result<(), RtfError> {
+    if value.is_some() {
+        return Err(RtfError::MalformedDocument(format!(
+            "RTF {name} must not have a numeric parameter"
+        )));
+    }
+    Ok(())
+}
+
 impl RtfEncoding {
     fn decode(self, bytes: &[u8]) -> Cow<'_, str> {
         match self {
@@ -3472,6 +3497,20 @@ impl<'a> Parser<'a> {
             ControlWord::KeepNext => state.paragraph.keep_next = true,
             ControlWord::PageBreakBefore => state.paragraph.page_break_before = true,
             ControlWord::WidowControl => state.paragraph.widow_control = true,
+            ControlWord::ParagraphHyphenation(value) => state.paragraph.line_breaking.automatic_hyphenation = strict_paragraph_toggle(*value, "hyphpar")?,
+            ControlWord::AutoSpaceAlphabetic(value) => state.paragraph.line_breaking.auto_space_alphabetic = strict_paragraph_toggle(*value, "aspalpha")?,
+            ControlWord::AutoSpaceNumbers(value) => state.paragraph.line_breaking.auto_space_numbers = strict_paragraph_toggle(*value, "aspnum")?,
+            ControlWord::AdjustRightIndent(value) => state.paragraph.line_breaking.adjust_right_indent = strict_paragraph_toggle(*value, "adjustright")?,
+            ControlWord::WrapDefault(value) => { strict_paragraph_selector(*value, "wrapdefault")?; state.paragraph.line_breaking.wrapping = crate::ParagraphWrapping::Default; },
+            ControlWord::NoCharacterWrap(value) => { strict_paragraph_selector(*value, "nocwrap")?; state.paragraph.line_breaking.wrapping = crate::ParagraphWrapping::NoCharacterWrap; },
+            ControlWord::NoWordWrap(value) => { strict_paragraph_selector(*value, "nowwrap")?; state.paragraph.line_breaking.wrapping = crate::ParagraphWrapping::NoWordWrap; },
+            ControlWord::NoOverflow(value) => { strict_paragraph_selector(*value, "nooverflow")?; state.paragraph.line_breaking.wrapping = crate::ParagraphWrapping::NoOverflow; },
+            ControlWord::FontAlignAuto(value) => { strict_paragraph_selector(*value, "faauto")?; state.paragraph.line_breaking.font_alignment = crate::ParagraphFontAlignment::Auto; },
+            ControlWord::FontAlignHanging(value) => { strict_paragraph_selector(*value, "fahang")?; state.paragraph.line_breaking.font_alignment = crate::ParagraphFontAlignment::Hanging; },
+            ControlWord::FontAlignCenter(value) => { strict_paragraph_selector(*value, "facenter")?; state.paragraph.line_breaking.font_alignment = crate::ParagraphFontAlignment::Center; },
+            ControlWord::FontAlignRoman(value) => { strict_paragraph_selector(*value, "faroman")?; state.paragraph.line_breaking.font_alignment = crate::ParagraphFontAlignment::Roman; },
+            ControlWord::FontAlignVariable(value) => { strict_paragraph_selector(*value, "favar")?; state.paragraph.line_breaking.font_alignment = crate::ParagraphFontAlignment::Variable; },
+            ControlWord::FontAlignFixed(value) => { strict_paragraph_selector(*value, "fafixed")?; state.paragraph.line_breaking.font_alignment = crate::ParagraphFontAlignment::Fixed; },
             ControlWord::ListOverrideIndex(value) => {
                 state.paragraph.list_override = Some(*value);
             },
@@ -6577,6 +6616,20 @@ impl<'a> Parser<'a> {
             ControlWord::KeepNext => state.paragraph.keep_next = true,
             ControlWord::PageBreakBefore => state.paragraph.page_break_before = true,
             ControlWord::WidowControl => state.paragraph.widow_control = true,
+            ControlWord::ParagraphHyphenation(value) => state.paragraph.line_breaking.automatic_hyphenation = strict_paragraph_toggle(*value, "hyphpar")?,
+            ControlWord::AutoSpaceAlphabetic(value) => state.paragraph.line_breaking.auto_space_alphabetic = strict_paragraph_toggle(*value, "aspalpha")?,
+            ControlWord::AutoSpaceNumbers(value) => state.paragraph.line_breaking.auto_space_numbers = strict_paragraph_toggle(*value, "aspnum")?,
+            ControlWord::AdjustRightIndent(value) => state.paragraph.line_breaking.adjust_right_indent = strict_paragraph_toggle(*value, "adjustright")?,
+            ControlWord::WrapDefault(value) => { strict_paragraph_selector(*value, "wrapdefault")?; state.paragraph.line_breaking.wrapping = crate::ParagraphWrapping::Default; },
+            ControlWord::NoCharacterWrap(value) => { strict_paragraph_selector(*value, "nocwrap")?; state.paragraph.line_breaking.wrapping = crate::ParagraphWrapping::NoCharacterWrap; },
+            ControlWord::NoWordWrap(value) => { strict_paragraph_selector(*value, "nowwrap")?; state.paragraph.line_breaking.wrapping = crate::ParagraphWrapping::NoWordWrap; },
+            ControlWord::NoOverflow(value) => { strict_paragraph_selector(*value, "nooverflow")?; state.paragraph.line_breaking.wrapping = crate::ParagraphWrapping::NoOverflow; },
+            ControlWord::FontAlignAuto(value) => { strict_paragraph_selector(*value, "faauto")?; state.paragraph.line_breaking.font_alignment = crate::ParagraphFontAlignment::Auto; },
+            ControlWord::FontAlignHanging(value) => { strict_paragraph_selector(*value, "fahang")?; state.paragraph.line_breaking.font_alignment = crate::ParagraphFontAlignment::Hanging; },
+            ControlWord::FontAlignCenter(value) => { strict_paragraph_selector(*value, "facenter")?; state.paragraph.line_breaking.font_alignment = crate::ParagraphFontAlignment::Center; },
+            ControlWord::FontAlignRoman(value) => { strict_paragraph_selector(*value, "faroman")?; state.paragraph.line_breaking.font_alignment = crate::ParagraphFontAlignment::Roman; },
+            ControlWord::FontAlignVariable(value) => { strict_paragraph_selector(*value, "favar")?; state.paragraph.line_breaking.font_alignment = crate::ParagraphFontAlignment::Variable; },
+            ControlWord::FontAlignFixed(value) => { strict_paragraph_selector(*value, "fafixed")?; state.paragraph.line_breaking.font_alignment = crate::ParagraphFontAlignment::Fixed; },
             ControlWord::ListOverrideIndex(value) => {
                 state.paragraph.list_override = Some(*value);
             },

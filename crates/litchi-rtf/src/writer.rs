@@ -2674,6 +2674,34 @@ impl<W: Write> RtfWriter<W> {
             self.write_control_word("widctlpar", None)?;
         }
 
+        let breaking = para.line_breaking;
+        if breaking.automatic_hyphenation {
+            self.write_control_word("hyphpar", None)?;
+        }
+        match breaking.wrapping {
+            crate::ParagraphWrapping::Default => {}
+            crate::ParagraphWrapping::NoCharacterWrap => self.write_control_word("nocwrap", None)?,
+            crate::ParagraphWrapping::NoWordWrap => self.write_control_word("nowwrap", None)?,
+            crate::ParagraphWrapping::NoOverflow => self.write_control_word("nooverflow", None)?,
+        }
+        if breaking.auto_space_alphabetic {
+            self.write_control_word("aspalpha", None)?;
+        }
+        if breaking.auto_space_numbers {
+            self.write_control_word("aspnum", None)?;
+        }
+        match breaking.font_alignment {
+            crate::ParagraphFontAlignment::Auto => {}
+            crate::ParagraphFontAlignment::Hanging => self.write_control_word("fahang", None)?,
+            crate::ParagraphFontAlignment::Center => self.write_control_word("facenter", None)?,
+            crate::ParagraphFontAlignment::Roman => self.write_control_word("faroman", None)?,
+            crate::ParagraphFontAlignment::Variable => self.write_control_word("favar", None)?,
+            crate::ParagraphFontAlignment::Fixed => self.write_control_word("fafixed", None)?,
+        }
+        if breaking.adjust_right_indent {
+            self.write_control_word("adjustright", None)?;
+        }
+
         if let Some(list_override) = para.list_override {
             self.write_control_word("ls", Some(list_override))?;
         }

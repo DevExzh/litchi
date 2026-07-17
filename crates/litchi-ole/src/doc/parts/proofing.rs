@@ -1,0 +1,481 @@
+//! Word spelling and grammar proofing-state PLCFs.
+
+use super::super::package::{DocError, Result};
+use super::fib::FileInformationBlock;
+
+const SPELLING_FIB_INDEX: usize = 55;
+const GRAMMAR_FIB_INDEX: usize = 90;
+const MAX_PROOFING_ENTRIES: usize = 1_000_000;
+const MAX_PROOFING_TABLE_BYTES: usize = 4 + MAX_PROOFING_ENTRIES * 6;
+
+fn corrupted(message: impl Into<String>) -> DocError {
+    DocError::Corrupted(message.into())
+}
+
+fn read_u16(data: &[u8], offset: usize, field: &str) -> Result<u16> {
+    litchi_core::binary::read_u16_le(data, offset)
+        .map_err(|error| corrupted(format!("invalid {field}: {error}")))
+}
+
+fn read_u32(data: &[u8], offset: usize, field: &str) -> Result<u32> {
+    litchi_core::binary::read_u32_le(data, offset)
+        .map_err(|error| corrupted(format!("invalid {field}: {error}")))
+}
+
+/// The checker whose state is described by a proofing PLCF.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ProofingFeature {
+    Spelling,
+    Grammar,
+}
+
+/// Allowed `SPLS.splf` proofing states.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u8)]
+pub enum ProofingState {
+    MaybeDirty = 0x2,
+    Dirty = 0x3,
+    Edit = 0x4,
+    Foreign = 0x5,
+    Clean = 0x7,
+    Error = 0xA,
+    RepeatWord = 0xB,
+    UnknownWord = 0xC,
+}
+
+impl ProofingState {
+    fn from_raw(value: u8) -> Result<Self> {
+        match value {
+            0x2 => Ok(Self::MaybeDirty),
+            0x3 => Ok(Self::Dirty),
+            0x4 => Ok(Self::Edit),
+            0x5 => Ok(Self::Foreign),
+            0x7 => Ok(Self::Clean),
+            0xA => Ok(Self::Error),
+            0xB => Ok(Self::RepeatWord),
+            0xC => Ok(Self::UnknownWord),
+            _ => Err(corrupted(format!("invalid SPLS state 0x{value:X}"))),
+        }
+    }
+
+    fn requires_error(self) -> bool {
+        matches!(self, Self::Error | Self::RepeatWord | Self::UnknownWord)
+    }
+
+    fn permits_error(self) -> bool {
+        matches!(
+            self,
+            Self::Dirty | Self::Edit | Self::Error | Self::RepeatWord | Self::UnknownWord
+        )
+    }
+}
+
+/// Decoded two-byte `SPLS` state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ProofingStatus {
+    state: ProofingState,
+    error: bool,
+    extend: bool,
+    typo: bool,
+}
+
+impl ProofingStatus {
+    pub fn try_new(
+        feature: ProofingFeature,
+        state: ProofingState,
+        error: bool,
+        extend: bool,
+        typo: bool,
+    ) -> Result<Self> {
+        let status = Self {
+            state,
+            error,
+            extend,
+            typo,
+        };
+        status.validate(feature)?;
+        Ok(status)
+    }
+
+    pub fn state(&self) -> ProofingState { self.state }
+    pub fn is_error(&self) -> bool { self.error }
+    pub fn extend_on_recheck(&self) -> bool { self.extend }
+    pub fn is_typo(&self) -> bool { self.typo }
+
+    pub fn from_raw(feature: ProofingFeature, raw: u16) -> Result<Self> {
+        if raw & 0xFF80 != 0 {
+            return Err(corrupted("SPLS unused bits must be zero"));
+        }
+        let status = Self {
+            state: ProofingState::from_raw((raw & 0xF) as u8)?,
+            error: raw & 0x10 != 0,
+            extend: raw & 0x20 != 0,
+            typo: raw & 0x40 != 0,
+        };
+        status.validate(feature)?;
+        Ok(status)
+    }
+
+    pub fn to_raw(self, feature: ProofingFeature) -> Result<u16> {
+        self.validate(feature)?;
+        Ok(self.state as u16
+            | u16::from(self.error) << 4
+            | u16::from(self.extend) << 5
+            | u16::from(self.typo) << 6)
+    }
+
+    fn validate(self, feature: ProofingFeature) -> Result<()> {
+        if self.state.requires_error() && !self.error {
+            return Err(corrupted("SPLS error state requires fError"));
+        }
+        if self.error && !self.state.permits_error() {
+            return Err(corrupted("SPLS fError is invalid for this state"));
+        }
+        match feature {
+            ProofingFeature::Spelling => {
+                if self.state == ProofingState::Error {
+                    return Err(corrupted("SpellingSpls does not permit splfErrorMin"));
+                }
+                if self.extend || self.typo {
+                    return Err(corrupted("SpellingSpls fExtend and fTypo must be zero"));
+                }
+            }
+            ProofingFeature::Grammar => {
+                if self.extend && !self.error {
+                    return Err(corrupted("GrammarSpls fExtend requires fError"));
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+/// One proofing state beginning at `start_cp`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ProofingEntry {
+    start_cp: u32,
+    status: ProofingStatus,
+}
+
+impl ProofingEntry {
+    pub const fn new(start_cp: u32, status: ProofingStatus) -> Self {
+        Self { start_cp, status }
+    }
+
+    pub fn start_cp(&self) -> u32 { self.start_cp }
+    pub fn status(&self) -> ProofingStatus { self.status }
+}
+
+/// A resolved proofing range. Zero-length ranges represent insertion/deletion points.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ProofingRange {
+    start_cp: u32,
+    end_cp: u32,
+    status: ProofingStatus,
+}
+
+impl ProofingRange {
+    pub fn start_cp(&self) -> u32 { self.start_cp }
+    pub fn end_cp(&self) -> u32 { self.end_cp }
+    pub fn is_point(&self) -> bool { self.start_cp == self.end_cp }
+    pub fn status(&self) -> ProofingStatus { self.status }
+}
+
+/// A typed `Plcfspl` or `Plcfgram` table.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProofingStateTable {
+    feature: ProofingFeature,
+    entries: Vec<ProofingEntry>,
+    terminal_cp: u32,
+}
+
+impl ProofingStateTable {
+    pub fn try_new(
+        feature: ProofingFeature,
+        entries: Vec<ProofingEntry>,
+        terminal_cp: u32,
+    ) -> Result<Self> {
+        validate_entries(feature, &entries, terminal_cp, None)?;
+        Ok(Self {
+            feature,
+            entries,
+            terminal_cp,
+        })
+    }
+
+    pub fn parse_bytes(feature: ProofingFeature, data: &[u8]) -> Result<Self> {
+        Self::parse_bytes_with_max_cp(feature, data, None)
+    }
+
+    fn parse_bytes_with_max_cp(
+        feature: ProofingFeature,
+        data: &[u8],
+        maximum_cp: Option<u32>,
+    ) -> Result<Self> {
+        if data.len() < 4 || (data.len() - 4) % 6 != 0 {
+            return Err(corrupted("proofing PLCF length must have form 6n + 4"));
+        }
+        if data.len() > MAX_PROOFING_TABLE_BYTES {
+            return Err(corrupted("proofing PLCF exceeds one-million-entry cap"));
+        }
+        let count = (data.len() - 4) / 6;
+        let cp_bytes = count
+            .checked_add(1)
+            .and_then(|value| value.checked_mul(4))
+            .ok_or_else(|| corrupted("proofing PLCF CP array size overflows"))?;
+        let mut positions = Vec::with_capacity(count + 1);
+        for index in 0..=count {
+            positions.push(read_u32(data, index * 4, "proofing CP")?);
+        }
+        let terminal_cp = positions[count];
+        let mut entries = Vec::with_capacity(count);
+        for (index, &start_cp) in positions[..count].iter().enumerate() {
+            let raw = read_u16(data, cp_bytes + index * 2, "proofing SPLS")?;
+            entries.push(ProofingEntry::new(
+                start_cp,
+                ProofingStatus::from_raw(feature, raw)?,
+            ));
+        }
+        validate_entries(feature, &entries, terminal_cp, maximum_cp)?;
+        Ok(Self {
+            feature,
+            entries,
+            terminal_cp,
+        })
+    }
+
+    pub fn feature(&self) -> ProofingFeature { self.feature }
+    pub fn entries(&self) -> &[ProofingEntry] { &self.entries }
+    pub fn terminal_cp(&self) -> u32 { self.terminal_cp }
+    pub fn len(&self) -> usize { self.entries.len() }
+    pub fn is_empty(&self) -> bool { self.entries.is_empty() }
+
+    pub fn range(&self, index: usize) -> Option<ProofingRange> {
+        let entry = self.entries.get(index)?;
+        let end_cp = self
+            .entries
+            .get(index + 1)
+            .map(ProofingEntry::start_cp)
+            .unwrap_or(self.terminal_cp);
+        Some(ProofingRange {
+            start_cp: entry.start_cp,
+            end_cp,
+            status: entry.status,
+        })
+    }
+
+    pub fn ranges(&self) -> impl ExactSizeIterator<Item = ProofingRange> + '_ {
+        (0..self.entries.len()).map(|index| self.range(index).unwrap())
+    }
+
+    /// Serialize the complete PLC deterministically.
+    pub fn to_bytes(&self) -> Result<Vec<u8>> {
+        validate_entries(self.feature, &self.entries, self.terminal_cp, None)?;
+        let size = self
+            .entries
+            .len()
+            .checked_mul(6)
+            .and_then(|value| value.checked_add(4))
+            .ok_or_else(|| corrupted("proofing PLCF serialized size overflows"))?;
+        let mut data = Vec::with_capacity(size);
+        for entry in &self.entries {
+            data.extend_from_slice(&entry.start_cp.to_le_bytes());
+        }
+        data.extend_from_slice(&self.terminal_cp.to_le_bytes());
+        for entry in &self.entries {
+            data.extend_from_slice(&entry.status.to_raw(self.feature)?.to_le_bytes());
+        }
+        Ok(data)
+    }
+}
+
+fn validate_entries(
+    feature: ProofingFeature,
+    entries: &[ProofingEntry],
+    terminal_cp: u32,
+    maximum_cp: Option<u32>,
+) -> Result<()> {
+    if entries.len() > MAX_PROOFING_ENTRIES {
+        return Err(corrupted("proofing PLCF exceeds one-million-entry cap"));
+    }
+    let mut previous = None;
+    for (index, entry) in entries.iter().enumerate() {
+        entry.status.validate(feature)?;
+        if entry.start_cp > i32::MAX as u32 {
+            return Err(corrupted(format!("proofing CP {index} exceeds signed CP range")));
+        }
+        if previous.is_some_and(|value| entry.start_cp < value) {
+            return Err(corrupted("proofing PLCF CPs are not nondecreasing"));
+        }
+        previous = Some(entry.start_cp);
+    }
+    if terminal_cp > i32::MAX as u32 {
+        return Err(corrupted("proofing terminal CP exceeds signed CP range"));
+    }
+    if previous.is_some_and(|value| terminal_cp < value) {
+        return Err(corrupted("proofing terminal CP precedes the final entry"));
+    }
+    if maximum_cp.is_some_and(|maximum| terminal_cp > maximum) {
+        return Err(corrupted("proofing terminal CP exceeds the document parts"));
+    }
+    Ok(())
+}
+
+/// Optional spelling and grammar proofing tables for a document.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ProofingTables {
+    spelling: Option<ProofingStateTable>,
+    grammar: Option<ProofingStateTable>,
+}
+
+impl ProofingTables {
+    pub fn parse(fib: &FileInformationBlock, table_stream: &[u8]) -> Result<Self> {
+        let maximum_cp = fib
+            .get_document_parts_end()
+            .and_then(|value| value.checked_add(2))
+            .ok_or_else(|| corrupted("document-parts proofing CP ceiling overflows"))?;
+        Ok(Self {
+            spelling: parse_fib_table(
+                fib,
+                table_stream,
+                SPELLING_FIB_INDEX,
+                ProofingFeature::Spelling,
+                maximum_cp,
+            )?,
+            grammar: parse_fib_table(
+                fib,
+                table_stream,
+                GRAMMAR_FIB_INDEX,
+                ProofingFeature::Grammar,
+                maximum_cp,
+            )?,
+        })
+    }
+
+    pub fn spelling(&self) -> Option<&ProofingStateTable> { self.spelling.as_ref() }
+    pub fn grammar(&self) -> Option<&ProofingStateTable> { self.grammar.as_ref() }
+}
+
+fn parse_fib_table(
+    fib: &FileInformationBlock,
+    table_stream: &[u8],
+    index: usize,
+    feature: ProofingFeature,
+    maximum_cp: u32,
+) -> Result<Option<ProofingStateTable>> {
+    let Some((offset, length)) = fib.get_table_pointer(index) else {
+        return Ok(None);
+    };
+    if length == 0 {
+        return Ok(None);
+    }
+    let start = usize::try_from(offset)
+        .map_err(|_| corrupted("proofing PLCF offset is too large"))?;
+    let length = usize::try_from(length)
+        .map_err(|_| corrupted("proofing PLCF length is too large"))?;
+    if length > MAX_PROOFING_TABLE_BYTES {
+        return Err(corrupted("proofing PLCF exceeds one-million-entry cap"));
+    }
+    let end = start
+        .checked_add(length)
+        .ok_or_else(|| corrupted("proofing PLCF range overflows"))?;
+    let data = table_stream
+        .get(start..end)
+        .ok_or_else(|| corrupted("proofing PLCF extends beyond the table stream"))?;
+    ProofingStateTable::parse_bytes_with_max_cp(feature, data, Some(maximum_cp)).map(Some)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const POI_SPELLING: [u8; 22] = [
+        0, 0, 0, 0, 33, 0, 0, 0, 39, 0, 0, 0, 162, 0, 0, 0, 7, 0, 4, 0, 7, 0,
+    ];
+    const POI_GRAMMAR: [u8; 34] = [
+        0, 0, 0, 0, 18, 0, 0, 0, 40, 0, 0, 0, 68, 0, 0, 0, 98, 0, 0, 0, 162,
+        0, 0, 0, 7, 0, 4, 0, 7, 0, 51, 0, 7, 0,
+    ];
+
+    #[test]
+    fn parses_and_round_trips_poi_reference_tables() {
+        let spelling = ProofingStateTable::parse_bytes(
+            ProofingFeature::Spelling,
+            &POI_SPELLING,
+        )
+        .unwrap();
+        assert_eq!(spelling.terminal_cp(), 162);
+        assert_eq!(spelling.len(), 3);
+        assert_eq!(spelling.range(1).unwrap().start_cp(), 33);
+        assert_eq!(spelling.range(1).unwrap().end_cp(), 39);
+        assert_eq!(spelling.range(1).unwrap().status().state(), ProofingState::Edit);
+        assert_eq!(spelling.to_bytes().unwrap(), POI_SPELLING);
+
+        let grammar = ProofingStateTable::parse_bytes(
+            ProofingFeature::Grammar,
+            &POI_GRAMMAR,
+        )
+        .unwrap();
+        let error = grammar.range(3).unwrap();
+        assert_eq!((error.start_cp(), error.end_cp()), (68, 98));
+        assert_eq!(error.status().state(), ProofingState::Dirty);
+        assert!(error.status().is_error());
+        assert!(error.status().extend_on_recheck());
+        assert_eq!(grammar.to_bytes().unwrap(), POI_GRAMMAR);
+    }
+
+    #[test]
+    fn preserves_duplicate_cp_point_ranges() {
+        let clean = ProofingStatus::try_new(
+            ProofingFeature::Spelling,
+            ProofingState::Clean,
+            false,
+            false,
+            false,
+        )
+        .unwrap();
+        let table = ProofingStateTable::try_new(
+            ProofingFeature::Spelling,
+            vec![ProofingEntry::new(10, clean), ProofingEntry::new(10, clean)],
+            20,
+        )
+        .unwrap();
+        assert!(table.range(0).unwrap().is_point());
+        assert_eq!(
+            ProofingStateTable::parse_bytes(ProofingFeature::Spelling, &table.to_bytes().unwrap())
+                .unwrap(),
+            table
+        );
+    }
+
+    #[test]
+    fn rejects_malformed_plc_shapes_and_positions() {
+        assert!(ProofingStateTable::parse_bytes(ProofingFeature::Spelling, &[]).is_err());
+        assert!(ProofingStateTable::parse_bytes(
+            ProofingFeature::Spelling,
+            &POI_SPELLING[..21],
+        )
+        .is_err());
+        let mut bytes = POI_SPELLING;
+        bytes[4..8].copy_from_slice(&40u32.to_le_bytes());
+        assert!(ProofingStateTable::parse_bytes(ProofingFeature::Spelling, &bytes).is_err());
+        let mut bytes = POI_SPELLING;
+        bytes[12..16].copy_from_slice(&38u32.to_le_bytes());
+        assert!(ProofingStateTable::parse_bytes(ProofingFeature::Spelling, &bytes).is_err());
+        let mut bytes = POI_SPELLING;
+        bytes[0..4].copy_from_slice(&0x8000_0000u32.to_le_bytes());
+        assert!(ProofingStateTable::parse_bytes(ProofingFeature::Spelling, &bytes).is_err());
+    }
+
+    #[test]
+    fn rejects_invalid_spls_states_and_flags() {
+        assert!(ProofingStatus::from_raw(ProofingFeature::Spelling, 0).is_err());
+        assert!(ProofingStatus::from_raw(ProofingFeature::Spelling, 0x8007).is_err());
+        assert!(ProofingStatus::from_raw(ProofingFeature::Spelling, 0x0A).is_err());
+        assert!(ProofingStatus::from_raw(ProofingFeature::Spelling, 0x1A).is_err());
+        assert!(ProofingStatus::from_raw(ProofingFeature::Spelling, 0x27).is_err());
+        assert!(ProofingStatus::from_raw(ProofingFeature::Grammar, 0x25).is_err());
+        assert!(ProofingStatus::from_raw(ProofingFeature::Grammar, 0x1A).is_ok());
+        assert!(ProofingStatus::from_raw(ProofingFeature::Grammar, 0x33).is_ok());
+    }
+}

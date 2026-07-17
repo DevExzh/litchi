@@ -40,6 +40,7 @@ pub struct DocumentBuilder {
     metadata: Metadata,
     paragraph_tab_styles: Vec<crate::ParagraphStyleTabStops>,
     paragraph_drop_cap_styles: Vec<crate::ParagraphStyleDropCap>,
+    list_level_label_alignments: Vec<crate::ListStyleLevelLabelAlignment>,
     page_layout_columns: Vec<(String, crate::StyleColumns)>,
     page_layout_footnote_separators: Vec<(String, crate::StyleFootnoteSeparator)>,
 }
@@ -66,6 +67,7 @@ impl DocumentBuilder {
             metadata: Metadata::default(),
             paragraph_tab_styles: Vec::new(),
             paragraph_drop_cap_styles: Vec::new(),
+            list_level_label_alignments: Vec::new(),
             page_layout_columns: Vec::new(),
             page_layout_footnote_separators: Vec::new(),
         }
@@ -111,6 +113,13 @@ impl DocumentBuilder {
         }
         self.paragraph_drop_cap_styles.push(style);
         Ok(self)
+    }
+
+    /// Customize one of the three generated `L1` numbered-list levels.
+    pub fn set_numbered_list_level_label_alignment(&mut self, level:u16, alignment:crate::ListLevelLabelAlignment)->Result<&mut Self>{
+        if !(1..=3).contains(&level){return Err(litchi_core::Error::InvalidFormat("generated numbered-list level must be 1..=3".to_string()));}
+        let item=crate::ListStyleLevelLabelAlignment::new("L1",level,alignment)?;
+        if let Some(old)=self.list_level_label_alignments.iter_mut().find(|x|x.level==level){*old=item}else{self.list_level_label_alignments.push(item)}Ok(self)
     }
 
     /// Add a named automatic page layout with typed multi-column properties.
@@ -607,6 +616,9 @@ impl DocumentBuilder {
                 ),
                 1,
             );
+        }
+        for alignment in &self.list_level_label_alignments {
+            xml=crate::list_label_alignment::replace_list_level_label_alignment_xml(&xml,alignment).expect("validated generated list alignment");
         }
         xml
     }

@@ -25,6 +25,7 @@ pub mod pap_bin_table;
 pub mod paragraph_extractor;
 pub mod piece_table;
 pub mod list_names;
+pub mod proofing;
 pub mod revisions;
 pub mod saved_by;
 pub mod sections;

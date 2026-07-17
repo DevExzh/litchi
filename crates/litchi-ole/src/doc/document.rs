@@ -22,6 +22,7 @@ use super::parts::numbering::ListTables;
 use super::parts::pap_bin_table::PapBinTable;
 use super::parts::paragraph_extractor::{ExtractedParagraph, ParagraphExtractor};
 use super::parts::piece_table::PieceTable;
+use super::parts::proofing::ProofingTables;
 use super::parts::revisions::RevisionAuthorTable;
 use super::parts::sections::SectionsTable;
 use super::parts::styles::StyleSheet;
@@ -98,6 +99,8 @@ pub struct Document {
     associated_strings: Option<DocumentAssociatedStrings>,
     /// Names parallel to list definitions for LISTNUM fields
     list_names: Option<ListNamesTable>,
+    /// Deferred strict spelling/grammar proofing metadata parse
+    proofing_tables: Result<ProofingTables>,
     /// Section ranges, layout, and property revision marks
     sections: SectionsTable,
     /// Hyperlinks table
@@ -195,6 +198,7 @@ impl Document {
         let revision_authors = RevisionAuthorTable::parse(&fib, &table_stream)?;
         let associated_strings = DocumentAssociatedStrings::parse(&fib, &table_stream)?;
         let list_names = ListNamesTable::parse(&fib, &table_stream)?;
+        let proofing_tables = ProofingTables::parse(&fib, &table_stream);
         let sections =
             SectionsTable::parse(&fib, &table_stream, &word_document, &revision_authors)?;
 
@@ -264,6 +268,7 @@ impl Document {
             revision_authors,
             associated_strings,
             list_names,
+            proofing_tables,
             sections,
             hyperlinks_table,
             list_tables,
@@ -562,6 +567,16 @@ impl Document {
     /// Get the ordered `LISTNUM` list-name metadata table.
     pub fn list_names(&self) -> Option<&ListNamesTable> {
         self.list_names.as_ref()
+    }
+
+    /// Strictly access spelling and grammar proofing-state ranges.
+    ///
+    /// Parsing is deferred so nonconforming producer caches do not prevent the document's
+    /// primary text from opening. Any malformed PLCF is reported when this metadata is requested.
+    pub fn proofing_tables(&self) -> Result<&ProofingTables> {
+        self.proofing_tables.as_ref().map_err(|error| {
+            DocError::Corrupted(format!("invalid proofing metadata: {error}"))
+        })
     }
 
     /// Get access to the fields table (if parsed).

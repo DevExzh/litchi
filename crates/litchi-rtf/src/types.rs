@@ -297,6 +297,45 @@ pub struct Indentation {
     pub first_line: i32,
 }
 
+/// Paragraph wrapping policy from `wrapdefault`, `nocwrap`, `nowwrap`, and `nooverflow`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ParagraphWrapping {
+    #[default]
+    Default,
+    NoCharacterWrap,
+    NoWordWrap,
+    NoOverflow,
+}
+
+/// East Asian paragraph font alignment from the RTF 1.9.1 `fa*` selectors.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ParagraphFontAlignment {
+    #[default]
+    Auto,
+    Hanging,
+    Center,
+    Roman,
+    Variable,
+    Fixed,
+}
+
+/// Effective paragraph line-breaking and automatic-spacing policy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct ParagraphLineBreaking {
+    /// Automatic paragraph hyphenation (`hyphpar`).
+    pub automatic_hyphenation: bool,
+    /// Automatic spacing between Asian and alphabetic text (`aspalpha`).
+    pub auto_space_alphabetic: bool,
+    /// Automatic spacing between Asian text and numbers (`aspnum`).
+    pub auto_space_numbers: bool,
+    /// Adjust the right indent for a document grid (`adjustright`).
+    pub adjust_right_indent: bool,
+    /// Wrapping/overflow selector.
+    pub wrapping: ParagraphWrapping,
+    /// East Asian font-alignment selector.
+    pub font_alignment: ParagraphFontAlignment,
+}
+
 /// Paragraph properties.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Paragraph {
@@ -322,6 +361,8 @@ pub struct Paragraph {
     pub page_break_before: bool,
     /// Widow/orphan control
     pub widow_control: bool,
+    /// Line-breaking and automatic-spacing policy.
+    pub line_breaking: ParagraphLineBreaking,
     /// List override index (`\lsN`) applied to this paragraph
     pub list_override: Option<i32>,
     /// Zero-based list level (`\ilvlN`) applied to this paragraph

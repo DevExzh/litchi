@@ -146,7 +146,8 @@ pub use stylesheet::{Style, StyleSheet, StyleType};
 pub use table::{Cell, Row, Table};
 pub use types::{
     Alignment, AssociatedCharacterFormatting, Color, ColorRef, ColorTable, DocumentElement, Font,
-    FontFamily, FontPitch, FontRef, FontTable, Formatting, Indentation, Paragraph, ParagraphContent,
+    FontFamily, FontPitch, FontRef, FontTable, Formatting, Indentation, Paragraph,
+    ParagraphContent, ParagraphFontAlignment, ParagraphLineBreaking, ParagraphWrapping,
     Run, Spacing, StyleBlock, TextDirection, UnderlineStyle,
 };
 pub use writer::{RtfWriter, WriterOptions};
