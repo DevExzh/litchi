@@ -129,6 +129,51 @@ impl PagesEditor {
         self.set_table_cell(model_object_id, row, column, PagesCellValue::Empty)
     }
 
+    /// Rename a reachable body table transactionally.
+    pub fn rename_table(&mut self, model_object_id: u64, name: &str) -> Result<()> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::rename_table_in_package(&mut staged, model_object_id, name)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        let renamed = verified.require_body_table(model_object_id)?;
+        if renamed.info.name != name {
+            return Err(Error::InvalidFormat(
+                "Pages table rename failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Resize a reachable body table while preserving existing cells and UIDs.
+    ///
+    /// Growth creates blank trailing rows or columns. Shrinkage is rejected if
+    /// any removed row or column contains stored cell data.
+    pub fn resize_table(
+        &mut self,
+        model_object_id: u64,
+        rows: usize,
+        columns: usize,
+    ) -> Result<()> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::resize_table_in_package(
+            &mut staged,
+            model_object_id,
+            rows,
+            columns,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        let resized = verified.require_body_table(model_object_id)?;
+        if (resized.info.rows, resized.info.columns) != (rows, columns) {
+            return Err(Error::InvalidFormat(
+                "Pages table resize failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
     fn require_body_table(&self, model_object_id: u64) -> Result<PagesTableGraph> {
         body_table_graphs(self)?
             .into_iter()
@@ -301,6 +346,51 @@ mod tests {
                 .set_table_cell(model_id, 2, 0, PagesCellValue::Boolean(true))
                 .is_err()
         );
+        assert_eq!(editor.to_bytes().unwrap(), before);
+    }
+
+    #[test]
+    fn source_built_table_roundtrips_rename_and_resize() {
+        let mut editor = PagesDocumentBuilder::new()
+            .body_table("Original", 3, 2)
+            .build()
+            .unwrap();
+        let model_id = editor.tables().unwrap()[0].model_object_id;
+        editor
+            .set_table_cell(model_id, 1, 1, PagesCellValue::Text("kept".to_owned()))
+            .unwrap();
+
+        editor.rename_table(model_id, "Renamed").unwrap();
+        editor.resize_table(model_id, 5, 4).unwrap();
+        let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let info = reopened.tables().unwrap().remove(0);
+        assert_eq!(info.name, "Renamed");
+        assert_eq!((info.rows, info.columns), (5, 4));
+        assert_eq!(
+            reopened.table(model_id).unwrap().get_cell(1, 1),
+            Some(&PagesCellValue::Text("kept".to_owned()))
+        );
+
+        reopened.resize_table(model_id, 2, 2).unwrap();
+        let info = reopened.tables().unwrap().remove(0);
+        assert_eq!((info.rows, info.columns), (2, 2));
+    }
+
+    #[test]
+    fn table_rename_and_occupied_shrink_are_transactional() {
+        let mut editor = PagesDocumentBuilder::new()
+            .body_table("Protected", 3, 3)
+            .build()
+            .unwrap();
+        let model_id = editor.tables().unwrap()[0].model_object_id;
+        editor
+            .set_table_cell(model_id, 2, 2, PagesCellValue::Number(7.0))
+            .unwrap();
+
+        let before = editor.to_bytes().unwrap();
+        assert!(editor.rename_table(model_id, "").is_err());
+        assert_eq!(editor.to_bytes().unwrap(), before);
+        assert!(editor.resize_table(model_id, 2, 2).is_err());
         assert_eq!(editor.to_bytes().unwrap(), before);
     }
 }

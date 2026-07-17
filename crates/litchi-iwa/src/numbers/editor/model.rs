@@ -1367,7 +1367,7 @@ pub(super) fn table_model_references(model: &TableModelArchive) -> Vec<u64> {
 pub(super) fn validate_name(name: &str, kind: &str) -> Result<()> {
     if name.is_empty() || name.contains('\0') {
         return Err(Error::ParseError(format!(
-            "Numbers {kind} names must be non-empty and contain no NUL"
+            "iWork {kind} names must be non-empty and contain no NUL"
         )));
     }
     Ok(())
@@ -1376,21 +1376,21 @@ pub(super) fn validate_name(name: &str, kind: &str) -> Result<()> {
 pub(super) fn validate_table_dimensions(rows: usize, columns: usize) -> Result<(u32, u32)> {
     if rows == 0 || columns == 0 {
         return Err(Error::ParseError(
-            "Numbers tables must contain at least one row and one column".to_owned(),
+            "iWork tables must contain at least one row and one column".to_owned(),
         ));
     }
     let total_uids = rows
         .checked_add(columns)
-        .ok_or_else(|| Error::ParseError("Numbers table dimensions overflow usize".to_owned()))?;
+        .ok_or_else(|| Error::ParseError("iWork table dimensions overflow usize".to_owned()))?;
     if total_uids > MAX_TABLE_UIDS {
         return Err(Error::ParseError(format!(
-            "Numbers table dimensions require {total_uids} UIDs, exceeding the safety limit {MAX_TABLE_UIDS}"
+            "iWork table dimensions require {total_uids} UIDs, exceeding the safety limit {MAX_TABLE_UIDS}"
         )));
     }
     let rows = u32::try_from(rows)
-        .map_err(|_| Error::ParseError("Numbers row count exceeds u32".to_owned()))?;
+        .map_err(|_| Error::ParseError("iWork row count exceeds u32".to_owned()))?;
     let columns = u32::try_from(columns)
-        .map_err(|_| Error::ParseError("Numbers column count exceeds u32".to_owned()))?;
+        .map_err(|_| Error::ParseError("iWork column count exceeds u32".to_owned()))?;
     Ok((rows, columns))
 }
 
@@ -2169,9 +2169,8 @@ fn attached_table_descriptor(package: &IWorkPackage, table_id: u64) -> Result<Ta
                 continue;
             }
             let owns_model = object.messages.iter().any(|message| {
-                message.type_ == 6000
-                    && tst::TableInfoArchive::decode(message.data.as_slice())
-                        .is_ok_and(|info| info.table_model.identifier == table_id)
+                tst::TableInfoArchive::decode(message.data.as_slice())
+                    .is_ok_and(|info| info.table_model.identifier == table_id)
             });
             if owns_model && table_info_id.replace(identifier).is_some() {
                 return Err(Error::InvalidFormat(format!(
@@ -2188,6 +2187,140 @@ fn attached_table_descriptor(package: &IWorkPackage, table_id: u64) -> Result<Ta
             ))
         })?,
         model: model.clone(),
+    })
+}
+
+pub(super) fn rename_attached_table_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    name: &str,
+) -> Result<()> {
+    validate_name(name, "table")?;
+    attached_table_descriptor(package, table_id)?;
+    let locations = object_locations(package)?;
+    let archive_name = locations.get(&table_id).ok_or_else(|| {
+        Error::InvalidFormat(format!("iWork table model object {table_id} is missing"))
+    })?;
+    package.update_archive(archive_name, |archive| {
+        let object = archive.object_mut(table_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("iWork table model object {table_id} is missing"))
+        })?;
+        let message_index = object
+            .messages
+            .iter()
+            .position(|message| {
+                (message.type_ == 6000 || message.type_ == 6001)
+                    && TableModelArchive::decode(message.data.as_slice()).is_ok()
+            })
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Object {table_id} has no iWork table-model payload"
+                ))
+            })?;
+        let message_type = object.messages[message_index].type_;
+        let data = patch_length_delimited_field(
+            object.messages[message_index].data.as_slice(),
+            8,
+            true,
+            Some(name.as_bytes()),
+        )?;
+        let verified = TableModelArchive::decode(data.as_slice())?;
+        if verified.table_name != name {
+            return Err(Error::InvalidFormat(
+                "iWork table-name wire patch failed validation".to_owned(),
+            ));
+        }
+        object.replace_message(
+            message_index,
+            RawMessage {
+                type_: message_type,
+                data,
+            },
+        )?;
+        Ok(())
+    })
+}
+
+pub(super) fn resize_attached_table_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    rows: usize,
+    columns: usize,
+) -> Result<()> {
+    let (rows_u32, columns_u32) = validate_table_dimensions(rows, columns)?;
+    let descriptor = attached_table_descriptor(package, table_id)?;
+    let old_rows = descriptor.model.number_of_rows as usize;
+    let old_columns = descriptor.model.number_of_columns as usize;
+    if (rows, columns) == (old_rows, old_columns) {
+        return Ok(());
+    }
+
+    let locations = object_locations(package)?;
+    validate_and_trim_tiles(package, &locations, &descriptor.model, rows, columns)?;
+    resize_header_buckets(
+        package,
+        &locations,
+        &descriptor.model,
+        rows_u32,
+        columns_u32,
+    )?;
+    if let Some(reference) = &descriptor.model.base_column_row_uids {
+        resize_uid_map(
+            package,
+            &locations,
+            reference.identifier,
+            old_rows,
+            rows,
+            old_columns,
+            columns,
+        )?;
+    }
+    if let Some(reference) = &descriptor.model.stroke_sidecar {
+        resize_stroke_sidecar(
+            package,
+            &locations,
+            reference.identifier,
+            rows_u32,
+            columns_u32,
+        )?;
+    }
+    let table_archive = locations.get(&table_id).ok_or_else(|| {
+        Error::InvalidFormat(format!("iWork table model object {table_id} is missing"))
+    })?;
+    package.update_archive(table_archive, |archive| {
+        let object = archive.object_mut(table_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("iWork table model object {table_id} is missing"))
+        })?;
+        let message_index = object
+            .messages
+            .iter()
+            .position(|message| {
+                (message.type_ == 6000 || message.type_ == 6001)
+                    && TableModelArchive::decode(message.data.as_slice()).is_ok()
+            })
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Object {table_id} has no iWork table-model payload"
+                ))
+            })?;
+        let message_type = object.messages[message_index].type_;
+        let original = object.messages[message_index].data.as_slice();
+        let mut data = patch_varint_field(original, 6, true, Some(u64::from(rows_u32)))?;
+        data = patch_varint_field(&data, 7, true, Some(u64::from(columns_u32)))?;
+        let verified = TableModelArchive::decode(data.as_slice())?;
+        if (verified.number_of_rows, verified.number_of_columns) != (rows_u32, columns_u32) {
+            return Err(Error::InvalidFormat(
+                "iWork table-dimension wire patch failed validation".to_owned(),
+            ));
+        }
+        object.replace_message(
+            message_index,
+            RawMessage {
+                type_: message_type,
+                data,
+            },
+        )?;
+        Ok(())
     })
 }
 

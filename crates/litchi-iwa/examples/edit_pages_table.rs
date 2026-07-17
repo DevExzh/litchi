@@ -18,6 +18,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         0,
         PagesCellValue::Text("Updated by litchi-iwa".to_owned()),
     )?;
+    editor.rename_table(table.model_object_id, "Edited Table")?;
+    editor.resize_table(
+        table.model_object_id,
+        table.rows.max(5),
+        table.columns.max(4),
+    )?;
     editor.save(output)?;
     Ok(())
 }

@@ -2210,7 +2210,6 @@ impl NumbersEditor {
     }
 
     pub fn rename_table(&mut self, table_id: u64, name: &str) -> Result<()> {
-        validate_name(name, "table")?;
         if !self
             .tables()?
             .iter()
@@ -2220,46 +2219,8 @@ impl NumbersEditor {
                 "Numbers table object {table_id} is not attached to a workbook sheet"
             )));
         }
-        let locations = object_locations(&self.package)?;
-        let archive_name = locations
-            .get(&table_id)
-            .ok_or_else(|| Error::InvalidFormat(format!("Numbers table {table_id} is missing")))?
-            .to_owned();
         let mut staged = self.package.clone();
-        staged.update_archive(&archive_name, |archive| {
-            let object = archive.object_mut(table_id).ok_or_else(|| {
-                Error::InvalidFormat(format!("Numbers table {table_id} is missing"))
-            })?;
-            let message_index = object
-                .messages
-                .iter()
-                .position(|message| {
-                    (message.type_ == 6000 || message.type_ == 6001)
-                        && TableModelArchive::decode(message.data.as_slice()).is_ok()
-                })
-                .ok_or_else(|| {
-                    Error::InvalidFormat(format!(
-                        "Object {table_id} has no Numbers table model payload"
-                    ))
-                })?;
-            let message_type = object.messages[message_index].type_;
-            let original = object.messages[message_index].data.as_slice();
-            let data = patch_length_delimited_field(original, 8, true, Some(name.as_bytes()))?;
-            let verified = TableModelArchive::decode(data.as_slice())?;
-            if verified.table_name != name {
-                return Err(Error::InvalidFormat(
-                    "Numbers table-name wire patch failed validation".to_owned(),
-                ));
-            }
-            object.replace_message(
-                message_index,
-                RawMessage {
-                    type_: message_type,
-                    data,
-                },
-            )?;
-            Ok(())
-        })?;
+        rename_attached_table_in_package(&mut staged, table_id, name)?;
         let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
         if verified
             .tables()?
@@ -2282,87 +2243,8 @@ impl NumbersEditor {
     /// when the removed trailing region contains no stored cells; this prevents
     /// silently orphaning strings, formulas, rich text, comments, or styles.
     pub fn resize_table(&mut self, table_id: u64, rows: usize, columns: usize) -> Result<()> {
-        let (rows_u32, columns_u32) = validate_table_dimensions(rows, columns)?;
-        let descriptor = table_models(&self.package)?
-            .into_iter()
-            .find(|table| table.object_id == table_id)
-            .ok_or_else(|| {
-                Error::ParseError(format!("Numbers table object {table_id} not found"))
-            })?;
-        let old_rows = descriptor.model.number_of_rows as usize;
-        let old_columns = descriptor.model.number_of_columns as usize;
-        if (rows, columns) == (old_rows, old_columns) {
-            return Ok(());
-        }
-
-        let locations = object_locations(&self.package)?;
         let mut staged = self.package.clone();
-        validate_and_trim_tiles(&mut staged, &locations, &descriptor.model, rows, columns)?;
-        resize_header_buckets(
-            &mut staged,
-            &locations,
-            &descriptor.model,
-            rows_u32,
-            columns_u32,
-        )?;
-        if let Some(reference) = &descriptor.model.base_column_row_uids {
-            resize_uid_map(
-                &mut staged,
-                &locations,
-                reference.identifier,
-                old_rows,
-                rows,
-                old_columns,
-                columns,
-            )?;
-        }
-        if let Some(reference) = &descriptor.model.stroke_sidecar {
-            resize_stroke_sidecar(
-                &mut staged,
-                &locations,
-                reference.identifier,
-                rows_u32,
-                columns_u32,
-            )?;
-        }
-        let table_archive = locations.get(&table_id).ok_or_else(|| {
-            Error::InvalidFormat(format!("Numbers table object {table_id} is missing"))
-        })?;
-        staged.update_archive(table_archive, |archive| {
-            let object = archive.object_mut(table_id).ok_or_else(|| {
-                Error::InvalidFormat(format!("Numbers table object {table_id} is missing"))
-            })?;
-            let message_index = object
-                .messages
-                .iter()
-                .position(|message| {
-                    (message.type_ == 6000 || message.type_ == 6001)
-                        && TableModelArchive::decode(message.data.as_slice()).is_ok()
-                })
-                .ok_or_else(|| {
-                    Error::InvalidFormat(format!(
-                        "Object {table_id} has no Numbers table model payload"
-                    ))
-                })?;
-            let message_type = object.messages[message_index].type_;
-            let original = object.messages[message_index].data.as_slice();
-            let mut data = patch_varint_field(original, 6, true, Some(u64::from(rows_u32)))?;
-            data = patch_varint_field(&data, 7, true, Some(u64::from(columns_u32)))?;
-            let verified = TableModelArchive::decode(data.as_slice())?;
-            if (verified.number_of_rows, verified.number_of_columns) != (rows_u32, columns_u32) {
-                return Err(Error::InvalidFormat(
-                    "Numbers table-dimension wire patch failed validation".to_owned(),
-                ));
-            }
-            object.replace_message(
-                message_index,
-                RawMessage {
-                    type_: message_type,
-                    data,
-                },
-            )?;
-            Ok(())
-        })?;
+        resize_attached_table_in_package(&mut staged, table_id, rows, columns)?;
 
         let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
         let resized = verified
@@ -3211,6 +3093,23 @@ pub(crate) fn set_table_cell_in_package(
     value: CellValue,
 ) -> Result<()> {
     model::set_attached_cell_in_package(package, table_id, row, column, value)
+}
+
+pub(crate) fn rename_table_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    name: &str,
+) -> Result<()> {
+    model::rename_attached_table_in_package(package, table_id, name)
+}
+
+pub(crate) fn resize_table_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    rows: usize,
+    columns: usize,
+) -> Result<()> {
+    model::resize_attached_table_in_package(package, table_id, rows, columns)
 }
 
 mod column_insert;

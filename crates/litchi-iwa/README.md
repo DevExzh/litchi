@@ -113,6 +113,33 @@ pages.save("created.pages")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
 
+Scratch documents can include an independently writable native table from the
+first build. Its name, dimensions, and cells remain editable after reopening;
+shrinking rejects any operation that would discard stored cells:
+
+```rust
+use litchi_iwa::numbers::CellValue;
+use litchi_iwa::pages::PagesEditor;
+
+let mut pages = PagesEditor::builder()
+    .body_text("Quarterly revenue\n")
+    .body_table("Revenue", 4, 3)
+    .build()?;
+let table = pages.tables()?.remove(0);
+pages.set_table_cell(
+    table.model_object_id,
+    0,
+    0,
+    CellValue::Text("Quarter".to_owned()),
+)?;
+pages.rename_table(table.model_object_id, "Revenue by Quarter")?;
+pages.resize_table(table.model_object_id, 5, 4)?;
+pages.save("created-with-table.pages")?;
+# Ok::<(), litchi_iwa::Error>(())
+```
+
+The same table operations work on app-created files; see `edit_pages_table`.
+
 Scratch-created documents can also add independent, body-anchored text boxes;
 no existing drawable or template package is required:
 
