@@ -111,6 +111,59 @@ pub enum FontPitch {
     Variable,
 }
 
+/// Embedded font format from the `fontemb` destination.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum EmbeddedFontFormat {
+    /// `ftnil` — unknown or unspecified font format.
+    #[default]
+    Nil,
+    /// `fttruetype` — TrueType font data.
+    TrueType,
+}
+
+/// Embedded font payload from the inert `fontemb` destination.
+///
+/// A font entry may embed the font bytes directly (hexadecimal or `bin`
+/// payload) or reference an external font file through the `fontfile`
+/// destination; both carriers are optional in the specification.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct EmbeddedFont<'a> {
+    /// Declared embedded font format.
+    pub format: EmbeddedFontFormat,
+    /// File name from the nested `fontfile` destination, if present.
+    pub file_name: Option<Cow<'a, str>>,
+    /// Code page of the `fontfile` name from its `cpg` control word.
+    pub file_code_page: Option<u16>,
+    /// Decoded embedded font bytes, if the data is carried inline.
+    pub data: Option<Vec<u8>>,
+}
+
+impl EmbeddedFont<'_> {
+    /// Maximum accepted embedded font payload (32 MiB).
+    pub const MAX_DATA_BYTES: usize = 32 * 1_048_576;
+    /// Maximum accepted `fontfile` name length in bytes.
+    pub const MAX_FILE_NAME_BYTES: usize = 4_096;
+
+    pub fn validate(&self) -> RtfResult<()> {
+        if self.file_name.as_ref().is_some_and(|name| name.is_empty() || name.len() > Self::MAX_FILE_NAME_BYTES) {
+            return Err(RtfError::MalformedDocument("invalid or oversized RTF embedded font file name".to_string()));
+        }
+        if self.data.as_ref().is_some_and(|data| data.is_empty() || data.len() > Self::MAX_DATA_BYTES) {
+            return Err(RtfError::MalformedDocument("invalid or oversized RTF embedded font data".to_string()));
+        }
+        Ok(())
+    }
+
+    pub(crate) fn into_owned(self) -> EmbeddedFont<'static> {
+        EmbeddedFont {
+            format: self.format,
+            file_name: self.file_name.map(|name| Cow::Owned(name.into_owned())),
+            file_code_page: self.file_code_page,
+            data: self.data,
+        }
+    }
+}
+
 /// Font definition.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Font<'a> {
@@ -130,6 +183,8 @@ pub struct Font<'a> {
     pub pitch: FontPitch,
     /// Explicit font code page.
     pub code_page: Option<u16>,
+    /// Embedded font payload from the inert `fontemb` destination.
+    pub embedded: Option<EmbeddedFont<'a>>,
 }
 
 impl<'a> Font<'a> {
@@ -145,6 +200,7 @@ impl<'a> Font<'a> {
             panose: None,
             pitch: FontPitch::Default,
             code_page: None,
+            embedded: None,
         }
     }
 
@@ -156,6 +212,9 @@ impl<'a> Font<'a> {
             || self.non_tagged_name.as_ref().is_some_and(|name| name.is_empty() || name.len() > MAX_FONT_NAME_BYTES)
         {
             return Err(RtfError::MalformedDocument("invalid or oversized RTF font name".to_string()));
+        }
+        if let Some(embedded) = &self.embedded {
+            embedded.validate()?;
         }
         Ok(())
     }
@@ -170,6 +229,7 @@ impl<'a> Font<'a> {
             panose: self.panose,
             pitch: self.pitch,
             code_page: self.code_page,
+            embedded: self.embedded.map(EmbeddedFont::into_owned),
         }
     }
 }
@@ -227,7 +287,9 @@ impl<'a> FontTable<'a> {
         if self.fonts.len() > 65_536 || self.defined.len() != self.fonts.len() {
             return Err(RtfError::MalformedDocument("invalid RTF font-table size".to_string()));
         }
+        const MAX_AGGREGATE_EMBEDDED_BYTES: usize = 256 * 1_048_576;
         let mut aggregate = 0usize;
+        let mut embedded_aggregate = 0usize;
         for (font, defined) in self.fonts.iter().zip(&self.defined) {
             if !defined {
                 continue;
@@ -238,9 +300,15 @@ impl<'a> FontTable<'a> {
                 .and_then(|total| total.checked_add(font.alternate_name.as_ref().map_or(0, |name| name.len())))
                 .and_then(|total| total.checked_add(font.non_tagged_name.as_ref().map_or(0, |name| name.len())))
                 .ok_or_else(|| RtfError::MalformedDocument("RTF font-table text size overflow".to_string()))?;
+            embedded_aggregate = embedded_aggregate
+                .checked_add(font.embedded.as_ref().map_or(0, |embedded| embedded.data.as_ref().map_or(0, |data| data.len())))
+                .ok_or_else(|| RtfError::MalformedDocument("RTF font-table embedded size overflow".to_string()))?;
         }
         if aggregate > 16 * 1_048_576 {
             return Err(RtfError::MalformedDocument("RTF font-table text exceeds the safety limit".to_string()));
+        }
+        if embedded_aggregate > MAX_AGGREGATE_EMBEDDED_BYTES {
+            return Err(RtfError::MalformedDocument("RTF font-table embedded fonts exceed the safety limit".to_string()));
         }
         Ok(())
     }

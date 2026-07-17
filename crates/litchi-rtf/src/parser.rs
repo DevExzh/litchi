@@ -7263,6 +7263,7 @@ impl<'a> Parser<'a> {
         let mut alternate_name = None;
         let mut non_tagged_name = None;
         let mut panose = None;
+        let mut embedded = None;
         let mut name = String::new();
         let mut unicode_skip = self.current_state()?.unicode_skip.max(0);
         let mut seen = std::collections::HashSet::new();
@@ -7296,6 +7297,17 @@ impl<'a> Parser<'a> {
                     ) => {
                         if !seen.insert("panose") { return Err(RtfError::MalformedDocument("duplicate RTF panose destination".to_string())); }
                         panose = Some(self.parse_font_panose_destination()?);
+                    },
+                Token::OpenBrace
+                    if matches!(
+                        self.tokens.get(self.pos + 1..self.pos + 3),
+                        Some([Token::Control(ControlWord::IgnorableDestination), Token::Control(ControlWord::FontEmbedded)])
+                    ) || matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::FontEmbedded))
+                    ) => {
+                        if !seen.insert("fontemb") { return Err(RtfError::MalformedDocument("duplicate RTF fontemb destination".to_string())); }
+                        embedded = Some(self.parse_font_embedded_destination()?);
                     },
                 Token::OpenBrace => {
                     if matches!(
@@ -7378,6 +7390,7 @@ impl<'a> Parser<'a> {
         font.panose = panose;
         font.pitch = pitch;
         font.code_page = code_page;
+        font.embedded = embedded;
         font.validate()?;
         if let Some(existing) = self.font_table.borrow().get(font_num) {
             if existing == &font {
@@ -7459,6 +7472,149 @@ impl<'a> Parser<'a> {
             self.pos += 1;
             if digits.len() > 64 {
                 return Err(RtfError::MalformedDocument("RTF panose payload exceeds the safety limit".to_string()));
+            }
+        }
+        Err(RtfError::UnexpectedEof)
+    }
+
+    /// Parse the inert `fontemb` destination of a font-table entry.
+    fn parse_font_embedded_destination(&mut self) -> RtfResult<crate::EmbeddedFont<'static>> {
+        self.pos += 1; // opening brace
+        if matches!(self.tokens.get(self.pos), Some(Token::Control(ControlWord::IgnorableDestination))) {
+            self.pos += 1;
+        }
+        if self.tokens.get(self.pos) != Some(&Token::Control(ControlWord::FontEmbedded)) {
+            return Err(RtfError::MalformedDocument("invalid RTF fontemb destination".to_string()));
+        }
+        self.pos += 1;
+        let mut embedded = crate::EmbeddedFont::default();
+        let mut format_seen = false;
+        let mut file_seen = false;
+        let mut data = Vec::new();
+        let mut high_nibble: Option<u8> = None;
+        while self.pos < self.tokens.len() {
+            match &self.tokens[self.pos] {
+                Token::CloseBrace => {
+                    self.pos += 1;
+                    if high_nibble.is_some() {
+                        return Err(RtfError::MalformedDocument("RTF fontemb contains an odd number of hexadecimal digits".to_string()));
+                    }
+                    if !data.is_empty() {
+                        embedded.data = Some(data);
+                    }
+                    embedded.validate()?;
+                    return Ok(embedded);
+                },
+                Token::Control(ControlWord::FontEmbeddedType(kind)) => {
+                    if format_seen {
+                        return Err(RtfError::MalformedDocument("duplicate RTF embedded font format".to_string()));
+                    }
+                    format_seen = true;
+                    embedded.format = match *kind {
+                        "truetype" => crate::EmbeddedFontFormat::TrueType,
+                        _ => crate::EmbeddedFontFormat::Nil,
+                    };
+                    self.pos += 1;
+                },
+                Token::OpenBrace => {
+                    let is_font_file = matches!(
+                        self.tokens.get(self.pos + 1..self.pos + 3),
+                        Some([Token::Control(ControlWord::IgnorableDestination), Token::Control(ControlWord::FontFile)])
+                    ) || matches!(self.tokens.get(self.pos + 1), Some(Token::Control(ControlWord::FontFile)));
+                    if is_font_file {
+                        if file_seen {
+                            return Err(RtfError::MalformedDocument("duplicate RTF fontfile destination".to_string()));
+                        }
+                        file_seen = true;
+                        let (file_name, file_code_page) = self.parse_font_file_destination()?;
+                        embedded.file_name = Some(Cow::Owned(file_name));
+                        embedded.file_code_page = file_code_page;
+                    } else {
+                        self.skip_group()?;
+                    }
+                },
+                Token::Text(text) => {
+                    for byte in text.bytes().filter(|byte| !byte.is_ascii_whitespace()) {
+                        let nibble = Self::hex_nibble(byte).ok_or_else(|| {
+                            RtfError::MalformedDocument("RTF fontemb contains a non-hexadecimal character".to_string())
+                        })?;
+                        if let Some(high) = high_nibble.take() {
+                            data.push((high << 4) | nibble);
+                            if data.len() > crate::EmbeddedFont::MAX_DATA_BYTES {
+                                return Err(RtfError::MalformedDocument("RTF embedded font data exceeds the safety limit".to_string()));
+                            }
+                        } else {
+                            high_nibble = Some(nibble);
+                        }
+                    }
+                    self.pos += 1;
+                },
+                Token::Binary(bytes) => {
+                    if high_nibble.is_some() {
+                        return Err(RtfError::MalformedDocument("RTF fontemb binary payload splits a hexadecimal byte".to_string()));
+                    }
+                    data.extend_from_slice(bytes);
+                    if data.len() > crate::EmbeddedFont::MAX_DATA_BYTES {
+                        return Err(RtfError::MalformedDocument("RTF embedded font data exceeds the safety limit".to_string()));
+                    }
+                    self.pos += 1;
+                },
+                _ => self.pos += 1,
+            }
+        }
+        Err(RtfError::UnexpectedEof)
+    }
+
+    /// Parse the nested `fontfile` destination of a `fontemb` group.
+    fn parse_font_file_destination(&mut self) -> RtfResult<(String, Option<u16>)> {
+        self.pos += 1; // opening brace
+        if matches!(self.tokens.get(self.pos), Some(Token::Control(ControlWord::IgnorableDestination))) {
+            self.pos += 1;
+        }
+        if self.tokens.get(self.pos) != Some(&Token::Control(ControlWord::FontFile)) {
+            return Err(RtfError::MalformedDocument("invalid RTF fontfile destination".to_string()));
+        }
+        self.pos += 1;
+        let mut name = String::new();
+        let mut code_page = None;
+        let mut unicode_skip = self.current_state()?.unicode_skip.max(0);
+        while self.pos < self.tokens.len() {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    let name = name.trim().to_string();
+                    if name.is_empty() || name.len() > crate::EmbeddedFont::MAX_FILE_NAME_BYTES {
+                        return Err(RtfError::MalformedDocument("invalid or oversized RTF embedded font file name".to_string()));
+                    }
+                    return Ok((name, code_page));
+                },
+                Some(Token::Control(ControlWord::FontCodePage(value))) => {
+                    if code_page.is_some() {
+                        return Err(RtfError::MalformedDocument("duplicate RTF fontfile code page".to_string()));
+                    }
+                    code_page = Some(u16::try_from(*value).map_err(|_| {
+                        RtfError::MalformedDocument("invalid RTF fontfile code page".to_string())
+                    })?);
+                },
+                Some(Token::Text(text)) => name.push_str(&self.decode_transport_text(text)?),
+                Some(Token::Control(ControlWord::Unicode(first))) => {
+                    name.push_str(&self.parse_style_unicode(*first, unicode_skip)?);
+                    continue;
+                },
+                Some(Token::Control(ControlWord::UnicodeSkip(count))) => {
+                    unicode_skip = (*count).max(0);
+                },
+                Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
+                    name.push_str(control_symbol_text(control).unwrap_or_default());
+                },
+                Some(Token::OpenBrace) | Some(Token::Control(_)) | Some(Token::Binary(_)) => {
+                    return Err(RtfError::MalformedDocument("RTF fontfile destination contains unsupported content".to_string()));
+                },
+                None => return Err(RtfError::UnexpectedEof),
+            }
+            self.pos += 1;
+            if name.len() > crate::EmbeddedFont::MAX_FILE_NAME_BYTES {
+                return Err(RtfError::MalformedDocument("RTF embedded font file name exceeds the safety limit".to_string()));
             }
         }
         Err(RtfError::UnexpectedEof)

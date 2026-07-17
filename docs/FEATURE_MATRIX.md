@@ -585,10 +585,10 @@ This document tracks the implementation status of features across all supported 
 | Footnotes/Endnotes | ✅ | ✅ | ✅ | Footnote and endnote destinations |
 | Hyperlinks | ✅ | ✅ | ✅ | Hyperlink fields |
 | Track changes | ✅ | ✅ | ✅ | Revision marks |
-| Embedded objects (OLE) | ❌ | ❌ | ❌ | OLE packages and embeddings |
-| Equations | ❌ | ❌ | ❌ | EQ fields and embedded equation objects |
-| Embedded fonts | ❌ | ❌ | ❌ | Font embedding parts |
-| Digital signatures | ❌ | ❌ | ❌ | Package signatures |
+| Embedded objects (OLE) | ✅ | ✅ | ❌ | `objdata` OLE packages with OLE1 header decoding |
+| Equations | ✅ | ✅ | ❌ | EQ field codes and embedded equation objects |
+| Embedded fonts | ✅ | ✅ | ✅ | `fontemb`/`fontfile` destinations with inline data |
+| Digital signatures | N/A | N/A | N/A | RTF does not define package signatures |
 | Encryption / password-protected RTF | N/A | N/A | N/A | RTF does not define standard file encryption |
 
 ## Apple iWork Formats (Pages, Keynote, Numbers)

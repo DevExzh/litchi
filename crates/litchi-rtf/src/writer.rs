@@ -116,6 +116,7 @@ impl<W: Write> RtfWriter<W> {
                     panose: f.panose,
                     pitch: f.pitch,
                     code_page: f.code_page,
+                    embedded: f.embedded.clone().map(crate::EmbeddedFont::into_owned),
                 })
                 .collect(),
             defined: doc.font_table().defined.clone(),
@@ -332,6 +333,34 @@ impl<W: Write> RtfWriter<W> {
                 self.write_control_word("fname", None)?;
                 self.write_str(" ")?;
                 self.write_text(name)?;
+                self.write_str("}")?;
+            }
+            if let Some(embedded) = &font.embedded {
+                self.write_str("{\\*")?;
+                self.write_control_word("fontemb", None)?;
+                self.write_control_word(
+                    match embedded.format {
+                        crate::EmbeddedFontFormat::Nil => "ftnil",
+                        crate::EmbeddedFontFormat::TrueType => "fttruetype",
+                    },
+                    None,
+                )?;
+                if let Some(name) = embedded.file_name.as_deref() {
+                    self.write_str("{\\*")?;
+                    self.write_control_word("fontfile", None)?;
+                    if let Some(code_page) = embedded.file_code_page {
+                        self.write_control_word("cpg", Some(i32::from(code_page)))?;
+                    }
+                    self.write_str(" ")?;
+                    self.write_text(name)?;
+                    self.write_str("}")?;
+                }
+                if let Some(data) = &embedded.data {
+                    self.write_str(" ")?;
+                    for byte in data {
+                        write!(self.writer, "{byte:02x}")?;
+                    }
+                }
                 self.write_str("}")?;
             }
 
