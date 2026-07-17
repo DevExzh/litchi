@@ -379,10 +379,7 @@ fn parse_annotation_ranges(
         ));
     }
 
-    let sentinel = main_end.checked_add(1).ok_or_else(|| {
-        DocError::Corrupted("annotation bookmark sentinel CP overflows".to_string())
-    })?;
-    validate_bookmark_cps(&starts, main_end, sentinel, "PlcfAtnBkf")?;
+    validate_bookmark_cps(&starts, main_end, "PlcfAtnBkf")?;
 
     let ends_data = required_table_slice(fib, table_stream, 43, "PlcfAtnBkl")?;
     if ends_data.len() != (tags.len() + 1) * 4 {
@@ -398,8 +395,10 @@ fn parse_annotation_ranges(
             })?,
         );
     }
-    if ends.last().copied() != Some(sentinel)
-        || ends[..ends.len() - 1].iter().any(|&cp| cp > main_end)
+    // The final CP of a bookmark PLC is ignored per [MS-DOC] 2.8.10; writers
+    // disagree on whether it counts the paragraph mark that separates the main
+    // document from the subdocuments, so it carries no reliable information.
+    if ends[..ends.len() - 1].iter().any(|&cp| cp > main_end)
         || ends[..ends.len() - 1]
             .windows(2)
             .any(|pair| pair[0] > pair[1])
@@ -488,12 +487,10 @@ fn parse_annotation_bookmark_tags(data: &[u8]) -> Result<Vec<u32>> {
     Ok(tags)
 }
 
-fn validate_bookmark_cps(
-    plcf: &PlcfParser,
-    main_end: u32,
-    sentinel: u32,
-    name: &str,
-) -> Result<()> {
+fn validate_bookmark_cps(plcf: &PlcfParser, main_end: u32, name: &str) -> Result<()> {
+    // Every CP except the last must be inside the main document and
+    // monotonic. The final CP of a bookmark PLC is ignored per [MS-DOC]
+    // 2.8.10, so no constraint is placed on it.
     let mut previous = None;
     for index in 0..plcf.count() {
         let cp = plcf
@@ -505,11 +502,6 @@ fn validate_bookmark_cps(
             )));
         }
         previous = Some(cp);
-    }
-    if plcf.position(plcf.count()) != Some(sentinel) {
-        return Err(DocError::Corrupted(format!(
-            "{name} final CP must equal ccpText + 1"
-        )));
     }
     Ok(())
 }
@@ -826,9 +818,24 @@ mod tests {
             (Some(3), Some(9))
         );
 
+        // Word 97 and newer writers place the ignored final CP one past the
+        // paragraph mark that follows the main document (main_end + 2); it
+        // must not be validated ([MS-DOC] 2.8.10).
+        let mut word_final_cp = table.clone();
+        word_final_cp[starts_offset as usize + 4..starts_offset as usize + 8]
+            .copy_from_slice(&22u32.to_le_bytes());
+        word_final_cp[ends_offset as usize + 4..ends_offset as usize + 8]
+            .copy_from_slice(&22u32.to_le_bytes());
+        assert_eq!(
+            parse_annotation_ranges(&fib, &word_final_cp, 20, &tags)
+                .unwrap()
+                .get(&7),
+            Some(&(3, 9))
+        );
+
         let mut malformed = table.clone();
-        malformed[starts_offset as usize + 4..starts_offset as usize + 8]
-            .copy_from_slice(&20u32.to_le_bytes());
+        malformed[starts_offset as usize..starts_offset as usize + 4]
+            .copy_from_slice(&21u32.to_le_bytes());
         assert!(parse_annotation_ranges(&fib, &malformed, 20, &tags).is_err());
 
         let mut bad_bkc = table.clone();

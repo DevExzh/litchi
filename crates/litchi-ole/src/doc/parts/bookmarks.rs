@@ -47,10 +47,7 @@ impl BookmarksTable {
         let document_end = fib.get_document_parts_end().ok_or_else(|| {
             DocError::Corrupted("document-part character counts overflow".to_string())
         })?;
-        let sentinel = document_end
-            .checked_add(1)
-            .ok_or_else(|| DocError::Corrupted("bookmark sentinel CP overflows".to_string()))?;
-        validate_cps(&starts, document_end, sentinel, "PlcfBkf")?;
+        validate_cps(&starts, document_end, "PlcfBkf")?;
 
         let ends_data = required_slice(fib, table_stream, 23, "PlcfBkl")?;
         if ends_data.len() != (names.len() + 1) * 4 {
@@ -65,8 +62,10 @@ impl BookmarksTable {
                     .map_err(|error| DocError::Corrupted(format!("invalid PlcfBkl CP: {error}")))?,
             );
         }
-        if ends.last().copied() != Some(sentinel)
-            || ends[..ends.len() - 1].iter().any(|&cp| cp > document_end)
+        // The final CP of a bookmark PLC is ignored per [MS-DOC] 2.8.10;
+        // writers disagree on whether it counts the paragraph mark that
+        // separates the document parts, so no constraint is placed on it.
+        if ends[..ends.len() - 1].iter().any(|&cp| cp > document_end)
             || ends[..ends.len() - 1]
                 .windows(2)
                 .any(|pair| pair[0] > pair[1])
@@ -192,7 +191,10 @@ fn parse_names(data: &[u8]) -> Result<Vec<String>> {
     Ok(names)
 }
 
-fn validate_cps(plcf: &PlcfParser, document_end: u32, sentinel: u32, name: &str) -> Result<()> {
+fn validate_cps(plcf: &PlcfParser, document_end: u32, name: &str) -> Result<()> {
+    // Every CP except the last must lie within the document parts and be
+    // monotonic. The final CP of a bookmark PLC is ignored per [MS-DOC]
+    // 2.8.10, so no constraint is placed on it.
     let mut previous = None;
     for index in 0..plcf.count() {
         let cp = plcf
@@ -204,11 +206,6 @@ fn validate_cps(plcf: &PlcfParser, document_end: u32, sentinel: u32, name: &str)
             )));
         }
         previous = Some(cp);
-    }
-    if plcf.position(plcf.count()) != Some(sentinel) {
-        return Err(DocError::Corrupted(format!(
-            "{name} final CP must equal the document-parts end plus one"
-        )));
     }
     Ok(())
 }
@@ -328,9 +325,16 @@ mod tests {
     fn rejects_malformed_standard_bookmark_tables() {
         let (fib, table, starts_offset) = fixture();
 
-        let mut bad_sentinel = table.clone();
-        bad_sentinel[starts_offset + 8..starts_offset + 12].copy_from_slice(&10u32.to_le_bytes());
-        assert!(BookmarksTable::parse(&fib, &bad_sentinel).is_err());
+        // The final CP is ignored per [MS-DOC] 2.8.10, so an unexpected
+        // value there must not reject the document.
+        let mut ignored_final_cp = table.clone();
+        ignored_final_cp[starts_offset + 8..starts_offset + 12]
+            .copy_from_slice(&10u32.to_le_bytes());
+        assert!(BookmarksTable::parse(&fib, &ignored_final_cp).is_ok());
+
+        let mut out_of_range_start = table.clone();
+        out_of_range_start[starts_offset..starts_offset + 4].copy_from_slice(&11u32.to_le_bytes());
+        assert!(BookmarksTable::parse(&fib, &out_of_range_start).is_err());
 
         let mut duplicate_ibkl = table.clone();
         duplicate_ibkl[starts_offset + 16..starts_offset + 18].copy_from_slice(&1u16.to_le_bytes());
