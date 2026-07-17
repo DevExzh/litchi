@@ -12,9 +12,10 @@ use litchi_iwa::text::{
     DropCapWrap, ParagraphDropCap, ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing,
     ParagraphLineSpacingMultiple, ParagraphSpacing, ParagraphSpacingPoints, ParagraphStart,
     ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
-    ParagraphTabStops, TextAlignment, TextBaselineShift, TextCapitalization, TextCharacterSpacing,
-    TextColumnCount, TextColumnGap, TextColumns, TextDecorations, TextLigatures, TextOutline,
-    TextPointSize, TextScript, TextShadow, TextStrikethrough, TextStyle, TextUnderline,
+    ParagraphTabStops, TextAlignment, TextBackground, TextBaselineShift, TextCapitalization,
+    TextCharacterSpacing, TextColumnCount, TextColumnGap, TextColumns, TextDecorations,
+    TextLigatures, TextOutline, TextPointSize, TextScript, TextShadow, TextStrikethrough,
+    TextStyle, TextUnderline,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -83,6 +84,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_text_box_text_ligatures(created.drawable_object_id, TextLigatures::RequiredOnly)?;
     editor.set_text_box_text_outline(created.drawable_object_id, TextOutline::standard())?;
     editor.set_text_box_text_shadow(created.drawable_object_id, TextShadow::standard())?;
+    editor.set_text_box_text_background(
+        created.drawable_object_id,
+        TextBackground::Color(RgbaColor::new(1.0, 0.82, 0.72, 1.0, RgbColorSpace::Srgb)?),
+    )?;
     editor.set_text_box_paragraph_alignment(created.drawable_object_id, TextAlignment::Center)?;
     editor.set_text_box_paragraph_line_spacing(
         created.drawable_object_id,

@@ -470,6 +470,19 @@ impl TextShadow {
     }
 }
 
+/// Effective solid background painted behind uniformly styled text.
+///
+/// Pages, Numbers, and Keynote store this independently from both the text
+/// foreground fill and the enclosing text-box fill.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub enum TextBackground {
+    /// Do not paint a background behind the text glyph run.
+    #[default]
+    None,
+    /// Paint a solid native color behind the text glyph run.
+    Color(RgbaColor),
+}
+
 /// Uniform paragraph properties currently supported by the shared text editor.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ParagraphStyle {

@@ -40,8 +40,9 @@ use crate::shapes::{
 use crate::text::{
     IWorkTextEditor, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphIndents,
     ParagraphLineSpacing, ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment,
-    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumns, TextDecorations,
-    TextLigatures, TextOutline, TextScript, TextShadow, TextStorageInfo, TextStyle,
+    TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumns,
+    TextDecorations, TextLigatures, TextOutline, TextScript, TextShadow, TextStorageInfo,
+    TextStyle,
 };
 use crate::wire::{
     patch_length_delimited_field, patch_nested_fixed32_field, patch_nested_length_delimited_field,
@@ -1031,6 +1032,51 @@ impl NumbersEditor {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
         let changed = text.reset_text_shadow(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(text.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective solid background of a sheet-owned text box.
+    pub fn sheet_text_box_text_background(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<TextBackground> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        IWorkTextEditor::from_package(self.package.clone()).text_background(graph.storage_id)
+    }
+
+    /// Atomically set a solid background across a sheet-owned text box.
+    pub fn set_sheet_text_box_text_background(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        background: TextBackground,
+    ) -> Result<()> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        text.set_text_background(graph.storage_id, background)?;
+        let verified = Self::from_package(text.into_package())?;
+        if verified.sheet_text_box_text_background(sheet_id, drawable_object_id)? != background {
+            return Err(Error::InvalidFormat(
+                "Numbers text-box background update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore the inherited text background while preserving sibling overrides.
+    pub fn reset_sheet_text_box_text_background(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let changed = text.reset_text_background(graph.storage_id)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
         }

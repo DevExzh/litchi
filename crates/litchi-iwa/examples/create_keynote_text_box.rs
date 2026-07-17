@@ -12,9 +12,10 @@ use litchi_iwa::text::{
     DropCapWrap, ParagraphDropCap, ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing,
     ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, ParagraphStart,
     ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
-    ParagraphTabStops, TextAlignment, TextBaselineShift, TextCapitalization, TextCharacterSpacing,
-    TextColumnCount, TextColumns, TextDecorations, TextLigatures, TextOutline, TextPointSize,
-    TextScript, TextShadow, TextStrikethrough, TextStyle, TextUnderline,
+    ParagraphTabStops, TextAlignment, TextBackground, TextBaselineShift, TextCapitalization,
+    TextCharacterSpacing, TextColumnCount, TextColumns, TextDecorations, TextLigatures,
+    TextOutline, TextPointSize, TextScript, TextShadow, TextStrikethrough, TextStyle,
+    TextUnderline,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -104,6 +105,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         TextOutline::standard(),
     )?;
     editor.set_slide_text_box_text_shadow(0, created.drawable_object_id, TextShadow::standard())?;
+    editor.set_slide_text_box_text_background(
+        0,
+        created.drawable_object_id,
+        TextBackground::Color(RgbaColor::new(0.72, 0.84, 1.0, 1.0, RgbColorSpace::Srgb)?),
+    )?;
     editor.set_slide_text_box_paragraph_alignment(
         0,
         created.drawable_object_id,

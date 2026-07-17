@@ -14,9 +14,9 @@ use crate::{Error, IWorkPackage, Result};
 use self::native::ParagraphStyleOverrides;
 use super::paragraph_tabs::ParagraphTabStops;
 use super::style::{
-    ParagraphIndents, ParagraphLineSpacing, ParagraphSpacing, TextAlignment, TextBaselineShift,
-    TextCapitalization, TextCharacterSpacing, TextDecorations, TextLigatures, TextOutline,
-    TextScript, TextShadow, TextStyle,
+    ParagraphIndents, ParagraphLineSpacing, ParagraphSpacing, TextAlignment, TextBackground,
+    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextDecorations, TextLigatures,
+    TextOutline, TextScript, TextShadow, TextStyle,
 };
 use super::style_registry::{
     object_archive_name, register_private_style, unregister_private_style,
@@ -34,6 +34,7 @@ enum ParagraphProperty<'a> {
     TextLigatures(TextLigatures),
     TextOutline(TextOutline),
     TextShadow(TextShadow),
+    TextBackground(TextBackground),
     Alignment(TextAlignment),
     LineSpacing(ParagraphLineSpacing),
     Spacing(ParagraphSpacing),
@@ -53,6 +54,7 @@ enum ParagraphPropertyKind {
     TextLigatures,
     TextOutline,
     TextShadow,
+    TextBackground,
     Alignment,
     LineSpacing,
     Spacing,
@@ -73,6 +75,7 @@ enum InheritedCharacterProperty {
     TextLigatures(TextLigatures),
     TextOutline(TextOutline),
     TextShadow(TextShadow),
+    TextBackground(TextBackground),
 }
 
 pub(super) fn text_style(package: &IWorkPackage, storage_id: u64) -> Result<TextStyle> {
@@ -323,6 +326,30 @@ pub(super) fn set_text_shadow(
 
 pub(super) fn reset_text_shadow(package: &mut IWorkPackage, storage_id: u64) -> Result<bool> {
     reset_property(package, storage_id, ParagraphPropertyKind::TextShadow)
+}
+
+pub(super) fn text_background(package: &IWorkPackage, storage_id: u64) -> Result<TextBackground> {
+    let storage = storage::locate(package, storage_id)?;
+    native::inherited_text_background(package, storage.style_id)
+}
+
+pub(super) fn set_text_background(
+    package: &mut IWorkPackage,
+    storage_id: u64,
+    background: TextBackground,
+) -> Result<()> {
+    if text_background(package, storage_id)? == background {
+        return Ok(());
+    }
+    set_property(
+        package,
+        storage_id,
+        ParagraphProperty::TextBackground(background),
+    )
+}
+
+pub(super) fn reset_text_background(package: &mut IWorkPackage, storage_id: u64) -> Result<bool> {
+    reset_property(package, storage_id, ParagraphPropertyKind::TextBackground)
 }
 
 pub(super) fn paragraph_alignment(
@@ -645,6 +672,10 @@ fn inherited_character_property(
         },
         ParagraphProperty::TextShadow(_) => native::inherited_text_shadow(package, parent_style_id)
             .map(InheritedCharacterProperty::TextShadow),
+        ParagraphProperty::TextBackground(_) => {
+            native::inherited_text_background(package, parent_style_id)
+                .map(InheritedCharacterProperty::TextBackground)
+        },
         _ => Ok(InheritedCharacterProperty::None),
     }
 }
@@ -742,6 +773,14 @@ fn apply_property(
             };
             overrides.shadow = (*shadow != inherited).then_some(*shadow);
         },
+        ParagraphProperty::TextBackground(background) => {
+            let InheritedCharacterProperty::TextBackground(inherited) = inherited else {
+                return Err(Error::InvalidFormat(
+                    "text background mutation has no inherited character formatting".to_owned(),
+                ));
+            };
+            overrides.background = (*background != inherited).then_some(*background);
+        },
         ParagraphProperty::Alignment(alignment) => overrides.alignment = Some(*alignment),
         ParagraphProperty::LineSpacing(spacing) => overrides.line_spacing = Some(*spacing),
         ParagraphProperty::Spacing(spacing) => {
@@ -776,6 +815,7 @@ fn has_property(overrides: &ParagraphStyleOverrides, kind: ParagraphPropertyKind
         ParagraphPropertyKind::TextLigatures => overrides.ligatures.is_some(),
         ParagraphPropertyKind::TextOutline => overrides.outline.is_some(),
         ParagraphPropertyKind::TextShadow => overrides.shadow.is_some(),
+        ParagraphPropertyKind::TextBackground => overrides.background.is_some(),
         ParagraphPropertyKind::Alignment => overrides.alignment.is_some(),
         ParagraphPropertyKind::LineSpacing => overrides.line_spacing.is_some(),
         ParagraphPropertyKind::Spacing => {
@@ -809,6 +849,7 @@ fn clear_property(overrides: &mut ParagraphStyleOverrides, kind: ParagraphProper
         ParagraphPropertyKind::TextLigatures => overrides.ligatures = None,
         ParagraphPropertyKind::TextOutline => overrides.outline = None,
         ParagraphPropertyKind::TextShadow => overrides.shadow = None,
+        ParagraphPropertyKind::TextBackground => overrides.background = None,
         ParagraphPropertyKind::Alignment => overrides.alignment = None,
         ParagraphPropertyKind::LineSpacing => overrides.line_spacing = None,
         ParagraphPropertyKind::Spacing => {
@@ -859,6 +900,9 @@ fn inherited_property(
         )),
         ParagraphPropertyKind::TextShadow => Ok(ParagraphProperty::TextShadow(
             native::inherited_text_shadow(package, style_id)?,
+        )),
+        ParagraphPropertyKind::TextBackground => Ok(ParagraphProperty::TextBackground(
+            native::inherited_text_background(package, style_id)?,
         )),
         ParagraphPropertyKind::Alignment => Ok(ParagraphProperty::Alignment(
             native::inherited_alignment(package, style_id)?,
@@ -914,6 +958,9 @@ fn validate_expected_property(
         },
         ParagraphProperty::TextOutline(outline) => text_outline(package, storage_id)? == outline,
         ParagraphProperty::TextShadow(shadow) => text_shadow(package, storage_id)? == shadow,
+        ParagraphProperty::TextBackground(background) => {
+            text_background(package, storage_id)? == background
+        },
         ParagraphProperty::Alignment(alignment) => {
             paragraph_alignment(package, storage_id)? == alignment
         },

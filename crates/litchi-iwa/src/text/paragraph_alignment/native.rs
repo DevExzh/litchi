@@ -18,9 +18,9 @@ use super::super::paragraph_tabs::ParagraphTabStops;
 use super::super::style::{
     ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingMultiple,
     ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, TextAlignment,
-    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextDecorations, TextLigatures,
-    TextOutline, TextPointSize, TextScript, TextShadow, TextStrikethrough, TextStyle,
-    TextUnderline,
+    TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextDecorations,
+    TextLigatures, TextOutline, TextPointSize, TextScript, TextShadow, TextStrikethrough,
+    TextStyle, TextUnderline,
 };
 use super::super::style_registry::object_archive_name;
 
@@ -47,6 +47,8 @@ const CHARACTER_BASELINE_SHIFT_FIELD: u32 = 14;
 const CHARACTER_LIGATURES_FIELD: u32 = 16;
 const CHARACTER_SHADOW_NULL_FIELD: u32 = 20;
 const CHARACTER_SHADOW_FIELD: u32 = 21;
+const CHARACTER_BACKGROUND_COLOR_NULL_FIELD: u32 = 25;
+const CHARACTER_BACKGROUND_COLOR_FIELD: u32 = 26;
 const CHARACTER_TRACKING_FIELD: u32 = 27;
 const CHARACTER_DRAWING_STROKE_NULL_FIELD: u32 = 43;
 const CHARACTER_DRAWING_STROKE_FIELD: u32 = 44;
@@ -95,6 +97,7 @@ pub(super) struct ParagraphStyleOverrides {
     pub(super) ligatures: Option<TextLigatures>,
     pub(super) outline: Option<TextOutline>,
     pub(super) shadow: Option<TextShadow>,
+    pub(super) background: Option<TextBackground>,
     pub(super) underline: Option<TextUnderline>,
     pub(super) strikethrough: Option<TextStrikethrough>,
     pub(super) alignment: Option<TextAlignment>,
@@ -122,6 +125,7 @@ impl ParagraphStyleOverrides {
             + u32::from(self.ligatures.is_some())
             + u32::from(self.outline.is_some())
             + u32::from(self.shadow.is_some())
+            + u32::from(self.background.is_some())
             + u32::from(self.underline.is_some())
             + u32::from(self.strikethrough.is_some())
             + u32::from(self.alignment.is_some())
@@ -247,6 +251,13 @@ pub(super) fn inherited_text_shadow(
     inheritance::text_shadow(package, first_style_id)
 }
 
+pub(super) fn inherited_text_background(
+    package: &IWorkPackage,
+    first_style_id: u64,
+) -> Result<TextBackground> {
+    inheritance::text_background(package, first_style_id)
+}
+
 pub(super) fn inherited_line_spacing(
     package: &IWorkPackage,
     first_style_id: u64,
@@ -311,6 +322,7 @@ pub(super) fn direct_overrides(
         .transpose()?;
     let outline = text_outline_from_character(character_properties)?;
     let shadow = text_shadow_from_character(character_properties)?;
+    let background = text_background_from_character(character_properties)?;
     let underline = character_properties
         .underline
         .map(TextUnderline::from_native_value)
@@ -365,6 +377,7 @@ pub(super) fn direct_overrides(
         ligatures,
         outline,
         shadow,
+        background,
         underline,
         strikethrough,
         alignment,
@@ -406,6 +419,10 @@ pub(super) fn direct_overrides(
     if shadow.is_some() {
         remaining_character.shadow_null = None;
         remaining_character.shadow = None;
+    }
+    if background.is_some() {
+        remaining_character.background_color_null = None;
+        remaining_character.background_color = None;
     }
     remaining_character.underline = None;
     remaining_character.strikethru = None;
@@ -497,6 +514,19 @@ pub(super) fn direct_overrides(
             TextShadow::None => CHARACTER_SHADOW_NULL_FIELD,
             TextShadow::Drop(_) => CHARACTER_SHADOW_FIELD,
         });
+    }
+    if let Some(background) = background {
+        let field = match background {
+            TextBackground::None => CHARACTER_BACKGROUND_COLOR_NULL_FIELD,
+            TextBackground::Color(_) => CHARACTER_BACKGROUND_COLOR_FIELD,
+        };
+        character_fields.push(field);
+        if matches!(background, TextBackground::Color(_)) {
+            let color_raw = required_payload(character_raw, field, "paragraph text background")?;
+            if !has_canonical_color_wire(color_raw)? {
+                return Ok(None);
+            }
+        }
     }
     if underline.is_some() {
         character_fields.push(CHARACTER_UNDERLINE_FIELD);
@@ -612,6 +642,14 @@ pub(super) fn variation_object(
                     crate::shapes::ShapeShadow::Disabled => None,
                     enabled => Some(shadow_to_native(enabled)),
                 }),
+            background_color_null: matches!(overrides.background, Some(TextBackground::None))
+                .then_some(true),
+            background_color: overrides
+                .background
+                .and_then(|background| match background {
+                    TextBackground::None => None,
+                    TextBackground::Color(color) => Some(color_to_native(color)),
+                }),
             underline: overrides.underline.map(TextUnderline::native_value),
             strikethru: overrides.strikethrough.map(TextStrikethrough::native_value),
             tsd_fill: overrides.font_color.map(|color| tsd::FillArchive {
@@ -665,6 +703,11 @@ pub(super) fn variation_object(
             .field_infos
             .push(text_shadow_field_info());
     }
+    if matches!(overrides.background, Some(TextBackground::Color(_))) {
+        object.archive_info.message_infos[0]
+            .field_infos
+            .push(text_background_field_info());
+    }
     Ok(object)
 }
 
@@ -686,6 +729,10 @@ pub(super) fn replace_variation(
         .field_infos
         .iter()
         .any(is_text_shadow_field_info);
+    let has_text_background_info = replacement.archive_info.message_infos[0]
+        .field_infos
+        .iter()
+        .any(is_text_background_field_info);
     let message = replacement.messages.pop().ok_or_else(|| {
         Error::InvalidFormat("replacement paragraph style has no payload".to_owned())
     })?;
@@ -716,6 +763,7 @@ pub(super) fn replace_variation(
             !is_text_fill_field_info(field)
                 && !is_text_stroke_field_info(field)
                 && !is_text_shadow_field_info(field)
+                && !is_text_background_field_info(field)
         });
         if has_text_fill_info {
             info.field_infos.push(text_fill_field_info());
@@ -725,6 +773,9 @@ pub(super) fn replace_variation(
         }
         if has_text_shadow_info {
             info.field_infos.push(text_shadow_field_info());
+        }
+        if has_text_background_info {
+            info.field_infos.push(text_background_field_info());
         }
         Ok(())
     })
@@ -819,6 +870,29 @@ pub(super) fn text_shadow_from_character(
         .transpose()
 }
 
+pub(super) fn text_background_from_character(
+    properties: &tswp::CharacterStylePropertiesArchive,
+) -> Result<Option<TextBackground>> {
+    if properties.background_color_null == Some(true) {
+        if properties.background_color.is_some() {
+            return Err(Error::InvalidFormat(
+                "native iWork text background is both null and populated".to_owned(),
+            ));
+        }
+        return Ok(Some(TextBackground::None));
+    }
+    if properties.background_color_null == Some(false) && properties.background_color.is_none() {
+        return Err(Error::InvalidFormat(
+            "native iWork text background has a false null marker without a color".to_owned(),
+        ));
+    }
+    properties
+        .background_color
+        .as_ref()
+        .map(|color| color_from_native(color).map(TextBackground::Color))
+        .transpose()
+}
+
 pub(super) fn capitalization_from_character(
     properties: &tswp::CharacterStylePropertiesArchive,
 ) -> Result<Option<TextCapitalization>> {
@@ -887,6 +961,20 @@ fn text_shadow_field_info() -> tsp::FieldInfo {
     }
 }
 
+fn text_background_field_info() -> tsp::FieldInfo {
+    tsp::FieldInfo {
+        path: tsp::FieldPath {
+            path: vec![
+                STYLE_CHARACTER_PROPERTIES_FIELD,
+                CHARACTER_BACKGROUND_COLOR_FIELD,
+            ],
+        },
+        r#type: Some(tsp::field_info::Type::Message as i32),
+        unknown_field_rule: Some(tsp::field_info::UnknownFieldRule::IgnoreAndPreserve as i32),
+        ..Default::default()
+    }
+}
+
 fn is_text_fill_field_info(field: &tsp::FieldInfo) -> bool {
     field.path.path
         == [
@@ -905,6 +993,14 @@ fn is_text_stroke_field_info(field: &tsp::FieldInfo) -> bool {
 
 fn is_text_shadow_field_info(field: &tsp::FieldInfo) -> bool {
     field.path.path == [STYLE_CHARACTER_PROPERTIES_FIELD, CHARACTER_SHADOW_FIELD]
+}
+
+fn is_text_background_field_info(field: &tsp::FieldInfo) -> bool {
+    field.path.path
+        == [
+            STYLE_CHARACTER_PROPERTIES_FIELD,
+            CHARACTER_BACKGROUND_COLOR_FIELD,
+        ]
 }
 
 pub(super) fn is_exclusive(package: &IWorkPackage, style_id: u64) -> Result<bool> {

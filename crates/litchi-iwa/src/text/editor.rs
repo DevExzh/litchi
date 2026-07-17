@@ -26,21 +26,21 @@ use super::paragraph_alignment::{
     paragraph_alignment, paragraph_indents, paragraph_line_spacing, paragraph_spacing,
     paragraph_tab_stops, reset_paragraph_alignment, reset_paragraph_indents,
     reset_paragraph_line_spacing, reset_paragraph_spacing, reset_paragraph_tab_stops,
-    reset_text_baseline_shift, reset_text_capitalization, reset_text_character_spacing,
-    reset_text_color, reset_text_decorations, reset_text_ligatures, reset_text_outline,
-    reset_text_script, reset_text_shadow, reset_text_style, set_paragraph_alignment,
-    set_paragraph_indents, set_paragraph_line_spacing, set_paragraph_spacing,
-    set_paragraph_tab_stops, set_text_baseline_shift, set_text_capitalization,
-    set_text_character_spacing, set_text_color, set_text_decorations, set_text_ligatures,
-    set_text_outline, set_text_script, set_text_shadow, set_text_style, text_baseline_shift,
-    text_capitalization, text_character_spacing, text_color, text_decorations, text_ligatures,
-    text_outline, text_script, text_shadow, text_style,
+    reset_text_background, reset_text_baseline_shift, reset_text_capitalization,
+    reset_text_character_spacing, reset_text_color, reset_text_decorations, reset_text_ligatures,
+    reset_text_outline, reset_text_script, reset_text_shadow, reset_text_style,
+    set_paragraph_alignment, set_paragraph_indents, set_paragraph_line_spacing,
+    set_paragraph_spacing, set_paragraph_tab_stops, set_text_background, set_text_baseline_shift,
+    set_text_capitalization, set_text_character_spacing, set_text_color, set_text_decorations,
+    set_text_ligatures, set_text_outline, set_text_script, set_text_shadow, set_text_style,
+    text_background, text_baseline_shift, text_capitalization, text_character_spacing, text_color,
+    text_decorations, text_ligatures, text_outline, text_script, text_shadow, text_style,
 };
 use super::paragraph_tabs::ParagraphTabStops;
 use super::style::{
-    ParagraphIndents, ParagraphLineSpacing, ParagraphSpacing, TextAlignment, TextBaselineShift,
-    TextCapitalization, TextCharacterSpacing, TextDecorations, TextLigatures, TextOutline,
-    TextScript, TextShadow, TextStyle,
+    ParagraphIndents, ParagraphLineSpacing, ParagraphSpacing, TextAlignment, TextBackground,
+    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextDecorations, TextLigatures,
+    TextOutline, TextScript, TextShadow, TextStyle,
 };
 
 const STORAGE_MESSAGE_TYPES: &[u32] = &[2001, 2022];
@@ -521,6 +521,45 @@ impl IWorkTextEditor {
     pub fn reset_text_shadow(&mut self, object_id: u64) -> Result<bool> {
         let mut staged = self.package.clone();
         let changed = reset_text_shadow(&mut staged, object_id)?;
+        if changed {
+            let bytes = staged.to_bytes()?;
+            IWorkPackage::from_bytes(&bytes)?;
+            self.package = staged;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective solid background behind uniformly styled text.
+    pub fn text_background(&self, object_id: u64) -> Result<TextBackground> {
+        text_background(&self.package, object_id)
+    }
+
+    /// Atomically set a typed solid background across a uniformly styled storage.
+    ///
+    /// Rich text containing multiple paragraph-style boundaries is rejected so
+    /// the operation cannot flatten independently formatted paragraphs.
+    pub fn set_text_background(
+        &mut self,
+        object_id: u64,
+        background: TextBackground,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        set_text_background(&mut staged, object_id, background)?;
+        let bytes = staged.to_bytes()?;
+        let verified = IWorkPackage::from_bytes(&bytes)?;
+        if text_background(&verified, object_id)? != background {
+            return Err(Error::InvalidFormat(
+                "iWork text background update failed round-trip validation".to_owned(),
+            ));
+        }
+        self.package = staged;
+        Ok(())
+    }
+
+    /// Restore the inherited text background while preserving sibling overrides.
+    pub fn reset_text_background(&mut self, object_id: u64) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = reset_text_background(&mut staged, object_id)?;
         if changed {
             let bytes = staged.to_bytes()?;
             IWorkPackage::from_bytes(&bytes)?;
