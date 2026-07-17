@@ -457,6 +457,8 @@ pub struct AssociatedCharacterFormatting {
 /// Character formatting properties.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Formatting {
+    /// Typed baseline, expansion, scaling, and kerning state.
+    pub character_positioning: crate::CharacterPositioning,
     /// Font reference
     pub font_ref: FontRef,
     /// Font size in half-points
@@ -522,6 +524,7 @@ pub struct Formatting {
 impl Default for Formatting {
     fn default() -> Self {
         Self {
+            character_positioning: crate::CharacterPositioning::default(),
             font_ref: 0,
             // SAFETY: 24 (12pt) is non-zero
             font_size: unsafe { NonZeroU16::new_unchecked(24) },

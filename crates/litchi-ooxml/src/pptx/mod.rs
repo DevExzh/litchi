@@ -65,6 +65,7 @@ pub mod format;
 pub mod handout;
 pub mod hyperlinks;
 pub mod media;
+pub mod media_parts;
 mod namespace;
 pub mod package;
 pub mod parts;
@@ -101,6 +102,12 @@ pub use format::{ImageFormat, TextFormat};
 pub use handout::{HandoutHeaderFooter, HandoutLayout, HandoutMaster};
 pub use hyperlinks::Hyperlink;
 pub use media::{Media, MediaFormat, MediaType};
+pub use media_parts::{
+    MediaBookmark, MediaFade, MediaResource, MediaTrim, OfficeMediaExtension,
+    SlideMediaConformance, SlideMediaKind, SlideMediaList, SlideMediaPicture,
+    SlideMediaPoster, SlideMediaTransform, load_slide_media, parse_slide_media,
+    store_slide_media, write_slide_media_pictures,
+};
 pub use package::Package;
 pub use parts::{ChartData, ChartSeries, ChartType};
 pub use presentation::Presentation;

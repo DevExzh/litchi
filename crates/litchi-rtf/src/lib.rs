@@ -29,6 +29,7 @@
 mod annotation;
 mod bookmark;
 mod border;
+mod character_positioning;
 mod page_border;
 mod compressed;
 mod document;
@@ -72,6 +73,11 @@ pub use bookmark::{Bookmark, BookmarkTable};
 pub use border::{
     Border, BorderStyle, Borders, CharacterBorder, CharacterBorderStyle, CharacterShading,
     MAX_PARAGRAPH_TAB_STOPS, Shading, ShadingPattern, TabAlignment, TabLeader, TabStop, TabStops,
+};
+pub use character_positioning::{
+    CharacterBaseline, CharacterExpansion, CharacterPositioning,
+    MAX_CHARACTER_BASELINE_HALF_POINTS, MAX_CHARACTER_EXPANSION,
+    MAX_CHARACTER_KERNING_HALF_POINTS, MAX_CHARACTER_SCALE_PERCENT,
 };
 pub use compressed::{compress, decompress, is_compressed_rtf};
 pub use document::RtfDocument;

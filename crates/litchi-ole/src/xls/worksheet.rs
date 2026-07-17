@@ -61,6 +61,7 @@ pub struct XlsWorksheet {
     vba_code_name: Option<String>,
     conditional_formattings: Vec<XlsConditionalFormatting>,
     consolidation: Option<crate::xls::consolidation::XlsConsolidation>,
+    formula_error_features: Vec<crate::xls::formula_errors::XlsFormulaErrorFeature>,
 }
 
 impl XlsWorksheet {
@@ -93,6 +94,7 @@ impl XlsWorksheet {
             vba_code_name: None,
             conditional_formattings: Vec::new(),
             consolidation: None,
+            formula_error_features: Vec::new(),
         }
     }
 
@@ -125,6 +127,7 @@ impl XlsWorksheet {
             vba_code_name: None,
             conditional_formattings: Vec::new(),
             consolidation: None,
+            formula_error_features: Vec::new(),
         }
     }
 
@@ -272,6 +275,20 @@ impl XlsWorksheet {
     /// All pivot tables in this worksheet.
     pub fn pivot_tables(&self) -> &[PivotTable] {
         &self.pivot_tables
+    }
+
+    /// Formula error-checking shared features declared for this worksheet.
+    pub fn formula_error_features(
+        &self,
+    ) -> &[crate::xls::formula_errors::XlsFormulaErrorFeature] {
+        &self.formula_error_features
+    }
+
+    pub(crate) fn set_formula_error_features(
+        &mut self,
+        features: Vec<crate::xls::formula_errors::XlsFormulaErrorFeature>,
+    ) {
+        self.formula_error_features = features;
     }
 
     // -- Sheet Protection --

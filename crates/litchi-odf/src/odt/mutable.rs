@@ -176,6 +176,21 @@ impl MutableDocument {
         Ok(())
     }
 
+    /// Create or replace typed header/footer properties in one page layout.
+    pub fn set_page_layout_header_footer_properties(
+        &mut self,
+        page_layout_name: &str,
+        region: crate::PageHeaderFooterRegion,
+        properties: &crate::HeaderFooterStyleProperties,
+    ) -> Result<()> {
+        let styles = self.styles_xml.as_deref().ok_or_else(|| litchi_core::Error::InvalidFormat("document has no styles.xml page layout to modify".to_string()))?;
+        let layouts = parse_page_layouts(styles)?;
+        let layout = layouts.iter().find(|layout| layout.name == page_layout_name).ok_or_else(|| litchi_core::Error::InvalidFormat(format!("page layout '{page_layout_name}' does not exist")))?;
+        let replacement = crate::header_footer_properties::replace_page_layout_region_properties(layout, region, properties)?;
+        self.styles_xml = Some(set_page_layout_xml(styles, page_layout_name, &replacement)?);
+        Ok(())
+    }
+
     /// Create or replace typed columns in one existing page layout.
     pub fn set_page_layout_columns(
         &mut self,

@@ -119,8 +119,12 @@ pub struct PageLayout {
     pub properties: Option<PageLayoutProperties>,
     /// Exact `style:header-style` XML, including header/footer properties.
     pub header_style_xml: Option<String>,
+    /// Typed standard properties from `style:header-style`.
+    pub header_properties: Option<crate::HeaderFooterStyleProperties>,
     /// Exact `style:footer-style` XML, including header/footer properties.
     pub footer_style_xml: Option<String>,
+    /// Typed standard properties from `style:footer-style`.
+    pub footer_properties: Option<crate::HeaderFooterStyleProperties>,
     /// Exact `style:page-layout` element bytes.
     pub xml: String,
 }
@@ -372,7 +376,9 @@ fn parse_page_layout(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Resu
         page_usage,
         properties: None,
         header_style_xml: None,
+        header_properties: None,
         footer_style_xml: None,
+        footer_properties: None,
         xml: String::new(),
     })
 }
@@ -497,8 +503,8 @@ fn store_child(
                 xml,
             });
         },
-        ChildKind::HeaderStyle => layout.header_style_xml = Some(xml),
-        ChildKind::FooterStyle => layout.footer_style_xml = Some(xml),
+        ChildKind::HeaderStyle => { layout.header_properties = crate::header_footer_properties::parse_region_properties(&xml)?; layout.header_style_xml = Some(xml); },
+        ChildKind::FooterStyle => { layout.footer_properties = crate::header_footer_properties::parse_region_properties(&xml)?; layout.footer_style_xml = Some(xml); },
     }
     Ok(())
 }

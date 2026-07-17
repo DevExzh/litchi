@@ -2535,14 +2535,15 @@ impl<W: Write> RtfWriter<W> {
             self.write_control_word("striked", None)?;
         }
 
-        // Superscript
-        if fmt.superscript {
-            self.write_control_word("super", None)?;
-        }
-
-        // Subscript
-        if fmt.subscript {
-            self.write_control_word("sub", None)?;
+        fmt.character_positioning.validate().map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+        match fmt.character_positioning.baseline {
+            CharacterBaseline::Normal if fmt.superscript => self.write_control_word("super", None)?,
+            CharacterBaseline::Normal if fmt.subscript => self.write_control_word("sub", None)?,
+            CharacterBaseline::Normal => {},
+            CharacterBaseline::Superscript => self.write_control_word("super", None)?,
+            CharacterBaseline::Subscript => self.write_control_word("sub", None)?,
+            CharacterBaseline::RaisedHalfPoints(value) => self.write_control_word("up", Some(i32::from(value)))?,
+            CharacterBaseline::LoweredHalfPoints(value) => self.write_control_word("dn", Some(i32::from(value)))?,
         }
 
         // Small caps
@@ -2580,20 +2581,16 @@ impl<W: Write> RtfWriter<W> {
             self.write_control_word("impr", None)?;
         }
 
-        // Character spacing
-        if fmt.char_spacing != 0 {
-            self.write_control_word("expnd", Some(fmt.char_spacing))?;
+        match fmt.character_positioning.expansion {
+            CharacterExpansion::None if fmt.char_spacing != 0 => self.write_control_word("expnd", Some(fmt.char_spacing))?,
+            CharacterExpansion::None => {},
+            CharacterExpansion::QuarterPoints(value) => self.write_control_word("expnd", Some(i32::from(value)))?,
+            CharacterExpansion::Twips(value) => self.write_control_word("expndtw", Some(i32::from(value)))?,
         }
-
-        // Character scale
-        if fmt.char_scale != 100 {
-            self.write_control_word("charscalex", Some(fmt.char_scale))?;
-        }
-
-        // Kerning
-        if fmt.kerning != 0 {
-            self.write_control_word("kerning", Some(fmt.kerning))?;
-        }
+        let scale = if fmt.character_positioning.horizontal_scale_percent != 100 { i32::from(fmt.character_positioning.horizontal_scale_percent) } else { fmt.char_scale };
+        if scale != 100 { self.write_control_word("charscalex", Some(scale))?; }
+        let kerning = if fmt.character_positioning.kerning_half_points != 0 { i32::from(fmt.character_positioning.kerning_half_points) } else { fmt.kerning };
+        if kerning != 0 { self.write_control_word("kerning", Some(kerning))?; }
 
         Ok(())
     }

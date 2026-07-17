@@ -62,7 +62,7 @@ mod index;
 mod index_mark;
 mod mutable;
 mod note;
-mod page_layout;
+pub(crate) mod page_layout;
 mod parser;
 mod reference_mark;
 mod ruby;

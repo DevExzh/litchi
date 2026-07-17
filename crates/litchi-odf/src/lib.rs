@@ -506,3 +506,5 @@ pub use elements::parser::{DocumentOrderElement, DocumentParser};
 
 pub mod section_properties;
 pub use section_properties::*;
+mod header_footer_properties;
+pub use header_footer_properties::*;

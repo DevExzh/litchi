@@ -45,6 +45,7 @@ pub struct DocumentBuilder {
     section_property_styles: Vec<crate::SectionStyleProperties>,
     page_layout_columns: Vec<(String, crate::StyleColumns)>,
     page_layout_footnote_separators: Vec<(String, crate::StyleFootnoteSeparator)>,
+    page_layout_header_footer_properties: Vec<(String, crate::PageHeaderFooterRegion, crate::HeaderFooterStyleProperties)>,
 }
 
 impl Default for DocumentBuilder {
@@ -74,6 +75,7 @@ impl DocumentBuilder {
             section_property_styles: Vec::new(),
             page_layout_columns: Vec::new(),
             page_layout_footnote_separators: Vec::new(),
+            page_layout_header_footer_properties: Vec::new(),
         }
     }
 
@@ -189,6 +191,10 @@ impl DocumentBuilder {
         }
         self.page_layout_footnote_separators.push((name, separator));
         Ok(self)
+    }
+
+    pub fn add_page_layout_header_footer_properties(&mut self, page_layout_name: impl Into<String>, region: crate::PageHeaderFooterRegion, properties: crate::HeaderFooterStyleProperties) -> Result<&mut Self> {
+        let name=page_layout_name.into();properties.validate()?;if self.page_layout_header_footer_properties.len()>=8192||self.page_layout_header_footer_properties.iter().any(|(n,r,_)|n==&name&&*r==region){return Err(litchi_core::Error::InvalidFormat("duplicate or excessive page-layout header/footer properties".to_string()))}self.page_layout_header_footer_properties.push((name,region,properties));Ok(self)
     }
 
     /// Set document metadata
@@ -593,7 +599,7 @@ impl DocumentBuilder {
         }
         if !self.paragraph_flow_styles.is_empty(){let insertion=xml.find("</office:styles>").expect("static styles root");let fragments=self.paragraph_flow_styles.iter().map(|x|x.to_xml_fragment().expect("validated paragraph flow style")).collect::<String>();xml.insert_str(insertion,&fragments);}
         if !self.section_property_styles.is_empty(){let insertion=xml.find("</office:styles>").expect("static styles root");let fragments=self.section_property_styles.iter().map(|x|x.to_xml_fragment().expect("validated section property style")).collect::<String>();xml.insert_str(insertion,&fragments);}
-        if !self.page_layout_columns.is_empty() || !self.page_layout_footnote_separators.is_empty() {
+        if !self.page_layout_columns.is_empty() || !self.page_layout_footnote_separators.is_empty() || !self.page_layout_header_footer_properties.is_empty() {
             let mut fragments = self
                 .page_layout_columns
                 .iter()
@@ -614,18 +620,20 @@ impl DocumentBuilder {
                             &separator.to_xml_fragment().expect("validated footnote separator"),
                         );
                     }
+                    for (_,region,properties) in self.page_layout_header_footer_properties.iter().filter(|(property_name,_,_)|property_name==name){let insertion=fragment.rfind("</style:page-layout>").expect("page layout fragment");fragment.insert_str(insertion,&properties.to_region_fragment(*region).expect("validated header/footer properties"));}
                     fragment
                 })
                 .collect::<String>();
             for (name, separator) in &self.page_layout_footnote_separators {
                 if !self.page_layout_columns.iter().any(|(column_name, _)| column_name == name) {
-                    fragments.push_str(
-                        &separator
+                    let mut fragment = separator
                             .to_page_layout_fragment(name)
-                            .expect("validated footnote separator page layout"),
-                    );
+                            .expect("validated footnote separator page layout");
+                    for (_,region,properties) in self.page_layout_header_footer_properties.iter().filter(|(property_name,_,_)|property_name==name){let insertion=fragment.rfind("</style:page-layout>").expect("page layout fragment");fragment.insert_str(insertion,&properties.to_region_fragment(*region).expect("validated header/footer properties"));}
+                    fragments.push_str(&fragment);
                 }
             }
+            for (index,(name,_,_)) in self.page_layout_header_footer_properties.iter().enumerate() { if self.page_layout_columns.iter().any(|(n,_)|n==name)||self.page_layout_footnote_separators.iter().any(|(n,_)|n==name)||self.page_layout_header_footer_properties[..index].iter().any(|(n,_,_)|n==name){continue}let mut fragment=format!("<style:page-layout style:name=\"{}\">",litchi_core::xml::escape_xml(name));for (_,region,properties) in self.page_layout_header_footer_properties.iter().filter(|(n,_,_)|n==name){fragment.push_str(&properties.to_region_fragment(*region).expect("validated header/footer properties"));}fragment.push_str("</style:page-layout>");fragments.push_str(&fragment); }
             xml = xml.replacen(
                 "<office:automatic-styles/>",
                 &format!(
