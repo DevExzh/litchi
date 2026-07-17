@@ -1027,6 +1027,10 @@ Workbook sheet ordering and standard or form-sheet table ownership lists reuse
 the original raw `TSP.Reference` payloads, preserving extensions inside each
 reference; newly appended references are removed byte-exactly on rollback or
 create/delete cycles.
+`NumbersEditor::add_empty_table` can also recreate the first native table after
+the workbook's last table was removed. It derives the style graph from the
+workbook theme, builds independent storage and row/column identities, and
+registers a fresh formula owner without relying on a hidden template table.
 Populated tables can also move between sheets without changing their object
 identity, cell stores, formulas, comments, styles, or geometry. The operation
 transfers the original raw drawable reference, rewrites the optional table

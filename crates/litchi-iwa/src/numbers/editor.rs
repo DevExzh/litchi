@@ -2482,12 +2482,13 @@ impl NumbersEditor {
         Ok(created)
     }
 
-    /// Add an empty table to an existing sheet using another table as a style template.
+    /// Add an independent empty native table to an existing sheet.
     ///
-    /// Cell stores, data lists, row/column UIDs, headers, and stroke state are
-    /// allocated independently in their corresponding native components. A
-    /// fresh CalculationEngine owner makes the table immediately formula-ready.
-    /// Workbook styles are shared intentionally.
+    /// An attached table supplies structural templates when one exists. If the
+    /// workbook is table-less, the first table is built from its native theme
+    /// preset instead. Cell stores, data lists, row/column UIDs, headers, stroke
+    /// state, and the CalculationEngine owner are allocated independently;
+    /// workbook styles are shared intentionally.
     #[allow(deprecated)]
     pub fn add_empty_table(
         &mut self,
@@ -2504,24 +2505,29 @@ impl NumbersEditor {
         }
 
         let descriptors = table_models(&self.package)?;
-        let template = descriptors.first().ok_or_else(|| {
-            Error::ParseError(
-                "Adding a Numbers table requires an existing table style template".to_owned(),
-            )
-        })?;
-        let template_owner = find_table_owner(&self.package, template.object_id)?;
         let mut staged = self.package.clone();
-        let graph = table_create::create_empty_table_graph(
-            &mut staged,
-            template_owner.table_info_id,
-            template.object_id,
-            template_owner.sheet_id,
-            sheet_id,
-            name,
-            rows,
-            columns,
-            (template_owner.sheet_id == sheet_id).then_some(EMPTY_TABLE_POSITION_OFFSET),
-        )?;
+        let graph = if let Some(template) = descriptors.first() {
+            let template_owner = find_table_owner(&self.package, template.object_id)?;
+            table_create::create_empty_table_graph(
+                &mut staged,
+                template_owner.table_info_id,
+                template.object_id,
+                template_owner.sheet_id,
+                sheet_id,
+                name,
+                rows,
+                columns,
+                (template_owner.sheet_id == sheet_id).then_some(EMPTY_TABLE_POSITION_OFFSET),
+            )?
+        } else {
+            table_bootstrap::bootstrap_empty_table_graph(
+                &mut staged,
+                sheet_id,
+                name,
+                rows,
+                columns,
+            )?
+        };
         let new_info_id = graph.info_object_id;
         let new_model_id = graph.model_object_id;
         let locations = object_locations(&staged)?;
@@ -3038,6 +3044,7 @@ mod sheet_images;
 mod sheet_movies;
 mod sheet_shapes;
 mod storage;
+mod table_bootstrap;
 mod table_create;
 mod table_delete;
 mod table_dimension;

@@ -1,6 +1,6 @@
 use super::*;
 use crate::archive::{Archive, ArchiveObject};
-use crate::numbers::NumbersDocument;
+use crate::numbers::{NumbersDocument, NumbersDocumentBuilder};
 use crate::package_metadata::{PACKAGE_METADATA_ENTRY, PACKAGE_METADATA_MESSAGE_TYPE};
 use crate::protobuf::tn;
 use crate::protobuf::tsp::{ComponentInfo, ObjectUuidMapEntry, PackageMetadata, Reference, Uuid};
@@ -4210,6 +4210,94 @@ fn creates_independent_empty_table_on_an_existing_sheet() {
     );
     let before = editor.to_bytes().unwrap();
     assert!(editor.add_empty_table(999, "Missing", 2, 2).is_err());
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
+fn recreates_first_table_after_removing_the_last_scratch_table() {
+    let mut editor = NumbersDocumentBuilder::new()
+        .table_dimensions(2, 2)
+        .build()
+        .unwrap();
+    let sheet_id = editor.sheets().unwrap()[0].object_id;
+    let original_table_id = editor.tables().unwrap()[0].object_id;
+    editor.remove_table(original_table_id).unwrap();
+    let tableless = editor.to_bytes().unwrap();
+
+    let created = editor
+        .add_empty_table(sheet_id, "First runtime", 3, 2)
+        .unwrap();
+    assert_eq!((created.rows, created.columns), (3, 2));
+    assert_eq!(created.name, "First runtime");
+    editor
+        .set_cell(
+            created.object_id,
+            2,
+            1,
+            CellValue::Text("bootstrapped".to_owned()),
+        )
+        .unwrap();
+
+    let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let table = NumbersDocument::from_bytes(&reopened.to_bytes().unwrap())
+        .unwrap()
+        .sheets()
+        .unwrap()
+        .remove(0)
+        .tables
+        .remove(0);
+    assert_eq!(
+        table.get_cell(2, 1),
+        Some(&CellValue::Text("bootstrapped".to_owned()))
+    );
+    reopened.remove_table(created.object_id).unwrap();
+    assert_eq!(reopened.to_bytes().unwrap(), tableless);
+}
+
+#[test]
+fn first_table_bootstrap_uses_the_target_sheet() {
+    let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+    let original_table_id = editor.tables().unwrap()[0].object_id;
+    editor.remove_table(original_table_id).unwrap();
+    let target = editor.add_empty_sheet("Target").unwrap();
+
+    let created = editor
+        .add_empty_table(target.object_id, "Target table", 2, 3)
+        .unwrap();
+    assert_eq!(
+        find_table_owner(editor.package(), created.object_id)
+            .unwrap()
+            .sheet_id,
+        target.object_id
+    );
+    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let sheets = document.sheets().unwrap();
+    assert!(sheets[0].tables.is_empty());
+    assert_eq!(sheets[1].tables[0].name, "Target table");
+}
+
+#[test]
+fn first_table_bootstrap_rejects_a_missing_theme_preset_transactionally() {
+    let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+    let sheet_id = editor.sheets().unwrap()[0].object_id;
+    let original_table_id = editor.tables().unwrap()[0].object_id;
+    editor.remove_table(original_table_id).unwrap();
+    editor
+        .package
+        .update_archive("Index/Document.iwa", |archive| {
+            archive
+                .remove_object(20)
+                .ok_or_else(|| Error::InvalidFormat("test table preset is missing".to_owned()))?;
+            Ok(())
+        })
+        .unwrap();
+    let before = editor.to_bytes().unwrap();
+
+    assert!(
+        editor
+            .add_empty_table(sheet_id, "Missing preset", 2, 2)
+            .is_err()
+    );
     assert_eq!(editor.to_bytes().unwrap(), before);
 }
 
