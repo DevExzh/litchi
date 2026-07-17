@@ -14,9 +14,9 @@ use litchi_iwa::text::{
     ParagraphSpacingPoints, ParagraphStart, ParagraphTabAlignment, ParagraphTabLeader,
     ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops, TextAlignment, TextBackground,
     TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumnCount, TextColumns,
-    TextDecorations, TextFont, TextHyperlinkTarget, TextLanguage, TextLigatures, TextOutline,
-    TextPointSize, TextPosition, TextRange, TextScript, TextShadow, TextStrikethrough, TextStyle,
-    TextUnderline,
+    TextCommentBody, TextDecorations, TextFont, TextHyperlinkTarget, TextLanguage, TextLigatures,
+    TextOutline, TextPointSize, TextPosition, TextRange, TextScript, TextShadow, TextStrikethrough,
+    TextStyle, TextUnderline,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -166,6 +166,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         created.drawable_object_id,
         TextRange::from_utf16_indexes(0, text[..first_word_end].encode_utf16().count())?,
     )?;
+    if let Some(tab) = text.find('\t') {
+        let start_byte = tab + 1;
+        let end_byte = text[start_byte..]
+            .find(char::is_whitespace)
+            .map_or(text.len(), |offset| start_byte + offset);
+        editor.add_slide_text_box_comment(
+            0,
+            created.drawable_object_id,
+            TextRange::from_utf16_indexes(
+                text[..start_byte].encode_utf16().count(),
+                text[..end_byte].encode_utf16().count(),
+            )?,
+            TextCommentBody::new("Created by litchi-iwa")?,
+        )?;
+    }
     if let Some(newline) = text.find('\n') {
         let start_index = text[..=newline].encode_utf16().count();
         let start = ParagraphStart::from_utf16_index(start_index)?;

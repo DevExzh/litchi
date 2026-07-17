@@ -65,6 +65,10 @@ use super::style::{
     TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextDecorations, TextLigatures,
     TextOutline, TextScript, TextShadow, TextStyle,
 };
+use super::text_comment::{
+    add_text_comment, remove_text_comment, text_comments, update_text_comment,
+};
+use super::text_comment_types::{TextComment, TextCommentBody, TextCommentId};
 
 const STORAGE_MESSAGE_TYPES: &[u32] = &[2001, 2022];
 
@@ -393,6 +397,41 @@ impl IWorkTextEditor {
         id: TextHighlightId,
     ) -> Result<TextHighlight> {
         remove_text_highlight(&mut self.package, object_id, id)
+    }
+
+    /// Read every native ranged comment in a text storage.
+    pub fn text_comments(&self, object_id: u64) -> Result<Vec<TextComment>> {
+        text_comments(&self.package, object_id)
+    }
+
+    /// Create a native comment over a nonempty, unoccupied UTF-16 range.
+    pub fn add_text_comment(
+        &mut self,
+        object_id: u64,
+        range: TextRange,
+        body: TextCommentBody,
+    ) -> Result<TextComment> {
+        add_text_comment(&mut self.package, object_id, range, body)
+    }
+
+    /// Atomically update a comment's range and body while retaining its ID.
+    pub fn update_text_comment(
+        &mut self,
+        object_id: u64,
+        id: TextCommentId,
+        range: TextRange,
+        body: TextCommentBody,
+    ) -> Result<TextComment> {
+        update_text_comment(&mut self.package, object_id, id, range, body)
+    }
+
+    /// Delete one ranged comment and its owned root/reply annotation graph.
+    pub fn remove_text_comment(
+        &mut self,
+        object_id: u64,
+        id: TextCommentId,
+    ) -> Result<TextComment> {
+        remove_text_comment(&mut self.package, object_id, id)
     }
 
     /// Read the canonical list preset applied uniformly to a text storage.

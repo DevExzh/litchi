@@ -1,19 +1,52 @@
-//! Native plain-highlight object graphs and ownership validation.
+//! Native ranged-annotation object graphs and ownership validation.
+
+use std::collections::HashSet;
 
 use prost::Message;
 
 use crate::archive::{ArchiveObject, RawMessage};
-use crate::comments::{fresh_comment_storage_uuid, insert_comment_storage};
+use crate::comments::{IWorkCommentUuid, fresh_comment_storage_uuid, insert_comment_storage};
 use crate::protobuf::{tsd, tsp, tswp};
+use crate::wire::patch_length_delimited_field;
 use crate::{Error, IWorkPackage, Result};
 
 pub(super) const HIGHLIGHT_MESSAGE_TYPE: u32 = 2_013;
 pub(super) const COMMENT_STORAGE_MESSAGE_TYPE: u32 = 3_056;
 
 #[derive(Debug, Clone, Copy)]
-pub(super) struct PlainHighlightGraph {
-    pub(super) comment_storage_id: u64,
+pub(super) struct AnnotationReplyGraph {
+    pub(super) storage_id: u64,
     pub(super) author_id: Option<u64>,
+}
+
+#[derive(Debug, Clone)]
+pub(super) struct AnnotationGraph {
+    pub(super) comment_storage_id: u64,
+    pub(super) body: String,
+    pub(super) creation_date_seconds: Option<f64>,
+    pub(super) author_id: Option<u64>,
+    pub(super) storage_uuid: IWorkCommentUuid,
+    pub(super) replies: Vec<AnnotationReplyGraph>,
+}
+
+impl AnnotationGraph {
+    pub(super) fn is_plain_highlight(&self) -> bool {
+        self.body.is_empty()
+    }
+
+    pub(super) fn author_ids(&self) -> impl Iterator<Item = u64> + '_ {
+        self.author_id
+            .into_iter()
+            .chain(self.replies.iter().filter_map(|reply| reply.author_id))
+    }
+}
+
+struct CommentNode {
+    body: String,
+    creation_date_seconds: Option<f64>,
+    author_id: Option<u64>,
+    storage_uuid: IWorkCommentUuid,
+    reply_ids: Vec<u64>,
 }
 
 pub(super) fn validate_highlight_object(
@@ -78,63 +111,134 @@ fn validate_uuid(identifier: u64, uuid: &str) -> Result<()> {
     Ok(())
 }
 
+pub(super) fn validate_annotation_graph(
+    package: &IWorkPackage,
+    archive_name: &str,
+    identifier: u64,
+    object: &ArchiveObject,
+) -> Result<Option<AnnotationGraph>> {
+    let Some(comment_storage_id) = validate_highlight_object(identifier, object)? else {
+        return Ok(None);
+    };
+    let root = validate_comment_node(package, archive_name, identifier, comment_storage_id)?;
+    if root.body.is_empty() && !root.reply_ids.is_empty() {
+        return Err(Error::InvalidFormat(format!(
+            "plain highlight {identifier} unexpectedly owns comment replies"
+        )));
+    }
+
+    let mut seen = HashSet::with_capacity(root.reply_ids.len());
+    let mut replies = Vec::with_capacity(root.reply_ids.len());
+    for reply_id in root.reply_ids {
+        if reply_id == comment_storage_id || !seen.insert(reply_id) {
+            return Err(Error::InvalidFormat(format!(
+                "text annotation {identifier} has a cyclic or duplicate reply {reply_id}"
+            )));
+        }
+        let reply = validate_comment_node(package, archive_name, identifier, reply_id)?;
+        if reply.body.is_empty() || !reply.reply_ids.is_empty() {
+            return Err(Error::InvalidFormat(format!(
+                "text annotation {identifier} reply {reply_id} must be nonempty and cannot own nested replies"
+            )));
+        }
+        replies.push(AnnotationReplyGraph {
+            storage_id: reply_id,
+            author_id: reply.author_id,
+        });
+    }
+    Ok(Some(AnnotationGraph {
+        comment_storage_id,
+        body: root.body,
+        creation_date_seconds: root.creation_date_seconds,
+        author_id: root.author_id,
+        storage_uuid: root.storage_uuid,
+        replies,
+    }))
+}
+
+#[cfg(test)]
 pub(super) fn validate_plain_highlight_graph(
     package: &IWorkPackage,
     archive_name: &str,
     identifier: u64,
     object: &ArchiveObject,
-) -> Result<Option<PlainHighlightGraph>> {
-    let Some(comment_storage_id) = validate_highlight_object(identifier, object)? else {
+) -> Result<Option<AnnotationGraph>> {
+    let Some(graph) = validate_annotation_graph(package, archive_name, identifier, object)? else {
         return Ok(None);
     };
-    let archive = package.archive(archive_name)?;
-    let comment_object = archive.object(comment_storage_id).ok_or_else(|| {
-        Error::InvalidFormat(format!(
-            "iWork highlight object {identifier} references missing comment storage {comment_storage_id}"
-        ))
-    })?;
-    if comment_object.messages.len() != 1
-        || comment_object.messages[0].type_ != COMMENT_STORAGE_MESSAGE_TYPE
-    {
-        return Err(Error::InvalidFormat(format!(
-            "iWork highlight {identifier} comment storage {comment_storage_id} must contain exactly one comment payload"
-        )));
-    }
-    let comment = tsd::CommentStorageArchive::decode(comment_object.messages[0].data.as_slice())?;
-    if comment.text.as_deref() != Some("") || !comment.replies.is_empty() {
+    if !graph.is_plain_highlight() {
         return Err(Error::InvalidFormat(format!(
             "iWork highlight {identifier} is comment-backed rather than a plain highlight"
         )));
     }
-    if comment
-        .creation_date
-        .as_ref()
-        .is_some_and(|date| !date.seconds.is_finite())
-    {
+    Ok(Some(graph))
+}
+
+fn validate_comment_node(
+    package: &IWorkPackage,
+    archive_name: &str,
+    annotation_id: u64,
+    storage_id: u64,
+) -> Result<CommentNode> {
+    let archive = package.archive(archive_name)?;
+    let object = archive.object(storage_id).ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "iWork text annotation {annotation_id} references missing comment storage {storage_id}"
+        ))
+    })?;
+    if object.messages.len() != 1 || object.messages[0].type_ != COMMENT_STORAGE_MESSAGE_TYPE {
         return Err(Error::InvalidFormat(format!(
-            "iWork highlight {identifier} has a non-finite creation date"
+            "iWork text annotation {annotation_id} comment storage {storage_id} must contain exactly one comment payload"
         )));
     }
-    let uuid = comment.storage_uuid.as_ref().ok_or_else(|| {
+    let comment = tsd::CommentStorageArchive::decode(object.messages[0].data.as_slice())?;
+    let body = comment.text.ok_or_else(|| {
         Error::InvalidFormat(format!(
-            "iWork highlight {identifier} comment storage is missing its UUID"
+            "iWork text annotation {annotation_id} comment storage {storage_id} is missing text presence"
+        ))
+    })?;
+    let creation_date_seconds = comment.creation_date.map(|date| date.seconds);
+    if creation_date_seconds.is_some_and(|seconds| !seconds.is_finite()) {
+        return Err(Error::InvalidFormat(format!(
+            "iWork text annotation {annotation_id} has a non-finite creation date"
+        )));
+    }
+    let uuid = comment.storage_uuid.ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "iWork text annotation {annotation_id} comment storage {storage_id} is missing its UUID"
         ))
     })?;
     if uuid.lower == 0 && uuid.upper == 0 {
         return Err(Error::InvalidFormat(format!(
-            "iWork highlight {identifier} comment storage has a zero UUID"
+            "iWork text annotation {annotation_id} comment storage {storage_id} has a zero UUID"
         )));
     }
     let author_id = comment.author.map(|reference| reference.identifier);
     if author_id == Some(0) {
         return Err(Error::InvalidFormat(format!(
-            "iWork highlight {identifier} has a zero author identifier"
+            "iWork text annotation {annotation_id} has a zero author identifier"
         )));
     }
-    Ok(Some(PlainHighlightGraph {
-        comment_storage_id,
+    let reply_ids = comment
+        .replies
+        .into_iter()
+        .map(|reference| reference.identifier)
+        .collect::<Vec<_>>();
+    if reply_ids.contains(&0) {
+        return Err(Error::InvalidFormat(format!(
+            "iWork text annotation {annotation_id} has a zero reply identifier"
+        )));
+    }
+    Ok(CommentNode {
+        body,
+        creation_date_seconds,
         author_id,
-    }))
+        storage_uuid: IWorkCommentUuid {
+            lower: uuid.lower,
+            upper: uuid.upper,
+        },
+        reply_ids,
+    })
 }
 
 pub(super) fn new_highlight_object(
@@ -166,10 +270,11 @@ pub(super) fn new_highlight_object(
     Ok(object)
 }
 
-pub(super) fn insert_plain_comment_storage(
+pub(super) fn insert_annotation_comment_storage(
     package: &mut IWorkPackage,
     archive_name: &str,
     comment_storage_id: u64,
+    body: String,
     author_id: Option<u64>,
 ) -> Result<()> {
     let storage_uuid = fresh_comment_storage_uuid(package)?;
@@ -177,10 +282,56 @@ pub(super) fn insert_plain_comment_storage(
         package,
         archive_name,
         comment_storage_id,
-        String::new(),
+        body,
         author_id,
         storage_uuid,
     )
+}
+
+pub(super) fn update_annotation_comment_text(
+    package: &mut IWorkPackage,
+    archive_name: &str,
+    annotation_id: u64,
+    storage_id: u64,
+    body: &str,
+) -> Result<()> {
+    package.update_archive(archive_name, |archive| {
+        let object = archive.object_mut(storage_id).ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "iWork text annotation {annotation_id} comment storage {storage_id} is missing"
+            ))
+        })?;
+        if object.messages.len() != 1 || object.messages[0].type_ != COMMENT_STORAGE_MESSAGE_TYPE {
+            return Err(Error::InvalidFormat(format!(
+                "iWork text annotation {annotation_id} comment storage {storage_id} must contain exactly one comment payload"
+            )));
+        }
+        let original = &object.messages[0];
+        let comment = tsd::CommentStorageArchive::decode(original.data.as_slice())?;
+        let data = patch_length_delimited_field(
+            &original.data,
+            1,
+            comment.text.is_some(),
+            Some(body.as_bytes()),
+        )?;
+        if tsd::CommentStorageArchive::decode(data.as_slice())?
+            .text
+            .as_deref()
+            != Some(body)
+        {
+            return Err(Error::InvalidFormat(format!(
+                "iWork text annotation {annotation_id} comment update failed validation"
+            )));
+        }
+        object.replace_message(
+            0,
+            RawMessage {
+                type_: original.type_,
+                data,
+            },
+        )?;
+        Ok(())
+    })
 }
 
 pub(super) fn require_exclusive_reference(
@@ -224,7 +375,7 @@ pub(super) fn ensure_no_metadata_reference(package: &IWorkPackage, identifier: u
                         .any(|field| field.object_references.contains(&identifier))
             }) {
                 return Err(Error::InvalidFormat(format!(
-                    "highlight graph object {identifier} retains an indexed reference in {archive_name}"
+                    "text-annotation graph object {identifier} retains an indexed reference in {archive_name}"
                 )));
             }
         }

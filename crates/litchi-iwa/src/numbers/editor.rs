@@ -41,10 +41,11 @@ use crate::text::{
     IWorkTextEditor, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphIndents,
     ParagraphLineSpacing, ParagraphList, ParagraphListLevel, ParagraphListLevelPlacement,
     ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment, TextBackground,
-    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumns, TextDecorations,
-    TextFont, TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget,
-    TextLanguage, TextLanguageRun, TextLigatures, TextOutline, TextPosition, TextRange, TextScript,
-    TextShadow, TextStorageInfo, TextStyle,
+    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumns, TextComment,
+    TextCommentBody, TextCommentId, TextDecorations, TextFont, TextHighlight, TextHighlightId,
+    TextHyperlink, TextHyperlinkId, TextHyperlinkTarget, TextLanguage, TextLanguageRun,
+    TextLigatures, TextOutline, TextPosition, TextRange, TextScript, TextShadow, TextStorageInfo,
+    TextStyle,
 };
 use crate::wire::{
     patch_length_delimited_field, patch_nested_fixed32_field, patch_nested_length_delimited_field,
@@ -845,6 +846,61 @@ impl NumbersEditor {
         let highlight = text.remove_text_highlight(graph.storage_id, id)?;
         *self = Self::from_package(text.into_package())?;
         Ok(highlight)
+    }
+
+    /// Read every ranged comment in a sheet-owned text box.
+    pub fn sheet_text_box_comments(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<Vec<TextComment>> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        IWorkTextEditor::from_package(self.package.clone()).text_comments(graph.storage_id)
+    }
+
+    /// Create a ranged comment in a sheet-owned text box.
+    pub fn add_sheet_text_box_comment(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        range: TextRange,
+        body: TextCommentBody,
+    ) -> Result<TextComment> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let comment = text.add_text_comment(graph.storage_id, range, body)?;
+        *self = Self::from_package(text.into_package())?;
+        Ok(comment)
+    }
+
+    /// Update a text-box comment's range and body without changing its ID.
+    pub fn update_sheet_text_box_comment(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        id: TextCommentId,
+        range: TextRange,
+        body: TextCommentBody,
+    ) -> Result<TextComment> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let comment = text.update_text_comment(graph.storage_id, id, range, body)?;
+        *self = Self::from_package(text.into_package())?;
+        Ok(comment)
+    }
+
+    /// Delete a ranged text-box comment and its owned annotation graph.
+    pub fn remove_sheet_text_box_comment(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        id: TextCommentId,
+    ) -> Result<TextComment> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let comment = text.remove_text_comment(graph.storage_id, id)?;
+        *self = Self::from_package(text.into_package())?;
+        Ok(comment)
     }
 
     /// Read the canonical list preset of a sheet-owned text box.

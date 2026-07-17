@@ -3,6 +3,7 @@
 //! This module provides shared text extraction functionality used across
 //! Pages, Numbers, and Keynote documents.
 
+mod annotation;
 pub(crate) mod columns;
 mod drop_cap;
 pub mod editor;
@@ -26,6 +27,8 @@ pub mod storage;
 mod storage_wire;
 pub mod style;
 mod style_registry;
+mod text_comment;
+mod text_comment_types;
 
 #[cfg(test)]
 mod highlight_tests;
@@ -33,6 +36,8 @@ mod highlight_tests;
 mod hyperlink_tests;
 #[cfg(test)]
 mod language_tests;
+#[cfg(test)]
+mod text_comment_tests;
 
 pub use columns::{
     EqualTextColumns, FollowingTextColumn, TextColumnCount, TextColumnGap, TextColumnWidth,
@@ -54,6 +59,7 @@ pub use paragraph_tabs::{
     ParagraphTabStops,
 };
 pub use position::{TextPosition, TextRange};
+pub use text_comment_types::{TextComment, TextCommentBody, TextCommentId};
 
 pub use extractor::TextExtractor;
 pub use storage::{TextFragment, TextRun, TextStorage};

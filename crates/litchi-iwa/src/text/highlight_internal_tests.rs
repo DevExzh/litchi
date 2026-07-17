@@ -1,6 +1,8 @@
 use crate::archive::{ArchiveObject, RawMessage};
 use crate::pages::PagesEditor;
 use crate::shapes::{DrawablePoint, DrawableSize};
+use crate::text::highlight_object::validate_plain_highlight_graph;
+use crate::text::highlight_storage::locate_storage;
 use crate::text::highlight_storage::{HIGHLIGHT_TABLE_FIELD, TABLE_ENTRIES_FIELD};
 use crate::text::storage_wire::STORAGE_MESSAGE_TYPES;
 use crate::wire::{
@@ -183,7 +185,7 @@ fn highlight_with_an_additional_owner_cannot_be_updated_or_deleted() {
 }
 
 #[test]
-fn comment_backed_highlights_are_rejected_without_mutation() {
+fn comment_backed_annotations_are_classified_without_mutation() {
     let mut pages = PagesEditor::create_with_text("Body").unwrap();
     let text_box = pages.add_text_box(4, "Alpha Beta", POSITION, SIZE).unwrap();
     let storage_id = text_box.storage.object_id;
@@ -221,7 +223,11 @@ fn comment_backed_highlights_are_rejected_without_mutation() {
         })
         .unwrap();
     let before = package.to_bytes().unwrap();
-    assert!(text_highlights(&package, storage_id).is_err());
+    assert!(text_highlights(&package, storage_id).unwrap().is_empty());
+    let comments = crate::text::text_comment::text_comments(&package, storage_id).unwrap();
+    assert_eq!(comments.len(), 1);
+    assert_eq!(comments[0].id.object_id(), created.id.object_id());
+    assert_eq!(comments[0].body.as_str(), "note");
     assert!(
         remove_text_highlight(&mut package, storage_id, created.id).is_err(),
         "comment-backed annotation must not be discarded"

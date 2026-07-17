@@ -50,7 +50,9 @@ println!("{}", structured.summary());
 - Native cross-suite text-hyperlink CRUD with typed nonempty UTF-16 ranges,
   lossless web, mail, and Keynote navigation targets, and owned-object cleanup
 - Native cross-suite plain-text highlight CRUD with typed nonempty UTF-16 ranges,
-  lossless table mutation, strict comment guards, and owned annotation cleanup
+  lossless table mutation and owned annotation cleanup
+- Native cross-suite ranged text-comment CRUD with nonempty typed bodies,
+  stable IDs and metadata, reply preservation, and scratch-package creation
 - Lossless Pages document body/header/footer visibility, facing-page layout,
   automatic hyphenation, and ligature options
 - Typed Numbers table header/footer counts, freeze state, and repeating-header
@@ -1125,11 +1127,19 @@ Native plain highlights use `TextHighlight`, `TextHighlightId`, and the same
 strict `TextRange` boundaries. Creation builds the complete native annotation
 graph with author, timestamp, and UUID metadata; range updates retain object
 identity and unknown wire fields; deletion reclaims the owned empty comment
-storage and generated author when unused. Comment-backed and overlapping
-annotations are rejected rather than silently losing user content. The
-ownership-checked Pages, Numbers, and Keynote wrappers are demonstrated by
-`edit_iwork_text_highlight`; `inspect_iwork_text_styles` reports both highlight
-IDs and ranges.
+storage and generated author when unused. Plain highlights and ranged comments
+are classified independently while sharing one strictly validated native range
+table. The ownership-checked Pages, Numbers, and Keynote wrappers are
+demonstrated by `edit_iwork_text_highlight`; `inspect_iwork_text_styles` reports
+both highlight IDs and ranges.
+Ranged comments use `TextComment`, `TextCommentId`, and the nonempty
+`TextCommentBody` newtype. Create emits the complete native type-2013/type-3056
+graph used by all three applications. Update can move the range and replace the
+body without changing the annotation ID, timestamp, author, storage UUID, or
+reply thread. Delete validates exclusive ownership and reclaims the root,
+direct replies, and generated author. Unknown fields at the table, boundary,
+annotation, and comment-storage levels survive updates. See
+`edit_iwork_text_comment` and the three scratch text-box creation examples.
 Slide move, duplicate, and delete operations likewise rewrite only the nested
 slide-tree ownership list. Existing raw `TSP.Reference` payloads are reused,
 so extensions inside the show, slide tree, and individual references survive;

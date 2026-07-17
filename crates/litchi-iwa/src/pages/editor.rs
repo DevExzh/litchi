@@ -32,10 +32,11 @@ use crate::text::{
     IWorkTextEditor, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphIndents,
     ParagraphLineSpacing, ParagraphList, ParagraphListLevel, ParagraphListLevelPlacement,
     ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment, TextBackground,
-    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumns, TextDecorations,
-    TextFont, TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget,
-    TextLanguage, TextLanguageRun, TextLigatures, TextOutline, TextPosition, TextRange, TextScript,
-    TextShadow, TextStorageInfo, TextStyle,
+    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumns, TextComment,
+    TextCommentBody, TextCommentId, TextDecorations, TextFont, TextHighlight, TextHighlightId,
+    TextHyperlink, TextHyperlinkId, TextHyperlinkTarget, TextLanguage, TextLanguageRun,
+    TextLigatures, TextOutline, TextPosition, TextRange, TextScript, TextShadow, TextStorageInfo,
+    TextStyle,
 };
 use crate::wire::{
     append_repeated_length_delimited_field, patch_fixed32_field, patch_length_delimited_field,
@@ -575,6 +576,54 @@ impl PagesEditor {
         let highlight = staged.remove_text_highlight(graph.storage_id, id)?;
         *self = Self::from_package(staged.into_package())?;
         Ok(highlight)
+    }
+
+    /// Read every ranged comment in an ordinary text box.
+    pub fn text_box_comments(&self, drawable_object_id: u64) -> Result<Vec<TextComment>> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        self.text.text_comments(graph.storage_id)
+    }
+
+    /// Create a ranged comment in an ordinary text box.
+    pub fn add_text_box_comment(
+        &mut self,
+        drawable_object_id: u64,
+        range: TextRange,
+        body: TextCommentBody,
+    ) -> Result<TextComment> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let comment = staged.add_text_comment(graph.storage_id, range, body)?;
+        *self = Self::from_package(staged.into_package())?;
+        Ok(comment)
+    }
+
+    /// Update a text-box comment's range and body without changing its ID.
+    pub fn update_text_box_comment(
+        &mut self,
+        drawable_object_id: u64,
+        id: TextCommentId,
+        range: TextRange,
+        body: TextCommentBody,
+    ) -> Result<TextComment> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let comment = staged.update_text_comment(graph.storage_id, id, range, body)?;
+        *self = Self::from_package(staged.into_package())?;
+        Ok(comment)
+    }
+
+    /// Delete a ranged text-box comment and its owned annotation graph.
+    pub fn remove_text_box_comment(
+        &mut self,
+        drawable_object_id: u64,
+        id: TextCommentId,
+    ) -> Result<TextComment> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let comment = staged.remove_text_comment(graph.storage_id, id)?;
+        *self = Self::from_package(staged.into_package())?;
+        Ok(comment)
     }
 
     /// Read the canonical list preset of an ordinary text box.
