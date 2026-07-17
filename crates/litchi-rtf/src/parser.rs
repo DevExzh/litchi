@@ -369,6 +369,8 @@ fn apply_table_distance(state:&mut State,target:crate::TableDistanceTarget,param
 fn require_parameterless(parameter:Option<i32>,name:&str)->RtfResult<()>{if parameter.is_some(){return Err(RtfError::MalformedDocument(format!("RTF {name} does not accept a parameter")))}Ok(())}
 fn floating_table_offset(parameter:Option<i32>,negative:bool,axis:&str)->RtfResult<i32>{let value=parameter.ok_or_else(||RtfError::MalformedDocument(format!("RTF floating-table {axis} offset requires a parameter")))?;let valid=if negative{(-crate::MAX_FLOATING_TABLE_DISTANCE_TWIPS..=-1).contains(&value)}else{(0..=crate::MAX_FLOATING_TABLE_DISTANCE_TWIPS).contains(&value)};if !valid{return Err(RtfError::MalformedDocument(format!("RTF floating-table {axis} offset is out of range")))}Ok(value)}
 fn floating_table_wrap_distance(parameter:Option<i32>)->RtfResult<u16>{let value=parameter.ok_or_else(||RtfError::MalformedDocument("RTF floating-table wrap distance requires a parameter".to_string()))?;if !(0..=crate::MAX_FLOATING_TABLE_DISTANCE_TWIPS).contains(&value){return Err(RtfError::MalformedDocument("RTF floating-table wrap distance is out of range".to_string()))}Ok(value as u16)}
+const MAX_LOGICAL_TABLES:usize=4096;
+const MAX_LOGICAL_TABLE_ROWS:usize=65_536;
 
 fn associated_font_ref(value: Option<i32>) -> RtfResult<FontRef> {
     let value = value.ok_or_else(|| {
@@ -935,7 +937,7 @@ impl<'a> Parser<'a> {
         self.parse_group()?;
 
         // Finalize any remaining table
-        self.finalize_table();
+        self.finalize_table()?;
         self.finalize_bookmarks()?;
         self.finalize_annotations()?;
 
@@ -2821,18 +2823,21 @@ impl<'a> Parser<'a> {
                 Token::Control(control) => {
                     match control {
                         ControlWord::Par | ControlWord::Line => {
+                            let structural_table_boundary=self.finalize_table_before_non_table_body_content(true)?;
                             self.pos += 1;
                             // Paragraph break - flush current text
                             if !text_buffer.is_empty() {
                                 self.flush_text_buffer(&mut text_buffer)?;
                             }
-                            text_buffer.push(b'\n');
+                            if !structural_table_boundary{text_buffer.push(b'\n');}
                         },
                         ControlWord::Tab => {
+                            self.finalize_table_before_non_table_body_content(true)?;
                             self.pos += 1;
                             text_buffer.push(b'\t');
                         },
                         ControlWord::Unicode(code) => {
+                            self.finalize_table_before_non_table_body_content(true)?;
                             // Handle Unicode character with potential fallback
                             if self.states.last().is_some_and(|state| {
                                 state.destination == Destination::DocumentBody
@@ -2921,6 +2926,7 @@ impl<'a> Parser<'a> {
                     if text.is_empty() {
                         continue;
                     }
+                    self.finalize_table_before_non_table_body_content(!text.trim().is_empty())?;
                     if self.states.last().is_some_and(|state| {
                         state.destination == Destination::DocumentBody
                     }) && !text.trim().is_empty()
@@ -2994,6 +3000,7 @@ impl<'a> Parser<'a> {
     }
 
     fn append_semantic_text(&mut self, text: &str) -> RtfResult<()> {
+        self.finalize_table_before_non_table_body_content(!text.is_empty())?;
         let state = self.current_state()?.clone();
         if state.in_table {
             self.current_cell_text.extend_from_slice(text.as_bytes());
@@ -3518,6 +3525,7 @@ impl<'a> Parser<'a> {
                 state.paragraph = Paragraph::default();
                 state.pending_tab_alignment = None;
                 state.pending_tab_leader = None;
+                state.in_table = false;
             },
 
             // Paragraph spacing
@@ -3735,12 +3743,13 @@ impl<'a> Parser<'a> {
             ControlWord::TableNoOverlap(param)=>if state.destination==Destination::DocumentBody{state.table_row_positioning.no_overlap=match *param{None|Some(1)=>true,Some(0)=>false,Some(_)=>return Err(RtfError::MalformedDocument("RTF tabsnoovrlp accepts only 0 or 1".to_string()))}},
             ControlWord::TableCell => {
                 // Cell break - finalize current cell
-                self.finalize_cell();
+                self.start_table_if_needed();
+                self.finalize_cell(true);
             },
             ControlWord::TableRow => {
                 // Row break - finalize current row
                 let row_padding=state.table_row_padding.clone();let row_spacing=state.table_row_spacing.clone();let row_positioning=state.table_row_positioning.clone();if let Some(row)=&mut self.current_row{row.set_padding(row_padding);row.set_spacing(row_spacing);row.set_positioning(row_positioning);}
-                self.finalize_row();
+                self.finalize_row()?;
             },
 
             _ => {
@@ -8243,8 +8252,8 @@ impl<'a> Parser<'a> {
     }
 
     /// Finalize the current cell and add it to the current row.
-    fn finalize_cell(&mut self) {
-        if !self.current_cell_text.is_empty() {
+    fn finalize_cell(&mut self, explicit:bool) {
+        if explicit || !self.current_cell_text.is_empty() {
             // Convert cell text to string
             if let Ok(text_str) = std::str::from_utf8(&self.current_cell_text) {
                 let allocated = self.arena.alloc_str(text_str);
@@ -8256,40 +8265,61 @@ impl<'a> Parser<'a> {
                 }
             }
 
-            // Clear cell buffer
-            self.current_cell_text.clear();
         }
+        self.current_cell_text.clear();
     }
 
     /// Finalize the current row and add it to the current table.
-    fn finalize_row(&mut self) {
+    fn finalize_row(&mut self) -> RtfResult<()> {
         // Finalize any pending cell
-        self.finalize_cell();
+        self.finalize_cell(false);
 
         // Add row to table
         if let (Some(table), Some(row)) = (&mut self.current_table, self.current_row.take())
             && row.cell_count() > 0
         {
+            if table.row_count() >= MAX_LOGICAL_TABLE_ROWS {
+                return Err(RtfError::MalformedDocument("RTF logical table exceeds 65536 rows".to_string()));
+            }
+            if table.rows().first().is_some_and(|first| first.positioning() != row.positioning()) {
+                return Err(RtfError::MalformedDocument("RTF positioned-table properties must be identical for all rows in one logical table".to_string()));
+            }
             table.add_row(row);
         }
 
         // Start a new row for next cells
         self.current_row = Some(super::table::Row::new());
+        Ok(())
     }
 
     /// Finalize the current table and add it to the tables list.
-    fn finalize_table(&mut self) {
+    fn finalize_table(&mut self) -> RtfResult<()> {
         // Finalize any pending row
         if self.current_row.is_some() {
-            self.finalize_row();
+            self.finalize_row()?;
         }
 
         // Add table to tables list
         if let Some(table) = self.current_table.take()
             && table.row_count() > 0
         {
+            if self.tables.len() >= MAX_LOGICAL_TABLES {
+                return Err(RtfError::MalformedDocument("RTF document exceeds 4096 logical tables".to_string()));
+            }
             self.tables.push(table);
         }
+        Ok(())
+    }
+
+    fn finalize_table_before_non_table_body_content(&mut self, meaningful:bool)->RtfResult<bool> {
+        if meaningful
+            && self.current_table.as_ref().is_some_and(|table|table.row_count()>0)
+            && self.current_state().is_ok_and(|state|state.destination==Destination::DocumentBody&&!state.in_table)
+        {
+            self.finalize_table()?;
+            return Ok(true);
+        }
+        Ok(false)
     }
 
     /// Parse an `object` destination without activating or updating its content.

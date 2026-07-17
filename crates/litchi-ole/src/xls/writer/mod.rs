@@ -15,6 +15,9 @@ pub mod formatting;
 /// Formula tokenization
 pub mod formula;
 
+/// Checked BIFF8 INDEX/DBCELL worksheet layout generation
+pub mod row_blocks;
+
 // Re-export public types
 pub use biff::AutoFilterConditionWrite;
 pub use core::{

@@ -378,7 +378,42 @@ impl RowBlockIndexCollector {
     fn finish_block(&mut self, position: u32, data: &[u8]) -> XlsResult<()> {
         let dbcell = XlsDbCellRecord::parse_payload(position, self.stream_len, data)?;
         if self.pending_rows.is_empty() {
-            return Err(invalid(DBCELL_RECORD_TYPE, "DBCELL has no preceding ROW records"));
+            if data.len() != 4
+                || dbcell.first_row_position.is_some()
+                || !dbcell.cell_offsets.is_empty()
+                || !self.pending_first_cells.is_empty()
+            {
+                return Err(invalid(DBCELL_RECORD_TYPE, "DBCELL has no preceding ROW records"));
+            }
+            let (_, index) = self.index.as_ref().ok_or_else(|| {
+                invalid(DBCELL_RECORD_TYPE, "empty DBCELL block has no worksheet INDEX")
+            })?;
+            let block_offset = u32::try_from(self.blocks.len())
+                .ok()
+                .and_then(|value| value.checked_mul(MAX_ROWS_PER_BLOCK as u32))
+                .ok_or_else(|| invalid(DBCELL_RECORD_TYPE, "empty DBCELL block range overflow"))?;
+            let first_row = index
+                .first_data_row()
+                .checked_add(block_offset)
+                .ok_or_else(|| invalid(DBCELL_RECORD_TYPE, "empty DBCELL block range overflow"))?;
+            let last_row_exclusive = first_row
+                .checked_add(MAX_ROWS_PER_BLOCK as u32)
+                .map(|value| value.min(index.last_data_row_exclusive()))
+                .ok_or_else(|| invalid(DBCELL_RECORD_TYPE, "empty DBCELL block range overflow"))?;
+            if first_row >= last_row_exclusive {
+                return Err(invalid(DBCELL_RECORD_TYPE, "empty DBCELL lies outside INDEX row bounds"));
+            }
+            self.blocks.push(XlsRowBlock {
+                first_row: u16::try_from(first_row).map_err(|_| {
+                    invalid(DBCELL_RECORD_TYPE, "empty DBCELL first row exceeds BIFF8 limit")
+                })?,
+                last_row: u16::try_from(last_row_exclusive - 1).map_err(|_| {
+                    invalid(DBCELL_RECORD_TYPE, "empty DBCELL last row exceeds BIFF8 limit")
+                })?,
+                dbcell,
+                indexed_rows: Vec::new(),
+            });
+            return Ok(());
         }
         if self.pending_rows.len() > MAX_ROWS_PER_BLOCK {
             return Err(invalid(DBCELL_RECORD_TYPE, "DBCELL row block exceeds 32 rows"));
@@ -472,13 +507,10 @@ impl RowBlockIndexCollector {
             .flat_map(|block| block.indexed_rows.iter())
             .map(|row| u32::from(row.row))
             .max();
-        let expected_bounds = match (first_data_row, last_data_row) {
-            (Some(first), Some(last)) => (first, last + 1),
-            (None, None) => (0, 0),
-            _ => unreachable!(),
-        };
-        if (index.first_data_row, index.last_data_row_exclusive) != expected_bounds {
-            return Err(invalid(INDEX_RECORD_TYPE, "INDEX row bounds do not match indexed cell rows"));
+        if let (Some(first), Some(last)) = (first_data_row, last_data_row) {
+            if (index.first_data_row, index.last_data_row_exclusive) != (first, last + 1) {
+                return Err(invalid(INDEX_RECORD_TYPE, "INDEX row bounds do not match indexed cell rows"));
+            }
         }
         Ok(Some(XlsRowBlockIndex { index_record_position, index, blocks: self.blocks }))
     }

@@ -270,6 +270,13 @@ impl MutableDocument {
         Ok(())
     }
 
+    /// Replace, insert, or remove typed properties on an existing table style.
+    pub fn set_table_style_properties(&mut self, style: &crate::TableStyleProperties) -> Result<()> {
+        let styles = self.styles_xml.as_deref().ok_or_else(|| litchi_core::Error::InvalidFormat("document has no styles.xml table style to modify".to_string()))?;
+        self.styles_xml = Some(crate::set_table_style_properties_xml(styles, style)?);
+        Ok(())
+    }
+
     /// Add an empty master page and its referenced page layout.
     ///
     /// A minimal page layout is created in `office:automatic-styles` when a

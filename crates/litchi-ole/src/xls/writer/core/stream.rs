@@ -366,20 +366,9 @@ pub(crate) fn generate_workbook_stream(
             let mut rows = BTreeSet::<u32>::new();
             rows.extend(worksheet.row_heights.keys().copied());
             rows.extend(worksheet.hidden_rows.iter().copied());
-            if !worksheet.pivot_tables.is_empty() {
-                rows.extend(row_spans.keys().copied());
-            }
+            rows.extend(row_spans.keys().copied());
             rows.into_iter().collect()
         };
-        let pivot_first_used_row = row_spans.keys().min().copied().unwrap_or(0);
-        let pivot_last_used_row_plus1 = row_spans
-            .keys()
-            .max()
-            .copied()
-            .map(|row| row.saturating_add(1))
-            .unwrap_or(0);
-        let pivot_row_block_count = emitted_rows.len().div_ceil(32);
-
         // BOF record (worksheet)
         biff::write_bof(&mut stream, 0x0010)?;
 
@@ -387,21 +376,7 @@ pub(crate) fn generate_workbook_stream(
             biff::write_uncalced(&mut stream)?;
         }
 
-        let pivot_index_record_pos =
-            if !worksheet.pivot_tables.is_empty() && pivot_row_block_count > 0 {
-                let index_record_pos = stream.len();
-                let zero_dbcells = vec![0u32; pivot_row_block_count];
-                biff::write_index(
-                    &mut stream,
-                    pivot_first_used_row,
-                    pivot_last_used_row_plus1,
-                    0,
-                    &zero_dbcells,
-                )?;
-                Some(index_record_pos)
-            } else {
-                None
-            };
+        let index_record_pos = stream.len();
 
         biff::write_calculation_settings(&mut stream, &calculation_settings)?;
 
@@ -422,7 +397,9 @@ pub(crate) fn generate_workbook_stream(
             biff::write_scenario_manager(&mut stream, manager)?;
         }
 
+        let mut def_col_width_pos = None;
         if worksheet.pivot_tables.is_empty() {
+            def_col_width_pos = Some(stream.len());
             biff::write_def_col_width(
                 &mut stream,
                 worksheet.sheet_layout.default_column_width_chars,
@@ -519,16 +496,13 @@ pub(crate) fn generate_workbook_stream(
         }
 
         // Column width / hidden state via COLINFO records.
-        let pivot_def_col_width_pos = if !worksheet.pivot_tables.is_empty() {
-            let pos = stream.len() as u32;
+        if !worksheet.pivot_tables.is_empty() {
+            def_col_width_pos = Some(stream.len());
             biff::write_def_col_width(
                 &mut stream,
                 worksheet.sheet_layout.default_column_width_chars,
             )?;
-            Some(pos)
-        } else {
-            None
-        };
+        }
 
         if !worksheet.column_widths.is_empty() || !worksheet.hidden_columns.is_empty() {
             use std::collections::BTreeSet;
@@ -567,10 +541,9 @@ pub(crate) fn generate_workbook_stream(
         // Pivot worksheets also emit ROW records for used rows even when the
         // height is default, which appears to be part of Excel's expected
         // substream scaffolding for page-field dropdowns.
-        let mut row_record_positions = StdHashMap::<u32, u32>::new();
+        let row_table_start = stream.len();
         if !emitted_rows.is_empty() {
             for row in &emitted_rows {
-                row_record_positions.insert(*row, stream.len() as u32);
                 let (mut first_col, mut last_col_plus1) =
                     row_spans.get(row).copied().unwrap_or((0, 0));
                 if !worksheet.pivot_tables.is_empty() {
@@ -597,7 +570,6 @@ pub(crate) fn generate_workbook_stream(
         let mut sorted_cells: Vec<_> = worksheet.cells.iter().collect();
         sorted_cells.sort_by_key(|(k, _)| *k);
 
-        let mut row_first_cell_positions = StdHashMap::<u32, u32>::new();
         let pivot_xf_indices = fmt.pivot_xf_indices();
 
         let mut cell_index = 0usize;
@@ -647,9 +619,6 @@ pub(crate) fn generate_workbook_stream(
                 }
 
                 if mulrk_values.len() >= 2 {
-                    row_first_cell_positions
-                        .entry(*row)
-                        .or_insert(stream.len() as u32);
                     biff::write_mulrk(&mut stream, *row, *col, &mulrk_values)?;
                     cell_index = next_index;
                     continue;
@@ -658,31 +627,19 @@ pub(crate) fn generate_workbook_stream(
 
             match &cell.value {
                 XlsCellValue::Number(value) => {
-                    row_first_cell_positions
-                        .entry(*row)
-                        .or_insert(stream.len() as u32);
                     biff::write_number(&mut stream, *row, *col, xf_index, *value)?;
                 },
                 XlsCellValue::String(s) => {
                     let sst_index = *string_map.get(s).unwrap();
-                    row_first_cell_positions
-                        .entry(*row)
-                        .or_insert(stream.len() as u32);
                     biff::write_labelsst(&mut stream, *row, *col, xf_index, sst_index)?;
                 },
                 XlsCellValue::Boolean(value) => {
-                    row_first_cell_positions
-                        .entry(*row)
-                        .or_insert(stream.len() as u32);
                     biff::write_boolerr(&mut stream, *row, *col, xf_index, *value)?;
                 },
                 XlsCellValue::Formula(formula) => {
                     let expression = formula.strip_prefix('=').unwrap_or(formula);
                     let tokens = FormulaTokenizer::new().tokenize(expression)?;
                     let encoded = encode_ptg_tokens(&tokens);
-                    row_first_cell_positions
-                        .entry(*row)
-                        .or_insert(stream.len() as u32);
                     biff::write_formula(&mut stream, *row, *col, xf_index, &encoded)?;
                 },
                 XlsCellValue::Blank => {
@@ -692,59 +649,29 @@ pub(crate) fn generate_workbook_stream(
             cell_index += 1;
         }
 
-        let mut pivot_dbcell_positions = Vec::new();
-        if !worksheet.pivot_tables.is_empty() && !emitted_rows.is_empty() {
-            for row_block in emitted_rows.chunks(32) {
-                let dbcell_pos = stream.len() as u32;
-                let first_row_pos = row_record_positions
-                    .get(&row_block[0])
-                    .copied()
-                    .ok_or_else(|| {
-                        XlsError::InvalidData(
-                            "pivot worksheet row block missing ROW record offset for DBCELL"
-                                .to_string(),
-                        )
-                    })?;
-                let mut cell_offsets = Vec::new();
-                let mut previous_row_first_cell_pos = None;
-                for row in row_block {
-                    if let Some(first_cell_pos) = row_first_cell_positions.get(row).copied() {
-                        let offset = if let Some(previous_pos) = previous_row_first_cell_pos {
-                            first_cell_pos.saturating_sub(previous_pos)
-                        } else {
-                            first_cell_pos.saturating_sub(first_row_pos.saturating_add(20))
-                        };
-                        cell_offsets.push(u16::try_from(offset).map_err(|_| {
-                            XlsError::InvalidData(
-                                "pivot worksheet DBCELL cell offset exceeds BIFF8 limit"
-                                    .to_string(),
-                            )
-                        })?);
-                        previous_row_first_cell_pos = Some(first_cell_pos);
-                    }
-                }
-
-                biff::write_dbcell(
-                    &mut stream,
-                    dbcell_pos.saturating_sub(first_row_pos),
-                    &cell_offsets,
-                )?;
-                pivot_dbcell_positions.push(dbcell_pos);
-            }
-        }
-
-        if let Some(index_record_pos) = pivot_index_record_pos {
-            let mut index_record = Vec::new();
-            biff::write_index(
-                &mut index_record,
-                pivot_first_used_row,
-                pivot_last_used_row_plus1,
-                pivot_def_col_width_pos.unwrap_or(0),
-                &pivot_dbcell_positions,
-            )?;
-            stream[index_record_pos..index_record_pos + index_record.len()]
-                .copy_from_slice(&index_record);
-        }
+        let staged_row_table = stream.split_off(row_table_start);
+        let def_col_width_pos = def_col_width_pos.ok_or_else(|| {
+            XlsError::InvalidData("worksheet is missing DEFCOLWIDTH for INDEX".to_string())
+        })?;
+        let plan = crate::xls::writer::row_blocks::XlsRowBlockLayoutPlan::generate_from_staged(
+            u64::try_from(index_record_pos).map_err(|_| {
+                XlsError::InvalidData("worksheet INDEX position overflow".to_string())
+            })?,
+            u64::try_from(row_table_start.checked_sub(index_record_pos).ok_or_else(|| {
+                XlsError::InvalidData("worksheet row table precedes INDEX".to_string())
+            })?).map_err(|_| {
+                XlsError::InvalidData("worksheet row-table position overflow".to_string())
+            })?,
+            u64::try_from(def_col_width_pos.checked_sub(index_record_pos).ok_or_else(|| {
+                XlsError::InvalidData("worksheet DEFCOLWIDTH precedes INDEX".to_string())
+            })?).map_err(|_| {
+                XlsError::InvalidData("worksheet DEFCOLWIDTH position overflow".to_string())
+            })?,
+            &staged_row_table,
+        )?;
+        let (index_record, row_table) = plan.into_records();
+        stream.splice(index_record_pos..index_record_pos, index_record);
+        stream.extend_from_slice(&row_table);
 
         // Hyperlink records for cells or ranges.
         for hyperlink in &worksheet.hyperlinks {

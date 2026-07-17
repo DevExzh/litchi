@@ -30,3 +30,18 @@ fn parses_poi_simple_and_multirow_indexes() {
     assert_eq!(index.first_cell_position(8), None);
     assert_eq!(index.first_cell_position(28), Some(17_856));
 }
+
+#[test]
+fn parses_real_sparse_and_rowless_dbcell_blocks() {
+    let sparse_path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../test-data/ole/xls/ConditionalFormattingSamples.xls"
+    );
+    let workbook = XlsWorkbook::new(File::open(sparse_path).unwrap()).unwrap();
+    let index = workbook.xls_worksheet(13).unwrap().row_block_index().unwrap().unwrap();
+    assert_eq!((index.index_record().first_data_row(), index.index_record().last_data_row_exclusive()), (1, 92));
+    assert_eq!(index.blocks().len(), 3);
+    assert!(index.blocks()[1].indexed_rows().is_empty());
+    assert!(index.blocks()[1].dbcell().first_row_position().is_none());
+    assert!(index.blocks()[1].dbcell().cell_offsets().is_empty());
+}

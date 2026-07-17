@@ -76,9 +76,9 @@ pub mod views;
 pub mod workbook;
 pub mod worksheet;
 pub use chartsheet::{
-    ChartSheet, ChartSheetChartResource, ChartSheetColor, ChartSheetConformance,
+    ChartSheet, ChartSheetBackgroundPicture, ChartSheetChartResource, ChartSheetColor, ChartSheetConformance,
     ChartSheetCustomView, ChartSheetDrawingResource, ChartSheetEntry, ChartSheetHeaderFooter, ChartSheetMargins,
-    ChartSheetPackage, ChartSheetPageSetup, ChartSheetProperties, ChartSheetProtection,
+    ChartSheetImageContentType, ChartSheetPackage, ChartSheetPageSetup, ChartSheetProperties, ChartSheetProtection,
     ChartSheetState, ChartSheetView, PageOrientation, load_chartsheet, parse_chartsheet,
     store_chartsheet, write_chartsheet,
 };

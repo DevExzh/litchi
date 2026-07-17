@@ -547,6 +547,7 @@ pub fn write_def_col_width<W: Write>(writer: &mut W, width_chars: u16) -> XlsRes
 /// Write INDEX record.
 ///
 /// Record type: 0x020B
+#[allow(dead_code)]
 pub fn write_index<W: Write>(
     writer: &mut W,
     first_row: u32,
@@ -566,6 +567,7 @@ pub fn write_index<W: Write>(
 /// Write DBCELL record.
 ///
 /// Record type: 0x00D7
+#[allow(dead_code)]
 pub fn write_dbcell<W: Write>(
     writer: &mut W,
     row_offset: u32,

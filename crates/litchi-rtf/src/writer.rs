@@ -199,7 +199,12 @@ impl<W: Write> RtfWriter<W> {
         )?;
 
         // Write tables
-        for table in doc.tables() {
+        for (index, table) in doc.tables().iter().enumerate() {
+            if index > 0 {
+                self.write_control_word("pard", None)?;
+                self.write_control_word("par", None)?;
+                self.write_str("\n")?;
+            }
             self.write_table(table)?;
         }
 
@@ -2898,6 +2903,11 @@ impl<W: Write> RtfWriter<W> {
 
     /// Write a table
     fn write_table(&mut self, table: &Table) -> io::Result<()> {
+        if let Some(first) = table.rows().first()
+            && table.rows().iter().skip(1).any(|row|row.positioning()!=first.positioning())
+        {
+            return Err(io::Error::new(io::ErrorKind::InvalidInput,"RTF positioned-table properties must be identical for all rows in one logical table"));
+        }
         for row in table.rows() {
             self.write_table_row(row, table.direction())?;
         }

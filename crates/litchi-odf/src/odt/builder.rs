@@ -43,6 +43,7 @@ pub struct DocumentBuilder {
     list_level_label_alignments: Vec<crate::ListStyleLevelLabelAlignment>,
     paragraph_flow_styles: Vec<crate::ParagraphStyleFlow>,
     table_row_property_styles: Vec<crate::TableRowStyleProperties>,
+    table_property_styles: Vec<crate::TableStyleProperties>,
     section_property_styles: Vec<crate::SectionStyleProperties>,
     page_layout_columns: Vec<(String, crate::StyleColumns)>,
     page_layout_footnote_separators: Vec<(String, crate::StyleFootnoteSeparator)>,
@@ -74,6 +75,7 @@ impl DocumentBuilder {
             list_level_label_alignments: Vec::new(),
             paragraph_flow_styles: Vec::new(),
             table_row_property_styles: Vec::new(),
+            table_property_styles: Vec::new(),
             section_property_styles: Vec::new(),
             page_layout_columns: Vec::new(),
             page_layout_footnote_separators: Vec::new(),
@@ -133,6 +135,9 @@ impl DocumentBuilder {
 
     /// Add a named or default table-row style carrying typed row properties.
     pub fn add_table_row_property_style(&mut self, style: crate::TableRowStyleProperties) -> Result<&mut Self> { style.validate()?; if self.table_row_property_styles.len()>=4096 || self.table_row_property_styles.iter().any(|x|x.name==style.name&&x.is_default_style==style.is_default_style){return Err(litchi_core::Error::InvalidFormat("duplicate or excessive table-row property style".to_string()));} self.table_row_property_styles.push(style); Ok(self) }
+
+    /// Add a named or default table style carrying typed table properties.
+    pub fn add_table_property_style(&mut self, style: crate::TableStyleProperties) -> Result<&mut Self> { style.validate()?; if self.table_property_styles.len()>=4096 || self.table_property_styles.iter().any(|x|x.name==style.name&&x.is_default_style==style.is_default_style){return Err(litchi_core::Error::InvalidFormat("duplicate or excessive table property style".to_string()));} self.table_property_styles.push(style); Ok(self) }
 
     /// Add a named section style carrying typed residual section properties.
     pub fn add_section_property_style(&mut self, style: crate::SectionStyleProperties) -> Result<&mut Self> {
@@ -604,6 +609,7 @@ impl DocumentBuilder {
         }
         if !self.paragraph_flow_styles.is_empty(){let insertion=xml.find("</office:styles>").expect("static styles root");let fragments=self.paragraph_flow_styles.iter().map(|x|x.to_xml_fragment().expect("validated paragraph flow style")).collect::<String>();xml.insert_str(insertion,&fragments);}
         if !self.table_row_property_styles.is_empty(){let insertion=xml.find("</office:styles>").expect("static styles root");let fragments=self.table_row_property_styles.iter().map(|x|x.to_xml_fragment().expect("validated table-row property style")).collect::<String>();xml.insert_str(insertion,&fragments);}
+        if !self.table_property_styles.is_empty(){let insertion=xml.find("</office:styles>").expect("static styles root");let fragments=self.table_property_styles.iter().map(|x|x.to_xml_fragment().expect("validated table property style")).collect::<String>();xml.insert_str(insertion,&fragments);}
         if !self.section_property_styles.is_empty(){let insertion=xml.find("</office:styles>").expect("static styles root");let fragments=self.section_property_styles.iter().map(|x|x.to_xml_fragment().expect("validated section property style")).collect::<String>();xml.insert_str(insertion,&fragments);}
         if !self.page_layout_columns.is_empty() || !self.page_layout_footnote_separators.is_empty() || !self.page_layout_header_footer_properties.is_empty() {
             let mut fragments = self
