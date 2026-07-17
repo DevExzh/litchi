@@ -250,11 +250,7 @@ impl PagesDocumentBuilder {
 
     /// Build the underlying package for lower-level IWA manipulation.
     pub fn build_package(self) -> Result<IWorkPackage> {
-        if self.language.trim().is_empty() {
-            return Err(crate::Error::InvalidFormat(
-                "Pages document language cannot be empty".to_owned(),
-            ));
-        }
+        crate::text::TextLanguageTag::new(self.language.as_str())?;
         if self.locale.trim().is_empty() {
             return Err(crate::Error::InvalidFormat(
                 "Pages document locale cannot be empty".to_owned(),

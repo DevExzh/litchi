@@ -186,7 +186,12 @@ impl KeynoteEditor {
         let context = text_box_context(&graph, slide_index)?;
         let styles = text_box_theme_styles(&graph, context.theme_id, context.stylesheet_id)?;
         let base_storage = slide_text_storage_template(&graph, &context.slide)?;
-        let storage = text_box_storage(text, base_storage.as_ref(), &styles);
+        let storage = text_box_storage(
+            text,
+            base_storage.as_ref(),
+            &styles,
+            context.language.as_deref(),
+        );
         let ids = TextBoxObjectIds::allocate(next_object_identifier(self.package())?)?;
         let archive_name = graph.archive_name(context.slide_id)?.to_owned();
         let component_id = component_identifier_for_entry(self.package(), &archive_name)?

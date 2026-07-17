@@ -184,7 +184,7 @@ impl NumbersEditor {
             document.theme.identifier,
             document.stylesheet.identifier,
         )?;
-        let storage = text_box_storage(text, &styles);
+        let storage = text_box_storage(text, &styles, document.super_.document_language.as_deref());
         let ids = TextBoxObjectIds::allocate(next_object_identifier(&self.package)?)?;
         let objects = text_box_objects(
             ids,

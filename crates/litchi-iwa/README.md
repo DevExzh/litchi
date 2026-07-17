@@ -45,6 +45,8 @@ println!("{}", structured.summary());
 - Typed copy-on-write text-box paragraph alignment, native line-spacing modes,
   atomic before/after spacing, first-line/left/right indentation, and ordered
   left/center/right/decimal tab stops with leaders across Pages, Numbers, and Keynote
+- Typed BCP 47 text-language run CRUD at validated UTF-16 scalar boundaries,
+  including automatic-language sentinels and lossless boundary deletion
 - Lossless Pages document body/header/footer visibility, facing-page layout,
   automatic hyphenation, and ligature options
 - Typed Numbers table header/footer counts, freeze state, and repeating-header
@@ -1097,6 +1099,15 @@ Shared drawable properties use the same ownership guard and wire-preserving
 mutation path. Keynote exposes Lock for ordinary text boxes but can disable its
 aspect-ratio control when the text box height is auto-sized. See
 `edit_keynote_text_box_properties`.
+
+Text storages shared by all three applications expose explicit language runs
+through `TextLanguage`, `TextLanguageTag`, and `TextPosition`. Setters accept
+only scalar UTF-16 boundaries, preserve unknown table and entry fields, and
+coalesce redundant adjacent runs. Scratch-created text boxes inherit the
+document language, matching real Pages, Numbers, and Keynote output. Individual
+nonzero boundaries or the complete language table can be deleted without
+changing text or sibling formatting. See `edit_iwork_text_language` and
+`inspect_iwork_text_styles`.
 Slide move, duplicate, and delete operations likewise rewrite only the nested
 slide-tree ownership list. Existing raw `TSP.Reference` payloads are reused,
 so extensions inside the show, slide tree, and individual references survive;

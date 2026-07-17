@@ -33,7 +33,8 @@ use crate::text::{
     ParagraphLineSpacing, ParagraphList, ParagraphListLevel, ParagraphListLevelPlacement,
     ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment, TextBackground,
     TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumns, TextDecorations,
-    TextFont, TextLigatures, TextOutline, TextScript, TextShadow, TextStorageInfo, TextStyle,
+    TextFont, TextLanguage, TextLanguageRun, TextLigatures, TextOutline, TextPosition, TextScript,
+    TextShadow, TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     append_repeated_length_delimited_field, patch_fixed32_field, patch_length_delimited_field,
@@ -419,6 +420,62 @@ impl PagesEditor {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
         let changed = staged.reset_text_font(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read every explicit language boundary in an ordinary text box.
+    pub fn text_box_text_languages(&self, drawable_object_id: u64) -> Result<Vec<TextLanguageRun>> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        self.text.text_languages(graph.storage_id)
+    }
+
+    /// Read the effective language at one UTF-16 text boundary.
+    pub fn text_box_text_language(
+        &self,
+        drawable_object_id: u64,
+        position: TextPosition,
+    ) -> Result<TextLanguage> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        self.text.text_language(graph.storage_id, position)
+    }
+
+    /// Atomically create or update one text-language boundary.
+    pub fn set_text_box_text_language(
+        &mut self,
+        drawable_object_id: u64,
+        position: TextPosition,
+        language: TextLanguage,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_text_language(graph.storage_id, position, language)?;
+        *self = Self::from_package(staged.into_package())?;
+        Ok(())
+    }
+
+    /// Delete one nonzero language boundary so it inherits the preceding run.
+    pub fn remove_text_box_text_language_boundary(
+        &mut self,
+        drawable_object_id: u64,
+        position: TextPosition,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.remove_text_language_boundary(graph.storage_id, position)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Restore automatic language selection across an ordinary text box.
+    pub fn reset_text_box_text_languages(&mut self, drawable_object_id: u64) -> Result<bool> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_text_languages(graph.storage_id)?;
         if changed {
             *self = Self::from_package(staged.into_package())?;
         }

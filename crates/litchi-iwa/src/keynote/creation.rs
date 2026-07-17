@@ -261,12 +261,11 @@ impl KeynoteDocumentBuilder {
     }
 
     fn validate(&self) -> Result<()> {
-        for (value, kind) in [(&self.language, "language"), (&self.locale, "locale")] {
-            if value.trim().is_empty() {
-                return Err(crate::Error::InvalidFormat(format!(
-                    "Keynote document {kind} cannot be empty"
-                )));
-            }
+        crate::text::TextLanguageTag::new(self.language.as_str())?;
+        if self.locale.trim().is_empty() {
+            return Err(crate::Error::InvalidFormat(
+                "Keynote document locale cannot be empty".to_owned(),
+            ));
         }
         if !self.width.is_finite()
             || !self.height.is_finite()
@@ -547,13 +546,13 @@ fn template_archive(builder: &KeynoteDocumentBuilder) -> Result<Archive> {
             object(
                 TEMPLATE_TITLE_STORAGE,
                 KeynoteMessageType::Storage,
-                text_storage(String::new()),
+                text_storage(String::new(), &builder.language),
                 &[STYLESHEET, PARAGRAPH_STYLE, LIST_STYLE],
             )?,
             object(
                 TEMPLATE_BODY_STORAGE,
                 KeynoteMessageType::Storage,
-                text_storage(String::new()),
+                text_storage(String::new(), &builder.language),
                 &[STYLESHEET, PARAGRAPH_STYLE, LIST_STYLE],
             )?,
             object(
@@ -615,13 +614,13 @@ fn slide_archive(builder: &KeynoteDocumentBuilder) -> Result<Archive> {
             object(
                 LIVE_TITLE_STORAGE,
                 KeynoteMessageType::Storage,
-                text_storage(builder.title.clone()),
+                text_storage(builder.title.clone(), &builder.language),
                 &[STYLESHEET, PARAGRAPH_STYLE, LIST_STYLE],
             )?,
             object(
                 LIVE_BODY_STORAGE,
                 KeynoteMessageType::Storage,
-                text_storage(builder.subtitle.clone()),
+                text_storage(builder.subtitle.clone(), &builder.language),
                 &[STYLESHEET, PARAGRAPH_STYLE, LIST_STYLE],
             )?,
             object(
@@ -635,7 +634,7 @@ fn slide_archive(builder: &KeynoteDocumentBuilder) -> Result<Archive> {
             object(
                 LIVE_NOTE_STORAGE,
                 KeynoteMessageType::Storage,
-                note_storage(builder.presenter_notes.clone()),
+                note_storage(builder.presenter_notes.clone(), &builder.language),
                 &[STYLESHEET, PARAGRAPH_STYLE, LIST_STYLE],
             )?,
             object(
@@ -812,7 +811,7 @@ fn transition() -> kn::TransitionArchive {
     }
 }
 
-fn text_storage(text: String) -> tswp::StorageArchive {
+fn text_storage(text: String, language: &str) -> tswp::StorageArchive {
     tswp::StorageArchive {
         style_sheet: Some(reference(STYLESHEET)),
         text: vec![text],
@@ -821,15 +820,21 @@ fn text_storage(text: String) -> tswp::StorageArchive {
         table_para_data: Some(para_data_table()),
         table_list_style: Some(object_attribute_table(Some(LIST_STYLE))),
         table_para_starts: Some(para_data_table()),
+        table_language: Some(tswp::StringAttributeTable {
+            entries: vec![tswp::string_attribute_table::StringAttribute {
+                character_index: 0,
+                object: Some(language.to_owned()),
+            }],
+        }),
         table_para_bidi: Some(para_data_table()),
         ..Default::default()
     }
 }
 
-fn note_storage(text: String) -> tswp::StorageArchive {
+fn note_storage(text: String, language: &str) -> tswp::StorageArchive {
     tswp::StorageArchive {
         kind: Some(tswp::storage_archive::KindType::Note as i32),
-        ..text_storage(text)
+        ..text_storage(text, language)
     }
 }
 

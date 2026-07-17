@@ -245,6 +245,7 @@ impl NumbersDocumentBuilder {
     }
 
     fn validate(&self) -> Result<()> {
+        crate::text::TextLanguageTag::new(self.language.as_str())?;
         for (value, kind) in [(&self.sheet_name, "sheet"), (&self.table_name, "table")] {
             if value.trim().is_empty() {
                 return Err(crate::Error::InvalidFormat(format!(
@@ -252,12 +253,10 @@ impl NumbersDocumentBuilder {
                 )));
             }
         }
-        for (value, kind) in [(&self.language, "language"), (&self.locale, "locale")] {
-            if value.trim().is_empty() {
-                return Err(crate::Error::InvalidFormat(format!(
-                    "Numbers document {kind} cannot be empty"
-                )));
-            }
+        if self.locale.trim().is_empty() {
+            return Err(crate::Error::InvalidFormat(
+                "Numbers document locale cannot be empty".to_owned(),
+            ));
         }
         if self.rows == 0 || self.columns == 0 {
             return Err(crate::Error::InvalidFormat(

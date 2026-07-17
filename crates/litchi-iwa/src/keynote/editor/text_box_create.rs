@@ -41,6 +41,7 @@ pub(super) struct TextBoxContext {
     pub(super) slide_id: u64,
     pub(super) theme_id: u64,
     pub(super) stylesheet_id: u64,
+    pub(super) language: Option<String>,
     pub(super) slide: kn::SlideArchive,
 }
 
@@ -94,7 +95,12 @@ impl KeynoteEditor {
         let context = text_box_context(&graph, slide_index)?;
         let styles = text_box_theme_styles(&graph, context.theme_id, context.stylesheet_id)?;
         let base_storage = slide_text_storage_template(&graph, &context.slide)?;
-        let storage = text_box_storage(text, base_storage.as_ref(), &styles);
+        let storage = text_box_storage(
+            text,
+            base_storage.as_ref(),
+            &styles,
+            context.language.as_deref(),
+        );
         let ids = TextBoxObjectIds::allocate(next_object_identifier(self.package())?)?;
         let archive_name = graph.archive_name(context.slide_id)?.to_owned();
         let objects = text_box_objects(
@@ -172,6 +178,7 @@ pub(super) fn text_box_context(graph: &ObjectGraph, slide_index: usize) -> Resul
         slide_id,
         theme_id: show.theme.identifier,
         stylesheet_id: show.stylesheet.identifier,
+        language: document.super_.document_language,
         slide: graph.decode_type(slide_id, 5, "KN.SlideArchive")?,
     })
 }
@@ -250,6 +257,7 @@ pub(super) fn text_box_storage(
     text: &str,
     base: Option<&tswp::StorageArchive>,
     styles: &TextBoxThemeStyles,
+    default_language: Option<&str>,
 ) -> tswp::StorageArchive {
     let paragraph_style = base
         .and_then(|storage| first_object_attribute(&storage.table_para_style))
@@ -266,7 +274,8 @@ pub(super) fn text_box_storage(
                 .entries
                 .iter()
                 .find_map(|entry| entry.object.as_ref().cloned())
-        });
+        })
+        .or_else(|| default_language.map(str::to_owned));
     tswp::StorageArchive {
         style_sheet: Some(
             base.and_then(|storage| storage.style_sheet)

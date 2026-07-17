@@ -14,8 +14,8 @@ use litchi_iwa::text::{
     ParagraphSpacingPoints, ParagraphStart, ParagraphTabAlignment, ParagraphTabLeader,
     ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops, TextAlignment, TextBackground,
     TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumnCount, TextColumns,
-    TextDecorations, TextFont, TextLigatures, TextOutline, TextPointSize, TextScript, TextShadow,
-    TextStrikethrough, TextStyle, TextUnderline,
+    TextDecorations, TextFont, TextLanguage, TextLigatures, TextOutline, TextPointSize,
+    TextPosition, TextScript, TextShadow, TextStrikethrough, TextStyle, TextUnderline,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -24,7 +24,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .next()
         .ok_or("usage: create_keynote_text_box <output.key> [text]")?;
     let text = arguments.next().unwrap_or_else(|| {
-        "Quarterly result\t42.50 — built from typed IWA objects\nOutlook\tNested bullet item"
+        "Quarterly result\t42.50 — built from typed IWA objects\nPrévisions\tÉlément imbriqué"
             .to_owned()
     });
     if arguments.next().is_some() {
@@ -160,12 +160,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ParagraphList::Bullet,
     )?;
     if let Some(newline) = text.find('\n') {
-        let start = ParagraphStart::from_utf16_index(text[..=newline].encode_utf16().count())?;
+        let start_index = text[..=newline].encode_utf16().count();
+        let start = ParagraphStart::from_utf16_index(start_index)?;
         editor.set_slide_text_box_paragraph_list_level(
             0,
             created.drawable_object_id,
             start,
             ParagraphListLevel::ONE,
+        )?;
+        editor.set_slide_text_box_text_language(
+            0,
+            created.drawable_object_id,
+            TextPosition::from_utf16_index(start_index)?,
+            TextLanguage::tag("fr-CA")?,
         )?;
     }
     editor.set_slide_text_box_paragraph_drop_cap(

@@ -8,12 +8,17 @@ mod drop_cap;
 pub mod editor;
 pub mod extractor;
 mod font;
+mod language;
+mod language_types;
 mod paragraph_alignment;
 mod paragraph_list;
 mod paragraph_tabs;
 pub mod storage;
 pub mod style;
 mod style_registry;
+
+#[cfg(test)]
+mod language_tests;
 
 pub use columns::{
     EqualTextColumns, FollowingTextColumn, TextColumnCount, TextColumnGap, TextColumnWidth,
@@ -26,6 +31,7 @@ pub use drop_cap::{
 };
 pub use editor::{IWorkTextEditor, TextStorageInfo};
 pub use font::{TextFont, TextFontName};
+pub use language_types::{TextLanguage, TextLanguageRun, TextLanguageTag, TextPosition};
 pub use paragraph_list::{ParagraphList, ParagraphListLevel, ParagraphListLevelPlacement};
 pub use paragraph_tabs::{
     ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,

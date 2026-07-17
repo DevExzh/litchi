@@ -91,7 +91,7 @@ impl NumbersEditor {
             document.theme.identifier,
             document.stylesheet.identifier,
         )?;
-        let storage = text_box_storage(text, &styles);
+        let storage = text_box_storage(text, &styles, document.super_.document_language.as_deref());
         let ids = TextBoxObjectIds::allocate(next_object_identifier(&self.package)?)?;
         let objects = text_box_objects(
             ids,
@@ -237,7 +237,11 @@ pub(super) fn text_box_theme_styles(
     Ok(styles)
 }
 
-pub(super) fn text_box_storage(text: &str, styles: &TextBoxThemeStyles) -> tswp::StorageArchive {
+pub(super) fn text_box_storage(
+    text: &str,
+    styles: &TextBoxThemeStyles,
+    language: Option<&str>,
+) -> tswp::StorageArchive {
     tswp::StorageArchive {
         style_sheet: Some(styles.stylesheet),
         text: vec![text.to_owned()],
@@ -246,6 +250,12 @@ pub(super) fn text_box_storage(text: &str, styles: &TextBoxThemeStyles) -> tswp:
         table_para_data: Some(zero_para_data()),
         table_list_style: Some(object_attribute_table(styles.list)),
         table_para_starts: Some(zero_para_data()),
+        table_language: language.map(|language| tswp::StringAttributeTable {
+            entries: vec![tswp::string_attribute_table::StringAttribute {
+                character_index: 0,
+                object: Some(language.to_owned()),
+            }],
+        }),
         table_para_bidi: Some(zero_para_data()),
         table_drop_cap_style: Some(object_attribute_table(None)),
         ..Default::default()

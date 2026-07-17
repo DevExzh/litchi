@@ -14,8 +14,9 @@ use litchi_iwa::text::{
     ParagraphSpacingPoints, ParagraphStart, ParagraphTabAlignment, ParagraphTabLeader,
     ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops, TextAlignment, TextBackground,
     TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumnCount, TextColumnGap,
-    TextColumns, TextDecorations, TextFont, TextLigatures, TextOutline, TextPointSize, TextScript,
-    TextShadow, TextStrikethrough, TextStyle, TextUnderline,
+    TextColumns, TextDecorations, TextFont, TextLanguage, TextLigatures, TextOutline,
+    TextPointSize, TextPosition, TextScript, TextShadow, TextStrikethrough, TextStyle,
+    TextUnderline,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -24,7 +25,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .next()
         .ok_or("usage: create_numbers_text_box <output.numbers> [text]")?;
     let text = arguments.next().unwrap_or_else(|| {
-        "Revenue\t42.50 — built from typed IWA objects\nMargin\tNested numbered item".to_owned()
+        "Revenue\t42.50 — built from typed IWA objects\nMarge\tÉlément numéroté imbriqué".to_owned()
     });
     if arguments.next().is_some() {
         return Err("unexpected extra arguments".into());
@@ -165,12 +166,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ParagraphList::Numbered,
     )?;
     if let Some(newline) = text.find('\n') {
-        let start = ParagraphStart::from_utf16_index(text[..=newline].encode_utf16().count())?;
+        let start_index = text[..=newline].encode_utf16().count();
+        let start = ParagraphStart::from_utf16_index(start_index)?;
         editor.set_sheet_text_box_paragraph_list_level(
             sheet_id,
             created.drawable_object_id,
             start,
             ParagraphListLevel::ONE,
+        )?;
+        editor.set_sheet_text_box_text_language(
+            sheet_id,
+            created.drawable_object_id,
+            TextPosition::from_utf16_index(start_index)?,
+            TextLanguage::tag("fr-CA")?,
         )?;
     }
     editor.set_sheet_text_box_paragraph_drop_cap(

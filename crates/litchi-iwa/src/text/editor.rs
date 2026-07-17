@@ -23,6 +23,11 @@ use super::drop_cap::{
     paragraph_drop_caps, remove_paragraph_drop_cap, set_paragraph_drop_cap,
 };
 use super::font::TextFont;
+use super::language::{
+    remove_text_language_boundary, reset_text_languages, set_text_language, text_language,
+    text_languages,
+};
+use super::language_types::{TextLanguage, TextLanguageRun, TextPosition};
 use super::paragraph_alignment::{
     paragraph_alignment, paragraph_indents, paragraph_line_spacing, paragraph_spacing,
     paragraph_tab_stops, reset_paragraph_alignment, reset_paragraph_indents,
@@ -235,6 +240,77 @@ impl IWorkTextEditor {
         if changed {
             let bytes = staged.to_bytes()?;
             IWorkPackage::from_bytes(&bytes)?;
+            self.package = staged;
+        }
+        Ok(changed)
+    }
+
+    /// Read every explicit native language boundary in a text storage.
+    pub fn text_languages(&self, object_id: u64) -> Result<Vec<TextLanguageRun>> {
+        text_languages(&self.package, object_id)
+    }
+
+    /// Read the effective language at one validated UTF-16 text boundary.
+    pub fn text_language(&self, object_id: u64, position: TextPosition) -> Result<TextLanguage> {
+        text_language(&self.package, object_id, position)
+    }
+
+    /// Atomically create or update a language boundary.
+    pub fn set_text_language(
+        &mut self,
+        object_id: u64,
+        position: TextPosition,
+        language: TextLanguage,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        set_text_language(&mut staged, object_id, position, &language)?;
+        let bytes = staged.to_bytes()?;
+        let verified = IWorkPackage::from_bytes(&bytes)?;
+        if text_language(&verified, object_id, position)? != language {
+            return Err(Error::InvalidFormat(
+                "iWork text-language update failed round-trip validation".to_owned(),
+            ));
+        }
+        self.package = staged;
+        Ok(())
+    }
+
+    /// Delete one nonzero language boundary so it inherits the preceding run.
+    pub fn remove_text_language_boundary(
+        &mut self,
+        object_id: u64,
+        position: TextPosition,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = remove_text_language_boundary(&mut staged, object_id, position)?;
+        if changed {
+            let bytes = staged.to_bytes()?;
+            let verified = IWorkPackage::from_bytes(&bytes)?;
+            if text_languages(&verified, object_id)?
+                .iter()
+                .any(|run| run.position == position)
+            {
+                return Err(Error::InvalidFormat(
+                    "iWork text-language boundary removal failed round-trip validation".to_owned(),
+                ));
+            }
+            self.package = staged;
+        }
+        Ok(changed)
+    }
+
+    /// Remove all explicit language boundaries and restore automatic selection.
+    pub fn reset_text_languages(&mut self, object_id: u64) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = reset_text_languages(&mut staged, object_id)?;
+        if changed {
+            let bytes = staged.to_bytes()?;
+            let verified = IWorkPackage::from_bytes(&bytes)?;
+            if !text_languages(&verified, object_id)?.is_empty() {
+                return Err(Error::InvalidFormat(
+                    "iWork text-language reset failed round-trip validation".to_owned(),
+                ));
+            }
             self.package = staged;
         }
         Ok(changed)
