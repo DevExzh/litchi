@@ -6,7 +6,7 @@ use prost::Message;
 use super::editor::{PagesEditor, PagesSectionPageNumbering, PagesSectionStart};
 use crate::archive::{Archive, ArchiveObject, RawMessage};
 use crate::identity::IWorkDocumentIdentity;
-use crate::protobuf::{tp, tsa, tsd, tsk, tsp, tss, tswp};
+use crate::protobuf::{tp, tsa, tsd, tsk, tsp, tss, tst, tswp};
 use crate::{IWorkPackage, IWorkThemeArchive, IWorkThemeExtensions, Result};
 
 const DOCUMENT_ARCHIVE_ENTRY: &str = "Index/Document.iwa";
@@ -53,7 +53,77 @@ const DEFAULT_STYLE_OVERRIDE_COUNT: u32 = 0;
 const INITIAL_SAVE_TOKEN: u64 = 1;
 const INITIAL_REVISION_SEQUENCE: i32 = 0;
 const INITIAL_PAGE_NUMBER: u32 = 1;
+#[cfg(test)]
 const COLLABORATION_DOCUMENT_SUPPORT_OBJECT_ID: u64 = 3;
+const TABLE_INFO_OBJECT_ID: u64 = 9;
+const SOURCE_TABLE_SHEET_OBJECT_ID: u64 = 8;
+const TABLE_MODEL_OBJECT_ID: u64 = 10;
+const TABLE_LIST_STYLE_OBJECT_ID: u64 = 11;
+const TABLE_PARAGRAPH_STYLE_OBJECT_ID: u64 = 12;
+const TABLE_CHARACTER_STYLE_OBJECT_ID: u64 = 13;
+const TABLE_SHAPE_STYLE_OBJECT_ID: u64 = 14;
+const TABLE_MEDIA_STYLE_OBJECT_ID: u64 = 15;
+const TABLE_DROP_CAP_STYLE_OBJECT_ID: u64 = 16;
+const TABLE_SHEET_STYLE_OBJECT_ID: u64 = 17;
+const TABLE_STYLE_OBJECT_ID: u64 = 18;
+const TABLE_CELL_STYLE_OBJECT_ID: u64 = 19;
+const TABLE_PRESET_OBJECT_ID: u64 = 20;
+const TABLE_TILE_OBJECT_ID: u64 = 22;
+const TABLE_ROW_HEADERS_OBJECT_ID: u64 = 23;
+const TABLE_COLUMN_HEADERS_OBJECT_ID: u64 = 24;
+const TABLE_STRING_LIST_OBJECT_ID: u64 = 25;
+const TABLE_STYLE_LIST_OBJECT_ID: u64 = 26;
+const TABLE_FORMULA_LIST_OBJECT_ID: u64 = 27;
+const TABLE_FORMAT_LIST_OBJECT_ID: u64 = 28;
+const TABLE_UID_MAP_OBJECT_ID: u64 = 29;
+const TABLE_STROKE_SIDECAR_OBJECT_ID: u64 = 30;
+const TABLE_CALCULATION_ENGINE_OBJECT_ID: u64 = 31;
+const TABLE_STYLE_NETWORK_OBJECT_ID: u64 = 32;
+const TABLE_FUNCTION_BROWSER_STATE_OBJECT_ID: u64 = 33;
+const TABLE_CUSTOM_FORMAT_LIST_OBJECT_ID: u64 = 34;
+const TABLE_FORMULA_OWNER_OBJECT_ID: u64 = 39;
+const TABLE_STYLESHEET_OBJECT_ID: u64 = 40;
+const TABLE_ATTACHMENT_OBJECT_ID: u64 = 41;
+const TABLE_STYLE_OBJECT_IDS: &[u64] = &[
+    TABLE_LIST_STYLE_OBJECT_ID,
+    TABLE_PARAGRAPH_STYLE_OBJECT_ID,
+    TABLE_CHARACTER_STYLE_OBJECT_ID,
+    TABLE_SHAPE_STYLE_OBJECT_ID,
+    TABLE_MEDIA_STYLE_OBJECT_ID,
+    TABLE_DROP_CAP_STYLE_OBJECT_ID,
+    TABLE_SHEET_STYLE_OBJECT_ID,
+    TABLE_STYLE_OBJECT_ID,
+    TABLE_CELL_STYLE_OBJECT_ID,
+    TABLE_STYLESHEET_OBJECT_ID,
+];
+const TABLE_DOCUMENT_OBJECT_IDS: &[u64] = &[
+    TABLE_INFO_OBJECT_ID,
+    TABLE_MODEL_OBJECT_ID,
+    TABLE_PRESET_OBJECT_ID,
+    TABLE_TILE_OBJECT_ID,
+    TABLE_ROW_HEADERS_OBJECT_ID,
+    TABLE_COLUMN_HEADERS_OBJECT_ID,
+    TABLE_STRING_LIST_OBJECT_ID,
+    TABLE_STYLE_LIST_OBJECT_ID,
+    TABLE_FORMULA_LIST_OBJECT_ID,
+    TABLE_FORMAT_LIST_OBJECT_ID,
+    TABLE_UID_MAP_OBJECT_ID,
+    TABLE_STROKE_SIDECAR_OBJECT_ID,
+    TABLE_STYLE_NETWORK_OBJECT_ID,
+    TABLE_FUNCTION_BROWSER_STATE_OBJECT_ID,
+    TABLE_CUSTOM_FORMAT_LIST_OBJECT_ID,
+];
+const TABLE_ATTACHMENT_MESSAGE_TYPE: u32 = 2_003;
+const TABLE_INFO_MESSAGE_TYPE: u32 = 6_000;
+const TABLE_DRAWABLE_FLAGS: u32 = 3;
+const TABLE_ATTACHMENT_OFFSET_TYPE: u32 = 0;
+const TABLE_ATTACHMENT_OFFSET_POINTS: f32 = 0.0;
+const TABLE_ROTATION_DEGREES: f32 = 0.0;
+const TABLE_CALCULATION_COMPONENT_VERSION: [u32; 3] = [3, 2, 10];
+const DEFAULT_TABLE_WIDTH_POINTS: f32 = 468.0;
+const DEFAULT_TABLE_ROW_HEIGHT_POINTS: f32 = 22.73;
+const DEFAULT_TABLE_X_POINTS: f32 = 0.0;
+const DEFAULT_TABLE_Y_POINTS: f32 = 0.0;
 
 const COLOR_PRESET_COUNT: usize = 30;
 const GRADIENT_FILL_PRESET_COUNT: usize = 6;
@@ -80,35 +150,36 @@ enum PagesObjectId {
     Document = 1,
     PackageMetadata = 2,
     // `COLLABORATION_DOCUMENT_SUPPORT_OBJECT_ID` is reserved for TSCKDocumentSupport.
-    Stylesheet = COLLABORATION_DOCUMENT_SUPPORT_OBJECT_ID + 1,
-    Theme = 5,
-    Body = 6,
-    Settings = 7,
-    Section = 8,
-    SectionTemplate = 9,
-    ListStyle = 10,
-    ParagraphStyle = 11,
-    CharacterStyle = 12,
-    LineStyle = 13,
-    ShapeStyle = 14,
-    TextBoxStyle = 15,
-    ImageStyle = 16,
-    MovieStyle = 17,
-    DrawingLineStyle = 18,
-    TocEntryStyle = 19,
-    DropCapStyle = 20,
-    BaseColumnStyle = 21,
-    ColumnStyle = 22,
-    TocSettings = 23,
-    CaptionStyle = 24,
-    SvgImportStyle = 25,
-    HeaderPrimary = 26,
-    HeaderEven = 27,
-    HeaderFirst = 28,
-    FooterPrimary = 29,
-    FooterEven = 30,
-    FooterFirst = 31,
-    AnnotationAuthorStorage = 32,
+    // Keep the low identifier range available to the shared source-built table graph.
+    Stylesheet = 101,
+    Theme = 102,
+    Body = 103,
+    Settings = 104,
+    Section = 105,
+    SectionTemplate = 106,
+    ListStyle = 107,
+    ParagraphStyle = 108,
+    CharacterStyle = 109,
+    LineStyle = 110,
+    ShapeStyle = 111,
+    TextBoxStyle = 112,
+    ImageStyle = 113,
+    MovieStyle = 114,
+    DrawingLineStyle = 115,
+    TocEntryStyle = 116,
+    DropCapStyle = 117,
+    BaseColumnStyle = 118,
+    ColumnStyle = 119,
+    TocSettings = 120,
+    CaptionStyle = 121,
+    SvgImportStyle = 122,
+    HeaderPrimary = 123,
+    HeaderEven = 124,
+    HeaderFirst = 125,
+    FooterPrimary = 126,
+    FooterEven = 127,
+    FooterFirst = 128,
+    AnnotationAuthorStorage = 129,
 }
 
 impl PagesObjectId {
@@ -210,6 +281,14 @@ pub struct PagesDocumentBuilder {
     body_text: String,
     language: String,
     locale: String,
+    initial_table: Option<InitialPagesTable>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct InitialPagesTable {
+    name: String,
+    rows: usize,
+    columns: usize,
 }
 
 impl Default for PagesDocumentBuilder {
@@ -218,6 +297,7 @@ impl Default for PagesDocumentBuilder {
             body_text: String::new(),
             language: DEFAULT_LANGUAGE.to_owned(),
             locale: DEFAULT_LOCALE.to_owned(),
+            initial_table: None,
         }
     }
 }
@@ -246,6 +326,19 @@ impl PagesDocumentBuilder {
         self
     }
 
+    /// Append one empty native table to the initial document body.
+    ///
+    /// The table owns independent cell storage and is immediately writable
+    /// through [`PagesEditor::set_table_cell`](super::editor::PagesEditor::set_table_cell).
+    pub fn body_table(mut self, name: impl Into<String>, rows: usize, columns: usize) -> Self {
+        self.initial_table = Some(InitialPagesTable {
+            name: name.into(),
+            rows,
+            columns,
+        });
+        self
+    }
+
     /// Build a mutable editor for the new document.
     pub fn build(self) -> Result<PagesEditor> {
         PagesEditor::from_package(self.build_package()?)
@@ -259,25 +352,44 @@ impl PagesDocumentBuilder {
                 "Pages document locale cannot be empty".to_owned(),
             ));
         }
+        if let Some(table) = &self.initial_table {
+            validate_initial_table(table)?;
+        }
 
         let identity = IWorkDocumentIdentity::generate();
         let mut package = IWorkPackage::new();
         package.replace_archive(
             DOCUMENT_ARCHIVE_ENTRY,
-            &document_archive(&self.body_text, &self.language, &self.locale)?,
+            &document_archive(
+                &self.body_text,
+                &self.language,
+                &self.locale,
+                self.initial_table.as_ref(),
+            )?,
         )?;
         package.replace_archive(STYLESHEET_ARCHIVE_ENTRY, &stylesheet_archive()?)?;
         package.replace_archive(
             ANNOTATION_ARCHIVE_ENTRY,
             &annotation_author_storage_archive()?,
         )?;
-        package.replace_archive(METADATA_ARCHIVE_ENTRY, &metadata_archive(&identity)?)?;
+        package.replace_archive(
+            METADATA_ARCHIVE_ENTRY,
+            &metadata_archive(&identity, self.initial_table.is_some())?,
+        )?;
+        if let Some(table) = &self.initial_table {
+            install_initial_table_graph(&mut package, table, &self.language, &self.locale)?;
+        }
         insert_property_lists(&mut package, &identity)?;
         Ok(package)
     }
 }
 
-fn document_archive(body_text: &str, language: &str, locale: &str) -> Result<Archive> {
+fn document_archive(
+    body_text: &str,
+    language: &str,
+    locale: &str,
+    initial_table: Option<&InitialPagesTable>,
+) -> Result<Archive> {
     let document = tp::DocumentArchive {
         super_: tsa::DocumentArchive {
             super_: tsk::DocumentArchive {
@@ -289,6 +401,12 @@ fn document_archive(body_text: &str, language: &str, locale: &str) -> Result<Arc
                 ..Default::default()
             },
             document_language: Some(language.to_owned()),
+            calculation_engine: initial_table
+                .map(|_| raw_reference(TABLE_CALCULATION_ENGINE_OBJECT_ID)),
+            function_browser_state: initial_table
+                .map(|_| raw_reference(TABLE_FUNCTION_BROWSER_STATE_OBJECT_ID)),
+            custom_format_list: initial_table
+                .map(|_| raw_reference(TABLE_CUSTOM_FORMAT_LIST_OBJECT_ID)),
             ..Default::default()
         },
         stylesheet: Some(reference(PagesObjectId::Stylesheet)),
@@ -306,10 +424,23 @@ fn document_archive(body_text: &str, language: &str, locale: &str) -> Result<Arc
         page_scale: Some(DEFAULT_PAGE_SCALE),
         ..Default::default()
     };
+    let table_anchor = initial_table
+        .map(|_| {
+            u32::try_from(body_text.encode_utf16().count()).map_err(|_| {
+                crate::Error::InvalidFormat(
+                    "Pages table anchor exceeds the UTF-16 index limit".to_owned(),
+                )
+            })
+        })
+        .transpose()?;
+    let mut body_contents = body_text.to_owned();
+    if initial_table.is_some() {
+        body_contents.push('\u{fffc}');
+    }
     let body = tswp::StorageArchive {
         kind: Some(tswp::storage_archive::KindType::Body as i32),
         style_sheet: Some(reference(PagesObjectId::Stylesheet)),
-        text: vec![body_text.to_owned()],
+        text: vec![body_contents],
         in_document: Some(true),
         table_para_style: Some(object_table(Some(PagesObjectId::ParagraphStyle))),
         table_para_data: Some(zero_para_data()),
@@ -317,6 +448,12 @@ fn document_archive(body_text: &str, language: &str, locale: &str) -> Result<Arc
         table_layout_style: Some(object_table(Some(PagesObjectId::ColumnStyle))),
         table_para_starts: Some(zero_para_data()),
         table_section: Some(object_table(Some(PagesObjectId::Section))),
+        table_attachment: table_anchor.map(|character_index| tswp::ObjectAttributeTable {
+            entries: vec![tswp::object_attribute_table::ObjectAttribute {
+                character_index,
+                object: Some(raw_reference(TABLE_ATTACHMENT_OBJECT_ID)),
+            }],
+        }),
         table_language: Some(tswp::StringAttributeTable {
             entries: vec![tswp::string_attribute_table::StringAttribute {
                 character_index: 0,
@@ -393,7 +530,10 @@ fn document_archive(body_text: &str, language: &str, locale: &str) -> Result<Arc
                 ..Default::default()
             }),
             chart: None,
-            table: None,
+            table: initial_table.map(|_| tst::ThemePresetsArchive {
+                table_style_presets: vec![raw_reference(TABLE_PRESET_OBJECT_ID)],
+                ..Default::default()
+            }),
             application: Some(tsa::ThemePresetsArchive {
                 caption_style_presets: repeated_reference(
                     CAPTION_STYLE_PRESET_COUNT,
@@ -407,164 +547,187 @@ fn document_archive(body_text: &str, language: &str, locale: &str) -> Result<Arc
         },
     );
 
-    Ok(Archive {
-        objects: vec![
-            object(
-                PagesObjectId::Document,
-                PagesMessageType::Document,
-                document,
-                &[
-                    PagesObjectId::Stylesheet,
-                    PagesObjectId::Body,
-                    PagesObjectId::Theme,
-                    PagesObjectId::Settings,
-                    PagesObjectId::AnnotationAuthorStorage,
-                ],
-            )?,
-            raw_object(
-                PagesObjectId::Theme,
-                PagesMessageType::Theme,
-                theme.encode()?,
-                &[
-                    PagesObjectId::Stylesheet,
-                    PagesObjectId::ListStyle,
-                    PagesObjectId::ParagraphStyle,
-                    PagesObjectId::CharacterStyle,
-                    PagesObjectId::LineStyle,
-                    PagesObjectId::ShapeStyle,
-                    PagesObjectId::TextBoxStyle,
-                    PagesObjectId::ImageStyle,
-                    PagesObjectId::MovieStyle,
-                    PagesObjectId::DrawingLineStyle,
-                    PagesObjectId::TocEntryStyle,
-                    PagesObjectId::TocSettings,
-                    PagesObjectId::DropCapStyle,
-                    PagesObjectId::CaptionStyle,
-                    PagesObjectId::SvgImportStyle,
-                ],
-            )?,
-            object(
+    let mut objects = vec![
+        object(
+            PagesObjectId::Document,
+            PagesMessageType::Document,
+            document,
+            &[
+                PagesObjectId::Stylesheet,
                 PagesObjectId::Body,
-                PagesMessageType::Storage,
-                body,
-                &[
-                    PagesObjectId::Stylesheet,
-                    PagesObjectId::ParagraphStyle,
-                    PagesObjectId::ListStyle,
-                    PagesObjectId::ColumnStyle,
-                    PagesObjectId::Section,
-                ],
-            )?,
-            object(
+                PagesObjectId::Theme,
                 PagesObjectId::Settings,
-                PagesMessageType::Settings,
-                tp::SettingsArchive {
-                    body: Some(true),
-                    headers: Some(false),
-                    footers: Some(false),
-                    language: Some(language.to_owned()),
-                    creation_locale: Some(locale.to_owned()),
-                    last_locale: Some(locale.to_owned()),
-                    ..Default::default()
-                },
-                &[],
-            )?,
-            object(
+                PagesObjectId::AnnotationAuthorStorage,
+            ],
+        )?,
+        raw_object(
+            PagesObjectId::Theme,
+            PagesMessageType::Theme,
+            theme.encode()?,
+            &[
+                PagesObjectId::Stylesheet,
+                PagesObjectId::ListStyle,
+                PagesObjectId::ParagraphStyle,
+                PagesObjectId::CharacterStyle,
+                PagesObjectId::LineStyle,
+                PagesObjectId::ShapeStyle,
+                PagesObjectId::TextBoxStyle,
+                PagesObjectId::ImageStyle,
+                PagesObjectId::MovieStyle,
+                PagesObjectId::DrawingLineStyle,
+                PagesObjectId::TocEntryStyle,
+                PagesObjectId::TocSettings,
+                PagesObjectId::DropCapStyle,
+                PagesObjectId::CaptionStyle,
+                PagesObjectId::SvgImportStyle,
+            ],
+        )?,
+        object(
+            PagesObjectId::Body,
+            PagesMessageType::Storage,
+            body,
+            &[
+                PagesObjectId::Stylesheet,
+                PagesObjectId::ParagraphStyle,
+                PagesObjectId::ListStyle,
+                PagesObjectId::ColumnStyle,
                 PagesObjectId::Section,
-                PagesMessageType::Section,
-                tp::SectionArchive {
-                    inherit_previous_header_footer: Some(true),
-                    section_template_first_page_different: Some(false),
-                    section_template_even_odd_pages_different: Some(false),
-                    section_start_kind: Some(PagesSectionStart::NextPage.as_raw()),
-                    section_page_number_kind: Some(
-                        PagesSectionPageNumbering::ContinueFromPrevious.as_raw(),
-                    ),
-                    section_page_number_start: Some(INITIAL_PAGE_NUMBER),
-                    first_section_template_page: Some(reference(PagesObjectId::SectionTemplate)),
-                    even_section_template_page: Some(reference(PagesObjectId::SectionTemplate)),
-                    odd_section_template_page: Some(reference(PagesObjectId::SectionTemplate)),
-                    name: Some(SECTION_NAME.to_owned()),
-                    section_template_first_page_hides_header_footer: Some(false),
-                    ..Default::default()
-                },
-                &[PagesObjectId::SectionTemplate],
-            )?,
-            object(
-                PagesObjectId::SectionTemplate,
-                PagesMessageType::SectionTemplate,
-                tp::SectionTemplateArchive {
-                    headers: [
-                        PagesObjectId::HeaderPrimary,
-                        PagesObjectId::HeaderEven,
-                        PagesObjectId::HeaderFirst,
-                    ]
-                    .into_iter()
-                    .map(reference)
-                    .collect(),
-                    footers: [
-                        PagesObjectId::FooterPrimary,
-                        PagesObjectId::FooterEven,
-                        PagesObjectId::FooterFirst,
-                    ]
-                    .into_iter()
-                    .map(reference)
-                    .collect(),
-                    ..Default::default()
-                },
-                &[
+            ],
+        )?,
+        object(
+            PagesObjectId::Settings,
+            PagesMessageType::Settings,
+            tp::SettingsArchive {
+                body: Some(true),
+                headers: Some(false),
+                footers: Some(false),
+                language: Some(language.to_owned()),
+                creation_locale: Some(locale.to_owned()),
+                last_locale: Some(locale.to_owned()),
+                ..Default::default()
+            },
+            &[],
+        )?,
+        object(
+            PagesObjectId::Section,
+            PagesMessageType::Section,
+            tp::SectionArchive {
+                inherit_previous_header_footer: Some(true),
+                section_template_first_page_different: Some(false),
+                section_template_even_odd_pages_different: Some(false),
+                section_start_kind: Some(PagesSectionStart::NextPage.as_raw()),
+                section_page_number_kind: Some(
+                    PagesSectionPageNumbering::ContinueFromPrevious.as_raw(),
+                ),
+                section_page_number_start: Some(INITIAL_PAGE_NUMBER),
+                first_section_template_page: Some(reference(PagesObjectId::SectionTemplate)),
+                even_section_template_page: Some(reference(PagesObjectId::SectionTemplate)),
+                odd_section_template_page: Some(reference(PagesObjectId::SectionTemplate)),
+                name: Some(SECTION_NAME.to_owned()),
+                section_template_first_page_hides_header_footer: Some(false),
+                ..Default::default()
+            },
+            &[PagesObjectId::SectionTemplate],
+        )?,
+        object(
+            PagesObjectId::SectionTemplate,
+            PagesMessageType::SectionTemplate,
+            tp::SectionTemplateArchive {
+                headers: [
                     PagesObjectId::HeaderPrimary,
                     PagesObjectId::HeaderEven,
                     PagesObjectId::HeaderFirst,
+                ]
+                .into_iter()
+                .map(reference)
+                .collect(),
+                footers: [
                     PagesObjectId::FooterPrimary,
                     PagesObjectId::FooterEven,
                     PagesObjectId::FooterFirst,
-                ],
-            )?,
-            object(
+                ]
+                .into_iter()
+                .map(reference)
+                .collect(),
+                ..Default::default()
+            },
+            &[
                 PagesObjectId::HeaderPrimary,
-                PagesMessageType::Storage,
-                header_footer_storage(),
-                &[PagesObjectId::ParagraphStyle, PagesObjectId::ListStyle],
-            )?,
-            object(
                 PagesObjectId::HeaderEven,
-                PagesMessageType::Storage,
-                header_footer_storage(),
-                &[PagesObjectId::ParagraphStyle, PagesObjectId::ListStyle],
-            )?,
-            object(
                 PagesObjectId::HeaderFirst,
-                PagesMessageType::Storage,
-                header_footer_storage(),
-                &[PagesObjectId::ParagraphStyle, PagesObjectId::ListStyle],
-            )?,
-            object(
                 PagesObjectId::FooterPrimary,
-                PagesMessageType::Storage,
-                header_footer_storage(),
-                &[PagesObjectId::ParagraphStyle, PagesObjectId::ListStyle],
-            )?,
-            object(
                 PagesObjectId::FooterEven,
-                PagesMessageType::Storage,
-                header_footer_storage(),
-                &[PagesObjectId::ParagraphStyle, PagesObjectId::ListStyle],
-            )?,
-            object(
                 PagesObjectId::FooterFirst,
-                PagesMessageType::Storage,
-                header_footer_storage(),
-                &[PagesObjectId::ParagraphStyle, PagesObjectId::ListStyle],
-            )?,
-            object(
-                PagesObjectId::TocSettings,
-                PagesMessageType::TocSettings,
-                tswp::TocSettingsArchive::default(),
-                &[],
-            )?,
-        ],
-    })
+            ],
+        )?,
+        object(
+            PagesObjectId::HeaderPrimary,
+            PagesMessageType::Storage,
+            header_footer_storage(),
+            &[PagesObjectId::ParagraphStyle, PagesObjectId::ListStyle],
+        )?,
+        object(
+            PagesObjectId::HeaderEven,
+            PagesMessageType::Storage,
+            header_footer_storage(),
+            &[PagesObjectId::ParagraphStyle, PagesObjectId::ListStyle],
+        )?,
+        object(
+            PagesObjectId::HeaderFirst,
+            PagesMessageType::Storage,
+            header_footer_storage(),
+            &[PagesObjectId::ParagraphStyle, PagesObjectId::ListStyle],
+        )?,
+        object(
+            PagesObjectId::FooterPrimary,
+            PagesMessageType::Storage,
+            header_footer_storage(),
+            &[PagesObjectId::ParagraphStyle, PagesObjectId::ListStyle],
+        )?,
+        object(
+            PagesObjectId::FooterEven,
+            PagesMessageType::Storage,
+            header_footer_storage(),
+            &[PagesObjectId::ParagraphStyle, PagesObjectId::ListStyle],
+        )?,
+        object(
+            PagesObjectId::FooterFirst,
+            PagesMessageType::Storage,
+            header_footer_storage(),
+            &[PagesObjectId::ParagraphStyle, PagesObjectId::ListStyle],
+        )?,
+        object(
+            PagesObjectId::TocSettings,
+            PagesMessageType::TocSettings,
+            tswp::TocSettingsArchive::default(),
+            &[],
+        )?,
+    ];
+    if initial_table.is_some() {
+        for identifier in [
+            TABLE_CALCULATION_ENGINE_OBJECT_ID,
+            TABLE_FUNCTION_BROWSER_STATE_OBJECT_ID,
+            TABLE_CUSTOM_FORMAT_LIST_OBJECT_ID,
+        ] {
+            append_object_reference(&mut objects[0], identifier);
+        }
+        append_object_reference(&mut objects[1], TABLE_PRESET_OBJECT_ID);
+        append_object_reference(&mut objects[2], TABLE_ATTACHMENT_OBJECT_ID);
+        objects.push(raw_object_with_id(
+            TABLE_ATTACHMENT_OBJECT_ID,
+            TABLE_ATTACHMENT_MESSAGE_TYPE,
+            tswp::DrawableAttachmentArchive {
+                drawable: Some(raw_reference(TABLE_INFO_OBJECT_ID)),
+                h_offset_type: Some(TABLE_ATTACHMENT_OFFSET_TYPE),
+                h_offset: Some(TABLE_ATTACHMENT_OFFSET_POINTS),
+                v_offset_type: Some(TABLE_ATTACHMENT_OFFSET_TYPE),
+                v_offset: Some(TABLE_ATTACHMENT_OFFSET_POINTS),
+            }
+            .encode_to_vec(),
+            &[TABLE_INFO_OBJECT_ID],
+        )?);
+    }
+    Ok(Archive { objects })
 }
 
 fn stylesheet_archive() -> Result<Archive> {
@@ -758,16 +921,30 @@ fn stylesheet_archive() -> Result<Archive> {
     Ok(Archive { objects })
 }
 
-fn metadata_archive(identity: &IWorkDocumentIdentity) -> Result<Archive> {
+fn metadata_archive(identity: &IWorkDocumentIdentity, has_initial_table: bool) -> Result<Archive> {
     let mut stylesheet = component(PagesObjectId::Stylesheet, "DocumentStylesheet");
     stylesheet.object_uuid_map_entries = STYLESHEET_OBJECTS
         .iter()
         .copied()
         .map(object_uuid)
         .collect();
+    if has_initial_table {
+        stylesheet
+            .object_uuid_map_entries
+            .extend(TABLE_STYLE_OBJECT_IDS.iter().copied().map(object_uuid_raw));
+    }
 
     let mut document = component(PagesObjectId::Document, "Document");
     document.object_uuid_map_entries = DOCUMENT_OBJECTS.iter().copied().map(object_uuid).collect();
+    if has_initial_table {
+        document.object_uuid_map_entries.extend(
+            TABLE_DOCUMENT_OBJECT_IDS
+                .iter()
+                .copied()
+                .chain(std::iter::once(TABLE_ATTACHMENT_OBJECT_ID))
+                .map(object_uuid_raw),
+        );
+    }
     document.external_references = std::iter::once(None)
         .chain(STYLESHEET_OBJECTS.iter().copied().map(Some))
         .map(|object_identifier| tsp::ComponentExternalReference {
@@ -783,11 +960,55 @@ fn metadata_archive(identity: &IWorkDocumentIdentity) -> Result<Archive> {
             object_identifier: None,
             is_weak: None,
         });
+    if has_initial_table {
+        document
+            .external_references
+            .extend(
+                TABLE_STYLE_OBJECT_IDS
+                    .iter()
+                    .copied()
+                    .map(|object_identifier| tsp::ComponentExternalReference {
+                        component_identifier: PagesObjectId::Stylesheet.value(),
+                        object_identifier: Some(object_identifier),
+                        is_weak: None,
+                    }),
+            );
+        document
+            .external_references
+            .push(tsp::ComponentExternalReference {
+                component_identifier: TABLE_CALCULATION_ENGINE_OBJECT_ID,
+                object_identifier: None,
+                is_weak: None,
+            });
+    }
 
     let annotation = component(
         PagesObjectId::AnnotationAuthorStorage,
         "AnnotationAuthorStorage",
     );
+
+    let mut components = vec![stylesheet, annotation];
+    if has_initial_table {
+        let mut calculation = component_raw(
+            TABLE_CALCULATION_ENGINE_OBJECT_ID,
+            "CalculationEngine",
+            &TABLE_CALCULATION_COMPONENT_VERSION,
+        );
+        calculation.object_uuid_map_entries = [
+            TABLE_CALCULATION_ENGINE_OBJECT_ID,
+            TABLE_FORMULA_OWNER_OBJECT_ID,
+        ]
+        .into_iter()
+        .map(object_uuid_raw)
+        .collect();
+        calculation.external_references = vec![tsp::ComponentExternalReference {
+            component_identifier: PagesObjectId::Document.value(),
+            object_identifier: Some(TABLE_INFO_OBJECT_ID),
+            is_weak: None,
+        }];
+        components.push(calculation);
+    }
+    components.push(document);
 
     let metadata = tsp::PackageMetadata {
         last_object_identifier: PagesObjectId::AnnotationAuthorStorage.value(),
@@ -796,7 +1017,7 @@ fn metadata_archive(identity: &IWorkDocumentIdentity) -> Result<Archive> {
             identifier: Some(identity.version_uuid().to_owned()),
             sequence_64: None,
         }),
-        components: vec![stylesheet, annotation, document],
+        components,
         read_version: PACKAGE_VERSION.to_vec(),
         write_version: PACKAGE_VERSION.to_vec(),
         file_format_version: FILE_FORMAT_VERSION.to_vec(),
@@ -825,21 +1046,29 @@ fn annotation_author_storage_archive() -> Result<Archive> {
 }
 
 fn component(identifier: PagesObjectId, locator: &str) -> tsp::ComponentInfo {
+    component_raw(identifier.value(), locator, &PACKAGE_VERSION)
+}
+
+fn component_raw(identifier: u64, locator: &str, version: &[u32]) -> tsp::ComponentInfo {
     tsp::ComponentInfo {
-        identifier: identifier.value(),
+        identifier,
         preferred_locator: locator.to_owned(),
-        document_read_version: PACKAGE_VERSION.to_vec(),
-        document_write_version: PACKAGE_VERSION.to_vec(),
-        component_read_version: PACKAGE_VERSION.to_vec(),
+        document_read_version: version.to_vec(),
+        document_write_version: version.to_vec(),
+        component_read_version: version.to_vec(),
         save_token: Some(INITIAL_SAVE_TOKEN),
         ..Default::default()
     }
 }
 
 fn object_uuid(identifier: PagesObjectId) -> tsp::ObjectUuidMapEntry {
+    object_uuid_raw(identifier.value())
+}
+
+fn object_uuid_raw(identifier: u64) -> tsp::ObjectUuidMapEntry {
     let bytes = litchi_core::id::generate_guid_bytes();
     tsp::ObjectUuidMapEntry {
-        identifier: identifier.value(),
+        identifier,
         uuid: tsp::Uuid {
             lower: u64::from_be_bytes([
                 bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14],
@@ -951,6 +1180,135 @@ fn raw_object(
     Ok(object)
 }
 
+fn raw_object_with_id(
+    identifier: u64,
+    message_type: u32,
+    data: Vec<u8>,
+    references: &[u64],
+) -> Result<ArchiveObject> {
+    let mut object = ArchiveObject::new(
+        identifier,
+        vec![RawMessage {
+            type_: message_type,
+            data,
+        }],
+    )?;
+    let message_info = &mut object.archive_info.message_infos[0];
+    message_info.versions = MESSAGE_VERSION.to_vec();
+    message_info.object_references = references.to_vec();
+    Ok(object)
+}
+
+fn append_object_reference(object: &mut ArchiveObject, identifier: u64) {
+    let references = &mut object.archive_info.message_infos[0].object_references;
+    if !references.contains(&identifier) {
+        references.push(identifier);
+    }
+}
+
+fn validate_initial_table(table: &InitialPagesTable) -> Result<()> {
+    if table.name.is_empty() || table.name.contains('\0') {
+        return Err(crate::Error::InvalidFormat(
+            "Pages table names must be non-empty and contain no NUL".to_owned(),
+        ));
+    }
+    if table.rows == 0 || table.columns == 0 {
+        return Err(crate::Error::InvalidFormat(
+            "Pages tables must contain at least one row and one column".to_owned(),
+        ));
+    }
+    u32::try_from(table.rows)
+        .and_then(|_| u32::try_from(table.columns))
+        .map_err(|_| crate::Error::InvalidFormat("Pages table dimensions exceed u32".to_owned()))?;
+    Ok(())
+}
+
+fn install_initial_table_graph(
+    package: &mut IWorkPackage,
+    table: &InitialPagesTable,
+    language: &str,
+    locale: &str,
+) -> Result<()> {
+    let source = crate::numbers::NumbersDocumentBuilder::new()
+        .table_name(&table.name)
+        .table_dimensions(table.rows, table.columns)
+        .language(language)
+        .locale(locale)
+        .build_package()?;
+
+    let mut document_objects = source.archive(DOCUMENT_ARCHIVE_ENTRY)?.objects;
+    document_objects.retain(|object| {
+        object
+            .archive_info
+            .identifier
+            .is_some_and(|identifier| TABLE_DOCUMENT_OBJECT_IDS.contains(&identifier))
+    });
+    let table_info = document_objects
+        .iter_mut()
+        .find(|object| object.archive_info.identifier == Some(TABLE_INFO_OBJECT_ID))
+        .ok_or_else(|| {
+            crate::Error::InvalidFormat("source-built table info is missing".to_owned())
+        })?;
+    let message = table_info
+        .messages
+        .iter_mut()
+        .find(|message| message.type_ == TABLE_INFO_MESSAGE_TYPE)
+        .ok_or_else(|| {
+            crate::Error::InvalidFormat("source-built table info payload is missing".to_owned())
+        })?;
+    let mut info = tst::TableInfoArchive::decode(message.data.as_slice())?;
+    info.super_.parent = Some(reference(PagesObjectId::Body));
+    info.super_.geometry = Some(tsd::GeometryArchive {
+        position: Some(tsp::Point {
+            x: DEFAULT_TABLE_X_POINTS,
+            y: DEFAULT_TABLE_Y_POINTS,
+        }),
+        size: Some(tsp::Size {
+            width: DEFAULT_TABLE_WIDTH_POINTS,
+            height: DEFAULT_TABLE_ROW_HEIGHT_POINTS * table.rows as f32,
+        }),
+        flags: Some(TABLE_DRAWABLE_FLAGS),
+        angle: Some(TABLE_ROTATION_DEGREES),
+    });
+    message.data = info.encode_to_vec();
+    let references = &mut table_info.archive_info.message_infos[0].object_references;
+    references.retain(|identifier| *identifier != SOURCE_TABLE_SHEET_OBJECT_ID);
+    if !references.contains(&PagesObjectId::Body.value()) {
+        references.push(PagesObjectId::Body.value());
+    }
+
+    package.update_archive(DOCUMENT_ARCHIVE_ENTRY, |archive| {
+        for object in document_objects {
+            archive.insert_object(object)?;
+        }
+        Ok(())
+    })?;
+
+    let mut style_objects = source.archive(STYLESHEET_ARCHIVE_ENTRY)?.objects;
+    style_objects.retain(|object| {
+        object
+            .archive_info
+            .identifier
+            .is_some_and(|identifier| TABLE_STYLE_OBJECT_IDS.contains(&identifier))
+    });
+    package.update_archive(STYLESHEET_ARCHIVE_ENTRY, |archive| {
+        for object in style_objects {
+            archive.insert_object(object)?;
+        }
+        Ok(())
+    })?;
+
+    let mut calculation = source.archive("Index/CalculationEngine.iwa")?;
+    calculation.objects.retain(|object| {
+        matches!(
+            object.archive_info.identifier,
+            Some(TABLE_CALCULATION_ENGINE_OBJECT_ID | TABLE_FORMULA_OWNER_OBJECT_ID)
+        )
+    });
+    package.replace_archive("Index/CalculationEngine.iwa", &calculation)?;
+    Ok(())
+}
+
 fn object_table(identifier: Option<PagesObjectId>) -> tswp::ObjectAttributeTable {
     tswp::ObjectAttributeTable {
         entries: vec![tswp::object_attribute_table::ObjectAttribute {
@@ -1053,8 +1411,12 @@ fn repeated_reference(count: usize, identifier: PagesObjectId) -> Vec<tsp::Refer
 }
 
 fn reference(identifier: PagesObjectId) -> tsp::Reference {
+    raw_reference(identifier.value())
+}
+
+fn raw_reference(identifier: u64) -> tsp::Reference {
     tsp::Reference {
-        identifier: identifier.value(),
+        identifier,
         deprecated_type: None,
         deprecated_is_external: None,
     }

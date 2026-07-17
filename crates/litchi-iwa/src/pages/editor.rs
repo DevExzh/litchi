@@ -3772,6 +3772,7 @@ mod page_layout;
 mod section_background;
 mod section_content;
 mod section_settings;
+mod tables;
 mod text_box_create;
 mod types;
 
@@ -3779,6 +3780,7 @@ pub use audio::{PagesAudioInfo, PagesAudioOptions, RemovedPagesAudio};
 pub use body_shapes::{PagesBodyShapeInfo, PagesBodyShapeKind, RemovedPagesBodyShape};
 pub use images::{PagesImageInfo, RemovedPagesImage};
 pub use movies::{PagesMovieInfo, PagesMovieOptions, RemovedPagesMovie};
+pub use tables::{PagesCellValue, PagesTable, PagesTableInfo};
 
 #[cfg(test)]
 mod tests;

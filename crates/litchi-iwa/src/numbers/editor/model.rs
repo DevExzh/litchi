@@ -2063,7 +2063,25 @@ pub(super) fn locate_cell(
         .into_iter()
         .find(|table| table.object_id == table_id)
         .ok_or_else(|| Error::ParseError(format!("Numbers table object {table_id} not found")))?;
+    locate_cell_in_descriptor(package, descriptor, row, column)
+}
 
+fn locate_attached_cell(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<CellLocation> {
+    let descriptor = attached_table_descriptor(package, table_id)?;
+    locate_cell_in_descriptor(package, descriptor, row, column)
+}
+
+fn locate_cell_in_descriptor(
+    package: &IWorkPackage,
+    descriptor: TableDescriptor,
+    row: usize,
+    column: usize,
+) -> Result<CellLocation> {
     if row >= descriptor.model.number_of_rows as usize
         || column >= descriptor.model.number_of_columns as usize
     {
@@ -2118,9 +2136,86 @@ pub(super) fn locate_cell(
     })
 }
 
+fn attached_table_descriptor(package: &IWorkPackage, table_id: u64) -> Result<TableDescriptor> {
+    let locations = object_locations(package)?;
+    let model_archive_name = locations.get(&table_id).ok_or_else(|| {
+        Error::ParseError(format!("iWork table model object {table_id} not found"))
+    })?;
+    let model_archive = package.archive(model_archive_name)?;
+    let model_object = model_archive.object(table_id).ok_or_else(|| {
+        Error::InvalidFormat(format!("iWork table model object {table_id} is missing"))
+    })?;
+    let models = model_object
+        .messages
+        .iter()
+        .filter(|message| message.type_ == 6000 || message.type_ == 6001)
+        .filter_map(|message| TableModelArchive::decode(message.data.as_slice()).ok())
+        .collect::<Vec<_>>();
+    let [model] = models.as_slice() else {
+        return Err(Error::InvalidFormat(format!(
+            "iWork table model {table_id} must contain exactly one table-model payload"
+        )));
+    };
+
+    let mut table_info_id = None;
+    let archive_names = locations.values().collect::<HashSet<_>>();
+    for archive_name in archive_names {
+        let archive = package.archive(archive_name)?;
+        for object in &archive.objects {
+            let Some(identifier) = object.archive_info.identifier else {
+                continue;
+            };
+            if identifier == table_id {
+                continue;
+            }
+            let owns_model = object.messages.iter().any(|message| {
+                message.type_ == 6000
+                    && tst::TableInfoArchive::decode(message.data.as_slice())
+                        .is_ok_and(|info| info.table_model.identifier == table_id)
+            });
+            if owns_model && table_info_id.replace(identifier).is_some() {
+                return Err(Error::InvalidFormat(format!(
+                    "iWork table model {table_id} has multiple table-info owners"
+                )));
+            }
+        }
+    }
+    Ok(TableDescriptor {
+        object_id: table_id,
+        table_info_id: table_info_id.ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "iWork table model {table_id} has no table-info owner"
+            ))
+        })?,
+        model: model.clone(),
+    })
+}
+
 pub(super) fn set_cell_in_package(
     package: &mut IWorkPackage,
     table_id: u64,
+    row: usize,
+    column: usize,
+    value: CellValue,
+) -> Result<()> {
+    let location = locate_cell(package, table_id, row, column)?;
+    set_cell_at_location(package, location, row, column, value)
+}
+
+pub(super) fn set_attached_cell_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    value: CellValue,
+) -> Result<()> {
+    let location = locate_attached_cell(package, table_id, row, column)?;
+    set_cell_at_location(package, location, row, column, value)
+}
+
+fn set_cell_at_location(
+    package: &mut IWorkPackage,
+    location: CellLocation,
     row: usize,
     column: usize,
     value: CellValue,
@@ -2130,7 +2225,6 @@ pub(super) fn set_cell_in_package(
             "Formula and error cell writes require referenced-table construction".to_string(),
         ));
     }
-    let location = locate_cell(package, table_id, row, column)?;
     let old_cell = read_tile_cell(
         package,
         &location.tile_archive,

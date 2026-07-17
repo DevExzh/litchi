@@ -3203,6 +3203,16 @@ impl NumbersEditor {
     }
 }
 
+pub(crate) fn set_table_cell_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    value: CellValue,
+) -> Result<()> {
+    model::set_attached_cell_in_package(package, table_id, row, column, value)
+}
+
 mod column_insert;
 mod date_time_fields;
 mod formula_clone;
