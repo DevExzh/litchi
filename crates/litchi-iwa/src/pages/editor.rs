@@ -32,7 +32,7 @@ use crate::text::{
     IWorkTextEditor, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphIndents,
     ParagraphLineSpacing, ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment,
     TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumns,
-    TextDecorations, TextLigatures, TextOutline, TextScript, TextShadow, TextStorageInfo,
+    TextDecorations, TextFont, TextLigatures, TextOutline, TextScript, TextShadow, TextStorageInfo,
     TextStyle,
 };
 use crate::wire::{
@@ -389,6 +389,36 @@ impl PagesEditor {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
         let changed = staged.reset_text_style(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective PostScript font identity of an ordinary text box.
+    pub fn text_box_text_font(&self, drawable_object_id: u64) -> Result<TextFont> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        self.text.text_font(graph.storage_id)
+    }
+
+    /// Atomically set a typed font identity across an ordinary text box.
+    pub fn set_text_box_text_font(
+        &mut self,
+        drawable_object_id: u64,
+        font: TextFont,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_text_font(graph.storage_id, font)?;
+        *self = Self::from_package(staged.into_package())?;
+        Ok(())
+    }
+
+    /// Restore the inherited font while preserving sibling overrides.
+    pub fn reset_text_box_text_font(&mut self, drawable_object_id: u64) -> Result<bool> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_text_font(graph.storage_id)?;
         if changed {
             *self = Self::from_package(staged.into_package())?;
         }

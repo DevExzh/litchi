@@ -17,6 +17,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for storage in editor.storages()? {
         match (
             editor.text_style(storage.object_id),
+            editor.text_font(storage.object_id),
             editor.text_decorations(storage.object_id),
             editor.text_color(storage.object_id),
             editor.text_capitalization(storage.object_id),
@@ -30,6 +31,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ) {
             (
                 Ok(style),
+                Ok(font),
                 Ok(decorations),
                 Ok(color),
                 Ok(capitalization),
@@ -41,7 +43,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Ok(shadow),
                 Ok(background),
             ) => println!(
-                "storage={} points={} bold={} italic={} underline={:?} strikethrough={:?} rgba=({},{},{},{}) color_space={:?} capitalization={capitalization:?} script={script:?} baseline_shift_points={} character_spacing_percent={} ligatures={ligatures:?} outline={outline:?} shadow={shadow:?} background={background:?}",
+                "storage={} font={font:?} points={} bold={} italic={} underline={:?} strikethrough={:?} rgba=({},{},{},{}) color_space={:?} capitalization={capitalization:?} script={script:?} baseline_shift_points={} character_spacing_percent={} ligatures={ligatures:?} outline={outline:?} shadow={shadow:?} background={background:?}",
                 storage.object_id,
                 style.point_size.points(),
                 style.bold,
@@ -56,17 +58,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 baseline_shift.points(),
                 character_spacing.percent()
             ),
-            (Err(error), _, _, _, _, _, _, _, _, _, _)
-            | (_, Err(error), _, _, _, _, _, _, _, _, _)
-            | (_, _, Err(error), _, _, _, _, _, _, _, _)
-            | (_, _, _, Err(error), _, _, _, _, _, _, _)
-            | (_, _, _, _, Err(error), _, _, _, _, _, _)
-            | (_, _, _, _, _, Err(error), _, _, _, _, _)
-            | (_, _, _, _, _, _, Err(error), _, _, _, _)
-            | (_, _, _, _, _, _, _, Err(error), _, _, _)
-            | (_, _, _, _, _, _, _, _, Err(error), _, _)
-            | (_, _, _, _, _, _, _, _, _, Err(error), _)
-            | (_, _, _, _, _, _, _, _, _, _, Err(error)) => {
+            (Err(error), _, _, _, _, _, _, _, _, _, _, _)
+            | (_, Err(error), _, _, _, _, _, _, _, _, _, _)
+            | (_, _, Err(error), _, _, _, _, _, _, _, _, _)
+            | (_, _, _, Err(error), _, _, _, _, _, _, _, _)
+            | (_, _, _, _, Err(error), _, _, _, _, _, _, _)
+            | (_, _, _, _, _, Err(error), _, _, _, _, _, _)
+            | (_, _, _, _, _, _, Err(error), _, _, _, _, _)
+            | (_, _, _, _, _, _, _, Err(error), _, _, _, _)
+            | (_, _, _, _, _, _, _, _, Err(error), _, _, _)
+            | (_, _, _, _, _, _, _, _, _, Err(error), _, _)
+            | (_, _, _, _, _, _, _, _, _, _, Err(error), _)
+            | (_, _, _, _, _, _, _, _, _, _, _, Err(error)) => {
                 println!("storage={} unavailable={error}", storage.object_id)
             },
         }

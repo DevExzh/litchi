@@ -14,6 +14,7 @@ use crate::shapes::{
 use crate::wire::{parse_wire_fields, repeated_length_delimited_payloads};
 use crate::{Error, IWorkPackage, Result};
 
+use super::super::font::{TextFont, TextFontName};
 use super::super::paragraph_tabs::ParagraphTabStops;
 use super::super::style::{
     ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingMultiple,
@@ -38,6 +39,8 @@ const STYLE_STYLESHEET_FIELD: u32 = 5;
 const CHARACTER_BOLD_FIELD: u32 = 1;
 const CHARACTER_ITALIC_FIELD: u32 = 2;
 const CHARACTER_FONT_SIZE_FIELD: u32 = 3;
+const CHARACTER_FONT_NAME_NULL_FIELD: u32 = 4;
+const CHARACTER_FONT_NAME_FIELD: u32 = 5;
 const CHARACTER_FONT_COLOR_FIELD: u32 = 7;
 const CHARACTER_SCRIPT_FIELD: u32 = 10;
 const CHARACTER_UNDERLINE_FIELD: u32 = 11;
@@ -89,6 +92,7 @@ pub(super) struct ParagraphStyleOverrides {
     pub(super) bold: Option<bool>,
     pub(super) italic: Option<bool>,
     pub(super) point_size: Option<TextPointSize>,
+    pub(super) font: Option<TextFont>,
     pub(super) font_color: Option<RgbaColor>,
     pub(super) capitalization: Option<TextCapitalization>,
     pub(super) script: Option<TextScript>,
@@ -115,6 +119,7 @@ impl ParagraphStyleOverrides {
         u32::from(self.bold.is_some())
             + u32::from(self.italic.is_some())
             + u32::from(self.point_size.is_some())
+            + u32::from(self.font.is_some())
             + u32::from(self.font_color.is_some())
             + self
                 .capitalization
@@ -186,6 +191,10 @@ pub(super) fn inherited_text_style(
     first_style_id: u64,
 ) -> Result<TextStyle> {
     inheritance::text_style(package, first_style_id)
+}
+
+pub(super) fn inherited_text_font(package: &IWorkPackage, first_style_id: u64) -> Result<TextFont> {
+    inheritance::text_font(package, first_style_id)
 }
 
 pub(super) fn inherited_text_decorations(
@@ -302,6 +311,12 @@ pub(super) fn direct_overrides(
         .font_size
         .map(TextPointSize::from_points)
         .transpose()?;
+    let font = text_font_from_character(character_properties)?;
+    let font_is_some = font.is_some();
+    let font_field = font.as_ref().map(|font| match font {
+        TextFont::Default => CHARACTER_FONT_NAME_NULL_FIELD,
+        TextFont::Named(_) => CHARACTER_FONT_NAME_FIELD,
+    });
     let font_color = text_color_from_character(character_properties)?;
     let capitalization = capitalization_from_character(character_properties)?;
     let script = character_properties
@@ -369,6 +384,7 @@ pub(super) fn direct_overrides(
         bold,
         italic,
         point_size,
+        font,
         font_color,
         capitalization,
         script,
@@ -402,6 +418,10 @@ pub(super) fn direct_overrides(
     remaining_character.bold = None;
     remaining_character.italic = None;
     remaining_character.font_size = None;
+    if font_is_some {
+        remaining_character.font_name_null = None;
+        remaining_character.font_name = None;
+    }
     remaining_character.font_color = None;
     remaining_character.tsd_fill = None;
     if capitalization.is_some() {
@@ -459,6 +479,9 @@ pub(super) fn direct_overrides(
     }
     if point_size.is_some() {
         character_fields.push(CHARACTER_FONT_SIZE_FIELD);
+    }
+    if let Some(field) = font_field {
+        character_fields.push(field);
     }
     if font_color.is_some() {
         character_fields.push(CHARACTER_FONT_COLOR_FIELD);
@@ -607,6 +630,12 @@ pub(super) fn variation_object(
             "an iWork paragraph-style variation must contain an override".to_owned(),
         ));
     }
+    let override_count = overrides.count();
+    let (font_name_null, font_name) = match overrides.font {
+        Some(TextFont::Default) => (Some(true), None),
+        Some(TextFont::Named(name)) => (None, Some(name.into_string())),
+        None => (None, None),
+    };
     let data = tswp::ParagraphStyleArchive {
         super_: tss::StyleArchive {
             parent: Some(reference(parent_style_id)),
@@ -614,11 +643,13 @@ pub(super) fn variation_object(
             stylesheet: Some(reference(stylesheet_id)),
             ..Default::default()
         },
-        override_count: Some(overrides.count()),
+        override_count: Some(override_count),
         char_properties: Some(tswp::CharacterStylePropertiesArchive {
             bold: overrides.bold,
             italic: overrides.italic,
             font_size: overrides.point_size.map(TextPointSize::points),
+            font_name_null,
+            font_name,
             font_color: overrides.font_color.map(color_to_native),
             capitalization: overrides
                 .capitalization
@@ -819,6 +850,29 @@ pub(super) fn text_color_from_character(
         (Some(color), _) | (_, Some(color)) => Ok(Some(color)),
         (None, None) => Ok(None),
     }
+}
+
+pub(super) fn text_font_from_character(
+    properties: &tswp::CharacterStylePropertiesArchive,
+) -> Result<Option<TextFont>> {
+    if properties.font_name_null == Some(true) {
+        if properties.font_name.is_some() {
+            return Err(Error::InvalidFormat(
+                "native iWork text font is both null and populated".to_owned(),
+            ));
+        }
+        return Ok(Some(TextFont::Default));
+    }
+    if properties.font_name_null == Some(false) && properties.font_name.is_none() {
+        return Err(Error::InvalidFormat(
+            "native iWork text font has a false null marker without a name".to_owned(),
+        ));
+    }
+    properties
+        .font_name
+        .as_deref()
+        .map(|name| TextFontName::new(name).map(TextFont::Named))
+        .transpose()
 }
 
 pub(super) fn text_outline_from_character(

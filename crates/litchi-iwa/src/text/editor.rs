@@ -22,19 +22,21 @@ use super::drop_cap::{
     ParagraphDropCap, ParagraphDropCapPlacement, ParagraphStart, paragraph_drop_cap,
     paragraph_drop_caps, remove_paragraph_drop_cap, set_paragraph_drop_cap,
 };
+use super::font::TextFont;
 use super::paragraph_alignment::{
     paragraph_alignment, paragraph_indents, paragraph_line_spacing, paragraph_spacing,
     paragraph_tab_stops, reset_paragraph_alignment, reset_paragraph_indents,
     reset_paragraph_line_spacing, reset_paragraph_spacing, reset_paragraph_tab_stops,
     reset_text_background, reset_text_baseline_shift, reset_text_capitalization,
-    reset_text_character_spacing, reset_text_color, reset_text_decorations, reset_text_ligatures,
-    reset_text_outline, reset_text_script, reset_text_shadow, reset_text_style,
-    set_paragraph_alignment, set_paragraph_indents, set_paragraph_line_spacing,
+    reset_text_character_spacing, reset_text_color, reset_text_decorations, reset_text_font,
+    reset_text_ligatures, reset_text_outline, reset_text_script, reset_text_shadow,
+    reset_text_style, set_paragraph_alignment, set_paragraph_indents, set_paragraph_line_spacing,
     set_paragraph_spacing, set_paragraph_tab_stops, set_text_background, set_text_baseline_shift,
     set_text_capitalization, set_text_character_spacing, set_text_color, set_text_decorations,
-    set_text_ligatures, set_text_outline, set_text_script, set_text_shadow, set_text_style,
-    text_background, text_baseline_shift, text_capitalization, text_character_spacing, text_color,
-    text_decorations, text_ligatures, text_outline, text_script, text_shadow, text_style,
+    set_text_font, set_text_ligatures, set_text_outline, set_text_script, set_text_shadow,
+    set_text_style, text_background, text_baseline_shift, text_capitalization,
+    text_character_spacing, text_color, text_decorations, text_font, text_ligatures, text_outline,
+    text_script, text_shadow, text_style,
 };
 use super::paragraph_tabs::ParagraphTabStops;
 use super::style::{
@@ -190,6 +192,41 @@ impl IWorkTextEditor {
     pub fn reset_text_style(&mut self, object_id: u64) -> Result<bool> {
         let mut staged = self.package.clone();
         let changed = reset_text_style(&mut staged, object_id)?;
+        if changed {
+            let bytes = staged.to_bytes()?;
+            IWorkPackage::from_bytes(&bytes)?;
+            self.package = staged;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective PostScript font identity of uniformly styled text.
+    pub fn text_font(&self, object_id: u64) -> Result<TextFont> {
+        text_font(&self.package, object_id)
+    }
+
+    /// Atomically set a typed font identity across a uniformly styled storage.
+    ///
+    /// Rich text containing multiple paragraph-style boundaries is rejected so
+    /// the operation cannot flatten independently formatted paragraphs.
+    pub fn set_text_font(&mut self, object_id: u64, font: TextFont) -> Result<()> {
+        let mut staged = self.package.clone();
+        set_text_font(&mut staged, object_id, font.clone())?;
+        let bytes = staged.to_bytes()?;
+        let verified = IWorkPackage::from_bytes(&bytes)?;
+        if text_font(&verified, object_id)? != font {
+            return Err(Error::InvalidFormat(
+                "iWork text font update failed round-trip validation".to_owned(),
+            ));
+        }
+        self.package = staged;
+        Ok(())
+    }
+
+    /// Restore the inherited font while preserving sibling overrides.
+    pub fn reset_text_font(&mut self, object_id: u64) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = reset_text_font(&mut staged, object_id)?;
         if changed {
             let bytes = staged.to_bytes()?;
             IWorkPackage::from_bytes(&bytes)?;

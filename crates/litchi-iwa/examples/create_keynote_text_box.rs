@@ -13,7 +13,7 @@ use litchi_iwa::text::{
     ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, ParagraphStart,
     ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
     ParagraphTabStops, TextAlignment, TextBackground, TextBaselineShift, TextCapitalization,
-    TextCharacterSpacing, TextColumnCount, TextColumns, TextDecorations, TextLigatures,
+    TextCharacterSpacing, TextColumnCount, TextColumns, TextDecorations, TextFont, TextLigatures,
     TextOutline, TextPointSize, TextScript, TextShadow, TextStrikethrough, TextStyle,
     TextUnderline,
 };
@@ -63,6 +63,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         TextStyle::new(TextPointSize::from_points(23.0)?)
             .with_bold(true)
             .with_italic(true),
+    )?;
+    editor.set_slide_text_box_text_font(
+        0,
+        created.drawable_object_id,
+        TextFont::named("AvenirNext-BoldItalic")?,
     )?;
     editor.set_slide_text_box_text_decorations(
         0,

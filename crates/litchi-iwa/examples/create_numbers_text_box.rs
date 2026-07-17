@@ -13,7 +13,7 @@ use litchi_iwa::text::{
     ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, ParagraphStart,
     ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
     ParagraphTabStops, TextAlignment, TextBackground, TextBaselineShift, TextCapitalization,
-    TextCharacterSpacing, TextColumnCount, TextColumnGap, TextColumns, TextDecorations,
+    TextCharacterSpacing, TextColumnCount, TextColumnGap, TextColumns, TextDecorations, TextFont,
     TextLigatures, TextOutline, TextPointSize, TextScript, TextShadow, TextStrikethrough,
     TextStyle, TextUnderline,
 };
@@ -65,6 +65,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         sheet_id,
         created.drawable_object_id,
         TextStyle::new(TextPointSize::from_points(21.0)?).with_italic(true),
+    )?;
+    editor.set_sheet_text_box_text_font(
+        sheet_id,
+        created.drawable_object_id,
+        TextFont::named("TimesNewRomanPS-ItalicMT")?,
     )?;
     editor.set_sheet_text_box_text_decorations(
         sheet_id,

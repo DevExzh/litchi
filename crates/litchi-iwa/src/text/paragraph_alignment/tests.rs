@@ -16,7 +16,7 @@ use crate::text::{
     ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, ParagraphTabAlignment,
     ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops, TextBackground,
     TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumnCount, TextColumns,
-    TextDecorations, TextLigatures, TextOutline, TextPointSize, TextScript, TextShadow,
+    TextDecorations, TextFont, TextLigatures, TextOutline, TextPointSize, TextScript, TextShadow,
     TextStrikethrough, TextStyle, TextUnderline,
 };
 
@@ -88,6 +88,55 @@ fn native_text_color_override_is_canonical_and_reversible() {
         native::direct_overrides(&archive, &message.data).unwrap(),
         Some(overrides)
     );
+}
+
+#[test]
+fn native_text_font_overrides_are_canonical_strict_and_reversible() {
+    for font in [
+        TextFont::Default,
+        TextFont::named("AvenirNext-BoldItalic").unwrap(),
+    ] {
+        let overrides = ParagraphStyleOverrides {
+            font: Some(font.clone()),
+            ..Default::default()
+        };
+        let object = native::variation_object(23, 24, 25, overrides.clone()).unwrap();
+        let message = &object.messages[0];
+        let archive = tswp::ParagraphStyleArchive::decode(message.data.as_slice()).unwrap();
+        let properties = archive.char_properties.as_ref().unwrap();
+        assert_eq!(archive.override_count, Some(1));
+        match font {
+            TextFont::Default => {
+                assert_eq!(properties.font_name_null, Some(true));
+                assert!(properties.font_name.is_none());
+            },
+            TextFont::Named(name) => {
+                assert!(properties.font_name_null.is_none());
+                assert_eq!(properties.font_name.as_deref(), Some(name.as_str()));
+            },
+        }
+        assert_eq!(
+            native::direct_overrides(&archive, &message.data).unwrap(),
+            Some(overrides)
+        );
+    }
+
+    let both = tswp::CharacterStylePropertiesArchive {
+        font_name_null: Some(true),
+        font_name: Some("Helvetica".to_owned()),
+        ..Default::default()
+    };
+    assert!(native::text_font_from_character(&both).is_err());
+    let false_without_name = tswp::CharacterStylePropertiesArchive {
+        font_name_null: Some(false),
+        ..Default::default()
+    };
+    assert!(native::text_font_from_character(&false_without_name).is_err());
+    let invalid_name = tswp::CharacterStylePropertiesArchive {
+        font_name: Some(" Helvetica".to_owned()),
+        ..Default::default()
+    };
+    assert!(native::text_font_from_character(&invalid_name).is_err());
 }
 
 #[test]
@@ -1490,6 +1539,158 @@ fn uniform_text_background_round_trips_isolates_and_resets_in_every_suite() {
 }
 
 #[test]
+fn uniform_text_font_round_trips_isolates_and_resets_in_every_suite() {
+    let pages_font = TextFont::named("Georgia-Bold").unwrap();
+    let pages_background =
+        TextBackground::Color(RgbaColor::new(0.95, 0.72, 0.52, 1.0, RgbColorSpace::Srgb).unwrap());
+    let mut pages = PagesEditor::create_with_text("Fonts").unwrap();
+    let pages_box = pages
+        .add_text_box(
+            5,
+            "Pages font",
+            DrawablePoint { x: 20.0, y: 40.0 },
+            DrawableSize {
+                width: 240.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    let pages_sibling = pages
+        .add_text_box(
+            5,
+            "Plain Pages font",
+            DrawablePoint { x: 280.0, y: 40.0 },
+            DrawableSize {
+                width: 240.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    let inherited_pages = pages
+        .text_box_text_font(pages_box.drawable_object_id)
+        .unwrap();
+    pages
+        .set_text_box_text_background(pages_box.drawable_object_id, pages_background)
+        .unwrap();
+    pages
+        .set_text_box_text_font(pages_box.drawable_object_id, pages_font.clone())
+        .unwrap();
+    assert_eq!(
+        pages
+            .text_box_text_font(pages_sibling.drawable_object_id)
+            .unwrap(),
+        inherited_pages
+    );
+    let mut pages = PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        pages
+            .text_box_text_font(pages_box.drawable_object_id)
+            .unwrap(),
+        pages_font
+    );
+    assert!(
+        pages
+            .reset_text_box_text_font(pages_box.drawable_object_id)
+            .unwrap()
+    );
+    assert_eq!(
+        pages
+            .text_box_text_font(pages_box.drawable_object_id)
+            .unwrap(),
+        inherited_pages
+    );
+    assert_eq!(
+        pages
+            .text_box_text_background(pages_box.drawable_object_id)
+            .unwrap(),
+        pages_background
+    );
+
+    let numbers_font = TextFont::named("TimesNewRomanPS-ItalicMT").unwrap();
+    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let sheet_id = numbers.sheets().unwrap()[0].object_id;
+    let numbers_box = numbers
+        .add_sheet_text_box(
+            sheet_id,
+            "Numbers font",
+            DrawablePoint { x: 20.0, y: 200.0 },
+            DrawableSize {
+                width: 240.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    let inherited_numbers = numbers
+        .sheet_text_box_text_font(sheet_id, numbers_box.drawable_object_id)
+        .unwrap();
+    numbers
+        .set_sheet_text_box_text_font(
+            sheet_id,
+            numbers_box.drawable_object_id,
+            numbers_font.clone(),
+        )
+        .unwrap();
+    let mut numbers =
+        crate::numbers::NumbersEditor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        numbers
+            .sheet_text_box_text_font(sheet_id, numbers_box.drawable_object_id)
+            .unwrap(),
+        numbers_font
+    );
+    assert!(
+        numbers
+            .reset_sheet_text_box_text_font(sheet_id, numbers_box.drawable_object_id)
+            .unwrap()
+    );
+    assert_eq!(
+        numbers
+            .sheet_text_box_text_font(sheet_id, numbers_box.drawable_object_id)
+            .unwrap(),
+        inherited_numbers
+    );
+
+    let keynote_font = TextFont::named("AvenirNext-BoldItalic").unwrap();
+    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let keynote_box = keynote
+        .add_slide_text_box(
+            0,
+            "Keynote font",
+            DrawablePoint { x: 80.0, y: 500.0 },
+            DrawableSize {
+                width: 500.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    let inherited_keynote = keynote
+        .slide_text_box_text_font(0, keynote_box.drawable_object_id)
+        .unwrap();
+    keynote
+        .set_slide_text_box_text_font(0, keynote_box.drawable_object_id, keynote_font.clone())
+        .unwrap();
+    let mut keynote =
+        crate::keynote::KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        keynote
+            .slide_text_box_text_font(0, keynote_box.drawable_object_id)
+            .unwrap(),
+        keynote_font
+    );
+    assert!(
+        keynote
+            .reset_slide_text_box_text_font(0, keynote_box.drawable_object_id)
+            .unwrap()
+    );
+    assert_eq!(
+        keynote
+            .slide_text_box_text_font(0, keynote_box.drawable_object_id)
+            .unwrap(),
+        inherited_keynote
+    );
+}
+
+#[test]
 fn uniform_capitalization_round_trips_isolates_and_resets_in_every_suite() {
     let mut pages = PagesEditor::create_with_text("Caps").unwrap();
     let pages_box = pages
@@ -2633,6 +2834,11 @@ fn multiple_paragraph_boundaries_are_rejected_transactionally() {
                 storage_id,
                 TextStyle::new(TextPointSize::from_points(18.0).unwrap()).with_bold(true),
             )
+            .is_err()
+    );
+    assert!(
+        editor
+            .set_text_font(storage_id, TextFont::named("Georgia-Bold").unwrap())
             .is_err()
     );
     assert!(

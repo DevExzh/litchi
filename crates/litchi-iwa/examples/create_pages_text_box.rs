@@ -13,7 +13,7 @@ use litchi_iwa::text::{
     ParagraphLineSpacingMultiple, ParagraphSpacing, ParagraphSpacingPoints, ParagraphStart,
     ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
     ParagraphTabStops, TextAlignment, TextBackground, TextBaselineShift, TextCapitalization,
-    TextCharacterSpacing, TextColumnCount, TextColumnGap, TextColumns, TextDecorations,
+    TextCharacterSpacing, TextColumnCount, TextColumnGap, TextColumns, TextDecorations, TextFont,
     TextLigatures, TextOutline, TextPointSize, TextScript, TextShadow, TextStrikethrough,
     TextStyle, TextUnderline,
 };
@@ -60,6 +60,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         created.drawable_object_id,
         TextStyle::new(TextPointSize::from_points(19.5)?).with_bold(true),
     )?;
+    editor.set_text_box_text_font(created.drawable_object_id, TextFont::named("Georgia-Bold")?)?;
     editor.set_text_box_text_decorations(
         created.drawable_object_id,
         TextDecorations::new(TextUnderline::Single, TextStrikethrough::Single),

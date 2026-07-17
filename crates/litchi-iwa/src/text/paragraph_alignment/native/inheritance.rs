@@ -4,6 +4,7 @@ use std::collections::HashSet;
 
 use crate::protobuf::tswp;
 use crate::shapes::RgbaColor;
+use crate::text::font::TextFont;
 use crate::text::paragraph_tabs::ParagraphTabStops;
 use crate::text::style::{
     ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing, ParagraphSpacing,
@@ -15,8 +16,8 @@ use crate::{Error, IWorkPackage, Result};
 
 use super::{
     capitalization_from_character, line_spacing_from_archive, locate_style, tabs,
-    text_background_from_character, text_color_from_character, text_outline_from_character,
-    text_shadow_from_character,
+    text_background_from_character, text_color_from_character, text_font_from_character,
+    text_outline_from_character, text_shadow_from_character,
 };
 
 const MAX_STYLE_INHERITANCE_DEPTH: usize = 64;
@@ -59,6 +60,20 @@ pub(super) fn text_style(package: &IWorkPackage, first_style_id: u64) -> Result<
     Ok(TextStyle::new(point_size.unwrap_or_default())
         .with_bold(bold.unwrap_or(false))
         .with_italic(italic.unwrap_or(false)))
+}
+
+pub(super) fn text_font(package: &IWorkPackage, first_style_id: u64) -> Result<TextFont> {
+    let value = walk(package, first_style_id, None, |value, style| {
+        let Some(properties) = style.char_properties.as_ref() else {
+            return Ok(InheritanceControl::Continue);
+        };
+        let Some(font) = text_font_from_character(properties)? else {
+            return Ok(InheritanceControl::Continue);
+        };
+        *value = Some(font);
+        Ok(InheritanceControl::Complete)
+    })?;
+    Ok(value.unwrap_or_default())
 }
 
 pub(super) fn text_decorations(

@@ -41,7 +41,7 @@ use crate::text::{
     IWorkTextEditor, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphIndents,
     ParagraphLineSpacing, ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment,
     TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumns,
-    TextDecorations, TextLigatures, TextOutline, TextScript, TextShadow, TextStorageInfo,
+    TextDecorations, TextFont, TextLigatures, TextOutline, TextScript, TextShadow, TextStorageInfo,
     TextStyle,
 };
 use crate::wire::{
@@ -624,6 +624,45 @@ impl NumbersEditor {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
         let changed = text.reset_text_style(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(text.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective PostScript font identity of a sheet-owned text box.
+    pub fn sheet_text_box_text_font(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<TextFont> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        IWorkTextEditor::from_package(self.package.clone()).text_font(graph.storage_id)
+    }
+
+    /// Atomically set a typed font identity across a sheet-owned text box.
+    pub fn set_sheet_text_box_text_font(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        font: TextFont,
+    ) -> Result<()> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        text.set_text_font(graph.storage_id, font)?;
+        *self = Self::from_package(text.into_package())?;
+        Ok(())
+    }
+
+    /// Restore the inherited font while preserving sibling overrides.
+    pub fn reset_sheet_text_box_text_font(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let changed = text.reset_text_font(graph.storage_id)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
         }

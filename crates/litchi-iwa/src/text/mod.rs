@@ -7,6 +7,7 @@ pub(crate) mod columns;
 mod drop_cap;
 pub mod editor;
 pub mod extractor;
+mod font;
 mod paragraph_alignment;
 mod paragraph_tabs;
 pub mod storage;
@@ -23,6 +24,7 @@ pub use drop_cap::{
     ParagraphDropCapPlacement, ParagraphStart,
 };
 pub use editor::{IWorkTextEditor, TextStorageInfo};
+pub use font::{TextFont, TextFontName};
 pub use paragraph_tabs::{
     ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
     ParagraphTabStops,

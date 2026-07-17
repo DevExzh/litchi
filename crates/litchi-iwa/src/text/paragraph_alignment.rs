@@ -12,6 +12,7 @@ use crate::shapes::{RgbaColor, insert_style_variation, remove_style_variation};
 use crate::{Error, IWorkPackage, Result};
 
 use self::native::ParagraphStyleOverrides;
+use super::font::TextFont;
 use super::paragraph_tabs::ParagraphTabStops;
 use super::style::{
     ParagraphIndents, ParagraphLineSpacing, ParagraphSpacing, TextAlignment, TextBackground,
@@ -25,6 +26,7 @@ use super::style_registry::{
 #[derive(Debug, Clone)]
 enum ParagraphProperty<'a> {
     TextStyle(TextStyle),
+    TextFont(TextFont),
     TextDecorations(TextDecorations),
     TextColor(RgbaColor),
     TextCapitalization(TextCapitalization),
@@ -45,6 +47,7 @@ enum ParagraphProperty<'a> {
 #[derive(Debug, Clone, Copy)]
 enum ParagraphPropertyKind {
     TextStyle,
+    TextFont,
     TextDecorations,
     TextColor,
     TextCapitalization,
@@ -62,10 +65,11 @@ enum ParagraphPropertyKind {
     TabStops,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 enum InheritedCharacterProperty {
     None,
     TextStyle(TextStyle),
+    TextFont(TextFont),
     TextDecorations(TextDecorations),
     TextColor(RgbaColor),
     TextCapitalization(TextCapitalization),
@@ -96,6 +100,26 @@ pub(super) fn set_text_style(
 
 pub(super) fn reset_text_style(package: &mut IWorkPackage, storage_id: u64) -> Result<bool> {
     reset_property(package, storage_id, ParagraphPropertyKind::TextStyle)
+}
+
+pub(super) fn text_font(package: &IWorkPackage, storage_id: u64) -> Result<TextFont> {
+    let storage = storage::locate(package, storage_id)?;
+    native::inherited_text_font(package, storage.style_id)
+}
+
+pub(super) fn set_text_font(
+    package: &mut IWorkPackage,
+    storage_id: u64,
+    font: TextFont,
+) -> Result<()> {
+    if text_font(package, storage_id)? == font {
+        return Ok(());
+    }
+    set_property(package, storage_id, ParagraphProperty::TextFont(font))
+}
+
+pub(super) fn reset_text_font(package: &mut IWorkPackage, storage_id: u64) -> Result<bool> {
+    reset_property(package, storage_id, ParagraphPropertyKind::TextFont)
 }
 
 pub(super) fn text_decorations(package: &IWorkPackage, storage_id: u64) -> Result<TextDecorations> {
@@ -642,6 +666,8 @@ fn inherited_character_property(
     match property {
         ParagraphProperty::TextStyle(_) => native::inherited_text_style(package, parent_style_id)
             .map(InheritedCharacterProperty::TextStyle),
+        ParagraphProperty::TextFont(_) => native::inherited_text_font(package, parent_style_id)
+            .map(InheritedCharacterProperty::TextFont),
         ParagraphProperty::TextDecorations(_) => {
             native::inherited_text_decorations(package, parent_style_id)
                 .map(InheritedCharacterProperty::TextDecorations)
@@ -696,6 +722,14 @@ fn apply_property(
                 (style.point_size != inherited.point_size).then_some(style.point_size);
             overrides.bold = (style.bold != inherited.bold).then_some(style.bold);
             overrides.italic = (style.italic != inherited.italic).then_some(style.italic);
+        },
+        ParagraphProperty::TextFont(font) => {
+            let InheritedCharacterProperty::TextFont(inherited) = inherited else {
+                return Err(Error::InvalidFormat(
+                    "text-font mutation has no inherited character font".to_owned(),
+                ));
+            };
+            overrides.font = (font != &inherited).then(|| font.clone());
         },
         ParagraphProperty::TextDecorations(decorations) => {
             let InheritedCharacterProperty::TextDecorations(inherited) = inherited else {
@@ -804,6 +838,7 @@ fn has_property(overrides: &ParagraphStyleOverrides, kind: ParagraphPropertyKind
         ParagraphPropertyKind::TextStyle => {
             overrides.point_size.is_some() || overrides.bold.is_some() || overrides.italic.is_some()
         },
+        ParagraphPropertyKind::TextFont => overrides.font.is_some(),
         ParagraphPropertyKind::TextDecorations => {
             overrides.underline.is_some() || overrides.strikethrough.is_some()
         },
@@ -837,6 +872,7 @@ fn clear_property(overrides: &mut ParagraphStyleOverrides, kind: ParagraphProper
             overrides.bold = None;
             overrides.italic = None;
         },
+        ParagraphPropertyKind::TextFont => overrides.font = None,
         ParagraphPropertyKind::TextDecorations => {
             overrides.underline = None;
             overrides.strikethrough = None;
@@ -873,6 +909,9 @@ fn inherited_property(
     match kind {
         ParagraphPropertyKind::TextStyle => Ok(ParagraphProperty::TextStyle(
             native::inherited_text_style(package, style_id)?,
+        )),
+        ParagraphPropertyKind::TextFont => Ok(ParagraphProperty::TextFont(
+            native::inherited_text_font(package, style_id)?,
         )),
         ParagraphPropertyKind::TextDecorations => Ok(ParagraphProperty::TextDecorations(
             native::inherited_text_decorations(package, style_id)?,
@@ -939,6 +978,7 @@ fn validate_expected_property(
 ) -> Result<()> {
     let matches = match expected {
         ParagraphProperty::TextStyle(style) => text_style(package, storage_id)? == style,
+        ParagraphProperty::TextFont(font) => text_font(package, storage_id)? == font,
         ParagraphProperty::TextDecorations(decorations) => {
             text_decorations(package, storage_id)? == decorations
         },
