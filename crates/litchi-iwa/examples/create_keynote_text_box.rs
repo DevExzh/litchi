@@ -160,6 +160,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         created.drawable_object_id,
         ParagraphList::Bullet,
     )?;
+    let first_word_end = text.find(char::is_whitespace).unwrap_or(text.len());
+    editor.add_slide_text_box_highlight(
+        0,
+        created.drawable_object_id,
+        TextRange::from_utf16_indexes(0, text[..first_word_end].encode_utf16().count())?,
+    )?;
     if let Some(newline) = text.find('\n') {
         let start_index = text[..=newline].encode_utf16().count();
         let start = ParagraphStart::from_utf16_index(start_index)?;

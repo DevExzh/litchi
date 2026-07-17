@@ -21,6 +21,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if let Ok(hyperlinks) = editor.text_hyperlinks(storage.object_id) {
             println!("storage={} hyperlinks={hyperlinks:?}", storage.object_id);
         }
+        if let Ok(highlights) = editor.text_highlights(storage.object_id) {
+            println!("storage={} highlights={highlights:?}", storage.object_id);
+        }
         if let Ok(levels) = editor.paragraph_list_levels(storage.object_id) {
             println!("storage={} list_levels={levels:?}", storage.object_id);
         }

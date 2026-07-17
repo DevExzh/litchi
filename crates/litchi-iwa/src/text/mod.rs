@@ -8,6 +8,10 @@ mod drop_cap;
 pub mod editor;
 pub mod extractor;
 mod font;
+mod highlight;
+mod highlight_object;
+mod highlight_storage;
+mod highlight_types;
 mod hyperlink;
 mod hyperlink_object;
 mod hyperlink_storage;
@@ -24,6 +28,8 @@ pub mod style;
 mod style_registry;
 
 #[cfg(test)]
+mod highlight_tests;
+#[cfg(test)]
 mod hyperlink_tests;
 #[cfg(test)]
 mod language_tests;
@@ -39,6 +45,7 @@ pub use drop_cap::{
 };
 pub use editor::{IWorkTextEditor, TextStorageInfo};
 pub use font::{TextFont, TextFontName};
+pub use highlight_types::{TextHighlight, TextHighlightId};
 pub use hyperlink_types::{TextHyperlink, TextHyperlinkId, TextHyperlinkTarget};
 pub use language_types::{TextLanguage, TextLanguageRun, TextLanguageTag};
 pub use paragraph_list::{ParagraphList, ParagraphListLevel, ParagraphListLevelPlacement};

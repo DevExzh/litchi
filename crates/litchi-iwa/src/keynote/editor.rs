@@ -30,9 +30,9 @@ use crate::text::{
     ParagraphLineSpacing, ParagraphList, ParagraphListLevel, ParagraphListLevelPlacement,
     ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment, TextBackground,
     TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumns, TextDecorations,
-    TextFont, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget, TextLanguage, TextLanguageRun,
-    TextLigatures, TextOutline, TextPosition, TextRange, TextScript, TextShadow, TextStorageInfo,
-    TextStyle,
+    TextFont, TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget,
+    TextLanguage, TextLanguageRun, TextLigatures, TextOutline, TextPosition, TextRange, TextScript,
+    TextShadow, TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     append_repeated_length_delimited_field, parse_wire_fields, patch_fixed32_field,
@@ -1458,6 +1458,59 @@ impl KeynoteEditor {
         let hyperlink = staged.remove_text_hyperlink(graph.storage_id, id)?;
         *self = Self::from_package(staged.into_package())?;
         Ok(hyperlink)
+    }
+
+    /// Read every plain highlight in an ordinary slide text box.
+    pub fn slide_text_box_highlights(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<Vec<TextHighlight>> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text.text_highlights(graph.storage_id)
+    }
+
+    /// Create a plain highlight over a nonempty UTF-16 text range.
+    pub fn add_slide_text_box_highlight(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        range: TextRange,
+    ) -> Result<TextHighlight> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let highlight = staged.add_text_highlight(graph.storage_id, range)?;
+        *self = Self::from_package(staged.into_package())?;
+        Ok(highlight)
+    }
+
+    /// Move a plain text-box highlight without changing its ID.
+    pub fn update_slide_text_box_highlight(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        id: TextHighlightId,
+        range: TextRange,
+    ) -> Result<TextHighlight> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let highlight = staged.update_text_highlight(graph.storage_id, id, range)?;
+        *self = Self::from_package(staged.into_package())?;
+        Ok(highlight)
+    }
+
+    /// Delete a plain text-box highlight and its empty annotation graph.
+    pub fn remove_slide_text_box_highlight(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        id: TextHighlightId,
+    ) -> Result<TextHighlight> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let highlight = staged.remove_text_highlight(graph.storage_id, id)?;
+        *self = Self::from_package(staged.into_package())?;
+        Ok(highlight)
     }
 
     /// Read the canonical list preset of an ordinary slide text box.

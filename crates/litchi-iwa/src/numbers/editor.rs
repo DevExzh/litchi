@@ -42,9 +42,9 @@ use crate::text::{
     ParagraphLineSpacing, ParagraphList, ParagraphListLevel, ParagraphListLevelPlacement,
     ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment, TextBackground,
     TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumns, TextDecorations,
-    TextFont, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget, TextLanguage, TextLanguageRun,
-    TextLigatures, TextOutline, TextPosition, TextRange, TextScript, TextShadow, TextStorageInfo,
-    TextStyle,
+    TextFont, TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget,
+    TextLanguage, TextLanguageRun, TextLigatures, TextOutline, TextPosition, TextRange, TextScript,
+    TextShadow, TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     patch_length_delimited_field, patch_nested_fixed32_field, patch_nested_length_delimited_field,
@@ -792,6 +792,59 @@ impl NumbersEditor {
         let hyperlink = text.remove_text_hyperlink(graph.storage_id, id)?;
         *self = Self::from_package(text.into_package())?;
         Ok(hyperlink)
+    }
+
+    /// Read every plain highlight in a sheet-owned text box.
+    pub fn sheet_text_box_highlights(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<Vec<TextHighlight>> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        IWorkTextEditor::from_package(self.package.clone()).text_highlights(graph.storage_id)
+    }
+
+    /// Create a plain highlight over a nonempty UTF-16 text range.
+    pub fn add_sheet_text_box_highlight(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        range: TextRange,
+    ) -> Result<TextHighlight> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let highlight = text.add_text_highlight(graph.storage_id, range)?;
+        *self = Self::from_package(text.into_package())?;
+        Ok(highlight)
+    }
+
+    /// Move a plain text-box highlight without changing its ID.
+    pub fn update_sheet_text_box_highlight(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        id: TextHighlightId,
+        range: TextRange,
+    ) -> Result<TextHighlight> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let highlight = text.update_text_highlight(graph.storage_id, id, range)?;
+        *self = Self::from_package(text.into_package())?;
+        Ok(highlight)
+    }
+
+    /// Delete a plain text-box highlight and its empty annotation graph.
+    pub fn remove_sheet_text_box_highlight(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        id: TextHighlightId,
+    ) -> Result<TextHighlight> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let highlight = text.remove_text_highlight(graph.storage_id, id)?;
+        *self = Self::from_package(text.into_package())?;
+        Ok(highlight)
     }
 
     /// Read the canonical list preset of a sheet-owned text box.

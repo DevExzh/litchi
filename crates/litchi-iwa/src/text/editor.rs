@@ -23,6 +23,11 @@ use super::drop_cap::{
     paragraph_drop_caps, remove_paragraph_drop_cap, set_paragraph_drop_cap,
 };
 use super::font::TextFont;
+use super::highlight::{
+    add_text_highlight, remove_text_highlight, remove_unreferenced_highlight_objects,
+    text_highlights, update_text_highlight,
+};
+use super::highlight_types::{TextHighlight, TextHighlightId};
 use super::hyperlink::{
     add_text_hyperlink, remove_text_hyperlink, remove_unreferenced_hyperlink_objects,
     text_hyperlinks, update_text_hyperlink,
@@ -355,6 +360,39 @@ impl IWorkTextEditor {
         id: TextHyperlinkId,
     ) -> Result<TextHyperlink> {
         remove_text_hyperlink(&mut self.package, object_id, id)
+    }
+
+    /// Read every native plain highlight in a text storage.
+    pub fn text_highlights(&self, object_id: u64) -> Result<Vec<TextHighlight>> {
+        text_highlights(&self.package, object_id)
+    }
+
+    /// Create a native plain highlight over a nonempty, unoccupied UTF-16 range.
+    pub fn add_text_highlight(
+        &mut self,
+        object_id: u64,
+        range: TextRange,
+    ) -> Result<TextHighlight> {
+        add_text_highlight(&mut self.package, object_id, range)
+    }
+
+    /// Atomically move a plain highlight while retaining its native identity.
+    pub fn update_text_highlight(
+        &mut self,
+        object_id: u64,
+        id: TextHighlightId,
+        range: TextRange,
+    ) -> Result<TextHighlight> {
+        update_text_highlight(&mut self.package, object_id, id, range)
+    }
+
+    /// Delete one plain highlight and its owned empty annotation graph.
+    pub fn remove_text_highlight(
+        &mut self,
+        object_id: u64,
+        id: TextHighlightId,
+    ) -> Result<TextHighlight> {
+        remove_text_highlight(&mut self.package, object_id, id)
     }
 
     /// Read the canonical list preset applied uniformly to a text storage.
@@ -1160,7 +1198,8 @@ fn replace_storage_text(
         }
         Ok(())
     })?;
-    remove_unreferenced_hyperlink_objects(package, &archive_name, &removed_references)
+    remove_unreferenced_hyperlink_objects(package, &archive_name, &removed_references)?;
+    remove_unreferenced_highlight_objects(package, &archive_name, &removed_references)
 }
 
 fn find_storage_archive(package: &IWorkPackage, object_id: u64) -> Result<String> {
@@ -1240,7 +1279,6 @@ fn adjust_storage_attributes(
         &mut storage.table_rubyfield,
         &mut storage.table_insertion,
         &mut storage.table_deletion,
-        &mut storage.table_highlight,
         &mut storage.table_tatechuyoko,
     ] {
         adjust_object_table(table, &range, replacement_units, false)?;
@@ -1251,7 +1289,14 @@ fn adjust_storage_attributes(
         replacement_units,
         false,
     )?;
-    normalize_smartfield_table(&mut storage.table_smartfield);
+    normalize_ranged_object_table(&mut storage.table_smartfield);
+    adjust_object_table(
+        &mut storage.table_highlight,
+        &range,
+        replacement_units,
+        false,
+    )?;
+    normalize_ranged_object_table(&mut storage.table_highlight);
     // A drop-cap record is a paragraph-start boundary. Numbers commonly emits
     // an explicit index-zero entry with no style reference as a sentinel, and
     // replacing the paragraph text must not erase that structural marker.
@@ -1291,22 +1336,24 @@ fn patch_storage_text_wire(
             adjust_index_table_wire(table, range, replacement_units, true)
         })?;
     }
-    for field in [9, 15, 16, 18, 21, 22, 23, 27] {
+    for field in [9, 15, 16, 18, 21, 22, 27] {
         data = transform_optional_table(&data, field, |table| {
             adjust_index_table_wire(table, range, replacement_units, false)
         })?;
     }
-    let smart_field_tables = repeated_length_delimited_payloads(&data, 11)?;
-    if smart_field_tables.len() > 1 {
-        return Err(Error::InvalidFormat(format!(
-            "singular TSWP storage table field 11 occurs {} times",
-            smart_field_tables.len()
-        )));
-    }
-    if let Some(table) = smart_field_tables.first() {
-        let adjusted = adjust_index_table_wire(table, range, replacement_units, false)?;
-        let normalized = normalize_smartfield_table_wire(&adjusted)?;
-        data = patch_length_delimited_field(&data, 11, true, normalized.as_deref())?;
+    for field in [11, 23] {
+        let tables = repeated_length_delimited_payloads(&data, field)?;
+        if tables.len() > 1 {
+            return Err(Error::InvalidFormat(format!(
+                "singular TSWP storage table field {field} occurs {} times",
+                tables.len()
+            )));
+        }
+        if let Some(table) = tables.first() {
+            let adjusted = adjust_index_table_wire(table, range, replacement_units, false)?;
+            let normalized = normalize_ranged_object_table_wire(&adjusted)?;
+            data = patch_length_delimited_field(&data, field, true, normalized.as_deref())?;
+        }
     }
     for field in [6, 14, 19, 20, 24] {
         data = transform_optional_table(&data, field, |table| {
@@ -1321,7 +1368,7 @@ fn patch_storage_text_wire(
     Ok(data)
 }
 
-fn normalize_smartfield_table(table: &mut Option<ObjectAttributeTable>) {
+fn normalize_ranged_object_table(table: &mut Option<ObjectAttributeTable>) {
     let Some(entries) = table.as_mut().map(|table| &mut table.entries) else {
         return;
     };
@@ -1345,7 +1392,7 @@ fn normalize_smartfield_table(table: &mut Option<ObjectAttributeTable>) {
     }
 }
 
-fn normalize_smartfield_table_wire(table: &[u8]) -> Result<Option<Vec<u8>>> {
+fn normalize_ranged_object_table_wire(table: &[u8]) -> Result<Option<Vec<u8>>> {
     let mut entries = repeated_length_delimited_payloads(table, 1)?
         .into_iter()
         .map(|raw| {

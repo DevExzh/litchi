@@ -49,6 +49,8 @@ println!("{}", structured.summary());
   including automatic-language sentinels and lossless boundary deletion
 - Native cross-suite text-hyperlink CRUD with typed nonempty UTF-16 ranges,
   lossless web, mail, and Keynote navigation targets, and owned-object cleanup
+- Native cross-suite plain-text highlight CRUD with typed nonempty UTF-16 ranges,
+  lossless table mutation, strict comment guards, and owned annotation cleanup
 - Lossless Pages document body/header/footer visibility, facing-page layout,
   automatic hyphenation, and ligature options
 - Typed Numbers table header/footer counts, freeze state, and repeating-header
@@ -1119,6 +1121,15 @@ and hyperlink payload survive edits. Web URLs, `mailto:` links, and Keynote
 targets such as `?slide=next` are represented losslessly. The Pages, Numbers,
 and Keynote text-box editors provide ownership-checked wrappers; see
 `edit_iwork_text_hyperlink` and `inspect_iwork_text_styles`.
+Native plain highlights use `TextHighlight`, `TextHighlightId`, and the same
+strict `TextRange` boundaries. Creation builds the complete native annotation
+graph with author, timestamp, and UUID metadata; range updates retain object
+identity and unknown wire fields; deletion reclaims the owned empty comment
+storage and generated author when unused. Comment-backed and overlapping
+annotations are rejected rather than silently losing user content. The
+ownership-checked Pages, Numbers, and Keynote wrappers are demonstrated by
+`edit_iwork_text_highlight`; `inspect_iwork_text_styles` reports both highlight
+IDs and ranges.
 Slide move, duplicate, and delete operations likewise rewrite only the nested
 slide-tree ownership list. Existing raw `TSP.Reference` payloads are reused,
 so extensions inside the show, slide tree, and individual references survive;
