@@ -326,6 +326,7 @@ pub struct Indentation {
     /// First line indent (in twips)
     pub first_line: i32,
 }
+#[derive(Debug,Clone,Copy,PartialEq,Eq,Default)]pub struct ParagraphLogicalIndentation{pub start:Option<i32>,pub end:Option<i32>,pub first_line_character_units:Option<i32>,pub left_character_units:Option<i32>,pub right_character_units:Option<i32>,pub mirrored:bool}
 
 /// Paragraph wrapping policy from `wrapdefault`, `nocwrap`, `nowwrap`, and `nooverflow`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -379,6 +380,7 @@ pub struct Paragraph {
     pub spacing_policy: ParagraphSpacingPolicy,
     /// Indentation
     pub indentation: Indentation,
+    pub logical_indentation: ParagraphLogicalIndentation,
     /// Custom tab stops in RTF declaration order
     pub tab_stops: super::border::TabStops,
     /// Borders

@@ -2660,6 +2660,7 @@ impl<W: Write> RtfWriter<W> {
         if para.indentation.first_line != 0 {
             self.write_control_word("fi", Some(para.indentation.first_line))?;
         }
+        let logical=para.logical_indentation;if let Some(v)=logical.start{self.write_control_word("lin",Some(v))?;}if let Some(v)=logical.end{self.write_control_word("rin",Some(v))?;}if let Some(v)=logical.first_line_character_units{self.write_control_word("cufi",Some(v))?;}if let Some(v)=logical.left_character_units{self.write_control_word("culi",Some(v))?;}if let Some(v)=logical.right_character_units{self.write_control_word("curi",Some(v))?;}if logical.mirrored{self.write_control_word("indmirror",None)?;}
 
         // Borders (if any)
         self.write_borders(&para.borders)?;

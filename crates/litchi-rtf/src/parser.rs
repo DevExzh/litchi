@@ -59,6 +59,7 @@ fn required_list_spacing(value: Option<i32>, name: &str) -> std::result::Result<
         RtfError::MalformedDocument(format!("RTF {name} must be in 0..=1000000"))
     })
 }
+fn required_paragraph_indent(value:Option<i32>,name:&str)->std::result::Result<i32,RtfError>{let value=value.ok_or_else(||RtfError::MalformedDocument(format!("RTF {name} requires a numeric parameter")))?;if value.unsigned_abs()>10_000_000{return Err(RtfError::MalformedDocument(format!("RTF {name} exceeds the supported range")))}Ok(value)}
 
 impl RtfEncoding {
     fn decode(self, bytes: &[u8]) -> Cow<'_, str> {
@@ -3513,6 +3514,7 @@ impl<'a> Parser<'a> {
             ControlWord::LeftIndent(n) => state.paragraph.indentation.left = *n,
             ControlWord::RightIndent(n) => state.paragraph.indentation.right = *n,
             ControlWord::FirstLineIndent(n) => state.paragraph.indentation.first_line = *n,
+            ControlWord::LogicalLeftIndent(v)=>state.paragraph.logical_indentation.start=Some(required_paragraph_indent(*v,"lin")?), ControlWord::LogicalRightIndent(v)=>state.paragraph.logical_indentation.end=Some(required_paragraph_indent(*v,"rin")?), ControlWord::CharacterFirstLineIndent(v)=>state.paragraph.logical_indentation.first_line_character_units=Some(required_paragraph_indent(*v,"cufi")?), ControlWord::CharacterLeftIndent(v)=>state.paragraph.logical_indentation.left_character_units=Some(required_paragraph_indent(*v,"culi")?), ControlWord::CharacterRightIndent(v)=>state.paragraph.logical_indentation.right_character_units=Some(required_paragraph_indent(*v,"curi")?), ControlWord::MirrorIndents(v)=>{strict_paragraph_selector(*v,"indmirror")?;state.paragraph.logical_indentation.mirrored=true;},
 
             // Paragraph additional properties
             ControlWord::KeepTogether => state.paragraph.keep_together = true,
@@ -6640,6 +6642,7 @@ impl<'a> Parser<'a> {
             ControlWord::FirstLineIndent(value) => {
                 state.paragraph.indentation.first_line = *value;
             },
+            ControlWord::LogicalLeftIndent(v)=>state.paragraph.logical_indentation.start=Some(required_paragraph_indent(*v,"lin")?), ControlWord::LogicalRightIndent(v)=>state.paragraph.logical_indentation.end=Some(required_paragraph_indent(*v,"rin")?), ControlWord::CharacterFirstLineIndent(v)=>state.paragraph.logical_indentation.first_line_character_units=Some(required_paragraph_indent(*v,"cufi")?), ControlWord::CharacterLeftIndent(v)=>state.paragraph.logical_indentation.left_character_units=Some(required_paragraph_indent(*v,"culi")?), ControlWord::CharacterRightIndent(v)=>state.paragraph.logical_indentation.right_character_units=Some(required_paragraph_indent(*v,"curi")?), ControlWord::MirrorIndents(v)=>{strict_paragraph_selector(*v,"indmirror")?;state.paragraph.logical_indentation.mirrored=true;},
             ControlWord::KeepTogether => state.paragraph.keep_together = true,
             ControlWord::KeepNext => state.paragraph.keep_next = true,
             ControlWord::PageBreakBefore => state.paragraph.page_break_before = true,

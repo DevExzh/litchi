@@ -150,6 +150,7 @@ pub struct XlsWorkbook<R: Read + Seek> {
     vba_metadata: crate::xls::vba::XlsVbaMetadata,
     environment: crate::xls::environment::XlsWorkbookEnvironment,
     write_access: crate::xls::XlsResult<Option<crate::xls::access::XlsWriteAccess>>,
+    table_styles: Option<crate::xls::table_styles::XlsTableStyles>,
     workbook_view: crate::xls::workbook_view::XlsWorkbookView,
     function_groups: Option<crate::xls::function_group::XlsFunctionGroups>,
     external_links: crate::xls::external_link::XlsExternalLinks,
@@ -193,6 +194,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             vba_metadata: crate::xls::vba::XlsVbaMetadata::default(),
             environment: crate::xls::environment::XlsWorkbookEnvironment::default(),
             write_access: Ok(None),
+            table_styles: None,
             workbook_view: crate::xls::workbook_view::XlsWorkbookView::default(),
             function_groups: None,
         };
@@ -239,6 +241,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             vba_metadata: crate::xls::vba::XlsVbaMetadata::default(),
             environment: crate::xls::environment::XlsWorkbookEnvironment::default(),
             write_access: Ok(None),
+            table_styles: None,
             workbook_view: crate::xls::workbook_view::XlsWorkbookView::default(),
             function_groups: None,
         };
@@ -360,6 +363,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         let mut vba_collector = crate::xls::vba::WorkbookVbaCollector::new();
         let mut environment_collector = crate::xls::environment::EnvironmentCollector::new();
         let mut write_access_collector = crate::xls::access::WriteAccessCollector::new();
+        let mut table_styles_collector = crate::xls::table_styles::TableStylesCollector::new();
         let mut workbook_view_collector = crate::xls::workbook_view::WorkbookViewCollector::new();
         let mut function_group_collector = crate::xls::function_group::FunctionGroupCollector::new();
         let mut external_link_collector = crate::xls::external_link::ExternalLinkCollector::new();
@@ -371,6 +375,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             vba_collector.feed_record(record.header.record_type, &record.data)?;
             environment_collector.feed_record(record.header.record_type, &record.data)?;
             write_access_collector.feed_record(record.header.record_type, &record.data);
+            table_styles_collector.feed_record(record.header.record_type, &record.data)?;
             workbook_view_collector.feed_record(record.header.record_type, &record.data)?;
             function_group_collector.feed_record(record.header.record_type, &record.data)?;
             external_link_collector.feed_record(record.header.record_type, &record.data)?;
@@ -471,6 +476,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                     self.vba_metadata = vba_collector.finish();
                     self.environment = environment_collector.finish()?;
                     self.write_access = write_access_collector.finish();
+                    self.table_styles = table_styles_collector.finish();
                     self.workbook_view = workbook_view_collector.finish(bound_sheets.len())?;
                     self.function_groups = function_group_collector.finish()?;
                     self.external_links = external_link_collector.finish(bound_sheets.len())?;
@@ -954,6 +960,11 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                 message: format!("invalid WriteAccess metadata: {error}"),
             }),
         }
+    }
+
+    /// Default table and PivotTable style catalog, when present.
+    pub fn table_styles(&self) -> Option<&crate::xls::table_styles::XlsTableStyles> {
+        self.table_styles.as_ref()
     }
 
     pub fn number_formats(&self) -> &[XlsNumberFormat] {

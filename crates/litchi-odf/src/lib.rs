@@ -503,3 +503,6 @@ pub use elements::text::{Heading, List, ListItem, Paragraph}; // Span is equival
 
 // Re-export parser types for document element iteration
 pub use elements::parser::{DocumentOrderElement, DocumentParser};
+
+pub mod section_properties;
+pub use section_properties::*;

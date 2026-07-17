@@ -58,6 +58,7 @@ pub mod parsers;
 pub mod phonetic_properties;
 pub mod pivot;
 pub mod print_options;
+pub mod printer_settings;
 pub mod shared_strings;
 pub mod sheet_format;
 pub mod sheet_properties;
@@ -190,6 +191,12 @@ pub use phonetic_properties::{
     parse_worksheet_phonetic_properties,
 };
 pub use print_options::{WorksheetPrintOptions, parse_worksheet_print_options};
+pub use printer_settings::{
+    PrinterSettingsConformance, PrinterSettingsResource, WorksheetPrinterSettings,
+    WorksheetPrinterSettingsReference, load_worksheet_printer_settings,
+    parse_worksheet_printer_settings_reference, store_worksheet_printer_settings,
+    write_worksheet_printer_settings_reference,
+};
 pub use sort::{SortBy, SortCondition, SortMethod, SortState};
 pub use sparkline::{
     Sparkline, SparklineAxisMinMax, SparklineColor, SparklineDisplayEmptyCellsAs, SparklineGroup,

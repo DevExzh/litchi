@@ -6,8 +6,6 @@ use super::write_record_header;
 const SXDBEX_CREATION_TIMESTAMP: [u8; 8] = [0xFC, 0xE5, 0x58, 0x44, 0xBC, 0x7D, 0xE6, 0x40];
 
 const TABLE_STYLES_RECORD_ID: u16 = 0x088E;
-const TABLE_STYLES_RESERVED: [u8; 8] = [0; 8];
-const TABLE_STYLES_COUNT_HINT: u32 = 0x0000_0090;
 const DEFAULT_TABLE_STYLE_NAME: &str = "TableStyleMedium2";
 const DEFAULT_PIVOT_STYLE_NAME: &str = "PivotStyleLight16";
 
@@ -55,13 +53,6 @@ fn write_frt_header<W: Write>(writer: &mut W, record_id: u16) -> XlsResult<()> {
     Ok(())
 }
 
-fn write_wide_string<W: Write>(writer: &mut W, value: &str) -> XlsResult<()> {
-    for ch in value.encode_utf16() {
-        writer.write_all(&ch.to_le_bytes())?;
-    }
-    Ok(())
-}
-
 fn write_sxaddl_header<W: Write>(writer: &mut W, header: SxAddlHeader) -> XlsResult<()> {
     write_frt_header(writer, SXADDL_RECORD_ID)?;
     writer.write_all(&[header.class as u8])?;
@@ -72,19 +63,17 @@ fn write_sxaddl_header<W: Write>(writer: &mut W, header: SxAddlHeader) -> XlsRes
 }
 
 pub fn write_table_styles<W: Write>(writer: &mut W) -> XlsResult<()> {
-    let table_style_name_len = DEFAULT_TABLE_STYLE_NAME.encode_utf16().count() as u16;
-    let pivot_style_name_len = DEFAULT_PIVOT_STYLE_NAME.encode_utf16().count() as u16;
-    let data_len =
-        20u16 + table_style_name_len.saturating_mul(2) + pivot_style_name_len.saturating_mul(2);
-
+    let styles = crate::xls::table_styles::XlsTableStyles::try_new(
+        144,
+        DEFAULT_TABLE_STYLE_NAME,
+        DEFAULT_PIVOT_STYLE_NAME,
+    )?;
+    let payload = styles.to_payload()?;
+    let data_len = u16::try_from(payload.len()).map_err(|_| {
+        crate::xls::XlsError::InvalidData("TABLESTYLES payload exceeds BIFF record size".to_string())
+    })?;
     write_record_header(writer, TABLE_STYLES_RECORD_ID, data_len)?;
-    write_frt_header(writer, TABLE_STYLES_RECORD_ID)?;
-    writer.write_all(&TABLE_STYLES_RESERVED)?;
-    writer.write_all(&TABLE_STYLES_COUNT_HINT.to_le_bytes())?;
-    writer.write_all(&table_style_name_len.to_le_bytes())?;
-    writer.write_all(&pivot_style_name_len.to_le_bytes())?;
-    write_wide_string(writer, DEFAULT_TABLE_STYLE_NAME)?;
-    write_wide_string(writer, DEFAULT_PIVOT_STYLE_NAME)?;
+    writer.write_all(&payload)?;
     Ok(())
 }
 

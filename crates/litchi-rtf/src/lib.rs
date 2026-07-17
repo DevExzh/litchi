@@ -147,7 +147,7 @@ pub use table::{Cell, Row, Table};
 pub use types::{
     Alignment, AssociatedCharacterFormatting, Color, ColorRef, ColorTable, DocumentElement, Font,
     FontFamily, FontPitch, FontRef, FontTable, Formatting, Indentation, Paragraph,
-    ParagraphContent, ParagraphFontAlignment, ParagraphLineBreaking, ParagraphSpacingPolicy,
+    ParagraphContent, ParagraphFontAlignment, ParagraphLineBreaking, ParagraphLogicalIndentation, ParagraphSpacingPolicy,
     ParagraphWrapping,
     Run, Spacing, StyleBlock, TextDirection, UnderlineStyle,
 };

@@ -41,6 +41,9 @@ mod environment;
 /// Inert BIFF8 workbook access-provenance metadata.
 mod access;
 
+/// BIFF8 default table and PivotTable style catalog metadata.
+mod table_styles;
+
 /// BIFF8 workbook windows and stable sheet-tab identifiers.
 mod workbook_view;
 
@@ -126,6 +129,7 @@ pub use scenario::{XlsScenario, XlsScenarioCell, XlsScenarioManager, XlsScenario
 pub use vba::XlsVbaMetadata;
 pub use environment::{XlsLinkUpdateMode, XlsObjectDisplayMode, XlsWorkbookEnvironment};
 pub use access::{XlsWriteAccess, XlsWriteAccessEncoding};
+pub use table_styles::XlsTableStyles;
 pub use workbook_view::{XlsWorkbookView, XlsWorkbookWindow};
 pub use function_group::{XlsBuiltInFunctionCategories, XlsFunctionGroups};
 pub use external_link::{

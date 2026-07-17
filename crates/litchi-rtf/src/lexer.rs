@@ -318,6 +318,7 @@ pub enum ControlWord<'a> {
     LeftIndent(i32),
     RightIndent(i32),
     FirstLineIndent(i32),
+    LogicalLeftIndent(Option<i32>), LogicalRightIndent(Option<i32>), CharacterFirstLineIndent(Option<i32>), CharacterLeftIndent(Option<i32>), CharacterRightIndent(Option<i32>), MirrorIndents(Option<i32>),
 
     // Paragraph additional properties
     KeepTogether,
@@ -1164,6 +1165,7 @@ impl<'a> Lexer<'a> {
             "li" => ControlWord::LeftIndent(param_value),
             "ri" => ControlWord::RightIndent(param_value),
             "fi" => ControlWord::FirstLineIndent(param_value),
+            "lin" => ControlWord::LogicalLeftIndent(param), "rin" => ControlWord::LogicalRightIndent(param), "cufi" => ControlWord::CharacterFirstLineIndent(param), "culi" => ControlWord::CharacterLeftIndent(param), "curi" => ControlWord::CharacterRightIndent(param), "indmirror" => ControlWord::MirrorIndents(param),
 
             // Paragraph additional properties
             "keep" => ControlWord::KeepTogether,
