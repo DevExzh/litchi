@@ -44,6 +44,22 @@ fn strict_paragraph_selector(
     Ok(())
 }
 
+fn required_paragraph_bool(value: Option<i32>, name: &str) -> std::result::Result<bool, RtfError> {
+    match value {
+        Some(0) => Ok(false),
+        Some(1) => Ok(true),
+        None => Err(RtfError::MalformedDocument(format!("RTF {name} requires 0 or 1"))),
+        Some(_) => Err(RtfError::MalformedDocument(format!("RTF {name} accepts only 0 or 1"))),
+    }
+}
+
+fn required_list_spacing(value: Option<i32>, name: &str) -> std::result::Result<u32, RtfError> {
+    let value = value.ok_or_else(|| RtfError::MalformedDocument(format!("RTF {name} requires a numeric parameter")))?;
+    u32::try_from(value).ok().filter(|value| *value <= 1_000_000).ok_or_else(|| {
+        RtfError::MalformedDocument(format!("RTF {name} must be in 0..=1000000"))
+    })
+}
+
 impl RtfEncoding {
     fn decode(self, bytes: &[u8]) -> Cow<'_, str> {
         match self {
@@ -3486,6 +3502,12 @@ impl<'a> Parser<'a> {
             ControlWord::SpaceAfter(n) => state.paragraph.spacing.after = *n,
             ControlWord::SpaceBetween(n) => state.paragraph.spacing.line = *n,
             ControlWord::LineMultiple(b) => state.paragraph.spacing.line_multiple = *b,
+            ControlWord::SpaceBeforeAuto(value) => state.paragraph.spacing_policy.automatic_before = required_paragraph_bool(*value, "sbauto")?,
+            ControlWord::SpaceAfterAuto(value) => state.paragraph.spacing_policy.automatic_after = required_paragraph_bool(*value, "saauto")?,
+            ControlWord::ListSpaceBefore(value) => state.paragraph.spacing_policy.list_before = Some(required_list_spacing(*value, "lisb")?),
+            ControlWord::ListSpaceAfter(value) => state.paragraph.spacing_policy.list_after = Some(required_list_spacing(*value, "lisa")?),
+            ControlWord::NoSnapLineGrid(value) => { strict_paragraph_selector(*value, "nosnaplinegrid")?; state.paragraph.spacing_policy.snap_to_line_grid = false; },
+            ControlWord::ContextualSpacing(value) => { strict_paragraph_selector(*value, "contextualspace")?; state.paragraph.spacing_policy.contextual_spacing = true; },
 
             // Paragraph indentation
             ControlWord::LeftIndent(n) => state.paragraph.indentation.left = *n,
@@ -6607,6 +6629,12 @@ impl<'a> Parser<'a> {
             ControlWord::SpaceAfter(value) => state.paragraph.spacing.after = *value,
             ControlWord::SpaceBetween(value) => state.paragraph.spacing.line = *value,
             ControlWord::LineMultiple(value) => state.paragraph.spacing.line_multiple = *value,
+            ControlWord::SpaceBeforeAuto(value) => state.paragraph.spacing_policy.automatic_before = required_paragraph_bool(*value, "sbauto")?,
+            ControlWord::SpaceAfterAuto(value) => state.paragraph.spacing_policy.automatic_after = required_paragraph_bool(*value, "saauto")?,
+            ControlWord::ListSpaceBefore(value) => state.paragraph.spacing_policy.list_before = Some(required_list_spacing(*value, "lisb")?),
+            ControlWord::ListSpaceAfter(value) => state.paragraph.spacing_policy.list_after = Some(required_list_spacing(*value, "lisa")?),
+            ControlWord::NoSnapLineGrid(value) => { strict_paragraph_selector(*value, "nosnaplinegrid")?; state.paragraph.spacing_policy.snap_to_line_grid = false; },
+            ControlWord::ContextualSpacing(value) => { strict_paragraph_selector(*value, "contextualspace")?; state.paragraph.spacing_policy.contextual_spacing = true; },
             ControlWord::LeftIndent(value) => state.paragraph.indentation.left = *value,
             ControlWord::RightIndent(value) => state.paragraph.indentation.right = *value,
             ControlWord::FirstLineIndent(value) => {

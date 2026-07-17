@@ -286,6 +286,36 @@ pub struct Spacing {
     pub line_multiple: bool,
 }
 
+/// Paragraph spacing policy layered over raw twip spacing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ParagraphSpacingPolicy {
+    /// `sbauto1` makes space-before automatic and ignores `sbN`.
+    pub automatic_before: bool,
+    /// `saauto1` makes space-after automatic and ignores `saN`.
+    pub automatic_after: bool,
+    /// `lisbN`, in hundredths of a character unit; overrides `sbN` when present.
+    pub list_before: Option<u32>,
+    /// `lisaN`, in hundredths of a character unit; overrides `saN` when present.
+    pub list_after: Option<u32>,
+    /// Whether lines snap to the document grid; disabled by `nosnaplinegrid`.
+    pub snap_to_line_grid: bool,
+    /// Suppress before/after spacing between adjacent paragraphs of the same style.
+    pub contextual_spacing: bool,
+}
+
+impl Default for ParagraphSpacingPolicy {
+    fn default() -> Self {
+        Self {
+            automatic_before: false,
+            automatic_after: false,
+            list_before: None,
+            list_after: None,
+            snap_to_line_grid: true,
+            contextual_spacing: false,
+        }
+    }
+}
+
 /// Indentation information for paragraphs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Indentation {
@@ -345,6 +375,8 @@ pub struct Paragraph {
     pub alignment: Alignment,
     /// Spacing
     pub spacing: Spacing,
+    /// Automatic, list-unit, contextual, and grid spacing policy.
+    pub spacing_policy: ParagraphSpacingPolicy,
     /// Indentation
     pub indentation: Indentation,
     /// Custom tab stops in RTF declaration order

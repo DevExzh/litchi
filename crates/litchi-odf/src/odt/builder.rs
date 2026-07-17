@@ -41,6 +41,7 @@ pub struct DocumentBuilder {
     paragraph_tab_styles: Vec<crate::ParagraphStyleTabStops>,
     paragraph_drop_cap_styles: Vec<crate::ParagraphStyleDropCap>,
     list_level_label_alignments: Vec<crate::ListStyleLevelLabelAlignment>,
+    paragraph_flow_styles: Vec<crate::ParagraphStyleFlow>,
     page_layout_columns: Vec<(String, crate::StyleColumns)>,
     page_layout_footnote_separators: Vec<(String, crate::StyleFootnoteSeparator)>,
 }
@@ -68,6 +69,7 @@ impl DocumentBuilder {
             paragraph_tab_styles: Vec::new(),
             paragraph_drop_cap_styles: Vec::new(),
             list_level_label_alignments: Vec::new(),
+            paragraph_flow_styles: Vec::new(),
             page_layout_columns: Vec::new(),
             page_layout_footnote_separators: Vec::new(),
         }
@@ -121,6 +123,7 @@ impl DocumentBuilder {
         let item=crate::ListStyleLevelLabelAlignment::new("L1",level,alignment)?;
         if let Some(old)=self.list_level_label_alignments.iter_mut().find(|x|x.level==level){*old=item}else{self.list_level_label_alignments.push(item)}Ok(self)
     }
+    pub fn add_paragraph_flow_style(&mut self,style:crate::ParagraphStyleFlow)->Result<&mut Self>{style.validate()?;if self.paragraph_flow_styles.len()>=4096||self.paragraph_flow_styles.iter().any(|x|x.name==style.name&&x.is_default_style==style.is_default_style){return Err(litchi_core::Error::InvalidFormat("duplicate or excessive paragraph flow style".to_string()))}if self.paragraph_tab_styles.iter().any(|x|x.name==style.name&&x.is_default_style==style.is_default_style)||self.paragraph_drop_cap_styles.iter().any(|x|x.name==style.name&&x.is_default_style==style.is_default_style){return Err(litchi_core::Error::InvalidFormat("paragraph flow style conflicts with another typed paragraph style".to_string()))}self.paragraph_flow_styles.push(style);Ok(self)}
 
     /// Add a named automatic page layout with typed multi-column properties.
     pub fn add_page_layout_columns(
@@ -576,6 +579,7 @@ impl DocumentBuilder {
                 .collect::<String>();
             xml.insert_str(insertion, &fragments);
         }
+        if !self.paragraph_flow_styles.is_empty(){let insertion=xml.find("</office:styles>").expect("static styles root");let fragments=self.paragraph_flow_styles.iter().map(|x|x.to_xml_fragment().expect("validated paragraph flow style")).collect::<String>();xml.insert_str(insertion,&fragments);}
         if !self.page_layout_columns.is_empty() || !self.page_layout_footnote_separators.is_empty() {
             let mut fragments = self
                 .page_layout_columns

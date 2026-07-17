@@ -38,6 +38,9 @@ mod vba;
 /// BIFF8 workbook-global environment and behavioral options.
 mod environment;
 
+/// Inert BIFF8 workbook access-provenance metadata.
+mod access;
+
 /// BIFF8 workbook windows and stable sheet-tab identifiers.
 mod workbook_view;
 
@@ -122,6 +125,7 @@ pub use calculation::{
 pub use scenario::{XlsScenario, XlsScenarioCell, XlsScenarioManager, XlsScenarioRange};
 pub use vba::XlsVbaMetadata;
 pub use environment::{XlsLinkUpdateMode, XlsObjectDisplayMode, XlsWorkbookEnvironment};
+pub use access::{XlsWriteAccess, XlsWriteAccessEncoding};
 pub use workbook_view::{XlsWorkbookView, XlsWorkbookWindow};
 pub use function_group::{XlsBuiltInFunctionCategories, XlsFunctionGroups};
 pub use external_link::{

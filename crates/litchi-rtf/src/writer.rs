@@ -2625,6 +2625,24 @@ impl<W: Write> RtfWriter<W> {
         if para.spacing.after != 0 {
             self.write_control_word("sa", Some(para.spacing.after))?;
         }
+        if let Some(value) = para.spacing_policy.list_before {
+            self.write_control_word("lisb", Some(i32::try_from(value).map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "RTF lisb exceeds i32"))?))?;
+        }
+        if let Some(value) = para.spacing_policy.list_after {
+            self.write_control_word("lisa", Some(i32::try_from(value).map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "RTF lisa exceeds i32"))?))?;
+        }
+        if para.spacing_policy.automatic_before {
+            self.write_control_word("sbauto", Some(1))?;
+        }
+        if para.spacing_policy.automatic_after {
+            self.write_control_word("saauto", Some(1))?;
+        }
+        if !para.spacing_policy.snap_to_line_grid {
+            self.write_control_word("nosnaplinegrid", None)?;
+        }
+        if para.spacing_policy.contextual_spacing {
+            self.write_control_word("contextualspace", None)?;
+        }
         if para.spacing.line != 0 {
             self.write_control_word("sl", Some(para.spacing.line))?;
             if para.spacing.line_multiple {

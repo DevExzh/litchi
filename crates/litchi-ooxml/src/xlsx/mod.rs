@@ -50,6 +50,7 @@ pub mod header_footer;
 pub mod ignored_errors;
 mod namespace;
 pub mod named_sheet_view;
+pub mod ole_objects;
 pub mod outline_properties;
 pub mod page_margins;
 pub mod page_setup;
@@ -172,6 +173,12 @@ pub use named_sheet_view::{
     NamedSheetViewSortRules, NamedSheetViews, parse_named_sheet_views,
 };
 pub use outline_properties::{WorksheetOutlineProperties, parse_worksheet_outline_properties};
+pub use ole_objects::{
+    OleObjectAnchor, OleObjectAspect, OleObjectConformance, OleObjectMarker,
+    OleObjectProperties, OleObjectRelationshipKind, OleObjectResource, OleObjectTarget,
+    OleObjectUpdate, WorksheetOleObject, WorksheetOleObjects, load_worksheet_ole_objects,
+    parse_worksheet_ole_objects, store_worksheet_ole_objects, write_worksheet_ole_objects,
+};
 pub use page_margins::{PageMargin, WorksheetPageMargins, parse_worksheet_page_margins};
 pub use page_setup::{
     PageSetupCellComments, PageSetupOrder, PageSetupOrientation, PageSetupPrintErrors,

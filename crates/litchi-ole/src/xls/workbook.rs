@@ -149,6 +149,7 @@ pub struct XlsWorkbook<R: Read + Seek> {
     calculation: crate::xls::calculation::XlsWorkbookCalculation,
     vba_metadata: crate::xls::vba::XlsVbaMetadata,
     environment: crate::xls::environment::XlsWorkbookEnvironment,
+    write_access: crate::xls::XlsResult<Option<crate::xls::access::XlsWriteAccess>>,
     workbook_view: crate::xls::workbook_view::XlsWorkbookView,
     function_groups: Option<crate::xls::function_group::XlsFunctionGroups>,
     external_links: crate::xls::external_link::XlsExternalLinks,
@@ -191,6 +192,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             calculation: crate::xls::calculation::XlsWorkbookCalculation::default(),
             vba_metadata: crate::xls::vba::XlsVbaMetadata::default(),
             environment: crate::xls::environment::XlsWorkbookEnvironment::default(),
+            write_access: Ok(None),
             workbook_view: crate::xls::workbook_view::XlsWorkbookView::default(),
             function_groups: None,
         };
@@ -236,6 +238,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             calculation: crate::xls::calculation::XlsWorkbookCalculation::default(),
             vba_metadata: crate::xls::vba::XlsVbaMetadata::default(),
             environment: crate::xls::environment::XlsWorkbookEnvironment::default(),
+            write_access: Ok(None),
             workbook_view: crate::xls::workbook_view::XlsWorkbookView::default(),
             function_groups: None,
         };
@@ -356,6 +359,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             crate::xls::calculation::WorkbookCalculationCollector::new();
         let mut vba_collector = crate::xls::vba::WorkbookVbaCollector::new();
         let mut environment_collector = crate::xls::environment::EnvironmentCollector::new();
+        let mut write_access_collector = crate::xls::access::WriteAccessCollector::new();
         let mut workbook_view_collector = crate::xls::workbook_view::WorkbookViewCollector::new();
         let mut function_group_collector = crate::xls::function_group::FunctionGroupCollector::new();
         let mut external_link_collector = crate::xls::external_link::ExternalLinkCollector::new();
@@ -366,6 +370,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             calculation_collector.feed_record(record.header.record_type, &record.data)?;
             vba_collector.feed_record(record.header.record_type, &record.data)?;
             environment_collector.feed_record(record.header.record_type, &record.data)?;
+            write_access_collector.feed_record(record.header.record_type, &record.data);
             workbook_view_collector.feed_record(record.header.record_type, &record.data)?;
             function_group_collector.feed_record(record.header.record_type, &record.data)?;
             external_link_collector.feed_record(record.header.record_type, &record.data)?;
@@ -465,6 +470,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                     self.calculation = calculation_collector.finish();
                     self.vba_metadata = vba_collector.finish();
                     self.environment = environment_collector.finish()?;
+                    self.write_access = write_access_collector.finish();
                     self.workbook_view = workbook_view_collector.finish(bound_sheets.len())?;
                     self.function_groups = function_group_collector.finish()?;
                     self.external_links = external_link_collector.finish(bound_sheets.len())?;
@@ -935,6 +941,19 @@ impl<R: Read + Seek> XlsWorkbook<R> {
 
     pub fn environment(&self) -> &crate::xls::environment::XlsWorkbookEnvironment {
         &self.environment
+    }
+
+    /// Strictly access the user recorded as last creating, opening, or modifying the workbook.
+    ///
+    /// Noncanonical legacy producer variants are deferred until this metadata is requested.
+    pub fn write_access(&self) -> XlsResult<Option<&crate::xls::access::XlsWriteAccess>> {
+        match &self.write_access {
+            Ok(value) => Ok(value.as_ref()),
+            Err(error) => Err(XlsError::InvalidRecord {
+                record_type: crate::xls::access::WRITE_ACCESS_RECORD_TYPE,
+                message: format!("invalid WriteAccess metadata: {error}"),
+            }),
+        }
     }
 
     pub fn number_formats(&self) -> &[XlsNumberFormat] {

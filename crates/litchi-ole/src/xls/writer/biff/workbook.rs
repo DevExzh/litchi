@@ -6,7 +6,6 @@ use std::io::Write;
 use super::write_record_header;
 
 const WRITE_ACCESS_DATA_LEN: u16 = 112;
-const WRITE_ACCESS_STRING_BYTES: usize = (WRITE_ACCESS_DATA_LEN as usize) - 3;
 
 /// Workbook-global EXTERNSHEET layout mode.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -47,37 +46,9 @@ pub fn write_interface_end<W: Write>(writer: &mut W) -> XlsResult<()> {
 ///
 /// Record type: 0x005C
 pub fn write_write_access<W: Write>(writer: &mut W, username: &str) -> XlsResult<()> {
-    let is_16bit = !username.is_ascii();
-    let encoded_len = if is_16bit {
-        username.encode_utf16().count().saturating_mul(2)
-    } else {
-        username.len()
-    };
-
-    if encoded_len > WRITE_ACCESS_STRING_BYTES {
-        return Err(XlsError::InvalidData(
-            "WRITEACCESS username exceeds BIFF8 fixed-size payload".to_string(),
-        ));
-    }
-
+    let access = crate::xls::access::XlsWriteAccess::try_new(username)?;
     write_record_header(writer, 0x005C, WRITE_ACCESS_DATA_LEN)?;
-    writer.write_all(&(username.chars().count() as u16).to_le_bytes())?;
-    writer.write_all(&[u8::from(is_16bit)])?;
-
-    let mut payload = [b' '; WRITE_ACCESS_STRING_BYTES];
-    if is_16bit {
-        let mut offset = 0usize;
-        for code_unit in username.encode_utf16() {
-            let bytes = code_unit.to_le_bytes();
-            payload[offset] = bytes[0];
-            payload[offset + 1] = bytes[1];
-            offset += 2;
-        }
-    } else {
-        payload[..username.len()].copy_from_slice(username.as_bytes());
-    }
-
-    writer.write_all(&payload)?;
+    writer.write_all(&access.to_payload()?)?;
     Ok(())
 }
 

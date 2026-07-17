@@ -300,6 +300,7 @@ pub mod content_validation;
 mod paragraph_tab_stop;
 mod paragraph_drop_cap;
 mod list_label_alignment;
+mod paragraph_flow;
 mod style_columns;
 mod footnote_separator;
 /// ODF XML element classes
@@ -370,6 +371,7 @@ pub use paragraph_drop_cap::{
 pub use list_label_alignment::{LabelFollowedBy, ListLabelLength, ListLevelLabelAlignment,
     ListLevelLabelAlignmentSet, ListStyleKind, ListStyleLevelLabelAlignment,
     parse_list_level_label_alignments};
+pub use paragraph_flow::{HyphenationKeep,HyphenationLadder,Keep,LineBreak,ParagraphFlowProperties,ParagraphStyleFlow,ParagraphStyleFlowSet,PunctuationWrap,parse_paragraph_style_flows};
 pub use style_columns::{
     MAX_STYLE_COLUMNS, StyleColumn, StyleColumnLength, StyleColumnSeparator,
     StyleColumnSeparatorAlignment, StyleColumnSeparatorStyle, StyleColumns,
