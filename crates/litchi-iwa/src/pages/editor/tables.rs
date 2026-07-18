@@ -874,6 +874,48 @@ mod tests {
     }
 
     #[test]
+    fn source_built_footer_formula_expands_and_contracts_with_body_rows() {
+        let mut editor = PagesDocumentBuilder::new()
+            .body_table("Footer aggregate", 4, 3)
+            .build()
+            .unwrap();
+        let model_id = editor.tables().unwrap()[0].model_object_id;
+        editor
+            .set_table_header_settings(
+                model_id,
+                PagesTableHeaderSettings {
+                    footer_rows: Some(PagesTableHeaderCount::ONE),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        editor
+            .set_table_formula(
+                model_id,
+                3,
+                1,
+                PagesTableFormulaExpression::function(
+                    "SUM",
+                    [PagesTableFormulaExpression::range(
+                        PagesTableFormulaCellReference::relative(1, 1),
+                        PagesTableFormulaCellReference::relative(2, 1),
+                    )],
+                ),
+                PagesTableFormulaCachedValue::Number(3.0),
+            )
+            .unwrap();
+        let baseline = editor.to_bytes().unwrap();
+
+        editor.insert_table_row(model_id, 3).unwrap();
+        assert_eq!(
+            editor.table_formula(model_id, 4, 1).unwrap().as_deref(),
+            Some("=SUM(B2:B4)")
+        );
+        editor.remove_table_row(model_id, 3).unwrap();
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
+    }
+
+    #[test]
     fn source_built_table_roundtrips_title_settings_transactionally() {
         let mut editor = PagesDocumentBuilder::new()
             .body_table("Revenue", 2, 2)

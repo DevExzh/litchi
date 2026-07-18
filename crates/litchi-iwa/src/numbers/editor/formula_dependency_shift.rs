@@ -29,6 +29,30 @@ enum DependencyMutation {
     Delete,
 }
 
+#[derive(Debug, Default)]
+struct FormulaDependencyAdjustments {
+    local_precedents: BTreeMap<(u32, u32), LocalPrecedentAdjustments>,
+}
+
+#[derive(Debug, Default)]
+struct LocalPrecedentAdjustments {
+    insert: Vec<(u32, u32)>,
+    remove: Vec<(u32, u32)>,
+}
+
+impl LocalPrecedentAdjustments {
+    fn normalize(&mut self) {
+        self.insert.sort_unstable();
+        self.insert.dedup();
+        self.remove.sort_unstable();
+        self.remove.dedup();
+    }
+
+    fn is_empty(&self) -> bool {
+        self.insert.is_empty() && self.remove.is_empty()
+    }
+}
+
 impl DependencyMutation {
     fn verb(self) -> &'static str {
         match self {
@@ -94,7 +118,7 @@ fn mutate_formula_dependencies(
     if !package.contains_entry(COMPONENT) {
         return Ok(());
     }
-    rewrite_formula_asts(package, table_info_id, axis, position, mutation)?;
+    let adjustments = rewrite_formula_asts(package, table_info_id, axis, position, mutation)?;
     package.update_archive(COMPONENT, |archive| {
         let Some((owner_id, message_index)) = archive.objects.iter().find_map(|object| {
             object.messages.iter().enumerate().find_map(|(index, message)| {
@@ -139,6 +163,7 @@ fn mutate_formula_dependencies(
                     position,
                     internal_owner_id,
                     mutation,
+                    &adjustments,
                 )?;
             }
         }
@@ -184,6 +209,7 @@ fn mutate_formula_dependencies(
                     position,
                     internal_owner_id,
                     mutation,
+                    &adjustments,
                 )?;
                 let (coordinate, tile_begin, tile_size) = match axis {
                     DependencyAxis::Column => (
@@ -444,7 +470,9 @@ fn mutate_dependency_record(
     position: u32,
     internal_owner_id: u32,
     mutation: DependencyMutation,
+    adjustments: &FormulaDependencyAdjustments,
 ) -> Result<()> {
+    let previous_host = (record.row, record.column);
     match axis {
         DependencyAxis::Column => {
             record.column = mutation.coordinate(record.column, position, "formula column")?;
@@ -464,19 +492,65 @@ fn mutate_dependency_record(
             "Numbers formula dependency edge arrays have inconsistent lengths".to_owned(),
         ));
     }
-    let local_coordinates = match axis {
-        DependencyAxis::Column => &mut edges.edge_without_owner_columns,
-        DependencyAxis::Row => &mut edges.edge_without_owner_rows,
-    };
-    for coordinate in local_coordinates {
-        *coordinate = mutation.coordinate(
-            *coordinate,
-            position,
+    if let Some(adjustment) = adjustments.local_precedents.get(&previous_host) {
+        if adjustment.remove.iter().any(|coordinate| {
+            !edges
+                .edge_without_owner_rows
+                .iter()
+                .copied()
+                .zip(edges.edge_without_owner_columns.iter().copied())
+                .any(|existing| existing == *coordinate)
+        }) {
+            return Err(Error::InvalidFormat(format!(
+                "iWork footer formula at ({}, {}) does not contain every dependency selected for contraction",
+                previous_host.0, previous_host.1
+            )));
+        }
+        let mut retained = edges
+            .edge_without_owner_rows
+            .iter()
+            .copied()
+            .zip(edges.edge_without_owner_columns.iter().copied())
+            .filter(|coordinate| adjustment.remove.binary_search(coordinate).is_err())
+            .collect::<Vec<_>>();
+        for coordinate in &mut retained {
             match axis {
-                DependencyAxis::Column => "local formula precedent column",
-                DependencyAxis::Row => "local formula precedent row",
-            },
-        )?;
+                DependencyAxis::Column => {
+                    coordinate.1 = mutation.coordinate(
+                        coordinate.1,
+                        position,
+                        "local formula precedent column",
+                    )?;
+                },
+                DependencyAxis::Row => {
+                    coordinate.0 = mutation.coordinate(
+                        coordinate.0,
+                        position,
+                        "local formula precedent row",
+                    )?;
+                },
+            }
+        }
+        retained.extend(adjustment.insert.iter().copied());
+        retained.sort_unstable();
+        retained.dedup();
+        edges.edge_without_owner_rows = retained.iter().map(|(row, _)| *row).collect();
+        edges.edge_without_owner_columns = retained.iter().map(|(_, column)| *column).collect();
+    } else {
+        let local_coordinates = match axis {
+            DependencyAxis::Column => &mut edges.edge_without_owner_columns,
+            DependencyAxis::Row => &mut edges.edge_without_owner_rows,
+        };
+        for coordinate in local_coordinates {
+            *coordinate = mutation.coordinate(
+                *coordinate,
+                position,
+                match axis {
+                    DependencyAxis::Column => "local formula precedent column",
+                    DependencyAxis::Row => "local formula precedent row",
+                },
+            )?;
+        }
     }
     let owned_coordinates = match axis {
         DependencyAxis::Column => &mut edges.edge_with_owner_columns,

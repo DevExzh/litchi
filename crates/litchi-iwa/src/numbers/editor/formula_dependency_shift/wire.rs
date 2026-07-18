@@ -231,7 +231,7 @@ fn rewrite_shifted_dependency_records(
             match (&previous.expanded_edges, &current.expanded_edges) {
                 (Some(previous), Some(current)) => {
                     record = transform_length_delimited_field(&record, 6, |edges| {
-                        rewrite_shifted_edges(edges, previous, current, axis)
+                        rewrite_shifted_edges(edges, previous, current)
                     })?;
                 },
                 (None, None) => {},
@@ -251,56 +251,34 @@ fn rewrite_shifted_edges(
     original: &[u8],
     previous: &tsce::ExpandedEdgesArchive,
     current: &tsce::ExpandedEdgesArchive,
-    axis: DependencyAxis,
 ) -> Result<Vec<u8>> {
     let mut immutable = current.clone();
-    match axis {
-        DependencyAxis::Column => {
-            immutable.edge_without_owner_columns = previous.edge_without_owner_columns.clone();
-            immutable.edge_with_owner_columns = previous.edge_with_owner_columns.clone();
-        },
-        DependencyAxis::Row => {
-            immutable.edge_without_owner_rows = previous.edge_without_owner_rows.clone();
-            immutable.edge_with_owner_rows = previous.edge_with_owner_rows.clone();
-        },
-    }
+    immutable.edge_without_owner_rows = previous.edge_without_owner_rows.clone();
+    immutable.edge_without_owner_columns = previous.edge_without_owner_columns.clone();
+    immutable.edge_with_owner_rows = previous.edge_with_owner_rows.clone();
+    immutable.edge_with_owner_columns = previous.edge_with_owner_columns.clone();
     if immutable != *previous {
         return Err(Error::InvalidFormat(
             "Numbers formula edges changed outside row coordinates".to_owned(),
         ));
     }
-    let (local_field, local_coordinates, owned_field, owned_coordinates) = match axis {
-        DependencyAxis::Column => (
-            2,
-            &current.edge_without_owner_columns,
-            4,
-            &current.edge_with_owner_columns,
-        ),
-        DependencyAxis::Row => (
-            1,
-            &current.edge_without_owner_rows,
-            3,
-            &current.edge_with_owner_rows,
-        ),
-    };
-    let mut data = rewrite_repeated_varint_fields(
-        original,
-        local_field,
-        &local_coordinates
-            .iter()
-            .copied()
-            .map(u64::from)
-            .collect::<Vec<_>>(),
-    )?;
-    data = rewrite_repeated_varint_fields(
-        &data,
-        owned_field,
-        &owned_coordinates
-            .iter()
-            .copied()
-            .map(u64::from)
-            .collect::<Vec<_>>(),
-    )?;
+    let mut data = original.to_vec();
+    for (field, coordinates) in [
+        (1, &current.edge_without_owner_rows),
+        (2, &current.edge_without_owner_columns),
+        (3, &current.edge_with_owner_rows),
+        (4, &current.edge_with_owner_columns),
+    ] {
+        data = rewrite_repeated_varint_fields(
+            &data,
+            field,
+            &coordinates
+                .iter()
+                .copied()
+                .map(u64::from)
+                .collect::<Vec<_>>(),
+        )?;
+    }
     if tsce::ExpandedEdgesArchive::decode(data.as_slice())? != *current {
         return Err(Error::InvalidFormat(
             "Numbers formula edge row shift failed wire validation".to_owned(),

@@ -317,6 +317,54 @@ fn source_built_table_roundtrips_physical_axis_crud_transactionally() {
 }
 
 #[test]
+fn source_built_footer_formula_expands_and_contracts_with_body_rows() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let (position, size) = table_geometry();
+    let table = editor
+        .add_slide_table(0, "Footer aggregate", 4, 3, position, size)
+        .unwrap();
+    let model_id = table.model_object_id;
+    editor
+        .set_slide_table_header_settings(
+            0,
+            model_id,
+            KeynoteTableHeaderSettings {
+                footer_rows: Some(KeynoteTableHeaderCount::ONE),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    editor
+        .set_slide_table_formula(
+            0,
+            model_id,
+            3,
+            1,
+            KeynoteTableFormulaExpression::function(
+                "SUM",
+                [KeynoteTableFormulaExpression::range(
+                    KeynoteTableFormulaCellReference::relative(1, 1),
+                    KeynoteTableFormulaCellReference::relative(2, 1),
+                )],
+            ),
+            KeynoteTableFormulaCachedValue::Number(3.0),
+        )
+        .unwrap();
+    let baseline = editor.to_bytes().unwrap();
+
+    editor.insert_slide_table_row(0, model_id, 3).unwrap();
+    assert_eq!(
+        editor
+            .slide_table_formula(0, model_id, 4, 1)
+            .unwrap()
+            .as_deref(),
+        Some("=SUM(B2:B4)")
+    );
+    editor.remove_slide_table_row(0, model_id, 3).unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+}
+
+#[test]
 fn source_built_table_roundtrips_title_settings_transactionally() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let (position, size) = table_geometry();

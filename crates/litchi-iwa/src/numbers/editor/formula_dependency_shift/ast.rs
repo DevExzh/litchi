@@ -16,7 +16,7 @@ pub(super) fn rewrite_formula_asts(
     axis: DependencyAxis,
     position: u32,
     mutation: DependencyMutation,
-) -> Result<()> {
+) -> Result<FormulaDependencyAdjustments> {
     const COMPONENT: &str = "Index/CalculationEngine.iwa";
 
     let descriptor = attached_table_descriptors(package)?
@@ -86,7 +86,7 @@ pub(super) fn rewrite_formula_asts(
         );
     }
     if formula_cells.is_empty() {
-        return Ok(());
+        return Ok(FormulaDependencyAdjustments::default());
     }
 
     let locations = object_locations(package)?;
@@ -100,6 +100,7 @@ pub(super) fn rewrite_formula_asts(
     let mut formula_cells = formula_cells.into_iter().collect::<Vec<_>>();
     formula_cells.sort_unstable();
     let mut rewrites = BTreeMap::<u32, Vec<FormulaRewrite>>::new();
+    let mut dependency_adjustments = FormulaDependencyAdjustments::default();
     for (row, column) in formula_cells {
         let row_index = usize::try_from(row)
             .map_err(|_| Error::ParseError("iWork formula row exceeds usize".to_owned()))?;
@@ -138,19 +139,11 @@ pub(super) fn rewrite_formula_asts(
             })?;
         let footer_rows = descriptor.model.number_of_footer_rows.unwrap_or(0);
         let footer_boundary = descriptor.model.number_of_rows.saturating_sub(footer_rows);
-        if axis == DependencyAxis::Row
-            && mutation == DependencyMutation::Insert
-            && footer_rows > 0
-            && position == footer_boundary
-            && row >= footer_boundary
-            && formula_has_local_row_coordinate(&previous.ast_node_array)
-        {
-            return Err(Error::ParseError(
-                "Cannot yet insert an iWork body row directly before a footer formula because native footer ranges require aggregate expansion"
-                    .to_owned(),
-            ));
-        }
+        let footer = (footer_rows > 0 && row >= footer_boundary).then_some(FooterFormulaContext {
+            boundary: footer_boundary,
+        });
         let mut current = previous.clone();
+        let mut local_adjustments = LocalPrecedentAdjustments::default();
         rewrite_formula_nodes(
             &mut current.ast_node_array,
             row,
@@ -158,7 +151,15 @@ pub(super) fn rewrite_formula_asts(
             axis,
             position,
             mutation,
+            footer,
+            &mut local_adjustments,
         )?;
+        local_adjustments.normalize();
+        if !local_adjustments.is_empty() {
+            dependency_adjustments
+                .local_precedents
+                .insert((row, column), local_adjustments);
+        }
         rewrites
             .entry(identifier)
             .or_default()
@@ -220,17 +221,106 @@ pub(super) fn rewrite_formula_asts(
             decrement_formula_table(package, &locations, formula_table_id, identifier)?;
         }
     }
-    Ok(())
+    Ok(dependency_adjustments)
 }
 
-fn formula_has_local_row_coordinate(array: &tsce::AstNodeArrayArchive) -> bool {
-    array.ast_node.iter().any(|node| {
-        (node.ast_row.is_some() && node.ast_cross_table_reference_extra_info.is_none())
-            || node
-                .ast_thunk_node_array
-                .as_ref()
-                .is_some_and(formula_has_local_row_coordinate)
-    })
+#[derive(Clone, Copy, Debug)]
+struct FooterFormulaContext {
+    boundary: u32,
+}
+
+fn footer_range_overrides(
+    array: &tsce::AstNodeArrayArchive,
+    host_row: u32,
+    host_column: u32,
+    axis: DependencyAxis,
+    position: u32,
+    mutation: DependencyMutation,
+    footer: Option<FooterFormulaContext>,
+    dependency_adjustments: &mut LocalPrecedentAdjustments,
+) -> Result<HashMap<usize, u32>> {
+    use tsce::ast_node_array_archive::AstNodeType;
+
+    let Some(footer) = footer.filter(|_| axis == DependencyAxis::Row) else {
+        return Ok(HashMap::new());
+    };
+    let expands_footer = mutation == DependencyMutation::Insert && position == footer.boundary;
+    let contracts_footer =
+        mutation == DependencyMutation::Delete && position.checked_add(1) == Some(footer.boundary);
+    if !expands_footer && !contracts_footer {
+        return Ok(HashMap::new());
+    }
+
+    let mut overrides = HashMap::new();
+    for index in 0..array.ast_node.len().saturating_sub(2) {
+        let start_node = &array.ast_node[index];
+        let end_node = &array.ast_node[index + 1];
+        let colon = &array.ast_node[index + 2];
+        if colon.ast_node_type != AstNodeType::ColonNode as i32 {
+            continue;
+        }
+        let Some(start) = local_cell_coordinate(start_node, host_row, host_column)? else {
+            continue;
+        };
+        let Some(end) = local_cell_coordinate(end_node, host_row, host_column)? else {
+            continue;
+        };
+        let (endpoint_index, replacement_row) =
+            if expands_footer && start.0.max(end.0).checked_add(1) == Some(position) {
+                (if end.0 >= start.0 { index + 1 } else { index }, position)
+            } else if contracts_footer
+                && start.0.max(end.0) == position
+                && start.0.min(end.0) < position
+            {
+                (
+                    if end.0 >= start.0 { index + 1 } else { index },
+                    position.checked_sub(1).ok_or_else(|| {
+                        Error::ParseError("iWork footer range contraction underflow".to_owned())
+                    })?,
+                )
+            } else {
+                continue;
+            };
+        if overrides.insert(endpoint_index, replacement_row).is_some() {
+            return Err(Error::InvalidFormat(
+                "iWork formula range endpoint participates in multiple footer ranges".to_owned(),
+            ));
+        }
+        let coordinates =
+            (start.1.min(end.1)..=start.1.max(end.1)).map(|column| (position, column));
+        match mutation {
+            DependencyMutation::Insert => dependency_adjustments.insert.extend(coordinates),
+            DependencyMutation::Delete => dependency_adjustments.remove.extend(coordinates),
+        }
+    }
+    Ok(overrides)
+}
+
+fn local_cell_coordinate(
+    node: &tsce::ast_node_array_archive::AstNodeArchive,
+    host_row: u32,
+    host_column: u32,
+) -> Result<Option<(u32, u32)>> {
+    if node.ast_cross_table_reference_extra_info.is_some() {
+        return Ok(None);
+    }
+    let (Some(row), Some(column)) = (node.ast_row.as_ref(), node.ast_column.as_ref()) else {
+        return Ok(None);
+    };
+    let resolve = |encoded: i32, absolute: bool, host: u32| {
+        let value = if absolute {
+            i64::from(encoded)
+        } else {
+            i64::from(host) + i64::from(encoded)
+        };
+        u32::try_from(value).map_err(|_| {
+            Error::InvalidFormat("iWork formula AST coordinate is outside u32".to_owned())
+        })
+    };
+    Ok(Some((
+        resolve(row.row, row.absolute.unwrap_or(false), host_row)?,
+        resolve(column.column, column.absolute.unwrap_or(false), host_column)?,
+    )))
 }
 
 fn rewrite_formula_nodes(
@@ -240,20 +330,41 @@ fn rewrite_formula_nodes(
     axis: DependencyAxis,
     position: u32,
     mutation: DependencyMutation,
+    footer: Option<FooterFormulaContext>,
+    dependency_adjustments: &mut LocalPrecedentAdjustments,
 ) -> Result<()> {
     let host = match axis {
         DependencyAxis::Row => host_row,
         DependencyAxis::Column => host_column,
     };
     let shifted_host = mutation.coordinate(host, position, "formula host coordinate")?;
-    for node in &mut array.ast_node {
+    let footer_overrides = footer_range_overrides(
+        array,
+        host_row,
+        host_column,
+        axis,
+        position,
+        mutation,
+        footer,
+        dependency_adjustments,
+    )?;
+    for (index, node) in array.ast_node.iter_mut().enumerate() {
         if node.ast_colon_tract.is_some()
             || (node.ast_category_ref.is_some() && shifted_host != host)
         {
             return Err(formula_ast_rewrite_error(axis, mutation));
         }
         if let Some(nested) = &mut node.ast_thunk_node_array {
-            rewrite_formula_nodes(nested, host_row, host_column, axis, position, mutation)?;
+            rewrite_formula_nodes(
+                nested,
+                host_row,
+                host_column,
+                axis,
+                position,
+                mutation,
+                footer,
+                dependency_adjustments,
+            )?;
         }
         let (encoded, absolute) = match axis {
             DependencyAxis::Row => node
@@ -293,7 +404,11 @@ fn rewrite_formula_nodes(
             let target = u32::try_from(target).map_err(|_| {
                 Error::InvalidFormat("iWork formula AST coordinate is outside u32".to_owned())
             })?;
-            let shifted_target = mutation.coordinate(target, position, "formula reference")?;
+            let shifted_target = footer_overrides
+                .get(&index)
+                .copied()
+                .map(Ok)
+                .unwrap_or_else(|| mutation.coordinate(target, position, "formula reference"))?;
             if absolute {
                 i64::from(shifted_target)
             } else {

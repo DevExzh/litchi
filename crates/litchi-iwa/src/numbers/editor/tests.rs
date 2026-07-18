@@ -3030,7 +3030,7 @@ fn row_insert_copy_on_writes_shared_formula_ast_and_remerges_on_delete() {
 }
 
 #[test]
-fn row_insert_rejects_footer_aggregate_expansion_transactionally() {
+fn row_insert_expands_footer_aggregate_and_delete_restores_exact_bytes() {
     let mut editor = NumbersEditor::from_package(test_package_with_calculation_engine()).unwrap();
     editor
         .set_table_header_settings(
@@ -3055,9 +3055,67 @@ fn row_insert_rejects_footer_aggregate_expansion_transactionally() {
             ),
         )
         .unwrap();
+    let mut package = editor.into_package();
+    let dependency_tile_id = {
+        let archive = package.archive("Index/CalculationEngine.iwa").unwrap();
+        let owner = tsce::FormulaOwnerDependenciesArchive::decode(
+            archive.object(101).unwrap().messages[0].data.as_slice(),
+        )
+        .unwrap();
+        owner.tiled_cell_dependencies.unwrap().cell_record_tiles[0].identifier
+    };
+    package
+        .update_archive("Index/CalculationEngine.iwa", |archive| {
+            for (object_id, path, field, value) in [
+                (101, vec![4, 1, 6], 99, 990),
+                (dependency_tile_id, vec![4, 6], 98, 980),
+            ] {
+                let object = archive.object_mut(object_id).unwrap();
+                let message = object.messages[0].clone();
+                let data = crate::wire::transform_length_delimited_fields_at_path(
+                    &message.data,
+                    &path,
+                    |payload| {
+                        let mut payload = payload.to_vec();
+                        append_unknown_varint(&mut payload, field, value);
+                        Ok(payload)
+                    },
+                )?;
+                object.replace_message(
+                    0,
+                    RawMessage {
+                        type_: message.type_,
+                        data,
+                    },
+                )?;
+            }
+            Ok(())
+        })
+        .unwrap();
+    let mut editor = NumbersEditor::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
 
-    assert!(editor.insert_table_row(10, 3).is_err());
+    editor.insert_table_row(10, 3).unwrap();
+    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        document.sheets().unwrap()[0].tables[0].get_cell(4, 1),
+        Some(&CellValue::Formula("=SUM(B2:B4)".to_owned()))
+    );
+    let archive = editor
+        .package()
+        .archive("Index/CalculationEngine.iwa")
+        .unwrap();
+    let owner = tsce::FormulaOwnerDependenciesArchive::decode(
+        archive.object(101).unwrap().messages[0].data.as_slice(),
+    )
+    .unwrap();
+    let record = &owner.cell_dependencies.unwrap().cell_record[0];
+    let edges = record.expanded_edges.as_ref().unwrap();
+    assert_eq!((record.row, record.column), (4, 1));
+    assert_eq!(edges.edge_without_owner_rows, [1, 2, 3]);
+    assert_eq!(edges.edge_without_owner_columns, [1, 1, 1]);
+
+    editor.remove_table_row(10, 3).unwrap();
     assert_eq!(editor.to_bytes().unwrap(), before);
 }
 

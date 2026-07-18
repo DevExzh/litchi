@@ -38,13 +38,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_table_cell(table.model_object_id, 1, 2, PagesCellValue::Number(0.18))?;
     editor.set_table_formula(
         table.model_object_id,
-        2,
+        3,
         1,
         PagesTableFormulaExpression::function(
             "SUM",
             [PagesTableFormulaExpression::range(
                 PagesTableFormulaCellReference::relative(1, 1),
-                PagesTableFormulaCellReference::relative(1, 1),
+                PagesTableFormulaCellReference::relative(2, 1),
             )],
         ),
         PagesTableFormulaCachedValue::Number(125_000.0),
@@ -79,7 +79,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             PagesTableDimensionSize::points(height)?,
         )?;
     }
-    editor.insert_table_row(table.model_object_id, 2)?;
+    editor.insert_table_row(table.model_object_id, 3)?;
     editor.insert_table_column(table.model_object_id, 2)?;
     for (column, value) in [
         PagesCellValue::Text("Q2".to_owned()),
@@ -90,7 +90,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     .into_iter()
     .enumerate()
     {
-        editor.set_table_cell(table.model_object_id, 2, column, value)?;
+        editor.set_table_cell(table.model_object_id, 3, column, value)?;
     }
     editor.set_table_cell(
         table.model_object_id,
