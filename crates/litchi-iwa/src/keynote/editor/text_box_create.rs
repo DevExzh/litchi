@@ -558,13 +558,17 @@ mod tests {
 
     #[test]
     fn slide_without_placeholders_uses_theme_text_styles() {
-        let mut package = KeynoteDocumentBuilder::new()
-            .build()
-            .unwrap()
-            .into_package();
+        let editor = KeynoteDocumentBuilder::new().build().unwrap();
+        let graph = ObjectGraph::read(editor.package()).unwrap();
+        let context = text_box_context(&graph, 0).unwrap();
+        let slide_id = context.slide_id;
+        let title_id = context.slide.title_placeholder.unwrap().identifier;
+        let body_id = context.slide.body_placeholder.unwrap().identifier;
+        let slide_archive = graph.archive_name(slide_id).unwrap().to_owned();
+        let mut package = editor.into_package();
         package
-            .update_archive("Index/Slide-14.iwa", |archive| {
-                let object = archive.object_mut(14).unwrap();
+            .update_archive(&slide_archive, |archive| {
+                let object = archive.object_mut(slide_id).unwrap();
                 let mut slide = kn::SlideArchive::decode(object.messages[0].data.as_slice())?;
                 slide.title_placeholder = None;
                 slide.body_placeholder = None;
@@ -579,11 +583,11 @@ mod tests {
                 )?;
                 let info = &mut object.archive_info.message_infos[0];
                 info.object_references
-                    .retain(|identifier| ![15, 16].contains(identifier));
+                    .retain(|identifier| ![title_id, body_id].contains(identifier));
                 for field in &mut info.field_infos {
                     field
                         .object_references
-                        .retain(|identifier| ![15, 16].contains(identifier));
+                        .retain(|identifier| ![title_id, body_id].contains(identifier));
                 }
                 Ok(())
             })

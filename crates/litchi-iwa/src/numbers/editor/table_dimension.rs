@@ -204,3 +204,21 @@ fn validate_dimension_index(
     }
     Ok(())
 }
+
+pub(super) fn set_attached_table_dimension_size(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    dimension: NumbersTableDimension,
+    size: NumbersTableDimensionSize,
+) -> Result<()> {
+    let descriptor = attached_table_descriptor(package, table_id)?;
+    validate_dimension_index(&descriptor.model, dimension)?;
+    let locations = object_locations(package)?;
+    write_dimension_size(
+        package,
+        &locations,
+        &descriptor.model,
+        dimension,
+        size.stored_points(),
+    )
+}

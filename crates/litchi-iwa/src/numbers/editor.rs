@@ -2991,6 +2991,15 @@ pub(crate) fn resize_table_in_package(
     model::resize_attached_table_in_package(package, table_id, rows, columns)
 }
 
+pub(crate) fn set_table_dimension_size_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    dimension: NumbersTableDimension,
+    size: NumbersTableDimensionSize,
+) -> Result<()> {
+    table_dimension::set_attached_table_dimension_size(package, table_id, dimension, size)
+}
+
 pub(crate) fn table_owned_object_ids_in_package(
     package: &IWorkPackage,
     table_id: u64,

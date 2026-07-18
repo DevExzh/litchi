@@ -4302,6 +4302,7 @@ mod slide_shapes;
 mod slide_style_graph;
 mod slide_style_metadata;
 mod slide_style_registry;
+mod slide_tables;
 mod soundtrack;
 mod soundtrack_items;
 mod soundtrack_wire;
@@ -4327,6 +4328,9 @@ pub use slide_movies::{
     RemovedKeynoteSlideMovie,
 };
 pub use slide_shapes::{KeynoteSlideShapeInfo, KeynoteSlideShapeKind, RemovedKeynoteSlideShape};
+pub use slide_tables::{
+    KeynoteSlideTable, KeynoteSlideTableInfo, KeynoteTableCellValue, RemovedKeynoteSlideTable,
+};
 pub use soundtrack::{KeynoteSoundtrackMode, KeynoteSoundtrackSettings};
 pub use soundtrack_items::KeynoteSoundtrackItemInfo;
 pub use transition::{
