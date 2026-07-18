@@ -4329,7 +4329,8 @@ pub use slide_movies::{
 };
 pub use slide_shapes::{KeynoteSlideShapeInfo, KeynoteSlideShapeKind, RemovedKeynoteSlideShape};
 pub use slide_tables::{
-    KeynoteSlideTable, KeynoteSlideTableInfo, KeynoteTableCellUpdate, KeynoteTableCellValue,
+    KeynoteSlideTable, KeynoteSlideTableInfo, KeynoteTableCellComment, KeynoteTableCellCommentInfo,
+    KeynoteTableCellCommentReplyInfo, KeynoteTableCellUpdate, KeynoteTableCellValue,
     KeynoteTableColumnDeletion, KeynoteTableColumnInsertion, KeynoteTableDimension,
     KeynoteTableDimensionSize, KeynoteTableFormulaAxisReference, KeynoteTableFormulaBinaryOperator,
     KeynoteTableFormulaCachedValue, KeynoteTableFormulaCellReference,

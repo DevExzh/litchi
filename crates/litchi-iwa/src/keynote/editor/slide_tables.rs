@@ -8,12 +8,16 @@ use crate::numbers::table_extractor::TableDataExtractor;
 use crate::object_index::ObjectIndex;
 use crate::shapes::{DrawableGeometry, DrawablePoint, DrawableSize};
 
+mod comments;
 mod formula;
 mod graph;
 mod storage;
 mod title;
 mod topology;
 
+pub use comments::{
+    KeynoteTableCellComment, KeynoteTableCellCommentInfo, KeynoteTableCellCommentReplyInfo,
+};
 pub use formula::{
     KeynoteTableFormulaAxisReference, KeynoteTableFormulaBinaryOperator,
     KeynoteTableFormulaCachedValue, KeynoteTableFormulaCellReference,
@@ -69,11 +73,18 @@ pub struct KeynoteSlideTableInfo {
 pub struct KeynoteSlideTable {
     pub info: KeynoteSlideTableInfo,
     pub cells: HashMap<(usize, usize), KeynoteTableCellValue>,
+    /// Comments indexed independently from cell values by `(row, column)`.
+    pub comments: HashMap<(usize, usize), KeynoteTableCellComment>,
 }
 
 impl KeynoteSlideTable {
     pub fn get_cell(&self, row: usize, column: usize) -> Option<&KeynoteTableCellValue> {
         self.cells.get(&(row, column))
+    }
+
+    /// Borrow the comment attached to a materialized cell, if any.
+    pub fn get_comment(&self, row: usize, column: usize) -> Option<&KeynoteTableCellComment> {
+        self.comments.get(&(row, column))
     }
 }
 
@@ -139,6 +150,7 @@ impl KeynoteEditor {
         Ok(KeynoteSlideTable {
             info,
             cells: table.cells,
+            comments: table.comments,
         })
     }
 

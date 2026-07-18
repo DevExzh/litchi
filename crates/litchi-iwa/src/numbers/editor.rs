@@ -16,8 +16,9 @@ use super::table::{NumbersCellComment, NumbersCommentUuid};
 use crate::archive::{Archive, ArchiveObject, RawMessage};
 use crate::comments::{
     DrawableCommentInfo, DrawableCommentReplyInfo, IWorkDrawableCommentEditor, IWorkDrawableInfo,
-    advance_save_tokens_for_entries, clone_comment_storage_exact, current_apple_reference_date,
-    fresh_comment_storage_uuid, insert_comment_storage, preferred_annotation_author,
+    IWorkTableCellCommentInfo, IWorkTableCellCommentReplyInfo, advance_save_tokens_for_entries,
+    clone_comment_storage_exact, current_apple_reference_date, fresh_comment_storage_uuid,
+    insert_comment_storage, preferred_annotation_author,
     remove_generated_annotation_author_if_unused, update_comment_reply_reference,
 };
 use crate::media::reachable_embedded_assets;
@@ -122,26 +123,10 @@ pub struct NumbersPivotCategoryInfo {
 }
 
 /// Address and storage identity of a comment attached to a Numbers cell.
-#[derive(Debug, Clone, PartialEq)]
-pub struct NumbersCellCommentInfo {
-    pub table_id: u64,
-    pub row: usize,
-    pub column: usize,
-    pub list_identifier: u32,
-    pub storage_object_id: u64,
-    pub comment: NumbersCellComment,
-}
+pub type NumbersCellCommentInfo = IWorkTableCellCommentInfo;
 
 /// A resolved direct reply in a Numbers cell-comment thread.
-#[derive(Debug, Clone, PartialEq)]
-pub struct NumbersCellCommentReplyInfo {
-    pub table_id: u64,
-    pub row: usize,
-    pub column: usize,
-    pub root_storage_object_id: u64,
-    pub storage_object_id: u64,
-    pub comment: NumbersCellComment,
-}
+pub type NumbersCellCommentReplyInfo = IWorkTableCellCommentReplyInfo;
 
 /// Mutable, transactional Numbers package editor.
 ///
@@ -1958,6 +1943,10 @@ impl NumbersEditor {
     }
 
     /// Create or replace a cell comment without changing the cell value or style.
+    ///
+    /// Numbers must already have registered a native annotation author in the
+    /// package. Otherwise this fails before mutation because Numbers rewrites
+    /// fabricated authors into blank comment drafts.
     pub fn set_cell_comment(
         &mut self,
         table_id: u64,
@@ -2938,6 +2927,87 @@ pub(crate) fn set_table_cell_in_package(
     model::set_attached_cell_in_package(package, table_id, row, column, value)?;
     formula_cache::refresh_formula_caches_after_cell_write(package, table_id, row, column)?;
     Ok(())
+}
+
+pub(crate) fn table_cell_comment_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<NumbersCellCommentInfo>> {
+    model::attached_cell_comment_in_package(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_comment_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    text: String,
+) -> Result<()> {
+    model::set_attached_cell_comment_in_package(package, table_id, row, column, text)
+}
+
+pub(crate) fn clear_table_cell_comment_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<()> {
+    model::clear_attached_cell_comment_in_package(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_comment_replies_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Vec<NumbersCellCommentReplyInfo>> {
+    model::attached_cell_comment_replies_in_package(package, table_id, row, column)
+}
+
+pub(crate) fn add_table_cell_comment_reply_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    text: String,
+) -> Result<u64> {
+    model::add_attached_cell_comment_reply_in_package(package, table_id, row, column, text)
+}
+
+pub(crate) fn set_table_cell_comment_reply_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    reply_storage_object_id: u64,
+    text: String,
+) -> Result<u64> {
+    model::set_attached_cell_comment_reply_in_package(
+        package,
+        table_id,
+        row,
+        column,
+        reply_storage_object_id,
+        text,
+    )
+}
+
+pub(crate) fn remove_table_cell_comment_reply_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    reply_storage_object_id: u64,
+) -> Result<()> {
+    model::remove_attached_cell_comment_reply_in_package(
+        package,
+        table_id,
+        row,
+        column,
+        reply_storage_object_id,
+    )
 }
 
 pub(crate) fn set_table_formula_in_package(

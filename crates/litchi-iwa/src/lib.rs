@@ -168,7 +168,8 @@ pub use archive::{ArchiveInfo, MessageInfo};
 pub use bundle::{Bundle, BundleMetadata, PropertyValue};
 pub use comments::{
     DrawableCommentInfo, DrawableCommentReplyInfo, IWorkComment, IWorkCommentUuid,
-    IWorkDrawableCommentEditor, IWorkDrawableInfo,
+    IWorkDrawableCommentEditor, IWorkDrawableInfo, IWorkTableCellCommentInfo,
+    IWorkTableCellCommentReplyInfo,
 };
 pub use document::Document;
 pub use identity::IWorkDocumentIdentity;

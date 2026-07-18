@@ -72,12 +72,34 @@ pub struct DrawableCommentReplyInfo {
     pub comment: IWorkComment,
 }
 
+/// Address and storage identity of a comment attached to an iWork table cell.
+#[derive(Debug, Clone, PartialEq)]
+pub struct IWorkTableCellCommentInfo {
+    pub table_id: u64,
+    pub row: usize,
+    pub column: usize,
+    pub list_identifier: u32,
+    pub storage_object_id: u64,
+    pub comment: IWorkComment,
+}
+
+/// A resolved direct reply in an iWork table-cell comment thread.
+#[derive(Debug, Clone, PartialEq)]
+pub struct IWorkTableCellCommentReplyInfo {
+    pub table_id: u64,
+    pub row: usize,
+    pub column: usize,
+    pub root_storage_object_id: u64,
+    pub storage_object_id: u64,
+    pub comment: IWorkComment,
+}
+
 /// Transactional direct-comment editor shared by Pages, Numbers, and Keynote.
 ///
 /// It edits the `TSD.DrawableArchive.comment` reference nested in each known
 /// drawable payload and stores comment bodies in `TSD.CommentStorageArchive`
-/// objects. Cell comments in Numbers use a separate table-list indirection and
-/// remain available through [`crate::numbers::NumbersEditor`].
+/// objects. Table-cell comments use a separate table-list indirection and are
+/// available through each application's semantic editor.
 #[derive(Debug, Clone)]
 pub struct IWorkDrawableCommentEditor {
     package: IWorkPackage,
@@ -1338,12 +1360,25 @@ fn generated_annotation_author() -> tsk::AnnotationAuthorArchive {
     }
 }
 
-fn generated_annotation_author_object(author_id: u64) -> Result<ArchiveObject> {
+fn generated_local_annotation_author() -> tsk::AnnotationAuthorArchive {
+    tsk::AnnotationAuthorArchive {
+        name: Some(GENERATED_AUTHOR_NAME.to_owned()),
+        color: generated_annotation_author().color,
+        public_id: None,
+        is_public_author: Some(false),
+        public_ids: Vec::new(),
+    }
+}
+
+fn generated_annotation_author_object(
+    author_id: u64,
+    author: &tsk::AnnotationAuthorArchive,
+) -> Result<ArchiveObject> {
     let mut object = ArchiveObject::new(
         author_id,
         vec![RawMessage {
             type_: ANNOTATION_AUTHOR_MESSAGE_TYPE,
-            data: generated_annotation_author().encode_to_vec(),
+            data: author.encode_to_vec(),
         }],
     )?;
     object.archive_info.message_infos[0].field_infos = [4, 3]
@@ -1362,6 +1397,44 @@ fn generated_annotation_author_object(author_id: u64) -> Result<ArchiveObject> {
 pub(crate) fn ensure_annotation_author(
     package: &mut IWorkPackage,
 ) -> Result<(Option<u64>, Option<String>, bool)> {
+    ensure_generated_annotation_author(package, generated_annotation_author())
+}
+
+pub(crate) fn ensure_table_annotation_author(
+    package: &mut IWorkPackage,
+) -> Result<(Option<u64>, Option<String>, bool)> {
+    ensure_generated_annotation_author(package, generated_local_annotation_author())
+}
+
+pub(crate) fn preferred_or_ensure_table_annotation_author(
+    package: &mut IWorkPackage,
+) -> Result<(Option<u64>, Option<String>, bool)> {
+    let Some(location) = annotation_author_storage_location(package)? else {
+        return Ok((None, None, false));
+    };
+    let storage = {
+        let archive = package.archive(&location.archive_name)?;
+        let object = archive.object(location.object_id).ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "annotation-author storage object {} is missing",
+                location.object_id
+            ))
+        })?;
+        tsk::AnnotationAuthorStorageArchive::decode(
+            object.messages[location.message_index].data.as_slice(),
+        )?
+    };
+    if storage.annotation_author.is_empty() {
+        ensure_table_annotation_author(package)
+    } else {
+        preferred_annotation_author(package)
+    }
+}
+
+fn ensure_generated_annotation_author(
+    package: &mut IWorkPackage,
+    generated: tsk::AnnotationAuthorArchive,
+) -> Result<(Option<u64>, Option<String>, bool)> {
     let Some(location) = annotation_author_storage_location(package)? else {
         return Ok((None, None, false));
     };
@@ -1379,7 +1452,6 @@ pub(crate) fn ensure_annotation_author(
     };
     let mut seen = HashSet::new();
     let locations = object_locations(package)?;
-    let generated = generated_annotation_author();
     for author in &storage.annotation_author {
         if !seen.insert(author.identifier) {
             return Err(Error::InvalidFormat(format!(
@@ -1435,18 +1507,17 @@ pub(crate) fn ensure_annotation_author(
                 },
             )?;
         }
-        archive.insert_object(generated_annotation_author_object(author_id)?)
+        archive.insert_object(generated_annotation_author_object(author_id, &generated)?)
     })?;
     Ok((Some(author_id), Some(location.archive_name), true))
 }
 
 /// Return the first author already registered by iWork.
 ///
-/// Numbers cell comments are stricter than drawable annotations: Numbers
-/// silently treats a fabricated author as an uncommitted blank draft. A real
-/// package whose author storage is still empty must therefore be primed by
-/// creating one comment in Numbers before offline cell-comment creation is
-/// safe. Minimal synthetic packages may omit author storage entirely.
+/// Table comments prefer an existing native author. Pages source-built
+/// packages can use [`preferred_or_ensure_table_annotation_author`] for a
+/// generated local author; Numbers and Keynote reject non-native authors as
+/// uncommitted blank drafts.
 pub(crate) fn preferred_annotation_author(
     package: &mut IWorkPackage,
 ) -> Result<(Option<u64>, Option<String>, bool)> {
@@ -1467,7 +1538,7 @@ pub(crate) fn preferred_annotation_author(
     };
     if storage.annotation_author.is_empty() {
         return Err(Error::ParseError(
-            "Numbers cell-comment creation requires a native annotation author; create and save one comment in Numbers first"
+            "Table-cell comment creation in Numbers and Keynote requires a native annotation author; create and save one comment in the target app first"
                 .to_owned(),
         ));
     }
@@ -1495,7 +1566,7 @@ pub(crate) fn remove_generated_annotation_author_if_unused(
 ) -> Result<bool> {
     let locations = object_locations(package)?;
     let author = annotation_author(package, &locations, author_id)?;
-    if author != generated_annotation_author() {
+    if author != generated_annotation_author() && author != generated_local_annotation_author() {
         return Ok(false);
     }
     for name in package.iwa_entry_names() {

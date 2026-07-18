@@ -1,10 +1,14 @@
 //! Native table discovery and cell editing for Pages body attachments.
 
+mod comments;
 mod formula;
 mod layout;
 mod title;
 mod topology;
 
+pub use comments::{
+    PagesTableCellComment, PagesTableCellCommentInfo, PagesTableCellCommentReplyInfo,
+};
 pub use formula::{
     PagesTableFormulaAxisReference, PagesTableFormulaBinaryOperator, PagesTableFormulaCachedValue,
     PagesTableFormulaCellReference, PagesTableFormulaExpression,
@@ -66,12 +70,19 @@ pub struct PagesTable {
     pub info: PagesTableInfo,
     /// Materialized non-empty cells indexed by `(row, column)`.
     pub cells: HashMap<(usize, usize), PagesCellValue>,
+    /// Comments indexed independently from cell values by `(row, column)`.
+    pub comments: HashMap<(usize, usize), PagesTableCellComment>,
 }
 
 impl PagesTable {
     /// Borrow a materialized cell value, or return `None` for an empty cell.
     pub fn get_cell(&self, row: usize, column: usize) -> Option<&PagesCellValue> {
         self.cells.get(&(row, column))
+    }
+
+    /// Borrow the comment attached to a materialized cell, if any.
+    pub fn get_comment(&self, row: usize, column: usize) -> Option<&PagesTableCellComment> {
+        self.comments.get(&(row, column))
     }
 }
 
@@ -120,6 +131,7 @@ impl PagesEditor {
         Ok(PagesTable {
             info,
             cells: table.cells,
+            comments: table.comments,
         })
     }
 

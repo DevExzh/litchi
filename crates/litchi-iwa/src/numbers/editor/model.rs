@@ -2059,6 +2059,41 @@ pub(super) struct CellLocation {
     pub(super) tile_row: u32,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CellCommentAuthorPolicy {
+    ExistingNative,
+    NativeOrLocal,
+}
+
+impl CellCommentAuthorPolicy {
+    fn resolve(self, package: &mut IWorkPackage) -> Result<(Option<u64>, Option<String>, bool)> {
+        match self {
+            Self::ExistingNative => preferred_annotation_author(package),
+            Self::NativeOrLocal => {
+                crate::comments::preferred_or_ensure_table_annotation_author(package)
+            },
+        }
+    }
+}
+
+fn attached_cell_comment_author_policy(package: &IWorkPackage) -> Result<CellCommentAuthorPolicy> {
+    let archive = package.archive("Index/Document.iwa")?;
+    let object = archive.object(1).ok_or_else(|| {
+        Error::InvalidFormat("iWork root document object 1 is missing".to_owned())
+    })?;
+    let application = object
+        .messages
+        .iter()
+        .find_map(|message| detect_application_from_document(&message.data))
+        .ok_or_else(|| Error::InvalidFormat("iWork root document payload is missing".to_owned()))?;
+    match application {
+        Application::Pages => Ok(CellCommentAuthorPolicy::NativeOrLocal),
+        Application::Keynote | Application::Numbers | Application::Common => {
+            Ok(CellCommentAuthorPolicy::ExistingNative)
+        },
+    }
+}
+
 pub(super) fn locate_cell(
     package: &IWorkPackage,
     table_id: u64,
@@ -2815,6 +2850,26 @@ pub(super) fn cell_comment_in_package(
     column: usize,
 ) -> Result<Option<NumbersCellCommentInfo>> {
     let location = locate_cell(package, table_id, row, column)?;
+    cell_comment_at_location(package, location, table_id, row, column)
+}
+
+pub(super) fn attached_cell_comment_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<NumbersCellCommentInfo>> {
+    let location = locate_attached_cell(package, table_id, row, column)?;
+    cell_comment_at_location(package, location, table_id, row, column)
+}
+
+fn cell_comment_at_location(
+    package: &IWorkPackage,
+    location: CellLocation,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<NumbersCellCommentInfo>> {
     let Some(cell) = read_tile_cell(
         package,
         &location.tile_archive,
@@ -2851,11 +2906,33 @@ pub(super) fn cell_comment_replies_in_package(
     row: usize,
     column: usize,
 ) -> Result<Vec<NumbersCellCommentReplyInfo>> {
-    let root = cell_comment_in_package(package, table_id, row, column)?.ok_or_else(|| {
-        Error::ParseError(format!(
-            "Numbers cell ({row}, {column}) in table {table_id} has no comment"
-        ))
-    })?;
+    let location = locate_cell(package, table_id, row, column)?;
+    cell_comment_replies_at_location(package, location, table_id, row, column)
+}
+
+pub(super) fn attached_cell_comment_replies_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Vec<NumbersCellCommentReplyInfo>> {
+    let location = locate_attached_cell(package, table_id, row, column)?;
+    cell_comment_replies_at_location(package, location, table_id, row, column)
+}
+
+fn cell_comment_replies_at_location(
+    package: &IWorkPackage,
+    location: CellLocation,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Vec<NumbersCellCommentReplyInfo>> {
+    let root =
+        cell_comment_at_location(package, location, table_id, row, column)?.ok_or_else(|| {
+            Error::ParseError(format!(
+                "iWork table cell ({row}, {column}) in table {table_id} has no comment"
+            ))
+        })?;
     let locations = object_locations(package)?;
     validate_cell_comment_reply_graph(package, &locations, root.storage_object_id, &root.comment)?;
     root.comment
@@ -3324,6 +3401,36 @@ pub(super) fn set_cell_comment_in_package(
     text: String,
 ) -> Result<()> {
     let location = locate_cell(package, table_id, row, column)?;
+    set_cell_comment_at_location(
+        package,
+        location,
+        row,
+        column,
+        text,
+        CellCommentAuthorPolicy::ExistingNative,
+    )
+}
+
+pub(super) fn set_attached_cell_comment_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    text: String,
+) -> Result<()> {
+    let author_policy = attached_cell_comment_author_policy(package)?;
+    let location = locate_attached_cell(package, table_id, row, column)?;
+    set_cell_comment_at_location(package, location, row, column, text, author_policy)
+}
+
+fn set_cell_comment_at_location(
+    package: &mut IWorkPackage,
+    location: CellLocation,
+    row: usize,
+    column: usize,
+    text: String,
+    author_policy: CellCommentAuthorPolicy,
+) -> Result<()> {
     let old_identifier = read_tile_cell(
         package,
         &location.tile_archive,
@@ -3359,7 +3466,7 @@ pub(super) fn set_cell_comment_in_package(
         }
         let (author_id, author_component_entry, created_author) =
             if old_comment.author_object_id.is_none() {
-                preferred_annotation_author(package)?
+                author_policy.resolve(package)?
             } else {
                 (old_comment.author_object_id, None, false)
             };
@@ -3435,7 +3542,7 @@ pub(super) fn set_cell_comment_in_package(
         return advance_save_tokens_for_entries(package, &modified_entries);
     }
 
-    let (author_id, author_component_entry, created_author) = preferred_annotation_author(package)?;
+    let (author_id, author_component_entry, created_author) = author_policy.resolve(package)?;
     let comment_table_id = match &location
         .descriptor
         .model
@@ -3472,13 +3579,13 @@ pub(super) fn set_cell_comment_in_package(
     advance_save_tokens_for_entries(package, &modified_entries)
 }
 
-pub(super) fn required_cell_comment_root(
+fn required_cell_comment_root_at_location(
     package: &IWorkPackage,
+    location: CellLocation,
     table_id: u64,
     row: usize,
     column: usize,
 ) -> Result<(CellLocation, u32, CommentEntryLocation, NumbersCellComment)> {
-    let location = locate_cell(package, table_id, row, column)?;
     let identifier = read_tile_cell(
         package,
         &location.tile_archive,
@@ -3492,7 +3599,7 @@ pub(super) fn required_cell_comment_root(
     .and_then(|cell| cell.comment_identifier())
     .ok_or_else(|| {
         Error::ParseError(format!(
-            "Numbers cell ({row}, {column}) in table {table_id} has no comment"
+            "iWork table cell ({row}, {column}) in table {table_id} has no comment"
         ))
     })?;
     let entry = comment_entry_location(
@@ -3518,10 +3625,51 @@ pub(super) fn add_cell_comment_reply_in_package(
     column: usize,
     text: String,
 ) -> Result<u64> {
+    let location = locate_cell(package, table_id, row, column)?;
+    add_cell_comment_reply_at_location(
+        package,
+        location,
+        table_id,
+        row,
+        column,
+        text,
+        CellCommentAuthorPolicy::ExistingNative,
+    )
+}
+
+pub(super) fn add_attached_cell_comment_reply_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    text: String,
+) -> Result<u64> {
+    let author_policy = attached_cell_comment_author_policy(package)?;
+    let location = locate_attached_cell(package, table_id, row, column)?;
+    add_cell_comment_reply_at_location(
+        package,
+        location,
+        table_id,
+        row,
+        column,
+        text,
+        author_policy,
+    )
+}
+
+fn add_cell_comment_reply_at_location(
+    package: &mut IWorkPackage,
+    location: CellLocation,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    text: String,
+    author_policy: CellCommentAuthorPolicy,
+) -> Result<u64> {
     let (location, identifier, entry, _) =
-        required_cell_comment_root(package, table_id, row, column)?;
+        required_cell_comment_root_at_location(package, location, table_id, row, column)?;
     let original_locations = location.object_locations.clone();
-    let (author_id, author_component_entry, created_author) = preferred_annotation_author(package)?;
+    let (author_id, author_component_entry, created_author) = author_policy.resolve(package)?;
     let new_root_id = next_object_identifier(package)?;
     let root_archive =
         clone_comment_storage_exact(package, &original_locations, entry.storage_id, new_root_id)?;
@@ -3576,8 +3724,50 @@ pub(super) fn set_cell_comment_reply_in_package(
     reply_storage_object_id: u64,
     text: String,
 ) -> Result<u64> {
+    let location = locate_cell(package, table_id, row, column)?;
+    set_cell_comment_reply_at_location(
+        package,
+        location,
+        table_id,
+        row,
+        column,
+        reply_storage_object_id,
+        text,
+    )
+}
+
+pub(super) fn set_attached_cell_comment_reply_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    reply_storage_object_id: u64,
+    text: String,
+) -> Result<u64> {
+    let location = locate_attached_cell(package, table_id, row, column)?;
+    set_cell_comment_reply_at_location(
+        package,
+        location,
+        table_id,
+        row,
+        column,
+        reply_storage_object_id,
+        text,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn set_cell_comment_reply_at_location(
+    package: &mut IWorkPackage,
+    location: CellLocation,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    reply_storage_object_id: u64,
+    text: String,
+) -> Result<u64> {
     let (location, identifier, entry, root) =
-        required_cell_comment_root(package, table_id, row, column)?;
+        required_cell_comment_root_at_location(package, location, table_id, row, column)?;
     validate_cell_comment_reply_reference(entry.storage_id, &root, reply_storage_object_id)?;
     let reply =
         read_comment_storage_by_id(package, &location.object_locations, reply_storage_object_id)?;
@@ -3645,8 +3835,45 @@ pub(super) fn remove_cell_comment_reply_in_package(
     column: usize,
     reply_storage_object_id: u64,
 ) -> Result<()> {
+    let location = locate_cell(package, table_id, row, column)?;
+    remove_cell_comment_reply_at_location(
+        package,
+        location,
+        table_id,
+        row,
+        column,
+        reply_storage_object_id,
+    )
+}
+
+pub(super) fn remove_attached_cell_comment_reply_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    reply_storage_object_id: u64,
+) -> Result<()> {
+    let location = locate_attached_cell(package, table_id, row, column)?;
+    remove_cell_comment_reply_at_location(
+        package,
+        location,
+        table_id,
+        row,
+        column,
+        reply_storage_object_id,
+    )
+}
+
+fn remove_cell_comment_reply_at_location(
+    package: &mut IWorkPackage,
+    location: CellLocation,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    reply_storage_object_id: u64,
+) -> Result<()> {
     let (location, identifier, entry, root) =
-        required_cell_comment_root(package, table_id, row, column)?;
+        required_cell_comment_root_at_location(package, location, table_id, row, column)?;
     validate_cell_comment_reply_reference(entry.storage_id, &root, reply_storage_object_id)?;
     read_comment_storage_by_id(package, &location.object_locations, reply_storage_object_id)?;
     let original_locations = location.object_locations.clone();
