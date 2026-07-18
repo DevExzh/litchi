@@ -94,26 +94,7 @@ impl NumbersEditor {
         table_id: u64,
         dimension: NumbersTableDimension,
     ) -> Result<NumbersTableDimensionSize> {
-        let descriptor = table_models(&self.package)?
-            .into_iter()
-            .find(|table| table.object_id == table_id)
-            .ok_or_else(|| {
-                Error::ParseError(format!("Numbers table object {table_id} not found"))
-            })?;
-        validate_dimension_index(&descriptor.model, dimension)?;
-        let locations = object_locations(&self.package)?;
-        match read_dimension_size(&self.package, &locations, &descriptor.model, dimension)? {
-            None => Ok(NumbersTableDimensionSize::Default),
-            Some(points) => Ok(NumbersTableDimensionSize::Points(
-                NumbersTablePoints::new(points).map_err(|_| {
-                    Error::InvalidFormat(format!(
-                        "Numbers table {} {} has invalid size {points}",
-                        dimension.noun(),
-                        dimension.index()
-                    ))
-                })?,
-            )),
-        }
+        read_attached_table_dimension_size(&self.package, table_id, dimension)
     }
 
     /// Transactionally set or clear a row-height or column-width override.
@@ -123,22 +104,8 @@ impl NumbersEditor {
         dimension: NumbersTableDimension,
         size: NumbersTableDimensionSize,
     ) -> Result<()> {
-        let descriptor = table_models(&self.package)?
-            .into_iter()
-            .find(|table| table.object_id == table_id)
-            .ok_or_else(|| {
-                Error::ParseError(format!("Numbers table object {table_id} not found"))
-            })?;
-        validate_dimension_index(&descriptor.model, dimension)?;
-        let locations = object_locations(&self.package)?;
         let mut staged = self.package.clone();
-        write_dimension_size(
-            &mut staged,
-            &locations,
-            &descriptor.model,
-            dimension,
-            size.stored_points(),
-        )?;
+        set_attached_table_dimension_size(&mut staged, table_id, dimension, size)?;
 
         let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
         if verified.table_dimension_size(table_id, dimension)? != size {
@@ -221,4 +188,82 @@ pub(super) fn set_attached_table_dimension_size(
         dimension,
         size.stored_points(),
     )
+}
+
+pub(super) fn read_attached_table_dimension_size(
+    package: &IWorkPackage,
+    table_id: u64,
+    dimension: NumbersTableDimension,
+) -> Result<NumbersTableDimensionSize> {
+    let descriptor = attached_table_descriptor(package, table_id)?;
+    validate_dimension_index(&descriptor.model, dimension)?;
+    let locations = object_locations(package)?;
+    match read_dimension_size(package, &locations, &descriptor.model, dimension)? {
+        None => Ok(NumbersTableDimensionSize::Default),
+        Some(points) => Ok(NumbersTableDimensionSize::Points(
+            NumbersTablePoints::new(points).map_err(|_| {
+                Error::InvalidFormat(format!(
+                    "Numbers table {} {} has invalid size {points}",
+                    dimension.noun(),
+                    dimension.index()
+                ))
+            })?,
+        )),
+    }
+}
+
+pub(super) fn attached_table_size_points(
+    package: &IWorkPackage,
+    table_id: u64,
+) -> Result<(f32, f32)> {
+    let descriptor = attached_table_descriptor(package, table_id)?;
+    let locations = object_locations(package)?;
+    let mut width = 0.0f64;
+    for column in 0..descriptor.model.number_of_columns as usize {
+        width += f64::from(effective_dimension_points(
+            package,
+            &locations,
+            &descriptor.model,
+            NumbersTableDimension::Column(column),
+        )?);
+    }
+    let mut height = 0.0f64;
+    for row in 0..descriptor.model.number_of_rows as usize {
+        height += f64::from(effective_dimension_points(
+            package,
+            &locations,
+            &descriptor.model,
+            NumbersTableDimension::Row(row),
+        )?);
+    }
+    let width = width as f32;
+    let height = height as f32;
+    if !width.is_finite() || !height.is_finite() || width <= 0.0 || height <= 0.0 {
+        return Err(Error::InvalidFormat(format!(
+            "Numbers table {table_id} has invalid rendered size {width}x{height}"
+        )));
+    }
+    Ok((width, height))
+}
+
+fn effective_dimension_points(
+    package: &IWorkPackage,
+    locations: &HashMap<u64, String>,
+    model: &TableModelArchive,
+    dimension: NumbersTableDimension,
+) -> Result<f32> {
+    let points =
+        read_dimension_size(package, locations, model, dimension)?.unwrap_or(match dimension {
+            NumbersTableDimension::Row(_) => model.default_row_height as f32,
+            NumbersTableDimension::Column(_) => model.default_column_width as f32,
+        });
+    NumbersTablePoints::new(points)
+        .map(NumbersTablePoints::get)
+        .map_err(|_| {
+            Error::InvalidFormat(format!(
+                "Numbers table {} {} has invalid effective size {points}",
+                dimension.noun(),
+                dimension.index()
+            ))
+        })
 }

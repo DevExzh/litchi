@@ -3000,6 +3000,36 @@ pub(crate) fn set_table_dimension_size_in_package(
     table_dimension::set_attached_table_dimension_size(package, table_id, dimension, size)
 }
 
+pub(crate) fn table_dimension_size_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    dimension: NumbersTableDimension,
+) -> Result<NumbersTableDimensionSize> {
+    table_dimension::read_attached_table_dimension_size(package, table_id, dimension)
+}
+
+pub(crate) fn table_size_points_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+) -> Result<(f32, f32)> {
+    table_dimension::attached_table_size_points(package, table_id)
+}
+
+pub(crate) fn table_header_settings_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+) -> Result<NumbersTableHeaderSettings> {
+    table_headers::read_attached_table_header_settings(package, table_id)
+}
+
+pub(crate) fn set_table_header_settings_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    settings: NumbersTableHeaderSettings,
+) -> Result<()> {
+    table_headers::set_attached_table_header_settings(package, table_id, settings)
+}
+
 pub(crate) fn table_owned_object_ids_in_package(
     package: &IWorkPackage,
     table_id: u64,

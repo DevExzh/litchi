@@ -146,8 +146,7 @@ impl NumbersTableHeaderSettings {
 impl NumbersEditor {
     /// Read the lossless header and footer configuration of an attached table.
     pub fn table_header_settings(&self, table_id: u64) -> Result<NumbersTableHeaderSettings> {
-        let descriptor = table_descriptor(&self.package, table_id)?;
-        read_table_header_settings(&self.package, &descriptor)
+        read_attached_table_header_settings(&self.package, table_id)
     }
 
     /// Replace an attached table's header and footer configuration transactionally.
@@ -156,35 +155,11 @@ impl NumbersEditor {
         table_id: u64,
         settings: NumbersTableHeaderSettings,
     ) -> Result<()> {
-        let descriptor = table_descriptor(&self.package, table_id)?;
-        validate_table_header_settings(&descriptor.model, settings)?;
-        if read_table_header_settings(&self.package, &descriptor)? == settings {
+        if read_attached_table_header_settings(&self.package, table_id)? == settings {
             return Ok(());
         }
-
-        let locations = object_locations(&self.package)?;
-        let archive_name = locations.get(&table_id).ok_or_else(|| {
-            Error::InvalidFormat(format!("Numbers table model object {table_id} is missing"))
-        })?;
         let mut staged = self.package.clone();
-        staged.update_archive(archive_name, |archive| {
-            let object = archive.object_mut(table_id).ok_or_else(|| {
-                Error::InvalidFormat(format!("Numbers table model object {table_id} is missing"))
-            })?;
-            let message_index = table_model_message_index(object, table_id)?;
-            let message_type = object.messages[message_index].type_;
-            let original = object.messages[message_index].data.as_slice();
-            let model = TableModelArchive::decode(original)?;
-            let data = write_table_header_settings_wire(original, &model, settings)?;
-            object.replace_message(
-                message_index,
-                RawMessage {
-                    type_: message_type,
-                    data,
-                },
-            )?;
-            Ok(())
-        })?;
+        set_attached_table_header_settings(&mut staged, table_id, settings)?;
 
         let verified = Self::from_bytes(&staged.to_bytes()?)?;
         if verified.table_header_settings(table_id)? != settings {
@@ -201,13 +176,6 @@ fn invalid_header_count() -> Error {
     Error::ParseError(format!(
         "Numbers table header and footer counts must be in 1..={MAX_NATIVE_HEADER_COUNT}"
     ))
-}
-
-fn table_descriptor(package: &IWorkPackage, table_id: u64) -> Result<TableDescriptor> {
-    table_models(package)?
-        .into_iter()
-        .find(|table| table.object_id == table_id)
-        .ok_or_else(|| Error::ParseError(format!("Numbers table object {table_id} not found")))
 }
 
 fn read_table_header_settings(
@@ -240,6 +208,48 @@ fn read_table_header_settings(
         ))
     })?;
     Ok(settings)
+}
+
+pub(super) fn read_attached_table_header_settings(
+    package: &IWorkPackage,
+    table_id: u64,
+) -> Result<NumbersTableHeaderSettings> {
+    let descriptor = attached_table_descriptor(package, table_id)?;
+    read_table_header_settings(package, &descriptor)
+}
+
+pub(super) fn set_attached_table_header_settings(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    settings: NumbersTableHeaderSettings,
+) -> Result<()> {
+    let descriptor = attached_table_descriptor(package, table_id)?;
+    validate_table_header_settings(&descriptor.model, settings)?;
+    if read_table_header_settings(package, &descriptor)? == settings {
+        return Ok(());
+    }
+    let locations = object_locations(package)?;
+    let archive_name = locations.get(&table_id).ok_or_else(|| {
+        Error::InvalidFormat(format!("Numbers table model object {table_id} is missing"))
+    })?;
+    package.update_archive(archive_name, |archive| {
+        let object = archive.object_mut(table_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("Numbers table model object {table_id} is missing"))
+        })?;
+        let message_index = table_model_message_index(object, table_id)?;
+        let message_type = object.messages[message_index].type_;
+        let original = object.messages[message_index].data.as_slice();
+        let model = TableModelArchive::decode(original)?;
+        let data = write_table_header_settings_wire(original, &model, settings)?;
+        object.replace_message(
+            message_index,
+            RawMessage {
+                type_: message_type,
+                data,
+            },
+        )?;
+        Ok(())
+    })
 }
 
 fn table_model_message_index(object: &ArchiveObject, table_id: u64) -> Result<usize> {

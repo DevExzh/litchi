@@ -21,6 +21,16 @@ const TABLE_ANGLE_DEGREES: f32 = 0.0;
 
 /// Strongly typed value stored in a Keynote table cell.
 pub type KeynoteTableCellValue = crate::numbers::CellValue;
+/// A validated non-zero native header or footer count.
+pub type KeynoteTableHeaderCount = crate::numbers::NumbersTableHeaderCount;
+/// Lossless header/footer configuration shared by native iWork tables.
+pub type KeynoteTableHeaderSettings = crate::numbers::NumbersTableHeaderSettings;
+/// One row or column addressed by zero-based index.
+pub type KeynoteTableDimension = crate::numbers::NumbersTableDimension;
+/// A validated positive point measurement for a table axis.
+pub type KeynoteTablePoints = crate::numbers::NumbersTablePoints;
+/// Either a table style's default axis size or an explicit point override.
+pub type KeynoteTableDimensionSize = crate::numbers::NumbersTableDimensionSize;
 
 /// Stable identity, dimensions, and geometry of one slide-owned table.
 #[derive(Debug, Clone, PartialEq)]
@@ -259,6 +269,154 @@ impl KeynoteEditor {
         }
         *self = verified;
         Ok(())
+    }
+
+    /// Read a slide table's lossless header and footer configuration.
+    pub fn slide_table_header_settings(
+        &self,
+        slide_index: usize,
+        model_object_id: u64,
+    ) -> Result<KeynoteTableHeaderSettings> {
+        require_table_model(self, slide_index, model_object_id)?;
+        crate::numbers::editor::table_header_settings_in_package(self.package(), model_object_id)
+    }
+
+    /// Replace a slide table's header and footer configuration transactionally.
+    pub fn set_slide_table_header_settings(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        settings: KeynoteTableHeaderSettings,
+    ) -> Result<()> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_header_settings_in_package(
+            &mut staged,
+            model_object_id,
+            settings,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.slide_table_header_settings(slide_index, model_object_id)? != settings {
+            return Err(Error::InvalidFormat(
+                "Keynote table header settings failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Read one row-height or column-width override.
+    pub fn slide_table_dimension_size(
+        &self,
+        slide_index: usize,
+        model_object_id: u64,
+        dimension: KeynoteTableDimension,
+    ) -> Result<KeynoteTableDimensionSize> {
+        require_table_model(self, slide_index, model_object_id)?;
+        crate::numbers::editor::table_dimension_size_in_package(
+            self.package(),
+            model_object_id,
+            dimension,
+        )
+    }
+
+    /// Set or clear one row-height or column-width override transactionally.
+    ///
+    /// The drawable bounds are updated to the sum of the effective native row
+    /// heights and column widths so Keynote's selection box remains exact.
+    pub fn set_slide_table_dimension_size(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        dimension: KeynoteTableDimension,
+        size: KeynoteTableDimensionSize,
+    ) -> Result<()> {
+        let source = require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_dimension_size_in_package(
+            &mut staged,
+            model_object_id,
+            dimension,
+            size,
+        )?;
+        let (width, height) =
+            crate::numbers::editor::table_size_points_in_package(&staged, model_object_id)?;
+        let geometry = DrawableGeometry {
+            size: Some(DrawableSize { width, height }),
+            ..source.geometry
+        };
+        set_table_geometry_in_package(&mut staged, source.drawable_object_id, geometry)?;
+
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.slide_table_dimension_size(slide_index, model_object_id, dimension)? != size
+            || require_table_model(&verified, slide_index, model_object_id)?.geometry != geometry
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote table dimension update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Read one row-height override.
+    pub fn slide_table_row_height(
+        &self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+    ) -> Result<KeynoteTableDimensionSize> {
+        self.slide_table_dimension_size(
+            slide_index,
+            model_object_id,
+            KeynoteTableDimension::Row(row),
+        )
+    }
+
+    /// Set or clear one row-height override.
+    pub fn set_slide_table_row_height(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        size: KeynoteTableDimensionSize,
+    ) -> Result<()> {
+        self.set_slide_table_dimension_size(
+            slide_index,
+            model_object_id,
+            KeynoteTableDimension::Row(row),
+            size,
+        )
+    }
+
+    /// Read one column-width override.
+    pub fn slide_table_column_width(
+        &self,
+        slide_index: usize,
+        model_object_id: u64,
+        column: usize,
+    ) -> Result<KeynoteTableDimensionSize> {
+        self.slide_table_dimension_size(
+            slide_index,
+            model_object_id,
+            KeynoteTableDimension::Column(column),
+        )
+    }
+
+    /// Set or clear one column-width override.
+    pub fn set_slide_table_column_width(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        column: usize,
+        size: KeynoteTableDimensionSize,
+    ) -> Result<()> {
+        self.set_slide_table_dimension_size(
+            slide_index,
+            model_object_id,
+            KeynoteTableDimension::Column(column),
+            size,
+        )
     }
 
     /// Update one slide table's position, size, flags, and rotation.

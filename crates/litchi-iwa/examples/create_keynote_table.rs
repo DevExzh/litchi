@@ -1,6 +1,9 @@
 use std::env;
 
-use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteTableCellValue};
+use litchi_iwa::keynote::{
+    KeynoteDocumentBuilder, KeynoteTableCellValue, KeynoteTableDimensionSize,
+    KeynoteTableHeaderCount, KeynoteTableHeaderSettings,
+};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -39,6 +42,32 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             };
             editor.set_slide_table_cell(0, table.model_object_id, row, column, value)?;
         }
+    }
+    editor.set_slide_table_header_settings(
+        0,
+        table.model_object_id,
+        KeynoteTableHeaderSettings {
+            header_rows: Some(KeynoteTableHeaderCount::ONE),
+            header_columns: Some(KeynoteTableHeaderCount::ONE),
+            footer_rows: Some(KeynoteTableHeaderCount::ONE),
+            ..Default::default()
+        },
+    )?;
+    for (column, width) in [440.0, 390.0, 390.0].into_iter().enumerate() {
+        editor.set_slide_table_column_width(
+            0,
+            table.model_object_id,
+            column,
+            KeynoteTableDimensionSize::points(width)?,
+        )?;
+    }
+    for (row, height) in [90.0, 100.0, 110.0, 130.0].into_iter().enumerate() {
+        editor.set_slide_table_row_height(
+            0,
+            table.model_object_id,
+            row,
+            KeynoteTableDimensionSize::points(height)?,
+        )?;
     }
     editor.save(&output)?;
     println!("created {output}");

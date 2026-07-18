@@ -58,13 +58,63 @@ fn source_built_table_roundtrips_full_crud() {
     editor
         .set_slide_table_geometry(0, table.drawable_object_id, replacement)
         .unwrap();
+    let headers = KeynoteTableHeaderSettings {
+        header_rows: Some(KeynoteTableHeaderCount::TWO),
+        header_columns: None,
+        footer_rows: Some(KeynoteTableHeaderCount::ONE),
+        ..Default::default()
+    };
+    editor
+        .set_slide_table_header_settings(0, table.model_object_id, headers)
+        .unwrap();
+    editor
+        .set_slide_table_column_width(
+            0,
+            table.model_object_id,
+            0,
+            KeynoteTableDimensionSize::points(300.0).unwrap(),
+        )
+        .unwrap();
+    editor
+        .set_slide_table_row_height(
+            0,
+            table.model_object_id,
+            0,
+            KeynoteTableDimensionSize::points(140.0).unwrap(),
+        )
+        .unwrap();
+    let laid_out_geometry = DrawableGeometry {
+        size: Some(DrawableSize {
+            width: 975.0,
+            height: 455.0,
+        }),
+        ..replacement
+    };
 
     let bytes = editor.to_bytes().unwrap();
     let mut reopened = KeynoteEditor::from_bytes(&bytes).unwrap();
     let materialized = reopened.slide_table(0, table.model_object_id).unwrap();
     assert_eq!(materialized.info.name, "Outlook");
     assert_eq!((materialized.info.rows, materialized.info.columns), (4, 4));
-    assert_eq!(materialized.info.geometry, replacement);
+    assert_eq!(materialized.info.geometry, laid_out_geometry);
+    assert_eq!(
+        reopened
+            .slide_table_header_settings(0, table.model_object_id)
+            .unwrap(),
+        headers
+    );
+    assert_eq!(
+        reopened
+            .slide_table_column_width(0, table.model_object_id, 0)
+            .unwrap(),
+        KeynoteTableDimensionSize::points(300.0).unwrap()
+    );
+    assert_eq!(
+        reopened
+            .slide_table_row_height(0, table.model_object_id, 0)
+            .unwrap(),
+        KeynoteTableDimensionSize::points(140.0).unwrap()
+    );
     assert_eq!(
         materialized.get_cell(0, 0),
         Some(&KeynoteTableCellValue::Text("Region".to_owned()))
