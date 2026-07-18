@@ -1,10 +1,8 @@
 //! Standalone, inline-data chart CRUD for Numbers sheets.
 
-mod build;
 mod graph;
 mod theme;
 
-use build::{chart_grid, chart_objects};
 use graph::chart_graph;
 use theme::{chart_theme_context, patch_theme_chart_preset};
 
@@ -12,74 +10,19 @@ use std::collections::HashSet;
 
 use super::*;
 use crate::IWorkThemeArchive;
-use crate::charts::{ChartData, ChartKind, IWorkChartArchive};
-use crate::protobuf::{tsch, tsk, tss};
+use crate::charts::source::{
+    AXIS_NON_STYLE_MESSAGE_TYPE, AXIS_STYLE_MESSAGE_TYPE, CHART_MEDIATOR_MESSAGE_TYPE,
+    CHART_MESSAGE_TYPE, CHART_NON_STYLE_MESSAGE_TYPE, CHART_PRESET_MESSAGE_TYPE,
+    CHART_STYLE_MESSAGE_TYPE, ChartApplicationProfile, LEGEND_NON_STYLE_MESSAGE_TYPE,
+    LEGEND_STYLE_MESSAGE_TYPE, SERIES_STYLE_MESSAGE_TYPE, STANDIN_MESSAGE_TYPE,
+    SourceChartObjectIds, chart_data, chart_geometry, chart_grid, drawable_geometry,
+    geometry_archive, reference, require_creatable_kind, source_chart_objects,
+};
+use crate::charts::{ChartData, ChartKind, ChartSeriesDirection, IWorkChartArchive};
+use crate::protobuf::tsch;
 use crate::shapes::{DrawableGeometry, DrawablePoint, DrawableSize};
-use crate::wire::append_length_delimited_field;
 
-const CHART_MESSAGE_TYPE: u32 = 5_021;
-const CHART_MEDIATOR_MESSAGE_TYPE: u32 = 12_006;
-const STANDIN_MESSAGE_TYPE: u32 = 3_097;
-const CHART_PRESET_MESSAGE_TYPE: u32 = 5_020;
-const CHART_STYLE_MESSAGE_TYPE: u32 = 5_022;
-const CHART_NON_STYLE_MESSAGE_TYPE: u32 = 5_023;
-const LEGEND_STYLE_MESSAGE_TYPE: u32 = 5_024;
-const LEGEND_NON_STYLE_MESSAGE_TYPE: u32 = 5_025;
-const AXIS_STYLE_MESSAGE_TYPE: u32 = 5_026;
-const AXIS_NON_STYLE_MESSAGE_TYPE: u32 = 5_027;
-const SERIES_STYLE_MESSAGE_TYPE: u32 = 5_028;
 const NUMBERS_THEME_MESSAGE_TYPE: u32 = 12_009;
-const CURRENT_STYLE_EXTENSION_FIELD: u32 = 10_000;
-const CHART_SCENE_DEPTH_EXTENSION_FIELD: u32 = 10_002;
-const CHART_APPEARANCE_PRESERVED_EXTENSION_FIELD: u32 = 10_023;
-const CHART_PROPORTIONAL_CALLOUTS_EXTENSION_FIELD: u32 = 10_024;
-const CHART_ROUNDED_CORNERS_EXTENSION_FIELD: u32 = 10_026;
-const CHART_VALUE_LABEL_SPACING_EXTENSION_FIELD: u32 = 10_027;
-const CHART_ERROR_BAR_SPACING_EXTENSION_FIELD: u32 = 10_028;
-const CHART_STACKED_SUMMARY_LABELS_EXTENSION_FIELD: u32 = 10_029;
-const CHART_CACHED_FORMATTERS_EXTENSION_FIELD: u32 = 10_030;
-const STANDARD_MESSAGE_VERSION: &[u32] = &[1, 0, 5];
-const STANDIN_MESSAGE_VERSION: &[u32] = &[10, 1, 0];
-const DEFAULT_DRAWABLE_FLAGS: u32 = 3;
-const DEFAULT_ROTATION_DEGREES: f32 = 0.0;
-const DEFAULT_TEXT_WRAP_MARGIN_POINTS: f32 = 12.0;
-const DEFAULT_TEXT_WRAP_ALPHA_THRESHOLD: f32 = 0.5;
-const MEDIATOR_LOCAL_SERIES_SENTINEL: u32 = u32::MAX;
-const MEDIATOR_REMOTE_SERIES_INDEX: u32 = 0;
-const MEDIATOR_FORMULA_DIRECTION: i32 = 0;
-const MEDIATOR_FORMULA_SCHEME: i32 = 0;
-const DEFAULT_CHART_DATASET_INDEX: u32 = 0;
-const DEFAULT_CHART_NUMBER_FORMAT_TYPE: u32 = 256;
-const AUTOMATIC_CHART_DECIMAL_PLACES: u32 = 253;
-const DEFAULT_CHART_NEGATIVE_STYLE: u32 = 0;
-const CHART_PARAGRAPH_STYLE_COUNT: usize = 30;
-
-/// Whether chart series are stored in rows or columns.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum ChartSeriesDirection {
-    Rows,
-    Columns,
-    Unsupported(i32),
-}
-
-impl ChartSeriesDirection {
-    const fn from_raw(value: i32) -> Self {
-        match value {
-            x if x == tsch::SeriesDirection::ByRow as i32 => Self::Rows,
-            x if x == tsch::SeriesDirection::ByColumn as i32 => Self::Columns,
-            value => Self::Unsupported(value),
-        }
-    }
-
-    const fn into_raw(self) -> i32 {
-        match self {
-            Self::Rows => tsch::SeriesDirection::ByRow as i32,
-            Self::Columns => tsch::SeriesDirection::ByColumn as i32,
-            Self::Unsupported(value) => value,
-        }
-    }
-}
 
 /// One chart drawable owned by a Numbers sheet.
 #[derive(Debug, Clone, PartialEq)]
@@ -96,124 +39,6 @@ pub struct NumbersSheetChartInfo {
 #[derive(Debug, Clone, PartialEq)]
 pub struct RemovedNumbersSheetChart {
     pub chart: NumbersSheetChartInfo,
-}
-
-#[derive(Debug, Clone, Copy)]
-struct ChartObjectIds {
-    drawable: u64,
-    caption: u64,
-    title: u64,
-    mediator: u64,
-    preset: u64,
-    chart_style: u64,
-    chart_non_style: u64,
-    legend_style: u64,
-    legend_non_style: u64,
-    value_axis_styles: [u64; 2],
-    value_axis_non_styles: [u64; 2],
-    category_axis_style: u64,
-    category_axis_non_style: u64,
-    series_styles: [u64; 6],
-}
-
-impl ChartObjectIds {
-    const COUNT: usize = 21;
-
-    fn allocate(package: &IWorkPackage) -> Result<Self> {
-        let mut next = next_object_identifier(package)?;
-        Ok(Self {
-            drawable: take_identifier(&mut next)?,
-            caption: take_identifier(&mut next)?,
-            title: take_identifier(&mut next)?,
-            mediator: take_identifier(&mut next)?,
-            preset: take_identifier(&mut next)?,
-            chart_style: take_identifier(&mut next)?,
-            chart_non_style: take_identifier(&mut next)?,
-            legend_style: take_identifier(&mut next)?,
-            legend_non_style: take_identifier(&mut next)?,
-            value_axis_styles: [take_identifier(&mut next)?, take_identifier(&mut next)?],
-            value_axis_non_styles: [take_identifier(&mut next)?, take_identifier(&mut next)?],
-            category_axis_style: take_identifier(&mut next)?,
-            category_axis_non_style: take_identifier(&mut next)?,
-            series_styles: [
-                take_identifier(&mut next)?,
-                take_identifier(&mut next)?,
-                take_identifier(&mut next)?,
-                take_identifier(&mut next)?,
-                take_identifier(&mut next)?,
-                take_identifier(&mut next)?,
-            ],
-        })
-    }
-
-    const fn all(self) -> [u64; Self::COUNT] {
-        [
-            self.drawable,
-            self.caption,
-            self.title,
-            self.mediator,
-            self.preset,
-            self.chart_style,
-            self.chart_non_style,
-            self.legend_style,
-            self.legend_non_style,
-            self.value_axis_styles[0],
-            self.value_axis_styles[1],
-            self.value_axis_non_styles[0],
-            self.value_axis_non_styles[1],
-            self.category_axis_style,
-            self.category_axis_non_style,
-            self.series_styles[0],
-            self.series_styles[1],
-            self.series_styles[2],
-            self.series_styles[3],
-            self.series_styles[4],
-            self.series_styles[5],
-        ]
-    }
-
-    const fn last(self) -> u64 {
-        self.series_styles[5]
-    }
-
-    fn chart_references(self) -> Vec<u64> {
-        let mut references = Vec::with_capacity(Self::COUNT - 1);
-        references.extend([self.caption, self.title, self.mediator]);
-        references.extend([
-            self.preset,
-            self.chart_style,
-            self.chart_non_style,
-            self.legend_style,
-            self.legend_non_style,
-        ]);
-        references.extend(self.value_axis_styles);
-        references.extend(self.value_axis_non_styles);
-        references.extend([self.category_axis_style, self.category_axis_non_style]);
-        references.extend(self.series_styles);
-        references
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-enum GridAxis {
-    Row,
-    Column,
-}
-
-impl GridAxis {
-    const fn label(self) -> &'static str {
-        match self {
-            Self::Row => "row",
-            Self::Column => "column",
-        }
-    }
-
-    const fn identifier_offset(self) -> u64 {
-        match self {
-            Self::Row => 0,
-            Self::Column => 1_u64 << 47,
-        }
-    }
 }
 
 impl NumbersEditor {
@@ -259,7 +84,7 @@ impl NumbersEditor {
         size: DrawableSize,
     ) -> Result<NumbersSheetChartInfo> {
         require_creatable_kind(kind)?;
-        let geometry = chart_geometry(position, size)?;
+        let geometry = chart_geometry("Numbers", position, size)?;
         let (archive_name, _, _) = numbers_sheet(self.package(), sheet_id)?;
         let component_id = component_identifier_for_entry(self.package(), &archive_name)?
             .ok_or_else(|| {
@@ -268,14 +93,18 @@ impl NumbersEditor {
                 ))
             })?;
         let theme = chart_theme_context(self.package())?;
-        let ids = ChartObjectIds::allocate(self.package())?;
-        let objects = chart_objects(
+        let ids = SourceChartObjectIds::allocate(
+            next_object_identifier(self.package())?,
+            ChartApplicationProfile::Numbers,
+        )?;
+        let objects = source_chart_objects(
             ids,
             sheet_id,
             kind,
             data.clone(),
             geometry,
             theme.paragraph_style_id,
+            ChartApplicationProfile::Numbers,
         )?;
 
         let mut staged = self.package.clone();
@@ -545,53 +374,6 @@ impl NumbersEditor {
     }
 }
 
-fn geometry_archive(geometry: DrawableGeometry) -> Result<tsd::GeometryArchive> {
-    geometry.validate()?;
-    Ok(tsd::GeometryArchive {
-        position: geometry.position.map(|point| tsp::Point {
-            x: point.x,
-            y: point.y,
-        }),
-        size: geometry.size.map(|size| tsp::Size {
-            width: size.width,
-            height: size.height,
-        }),
-        flags: geometry.flags,
-        angle: geometry.angle,
-    })
-}
-
-fn chart_geometry(position: DrawablePoint, size: DrawableSize) -> Result<DrawableGeometry> {
-    if size.width <= 0.0 || size.height <= 0.0 {
-        return Err(Error::ParseError(
-            "Numbers chart dimensions must be positive".to_owned(),
-        ));
-    }
-    DrawableGeometry {
-        position: Some(position),
-        size: Some(size),
-        flags: Some(DEFAULT_DRAWABLE_FLAGS),
-        angle: Some(DEFAULT_ROTATION_DEGREES),
-    }
-    .validate()
-}
-
-fn require_creatable_kind(kind: ChartKind) -> Result<()> {
-    if matches!(kind, ChartKind::Undefined | ChartKind::Unsupported(_)) {
-        return Err(Error::ParseError(
-            "chart kind must be a supported concrete iWork kind".to_owned(),
-        ));
-    }
-    Ok(())
-}
-
-fn reference(identifier: u64) -> tsp::Reference {
-    tsp::Reference {
-        identifier,
-        ..Default::default()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -648,15 +430,15 @@ mod tests {
                 ChartSeriesDirection::Columns,
             )
             .unwrap();
-        let changed_geometry = DrawableGeometry {
-            position: Some(DrawablePoint { x: 72.0, y: 360.0 }),
-            size: Some(DrawableSize {
+        let changed_geometry = chart_geometry(
+            "Numbers",
+            DrawablePoint { x: 72.0, y: 360.0 },
+            DrawableSize {
                 width: 500.0,
                 height: 300.0,
-            }),
-            flags: Some(DEFAULT_DRAWABLE_FLAGS),
-            angle: Some(0.0),
-        };
+            },
+        )
+        .unwrap();
         editor
             .set_sheet_chart_geometry(sheet_id, created.drawable_object_id, changed_geometry)
             .unwrap();

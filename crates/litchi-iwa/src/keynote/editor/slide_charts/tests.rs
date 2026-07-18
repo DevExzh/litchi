@@ -1,0 +1,153 @@
+//! Source-built Keynote chart CRUD regression tests.
+
+use super::*;
+use crate::keynote::KeynoteDocumentBuilder;
+
+const POSITION: DrawablePoint = DrawablePoint { x: 240.0, y: 260.0 };
+const SIZE: DrawableSize = DrawableSize {
+    width: 720.0,
+    height: 420.0,
+};
+
+fn sample_data() -> ChartData {
+    ChartData::new(
+        vec!["Region 1".to_owned(), "Region 2".to_owned()],
+        vec![
+            "April".to_owned(),
+            "May".to_owned(),
+            "June".to_owned(),
+            "July".to_owned(),
+        ],
+        vec![
+            vec![Some(17.0), Some(26.0), Some(53.0), Some(96.0)],
+            vec![Some(55.0), Some(43.0), Some(70.0), Some(58.0)],
+        ],
+    )
+    .unwrap()
+}
+
+#[test]
+fn scratch_presentation_supports_standalone_chart_crud() {
+    let mut editor = KeynoteDocumentBuilder::new()
+        .title("Source-built chart")
+        .build()
+        .unwrap();
+    let baseline = editor.to_bytes().unwrap();
+
+    let created = editor
+        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .unwrap();
+    assert_eq!(created.kind, ChartKind::Column2d);
+    assert_eq!(created.direction, ChartSeriesDirection::Rows);
+    assert_eq!(created.data, sample_data());
+
+    let replacement = ChartData::new(
+        vec!["Revenue".to_owned()],
+        vec!["2026".to_owned(), "2027".to_owned(), "2028".to_owned()],
+        vec![vec![Some(30.0), Some(45.0), None]],
+    )
+    .unwrap();
+    editor
+        .set_slide_chart_kind(0, created.drawable_object_id, ChartKind::Bar2d)
+        .unwrap();
+    editor
+        .set_slide_chart_data(0, created.drawable_object_id, replacement.clone())
+        .unwrap();
+    editor
+        .set_slide_chart_direction(0, created.drawable_object_id, ChartSeriesDirection::Columns)
+        .unwrap();
+    let changed_geometry = chart_geometry(
+        "Keynote",
+        DrawablePoint { x: 360.0, y: 180.0 },
+        DrawableSize {
+            width: 840.0,
+            height: 480.0,
+        },
+    )
+    .unwrap();
+    editor
+        .set_slide_chart_geometry(0, created.drawable_object_id, changed_geometry)
+        .unwrap();
+
+    let reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let chart = &reopened.slide_charts(0).unwrap()[0];
+    assert_eq!(chart.kind, ChartKind::Bar2d);
+    assert_eq!(chart.direction, ChartSeriesDirection::Columns);
+    assert_eq!(chart.data, replacement);
+    assert_eq!(chart.geometry, changed_geometry);
+
+    let removed = editor
+        .remove_slide_chart(0, created.drawable_object_id)
+        .unwrap();
+    assert_eq!(removed.chart.drawable_object_id, created.drawable_object_id);
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+}
+
+#[test]
+fn chart_creation_rejects_invalid_inputs_transactionally() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let baseline = editor.to_bytes().unwrap();
+    assert!(
+        editor
+            .add_slide_chart(0, ChartKind::Undefined, sample_data(), POSITION, SIZE)
+            .is_err()
+    );
+    assert!(
+        editor
+            .add_slide_chart(
+                0,
+                ChartKind::Column2d,
+                sample_data(),
+                POSITION,
+                DrawableSize {
+                    width: 0.0,
+                    height: SIZE.height,
+                },
+            )
+            .is_err()
+    );
+    assert!(
+        editor
+            .add_slide_chart(1, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+}
+
+#[test]
+fn multiple_chart_theme_registrations_are_removed_independently() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let baseline = editor.to_bytes().unwrap();
+    let first = editor
+        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .unwrap();
+    let second = editor
+        .add_slide_chart(
+            0,
+            ChartKind::Line2d,
+            sample_data(),
+            DrawablePoint {
+                x: POSITION.x + SIZE.width,
+                y: POSITION.y,
+            },
+            SIZE,
+        )
+        .unwrap();
+
+    editor
+        .remove_slide_chart(0, first.drawable_object_id)
+        .unwrap();
+    assert_eq!(
+        editor
+            .slide_charts(0)
+            .unwrap()
+            .iter()
+            .map(|chart| chart.drawable_object_id)
+            .collect::<Vec<_>>(),
+        vec![second.drawable_object_id]
+    );
+    editor
+        .remove_slide_chart(0, second.drawable_object_id)
+        .unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+}

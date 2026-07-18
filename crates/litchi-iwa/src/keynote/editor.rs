@@ -4289,6 +4289,7 @@ mod slide_background_gradient;
 mod slide_background_gradient_wire;
 mod slide_background_reset;
 mod slide_background_wire;
+mod slide_charts;
 mod slide_create;
 mod slide_graph;
 mod slide_images;
@@ -4318,6 +4319,7 @@ pub use slide_background_color::{KeynoteRgbColorSpace, KeynoteRgbaColor};
 pub use slide_background_gradient::{
     KeynoteGradient, KeynoteGradientAngle, KeynoteGradientKind, KeynoteGradientStop,
 };
+pub use slide_charts::{KeynoteSlideChartInfo, RemovedKeynoteSlideChart};
 use slide_graph::*;
 pub use slide_images::{KeynoteSlideImageInfo, KeynoteSlideImageKind, RemovedKeynoteSlideImage};
 pub use slide_movies::{

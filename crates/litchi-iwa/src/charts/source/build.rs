@@ -1,33 +1,47 @@
-//! Source-built Numbers chart object and style graphs.
+//! Native chart drawable, style, and optional mediator construction.
 
 use super::*;
 
-fn repeated_references(count: usize, identifier: u64) -> Vec<tsp::Reference> {
-    std::iter::repeat_with(|| reference(identifier))
-        .take(count)
-        .collect()
+#[derive(Debug, Clone, Copy)]
+#[repr(u32)]
+enum TextWrapType {
+    Square = 4,
 }
 
+#[derive(Debug, Clone, Copy)]
+#[repr(u32)]
+enum TextWrapDirection {
+    BothSides = 2,
+}
+
+#[derive(Debug, Clone, Copy)]
+#[repr(u32)]
+enum TextWrapFit {
+    Text = 1,
+}
+
+/// Native graph differences that cannot be shared across iWork applications.
 #[allow(deprecated)]
-pub(super) fn chart_objects(
-    ids: ChartObjectIds,
-    sheet_id: u64,
+pub(crate) fn source_chart_objects(
+    ids: SourceChartObjectIds,
+    parent_id: u64,
     kind: ChartKind,
     data: ChartData,
     geometry: DrawableGeometry,
     paragraph_style_id: u64,
-) -> Result<[ArchiveObject; ChartObjectIds::COUNT]> {
-    let paragraph_styles = repeated_references(CHART_PARAGRAPH_STYLE_COUNT, paragraph_style_id);
+    profile: ChartApplicationProfile,
+) -> Result<Vec<ArchiveObject>> {
+    let paragraph_styles = repeated_references(profile.paragraph_style_count(), paragraph_style_id);
     let series_count = data.row_names().len();
     let mut chart = IWorkChartArchive::new(
         tsch::ChartDrawableArchive {
             super_: Some(tsd::DrawableArchive {
                 geometry: Some(geometry_archive(geometry)?),
-                parent: Some(reference(sheet_id)),
+                parent: Some(reference(parent_id)),
                 exterior_text_wrap: Some(tsd::ExteriorTextWrapArchive {
-                    r#type: Some(4),
-                    direction: Some(2),
-                    fit_type: Some(1),
+                    r#type: Some(TextWrapType::Square as u32),
+                    direction: Some(TextWrapDirection::BothSides as u32),
+                    fit_type: Some(TextWrapFit::Text as u32),
                     margin: Some(DEFAULT_TEXT_WRAP_MARGIN_POINTS),
                     alpha_threshold: Some(DEFAULT_TEXT_WRAP_ALPHA_THRESHOLD),
                     is_html_wrap: Some(false),
@@ -48,7 +62,7 @@ pub(super) fn chart_objects(
             series_direction: Some(tsch::SeriesDirection::ByRow as i32),
             contains_default_data: None,
             grid: Some(chart_grid(ids.drawable, data)?),
-            mediator: Some(reference(ids.mediator)),
+            mediator: ids.mediator.map(reference),
             chart_style: Some(reference(ids.chart_style)),
             chart_non_style: Some(reference(ids.chart_non_style)),
             legend_style: Some(reference(ids.legend_style)),
@@ -84,21 +98,7 @@ pub(super) fn chart_objects(
         CHART_CACHED_FORMATTERS_EXTENSION_FIELD,
         &default_cached_formatters(series_count)?,
     )?;
-    let mediator = tn::ChartMediatorArchive {
-        super_: tsch::ChartMediatorArchive {
-            info: None,
-            local_series_indexes: vec![MEDIATOR_LOCAL_SERIES_SENTINEL],
-            remote_series_indexes: vec![MEDIATOR_REMOTE_SERIES_INDEX],
-        },
-        entity_id: allocate_table_uuid(ids.mediator, &HashSet::new()),
-        formulas: Some(tn::ChartMediatorFormulaStorage {
-            direction: Some(MEDIATOR_FORMULA_DIRECTION),
-            scheme: Some(MEDIATOR_FORMULA_SCHEME),
-            ..Default::default()
-        }),
-        columns_are_series: None,
-        is_registered_with_calc_engine: None,
-    };
+
     let preset = tsch::ChartStylePreset {
         chart_style: Some(reference(ids.chart_style)),
         legend_style: Some(reference(ids.legend_style)),
@@ -124,42 +124,46 @@ pub(super) fn chart_objects(
         ids.series_styles[5],
     ];
     preset_references.push(paragraph_style_id);
-    Ok([
-        chart_object(
-            ids.drawable,
-            CHART_MESSAGE_TYPE,
-            chart.encode()?,
-            STANDARD_MESSAGE_VERSION,
-            &chart_references,
-        )?,
-        message_object(
-            ids.caption,
-            STANDIN_MESSAGE_TYPE,
-            tsd::StandinCaptionArchive::default(),
-            STANDIN_MESSAGE_VERSION,
-            &[],
-        )?,
-        message_object(
-            ids.title,
-            STANDIN_MESSAGE_TYPE,
-            tsd::StandinCaptionArchive::default(),
-            STANDIN_MESSAGE_VERSION,
-            &[],
-        )?,
-        message_object(
-            ids.mediator,
+
+    let mut objects = Vec::with_capacity(ids.all().len());
+    objects.push(chart_object(
+        ids.drawable,
+        CHART_MESSAGE_TYPE,
+        chart.encode()?,
+        STANDARD_MESSAGE_VERSION,
+        &chart_references,
+    )?);
+    objects.push(message_object(
+        ids.caption,
+        STANDIN_MESSAGE_TYPE,
+        tsd::StandinCaptionArchive::default(),
+        STANDIN_MESSAGE_VERSION,
+        &[],
+    )?);
+    objects.push(message_object(
+        ids.title,
+        STANDIN_MESSAGE_TYPE,
+        tsd::StandinCaptionArchive::default(),
+        STANDIN_MESSAGE_VERSION,
+        &[],
+    )?);
+    if let Some(mediator_id) = ids.mediator {
+        objects.push(message_object(
+            mediator_id,
             CHART_MEDIATOR_MESSAGE_TYPE,
-            mediator,
+            numbers_mediator(mediator_id),
             STANDARD_MESSAGE_VERSION,
             &[],
-        )?,
-        message_object(
-            ids.preset,
-            CHART_PRESET_MESSAGE_TYPE,
-            preset,
-            STANDARD_MESSAGE_VERSION,
-            &preset_references,
-        )?,
+        )?);
+    }
+    objects.push(message_object(
+        ids.preset,
+        CHART_PRESET_MESSAGE_TYPE,
+        preset,
+        STANDARD_MESSAGE_VERSION,
+        &preset_references,
+    )?);
+    objects.extend([
         extension_style_object(
             ids.chart_style,
             CHART_STYLE_MESSAGE_TYPE,
@@ -254,106 +258,24 @@ pub(super) fn chart_objects(
             },
             default_axis_non_style(),
         )?,
-        extension_style_object(
-            ids.series_styles[0],
+    ]);
+    for (identifier, index) in ids.series_styles.into_iter().zip(0..) {
+        objects.push(extension_style_object(
+            identifier,
             SERIES_STYLE_MESSAGE_TYPE,
             tsch::ChartSeriesStyleArchive {
                 super_: Some(tss::StyleArchive::default()),
             },
-            default_series_style(0),
-        )?,
-        extension_style_object(
-            ids.series_styles[1],
-            SERIES_STYLE_MESSAGE_TYPE,
-            tsch::ChartSeriesStyleArchive {
-                super_: Some(tss::StyleArchive::default()),
-            },
-            default_series_style(1),
-        )?,
-        extension_style_object(
-            ids.series_styles[2],
-            SERIES_STYLE_MESSAGE_TYPE,
-            tsch::ChartSeriesStyleArchive {
-                super_: Some(tss::StyleArchive::default()),
-            },
-            default_series_style(2),
-        )?,
-        extension_style_object(
-            ids.series_styles[3],
-            SERIES_STYLE_MESSAGE_TYPE,
-            tsch::ChartSeriesStyleArchive {
-                super_: Some(tss::StyleArchive::default()),
-            },
-            default_series_style(3),
-        )?,
-        extension_style_object(
-            ids.series_styles[4],
-            SERIES_STYLE_MESSAGE_TYPE,
-            tsch::ChartSeriesStyleArchive {
-                super_: Some(tss::StyleArchive::default()),
-            },
-            default_series_style(4),
-        )?,
-        extension_style_object(
-            ids.series_styles[5],
-            SERIES_STYLE_MESSAGE_TYPE,
-            tsch::ChartSeriesStyleArchive {
-                super_: Some(tss::StyleArchive::default()),
-            },
-            default_series_style(5),
-        )?,
-    ])
+            default_series_style(index),
+        )?);
+    }
+    Ok(objects)
 }
 
-pub(super) fn chart_grid(seed: u64, data: ChartData) -> Result<tsch::ChartGridArchive> {
-    let (row_names, column_names, values) = data.into_parts();
-    let row_id_map = (0..row_names.len())
-        .map(|index| grid_id_entry(seed, index, GridAxis::Row))
-        .collect::<Result<_>>()?;
-    let column_id_map = (0..column_names.len())
-        .map(|index| grid_id_entry(seed, index, GridAxis::Column))
-        .collect::<Result<_>>()?;
-    Ok(tsch::ChartGridArchive {
-        row_name: row_names,
-        column_name: column_names,
-        grid_row: values
-            .into_iter()
-            .map(|row| tsch::GridRow {
-                value: row
-                    .into_iter()
-                    .map(|numeric_value| tsch::GridValue {
-                        numeric_value,
-                        ..Default::default()
-                    })
-                    .collect(),
-            })
-            .collect(),
-        id_map: Some(tsch::chart_grid_archive::ChartGridRowColumnIdMap {
-            row_id_map,
-            column_id_map,
-        }),
-    })
-}
-
-fn grid_id_entry(
-    seed: u64,
-    index: usize,
-    axis: GridAxis,
-) -> Result<tsch::chart_grid_archive::chart_grid_row_column_id_map::Entry> {
-    let index_u32 = u32::try_from(index)
-        .map_err(|_| Error::ParseError(format!("chart {} index exceeds u32", axis.label())))?;
-    let offset = u64::try_from(index)
-        .map_err(|_| Error::ParseError(format!("chart {} index exceeds u64", axis.label())))?;
-    Ok(
-        tsch::chart_grid_archive::chart_grid_row_column_id_map::Entry {
-            unique_id: allocate_table_uuid(
-                seed.wrapping_add(axis.identifier_offset())
-                    .wrapping_add(offset),
-                &HashSet::new(),
-            ),
-            index: index_u32,
-        },
-    )
+fn repeated_references(count: usize, identifier: u64) -> Vec<tsp::Reference> {
+    std::iter::repeat_with(|| reference(identifier))
+        .take(count)
+        .collect()
 }
 
 fn chart_object(
@@ -413,6 +335,25 @@ fn extension_style_object(
     )
 }
 
+#[allow(deprecated)]
+fn numbers_mediator(identifier: u64) -> tn::ChartMediatorArchive {
+    tn::ChartMediatorArchive {
+        super_: tsch::ChartMediatorArchive {
+            info: None,
+            local_series_indexes: vec![MEDIATOR_LOCAL_SERIES_SENTINEL],
+            remote_series_indexes: vec![MEDIATOR_REMOTE_SERIES_INDEX],
+        },
+        entity_id: deterministic_uuid(identifier),
+        formulas: Some(tn::ChartMediatorFormulaStorage {
+            direction: Some(MEDIATOR_FORMULA_DIRECTION),
+            scheme: Some(MEDIATOR_FORMULA_SCHEME),
+            ..Default::default()
+        }),
+        columns_are_series: None,
+        is_registered_with_calc_engine: None,
+    }
+}
+
 fn default_axis_style() -> tsch::generated::ChartAxisStyleArchive {
     tsch::generated::ChartAxisStyleArchive {
         tschchartaxiscategoryshowaxis: Some(true),
@@ -436,7 +377,7 @@ fn default_axis_non_style() -> tsch::generated::ChartAxisNonStyleArchive {
 }
 
 fn default_series_style(index: usize) -> tsch::generated::ChartSeriesStyleArchive {
-    const COLORS: [(f32, f32, f32); 6] = [
+    const COLORS: [(f32, f32, f32); SERIES_STYLE_COUNT] = [
         (0.16, 0.55, 0.88),
         (0.29, 0.70, 0.39),
         (0.57, 0.57, 0.60),

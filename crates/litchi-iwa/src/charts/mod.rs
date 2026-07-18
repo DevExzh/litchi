@@ -11,10 +11,13 @@
 
 mod archive;
 mod data;
+mod direction;
 mod kind;
 pub mod metadata_extractor;
+pub(crate) mod source;
 
 pub use archive::IWorkChartArchive;
 pub use data::ChartData;
+pub use direction::ChartSeriesDirection;
 pub use kind::ChartKind;
 pub use metadata_extractor::{ChartMetadata, ChartMetadataExtractor};

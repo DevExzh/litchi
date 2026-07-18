@@ -1,42 +1,48 @@
-//! Numbers sheet chart graph discovery and validation.
+//! Keynote slide chart graph discovery and validation.
 
 use super::*;
 
-pub(super) struct SheetChartGraph {
+pub(super) struct SlideChartGraph {
     pub(super) archive_name: String,
     pub(super) component_id: u64,
-    pub(super) info: NumbersSheetChartInfo,
+    pub(super) info: KeynoteSlideChartInfo,
     pub(super) object_ids: Vec<u64>,
     pub(super) uuid_object_ids: Vec<u64>,
     pub(super) private_preset_id: Option<u64>,
 }
 
 pub(super) fn chart_graph(
-    editor: &NumbersEditor,
-    sheet_id: u64,
+    editor: &KeynoteEditor,
+    slide_index: usize,
     drawable_object_id: u64,
-) -> Result<SheetChartGraph> {
-    let (archive_name, _, sheet) = numbers_sheet(editor.package(), sheet_id)?;
-    if sheet
-        .drawable_infos
-        .iter()
-        .filter(|reference| reference.identifier == drawable_object_id)
-        .count()
-        != 1
-    {
-        return Err(Error::ParseError(format!(
-            "Numbers sheet {sheet_id} does not own chart {drawable_object_id} exactly once"
-        )));
+) -> Result<SlideChartGraph> {
+    let graph = ObjectGraph::read(editor.package())?;
+    let context = text_box_create::text_box_context(&graph, slide_index)?;
+    for (name, references) in [
+        ("owned_drawables", &context.slide.owned_drawables),
+        ("drawables_z_order", &context.slide.drawables_z_order),
+    ] {
+        if references
+            .iter()
+            .filter(|reference| reference.identifier == drawable_object_id)
+            .count()
+            != 1
+        {
+            return Err(Error::ParseError(format!(
+                "Keynote slide {} {name} does not own chart {drawable_object_id} exactly once",
+                context.slide_id
+            )));
+        }
     }
-    let locations = object_locations(editor.package())?;
-    if locations.get(&drawable_object_id).map(String::as_str) != Some(archive_name.as_str()) {
+    let archive_name = graph.archive_name(context.slide_id)?.to_owned();
+    if graph.archive_name(drawable_object_id)? != archive_name {
         return Err(Error::InvalidFormat(format!(
-            "Numbers chart {drawable_object_id} is outside sheet component {archive_name}"
+            "Keynote chart {drawable_object_id} is outside slide component {archive_name}"
         )));
     }
     let archive = editor.package().archive(&archive_name)?;
     let object = archive.object(drawable_object_id).ok_or_else(|| {
-        Error::InvalidFormat(format!("Numbers chart {drawable_object_id} is missing"))
+        Error::InvalidFormat(format!("Keynote chart {drawable_object_id} is missing"))
     })?;
     let messages = object
         .messages
@@ -45,30 +51,40 @@ pub(super) fn chart_graph(
         .collect::<Vec<_>>();
     let [message] = messages.as_slice() else {
         return Err(Error::ParseError(format!(
-            "Numbers drawable {drawable_object_id} is not exactly one chart"
+            "Keynote drawable {drawable_object_id} is not exactly one chart"
         )));
     };
     let chart = IWorkChartArchive::decode(&message.data)?;
     let drawable = chart.drawable.super_.as_ref().ok_or_else(|| {
         Error::InvalidFormat(format!(
-            "Numbers chart {drawable_object_id} has no drawable payload"
+            "Keynote chart {drawable_object_id} has no drawable payload"
         ))
     })?;
     if drawable
         .parent
         .as_ref()
         .map(|reference| reference.identifier)
-        != Some(sheet_id)
+        != Some(context.slide_id)
     {
         return Err(Error::InvalidFormat(format!(
-            "Numbers chart {drawable_object_id} does not name sheet {sheet_id} as its parent"
+            "Keynote chart {drawable_object_id} does not name slide {} as its parent",
+            context.slide_id
         )));
     }
     let payload = chart.chart.as_ref().ok_or_else(|| {
         Error::InvalidFormat(format!(
-            "Numbers chart {drawable_object_id} has no chart payload"
+            "Keynote chart {drawable_object_id} has no chart payload"
         ))
     })?;
+    if payload
+        .mediator
+        .as_ref()
+        .is_some_and(|reference| reference.identifier != 0)
+    {
+        return Err(Error::InvalidFormat(format!(
+            "Keynote inline chart {drawable_object_id} unexpectedly has a Numbers mediator"
+        )));
+    }
     let caption_id = required_chart_reference(
         drawable_object_id,
         drawable.caption.as_ref(),
@@ -79,13 +95,11 @@ pub(super) fn chart_graph(
         drawable.title.as_ref(),
         "title stand-in",
     )?;
-    let mediator_id =
-        required_chart_reference(drawable_object_id, payload.mediator.as_ref(), "mediator")?;
     let preset_id = payload
         .preset
         .as_ref()
         .map(|reference| reference.identifier);
-    let mut object_ids = vec![drawable_object_id, caption_id, title_id, mediator_id];
+    let mut object_ids = vec![drawable_object_id, caption_id, title_id];
     let mut local_styles = Vec::new();
     local_styles.extend(
         payload
@@ -156,11 +170,11 @@ pub(super) fn chart_graph(
         )
     }));
     for (identifier, message_type, label) in local_styles {
-        if locations.get(&identifier).map(String::as_str) != Some(archive_name.as_str()) {
+        if graph.archive_name(identifier)? != archive_name {
             continue;
         }
         let style = archive.object(identifier).ok_or_else(|| {
-            Error::InvalidFormat(format!("Numbers chart {label} {identifier} is missing"))
+            Error::InvalidFormat(format!("Keynote chart {label} {identifier} is missing"))
         })?;
         if style
             .messages
@@ -170,45 +184,44 @@ pub(super) fn chart_graph(
             != 1
         {
             return Err(Error::InvalidFormat(format!(
-                "Numbers chart {label} {identifier} must have exactly one expected payload"
+                "Keynote chart {label} {identifier} must have exactly one expected payload"
             )));
         }
         object_ids.push(identifier);
     }
     if object_ids.iter().copied().collect::<HashSet<_>>().len() != object_ids.len() {
         return Err(Error::InvalidFormat(format!(
-            "Numbers chart {drawable_object_id} aliases private objects"
+            "Keynote chart {drawable_object_id} aliases private objects"
         )));
     }
-    for (identifier, message_type, label) in [
-        (caption_id, STANDIN_MESSAGE_TYPE, "caption stand-in"),
-        (title_id, STANDIN_MESSAGE_TYPE, "title stand-in"),
-        (mediator_id, CHART_MEDIATOR_MESSAGE_TYPE, "mediator"),
+    for (identifier, label) in [
+        (caption_id, "caption stand-in"),
+        (title_id, "title stand-in"),
     ] {
-        if locations.get(&identifier).map(String::as_str) != Some(archive_name.as_str()) {
+        if graph.archive_name(identifier)? != archive_name {
             return Err(Error::InvalidFormat(format!(
-                "Numbers chart {label} {identifier} is outside {archive_name}"
+                "Keynote chart {label} {identifier} is outside {archive_name}"
             )));
         }
         let private = archive.object(identifier).ok_or_else(|| {
-            Error::InvalidFormat(format!("Numbers chart {label} {identifier} is missing"))
+            Error::InvalidFormat(format!("Keynote chart {label} {identifier} is missing"))
         })?;
         if private
             .messages
             .iter()
-            .filter(|message| message.type_ == message_type)
+            .filter(|message| message.type_ == STANDIN_MESSAGE_TYPE)
             .count()
             != 1
         {
             return Err(Error::InvalidFormat(format!(
-                "Numbers chart {label} {identifier} must have exactly one expected payload"
+                "Keynote chart {label} {identifier} must have exactly one expected payload"
             )));
         }
     }
     let component_id = component_identifier_for_entry(editor.package(), &archive_name)?
         .ok_or_else(|| {
             Error::InvalidFormat(format!(
-                "Numbers sheet component {archive_name} is not registered"
+                "Keynote slide component {archive_name} is not registered"
             ))
         })?;
     let registered =
@@ -220,17 +233,20 @@ pub(super) fn chart_graph(
         .collect::<Vec<_>>();
     if !registered.is_empty() && uuid_object_ids.len() != object_ids.len() {
         return Err(Error::InvalidFormat(format!(
-            "Numbers component {component_id} UUID map does not cover chart {drawable_object_id}"
+            "Keynote slide UUID map does not cover chart {drawable_object_id}"
         )));
     }
     let private_preset_id = preset_id.filter(|identifier| {
-        locations.get(identifier).map(String::as_str) == Some(archive_name.as_str())
+        graph
+            .archive_name(*identifier)
+            .is_ok_and(|name| name == archive_name)
     });
-    Ok(SheetChartGraph {
+    Ok(SlideChartGraph {
         archive_name,
         component_id,
-        info: NumbersSheetChartInfo {
-            sheet_id,
+        info: KeynoteSlideChartInfo {
+            slide_index,
+            slide_id: context.slide_id,
             drawable_object_id,
             kind: ChartKind::from_raw(
                 payload
@@ -242,8 +258,8 @@ pub(super) fn chart_graph(
                     .series_direction
                     .unwrap_or(tsch::SeriesDirection::Unknown as i32),
             ),
-            data: chart_data("Numbers", drawable_object_id, payload)?,
-            geometry: drawable_geometry("Numbers", drawable_object_id, drawable)?,
+            data: chart_data("Keynote", drawable_object_id, payload)?,
+            geometry: drawable_geometry("Keynote", drawable_object_id, drawable)?,
         },
         object_ids,
         uuid_object_ids,
@@ -260,6 +276,6 @@ fn required_chart_reference(
         .map(|reference| reference.identifier)
         .filter(|identifier| *identifier != 0)
         .ok_or_else(|| {
-            Error::InvalidFormat(format!("Numbers chart {drawable_object_id} has no {label}"))
+            Error::InvalidFormat(format!("Keynote chart {drawable_object_id} has no {label}"))
         })
 }
