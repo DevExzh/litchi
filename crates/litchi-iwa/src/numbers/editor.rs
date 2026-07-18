@@ -3052,5 +3052,8 @@ pub use table_dimension::{NumbersTableDimension, NumbersTableDimensionSize, Numb
 use table_duplicate::*;
 pub use table_headers::{NumbersTableHeaderCount, NumbersTableHeaderSettings};
 pub use table_title::NumbersTableTitleSettings;
+pub(crate) use table_title::{
+    set_table_title_settings_in_package, table_title_settings_in_package,
+};
 #[cfg(test)]
 mod tests;

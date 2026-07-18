@@ -3,6 +3,7 @@ use std::env;
 use litchi_iwa::pages::{
     PagesCellValue, PagesDocumentBuilder, PagesTableDimensionSize, PagesTableFormulaCachedValue,
     PagesTableFormulaExpression, PagesTableHeaderCount, PagesTableHeaderSettings,
+    PagesTableTitleSettings,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -55,6 +56,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             header_columns: Some(PagesTableHeaderCount::ONE),
             footer_rows: Some(PagesTableHeaderCount::ONE),
             ..Default::default()
+        },
+    )?;
+    editor.set_table_title_settings(
+        table.model_object_id,
+        PagesTableTitleSettings {
+            visible: Some(true),
+            outlined: Some(true),
         },
     )?;
     for (column, width) in [120.0, 160.0, 100.0].into_iter().enumerate() {

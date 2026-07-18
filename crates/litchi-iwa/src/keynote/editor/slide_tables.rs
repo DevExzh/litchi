@@ -11,6 +11,7 @@ use crate::shapes::{DrawableGeometry, DrawablePoint, DrawableSize};
 mod formula;
 mod graph;
 mod storage;
+mod title;
 
 pub use formula::{
     KeynoteTableFormulaAxisReference, KeynoteTableFormulaBinaryOperator,
@@ -19,6 +20,7 @@ pub use formula::{
 };
 use graph::{require_table_model, slide_table_graph, table_template};
 use storage::{remove_objects, set_table_geometry_in_package, set_uniform_table_dimensions};
+pub use title::KeynoteTableTitleSettings;
 
 const TABLE_INFO_MESSAGE_TYPE: u32 = 6_000;
 const TABLE_MODEL_MESSAGE_TYPES: &[u32] = &[6_000, 6_001];

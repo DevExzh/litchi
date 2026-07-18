@@ -47,7 +47,7 @@ pub use editor::{
     PagesTableDimensionSize, PagesTableFormulaAxisReference, PagesTableFormulaBinaryOperator,
     PagesTableFormulaCachedValue, PagesTableFormulaCellReference, PagesTableFormulaExpression,
     PagesTableHeaderCount, PagesTableHeaderSettings, PagesTableInfo, PagesTablePoints,
-    PagesTemplateKind, RemovedPagesAudio, RemovedPagesBodyChart, RemovedPagesBodyShape,
-    RemovedPagesImage, RemovedPagesMovie, RemovedPagesTextBox,
+    PagesTableTitleSettings, PagesTemplateKind, RemovedPagesAudio, RemovedPagesBodyChart,
+    RemovedPagesBodyShape, RemovedPagesImage, RemovedPagesMovie, RemovedPagesTextBox,
 };
 pub use section::{PagesSection, PagesSectionType};

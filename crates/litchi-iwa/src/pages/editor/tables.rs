@@ -2,6 +2,7 @@
 
 mod formula;
 mod layout;
+mod title;
 
 pub use formula::{
     PagesTableFormulaAxisReference, PagesTableFormulaBinaryOperator, PagesTableFormulaCachedValue,
@@ -11,6 +12,7 @@ pub use layout::{
     PagesTableDimension, PagesTableDimensionSize, PagesTableHeaderCount, PagesTableHeaderSettings,
     PagesTablePoints,
 };
+pub use title::PagesTableTitleSettings;
 
 use std::collections::{HashMap, HashSet};
 
@@ -812,6 +814,63 @@ mod tests {
         let cleared = reopened.to_bytes().unwrap();
         assert!(reopened.clear_table_formula(model_id, 1, 1).is_err());
         assert_eq!(reopened.to_bytes().unwrap(), cleared);
+    }
+
+    #[test]
+    fn source_built_table_roundtrips_title_settings_transactionally() {
+        let mut editor = PagesDocumentBuilder::new()
+            .body_table("Revenue", 2, 2)
+            .build()
+            .unwrap();
+        let model_id = editor.tables().unwrap()[0].model_object_id;
+        let visible = PagesTableTitleSettings {
+            visible: Some(true),
+            outlined: Some(true),
+        };
+        let initially_hidden = PagesTableTitleSettings {
+            visible: Some(false),
+            outlined: None,
+        };
+        assert_eq!(
+            editor.table_title_settings(model_id).unwrap(),
+            initially_hidden
+        );
+        editor.set_table_title_settings(model_id, visible).unwrap();
+
+        let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(reopened.table_title_settings(model_id).unwrap(), visible);
+        let unchanged = reopened.to_bytes().unwrap();
+        reopened
+            .set_table_title_settings(model_id, visible)
+            .unwrap();
+        assert_eq!(reopened.to_bytes().unwrap(), unchanged);
+
+        let explicit_hidden = PagesTableTitleSettings {
+            visible: Some(false),
+            outlined: Some(false),
+        };
+        reopened
+            .set_table_title_settings(model_id, explicit_hidden)
+            .unwrap();
+        assert_eq!(
+            reopened.table_title_settings(model_id).unwrap(),
+            explicit_hidden
+        );
+        reopened
+            .set_table_title_settings(model_id, PagesTableTitleSettings::default())
+            .unwrap();
+        assert_eq!(
+            reopened.table_title_settings(model_id).unwrap(),
+            PagesTableTitleSettings::default()
+        );
+
+        let before_error = reopened.to_bytes().unwrap();
+        assert!(
+            reopened
+                .set_table_title_settings(u64::MAX, visible)
+                .is_err()
+        );
+        assert_eq!(reopened.to_bytes().unwrap(), before_error);
     }
 
     #[test]

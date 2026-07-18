@@ -4,6 +4,7 @@ use litchi_iwa::keynote::{
     KeynoteDocumentBuilder, KeynoteTableCellValue, KeynoteTableDimensionSize,
     KeynoteTableFormulaCachedValue, KeynoteTableFormulaCellReference,
     KeynoteTableFormulaExpression, KeynoteTableHeaderCount, KeynoteTableHeaderSettings,
+    KeynoteTableTitleSettings,
 };
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 
@@ -52,6 +53,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             header_columns: Some(KeynoteTableHeaderCount::ONE),
             footer_rows: Some(KeynoteTableHeaderCount::ONE),
             ..Default::default()
+        },
+    )?;
+    editor.set_slide_table_title_settings(
+        0,
+        table.model_object_id,
+        KeynoteTableTitleSettings {
+            visible: Some(true),
+            outlined: Some(true),
         },
     )?;
     for (column, width) in [440.0, 390.0, 390.0].into_iter().enumerate() {

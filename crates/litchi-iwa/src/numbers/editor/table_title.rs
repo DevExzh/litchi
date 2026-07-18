@@ -1,4 +1,4 @@
-//! Typed title visibility and outline settings for Numbers tables.
+//! Typed title visibility and outline settings for native iWork tables.
 
 use super::*;
 
@@ -7,11 +7,13 @@ mod wire;
 use wire::{read_table_title_settings_wire, write_table_title_settings_wire};
 
 const TABLE_MODEL_MESSAGE_TYPES: &[u32] = &[6_000, 6_001];
+const PARAGRAPH_STYLE_MESSAGE_TYPE: u32 = 2_022;
+const SHAPE_STYLE_MESSAGE_TYPE: u32 = 2_025;
 
-/// Lossless optional title settings stored by a Numbers table model.
+/// Lossless optional title settings stored by a native iWork table model.
 ///
-/// Optional booleans retain their native protobuf presence. Numbers normally
-/// omits `visible` when the title is hidden, while documents from other
+/// Optional booleans retain their native protobuf presence. iWork normally
+/// omits `visible` when the title is hidden, while documents from other app
 /// versions may encode an explicit `false` value.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct NumbersTableTitleSettings {
@@ -43,8 +45,7 @@ impl NumbersTableTitleSettings {
 impl NumbersEditor {
     /// Read an attached table's lossless title visibility and outline settings.
     pub fn table_title_settings(&self, table_id: u64) -> Result<NumbersTableTitleSettings> {
-        let descriptor = table_descriptor(&self.package, table_id)?;
-        read_table_title_settings(&self.package, &descriptor)
+        table_title_settings_in_package(&self.package, table_id)
     }
 
     /// Replace an attached table's title visibility and outline settings transactionally.
@@ -53,34 +54,11 @@ impl NumbersEditor {
         table_id: u64,
         settings: NumbersTableTitleSettings,
     ) -> Result<()> {
-        let descriptor = table_descriptor(&self.package, table_id)?;
-        if read_table_title_settings(&self.package, &descriptor)? == settings {
+        if table_title_settings_in_package(&self.package, table_id)? == settings {
             return Ok(());
         }
-
-        let locations = object_locations(&self.package)?;
-        let archive_name = locations.get(&table_id).ok_or_else(|| {
-            Error::InvalidFormat(format!("Numbers table model object {table_id} is missing"))
-        })?;
         let mut staged = self.package.clone();
-        staged.update_archive(archive_name, |archive| {
-            let object = archive.object_mut(table_id).ok_or_else(|| {
-                Error::InvalidFormat(format!("Numbers table model object {table_id} is missing"))
-            })?;
-            let message_index = table_model_message_index(object, table_id)?;
-            let message_type = object.messages[message_index].type_;
-            let original = object.messages[message_index].data.as_slice();
-            let model = TableModelArchive::decode(original)?;
-            let data = write_table_title_settings_wire(original, &model, settings)?;
-            object.replace_message(
-                message_index,
-                RawMessage {
-                    type_: message_type,
-                    data,
-                },
-            )?;
-            Ok(())
-        })?;
+        set_table_title_settings_in_package(&mut staged, table_id, settings)?;
 
         let verified = Self::from_package(staged)?;
         if verified.table_title_settings(table_id)? != settings {
@@ -93,11 +71,176 @@ impl NumbersEditor {
     }
 }
 
-fn table_descriptor(package: &IWorkPackage, table_id: u64) -> Result<TableDescriptor> {
-    table_models(package)?
-        .into_iter()
-        .find(|table| table.object_id == table_id)
-        .ok_or_else(|| Error::ParseError(format!("Numbers table object {table_id} not found")))
+pub(crate) fn table_title_settings_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+) -> Result<NumbersTableTitleSettings> {
+    let descriptor = attached_table_descriptor(package, table_id)?;
+    read_table_title_settings(package, &descriptor)
+}
+
+pub(crate) fn set_table_title_settings_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    settings: NumbersTableTitleSettings,
+) -> Result<()> {
+    let descriptor = attached_table_descriptor(package, table_id)?;
+    if read_table_title_settings(package, &descriptor)? == settings {
+        return Ok(());
+    }
+    let locations = object_locations(package)?;
+    if settings.is_visible() {
+        validate_visible_title_prerequisites(package, &locations, &descriptor)?;
+    }
+    let archive_name = locations.get(&table_id).ok_or_else(|| {
+        Error::InvalidFormat(format!("iWork table model object {table_id} is missing"))
+    })?;
+    package.update_archive(archive_name, |archive| {
+        let object = archive.object_mut(table_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("iWork table model object {table_id} is missing"))
+        })?;
+        let message_index = table_model_message_index(object, table_id)?;
+        let message_type = object.messages[message_index].type_;
+        let original = object.messages[message_index].data.as_slice();
+        let model = TableModelArchive::decode(original)?;
+        let data = write_table_title_settings_wire(original, &model, settings)?;
+        object.replace_message(
+            message_index,
+            RawMessage {
+                type_: message_type,
+                data,
+            },
+        )?;
+        Ok(())
+    })?;
+    if table_title_settings_in_package(package, table_id)? != settings {
+        return Err(Error::InvalidFormat(
+            "iWork table title settings failed validation".to_owned(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_visible_title_prerequisites(
+    package: &IWorkPackage,
+    locations: &HashMap<u64, String>,
+    descriptor: &TableDescriptor,
+) -> Result<()> {
+    let height = descriptor.model.table_name_height.ok_or_else(|| {
+        Error::ParseError(format!(
+            "Cannot safely enable the title for iWork table {} because its title height is absent",
+            descriptor.object_id
+        ))
+    })?;
+    if !height.is_finite() || height < 0.0 {
+        return Err(Error::InvalidFormat(format!(
+            "iWork table {} has invalid title height {height}",
+            descriptor.object_id
+        )));
+    }
+    let paragraph_style = descriptor
+        .model
+        .table_name_style
+        .as_ref()
+        .map(|reference| reference.identifier)
+        .filter(|identifier| *identifier != 0)
+        .ok_or_else(|| {
+            Error::ParseError(format!(
+                "Cannot safely enable the title for iWork table {} because its title text style is absent",
+                descriptor.object_id
+            ))
+        })?;
+    let shape_style = descriptor
+        .model
+        .table_name_shape_style
+        .as_ref()
+        .map(|reference| reference.identifier)
+        .filter(|identifier| *identifier != 0)
+        .ok_or_else(|| {
+            Error::ParseError(format!(
+                "Cannot safely enable the title for iWork table {} because its title shape style is absent",
+                descriptor.object_id
+            ))
+        })?;
+    require_title_style::<tswp::ParagraphStyleArchive>(
+        package,
+        locations,
+        paragraph_style,
+        PARAGRAPH_STYLE_MESSAGE_TYPE,
+        "text",
+    )?;
+    require_title_style::<tswp::ShapeStyleArchive>(
+        package,
+        locations,
+        shape_style,
+        SHAPE_STYLE_MESSAGE_TYPE,
+        "shape",
+    )?;
+
+    let model_archive_name = locations.get(&descriptor.object_id).ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "iWork table model object {} is missing",
+            descriptor.object_id
+        ))
+    })?;
+    let model_archive = package.archive(model_archive_name)?;
+    let model_object = model_archive.object(descriptor.object_id).ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "iWork table model object {} is missing",
+            descriptor.object_id
+        ))
+    })?;
+    let message_index = table_model_message_index(model_object, descriptor.object_id)?;
+    let references = &model_object.archive_info.message_infos[message_index].object_references;
+    for (identifier, label) in [(paragraph_style, "text"), (shape_style, "shape")] {
+        if !references.contains(&identifier) {
+            return Err(Error::InvalidFormat(format!(
+                "iWork table {} title {label} style {identifier} is missing from its native reference metadata",
+                descriptor.object_id
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn require_title_style<M: Message + Default>(
+    package: &IWorkPackage,
+    locations: &HashMap<u64, String>,
+    identifier: u64,
+    message_type: u32,
+    label: &str,
+) -> Result<()> {
+    let archive_name = locations.get(&identifier).ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "iWork table title {label} style object {identifier} is missing"
+        ))
+    })?;
+    let archive = package.archive(archive_name)?;
+    let object = archive.object(identifier).ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "iWork table title {label} style object {identifier} is missing"
+        ))
+    })?;
+    let mut messages = object
+        .messages
+        .iter()
+        .filter(|message| message.type_ == message_type);
+    let Some(message) = messages.next() else {
+        return Err(Error::InvalidFormat(format!(
+            "iWork table title {label} style object {identifier} must contain exactly one native payload"
+        )));
+    };
+    if messages.next().is_some() {
+        return Err(Error::InvalidFormat(format!(
+            "iWork table title {label} style object {identifier} must contain exactly one native payload"
+        )));
+    }
+    M::decode(message.data.as_slice()).map_err(|error| {
+        Error::InvalidFormat(format!(
+            "iWork table title {label} style object {identifier} is invalid: {error}"
+        ))
+    })?;
+    Ok(())
 }
 
 fn read_table_title_settings(
@@ -107,14 +250,14 @@ fn read_table_title_settings(
     let locations = object_locations(package)?;
     let archive_name = locations.get(&descriptor.object_id).ok_or_else(|| {
         Error::InvalidFormat(format!(
-            "Numbers table model object {} is missing",
+            "iWork table model object {} is missing",
             descriptor.object_id
         ))
     })?;
     let archive = package.archive(archive_name)?;
     let object = archive.object(descriptor.object_id).ok_or_else(|| {
         Error::InvalidFormat(format!(
-            "Numbers table model object {} is missing",
+            "iWork table model object {} is missing",
             descriptor.object_id
         ))
     })?;
@@ -137,18 +280,18 @@ fn table_model_message_index(object: &ArchiveObject, table_id: u64) -> Result<us
         });
     let Some(index) = matches.next() else {
         return Err(Error::InvalidFormat(format!(
-            "Numbers table model object {table_id} must contain exactly one payload, found 0"
+            "iWork table model object {table_id} must contain exactly one payload, found 0"
         )));
     };
     if matches.next().is_some() {
         let count = 2 + matches.count();
         return Err(Error::InvalidFormat(format!(
-            "Numbers table model object {table_id} must contain exactly one payload, found {count}"
+            "iWork table model object {table_id} must contain exactly one payload, found {count}"
         )));
     }
     TableModelArchive::decode(object.messages[index].data.as_slice()).map_err(|error| {
         Error::InvalidFormat(format!(
-            "Numbers table model object {table_id} has an invalid payload: {error}"
+            "iWork table model object {table_id} has an invalid payload: {error}"
         ))
     })?;
     Ok(index)

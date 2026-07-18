@@ -1,4 +1,4 @@
-//! Lossless protobuf wire handling for Numbers table title settings.
+//! Lossless protobuf wire handling for native iWork table title settings.
 
 use super::*;
 
@@ -45,7 +45,7 @@ pub(super) fn write_table_title_settings_wire(
     let verified = TableModelArchive::decode(data.as_slice())?;
     if read_table_title_settings_wire(&data, &verified)? != settings {
         return Err(Error::InvalidFormat(
-            "Numbers table title wire patch failed validation".to_owned(),
+            "iWork table title wire patch failed validation".to_owned(),
         ));
     }
     Ok(data)
@@ -61,7 +61,7 @@ fn require_optional_bool(
     let expected = decoded.map(u64::from);
     if values.as_slice() != expected.as_slice() {
         return Err(Error::InvalidFormat(format!(
-            "Numbers table {label} wire value is missing, duplicated, non-Boolean, or inconsistent"
+            "iWork table {label} wire value is missing, duplicated, non-Boolean, or inconsistent"
         )));
     }
     Ok(())

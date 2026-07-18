@@ -4333,7 +4333,7 @@ pub use slide_tables::{
     KeynoteTableDimensionSize, KeynoteTableFormulaAxisReference, KeynoteTableFormulaBinaryOperator,
     KeynoteTableFormulaCachedValue, KeynoteTableFormulaCellReference,
     KeynoteTableFormulaExpression, KeynoteTableHeaderCount, KeynoteTableHeaderSettings,
-    KeynoteTablePoints, RemovedKeynoteSlideTable,
+    KeynoteTablePoints, KeynoteTableTitleSettings, RemovedKeynoteSlideTable,
 };
 pub use soundtrack::{KeynoteSoundtrackMode, KeynoteSoundtrackSettings};
 pub use soundtrack_items::KeynoteSoundtrackItemInfo;

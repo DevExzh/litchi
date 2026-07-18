@@ -234,6 +234,80 @@ fn source_built_table_roundtrips_formula_crud_transactionally() {
 }
 
 #[test]
+fn source_built_table_roundtrips_title_settings_transactionally() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let (position, size) = table_geometry();
+    let table = editor
+        .add_slide_table(0, "Forecast", 2, 2, position, size)
+        .unwrap();
+    let visible = KeynoteTableTitleSettings {
+        visible: Some(true),
+        outlined: Some(true),
+    };
+    let initially_hidden = KeynoteTableTitleSettings {
+        visible: Some(false),
+        outlined: None,
+    };
+    assert_eq!(
+        editor
+            .slide_table_title_settings(0, table.model_object_id)
+            .unwrap(),
+        initially_hidden
+    );
+    editor
+        .set_slide_table_title_settings(0, table.model_object_id, visible)
+        .unwrap();
+
+    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened
+            .slide_table_title_settings(0, table.model_object_id)
+            .unwrap(),
+        visible
+    );
+    let unchanged = reopened.to_bytes().unwrap();
+    reopened
+        .set_slide_table_title_settings(0, table.model_object_id, visible)
+        .unwrap();
+    assert_eq!(reopened.to_bytes().unwrap(), unchanged);
+
+    let explicit_hidden = KeynoteTableTitleSettings {
+        visible: Some(false),
+        outlined: Some(false),
+    };
+    reopened
+        .set_slide_table_title_settings(0, table.model_object_id, explicit_hidden)
+        .unwrap();
+    assert_eq!(
+        reopened
+            .slide_table_title_settings(0, table.model_object_id)
+            .unwrap(),
+        explicit_hidden
+    );
+    reopened
+        .set_slide_table_title_settings(
+            0,
+            table.model_object_id,
+            KeynoteTableTitleSettings::default(),
+        )
+        .unwrap();
+    assert_eq!(
+        reopened
+            .slide_table_title_settings(0, table.model_object_id)
+            .unwrap(),
+        KeynoteTableTitleSettings::default()
+    );
+
+    let before_error = reopened.to_bytes().unwrap();
+    assert!(
+        reopened
+            .set_slide_table_title_settings(1, table.model_object_id, visible)
+            .is_err()
+    );
+    assert_eq!(reopened.to_bytes().unwrap(), before_error);
+}
+
+#[test]
 fn tables_on_multiple_slides_remain_isolated() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let layout = editor

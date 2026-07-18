@@ -3787,7 +3787,7 @@ pub use tables::{
     PagesCellValue, PagesTable, PagesTableDimension, PagesTableDimensionSize,
     PagesTableFormulaAxisReference, PagesTableFormulaBinaryOperator, PagesTableFormulaCachedValue,
     PagesTableFormulaCellReference, PagesTableFormulaExpression, PagesTableHeaderCount,
-    PagesTableHeaderSettings, PagesTableInfo, PagesTablePoints,
+    PagesTableHeaderSettings, PagesTableInfo, PagesTablePoints, PagesTableTitleSettings,
 };
 
 #[cfg(test)]

@@ -400,6 +400,8 @@ fn document_archive(builder: &NumbersDocumentBuilder, table_uuid: &tsp::Uuid) ->
         header_row_style: reference(CELL_STYLE),
         header_column_style: reference(CELL_STYLE),
         footer_row_style: reference(CELL_STYLE),
+        table_name_style: Some(reference(PARAGRAPH_STYLE)),
+        table_name_shape_style: Some(reference(SHAPE_STYLE)),
         table_style_preset: Some(reference(TABLE_PRESET)),
         preset_index: Some(0),
         base_data_store: tst::DataStore {
@@ -433,6 +435,7 @@ fn document_archive(builder: &NumbersDocumentBuilder, table_uuid: &tsp::Uuid) ->
         number_of_columns: columns,
         table_name: builder.table_name.clone(),
         table_name_enabled: Some(false),
+        table_name_height: Some(0.0),
         number_of_header_rows: Some(1),
         number_of_header_columns: Some(1),
         header_rows_frozen: Some(true),
@@ -552,6 +555,7 @@ fn document_archive(builder: &NumbersDocumentBuilder, table_uuid: &tsp::Uuid) ->
             &[
                 TABLE_STYLE,
                 PARAGRAPH_STYLE,
+                SHAPE_STYLE,
                 CELL_STYLE,
                 TABLE_PRESET,
                 TILE,
@@ -655,10 +659,12 @@ fn document_archive(builder: &NumbersDocumentBuilder, table_uuid: &tsp::Uuid) ->
                 header_column_style: reference(CELL_STYLE),
                 footer_row_style: reference(CELL_STYLE),
                 table_style: reference(TABLE_STYLE),
+                table_name_style: Some(reference(PARAGRAPH_STYLE)),
+                table_name_shape_style: Some(reference(SHAPE_STYLE)),
                 preset_id: Some(0),
                 ..Default::default()
             },
-            &[PARAGRAPH_STYLE, CELL_STYLE, TABLE_STYLE],
+            &[PARAGRAPH_STYLE, SHAPE_STYLE, CELL_STYLE, TABLE_STYLE],
         )?,
         object(
             FUNCTION_BROWSER_STATE,

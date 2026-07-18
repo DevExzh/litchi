@@ -3535,7 +3535,9 @@ fn table_header_settings_reject_malformed_wire_transactionally() {
 
 #[test]
 fn table_title_settings_are_lossless_transactional_and_wire_exact() {
-    let mut package = test_package();
+    let mut package = crate::numbers::NumbersDocumentBuilder::new()
+        .build_package()
+        .unwrap();
     package
         .update_archive("Index/Document.iwa", |archive| {
             let object = archive.object_mut(10).unwrap();
@@ -3554,10 +3556,13 @@ fn table_title_settings_are_lossless_transactional_and_wire_exact() {
         .unwrap();
     let mut editor = NumbersEditor::from_package(package).unwrap();
     let baseline = editor.to_bytes().unwrap();
-    let defaults = NumbersTableTitleSettings::default();
-    assert_eq!(editor.table_title_settings(10).unwrap(), defaults);
-    assert!(!defaults.is_visible());
-    assert!(!defaults.is_outlined());
+    let initial = NumbersTableTitleSettings {
+        visible: Some(false),
+        outlined: None,
+    };
+    assert_eq!(editor.table_title_settings(10).unwrap(), initial);
+    assert!(!initial.is_visible());
+    assert!(!initial.is_outlined());
 
     let settings = NumbersTableTitleSettings {
         visible: Some(true),
@@ -3578,14 +3583,16 @@ fn table_title_settings_are_lossless_transactional_and_wire_exact() {
 
     editor.set_table_title_settings(10, settings).unwrap();
     assert_eq!(editor.to_bytes().unwrap(), changed);
-    editor.set_table_title_settings(10, defaults).unwrap();
+    editor.set_table_title_settings(10, initial).unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
     assert!(editor.table_title_settings(u64::MAX).is_err());
 }
 
 #[test]
 fn table_title_settings_restore_native_presence_exactly() {
-    let mut package = test_package();
+    let mut package = crate::numbers::NumbersDocumentBuilder::new()
+        .build_package()
+        .unwrap();
     package
         .update_archive("Index/Document.iwa", |archive| {
             let object = archive.object_mut(10).unwrap();
@@ -3636,6 +3643,24 @@ fn table_title_settings_restore_native_presence_exactly() {
     assert_eq!(changed_model.table_name_height, Some(28.0));
     editor.set_table_title_settings(10, native).unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
+}
+
+#[test]
+fn table_title_settings_reject_missing_render_styles_transactionally() {
+    let mut editor = NumbersEditor::from_package(test_package()).unwrap();
+    let before = editor.to_bytes().unwrap();
+    assert!(
+        editor
+            .set_table_title_settings(
+                10,
+                NumbersTableTitleSettings {
+                    visible: Some(true),
+                    outlined: Some(false),
+                },
+            )
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), before);
 }
 
 #[test]

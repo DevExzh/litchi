@@ -19,6 +19,7 @@ const DEFAULT_TABLE_WIDTH_POINTS: f32 = 490.0;
 const DEFAULT_TABLE_HEIGHT_POINTS: f32 = 200.0;
 const DEFAULT_ROW_HEIGHT_POINTS: f64 = 20.0;
 const DEFAULT_COLUMN_WIDTH_POINTS: f64 = 98.0;
+const DEFAULT_TABLE_TITLE_HEIGHT_POINTS: f64 = 0.0;
 const DEFAULT_HEADER_COUNT: u32 = 1;
 const DEFAULT_TILE_SIZE: u32 = 256;
 const TABLE_GEOMETRY_FLAGS: u32 = 3;
@@ -91,22 +92,28 @@ struct TableStyleTemplate {
     header_row_cell: u64,
     header_column_cell: u64,
     footer_row_cell: u64,
+    table_name: Option<u64>,
+    table_name_shape: Option<u64>,
 }
 
 impl TableStyleTemplate {
-    fn referenced_objects(self) -> [u64; 10] {
+    fn referenced_objects(self) -> impl Iterator<Item = u64> {
         [
-            self.preset,
-            self.table,
-            self.body_text,
-            self.header_row_text,
-            self.header_column_text,
-            self.footer_row_text,
-            self.body_cell,
-            self.header_row_cell,
-            self.header_column_cell,
-            self.footer_row_cell,
+            Some(self.preset),
+            Some(self.table),
+            Some(self.body_text),
+            Some(self.header_row_text),
+            Some(self.header_column_text),
+            Some(self.footer_row_text),
+            Some(self.body_cell),
+            Some(self.header_row_cell),
+            Some(self.header_column_cell),
+            Some(self.footer_row_cell),
+            self.table_name,
+            self.table_name_shape,
         ]
+        .into_iter()
+        .flatten()
     }
 }
 
@@ -252,6 +259,14 @@ fn theme_table_style(package: &IWorkPackage) -> Result<TableStyleTemplate> {
         header_row_cell: network.header_row_style.identifier,
         header_column_cell: network.header_column_style.identifier,
         footer_row_cell: network.footer_row_style.identifier,
+        table_name: network
+            .table_name_style
+            .map(|reference| reference.identifier)
+            .filter(|identifier| *identifier != 0),
+        table_name_shape: network
+            .table_name_shape_style
+            .map(|reference| reference.identifier)
+            .filter(|identifier| *identifier != 0),
     };
     for identifier in style.referenced_objects() {
         if identifier == 0 || !locations.contains_key(&identifier) {
@@ -355,6 +370,8 @@ fn table_objects(
         header_row_style: reference(style.header_row_cell),
         header_column_style: reference(style.header_column_cell),
         footer_row_style: reference(style.footer_row_cell),
+        table_name_style: style.table_name.map(reference),
+        table_name_shape_style: style.table_name_shape.map(reference),
         table_style_preset: Some(reference(style.preset)),
         preset_index: Some(style.preset_index),
         base_data_store: tst::DataStore {
@@ -388,6 +405,8 @@ fn table_objects(
         number_of_columns: columns,
         table_name: name.to_owned(),
         table_name_enabled: Some(false),
+        table_name_height: (style.table_name.is_some() && style.table_name_shape.is_some())
+            .then_some(DEFAULT_TABLE_TITLE_HEIGHT_POINTS),
         number_of_header_rows: Some(DEFAULT_HEADER_COUNT),
         number_of_header_columns: Some(DEFAULT_HEADER_COUNT),
         header_rows_frozen: Some(true),
