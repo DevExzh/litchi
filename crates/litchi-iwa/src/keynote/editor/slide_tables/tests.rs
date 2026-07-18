@@ -350,6 +350,12 @@ fn source_built_footer_formula_expands_and_contracts_with_body_rows() {
             KeynoteTableFormulaCachedValue::Number(3.0),
         )
         .unwrap();
+    let mut package = editor.into_package();
+    let engine = package.remove_entry("Index/CalculationEngine.iwa").unwrap();
+    package
+        .insert_entry("Index/CalculationEngine-42-2.iwa", engine)
+        .unwrap();
+    let mut editor = KeynoteEditor::from_package(package).unwrap();
     let baseline = editor.to_bytes().unwrap();
 
     editor.insert_slide_table_row(0, model_id, 3).unwrap();

@@ -12,13 +12,12 @@ struct FormulaRewrite {
 
 pub(super) fn rewrite_formula_asts(
     package: &mut IWorkPackage,
+    component: &str,
     table_info_id: u64,
     axis: DependencyAxis,
     position: u32,
     mutation: DependencyMutation,
 ) -> Result<FormulaDependencyAdjustments> {
-    const COMPONENT: &str = "Index/CalculationEngine.iwa";
-
     let descriptor = attached_table_descriptors(package)?
         .into_iter()
         .find(|table| table.table_info_id == table_info_id)
@@ -27,7 +26,7 @@ pub(super) fn rewrite_formula_asts(
                 "iWork table info {table_info_id} has no attached table model"
             ))
         })?;
-    let archive = package.archive(COMPONENT)?;
+    let archive = package.archive(component)?;
     let owner = archive
         .objects
         .iter()
@@ -349,11 +348,19 @@ fn rewrite_formula_nodes(
         dependency_adjustments,
     )?;
     for (index, node) in array.ast_node.iter_mut().enumerate() {
-        if node.ast_colon_tract.is_some()
-            || (node.ast_category_ref.is_some() && shifted_host != host)
-        {
+        if node.ast_category_ref.is_some() && shifted_host != host {
             return Err(formula_ast_rewrite_error(axis, mutation));
         }
+        rewrite_colon_tract(
+            node,
+            host_row,
+            host_column,
+            axis,
+            position,
+            mutation,
+            footer,
+            dependency_adjustments,
+        )?;
         if let Some(nested) = &mut node.ast_thunk_node_array {
             rewrite_formula_nodes(
                 nested,
@@ -440,6 +447,171 @@ fn rewrite_formula_nodes(
     Ok(())
 }
 
+fn rewrite_colon_tract(
+    node: &mut tsce::ast_node_array_archive::AstNodeArchive,
+    host_row: u32,
+    host_column: u32,
+    axis: DependencyAxis,
+    position: u32,
+    mutation: DependencyMutation,
+    footer: Option<FooterFormulaContext>,
+    dependency_adjustments: &mut LocalPrecedentAdjustments,
+) -> Result<()> {
+    let cross_table = node.ast_cross_table_reference_extra_info.is_some();
+    let Some(tract) = &mut node.ast_colon_tract else {
+        return Ok(());
+    };
+    let column_ranges = tract_axis_intervals(tract, DependencyAxis::Column, host_column)?;
+    let (relative, absolute, host) = match axis {
+        DependencyAxis::Column => (
+            &mut tract.relative_column,
+            &mut tract.absolute_column,
+            host_column,
+        ),
+        DependencyAxis::Row => (&mut tract.relative_row, &mut tract.absolute_row, host_row),
+    };
+    let shifted_host = mutation.coordinate(host, position, "formula host coordinate")?;
+    for range in relative {
+        let begin = resolve_relative_tract_coordinate(host, range.range_begin)?;
+        let end = range
+            .range_end
+            .map(|end| resolve_relative_tract_coordinate(host, end))
+            .transpose()?
+            .unwrap_or(begin);
+        let (shifted_begin, shifted_end) = mutate_tract_interval(
+            begin,
+            end,
+            cross_table,
+            axis,
+            position,
+            mutation,
+            footer,
+            &column_ranges,
+            dependency_adjustments,
+        )?;
+        range.range_begin = relative_tract_coordinate(shifted_begin, shifted_host)?;
+        range.range_end = (shifted_begin != shifted_end)
+            .then(|| relative_tract_coordinate(shifted_end, shifted_host))
+            .transpose()?;
+    }
+    for range in absolute {
+        let begin = range.range_begin;
+        let end = range.range_end.unwrap_or(begin);
+        let (shifted_begin, shifted_end) = mutate_tract_interval(
+            begin,
+            end,
+            cross_table,
+            axis,
+            position,
+            mutation,
+            footer,
+            &column_ranges,
+            dependency_adjustments,
+        )?;
+        range.range_begin = shifted_begin;
+        range.range_end = (shifted_begin != shifted_end).then_some(shifted_end);
+    }
+    Ok(())
+}
+
+fn tract_axis_intervals(
+    tract: &tsce::ast_node_array_archive::AstColonTractArchive,
+    axis: DependencyAxis,
+    host: u32,
+) -> Result<Vec<(u32, u32)>> {
+    let (relative, absolute) = match axis {
+        DependencyAxis::Column => (&tract.relative_column, &tract.absolute_column),
+        DependencyAxis::Row => (&tract.relative_row, &tract.absolute_row),
+    };
+    let mut intervals = Vec::with_capacity(relative.len() + absolute.len());
+    for range in relative {
+        let begin = resolve_relative_tract_coordinate(host, range.range_begin)?;
+        let end = range
+            .range_end
+            .map(|end| resolve_relative_tract_coordinate(host, end))
+            .transpose()?
+            .unwrap_or(begin);
+        intervals.push((begin.min(end), begin.max(end)));
+    }
+    intervals.extend(absolute.iter().map(|range| {
+        let end = range.range_end.unwrap_or(range.range_begin);
+        (range.range_begin.min(end), range.range_begin.max(end))
+    }));
+    Ok(intervals)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn mutate_tract_interval(
+    begin: u32,
+    end: u32,
+    cross_table: bool,
+    axis: DependencyAxis,
+    position: u32,
+    mutation: DependencyMutation,
+    footer: Option<FooterFormulaContext>,
+    column_ranges: &[(u32, u32)],
+    dependency_adjustments: &mut LocalPrecedentAdjustments,
+) -> Result<(u32, u32)> {
+    if cross_table {
+        return Ok((begin, end));
+    }
+    let low = begin.min(end);
+    let high = begin.max(end);
+    let footer_change = axis == DependencyAxis::Row
+        && footer.is_some_and(|footer| match mutation {
+            DependencyMutation::Insert => {
+                position == footer.boundary && high.checked_add(1) == Some(position)
+            },
+            DependencyMutation::Delete => {
+                position.checked_add(1) == Some(footer.boundary)
+                    && high == position
+                    && low < position
+            },
+        });
+    let shifted_high = if footer_change {
+        match mutation {
+            DependencyMutation::Insert => position,
+            DependencyMutation::Delete => position.checked_sub(1).ok_or_else(|| {
+                Error::ParseError("iWork footer tract contraction underflow".to_owned())
+            })?,
+        }
+    } else {
+        mutation.coordinate(high, position, "formula tract endpoint")?
+    };
+    let shifted_low = mutation.coordinate(low, position, "formula tract endpoint")?;
+    if footer_change {
+        if column_ranges.is_empty() {
+            return Err(Error::ParseError(
+                "Cannot expand an iWork footer tract without explicit columns".to_owned(),
+            ));
+        }
+        for &(start, end) in column_ranges {
+            let coordinates = (start..=end).map(|column| (position, column));
+            match mutation {
+                DependencyMutation::Insert => dependency_adjustments.insert.extend(coordinates),
+                DependencyMutation::Delete => dependency_adjustments.remove.extend(coordinates),
+            }
+        }
+    }
+    Ok(if begin <= end {
+        (shifted_low, shifted_high)
+    } else {
+        (shifted_high, shifted_low)
+    })
+}
+
+fn resolve_relative_tract_coordinate(host: u32, offset: i32) -> Result<u32> {
+    let coordinate = i64::from(host) + i64::from(offset);
+    u32::try_from(coordinate)
+        .map_err(|_| Error::InvalidFormat("iWork formula tract is outside u32".to_owned()))
+}
+
+fn relative_tract_coordinate(coordinate: u32, host: u32) -> Result<i32> {
+    let offset = i64::from(coordinate) - i64::from(host);
+    i32::try_from(offset)
+        .map_err(|_| Error::ParseError("iWork formula tract exceeds i32".to_owned()))
+}
+
 fn rewrite_formula_archive_wire(
     data: &[u8],
     previous: &tsce::FormulaArchive,
@@ -522,12 +694,146 @@ fn rewrite_ast_node_wire(
             rewrite_ast_array_wire(array, previous_array, current_array)
         })?;
     }
+    if previous.ast_colon_tract != current.ast_colon_tract {
+        let previous_tract = previous.ast_colon_tract.as_ref().ok_or_else(|| {
+            Error::InvalidFormat("iWork formula colon tract appeared during mutation".to_owned())
+        })?;
+        let current_tract = current.ast_colon_tract.as_ref().ok_or_else(|| {
+            Error::InvalidFormat("iWork formula colon tract disappeared during mutation".to_owned())
+        })?;
+        data = transform_length_delimited_field(&data, 40, |tract| {
+            rewrite_colon_tract_wire(tract, previous_tract, current_tract)
+        })?;
+    }
     if tsce::ast_node_array_archive::AstNodeArchive::decode(data.as_slice())? != *current {
         return Err(Error::InvalidFormat(
             "iWork formula AST node changed outside supported coordinates".to_owned(),
         ));
     }
     Ok(data)
+}
+
+fn rewrite_colon_tract_wire(
+    data: &[u8],
+    previous: &tsce::ast_node_array_archive::AstColonTractArchive,
+    current: &tsce::ast_node_array_archive::AstColonTractArchive,
+) -> Result<Vec<u8>> {
+    let mut immutable = current.clone();
+    immutable.relative_column = previous.relative_column.clone();
+    immutable.relative_row = previous.relative_row.clone();
+    immutable.absolute_column = previous.absolute_column.clone();
+    immutable.absolute_row = previous.absolute_row.clone();
+    if immutable != *previous {
+        return Err(Error::InvalidFormat(
+            "iWork formula colon tract changed outside coordinate ranges".to_owned(),
+        ));
+    }
+    let mut rewritten = data.to_vec();
+    for (field, previous, current) in [
+        (1, &previous.relative_column, &current.relative_column),
+        (2, &previous.relative_row, &current.relative_row),
+    ] {
+        rewritten = rewrite_relative_tract_ranges(&rewritten, field, previous, current)?;
+    }
+    for (field, previous, current) in [
+        (3, &previous.absolute_column, &current.absolute_column),
+        (4, &previous.absolute_row, &current.absolute_row),
+    ] {
+        rewritten = rewrite_absolute_tract_ranges(&rewritten, field, previous, current)?;
+    }
+    if tsce::ast_node_array_archive::AstColonTractArchive::decode(rewritten.as_slice())? != *current
+    {
+        return Err(Error::InvalidFormat(
+            "iWork formula colon tract rewrite failed wire validation".to_owned(),
+        ));
+    }
+    Ok(rewritten)
+}
+
+fn rewrite_relative_tract_ranges(
+    data: &[u8],
+    field_number: u32,
+    previous: &[tsce::ast_node_array_archive::ast_colon_tract_archive::AstColonTractRelativeRangeArchive],
+    current: &[tsce::ast_node_array_archive::ast_colon_tract_archive::AstColonTractRelativeRangeArchive],
+) -> Result<Vec<u8>> {
+    let raw = repeated_length_delimited_payloads(data, field_number)?;
+    if raw.len() != previous.len() || previous.len() != current.len() {
+        return Err(Error::InvalidFormat(
+            "iWork relative tract range count changed".to_owned(),
+        ));
+    }
+    let replacements = previous
+        .iter()
+        .zip(current)
+        .zip(raw)
+        .map(|((previous, current), raw)| {
+            let mut rewritten = patch_varint_field(
+                raw,
+                1,
+                true,
+                Some(current.range_begin as i64 as u64),
+            )?;
+            rewritten = patch_varint_field(
+                &rewritten,
+                2,
+                previous.range_end.is_some(),
+                current.range_end.map(|value| value as i64 as u64),
+            )?;
+            if tsce::ast_node_array_archive::ast_colon_tract_archive::AstColonTractRelativeRangeArchive::decode(
+                rewritten.as_slice(),
+            )? != *current
+            {
+                return Err(Error::InvalidFormat(
+                    "iWork relative tract range rewrite failed wire validation".to_owned(),
+                ));
+            }
+            Ok(rewritten)
+        })
+        .collect::<Result<Vec<_>>>()?;
+    rewrite_repeated_length_delimited_fields(data, field_number, &replacements)
+}
+
+fn rewrite_absolute_tract_ranges(
+    data: &[u8],
+    field_number: u32,
+    previous: &[tsce::ast_node_array_archive::ast_colon_tract_archive::AstColonTractAbsoluteRangeArchive],
+    current: &[tsce::ast_node_array_archive::ast_colon_tract_archive::AstColonTractAbsoluteRangeArchive],
+) -> Result<Vec<u8>> {
+    let raw = repeated_length_delimited_payloads(data, field_number)?;
+    if raw.len() != previous.len() || previous.len() != current.len() {
+        return Err(Error::InvalidFormat(
+            "iWork absolute tract range count changed".to_owned(),
+        ));
+    }
+    let replacements = previous
+        .iter()
+        .zip(current)
+        .zip(raw)
+        .map(|((previous, current), raw)| {
+            let mut rewritten = patch_varint_field(
+                raw,
+                1,
+                true,
+                Some(u64::from(current.range_begin)),
+            )?;
+            rewritten = patch_varint_field(
+                &rewritten,
+                2,
+                previous.range_end.is_some(),
+                current.range_end.map(u64::from),
+            )?;
+            if tsce::ast_node_array_archive::ast_colon_tract_archive::AstColonTractAbsoluteRangeArchive::decode(
+                rewritten.as_slice(),
+            )? != *current
+            {
+                return Err(Error::InvalidFormat(
+                    "iWork absolute tract range rewrite failed wire validation".to_owned(),
+                ));
+            }
+            Ok(rewritten)
+        })
+        .collect::<Result<Vec<_>>>()?;
+    rewrite_repeated_length_delimited_fields(data, field_number, &replacements)
 }
 
 const fn zigzag_i32(value: i32) -> u64 {

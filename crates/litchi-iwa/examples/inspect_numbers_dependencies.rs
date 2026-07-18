@@ -44,7 +44,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .get(1)
         .is_some_and(|argument| argument == "--debug");
     let package = IWorkPackage::open(path)?;
-    let archive = package.archive("Index/CalculationEngine.iwa")?;
+    let mut candidates = package.iwa_entry_names().filter(|name| {
+        name.rsplit('/').next().is_some_and(|file_name| {
+            file_name == "CalculationEngine.iwa"
+                || file_name
+                    .strip_prefix("CalculationEngine-")
+                    .and_then(|suffix| suffix.strip_suffix(".iwa"))
+                    .is_some_and(|version| {
+                        !version.is_empty()
+                            && version.split('-').all(|part| {
+                                !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_digit())
+                            })
+                    })
+        })
+    });
+    let component = candidates
+        .next()
+        .ok_or("package has no CalculationEngine component")?;
+    if candidates.next().is_some() {
+        return Err("package has multiple CalculationEngine components".into());
+    }
+    println!("component={component}");
+    let archive = package.archive(component)?;
     for object in archive.objects {
         let id = object.archive_info.identifier.unwrap_or(0);
         for message in object.messages {
@@ -108,6 +129,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     );
                     for record in tile.cell_records {
                         print_record(&record, "  ");
+                    }
+                },
+                4010 => {
+                    let tile = tsce::RangePrecedentsTileArchive::decode(message.data.as_slice())?;
+                    println!(
+                        "range_tile={id} owner={} records={}",
+                        tile.to_owner_id,
+                        tile.from_to_range.len()
+                    );
+                    if debug {
+                        println!("  {tile:#?}");
                     }
                 },
                 _ => {},

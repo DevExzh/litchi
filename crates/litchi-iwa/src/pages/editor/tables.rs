@@ -904,6 +904,12 @@ mod tests {
                 PagesTableFormulaCachedValue::Number(3.0),
             )
             .unwrap();
+        let mut package = editor.into_package();
+        let engine = package.remove_entry("Index/CalculationEngine.iwa").unwrap();
+        package
+            .insert_entry("Index/CalculationEngine-42-2.iwa", engine)
+            .unwrap();
+        let mut editor = PagesEditor::from_package(package).unwrap();
         let baseline = editor.to_bytes().unwrap();
 
         editor.insert_table_row(model_id, 3).unwrap();

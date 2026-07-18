@@ -2456,6 +2456,35 @@ pub(super) fn object_locations(package: &IWorkPackage) -> Result<HashMap<u64, St
     Ok(locations)
 }
 
+pub(super) fn calculation_engine_entry(package: &IWorkPackage) -> Result<Option<String>> {
+    const BASE_NAME: &str = "CalculationEngine.iwa";
+    const VERSIONED_PREFIX: &str = "CalculationEngine-";
+
+    let mut entries = package.iwa_entry_names().filter(|name| {
+        name.rsplit('/').next().is_some_and(|file_name| {
+            file_name == BASE_NAME
+                || file_name
+                    .strip_prefix(VERSIONED_PREFIX)
+                    .and_then(|suffix| suffix.strip_suffix(".iwa"))
+                    .is_some_and(|version| {
+                        !version.is_empty()
+                            && version.split('-').all(|part| {
+                                !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_digit())
+                            })
+                    })
+        })
+    });
+    let Some(entry) = entries.next() else {
+        return Ok(None);
+    };
+    if entries.next().is_some() {
+        return Err(Error::InvalidFormat(
+            "iWork package contains multiple CalculationEngine components".to_owned(),
+        ));
+    }
+    Ok(Some(entry.to_owned()))
+}
+
 pub(super) fn read_tile_cell(
     package: &IWorkPackage,
     archive_name: &str,

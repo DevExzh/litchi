@@ -66,6 +66,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
     let editor = NumbersEditor::open(path)?;
+    for table in editor.tables()? {
+        println!(
+            "table id={} name={:?} dimensions={}x{}",
+            table.object_id, table.name, table.rows, table.columns
+        );
+    }
     for category in editor.pivot_categories()? {
         println!(
             "pivot category label={:?} group_by={:?} column={:?} group={:?} aggregate_type={} level={}",

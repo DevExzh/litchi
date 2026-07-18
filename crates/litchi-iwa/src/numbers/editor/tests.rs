@@ -3120,6 +3120,284 @@ fn row_insert_expands_footer_aggregate_and_delete_restores_exact_bytes() {
 }
 
 #[test]
+fn row_insert_roundtrips_app_normalized_footer_range_dependencies() {
+    const FORMULA_OWNER_ID: u64 = 101;
+    const FORMULA_OWNER_MESSAGE_TYPE: u32 = 4_008;
+    const RANGE_TILE_ID: u64 = 10_001;
+    const RANGE_TILE_MESSAGE_TYPE: u32 = 4_010;
+    const VERSIONED_ENGINE_ENTRY: &str = "Index/CalculationEngine-10-2.iwa";
+
+    let mut editor = NumbersEditor::from_package(test_package_with_calculation_engine()).unwrap();
+    editor
+        .set_table_header_settings(
+            10,
+            NumbersTableHeaderSettings {
+                footer_rows: Some(NumbersTableHeaderCount::ONE),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    editor
+        .set_formula(
+            10,
+            3,
+            1,
+            FormulaExpression::function(
+                "SUM",
+                [FormulaExpression::range(
+                    crate::numbers::FormulaCellReference::relative(1, 1),
+                    crate::numbers::FormulaCellReference::relative(2, 1),
+                )],
+            ),
+        )
+        .unwrap();
+    let mut package = editor.into_package();
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            use tsce::ast_node_array_archive::ast_colon_tract_archive::AstColonTractRelativeRangeArchive;
+            use tsce::ast_node_array_archive::{
+                AstColonTractArchive, AstNodeArchive, AstNodeType, AstStickyBits,
+            };
+
+            let object = archive.object_mut(21).unwrap();
+            let mut formulas = TableDataList::decode(object.messages[0].data.as_slice())?;
+            let formula = formulas.entries[0].formula.as_mut().unwrap();
+            let function = formula.ast_node_array.ast_node.pop().unwrap();
+            formula.ast_node_array.ast_node = vec![
+                AstNodeArchive {
+                    ast_node_type: AstNodeType::ColonTractNode as i32,
+                    ast_sticky_bits: Some(AstStickyBits {
+                        begin_row_is_absolute: false,
+                        begin_column_is_absolute: false,
+                        end_row_is_absolute: false,
+                        end_column_is_absolute: false,
+                    }),
+                    ast_colon_tract: Some(AstColonTractArchive {
+                        relative_column: vec![AstColonTractRelativeRangeArchive {
+                            range_begin: 0,
+                            range_end: None,
+                        }],
+                        relative_row: vec![AstColonTractRelativeRangeArchive {
+                            range_begin: -2,
+                            range_end: Some(-1),
+                        }],
+                        preserve_rectangular: Some(true),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                },
+                function,
+            ];
+            object.replace_message(
+                0,
+                RawMessage {
+                    type_: object.messages[0].type_,
+                    data: formulas.encode_to_vec(),
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    package
+        .update_archive("Index/CalculationEngine.iwa", |archive| {
+            let object = archive.object_mut(FORMULA_OWNER_ID).unwrap();
+            let mut owner =
+                tsce::FormulaOwnerDependenciesArchive::decode(object.messages[0].data.as_slice())?;
+            let internal_owner_id = owner.internal_formula_owner_id;
+            let owner_uid = owner.formula_owner_uid;
+            let cell_tile_id = owner
+                .tiled_cell_dependencies
+                .as_ref()
+                .unwrap()
+                .cell_record_tiles[0]
+                .identifier;
+            owner.cell_dependencies.as_mut().unwrap().cell_record[0].expanded_edges =
+                Some(tsce::ExpandedEdgesArchive::default());
+            owner.range_dependencies = Some(tsce::RangeDependenciesArchive {
+                back_dependency: vec![tsce::RangeBackDependencyArchive {
+                    cell_coord_row: 3,
+                    cell_coord_column: 1,
+                    internal_range_reference: Some(tsce::InternalRangeReferenceArchive {
+                        owner_id: internal_owner_id,
+                        range: tsce::RangeCoordinateArchive {
+                            top_left_column: 1,
+                            top_left_row: 1,
+                            bottom_right_column: 1,
+                            bottom_right_row: 2,
+                        },
+                    }),
+                    ..Default::default()
+                }],
+            });
+            owner.uuid_references = Some(tsce::UuidReferencesArchive {
+                table_uuid_refs: vec![tsce::uuid_references_archive::TableWithUuidRef {
+                    owner_uuid: owner_uid,
+                    uuid_refs: vec![tsce::uuid_references_archive::UuidRef {
+                        uuid: tsp::Uuid {
+                            lower: 111,
+                            upper: 222,
+                        },
+                        coord_set: Some(tsce::CellCoordSetArchive {
+                            column_entries: vec![tsce::cell_coord_set_archive::ColumnEntry {
+                                column: 1,
+                                row_set: tsce::IndexSetArchive {
+                                    entries: vec![tsce::index_set_archive::IndexSetEntry {
+                                        range_begin: 3,
+                                        range_end: None,
+                                    }],
+                                },
+                            }],
+                        }),
+                    }],
+                }],
+                ..Default::default()
+            });
+            owner.tiled_range_dependencies = Some(tsce::RangeDependenciesTiledArchive {
+                range_precedents_tile: vec![Reference {
+                    identifier: RANGE_TILE_ID,
+                    ..Default::default()
+                }],
+            });
+            object.replace_message(
+                0,
+                RawMessage {
+                    type_: FORMULA_OWNER_MESSAGE_TYPE,
+                    data: owner.encode_to_vec(),
+                },
+            )?;
+            let tile_object = archive.object_mut(cell_tile_id).unwrap();
+            let mut tile =
+                tsce::CellRecordTileArchive::decode(tile_object.messages[0].data.as_slice())?;
+            tile.cell_records[0].expanded_edges = Some(tsce::ExpandedEdgesArchive::default());
+            tile_object.replace_message(
+                0,
+                RawMessage {
+                    type_: 4_009,
+                    data: tile.encode_to_vec(),
+                },
+            )?;
+            archive.insert_object(ArchiveObject::new(
+                RANGE_TILE_ID,
+                vec![RawMessage {
+                    type_: RANGE_TILE_MESSAGE_TYPE,
+                    data: tsce::RangePrecedentsTileArchive {
+                        to_owner_id: internal_owner_id,
+                        from_to_range: vec![
+                            tsce::range_precedents_tile_archive::FromToRangeArchive {
+                                from_coord: tsce::CellCoordinateArchive {
+                                    column: Some(1),
+                                    row: Some(3),
+                                    ..Default::default()
+                                },
+                                refers_to_rect: tsce::CellRectArchive {
+                                    origin: tsce::CellCoordinateArchive {
+                                        column: Some(1),
+                                        row: Some(1),
+                                        ..Default::default()
+                                    },
+                                    size: tsce::ColumnRowSize {
+                                        num_rows: Some(2),
+                                        ..Default::default()
+                                    },
+                                },
+                            },
+                        ],
+                    }
+                    .encode_to_vec(),
+                }],
+            )?)?;
+            Ok(())
+        })
+        .unwrap();
+    package
+        .update_archive("Index/CalculationEngine.iwa", |archive| {
+            for (object_id, path, field, value) in [
+                (FORMULA_OWNER_ID, vec![5, 2], 99, 990),
+                (FORMULA_OWNER_ID, vec![14, 2, 2, 2, 1, 2, 1], 98, 980),
+                (RANGE_TILE_ID, vec![2], 97, 970),
+                (RANGE_TILE_ID, vec![2, 2], 96, 960),
+            ] {
+                let object = archive.object_mut(object_id).unwrap();
+                let message = object.messages[0].clone();
+                let data = crate::wire::transform_length_delimited_fields_at_path(
+                    &message.data,
+                    &path,
+                    |payload| {
+                        let mut payload = payload.to_vec();
+                        append_unknown_varint(&mut payload, field, value);
+                        Ok(payload)
+                    },
+                )?;
+                object.replace_message(
+                    0,
+                    RawMessage {
+                        type_: message.type_,
+                        data,
+                    },
+                )?;
+            }
+            Ok(())
+        })
+        .unwrap();
+    let engine = package.remove_entry("Index/CalculationEngine.iwa").unwrap();
+    package
+        .insert_entry(VERSIONED_ENGINE_ENTRY, engine)
+        .unwrap();
+    let mut editor = NumbersEditor::from_package(package).unwrap();
+    let before = editor.to_bytes().unwrap();
+
+    editor.insert_table_row(10, 3).unwrap();
+    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        document.sheets().unwrap()[0].tables[0].get_cell(4, 1),
+        Some(&CellValue::Formula("=SUM(B2:B4)".to_owned()))
+    );
+    let archive = editor.package().archive(VERSIONED_ENGINE_ENTRY).unwrap();
+    let owner = tsce::FormulaOwnerDependenciesArchive::decode(
+        archive.object(FORMULA_OWNER_ID).unwrap().messages[0]
+            .data
+            .as_slice(),
+    )
+    .unwrap();
+    let dependency = &owner.range_dependencies.as_ref().unwrap().back_dependency[0];
+    assert_eq!(
+        (dependency.cell_coord_row, dependency.cell_coord_column),
+        (4, 1)
+    );
+    assert_eq!(
+        dependency
+            .internal_range_reference
+            .as_ref()
+            .unwrap()
+            .range
+            .bottom_right_row,
+        3
+    );
+    let uuid_row = &owner.uuid_references.as_ref().unwrap().table_uuid_refs[0].uuid_refs[0]
+        .coord_set
+        .as_ref()
+        .unwrap()
+        .column_entries[0]
+        .row_set
+        .entries[0];
+    assert_eq!(uuid_row.range_begin, 4);
+    let range_tile = tsce::RangePrecedentsTileArchive::decode(
+        archive.object(RANGE_TILE_ID).unwrap().messages[0]
+            .data
+            .as_slice(),
+    )
+    .unwrap();
+    assert_eq!(range_tile.from_to_range[0].from_coord.row, Some(4));
+    assert_eq!(
+        range_tile.from_to_range[0].refers_to_rect.size.num_rows,
+        Some(3)
+    );
+
+    editor.remove_table_row(10, 3).unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
 fn row_insert_rejects_incoming_cross_table_formula_transactionally() {
     let mut editor = NumbersEditor::from_package(test_package_with_cross_table_engine()).unwrap();
     editor

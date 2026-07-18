@@ -6,7 +6,10 @@ mod ast;
 mod wire;
 
 use ast::rewrite_formula_asts;
-use wire::{rewrite_shifted_dependency_tile_wire, rewrite_shifted_formula_owner_wire};
+use wire::{
+    rewrite_shifted_dependency_tile_wire, rewrite_shifted_formula_owner_wire,
+    rewrite_shifted_range_tile_wire,
+};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum DependencyAxis {
@@ -114,12 +117,12 @@ fn mutate_formula_dependencies(
     position: u32,
     mutation: DependencyMutation,
 ) -> Result<()> {
-    const COMPONENT: &str = "Index/CalculationEngine.iwa";
-    if !package.contains_entry(COMPONENT) {
+    let Some(component) = calculation_engine_entry(package)? else {
         return Ok(());
-    }
-    let adjustments = rewrite_formula_asts(package, table_info_id, axis, position, mutation)?;
-    package.update_archive(COMPONENT, |archive| {
+    };
+    let adjustments =
+        rewrite_formula_asts(package, &component, table_info_id, axis, position, mutation)?;
+    package.update_archive(&component, |archive| {
         let Some((owner_id, message_index)) = archive.objects.iter().find_map(|object| {
             object.messages.iter().enumerate().find_map(|(index, message)| {
                 if message.type_ != 4008 {
@@ -143,7 +146,15 @@ fn mutate_formula_dependencies(
         let previous = tsce::FormulaOwnerDependenciesArchive::decode(original.as_slice())?;
         validate_shiftable_formula_owner(&previous, axis, mutation)?;
         let internal_owner_id = previous.internal_formula_owner_id;
-        reject_incoming_dependencies(archive, owner_id, internal_owner_id, axis, mutation)?;
+        reject_incoming_dependencies(
+            archive,
+            owner_id,
+            internal_owner_id,
+            &previous.formula_owner_uid,
+            axis,
+            mutation,
+        )?;
+        let range_dependency_hosts = range_dependency_hosts(archive, &previous)?;
         let mut current = previous.clone();
         mutate_spanning_ranges(
             &mut current.spanning_column_dependencies,
@@ -155,6 +166,20 @@ fn mutate_formula_dependencies(
             axis,
             mutation,
         )?;
+        mutate_range_dependencies(
+            &mut current.range_dependencies,
+            axis,
+            position,
+            internal_owner_id,
+            mutation,
+            &adjustments,
+        )?;
+        mutate_uuid_references(
+            &mut current.uuid_references,
+            axis,
+            position,
+            mutation,
+        )?;
         if let Some(dependencies) = &mut current.cell_dependencies {
             for record in &mut dependencies.cell_record {
                 mutate_dependency_record(
@@ -164,6 +189,7 @@ fn mutate_formula_dependencies(
                     internal_owner_id,
                     mutation,
                     &adjustments,
+                    &range_dependency_hosts,
                 )?;
             }
         }
@@ -210,6 +236,7 @@ fn mutate_formula_dependencies(
                     internal_owner_id,
                     mutation,
                     &adjustments,
+                    &range_dependency_hosts,
                 )?;
                 let (coordinate, tile_begin, tile_size) = match axis {
                     DependencyAxis::Column => (
@@ -246,6 +273,53 @@ fn mutate_formula_dependencies(
             )?;
         }
 
+        let range_tile_ids = previous
+            .tiled_range_dependencies
+            .as_ref()
+            .map(|dependencies| {
+                dependencies
+                    .range_precedents_tile
+                    .iter()
+                    .map(|reference| reference.identifier)
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        for tile_id in range_tile_ids {
+            let object = archive.object_mut(tile_id).ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Numbers range dependency tile {tile_id} is missing"
+                ))
+            })?;
+            let message_index = object
+                .messages
+                .iter()
+                .position(|message| message.type_ == 4010)
+                .ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Numbers range dependency tile {tile_id} has no payload"
+                    ))
+                })?;
+            let original = object.messages[message_index].data.clone();
+            let previous_tile =
+                tsce::RangePrecedentsTileArchive::decode(original.as_slice())?;
+            let mut current_tile = previous_tile.clone();
+            mutate_range_tile(
+                &mut current_tile,
+                axis,
+                position,
+                internal_owner_id,
+                mutation,
+                &adjustments,
+            )?;
+            let data = rewrite_shifted_range_tile_wire(
+                &original,
+                &previous_tile,
+                &current_tile,
+            )?;
+            let message_type = object.messages[message_index].type_;
+            object.replace_message(message_index, RawMessage { type_: message_type, data })?;
+        }
+
         let data = rewrite_shifted_formula_owner_wire(&original, &previous, &current, axis)?;
         let object = archive.object_mut(owner_id).ok_or_else(|| {
             Error::InvalidFormat(format!("Numbers formula owner {owner_id} is missing"))
@@ -262,10 +336,342 @@ fn mutate_formula_dependencies(
     })
 }
 
+fn range_dependency_hosts(
+    archive: &Archive,
+    owner: &tsce::FormulaOwnerDependenciesArchive,
+) -> Result<HashSet<(u32, u32)>> {
+    let mut hosts = owner
+        .range_dependencies
+        .as_ref()
+        .into_iter()
+        .flat_map(|dependencies| &dependencies.back_dependency)
+        .map(|dependency| (dependency.cell_coord_row, dependency.cell_coord_column))
+        .collect::<HashSet<_>>();
+    for reference in owner
+        .tiled_range_dependencies
+        .as_ref()
+        .into_iter()
+        .flat_map(|dependencies| &dependencies.range_precedents_tile)
+    {
+        let object = archive.object(reference.identifier).ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Numbers range dependency tile {} is missing",
+                reference.identifier
+            ))
+        })?;
+        let message = object
+            .messages
+            .iter()
+            .find(|message| message.type_ == 4010)
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Numbers range dependency tile {} has no payload",
+                    reference.identifier
+                ))
+            })?;
+        let tile = tsce::RangePrecedentsTileArchive::decode(message.data.as_slice())?;
+        for dependency in &tile.from_to_range {
+            hosts.insert(explicit_cell_coordinate(
+                &dependency.from_coord,
+                "range-tile host",
+            )?);
+        }
+    }
+    Ok(hosts)
+}
+
+fn mutate_range_dependencies(
+    dependencies: &mut Option<tsce::RangeDependenciesArchive>,
+    axis: DependencyAxis,
+    position: u32,
+    internal_owner_id: u32,
+    mutation: DependencyMutation,
+    adjustments: &FormulaDependencyAdjustments,
+) -> Result<()> {
+    let Some(dependencies) = dependencies else {
+        return Ok(());
+    };
+    for dependency in &mut dependencies.back_dependency {
+        let host = (dependency.cell_coord_row, dependency.cell_coord_column);
+        let local_adjustments = adjustments.local_precedents.get(&host);
+        match axis {
+            DependencyAxis::Column => {
+                dependency.cell_coord_column = mutation.coordinate(
+                    dependency.cell_coord_column,
+                    position,
+                    "range dependency host column",
+                )?;
+            },
+            DependencyAxis::Row => {
+                dependency.cell_coord_row = mutation.coordinate(
+                    dependency.cell_coord_row,
+                    position,
+                    "range dependency host row",
+                )?;
+            },
+        }
+        if dependency.range_reference.is_some() && dependency.internal_range_reference.is_some() {
+            return Err(Error::InvalidFormat(
+                "iWork range dependency has both external and internal references".to_owned(),
+            ));
+        }
+        if let Some(reference) = &mut dependency.internal_range_reference
+            && reference.owner_id == internal_owner_id
+        {
+            mutate_range_coordinate(
+                &mut reference.range,
+                axis,
+                position,
+                mutation,
+                local_adjustments,
+            )?;
+        }
+    }
+    Ok(())
+}
+
+fn mutate_range_tile(
+    tile: &mut tsce::RangePrecedentsTileArchive,
+    axis: DependencyAxis,
+    position: u32,
+    internal_owner_id: u32,
+    mutation: DependencyMutation,
+    adjustments: &FormulaDependencyAdjustments,
+) -> Result<()> {
+    for dependency in &mut tile.from_to_range {
+        let host = explicit_cell_coordinate(&dependency.from_coord, "range-tile host")?;
+        let local_adjustments = adjustments.local_precedents.get(&host);
+        mutate_cell_coordinate(
+            &mut dependency.from_coord,
+            axis,
+            position,
+            mutation,
+            "range-tile host",
+        )?;
+        if tile.to_owner_id == internal_owner_id {
+            mutate_cell_rect(
+                &mut dependency.refers_to_rect,
+                axis,
+                position,
+                mutation,
+                local_adjustments,
+            )?;
+        }
+    }
+    Ok(())
+}
+
+fn mutate_cell_rect(
+    rect: &mut tsce::CellRectArchive,
+    axis: DependencyAxis,
+    position: u32,
+    mutation: DependencyMutation,
+    adjustments: Option<&LocalPrecedentAdjustments>,
+) -> Result<()> {
+    let (origin_row, origin_column) = explicit_cell_coordinate(&rect.origin, "range origin")?;
+    let row_count = rect.size.num_rows.unwrap_or(1);
+    let column_count = rect.size.num_columns.unwrap_or(1);
+    let mut range = tsce::RangeCoordinateArchive {
+        top_left_column: origin_column,
+        top_left_row: origin_row,
+        bottom_right_column: origin_column
+            .checked_add(column_count.saturating_sub(1))
+            .ok_or_else(|| Error::ParseError("iWork range column overflow".to_owned()))?,
+        bottom_right_row: origin_row
+            .checked_add(row_count.saturating_sub(1))
+            .ok_or_else(|| Error::ParseError("iWork range row overflow".to_owned()))?,
+    };
+    mutate_range_coordinate(&mut range, axis, position, mutation, adjustments)?;
+    rect.origin.column = Some(range.top_left_column);
+    rect.origin.row = Some(range.top_left_row);
+    let columns = range
+        .bottom_right_column
+        .checked_sub(range.top_left_column)
+        .and_then(|size| size.checked_add(1))
+        .ok_or_else(|| Error::InvalidFormat("iWork range has inverted columns".to_owned()))?;
+    let rows = range
+        .bottom_right_row
+        .checked_sub(range.top_left_row)
+        .and_then(|size| size.checked_add(1))
+        .ok_or_else(|| Error::InvalidFormat("iWork range has inverted rows".to_owned()))?;
+    rect.size.num_columns = (columns != 1).then_some(columns);
+    rect.size.num_rows = (rows != 1).then_some(rows);
+    Ok(())
+}
+
+fn mutate_range_coordinate(
+    range: &mut tsce::RangeCoordinateArchive,
+    axis: DependencyAxis,
+    position: u32,
+    mutation: DependencyMutation,
+    adjustments: Option<&LocalPrecedentAdjustments>,
+) -> Result<()> {
+    let footer_override = adjustments.and_then(|adjustments| {
+        (axis == DependencyAxis::Row)
+            .then(|| match mutation {
+                DependencyMutation::Insert
+                    if range.bottom_right_row.checked_add(1) == Some(position)
+                        && adjustments.insert.iter().any(|&(row, column)| {
+                            row == position
+                                && (range.top_left_column..=range.bottom_right_column)
+                                    .contains(&column)
+                        }) =>
+                {
+                    Some(position)
+                },
+                DependencyMutation::Delete
+                    if range.bottom_right_row == position
+                        && range.top_left_row < position
+                        && adjustments.remove.iter().any(|&(row, column)| {
+                            row == position
+                                && (range.top_left_column..=range.bottom_right_column)
+                                    .contains(&column)
+                        }) =>
+                {
+                    position.checked_sub(1)
+                },
+                _ => None,
+            })
+            .flatten()
+    });
+    match axis {
+        DependencyAxis::Column => {
+            range.top_left_column =
+                mutation.coordinate(range.top_left_column, position, "range start column")?;
+            range.bottom_right_column =
+                mutation.coordinate(range.bottom_right_column, position, "range end column")?;
+        },
+        DependencyAxis::Row => {
+            range.top_left_row =
+                mutation.coordinate(range.top_left_row, position, "range start row")?;
+            range.bottom_right_row = footer_override.map(Ok).unwrap_or_else(|| {
+                mutation.coordinate(range.bottom_right_row, position, "range end row")
+            })?;
+        },
+    }
+    Ok(())
+}
+
+fn mutate_uuid_references(
+    references: &mut Option<tsce::UuidReferencesArchive>,
+    axis: DependencyAxis,
+    position: u32,
+    mutation: DependencyMutation,
+) -> Result<()> {
+    let Some(references) = references else {
+        return Ok(());
+    };
+    for reference in &mut references.table_refs {
+        if let Some(coordinates) = &mut reference.coord_set {
+            mutate_cell_coord_set(coordinates, axis, position, mutation)?;
+        }
+    }
+    for table in &mut references.table_uuid_refs {
+        for reference in &mut table.uuid_refs {
+            if let Some(coordinates) = &mut reference.coord_set {
+                mutate_cell_coord_set(coordinates, axis, position, mutation)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn mutate_cell_coord_set(
+    coordinates: &mut tsce::CellCoordSetArchive,
+    axis: DependencyAxis,
+    position: u32,
+    mutation: DependencyMutation,
+) -> Result<()> {
+    for column in &mut coordinates.column_entries {
+        if axis == DependencyAxis::Column {
+            column.column =
+                mutation.coordinate(column.column, position, "UUID-reference host column")?;
+        } else {
+            for entry in &mut column.row_set.entries {
+                let begin = u32::try_from(entry.range_begin).map_err(|_| {
+                    Error::InvalidFormat("iWork UUID-reference row is negative".to_owned())
+                })?;
+                let end = entry
+                    .range_end
+                    .map(u32::try_from)
+                    .transpose()
+                    .map_err(|_| {
+                        Error::InvalidFormat("iWork UUID-reference row is negative".to_owned())
+                    })?;
+                if end.is_some_and(|end| begin < position && position <= end) {
+                    return Err(Error::ParseError(format!(
+                        "Cannot {} an iWork row through a compact UUID-reference host range",
+                        mutation.verb()
+                    )));
+                }
+                entry.range_begin = i32::try_from(mutation.coordinate(
+                    begin,
+                    position,
+                    "UUID-reference host row",
+                )?)
+                .map_err(|_| Error::ParseError("iWork UUID-reference row overflow".to_owned()))?;
+                entry.range_end = end
+                    .map(|end| {
+                        mutation
+                            .coordinate(end, position, "UUID-reference host row")
+                            .and_then(|end| {
+                                i32::try_from(end).map_err(|_| {
+                                    Error::ParseError(
+                                        "iWork UUID-reference row overflow".to_owned(),
+                                    )
+                                })
+                            })
+                    })
+                    .transpose()?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn explicit_cell_coordinate(
+    coordinate: &tsce::CellCoordinateArchive,
+    what: &str,
+) -> Result<(u32, u32)> {
+    if coordinate.packed_data.is_some() {
+        return Err(Error::ParseError(format!(
+            "Cannot rewrite packed iWork {what} coordinates"
+        )));
+    }
+    Ok((
+        coordinate
+            .row
+            .ok_or_else(|| Error::InvalidFormat(format!("iWork {what} row is missing")))?,
+        coordinate
+            .column
+            .ok_or_else(|| Error::InvalidFormat(format!("iWork {what} column is missing")))?,
+    ))
+}
+
+fn mutate_cell_coordinate(
+    coordinate: &mut tsce::CellCoordinateArchive,
+    axis: DependencyAxis,
+    position: u32,
+    mutation: DependencyMutation,
+    what: &str,
+) -> Result<()> {
+    let (row, column) = explicit_cell_coordinate(coordinate, what)?;
+    match axis {
+        DependencyAxis::Column => {
+            coordinate.column = Some(mutation.coordinate(column, position, what)?);
+        },
+        DependencyAxis::Row => {
+            coordinate.row = Some(mutation.coordinate(row, position, what)?);
+        },
+    }
+    Ok(())
+}
+
 fn reject_incoming_dependencies(
     archive: &Archive,
     target_object_id: u64,
     target_internal_owner_id: u32,
+    target_owner_uid: &tsp::Uuid,
     axis: DependencyAxis,
     mutation: DependencyMutation,
 ) -> Result<()> {
@@ -288,6 +694,22 @@ fn reject_incoming_dependencies(
                         .iter()
                         .any(|record| record_has_external_owner(record, target_internal_owner_id))
                 })
+            {
+                return Err(incoming_dependency_error(axis, mutation));
+            }
+            if owner
+                .range_dependencies
+                .as_ref()
+                .is_some_and(|dependencies| {
+                    dependencies.back_dependency.iter().any(|dependency| {
+                        dependency
+                            .internal_range_reference
+                            .as_ref()
+                            .is_some_and(|reference| reference.owner_id == target_internal_owner_id)
+                            || dependency.range_reference.is_some()
+                    })
+                })
+                || uuid_references_owner(&owner.uuid_references, target_owner_uid)
             {
                 return Err(incoming_dependency_error(axis, mutation));
             }
@@ -322,9 +744,52 @@ fn reject_incoming_dependencies(
                     return Err(incoming_dependency_error(axis, mutation));
                 }
             }
+            for reference in owner
+                .tiled_range_dependencies
+                .as_ref()
+                .into_iter()
+                .flat_map(|dependencies| &dependencies.range_precedents_tile)
+            {
+                let tile_object = archive.object(reference.identifier).ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Numbers range dependency tile {} is missing",
+                        reference.identifier
+                    ))
+                })?;
+                let tile_message = tile_object
+                    .messages
+                    .iter()
+                    .find(|message| message.type_ == 4010)
+                    .ok_or_else(|| {
+                        Error::InvalidFormat(format!(
+                            "Numbers range dependency tile {} has no payload",
+                            reference.identifier
+                        ))
+                    })?;
+                let tile = tsce::RangePrecedentsTileArchive::decode(tile_message.data.as_slice())?;
+                if tile.to_owner_id == target_internal_owner_id && !tile.from_to_range.is_empty() {
+                    return Err(incoming_dependency_error(axis, mutation));
+                }
+            }
         }
     }
     Ok(())
+}
+
+fn uuid_references_owner(
+    references: &Option<tsce::UuidReferencesArchive>,
+    owner_uid: &tsp::Uuid,
+) -> bool {
+    references.as_ref().is_some_and(|references| {
+        references
+            .table_refs
+            .iter()
+            .any(|reference| reference.owner_uuid == *owner_uid)
+            || references
+                .table_uuid_refs
+                .iter()
+                .any(|reference| reference.owner_uuid == *owner_uid)
+    })
 }
 
 fn record_has_external_owner(
@@ -351,10 +816,6 @@ fn validate_shiftable_formula_owner(
     axis: DependencyAxis,
     mutation: DependencyMutation,
 ) -> Result<()> {
-    let range_dependencies = owner
-        .range_dependencies
-        .as_ref()
-        .is_some_and(|dependencies| !dependencies.back_dependency.is_empty());
     let volatile_dependencies = owner
         .volatile_dependencies
         .as_ref()
@@ -376,28 +837,18 @@ fn validate_shiftable_formula_owner(
         .cell_errors
         .as_ref()
         .is_some_and(|errors| !errors.errors.is_empty() || !errors.enhanced_errors.is_empty());
-    let uuid_references = owner.uuid_references.as_ref().is_some_and(|references| {
-        !references.table_refs.is_empty() || !references.table_uuid_refs.is_empty()
-    });
-    let tiled_ranges = owner
-        .tiled_range_dependencies
-        .as_ref()
-        .is_some_and(|dependencies| !dependencies.range_precedents_tile.is_empty());
     let spills = owner
         .spill_range_sizes
         .as_ref()
         .is_some_and(|spills| !spills.spills.is_empty());
-    if range_dependencies
-        || volatile_dependencies
+    if volatile_dependencies
         || spanning_dependencies
         || whole_owner_dependencies
         || cell_errors
-        || uuid_references
-        || tiled_ranges
         || spills
     {
         return Err(Error::ParseError(format!(
-            "Cannot yet {} a {} in a Numbers table with advanced range, volatile, spanning, error, UUID, or spill dependency state",
+            "Cannot yet {} a {} in a Numbers table with volatile, spanning, error, or spill dependency state",
             mutation.verb(),
             axis.noun()
         )));
@@ -471,6 +922,7 @@ fn mutate_dependency_record(
     internal_owner_id: u32,
     mutation: DependencyMutation,
     adjustments: &FormulaDependencyAdjustments,
+    range_dependency_hosts: &HashSet<(u32, u32)>,
 ) -> Result<()> {
     let previous_host = (record.row, record.column);
     match axis {
@@ -492,7 +944,11 @@ fn mutate_dependency_record(
             "Numbers formula dependency edge arrays have inconsistent lengths".to_owned(),
         ));
     }
-    if let Some(adjustment) = adjustments.local_precedents.get(&previous_host) {
+    if let Some(adjustment) = adjustments
+        .local_precedents
+        .get(&previous_host)
+        .filter(|_| !range_dependency_hosts.contains(&previous_host))
+    {
         if adjustment.remove.iter().any(|coordinate| {
             !edges
                 .edge_without_owner_rows
