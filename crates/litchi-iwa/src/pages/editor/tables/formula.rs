@@ -2,10 +2,16 @@
 
 use super::*;
 
+/// A typed whole-row or whole-column reference used by a table formula.
+pub type PagesTableFormulaAxisReference = crate::numbers::FormulaAxisReference;
+/// A typed binary operator used by a table formula.
+pub type PagesTableFormulaBinaryOperator = crate::numbers::FormulaBinaryOperator;
 /// A typed formula AST compiled into native iWork table storage.
 pub type PagesTableFormulaExpression = crate::numbers::FormulaExpression;
 /// A typed formula result displayed before Pages next recalculates the cell.
 pub type PagesTableFormulaCachedValue = crate::numbers::FormulaCachedValue;
+/// A typed cell address used by a table formula.
+pub type PagesTableFormulaCellReference = crate::numbers::FormulaCellReference;
 
 impl PagesEditor {
     /// Read a cell's canonical formula source, including the leading equals sign.

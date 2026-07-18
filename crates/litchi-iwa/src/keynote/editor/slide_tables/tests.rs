@@ -143,6 +143,97 @@ fn source_built_table_roundtrips_full_crud() {
 }
 
 #[test]
+fn source_built_table_roundtrips_formula_crud_transactionally() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let (position, size) = table_geometry();
+    let table = editor
+        .add_slide_table(0, "Formula", 3, 2, position, size)
+        .unwrap();
+    editor
+        .set_slide_table_formula(
+            0,
+            table.model_object_id,
+            2,
+            1,
+            KeynoteTableFormulaExpression::function(
+                "SUM",
+                [
+                    KeynoteTableFormulaExpression::Number(1.0),
+                    KeynoteTableFormulaExpression::Number(2.0),
+                ],
+            ),
+            KeynoteTableFormulaCachedValue::Number(3.0),
+        )
+        .unwrap();
+
+    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened
+            .slide_table_formula(0, table.model_object_id, 2, 1)
+            .unwrap()
+            .as_deref(),
+        Some("=SUM(1,2)")
+    );
+    reopened
+        .set_slide_table_formula(
+            0,
+            table.model_object_id,
+            2,
+            1,
+            KeynoteTableFormulaExpression::function(
+                "SUM",
+                [
+                    KeynoteTableFormulaExpression::Number(3.0),
+                    KeynoteTableFormulaExpression::Number(4.0),
+                ],
+            ),
+            KeynoteTableFormulaCachedValue::Number(7.0),
+        )
+        .unwrap();
+    assert_eq!(
+        reopened
+            .slide_table_formula(0, table.model_object_id, 2, 1)
+            .unwrap()
+            .as_deref(),
+        Some("=SUM(3,4)")
+    );
+
+    let before = reopened.to_bytes().unwrap();
+    assert!(
+        reopened
+            .set_slide_table_formula(
+                0,
+                table.model_object_id,
+                usize::MAX,
+                1,
+                KeynoteTableFormulaExpression::Number(1.0),
+                KeynoteTableFormulaCachedValue::Number(1.0),
+            )
+            .is_err()
+    );
+    assert_eq!(reopened.to_bytes().unwrap(), before);
+    assert_eq!(
+        reopened
+            .clear_slide_table_formula(0, table.model_object_id, 2, 1)
+            .unwrap(),
+        "=SUM(3,4)"
+    );
+    assert_eq!(
+        reopened
+            .slide_table_formula(0, table.model_object_id, 2, 1)
+            .unwrap(),
+        None
+    );
+    let cleared = reopened.to_bytes().unwrap();
+    assert!(
+        reopened
+            .clear_slide_table_formula(0, table.model_object_id, 2, 1)
+            .is_err()
+    );
+    assert_eq!(reopened.to_bytes().unwrap(), cleared);
+}
+
+#[test]
 fn tables_on_multiple_slides_remain_isolated() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let layout = editor

@@ -2,7 +2,8 @@ use std::env;
 
 use litchi_iwa::keynote::{
     KeynoteDocumentBuilder, KeynoteTableCellValue, KeynoteTableDimensionSize,
-    KeynoteTableHeaderCount, KeynoteTableHeaderSettings,
+    KeynoteTableFormulaCachedValue, KeynoteTableFormulaCellReference,
+    KeynoteTableFormulaExpression, KeynoteTableHeaderCount, KeynoteTableHeaderSettings,
 };
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 
@@ -69,6 +70,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             KeynoteTableDimensionSize::points(height)?,
         )?;
     }
+    editor.set_slide_table_formula(
+        0,
+        table.model_object_id,
+        3,
+        1,
+        KeynoteTableFormulaExpression::function(
+            "SUM",
+            [KeynoteTableFormulaExpression::range(
+                KeynoteTableFormulaCellReference::relative(1, 1),
+                KeynoteTableFormulaCellReference::relative(2, 1),
+            )],
+        ),
+        KeynoteTableFormulaCachedValue::Number(218.0),
+    )?;
     editor.save(&output)?;
     println!("created {output}");
     Ok(())

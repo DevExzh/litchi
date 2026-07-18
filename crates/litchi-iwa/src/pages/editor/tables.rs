@@ -3,7 +3,10 @@
 mod formula;
 mod layout;
 
-pub use formula::{PagesTableFormulaCachedValue, PagesTableFormulaExpression};
+pub use formula::{
+    PagesTableFormulaAxisReference, PagesTableFormulaBinaryOperator, PagesTableFormulaCachedValue,
+    PagesTableFormulaCellReference, PagesTableFormulaExpression,
+};
 pub use layout::{
     PagesTableDimension, PagesTableDimensionSize, PagesTableHeaderCount, PagesTableHeaderSettings,
     PagesTablePoints,

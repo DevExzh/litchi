@@ -8,9 +8,15 @@ use crate::numbers::table_extractor::TableDataExtractor;
 use crate::object_index::ObjectIndex;
 use crate::shapes::{DrawableGeometry, DrawablePoint, DrawableSize};
 
+mod formula;
 mod graph;
 mod storage;
 
+pub use formula::{
+    KeynoteTableFormulaAxisReference, KeynoteTableFormulaBinaryOperator,
+    KeynoteTableFormulaCachedValue, KeynoteTableFormulaCellReference,
+    KeynoteTableFormulaExpression,
+};
 use graph::{require_table_model, slide_table_graph, table_template};
 use storage::{remove_objects, set_table_geometry_in_package, set_uniform_table_dimensions};
 

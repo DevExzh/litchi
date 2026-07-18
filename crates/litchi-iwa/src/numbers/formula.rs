@@ -1,4 +1,4 @@
-//! Typed construction of Numbers formula ASTs and dependency edges.
+//! Typed construction of native iWork table formula ASTs and dependency edges.
 
 use std::collections::{BTreeSet, HashMap};
 
@@ -40,10 +40,10 @@ impl FormulaCachedValue {
     }
 }
 
-/// A cell address used by a Numbers formula.
+/// A cell address used by an iWork table formula.
 ///
 /// The row and column are zero-based logical table coordinates. Absolute flags
-/// control how the address behaves when Numbers fills or moves the formula;
+/// control how the address behaves when an iWork app fills or moves the formula;
 /// they do not change which cell is referenced at the formula's current host.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct FormulaCellReference {
@@ -156,7 +156,7 @@ impl FormulaAxisReference {
     }
 }
 
-/// A binary operator in a Numbers formula.
+/// A binary operator in an iWork table formula.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FormulaBinaryOperator {
     Add,
@@ -173,13 +173,13 @@ pub enum FormulaBinaryOperator {
     NotEqual,
 }
 
-/// A typed formula expression compiled to Numbers' postfix protobuf AST.
+/// A typed formula expression compiled to iWork's postfix protobuf AST.
 ///
 /// Local and cross-table cells, rectangles, and whole-axis ranges are encoded
 /// relative to the host cell and mirrored into CalculationEngine records by
-/// [`super::NumbersEditor`]. Functions with lazy/thunk arguments, volatile
-/// behavior, remote data, or spill results are rejected until their additional
-/// records can be generated and validated.
+/// the host table's calculation engine. Functions with lazy/thunk arguments,
+/// volatile behavior, remote data, or spill results are rejected until their
+/// additional records can be generated and validated.
 #[derive(Debug, Clone, PartialEq)]
 pub enum FormulaExpression {
     Number(f64),

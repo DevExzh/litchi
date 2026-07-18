@@ -3785,7 +3785,8 @@ pub use images::{PagesImageInfo, RemovedPagesImage};
 pub use movies::{PagesMovieInfo, PagesMovieOptions, RemovedPagesMovie};
 pub use tables::{
     PagesCellValue, PagesTable, PagesTableDimension, PagesTableDimensionSize,
-    PagesTableFormulaCachedValue, PagesTableFormulaExpression, PagesTableHeaderCount,
+    PagesTableFormulaAxisReference, PagesTableFormulaBinaryOperator, PagesTableFormulaCachedValue,
+    PagesTableFormulaCellReference, PagesTableFormulaExpression, PagesTableHeaderCount,
     PagesTableHeaderSettings, PagesTableInfo, PagesTablePoints,
 };
 
