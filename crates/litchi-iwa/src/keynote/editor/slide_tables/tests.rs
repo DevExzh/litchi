@@ -234,6 +234,89 @@ fn source_built_table_roundtrips_formula_crud_transactionally() {
 }
 
 #[test]
+fn source_built_table_roundtrips_physical_axis_crud_transactionally() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let (position, size) = table_geometry();
+    let table = editor
+        .add_slide_table(0, "Topology", 4, 4, position, size)
+        .unwrap();
+    let model_id = table.model_object_id;
+    let row_size = KeynoteTableDimensionSize::points(88.0).unwrap();
+    let column_size = KeynoteTableDimensionSize::points(144.0).unwrap();
+    editor
+        .set_slide_table_cell(
+            0,
+            model_id,
+            1,
+            1,
+            KeynoteTableCellValue::Text("shift me".to_owned()),
+        )
+        .unwrap();
+    editor
+        .set_slide_table_formula(
+            0,
+            model_id,
+            2,
+            2,
+            KeynoteTableFormulaExpression::Number(7.0),
+            KeynoteTableFormulaCachedValue::Number(7.0),
+        )
+        .unwrap();
+    editor
+        .set_slide_table_row_height(0, model_id, 1, row_size)
+        .unwrap();
+    editor
+        .set_slide_table_column_width(0, model_id, 1, column_size)
+        .unwrap();
+    let baseline_geometry = editor.slide_tables(0).unwrap()[0].geometry;
+    let baseline = editor.to_bytes().unwrap();
+
+    editor.insert_slide_table_row(0, model_id, 1).unwrap();
+    editor.insert_slide_table_column(0, model_id, 1).unwrap();
+    let reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let shifted = reopened.slide_table(0, model_id).unwrap();
+    assert_eq!((shifted.info.rows, shifted.info.columns), (5, 5));
+    assert_ne!(shifted.info.geometry.size, baseline_geometry.size);
+    assert_eq!(
+        shifted.get_cell(2, 2),
+        Some(&KeynoteTableCellValue::Text("shift me".to_owned()))
+    );
+    assert_eq!(
+        shifted.get_cell(3, 3),
+        Some(&KeynoteTableCellValue::Formula("=7".to_owned()))
+    );
+    assert_eq!(
+        reopened.slide_table_row_height(0, model_id, 2).unwrap(),
+        row_size
+    );
+    assert_eq!(
+        reopened.slide_table_column_width(0, model_id, 2).unwrap(),
+        column_size
+    );
+
+    editor.remove_slide_table_column(0, model_id, 1).unwrap();
+    editor.remove_slide_table_row(0, model_id, 1).unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+    assert_eq!(
+        editor.slide_tables(0).unwrap()[0].geometry,
+        baseline_geometry
+    );
+
+    let before_error = editor.to_bytes().unwrap();
+    assert!(
+        editor
+            .insert_slide_table_row(1, model_id, usize::MAX)
+            .is_err()
+    );
+    assert!(
+        editor
+            .remove_slide_table_column(0, model_id, usize::MAX)
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), before_error);
+}
+
+#[test]
 fn source_built_table_roundtrips_title_settings_transactionally() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let (position, size) = table_geometry();

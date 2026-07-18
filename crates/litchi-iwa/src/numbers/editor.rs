@@ -2934,6 +2934,75 @@ pub(crate) fn resize_table_in_package(
     model::resize_attached_table_in_package(package, table_id, rows, columns)
 }
 
+pub(crate) fn table_dimensions_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+) -> Result<(usize, usize)> {
+    let descriptor = model::attached_table_descriptor(package, table_id)?;
+    Ok((
+        descriptor.model.number_of_rows as usize,
+        descriptor.model.number_of_columns as usize,
+    ))
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum TableTopologyMutation {
+    InsertRow(usize),
+    InsertColumn(usize),
+    RemoveRow(usize),
+    RemoveColumn(usize),
+}
+
+impl TableTopologyMutation {
+    pub(crate) fn apply(self, package: &mut IWorkPackage, table_id: u64) -> Result<(usize, usize)> {
+        let dimensions = table_dimensions_in_package(package, table_id)?;
+        match self {
+            Self::InsertRow(row) => Ok((
+                insert_table_row_in_package(package, table_id, row)?,
+                dimensions.1,
+            )),
+            Self::InsertColumn(column) => Ok((
+                dimensions.0,
+                insert_table_column_in_package(package, table_id, column)?,
+            )),
+            Self::RemoveRow(row) => remove_table_row_in_package(package, table_id, row),
+            Self::RemoveColumn(column) => remove_table_column_in_package(package, table_id, column),
+        }
+    }
+}
+
+pub(crate) fn insert_table_row_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+) -> Result<usize> {
+    row_insert::insert_attached_table_row(package, table_id, row)
+}
+
+pub(crate) fn insert_table_column_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    column: usize,
+) -> Result<usize> {
+    column_insert::insert_attached_table_column(package, table_id, column)
+}
+
+pub(crate) fn remove_table_row_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+) -> Result<(usize, usize)> {
+    table_delete::remove_attached_table_row(package, table_id, row)
+}
+
+pub(crate) fn remove_table_column_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    column: usize,
+) -> Result<(usize, usize)> {
+    table_delete::remove_attached_table_column(package, table_id, column)
+}
+
 pub(crate) fn set_table_dimension_size_in_package(
     package: &mut IWorkPackage,
     table_id: u64,

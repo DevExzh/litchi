@@ -12,6 +12,7 @@ mod formula;
 mod graph;
 mod storage;
 mod title;
+mod topology;
 
 pub use formula::{
     KeynoteTableFormulaAxisReference, KeynoteTableFormulaBinaryOperator,

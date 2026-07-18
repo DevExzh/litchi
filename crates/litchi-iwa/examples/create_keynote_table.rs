@@ -93,6 +93,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ),
         KeynoteTableFormulaCachedValue::Number(218.0),
     )?;
+    editor.insert_slide_table_row(0, table.model_object_id, 1)?;
+    editor.insert_slide_table_column(0, table.model_object_id, 2)?;
+    for (column, value) in [
+        KeynoteTableCellValue::Text("Central".to_owned()),
+        KeynoteTableCellValue::Number(105.0),
+        KeynoteTableCellValue::Text("review".to_owned()),
+        KeynoteTableCellValue::Number(139.0),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        editor.set_slide_table_cell(0, table.model_object_id, 1, column, value)?;
+    }
+    editor.set_slide_table_cell(
+        0,
+        table.model_object_id,
+        0,
+        2,
+        KeynoteTableCellValue::Text("Status".to_owned()),
+    )?;
     editor.save(&output)?;
     println!("created {output}");
     Ok(())

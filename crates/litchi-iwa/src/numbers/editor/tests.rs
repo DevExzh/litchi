@@ -2862,6 +2862,23 @@ fn row_insert_rejects_out_of_bounds_index_transactionally() {
 }
 
 #[test]
+fn row_insert_rejects_formula_ast_rewrite_transactionally() {
+    let mut editor = NumbersEditor::from_package(test_package_with_calculation_engine()).unwrap();
+    editor
+        .set_formula(
+            10,
+            2,
+            2,
+            FormulaExpression::cell(crate::numbers::FormulaCellReference::relative(1, 1)),
+        )
+        .unwrap();
+    let before = editor.to_bytes().unwrap();
+
+    assert!(editor.insert_table_row(10, 2).is_err());
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
 fn row_insert_rejects_incoming_cross_table_formula_transactionally() {
     let mut editor = NumbersEditor::from_package(test_package_with_cross_table_engine()).unwrap();
     editor

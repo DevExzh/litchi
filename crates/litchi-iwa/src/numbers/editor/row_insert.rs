@@ -20,49 +20,8 @@ impl NumbersEditor {
     /// topology cannot yet be rewritten safely are rejected without changing
     /// the package.
     pub fn insert_table_row(&mut self, table_id: u64, row: usize) -> Result<()> {
-        let descriptor = table_models(&self.package)?
-            .into_iter()
-            .find(|table| table.object_id == table_id)
-            .ok_or_else(|| {
-                Error::ParseError(format!("Numbers table object {table_id} not found"))
-            })?;
-        let old_rows = descriptor.model.number_of_rows as usize;
-        if row > old_rows {
-            return Err(Error::ParseError(format!(
-                "Cannot insert Numbers row {row} into a table with {old_rows} rows"
-            )));
-        }
-        let new_rows = old_rows
-            .checked_add(1)
-            .ok_or_else(|| Error::ParseError("Numbers row count overflow".to_owned()))?;
-        let (new_rows_u32, _) =
-            validate_table_dimensions(new_rows, descriptor.model.number_of_columns as usize)?;
-        let locations = object_locations(&self.package)?;
-        validate_row_insertion_features(
-            &self.package,
-            &locations,
-            &descriptor.model,
-            row,
-            old_rows,
-        )?;
         let mut staged = self.package.clone();
-        shift_table_tile_rows(&mut staged, &locations, &descriptor.model, row)?;
-        shift_row_headers(&mut staged, &locations, &descriptor.model, row)?;
-        if let Some(reference) = &descriptor.model.base_column_row_uids {
-            insert_row_uid(&mut staged, &locations, reference.identifier, old_rows, row)?;
-        }
-        if let Some(reference) = &descriptor.model.stroke_sidecar {
-            insert_stroke_row(&mut staged, &locations, reference.identifier, new_rows_u32)?;
-        }
-        shift_formula_dependencies(
-            &mut staged,
-            descriptor.table_info_id,
-            DependencyAxis::Row,
-            u32::try_from(row)
-                .map_err(|_| Error::ParseError("Numbers row exceeds u32".to_owned()))?,
-        )?;
-        set_table_row_count(&mut staged, &locations, descriptor.object_id, new_rows_u32)?;
-
+        let new_rows = insert_attached_table_row(&mut staged, table_id, row)?;
         let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
         let table = verified
             .tables()?
@@ -81,6 +40,52 @@ impl NumbersEditor {
     }
 }
 
+pub(super) fn insert_attached_table_row(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+) -> Result<usize> {
+    let descriptor = attached_table_descriptor(package, table_id)?;
+    let old_rows = descriptor.model.number_of_rows as usize;
+    if row > old_rows {
+        return Err(Error::ParseError(format!(
+            "Cannot insert iWork row {row} into a table with {old_rows} rows"
+        )));
+    }
+    let new_rows = old_rows
+        .checked_add(1)
+        .ok_or_else(|| Error::ParseError("iWork row count overflow".to_owned()))?;
+    let (new_rows_u32, _) =
+        validate_table_dimensions(new_rows, descriptor.model.number_of_columns as usize)?;
+    let locations = object_locations(package)?;
+    validate_row_insertion_features(package, &locations, &descriptor.model, row, old_rows)?;
+    shift_formula_dependencies(
+        package,
+        descriptor.table_info_id,
+        DependencyAxis::Row,
+        u32::try_from(row).map_err(|_| Error::ParseError("iWork row exceeds u32".to_owned()))?,
+    )?;
+    shift_table_tile_rows(package, &locations, &descriptor.model, row)?;
+    shift_row_headers(package, &locations, &descriptor.model, row)?;
+    if let Some(reference) = &descriptor.model.base_column_row_uids {
+        insert_row_uid(package, &locations, reference.identifier, old_rows, row)?;
+    }
+    if let Some(reference) = &descriptor.model.stroke_sidecar {
+        insert_stroke_row(package, &locations, reference.identifier, new_rows_u32)?;
+    }
+    set_table_row_count(package, &locations, descriptor.object_id, new_rows_u32)?;
+    if attached_table_descriptor(package, table_id)?
+        .model
+        .number_of_rows
+        != new_rows_u32
+    {
+        return Err(Error::InvalidFormat(
+            "iWork inserted row failed dimension validation".to_owned(),
+        ));
+    }
+    Ok(new_rows)
+}
+
 fn validate_row_insertion_features(
     package: &IWorkPackage,
     locations: &HashMap<u64, String>,
@@ -92,12 +97,12 @@ fn validate_row_insertion_features(
     let footer_rows = model.number_of_footer_rows.unwrap_or(0) as usize;
     if row < header_rows {
         return Err(Error::ParseError(
-            "Inserting inside Numbers header rows is not yet supported".to_owned(),
+            "Inserting inside iWork header rows is not yet supported".to_owned(),
         ));
     }
     if footer_rows > 0 && row > old_rows.saturating_sub(footer_rows) {
         return Err(Error::ParseError(
-            "Inserting inside Numbers footer rows is not yet supported".to_owned(),
+            "Inserting inside iWork footer rows is not yet supported".to_owned(),
         ));
     }
     if model.number_of_hidden_rows.unwrap_or(0) != 0
@@ -118,13 +123,13 @@ fn validate_row_insertion_features(
         || category_grouping_is_enabled(package, locations, model.category_owner.as_ref())?
     {
         return Err(Error::ParseError(
-            "Cannot yet insert a row into a sorted, filtered, hidden, merged, grouped, pivot, or spill Numbers table"
+            "Cannot yet insert a row into a sorted, filtered, hidden, merged, grouped, pivot, or spill iWork table"
                 .to_owned(),
         ));
     }
     if model.base_column_row_uids.is_none() {
         return Err(Error::ParseError(
-            "Cannot safely insert a Numbers row without a stable row UID map".to_owned(),
+            "Cannot safely insert an iWork row without a stable row UID map".to_owned(),
         ));
     }
     Ok(())

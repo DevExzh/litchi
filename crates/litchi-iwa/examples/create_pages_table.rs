@@ -79,6 +79,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             PagesTableDimensionSize::points(height)?,
         )?;
     }
+    editor.insert_table_row(table.model_object_id, 2)?;
+    editor.insert_table_column(table.model_object_id, 2)?;
+    for (column, value) in [
+        PagesCellValue::Text("Q2".to_owned()),
+        PagesCellValue::Number(142_000.0),
+        PagesCellValue::Text("provisional".to_owned()),
+        PagesCellValue::Number(0.14),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        editor.set_table_cell(table.model_object_id, 2, column, value)?;
+    }
+    editor.set_table_cell(
+        table.model_object_id,
+        0,
+        2,
+        PagesCellValue::Text("Status".to_owned()),
+    )?;
     let second_anchor = editor.body_text()?.encode_utf16().count();
     let notes = editor.add_table(second_anchor, "Notes", 2, 2)?;
     editor.set_table_cell(

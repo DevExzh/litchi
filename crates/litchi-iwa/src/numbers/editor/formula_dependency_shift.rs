@@ -2,8 +2,10 @@
 
 use super::*;
 
+mod ast;
 mod wire;
 
+use ast::validate_formula_ast_stability;
 use wire::{rewrite_shifted_dependency_tile_wire, rewrite_shifted_formula_owner_wire};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -92,6 +94,7 @@ fn mutate_formula_dependencies(
     if !package.contains_entry(COMPONENT) {
         return Ok(());
     }
+    validate_formula_ast_stability(package, table_info_id, axis, position, mutation)?;
     package.update_archive(COMPONENT, |archive| {
         let Some((owner_id, message_index)) = archive.objects.iter().find_map(|object| {
             object.messages.iter().enumerate().find_map(|(index, message)| {

@@ -36,65 +36,9 @@ impl NumbersEditor {
     /// dimension sidecars are removed or shifted together. Formulas that still
     /// reference the deleted row cause the entire operation to fail unchanged.
     pub fn remove_table_row(&mut self, table_id: u64, row: usize) -> Result<()> {
-        let descriptor = table_descriptor(&self.package, table_id)?;
-        let old_rows = descriptor.model.number_of_rows as usize;
-        if row >= old_rows {
-            return Err(axis_index_error(TableAxis::Row, row, old_rows));
-        }
-        let new_rows = old_rows.checked_sub(1).ok_or_else(|| {
-            Error::ParseError("Numbers tables must retain at least one row".to_owned())
-        })?;
-        let (new_rows_u32, columns_u32) =
-            validate_table_dimensions(new_rows, descriptor.model.number_of_columns as usize)?;
-        let locations = object_locations(&self.package)?;
-        validate_deletion_features(
-            &self.package,
-            &locations,
-            &descriptor.model,
-            TableAxis::Row,
-            new_rows,
-        )?;
-        let cells = stored_cells_on_axis(
-            &self.package,
-            &locations,
-            &descriptor.model,
-            TableAxis::Row,
-            row,
-        )?;
-
         let mut staged = self.package.clone();
-        clear_stored_cells(&mut staged, table_id, &cells)?;
-        delete_formula_dependencies(
-            &mut staged,
-            descriptor.table_info_id,
-            DependencyAxis::Row,
-            u32::try_from(row)
-                .map_err(|_| Error::ParseError("Numbers row exceeds u32".to_owned()))?,
-        )?;
-        delete_table_tile_row(&mut staged, &locations, &descriptor.model, row)?;
-        delete_row_headers(&mut staged, &locations, &descriptor.model, row)?;
-        let uid = descriptor
-            .model
-            .base_column_row_uids
-            .as_ref()
-            .ok_or_else(|| {
-                Error::ParseError(
-                    "Cannot safely delete a Numbers row without a stable row UID map".to_owned(),
-                )
-            })?;
-        delete_row_uid(&mut staged, &locations, uid.identifier, old_rows, row)?;
-        if let Some(sidecar) = &descriptor.model.stroke_sidecar {
-            set_stroke_dimensions(
-                &mut staged,
-                &locations,
-                sidecar.identifier,
-                new_rows_u32,
-                columns_u32,
-            )?;
-        }
-        set_table_dimensions(&mut staged, &locations, table_id, new_rows_u32, columns_u32)?;
-
-        verify_dimensions(&staged, table_id, new_rows, columns_u32 as usize)?;
+        let (new_rows, columns) = remove_attached_table_row(&mut staged, table_id, row)?;
+        verify_numbers_dimensions(&staged, table_id, new_rows, columns)?;
         self.package = staged;
         Ok(())
     }
@@ -105,81 +49,140 @@ impl NumbersEditor {
     /// dimension sidecars are removed or shifted together. Formulas that still
     /// reference the deleted column cause the entire operation to fail unchanged.
     pub fn remove_table_column(&mut self, table_id: u64, column: usize) -> Result<()> {
-        let descriptor = table_descriptor(&self.package, table_id)?;
-        let old_columns = descriptor.model.number_of_columns as usize;
-        if column >= old_columns {
-            return Err(axis_index_error(TableAxis::Column, column, old_columns));
-        }
-        let new_columns = old_columns.checked_sub(1).ok_or_else(|| {
-            Error::ParseError("Numbers tables must retain at least one column".to_owned())
-        })?;
-        let (rows_u32, new_columns_u32) =
-            validate_table_dimensions(descriptor.model.number_of_rows as usize, new_columns)?;
-        let locations = object_locations(&self.package)?;
-        validate_deletion_features(
-            &self.package,
-            &locations,
-            &descriptor.model,
-            TableAxis::Column,
-            new_columns,
-        )?;
-        let cells = stored_cells_on_axis(
-            &self.package,
-            &locations,
-            &descriptor.model,
-            TableAxis::Column,
-            column,
-        )?;
-
         let mut staged = self.package.clone();
-        clear_stored_cells(&mut staged, table_id, &cells)?;
-        delete_formula_dependencies(
-            &mut staged,
-            descriptor.table_info_id,
-            DependencyAxis::Column,
-            u32::try_from(column)
-                .map_err(|_| Error::ParseError("Numbers column exceeds u32".to_owned()))?,
-        )?;
-        delete_table_tile_column(&mut staged, &locations, &descriptor.model, column)?;
-        delete_column_headers(
-            &mut staged,
-            &locations,
-            descriptor.model.base_data_store.column_headers.identifier,
-            column,
-        )?;
-        let uid = descriptor
-            .model
-            .base_column_row_uids
-            .as_ref()
-            .ok_or_else(|| {
-                Error::ParseError(
-                    "Cannot safely delete a Numbers column without a stable column UID map"
-                        .to_owned(),
-                )
-            })?;
-        delete_column_uid(&mut staged, &locations, uid.identifier, old_columns, column)?;
-        if let Some(sidecar) = &descriptor.model.stroke_sidecar {
-            set_stroke_dimensions(
-                &mut staged,
-                &locations,
-                sidecar.identifier,
-                rows_u32,
-                new_columns_u32,
-            )?;
-        }
-        set_table_dimensions(&mut staged, &locations, table_id, rows_u32, new_columns_u32)?;
-
-        verify_dimensions(&staged, table_id, rows_u32 as usize, new_columns)?;
+        let (rows, new_columns) = remove_attached_table_column(&mut staged, table_id, column)?;
+        verify_numbers_dimensions(&staged, table_id, rows, new_columns)?;
         self.package = staged;
         Ok(())
     }
 }
 
-fn table_descriptor(package: &IWorkPackage, table_id: u64) -> Result<TableDescriptor> {
-    table_models(package)?
-        .into_iter()
-        .find(|table| table.object_id == table_id)
-        .ok_or_else(|| Error::ParseError(format!("Numbers table object {table_id} not found")))
+pub(super) fn remove_attached_table_row(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+) -> Result<(usize, usize)> {
+    let descriptor = attached_table_descriptor(package, table_id)?;
+    let old_rows = descriptor.model.number_of_rows as usize;
+    if row >= old_rows {
+        return Err(axis_index_error(TableAxis::Row, row, old_rows));
+    }
+    let new_rows = old_rows
+        .checked_sub(1)
+        .ok_or_else(|| Error::ParseError("iWork tables must retain at least one row".to_owned()))?;
+    let (new_rows_u32, columns_u32) =
+        validate_table_dimensions(new_rows, descriptor.model.number_of_columns as usize)?;
+    let locations = object_locations(package)?;
+    validate_deletion_features(
+        package,
+        &locations,
+        &descriptor.model,
+        TableAxis::Row,
+        new_rows,
+    )?;
+    let cells = stored_cells_on_axis(package, &locations, &descriptor.model, TableAxis::Row, row)?;
+
+    clear_stored_cells(package, table_id, &cells)?;
+    delete_formula_dependencies(
+        package,
+        descriptor.table_info_id,
+        DependencyAxis::Row,
+        u32::try_from(row).map_err(|_| Error::ParseError("iWork row exceeds u32".to_owned()))?,
+    )?;
+    delete_table_tile_row(package, &locations, &descriptor.model, row)?;
+    delete_row_headers(package, &locations, &descriptor.model, row)?;
+    let uid = descriptor
+        .model
+        .base_column_row_uids
+        .as_ref()
+        .ok_or_else(|| {
+            Error::ParseError(
+                "Cannot safely delete an iWork row without a stable row UID map".to_owned(),
+            )
+        })?;
+    delete_row_uid(package, &locations, uid.identifier, old_rows, row)?;
+    if let Some(sidecar) = &descriptor.model.stroke_sidecar {
+        set_stroke_dimensions(
+            package,
+            &locations,
+            sidecar.identifier,
+            new_rows_u32,
+            columns_u32,
+        )?;
+    }
+    set_table_dimensions(package, &locations, table_id, new_rows_u32, columns_u32)?;
+    verify_attached_dimensions(package, table_id, new_rows, columns_u32 as usize)?;
+    Ok((new_rows, columns_u32 as usize))
+}
+
+pub(super) fn remove_attached_table_column(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    column: usize,
+) -> Result<(usize, usize)> {
+    let descriptor = attached_table_descriptor(package, table_id)?;
+    let old_columns = descriptor.model.number_of_columns as usize;
+    if column >= old_columns {
+        return Err(axis_index_error(TableAxis::Column, column, old_columns));
+    }
+    let new_columns = old_columns.checked_sub(1).ok_or_else(|| {
+        Error::ParseError("iWork tables must retain at least one column".to_owned())
+    })?;
+    let (rows_u32, new_columns_u32) =
+        validate_table_dimensions(descriptor.model.number_of_rows as usize, new_columns)?;
+    let locations = object_locations(package)?;
+    validate_deletion_features(
+        package,
+        &locations,
+        &descriptor.model,
+        TableAxis::Column,
+        new_columns,
+    )?;
+    let cells = stored_cells_on_axis(
+        package,
+        &locations,
+        &descriptor.model,
+        TableAxis::Column,
+        column,
+    )?;
+
+    clear_stored_cells(package, table_id, &cells)?;
+    delete_formula_dependencies(
+        package,
+        descriptor.table_info_id,
+        DependencyAxis::Column,
+        u32::try_from(column)
+            .map_err(|_| Error::ParseError("iWork column exceeds u32".to_owned()))?,
+    )?;
+    delete_table_tile_column(package, &locations, &descriptor.model, column)?;
+    delete_column_headers(
+        package,
+        &locations,
+        descriptor.model.base_data_store.column_headers.identifier,
+        column,
+    )?;
+    let uid = descriptor
+        .model
+        .base_column_row_uids
+        .as_ref()
+        .ok_or_else(|| {
+            Error::ParseError(
+                "Cannot safely delete an iWork column without a stable column UID map".to_owned(),
+            )
+        })?;
+    delete_column_uid(package, &locations, uid.identifier, old_columns, column)?;
+    if let Some(sidecar) = &descriptor.model.stroke_sidecar {
+        set_stroke_dimensions(
+            package,
+            &locations,
+            sidecar.identifier,
+            rows_u32,
+            new_columns_u32,
+        )?;
+    }
+    set_table_dimensions(package, &locations, table_id, rows_u32, new_columns_u32)?;
+    verify_attached_dimensions(package, table_id, rows_u32 as usize, new_columns)?;
+    Ok((rows_u32 as usize, new_columns))
 }
 
 fn validate_deletion_features(
@@ -201,7 +204,7 @@ fn validate_deletion_features(
     };
     if !fixed_regions_fit {
         return Err(Error::ParseError(format!(
-            "Cannot delete a Numbers {} without removing configured header or footer regions",
+            "Cannot delete an iWork {} without removing configured header or footer regions",
             axis.noun()
         )));
     }
@@ -232,13 +235,13 @@ fn validate_deletion_features(
         || category_grouping_is_enabled(package, locations, model.category_owner.as_ref())?
     {
         return Err(Error::ParseError(format!(
-            "Cannot yet delete a {} from a sorted, filtered, hidden, merged, grouped, pivot, or spill Numbers table",
+            "Cannot yet delete a {} from a sorted, filtered, hidden, merged, grouped, pivot, or spill iWork table",
             axis.noun()
         )));
     }
     if model.base_column_row_uids.is_none() {
         return Err(Error::ParseError(format!(
-            "Cannot safely delete a Numbers {} without a stable UID map",
+            "Cannot safely delete an iWork {} without a stable UID map",
             axis.noun()
         )));
     }
@@ -331,7 +334,26 @@ fn clear_stored_cells(
     Ok(())
 }
 
-fn verify_dimensions(
+fn verify_attached_dimensions(
+    package: &IWorkPackage,
+    table_id: u64,
+    rows: usize,
+    columns: usize,
+) -> Result<()> {
+    let descriptor = attached_table_descriptor(package, table_id)?;
+    if (
+        descriptor.model.number_of_rows as usize,
+        descriptor.model.number_of_columns as usize,
+    ) != (rows, columns)
+    {
+        return Err(Error::InvalidFormat(
+            "iWork table axis deletion failed dimension validation".to_owned(),
+        ));
+    }
+    Ok(())
+}
+
+fn verify_numbers_dimensions(
     package: &IWorkPackage,
     table_id: u64,
     rows: usize,
@@ -355,7 +377,7 @@ fn verify_dimensions(
 
 fn axis_index_error(axis: TableAxis, index: usize, length: usize) -> Error {
     Error::ParseError(format!(
-        "Cannot delete Numbers {} {index} from a table with {length} {}s",
+        "Cannot delete iWork {} {index} from a table with {length} {}s",
         axis.noun(),
         axis.noun()
     ))

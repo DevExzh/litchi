@@ -3,6 +3,7 @@
 mod formula;
 mod layout;
 mod title;
+mod topology;
 
 pub use formula::{
     PagesTableFormulaAxisReference, PagesTableFormulaBinaryOperator, PagesTableFormulaCachedValue,
@@ -814,6 +815,62 @@ mod tests {
         let cleared = reopened.to_bytes().unwrap();
         assert!(reopened.clear_table_formula(model_id, 1, 1).is_err());
         assert_eq!(reopened.to_bytes().unwrap(), cleared);
+    }
+
+    #[test]
+    fn source_built_table_roundtrips_physical_axis_crud_transactionally() {
+        let mut editor = PagesDocumentBuilder::new()
+            .body_table("Topology", 4, 4)
+            .build()
+            .unwrap();
+        let model_id = editor.tables().unwrap()[0].model_object_id;
+        let row_size = PagesTableDimensionSize::points(33.0).unwrap();
+        let column_size = PagesTableDimensionSize::points(77.0).unwrap();
+        editor
+            .set_table_cell(model_id, 1, 1, PagesCellValue::Text("shift me".to_owned()))
+            .unwrap();
+        editor
+            .set_table_formula(
+                model_id,
+                2,
+                2,
+                PagesTableFormulaExpression::Number(7.0),
+                PagesTableFormulaCachedValue::Number(7.0),
+            )
+            .unwrap();
+        editor.set_table_row_height(model_id, 1, row_size).unwrap();
+        editor
+            .set_table_column_width(model_id, 1, column_size)
+            .unwrap();
+        let baseline = editor.to_bytes().unwrap();
+
+        editor.insert_table_row(model_id, 1).unwrap();
+        editor.insert_table_column(model_id, 1).unwrap();
+        let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let table = reopened.table(model_id).unwrap();
+        assert_eq!((table.info.rows, table.info.columns), (5, 5));
+        assert_eq!(
+            table.get_cell(2, 2),
+            Some(&PagesCellValue::Text("shift me".to_owned()))
+        );
+        assert_eq!(
+            table.get_cell(3, 3),
+            Some(&PagesCellValue::Formula("=7".to_owned()))
+        );
+        assert_eq!(reopened.table_row_height(model_id, 2).unwrap(), row_size);
+        assert_eq!(
+            reopened.table_column_width(model_id, 2).unwrap(),
+            column_size
+        );
+
+        editor.remove_table_column(model_id, 1).unwrap();
+        editor.remove_table_row(model_id, 1).unwrap();
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+        let before_error = editor.to_bytes().unwrap();
+        assert!(editor.insert_table_row(model_id, usize::MAX).is_err());
+        assert!(editor.remove_table_column(model_id, usize::MAX).is_err());
+        assert_eq!(editor.to_bytes().unwrap(), before_error);
     }
 
     #[test]

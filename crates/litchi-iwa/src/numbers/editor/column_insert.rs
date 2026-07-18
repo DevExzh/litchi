@@ -19,65 +19,8 @@ impl NumbersEditor {
     /// coordinates are shifted in lockstep. Unsupported topology is rejected
     /// transactionally without changing the package.
     pub fn insert_table_column(&mut self, table_id: u64, column: usize) -> Result<()> {
-        let descriptor = table_models(&self.package)?
-            .into_iter()
-            .find(|table| table.object_id == table_id)
-            .ok_or_else(|| {
-                Error::ParseError(format!("Numbers table object {table_id} not found"))
-            })?;
-        let old_columns = descriptor.model.number_of_columns as usize;
-        if column > old_columns {
-            return Err(Error::ParseError(format!(
-                "Cannot insert Numbers column {column} into a table with {old_columns} columns"
-            )));
-        }
-        let new_columns = old_columns
-            .checked_add(1)
-            .ok_or_else(|| Error::ParseError("Numbers column count overflow".to_owned()))?;
-        let (_, new_columns_u32) =
-            validate_table_dimensions(descriptor.model.number_of_rows as usize, new_columns)?;
-        let locations = object_locations(&self.package)?;
-        validate_column_insertion_features(&self.package, &locations, &descriptor.model, column)?;
-
         let mut staged = self.package.clone();
-        shift_table_tile_columns(&mut staged, &locations, &descriptor.model, column)?;
-        shift_column_headers(
-            &mut staged,
-            &locations,
-            descriptor.model.base_data_store.column_headers.identifier,
-            column,
-        )?;
-        if let Some(reference) = &descriptor.model.base_column_row_uids {
-            insert_column_uid(
-                &mut staged,
-                &locations,
-                reference.identifier,
-                old_columns,
-                column,
-            )?;
-        }
-        if let Some(reference) = &descriptor.model.stroke_sidecar {
-            insert_stroke_column(
-                &mut staged,
-                &locations,
-                reference.identifier,
-                new_columns_u32,
-            )?;
-        }
-        shift_formula_dependencies(
-            &mut staged,
-            descriptor.table_info_id,
-            DependencyAxis::Column,
-            u32::try_from(column)
-                .map_err(|_| Error::ParseError("Numbers column exceeds u32".to_owned()))?,
-        )?;
-        set_table_column_count(
-            &mut staged,
-            &locations,
-            descriptor.object_id,
-            new_columns_u32,
-        )?;
-
+        let new_columns = insert_attached_table_column(&mut staged, table_id, column)?;
         let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
         let table = verified
             .tables()?
@@ -96,6 +39,65 @@ impl NumbersEditor {
     }
 }
 
+pub(super) fn insert_attached_table_column(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    column: usize,
+) -> Result<usize> {
+    let descriptor = attached_table_descriptor(package, table_id)?;
+    let old_columns = descriptor.model.number_of_columns as usize;
+    if column > old_columns {
+        return Err(Error::ParseError(format!(
+            "Cannot insert iWork column {column} into a table with {old_columns} columns"
+        )));
+    }
+    let new_columns = old_columns
+        .checked_add(1)
+        .ok_or_else(|| Error::ParseError("iWork column count overflow".to_owned()))?;
+    let (_, new_columns_u32) =
+        validate_table_dimensions(descriptor.model.number_of_rows as usize, new_columns)?;
+    let locations = object_locations(package)?;
+    validate_column_insertion_features(package, &locations, &descriptor.model, column)?;
+
+    shift_formula_dependencies(
+        package,
+        descriptor.table_info_id,
+        DependencyAxis::Column,
+        u32::try_from(column)
+            .map_err(|_| Error::ParseError("iWork column exceeds u32".to_owned()))?,
+    )?;
+    shift_table_tile_columns(package, &locations, &descriptor.model, column)?;
+    shift_column_headers(
+        package,
+        &locations,
+        descriptor.model.base_data_store.column_headers.identifier,
+        column,
+    )?;
+    if let Some(reference) = &descriptor.model.base_column_row_uids {
+        insert_column_uid(
+            package,
+            &locations,
+            reference.identifier,
+            old_columns,
+            column,
+        )?;
+    }
+    if let Some(reference) = &descriptor.model.stroke_sidecar {
+        insert_stroke_column(package, &locations, reference.identifier, new_columns_u32)?;
+    }
+    set_table_column_count(package, &locations, descriptor.object_id, new_columns_u32)?;
+    if attached_table_descriptor(package, table_id)?
+        .model
+        .number_of_columns
+        != new_columns_u32
+    {
+        return Err(Error::InvalidFormat(
+            "iWork inserted column failed dimension validation".to_owned(),
+        ));
+    }
+    Ok(new_columns)
+}
+
 fn validate_column_insertion_features(
     package: &IWorkPackage,
     locations: &HashMap<u64, String>,
@@ -105,7 +107,7 @@ fn validate_column_insertion_features(
     let header_columns = model.number_of_header_columns.unwrap_or(0) as usize;
     if column < header_columns {
         return Err(Error::ParseError(
-            "Inserting inside Numbers header columns is not yet supported".to_owned(),
+            "Inserting inside iWork header columns is not yet supported".to_owned(),
         ));
     }
     if model.number_of_hidden_columns.unwrap_or(0) != 0
@@ -126,13 +128,13 @@ fn validate_column_insertion_features(
         || category_grouping_is_enabled(package, locations, model.category_owner.as_ref())?
     {
         return Err(Error::ParseError(
-            "Cannot yet insert a column into a sorted, filtered, hidden, merged, grouped, pivot, or spill Numbers table"
+            "Cannot yet insert a column into a sorted, filtered, hidden, merged, grouped, pivot, or spill iWork table"
                 .to_owned(),
         ));
     }
     if model.base_column_row_uids.is_none() {
         return Err(Error::ParseError(
-            "Cannot safely insert a Numbers column without a stable column UID map".to_owned(),
+            "Cannot safely insert an iWork column without a stable column UID map".to_owned(),
         ));
     }
     Ok(())
