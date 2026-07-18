@@ -44,8 +44,9 @@ pub use editor::{
     PagesMovieOptions, PagesPageLayout, PagesPageNumber, PagesPageOrientation, PagesRgbColorSpace,
     PagesRgbaColor, PagesSectionBackground, PagesSectionInfo, PagesSectionPageNumbering,
     PagesSectionSettings, PagesSectionStart, PagesTable, PagesTableDimension,
-    PagesTableDimensionSize, PagesTableHeaderCount, PagesTableHeaderSettings, PagesTableInfo,
-    PagesTablePoints, PagesTemplateKind, RemovedPagesAudio, RemovedPagesBodyChart,
-    RemovedPagesBodyShape, RemovedPagesImage, RemovedPagesMovie, RemovedPagesTextBox,
+    PagesTableDimensionSize, PagesTableFormulaCachedValue, PagesTableFormulaExpression,
+    PagesTableHeaderCount, PagesTableHeaderSettings, PagesTableInfo, PagesTablePoints,
+    PagesTemplateKind, RemovedPagesAudio, RemovedPagesBodyChart, RemovedPagesBodyShape,
+    RemovedPagesImage, RemovedPagesMovie, RemovedPagesTextBox,
 };
 pub use section::{PagesSection, PagesSectionType};

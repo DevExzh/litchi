@@ -9,8 +9,8 @@ use prost::Message;
 use super::bnc::{BncCell, StoredValue};
 use super::cell::CellValue;
 use super::formula::{
-    ExternalFormulaTable, ExternalPivotCategory, FormulaExpression, FormulaPivotCategoryReference,
-    FormulaUuid, PivotFormulaKey,
+    ExternalFormulaTable, ExternalPivotCategory, FormulaCachedValue, FormulaExpression,
+    FormulaPivotCategoryReference, FormulaUuid, PivotFormulaKey,
 };
 use super::table::{NumbersCellComment, NumbersCommentUuid};
 use crate::archive::{Archive, ArchiveObject, RawMessage};
@@ -2035,110 +2035,35 @@ impl NumbersEditor {
         expression: FormulaExpression,
     ) -> Result<()> {
         let mut staged = self.package.clone();
-        let descriptors = table_models(&staged)?;
-        let descriptor = descriptors
-            .iter()
-            .find(|table| table.object_id == table_id)
-            .cloned()
-            .ok_or_else(|| {
-                Error::ParseError(format!("Numbers table object {table_id} not found"))
-            })?;
-        let external_tables = formula_external_tables(&staged, &descriptors)?;
-        let pivot_categories = formula_pivot_categories(&staged)?;
-        let compiled = expression.compile(
-            row,
-            column,
-            descriptor.model.number_of_rows as usize,
-            descriptor.model.number_of_columns as usize,
-            &external_tables,
-            &pivot_categories,
-        )?;
-        let formula = compiled.archive;
-
-        let locations = object_locations(&staged)?;
-        let (old_formula, old_formula_error) = {
-            let location = locate_cell(&staged, table_id, row, column)?;
-            let cell = read_tile_cell(
-                &staged,
-                &location.tile_archive,
-                location.tile_id,
-                location.tile_row,
-                column,
-            )?
-            .as_deref()
-            .map(BncCell::parse)
-            .transpose()?;
-            let formula = cell.as_ref().and_then(|cell| match cell.stored_value() {
-                StoredValue::Formula(identifier) => Some(identifier),
-                _ => None,
-            });
-            let error = cell.as_ref().and_then(BncCell::formula_error_identifier);
-            (formula, error)
-        };
-        if old_formula.is_some()
-            && let Some(identifier) = old_formula_error
-        {
-            decrement_formula_error_table(&mut staged, &locations, &descriptor.model, identifier)?;
-        }
-        if let Some(identifier) = old_formula {
-            // Formula-to-formula replacement keeps the app's cached result and
-            // only swaps the formula reference. Numbers can then display the
-            // prior value until its calculation engine refreshes the cell.
-            decrement_formula_table(
-                &mut staged,
-                &locations,
-                descriptor.model.base_data_store.formula_table.identifier,
-                identifier,
-            )?;
-            update_formula_dependencies(
-                &mut staged,
-                descriptor.table_info_id,
-                row,
-                column,
-                false,
-                &[],
-                &[],
-            )?;
-        } else {
-            // Reuse the primitive mutation path to validate the target and
-            // release any string reference owned by the previous cell.
-            set_cell_in_package(&mut staged, table_id, row, column, CellValue::Number(0.0))?;
-        }
-
-        let formula_id = insert_formula_table(
-            &mut staged,
-            &locations,
-            descriptor.model.base_data_store.formula_table.identifier,
-            formula.clone(),
-        )?;
-        set_encoded_cell_value(
+        table_formula::set_attached_table_formula(
             &mut staged,
             table_id,
             row,
             column,
-            EncodedValue::Formula(formula_id),
+            expression,
+            None,
         )?;
-        update_formula_dependencies(
-            &mut staged,
-            descriptor.table_info_id,
-            row,
-            column,
-            true,
-            &compiled.local_precedents,
-            &compiled.external_precedents,
-        )?;
+        self.package = staged;
+        Ok(())
+    }
 
-        // Reparse the complete ZIP and verify both sides of the reference
-        // before committing the staged package.
-        let verified = IWorkPackage::from_bytes(&staged.to_bytes()?)?;
-        verify_formula_link(&verified, table_id, row, column, formula_id, &formula)?;
-        verify_formula_dependency(
-            &verified,
-            descriptor.table_info_id,
+    /// Set a formula together with the value displayed before the next recalculation.
+    pub fn set_formula_with_cached_value(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        expression: FormulaExpression,
+        cached_value: FormulaCachedValue,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        table_formula::set_attached_table_formula(
+            &mut staged,
+            table_id,
             row,
             column,
-            &compiled.local_precedents,
-            &compiled.external_precedents,
+            expression,
+            Some(cached_value),
         )?;
         self.package = staged;
         Ok(())
@@ -2974,6 +2899,24 @@ pub(crate) fn set_table_cell_in_package(
     model::set_attached_cell_in_package(package, table_id, row, column, value)
 }
 
+pub(crate) fn set_table_formula_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    expression: FormulaExpression,
+    cached_value: FormulaCachedValue,
+) -> Result<()> {
+    table_formula::set_attached_table_formula(
+        package,
+        table_id,
+        row,
+        column,
+        expression,
+        Some(cached_value),
+    )
+}
+
 pub(crate) fn rename_table_in_package(
     package: &mut IWorkPackage,
     table_id: u64,
@@ -3089,6 +3032,7 @@ mod table_create;
 mod table_delete;
 mod table_dimension;
 mod table_duplicate;
+mod table_formula;
 mod table_headers;
 mod table_move;
 mod table_title;

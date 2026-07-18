@@ -56,8 +56,8 @@ pub use editor::{
     RemovedNumbersSheetMovie, RemovedNumbersSheetShape, RemovedNumbersTextBox,
 };
 pub use formula::{
-    FormulaAxisReference, FormulaBinaryOperator, FormulaCellReference, FormulaExpression,
-    FormulaPivotCategoryReference, FormulaUuid,
+    FormulaAxisReference, FormulaBinaryOperator, FormulaCachedValue, FormulaCellReference,
+    FormulaExpression, FormulaPivotCategoryReference, FormulaUuid,
 };
 pub use sheet::NumbersSheet;
 pub use table::{NumbersCellComment, NumbersCommentUuid, NumbersTable};

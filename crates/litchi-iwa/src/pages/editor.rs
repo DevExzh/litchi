@@ -3785,7 +3785,8 @@ pub use images::{PagesImageInfo, RemovedPagesImage};
 pub use movies::{PagesMovieInfo, PagesMovieOptions, RemovedPagesMovie};
 pub use tables::{
     PagesCellValue, PagesTable, PagesTableDimension, PagesTableDimensionSize,
-    PagesTableHeaderCount, PagesTableHeaderSettings, PagesTableInfo, PagesTablePoints,
+    PagesTableFormulaCachedValue, PagesTableFormulaExpression, PagesTableHeaderCount,
+    PagesTableHeaderSettings, PagesTableInfo, PagesTablePoints,
 };
 
 #[cfg(test)]

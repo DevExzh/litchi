@@ -2066,7 +2066,7 @@ pub(super) fn locate_cell(
     locate_cell_in_descriptor(package, descriptor, row, column)
 }
 
-fn locate_attached_cell(
+pub(super) fn locate_attached_cell(
     package: &IWorkPackage,
     table_id: u64,
     row: usize,
@@ -2191,6 +2191,61 @@ pub(super) fn attached_table_descriptor(
         })?,
         model: model.clone(),
     })
+}
+
+pub(super) fn attached_table_descriptors(package: &IWorkPackage) -> Result<Vec<TableDescriptor>> {
+    let locations = object_locations(package)?;
+    let archive_names = locations.values().collect::<HashSet<_>>();
+    let mut descriptors = BTreeMap::<u64, TableDescriptor>::new();
+
+    for archive_name in archive_names {
+        let archive = package.archive(archive_name)?;
+        for object in &archive.objects {
+            let Some(table_info_id) = object.archive_info.identifier else {
+                continue;
+            };
+            let mut owned_models = HashSet::new();
+            for message in &object.messages {
+                let Ok(table_info) = tst::TableInfoArchive::decode(message.data.as_slice()) else {
+                    continue;
+                };
+                let model_id = table_info.table_model.identifier;
+                let Some(model_archive_name) = locations.get(&model_id) else {
+                    continue;
+                };
+                let model_archive = package.archive(model_archive_name)?;
+                let Some(model_object) = model_archive.object(model_id) else {
+                    continue;
+                };
+                let models = model_object
+                    .messages
+                    .iter()
+                    .filter(|candidate| candidate.type_ == 6000 || candidate.type_ == 6001)
+                    .filter_map(|candidate| {
+                        TableModelArchive::decode(candidate.data.as_slice()).ok()
+                    })
+                    .collect::<Vec<_>>();
+                let [model] = models.as_slice() else {
+                    continue;
+                };
+                if !owned_models.insert(model_id) {
+                    continue;
+                }
+                let descriptor = TableDescriptor {
+                    object_id: model_id,
+                    table_info_id,
+                    model: model.clone(),
+                };
+                if descriptors.insert(model_id, descriptor).is_some() {
+                    return Err(Error::InvalidFormat(format!(
+                        "iWork table model {model_id} has multiple table-info owners"
+                    )));
+                }
+            }
+        }
+    }
+
+    Ok(descriptors.into_values().collect())
 }
 
 pub(super) fn rename_attached_table_in_package(

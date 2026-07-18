@@ -1508,7 +1508,7 @@ pub(super) fn set_encoded_cell_value(
     column: usize,
     value: EncodedValue,
 ) -> Result<()> {
-    let location = locate_cell(package, table_id, row, column)?;
+    let location = locate_attached_cell(package, table_id, row, column)?;
     let cell_count = update_tile(
         package,
         &location.tile_archive,
@@ -1535,7 +1535,7 @@ pub(super) fn verify_formula_link(
     formula_id: u32,
     expected: &tsce::FormulaArchive,
 ) -> Result<()> {
-    let location = locate_cell(package, table_id, row, column)?;
+    let location = locate_attached_cell(package, table_id, row, column)?;
     let stored = read_tile_cell(
         package,
         &location.tile_archive,

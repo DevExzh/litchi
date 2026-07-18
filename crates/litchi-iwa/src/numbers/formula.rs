@@ -2,6 +2,7 @@
 
 use std::collections::{BTreeSet, HashMap};
 
+use super::CellValue;
 use super::function_map::function_identifier;
 use crate::protobuf::tsce;
 use crate::{Error, Result};
@@ -12,6 +13,32 @@ use tsce::ast_node_array_archive::AstNodeType;
 const MAX_FORMULA_PRECEDENTS: usize = 1_100_000;
 const WHOLE_ROW_COLUMN_SENTINEL: u32 = i16::MAX as u32;
 const WHOLE_COLUMN_ROW_SENTINEL: u32 = i32::MAX as u32;
+
+/// A typed display cache stored alongside a native formula reference.
+///
+/// iWork does not always recalculate formulas when opening a package written
+/// by another process. Supplying the last known result ensures the document
+/// displays a correct value before the application next evaluates the cell.
+#[derive(Debug, Clone, PartialEq)]
+pub enum FormulaCachedValue {
+    Number(f64),
+    Text(String),
+    Boolean(bool),
+    Date(f64),
+    Duration(f64),
+}
+
+impl FormulaCachedValue {
+    pub(crate) fn into_cell_value(self) -> CellValue {
+        match self {
+            Self::Number(value) => CellValue::Number(value),
+            Self::Text(value) => CellValue::Text(value),
+            Self::Boolean(value) => CellValue::Boolean(value),
+            Self::Date(value) => CellValue::Date(value),
+            Self::Duration(value) => CellValue::Duration(value),
+        }
+    }
+}
 
 /// A cell address used by a Numbers formula.
 ///

@@ -1,7 +1,9 @@
 //! Native table discovery and cell editing for Pages body attachments.
 
+mod formula;
 mod layout;
 
+pub use formula::{PagesTableFormulaCachedValue, PagesTableFormulaExpression};
 pub use layout::{
     PagesTableDimension, PagesTableDimensionSize, PagesTableHeaderCount, PagesTableHeaderSettings,
     PagesTablePoints,
@@ -736,6 +738,77 @@ mod tests {
         assert_eq!(table.get_cell(1, 1), Some(&PagesCellValue::Number(42.5)));
         reopened.clear_table_cell(model_id, 0, 0).unwrap();
         assert!(reopened.table(model_id).unwrap().get_cell(0, 0).is_none());
+    }
+
+    #[test]
+    fn source_built_table_roundtrips_formula_crud_transactionally() {
+        let mut editor = PagesDocumentBuilder::new()
+            .body_table("Formula", 3, 2)
+            .build()
+            .unwrap();
+        let model_id = editor.tables().unwrap()[0].model_object_id;
+        editor
+            .set_table_formula(
+                model_id,
+                1,
+                1,
+                PagesTableFormulaExpression::function(
+                    "SUM",
+                    [
+                        PagesTableFormulaExpression::Number(1.0),
+                        PagesTableFormulaExpression::Number(2.0),
+                    ],
+                ),
+                PagesTableFormulaCachedValue::Number(3.0),
+            )
+            .unwrap();
+
+        let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened.table_formula(model_id, 1, 1).unwrap().as_deref(),
+            Some("=SUM(1,2)")
+        );
+        reopened
+            .set_table_formula(
+                model_id,
+                1,
+                1,
+                PagesTableFormulaExpression::function(
+                    "SUM",
+                    [
+                        PagesTableFormulaExpression::Number(3.0),
+                        PagesTableFormulaExpression::Number(4.0),
+                    ],
+                ),
+                PagesTableFormulaCachedValue::Number(7.0),
+            )
+            .unwrap();
+        assert_eq!(
+            reopened.table_formula(model_id, 1, 1).unwrap().as_deref(),
+            Some("=SUM(3,4)")
+        );
+
+        let before = reopened.to_bytes().unwrap();
+        assert!(
+            reopened
+                .set_table_formula(
+                    model_id,
+                    usize::MAX,
+                    1,
+                    PagesTableFormulaExpression::Number(1.0),
+                    PagesTableFormulaCachedValue::Number(1.0),
+                )
+                .is_err()
+        );
+        assert_eq!(reopened.to_bytes().unwrap(), before);
+        assert_eq!(
+            reopened.clear_table_formula(model_id, 1, 1).unwrap(),
+            "=SUM(3,4)"
+        );
+        assert_eq!(reopened.table_formula(model_id, 1, 1).unwrap(), None);
+        let cleared = reopened.to_bytes().unwrap();
+        assert!(reopened.clear_table_formula(model_id, 1, 1).is_err());
+        assert_eq!(reopened.to_bytes().unwrap(), cleared);
     }
 
     #[test]

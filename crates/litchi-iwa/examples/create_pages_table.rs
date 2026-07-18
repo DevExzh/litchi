@@ -1,8 +1,8 @@
 use std::env;
 
 use litchi_iwa::pages::{
-    PagesCellValue, PagesDocumentBuilder, PagesTableDimensionSize, PagesTableHeaderCount,
-    PagesTableHeaderSettings,
+    PagesCellValue, PagesDocumentBuilder, PagesTableDimensionSize, PagesTableFormulaCachedValue,
+    PagesTableFormulaExpression, PagesTableHeaderCount, PagesTableHeaderSettings,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -35,6 +35,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         PagesCellValue::Number(125_000.0),
     )?;
     editor.set_table_cell(table.model_object_id, 1, 2, PagesCellValue::Number(0.18))?;
+    editor.set_table_formula(
+        table.model_object_id,
+        2,
+        1,
+        PagesTableFormulaExpression::function(
+            "SUM",
+            [
+                PagesTableFormulaExpression::Number(1.0),
+                PagesTableFormulaExpression::Number(2.0),
+            ],
+        ),
+        PagesTableFormulaCachedValue::Number(3.0),
+    )?;
     editor.set_table_header_settings(
         table.model_object_id,
         PagesTableHeaderSettings {
