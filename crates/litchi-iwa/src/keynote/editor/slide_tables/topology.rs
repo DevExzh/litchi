@@ -1,4 +1,4 @@
-//! Transactional physical row and column CRUD for Keynote slide tables.
+//! Transactional section-relative row and column CRUD for Keynote slide tables.
 
 use super::*;
 use crate::numbers::editor::TableTopologyMutation;
@@ -35,7 +35,7 @@ impl KeynoteEditor {
         )
     }
 
-    /// Delete one physical row and compact all following rows.
+    /// Delete one row from a semantic table section and compact following rows.
     ///
     /// The operation fails unchanged when a surviving formula still references
     /// the deleted row or native topology cannot be rewritten safely.
@@ -43,26 +43,26 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         model_object_id: u64,
-        row: usize,
+        deletion: KeynoteTableRowDeletion,
     ) -> Result<()> {
         self.edit_slide_table_topology(
             slide_index,
             model_object_id,
-            TableTopologyMutation::RemoveRow(row),
+            TableTopologyMutation::RemoveRow(deletion),
         )
     }
 
-    /// Delete one physical column and compact all following columns.
+    /// Delete one column from a semantic table section and compact following columns.
     pub fn remove_slide_table_column(
         &mut self,
         slide_index: usize,
         model_object_id: u64,
-        column: usize,
+        deletion: KeynoteTableColumnDeletion,
     ) -> Result<()> {
         self.edit_slide_table_topology(
             slide_index,
             model_object_id,
-            TableTopologyMutation::RemoveColumn(column),
+            TableTopologyMutation::RemoveColumn(deletion),
         )
     }
 

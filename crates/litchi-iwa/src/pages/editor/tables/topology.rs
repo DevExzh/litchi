@@ -1,4 +1,4 @@
-//! Transactional physical row and column CRUD for Pages body tables.
+//! Transactional section-relative row and column CRUD for Pages body tables.
 
 use super::*;
 use crate::numbers::editor::TableTopologyMutation;
@@ -29,17 +29,28 @@ impl PagesEditor {
         )
     }
 
-    /// Delete one physical row and compact all following rows.
+    /// Delete one row from a semantic table section and compact following rows.
     ///
     /// The operation fails unchanged when a surviving formula still references
     /// the deleted row or native topology cannot be rewritten safely.
-    pub fn remove_table_row(&mut self, model_object_id: u64, row: usize) -> Result<()> {
-        self.edit_table_topology(model_object_id, TableTopologyMutation::RemoveRow(row))
+    pub fn remove_table_row(
+        &mut self,
+        model_object_id: u64,
+        deletion: PagesTableRowDeletion,
+    ) -> Result<()> {
+        self.edit_table_topology(model_object_id, TableTopologyMutation::RemoveRow(deletion))
     }
 
-    /// Delete one physical column and compact all following columns.
-    pub fn remove_table_column(&mut self, model_object_id: u64, column: usize) -> Result<()> {
-        self.edit_table_topology(model_object_id, TableTopologyMutation::RemoveColumn(column))
+    /// Delete one column from a semantic table section and compact following columns.
+    pub fn remove_table_column(
+        &mut self,
+        model_object_id: u64,
+        deletion: PagesTableColumnDeletion,
+    ) -> Result<()> {
+        self.edit_table_topology(
+            model_object_id,
+            TableTopologyMutation::RemoveColumn(deletion),
+        )
     }
 
     fn edit_table_topology(

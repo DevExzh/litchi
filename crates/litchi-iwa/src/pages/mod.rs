@@ -44,11 +44,12 @@ pub use editor::{
     PagesMovieOptions, PagesPageLayout, PagesPageNumber, PagesPageOrientation, PagesRgbColorSpace,
     PagesRgbaColor, PagesSectionBackground, PagesSectionInfo, PagesSectionPageNumbering,
     PagesSectionSettings, PagesSectionStart, PagesTable, PagesTableCellUpdate,
-    PagesTableColumnInsertion, PagesTableDimension, PagesTableDimensionSize,
-    PagesTableFormulaAxisReference, PagesTableFormulaBinaryOperator, PagesTableFormulaCachedValue,
-    PagesTableFormulaCellReference, PagesTableFormulaExpression, PagesTableHeaderCount,
-    PagesTableHeaderSettings, PagesTableInfo, PagesTablePoints, PagesTableRowInsertion,
-    PagesTableTitleSettings, PagesTemplateKind, RemovedPagesAudio, RemovedPagesBodyChart,
-    RemovedPagesBodyShape, RemovedPagesImage, RemovedPagesMovie, RemovedPagesTextBox,
+    PagesTableColumnDeletion, PagesTableColumnInsertion, PagesTableDimension,
+    PagesTableDimensionSize, PagesTableFormulaAxisReference, PagesTableFormulaBinaryOperator,
+    PagesTableFormulaCachedValue, PagesTableFormulaCellReference, PagesTableFormulaExpression,
+    PagesTableHeaderCount, PagesTableHeaderSettings, PagesTableInfo, PagesTablePoints,
+    PagesTableRowDeletion, PagesTableRowInsertion, PagesTableTitleSettings, PagesTemplateKind,
+    RemovedPagesAudio, RemovedPagesBodyChart, RemovedPagesBodyShape, RemovedPagesImage,
+    RemovedPagesMovie, RemovedPagesTextBox,
 };
 pub use section::{PagesSection, PagesSectionType};

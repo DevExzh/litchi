@@ -53,8 +53,8 @@ pub use editor::{
     NumbersTableDimensionSize, NumbersTableHeaderCount, NumbersTableHeaderSettings,
     NumbersTableInfo, NumbersTablePoints, NumbersTableTitleSettings, NumbersTextBoxInfo,
     RemovedNumbersSheetAudio, RemovedNumbersSheetChart, RemovedNumbersSheetImage,
-    RemovedNumbersSheetMovie, RemovedNumbersSheetShape, RemovedNumbersTextBox,
-    TableColumnInsertion, TableRowInsertion,
+    RemovedNumbersSheetMovie, RemovedNumbersSheetShape, RemovedNumbersTextBox, TableColumnDeletion,
+    TableColumnInsertion, TableRowDeletion, TableRowInsertion,
 };
 pub use formula::{
     FormulaAxisReference, FormulaBinaryOperator, FormulaCachedValue, FormulaCellReference,

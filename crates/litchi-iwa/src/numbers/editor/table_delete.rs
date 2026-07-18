@@ -1,4 +1,4 @@
-//! Transactional deletion of physical table rows and columns.
+//! Transactional deletion of section-relative table rows and columns.
 
 use super::*;
 
@@ -31,27 +31,31 @@ impl TableAxis {
 }
 
 impl NumbersEditor {
-    /// Delete one physical table row and compact all following rows.
+    /// Delete one row from a semantic table section and compact following rows.
     ///
     /// Stored values, comments, formula records, headers, stable UIDs, and
     /// dimension sidecars are removed or shifted together. Formulas that still
     /// reference the deleted row cause the entire operation to fail unchanged.
-    pub fn remove_table_row(&mut self, table_id: u64, row: usize) -> Result<()> {
+    pub fn remove_table_row(&mut self, table_id: u64, deletion: TableRowDeletion) -> Result<()> {
         let mut staged = self.package.clone();
-        let (new_rows, columns) = remove_attached_table_row(&mut staged, table_id, row)?;
+        let (new_rows, columns) = remove_attached_table_row(&mut staged, table_id, deletion)?;
         verify_numbers_dimensions(&staged, table_id, new_rows, columns)?;
         self.package = staged;
         Ok(())
     }
 
-    /// Delete one physical table column and compact all following columns.
+    /// Delete one column from a semantic table section and compact following columns.
     ///
     /// Stored values, comments, formula records, headers, stable UIDs, and
     /// dimension sidecars are removed or shifted together. Formulas that still
     /// reference the deleted column cause the entire operation to fail unchanged.
-    pub fn remove_table_column(&mut self, table_id: u64, column: usize) -> Result<()> {
+    pub fn remove_table_column(
+        &mut self,
+        table_id: u64,
+        deletion: TableColumnDeletion,
+    ) -> Result<()> {
         let mut staged = self.package.clone();
-        let (rows, new_columns) = remove_attached_table_column(&mut staged, table_id, column)?;
+        let (rows, new_columns) = remove_attached_table_column(&mut staged, table_id, deletion)?;
         verify_numbers_dimensions(&staged, table_id, rows, new_columns)?;
         self.package = staged;
         Ok(())
@@ -61,19 +65,18 @@ impl NumbersEditor {
 pub(super) fn remove_attached_table_row(
     package: &mut IWorkPackage,
     table_id: u64,
-    row: usize,
+    deletion: TableRowDeletion,
 ) -> Result<(usize, usize)> {
     let descriptor = attached_table_descriptor(package, table_id)?;
     let old_rows = descriptor.model.number_of_rows as usize;
-    if row >= old_rows {
-        return Err(axis_index_error(TableAxis::Row, row, old_rows));
-    }
+    let resolved = resolve_row_deletion(&descriptor.model, deletion)?;
+    let row = resolved.physical_index;
     let new_rows = old_rows
         .checked_sub(1)
         .ok_or_else(|| Error::ParseError("iWork tables must retain at least one row".to_owned()))?;
     let (new_rows_u32, columns_u32) =
         validate_table_dimensions(new_rows, descriptor.model.number_of_columns as usize)?;
-    let updated_header_settings = header_settings_after_row_deletion(&descriptor.model, row)?;
+    let updated_header_settings = resolved.updated_header_settings;
     let locations = object_locations(package)?;
     validate_deletion_features(
         package,
@@ -124,19 +127,18 @@ pub(super) fn remove_attached_table_row(
 pub(super) fn remove_attached_table_column(
     package: &mut IWorkPackage,
     table_id: u64,
-    column: usize,
+    deletion: TableColumnDeletion,
 ) -> Result<(usize, usize)> {
     let descriptor = attached_table_descriptor(package, table_id)?;
     let old_columns = descriptor.model.number_of_columns as usize;
-    if column >= old_columns {
-        return Err(axis_index_error(TableAxis::Column, column, old_columns));
-    }
+    let resolved = resolve_column_deletion(&descriptor.model, deletion)?;
+    let column = resolved.physical_index;
     let new_columns = old_columns.checked_sub(1).ok_or_else(|| {
         Error::ParseError("iWork tables must retain at least one column".to_owned())
     })?;
     let (rows_u32, new_columns_u32) =
         validate_table_dimensions(descriptor.model.number_of_rows as usize, new_columns)?;
-    let updated_header_settings = header_settings_after_column_deletion(&descriptor.model, column)?;
+    let updated_header_settings = resolved.updated_header_settings;
     let locations = object_locations(package)?;
     validate_deletion_features(
         package,
@@ -259,50 +261,96 @@ fn validate_deletion_features(
     Ok(())
 }
 
-fn header_settings_after_row_deletion(
+struct ResolvedRowDeletion {
+    physical_index: usize,
+    updated_header_settings: Option<NumbersTableHeaderSettings>,
+}
+
+fn resolve_row_deletion(
     model: &TableModelArchive,
-    row: usize,
-) -> Result<Option<NumbersTableHeaderSettings>> {
+    deletion: TableRowDeletion,
+) -> Result<ResolvedRowDeletion> {
     let mut settings = NumbersTableHeaderSettings::from_model(model)?;
     let rows = model.number_of_rows as usize;
     let header_rows = settings.header_row_count();
     let footer_rows = settings.footer_row_count();
-    if header_rows
+    let fixed_rows = header_rows
         .checked_add(footer_rows)
-        .is_none_or(|fixed| fixed > rows)
-    {
-        return Err(Error::InvalidFormat(
-            "iWork header and footer rows exceed the table row count".to_owned(),
-        ));
-    }
-    if row < header_rows {
-        settings.header_rows = decremented_header_count(header_rows)?;
-        Ok(Some(settings))
-    } else if footer_rows > 0 && row >= rows - footer_rows {
-        settings.footer_rows = decremented_header_count(footer_rows)?;
-        Ok(Some(settings))
-    } else {
-        Ok(None)
+        .filter(|&fixed| fixed <= rows)
+        .ok_or_else(|| {
+            Error::InvalidFormat(
+                "iWork header and footer rows exceed the table row count".to_owned(),
+            )
+        })?;
+    let body_rows = rows - fixed_rows;
+    match deletion {
+        TableRowDeletion::Header { index } => {
+            validate_section_deletion(index, header_rows, "header row")?;
+            settings.header_rows = decremented_header_count(header_rows)?;
+            Ok(ResolvedRowDeletion {
+                physical_index: index,
+                updated_header_settings: Some(settings),
+            })
+        },
+        TableRowDeletion::Body { index } => {
+            validate_section_deletion(index, body_rows, "body row")?;
+            Ok(ResolvedRowDeletion {
+                physical_index: header_rows + index,
+                updated_header_settings: None,
+            })
+        },
+        TableRowDeletion::Footer { index } => {
+            validate_section_deletion(index, footer_rows, "footer row")?;
+            settings.footer_rows = decremented_header_count(footer_rows)?;
+            Ok(ResolvedRowDeletion {
+                physical_index: rows - footer_rows + index,
+                updated_header_settings: Some(settings),
+            })
+        },
     }
 }
 
-fn header_settings_after_column_deletion(
+struct ResolvedColumnDeletion {
+    physical_index: usize,
+    updated_header_settings: Option<NumbersTableHeaderSettings>,
+}
+
+fn resolve_column_deletion(
     model: &TableModelArchive,
-    column: usize,
-) -> Result<Option<NumbersTableHeaderSettings>> {
+    deletion: TableColumnDeletion,
+) -> Result<ResolvedColumnDeletion> {
     let mut settings = NumbersTableHeaderSettings::from_model(model)?;
+    let columns = model.number_of_columns as usize;
     let header_columns = settings.header_column_count();
-    if header_columns > model.number_of_columns as usize {
-        return Err(Error::InvalidFormat(
-            "iWork header columns exceed the table column count".to_owned(),
-        ));
+    let body_columns = columns.checked_sub(header_columns).ok_or_else(|| {
+        Error::InvalidFormat("iWork header columns exceed the table column count".to_owned())
+    })?;
+    match deletion {
+        TableColumnDeletion::Header { index } => {
+            validate_section_deletion(index, header_columns, "header column")?;
+            settings.header_columns = decremented_header_count(header_columns)?;
+            Ok(ResolvedColumnDeletion {
+                physical_index: index,
+                updated_header_settings: Some(settings),
+            })
+        },
+        TableColumnDeletion::Body { index } => {
+            validate_section_deletion(index, body_columns, "body column")?;
+            Ok(ResolvedColumnDeletion {
+                physical_index: header_columns + index,
+                updated_header_settings: None,
+            })
+        },
     }
-    if column < header_columns {
-        settings.header_columns = decremented_header_count(header_columns)?;
-        Ok(Some(settings))
-    } else {
-        Ok(None)
+}
+
+fn validate_section_deletion(index: usize, length: usize, section: &str) -> Result<()> {
+    if index >= length {
+        return Err(Error::ParseError(format!(
+            "Cannot delete iWork {section} {index} from a section with {length} entries"
+        )));
     }
+    Ok(())
 }
 
 fn decremented_header_count(count: usize) -> Result<Option<NumbersTableHeaderCount>> {
@@ -321,7 +369,7 @@ fn stored_cells_on_axis(
     model: &TableModelArchive,
     axis: TableAxis,
     target: usize,
-) -> Result<Vec<(usize, usize)>> {
+) -> Result<Vec<(usize, usize, bool)>> {
     let tile_size = model.base_data_store.tiles.tile_size.unwrap_or(256) as usize;
     if tile_size == 0 {
         return Err(Error::InvalidFormat(
@@ -372,31 +420,42 @@ fn stored_cells_on_axis(
             }
             match axis {
                 TableAxis::Row => {
-                    cells.extend(
-                        stored
-                            .iter()
-                            .take(columns)
-                            .enumerate()
-                            .filter_map(|(column, cell)| cell.as_ref().map(|_| (row, column))),
-                    );
+                    for (column, cell) in stored.iter().take(columns).enumerate() {
+                        if let Some(cell) = cell {
+                            cells.push((
+                                row,
+                                column,
+                                BncCell::parse(cell)?.comment_identifier().is_some(),
+                            ));
+                        }
+                    }
                 },
-                TableAxis::Column if stored[target].is_some() => cells.push((row, target)),
-                TableAxis::Column => {},
+                TableAxis::Column => {
+                    if let Some(cell) = &stored[target] {
+                        cells.push((
+                            row,
+                            target,
+                            BncCell::parse(cell)?.comment_identifier().is_some(),
+                        ));
+                    }
+                },
             }
         }
     }
-    cells.sort_unstable();
+    cells.sort_unstable_by_key(|&(row, column, _)| (row, column));
     Ok(cells)
 }
 
 fn clear_stored_cells(
     package: &mut IWorkPackage,
     table_id: u64,
-    cells: &[(usize, usize)],
+    cells: &[(usize, usize, bool)],
 ) -> Result<()> {
-    for &(row, column) in cells {
-        clear_cell_comment_in_package(package, table_id, row, column)?;
-        set_cell_in_package(package, table_id, row, column, CellValue::Empty)?;
+    for &(row, column, has_comment) in cells {
+        if has_comment {
+            clear_attached_cell_comment_in_package(package, table_id, row, column)?;
+        }
+        set_attached_cell_in_package(package, table_id, row, column, CellValue::Empty)?;
     }
     Ok(())
 }
@@ -440,12 +499,4 @@ fn verify_numbers_dimensions(
         ));
     }
     Ok(())
-}
-
-fn axis_index_error(axis: TableAxis, index: usize, length: usize) -> Error {
-    Error::ParseError(format!(
-        "Cannot delete iWork {} {index} from a table with {length} {}s",
-        axis.noun(),
-        axis.noun()
-    ))
 }

@@ -2990,8 +2990,8 @@ pub(crate) fn table_dimensions_in_package(
 pub(crate) enum TableTopologyMutation {
     InsertRow(TableRowInsertion),
     InsertColumn(TableColumnInsertion),
-    RemoveRow(usize),
-    RemoveColumn(usize),
+    RemoveRow(TableRowDeletion),
+    RemoveColumn(TableColumnDeletion),
 }
 
 impl TableTopologyMutation {
@@ -3031,17 +3031,17 @@ pub(crate) fn insert_table_column_in_package(
 pub(crate) fn remove_table_row_in_package(
     package: &mut IWorkPackage,
     table_id: u64,
-    row: usize,
+    deletion: TableRowDeletion,
 ) -> Result<(usize, usize)> {
-    table_delete::remove_attached_table_row(package, table_id, row)
+    table_delete::remove_attached_table_row(package, table_id, deletion)
 }
 
 pub(crate) fn remove_table_column_in_package(
     package: &mut IWorkPackage,
     table_id: u64,
-    column: usize,
+    deletion: TableColumnDeletion,
 ) -> Result<(usize, usize)> {
-    table_delete::remove_attached_table_column(package, table_id, column)
+    table_delete::remove_attached_table_column(package, table_id, deletion)
 }
 
 pub(crate) fn set_table_dimension_size_in_package(
@@ -3138,6 +3138,7 @@ mod sheet_images;
 mod sheet_movies;
 mod sheet_shapes;
 mod storage;
+mod table_axis_deletion;
 mod table_axis_insertion;
 mod table_bootstrap;
 mod table_cells;
@@ -3161,6 +3162,7 @@ pub use sheet_images::{NumbersSheetImageInfo, RemovedNumbersSheetImage};
 pub use sheet_movies::{NumbersSheetMovieInfo, NumbersSheetMovieOptions, RemovedNumbersSheetMovie};
 pub use sheet_shapes::{NumbersSheetShapeInfo, NumbersSheetShapeKind, RemovedNumbersSheetShape};
 use storage::*;
+pub use table_axis_deletion::{TableColumnDeletion, TableRowDeletion};
 pub use table_axis_insertion::{TableColumnInsertion, TableRowInsertion};
 pub(crate) use table_cells::TableCellBatch;
 pub use table_dimension::{NumbersTableDimension, NumbersTableDimensionSize, NumbersTablePoints};

@@ -3,16 +3,18 @@
 use std::path::{Path, PathBuf};
 
 use litchi_iwa::keynote::{
-    KeynoteDocumentBuilder, KeynoteTableColumnInsertion, KeynoteTableHeaderCount,
-    KeynoteTableHeaderSettings, KeynoteTableRowInsertion,
+    KeynoteDocumentBuilder, KeynoteTableColumnDeletion, KeynoteTableColumnInsertion,
+    KeynoteTableHeaderCount, KeynoteTableHeaderSettings, KeynoteTableRowDeletion,
+    KeynoteTableRowInsertion,
 };
 use litchi_iwa::numbers::{
     CellValue, NumbersDocumentBuilder, NumbersTableHeaderCount, NumbersTableHeaderSettings,
-    TableCellUpdate, TableColumnInsertion, TableRowInsertion,
+    TableCellUpdate, TableColumnDeletion, TableColumnInsertion, TableRowDeletion,
+    TableRowInsertion,
 };
 use litchi_iwa::pages::{
-    PagesDocumentBuilder, PagesTableColumnInsertion, PagesTableHeaderCount,
-    PagesTableHeaderSettings, PagesTableRowInsertion,
+    PagesDocumentBuilder, PagesTableColumnDeletion, PagesTableColumnInsertion,
+    PagesTableHeaderCount, PagesTableHeaderSettings, PagesTableRowDeletion, PagesTableRowInsertion,
 };
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 
@@ -26,13 +28,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .ok_or("usage: create_iwork_table_sections <output-directory>")?,
     );
     std::fs::create_dir_all(&output)?;
-    create_numbers(&output.join("section-crud.numbers"))?;
-    create_pages(&output.join("section-crud.pages"))?;
-    create_keynote(&output.join("section-crud.key"))?;
+    create_numbers(
+        &output.join("section-insertions.numbers"),
+        &output.join("section-deletions.numbers"),
+    )?;
+    create_pages(
+        &output.join("section-insertions.pages"),
+        &output.join("section-deletions.pages"),
+    )?;
+    create_keynote(
+        &output.join("section-insertions.key"),
+        &output.join("section-deletions.key"),
+    )?;
     Ok(())
 }
 
-fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
+fn create_numbers(insertions: &Path, deletions: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let mut editor = NumbersDocumentBuilder::new()
         .table_name("Section CRUD")
         .table_dimensions(TABLE_ROWS, TABLE_COLUMNS)
@@ -51,11 +62,15 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     editor.insert_table_row(table_id, TableRowInsertion::footer(0))?;
     editor.insert_table_column(table_id, TableColumnInsertion::header(1))?;
     editor.set_cells(table_id, section_values())?;
-    editor.save(output)?;
+    editor.save(insertions)?;
+    editor.remove_table_row(table_id, TableRowDeletion::header(0))?;
+    editor.remove_table_row(table_id, TableRowDeletion::footer(1))?;
+    editor.remove_table_column(table_id, TableColumnDeletion::header(0))?;
+    editor.save(deletions)?;
     Ok(())
 }
 
-fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
+fn create_pages(insertions: &Path, deletions: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let mut editor = PagesDocumentBuilder::new()
         .body_text("Section-aware table CRUD\n")
         .body_table("Section CRUD", TABLE_ROWS, TABLE_COLUMNS)
@@ -74,11 +89,15 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     editor.insert_table_row(table_id, PagesTableRowInsertion::footer(0))?;
     editor.insert_table_column(table_id, PagesTableColumnInsertion::header(1))?;
     editor.set_table_cells(table_id, section_values())?;
-    editor.save(output)?;
+    editor.save(insertions)?;
+    editor.remove_table_row(table_id, PagesTableRowDeletion::header(0))?;
+    editor.remove_table_row(table_id, PagesTableRowDeletion::footer(1))?;
+    editor.remove_table_column(table_id, PagesTableColumnDeletion::header(0))?;
+    editor.save(deletions)?;
     Ok(())
 }
 
-fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
+fn create_keynote(insertions: &Path, deletions: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let mut editor = KeynoteDocumentBuilder::new()
         .title("Section-aware table CRUD")
         .build()?;
@@ -119,7 +138,15 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         KeynoteTableColumnInsertion::header(1),
     )?;
     editor.set_slide_table_cells(0, table.model_object_id, section_values())?;
-    editor.save(output)?;
+    editor.save(insertions)?;
+    editor.remove_slide_table_row(0, table.model_object_id, KeynoteTableRowDeletion::header(0))?;
+    editor.remove_slide_table_row(0, table.model_object_id, KeynoteTableRowDeletion::footer(1))?;
+    editor.remove_slide_table_column(
+        0,
+        table.model_object_id,
+        KeynoteTableColumnDeletion::header(0),
+    )?;
+    editor.save(deletions)?;
     Ok(())
 }
 

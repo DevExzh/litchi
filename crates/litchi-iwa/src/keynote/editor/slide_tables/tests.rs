@@ -259,7 +259,7 @@ fn source_built_table_roundtrips_formula_crud_transactionally() {
 }
 
 #[test]
-fn source_built_table_roundtrips_physical_axis_crud_transactionally() {
+fn source_built_table_roundtrips_section_relative_axis_crud_transactionally() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
@@ -323,8 +323,12 @@ fn source_built_table_roundtrips_physical_axis_crud_transactionally() {
         column_size
     );
 
-    editor.remove_slide_table_column(0, model_id, 2).unwrap();
-    editor.remove_slide_table_row(0, model_id, 2).unwrap();
+    editor
+        .remove_slide_table_column(0, model_id, KeynoteTableColumnDeletion::body(1))
+        .unwrap();
+    editor
+        .remove_slide_table_row(0, model_id, KeynoteTableRowDeletion::body(1))
+        .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
     assert_eq!(
         editor.slide_tables(0).unwrap()[0].geometry,
@@ -339,7 +343,7 @@ fn source_built_table_roundtrips_physical_axis_crud_transactionally() {
     );
     assert!(
         editor
-            .remove_slide_table_column(0, model_id, usize::MAX)
+            .remove_slide_table_column(0, model_id, KeynoteTableColumnDeletion::body(usize::MAX))
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before_error);
@@ -397,7 +401,9 @@ fn source_built_footer_formula_expands_and_contracts_with_body_rows() {
             .as_deref(),
         Some("=SUM(B2:B4)")
     );
-    editor.remove_slide_table_row(0, model_id, 3).unwrap();
+    editor
+        .remove_slide_table_row(0, model_id, KeynoteTableRowDeletion::body(3))
+        .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 }
 
@@ -439,10 +445,67 @@ fn source_built_fixed_table_sections_roundtrip_full_axis_crud() {
     let table = editor.slide_table(0, model_id).unwrap();
     assert_eq!((table.info.rows, table.info.columns), (6, 5));
 
-    editor.remove_slide_table_column(0, model_id, 1).unwrap();
-    editor.remove_slide_table_row(0, model_id, 4).unwrap();
-    editor.remove_slide_table_row(0, model_id, 1).unwrap();
+    editor
+        .remove_slide_table_column(0, model_id, KeynoteTableColumnDeletion::header(1))
+        .unwrap();
+    editor
+        .remove_slide_table_row(0, model_id, KeynoteTableRowDeletion::footer(0))
+        .unwrap();
+    editor
+        .remove_slide_table_row(0, model_id, KeynoteTableRowDeletion::header(1))
+        .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+    editor
+        .set_slide_table_cell(
+            0,
+            model_id,
+            0,
+            0,
+            KeynoteTableCellValue::Text("Header".to_owned()),
+        )
+        .unwrap();
+    editor
+        .set_slide_table_cell(
+            0,
+            model_id,
+            1,
+            1,
+            KeynoteTableCellValue::Text("Body".to_owned()),
+        )
+        .unwrap();
+    editor
+        .set_slide_table_cell(
+            0,
+            model_id,
+            3,
+            2,
+            KeynoteTableCellValue::Text("Footer".to_owned()),
+        )
+        .unwrap();
+    editor
+        .remove_slide_table_row(0, model_id, KeynoteTableRowDeletion::header(0))
+        .unwrap();
+    editor
+        .remove_slide_table_row(0, model_id, KeynoteTableRowDeletion::footer(0))
+        .unwrap();
+    editor
+        .remove_slide_table_column(0, model_id, KeynoteTableColumnDeletion::header(0))
+        .unwrap();
+    let settings = editor.slide_table_header_settings(0, model_id).unwrap();
+    assert_eq!(settings.header_row_count(), 0);
+    assert_eq!(settings.footer_row_count(), 0);
+    assert_eq!(settings.header_column_count(), 0);
+    let table = editor.slide_table(0, model_id).unwrap();
+    assert_eq!((table.info.rows, table.info.columns), (2, 3));
+    assert_eq!(
+        table.get_cell(0, 0),
+        Some(&KeynoteTableCellValue::Text("Body".to_owned()))
+    );
+    assert!(!table.cells.values().any(|value| matches!(
+        value,
+        KeynoteTableCellValue::Text(text) if text == "Header" || text == "Footer"
+    )));
 }
 
 #[test]

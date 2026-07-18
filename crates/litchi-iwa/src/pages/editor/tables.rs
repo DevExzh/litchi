@@ -33,6 +33,10 @@ const OBJECT_REPLACEMENT_CHARACTER: u16 = 0xfffc;
 pub type PagesCellValue = crate::numbers::CellValue;
 /// One mutation in a transactional Pages table-cell batch.
 pub type PagesTableCellUpdate = crate::numbers::TableCellUpdate;
+/// Section-relative row deletion shared by native iWork tables.
+pub type PagesTableRowDeletion = crate::numbers::TableRowDeletion;
+/// Section-relative column deletion shared by native iWork tables.
+pub type PagesTableColumnDeletion = crate::numbers::TableColumnDeletion;
 /// Section-relative row insertion shared by native iWork tables.
 pub type PagesTableRowInsertion = crate::numbers::TableRowInsertion;
 /// Section-relative column insertion shared by native iWork tables.
@@ -881,7 +885,7 @@ mod tests {
     }
 
     #[test]
-    fn source_built_table_roundtrips_physical_axis_crud_transactionally() {
+    fn source_built_table_roundtrips_section_relative_axis_crud_transactionally() {
         let mut editor = PagesDocumentBuilder::new()
             .body_table("Topology", 4, 4)
             .build()
@@ -930,8 +934,12 @@ mod tests {
             column_size
         );
 
-        editor.remove_table_column(model_id, 2).unwrap();
-        editor.remove_table_row(model_id, 2).unwrap();
+        editor
+            .remove_table_column(model_id, PagesTableColumnDeletion::body(1))
+            .unwrap();
+        editor
+            .remove_table_row(model_id, PagesTableRowDeletion::body(1))
+            .unwrap();
         assert_eq!(editor.to_bytes().unwrap(), baseline);
 
         let before_error = editor.to_bytes().unwrap();
@@ -940,7 +948,11 @@ mod tests {
                 .insert_table_row(model_id, PagesTableRowInsertion::body(usize::MAX))
                 .is_err()
         );
-        assert!(editor.remove_table_column(model_id, usize::MAX).is_err());
+        assert!(
+            editor
+                .remove_table_column(model_id, PagesTableColumnDeletion::body(usize::MAX))
+                .is_err()
+        );
         assert_eq!(editor.to_bytes().unwrap(), before_error);
     }
 
@@ -990,7 +1002,9 @@ mod tests {
             editor.table_formula(model_id, 4, 1).unwrap().as_deref(),
             Some("=SUM(B2:B4)")
         );
-        editor.remove_table_row(model_id, 3).unwrap();
+        editor
+            .remove_table_row(model_id, PagesTableRowDeletion::body(3))
+            .unwrap();
         assert_eq!(editor.to_bytes().unwrap(), baseline);
     }
 
@@ -1030,10 +1044,49 @@ mod tests {
         let table = editor.table(model_id).unwrap();
         assert_eq!((table.info.rows, table.info.columns), (6, 5));
 
-        editor.remove_table_column(model_id, 1).unwrap();
-        editor.remove_table_row(model_id, 4).unwrap();
-        editor.remove_table_row(model_id, 1).unwrap();
+        editor
+            .remove_table_column(model_id, PagesTableColumnDeletion::header(1))
+            .unwrap();
+        editor
+            .remove_table_row(model_id, PagesTableRowDeletion::footer(0))
+            .unwrap();
+        editor
+            .remove_table_row(model_id, PagesTableRowDeletion::header(1))
+            .unwrap();
         assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+        editor
+            .set_table_cell(model_id, 0, 0, PagesCellValue::Text("Header".to_owned()))
+            .unwrap();
+        editor
+            .set_table_cell(model_id, 1, 1, PagesCellValue::Text("Body".to_owned()))
+            .unwrap();
+        editor
+            .set_table_cell(model_id, 3, 2, PagesCellValue::Text("Footer".to_owned()))
+            .unwrap();
+        editor
+            .remove_table_row(model_id, PagesTableRowDeletion::header(0))
+            .unwrap();
+        editor
+            .remove_table_row(model_id, PagesTableRowDeletion::footer(0))
+            .unwrap();
+        editor
+            .remove_table_column(model_id, PagesTableColumnDeletion::header(0))
+            .unwrap();
+        let settings = editor.table_header_settings(model_id).unwrap();
+        assert_eq!(settings.header_row_count(), 0);
+        assert_eq!(settings.footer_row_count(), 0);
+        assert_eq!(settings.header_column_count(), 0);
+        let table = editor.table(model_id).unwrap();
+        assert_eq!((table.info.rows, table.info.columns), (2, 3));
+        assert_eq!(
+            table.get_cell(0, 0),
+            Some(&PagesCellValue::Text("Body".to_owned()))
+        );
+        assert!(!table.cells.values().any(|value| matches!(
+            value,
+            PagesCellValue::Text(text) if text == "Header" || text == "Footer"
+        )));
     }
 
     #[test]

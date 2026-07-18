@@ -3698,6 +3698,25 @@ pub(super) fn clear_cell_comment_in_package(
     column: usize,
 ) -> Result<()> {
     let location = locate_cell(package, table_id, row, column)?;
+    clear_cell_comment_at_location(package, location, row, column)
+}
+
+pub(super) fn clear_attached_cell_comment_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<()> {
+    let location = locate_attached_cell(package, table_id, row, column)?;
+    clear_cell_comment_at_location(package, location, row, column)
+}
+
+fn clear_cell_comment_at_location(
+    package: &mut IWorkPackage,
+    location: CellLocation,
+    row: usize,
+    column: usize,
+) -> Result<()> {
     let Some(cell) = read_tile_cell(
         package,
         &location.tile_archive,

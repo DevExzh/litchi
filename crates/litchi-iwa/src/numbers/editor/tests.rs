@@ -3557,7 +3557,9 @@ fn row_insert_rewrites_relative_formula_ast_losslessly() {
         document.sheets().unwrap()[0].tables[0].get_cell(3, 2),
         Some(&CellValue::Formula("=B2".to_owned()))
     );
-    editor.remove_table_row(10, 2).unwrap();
+    editor
+        .remove_table_row(10, TableRowDeletion::body(2))
+        .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), before);
 }
 
@@ -3583,7 +3585,9 @@ fn column_insert_rewrites_absolute_formula_ast_losslessly() {
         document.sheets().unwrap()[0].tables[0].get_cell(2, 3),
         Some(&CellValue::Formula("=$C$2".to_owned()))
     );
-    editor.remove_table_column(10, 1).unwrap();
+    editor
+        .remove_table_column(10, TableColumnDeletion::body(1))
+        .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), before);
 }
 
@@ -3644,7 +3648,9 @@ fn row_insert_rewrites_range_ast_and_preserves_unknown_formula_wire() {
         document.sheets().unwrap()[0].tables[0].get_cell(4, 2),
         Some(&CellValue::Formula("=SUM(B1:B2)".to_owned()))
     );
-    editor.remove_table_row(10, 2).unwrap();
+    editor
+        .remove_table_row(10, TableRowDeletion::body(2))
+        .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), before);
 }
 
@@ -3672,7 +3678,9 @@ fn row_insert_rewrites_segmented_formula_ast_losslessly() {
         document.sheets().unwrap()[0].tables[0].get_cell(3, 2),
         Some(&CellValue::Formula("=B2".to_owned()))
     );
-    editor.remove_table_row(10, 2).unwrap();
+    editor
+        .remove_table_row(10, TableRowDeletion::body(2))
+        .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), before);
 }
 
@@ -3710,7 +3718,9 @@ fn row_insert_copy_on_writes_shared_formula_ast_and_remerges_on_delete() {
         table.get_cell(4, 2),
         Some(&CellValue::Formula("=B4".to_owned()))
     );
-    editor.remove_table_row(10, 2).unwrap();
+    editor
+        .remove_table_row(10, TableRowDeletion::body(2))
+        .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), before);
 }
 
@@ -3802,7 +3812,9 @@ fn row_insert_expands_footer_aggregate_and_delete_restores_exact_bytes() {
     assert_eq!(edges.edge_without_owner_rows, [1, 2, 3]);
     assert_eq!(edges.edge_without_owner_columns, [1, 1, 1]);
 
-    editor.remove_table_row(10, 3).unwrap();
+    editor
+        .remove_table_row(10, TableRowDeletion::body(3))
+        .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), before);
 }
 
@@ -4090,7 +4102,9 @@ fn row_insert_roundtrips_app_normalized_footer_range_dependencies() {
         Some(3)
     );
 
-    editor.remove_table_row(10, 3).unwrap();
+    editor
+        .remove_table_row(10, TableRowDeletion::body(3))
+        .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), before);
 }
 
@@ -4578,7 +4592,9 @@ fn row_insert_then_delete_restores_exact_package_bytes() {
     editor
         .insert_table_row(10, TableRowInsertion::body(2))
         .unwrap();
-    editor.remove_table_row(10, 2).unwrap();
+    editor
+        .remove_table_row(10, TableRowDeletion::body(2))
+        .unwrap();
 
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 }
@@ -4603,7 +4619,9 @@ fn column_insert_then_delete_restores_exact_package_bytes() {
     editor
         .insert_table_column(10, TableColumnInsertion::body(2))
         .unwrap();
-    editor.remove_table_column(10, 2).unwrap();
+    editor
+        .remove_table_column(10, TableColumnDeletion::body(2))
+        .unwrap();
 
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 }
@@ -4657,8 +4675,12 @@ fn section_relative_header_insertions_shift_formulas_and_restore_exactly() {
         Some(&CellValue::Formula("=SUM(C3:C4)".to_owned()))
     );
 
-    editor.remove_table_column(10, 1).unwrap();
-    editor.remove_table_row(10, 1).unwrap();
+    editor
+        .remove_table_column(10, TableColumnDeletion::header(1))
+        .unwrap();
+    editor
+        .remove_table_row(10, TableRowDeletion::header(1))
+        .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 }
 
@@ -4704,7 +4726,9 @@ fn footer_insertions_do_not_expand_body_formula_ranges() {
         document.sheets().unwrap()[0].tables[0].get_cell(4, 1),
         Some(&CellValue::Formula("=SUM(B2:B3)".to_owned()))
     );
-    editor.remove_table_row(10, 3).unwrap();
+    editor
+        .remove_table_row(10, TableRowDeletion::footer(0))
+        .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
     editor
@@ -4714,7 +4738,9 @@ fn footer_insertions_do_not_expand_body_formula_ranges() {
         editor.table_header_settings(10).unwrap().footer_row_count(),
         2
     );
-    editor.remove_table_row(10, 4).unwrap();
+    editor
+        .remove_table_row(10, TableRowDeletion::footer(1))
+        .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 }
 
@@ -4737,9 +4763,15 @@ fn section_insertions_create_first_fixed_regions_transactionally() {
     assert_eq!(settings.footer_row_count(), 1);
     assert_eq!(settings.header_column_count(), 1);
 
-    editor.remove_table_column(10, 0).unwrap();
-    editor.remove_table_row(10, 5).unwrap();
-    editor.remove_table_row(10, 0).unwrap();
+    editor
+        .remove_table_column(10, TableColumnDeletion::header(0))
+        .unwrap();
+    editor
+        .remove_table_row(10, TableRowDeletion::footer(0))
+        .unwrap();
+    editor
+        .remove_table_row(10, TableRowDeletion::header(0))
+        .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
     let before = editor.to_bytes().unwrap();
@@ -4762,6 +4794,85 @@ fn section_insertions_create_first_fixed_regions_transactionally() {
 }
 
 #[test]
+fn section_relative_deletions_target_fixed_regions_transactionally() {
+    let mut editor = NumbersEditor::from_package(test_package()).unwrap();
+    editor
+        .set_table_header_settings(
+            10,
+            NumbersTableHeaderSettings {
+                header_rows: Some(NumbersTableHeaderCount::ONE),
+                header_columns: Some(NumbersTableHeaderCount::ONE),
+                footer_rows: Some(NumbersTableHeaderCount::ONE),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    editor
+        .set_cell(10, 0, 0, CellValue::Text("Header".to_owned()))
+        .unwrap();
+    editor
+        .set_cell(10, 1, 1, CellValue::Text("Body".to_owned()))
+        .unwrap();
+    editor
+        .set_cell(10, 3, 2, CellValue::Text("Footer".to_owned()))
+        .unwrap();
+
+    editor
+        .remove_table_row(10, TableRowDeletion::header(0))
+        .unwrap();
+    editor
+        .remove_table_row(10, TableRowDeletion::footer(0))
+        .unwrap();
+    editor
+        .remove_table_column(10, TableColumnDeletion::header(0))
+        .unwrap();
+
+    let settings = editor.table_header_settings(10).unwrap();
+    assert_eq!(settings.header_row_count(), 0);
+    assert_eq!(settings.footer_row_count(), 0);
+    assert_eq!(settings.header_column_count(), 0);
+    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let table = &document.sheets().unwrap()[0].tables[0];
+    assert_eq!((table.row_count, table.column_count), (2, 3));
+    assert_eq!(
+        table.get_cell(0, 0),
+        Some(&CellValue::Text("Body".to_owned()))
+    );
+    assert!(!table.cells.values().any(|value| matches!(
+        value,
+        CellValue::Text(text) if text == "Header" || text == "Footer"
+    )));
+
+    let before = editor.to_bytes().unwrap();
+    assert!(
+        editor
+            .remove_table_row(10, TableRowDeletion::header(0))
+            .is_err()
+    );
+    assert!(
+        editor
+            .remove_table_row(10, TableRowDeletion::footer(0))
+            .is_err()
+    );
+    assert!(
+        editor
+            .remove_table_column(10, TableColumnDeletion::header(0))
+            .is_err()
+    );
+    assert!(
+        editor
+            .remove_table_row(10, TableRowDeletion::body(2))
+            .is_err()
+    );
+    assert!(
+        editor
+            .remove_table_column(10, TableColumnDeletion::body(3))
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
 fn removes_populated_table_axes_with_reference_cleanup_and_formula_shifts() {
     let mut editor =
         NumbersEditor::from_package(test_package_with_column_headers_and_engine()).unwrap();
@@ -4771,7 +4882,9 @@ fn removes_populated_table_axes_with_reference_cleanup_and_formula_shifts() {
     editor
         .set_formula(10, 2, 2, FormulaExpression::Number(7.0))
         .unwrap();
-    editor.remove_table_row(10, 1).unwrap();
+    editor
+        .remove_table_row(10, TableRowDeletion::body(1))
+        .unwrap();
 
     let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let table = &document.sheets().unwrap()[0].tables[0];
@@ -4785,7 +4898,9 @@ fn removes_populated_table_axes_with_reference_cleanup_and_formula_shifts() {
     editor
         .set_cell(10, 1, 1, CellValue::Text("discarded column".to_owned()))
         .unwrap();
-    editor.remove_table_column(10, 1).unwrap();
+    editor
+        .remove_table_column(10, TableColumnDeletion::body(1))
+        .unwrap();
     let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let table = &document.sheets().unwrap()[0].tables[0];
     assert_eq!((table.row_count, table.column_count), (3, 3));
@@ -4800,9 +4915,13 @@ fn table_axis_delete_releases_comment_graphs() {
     for remove_row in [true, false] {
         let mut editor = NumbersEditor::from_package(test_package_with_comments(false)).unwrap();
         if remove_row {
-            editor.remove_table_row(10, 0).unwrap();
+            editor
+                .remove_table_row(10, TableRowDeletion::body(0))
+                .unwrap();
         } else {
-            editor.remove_table_column(10, 1).unwrap();
+            editor
+                .remove_table_column(10, TableColumnDeletion::body(1))
+                .unwrap();
         }
 
         let archive = editor.package().archive("Index/Document.iwa").unwrap();
@@ -4829,12 +4948,28 @@ fn table_axis_delete_rejects_live_formula_references_transactionally() {
         .unwrap();
     let baseline = editor.to_bytes().unwrap();
 
-    assert!(editor.remove_table_row(10, 1).is_err());
+    assert!(
+        editor
+            .remove_table_row(10, TableRowDeletion::body(1))
+            .is_err()
+    );
     assert_eq!(editor.to_bytes().unwrap(), baseline);
-    assert!(editor.remove_table_column(10, 1).is_err());
+    assert!(
+        editor
+            .remove_table_column(10, TableColumnDeletion::body(1))
+            .is_err()
+    );
     assert_eq!(editor.to_bytes().unwrap(), baseline);
-    assert!(editor.remove_table_row(10, 4).is_err());
-    assert!(editor.remove_table_column(10, 4).is_err());
+    assert!(
+        editor
+            .remove_table_row(10, TableRowDeletion::body(4))
+            .is_err()
+    );
+    assert!(
+        editor
+            .remove_table_column(10, TableColumnDeletion::body(4))
+            .is_err()
+    );
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 }
 
