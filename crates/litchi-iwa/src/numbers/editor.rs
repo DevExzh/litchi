@@ -18,7 +18,7 @@ use crate::comments::{
     DrawableCommentInfo, DrawableCommentReplyInfo, IWorkDrawableCommentEditor, IWorkDrawableInfo,
     IWorkTableCellCommentInfo, IWorkTableCellCommentReplyInfo, advance_save_tokens_for_entries,
     clone_comment_storage_exact, current_apple_reference_date, fresh_comment_storage_uuid,
-    insert_comment_storage, preferred_annotation_author,
+    insert_comment_storage, preferred_or_ensure_table_annotation_author,
     remove_generated_annotation_author_if_unused, update_comment_reply_reference,
 };
 use crate::media::reachable_embedded_assets;
@@ -1943,10 +1943,6 @@ impl NumbersEditor {
     }
 
     /// Create or replace a cell comment without changing the cell value or style.
-    ///
-    /// Numbers must already have registered a native annotation author in the
-    /// package. Otherwise this fails before mutation because Numbers rewrites
-    /// fabricated authors into blank comment drafts.
     pub fn set_cell_comment(
         &mut self,
         table_id: u64,

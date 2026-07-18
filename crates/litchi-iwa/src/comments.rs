@@ -1513,12 +1513,7 @@ fn ensure_generated_annotation_author(
 }
 
 /// Return the first author already registered by iWork.
-///
-/// Table comments prefer an existing native author. Pages source-built
-/// packages can use [`preferred_or_ensure_table_annotation_author`] for a
-/// generated local author; Numbers and Keynote reject non-native authors as
-/// uncommitted blank drafts.
-pub(crate) fn preferred_annotation_author(
+fn preferred_annotation_author(
     package: &mut IWorkPackage,
 ) -> Result<(Option<u64>, Option<String>, bool)> {
     let Some(location) = annotation_author_storage_location(package)? else {
@@ -1537,9 +1532,8 @@ pub(crate) fn preferred_annotation_author(
         )?
     };
     if storage.annotation_author.is_empty() {
-        return Err(Error::ParseError(
-            "Table-cell comment creation in Numbers and Keynote requires a native annotation author; create and save one comment in the target app first"
-                .to_owned(),
+        return Err(Error::InvalidFormat(
+            "annotation-author storage unexpectedly has no registered authors".to_owned(),
         ));
     }
     let locations = object_locations(package)?;

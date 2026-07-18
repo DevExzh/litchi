@@ -28,10 +28,6 @@ impl KeynoteEditor {
     }
 
     /// Create or replace a slide-table cell comment transactionally.
-    ///
-    /// Keynote must already have registered a native annotation author in the
-    /// package. Otherwise this fails before mutation because Keynote rewrites
-    /// fabricated authors into blank comment drafts.
     pub fn set_slide_table_cell_comment(
         &mut self,
         slide_index: usize,
@@ -242,7 +238,7 @@ mod tests {
     use crate::keynote::KeynoteDocumentBuilder;
 
     #[test]
-    fn seeded_table_comment_threads_support_full_crud() {
+    fn scratch_table_comment_threads_support_full_crud() {
         let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
         let table = editor
             .add_slide_table(
@@ -258,20 +254,6 @@ mod tests {
             )
             .unwrap();
         let table_id = table.model_object_id;
-
-        let before_unseeded = editor.to_bytes().unwrap();
-        let error = editor
-            .set_slide_table_cell_comment(0, table_id, 1, 1, "Rejected draft")
-            .unwrap_err();
-        assert!(error.to_string().contains("native annotation author"));
-        assert_eq!(editor.to_bytes().unwrap(), before_unseeded);
-
-        // Model a package that Keynote has already seeded with its native
-        // annotation author. Native-app validation covers the real author
-        // payload; this unit fixture isolates table-thread graph behavior.
-        let mut package = editor.into_package();
-        crate::comments::ensure_annotation_author(&mut package).unwrap();
-        let mut editor = KeynoteEditor::from_package(package).unwrap();
 
         editor
             .set_slide_table_cell_comment(0, table_id, 1, 1, "Initial review")

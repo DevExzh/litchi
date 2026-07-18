@@ -1634,7 +1634,7 @@ fn creates_comment_table_and_comment_only_cell_when_missing() {
 }
 
 #[test]
-fn empty_native_author_storage_rejects_unopenable_cell_comment_creation() {
+fn empty_native_author_storage_supports_cell_comment_creation() {
     let mut package = test_package();
     package
         .update_archive("Index/Document.iwa", |archive| {
@@ -1649,12 +1649,29 @@ fn empty_native_author_storage_rejects_unopenable_cell_comment_creation() {
         })
         .unwrap();
     let mut editor = NumbersEditor::from_package(package).unwrap();
-    let before = editor.to_bytes().unwrap();
-    let error = editor
-        .set_cell_comment(10, 1, 2, "Would become a blank draft")
-        .unwrap_err();
-    assert!(error.to_string().contains("native annotation author"));
-    assert_eq!(editor.to_bytes().unwrap(), before);
+    editor
+        .set_cell_comment(10, 1, 2, "Generated local author")
+        .unwrap();
+    let comment = editor.cell_comment(10, 1, 2).unwrap().unwrap();
+    assert_eq!(comment.comment.text, "Generated local author");
+    assert!(comment.comment.author_object_id.is_some());
+
+    let archive = editor.package().archive("Index/Document.iwa").unwrap();
+    let model =
+        TableModelArchive::decode(archive.object(10).unwrap().messages[0].data.as_slice()).unwrap();
+    let comment_table_id = model
+        .base_data_store
+        .comment_storage_table
+        .unwrap()
+        .identifier;
+    let comment_table = archive.object(comment_table_id).unwrap();
+    assert_eq!(
+        comment_table.archive_info.message_infos[0].versions,
+        [1, 0, 5]
+    );
+    let list = TableDataList::decode(comment_table.messages[0].data.as_slice()).unwrap();
+    assert_eq!(list.is_new_for_bnc, None);
+    assert_eq!(list.entries.len(), 1);
 }
 
 #[test]
