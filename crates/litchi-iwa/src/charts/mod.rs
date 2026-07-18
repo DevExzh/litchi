@@ -10,9 +10,11 @@
 //! - Grid data (row/column names and values)
 
 mod archive;
+mod data;
 mod kind;
 pub mod metadata_extractor;
 
 pub use archive::IWorkChartArchive;
+pub use data::ChartData;
 pub use kind::ChartKind;
 pub use metadata_extractor::{ChartMetadata, ChartMetadataExtractor};

@@ -85,7 +85,12 @@ fn print_archive(archive: litchi_iwa::archive::Archive, object_id: Option<u64>) 
             {
                 println!("  chart_drawable={chart:#?}");
             }
-            if matches!(message.type_, 0 | 8 | 153 | 205 | 212 | 213 | 3_056) {
+            if message.type_ == 12_006
+                && let Ok(mediator) = tn::ChartMediatorArchive::decode(message.data.as_slice())
+            {
+                println!("  numbers_chart_mediator={mediator:#?}");
+            }
+            if matches!(message.type_, 0 | 8 | 153 | 205 | 212 | 213 | 3_056 | 5_021) {
                 let hex = message
                     .data
                     .iter()

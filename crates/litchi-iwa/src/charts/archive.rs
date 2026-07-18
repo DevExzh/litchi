@@ -7,17 +7,21 @@
 use prost::Message;
 
 use crate::protobuf::tsch;
-use crate::wire::{WireField, append_length_delimited_field, parse_wire_fields};
+use crate::wire::{
+    WireField, append_length_delimited_field, append_varint_field, parse_wire_fields,
+};
 use crate::{Error, Result};
 
 const DRAWABLE_SUPER_FIELD: u32 = 1;
 const CHART_EXTENSION_FIELD: u32 = 10_000;
+const CHART_BASE_FIELDS: std::ops::RangeInclusive<u32> = 1..=24;
 
 /// A native chart drawable with its extension-backed chart payload retained.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct IWorkChartArchive {
     pub drawable: tsch::ChartDrawableArchive,
     pub chart: Option<tsch::ChartArchive>,
+    chart_opaque_fields: Vec<Vec<u8>>,
     opaque_fields: Vec<Vec<u8>>,
 }
 
@@ -27,19 +31,50 @@ impl IWorkChartArchive {
         Self {
             drawable,
             chart: Some(chart),
+            chart_opaque_fields: Vec::new(),
             opaque_fields: Vec::new(),
         }
+    }
+
+    pub(crate) fn append_chart_bool_extension(
+        &mut self,
+        field_number: u32,
+        value: bool,
+    ) -> Result<()> {
+        let mut field = Vec::new();
+        append_varint_field(&mut field, field_number, u64::from(value))?;
+        self.chart_opaque_fields.push(field);
+        Ok(())
+    }
+
+    pub(crate) fn append_chart_message_extension(
+        &mut self,
+        field_number: u32,
+        message: &impl Message,
+    ) -> Result<()> {
+        let mut field = Vec::new();
+        append_length_delimited_field(&mut field, field_number, &message.encode_to_vec())?;
+        self.chart_opaque_fields.push(field);
+        Ok(())
     }
 
     /// Decode a chart drawable without discarding extensions or future fields.
     pub fn decode(data: &[u8]) -> Result<Self> {
         let fields = parse_wire_fields(data)?;
-        let chart = unique_field(&fields, CHART_EXTENSION_FIELD)?
-            .map(|field| {
-                tsch::ChartArchive::decode(length_delimited_payload(data, field)?)
-                    .map_err(Error::from)
-            })
+        let chart_field = unique_field(&fields, CHART_EXTENSION_FIELD)?;
+        let chart_data = chart_field
+            .map(|field| length_delimited_payload(data, field))
             .transpose()?;
+        let chart = chart_data.map(tsch::ChartArchive::decode).transpose()?;
+        let chart_opaque_fields = if let Some(chart_data) = chart_data {
+            parse_wire_fields(chart_data)?
+                .into_iter()
+                .filter(|field| !CHART_BASE_FIELDS.contains(&field.number))
+                .map(|field| chart_data[field.start..field.end].to_vec())
+                .collect()
+        } else {
+            Vec::new()
+        };
         let opaque_fields = fields
             .iter()
             .filter(|field| {
@@ -51,6 +86,7 @@ impl IWorkChartArchive {
         Ok(Self {
             drawable: tsch::ChartDrawableArchive::decode(data)?,
             chart,
+            chart_opaque_fields,
             opaque_fields,
         })
     }
@@ -59,11 +95,11 @@ impl IWorkChartArchive {
     pub fn encode(&self) -> Result<Vec<u8>> {
         let mut output = self.drawable.encode_to_vec();
         if let Some(chart) = &self.chart {
-            append_length_delimited_field(
-                &mut output,
-                CHART_EXTENSION_FIELD,
-                &chart.encode_to_vec(),
-            )?;
+            let mut chart_data = chart.encode_to_vec();
+            for field in &self.chart_opaque_fields {
+                chart_data.extend_from_slice(field);
+            }
+            append_length_delimited_field(&mut output, CHART_EXTENSION_FIELD, &chart_data)?;
         }
         for field in &self.opaque_fields {
             output.extend_from_slice(field);
@@ -130,6 +166,24 @@ mod tests {
         let archive = IWorkChartArchive::default();
         let mut encoded = archive.encode().unwrap();
         append_length_delimited_field(&mut encoded, 77, b"future").unwrap();
+
+        assert_eq!(
+            IWorkChartArchive::decode(&encoded)
+                .unwrap()
+                .encode()
+                .unwrap(),
+            encoded
+        );
+    }
+
+    #[test]
+    fn unknown_chart_fields_are_preserved_byte_for_byte() {
+        let mut archive = IWorkChartArchive::new(
+            tsch::ChartDrawableArchive::default(),
+            tsch::ChartArchive::default(),
+        );
+        archive.append_chart_bool_extension(10_026, true).unwrap();
+        let encoded = archive.encode().unwrap();
 
         assert_eq!(
             IWorkChartArchive::decode(&encoded)

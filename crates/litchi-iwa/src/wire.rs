@@ -599,6 +599,19 @@ pub(crate) fn append_length_delimited_field(
     Ok(())
 }
 
+pub(crate) fn append_varint_field(
+    output: &mut Vec<u8>,
+    field_number: u32,
+    value: u64,
+) -> Result<()> {
+    append_scalar_field(
+        output,
+        field_number,
+        0,
+        &crate::varint::encode_varint(value),
+    )
+}
+
 fn append_scalar_field(
     output: &mut Vec<u8>,
     field_number: u32,

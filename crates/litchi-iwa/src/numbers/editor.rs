@@ -3039,6 +3039,7 @@ mod formula_dependency_shift;
 mod model;
 mod row_insert;
 mod sheet_audio;
+mod sheet_charts;
 mod sheet_duplicate;
 mod sheet_images;
 mod sheet_movies;
@@ -3058,6 +3059,7 @@ mod text_box_duplicate;
 
 use model::*;
 pub use sheet_audio::{NumbersSheetAudioInfo, NumbersSheetAudioOptions, RemovedNumbersSheetAudio};
+pub use sheet_charts::{ChartSeriesDirection, NumbersSheetChartInfo, RemovedNumbersSheetChart};
 pub use sheet_images::{NumbersSheetImageInfo, RemovedNumbersSheetImage};
 pub use sheet_movies::{NumbersSheetMovieInfo, NumbersSheetMovieOptions, RemovedNumbersSheetMovie};
 pub use sheet_shapes::{NumbersSheetShapeInfo, NumbersSheetShapeKind, RemovedNumbersSheetShape};
