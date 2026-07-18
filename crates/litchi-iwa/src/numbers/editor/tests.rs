@@ -2512,6 +2512,294 @@ fn duplicates_formula_table_with_independent_dependency_owner() {
 }
 
 #[test]
+fn duplicates_app_normalized_range_graph_and_removes_it_without_orphans() {
+    const FORMULA_OWNER_ID: u64 = 101;
+    const RANGE_TILE_ID: u64 = 10_001;
+    const RANGE_TILE_MESSAGE_TYPE: u32 = 4_010;
+
+    let mut editor = NumbersEditor::from_package(test_package_with_calculation_engine()).unwrap();
+    editor
+        .set_formula(
+            10,
+            3,
+            1,
+            FormulaExpression::function(
+                "SUM",
+                [FormulaExpression::range(
+                    crate::numbers::FormulaCellReference::relative(1, 1),
+                    crate::numbers::FormulaCellReference::relative(2, 1),
+                )],
+            ),
+        )
+        .unwrap();
+    let mut package = editor.into_package();
+    package
+        .update_archive("Index/CalculationEngine.iwa", |archive| {
+            let owner_object = archive.object_mut(FORMULA_OWNER_ID).unwrap();
+            let message = owner_object.messages[0].clone();
+            let mut owner = tsce::FormulaOwnerDependenciesArchive::decode(message.data.as_slice())?;
+            let internal_owner_id = owner.internal_formula_owner_id;
+            let owner_uuid = owner.formula_owner_uid;
+            owner.cell_dependencies.as_mut().unwrap().cell_record[0].expanded_edges =
+                Some(tsce::ExpandedEdgesArchive::default());
+            owner.range_dependencies = Some(tsce::RangeDependenciesArchive {
+                back_dependency: vec![tsce::RangeBackDependencyArchive {
+                    cell_coord_row: 3,
+                    cell_coord_column: 1,
+                    internal_range_reference: Some(tsce::InternalRangeReferenceArchive {
+                        owner_id: internal_owner_id,
+                        range: tsce::RangeCoordinateArchive {
+                            top_left_column: 1,
+                            top_left_row: 1,
+                            bottom_right_column: 1,
+                            bottom_right_row: 2,
+                        },
+                    }),
+                    ..Default::default()
+                }],
+            });
+            owner.uuid_references = Some(tsce::UuidReferencesArchive {
+                table_refs: vec![tsce::uuid_references_archive::TableRef {
+                    owner_uuid,
+                    coord_set: None,
+                }],
+                table_uuid_refs: vec![tsce::uuid_references_archive::TableWithUuidRef {
+                    owner_uuid,
+                    uuid_refs: vec![tsce::uuid_references_archive::UuidRef {
+                        uuid: tsp::Uuid {
+                            lower: 111,
+                            upper: 222,
+                        },
+                        coord_set: Some(tsce::CellCoordSetArchive {
+                            column_entries: vec![tsce::cell_coord_set_archive::ColumnEntry {
+                                column: 1,
+                                row_set: tsce::IndexSetArchive {
+                                    entries: vec![tsce::index_set_archive::IndexSetEntry {
+                                        range_begin: 3,
+                                        range_end: None,
+                                    }],
+                                },
+                            }],
+                        }),
+                    }],
+                }],
+            });
+            owner.tiled_range_dependencies = Some(tsce::RangeDependenciesTiledArchive {
+                range_precedents_tile: vec![Reference {
+                    identifier: RANGE_TILE_ID,
+                    ..Default::default()
+                }],
+            });
+            let mut data = owner.encode_to_vec();
+            data = crate::wire::transform_length_delimited_fields_at_path(
+                &data,
+                &[5, 2],
+                |payload| {
+                    let mut payload = payload.to_vec();
+                    append_unknown_varint(&mut payload, 99, 990);
+                    Ok(payload)
+                },
+            )?;
+            data = crate::wire::transform_length_delimited_fields_at_path(
+                &data,
+                &[14, 2, 2, 2, 1, 2, 1],
+                |payload| {
+                    let mut payload = payload.to_vec();
+                    append_unknown_varint(&mut payload, 98, 980);
+                    Ok(payload)
+                },
+            )?;
+            owner_object.replace_message(
+                0,
+                RawMessage {
+                    type_: message.type_,
+                    data,
+                },
+            )?;
+            owner_object.archive_info.message_infos[0]
+                .object_references
+                .push(RANGE_TILE_ID);
+
+            let mut tile_data = tsce::RangePrecedentsTileArchive {
+                to_owner_id: internal_owner_id,
+                from_to_range: vec![tsce::range_precedents_tile_archive::FromToRangeArchive {
+                    from_coord: tsce::CellCoordinateArchive {
+                        column: Some(1),
+                        row: Some(3),
+                        ..Default::default()
+                    },
+                    refers_to_rect: tsce::CellRectArchive {
+                        origin: tsce::CellCoordinateArchive {
+                            column: Some(1),
+                            row: Some(1),
+                            ..Default::default()
+                        },
+                        size: tsce::ColumnRowSize {
+                            num_rows: Some(2),
+                            ..Default::default()
+                        },
+                    },
+                }],
+            }
+            .encode_to_vec();
+            for (path, field, value) in [(vec![2], 97, 970), (vec![2, 2], 96, 960)] {
+                tile_data = crate::wire::transform_length_delimited_fields_at_path(
+                    &tile_data,
+                    &path,
+                    |payload| {
+                        let mut payload = payload.to_vec();
+                        append_unknown_varint(&mut payload, field, value);
+                        Ok(payload)
+                    },
+                )?;
+            }
+            archive.insert_object(ArchiveObject::new(
+                RANGE_TILE_ID,
+                vec![RawMessage {
+                    type_: RANGE_TILE_MESSAGE_TYPE,
+                    data: tile_data,
+                }],
+            )?)
+        })
+        .unwrap();
+
+    let mut editor = NumbersEditor::from_package(package).unwrap();
+    let created = editor.duplicate_table(10).unwrap();
+    let cloned_table_info_id = find_table_owner(editor.package(), created.object_id)
+        .unwrap()
+        .table_info_id;
+    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(document.sheets().unwrap()[0].tables.len(), 2);
+    assert!(
+        document.sheets().unwrap()[0].tables.iter().all(
+            |table| table.get_cell(3, 1) == Some(&CellValue::Formula("=SUM(B2:B3)".to_owned()))
+        )
+    );
+
+    let calculation = editor
+        .package()
+        .archive("Index/CalculationEngine.iwa")
+        .unwrap();
+    let owners = calculation
+        .objects
+        .iter()
+        .filter_map(|object| {
+            object
+                .messages
+                .iter()
+                .find(|message| message.type_ == 4_008)
+                .map(|message| {
+                    (
+                        object.archive_info.identifier.unwrap(),
+                        message,
+                        tsce::FormulaOwnerDependenciesArchive::decode(message.data.as_slice())
+                            .unwrap(),
+                    )
+                })
+        })
+        .collect::<Vec<_>>();
+    let original = owners
+        .iter()
+        .find(|(_, _, owner)| owner.formula_owner.as_ref().unwrap().identifier == 3)
+        .unwrap();
+    let cloned = owners
+        .iter()
+        .find(|(_, _, owner)| {
+            owner.formula_owner.as_ref().unwrap().identifier == cloned_table_info_id
+        })
+        .unwrap();
+    assert_ne!(
+        original.2.internal_formula_owner_id,
+        cloned.2.internal_formula_owner_id
+    );
+    assert_ne!(original.2.formula_owner_uid, cloned.2.formula_owner_uid);
+    let cloned_range = &cloned
+        .2
+        .range_dependencies
+        .as_ref()
+        .unwrap()
+        .back_dependency[0];
+    assert_eq!(
+        cloned_range
+            .internal_range_reference
+            .as_ref()
+            .unwrap()
+            .owner_id,
+        cloned.2.internal_formula_owner_id
+    );
+    let cloned_uuids = cloned.2.uuid_references.as_ref().unwrap();
+    assert_eq!(
+        cloned_uuids.table_refs[0].owner_uuid,
+        cloned.2.formula_owner_uid
+    );
+    assert_eq!(
+        cloned_uuids.table_uuid_refs[0].owner_uuid,
+        cloned.2.formula_owner_uid
+    );
+    assert_eq!(
+        cloned_uuids.table_uuid_refs[0].uuid_refs[0].uuid,
+        tsp::Uuid {
+            lower: 111,
+            upper: 222
+        }
+    );
+    let original_tile_id = original
+        .2
+        .tiled_range_dependencies
+        .as_ref()
+        .unwrap()
+        .range_precedents_tile[0]
+        .identifier;
+    let cloned_tile_id = cloned
+        .2
+        .tiled_range_dependencies
+        .as_ref()
+        .unwrap()
+        .range_precedents_tile[0]
+        .identifier;
+    assert_eq!(original_tile_id, RANGE_TILE_ID);
+    assert_ne!(cloned_tile_id, original_tile_id);
+    let cloned_tile_object = calculation.object(cloned_tile_id).unwrap();
+    let cloned_tile_message = &cloned_tile_object.messages[0];
+    let cloned_tile =
+        tsce::RangePrecedentsTileArchive::decode(cloned_tile_message.data.as_slice()).unwrap();
+    assert_eq!(cloned_tile.to_owner_id, cloned.2.internal_formula_owner_id);
+    assert_eq!(cloned_tile.from_to_range[0].from_coord.row, Some(3));
+    let suffix = |field: u32, value: u64| {
+        let mut data = crate::varint::encode_varint(u64::from(field) << 3);
+        data.extend(crate::varint::encode_varint(value));
+        data
+    };
+    let range_suffix = suffix(99, 990);
+    let owner_ranges = crate::wire::repeated_length_delimited_payloads(&cloned.1.data, 5).unwrap();
+    let range_records =
+        crate::wire::repeated_length_delimited_payloads(owner_ranges[0], 2).unwrap();
+    assert!(range_records[0].ends_with(&range_suffix));
+    let mut uuid_payload = cloned.1.data.as_slice();
+    for field in [14, 2, 2, 2, 1, 2, 1] {
+        let nested = crate::wire::repeated_length_delimited_payloads(uuid_payload, field).unwrap();
+        uuid_payload = nested[0];
+    }
+    assert!(uuid_payload.ends_with(&suffix(98, 980)));
+    let tile_suffix = suffix(97, 970);
+    let tile_records =
+        crate::wire::repeated_length_delimited_payloads(&cloned_tile_message.data, 2).unwrap();
+    assert!(tile_records[0].ends_with(&tile_suffix));
+    let rect_suffix = suffix(96, 960);
+    let rects = crate::wire::repeated_length_delimited_payloads(tile_records[0], 2).unwrap();
+    assert!(rects[0].ends_with(&rect_suffix));
+
+    editor.remove_table(created.object_id).unwrap();
+    let calculation = editor
+        .package()
+        .archive("Index/CalculationEngine.iwa")
+        .unwrap();
+    assert!(calculation.object(RANGE_TILE_ID).is_some());
+    assert!(calculation.object(cloned_tile_id).is_none());
+    assert!(calculation.object(cloned.0).is_none());
+}
+
+#[test]
 fn formula_table_duplicate_rejects_unsupported_dependencies_transactionally() {
     let mut package = test_package_with_calculation_engine();
     package
@@ -2519,12 +2807,18 @@ fn formula_table_duplicate_rejects_unsupported_dependencies_transactionally() {
             let object = archive.object_mut(101).unwrap();
             let message = object.messages[0].clone();
             let mut owner = tsce::FormulaOwnerDependenciesArchive::decode(message.data.as_slice())?;
-            owner.uuid_references = Some(tsce::UuidReferencesArchive {
-                table_refs: vec![tsce::uuid_references_archive::TableRef {
-                    owner_uuid: owner.formula_owner_uid,
-                    coord_set: None,
+            owner.spill_range_sizes = Some(tsce::CellSpillSizesArchive {
+                spills: vec![tsce::cell_spill_sizes_archive::SpillForCell {
+                    coordinate: tsce::CellCoordinateArchive {
+                        column: Some(1),
+                        row: Some(1),
+                        ..Default::default()
+                    },
+                    spill_size: tsce::ColumnRowSize {
+                        num_columns: Some(2),
+                        num_rows: Some(2),
+                    },
                 }],
-                table_uuid_refs: Vec::new(),
             });
             object.replace_message(
                 0,

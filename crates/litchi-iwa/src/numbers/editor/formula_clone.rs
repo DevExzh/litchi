@@ -14,7 +14,7 @@ use crate::wire::{
 };
 use dependency_wire::{
     append_formula_owners_to_engine, remap_cell_records, remap_cell_tile_wire, remap_formula_owner,
-    remap_formula_owner_wire,
+    remap_formula_owner_wire, remap_range_tile_wire,
 };
 pub(super) use formula_storage::{
     remap_cloned_formula_owner_storage, remap_cloned_formula_storage,
@@ -24,6 +24,7 @@ pub(super) use removal::{remove_table_formula_graph, remove_table_formula_graph_
 const CALCULATION_ENGINE_MESSAGE_TYPE: u32 = 4_000;
 const FORMULA_OWNER_MESSAGE_TYPE: u32 = 4_008;
 const CELL_RECORD_TILE_MESSAGE_TYPE: u32 = 4_009;
+const RANGE_PRECEDENTS_TILE_MESSAGE_TYPE: u32 = 4_010;
 
 struct FormulaOwnerSource {
     object: ArchiveObject,
@@ -35,6 +36,12 @@ struct CellTileSource {
     object: ArchiveObject,
     message_index: usize,
     tile: tsce::CellRecordTileArchive,
+}
+
+struct RangeTileSource {
+    object: ArchiveObject,
+    message_index: usize,
+    tile: tsce::RangePrecedentsTileArchive,
 }
 
 /// Attach an independent, empty CalculationEngine owner to a newly created table.
@@ -134,9 +141,11 @@ pub(super) fn clone_table_formula_graph(
         require_cloneable_formula_owner(&source.owner)?;
     }
     let tiles = cell_record_tiles(&archive, &owners)?;
+    let range_tiles = range_precedent_tiles(&archive, &owners)?;
 
     let mut next_identifier = next_object_identifier(package)?;
-    let mut object_remap = HashMap::with_capacity(owners.len() + tiles.len() + 1);
+    let mut object_remap =
+        HashMap::with_capacity(owners.len() + tiles.len() + range_tiles.len() + 1);
     object_remap.insert(source_table_info_id, new_table_info_id);
     for source in &owners {
         let identifier = source.object.archive_info.identifier.ok_or_else(|| {
@@ -147,6 +156,14 @@ pub(super) fn clone_table_formula_graph(
     for source in &tiles {
         let identifier = source.object.archive_info.identifier.ok_or_else(|| {
             Error::InvalidFormat("Numbers dependency tile has no object identifier".to_owned())
+        })?;
+        object_remap.insert(identifier, take_identifier(&mut next_identifier)?);
+    }
+    for source in &range_tiles {
+        let identifier = source.object.archive_info.identifier.ok_or_else(|| {
+            Error::InvalidFormat(
+                "Numbers range dependency tile has no object identifier".to_owned(),
+            )
         })?;
         object_remap.insert(identifier, take_identifier(&mut next_identifier)?);
     }
@@ -188,7 +205,7 @@ pub(super) fn clone_table_formula_graph(
         }
     }
 
-    let mut cloned_objects = Vec::with_capacity(owners.len() + tiles.len());
+    let mut cloned_objects = Vec::with_capacity(owners.len() + tiles.len() + range_tiles.len());
     let mut cloned_owner_ids = Vec::with_capacity(owners.len());
     let mut owner_map_entries = Vec::with_capacity(owners.len());
     let mut formula_count = 0u64;
@@ -256,6 +273,31 @@ pub(super) fn clone_table_formula_graph(
             &expected,
             &internal_remap,
         )?;
+        let mut messages = source.object.messages.clone();
+        messages[source.message_index] = RawMessage {
+            type_: original.type_,
+            data,
+        };
+        cloned_objects.push(clone_numbers_object_metadata(
+            &source.object,
+            object_remap[&source_id],
+            messages,
+            &object_remap,
+        )?);
+    }
+    for source in &range_tiles {
+        let source_id = source.object.archive_info.identifier.ok_or_else(|| {
+            Error::InvalidFormat(
+                "Numbers range dependency tile has no object identifier".to_owned(),
+            )
+        })?;
+        let original = &source.object.messages[source.message_index];
+        let mut expected = source.tile.clone();
+        expected.to_owner_id = internal_remap
+            .get(&source.tile.to_owner_id)
+            .copied()
+            .unwrap_or(source.tile.to_owner_id);
+        let data = remap_range_tile_wire(original.data.as_slice(), &source.tile, &expected)?;
         let mut messages = source.object.messages.clone();
         messages[source.message_index] = RawMessage {
             type_: original.type_,
@@ -376,21 +418,49 @@ pub(super) fn table_formula_graph_is_self_contained(
         .iter()
         .map(|source| source.owner.internal_formula_owner_id)
         .collect::<HashSet<_>>();
+    let family_uuids = owners
+        .iter()
+        .map(|source| uuid_key(&source.owner.formula_owner_uid))
+        .collect::<HashSet<_>>();
     let inline_is_self_contained = owners.iter().all(|source| {
-        source
-            .owner
-            .cell_dependencies
+        let owner = &source.owner;
+        owner.cell_dependencies.as_ref().is_none_or(|dependencies| {
+            dependency_records_are_self_contained(&dependencies.cell_record, &family)
+        }) && owner
+            .range_dependencies
             .as_ref()
             .is_none_or(|dependencies| {
-                dependency_records_are_self_contained(&dependencies.cell_record, &family)
+                dependencies.back_dependency.iter().all(|dependency| {
+                    dependency.range_reference.is_none()
+                        && dependency
+                            .internal_range_reference
+                            .as_ref()
+                            .is_none_or(|reference| family.contains(&reference.owner_id))
+                })
+            })
+            && owner.uuid_references.as_ref().is_none_or(|references| {
+                references
+                    .table_refs
+                    .iter()
+                    .all(|reference| family_uuids.contains(&uuid_key(&reference.owner_uuid)))
+                    && references
+                        .table_uuid_refs
+                        .iter()
+                        .all(|reference| family_uuids.contains(&uuid_key(&reference.owner_uuid)))
             })
     });
     if !inline_is_self_contained {
         return Ok(false);
     }
-    Ok(cell_record_tiles(&archive, &owners)?
+    let cell_tiles_are_self_contained = cell_record_tiles(&archive, &owners)?
         .iter()
-        .all(|source| dependency_records_are_self_contained(&source.tile.cell_records, &family)))
+        .all(|source| dependency_records_are_self_contained(&source.tile.cell_records, &family));
+    if !cell_tiles_are_self_contained {
+        return Ok(false);
+    }
+    Ok(range_precedent_tiles(&archive, &owners)?
+        .iter()
+        .all(|source| family.contains(&source.tile.to_owner_id)))
 }
 
 fn dependency_records_are_self_contained(
@@ -515,16 +585,57 @@ fn cell_record_tiles(
     Ok(result)
 }
 
+fn range_precedent_tiles(
+    archive: &Archive,
+    owners: &[FormulaOwnerSource],
+) -> Result<Vec<RangeTileSource>> {
+    let mut identifiers = BTreeMap::new();
+    for source in owners {
+        if let Some(dependencies) = &source.owner.tiled_range_dependencies {
+            for reference in &dependencies.range_precedents_tile {
+                if identifiers.insert(reference.identifier, ()).is_some() {
+                    return Err(Error::InvalidFormat(format!(
+                        "Numbers formula owner family shares range dependency tile {}",
+                        reference.identifier
+                    )));
+                }
+            }
+        }
+    }
+    let mut result = Vec::with_capacity(identifiers.len());
+    for identifier in identifiers.keys().copied() {
+        let object = archive.object(identifier).ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Numbers range dependency tile {identifier} is missing"
+            ))
+        })?;
+        let matches = object
+            .messages
+            .iter()
+            .enumerate()
+            .filter(|(_, message)| message.type_ == RANGE_PRECEDENTS_TILE_MESSAGE_TYPE)
+            .collect::<Vec<_>>();
+        if matches.len() != 1 {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers range dependency tile {identifier} must have exactly one range-tile payload"
+            )));
+        }
+        let (message_index, message) = matches[0];
+        result.push(RangeTileSource {
+            object: copy_archive_object(object)?,
+            message_index,
+            tile: tsce::RangePrecedentsTileArchive::decode(message.data.as_slice())?,
+        });
+    }
+    Ok(result)
+}
+
 fn require_cloneable_formula_owner(owner: &tsce::FormulaOwnerDependenciesArchive) -> Result<()> {
     let unsupported = owner
-        .range_dependencies
+        .volatile_dependencies
         .as_ref()
-        .is_some_and(|value| !value.back_dependency.is_empty())
-        || owner
-            .volatile_dependencies
-            .as_ref()
-            .and_then(|value| value.volatile_geometry_cell_refs.as_ref())
-            .is_some_and(|value| !value.owner_entries.is_empty())
+        .and_then(|value| value.volatile_geometry_cell_refs.as_ref())
+        .is_some_and(|value| !value.owner_entries.is_empty())
         || owner
             .spanning_column_dependencies
             .as_ref()
@@ -543,16 +654,12 @@ fn require_cloneable_formula_owner(owner: &tsce::FormulaOwnerDependenciesArchive
             .as_ref()
             .is_some_and(|value| !value.errors.is_empty() || !value.enhanced_errors.is_empty())
         || owner
-            .uuid_references
+            .spill_range_sizes
             .as_ref()
-            .is_some_and(|value| !value.table_refs.is_empty() || !value.table_uuid_refs.is_empty())
-        || owner
-            .tiled_range_dependencies
-            .as_ref()
-            .is_some_and(|value| !value.range_precedents_tile.is_empty());
+            .is_some_and(|value| !value.spills.is_empty());
     if unsupported {
         return Err(Error::ParseError(
-            "Cannot duplicate a Numbers table with advanced range, volatile, spill, or UUID dependency state"
+            "Cannot duplicate a Numbers table with volatile, spanning, whole-owner, error, or spill dependency state"
                 .to_owned(),
         ));
     }

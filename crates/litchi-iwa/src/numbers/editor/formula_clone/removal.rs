@@ -62,6 +62,7 @@ pub(in crate::numbers::editor) fn remove_table_formula_graph_for_contexts(
         &owner_uuids,
     )?;
     let tiles = cell_record_tiles(&archive, &owners)?;
+    let range_tiles = range_precedent_tiles(&archive, &owners)?;
     let formula_count = owners.iter().try_fold(0u64, |count, source| {
         count
             .checked_add(formula_cell_count(&source.owner, &tiles)?)
@@ -72,6 +73,16 @@ pub(in crate::numbers::editor) fn remove_table_formula_graph_for_contexts(
         .map(|source| {
             source.object.archive_info.identifier.ok_or_else(|| {
                 Error::InvalidFormat("Numbers dependency tile has no object identifier".to_owned())
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let range_tile_ids = range_tiles
+        .iter()
+        .map(|source| {
+            source.object.archive_info.identifier.ok_or_else(|| {
+                Error::InvalidFormat(
+                    "Numbers range dependency tile has no object identifier".to_owned(),
+                )
             })
         })
         .collect::<Result<Vec<_>>>()?;
@@ -103,7 +114,12 @@ pub(in crate::numbers::editor) fn remove_table_formula_graph_for_contexts(
                 .object_references
                 .retain(|identifier| !owner_ids.contains(identifier));
         }
-        for identifier in owner_ids.iter().copied().chain(tile_ids.iter().copied()) {
+        for identifier in owner_ids
+            .iter()
+            .copied()
+            .chain(tile_ids.iter().copied())
+            .chain(range_tile_ids.iter().copied())
+        {
             archive.remove_object(identifier).ok_or_else(|| {
                 Error::InvalidFormat(format!(
                     "Numbers calculation object {identifier} disappeared during removal"
@@ -115,6 +131,7 @@ pub(in crate::numbers::editor) fn remove_table_formula_graph_for_contexts(
 
     let mut removed = owner_ids.into_iter().collect::<Vec<_>>();
     removed.extend(tile_ids);
+    removed.extend(range_tile_ids);
     if let Some(component) = component_identifier_for_entry(package, &calculation_engine_entry)? {
         let mapped = component_uuid_identifiers(package, component)?.unwrap_or_default();
         let registered = removed
@@ -426,6 +443,30 @@ fn formula_owner_removed_dependency_kind(
             let tile = tsce::CellRecordTileArchive::decode(message.data.as_slice())?;
             if records_reference_removed(&tile.cell_records) {
                 return Ok(Some("tiled-cell"));
+            }
+        }
+    }
+    if let Some(dependencies) = &owner.tiled_range_dependencies {
+        for reference in &dependencies.range_precedents_tile {
+            let object = archive.object(reference.identifier).ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Numbers range dependency tile {} is missing",
+                    reference.identifier
+                ))
+            })?;
+            let message = object
+                .messages
+                .iter()
+                .find(|message| message.type_ == RANGE_PRECEDENTS_TILE_MESSAGE_TYPE)
+                .ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Numbers range dependency tile {} has no range-tile payload",
+                        reference.identifier
+                    ))
+                })?;
+            let tile = tsce::RangePrecedentsTileArchive::decode(message.data.as_slice())?;
+            if removed_internal_ids.contains(&tile.to_owner_id) && !tile.from_to_range.is_empty() {
+                return Ok(Some("tiled-range"));
             }
         }
     }
