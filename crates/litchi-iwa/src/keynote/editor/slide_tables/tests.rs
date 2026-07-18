@@ -296,8 +296,12 @@ fn source_built_table_roundtrips_physical_axis_crud_transactionally() {
     let baseline_geometry = editor.slide_tables(0).unwrap()[0].geometry;
     let baseline = editor.to_bytes().unwrap();
 
-    editor.insert_slide_table_row(0, model_id, 2).unwrap();
-    editor.insert_slide_table_column(0, model_id, 2).unwrap();
+    editor
+        .insert_slide_table_row(0, model_id, KeynoteTableRowInsertion::body(1))
+        .unwrap();
+    editor
+        .insert_slide_table_column(0, model_id, KeynoteTableColumnInsertion::body(1))
+        .unwrap();
     let reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let shifted = reopened.slide_table(0, model_id).unwrap();
     assert_eq!((shifted.info.rows, shifted.info.columns), (5, 5));
@@ -330,7 +334,7 @@ fn source_built_table_roundtrips_physical_axis_crud_transactionally() {
     let before_error = editor.to_bytes().unwrap();
     assert!(
         editor
-            .insert_slide_table_row(1, model_id, usize::MAX)
+            .insert_slide_table_row(1, model_id, KeynoteTableRowInsertion::body(usize::MAX))
             .is_err()
     );
     assert!(
@@ -383,7 +387,9 @@ fn source_built_footer_formula_expands_and_contracts_with_body_rows() {
     let mut editor = KeynoteEditor::from_package(package).unwrap();
     let baseline = editor.to_bytes().unwrap();
 
-    editor.insert_slide_table_row(0, model_id, 3).unwrap();
+    editor
+        .insert_slide_table_row(0, model_id, KeynoteTableRowInsertion::body(3))
+        .unwrap();
     assert_eq!(
         editor
             .slide_table_formula(0, model_id, 4, 1)
@@ -392,6 +398,50 @@ fn source_built_footer_formula_expands_and_contracts_with_body_rows() {
         Some("=SUM(B2:B4)")
     );
     editor.remove_slide_table_row(0, model_id, 3).unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+}
+
+#[test]
+fn source_built_fixed_table_sections_roundtrip_full_axis_crud() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let (position, size) = table_geometry();
+    let table = editor
+        .add_slide_table(0, "Fixed sections", 4, 4, position, size)
+        .unwrap();
+    let model_id = table.model_object_id;
+    editor
+        .set_slide_table_header_settings(
+            0,
+            model_id,
+            KeynoteTableHeaderSettings {
+                header_rows: Some(KeynoteTableHeaderCount::ONE),
+                header_columns: Some(KeynoteTableHeaderCount::ONE),
+                footer_rows: Some(KeynoteTableHeaderCount::ONE),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    let baseline = editor.to_bytes().unwrap();
+
+    editor
+        .insert_slide_table_row(0, model_id, KeynoteTableRowInsertion::header(1))
+        .unwrap();
+    editor
+        .insert_slide_table_row(0, model_id, KeynoteTableRowInsertion::footer(0))
+        .unwrap();
+    editor
+        .insert_slide_table_column(0, model_id, KeynoteTableColumnInsertion::header(1))
+        .unwrap();
+    let settings = editor.slide_table_header_settings(0, model_id).unwrap();
+    assert_eq!(settings.header_row_count(), 2);
+    assert_eq!(settings.footer_row_count(), 2);
+    assert_eq!(settings.header_column_count(), 2);
+    let table = editor.slide_table(0, model_id).unwrap();
+    assert_eq!((table.info.rows, table.info.columns), (6, 5));
+
+    editor.remove_slide_table_column(0, model_id, 1).unwrap();
+    editor.remove_slide_table_row(0, model_id, 4).unwrap();
+    editor.remove_slide_table_row(0, model_id, 1).unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 }
 

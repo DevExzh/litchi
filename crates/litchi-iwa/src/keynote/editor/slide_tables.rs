@@ -32,6 +32,10 @@ const TABLE_ANGLE_DEGREES: f32 = 0.0;
 pub type KeynoteTableCellValue = crate::numbers::CellValue;
 /// One mutation in a transactional Keynote table-cell batch.
 pub type KeynoteTableCellUpdate = crate::numbers::TableCellUpdate;
+/// Section-relative row insertion shared by native iWork tables.
+pub type KeynoteTableRowInsertion = crate::numbers::TableRowInsertion;
+/// Section-relative column insertion shared by native iWork tables.
+pub type KeynoteTableColumnInsertion = crate::numbers::TableColumnInsertion;
 /// A validated non-zero native header or footer count.
 pub type KeynoteTableHeaderCount = crate::numbers::NumbersTableHeaderCount;
 /// Lossless header/footer configuration shared by native iWork tables.

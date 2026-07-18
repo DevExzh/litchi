@@ -4,18 +4,29 @@ use super::*;
 use crate::numbers::editor::TableTopologyMutation;
 
 impl PagesEditor {
-    /// Insert one blank row before `row`; `row == table.rows` appends.
+    /// Insert one blank row at a section-relative position.
     ///
     /// Cell storage, formulas, dimension overrides, and stable row identities
     /// move together. Unsupported merged, filtered, grouped, pivot, spill, or
     /// hidden topology is rejected without changing the editor.
-    pub fn insert_table_row(&mut self, model_object_id: u64, row: usize) -> Result<()> {
-        self.edit_table_topology(model_object_id, TableTopologyMutation::InsertRow(row))
+    pub fn insert_table_row(
+        &mut self,
+        model_object_id: u64,
+        insertion: PagesTableRowInsertion,
+    ) -> Result<()> {
+        self.edit_table_topology(model_object_id, TableTopologyMutation::InsertRow(insertion))
     }
 
-    /// Insert one blank column before `column`; `column == table.columns` appends.
-    pub fn insert_table_column(&mut self, model_object_id: u64, column: usize) -> Result<()> {
-        self.edit_table_topology(model_object_id, TableTopologyMutation::InsertColumn(column))
+    /// Insert one blank column at a section-relative position.
+    pub fn insert_table_column(
+        &mut self,
+        model_object_id: u64,
+        insertion: PagesTableColumnInsertion,
+    ) -> Result<()> {
+        self.edit_table_topology(
+            model_object_id,
+            TableTopologyMutation::InsertColumn(insertion),
+        )
     }
 
     /// Delete one physical row and compact all following rows.

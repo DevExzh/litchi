@@ -33,6 +33,10 @@ const OBJECT_REPLACEMENT_CHARACTER: u16 = 0xfffc;
 pub type PagesCellValue = crate::numbers::CellValue;
 /// One mutation in a transactional Pages table-cell batch.
 pub type PagesTableCellUpdate = crate::numbers::TableCellUpdate;
+/// Section-relative row insertion shared by native iWork tables.
+pub type PagesTableRowInsertion = crate::numbers::TableRowInsertion;
+/// Section-relative column insertion shared by native iWork tables.
+pub type PagesTableColumnInsertion = crate::numbers::TableColumnInsertion;
 
 /// Stable identity and dimensions of one native table attached to the Pages body.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -903,8 +907,12 @@ mod tests {
             .unwrap();
         let baseline = editor.to_bytes().unwrap();
 
-        editor.insert_table_row(model_id, 2).unwrap();
-        editor.insert_table_column(model_id, 2).unwrap();
+        editor
+            .insert_table_row(model_id, PagesTableRowInsertion::body(1))
+            .unwrap();
+        editor
+            .insert_table_column(model_id, PagesTableColumnInsertion::body(1))
+            .unwrap();
         let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         let table = reopened.table(model_id).unwrap();
         assert_eq!((table.info.rows, table.info.columns), (5, 5));
@@ -927,7 +935,11 @@ mod tests {
         assert_eq!(editor.to_bytes().unwrap(), baseline);
 
         let before_error = editor.to_bytes().unwrap();
-        assert!(editor.insert_table_row(model_id, usize::MAX).is_err());
+        assert!(
+            editor
+                .insert_table_row(model_id, PagesTableRowInsertion::body(usize::MAX))
+                .is_err()
+        );
         assert!(editor.remove_table_column(model_id, usize::MAX).is_err());
         assert_eq!(editor.to_bytes().unwrap(), before_error);
     }
@@ -971,12 +983,56 @@ mod tests {
         let mut editor = PagesEditor::from_package(package).unwrap();
         let baseline = editor.to_bytes().unwrap();
 
-        editor.insert_table_row(model_id, 3).unwrap();
+        editor
+            .insert_table_row(model_id, PagesTableRowInsertion::body(3))
+            .unwrap();
         assert_eq!(
             editor.table_formula(model_id, 4, 1).unwrap().as_deref(),
             Some("=SUM(B2:B4)")
         );
         editor.remove_table_row(model_id, 3).unwrap();
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
+    }
+
+    #[test]
+    fn source_built_fixed_table_sections_roundtrip_full_axis_crud() {
+        let mut editor = PagesDocumentBuilder::new()
+            .body_table("Fixed sections", 4, 4)
+            .build()
+            .unwrap();
+        let model_id = editor.tables().unwrap()[0].model_object_id;
+        editor
+            .set_table_header_settings(
+                model_id,
+                PagesTableHeaderSettings {
+                    header_rows: Some(PagesTableHeaderCount::ONE),
+                    header_columns: Some(PagesTableHeaderCount::ONE),
+                    footer_rows: Some(PagesTableHeaderCount::ONE),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        let baseline = editor.to_bytes().unwrap();
+
+        editor
+            .insert_table_row(model_id, PagesTableRowInsertion::header(1))
+            .unwrap();
+        editor
+            .insert_table_row(model_id, PagesTableRowInsertion::footer(0))
+            .unwrap();
+        editor
+            .insert_table_column(model_id, PagesTableColumnInsertion::header(1))
+            .unwrap();
+        let settings = editor.table_header_settings(model_id).unwrap();
+        assert_eq!(settings.header_row_count(), 2);
+        assert_eq!(settings.footer_row_count(), 2);
+        assert_eq!(settings.header_column_count(), 2);
+        let table = editor.table(model_id).unwrap();
+        assert_eq!((table.info.rows, table.info.columns), (6, 5));
+
+        editor.remove_table_column(model_id, 1).unwrap();
+        editor.remove_table_row(model_id, 4).unwrap();
+        editor.remove_table_row(model_id, 1).unwrap();
         assert_eq!(editor.to_bytes().unwrap(), baseline);
     }
 

@@ -1,26 +1,25 @@
 use std::env;
 use std::path::PathBuf;
 
-use litchi_iwa::numbers::NumbersEditor;
+use litchi_iwa::numbers::{NumbersEditor, TableRowInsertion};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
-    let input =
-        PathBuf::from(arguments.next().ok_or(
-            "usage: insert_numbers_row <input.numbers> <output.numbers> <table-id> <row>",
-        )?);
+    let input = PathBuf::from(arguments.next().ok_or(
+        "usage: insert_numbers_row <input.numbers> <output.numbers> <table-id> <body-row>",
+    )?);
     let output = PathBuf::from(arguments.next().ok_or("missing output path")?);
     let table_id = arguments.next().ok_or("missing table ID")?.parse::<u64>()?;
     let row = arguments
         .next()
-        .ok_or("missing row index")?
+        .ok_or("missing body row index")?
         .parse::<usize>()?;
     if arguments.next().is_some() {
         return Err("unexpected extra argument".into());
     }
 
     let mut editor = NumbersEditor::open(input)?;
-    editor.insert_table_row(table_id, row)?;
+    editor.insert_table_row(table_id, TableRowInsertion::body(row))?;
     editor.save(output)?;
     Ok(())
 }

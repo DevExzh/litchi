@@ -4330,10 +4330,11 @@ pub use slide_movies::{
 pub use slide_shapes::{KeynoteSlideShapeInfo, KeynoteSlideShapeKind, RemovedKeynoteSlideShape};
 pub use slide_tables::{
     KeynoteSlideTable, KeynoteSlideTableInfo, KeynoteTableCellUpdate, KeynoteTableCellValue,
-    KeynoteTableDimension, KeynoteTableDimensionSize, KeynoteTableFormulaAxisReference,
-    KeynoteTableFormulaBinaryOperator, KeynoteTableFormulaCachedValue,
-    KeynoteTableFormulaCellReference, KeynoteTableFormulaExpression, KeynoteTableHeaderCount,
-    KeynoteTableHeaderSettings, KeynoteTablePoints, KeynoteTableTitleSettings,
+    KeynoteTableColumnInsertion, KeynoteTableDimension, KeynoteTableDimensionSize,
+    KeynoteTableFormulaAxisReference, KeynoteTableFormulaBinaryOperator,
+    KeynoteTableFormulaCachedValue, KeynoteTableFormulaCellReference,
+    KeynoteTableFormulaExpression, KeynoteTableHeaderCount, KeynoteTableHeaderSettings,
+    KeynoteTablePoints, KeynoteTableRowInsertion, KeynoteTableTitleSettings,
     RemovedKeynoteSlideTable,
 };
 pub use soundtrack::{KeynoteSoundtrackMode, KeynoteSoundtrackSettings};

@@ -17,6 +17,18 @@ pub(super) enum DependencyAxis {
     Row,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum FooterRangeInsertion {
+    Body,
+    FixedSection,
+}
+
+impl FooterRangeInsertion {
+    const fn expands_footer_ranges(self) -> bool {
+        matches!(self, Self::Body)
+    }
+}
+
 impl DependencyAxis {
     fn noun(self) -> &'static str {
         match self {
@@ -85,6 +97,7 @@ pub(super) fn shift_formula_dependencies(
     table_info_id: u64,
     axis: DependencyAxis,
     insertion: u32,
+    footer_range_insertion: FooterRangeInsertion,
 ) -> Result<()> {
     mutate_formula_dependencies(
         package,
@@ -92,6 +105,7 @@ pub(super) fn shift_formula_dependencies(
         axis,
         insertion,
         DependencyMutation::Insert,
+        footer_range_insertion.expands_footer_ranges(),
     )
 }
 
@@ -107,6 +121,7 @@ pub(super) fn delete_formula_dependencies(
         axis,
         deletion,
         DependencyMutation::Delete,
+        false,
     )
 }
 
@@ -116,12 +131,20 @@ fn mutate_formula_dependencies(
     axis: DependencyAxis,
     position: u32,
     mutation: DependencyMutation,
+    expand_footer_ranges: bool,
 ) -> Result<()> {
     let Some(component) = package.calculation_engine_entry_name()?.map(str::to_owned) else {
         return Ok(());
     };
-    let adjustments =
-        rewrite_formula_asts(package, &component, table_info_id, axis, position, mutation)?;
+    let adjustments = rewrite_formula_asts(
+        package,
+        &component,
+        table_info_id,
+        axis,
+        position,
+        mutation,
+        expand_footer_ranges,
+    )?;
     package.update_archive(&component, |archive| {
         let Some((owner_id, message_index)) = archive.objects.iter().find_map(|object| {
             object.messages.iter().enumerate().find_map(|(index, message)| {

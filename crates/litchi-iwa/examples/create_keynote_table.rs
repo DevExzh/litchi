@@ -2,9 +2,9 @@ use std::env;
 
 use litchi_iwa::keynote::{
     KeynoteDocumentBuilder, KeynoteTableCellUpdate, KeynoteTableCellValue,
-    KeynoteTableDimensionSize, KeynoteTableFormulaCachedValue, KeynoteTableFormulaCellReference,
-    KeynoteTableFormulaExpression, KeynoteTableHeaderCount, KeynoteTableHeaderSettings,
-    KeynoteTableTitleSettings,
+    KeynoteTableColumnInsertion, KeynoteTableDimensionSize, KeynoteTableFormulaCachedValue,
+    KeynoteTableFormulaCellReference, KeynoteTableFormulaExpression, KeynoteTableHeaderCount,
+    KeynoteTableHeaderSettings, KeynoteTableRowInsertion, KeynoteTableTitleSettings,
 };
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 
@@ -95,8 +95,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ),
         KeynoteTableFormulaCachedValue::Number(218.0),
     )?;
-    editor.insert_slide_table_row(0, table.model_object_id, 3)?;
-    editor.insert_slide_table_column(0, table.model_object_id, 2)?;
+    editor.insert_slide_table_row(0, table.model_object_id, KeynoteTableRowInsertion::body(2))?;
+    editor.insert_slide_table_column(
+        0,
+        table.model_object_id,
+        KeynoteTableColumnInsertion::body(1),
+    )?;
     editor.set_slide_table_cells(
         0,
         table.model_object_id,

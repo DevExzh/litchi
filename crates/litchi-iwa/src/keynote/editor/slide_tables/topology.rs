@@ -4,7 +4,7 @@ use super::*;
 use crate::numbers::editor::TableTopologyMutation;
 
 impl KeynoteEditor {
-    /// Insert one blank row before `row`; `row == table.rows` appends.
+    /// Insert one blank row at a section-relative position.
     ///
     /// Cell storage, formulas, dimension overrides, stable row identities, and
     /// the slide drawable bounds move together transactionally.
@@ -12,26 +12,26 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         model_object_id: u64,
-        row: usize,
+        insertion: KeynoteTableRowInsertion,
     ) -> Result<()> {
         self.edit_slide_table_topology(
             slide_index,
             model_object_id,
-            TableTopologyMutation::InsertRow(row),
+            TableTopologyMutation::InsertRow(insertion),
         )
     }
 
-    /// Insert one blank column before `column`; `column == table.columns` appends.
+    /// Insert one blank column at a section-relative position.
     pub fn insert_slide_table_column(
         &mut self,
         slide_index: usize,
         model_object_id: u64,
-        column: usize,
+        insertion: KeynoteTableColumnInsertion,
     ) -> Result<()> {
         self.edit_slide_table_topology(
             slide_index,
             model_object_id,
-            TableTopologyMutation::InsertColumn(column),
+            TableTopologyMutation::InsertColumn(insertion),
         )
     }
 

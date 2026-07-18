@@ -11,6 +11,7 @@ use column::{delete_column_headers, delete_table_tile_column};
 use dimension::{set_stroke_dimensions, set_table_dimensions};
 use formula_dependency_shift::{DependencyAxis, delete_formula_dependencies};
 use row::{delete_row_headers, delete_table_tile_row};
+use table_headers::set_attached_table_header_settings;
 use table_topology::{category_grouping_is_enabled, filter_has_row_state};
 use uid::{delete_column_uid, delete_row_uid};
 
@@ -72,6 +73,7 @@ pub(super) fn remove_attached_table_row(
         .ok_or_else(|| Error::ParseError("iWork tables must retain at least one row".to_owned()))?;
     let (new_rows_u32, columns_u32) =
         validate_table_dimensions(new_rows, descriptor.model.number_of_columns as usize)?;
+    let updated_header_settings = header_settings_after_row_deletion(&descriptor.model, row)?;
     let locations = object_locations(package)?;
     validate_deletion_features(
         package,
@@ -79,6 +81,7 @@ pub(super) fn remove_attached_table_row(
         &descriptor.model,
         TableAxis::Row,
         new_rows,
+        updated_header_settings,
     )?;
     let cells = stored_cells_on_axis(package, &locations, &descriptor.model, TableAxis::Row, row)?;
 
@@ -111,6 +114,9 @@ pub(super) fn remove_attached_table_row(
         )?;
     }
     set_table_dimensions(package, &locations, table_id, new_rows_u32, columns_u32)?;
+    if let Some(settings) = updated_header_settings {
+        set_attached_table_header_settings(package, table_id, settings)?;
+    }
     verify_attached_dimensions(package, table_id, new_rows, columns_u32 as usize)?;
     Ok((new_rows, columns_u32 as usize))
 }
@@ -130,6 +136,7 @@ pub(super) fn remove_attached_table_column(
     })?;
     let (rows_u32, new_columns_u32) =
         validate_table_dimensions(descriptor.model.number_of_rows as usize, new_columns)?;
+    let updated_header_settings = header_settings_after_column_deletion(&descriptor.model, column)?;
     let locations = object_locations(package)?;
     validate_deletion_features(
         package,
@@ -137,6 +144,7 @@ pub(super) fn remove_attached_table_column(
         &descriptor.model,
         TableAxis::Column,
         new_columns,
+        updated_header_settings,
     )?;
     let cells = stored_cells_on_axis(
         package,
@@ -181,6 +189,9 @@ pub(super) fn remove_attached_table_column(
         )?;
     }
     set_table_dimensions(package, &locations, table_id, rows_u32, new_columns_u32)?;
+    if let Some(settings) = updated_header_settings {
+        set_attached_table_header_settings(package, table_id, settings)?;
+    }
     verify_attached_dimensions(package, table_id, rows_u32 as usize, new_columns)?;
     Ok((rows_u32 as usize, new_columns))
 }
@@ -191,16 +202,16 @@ fn validate_deletion_features(
     model: &TableModelArchive,
     axis: TableAxis,
     new_length: usize,
+    updated_header_settings: Option<NumbersTableHeaderSettings>,
 ) -> Result<()> {
+    let stored_settings = NumbersTableHeaderSettings::from_model(model)?;
+    let settings = updated_header_settings.unwrap_or(stored_settings);
     let fixed_regions_fit = match axis {
-        TableAxis::Row => {
-            let header = model.number_of_header_rows.unwrap_or(0) as usize;
-            let footer = model.number_of_footer_rows.unwrap_or(0) as usize;
-            header
-                .checked_add(footer)
-                .is_some_and(|fixed| fixed <= new_length)
-        },
-        TableAxis::Column => model.number_of_header_columns.unwrap_or(0) as usize <= new_length,
+        TableAxis::Row => settings
+            .header_row_count()
+            .checked_add(settings.footer_row_count())
+            .is_some_and(|fixed| fixed <= new_length),
+        TableAxis::Column => settings.header_column_count() <= new_length,
     };
     if !fixed_regions_fit {
         return Err(Error::ParseError(format!(
@@ -246,6 +257,62 @@ fn validate_deletion_features(
         )));
     }
     Ok(())
+}
+
+fn header_settings_after_row_deletion(
+    model: &TableModelArchive,
+    row: usize,
+) -> Result<Option<NumbersTableHeaderSettings>> {
+    let mut settings = NumbersTableHeaderSettings::from_model(model)?;
+    let rows = model.number_of_rows as usize;
+    let header_rows = settings.header_row_count();
+    let footer_rows = settings.footer_row_count();
+    if header_rows
+        .checked_add(footer_rows)
+        .is_none_or(|fixed| fixed > rows)
+    {
+        return Err(Error::InvalidFormat(
+            "iWork header and footer rows exceed the table row count".to_owned(),
+        ));
+    }
+    if row < header_rows {
+        settings.header_rows = decremented_header_count(header_rows)?;
+        Ok(Some(settings))
+    } else if footer_rows > 0 && row >= rows - footer_rows {
+        settings.footer_rows = decremented_header_count(footer_rows)?;
+        Ok(Some(settings))
+    } else {
+        Ok(None)
+    }
+}
+
+fn header_settings_after_column_deletion(
+    model: &TableModelArchive,
+    column: usize,
+) -> Result<Option<NumbersTableHeaderSettings>> {
+    let mut settings = NumbersTableHeaderSettings::from_model(model)?;
+    let header_columns = settings.header_column_count();
+    if header_columns > model.number_of_columns as usize {
+        return Err(Error::InvalidFormat(
+            "iWork header columns exceed the table column count".to_owned(),
+        ));
+    }
+    if column < header_columns {
+        settings.header_columns = decremented_header_count(header_columns)?;
+        Ok(Some(settings))
+    } else {
+        Ok(None)
+    }
+}
+
+fn decremented_header_count(count: usize) -> Result<Option<NumbersTableHeaderCount>> {
+    match count.checked_sub(1) {
+        Some(0) => Ok(None),
+        Some(count) => NumbersTableHeaderCount::new(count).map(Some),
+        None => Err(Error::InvalidFormat(
+            "iWork header/footer deletion underflow".to_owned(),
+        )),
+    }
 }
 
 fn stored_cells_on_axis(

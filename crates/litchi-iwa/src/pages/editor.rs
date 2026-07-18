@@ -3784,10 +3784,11 @@ pub use charts::{PagesBodyChartInfo, RemovedPagesBodyChart};
 pub use images::{PagesImageInfo, RemovedPagesImage};
 pub use movies::{PagesMovieInfo, PagesMovieOptions, RemovedPagesMovie};
 pub use tables::{
-    PagesCellValue, PagesTable, PagesTableCellUpdate, PagesTableDimension, PagesTableDimensionSize,
-    PagesTableFormulaAxisReference, PagesTableFormulaBinaryOperator, PagesTableFormulaCachedValue,
-    PagesTableFormulaCellReference, PagesTableFormulaExpression, PagesTableHeaderCount,
-    PagesTableHeaderSettings, PagesTableInfo, PagesTablePoints, PagesTableTitleSettings,
+    PagesCellValue, PagesTable, PagesTableCellUpdate, PagesTableColumnInsertion,
+    PagesTableDimension, PagesTableDimensionSize, PagesTableFormulaAxisReference,
+    PagesTableFormulaBinaryOperator, PagesTableFormulaCachedValue, PagesTableFormulaCellReference,
+    PagesTableFormulaExpression, PagesTableHeaderCount, PagesTableHeaderSettings, PagesTableInfo,
+    PagesTablePoints, PagesTableRowInsertion, PagesTableTitleSettings,
 };
 
 #[cfg(test)]

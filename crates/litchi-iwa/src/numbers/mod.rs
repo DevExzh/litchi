@@ -54,6 +54,7 @@ pub use editor::{
     NumbersTableInfo, NumbersTablePoints, NumbersTableTitleSettings, NumbersTextBoxInfo,
     RemovedNumbersSheetAudio, RemovedNumbersSheetChart, RemovedNumbersSheetImage,
     RemovedNumbersSheetMovie, RemovedNumbersSheetShape, RemovedNumbersTextBox,
+    TableColumnInsertion, TableRowInsertion,
 };
 pub use formula::{
     FormulaAxisReference, FormulaBinaryOperator, FormulaCachedValue, FormulaCellReference,

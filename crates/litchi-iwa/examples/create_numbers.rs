@@ -2,7 +2,7 @@
 
 use litchi_iwa::numbers::{
     CellValue, FormulaCachedValue, FormulaCellReference, FormulaExpression, NumbersDocumentBuilder,
-    NumbersTableHeaderCount, NumbersTableHeaderSettings, TableCellUpdate,
+    NumbersTableHeaderCount, NumbersTableHeaderSettings, TableCellUpdate, TableRowInsertion,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -52,7 +52,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ),
         FormulaCachedValue::Number(218.0),
     )?;
-    editor.insert_table_row(table_id, 3)?;
+    editor.insert_table_row(table_id, TableRowInsertion::body(2))?;
     editor.set_cells(
         table_id,
         [

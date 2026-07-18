@@ -4,23 +4,28 @@ use super::*;
 
 mod storage;
 
-use formula_dependency_shift::{DependencyAxis, shift_formula_dependencies};
+use formula_dependency_shift::{DependencyAxis, FooterRangeInsertion, shift_formula_dependencies};
 use storage::{
     insert_column_uid, insert_stroke_column, set_table_column_count, shift_column_headers,
     shift_table_tile_columns,
 };
+use table_headers::set_attached_table_header_settings;
 use table_topology::{category_grouping_is_enabled, filter_has_row_state};
 
 impl NumbersEditor {
-    /// Insert one blank physical column before `column` in a table.
+    /// Insert one blank column at a section-relative position in a table.
     ///
-    /// `column == table.columns` appends a column. Stored cells, column
-    /// metadata, stable column UIDs, and ordinary formula dependency
-    /// coordinates are shifted in lockstep. Unsupported topology is rejected
-    /// transactionally without changing the package.
-    pub fn insert_table_column(&mut self, table_id: u64, column: usize) -> Result<()> {
+    /// Stored cells, column metadata, stable column UIDs, header counts, and
+    /// ordinary formula dependency coordinates are shifted in lockstep.
+    /// Unsupported topology is rejected transactionally without changing the
+    /// package.
+    pub fn insert_table_column(
+        &mut self,
+        table_id: u64,
+        insertion: TableColumnInsertion,
+    ) -> Result<()> {
         let mut staged = self.package.clone();
-        let new_columns = insert_attached_table_column(&mut staged, table_id, column)?;
+        let new_columns = insert_attached_table_column(&mut staged, table_id, insertion)?;
         let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
         let table = verified
             .tables()?
@@ -42,22 +47,19 @@ impl NumbersEditor {
 pub(super) fn insert_attached_table_column(
     package: &mut IWorkPackage,
     table_id: u64,
-    column: usize,
+    insertion: TableColumnInsertion,
 ) -> Result<usize> {
     let descriptor = attached_table_descriptor(package, table_id)?;
     let old_columns = descriptor.model.number_of_columns as usize;
-    if column > old_columns {
-        return Err(Error::ParseError(format!(
-            "Cannot insert iWork column {column} into a table with {old_columns} columns"
-        )));
-    }
+    let resolved = resolve_column_insertion(&descriptor.model, insertion)?;
+    let column = resolved.physical_index;
     let new_columns = old_columns
         .checked_add(1)
         .ok_or_else(|| Error::ParseError("iWork column count overflow".to_owned()))?;
     let (_, new_columns_u32) =
         validate_table_dimensions(descriptor.model.number_of_rows as usize, new_columns)?;
     let locations = object_locations(package)?;
-    validate_column_insertion_features(package, &locations, &descriptor.model, column)?;
+    validate_column_insertion_features(package, &locations, &descriptor.model)?;
 
     shift_formula_dependencies(
         package,
@@ -65,6 +67,7 @@ pub(super) fn insert_attached_table_column(
         DependencyAxis::Column,
         u32::try_from(column)
             .map_err(|_| Error::ParseError("iWork column exceeds u32".to_owned()))?,
+        FooterRangeInsertion::FixedSection,
     )?;
     shift_table_tile_columns(package, &locations, &descriptor.model, column)?;
     shift_column_headers(
@@ -86,6 +89,9 @@ pub(super) fn insert_attached_table_column(
         insert_stroke_column(package, &locations, reference.identifier, new_columns_u32)?;
     }
     set_table_column_count(package, &locations, descriptor.object_id, new_columns_u32)?;
+    if let Some(settings) = resolved.updated_header_settings {
+        set_attached_table_header_settings(package, table_id, settings)?;
+    }
     if attached_table_descriptor(package, table_id)?
         .model
         .number_of_columns
@@ -98,18 +104,54 @@ pub(super) fn insert_attached_table_column(
     Ok(new_columns)
 }
 
+struct ResolvedColumnInsertion {
+    physical_index: usize,
+    updated_header_settings: Option<NumbersTableHeaderSettings>,
+}
+
+fn resolve_column_insertion(
+    model: &TableModelArchive,
+    insertion: TableColumnInsertion,
+) -> Result<ResolvedColumnInsertion> {
+    let columns = model.number_of_columns as usize;
+    let mut settings = NumbersTableHeaderSettings::from_model(model)?;
+    let header_columns = settings.header_column_count();
+    let body_columns = columns.checked_sub(header_columns).ok_or_else(|| {
+        Error::InvalidFormat("iWork header columns exceed the table column count".to_owned())
+    })?;
+    match insertion {
+        TableColumnInsertion::Header { index } => {
+            validate_section_insertion(index, header_columns, "header column")?;
+            settings.header_columns = Some(NumbersTableHeaderCount::new(header_columns + 1)?);
+            Ok(ResolvedColumnInsertion {
+                physical_index: index,
+                updated_header_settings: Some(settings),
+            })
+        },
+        TableColumnInsertion::Body { index } => {
+            validate_section_insertion(index, body_columns, "body column")?;
+            Ok(ResolvedColumnInsertion {
+                physical_index: header_columns + index,
+                updated_header_settings: None,
+            })
+        },
+    }
+}
+
+fn validate_section_insertion(index: usize, length: usize, section: &str) -> Result<()> {
+    if index > length {
+        return Err(Error::ParseError(format!(
+            "Cannot insert iWork {section} {index} into a section with {length} columns"
+        )));
+    }
+    Ok(())
+}
+
 fn validate_column_insertion_features(
     package: &IWorkPackage,
     locations: &HashMap<u64, String>,
     model: &TableModelArchive,
-    column: usize,
 ) -> Result<()> {
-    let header_columns = model.number_of_header_columns.unwrap_or(0) as usize;
-    if column < header_columns {
-        return Err(Error::ParseError(
-            "Inserting inside iWork header columns is not yet supported".to_owned(),
-        ));
-    }
     if model.number_of_hidden_columns.unwrap_or(0) != 0
         || model.number_of_user_hidden_columns.unwrap_or(0) != 0
         || model.number_of_filtered_rows.unwrap_or(0) != 0

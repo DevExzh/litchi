@@ -17,6 +17,7 @@ pub(super) fn rewrite_formula_asts(
     axis: DependencyAxis,
     position: u32,
     mutation: DependencyMutation,
+    expand_footer_ranges: bool,
 ) -> Result<FormulaDependencyAdjustments> {
     let descriptor = attached_table_descriptors(package)?
         .into_iter()
@@ -140,6 +141,7 @@ pub(super) fn rewrite_formula_asts(
         let footer_boundary = descriptor.model.number_of_rows.saturating_sub(footer_rows);
         let footer = (footer_rows > 0 && row >= footer_boundary).then_some(FooterFormulaContext {
             boundary: footer_boundary,
+            expand_on_insert: expand_footer_ranges,
         });
         let mut current = previous.clone();
         let mut local_adjustments = LocalPrecedentAdjustments::default();
@@ -226,6 +228,7 @@ pub(super) fn rewrite_formula_asts(
 #[derive(Clone, Copy, Debug)]
 struct FooterFormulaContext {
     boundary: u32,
+    expand_on_insert: bool,
 }
 
 fn footer_range_overrides(
@@ -243,7 +246,9 @@ fn footer_range_overrides(
     let Some(footer) = footer.filter(|_| axis == DependencyAxis::Row) else {
         return Ok(HashMap::new());
     };
-    let expands_footer = mutation == DependencyMutation::Insert && position == footer.boundary;
+    let expands_footer = mutation == DependencyMutation::Insert
+        && footer.expand_on_insert
+        && position == footer.boundary;
     let contracts_footer =
         mutation == DependencyMutation::Delete && position.checked_add(1) == Some(footer.boundary);
     if !expands_footer && !contracts_footer {
@@ -560,7 +565,9 @@ fn mutate_tract_interval(
     let footer_change = axis == DependencyAxis::Row
         && footer.is_some_and(|footer| match mutation {
             DependencyMutation::Insert => {
-                position == footer.boundary && high.checked_add(1) == Some(position)
+                footer.expand_on_insert
+                    && position == footer.boundary
+                    && high.checked_add(1) == Some(position)
             },
             DependencyMutation::Delete => {
                 position.checked_add(1) == Some(footer.boundary)
