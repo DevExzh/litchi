@@ -160,7 +160,7 @@ pub(super) fn bootstrap_empty_table_graph(
     set_package_last_object_identifier(package, ids.stroke_sidecar)?;
 
     if let Some((calculation_entry, _)) =
-        create_empty_table_formula_graph(package, ids.info, ids.info, &table_uuid)?
+        create_empty_table_formula_graph(package, ids.info, &table_uuid)?
     {
         register_numbers_component_reference(
             package,

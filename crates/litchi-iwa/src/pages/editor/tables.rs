@@ -748,11 +748,17 @@ mod tests {
 
     #[test]
     fn source_built_table_roundtrips_formula_crud_transactionally() {
-        let mut editor = PagesDocumentBuilder::new()
+        let editor = PagesDocumentBuilder::new()
             .body_table("Formula", 3, 2)
             .build()
             .unwrap();
         let model_id = editor.tables().unwrap()[0].model_object_id;
+        let mut package = editor.into_package();
+        let engine = package.remove_entry("Index/CalculationEngine.iwa").unwrap();
+        package
+            .insert_entry("Index/CalculationEngine-82.iwa", engine)
+            .unwrap();
+        let mut editor = PagesEditor::from_package(package).unwrap();
         editor
             .set_table_formula(
                 model_id,
@@ -996,6 +1002,12 @@ mod tests {
             )
             .unwrap();
         let anchor = "Alpha 🙂\n".encode_utf16().count();
+        let mut package = editor.into_package();
+        let engine = package.remove_entry("Index/CalculationEngine.iwa").unwrap();
+        package
+            .insert_entry("Index/CalculationEngine-83.iwa", engine)
+            .unwrap();
+        let mut editor = PagesEditor::from_package(package).unwrap();
 
         let inserted = editor.add_table(anchor, "Inserted", 4, 3).unwrap();
         assert_eq!(inserted.anchor_character_index, anchor);

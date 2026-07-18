@@ -11,6 +11,7 @@ use std::io::Cursor;
 use soapberry_zip::office::ArchiveReader;
 
 use crate::archive::Archive;
+use crate::package::is_calculation_engine_entry_name;
 use crate::snappy::SnappyStream;
 use crate::{Error, Result};
 
@@ -188,7 +189,7 @@ pub fn analyze_file_structure(archive: &ArchiveReader<'_>) -> FileStructureInfo 
         }
 
         // Check for Numbers-specific patterns
-        if name == "Index/CalculationEngine.iwa" {
+        if is_calculation_engine_entry_name(name) {
             info.has_calculation_engine = true;
         }
 
@@ -211,7 +212,7 @@ pub fn analyze_file_structure(archive: &ArchiveReader<'_>) -> FileStructureInfo 
 pub struct FileStructureInfo {
     /// Number of table files found (Index/Tables/*.iwa)
     pub table_file_count: usize,
-    /// Whether CalculationEngine.iwa exists (Numbers-specific)
+    /// Whether a canonical or app-versioned CalculationEngine component exists.
     pub has_calculation_engine: bool,
     /// Number of slide files found (Index/Slide*.iwa)
     pub slide_file_count: usize,
@@ -279,6 +280,23 @@ mod tests {
         assert!(!pages_info.is_likely_keynote());
         assert!(!pages_info.is_likely_numbers());
         assert!(pages_info.is_likely_pages());
+    }
+
+    #[test]
+    fn versioned_calculation_engine_is_detected() {
+        let mut writer = StreamingArchiveWriter::new();
+        writer
+            .write_stored("Index/Tables/Table-1.iwa", b"table")
+            .unwrap();
+        writer
+            .write_stored("Index/CalculationEngine-138.iwa", b"engine")
+            .unwrap();
+        let bytes = writer.finish_to_bytes().unwrap();
+        let archive = ArchiveReader::new(&bytes).unwrap();
+
+        let info = analyze_file_structure(&archive);
+        assert!(info.has_calculation_engine);
+        assert!(info.is_likely_numbers());
     }
 
     #[test]

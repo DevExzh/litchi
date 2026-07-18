@@ -149,6 +149,27 @@ impl IWorkPackage {
             .map(|(name, _)| name.as_str())
     }
 
+    /// Locate the package's calculation-engine component without allocating.
+    ///
+    /// Pages and Numbers may add numeric suffixes when they save a package,
+    /// for example `Index/CalculationEngine-174.iwa`. Multiple matching
+    /// components are rejected because choosing one would make formula edits
+    /// ambiguous.
+    pub fn calculation_engine_entry_name(&self) -> Result<Option<&str>> {
+        let mut entries = self
+            .iwa_entry_names()
+            .filter(|name| is_calculation_engine_entry_name(name));
+        let Some(entry) = entries.next() else {
+            return Ok(None);
+        };
+        if entries.next().is_some() {
+            return Err(Error::InvalidFormat(
+                "iWork package contains multiple CalculationEngine components".to_owned(),
+            ));
+        }
+        Ok(Some(entry))
+    }
+
     pub fn contains_entry(&self, name: &str) -> bool {
         self.entry_position(normalize_entry_name(name)).is_some()
     }
@@ -304,6 +325,24 @@ fn insert_unique_archive_entry(
 
 fn normalize_entry_name(name: &str) -> &str {
     name.strip_prefix('/').unwrap_or(name)
+}
+
+pub(crate) fn is_calculation_engine_entry_name(name: &str) -> bool {
+    const BASE_NAME: &str = "CalculationEngine.iwa";
+    const VERSIONED_PREFIX: &str = "CalculationEngine-";
+
+    name.rsplit('/').next().is_some_and(|file_name| {
+        file_name == BASE_NAME
+            || file_name
+                .strip_prefix(VERSIONED_PREFIX)
+                .and_then(|suffix| suffix.strip_suffix(".iwa"))
+                .is_some_and(|version| {
+                    !version.is_empty()
+                        && version.split('-').all(|part| {
+                            !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_digit())
+                        })
+                })
+    })
 }
 
 fn is_legacy_operation_storage(name: &str, data: &[u8]) -> bool {
@@ -474,5 +513,45 @@ mod tests {
         );
         let error = package.archive("Index/OperationStorage.iwa").unwrap_err();
         assert!(error.to_string().contains("legacy operation log"));
+    }
+
+    #[test]
+    fn discovers_canonical_and_app_versioned_calculation_engines_strictly() {
+        for entry in [
+            "Index/CalculationEngine.iwa",
+            "Index/CalculationEngine-174.iwa",
+            "Index/CalculationEngine-10-2.iwa",
+        ] {
+            let mut package = IWorkPackage::new();
+            package.insert_entry(entry, vec![1]).unwrap();
+            assert_eq!(
+                package.calculation_engine_entry_name().unwrap(),
+                Some(entry)
+            );
+        }
+
+        for entry in [
+            "Index/CalculationEngine-.iwa",
+            "Index/CalculationEngine-copy.iwa",
+            "Index/CalculationEngine-1-.iwa",
+            "Index/CalculationEngine-1.txt",
+        ] {
+            let mut package = IWorkPackage::new();
+            package.insert_entry(entry, vec![1]).unwrap();
+            assert_eq!(package.calculation_engine_entry_name().unwrap(), None);
+        }
+    }
+
+    #[test]
+    fn rejects_ambiguous_calculation_engines() {
+        let mut package = IWorkPackage::new();
+        package
+            .insert_entry("Index/CalculationEngine.iwa", vec![1])
+            .unwrap();
+        package
+            .insert_entry("Index/CalculationEngine-1.iwa", vec![2])
+            .unwrap();
+
+        assert!(package.calculation_engine_entry_name().is_err());
     }
 }

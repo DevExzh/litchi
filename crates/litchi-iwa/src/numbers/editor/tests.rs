@@ -2043,7 +2043,13 @@ fn formula_dependency_tiles_use_app_dimensions_and_global_record_coordinates() {
 
 #[test]
 fn cross_table_formula_cells_write_owner_uid_ast_and_external_edges() {
-    let mut editor = NumbersEditor::from_package(test_package_with_cross_table_engine()).unwrap();
+    const VERSIONED_ENGINE_ENTRY: &str = "Index/CalculationEngine-77.iwa";
+    let mut package = test_package_with_cross_table_engine();
+    let engine = package.remove_entry("Index/CalculationEngine.iwa").unwrap();
+    package
+        .insert_entry(VERSIONED_ENGINE_ENTRY, engine)
+        .unwrap();
+    let mut editor = NumbersEditor::from_package(package).unwrap();
     editor
         .set_formula(
             10,
@@ -2083,10 +2089,7 @@ fn cross_table_formula_cells_write_owner_uid_ast_and_external_edges() {
     assert_eq!(table_id.uuid_w0, Some(0x3170_bbd8));
     assert_eq!(table_id.uuid_w3, Some(0xbd57_cadc));
 
-    let calculation_archive = editor
-        .package()
-        .archive("Index/CalculationEngine.iwa")
-        .unwrap();
+    let calculation_archive = editor.package().archive(VERSIONED_ENGINE_ENTRY).unwrap();
     let owner = tsce::FormulaOwnerDependenciesArchive::decode(
         calculation_archive.object(101).unwrap().messages[0]
             .data
@@ -2372,7 +2375,13 @@ fn duplicates_populated_table_with_independent_storage() {
 
 #[test]
 fn duplicates_formula_table_with_independent_dependency_owner() {
-    let mut editor = NumbersEditor::from_package(test_package_with_calculation_engine()).unwrap();
+    const VERSIONED_ENGINE_ENTRY: &str = "Index/CalculationEngine-78-2.iwa";
+    let mut package = test_package_with_calculation_engine();
+    let engine = package.remove_entry("Index/CalculationEngine.iwa").unwrap();
+    package
+        .insert_entry(VERSIONED_ENGINE_ENTRY, engine)
+        .unwrap();
+    let mut editor = NumbersEditor::from_package(package).unwrap();
     let expression = FormulaExpression::function(
         "SUM",
         [
@@ -2384,6 +2393,7 @@ fn duplicates_formula_table_with_independent_dependency_owner() {
 
     let created = editor.duplicate_table(10).unwrap();
     let owner = find_table_owner(editor.package(), created.object_id).unwrap();
+    let cloned_table_info_id = owner.table_info_id;
     let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(document.sheets().unwrap()[0].tables.len(), 2);
     assert_eq!(
@@ -2395,10 +2405,7 @@ fn duplicates_formula_table_with_independent_dependency_owner() {
         Some(&CellValue::Formula("=SUM(1,2)".to_owned()))
     );
 
-    let calculation = editor
-        .package()
-        .archive("Index/CalculationEngine.iwa")
-        .unwrap();
+    let calculation = editor.package().archive(VERSIONED_ENGINE_ENTRY).unwrap();
     let owners = calculation
         .objects
         .iter()
@@ -2472,6 +2479,36 @@ fn duplicates_formula_table_with_independent_dependency_owner() {
         document.sheets().unwrap()[0].tables[1].get_cell(1, 1),
         Some(&CellValue::Formula("=SUM(9)".to_owned()))
     );
+
+    editor.remove_table(created.object_id).unwrap();
+    assert_eq!(editor.tables().unwrap().len(), 1);
+    let calculation = editor.package().archive(VERSIONED_ENGINE_ENTRY).unwrap();
+    let owners = calculation
+        .objects
+        .iter()
+        .flat_map(|object| &object.messages)
+        .filter(|message| message.type_ == 4008)
+        .filter_map(|message| {
+            tsce::FormulaOwnerDependenciesArchive::decode(message.data.as_slice()).ok()
+        })
+        .collect::<Vec<_>>();
+    assert!(owners.iter().all(|owner| {
+        owner
+            .formula_owner
+            .as_ref()
+            .is_none_or(|owner| owner.identifier != cloned_table_info_id)
+    }));
+    let engine = calculation
+        .objects
+        .iter()
+        .flat_map(|object| &object.messages)
+        .find_map(|message| {
+            (message.type_ == 4000)
+                .then(|| tsce::CalculationEngineArchive::decode(message.data.as_slice()).ok())
+                .flatten()
+        })
+        .unwrap();
+    assert_eq!(engine.dependency_tracker.number_of_formulas, Some(1));
 }
 
 #[test]

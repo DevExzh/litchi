@@ -1933,13 +1933,11 @@ pub(super) fn update_formula_dependencies(
     local_precedents: &[(u32, u32)],
     external_precedents: &[(u32, u32, u32)],
 ) -> Result<()> {
-    const COMPONENT: &str = "Index/CalculationEngine.iwa";
-
     // Minimal synthetic packages used by embedders may omit CalculationEngine;
     // real Numbers documents always carry it.
-    if !package.contains_entry(COMPONENT) {
+    let Some(component) = package.calculation_engine_entry_name()?.map(str::to_owned) else {
         return Ok(());
-    }
+    };
     let row = u32::try_from(row)
         .map_err(|_| Error::ParseError("Numbers formula row exceeds u32".to_owned()))?;
     let column = u32::try_from(column)
@@ -1955,7 +1953,7 @@ pub(super) fn update_formula_dependencies(
         .checked_add(1)
         .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))?;
 
-    package.update_archive(COMPONENT, |archive| {
+    package.update_archive(&component, |archive| {
         let engine_id = archive
             .objects
             .iter()
@@ -2275,15 +2273,14 @@ pub(super) fn verify_formula_dependency(
     local_precedents: &[(u32, u32)],
     external_precedents: &[(u32, u32, u32)],
 ) -> Result<()> {
-    const COMPONENT: &str = "Index/CalculationEngine.iwa";
-    if !package.contains_entry(COMPONENT) {
+    let Some(component) = package.calculation_engine_entry_name()? else {
         return Ok(());
-    }
+    };
     let row = u32::try_from(row)
         .map_err(|_| Error::ParseError("Numbers formula row exceeds u32".to_owned()))?;
     let column = u32::try_from(column)
         .map_err(|_| Error::ParseError("Numbers formula column exceeds u32".to_owned()))?;
-    let archive = package.archive(COMPONENT)?;
+    let archive = package.archive(component)?;
     let expected_edges = expanded_formula_edges(local_precedents, external_precedents)?;
     let owner = archive
         .objects
@@ -2454,35 +2451,6 @@ pub(super) fn object_locations(package: &IWorkPackage) -> Result<HashMap<u64, St
         }
     }
     Ok(locations)
-}
-
-pub(super) fn calculation_engine_entry(package: &IWorkPackage) -> Result<Option<String>> {
-    const BASE_NAME: &str = "CalculationEngine.iwa";
-    const VERSIONED_PREFIX: &str = "CalculationEngine-";
-
-    let mut entries = package.iwa_entry_names().filter(|name| {
-        name.rsplit('/').next().is_some_and(|file_name| {
-            file_name == BASE_NAME
-                || file_name
-                    .strip_prefix(VERSIONED_PREFIX)
-                    .and_then(|suffix| suffix.strip_suffix(".iwa"))
-                    .is_some_and(|version| {
-                        !version.is_empty()
-                            && version.split('-').all(|part| {
-                                !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_digit())
-                            })
-                    })
-        })
-    });
-    let Some(entry) = entries.next() else {
-        return Ok(None);
-    };
-    if entries.next().is_some() {
-        return Err(Error::InvalidFormat(
-            "iWork package contains multiple CalculationEngine components".to_owned(),
-        ));
-    }
-    Ok(Some(entry.to_owned()))
 }
 
 pub(super) fn read_tile_cell(

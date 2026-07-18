@@ -2702,6 +2702,7 @@ impl NumbersEditor {
             Error::InvalidFormat("Numbers table clone allocated no identifiers".to_owned())
         })?;
         set_package_last_object_identifier(&mut staged, table_last_identifier)?;
+        let calculation_engine_entry = staged.calculation_engine_entry_name()?.map(str::to_owned);
         clone_table_formula_graph(
             &mut staged,
             owner.table_info_id,
@@ -2709,12 +2710,14 @@ impl NumbersEditor {
             &source.model.table_id,
             &table_uuid,
         )?;
-        register_numbers_component_reference(
-            &mut staged,
-            "Index/CalculationEngine.iwa",
-            info_archive_name,
-            new_info_id,
-        )?;
+        if let Some(calculation_engine_entry) = calculation_engine_entry {
+            register_numbers_component_reference(
+                &mut staged,
+                &calculation_engine_entry,
+                info_archive_name,
+                new_info_id,
+            )?;
+        }
 
         let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
         let created = verified

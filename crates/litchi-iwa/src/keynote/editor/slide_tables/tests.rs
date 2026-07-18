@@ -13,8 +13,14 @@ fn table_geometry() -> (DrawablePoint, DrawableSize) {
 
 #[test]
 fn source_built_table_roundtrips_full_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let editor = KeynoteDocumentBuilder::new().build().unwrap();
     assert!(editor.slide_tables(0).unwrap().is_empty());
+    let mut package = editor.into_package();
+    let engine = package.remove_entry("Index/CalculationEngine.iwa").unwrap();
+    package
+        .insert_entry("Index/CalculationEngine-81.iwa", engine)
+        .unwrap();
+    let mut editor = KeynoteEditor::from_package(package).unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Forecast", 3, 3, position, size)
@@ -144,7 +150,13 @@ fn source_built_table_roundtrips_full_crud() {
 
 #[test]
 fn source_built_table_roundtrips_formula_crud_transactionally() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut package = editor.into_package();
+    let engine = package.remove_entry("Index/CalculationEngine.iwa").unwrap();
+    package
+        .insert_entry("Index/CalculationEngine-82.iwa", engine)
+        .unwrap();
+    let mut editor = KeynoteEditor::from_package(package).unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Formula", 3, 2, position, size)

@@ -1800,11 +1800,10 @@ pub(super) fn formula_external_tables(
     package: &IWorkPackage,
     descriptors: &[TableDescriptor],
 ) -> Result<HashMap<u64, ExternalFormulaTable>> {
-    const COMPONENT: &str = "Index/CalculationEngine.iwa";
-    if !package.contains_entry(COMPONENT) {
+    let Some(component) = package.calculation_engine_entry_name()? else {
         return Ok(HashMap::new());
-    }
-    let archive = package.archive(COMPONENT)?;
+    };
+    let archive = package.archive(component)?;
     let owners = archive
         .objects
         .iter()
@@ -1839,11 +1838,10 @@ pub(super) fn formula_external_tables(
 pub(super) fn formula_pivot_categories(
     package: &IWorkPackage,
 ) -> Result<HashMap<PivotFormulaKey, ExternalPivotCategory>> {
-    const COMPONENT: &str = "Index/CalculationEngine.iwa";
-    if !package.contains_entry(COMPONENT) {
+    let Some(component) = package.calculation_engine_entry_name()? else {
         return Ok(HashMap::new());
-    }
-    let archive = package.archive(COMPONENT)?;
+    };
+    let archive = package.archive(component)?;
     let mut owner_ids = HashMap::<u32, Vec<u32>>::new();
     let mut groups = Vec::new();
     let mut group_nodes = HashMap::new();

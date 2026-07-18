@@ -117,7 +117,7 @@ fn mutate_formula_dependencies(
     position: u32,
     mutation: DependencyMutation,
 ) -> Result<()> {
-    let Some(component) = calculation_engine_entry(package)? else {
+    let Some(component) = package.calculation_engine_entry_name()?.map(str::to_owned) else {
         return Ok(());
     };
     let adjustments =

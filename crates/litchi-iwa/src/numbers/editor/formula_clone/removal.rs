@@ -241,31 +241,23 @@ pub(super) fn calculation_engine_entry_for_contexts(
     package: &IWorkPackage,
     table_context_ids: &HashSet<u64>,
 ) -> Result<Option<String>> {
-    let mut found = None;
-    for entry in package.iwa_entry_names() {
-        let archive = package.archive(entry)?;
-        let mut owns_table = false;
-        for message in archive
-            .objects
-            .iter()
-            .flat_map(|object| &object.messages)
-            .filter(|message| message.type_ == FORMULA_OWNER_MESSAGE_TYPE)
-        {
-            let owner = tsce::FormulaOwnerDependenciesArchive::decode(message.data.as_slice())?;
-            owns_table |= owner
-                .formula_owner
-                .is_some_and(|reference| table_context_ids.contains(&reference.identifier));
-        }
-        if !owns_table {
-            continue;
-        }
-        if found.replace(entry.to_owned()).is_some() {
-            return Err(Error::InvalidFormat(
-                "iWork table graph has formula owners in multiple components".to_owned(),
-            ));
-        }
+    let Some(entry) = package.calculation_engine_entry_name()? else {
+        return Ok(None);
+    };
+    let archive = package.archive(entry)?;
+    let mut owns_table = false;
+    for message in archive
+        .objects
+        .iter()
+        .flat_map(|object| &object.messages)
+        .filter(|message| message.type_ == FORMULA_OWNER_MESSAGE_TYPE)
+    {
+        let owner = tsce::FormulaOwnerDependenciesArchive::decode(message.data.as_slice())?;
+        owns_table |= owner
+            .formula_owner
+            .is_some_and(|reference| table_context_ids.contains(&reference.identifier));
     }
-    Ok(found)
+    Ok(owns_table.then(|| entry.to_owned()))
 }
 
 fn formula_owner_context_family(

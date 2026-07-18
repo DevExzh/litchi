@@ -21,7 +21,6 @@ pub(super) use formula_storage::{
 };
 pub(super) use removal::{remove_table_formula_graph, remove_table_formula_graph_for_contexts};
 
-const CALCULATION_ENGINE_ENTRY: &str = "Index/CalculationEngine.iwa";
 const CALCULATION_ENGINE_MESSAGE_TYPE: u32 = 4_000;
 const FORMULA_OWNER_MESSAGE_TYPE: u32 = 4_008;
 const CELL_RECORD_TILE_MESSAGE_TYPE: u32 = 4_009;
@@ -44,18 +43,12 @@ struct CellTileSource {
 /// editable, but there is no component in which to register formula state.
 pub(super) fn create_empty_table_formula_graph(
     package: &mut IWorkPackage,
-    template_table_info_id: u64,
     table_info_id: u64,
     table_uuid: &str,
 ) -> Result<Option<(String, u64)>> {
-    let contexts = HashSet::from([template_table_info_id]);
-    let calculation_engine_entry =
-        removal::calculation_engine_entry_for_contexts(package, &contexts)?.or_else(|| {
-            package
-                .contains_entry(CALCULATION_ENGINE_ENTRY)
-                .then(|| CALCULATION_ENGINE_ENTRY.to_owned())
-        });
-    let Some(calculation_engine_entry) = calculation_engine_entry else {
+    let Some(calculation_engine_entry) =
+        package.calculation_engine_entry_name()?.map(str::to_owned)
+    else {
         return Ok(None);
     };
     let table_uuid = parse_table_uuid(table_uuid)?;
@@ -123,12 +116,14 @@ pub(super) fn clone_table_formula_graph(
     source_table_uuid: &str,
     new_table_uuid: &str,
 ) -> Result<Vec<u64>> {
-    if !package.contains_entry(CALCULATION_ENGINE_ENTRY) {
+    let Some(calculation_engine_entry) =
+        package.calculation_engine_entry_name()?.map(str::to_owned)
+    else {
         return Ok(Vec::new());
-    }
+    };
     let source_uuid = parse_table_uuid(source_table_uuid)?;
     let new_uuid = parse_table_uuid(new_table_uuid)?;
-    let archive = package.archive(CALCULATION_ENGINE_ENTRY)?;
+    let archive = package.archive(&calculation_engine_entry)?;
     let (owners, source_owner_uuid) = formula_owner_family(&archive, source_table_info_id)?;
     if owners.is_empty() {
         return Err(Error::InvalidFormat(format!(
@@ -274,7 +269,7 @@ pub(super) fn clone_table_formula_graph(
         )?);
     }
 
-    let source_uuid_ids = component_identifier_for_entry(package, CALCULATION_ENGINE_ENTRY)?
+    let source_uuid_ids = component_identifier_for_entry(package, &calculation_engine_entry)?
         .map(|component| component_uuid_identifiers(package, component))
         .transpose()?
         .flatten()
@@ -287,7 +282,7 @@ pub(super) fn clone_table_formula_graph(
         })
         .collect::<Vec<_>>();
 
-    package.update_archive(CALCULATION_ENGINE_ENTRY, |archive| {
+    package.update_archive(&calculation_engine_entry, |archive| {
         let (engine_id, engine_message_index) = calculation_engine_location(archive)?;
         let engine_object = archive.object_mut(engine_id).ok_or_else(|| {
             Error::InvalidFormat("Numbers CalculationEngine root is missing".to_owned())
@@ -335,7 +330,7 @@ pub(super) fn clone_table_formula_graph(
         Error::InvalidFormat("Numbers formula clone allocated no identifiers".to_owned())
     })?;
     set_package_last_object_identifier(package, last_identifier)?;
-    if let Some(component) = component_identifier_for_entry(package, CALCULATION_ENGINE_ENTRY)? {
+    if let Some(component) = component_identifier_for_entry(package, &calculation_engine_entry)? {
         add_component_object_uuids(package, component, &new_uuid_ids)?;
     }
     Ok(cloned_owner_ids)
@@ -347,12 +342,12 @@ pub(super) fn formula_graph_owner_uuids(
     source_table_uuid: &str,
     new_table_uuid: &str,
 ) -> Result<Option<(tsp::Uuid, tsp::Uuid)>> {
-    if !package.contains_entry(CALCULATION_ENGINE_ENTRY) {
+    let Some(calculation_engine_entry) = package.calculation_engine_entry_name()? else {
         return Ok(None);
-    }
+    };
     let source_table_uuid = parse_table_uuid(source_table_uuid)?;
     let new_table_uuid = parse_table_uuid(new_table_uuid)?;
-    let archive = package.archive(CALCULATION_ENGINE_ENTRY)?;
+    let archive = package.archive(calculation_engine_entry)?;
     let (_, source_owner_uuid) = formula_owner_family(&archive, table_info_id)?;
     if source_owner_uuid != formula_owner_uuid_for_table(&source_table_uuid) {
         return Err(Error::InvalidFormat(format!(
@@ -372,10 +367,10 @@ pub(super) fn table_formula_graph_is_self_contained(
     package: &IWorkPackage,
     table_info_id: u64,
 ) -> Result<bool> {
-    if !package.contains_entry(CALCULATION_ENGINE_ENTRY) {
+    let Some(calculation_engine_entry) = package.calculation_engine_entry_name()? else {
         return Ok(true);
-    }
-    let archive = package.archive(CALCULATION_ENGINE_ENTRY)?;
+    };
+    let archive = package.archive(calculation_engine_entry)?;
     let (owners, _) = formula_owner_family(&archive, table_info_id)?;
     let family = owners
         .iter()
