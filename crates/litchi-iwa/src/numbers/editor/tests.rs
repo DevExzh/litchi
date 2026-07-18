@@ -2862,7 +2862,7 @@ fn row_insert_rejects_out_of_bounds_index_transactionally() {
 }
 
 #[test]
-fn row_insert_rejects_formula_ast_rewrite_transactionally() {
+fn row_insert_rewrites_relative_formula_ast_losslessly() {
     let mut editor = NumbersEditor::from_package(test_package_with_calculation_engine()).unwrap();
     editor
         .set_formula(
@@ -2874,7 +2874,190 @@ fn row_insert_rejects_formula_ast_rewrite_transactionally() {
         .unwrap();
     let before = editor.to_bytes().unwrap();
 
-    assert!(editor.insert_table_row(10, 2).is_err());
+    editor.insert_table_row(10, 2).unwrap();
+    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        document.sheets().unwrap()[0].tables[0].get_cell(3, 2),
+        Some(&CellValue::Formula("=B2".to_owned()))
+    );
+    editor.remove_table_row(10, 2).unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
+fn column_insert_rewrites_absolute_formula_ast_losslessly() {
+    let mut editor =
+        NumbersEditor::from_package(test_package_with_column_headers_and_engine()).unwrap();
+    editor
+        .set_formula(
+            10,
+            2,
+            2,
+            FormulaExpression::cell(crate::numbers::FormulaCellReference::absolute(1, 1)),
+        )
+        .unwrap();
+    let before = editor.to_bytes().unwrap();
+
+    editor.insert_table_column(10, 1).unwrap();
+    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        document.sheets().unwrap()[0].tables[0].get_cell(2, 3),
+        Some(&CellValue::Formula("=$C$2".to_owned()))
+    );
+    editor.remove_table_column(10, 1).unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
+fn row_insert_rewrites_range_ast_and_preserves_unknown_formula_wire() {
+    let mut editor = NumbersEditor::from_package(test_package_with_calculation_engine()).unwrap();
+    editor
+        .set_formula(
+            10,
+            3,
+            2,
+            FormulaExpression::function(
+                "SUM",
+                [FormulaExpression::range(
+                    crate::numbers::FormulaCellReference::relative(0, 1),
+                    crate::numbers::FormulaCellReference::relative(1, 1),
+                )],
+            ),
+        )
+        .unwrap();
+    let mut package = editor.into_package();
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            let object = archive.object_mut(21).unwrap();
+            let message = object.messages[0].clone();
+            let mut data = message.data;
+            for (path, field, value) in [
+                (vec![3], 99, 990),
+                (vec![3, 5], 98, 980),
+                (vec![3, 5, 1], 97, 970),
+                (vec![3, 5, 1, 1], 96, 960),
+                (vec![3, 5, 1, 1, 27], 95, 950),
+            ] {
+                data = transform_length_delimited_fields_at_path(&data, &path, |payload| {
+                    let mut payload = payload.to_vec();
+                    append_unknown_varint(&mut payload, field, value);
+                    Ok(payload)
+                })?;
+            }
+            object.replace_message(
+                0,
+                RawMessage {
+                    type_: message.type_,
+                    data,
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    let mut editor = NumbersEditor::from_package(package).unwrap();
+    let before = editor.to_bytes().unwrap();
+
+    editor.insert_table_row(10, 2).unwrap();
+    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        document.sheets().unwrap()[0].tables[0].get_cell(4, 2),
+        Some(&CellValue::Formula("=SUM(B1:B2)".to_owned()))
+    );
+    editor.remove_table_row(10, 2).unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
+fn row_insert_rewrites_segmented_formula_ast_losslessly() {
+    let mut editor = NumbersEditor::from_package(test_package_with_calculation_engine()).unwrap();
+    editor
+        .set_formula(
+            10,
+            2,
+            2,
+            FormulaExpression::cell(crate::numbers::FormulaCellReference::relative(1, 1)),
+        )
+        .unwrap();
+    let mut package = editor.into_package();
+    move_table_data_list_entries_to_segment(&mut package, 21, 61);
+    let mut editor = NumbersEditor::from_package(package).unwrap();
+    let before = editor.to_bytes().unwrap();
+
+    editor.insert_table_row(10, 2).unwrap();
+    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        document.sheets().unwrap()[0].tables[0].get_cell(3, 2),
+        Some(&CellValue::Formula("=B2".to_owned()))
+    );
+    editor.remove_table_row(10, 2).unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
+fn row_insert_copy_on_writes_shared_formula_ast_and_remerges_on_delete() {
+    let mut editor = NumbersEditor::from_package(test_package_with_calculation_engine()).unwrap();
+    editor
+        .set_formula(
+            10,
+            2,
+            2,
+            FormulaExpression::cell(crate::numbers::FormulaCellReference::relative(1, 1)),
+        )
+        .unwrap();
+    editor
+        .set_formula(
+            10,
+            3,
+            2,
+            FormulaExpression::cell(crate::numbers::FormulaCellReference::relative(2, 1)),
+        )
+        .unwrap();
+    let before = editor.to_bytes().unwrap();
+
+    editor.insert_table_row(10, 2).unwrap();
+    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let table = &document.sheets().unwrap()[0].tables[0];
+    assert_eq!(
+        table.get_cell(3, 2),
+        Some(&CellValue::Formula("=B2".to_owned()))
+    );
+    assert_eq!(
+        table.get_cell(4, 2),
+        Some(&CellValue::Formula("=B4".to_owned()))
+    );
+    editor.remove_table_row(10, 2).unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
+fn row_insert_rejects_footer_aggregate_expansion_transactionally() {
+    let mut editor = NumbersEditor::from_package(test_package_with_calculation_engine()).unwrap();
+    editor
+        .set_table_header_settings(
+            10,
+            NumbersTableHeaderSettings {
+                footer_rows: Some(NumbersTableHeaderCount::ONE),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    editor
+        .set_formula(
+            10,
+            3,
+            1,
+            FormulaExpression::function(
+                "SUM",
+                [FormulaExpression::range(
+                    crate::numbers::FormulaCellReference::relative(1, 1),
+                    crate::numbers::FormulaCellReference::relative(2, 1),
+                )],
+            ),
+        )
+        .unwrap();
+    let before = editor.to_bytes().unwrap();
+
+    assert!(editor.insert_table_row(10, 3).is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
 }
 
@@ -3335,8 +3518,8 @@ fn row_insert_then_delete_restores_exact_package_bytes() {
         .unwrap();
     let baseline = editor.to_bytes().unwrap();
 
-    editor.insert_table_row(10, 1).unwrap();
-    editor.remove_table_row(10, 1).unwrap();
+    editor.insert_table_row(10, 2).unwrap();
+    editor.remove_table_row(10, 2).unwrap();
 
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 }
@@ -3358,8 +3541,8 @@ fn column_insert_then_delete_restores_exact_package_bytes() {
         .unwrap();
     let baseline = editor.to_bytes().unwrap();
 
-    editor.insert_table_column(10, 1).unwrap();
-    editor.remove_table_column(10, 1).unwrap();
+    editor.insert_table_column(10, 2).unwrap();
+    editor.remove_table_column(10, 2).unwrap();
 
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 }

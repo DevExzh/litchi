@@ -82,18 +82,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_slide_table_formula(
         0,
         table.model_object_id,
-        3,
+        2,
         1,
         KeynoteTableFormulaExpression::function(
             "SUM",
             [KeynoteTableFormulaExpression::range(
                 KeynoteTableFormulaCellReference::relative(1, 1),
-                KeynoteTableFormulaCellReference::relative(2, 1),
+                KeynoteTableFormulaCellReference::relative(1, 1),
             )],
         ),
-        KeynoteTableFormulaCachedValue::Number(218.0),
+        KeynoteTableFormulaCachedValue::Number(120.0),
     )?;
-    editor.insert_slide_table_row(0, table.model_object_id, 1)?;
+    editor.insert_slide_table_row(0, table.model_object_id, 2)?;
     editor.insert_slide_table_column(0, table.model_object_id, 2)?;
     for (column, value) in [
         KeynoteTableCellValue::Text("Central".to_owned()),
@@ -104,7 +104,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     .into_iter()
     .enumerate()
     {
-        editor.set_slide_table_cell(0, table.model_object_id, 1, column, value)?;
+        editor.set_slide_table_cell(0, table.model_object_id, 2, column, value)?;
     }
     editor.set_slide_table_cell(
         0,

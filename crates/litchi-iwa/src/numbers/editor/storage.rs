@@ -1382,6 +1382,183 @@ pub(super) fn decrement_formula_table(
     Ok(())
 }
 
+pub(super) fn rewrite_formula_table_entry<F>(
+    package: &mut IWorkPackage,
+    resolved: &ResolvedTableDataList,
+    located: &LocatedTableDataListEntry,
+    current_formula: &tsce::FormulaArchive,
+    rewrite_formula_wire: F,
+) -> Result<()>
+where
+    F: FnOnce(&[u8]) -> Result<Vec<u8>>,
+{
+    fn rewrite_container<F>(
+        original: &[u8],
+        previous_entries: &[tst::table_data_list::ListEntry],
+        key: u32,
+        current_formula: &tsce::FormulaArchive,
+        rewrite_formula_wire: F,
+    ) -> Result<Vec<u8>>
+    where
+        F: FnOnce(&[u8]) -> Result<Vec<u8>>,
+    {
+        let raw_entries = repeated_length_delimited_payloads(original, 3)?;
+        if raw_entries.len() != previous_entries.len() {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers formula table has {} raw entries but {} decoded entries",
+                raw_entries.len(),
+                previous_entries.len()
+            )));
+        }
+        let position = previous_entries
+            .iter()
+            .position(|entry| entry.key == key)
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!("Numbers formula table has no entry {key}"))
+            })?;
+        let previous_entry = &previous_entries[position];
+        let previous_formula = previous_entry.formula.as_ref().ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Numbers formula table entry {key} has no formula payload"
+            ))
+        })?;
+        if tst::table_data_list::ListEntry::decode(raw_entries[position])? != *previous_entry {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers formula table entry {key} changed during wire mutation"
+            )));
+        }
+        let rewritten_entry =
+            transform_length_delimited_field(raw_entries[position], 5, rewrite_formula_wire)?;
+        let mut expected = previous_entry.clone();
+        expected.formula = Some(current_formula.clone());
+        if tst::table_data_list::ListEntry::decode(rewritten_entry.as_slice())? != expected {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers formula table entry {key} wire mutation failed validation"
+            )));
+        }
+        let raw_formulas = repeated_length_delimited_payloads(rewritten_entry.as_slice(), 5)?;
+        let [raw_formula] = raw_formulas.as_slice() else {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers formula table entry {key} must contain exactly one formula payload"
+            )));
+        };
+        if tsce::FormulaArchive::decode(*raw_formula)? != *current_formula
+            || previous_formula == current_formula
+        {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers formula table entry {key} did not receive a distinct valid formula"
+            )));
+        }
+        let mut replacements = raw_entries
+            .into_iter()
+            .map(<[u8]>::to_vec)
+            .collect::<Vec<_>>();
+        replacements[position] = rewritten_entry;
+        rewrite_repeated_length_delimited_fields(original, 3, &replacements)
+    }
+
+    let key = located.entry.key;
+    match &located.owner {
+        TableDataListEntryOwner::Root => {
+            package.update_archive(&resolved.table_archive, |archive| {
+                let object = archive.object_mut(resolved.table_id).ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Numbers formula table object {} is missing",
+                        resolved.table_id
+                    ))
+                })?;
+                let message_index =
+                    table_data_list_message_index(object, tst::table_data_list::ListType::Formula)
+                        .ok_or_else(|| {
+                            Error::InvalidFormat(format!(
+                                "Object {} has no Numbers formula TableDataList payload",
+                                resolved.table_id
+                            ))
+                        })?;
+                let original = object.messages[message_index].data.as_slice();
+                let previous = TableDataList::decode(original)?;
+                let data = rewrite_container(
+                    original,
+                    &previous.entries,
+                    key,
+                    current_formula,
+                    rewrite_formula_wire,
+                )?;
+                let mut expected = previous;
+                let entry = expected
+                    .entries
+                    .iter_mut()
+                    .find(|entry| entry.key == key)
+                    .ok_or_else(|| {
+                        Error::InvalidFormat(format!(
+                            "Numbers formula table has no entry {key} after wire mutation"
+                        ))
+                    })?;
+                entry.formula = Some(current_formula.clone());
+                if TableDataList::decode(data.as_slice())? != expected {
+                    return Err(Error::InvalidFormat(
+                        "Numbers formula table wire mutation failed validation".to_owned(),
+                    ));
+                }
+                let message_type = object.messages[message_index].type_;
+                object.replace_message(
+                    message_index,
+                    RawMessage {
+                        type_: message_type,
+                        data,
+                    },
+                )?;
+                Ok(())
+            })
+        },
+        TableDataListEntryOwner::Segment { object_id, archive } => {
+            package.update_archive(archive, |archive_data| {
+                let object = archive_data.object_mut(*object_id).ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Numbers formula table segment object {object_id} is missing"
+                    ))
+                })?;
+                let message_index = object
+                    .messages
+                    .iter()
+                    .position(|message| message.type_ == 6011)
+                    .ok_or_else(|| {
+                        Error::InvalidFormat(format!(
+                            "Object {object_id} has no Numbers TableDataListSegment payload"
+                        ))
+                    })?;
+                let original = object.messages[message_index].data.as_slice();
+                let previous = TableDataListSegment::decode(original)?;
+                let data = rewrite_container(
+                    original,
+                    &previous.entries,
+                    key,
+                    current_formula,
+                    rewrite_formula_wire,
+                )?;
+                let mut expected = previous;
+                let entry = expected
+                    .entries
+                    .iter_mut()
+                    .find(|entry| entry.key == key)
+                    .ok_or_else(|| {
+                        Error::InvalidFormat(format!(
+                            "Numbers formula table segment has no entry {key} after wire mutation"
+                        ))
+                    })?;
+                entry.formula = Some(current_formula.clone());
+                if TableDataListSegment::decode(data.as_slice())? != expected {
+                    return Err(Error::InvalidFormat(
+                        "Numbers formula table segment wire mutation failed validation".to_owned(),
+                    ));
+                }
+                object.replace_message(message_index, RawMessage { type_: 6011, data })?;
+                Ok(())
+            })
+        },
+    }
+}
+
 pub(super) fn decrement_formula_error_table(
     package: &mut IWorkPackage,
     locations: &HashMap<u64, String>,

@@ -258,7 +258,7 @@ fn source_built_table_roundtrips_physical_axis_crud_transactionally() {
             model_id,
             2,
             2,
-            KeynoteTableFormulaExpression::Number(7.0),
+            KeynoteTableFormulaExpression::cell(KeynoteTableFormulaCellReference::relative(1, 1)),
             KeynoteTableFormulaCachedValue::Number(7.0),
         )
         .unwrap();
@@ -271,31 +271,31 @@ fn source_built_table_roundtrips_physical_axis_crud_transactionally() {
     let baseline_geometry = editor.slide_tables(0).unwrap()[0].geometry;
     let baseline = editor.to_bytes().unwrap();
 
-    editor.insert_slide_table_row(0, model_id, 1).unwrap();
-    editor.insert_slide_table_column(0, model_id, 1).unwrap();
+    editor.insert_slide_table_row(0, model_id, 2).unwrap();
+    editor.insert_slide_table_column(0, model_id, 2).unwrap();
     let reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let shifted = reopened.slide_table(0, model_id).unwrap();
     assert_eq!((shifted.info.rows, shifted.info.columns), (5, 5));
     assert_ne!(shifted.info.geometry.size, baseline_geometry.size);
     assert_eq!(
-        shifted.get_cell(2, 2),
+        shifted.get_cell(1, 1),
         Some(&KeynoteTableCellValue::Text("shift me".to_owned()))
     );
     assert_eq!(
         shifted.get_cell(3, 3),
-        Some(&KeynoteTableCellValue::Formula("=7".to_owned()))
+        Some(&KeynoteTableCellValue::Formula("=B2".to_owned()))
     );
     assert_eq!(
-        reopened.slide_table_row_height(0, model_id, 2).unwrap(),
+        reopened.slide_table_row_height(0, model_id, 1).unwrap(),
         row_size
     );
     assert_eq!(
-        reopened.slide_table_column_width(0, model_id, 2).unwrap(),
+        reopened.slide_table_column_width(0, model_id, 1).unwrap(),
         column_size
     );
 
-    editor.remove_slide_table_column(0, model_id, 1).unwrap();
-    editor.remove_slide_table_row(0, model_id, 1).unwrap();
+    editor.remove_slide_table_column(0, model_id, 2).unwrap();
+    editor.remove_slide_table_row(0, model_id, 2).unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
     assert_eq!(
         editor.slide_tables(0).unwrap()[0].geometry,

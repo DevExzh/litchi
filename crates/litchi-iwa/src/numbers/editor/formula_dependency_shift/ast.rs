@@ -1,9 +1,17 @@
-//! Preflight validation for formula AST coordinates affected by axis edits.
+//! Lossless formula AST coordinate rewrites for table-axis edits.
 
 use super::*;
 
-pub(super) fn validate_formula_ast_stability(
-    package: &IWorkPackage,
+#[derive(Debug)]
+struct FormulaRewrite {
+    row: u32,
+    column: u32,
+    previous: tsce::FormulaArchive,
+    current: tsce::FormulaArchive,
+}
+
+pub(super) fn rewrite_formula_asts(
+    package: &mut IWorkPackage,
     table_info_id: u64,
     axis: DependencyAxis,
     position: u32,
@@ -82,12 +90,16 @@ pub(super) fn validate_formula_ast_stability(
     }
 
     let locations = object_locations(package)?;
+    let formula_table_id = descriptor.model.base_data_store.formula_table.identifier;
     let formulas = resolve_table_data_list(
         package,
         &locations,
-        descriptor.model.base_data_store.formula_table.identifier,
+        formula_table_id,
         tst::table_data_list::ListType::Formula,
     )?;
+    let mut formula_cells = formula_cells.into_iter().collect::<Vec<_>>();
+    formula_cells.sort_unstable();
+    let mut rewrites = BTreeMap::<u32, Vec<FormulaRewrite>>::new();
     for (row, column) in formula_cells {
         let row_index = usize::try_from(row)
             .map_err(|_| Error::ParseError("iWork formula row exceeds usize".to_owned()))?;
@@ -113,23 +125,116 @@ pub(super) fn validate_formula_ast_stability(
                 )));
             },
         };
-        let formula = formulas
+        let previous = formulas
             .entries
             .iter()
             .find(|entry| entry.entry.key == identifier)
             .and_then(|entry| entry.entry.formula.as_ref())
+            .cloned()
             .ok_or_else(|| {
                 Error::InvalidFormat(format!(
                     "iWork formula table has no formula entry {identifier}"
                 ))
             })?;
-        validate_formula_nodes_stable(formula, row, column, axis, position, mutation)?;
+        let footer_rows = descriptor.model.number_of_footer_rows.unwrap_or(0);
+        let footer_boundary = descriptor.model.number_of_rows.saturating_sub(footer_rows);
+        if axis == DependencyAxis::Row
+            && mutation == DependencyMutation::Insert
+            && footer_rows > 0
+            && position == footer_boundary
+            && row >= footer_boundary
+            && formula_has_local_row_coordinate(&previous.ast_node_array)
+        {
+            return Err(Error::ParseError(
+                "Cannot yet insert an iWork body row directly before a footer formula because native footer ranges require aggregate expansion"
+                    .to_owned(),
+            ));
+        }
+        let mut current = previous.clone();
+        rewrite_formula_nodes(
+            &mut current.ast_node_array,
+            row,
+            column,
+            axis,
+            position,
+            mutation,
+        )?;
+        rewrites
+            .entry(identifier)
+            .or_default()
+            .push(FormulaRewrite {
+                row,
+                column,
+                previous,
+                current,
+            });
+    }
+
+    for (identifier, jobs) in rewrites {
+        let located = formulas
+            .entries
+            .iter()
+            .find(|entry| entry.entry.key == identifier)
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "iWork formula table has no formula entry {identifier}"
+                ))
+            })?;
+        let changed = jobs
+            .iter()
+            .filter(|job| job.previous != job.current)
+            .collect::<Vec<_>>();
+        if changed.is_empty() {
+            continue;
+        }
+        let all_references_are_rewritten = usize::try_from(located.entry.refcount)
+            .is_ok_and(|refcount| refcount == jobs.len())
+            && changed.len() == jobs.len();
+        let one_shared_result = changed.iter().all(|job| job.current == changed[0].current);
+        let existing_equivalent = formulas.entries.iter().any(|entry| {
+            entry.entry.key != identifier
+                && entry.entry.formula.as_ref() == Some(&changed[0].current)
+        });
+        if !existing_equivalent
+            && (located.entry.refcount == 1 || (all_references_are_rewritten && one_shared_result))
+        {
+            let job = changed[0];
+            rewrite_formula_table_entry(package, &formulas, located, &job.current, |wire| {
+                rewrite_formula_archive_wire(wire, &job.previous, &job.current)
+            })?;
+            continue;
+        }
+        for job in changed {
+            let replacement =
+                insert_formula_table(package, &locations, formula_table_id, job.current.clone())?;
+            set_encoded_cell_value(
+                package,
+                descriptor.object_id,
+                usize::try_from(job.row)
+                    .map_err(|_| Error::ParseError("iWork formula row exceeds usize".to_owned()))?,
+                usize::try_from(job.column).map_err(|_| {
+                    Error::ParseError("iWork formula column exceeds usize".to_owned())
+                })?,
+                EncodedValue::Formula(replacement),
+            )?;
+            decrement_formula_table(package, &locations, formula_table_id, identifier)?;
+        }
     }
     Ok(())
 }
 
-fn validate_formula_nodes_stable(
-    formula: &tsce::FormulaArchive,
+fn formula_has_local_row_coordinate(array: &tsce::AstNodeArrayArchive) -> bool {
+    array.ast_node.iter().any(|node| {
+        (node.ast_row.is_some() && node.ast_cross_table_reference_extra_info.is_none())
+            || node
+                .ast_thunk_node_array
+                .as_ref()
+                .is_some_and(formula_has_local_row_coordinate)
+    })
+}
+
+fn rewrite_formula_nodes(
+    array: &mut tsce::AstNodeArrayArchive,
     host_row: u32,
     host_column: u32,
     axis: DependencyAxis,
@@ -141,13 +246,16 @@ fn validate_formula_nodes_stable(
         DependencyAxis::Column => host_column,
     };
     let shifted_host = mutation.coordinate(host, position, "formula host coordinate")?;
-    for node in &formula.ast_node_array.ast_node {
+    for node in &mut array.ast_node {
         if node.ast_colon_tract.is_some()
             || (node.ast_category_ref.is_some() && shifted_host != host)
         {
             return Err(formula_ast_rewrite_error(axis, mutation));
         }
-        let coordinate = match axis {
+        if let Some(nested) = &mut node.ast_thunk_node_array {
+            rewrite_formula_nodes(nested, host_row, host_column, axis, position, mutation)?;
+        }
+        let (encoded, absolute) = match axis {
             DependencyAxis::Row => node
                 .ast_row
                 .as_ref()
@@ -156,40 +264,164 @@ fn validate_formula_nodes_stable(
                 .ast_column
                 .as_ref()
                 .map(|coordinate| (coordinate.column, coordinate.absolute.unwrap_or(false))),
+        }
+        .unwrap_or((0, false));
+        let has_coordinate = match axis {
+            DependencyAxis::Row => node.ast_row.is_some(),
+            DependencyAxis::Column => node.ast_column.is_some(),
         };
-        let Some((encoded, absolute)) = coordinate else {
-            continue;
-        };
-        if node.ast_cross_table_reference_extra_info.is_some() {
-            if !absolute && shifted_host != host {
-                return Err(formula_ast_rewrite_error(axis, mutation));
-            }
+        if !has_coordinate {
             continue;
         }
-        let target = if absolute {
-            i64::from(encoded)
+        let shifted_encoded = if node.ast_cross_table_reference_extra_info.is_some() {
+            if absolute {
+                i64::from(encoded)
+            } else {
+                i64::from(host)
+                    .checked_add(i64::from(encoded))
+                    .and_then(|target| target.checked_sub(i64::from(shifted_host)))
+                    .ok_or_else(|| {
+                        Error::ParseError("iWork formula coordinate overflow".to_owned())
+                    })?
+            }
         } else {
-            i64::from(host) + i64::from(encoded)
+            let target = if absolute {
+                i64::from(encoded)
+            } else {
+                i64::from(host) + i64::from(encoded)
+            };
+            let target = u32::try_from(target).map_err(|_| {
+                Error::InvalidFormat("iWork formula AST coordinate is outside u32".to_owned())
+            })?;
+            let shifted_target = mutation.coordinate(target, position, "formula reference")?;
+            if absolute {
+                i64::from(shifted_target)
+            } else {
+                i64::from(shifted_target) - i64::from(shifted_host)
+            }
         };
-        let target = u32::try_from(target).map_err(|_| {
-            Error::InvalidFormat("iWork formula AST coordinate is outside u32".to_owned())
+        let shifted_encoded = i32::try_from(shifted_encoded).map_err(|_| {
+            Error::ParseError("iWork formula AST coordinate exceeds i32".to_owned())
         })?;
-        let shifted_target = mutation.coordinate(target, position, "formula reference")?;
-        let shifted_encoded = if absolute {
-            i64::from(shifted_target)
-        } else {
-            i64::from(shifted_target) - i64::from(shifted_host)
-        };
-        if shifted_encoded != i64::from(encoded) {
-            return Err(formula_ast_rewrite_error(axis, mutation));
+        match axis {
+            DependencyAxis::Row => {
+                let coordinate = node.ast_row.as_mut().ok_or_else(|| {
+                    Error::InvalidFormat(
+                        "iWork formula row coordinate disappeared during mutation".to_owned(),
+                    )
+                })?;
+                coordinate.row = shifted_encoded;
+            },
+            DependencyAxis::Column => {
+                let coordinate = node.ast_column.as_mut().ok_or_else(|| {
+                    Error::InvalidFormat(
+                        "iWork formula column coordinate disappeared during mutation".to_owned(),
+                    )
+                })?;
+                coordinate.column = shifted_encoded;
+            },
         }
     }
     Ok(())
 }
 
+fn rewrite_formula_archive_wire(
+    data: &[u8],
+    previous: &tsce::FormulaArchive,
+    current: &tsce::FormulaArchive,
+) -> Result<Vec<u8>> {
+    let data = transform_length_delimited_field(data, 1, |array| {
+        rewrite_ast_array_wire(array, &previous.ast_node_array, &current.ast_node_array)
+    })?;
+    if tsce::FormulaArchive::decode(data.as_slice())? != *current {
+        return Err(Error::InvalidFormat(
+            "iWork formula AST wire mutation failed validation".to_owned(),
+        ));
+    }
+    Ok(data)
+}
+
+fn rewrite_ast_array_wire(
+    data: &[u8],
+    previous: &tsce::AstNodeArrayArchive,
+    current: &tsce::AstNodeArrayArchive,
+) -> Result<Vec<u8>> {
+    let raw_nodes = repeated_length_delimited_payloads(data, 1)?;
+    if raw_nodes.len() != previous.ast_node.len()
+        || previous.ast_node.len() != current.ast_node.len()
+    {
+        return Err(Error::InvalidFormat(
+            "iWork formula AST node count changed during coordinate mutation".to_owned(),
+        ));
+    }
+    let replacements = raw_nodes
+        .into_iter()
+        .zip(&previous.ast_node)
+        .zip(&current.ast_node)
+        .map(|((raw, previous), current)| rewrite_ast_node_wire(raw, previous, current))
+        .collect::<Result<Vec<_>>>()?;
+    let data = rewrite_repeated_length_delimited_fields(data, 1, &replacements)?;
+    if tsce::AstNodeArrayArchive::decode(data.as_slice())? != *current {
+        return Err(Error::InvalidFormat(
+            "iWork formula AST array wire mutation failed validation".to_owned(),
+        ));
+    }
+    Ok(data)
+}
+
+fn rewrite_ast_node_wire(
+    data: &[u8],
+    previous: &tsce::ast_node_array_archive::AstNodeArchive,
+    current: &tsce::ast_node_array_archive::AstNodeArchive,
+) -> Result<Vec<u8>> {
+    let mut data = data.to_vec();
+    for (field, previous, current) in [
+        (
+            26,
+            previous.ast_column.map(|coordinate| coordinate.column),
+            current.ast_column.map(|coordinate| coordinate.column),
+        ),
+        (
+            27,
+            previous.ast_row.map(|coordinate| coordinate.row),
+            current.ast_row.map(|coordinate| coordinate.row),
+        ),
+    ] {
+        if previous != current {
+            let value = current.ok_or_else(|| {
+                Error::InvalidFormat(
+                    "iWork formula coordinate disappeared during mutation".to_owned(),
+                )
+            })?;
+            data = patch_nested_varint_field(&data, &[field, 1], true, Some(zigzag_i32(value)))?;
+        }
+    }
+    if previous.ast_thunk_node_array != current.ast_thunk_node_array {
+        let previous_array = previous.ast_thunk_node_array.as_ref().ok_or_else(|| {
+            Error::InvalidFormat("iWork formula thunk appeared during mutation".to_owned())
+        })?;
+        let current_array = current.ast_thunk_node_array.as_ref().ok_or_else(|| {
+            Error::InvalidFormat("iWork formula thunk disappeared during mutation".to_owned())
+        })?;
+        data = transform_length_delimited_field(&data, 14, |array| {
+            rewrite_ast_array_wire(array, previous_array, current_array)
+        })?;
+    }
+    if tsce::ast_node_array_archive::AstNodeArchive::decode(data.as_slice())? != *current {
+        return Err(Error::InvalidFormat(
+            "iWork formula AST node changed outside supported coordinates".to_owned(),
+        ));
+    }
+    Ok(data)
+}
+
+const fn zigzag_i32(value: i32) -> u64 {
+    ((value << 1) ^ (value >> 31)) as u32 as u64
+}
+
 fn formula_ast_rewrite_error(axis: DependencyAxis, mutation: DependencyMutation) -> Error {
     Error::ParseError(format!(
-        "Cannot safely {} an iWork {} because a surviving formula would require an AST coordinate rewrite",
+        "Cannot safely {} an iWork {} because a surviving formula uses an unsupported tract or category reference",
         mutation.verb(),
         axis.noun()
     ))

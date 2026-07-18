@@ -834,7 +834,7 @@ mod tests {
                 model_id,
                 2,
                 2,
-                PagesTableFormulaExpression::Number(7.0),
+                PagesTableFormulaExpression::cell(PagesTableFormulaCellReference::relative(1, 1)),
                 PagesTableFormulaCachedValue::Number(7.0),
             )
             .unwrap();
@@ -844,27 +844,27 @@ mod tests {
             .unwrap();
         let baseline = editor.to_bytes().unwrap();
 
-        editor.insert_table_row(model_id, 1).unwrap();
-        editor.insert_table_column(model_id, 1).unwrap();
+        editor.insert_table_row(model_id, 2).unwrap();
+        editor.insert_table_column(model_id, 2).unwrap();
         let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         let table = reopened.table(model_id).unwrap();
         assert_eq!((table.info.rows, table.info.columns), (5, 5));
         assert_eq!(
-            table.get_cell(2, 2),
+            table.get_cell(1, 1),
             Some(&PagesCellValue::Text("shift me".to_owned()))
         );
         assert_eq!(
             table.get_cell(3, 3),
-            Some(&PagesCellValue::Formula("=7".to_owned()))
+            Some(&PagesCellValue::Formula("=B2".to_owned()))
         );
-        assert_eq!(reopened.table_row_height(model_id, 2).unwrap(), row_size);
+        assert_eq!(reopened.table_row_height(model_id, 1).unwrap(), row_size);
         assert_eq!(
-            reopened.table_column_width(model_id, 2).unwrap(),
+            reopened.table_column_width(model_id, 1).unwrap(),
             column_size
         );
 
-        editor.remove_table_column(model_id, 1).unwrap();
-        editor.remove_table_row(model_id, 1).unwrap();
+        editor.remove_table_column(model_id, 2).unwrap();
+        editor.remove_table_row(model_id, 2).unwrap();
         assert_eq!(editor.to_bytes().unwrap(), baseline);
 
         let before_error = editor.to_bytes().unwrap();

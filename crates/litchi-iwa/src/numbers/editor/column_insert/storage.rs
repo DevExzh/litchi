@@ -52,18 +52,21 @@ pub(super) fn shift_table_tile_columns(
                         "Numbers row stores cells beyond the declared table columns".to_owned(),
                     ));
                 }
-                if insertion == old_columns
-                    || !cells[insertion..old_columns].iter().any(Option::is_some)
-                {
+                let needs_capacity = cells.len() == old_columns;
+                let needs_shift = insertion < old_columns
+                    && cells[insertion..old_columns].iter().any(Option::is_some);
+                if !needs_capacity && !needs_shift {
                     continue;
                 }
-                if cells.len() <= old_columns {
+                if needs_capacity {
                     cells.resize(old_columns + 1, None);
                 }
-                for column in (insertion..old_columns).rev() {
-                    cells[column + 1] = cells[column].take();
+                if needs_shift {
+                    for column in (insertion..old_columns).rev() {
+                        cells[column + 1] = cells[column].take();
+                    }
+                    cells[insertion] = None;
                 }
-                cells[insertion] = None;
                 rebuild_row(row, &cells)?;
                 changed = true;
             }

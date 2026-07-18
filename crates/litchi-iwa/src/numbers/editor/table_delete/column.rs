@@ -48,15 +48,20 @@ pub(super) fn delete_table_tile_column(
                         "Deleted Numbers column {deletion} still contains a stored cell"
                     )));
                 }
-                if deletion + 1 >= old_columns
-                    || !cells[deletion + 1..old_columns].iter().any(Option::is_some)
-                {
+                let needs_capacity = cells.len() == old_columns;
+                let needs_shift = deletion + 1 < old_columns
+                    && cells[deletion + 1..old_columns].iter().any(Option::is_some);
+                if !needs_capacity && !needs_shift {
                     continue;
                 }
-                for column in deletion..old_columns - 1 {
-                    cells[column] = cells[column + 1].take();
+                if needs_shift {
+                    for column in deletion..old_columns - 1 {
+                        cells[column] = cells[column + 1].take();
+                    }
                 }
-                cells.truncate(old_columns - 1);
+                if needs_capacity {
+                    cells.truncate(old_columns - 1);
+                }
                 rebuild_row(row, &cells)?;
                 changed = true;
             }
