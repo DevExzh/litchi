@@ -1,6 +1,9 @@
 use std::env;
 
-use litchi_iwa::pages::{PagesCellValue, PagesDocumentBuilder};
+use litchi_iwa::pages::{
+    PagesCellValue, PagesDocumentBuilder, PagesTableDimensionSize, PagesTableHeaderCount,
+    PagesTableHeaderSettings,
+};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = env::args()
@@ -32,6 +35,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         PagesCellValue::Number(125_000.0),
     )?;
     editor.set_table_cell(table.model_object_id, 1, 2, PagesCellValue::Number(0.18))?;
+    editor.set_table_header_settings(
+        table.model_object_id,
+        PagesTableHeaderSettings {
+            header_rows: Some(PagesTableHeaderCount::ONE),
+            header_columns: Some(PagesTableHeaderCount::ONE),
+            footer_rows: Some(PagesTableHeaderCount::ONE),
+            ..Default::default()
+        },
+    )?;
+    for (column, width) in [120.0, 160.0, 100.0].into_iter().enumerate() {
+        editor.set_table_column_width(
+            table.model_object_id,
+            column,
+            PagesTableDimensionSize::points(width)?,
+        )?;
+    }
+    for (row, height) in [28.0, 34.0, 40.0, 46.0].into_iter().enumerate() {
+        editor.set_table_row_height(
+            table.model_object_id,
+            row,
+            PagesTableDimensionSize::points(height)?,
+        )?;
+    }
     let second_anchor = editor.body_text()?.encode_utf16().count();
     let notes = editor.add_table(second_anchor, "Notes", 2, 2)?;
     editor.set_table_cell(

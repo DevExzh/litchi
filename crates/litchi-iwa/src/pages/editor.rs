@@ -3783,7 +3783,10 @@ pub use body_shapes::{PagesBodyShapeInfo, PagesBodyShapeKind, RemovedPagesBodySh
 pub use charts::{PagesBodyChartInfo, RemovedPagesBodyChart};
 pub use images::{PagesImageInfo, RemovedPagesImage};
 pub use movies::{PagesMovieInfo, PagesMovieOptions, RemovedPagesMovie};
-pub use tables::{PagesCellValue, PagesTable, PagesTableInfo};
+pub use tables::{
+    PagesCellValue, PagesTable, PagesTableDimension, PagesTableDimensionSize,
+    PagesTableHeaderCount, PagesTableHeaderSettings, PagesTableInfo, PagesTablePoints,
+};
 
 #[cfg(test)]
 mod tests;

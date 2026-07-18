@@ -1,5 +1,12 @@
 //! Native table discovery and cell editing for Pages body attachments.
 
+mod layout;
+
+pub use layout::{
+    PagesTableDimension, PagesTableDimensionSize, PagesTableHeaderCount, PagesTableHeaderSettings,
+    PagesTablePoints,
+};
+
 use std::collections::{HashMap, HashSet};
 
 use prost::Message;
@@ -916,6 +923,86 @@ mod tests {
         reopened.resize_table(model_id, 2, 2).unwrap();
         let info = reopened.tables().unwrap().remove(0);
         assert_eq!((info.rows, info.columns), (2, 2));
+    }
+
+    #[test]
+    fn source_built_table_roundtrips_layout_crud_transactionally() {
+        let mut editor = PagesDocumentBuilder::new()
+            .body_table("Layout", 4, 3)
+            .build()
+            .unwrap();
+        let model_id = editor.tables().unwrap()[0].model_object_id;
+        let settings = PagesTableHeaderSettings {
+            header_rows: Some(PagesTableHeaderCount::TWO),
+            header_columns: Some(PagesTableHeaderCount::ONE),
+            footer_rows: Some(PagesTableHeaderCount::ONE),
+            ..Default::default()
+        };
+
+        editor
+            .set_table_header_settings(model_id, settings)
+            .unwrap();
+        editor
+            .set_table_column_width(model_id, 0, PagesTableDimensionSize::points(150.0).unwrap())
+            .unwrap();
+        editor
+            .set_table_row_height(model_id, 2, PagesTableDimensionSize::points(42.0).unwrap())
+            .unwrap();
+
+        let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(reopened.table_header_settings(model_id).unwrap(), settings);
+        assert_eq!(
+            reopened.table_column_width(model_id, 0).unwrap(),
+            PagesTableDimensionSize::points(150.0).unwrap()
+        );
+        assert_eq!(
+            reopened.table_row_height(model_id, 2).unwrap(),
+            PagesTableDimensionSize::points(42.0).unwrap()
+        );
+        assert_eq!(
+            reopened.table_column_width(model_id, 1).unwrap(),
+            PagesTableDimensionSize::Default
+        );
+
+        reopened
+            .set_table_column_width(model_id, 0, PagesTableDimensionSize::Default)
+            .unwrap();
+        reopened
+            .set_table_row_height(model_id, 2, PagesTableDimensionSize::Default)
+            .unwrap();
+        assert_eq!(
+            reopened.table_column_width(model_id, 0).unwrap(),
+            PagesTableDimensionSize::Default
+        );
+        assert_eq!(
+            reopened.table_row_height(model_id, 2).unwrap(),
+            PagesTableDimensionSize::Default
+        );
+
+        let before = reopened.to_bytes().unwrap();
+        assert!(
+            reopened
+                .set_table_row_height(
+                    model_id,
+                    usize::MAX,
+                    PagesTableDimensionSize::points(20.0).unwrap(),
+                )
+                .is_err()
+        );
+        assert_eq!(reopened.to_bytes().unwrap(), before);
+        assert!(
+            reopened
+                .set_table_header_settings(
+                    model_id,
+                    PagesTableHeaderSettings {
+                        header_rows: Some(PagesTableHeaderCount::FOUR),
+                        footer_rows: Some(PagesTableHeaderCount::ONE),
+                        ..Default::default()
+                    },
+                )
+                .is_err()
+        );
+        assert_eq!(reopened.to_bytes().unwrap(), before);
     }
 
     #[test]
