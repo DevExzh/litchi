@@ -2682,6 +2682,12 @@ pub(super) fn update_tile(
                     EncodedValue::String(identifier) => cell.set_string(identifier),
                     EncodedValue::RichText(identifier) => cell.set_rich_text(identifier),
                     EncodedValue::Formula(identifier) => cell.set_formula_reference(identifier),
+                    EncodedValue::FormulaCachedNumber(number) => {
+                        cell.set_formula_cached_number(number)?;
+                    },
+                    EncodedValue::FormulaCachedBoolean(boolean) => {
+                        cell.set_formula_cached_boolean(boolean)?;
+                    },
                     EncodedValue::Clear
                     | EncodedValue::ClearValuePreservingMetadata
                     | EncodedValue::Comment(_) => unreachable!(),

@@ -17,8 +17,9 @@ const WHOLE_COLUMN_ROW_SENTINEL: u32 = i32::MAX as u32;
 /// A typed display cache stored alongside a native formula reference.
 ///
 /// iWork does not always recalculate formulas when opening a package written
-/// by another process. Supplying the last known result ensures the document
-/// displays a correct value before the application next evaluates the cell.
+/// by another process. Supplying the initial result ensures the document
+/// displays a correct value immediately. Later precedent writes refresh
+/// supported numeric and Boolean formula caches transactionally.
 #[derive(Debug, Clone, PartialEq)]
 pub enum FormulaCachedValue {
     Number(f64),

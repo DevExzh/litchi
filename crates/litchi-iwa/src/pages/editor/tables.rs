@@ -114,6 +114,10 @@ impl PagesEditor {
     }
 
     /// Set or clear one cell in a reachable body table transactionally.
+    ///
+    /// Supported dependent formula caches are refreshed before commit;
+    /// unsupported impacted formulas reject the edit instead of remaining
+    /// visibly stale.
     pub fn set_table_cell(
         &mut self,
         model_object_id: u64,

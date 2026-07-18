@@ -1987,6 +1987,217 @@ fn local_reference_formulas_write_exact_calculation_engine_edges() {
 }
 
 #[test]
+fn cell_write_refreshes_transitive_formula_caches_in_dependency_order() {
+    use crate::numbers::FormulaBinaryOperator;
+
+    let mut editor = NumbersEditor::from_package(test_package_with_calculation_engine()).unwrap();
+    editor.set_cell(10, 1, 1, CellValue::Number(2.0)).unwrap();
+    editor
+        .set_formula_with_cached_value(
+            10,
+            1,
+            2,
+            FormulaExpression::binary(
+                FormulaBinaryOperator::Add,
+                FormulaExpression::cell(crate::numbers::FormulaCellReference::relative(1, 1)),
+                FormulaExpression::Number(1.0),
+            ),
+            FormulaCachedValue::Number(3.0),
+        )
+        .unwrap();
+    editor
+        .set_formula_with_cached_value(
+            10,
+            1,
+            3,
+            FormulaExpression::binary(
+                FormulaBinaryOperator::Multiply,
+                FormulaExpression::cell(crate::numbers::FormulaCellReference::relative(1, 2)),
+                FormulaExpression::Number(2.0),
+            ),
+            FormulaCachedValue::Number(6.0),
+        )
+        .unwrap();
+
+    editor.set_cell(10, 1, 1, CellValue::Number(4.0)).unwrap();
+
+    assert_eq!(
+        cached_formula_scalar(&editor, 10, 1, 2),
+        crate::numbers::bnc::CachedScalar::Number(5.0)
+    );
+    assert_eq!(
+        cached_formula_scalar(&editor, 10, 1, 3),
+        crate::numbers::bnc::CachedScalar::Number(10.0)
+    );
+}
+
+#[test]
+fn cell_write_refreshes_aggregate_range_formula_cache() {
+    let mut editor = NumbersEditor::from_package(test_package_with_calculation_engine()).unwrap();
+    editor.set_cell(10, 1, 1, CellValue::Number(2.0)).unwrap();
+    editor.set_cell(10, 2, 1, CellValue::Number(3.0)).unwrap();
+    editor
+        .set_formula_with_cached_value(
+            10,
+            3,
+            2,
+            FormulaExpression::function(
+                "SUM",
+                [FormulaExpression::range(
+                    crate::numbers::FormulaCellReference::relative(1, 1),
+                    crate::numbers::FormulaCellReference::relative(2, 1),
+                )],
+            ),
+            FormulaCachedValue::Number(5.0),
+        )
+        .unwrap();
+
+    editor.set_cell(10, 1, 1, CellValue::Number(4.0)).unwrap();
+
+    assert_eq!(
+        cached_formula_scalar(&editor, 10, 3, 2),
+        crate::numbers::bnc::CachedScalar::Number(7.0)
+    );
+}
+
+#[test]
+fn cell_write_refreshes_typed_boolean_formula_cache() {
+    let mut editor = NumbersEditor::from_package(test_package_with_calculation_engine()).unwrap();
+    editor.set_cell(10, 1, 1, CellValue::Number(1.0)).unwrap();
+    editor
+        .set_formula_with_cached_value(
+            10,
+            1,
+            2,
+            FormulaExpression::binary(
+                crate::numbers::FormulaBinaryOperator::GreaterThan,
+                FormulaExpression::cell(crate::numbers::FormulaCellReference::relative(1, 1)),
+                FormulaExpression::Number(1.0),
+            ),
+            FormulaCachedValue::Boolean(false),
+        )
+        .unwrap();
+
+    editor.set_cell(10, 1, 1, CellValue::Number(2.0)).unwrap();
+
+    assert_eq!(
+        cached_formula_scalar(&editor, 10, 1, 2),
+        crate::numbers::bnc::CachedScalar::Boolean(true)
+    );
+}
+
+#[test]
+fn cell_write_refreshes_all_supported_numeric_aggregates() {
+    let mut editor = NumbersEditor::from_package(test_package_with_calculation_engine()).unwrap();
+    editor.set_cell(10, 1, 1, CellValue::Number(2.0)).unwrap();
+    editor.set_cell(10, 2, 1, CellValue::Number(4.0)).unwrap();
+    for (row, function, cached) in [
+        (0, "AVERAGE", 3.0),
+        (1, "COUNT", 2.0),
+        (2, "MIN", 2.0),
+        (3, "MAX", 4.0),
+    ] {
+        editor
+            .set_formula_with_cached_value(
+                10,
+                row,
+                2,
+                FormulaExpression::function(
+                    function,
+                    [FormulaExpression::range(
+                        crate::numbers::FormulaCellReference::relative(1, 1),
+                        crate::numbers::FormulaCellReference::relative(2, 1),
+                    )],
+                ),
+                FormulaCachedValue::Number(cached),
+            )
+            .unwrap();
+    }
+
+    editor.set_cell(10, 1, 1, CellValue::Number(6.0)).unwrap();
+
+    for (row, expected) in [(0, 5.0), (1, 2.0), (2, 4.0), (3, 6.0)] {
+        assert_eq!(
+            cached_formula_scalar(&editor, 10, row, 2),
+            crate::numbers::bnc::CachedScalar::Number(expected)
+        );
+    }
+}
+
+#[test]
+fn cell_write_refreshes_cross_table_formula_cache() {
+    let mut editor = NumbersEditor::from_package(test_package_with_cross_table_engine()).unwrap();
+    editor.set_cell(11, 0, 1, CellValue::Number(2.0)).unwrap();
+    editor
+        .set_formula_with_cached_value(
+            10,
+            3,
+            2,
+            FormulaExpression::table_cell(11, crate::numbers::FormulaCellReference::relative(0, 1)),
+            FormulaCachedValue::Number(2.0),
+        )
+        .unwrap();
+
+    editor.set_cell(11, 0, 1, CellValue::Number(4.0)).unwrap();
+
+    assert_eq!(
+        cached_formula_scalar(&editor, 10, 3, 2),
+        crate::numbers::bnc::CachedScalar::Number(4.0)
+    );
+}
+
+#[test]
+fn cell_write_rejects_unsupported_impacted_formula_transactionally() {
+    let mut editor = NumbersEditor::from_package(test_package_with_calculation_engine()).unwrap();
+    editor.set_cell(10, 1, 1, CellValue::Number(0.0)).unwrap();
+    editor
+        .set_formula_with_cached_value(
+            10,
+            1,
+            2,
+            FormulaExpression::function(
+                "SIN",
+                [FormulaExpression::cell(
+                    crate::numbers::FormulaCellReference::relative(1, 1),
+                )],
+            ),
+            FormulaCachedValue::Number(0.0),
+        )
+        .unwrap();
+    let before = editor.to_bytes().unwrap();
+
+    let error = editor
+        .set_cell(10, 1, 1, CellValue::Number(1.0))
+        .unwrap_err();
+
+    assert!(error.to_string().contains("SIN"));
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+fn cached_formula_scalar(
+    editor: &NumbersEditor,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> crate::numbers::bnc::CachedScalar {
+    let location = locate_attached_cell(editor.package(), table_id, row, column).unwrap();
+    let bytes = read_tile_cell(
+        editor.package(),
+        &location.tile_archive,
+        location.tile_id,
+        location.tile_row,
+        column,
+    )
+    .unwrap()
+    .unwrap();
+    BncCell::parse(&bytes)
+        .unwrap()
+        .cached_scalar()
+        .unwrap()
+        .unwrap()
+}
+
+#[test]
 fn formula_dependency_tiles_use_app_dimensions_and_global_record_coordinates() {
     let mut package = test_package_with_calculation_engine();
     package
@@ -3468,8 +3679,10 @@ fn row_insert_roundtrips_app_normalized_footer_range_dependencies() {
             },
         )
         .unwrap();
+    editor.set_cell(10, 1, 1, CellValue::Number(2.0)).unwrap();
+    editor.set_cell(10, 2, 1, CellValue::Number(3.0)).unwrap();
     editor
-        .set_formula(
+        .set_formula_with_cached_value(
             10,
             3,
             1,
@@ -3480,6 +3693,7 @@ fn row_insert_roundtrips_app_normalized_footer_range_dependencies() {
                     crate::numbers::FormulaCellReference::relative(2, 1),
                 )],
             ),
+            FormulaCachedValue::Number(5.0),
         )
         .unwrap();
     let mut package = editor.into_package();
@@ -3675,6 +3889,11 @@ fn row_insert_roundtrips_app_normalized_footer_range_dependencies() {
         .insert_entry(VERSIONED_ENGINE_ENTRY, engine)
         .unwrap();
     let mut editor = NumbersEditor::from_package(package).unwrap();
+    editor.set_cell(10, 1, 1, CellValue::Number(4.0)).unwrap();
+    assert_eq!(
+        cached_formula_scalar(&editor, 10, 3, 1),
+        crate::numbers::bnc::CachedScalar::Number(7.0)
+    );
     let before = editor.to_bytes().unwrap();
 
     editor.insert_table_row(10, 3).unwrap();

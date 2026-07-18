@@ -2040,6 +2040,8 @@ pub(super) enum EncodedValue {
     String(u32),
     RichText(u32),
     Formula(u32),
+    FormulaCachedNumber(f64),
+    FormulaCachedBoolean(bool),
     Comment(Option<u32>),
 }
 

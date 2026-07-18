@@ -4,6 +4,22 @@ use std::collections::BTreeMap;
 
 use crate::{Error, Result};
 
+const BNC_VERSION: u8 = 5;
+const BNC_PREFIX_LEN: usize = 8;
+const BNC_HEADER_LEN: usize = 12;
+const CELL_TYPE_EMPTY: u8 = 0;
+const CELL_TYPE_NUMBER: u8 = 2;
+const CELL_TYPE_TEXT: u8 = 3;
+const CELL_TYPE_DATE: u8 = 5;
+const CELL_TYPE_BOOLEAN: u8 = 6;
+const CELL_TYPE_DURATION: u8 = 7;
+const CELL_TYPE_ERROR: u8 = 8;
+const CELL_TYPE_RICH_TEXT_OR_NUMBER: u8 = 9;
+const CELL_TYPE_ALTERNATE_NUMBER: u8 = 10;
+const DECIMAL128_EXPONENT_BIAS: i32 = 0x1820;
+const DECIMAL128_COEFFICIENT_BITS: u32 = 113;
+const DECIMAL128_SIGN_BIT: u32 = 127;
+
 pub(crate) const DECIMAL_FLAG: u32 = 0x000001;
 pub(crate) const NUMBER_FLAG: u32 = 0x000002;
 pub(crate) const DATE_FLAG: u32 = 0x000004;
@@ -47,7 +63,7 @@ pub(crate) const FIELD_LAYOUT: &[(u32, usize)] = &[
 
 #[derive(Debug, Clone)]
 pub(crate) struct BncCell {
-    prefix: [u8; 8],
+    prefix: [u8; BNC_PREFIX_LEN],
     fields: BTreeMap<u32, Vec<u8>>,
     tail: Vec<u8>,
 }
@@ -66,24 +82,33 @@ pub(crate) enum StoredValue {
     Unsupported(u8),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) enum CachedScalar {
+    Number(f64),
+    Boolean(bool),
+    Date(f64),
+    Duration(f64),
+    Unsupported(u8),
+}
+
 impl BncCell {
     pub(crate) fn parse(data: &[u8]) -> Result<Self> {
-        if data.len() < 12 {
+        if data.len() < BNC_HEADER_LEN {
             return Err(Error::ParseError(
                 "Truncated Numbers BNC cell header".to_string(),
             ));
         }
-        if data[0] != 5 {
+        if data[0] != BNC_VERSION {
             return Err(Error::ParseError(format!(
                 "Numbers cell storage version {} is not writable BNC v5",
                 data[0]
             )));
         }
 
-        let mut prefix = [0; 8];
-        prefix.copy_from_slice(&data[..8]);
+        let mut prefix = [0; BNC_PREFIX_LEN];
+        prefix.copy_from_slice(&data[..BNC_PREFIX_LEN]);
         let mut flag_bytes = [0; 4];
-        flag_bytes.copy_from_slice(&data[8..12]);
+        flag_bytes.copy_from_slice(&data[BNC_PREFIX_LEN..BNC_HEADER_LEN]);
         let flags = u32::from_le_bytes(flag_bytes);
         let known_flags = FIELD_LAYOUT.iter().fold(0, |mask, (flag, _)| mask | flag);
         if flags & !known_flags != 0 {
@@ -93,7 +118,7 @@ impl BncCell {
             )));
         }
 
-        let mut cursor = 12usize;
+        let mut cursor = BNC_HEADER_LEN;
         let mut fields = BTreeMap::new();
         for &(flag, size) in FIELD_LAYOUT {
             if flags & flag == 0 {
@@ -117,8 +142,8 @@ impl BncCell {
     }
 
     pub(crate) fn minimal() -> Self {
-        let mut prefix = [0; 8];
-        prefix[0] = 5;
+        let mut prefix = [0; BNC_PREFIX_LEN];
+        prefix[0] = BNC_VERSION;
         Self {
             prefix,
             fields: BTreeMap::new(),
@@ -131,16 +156,16 @@ impl BncCell {
             return StoredValue::Formula(identifier);
         }
         match self.prefix[1] {
-            0 => StoredValue::Empty,
-            2 | 10 => StoredValue::Number,
-            3 => self
+            CELL_TYPE_EMPTY => StoredValue::Empty,
+            CELL_TYPE_NUMBER | CELL_TYPE_ALTERNATE_NUMBER => StoredValue::Number,
+            CELL_TYPE_TEXT => self
                 .u32_field(STRING_FLAG)
                 .map_or(StoredValue::Empty, StoredValue::Text),
-            5 => StoredValue::Date,
-            6 => StoredValue::Boolean,
-            7 => StoredValue::Duration,
-            8 => StoredValue::Error,
-            9 => {
+            CELL_TYPE_DATE => StoredValue::Date,
+            CELL_TYPE_BOOLEAN => StoredValue::Boolean,
+            CELL_TYPE_DURATION => StoredValue::Duration,
+            CELL_TYPE_ERROR => StoredValue::Error,
+            CELL_TYPE_RICH_TEXT_OR_NUMBER => {
                 if let Some(identifier) = self.u32_field(RICH_TEXT_FLAG) {
                     StoredValue::RichText(identifier)
                 } else if let Some(identifier) = self.u32_field(STRING_FLAG) {
@@ -159,13 +184,17 @@ impl BncCell {
                 "Numbers cells cannot store a non-finite numeric value".to_string(),
             ));
         }
-        self.replace_value(2, DECIMAL_FLAG, decimal128_le(value)?.to_vec());
+        self.replace_value(
+            CELL_TYPE_NUMBER,
+            DECIMAL_FLAG,
+            decimal128_le(value)?.to_vec(),
+        );
         Ok(())
     }
 
     pub(crate) fn set_boolean(&mut self, value: bool) {
         self.replace_value(
-            6,
+            CELL_TYPE_BOOLEAN,
             NUMBER_FLAG,
             (if value { 1.0f64 } else { 0.0f64 }).to_le_bytes().to_vec(),
         );
@@ -177,7 +206,11 @@ impl BncCell {
                 "Numbers cells cannot store a non-finite duration".to_string(),
             ));
         }
-        self.replace_value(7, NUMBER_FLAG, value.to_le_bytes().to_vec());
+        self.replace_value(
+            CELL_TYPE_DURATION,
+            NUMBER_FLAG,
+            value.to_le_bytes().to_vec(),
+        );
         Ok(())
     }
 
@@ -187,30 +220,92 @@ impl BncCell {
                 "Numbers cells cannot store a non-finite date".to_string(),
             ));
         }
-        self.replace_value(5, DATE_FLAG, value.to_le_bytes().to_vec());
+        self.replace_value(CELL_TYPE_DATE, DATE_FLAG, value.to_le_bytes().to_vec());
         Ok(())
     }
 
     pub(crate) fn set_string(&mut self, identifier: u32) {
-        self.replace_value(3, STRING_FLAG, identifier.to_le_bytes().to_vec());
+        self.replace_value(
+            CELL_TYPE_TEXT,
+            STRING_FLAG,
+            identifier.to_le_bytes().to_vec(),
+        );
     }
 
     pub(crate) fn set_rich_text(&mut self, identifier: u32) {
-        self.replace_value(9, RICH_TEXT_FLAG, identifier.to_le_bytes().to_vec());
+        self.replace_value(
+            CELL_TYPE_RICH_TEXT_OR_NUMBER,
+            RICH_TEXT_FLAG,
+            identifier.to_le_bytes().to_vec(),
+        );
     }
 
     pub(crate) fn set_formula_reference(&mut self, identifier: u32) {
         // Formula references coexist with the cached result value and its cell
         // type in app-generated BNC. The caller seeds a numeric cache before
         // attaching the formula when the target cell was empty.
-        if self.prefix[1] == 0 {
-            self.prefix[1] = 2;
+        if self.prefix[1] == CELL_TYPE_EMPTY {
+            self.prefix[1] = CELL_TYPE_NUMBER;
             self.fields
                 .insert(NUMBER_FLAG, 0.0f64.to_le_bytes().to_vec());
         }
         self.fields
             .insert(FORMULA_FLAG, identifier.to_le_bytes().to_vec());
         self.fields.remove(&FORMULA_ERROR_FLAG);
+    }
+
+    pub(crate) fn cached_scalar(&self) -> Result<Option<CachedScalar>> {
+        let scalar = match self.prefix[1] {
+            CELL_TYPE_NUMBER | CELL_TYPE_RICH_TEXT_OR_NUMBER | CELL_TYPE_ALTERNATE_NUMBER => self
+                .fields
+                .get(&DECIMAL_FLAG)
+                .map(|value| read_decimal128_le(value).map(CachedScalar::Number))
+                .or_else(|| {
+                    self.fields
+                        .get(&NUMBER_FLAG)
+                        .map(|value| read_f64_le(value).map(CachedScalar::Number))
+                })
+                .transpose()?
+                .or(Some(CachedScalar::Unsupported(self.prefix[1]))),
+            CELL_TYPE_TEXT | CELL_TYPE_ERROR => Some(CachedScalar::Unsupported(self.prefix[1])),
+            CELL_TYPE_DATE => self
+                .fields
+                .get(&DATE_FLAG)
+                .map(|value| read_f64_le(value).map(CachedScalar::Date))
+                .transpose()?
+                .or(Some(CachedScalar::Unsupported(CELL_TYPE_DATE))),
+            CELL_TYPE_BOOLEAN => self
+                .fields
+                .get(&NUMBER_FLAG)
+                .map(|value| read_f64_le(value).map(|number| CachedScalar::Boolean(number != 0.0)))
+                .transpose()?
+                .or(Some(CachedScalar::Unsupported(CELL_TYPE_BOOLEAN))),
+            CELL_TYPE_DURATION => self
+                .fields
+                .get(&NUMBER_FLAG)
+                .map(|value| read_f64_le(value).map(CachedScalar::Duration))
+                .transpose()?
+                .or(Some(CachedScalar::Unsupported(CELL_TYPE_DURATION))),
+            CELL_TYPE_EMPTY => None,
+            other => Some(CachedScalar::Unsupported(other)),
+        };
+        Ok(scalar)
+    }
+
+    pub(crate) fn set_formula_cached_number(&mut self, value: f64) -> Result<()> {
+        let formula = self.formula_identifier()?;
+        self.set_number(value)?;
+        self.fields
+            .insert(FORMULA_FLAG, formula.to_le_bytes().to_vec());
+        Ok(())
+    }
+
+    pub(crate) fn set_formula_cached_boolean(&mut self, value: bool) -> Result<()> {
+        let formula = self.formula_identifier()?;
+        self.set_boolean(value);
+        self.fields
+            .insert(FORMULA_FLAG, formula.to_le_bytes().to_vec());
+        Ok(())
     }
 
     pub(crate) fn formula_error_identifier(&self) -> Option<u32> {
@@ -231,14 +326,14 @@ impl BncCell {
     }
 
     pub(crate) fn clear_value_preserving_metadata(&mut self) {
-        self.prefix[1] = 0;
+        self.prefix[1] = CELL_TYPE_EMPTY;
         self.fields.retain(|field, _| VALUE_FLAGS & field == 0);
     }
 
     pub(crate) fn encode(&self) -> Vec<u8> {
         let flags = self.fields.keys().fold(0u32, |mask, flag| mask | flag);
         let field_len = self.fields.values().map(Vec::len).sum::<usize>();
-        let mut output = Vec::with_capacity(12 + field_len + self.tail.len());
+        let mut output = Vec::with_capacity(BNC_HEADER_LEN + field_len + self.tail.len());
         output.extend_from_slice(&self.prefix);
         output.extend_from_slice(&flags.to_le_bytes());
         for (flag, _) in FIELD_LAYOUT {
@@ -260,6 +355,40 @@ impl BncCell {
         let bytes: [u8; 4] = self.fields.get(&flag)?.as_slice().try_into().ok()?;
         Some(u32::from_le_bytes(bytes))
     }
+
+    fn formula_identifier(&self) -> Result<u32> {
+        self.u32_field(FORMULA_FLAG).ok_or_else(|| {
+            Error::InvalidFormat(
+                "Numbers formula cache update targeted a cell without a formula".to_owned(),
+            )
+        })
+    }
+}
+
+fn read_f64_le(data: &[u8]) -> Result<f64> {
+    let bytes: [u8; 8] = data
+        .try_into()
+        .map_err(|_| Error::ParseError("Expected an eight-byte Numbers field".to_owned()))?;
+    Ok(f64::from_le_bytes(bytes))
+}
+
+pub(crate) fn read_decimal128_le(data: &[u8]) -> Result<f64> {
+    if data.len() != 16 {
+        return Err(Error::ParseError(
+            "Expected a sixteen-byte Numbers decimal128 field".to_owned(),
+        ));
+    }
+    let exponent = (u16::from(data[15] & 0x7f) << 7) | u16::from(data[14] >> 1);
+    let mut coefficient = f64::from(data[14] & 1);
+    for byte in data[..14].iter().rev() {
+        coefficient = coefficient * 256.0 + f64::from(*byte);
+    }
+    let signed_coefficient = if data[15] & 0x80 != 0 {
+        -coefficient
+    } else {
+        coefficient
+    };
+    Ok(signed_coefficient * 10f64.powi(i32::from(exponent) - DECIMAL128_EXPONENT_BIAS))
 }
 
 /// Encode the finite `f64`'s shortest round-tripping decimal spelling into
@@ -308,7 +437,7 @@ pub(crate) fn decimal128_le(value: f64) -> Result<[u8; 16]> {
     let coefficient = digits
         .parse::<u128>()
         .map_err(|_| Error::ParseError(format!("Could not encode Numbers decimal {spelling:?}")))?;
-    if coefficient >= (1u128 << 113) {
+    if coefficient >= (1u128 << DECIMAL128_COEFFICIENT_BITS) {
         return Err(Error::ParseError(
             "Numbers decimal coefficient exceeds 113 bits".to_owned(),
         ));
@@ -320,12 +449,12 @@ pub(crate) fn decimal128_le(value: f64) -> Result<[u8; 16]> {
         .and_then(|value| value.checked_add(trailing_zeroes))
         .ok_or_else(|| Error::ParseError("Numbers decimal exponent overflow".to_owned()))?;
     let biased_exponent = exponent
-        .checked_add(0x1820)
+        .checked_add(DECIMAL128_EXPONENT_BIAS)
         .filter(|value| (0..=0x3fff).contains(value))
         .ok_or_else(|| Error::ParseError("Numbers decimal exponent is out of range".to_owned()))?;
-    let mut encoded = coefficient | ((biased_exponent as u128) << 113);
+    let mut encoded = coefficient | ((biased_exponent as u128) << DECIMAL128_COEFFICIENT_BITS);
     if negative {
-        encoded |= 1u128 << 127;
+        encoded |= 1u128 << DECIMAL128_SIGN_BIT;
     }
     Ok(encoded.to_le_bytes())
 }
@@ -372,6 +501,35 @@ mod tests {
         cell.set_formula_reference(3);
         assert_eq!(cell.formula_error_identifier(), None);
         assert_eq!(cell.stored_value(), StoredValue::Formula(3));
+    }
+
+    #[test]
+    fn formula_cache_updates_preserve_formula_and_metadata() {
+        let mut cell = BncCell::minimal();
+        cell.set_comment_identifier(Some(9));
+        cell.fields.insert(0x001000, 5u32.to_le_bytes().to_vec());
+        cell.set_number(3.0).unwrap();
+        cell.set_formula_reference(17);
+
+        cell.set_formula_cached_number(42.5).unwrap();
+        assert_eq!(cell.stored_value(), StoredValue::Formula(17));
+        assert_eq!(
+            cell.cached_scalar().unwrap(),
+            Some(CachedScalar::Number(42.5))
+        );
+        assert_eq!(cell.comment_identifier(), Some(9));
+        assert_eq!(cell.fields[&0x001000], 5u32.to_le_bytes());
+
+        cell.set_formula_cached_boolean(true).unwrap();
+        assert_eq!(cell.stored_value(), StoredValue::Formula(17));
+        assert_eq!(
+            cell.cached_scalar().unwrap(),
+            Some(CachedScalar::Boolean(true))
+        );
+        assert_eq!(cell.comment_identifier(), Some(9));
+        assert_eq!(cell.fields[&0x001000], 5u32.to_le_bytes());
+
+        assert!(BncCell::minimal().set_formula_cached_number(1.0).is_err());
     }
 
     #[test]

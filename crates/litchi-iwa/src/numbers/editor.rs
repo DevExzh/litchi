@@ -1891,6 +1891,11 @@ impl NumbersEditor {
     }
 
     /// Set or clear a cell in a table identified by its IWA object ID.
+    ///
+    /// Cached results of dependent numeric/Boolean formulas are refreshed in
+    /// dependency order. If an impacted formula is outside the strict local
+    /// evaluator subset, the entire edit is rejected without changing the
+    /// package rather than persisting a stale displayed result.
     pub fn set_cell(
         &mut self,
         table_id: u64,
@@ -1900,6 +1905,7 @@ impl NumbersEditor {
     ) -> Result<()> {
         let mut staged = self.package.clone();
         set_cell_in_package(&mut staged, table_id, row, column, value)?;
+        formula_cache::refresh_formula_caches_after_cell_write(&mut staged, table_id, row, column)?;
         // Exercise every serialization boundary before committing the edit.
         let bytes = staged.to_bytes()?;
         IWorkPackage::from_bytes(&bytes)?;
@@ -2899,7 +2905,9 @@ pub(crate) fn set_table_cell_in_package(
     column: usize,
     value: CellValue,
 ) -> Result<()> {
-    model::set_attached_cell_in_package(package, table_id, row, column, value)
+    model::set_attached_cell_in_package(package, table_id, row, column, value)?;
+    formula_cache::refresh_formula_caches_after_cell_write(package, table_id, row, column)?;
+    Ok(())
 }
 
 pub(crate) fn set_table_formula_in_package(
@@ -3088,6 +3096,7 @@ pub(crate) fn create_empty_table_graph_in_package(
 
 mod column_insert;
 mod date_time_fields;
+mod formula_cache;
 mod formula_clone;
 mod formula_dependency_shift;
 mod model;

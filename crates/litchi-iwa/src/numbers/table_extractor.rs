@@ -29,6 +29,7 @@
 //! }
 //! ```
 
+use super::bnc::read_decimal128_le;
 use super::cell::CellValue;
 use super::table::{NumbersCellComment, NumbersCommentUuid, NumbersTable};
 use crate::bundle::Bundle;
@@ -1651,28 +1652,6 @@ fn read_f64_le(data: &[u8]) -> Result<f64> {
         .try_into()
         .map_err(|_| Error::ParseError("Expected an eight-byte Numbers field".to_string()))?;
     Ok(f64::from_le_bytes(bytes))
-}
-
-/// Decode the little-endian IEEE 754 decimal128 representation used by BNC
-/// cell storage. The coefficient is converted to `f64`, matching the public
-/// numeric cell model.
-fn read_decimal128_le(data: &[u8]) -> Result<f64> {
-    if data.len() != 16 {
-        return Err(Error::ParseError(
-            "Expected a sixteen-byte Numbers decimal128 field".to_string(),
-        ));
-    }
-    let exponent = (u16::from(data[15] & 0x7f) << 7) | u16::from(data[14] >> 1);
-    let mut coefficient = f64::from(data[14] & 1);
-    for byte in data[..14].iter().rev() {
-        coefficient = coefficient * 256.0 + f64::from(*byte);
-    }
-    let signed_coefficient = if data[15] & 0x80 != 0 {
-        -coefficient
-    } else {
-        coefficient
-    };
-    Ok(signed_coefficient * 10f64.powi(i32::from(exponent) - 0x1820))
 }
 
 #[cfg(test)]

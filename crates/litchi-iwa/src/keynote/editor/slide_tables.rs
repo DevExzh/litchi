@@ -190,6 +190,10 @@ impl KeynoteEditor {
     }
 
     /// Set or clear one cell in a reachable slide table transactionally.
+    ///
+    /// Supported dependent formula caches are refreshed before commit;
+    /// unsupported impacted formulas reject the edit instead of remaining
+    /// visibly stale.
     pub fn set_slide_table_cell(
         &mut self,
         slide_index: usize,
