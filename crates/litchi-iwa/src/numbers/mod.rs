@@ -42,7 +42,7 @@ mod bnc;
 mod formula_owner;
 mod function_map;
 
-pub use cell::{APPLE_EPOCH_UNIX_OFFSET_SECONDS, CellType, CellValue};
+pub use cell::{APPLE_EPOCH_UNIX_OFFSET_SECONDS, CellType, CellValue, TableCellUpdate};
 pub use creation::NumbersDocumentBuilder;
 pub use document::NumbersDocument;
 pub use editor::{

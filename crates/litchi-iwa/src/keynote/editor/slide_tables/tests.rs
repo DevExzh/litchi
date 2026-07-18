@@ -28,24 +28,37 @@ fn source_built_table_roundtrips_full_crud() {
     assert_eq!(table.name, "Forecast");
     assert_eq!((table.rows, table.columns), (3, 3));
 
-    editor
-        .set_slide_table_cell(
-            0,
-            table.model_object_id,
-            0,
-            0,
-            KeynoteTableCellValue::Text("Region".to_owned()),
-        )
-        .unwrap();
-    editor
-        .set_slide_table_cell(
-            0,
-            table.model_object_id,
-            1,
-            1,
-            KeynoteTableCellValue::Number(42.5),
-        )
-        .unwrap();
+    assert_eq!(
+        editor
+            .set_slide_table_cells(
+                0,
+                table.model_object_id,
+                [
+                    KeynoteTableCellUpdate::new(
+                        0,
+                        0,
+                        KeynoteTableCellValue::Text("Region".to_owned()),
+                    ),
+                    KeynoteTableCellUpdate::new(1, 1, KeynoteTableCellValue::Number(42.5)),
+                ],
+            )
+            .unwrap(),
+        2
+    );
+    let before_invalid_batch = editor.to_bytes().unwrap();
+    assert!(
+        editor
+            .set_slide_table_cells(
+                0,
+                table.model_object_id,
+                [
+                    KeynoteTableCellUpdate::new(2, 0, KeynoteTableCellValue::Boolean(true),),
+                    KeynoteTableCellUpdate::clear(2, 0),
+                ],
+            )
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), before_invalid_batch);
     editor
         .rename_slide_table(0, table.model_object_id, "Outlook")
         .unwrap();

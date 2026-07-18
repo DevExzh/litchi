@@ -480,22 +480,34 @@ pub(super) fn refresh_formula_caches_after_cell_write(
     row: usize,
     column: usize,
 ) -> Result<usize> {
+    refresh_formula_caches_after_cell_writes(package, table_id, &[(row, column)])
+}
+
+pub(super) fn refresh_formula_caches_after_cell_writes(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    coordinates: &[(usize, usize)],
+) -> Result<usize> {
+    if coordinates.is_empty() {
+        return Ok(0);
+    }
     let Some(graph) = DependencyGraph::from_package(package)? else {
         return Ok(0);
     };
     let Some(&owner_id) = graph.table_to_owner.get(&table_id) else {
         return Ok(0);
     };
-    let changed = CellKey {
-        owner_id,
-        row: u32::try_from(row)
-            .map_err(|_| Error::ParseError("Numbers row exceeds u32".to_owned()))?,
-        column: u32::try_from(column)
-            .map_err(|_| Error::ParseError("Numbers column exceeds u32".to_owned()))?,
-    };
-
     let mut impacted = HashSet::new();
-    let mut queue = VecDeque::from([changed]);
+    let mut queue = VecDeque::with_capacity(coordinates.len());
+    for &(row, column) in coordinates {
+        queue.push_back(CellKey {
+            owner_id,
+            row: u32::try_from(row)
+                .map_err(|_| Error::ParseError("Numbers row exceeds u32".to_owned()))?,
+            column: u32::try_from(column)
+                .map_err(|_| Error::ParseError("Numbers column exceeds u32".to_owned()))?,
+        });
+    }
     while let Some(precedent) = queue.pop_front() {
         for dependent in graph.dependents_of(precedent) {
             if impacted.insert(dependent) {

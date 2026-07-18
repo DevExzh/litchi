@@ -30,6 +30,8 @@ const TABLE_ANGLE_DEGREES: f32 = 0.0;
 
 /// Strongly typed value stored in a Keynote table cell.
 pub type KeynoteTableCellValue = crate::numbers::CellValue;
+/// One mutation in a transactional Keynote table-cell batch.
+pub type KeynoteTableCellUpdate = crate::numbers::TableCellUpdate;
 /// A validated non-zero native header or footer count.
 pub type KeynoteTableHeaderCount = crate::numbers::NumbersTableHeaderCount;
 /// Lossless header/footer configuration shared by native iWork tables.
@@ -215,6 +217,35 @@ impl KeynoteEditor {
         require_table_model(&verified, slide_index, model_object_id)?;
         *self = verified;
         Ok(())
+    }
+
+    /// Set several slide-table cells with one package clone and dependency pass.
+    ///
+    /// Coordinates must be unique. Any invalid value, coordinate, or impacted
+    /// formula rejects the complete batch without changing the editor.
+    pub fn set_slide_table_cells(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        updates: impl IntoIterator<Item = KeynoteTableCellUpdate>,
+    ) -> Result<usize> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let batch = crate::numbers::editor::TableCellBatch::collect(updates)?;
+        if batch.is_empty() {
+            return Ok(0);
+        }
+        let expected = batch.len();
+        let mut staged = self.package().clone();
+        let applied = batch.apply_attached(&mut staged, model_object_id)?;
+        if applied != expected {
+            return Err(Error::InvalidFormat(format!(
+                "Keynote table-cell batch applied {applied} updates, expected {expected}"
+            )));
+        }
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        require_table_model(&verified, slide_index, model_object_id)?;
+        *self = verified;
+        Ok(applied)
     }
 
     /// Clear one cell in a reachable slide table.

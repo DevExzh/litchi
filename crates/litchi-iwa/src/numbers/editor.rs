@@ -7,7 +7,7 @@ use std::path::Path;
 use prost::Message;
 
 use super::bnc::{BncCell, StoredValue};
-use super::cell::CellValue;
+use super::cell::{CellValue, TableCellUpdate};
 use super::formula::{
     ExternalFormulaTable, ExternalPivotCategory, FormulaCachedValue, FormulaExpression,
     FormulaPivotCategoryReference, FormulaUuid, PivotFormulaKey,
@@ -1913,6 +1913,36 @@ impl NumbersEditor {
         Ok(())
     }
 
+    /// Set several cells in one table as one transaction.
+    ///
+    /// The batch must contain unique coordinates. It clones and serializes the
+    /// package once, reuses one table/object lookup context for every cell, and
+    /// refreshes all impacted formula caches from the final batch state in one
+    /// dependency pass. The returned count equals the number of applied cells.
+    pub fn set_cells(
+        &mut self,
+        table_id: u64,
+        updates: impl IntoIterator<Item = TableCellUpdate>,
+    ) -> Result<usize> {
+        let batch = table_cells::TableCellBatch::collect(updates)?;
+        if batch.is_empty() {
+            attached_table_descriptor(&self.package, table_id)?;
+            return Ok(0);
+        }
+        let expected = batch.len();
+        let mut staged = self.package.clone();
+        let applied = batch.apply_numbers(&mut staged, table_id)?;
+        if applied != expected {
+            return Err(Error::InvalidFormat(format!(
+                "Table cell batch applied {applied} updates, expected {expected}"
+            )));
+        }
+        let bytes = staged.to_bytes()?;
+        IWorkPackage::from_bytes(&bytes)?;
+        self.package = staged;
+        Ok(applied)
+    }
+
     pub fn clear_cell(&mut self, table_id: u64, row: usize, column: usize) -> Result<()> {
         self.set_cell(table_id, row, column, CellValue::Empty)
     }
@@ -3109,6 +3139,7 @@ mod sheet_movies;
 mod sheet_shapes;
 mod storage;
 mod table_bootstrap;
+mod table_cells;
 mod table_create;
 mod table_delete;
 mod table_dimension;
@@ -3129,6 +3160,7 @@ pub use sheet_images::{NumbersSheetImageInfo, RemovedNumbersSheetImage};
 pub use sheet_movies::{NumbersSheetMovieInfo, NumbersSheetMovieOptions, RemovedNumbersSheetMovie};
 pub use sheet_shapes::{NumbersSheetShapeInfo, NumbersSheetShapeKind, RemovedNumbersSheetShape};
 use storage::*;
+pub(crate) use table_cells::TableCellBatch;
 pub use table_dimension::{NumbersTableDimension, NumbersTableDimensionSize, NumbersTablePoints};
 use table_duplicate::*;
 pub use table_headers::{NumbersTableHeaderCount, NumbersTableHeaderSettings};

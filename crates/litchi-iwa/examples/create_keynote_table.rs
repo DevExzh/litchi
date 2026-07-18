@@ -1,8 +1,8 @@
 use std::env;
 
 use litchi_iwa::keynote::{
-    KeynoteDocumentBuilder, KeynoteTableCellValue, KeynoteTableDimensionSize,
-    KeynoteTableFormulaCachedValue, KeynoteTableFormulaCellReference,
+    KeynoteDocumentBuilder, KeynoteTableCellUpdate, KeynoteTableCellValue,
+    KeynoteTableDimensionSize, KeynoteTableFormulaCachedValue, KeynoteTableFormulaCellReference,
     KeynoteTableFormulaExpression, KeynoteTableHeaderCount, KeynoteTableHeaderSettings,
     KeynoteTableTitleSettings,
 };
@@ -27,6 +27,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             height: 430.0,
         },
     )?;
+    let mut updates = Vec::new();
     for (row, values) in [
         ["Region", "Q1", "Q2"],
         ["North", "120", "145"],
@@ -42,9 +43,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             } else {
                 KeynoteTableCellValue::Number(value.parse()?)
             };
-            editor.set_slide_table_cell(0, table.model_object_id, row, column, value)?;
+            updates.push(KeynoteTableCellUpdate::new(row, column, value));
         }
     }
+    editor.set_slide_table_cells(0, table.model_object_id, updates)?;
     editor.set_slide_table_header_settings(
         0,
         table.model_object_id,
@@ -95,23 +97,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     editor.insert_slide_table_row(0, table.model_object_id, 3)?;
     editor.insert_slide_table_column(0, table.model_object_id, 2)?;
-    for (column, value) in [
-        KeynoteTableCellValue::Text("Central".to_owned()),
-        KeynoteTableCellValue::Number(105.0),
-        KeynoteTableCellValue::Text("review".to_owned()),
-        KeynoteTableCellValue::Number(139.0),
-    ]
-    .into_iter()
-    .enumerate()
-    {
-        editor.set_slide_table_cell(0, table.model_object_id, 3, column, value)?;
-    }
-    editor.set_slide_table_cell(
+    editor.set_slide_table_cells(
         0,
         table.model_object_id,
-        0,
-        2,
-        KeynoteTableCellValue::Text("Status".to_owned()),
+        [
+            KeynoteTableCellUpdate::new(3, 0, KeynoteTableCellValue::Text("Central".to_owned())),
+            KeynoteTableCellUpdate::new(3, 1, KeynoteTableCellValue::Number(105.0)),
+            KeynoteTableCellUpdate::new(3, 2, KeynoteTableCellValue::Text("review".to_owned())),
+            KeynoteTableCellUpdate::new(3, 3, KeynoteTableCellValue::Number(139.0)),
+            KeynoteTableCellUpdate::new(0, 2, KeynoteTableCellValue::Text("Status".to_owned())),
+        ],
     )?;
     editor.save(&output)?;
     println!("created {output}");

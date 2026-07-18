@@ -1,9 +1,9 @@
 use std::env;
 
 use litchi_iwa::pages::{
-    PagesCellValue, PagesDocumentBuilder, PagesTableDimensionSize, PagesTableFormulaCachedValue,
-    PagesTableFormulaCellReference, PagesTableFormulaExpression, PagesTableHeaderCount,
-    PagesTableHeaderSettings, PagesTableTitleSettings,
+    PagesCellValue, PagesDocumentBuilder, PagesTableCellUpdate, PagesTableDimensionSize,
+    PagesTableFormulaCachedValue, PagesTableFormulaCellReference, PagesTableFormulaExpression,
+    PagesTableHeaderCount, PagesTableHeaderSettings, PagesTableTitleSettings,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -15,27 +15,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .body_table("Revenue", 4, 3)
         .build()?;
     let table = editor.tables()?.remove(0);
-    for (column, heading) in ["Quarter", "Revenue", "Growth"].into_iter().enumerate() {
-        editor.set_table_cell(
-            table.model_object_id,
-            0,
-            column,
-            PagesCellValue::Text(heading.to_owned()),
-        )?;
-    }
-    editor.set_table_cell(
+    editor.set_table_cells(
         table.model_object_id,
-        1,
-        0,
-        PagesCellValue::Text("Q1".to_owned()),
+        [
+            PagesTableCellUpdate::new(0, 0, PagesCellValue::Text("Quarter".to_owned())),
+            PagesTableCellUpdate::new(0, 1, PagesCellValue::Text("Revenue".to_owned())),
+            PagesTableCellUpdate::new(0, 2, PagesCellValue::Text("Growth".to_owned())),
+            PagesTableCellUpdate::new(1, 0, PagesCellValue::Text("Q1".to_owned())),
+            PagesTableCellUpdate::new(1, 1, PagesCellValue::Number(125_000.0)),
+            PagesTableCellUpdate::new(1, 2, PagesCellValue::Number(0.18)),
+        ],
     )?;
-    editor.set_table_cell(
-        table.model_object_id,
-        1,
-        1,
-        PagesCellValue::Number(125_000.0),
-    )?;
-    editor.set_table_cell(table.model_object_id, 1, 2, PagesCellValue::Number(0.18))?;
     editor.set_table_formula(
         table.model_object_id,
         3,
@@ -81,22 +71,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     editor.insert_table_row(table.model_object_id, 3)?;
     editor.insert_table_column(table.model_object_id, 2)?;
-    for (column, value) in [
-        PagesCellValue::Text("Q2".to_owned()),
-        PagesCellValue::Number(142_000.0),
-        PagesCellValue::Text("provisional".to_owned()),
-        PagesCellValue::Number(0.14),
-    ]
-    .into_iter()
-    .enumerate()
-    {
-        editor.set_table_cell(table.model_object_id, 3, column, value)?;
-    }
-    editor.set_table_cell(
+    editor.set_table_cells(
         table.model_object_id,
-        0,
-        2,
-        PagesCellValue::Text("Status".to_owned()),
+        [
+            PagesTableCellUpdate::new(3, 0, PagesCellValue::Text("Q2".to_owned())),
+            PagesTableCellUpdate::new(3, 1, PagesCellValue::Number(142_000.0)),
+            PagesTableCellUpdate::new(3, 2, PagesCellValue::Text("provisional".to_owned())),
+            PagesTableCellUpdate::new(3, 3, PagesCellValue::Number(0.14)),
+            PagesTableCellUpdate::new(0, 2, PagesCellValue::Text("Status".to_owned())),
+        ],
     )?;
     let second_anchor = editor.body_text()?.encode_utf16().count();
     let notes = editor.add_table(second_anchor, "Notes", 2, 2)?;

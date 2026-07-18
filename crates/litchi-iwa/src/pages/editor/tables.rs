@@ -31,6 +31,8 @@ const OBJECT_REPLACEMENT_CHARACTER: u16 = 0xfffc;
 
 /// Strongly typed cell value shared by Pages and Numbers table storage.
 pub type PagesCellValue = crate::numbers::CellValue;
+/// One mutation in a transactional Pages table-cell batch.
+pub type PagesTableCellUpdate = crate::numbers::TableCellUpdate;
 
 /// Stable identity and dimensions of one native table attached to the Pages body.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -138,6 +140,34 @@ impl PagesEditor {
         verified.require_body_table(model_object_id)?;
         *self = verified;
         Ok(())
+    }
+
+    /// Set several body-table cells with one package clone and dependency pass.
+    ///
+    /// Coordinates must be unique. Any invalid value, coordinate, or impacted
+    /// formula rejects the complete batch without changing the editor.
+    pub fn set_table_cells(
+        &mut self,
+        model_object_id: u64,
+        updates: impl IntoIterator<Item = PagesTableCellUpdate>,
+    ) -> Result<usize> {
+        self.require_body_table(model_object_id)?;
+        let batch = crate::numbers::editor::TableCellBatch::collect(updates)?;
+        if batch.is_empty() {
+            return Ok(0);
+        }
+        let expected = batch.len();
+        let mut staged = self.package().clone();
+        let applied = batch.apply_attached(&mut staged, model_object_id)?;
+        if applied != expected {
+            return Err(Error::InvalidFormat(format!(
+                "Pages table-cell batch applied {applied} updates, expected {expected}"
+            )));
+        }
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        verified.require_body_table(model_object_id)?;
+        *self = verified;
+        Ok(applied)
     }
 
     /// Clear one cell in a reachable body table.
@@ -733,12 +763,31 @@ mod tests {
         let model_id = info.model_object_id;
         assert!(editor.table(model_id).unwrap().cells.is_empty());
 
-        editor
-            .set_table_cell(model_id, 0, 0, PagesCellValue::Text("Header".to_owned()))
-            .unwrap();
-        editor
-            .set_table_cell(model_id, 1, 1, PagesCellValue::Number(42.5))
-            .unwrap();
+        assert_eq!(
+            editor
+                .set_table_cells(
+                    model_id,
+                    [
+                        PagesTableCellUpdate::new(0, 0, PagesCellValue::Text("Header".to_owned()),),
+                        PagesTableCellUpdate::new(1, 1, PagesCellValue::Number(42.5)),
+                    ],
+                )
+                .unwrap(),
+            2
+        );
+        let before_invalid_batch = editor.to_bytes().unwrap();
+        assert!(
+            editor
+                .set_table_cells(
+                    model_id,
+                    [
+                        PagesTableCellUpdate::new(2, 0, PagesCellValue::Boolean(true)),
+                        PagesTableCellUpdate::clear(2, 0),
+                    ],
+                )
+                .is_err()
+        );
+        assert_eq!(editor.to_bytes().unwrap(), before_invalid_batch);
         let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         let table = reopened.table(model_id).unwrap();
         assert_eq!(

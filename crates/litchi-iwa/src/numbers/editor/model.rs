@@ -1,6 +1,8 @@
 //! Sheet, table, cell, formula, and comment model operations.
 
 use super::*;
+
+const DEFAULT_TILE_SIZE_ROWS: u32 = 256;
 pub(super) fn numbers_document(package: &IWorkPackage) -> Result<tn::DocumentArchive> {
     let archive = package.archive("Index/Document.iwa")?;
     let object = archive
@@ -1480,7 +1482,11 @@ pub(super) fn validate_and_trim_tiles(
     rows: usize,
     columns: usize,
 ) -> Result<()> {
-    let tile_size = model.base_data_store.tiles.tile_size.unwrap_or(256);
+    let tile_size = model
+        .base_data_store
+        .tiles
+        .tile_size
+        .unwrap_or(DEFAULT_TILE_SIZE_ROWS);
     if tile_size == 0 {
         return Err(Error::InvalidFormat(
             "Numbers table declares a zero tile size".to_owned(),
@@ -2082,6 +2088,25 @@ fn locate_cell_in_descriptor(
     row: usize,
     column: usize,
 ) -> Result<CellLocation> {
+    let locations = object_locations(package)?;
+    let (tile_archive, tile_id, tile_row) =
+        cell_tile_location(&descriptor, &locations, row, column)?;
+    let tile_archive = tile_archive.to_owned();
+    Ok(CellLocation {
+        descriptor,
+        object_locations: locations,
+        tile_archive,
+        tile_id,
+        tile_row,
+    })
+}
+
+fn cell_tile_location<'a>(
+    descriptor: &TableDescriptor,
+    locations: &'a HashMap<u64, String>,
+    row: usize,
+    column: usize,
+) -> Result<(&'a str, u64, u32)> {
     if row >= descriptor.model.number_of_rows as usize
         || column >= descriptor.model.number_of_columns as usize
     {
@@ -2098,7 +2123,7 @@ fn locate_cell_in_descriptor(
         .base_data_store
         .tiles
         .tile_size
-        .unwrap_or(256);
+        .unwrap_or(DEFAULT_TILE_SIZE_ROWS);
     if tile_size == 0 {
         return Err(Error::ParseError(
             "Numbers table declares a zero tile size".to_owned(),
@@ -2122,18 +2147,10 @@ fn locate_cell_in_descriptor(
                 descriptor.model.table_name
             ))
         })?;
-    let locations = object_locations(package)?;
     let tile_archive = locations
         .get(&tile_id)
-        .ok_or_else(|| Error::ParseError(format!("Numbers tile object {tile_id} is missing")))?
-        .clone();
-    Ok(CellLocation {
-        descriptor,
-        object_locations: locations,
-        tile_archive,
-        tile_id,
-        tile_row,
-    })
+        .ok_or_else(|| Error::ParseError(format!("Numbers tile object {tile_id} is missing")))?;
+    Ok((tile_archive, tile_id, tile_row))
 }
 
 pub(super) fn attached_table_descriptor(
@@ -2404,6 +2421,57 @@ pub(super) fn set_attached_cell_in_package(
     set_cell_at_location(package, location, row, column, value)
 }
 
+pub(super) fn set_cells_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    updates: Vec<TableCellUpdate>,
+) -> Result<()> {
+    let descriptor = table_models(package)?
+        .into_iter()
+        .find(|table| table.object_id == table_id)
+        .ok_or_else(|| Error::ParseError(format!("Numbers table object {table_id} not found")))?;
+    set_cells_for_descriptor(package, descriptor, updates)
+}
+
+pub(super) fn set_attached_cells_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    updates: Vec<TableCellUpdate>,
+) -> Result<()> {
+    let descriptor = attached_table_descriptor(package, table_id)?;
+    set_cells_for_descriptor(package, descriptor, updates)
+}
+
+fn set_cells_for_descriptor(
+    package: &mut IWorkPackage,
+    descriptor: TableDescriptor,
+    updates: Vec<TableCellUpdate>,
+) -> Result<()> {
+    let locations = object_locations(package)?;
+    let mut resolved = Vec::with_capacity(updates.len());
+    for update in updates {
+        let (tile_archive, tile_id, tile_row) =
+            cell_tile_location(&descriptor, &locations, update.row, update.column)?;
+        if matches!(&update.value, CellValue::Formula(_) | CellValue::Error(_)) {
+            return Err(Error::ParseError(
+                "Formula and error cell writes require referenced-table construction".to_owned(),
+            ));
+        }
+        resolved.push((update, tile_archive, tile_id, tile_row));
+    }
+    for (update, tile_archive, tile_id, tile_row) in resolved {
+        let context = CellWriteContext {
+            descriptor: &descriptor,
+            object_locations: &locations,
+            tile_archive,
+            tile_id,
+            tile_row,
+        };
+        set_cell_with_context(package, &context, update.row, update.column, update.value)?;
+    }
+    Ok(())
+}
+
 fn set_cell_at_location(
     package: &mut IWorkPackage,
     location: CellLocation,
@@ -2411,18 +2479,44 @@ fn set_cell_at_location(
     column: usize,
     value: CellValue,
 ) -> Result<()> {
+    let context = CellWriteContext {
+        descriptor: &location.descriptor,
+        object_locations: &location.object_locations,
+        tile_archive: &location.tile_archive,
+        tile_id: location.tile_id,
+        tile_row: location.tile_row,
+    };
+    set_cell_with_context(package, &context, row, column, value)
+}
+
+struct CellWriteContext<'a> {
+    descriptor: &'a TableDescriptor,
+    object_locations: &'a HashMap<u64, String>,
+    tile_archive: &'a str,
+    tile_id: u64,
+    tile_row: u32,
+}
+
+fn set_cell_with_context(
+    package: &mut IWorkPackage,
+    context: &CellWriteContext<'_>,
+    row: usize,
+    column: usize,
+    value: CellValue,
+) -> Result<()> {
+    let CellWriteContext {
+        descriptor,
+        object_locations,
+        tile_archive,
+        tile_id,
+        tile_row,
+    } = context;
     if matches!(value, CellValue::Formula(_) | CellValue::Error(_)) {
         return Err(Error::ParseError(
             "Formula and error cell writes require referenced-table construction".to_string(),
         ));
     }
-    let old_cell = read_tile_cell(
-        package,
-        &location.tile_archive,
-        location.tile_id,
-        location.tile_row,
-        column,
-    )?;
+    let old_cell = read_tile_cell(package, tile_archive, *tile_id, *tile_row, column)?;
     let old_bnc = old_cell.as_deref().map(BncCell::parse).transpose()?;
     let old_formula_error = old_bnc.as_ref().and_then(BncCell::formula_error_identifier);
     let old_comment = old_bnc.as_ref().and_then(BncCell::comment_identifier);
@@ -2437,19 +2531,14 @@ fn set_cell_at_location(
     }
 
     if let Some(identifier) = old_formula_error {
-        decrement_formula_error_table(
-            package,
-            &location.object_locations,
-            &location.descriptor.model,
-            identifier,
-        )?;
+        decrement_formula_error_table(package, object_locations, &descriptor.model, identifier)?;
     }
 
     if let (StoredValue::RichText(identifier), CellValue::Text(replacement)) = (old_value, &value) {
         let replacement_identifier = set_rich_text(
             package,
-            &location.object_locations,
-            &location.descriptor.model,
+            object_locations,
+            &descriptor.model,
             identifier,
             row,
             column,
@@ -2460,29 +2549,24 @@ fn set_cell_at_location(
         }
         let cell_count = update_tile(
             package,
-            &location.tile_archive,
-            location.tile_id,
-            location.tile_row,
+            tile_archive,
+            *tile_id,
+            *tile_row,
             column,
-            location.descriptor.model.number_of_columns as usize,
+            descriptor.model.number_of_columns as usize,
             EncodedValue::RichText(replacement_identifier),
         )?;
         return update_row_header(
             package,
-            &location.object_locations,
-            &location.descriptor.model,
+            object_locations,
+            &descriptor.model,
             row,
             cell_count,
         );
     }
 
     if let StoredValue::RichText(identifier) = old_value {
-        release_rich_text(
-            package,
-            &location.object_locations,
-            &location.descriptor.model,
-            identifier,
-        )?;
+        release_rich_text(package, object_locations, &descriptor.model, identifier)?;
     }
 
     let old_string = match old_value {
@@ -2498,13 +2582,8 @@ fn set_cell_at_location(
             if let Some(identifier) = old_string {
                 update_string_table(
                     package,
-                    &location.object_locations,
-                    location
-                        .descriptor
-                        .model
-                        .base_data_store
-                        .string_table
-                        .identifier,
+                    object_locations,
+                    descriptor.model.base_data_store.string_table.identifier,
                     Some(identifier),
                     None,
                 )?;
@@ -2518,13 +2597,8 @@ fn set_cell_at_location(
         CellValue::Text(text) => {
             let identifier = update_string_table(
                 package,
-                &location.object_locations,
-                location
-                    .descriptor
-                    .model
-                    .base_data_store
-                    .string_table
-                    .identifier,
+                object_locations,
+                descriptor.model.base_data_store.string_table.identifier,
                 old_string,
                 Some(&text),
             )?
@@ -2536,39 +2610,19 @@ fn set_cell_at_location(
             EncodedValue::String(identifier)
         },
         CellValue::Number(value) => {
-            decrement_old_string(
-                package,
-                &location.object_locations,
-                &location.descriptor.model,
-                old_string,
-            )?;
+            decrement_old_string(package, object_locations, &descriptor.model, old_string)?;
             EncodedValue::Number(value)
         },
         CellValue::Boolean(value) => {
-            decrement_old_string(
-                package,
-                &location.object_locations,
-                &location.descriptor.model,
-                old_string,
-            )?;
+            decrement_old_string(package, object_locations, &descriptor.model, old_string)?;
             EncodedValue::Boolean(value)
         },
         CellValue::Date(value) => {
-            decrement_old_string(
-                package,
-                &location.object_locations,
-                &location.descriptor.model,
-                old_string,
-            )?;
+            decrement_old_string(package, object_locations, &descriptor.model, old_string)?;
             EncodedValue::Date(value)
         },
         CellValue::Duration(value) => {
-            decrement_old_string(
-                package,
-                &location.object_locations,
-                &location.descriptor.model,
-                old_string,
-            )?;
+            decrement_old_string(package, object_locations, &descriptor.model, old_string)?;
             EncodedValue::Duration(value)
         },
         CellValue::Formula(_) | CellValue::Error(_) => unreachable!("validated above"),
@@ -2577,18 +2631,13 @@ fn set_cell_at_location(
     if let Some(identifier) = old_formula {
         decrement_formula_table(
             package,
-            &location.object_locations,
-            location
-                .descriptor
-                .model
-                .base_data_store
-                .formula_table
-                .identifier,
+            object_locations,
+            descriptor.model.base_data_store.formula_table.identifier,
             identifier,
         )?;
         update_formula_dependencies(
             package,
-            location.descriptor.table_info_id,
+            descriptor.table_info_id,
             row,
             column,
             false,
@@ -2599,17 +2648,17 @@ fn set_cell_at_location(
 
     let cell_count = update_tile(
         package,
-        &location.tile_archive,
-        location.tile_id,
-        location.tile_row,
+        tile_archive,
+        *tile_id,
+        *tile_row,
         column,
-        location.descriptor.model.number_of_columns as usize,
+        descriptor.model.number_of_columns as usize,
         encoded_value,
     )?;
     update_row_header(
         package,
-        &location.object_locations,
-        &location.descriptor.model,
+        object_locations,
+        &descriptor.model,
         row,
         cell_count,
     )

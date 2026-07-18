@@ -43,7 +43,7 @@ pub use editor::{
     PagesHeaderFooterInfo, PagesHeaderFooterKind, PagesImageInfo, PagesMovieInfo,
     PagesMovieOptions, PagesPageLayout, PagesPageNumber, PagesPageOrientation, PagesRgbColorSpace,
     PagesRgbaColor, PagesSectionBackground, PagesSectionInfo, PagesSectionPageNumbering,
-    PagesSectionSettings, PagesSectionStart, PagesTable, PagesTableDimension,
+    PagesSectionSettings, PagesSectionStart, PagesTable, PagesTableCellUpdate, PagesTableDimension,
     PagesTableDimensionSize, PagesTableFormulaAxisReference, PagesTableFormulaBinaryOperator,
     PagesTableFormulaCachedValue, PagesTableFormulaCellReference, PagesTableFormulaExpression,
     PagesTableHeaderCount, PagesTableHeaderSettings, PagesTableInfo, PagesTablePoints,

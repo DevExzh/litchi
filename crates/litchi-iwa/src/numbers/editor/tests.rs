@@ -2032,6 +2032,115 @@ fn cell_write_refreshes_transitive_formula_caches_in_dependency_order() {
 }
 
 #[test]
+fn cell_batch_roundtrips_mixed_values_and_clear() {
+    let mut editor = NumbersEditor::from_package(test_package()).unwrap();
+    let applied = editor
+        .set_cells(
+            10,
+            [
+                TableCellUpdate::new(0, 0, CellValue::Text("Batch".to_owned())),
+                TableCellUpdate::new(1, 1, CellValue::Number(42.5)),
+                TableCellUpdate::new(2, 2, CellValue::Boolean(true)),
+                TableCellUpdate::clear(0, 1),
+            ],
+        )
+        .unwrap();
+
+    assert_eq!(applied, 4);
+    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let table = &document.sheets().unwrap()[0].tables[0];
+    assert_eq!(
+        table.get_cell(0, 0),
+        Some(&CellValue::Text("Batch".to_owned()))
+    );
+    assert_eq!(table.get_cell(1, 1), Some(&CellValue::Number(42.5)));
+    assert_eq!(table.get_cell(2, 2), Some(&CellValue::Boolean(true)));
+    assert!(table.get_cell(0, 1).is_none());
+}
+
+#[test]
+fn cell_batch_refreshes_formula_chain_from_final_state() {
+    use crate::numbers::FormulaBinaryOperator;
+
+    let mut editor = NumbersEditor::from_package(test_package_with_calculation_engine()).unwrap();
+    editor.set_cell(10, 1, 1, CellValue::Number(2.0)).unwrap();
+    editor.set_cell(10, 2, 1, CellValue::Number(3.0)).unwrap();
+    editor
+        .set_formula_with_cached_value(
+            10,
+            1,
+            2,
+            FormulaExpression::binary(
+                FormulaBinaryOperator::Add,
+                FormulaExpression::cell(crate::numbers::FormulaCellReference::relative(1, 1)),
+                FormulaExpression::cell(crate::numbers::FormulaCellReference::relative(2, 1)),
+            ),
+            FormulaCachedValue::Number(5.0),
+        )
+        .unwrap();
+    editor
+        .set_formula_with_cached_value(
+            10,
+            1,
+            3,
+            FormulaExpression::binary(
+                FormulaBinaryOperator::Multiply,
+                FormulaExpression::cell(crate::numbers::FormulaCellReference::relative(1, 2)),
+                FormulaExpression::Number(2.0),
+            ),
+            FormulaCachedValue::Number(10.0),
+        )
+        .unwrap();
+
+    let applied = editor
+        .set_cells(
+            10,
+            [
+                TableCellUpdate::new(1, 1, CellValue::Number(7.0)),
+                TableCellUpdate::new(2, 1, CellValue::Number(11.0)),
+            ],
+        )
+        .unwrap();
+
+    assert_eq!(applied, 2);
+    assert_eq!(
+        cached_formula_scalar(&editor, 10, 1, 2),
+        crate::numbers::bnc::CachedScalar::Number(18.0)
+    );
+    assert_eq!(
+        cached_formula_scalar(&editor, 10, 1, 3),
+        crate::numbers::bnc::CachedScalar::Number(36.0)
+    );
+}
+
+#[test]
+fn cell_batch_rejects_invalid_inputs_transactionally() {
+    let mut editor = NumbersEditor::from_package(test_package()).unwrap();
+    let before = editor.to_bytes().unwrap();
+
+    for updates in [
+        vec![
+            TableCellUpdate::new(0, 0, CellValue::Number(1.0)),
+            TableCellUpdate::new(0, 0, CellValue::Number(2.0)),
+        ],
+        vec![TableCellUpdate::new(4, 0, CellValue::Number(1.0))],
+        vec![TableCellUpdate::new(0, 0, CellValue::Number(f64::NAN))],
+        vec![TableCellUpdate::new(
+            0,
+            0,
+            CellValue::Formula("=1".to_owned()),
+        )],
+    ] {
+        assert!(editor.set_cells(10, updates).is_err());
+        assert_eq!(editor.to_bytes().unwrap(), before);
+    }
+    assert_eq!(editor.set_cells(10, []).unwrap(), 0);
+    assert_eq!(editor.to_bytes().unwrap(), before);
+    assert!(editor.set_cells(999, []).is_err());
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
 fn cell_write_refreshes_aggregate_range_formula_cache() {
     let mut editor = NumbersEditor::from_package(test_package_with_calculation_engine()).unwrap();
     editor.set_cell(10, 1, 1, CellValue::Number(2.0)).unwrap();
@@ -2170,6 +2279,18 @@ fn cell_write_rejects_unsupported_impacted_formula_transactionally() {
         .set_cell(10, 1, 1, CellValue::Number(1.0))
         .unwrap_err();
 
+    assert!(error.to_string().contains("SIN"));
+    assert_eq!(editor.to_bytes().unwrap(), before);
+
+    let error = editor
+        .set_cells(
+            10,
+            [
+                TableCellUpdate::new(1, 1, CellValue::Number(2.0)),
+                TableCellUpdate::new(2, 1, CellValue::Number(3.0)),
+            ],
+        )
+        .unwrap_err();
     assert!(error.to_string().contains("SIN"));
     assert_eq!(editor.to_bytes().unwrap(), before);
 }

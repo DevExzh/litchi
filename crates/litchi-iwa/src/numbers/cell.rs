@@ -29,6 +29,29 @@ pub enum CellValue {
     Error(String),
 }
 
+/// One typed mutation in a transactional table-cell batch.
+///
+/// Coordinates are zero-based. Batch APIs reject repeated `(row, column)`
+/// coordinates so every requested final value has exactly one source.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TableCellUpdate {
+    pub row: usize,
+    pub column: usize,
+    pub value: CellValue,
+}
+
+impl TableCellUpdate {
+    #[must_use]
+    pub const fn new(row: usize, column: usize, value: CellValue) -> Self {
+        Self { row, column, value }
+    }
+
+    #[must_use]
+    pub const fn clear(row: usize, column: usize) -> Self {
+        Self::new(row, column, CellValue::Empty)
+    }
+}
+
 impl CellValue {
     /// Construct a Numbers date from Unix epoch seconds.
     pub fn date_from_unix_seconds(unix_seconds: f64) -> Self {
