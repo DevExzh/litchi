@@ -3763,6 +3763,7 @@ fn insert_unique<T>(
 
 mod audio;
 mod body_shapes;
+mod charts;
 mod date_time_fields;
 mod document_options;
 mod footnote_settings;
@@ -3779,6 +3780,7 @@ mod types;
 
 pub use audio::{PagesAudioInfo, PagesAudioOptions, RemovedPagesAudio};
 pub use body_shapes::{PagesBodyShapeInfo, PagesBodyShapeKind, RemovedPagesBodyShape};
+pub use charts::{PagesBodyChartInfo, RemovedPagesBodyChart};
 pub use images::{PagesImageInfo, RemovedPagesImage};
 pub use movies::{PagesMovieInfo, PagesMovieOptions, RemovedPagesMovie};
 pub use tables::{PagesCellValue, PagesTable, PagesTableInfo};

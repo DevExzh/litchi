@@ -83,6 +83,7 @@ pub(crate) fn source_chart_objects(
             paragraph_styles: paragraph_styles.clone(),
             multidataset_index: Some(DEFAULT_CHART_DATASET_INDEX),
             needs_calc_engine_deferred_import_action: Some(false),
+            owned_preset: profile.owns_preset().then(|| reference(ids.preset)),
             is_dirty: Some(false),
             ..Default::default()
         },

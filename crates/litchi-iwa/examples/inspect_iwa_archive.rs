@@ -20,8 +20,8 @@ use litchi_iwa::protobuf::tst::TableDataList;
 use litchi_iwa::protobuf::tst::{TableInfoArchive, TableModelArchive};
 use litchi_iwa::protobuf::tswp::{
     BookmarkFieldArchive, CharacterStyleArchive, ColumnStyleArchive, DateTimeSmartFieldArchive,
-    DropCapStyleArchive, HighlightArchive, HyperlinkFieldArchive, ListStyleArchive,
-    ParagraphStyleArchive, ShapeInfoArchive, ShapeStyleArchive, StorageArchive,
+    DrawableAttachmentArchive, DropCapStyleArchive, HighlightArchive, HyperlinkFieldArchive,
+    ListStyleArchive, ParagraphStyleArchive, ShapeInfoArchive, ShapeStyleArchive, StorageArchive,
 };
 use prost::Message;
 
@@ -128,7 +128,7 @@ fn print_archive(archive: litchi_iwa::archive::Archive, object_id: Option<u64>) 
             {
                 println!("  keynote_theme={theme:#?}");
             }
-            if message.type_ == 10
+            if matches!(message.type_, 10 | 10_001)
                 && let Ok(theme) = IWorkThemeArchive::decode(message.data.as_slice())
             {
                 println!(
@@ -165,6 +165,11 @@ fn print_archive(archive: litchi_iwa::archive::Archive, object_id: Option<u64>) 
                         presets.svg_import_style_presets.len(),
                     )),
                 );
+            }
+            if message.type_ == 2_003
+                && let Ok(attachment) = DrawableAttachmentArchive::decode(message.data.as_slice())
+            {
+                println!("  drawable_attachment={attachment:#?}");
             }
             if message.type_ == 2_043
                 && let Ok(attachment) =

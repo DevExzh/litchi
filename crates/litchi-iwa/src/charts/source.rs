@@ -56,6 +56,7 @@ const DEFAULT_CHART_NUMBER_FORMAT_TYPE: u32 = 256;
 const AUTOMATIC_CHART_DECIMAL_PLACES: u32 = 253;
 const DEFAULT_CHART_NEGATIVE_STYLE: u32 = 0;
 const NUMBERS_PARAGRAPH_STYLE_COUNT: usize = 30;
+const PAGES_PARAGRAPH_STYLE_COUNT: usize = 30;
 const KEYNOTE_PARAGRAPH_STYLE_COUNT: usize = 25;
 const SERIES_STYLE_COUNT: usize = 6;
 const VALUE_AXIS_COUNT: usize = 2;
@@ -64,6 +65,7 @@ const VALUE_AXIS_COUNT: usize = 2;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ChartApplicationProfile {
     Numbers,
+    Pages,
     Keynote,
 }
 
@@ -71,12 +73,17 @@ impl ChartApplicationProfile {
     const fn paragraph_style_count(self) -> usize {
         match self {
             Self::Numbers => NUMBERS_PARAGRAPH_STYLE_COUNT,
+            Self::Pages => PAGES_PARAGRAPH_STYLE_COUNT,
             Self::Keynote => KEYNOTE_PARAGRAPH_STYLE_COUNT,
         }
     }
 
     const fn uses_mediator(self) -> bool {
         matches!(self, Self::Numbers)
+    }
+
+    const fn owns_preset(self) -> bool {
+        matches!(self, Self::Pages)
     }
 }
 
